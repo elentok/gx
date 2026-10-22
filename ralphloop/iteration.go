@@ -25,24 +25,24 @@ const conflictResolutionTimeoutMs = 30 * 60 * 1000
 // adopt any iteration_status report the agent left, cherry-pick its commits
 // onto the feature branch, mark the ticket done, and remove the iteration
 // worktree. An `iteration_status: asking` report is adopted before any
-// of that: see adoptNeedsAnswerReport. Otherwise, if the agent finishes
-// without landing any commits, the ticket is marked needs-answer instead and
+// of that: see adoptAskingReport. Otherwise, if the agent finishes
+// without merging any commits, the ticket is marked paused (answer) instead and
 // the worktree/tab are left in place for inspection — unless the agent
 // itself declared the zero-commit finish intentional via `gx tickets set
 // --iteration-status finished --commitless true`, in which case gx itself
 // writes status: done and the worktree/tab are cleaned up normally with no
-// commit landed.
+// commit merged.
 func runIteration(d Deps, p iterationParams) error {
 	label := iterLabel(p.FeatureBranch, p.Ticket.Identifier)
 	branch := iterBranch(p.FeatureBranch, p.Ticket.Identifier)
 	path := iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier)
 
-	// A branch surviving under this name means a prior park dropped this
+	// A branch surviving under this name means a prior pause dropped this
 	// ticket's worktree/tab but kept its branch, per finishIteration's
-	// needs-answer adoption cleanup. Landing that resumed iteration's commits
-	// — both the ones from before the park and whatever it adds after —
+	// paused (answer) adoption cleanup. Merging that resumed iteration's commits
+	// — both the ones from before the pause and whatever it adds after —
 	// needs the merge base of the two branches, not the feature tip: basing
-	// off today's tip would silently drop the pre-park commits, since the
+	// off today's tip would silently drop the pre-pause commits, since the
 	// feature branch has very likely advanced past the point this branch
 	// forked from.
 	var base string
@@ -97,18 +97,18 @@ func runIteration(d Deps, p iterationParams) error {
 	var sessionID string
 	if errors.Is(err, agentrunner.ErrNotReady) {
 		// The agent is live but blocked on a dialog gx did not raise: same
-		// park as a mid-turn block. One that cleared before the re-check is a
+		// pause as a mid-turn block. One that cleared before the re-check is a
 		// plain launch failure.
-		parked, parkErr := parkOnBlockedPane(d, launchParams, l.SessionID)
-		if parkErr != nil {
-			return parkErr
+		paused, pauseErr := pauseOnBlockedPane(d, launchParams, l.SessionID)
+		if pauseErr != nil {
+			return pauseErr
 		}
-		if parked {
-			sessionID, err = l.SessionID, errBlockedPaneParked
+		if paused {
+			sessionID, err = l.SessionID, errBlockedPanePaused
 		}
 	}
 	switch {
-	case errors.Is(err, errBlockedPaneParked):
+	case errors.Is(err, errBlockedPanePaused):
 	case err != nil:
 		err = fmt.Errorf("sending initial prompt: %w", err)
 		p.logLaunchFailed(label, 1, events.IterationError, err)
@@ -118,8 +118,8 @@ func runIteration(d Deps, p iterationParams) error {
 	default:
 		sessionID, err = promptedLaunch(d, launchParams, l.Baseline)
 	}
-	parked := errors.Is(err, errBlockedPaneParked)
-	if err != nil && !parked {
+	paused := errors.Is(err, errBlockedPanePaused)
+	if err != nil && !paused {
 		return err
 	}
 	if sessionID != "" {
@@ -127,8 +127,8 @@ func runIteration(d Deps, p iterationParams) error {
 			return fmt.Errorf("appending session id for ticket %s: %w", p.Ticket.Identifier, err)
 		}
 	}
-	if parked {
-		// The park already ended the iteration: the agent is still live in its
+	if paused {
+		// The pause already ended the iteration: the agent is still live in its
 		// pane, so finishIteration's commit-check/cherry-pick/cleanup — which
 		// assumes the agent actually finished — must not run. Only gx's
 		// watcher goes away; the pane, and worktree survive for a person
@@ -167,7 +167,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 	// cleared value is this iteration's only report and is restored before
 	// finishIteration reads it - otherwise a genuine finished+commitless
 	// report left by an agent that exited while the loop itself was down
-	// would be wiped by this same clear and wrongly fall to needs-answer.
+	// would be wiped by this same clear and wrongly fall to paused (answer).
 	preClear, err := schema.ParseTicket(p.Ticket.Path)
 	if err != nil {
 		return fmt.Errorf("reading ticket %s before clearing iteration_status: %w", p.Ticket.Identifier, err)
@@ -221,8 +221,8 @@ func reattachIteration(d Deps, p iterationParams) error {
 		// gate a live finish gets in waitForFinish (confirmFinished /
 		// waitForBackgroundTasks): without them, a genuine mid-turn pause or a
 		// still-outstanding backgrounded shell command reads as finished,
-		// landing a partial commit set and tearing down the worktree under a
-		// still-working agent - which is how both real park/reopen/reattach
+		// merging a partial commit set and tearing down the worktree under a
+		// still-working agent - which is how both real pause/reopen/reattach
 		// incidents actually looped, since this short-circuit used to skip
 		// waitForFinish (and its gate) entirely.
 		confirmed, err := confirmFinished(d, launchParams.session(), runnerFinishStates)
@@ -254,8 +254,8 @@ func reattachIteration(d Deps, p iterationParams) error {
 		}
 		launchParams.logLifecycleEvent(launchParams.FinishEvent, agent.SessionID)
 	} else if err := waitForFinish(d, launchParams, agent.SessionID); err != nil {
-		if errors.Is(err, errBlockedPaneParked) {
-			// Same as runIteration's park: the iteration ends here, the pane/
+		if errors.Is(err, errBlockedPanePaused) {
+			// Same as runIteration's pause: the iteration ends here, the pane/
 			// tab/worktree survive, and finishIteration must not run.
 			return nil
 		}
@@ -265,7 +265,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 		if err := Claim(p.Ticket.Path); err != nil {
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}
-		p.Sink.IterationResumed(p.Ticket.Identifier, label, PauseNeedsRepair)
+		p.Sink.IterationResumed(p.Ticket.Identifier, label, PauseRepair)
 		if p.Report != nil {
 			p.Report("resumed %s after restart recheck\n", label)
 		}
@@ -303,13 +303,13 @@ func resolveReattachSessionID(p iterationParams, agentSession string, priorSessi
 	return sessionID
 }
 
-// finishIteration lands a finished iteration's commits (or marks it
-// needs-answer if it produced none), then removes its worktree/tab on success.
+// finishIteration merges a finished iteration's commits (or marks it
+// paused (answer) if it produced none), then removes its worktree/tab on success.
 // Fresh and reattached iterations both carry their native session and pane
-// identity through this shared completion path. A needs-answer report is
-// adopted before any of that: see adoptNeedsAnswerReport.
+// identity through this shared completion path. A paused (answer) report is
+// adopted before any of that: see adoptAskingReport.
 func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessionID string) error {
-	adopted, err := adoptNeedsAnswerReport(p, path, pane, sessionID)
+	adopted, err := adoptAskingReport(p, path, pane, sessionID)
 	if err != nil {
 		return err
 	}
@@ -317,7 +317,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 		return nil
 	}
 	if adopted {
-		// The branch is what makes a later resume able to land both sides of
+		// The branch is what makes a later resume able to merge both sides of
 		// the answer boundary in one pick (see runIteration's branch-reuse
 		// base computation); only the worktree/tab/permit are redundant while
 		// the ticket waits on an answer.
@@ -327,12 +327,12 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 	ahead, err := iterationCommitsAhead(d, path, base, branch)
 	if err != nil || ahead == 0 {
 		// waitForFinish's own debounce (confirmFinished) already guards against
-		// herdr reporting the agent idle mid-turn, but a commit can still land
+		// herdr reporting the agent idle mid-turn, but a commit can still merge
 		// in the gap between that confirmation and this check (e.g. a reattached
 		// iteration, which skips waitForFinish's launch-time debounce entirely).
 		// The count can also fail transiently right after the pane exits (e.g.
 		// a worktree/ref momentarily unresolvable during concurrent reconcile
-		// activity) even though the agent's work already landed. Recheck once
+		// activity) even though the agent's work already merged. Recheck once
 		// more before giving up rather than orphaning a commit — or stranding
 		// an otherwise-finished ticket — on a one-off blip.
 		d.Sleep(finishDebounceMs * time.Millisecond)
@@ -350,7 +350,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 		// "this was deliberate" signal — not a non-claimed status, which an
 		// agent can no longer write itself (see ticket 11's CLI guard) — so a
 		// commitless ticket that never reported finished falls through to the
-		// needs-answer path below like any other zero-commit finish. This is
+		// paused (answer) path below like any other zero-commit finish. This is
 		// the one place gx writes status: done with no cherry-pick, so it does
 		// so itself here rather than trusting the ticket file to already say
 		// done.
@@ -364,13 +364,13 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 
 		// A zero-commit finish whose last turn is shaped like ticket 01's
 		// unexecuted-tool-call glitch gets one corrective nudge and re-wait
-		// before this falls to needs-answer — see
+		// before this falls to paused (answer) — see
 		// retryUnexecutedToolCallOnce. A non-match, a pane that isn't in a
-		// plain finish state any more, or a retry that itself parked on a
+		// plain finish state any more, or a retry that itself paused on a
 		// blocked pane all skip straight past this unchanged.
 		retried, newAhead, newSessionID, err := retryUnexecutedToolCallOnce(d, p, path, pane, base, branch, sessionID)
 		if err != nil {
-			if errors.Is(err, errBlockedPaneParked) {
+			if errors.Is(err, errBlockedPanePaused) {
 				return nil
 			}
 			return err
@@ -383,9 +383,9 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 			// with its own iteration_status self-report that has nothing to
 			// do with the original glitch (see ADR 0019). Re-run the same
 			// adoption checks that already ran pre-retry so that report isn't
-			// silently dropped into the ordinary zero-commit/land handling
+			// silently dropped into the ordinary zero-commit/merge handling
 			// below.
-			adopted, err := adoptNeedsAnswerReport(p, path, pane, sessionID)
+			adopted, err := adoptAskingReport(p, path, pane, sessionID)
 			if err != nil {
 				return err
 			}
@@ -408,30 +408,30 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 		}
 
 		if ahead == 0 {
-			// The agent finished without landing any commits: leave the worktree/
+			// The agent finished without merging any commits: leave the worktree/
 			// tab in place for inspection instead of silently marking done or
 			// retrying, and let the scheduler move on to other unblocked tickets.
-			if _, err := p.parkNeedsAnswer(events.ZeroCommit, zeroCommitReason(d, path), pane, sessionID, path); err != nil {
+			if _, err := p.pauseAsking(events.ZeroCommit, zeroCommitReason(d, path), pane, sessionID, path); err != nil {
 				return fmt.Errorf("marking ticket needs-answer: %w", err)
 			}
 			return nil
 		}
 	}
 
-	// Landing itself (cherry-pick, conflict resolution, mark-done, cleanup) is
-	// deferred to the land-queue worker rather than run inline here: that's
+	// Merging itself (cherry-pick, conflict resolution, mark-done, cleanup) is
+	// deferred to the merge-queue worker rather than run inline here: that's
 	// what lets this build's active slot free up immediately instead of
 	// holding it through up to 30 minutes of conflict resolution (see
-	// landqueue.go). iteration_status: finished is gx's own signal that this
-	// build has commits ready to land (see MarkBuiltAwaitingLand's doc for how
+	// mergequeue.go). iteration_status: finished is gx's own signal that this
+	// build has commits ready to merge (see MarkBuiltAwaitingMerge's doc for how
 	// this stays discriminable from an agent's own commitless self-report);
-	// Status stays claimed. builtAwaitingLandError carries everything the
+	// Status stays claimed. builtAwaitingMergeError carries everything the
 	// worker needs that only exists as live-process state — pane/tab/
 	// sessionID/path aren't available once this build goroutine returns.
-	if err := MarkBuiltAwaitingLand(p.Ticket.Path); err != nil {
-		return fmt.Errorf("marking ticket %s built awaiting land: %w", p.Ticket.Identifier, err)
+	if err := MarkBuiltAwaitingMerge(p.Ticket.Path); err != nil {
+		return fmt.Errorf("marking ticket %s built awaiting merge: %w", p.Ticket.Identifier, err)
 	}
-	return &builtAwaitingLandError{job: landJob{
+	return &builtAwaitingMergeError{job: mergeJob{
 		ticket:    p.Ticket,
 		base:      base,
 		branch:    branch,
@@ -444,7 +444,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 // iterationCommitsAhead counts the iteration's commits on branch. An agent
 // that detached HEAD in the worktree (e.g. `git checkout HEAD~0`) commits past
 // branch, so branch is first moved forward to HEAD; otherwise that work would
-// read as a zero-commit finish and never land. The move is best effort: if it
+// read as a zero-commit finish and never merge. The move is best effort: if it
 // fails, the count is the branch's own, as before.
 func iterationCommitsAhead(d Deps, path, base, branch string) (int, error) {
 	if d.AttachDetachedHead != nil {
@@ -453,11 +453,11 @@ func iterationCommitsAhead(d Deps, path, base, branch string) (int, error) {
 	return d.CommitsAhead(path, base, branch)
 }
 
-// zeroCommitReason is the zero-commit park's reason. It names a dirty worktree,
+// zeroCommitReason is the zero-commit pause's reason. It names a dirty worktree,
 // since uncommitted work there is what a person most needs to know; a status
 // that cannot be read keeps the plain reason.
 func zeroCommitReason(d Deps, path string) string {
-	const reason = "no commits landed"
+	const reason = "no commits merged"
 	if d.UncommittedChanges == nil {
 		return reason
 	}
@@ -486,11 +486,11 @@ const unexecutedToolCallCorrection = "Your last turn ended with a tool call writ
 // retried is false whenever no corrective prompt was sent — the transcript
 // doesn't match, or the pane's live status is no longer a plain finish state
 // (alreadyFinished) — so finishIteration's caller leaves ahead/sessionID
-// untouched and falls straight to needs-answer, same as before this ticket.
+// untouched and falls straight to paused (answer), same as before this ticket.
 // A pane that reads blocked at the moment of the check gets no prompt sent
 // at all, honoring the rule that gx never types into a pane sitting on a
-// dialog it did not raise (see parkOnBlockedPane); an err wrapping
-// errBlockedPaneParked reports the retry's own re-wait parking the same way.
+// dialog it did not raise (see pauseOnBlockedPane); an err wrapping
+// errBlockedPanePaused reports the retry's own re-wait pausing the same way.
 func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, base, branch, sessionID string) (retried bool, ahead int, newSessionID string, err error) {
 	matched, err := d.ReadUnexecutedToolCall(path, sessionID)
 	if err != nil {
@@ -520,14 +520,14 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, base, br
 	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "")
 	launchParams.Session = s
 	if err := promptIdle(d, launchParams, retrySessionID, unexecutedToolCallCorrection); err != nil {
-		if errors.Is(err, errBlockedPaneParked) {
+		if errors.Is(err, errBlockedPanePaused) {
 			return false, 0, "", err
 		}
 		return false, 0, "", fmt.Errorf("sending corrective prompt to %s: %w", label, err)
 	}
 
 	if err := waitForFinish(d, launchParams, retrySessionID); err != nil {
-		if errors.Is(err, errBlockedPaneParked) {
+		if errors.Is(err, errBlockedPanePaused) {
 			return false, 0, "", err
 		}
 		return false, 0, "", fmt.Errorf("waiting for %s to finish after corrective retry: %w", label, err)
@@ -564,9 +564,9 @@ func adoptCommitlessFinish(p iterationParams, path, pane, sessionID string) (ado
 	return true, nil
 }
 
-// adoptNeedsAnswerReport honours an agent's `iteration_status: asking`
-// report before finishIteration counts commits, lands them, cleans up, or
-// announces the iteration finished (ADR 0019's adoption-precedes-landing
+// adoptAskingReport honours an agent's `iteration_status: asking`
+// report before finishIteration counts commits, merges them, cleans up, or
+// announces the iteration finished (ADR 0019's adoption-precedes-merging
 // invariant): without this ordering, an agent that commits what is green and
 // then stops to ask has its partial work cherry-picked and marked done while
 // the question is still unanswered. Unlike the zero-commit fault path below,
@@ -575,7 +575,7 @@ func adoptCommitlessFinish(p iterationParams, path, pane, sessionID string) (ado
 // commits at this point is legal. It reads the ticket fresh rather than
 // trusting p.Ticket (populated once at claim time) because the report is
 // written by the agent during the iteration this call is completing.
-func adoptNeedsAnswerReport(p iterationParams, path, pane, sessionID string) (adopted bool, err error) {
+func adoptAskingReport(p iterationParams, path, pane, sessionID string) (adopted bool, err error) {
 	current, err := schema.ParseTicket(p.Ticket.Path)
 	if err != nil {
 		return false, fmt.Errorf("reading ticket %s for iteration-status adoption: %w", p.Ticket.Path, err)
@@ -584,16 +584,16 @@ func adoptNeedsAnswerReport(p iterationParams, path, pane, sessionID string) (ad
 		return false, nil
 	}
 
-	if _, err := p.parkNeedsAnswer(events.SelfReported, "agent reported needs-answer via iteration_status", pane, sessionID, path); err != nil {
+	if _, err := p.pauseAsking(events.SelfReported, "agent reported needs-answer via iteration_status", pane, sessionID, path); err != nil {
 		return false, fmt.Errorf("adopting needs-answer report: %w", err)
 	}
 	return true, nil
 }
 
-// parkNeedsAnswer routes a finish-time needs-answer park through the single
-// park path, carrying the iteration's pane/tab/session on the event.
-func (p iterationParams) parkNeedsAnswer(kind events.Kind, reason, pane, sessionID, cwd string) (string, error) {
-	return park(p.Sink, parkRequest{
+// pauseAsking routes a finish-time paused (answer) pause through the single
+// pause path, carrying the iteration's pane/tab/session on the event.
+func (p iterationParams) pauseAsking(kind events.Kind, reason, pane, sessionID, cwd string) (string, error) {
+	return pause(p.Sink, pauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 		Type: events.Paused, Kind: kind, Reason: reason,
 		Event: p.agentEvent(pane, sessionID, cwd),
@@ -603,7 +603,7 @@ func (p iterationParams) parkNeedsAnswer(kind events.Kind, reason, pane, session
 // markDoneStampingCloseMetadata marks p.Ticket done, stamping the closing
 // iteration's compaction count when sessionID is a live, fresh-iteration
 // session (runIteration's case) — its peak context window was already
-// stamped by landCherryPick. A reattached close (sessionID == "") skipped
+// stamped by mergeCherryPick. A reattached close (sessionID == "") skipped
 // that stamp, so it backfills from the ticket's original iteration-started
 // session in the run log instead.
 func markDoneStampingCloseMetadata(d Deps, p iterationParams, cwd, sessionID string) error {
@@ -615,7 +615,7 @@ func markDoneStampingCloseMetadata(d Deps, p iterationParams, cwd, sessionID str
 
 // backfillDoneMetadata handles a reattached ticket close: it looks up the
 // ticket's original iteration-started session from the run log (ticket 06a)
-// and stamps the landed metrics and compactions from that session's own
+// and stamps the merged metrics and compactions from that session's own
 // transcript, rather than leaving the fields blank or attributing them to a
 // fresh session that didn't do the work. Falls back to a plain MarkDone
 // whenever no prior session can be found — these fields are a best-effort
@@ -625,8 +625,8 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 	if !ok {
 		return MarkDone(p.Ticket.Path)
 	}
-	if _, _, _, _, err := writeLandedMetrics(agent, sessionCwd, sessionID, p.Ticket.Path); err != nil {
-		return fmt.Errorf("writing landed metrics for ticket %s: %w", p.Ticket.Identifier, err)
+	if _, _, _, _, err := writeMergedMetrics(agent, sessionCwd, sessionID, p.Ticket.Path); err != nil {
+		return fmt.Errorf("writing merged metrics for ticket %s: %w", p.Ticket.Identifier, err)
 	}
 	return markDoneWithCompactions(d, agent, p.Ticket.Path, sessionCwd, sessionID)
 }
@@ -651,8 +651,8 @@ func recoverIterationSession(p iterationParams) (sessionID, cwd string, agent Ag
 }
 
 // stampCommitlessMetrics writes actual_context_window/elapsed_time for a
-// commitless finish, the ahead==0 counterpart to landCherryPick's
-// writeLandedMetrics call on the committed path. A fresh iteration's own
+// commitless finish, the ahead==0 counterpart to mergeCherryPick's
+// writeMergedMetrics call on the committed path. A fresh iteration's own
 // sessionID is read directly; a reattached close (sessionID == "") recovers
 // its session the same way backfillDoneMetadata does. Metrics here are
 // best-effort — any failure to find or read a session leaves the fields at
@@ -661,30 +661,30 @@ func recoverIterationSession(p iterationParams) (sessionID, cwd string, agent Ag
 // precondition for closing it.
 func stampCommitlessMetrics(p iterationParams, cwd, sessionID string) {
 	if sessionID != "" {
-		writeLandedMetrics(p.Agent, cwd, sessionID, p.Ticket.Path)
+		writeMergedMetrics(p.Agent, cwd, sessionID, p.Ticket.Path)
 		return
 	}
 	sid, sessionCwd, agent, ok := recoverIterationSession(p)
 	if !ok {
 		return
 	}
-	writeLandedMetrics(agent, sessionCwd, sid, p.Ticket.Path)
+	writeMergedMetrics(agent, sessionCwd, sid, p.Ticket.Path)
 }
 
-// landCherryPick cherry-picks base..branch onto the feature branch (resolving
+// mergeCherryPick cherry-picks base..branch onto the feature branch (resolving
 // conflicts via cherryPickWithConflictResolution if any arise), then resolves
-// the SHA it landed at — the shared core of both a normal iteration's
-// completion (the land-queue worker) and a startup repair's re-cherry-pick
-// (repairRecoverableTicket). Callers serialize landings themselves (the
-// land-queue worker is a single goroutine; reconcile runs single-threaded at
+// the SHA it merged at — the shared core of both a normal iteration's
+// completion (the merge-queue worker) and a startup repair's re-cherry-pick
+// (repairRecoverableTicket). Callers serialize merges themselves (the
+// merge-queue worker is a single goroutine; reconcile runs single-threaded at
 // startup before it starts), so this function needs no lock of its own.
-// Before resolving the SHA, it writes the landing iteration's session
+// Before resolving the SHA, it writes the merging iteration's session
 // metrics (actual_context_window, elapsed_time) into the ticket's
-// frontmatter via writeLandedMetrics, then stamps ticketTrailerKey and —
+// frontmatter via writeMergedMetrics, then stamps ticketTrailerKey and —
 // when those metrics were available — the same values onto
 // tokensTrailerKey/elapsedTrailerKey, all in a single amend
 // (Deps.AppendTrailers) rather than one amend per trailer.
-func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane string) (string, error) {
+func mergeCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane string) (string, error) {
 	res, resolutionSessionID, err := cherryPickWithConflictResolution(d, p, base, branch, sessionID, pane)
 	if err != nil {
 		return "", err
@@ -697,8 +697,8 @@ func landCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane str
 
 // finishCleanup removes an iteration's now-redundant worktree and tab, and —
 // when removeBranch is true — its branch too. removeBranch is false for a
-// parked (needs-answer) iteration: the branch is what a later resume
-// reattaches to, so it must outlive the worktree/tab/permit that park drops
+// paused (paused (answer)) iteration: the branch is what a later resume
+// reattaches to, so it must outlive the worktree/tab/permit that pause drops
 // (see finishIteration's adopted-report path). Each check is independent
 // since callers run this against state left in different shapes: a normal
 // completion (worktree/tab/branch all just created and definitely present),
@@ -749,11 +749,11 @@ func branchExists(d Deps, dir, branch string) bool {
 // before confirming the cherry-pick sequence completed. sessionID/pane/tab
 // attach the iteration agent's own session to the conflict-hit event (the
 // resolution agent hasn't launched yet at that point). On resolution it
-// returns that agent's distinct session so landCherryPick can emit
+// returns that agent's distinct session so mergeCherryPick can emit
 // conflict-resolved with the final post-trailer SHA. The returned result is
-// Landed (stamped) or AlreadyApplied, never Conflicted.
-func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane string) (res LandResult, resolutionSessionID string, resultErr error) {
-	ld, lp := landDepsFor(d), landParamsFor(p, base, branch, sessionID)
+// Merged (stamped) or AlreadyApplied, never Conflicted.
+func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, sessionID, pane string) (res MergeResult, resolutionSessionID string, resultErr error) {
+	ld, lp := mergeDepsFor(d), mergeParamsFor(p, base, branch, sessionID)
 	p.Sink.CherryPickStarted(p.Ticket.Identifier)
 
 	// A previous invocation may have died after starting a cherry-pick but
@@ -770,56 +770,56 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	// corruption this guard exists to prevent. Reattach to it instead.
 	inProgress, err := d.CherryPickInProgress(p.FeatureWorktree)
 	if err != nil {
-		return LandResult{}, "", fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
+		return MergeResult{}, "", fmt.Errorf("checking for stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 	}
 	if inProgress {
 		liveSession, found, err := findLiveConflictResolutionTab(d, p)
 		if err != nil {
-			return LandResult{}, "", err
+			return MergeResult{}, "", err
 		}
 		if found {
 			resolutionSessionID, err := reattachLiveConflictResolver(d, p, liveSession)
 			if err != nil {
-				return LandResult{}, "", err
+				return MergeResult{}, "", err
 			}
-			res, err := stampLanded(ld, lp)
+			res, err := stampMerged(ld, lp)
 			return res, resolutionSessionID, err
 		}
-		// A land marker means the sequencer state is a human's pending
+		// A merge marker means the sequencer state is a human's pending
 		// conflict, not crash debris: aborting would discard their work.
-		lockDir, err := landLockDir(p.ScratchDir, p.FeatureBranch)
+		lockDir, err := mergeLockDir(p.ScratchDir, p.FeatureBranch)
 		if err != nil {
-			return LandResult{}, "", err
+			return MergeResult{}, "", err
 		}
-		marker, err := ReadLandMarker(lockDir)
+		marker, err := ReadMergeMarker(lockDir)
 		if err != nil {
-			return LandResult{}, "", fmt.Errorf("reading land marker: %w", err)
+			return MergeResult{}, "", fmt.Errorf("reading merge marker: %w", err)
 		}
 		if marker != nil {
-			return LandResult{}, "", errLandDeferred
+			return MergeResult{}, "", errMergeDeferred
 		}
 		// Only gx's own debris is lossless to abort: a pick of some iteration
 		// branch's commit. Anything else is a person's work in progress.
 		if foreign, sha := foreignCherryPick(d, p); foreign {
-			return LandResult{}, "", fmt.Errorf("the feature worktree %s has a cherry-pick of %s in progress that gx did not start; finish or abort it, then land again", p.FeatureWorktree, sha)
+			return MergeResult{}, "", fmt.Errorf("the feature worktree %s has a cherry-pick of %s in progress that gx did not start; finish or abort it, then merge again", p.FeatureWorktree, sha)
 		}
 		if err := d.AbortCherryPick(p.FeatureWorktree); err != nil {
-			return LandResult{}, "", fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
+			return MergeResult{}, "", fmt.Errorf("aborting stale cherry-pick onto %s: %w", p.FeatureBranch, err)
 		}
 	}
 
-	// LandTicket recognizes an iteration whose patch concurrent work already
+	// MergeTicket recognizes an iteration whose patch concurrent work already
 	// made redundant (git would stop that as an empty cherry-pick and leave
 	// sequencer state behind) before touching the worktree.
-	res, err = LandTicket(ld, lp)
+	res, err = MergeTicket(ld, lp)
 	if err != nil {
-		return LandResult{}, "", err
+		return MergeResult{}, "", err
 	}
 	if res.Outcome != Conflicted {
 		return res, "", nil
 	}
 	// This call now owns the active sequencer state. Always clean it up on
-	// failure, otherwise the next landing serialized behind this one could
+	// failure, otherwise the next merging serialized behind this one could
 	// mistake this ticket's CHERRY_PICK_HEAD for its own conflict.
 	defer func() {
 		if resultErr == nil {
@@ -845,10 +845,10 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 	// already means the cherry-pick sequence is genuinely clear.
 	resolutionSessionID, err = resolveCherryPickConflict(d, p)
 	if err != nil {
-		return LandResult{}, "", err
+		return MergeResult{}, "", err
 	}
 
-	res, err = stampLanded(ld, lp)
+	res, err = stampMerged(ld, lp)
 	return res, resolutionSessionID, err
 }
 
@@ -879,21 +879,21 @@ func foreignCherryPick(d Deps, p iterationParams) (foreign bool, sha string) {
 	return false, sha
 }
 
-// landParamsFor maps an iteration's landing onto LandParams. The recorded SHA
+// mergeParamsFor maps an iteration's merging onto MergeParams. The recorded SHA
 // (ladder rung one) is best-effort: an unreadable run log just skips that rung.
-func landParamsFor(p iterationParams, base, branch, sessionID string) LandParams {
+func mergeParamsFor(p iterationParams, base, branch, sessionID string) MergeParams {
 	recorded := ""
 	if events, ok, err := ReadEvents(p.ScratchDir, p.FeatureBranch); err == nil && ok {
 		recorded = latestCherryPickedSHA(events, p.Ticket.Identifier)
 	}
-	return LandParams{
+	return MergeParams{
 		FeatureWorktree: p.FeatureWorktree,
 		FeatureBranch:   p.FeatureBranch,
 		TicketID:        p.Ticket.Identifier,
 		TicketPath:      p.Ticket.Path,
 		SourceRange:     SourceRange{Base: base, Tip: branch},
 		RecordedSHA:     recorded,
-		Session: LandSession{
+		Session: MergeSession{
 			Agent: p.Agent,
 			Cwd:   iterationWorktreePath(p.WorktreeDir, p.FeatureBranch, p.Ticket.Identifier),
 			ID:    sessionID,
@@ -904,13 +904,13 @@ func landParamsFor(p iterationParams, base, branch, sessionID string) LandParams
 // errConflictResolutionUnresolved is resolveCherryPickConflict's sentinel for
 // a conflict-resolution failure caught by its own sequencer corroboration
 // (as opposed to a plain launch/wait error, e.g. a stuck agent, which is
-// reported the normal way). The failure is already recorded — needs-repair —
+// reported the normal way). The failure is already recorded — paused (repair) —
 // on the conflict-resolution child ticket by the time this is returned, so
 // finishIteration must swallow it rather than let it fall into the generic
 // per-iteration error path, which would wrongly also mark the parent
-// iteration ticket needs-repair (see ticket conflict-lifecycle/03: failures
+// iteration ticket paused (repair) (see ticket conflict-lifecycle/03: failures
 // here belong to the child, not the parent).
-var errConflictResolutionUnresolved = errors.New("conflict-resolution child ticket needs repair")
+var errConflictResolutionUnresolved = errors.New("conflict-resolution child ticket paused for repair")
 
 // findLiveConflictResolutionTab reports whether a tab labeled
 // conflictLabel(p.Ticket.Identifier) is currently live in p.WorkspaceID —
@@ -1013,7 +1013,7 @@ func reattachLiveConflictResolver(d Deps, p iterationParams, live agentrunner.Se
 // corroborating against the git sequencer itself (the ground truth for
 // whether the resolution actually finished). A sequencer that's still
 // conflicted at that point means the "done" signal was premature; the child
-// ticket is marked needs-repair instead of done, and this returns
+// ticket is marked paused (repair) instead of done, and this returns
 // errConflictResolutionUnresolved so the failure isn't also blamed on the
 // parent iteration ticket.
 func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, resultErr error) {
@@ -1071,11 +1071,11 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 	inProgress, cpErr := d.CherryPickInProgress(p.FeatureWorktree)
 	if cpErr != nil {
 		reason := fmt.Sprintf("checking cherry-pick state after conflict-resolution agent %s reported done: %v", label, cpErr)
-		return "", parkConflictResolutionChildNeedsRepair(p, childPath, childID, label, reason)
+		return "", pauseConflictResolutionChildRepair(p, childPath, childID, label, reason)
 	}
 	if inProgress {
 		reason := fmt.Sprintf("conflict-resolution agent %s reported done, but the cherry-pick sequencer is still conflicted onto %s", label, p.FeatureBranch)
-		return "", parkConflictResolutionChildNeedsRepair(p, childPath, childID, label, reason)
+		return "", pauseConflictResolutionChildRepair(p, childPath, childID, label, reason)
 	}
 
 	if err := MarkChildDone(childPath); err != nil {
@@ -1085,18 +1085,18 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 	return sessionID, nil
 }
 
-// parkConflictResolutionChildNeedsRepair marks the conflict-resolution child
+// pauseConflictResolutionChildRepair marks the conflict-resolution child
 // ticket (not the parent iteration ticket — see errConflictResolutionUnresolved)
-// needs-repair with reason, reports it, and returns the sentinel error that
+// paused (repair) with reason, reports it, and returns the sentinel error that
 // tells finishIteration to swallow this failure rather than also blaming the
 // parent.
-func parkConflictResolutionChildNeedsRepair(p iterationParams, childPath, childID, label, reason string) error {
+func pauseConflictResolutionChildRepair(p iterationParams, childPath, childID, label, reason string) error {
 	state := schema.FaultState{
 		Label:    label,
 		Branch:   p.FeatureBranch,
 		Worktree: p.FeatureWorktree,
 	}
-	park(p.Sink, parkRequest{
+	pause(p.Sink, pauseRequest{
 		ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: childID, Path: childPath,
 		Type: events.Paused, Kind: events.IterationError, Reason: reason, Repair: state,
 	})

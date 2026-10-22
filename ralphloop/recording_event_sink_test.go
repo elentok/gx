@@ -10,7 +10,7 @@ import (
 // recordingEventSink implements EventSink by recording every call as a
 // LiveEvent (see live_events.go) in call order, synchronously — unlike
 // ChannelEventSink's channel, a test can call Events() right after Run()
-// returns with no drain goroutine to coordinate. It exists so tests can
+// returns with no empty goroutine to coordinate. It exists so tests can
 // assert on the same structured data a real consumer (the TUI, via
 // ChannelEventSink) would see, instead of parsing rendered CLI text.
 type recordingEventSink struct {
@@ -117,16 +117,16 @@ func (s *recordingEventSink) TicketRecovering(identifier string) {
 	s.record(LiveEvent{Kind: LiveEventTicketRecovering, Identifier: identifier})
 }
 
-func (s *recordingEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {
-	s.record(LiveEvent{Kind: LiveEventTicketRecovered, Identifier: identifier, EpicName: epicName, Branch: branch, LandedSHA: landedSHA})
+func (s *recordingEventSink) TicketRecovered(identifier, epicName, branch, mergedSHA string) {
+	s.record(LiveEvent{Kind: LiveEventTicketRecovered, Identifier: identifier, EpicName: epicName, Branch: branch, MergedSHA: mergedSHA})
 }
 
 func (s *recordingEventSink) TicketUnrecoverable(identifier, epicName string) {
 	s.record(LiveEvent{Kind: LiveEventTicketUnrecoverable, Identifier: identifier, EpicName: epicName})
 }
 
-func (s *recordingEventSink) EpicParked(epicName string, stalled []StalledTicket) {
-	s.record(LiveEvent{Kind: LiveEventEpicParked, EpicName: epicName, Stalled: stalled})
+func (s *recordingEventSink) EpicPaused(epicName string, stalled []StalledTicket) {
+	s.record(LiveEvent{Kind: LiveEventEpicPaused, EpicName: epicName, Stalled: stalled})
 }
 
 func (s *recordingEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
@@ -134,7 +134,7 @@ func (s *recordingEventSink) EpicComplete(epicName string, completed int, elapse
 }
 
 // EpicFailed is a no-op here, matching ChannelEventSink: by the time the
-// registry calls it, this sink has already been closed and drained (see
+// registry calls it, this sink has already been closed and emptied (see
 // EventSink's doc comment on EpicFailed).
 func (s *recordingEventSink) EpicFailed(epicName string, err error) {}
 

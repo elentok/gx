@@ -27,14 +27,14 @@ func realGitDeps() Deps {
 	return d
 }
 
-// TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK exercises
+// TestClassifyDoneTicket_RealRepo_CommitMergedAndCleanedUp_OK exercises
 // classifyDoneTicket against an actual git repo: an iteration branch's
 // commit cherry-picked onto the feature branch (a fresh commit hash, exactly
 // as CherryPickRange produces in production), then the iteration branch
 // itself deleted — the fully-cleaned-up state a future cleanup step leaves
 // behind. Verifies the real git.IsAncestor/git.RevParse wiring, not just the
 // classifier's own branching logic.
-func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
+func TestClassifyDoneTicket_RealRepo_CommitMergedAndCleanedUp_OK(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
 	base, err := git.RevParse(dir, "HEAD")
@@ -54,7 +54,7 @@ func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
 	if err := git.CherryPickRange(dir, base, iterTip); err != nil {
 		t.Fatalf("CherryPickRange: %v", err)
 	}
-	landedSHA, err := git.RevParse(dir, "HEAD")
+	mergedSHA, err := git.RevParse(dir, "HEAD")
 	if err != nil {
 		t.Fatalf("RevParse: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestClassifyDoneTicket_RealRepo_CommitLandedAndCleanedUp_OK(t *testing.T) {
 	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/main-item-03")
 
 	d := realGitDeps()
-	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: landedSHA}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: mergedSHA}}
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
@@ -101,19 +101,19 @@ func TestClassifyDoneTicket_RealRepo_NeverCherryPicked_Recoverable(t *testing.T)
 	}
 }
 
-// TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK reproduces the
+// TestClassifyDoneTicket_RealRepo_RebasedAfterMerging_OK reproduces the
 // postmortem scenario that motivated the PatchesApplied fallback: a ticket
-// lands normally (cherry-picked, event recorded), but the feature branch is
-// later rebased onto a newer upstream, rewriting the landed commit's hash out
+// merges normally (cherry-picked, event recorded), but the feature branch is
+// later rebased onto a newer upstream, rewriting the merged commit's hash out
 // from under the recorded event's SHA — while the iteration branch (holding
 // the pre-rebase original) never got cleaned up. Without the fallback,
 // IsAncestor against the stale SHA reports false and the surviving iteration
 // branch would make this misclassify as doneRecoverable, re-cherry-picking
-// already-landed content onto the live feature worktree. PatchesApplied
+// already-merged content onto the live feature worktree. PatchesApplied
 // should recognize the rebased commit as patch-equivalent and classify this
-// doneStaleCleanup instead — landed, just needs its leftover branch cleaned
+// doneStaleCleanup instead — merged, just needs its leftover branch cleaned
 // up.
-func TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK(t *testing.T) {
+func TestClassifyDoneTicket_RealRepo_RebasedAfterMerging_OK(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
 	base, err := git.RevParse(dir, "HEAD")
@@ -133,13 +133,13 @@ func TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK(t *testing.T) {
 	if err := git.CherryPickRange(dir, base, iterTip); err != nil {
 		t.Fatalf("CherryPickRange: %v", err)
 	}
-	landedSHA, err := git.RevParse(dir, "HEAD")
+	mergedSHA, err := git.RevParse(dir, "HEAD")
 	if err != nil {
 		t.Fatalf("RevParse: %v", err)
 	}
 
 	// Simulate an unrelated upstream advance, then rebase main onto it — this
-	// rewrites landedSHA to a new hash, exactly as happened to this repo's own
+	// rewrites mergedSHA to a new hash, exactly as happened to this repo's own
 	// ralphloop-tui-impl branch.
 	testutil.MustGitExported(t, dir, "checkout", "-b", "upstream", base)
 	testutil.WriteFile(t, dir, "upstream.txt", "u\n")
@@ -150,28 +150,28 @@ func TestClassifyDoneTicket_RealRepo_RebasedAfterLanding_OK(t *testing.T) {
 	// ralph-loop/iter-03 was never cleaned up, still pointing at the
 	// pre-rebase original.
 	d := realGitDeps()
-	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: landedSHA}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: mergedSHA}}
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
 	if class != doneStaleCleanup {
-		t.Errorf("class = %v, want doneStaleCleanup — content already landed pre-rebase, just needs the leftover iteration branch cleaned up", class)
+		t.Errorf("class = %v, want doneStaleCleanup — content already merged pre-rebase, just needs the leftover iteration branch cleaned up", class)
 	}
 }
 
 // TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK reproduces
 // the scenario PatchesApplied still can't handle: the feature branch is
-// rebased onto an upstream that conflicts with the already-landed commit, so
-// landing it again requires a manually re-resolved merge — which changes the
+// rebased onto an upstream that conflicts with the already-merged commit, so
+// merging it again requires a manually re-resolved merge — which changes the
 // commit's hash *and* its diff (so PatchesApplied's patch-id comparison also
 // reports "not found"), same as what happened to this repo's own tickets
-// 01-03 after ralph-loop hit a real conflict re-landing a commit mid-rebase.
+// 01-03 after ralph-loop hit a real conflict re-merging a commit mid-rebase.
 // The iteration branch is also gone by this point (already cleaned up), so
 // PatchesApplied's hasBranch guard never even runs. Only the
-// Ralph-Loop-Ticket trailer landCherryPick stamps on every landed commit
+// Ralph-Loop-Ticket trailer mergeCherryPick stamps on every merged commit
 // survives a rebase's conflict-resolution message-preserving default,
-// letting classifyDoneTicket still recognize this as landed instead of
+// letting classifyDoneTicket still recognize this as merged instead of
 // flagging a genuinely-done ticket doneUnrecoverable.
 func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing.T) {
 	t.Parallel()
@@ -193,19 +193,19 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 	if err := git.CherryPickRange(dir, base, iterTip); err != nil {
 		t.Fatalf("CherryPickRange: %v", err)
 	}
-	// landCherryPick always stamps the ticket trailer right after landing,
+	// mergeCherryPick always stamps the ticket trailer right after merging,
 	// scoped to the epic (see ticketTrailerValue) so a same-numbered ticket
 	// from an unrelated epic can never satisfy this lookup.
 	if err := git.AppendTrailer(dir, ticketTrailerKey, ticketTrailerValue("main", "03")); err != nil {
 		t.Fatalf("AppendTrailer: %v", err)
 	}
-	landedSHA, err := git.RevParse(dir, "HEAD")
+	mergedSHA, err := git.RevParse(dir, "HEAD")
 	if err != nil {
 		t.Fatalf("RevParse: %v", err)
 	}
 
 	// An unrelated upstream commit that conflicts on the same file, then a
-	// rebase forcing a manual re-resolution — this both rewrites landedSHA's
+	// rebase forcing a manual re-resolution — this both rewrites mergedSHA's
 	// hash and changes its diff, defeating IsAncestor and PatchesApplied both.
 	testutil.MustGitExported(t, dir, "checkout", "-b", "upstream", base)
 	testutil.WriteFile(t, dir, "a.txt", "upstream content\n")
@@ -229,23 +229,23 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 	testutil.MustGitExported(t, dir, "branch", "-D", "ralph-loop/main-item-03")
 
 	d := realGitDeps()
-	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: landedSHA}}
-	landed, err := landedTickets(dir, "main")
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: mergedSHA}}
+	merged, err := mergedTickets(dir, "main")
 	if err != nil {
-		t.Fatalf("landedTickets: %v", err)
+		t.Fatalf("mergedTickets: %v", err)
 	}
-	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{}, landed)
+	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: dir, WorktreeDir: "/fake/worktrees"}, "main", tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}, events, map[string]bool{}, merged)
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
 	if class != doneOK {
-		t.Errorf("class = %v, want doneOK — trailer marker should recognize the rebased-and-reconflicted commit as landed", class)
+		t.Errorf("class = %v, want doneOK — trailer marker should recognize the rebased-and-reconflicted commit as merged", class)
 	}
 }
 
 // TestClassifyDoneTicket_RealRepo_TrailerScopedToEpic_NoCrossEpicFalsePositive
 // reproduces a real production incident: an unrelated, much earlier epic's
-// own ticket "05" landed and stamped a trailer, still reachable from main's
+// own ticket "05" merged and stamped a trailer, still reachable from main's
 // history (trailers never expire). This epic's own ticket "05" was never
 // cherry-picked at all — no run-log event, no surviving iteration branch. An
 // unscoped trailer value ("05") would collide across the two unrelated
@@ -254,12 +254,12 @@ func TestClassifyDoneTicket_RealRepo_RebasedWithConflictResolution_OK(t *testing
 // can't happen (this is exactly what happened in production to gx's own
 // tickets-ralph epic's ticket 05: classifyDoneTicket's trailer fallback
 // matched an unrelated older epic's same-numbered ticket, misclassified this
-// one doneOK, and its worktree/branch were deleted without ever landing).
+// one doneOK, and its worktree/branch were deleted without ever merging).
 func TestClassifyDoneTicket_RealRepo_TrailerScopedToEpic_NoCrossEpicFalsePositive(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
 
-	// An unrelated, older epic's own ticket "05" landed here long ago,
+	// An unrelated, older epic's own ticket "05" merged here long ago,
 	// stamped with the bare (pre-scoping) trailer value historical commits
 	// carry — still reachable from main.
 	testutil.WriteFile(t, dir, "unrelated.txt", "unrelated\n")
@@ -277,6 +277,6 @@ func TestClassifyDoneTicket_RealRepo_TrailerScopedToEpic_NoCrossEpicFalsePositiv
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
 	if class == doneOK || class == doneStaleCleanup {
-		t.Fatalf("class = %v, want doneRecoverable or doneUnrecoverable — must not treat an unrelated epic's same-numbered ticket's trailer as this ticket landed", class)
+		t.Fatalf("class = %v, want doneRecoverable or doneUnrecoverable — must not treat an unrelated epic's same-numbered ticket's trailer as this ticket merged", class)
 	}
 }

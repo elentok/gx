@@ -148,10 +148,10 @@ func TestRunScope_AllDoneForCompletedSubset(t *testing.T) {
 	}
 }
 
-// TestRunScope_AllDone_NeedsAnswerSubsetIsNotDone covers ticket 08's inversion
-// at scope level: needs-answer used to count as terminal and let a subset run
-// exit, and now must leave the run parked instead.
-func TestRunScope_AllDone_NeedsAnswerSubsetIsNotDone(t *testing.T) {
+// TestRunScope_AllDone_AskingSubsetIsNotDone covers ticket 08's inversion
+// at scope level: paused (answer) used to count as terminal and let a subset run
+// exit, and now must leave the run paused instead.
+func TestRunScope_AllDone_AskingSubsetIsNotDone(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Name: "delivery", Tickets: []tickets.Ticket{
 		{Number: 1, Identifier: "01", Status: "done"},
@@ -163,7 +163,7 @@ func TestRunScope_AllDone_NeedsAnswerSubsetIsNotDone(t *testing.T) {
 	}
 
 	if scope.AllDone(epic) {
-		t.Errorf("scope.AllDone() = true, want false while ticket 02 needs answer")
+		t.Errorf("scope.AllDone() = true, want false while ticket 02 paused for an answer")
 	}
 }
 

@@ -100,7 +100,7 @@ func SendTestBatch(cfg config.NotificationsConfig) ([]string, error) {
 }
 
 // gateCLISend runs transport's send through the notification gate with
-// source "cli" — there's no ticket to park a trip against, so parkTicket is
+// source "cli" — there's no ticket to pause a trip against, so pauseTicket is
 // nil. A trip still writes its bookkeeping; the caller just skips sending.
 func gateCLISend(transport string) (bool, error) {
 	result, err := NotificationGate(transport, notifyKindCLI, "cli", time.Now(), true, nil)

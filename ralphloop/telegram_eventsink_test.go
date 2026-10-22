@@ -65,7 +65,7 @@ func waitForRequests(get func() []telegramRequest, want int) []telegramRequest {
 
 // TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat exercises the
 // real telegramTransport (chat_id/parse_mode/body shape) end-to-end through
-// a real event; the membership/park-cardinality/message-content behavior is
+// a real event; the membership/pause-cardinality/message-content behavior is
 // exercised transport-agnostically in chat_eventsink_test.go.
 func TestTelegramEventSink_EpicComplete_PostsTelegramWireFormat(t *testing.T) {
 	t.Parallel()
@@ -115,7 +115,7 @@ func TestTelegramEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	}
 
 	waitForRequests(getRequests, 1)
-	// Drain the retry-and-log goroutine sendNotification spawns (it sleeps
+	// Empty the retry-and-log goroutine sendNotification spawns (it sleeps
 	// notificationRetryBackoff then retries) so it doesn't outlive the test.
 	waitForRunLogEvent(t, dir, "epic")
 }
@@ -142,7 +142,7 @@ func TestTelegramEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
 		t.Errorf("inner events = %v, want [EpicComplete]", got)
 	}
-	// Drain the retry-and-log goroutine sendNotification spawns (it sleeps
+	// Empty the retry-and-log goroutine sendNotification spawns (it sleeps
 	// notificationRetryBackoff then retries) so it doesn't outlive the test.
 	waitForRunLogEvent(t, dir, "epic")
 }

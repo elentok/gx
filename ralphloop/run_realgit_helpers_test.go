@@ -305,7 +305,7 @@ func writeFakeExecutable(t *testing.T, name, body string) string {
 // assertNoLaunchTrace asserts the outcomes ticket 32 requires of every
 // launch-environment failure that's caught before a ticket is claimed:
 // repository (no feature worktree ever created), tracker (ticket left open,
-// never claimed, so no done/needs-answer/needs-repair residue), and
+// never claimed, so no done/paused (answer)/paused (repair) residue), and
 // diagnostic-trace (no run-log.jsonl at all — logEvent is never reached this
 // early) outcomes. A failure this early also never opens a Herdr tab, since
 // FindOrCreateWorkspace/AddWorktree/TabCreate all run strictly after these

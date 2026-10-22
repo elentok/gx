@@ -27,7 +27,7 @@ type iterationParams struct {
 	FeatureBranch   string
 	Agent           AgentKind
 	// Runner and Label name the agentrunner and iteration label hosting the
-	// agent, recorded on the server finish path's park events.
+	// agent, recorded on the server finish path's pause events.
 	Runner string
 	Label  string
 	// Model and Effort are the resolved per-agent config the launched agent
@@ -37,7 +37,7 @@ type iterationParams struct {
 	Effort string
 	Skill  string
 	// KeepAskedAgent leaves the worktree, pane and session in place when the
-	// agent's needs-answer report is adopted: the agent waits idle for the answer.
+	// agent's paused (answer) report is adopted: the agent waits idle for the answer.
 	KeepAskedAgent bool
 	Ticket         tickets.Ticket
 	// ScratchDir locates this run's run-log.jsonl (see eventlog.go);
@@ -98,7 +98,7 @@ func (p iterationParams) launchAndPromptParams(label, pane, prompt, sessionCwd, 
 	}
 }
 
-// agentEvent is the park event fields naming the iteration's agent.
+// agentEvent is the pause event fields naming the iteration's agent.
 func (p iterationParams) agentEvent(pane, sessionID, cwd string) Event {
 	return Event{Agent: p.Agent, Runner: p.Runner, Label: p.Label, Pane: pane, AgentSession: sessionID, Cwd: cwd}
 }
@@ -106,7 +106,7 @@ func (p iterationParams) agentEvent(pane, sessionID, cwd string) Event {
 // logTicketEvent appends eventType to p's run-log with p's ticket number
 // plus the given pane/tab/session/cwd — the shared shape behind every event
 // this package logs outside launchAndPrompt's own generic start/finish pair
-// (needs-answer, cherry-picked, conflict-hit, conflict-resolved,
+// (paused (answer), cherry-picked, conflict-hit, conflict-resolved,
 // deps-installed).
 func (p iterationParams) logTicketEvent(eventType, pane, agentSession, cwd string) {
 	p.logTicketEventReason(eventType, pane, agentSession, cwd, "")
@@ -120,7 +120,7 @@ func (p iterationParams) logTicketEventReason(eventType, pane, agentSession, cwd
 }
 
 // logTicketEventSHA is logTicketEventReason plus a SHA, for the
-// cherry-picked event — the feature branch's landed tip, recorded so startup
+// cherry-picked event — the feature branch's merged tip, recorded so startup
 // reconciliation can later confirm it's still reachable (see Event.SHA).
 func (p iterationParams) logTicketEventSHA(eventType, pane, agentSession, cwd, reason, sha string) {
 	_ = logEvent(p.ScratchDir, p.FeatureBranch, Event{
@@ -270,7 +270,7 @@ func (p launchAndPromptParams) sink() EventSink {
 }
 
 // launchFailure carries the events kind of a failed launch up to the loop's
-// catch-all park, so the park event matches the launch-failed events.
+// catch-all pause, so the pause event matches the launch-failed events.
 type launchFailure struct {
 	Kind events.Kind
 	Err  error
@@ -304,9 +304,9 @@ func (p iterationParams) logPromptNudged(label string, attempt int, decision str
 
 // startAndPrompt starts a session and sends its initial prompt. A prompt the
 // agent never picks up (ErrNotDelivered) points at a bad session rather than a
-// slow agent, so it gets exactly one fresh session before parking as
+// slow agent, so it gets exactly one fresh session before pausing as
 // agent_prompt_stalled. Any other prompt error (e.g. ErrNotReady on a blocked
-// agent) returns with the session still live, for the blocked-pane park.
+// agent) returns with the session still live, for the blocked-pane pause.
 // onFail is called for every failed attempt, to log launch-failed, and
 // onNudge for every nudge decision the runner made on the prompt.
 //
@@ -430,7 +430,7 @@ func adoptedLaunch(d Deps, p launchAndPromptParams) (string, error) {
 			return sessionID, nil
 		}
 		if err := promptIdle(d, p, sessionID, p.Prompt); err != nil {
-			if errors.Is(err, errBlockedPaneParked) {
+			if errors.Is(err, errBlockedPanePaused) {
 				return sessionID, err
 			}
 			return "", fmt.Errorf("sending initial prompt to stalled adopted session: %w", err)
@@ -439,11 +439,11 @@ func adoptedLaunch(d Deps, p launchAndPromptParams) (string, error) {
 	return waitLaunched(d, p, sessionID)
 }
 
-// waitLaunched is waitForFinish keeping sessionID on a blocked-pane park,
+// waitLaunched is waitForFinish keeping sessionID on a blocked-pane pause,
 // whose caller still records the live session.
 func waitLaunched(d Deps, p launchAndPromptParams, sessionID string) (string, error) {
 	if err := waitForFinish(d, p, sessionID); err != nil {
-		if errors.Is(err, errBlockedPaneParked) {
+		if errors.Is(err, errBlockedPanePaused) {
 			return sessionID, err
 		}
 		return "", err
@@ -475,7 +475,7 @@ func noActivitySinceLaunch(scratchDir, epicName, agentSession string, currentSeq
 }
 
 // plainFinishStates are the agent state values that mean "the agent's turn is
-// over" for every agent kind. "blocked" needs its own quota/park handling
+// over" for every agent kind. "blocked" needs its own quota/pause handling
 // rather than being treated as finished.
 var plainFinishStates = []string{"idle", "done"}
 
@@ -486,7 +486,7 @@ var runnerFinishStates = []agentrunner.State{agentrunner.StateIdle, agentrunner.
 // e.g. from TabList) already matches one of waitForFinish's plain-completion
 // target states. "blocked" is deliberately excluded even though waitForFinish
 // treats it as a finish state of its own — a pane already sitting blocked at
-// reattach still needs waitForFinish's dwell-and-park handling, not a bare
+// reattach still needs waitForFinish's dwell-and-pause handling, not a bare
 // skip.
 func alreadyFinished(status string) bool {
 	return slices.Contains(plainFinishStates, status)

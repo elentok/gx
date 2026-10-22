@@ -51,7 +51,7 @@ func TestPrune_HeadlessDirsArePrunedUnderAHerdrConfig(t *testing.T) {
 	if err := ralphloop.Claim(ticket); err != nil {
 		t.Fatal(err)
 	}
-	if err := ralphloop.Park(filepath.Join(store, "proj"), "epic-a", "01", ticket, events.IterationError, "stuck", ralphloop.Event{}); err != nil {
+	if err := ralphloop.Pause(filepath.Join(store, "proj"), "epic-a", "01", ticket, events.IterationError, "stuck", ralphloop.Event{}); err != nil {
 		t.Fatal(err)
 	}
 	root := t.TempDir()

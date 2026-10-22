@@ -345,7 +345,7 @@ func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.UnparkResu
 		if t.PausedClass() != schema.PauseClassAnswer || open == nil || answerState(*open, t.PausedClass().LegacyStatus()) != req.State {
 			return tickets.LogEvent{}, resumeRefused{staleResumeRefusal()}
 		}
-		if err := ralphloop.UnparkTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {
+		if err := ralphloop.ResumeTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {
 			return tickets.LogEvent{}, resumeRefused{repairRefusal(err)}
 		}
 		return tickets.LogEvent{
@@ -401,7 +401,7 @@ func (s *Server) promptLiveAgent(dir string, addr tickets.Address, text string) 
 	}
 	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.worktreeDir(addr.Project))
 	runner := s.runnerFor(addr.Project)
-	if pause, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID); ok {
+	if pause, ok := ralphloop.LatestPauseEvent(dir, addr.Epic, addr.ID); ok {
 		if pause.Label != "" {
 			label = pause.Label
 		}
@@ -454,7 +454,7 @@ func (s *Server) resumeSelfReported(epicPath, id string) (RepairResult, bool, er
 		}
 		s.registry.delete(address)
 	}
-	if err := ralphloop.CloseOpenQuestion(t.Path, ralphloop.CloseUnparked); err != nil {
+	if err := ralphloop.CloseOpenQuestion(t.Path, ralphloop.CloseResumed); err != nil {
 		return RepairResult{}, false, fmt.Errorf("close question of %s: %w", address, err)
 	}
 	return RepairResult{}, false, nil

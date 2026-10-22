@@ -9,9 +9,9 @@ import (
 
 // EpicFailureNotifier is called by the loop registry once a run has
 // returned an error, after the run's own EventSink has been closed and
-// drained. It is a separate, exported interface (rather than a call
+// emptied. It is a separate, exported interface (rather than a call
 // straight into EventSink) for two reasons: its lifetime must outlive the
-// run-scoped sink the drain just tore down, and callers outside this
+// run-scoped sink the empty just tore down, and callers outside this
 // package (ui/tickets' loop registry) need to supply a test double without
 // reaching into ralphloop's unexported chatTransport.
 type EpicFailureNotifier interface {
@@ -22,7 +22,7 @@ type EpicFailureNotifier interface {
 // production: it holds its own chat transports (constructed once, at run
 // start, from the same config the run's chatEventSink decoration used) so
 // that its EpicFailed call — made after that decoration's sink has already
-// closed and drained — still reaches chat instead of being emitted into a
+// closed and emptied — still reaches chat instead of being emitted into a
 // closed sink and dropped.
 type EpicFailureReporter struct {
 	scratchDir string
@@ -80,7 +80,7 @@ func (r *EpicFailureReporter) gate(transport, source string) (GateResult, error)
 // same fire-and-forget/retry-once/run-log semantics as chatEventSink.send.
 // counts is loaded fresh here rather than carried over from a live event,
 // since the run that would have carried one has already ended. Each target
-// is gated (source "epic:<name>", no parkTicket — there's no ticket to park
+// is gated (source "epic:<name>", no pauseTicket — there's no ticket to pause
 // this send against) before it sends; a gate trip still writes its
 // bookkeeping but suppresses the send itself.
 func (r *EpicFailureReporter) EpicFailed(epicName string, err error) {

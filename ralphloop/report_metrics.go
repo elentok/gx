@@ -175,18 +175,18 @@ func readAgentSessionStats(key sessionKey) (sessionStats, error) {
 	}, nil
 }
 
-// writeLandedMetrics reads sessionID's own transcript — the same
+// writeMergedMetrics reads sessionID's own transcript — the same
 // readAgentSessionStats call `gx ralph-loop report` uses, just invoked at
-// land-time instead of report-time — and, if its stats are available, writes
+// merge-time instead of report-time — and, if its stats are available, writes
 // its peak context occupancy and wall-clock duration into ticketPath's
 // actual_context_window/elapsed_time frontmatter fields, also returning the
-// same two values (ok=true) so landCherryPick can stamp them onto the landed
+// same two values (ok=true) so mergeCherryPick can stamp them onto the merged
 // commit's trailers too, matching what's in the frontmatter. A no-op
 // (ok=false, not an error) when sessionID is empty or the transcript can't be
-// read yet: a repair/reattached landing (see reconcile.go) has no fresh
-// session of its own to read, and these metrics are a landing-time
+// read yet: a repair/reattached merging (see reconcile.go) has no fresh
+// session of its own to read, and these metrics are a merging-time
 // convenience, not a precondition for the cherry-pick itself to succeed.
-func writeLandedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (contextWindow, elapsedSeconds int, cost float64, ok bool, err error) {
+func writeMergedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (contextWindow, elapsedSeconds int, cost float64, ok bool, err error) {
 	stats, err := readAgentSessionStats(sessionKey{agent: agent, cwd: cwd, sessionID: sessionID})
 	if err != nil || !stats.ok {
 		return 0, 0, 0, false, nil

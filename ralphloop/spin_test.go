@@ -11,9 +11,9 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// seedParks writes n park events for ticket 01 at the given age, as a prior
+// seedPauses writes n pause events for ticket 01 at the given age, as a prior
 // run (or process) would have left in the run log.
-func seedParks(t *testing.T, scratchDir, epic string, n int, age time.Duration) {
+func seedPauses(t *testing.T, scratchDir, epic string, n int, age time.Duration) {
 	t.Helper()
 	for range n {
 		err := logEvent(scratchDir, epic, Event{
@@ -26,15 +26,15 @@ func seedParks(t *testing.T, scratchDir, epic string, n int, age time.Duration) 
 	}
 }
 
-func runSpinScenario(t *testing.T, parks int, age time.Duration, opts RunOptions) (scratchDir string, prompts *[]string) {
+func runSpinScenario(t *testing.T, pauses int, age time.Duration, opts RunOptions) (scratchDir string, prompts *[]string) {
 	t.Helper()
 	scratchDir = writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
-	seedParks(t, scratchDir, "epic", parks, age)
+	seedPauses(t, scratchDir, "epic", pauses, age)
 	d, prompts, _ := fakeDeps()
 	opts.EpicName, opts.Skill, opts.ScratchDir, opts.RepoDir = "epic", "implement", scratchDir, "/fake/repo"
-	runUntilParked(t, opts, d, noopEventSink{})
+	runUntilPaused(t, opts, d, noopEventSink{})
 	return scratchDir, prompts
 }
 
@@ -53,7 +53,7 @@ func spinningEvents(t *testing.T, scratchDir string) []Event {
 	return out
 }
 
-func TestRun_SpinCyclesInsideWindow_ParkSpinningAndNeverReclaim(t *testing.T) {
+func TestRun_SpinCyclesInsideWindow_PauseSpinningAndNeverReclaim(t *testing.T) {
 	t.Parallel()
 	scratchDir, prompts := runSpinScenario(t, 3, time.Minute, RunOptions{})
 
@@ -74,21 +74,21 @@ func TestRun_SpinCyclesInsideWindow_ParkSpinningAndNeverReclaim(t *testing.T) {
 func TestRun_SpinCycles_BelowThresholdOrOutsideWindow_StillClaims(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct {
-		parks int
-		age   time.Duration
-		opts  RunOptions
+		pauses int
+		age    time.Duration
+		opts   RunOptions
 	}{
-		"below default M":      {parks: 2, age: time.Minute},
-		"outside default 5min": {parks: 3, age: 10 * time.Minute},
-		"custom cycles":        {parks: 3, age: time.Minute, opts: RunOptions{SpinCycles: 4}},
-		"custom window":        {parks: 3, age: time.Minute, opts: RunOptions{SpinWindow: 30 * time.Second}},
+		"below default M":      {pauses: 2, age: time.Minute},
+		"outside default 5min": {pauses: 3, age: 10 * time.Minute},
+		"custom cycles":        {pauses: 3, age: time.Minute, opts: RunOptions{SpinCycles: 4}},
+		"custom window":        {pauses: 3, age: time.Minute, opts: RunOptions{SpinWindow: 30 * time.Second}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			scratchDir := writeEpic(t, "epic", map[string]string{
 				"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 			})
-			seedParks(t, scratchDir, "epic", tc.parks, tc.age)
+			seedPauses(t, scratchDir, "epic", tc.pauses, tc.age)
 			d, prompts, _ := fakeDeps()
 			opts := tc.opts
 			opts.EpicName, opts.Skill, opts.ScratchDir, opts.RepoDir = "epic", "implement", scratchDir, "/fake/repo"
@@ -118,7 +118,7 @@ func TestFirstNonSpinning_QuarantinesSpinningCandidatesAndReturnsNextClean(t *te
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
 	})
-	seedParks(t, scratchDir, "epic", 3, time.Minute)
+	seedPauses(t, scratchDir, "epic", 3, time.Minute)
 	epic, err := loadNamedEpic(scratchDir, "epic")
 	if err != nil {
 		t.Fatalf("loadNamedEpic: %v", err)

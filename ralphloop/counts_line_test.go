@@ -4,7 +4,7 @@ import "testing"
 
 // TestRenderCountsLine_DocumentedShapes tables the five shapes ticket 27's
 // spec calls out by name: fresh, resumed, already done, empty, and
-// mid-run park.
+// mid-run pause.
 func TestRenderCountsLine_DocumentedShapes(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -13,7 +13,7 @@ func TestRenderCountsLine_DocumentedShapes(t *testing.T) {
 		want   string
 	}{
 		{
-			name:   "fresh start, nothing landed yet",
+			name:   "fresh start, nothing merged yet",
 			counts: EpicCounts{Done: 0, InProgress: 1, Ready: 9, Total: 10},
 			want:   "0 done · 1 in progress · 9 ready · 10 total",
 		},
@@ -33,7 +33,7 @@ func TestRenderCountsLine_DocumentedShapes(t *testing.T) {
 			want:   "0 done · 0 total",
 		},
 		{
-			name:   "mid-run park, matching the spec's own example",
+			name:   "mid-run pause, matching the spec's own example",
 			counts: EpicCounts{Done: 8, PausedIdentifiers: []string{"07"}, Ready: 1, Total: 10},
 			want:   "8 done · 1 paused: 07 · 1 ready · 10 total",
 		},

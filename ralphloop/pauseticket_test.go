@@ -14,9 +14,9 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// Seam B: a ticket parked by the loop's catch-all writes the ticket, appends
-// exactly one needs-repair event with a kind and address, and notifies.
-func TestRun_CatchAll_ParksThroughOnePath(t *testing.T) {
+// Seam B: a ticket paused by the loop's catch-all writes the ticket, appends
+// exactly one paused (repair) event with a kind and address, and notifies.
+func TestRun_CatchAll_PausesThroughOnePath(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -30,8 +30,8 @@ func TestRun_CatchAll_ParksThroughOnePath(t *testing.T) {
 		}
 		return origAddWorktree(repoDir, wtPath, branch, base)
 	}
-	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
-		// End the run: a human closes the parked ticket.
+	d.PauseTimer = func(dur time.Duration) <-chan time.Time {
+		// End the run: a human closes the paused ticket.
 		if err := SetStatus(path, "done"); err != nil {
 			t.Errorf("SetStatus: %v", err)
 		}
@@ -62,7 +62,7 @@ func TestRun_CatchAll_ParksThroughOnePath(t *testing.T) {
 	}
 }
 
-func TestPark_WritesTicketEventAndNotifies(t *testing.T) {
+func TestPause_WritesTicketEventAndNotifies(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
@@ -70,7 +70,7 @@ func TestPark_WritesTicketEventAndNotifies(t *testing.T) {
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	sink := &recordingSink{}
 
-	park(sink, parkRequest{
+	pause(sink, pauseRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.IterationError, Reason: "boom",
 		Repair: schema.FaultState{Label: "l", Branch: "b", Worktree: "w"},
@@ -86,15 +86,15 @@ func TestPark_WritesTicketEventAndNotifies(t *testing.T) {
 	}
 }
 
-// A park write on a done ticket is refused under the ticket lock: nothing is
+// A pause write on a done ticket is refused under the ticket lock: nothing is
 // written, no event is appended, no one is notified, and the refusal is logged.
 // Not parallel: it captures the process-wide log output.
-func TestPark_RefusesDoneTicket(t *testing.T) {
+func TestPause_RefusesDoneTicket(t *testing.T) {
 	var logged bytes.Buffer
 	log.SetOutput(&logged)
 	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
-	// One kind per park writer: needs-repair, stubbed and bare needs-answer.
+	// One kind per pause writer: paused (repair), stubbed and bare paused (answer).
 	for _, kind := range []events.Kind{events.IterationError, events.BlockedPane, events.ZeroCommit} {
 		t.Run(string(kind), func(t *testing.T) {
 			logged.Reset()
@@ -103,13 +103,13 @@ func TestPark_RefusesDoneTicket(t *testing.T) {
 			path := ticketPath(scratchDir, "my-epic", "01-a.md")
 			sink := &recordingSink{}
 
-			_, err := park(sink, parkRequest{
+			_, err := pause(sink, pauseRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 				Type: events.Paused, Kind: kind, Reason: "late", Repair: schema.FaultState{Label: "l"},
 			})
 
-			if !errors.Is(err, ErrParkDone) {
-				t.Fatalf("err = %v, want ErrParkDone", err)
+			if !errors.Is(err, ErrPauseDone) {
+				t.Fatalf("err = %v, want ErrPauseDone", err)
 			}
 			if raw, _ := os.ReadFile(path); string(raw) != content {
 				t.Errorf("ticket rewritten:\n%s", raw)
@@ -127,9 +127,9 @@ func TestPark_RefusesDoneTicket(t *testing.T) {
 	}
 }
 
-// Seam B: finish-time needs-answer parks (zero-commit, self-reported) each write
-// the ticket's park_kind and append one needs-answer event with that kind.
-func TestPark_NeedsAnswerKinds(t *testing.T) {
+// Seam B: finish-time paused (answer) pauses (zero-commit, self-reported) each write
+// the ticket's pause_kind and append one paused (answer) event with that kind.
+func TestPause_AskingKinds(t *testing.T) {
 	t.Parallel()
 	for _, kind := range []events.Kind{events.ZeroCommit, events.SelfReported} {
 		t.Run(string(kind), func(t *testing.T) {
@@ -140,7 +140,7 @@ func TestPark_NeedsAnswerKinds(t *testing.T) {
 			path := ticketPath(scratchDir, "my-epic", "01-a.md")
 			sink := &recordingSink{}
 
-			if _, err := park(sink, parkRequest{
+			if _, err := pause(sink, pauseRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 				Type: events.Paused, Kind: kind, Reason: "why", Event: Event{Pane: "p1"},
 			}); err != nil {
@@ -160,7 +160,7 @@ func TestPark_NeedsAnswerKinds(t *testing.T) {
 	}
 }
 
-func TestPark_LogsGxQuestionPerKind(t *testing.T) {
+func TestPause_LogsGxQuestionPerKind(t *testing.T) {
 	t.Parallel()
 	for kind, summary := range gxQuestions {
 		t.Run(string(kind), func(t *testing.T) {
@@ -169,7 +169,7 @@ func TestPark_LogsGxQuestionPerKind(t *testing.T) {
 				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
 			path := ticketPath(scratchDir, "my-epic", "01-a.md")
-			if _, err := park(&recordingSink{}, parkRequest{
+			if _, err := pause(&recordingSink{}, pauseRequest{
 				ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 				Type: events.Paused, Kind: kind, Reason: "why",
 			}); err != nil {
@@ -186,13 +186,13 @@ func TestPark_LogsGxQuestionPerKind(t *testing.T) {
 	}
 }
 
-func TestPark_SelfReportedLogsNoQuestion(t *testing.T) {
+func TestPause_SelfReportedLogsNoQuestion(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
-	if _, err := park(&recordingSink{}, parkRequest{
+	if _, err := pause(&recordingSink{}, pauseRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.SelfReported, Reason: "why",
 	}); err != nil {
@@ -203,16 +203,16 @@ func TestPark_SelfReportedLogsNoQuestion(t *testing.T) {
 	}
 }
 
-// Seam B: a needs-repair park stamps the event's kind into frontmatter as
-// park_kind; a claim (resume) clears it while the event stays in the log.
-func TestPark_NeedsRepairStampsParkKindClearedOnClaim(t *testing.T) {
+// Seam B: a paused (repair) pause stamps the event's kind into frontmatter as
+// pause_kind; a claim (resume) clears it while the event stays in the log.
+func TestPause_RepairStampsPauseKindClearedOnClaim(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 
-	park(&recordingSink{}, parkRequest{
+	pause(&recordingSink{}, pauseRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.BudgetKilled, Reason: "boom",
 	})
@@ -226,7 +226,7 @@ func TestPark_NeedsRepairStampsParkKindClearedOnClaim(t *testing.T) {
 	}
 	evs, _, _ := ReadEvents(scratchDir, "my-epic")
 	if len(evs) != 1 || evs[0].Kind != "budget-killed" {
-		t.Errorf("events = %+v, want the park event kept", evs)
+		t.Errorf("events = %+v, want the pause event kept", evs)
 	}
 }
 
@@ -243,10 +243,10 @@ func openQuestionSummary(t *testing.T, path string) string {
 	return ""
 }
 
-// Seam 1: Park derives the event type from the kind, and a needs-answer park
+// Seam 1: Pause derives the event type from the kind, and a paused (answer) pause
 // never writes a Needs Answer/Handoff section into the markdown: the question
 // lives in the log.
-func TestPark_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T) {
+func TestPause_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		kind     events.Kind
@@ -271,13 +271,13 @@ func TestPark_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T)
 				"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 			})
 			path := ticketPath(scratchDir, "my-epic", "01-a.md")
-			if err := Park(scratchDir, "my-epic", "01", path, c.kind, "the-reason", Event{}); err != nil {
+			if err := Pause(scratchDir, "my-epic", "01", path, c.kind, "the-reason", Event{}); err != nil {
 				t.Fatal(err)
 			}
 			got := mustParse(t, path)
 			assertPaused(t, got, legacyClass(c.status), schema.ParsePauseReason(string(c.kind)))
 			if data, _ := os.ReadFile(path); strings.Contains(string(data), "## Needs Answer") || strings.Contains(string(data), "## Handoff") {
-				t.Errorf("park wrote a conversation section into the .md:\n%s", data)
+				t.Errorf("pause wrote a conversation section into the .md:\n%s", data)
 			}
 			qevs, err := tickets.ReadLog(path)
 			if err != nil {

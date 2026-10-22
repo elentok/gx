@@ -65,9 +65,9 @@ type sendResult struct {
 // Chat membership (see eventSinkVerdicts in eventsink_contract_test.go for
 // the full yes/no map over every EventSink method): EpicStarted,
 // IterationStarted, IterationPaused/IterationResumed (only for a
-// non-park pause kind — PauseNeedsRepair is the same outcome
-// TicketNeedsHuman already reports, and a park must produce exactly one
-// chat message), IterationFinished, TicketNeedsHuman, EpicParked,
+// non-pause pause kind — PauseRepair is the same outcome
+// TicketNeedsHuman already reports, and a pause must produce exactly one
+// chat message), IterationFinished, TicketNeedsHuman, EpicPaused,
 // and EpicComplete. Every other event is a pure pass-through
 // to the embedded EventSink.
 // ChatEventSink is the interface NewTelegramEventSink/NewSlackEventSink's
@@ -103,8 +103,8 @@ type chatEventSink struct {
 	gateKey string
 
 	// flushMidpointHook, if non-nil, runs synchronously inside flush() right
-	// after drainQueue but before the gate/sendRaw call that hands the
-	// drained items off — a test-only seam for deterministically landing
+	// after emptyQueue but before the gate/sendRaw call that hands the
+	// emptied items off — a test-only seam for deterministically merging
 	// Close() inside the exact window stopFlushLoop's wait-for-actual-exit
 	// exists to close: a flush that has already taken items off the queue
 	// but not yet reached sendRaw, and so not yet incremented inFlight. Nil
@@ -307,9 +307,9 @@ func (s *chatEventSink) enqueueIn(group, text chatmarkup.Text, kind string) {
 	s.queue = append(s.queue, batchedMessage{text: text, kind: kind, count: 1, group: group})
 }
 
-// drainQueue empties the queue and returns what it held, so flush/closeFlush
+// emptyQueue empties the queue and returns what it held, so flush/closeFlush
 // can render or suppress it outside the lock.
-func (s *chatEventSink) drainQueue() []batchedMessage {
+func (s *chatEventSink) emptyQueue() []batchedMessage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	items := s.queue
@@ -325,7 +325,7 @@ func (s *chatEventSink) drainQueue() []batchedMessage {
 // fail-open policy. A tick with an empty queue sends nothing and never
 // calls the gate.
 //
-// recordSend is false when every drained item is a requeue (see requeue) of
+// recordSend is false when every emptied item is a requeue (see requeue) of
 // a batch that already recorded a send on its first attempt — a retry cycle
 // during a sustained outage must not keep charging the budget for the same
 // logical batch, or it could trip the global-mute breaker purely from
@@ -333,7 +333,7 @@ func (s *chatEventSink) drainQueue() []batchedMessage {
 // fresh arrival, or one merged with a requeue — see requeue) still charges
 // normally.
 func (s *chatEventSink) flush() {
-	items := s.drainQueue()
+	items := s.emptyQueue()
 	if len(items) == 0 {
 		return
 	}
@@ -352,7 +352,7 @@ func (s *chatEventSink) flush() {
 	s.sendRaw(items, renderBatch(s.style, items), notifyKindBatch)
 }
 
-// allRequeued reports whether every item in a drained batch came back from a
+// allRequeued reports whether every item in a emptied batch came back from a
 // failed prior flush (see requeue) rather than a fresh enqueue.
 func allRequeued(items []batchedMessage) bool {
 	for _, it := range items {
@@ -373,7 +373,7 @@ func allRequeued(items []batchedMessage) bool {
 // rather than sendRaw's fire-and-forget goroutine, since the process may
 // exit right after Close returns.
 func (s *chatEventSink) closeFlush(deadline time.Time) {
-	items := s.drainQueue()
+	items := s.emptyQueue()
 	if len(items) == 0 {
 		return
 	}
@@ -506,18 +506,18 @@ func ResolveTicketPath(scratchDir, epicName, identifier string) string {
 	return matches[0]
 }
 
-// parkTicket is the ParkFunc the gate calls when it trips a per-source mute
+// pauseTicket is the PauseFunc the gate calls when it trips a per-source mute
 // on a ticket-backed source: source is already the ticket's file path (the
-// gate never calls this for a ticket-less source), so parking it is just
-// a park with a reason identifying the trip as a storm mute. It parks through
+// gate never calls this for a ticket-less source), so pausing it is just
+// a pause with a reason identifying the trip as a storm mute. It pauses through
 // the inner sink: the chat sink would re-enter the gate this callback runs
 // inside of.
-func (s *chatEventSink) parkTicket(source, reason string) error {
+func (s *chatEventSink) pauseTicket(source, reason string) error {
 	identifier := filepath.Base(source)
 	if t, err := schema.ParseTicket(source); err == nil {
 		identifier = string(t.ID)
 	}
-	_, err := park(s.EventSink, parkRequest{
+	_, err := pause(s.EventSink, pauseRequest{
 		ScratchDir: s.scratchDir,
 		EpicName:   s.epicName,
 		Ticket:     identifier,
@@ -539,9 +539,9 @@ func (s *chatEventSink) parkTicket(source, reason string) error {
 func (s *chatEventSink) gate(eventType, source string, recordSend bool) (GateResult, error) {
 	key := firstNonEmptyStr(s.gateKey, s.transport.name())
 	if s.gateStatePath != "" {
-		return notificationGateAt(s.gateStatePath, key, eventType, source, time.Now(), recordSend, s.parkTicket)
+		return notificationGateAt(s.gateStatePath, key, eventType, source, time.Now(), recordSend, s.pauseTicket)
 	}
-	return NotificationGate(key, eventType, source, time.Now(), recordSend, s.parkTicket)
+	return NotificationGate(key, eventType, source, time.Now(), recordSend, s.pauseTicket)
 }
 
 func (s *chatEventSink) EpicStarted(epicName string, done, total int) {
@@ -556,10 +556,10 @@ func (s *chatEventSink) IterationStarted(ticket tickets.Ticket, label, cwd, sess
 
 func (s *chatEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
 	s.EventSink.IterationPaused(identifier, label, kind, reason)
-	if kind == PauseNeedsRepair {
-		// A needs-repair pause always accompanies a TicketNeedsHuman park —
+	if kind == PauseRepair {
+		// A paused (repair) pause always accompanies a TicketNeedsHuman pause —
 		// that's the one chat-visible message for this outcome, so this
-		// pause itself stays TUI-only (see "park cardinality").
+		// pause itself stays TUI-only (see "pause cardinality").
 		return
 	}
 	s.send(s.style.iterationPausedText(label, reason, s.epicName, identifier), notifyKindIterationPaused, s.resolveTicketPath(identifier), identifier)
@@ -567,7 +567,7 @@ func (s *chatEventSink) IterationPaused(identifier, label string, kind PauseKind
 
 func (s *chatEventSink) IterationResumed(identifier, label string, kind PauseKind) {
 	s.EventSink.IterationResumed(identifier, label, kind)
-	if kind == PauseNeedsRepair {
+	if kind == PauseRepair {
 		return
 	}
 	s.send(s.style.iterationResumedText(label, s.epicName, identifier), notifyKindIterationResumed, s.resolveTicketPath(identifier), identifier)
@@ -584,8 +584,8 @@ func (s *chatEventSink) TicketNeedsHuman(identifier, epicName, status string, ki
 	s.send(s.style.ticketNeedsHumanText(identifier, epicName, status, kind, reason, counts), notifyKindTicketNeedsHuman, s.resolveTicketPath(identifier), identifier)
 }
 
-func (s *chatEventSink) EpicParked(epicName string, stalled []StalledTicket) {
-	s.EventSink.EpicParked(epicName, stalled)
+func (s *chatEventSink) EpicPaused(epicName string, stalled []StalledTicket) {
+	s.EventSink.EpicPaused(epicName, stalled)
 	identifiers := make([]string, len(stalled))
 	for i, t := range stalled {
 		identifiers[i] = t.Identifier
@@ -666,7 +666,7 @@ const maxRequeueSize = 50
 
 // requeue puts a failed flush's items back at the front of the queue —
 // prepended, since they're older than anything queued since the batch was
-// drained, and merged into any identical text already queued rather than
+// emptied, and merged into any identical text already queued rather than
 // appended as a duplicate (see enqueue's same dedup rule). Every requeued
 // entry is marked requeued so flush knows not to re-charge the notification
 // gate's send budget for a batch it already charged once (see flush); an

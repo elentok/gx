@@ -13,7 +13,7 @@ import (
 )
 
 // TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports exercises
-// ticket 02: a done ticket classified doneRecoverable (its landed commit
+// ticket 02: a done ticket classified doneRecoverable (its merged commit
 // missing from the feature branch, but its iteration branch still holds it)
 // gets re-cherry-picked automatically, with a cherry-picked event logged and
 // a report line naming what was restored.
@@ -31,7 +31,7 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 	}
 
 	d, _, _ := fakeDeps()
-	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil } // landed SHA missing
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil } // merged SHA missing
 	// d.RevParse defaults to returning "deadbeef" for any ref (fakeDeps), so
 	// the iteration branch is treated as still existing.
 
@@ -77,7 +77,7 @@ func TestReconcile_DoneTicketRecoverable_AutoRecherryPicksAndReports(t *testing.
 // seeds a live row before CherryPickStarted), a startup repair went straight
 // to CherryPickStarted/ConflictResolutionStarted with no live row to update,
 // so the tickets tab showed nothing (not even a spinner) while a done
-// ticket's commits were being re-landed. TicketRecovering must fire first so
+// ticket's commits were being re-merged. TicketRecovering must fire first so
 // a renderer has something to attach the cherry-pick phase to.
 func TestReconcile_DoneTicketRecoverable_ReportsRecoveringBeforeCherryPick(t *testing.T) {
 	t.Parallel()
@@ -196,7 +196,7 @@ func TestReconcile_DoneTicketRecoverable_ReattachesLiveConflictResolverWithoutRe
 	}
 
 	d, _, _ := fakeDeps()
-	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil } // landed SHA missing
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil } // merged SHA missing
 
 	hostLiveAgent(t, d, "conflict-03")
 	fakeRunner(d).SetState("conflict-03", agentrunner.StateWorking, "")
@@ -291,7 +291,7 @@ func TestReconcile_DoneTicketRecoverable_CleansUpLeftoverWorktreeAndTab(t *testi
 
 // TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup exercises
 // ticket 04: a done ticket classified doneStaleCleanup (commits already
-// landed, but a leftover worktree/tab/branch survived a crash between marking
+// merged, but a leftover worktree/tab/branch survived a crash between marking
 // done and the cleanup step right after it) gets that cleanup finished on
 // startup — worktree removed, tab closed, and its now-redundant branch
 // deleted.
@@ -310,7 +310,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 
 	d, _, _ := fakeDeps()
 	hostLiveAgent(t, d, iterLabel("epic", "03"))
-	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil } // commits landed
+	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil } // commits merged
 	d.WorktreeExists = func(path string) (bool, error) { return strings.Contains(path, "item-03"), nil }
 	// d.RevParse defaults to returning "deadbeef" for any ref (fakeDeps), so the
 	// iteration branch is treated as still existing too.
@@ -356,7 +356,7 @@ func TestReconcile_DoneTicketStaleCleanup_FinishesLeftoverCleanup(t *testing.T) 
 }
 
 // TestReconcile_DoneTicketFullyClean_NoOp verifies a done ticket with commits
-// landed and nothing left behind (doneOK) is untouched: no worktree/tab/
+// merged and nothing left behind (doneOK) is untouched: no worktree/tab/
 // branch cleanup calls, no spurious report lines.
 func TestReconcile_DoneTicketFullyClean_NoOp(t *testing.T) {
 	t.Parallel()

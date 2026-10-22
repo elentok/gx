@@ -13,10 +13,10 @@ import (
 // unfiltered list, with a landing in flight reported beside it.
 type VerifyResult struct {
 	Tickets         []ralphloop.TicketVerification `json:"tickets"`
-	LandingInFlight *ralphloop.LandMarker          `json:"landing_in_flight"`
+	LandingInFlight *ralphloop.MergeMarker         `json:"landing_in_flight"`
 	// OrphanLandLock is a land lock with no marker: a land mid-flight, or a
 	// crash leftover when its owner is not running.
-	OrphanLandLock *ralphloop.LandLockOwner `json:"orphan_land_lock"`
+	OrphanLandLock *ralphloop.MergeLockOwner `json:"orphan_land_lock"`
 }
 
 // VerifyRun is everything Verify needs.
@@ -80,18 +80,18 @@ func Verify(run VerifyRun) (VerifyResult, error) {
 		verifications = []ralphloop.TicketVerification{}
 	}
 
-	lockDir, err := ralphloop.LandLockDir(epicPath)
+	lockDir, err := ralphloop.MergeLockDir(epicPath)
 	if err != nil {
 		return VerifyResult{}, err
 	}
-	marker, err := ralphloop.ReadLandMarker(lockDir)
+	marker, err := ralphloop.ReadMergeMarker(lockDir)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("reading land marker: %w", err)
 	}
 	if marker != nil && marker.Epic != epicName {
 		marker = nil
 	}
-	orphan, err := ralphloop.OrphanLandLock(lockDir)
+	orphan, err := ralphloop.OrphanMergeLock(lockDir)
 	if err != nil {
 		return VerifyResult{}, fmt.Errorf("reading land lock: %w", err)
 	}

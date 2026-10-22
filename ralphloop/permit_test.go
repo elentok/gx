@@ -29,7 +29,7 @@ func (p *fakePermit) Release() {
 
 // TestRun_NilPermit_BehavesUnrestricted is regression coverage for
 // RunOptions.Permit left unset: every existing caller/test keeps today's
-// unrestricted behavior (mirrors TestRun_StalledTicket_ParksInsteadOfExiting's
+// unrestricted behavior (mirrors TestRun_StalledTicket_PausesInsteadOfExiting's
 // setup without duplicating its full assertion set).
 func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 	t.Parallel()
@@ -37,34 +37,34 @@ func TestRun_NilPermit_BehavesUnrestricted(t *testing.T) {
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
-	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
-	d.ParkTimer = parkTimer
+	pauseTimer, polls := clearOnPause(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
+	d.PauseTimer = pauseTimer
 
 	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
 	if err != nil {
 		t.Fatalf("Run() error = %v, want nil (no Permit set, unrestricted behavior)", err)
 	}
 	if *polls == 0 {
-		t.Errorf("run never parked (no park poll), want it to park on the needs-answer ticket")
+		t.Errorf("run never paused (no pause poll), want it to pause on the needs-answer ticket")
 	}
 	if len(*prompts) != 1 {
 		t.Errorf("prompts = %v, want the cleared ticket claimed and run once", *prompts)
 	}
 }
 
-// TestRun_Permit_AcquiredOnClaimReleasedOnPark proves the park transition
+// TestRun_Permit_AcquiredOnClaimReleasedOnPause proves the pause transition
 // releases the slot: a fake Permit fails the test outright if Acquire is
 // called a second time without an intervening Release, and the run must
 // Acquire at least twice — once before the initial claim attempt finds
-// nothing runnable and parks, once again after a human clears the ticket.
-func TestRun_Permit_AcquiredOnClaimReleasedOnPark(t *testing.T) {
+// nothing runnable and pauses, once again after a human clears the ticket.
+func TestRun_Permit_AcquiredOnClaimReleasedOnPause(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
-	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
-	d.ParkTimer = parkTimer
+	pauseTimer, polls := clearOnPause(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
+	d.PauseTimer = pauseTimer
 
 	var mu sync.Mutex
 	held := false
@@ -93,10 +93,10 @@ func TestRun_Permit_AcquiredOnClaimReleasedOnPark(t *testing.T) {
 
 	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", Permit: permit}, d, &recordingSink{})
 	if err != nil {
-		t.Fatalf("Run() error = %v, want nil (a stalled run parks, it doesn't error)", err)
+		t.Fatalf("Run() error = %v, want nil (a stalled run pauses, it doesn't error)", err)
 	}
 	if *polls == 0 {
-		t.Errorf("run never parked (no park poll)")
+		t.Errorf("run never paused (no pause poll)")
 	}
 	if len(*prompts) != 1 {
 		t.Errorf("prompts = %v, want the cleared ticket claimed and run once", *prompts)
@@ -105,10 +105,10 @@ func TestRun_Permit_AcquiredOnClaimReleasedOnPark(t *testing.T) {
 	mu.Lock()
 	defer mu.Unlock()
 	if acquireCalls < 2 {
-		t.Errorf("Acquire calls = %d, want at least 2 (initial park attempt, then the relaunch after clearing)", acquireCalls)
+		t.Errorf("Acquire calls = %d, want at least 2 (initial pause attempt, then the relaunch after clearing)", acquireCalls)
 	}
 	if releaseCalls == 0 {
-		t.Errorf("Release calls = %d, want at least 1 (released at the park)", releaseCalls)
+		t.Errorf("Release calls = %d, want at least 1 (released at the pause)", releaseCalls)
 	}
 	if held {
 		t.Errorf("permit left held after Run returned, want released (defer releasePermit)")

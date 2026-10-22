@@ -147,7 +147,7 @@ func TestRun_ForkParallelChildren_BothClaimedAfterParentHandsOff(t *testing.T) {
 // declares blocked_by: ["01"] alone, naming only the fork's root — but 01's
 // own AgentPrompt turn forks it into 01a (parent: "01") mid-run, and that
 // fork subtree must also finish before Epic.Blocking(01) clears, so 02 must
-// not be claimed until 01a lands too, not merely once 01 itself does.
+// not be claimed until 01a merges too, not merely once 01 itself does.
 func TestRun_DependentOfForkedTicket_WaitsForWholeSubtree(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -189,7 +189,7 @@ func TestRun_DependentOfForkedTicket_WaitsForWholeSubtree(t *testing.T) {
 // 01's own AgentPrompt turn forks it into two parallel children (01a, 01b,
 // both parent: "01"), and ticket 02 declares blocked_by: ["01a"] — one
 // specific fork sibling, not the shared parent 01 nor the other sibling 01b.
-// 02 must be claimable as soon as 01a lands, without waiting for 01b —
+// 02 must be claimable as soon as 01a merges, without waiting for 01b —
 // proven here by holding 01b's iteration open (via a blocked AgentPrompt
 // call) until after 02 has already been claimed.
 func TestRun_BlockedBySpecificForkSibling_WaitsForExactlyThatSibling(t *testing.T) {
@@ -223,7 +223,7 @@ func TestRun_BlockedBySpecificForkSibling_WaitsForExactlyThatSibling(t *testing.
 	// claimed (right before 01b's held-open AgentPrompt call is released) —
 	// if the scheduler wrongly required 01b done before claiming 02, this
 	// would already read "status: done"; instead it must still read
-	// "status: claimed", proving 02 didn't wait for 01b to land.
+	// "status: claimed", proving 02 didn't wait for 01b to merge.
 	var stillClaimedAt01bRelease string
 
 	onRunnerPrompt(d, func(s agentrunner.Session, _ string) error {

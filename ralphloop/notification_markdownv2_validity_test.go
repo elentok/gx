@@ -40,7 +40,7 @@ func TestMarkdownV2Validity_AllNotificationTexts(t *testing.T) {
 		"iterationPausedText":               telegramStyle.iterationPausedText("iter-04", "rate limit (hit).", adversarialEpic, adversarialTicket),
 		"iterationResumedText":              telegramStyle.iterationResumedText("iter-04", adversarialEpic, adversarialTicket),
 		"iterationFinishedText":             telegramStyle.iterationFinishedText(ticket, adversarialEpic, stats),
-		"ticketNeedsHumanText/needs-answer": telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, "needs-answer", "zero-commit", "No commits landed (yet).", overflowCounts),
+		"ticketNeedsHumanText/needs-answer": telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, "needs-answer", "zero-commit", "No commits merged (yet).", overflowCounts),
 		"ticketNeedsHumanText/needs-repair": telegramStyle.ticketNeedsHumanText(adversarialTicket, adversarialEpic, "needs-repair", "blocked-pane", "Operator intervention required.", overflowCounts),
 		"epicPausedText":                    telegramStyle.epicPausedText(adversarialEpic, []string{"04", "07"}),
 		"epicCompleteText":                  telegramStyle.epicCompleteText(adversarialEpic, overflowCounts, 5, 492, fractionalCost),

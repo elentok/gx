@@ -44,5 +44,5 @@ func Unpark(epicPath, id string, now time.Time, base string) (UnparkResult, erro
 	if status := epic.RenderedStatus(t); status != tickets.StatusPausedAnswer {
 		return res, &RefusalError{Reason: ReasonNotParked, Message: fmt.Sprintf("ticket %s is %v, not needs-answer", id, status)}
 	}
-	return res, ralphloop.UnparkTicketWithBase(t.Path, now, base)
+	return res, ralphloop.ResumeTicketWithBase(t.Path, now, base)
 }

@@ -28,12 +28,12 @@ import (
 // unrelated multi-minute package hang.
 func TestMain(m *testing.M) {
 	herdrfake.RunHelperProcess()
-	// Land locks live in the state dir; keep tests off the machine's real one.
+	// Merge locks live in the state dir; keep tests off the machine's real one.
 	state, err := os.MkdirTemp("", "gx-ralphloop-state")
 	if err != nil {
 		panic(err)
 	}
-	landLockStateDir = func() (string, error) { return state, nil }
+	mergeLockStateDir = func() (string, error) { return state, nil }
 	cleanup := claudeenv.Isolate()
 	code := m.Run()
 	cleanup()
@@ -287,7 +287,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 //
 // The compact-completion poll handler advances virtual time by one
 // smartZonePollMs tick per dispatch, which is what makes the boundary
-// eventually land: ClaudeCompact writes it lazily inside Status once virtual
+// eventually merge: ClaudeCompact writes it lazily inside Status once virtual
 // time passes its compaction duration, and herdrfake's clock never moves on
 // its own. A scenario that left the clock still would never reach the boundary
 // and would instead exercise the gated give-up path, so the virtual-time
@@ -378,7 +378,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 		done := finishedUp
 		keyed := ctrlCCalls > 0
 		mu.Unlock()
-		// Before the finish-up prompt lands the agent is mid-turn, so every
+		// Before the finish-up prompt merges the agent is mid-turn, so every
 		// ordinary finish poll times out — that's the tick the smart-zone
 		// breach is detected on.
 		if done && (len(until) == 0 || slices.Contains(until, "done")) {
@@ -398,7 +398,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	})
 
 	// Interrupt reads the state to pick its key: the pane is mid-turn until
-	// the interrupt lands.
+	// the interrupt merges.
 	s.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		mu.Lock()
 		keyed := ctrlCCalls > 0
@@ -483,7 +483,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	elapsedVirtual := virtualTime
 	mu.Unlock()
 	if got, want := elapsedVirtual, herdrfake.CompactDurationMs*time.Millisecond; got < want {
-		t.Errorf("VirtualTime() = %s, want >= %s (the compact polls must advance the clock far enough for the boundary to land)", got, want)
+		t.Errorf("VirtualTime() = %s, want >= %s (the compact polls must advance the clock far enough for the boundary to merge)", got, want)
 	}
 
 	events, ok, err := ReadEvents(scratchDir, "epic")
@@ -501,7 +501,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 		t.Error("smart-zone-recovery-failed event emitted, want none")
 	}
 	if !seen[string(eventsc.SmartZoneGateReleased)] {
-		t.Errorf("missing %s event — a premature-idle pane's completion must be attributed to the gate holding until the boundary landed", string(eventsc.SmartZoneGateReleased))
+		t.Errorf("missing %s event — a premature-idle pane's completion must be attributed to the gate holding until the boundary merged", string(eventsc.SmartZoneGateReleased))
 	}
 	if seen[string(eventsc.SmartZoneWaitExpired)] {
 		t.Errorf("%s logged for a gated completion, want it reserved for the pane-timeout route", string(eventsc.SmartZoneWaitExpired))
@@ -515,9 +515,9 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 // Status() — under WithPrematureIdlePane that is "idle" throughout — which is
 // the production shape that made the pane-status finish path fire while
 // "/compact" was still running: the iteration was declared finished, the ticket
-// closed needs-answer with no commit, and the worktree abandoned mid-compaction.
+// closed paused (answer) with no commit, and the worktree abandoned mid-compaction.
 // The run must instead end at errCompactRecoveryExhausted, which loop.go
-// persists as needs-repair for an operator.
+// persists as paused (repair) for an operator.
 func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var, and
 	// herdrfake.StartState calls t.Setenv for the helper socket path and PATH.
@@ -616,7 +616,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	})
 
 	// Interrupt reads the state to pick its key: the pane is mid-turn until
-	// the interrupt lands.
+	// the interrupt merges.
 	s.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		mu.Lock()
 		keyed := ctrlCCalls > 0
@@ -665,7 +665,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 		t.Errorf("compact prompts = %d, want exactly 1", compactCalls)
 	}
 	if finishUpCalls != 0 {
-		t.Errorf("finish-up prompts = %d, want 0 (it would land as input to a still-running compaction)", finishUpCalls)
+		t.Errorf("finish-up prompts = %d, want 0 (it would merge as input to a still-running compaction)", finishUpCalls)
 	}
 	if ctrlCCalls != 2 {
 		t.Errorf("ctrl+c sends = %d, want exactly 2 (interrupt, then clear the restored prompt)", ctrlCCalls)
@@ -757,13 +757,13 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents() ok=%v err=%v", ok, err)
 	}
-	var sawFailed, sawNeedsRepair, sawResumed bool
+	var sawFailed, sawRepair, sawResumed bool
 	for _, e := range events {
 		switch e.Type {
 		case string(eventsc.SmartZoneRecoveryFailed):
 			sawFailed = true
 		case string(eventsc.Paused):
-			sawNeedsRepair = true
+			sawRepair = true
 		case string(eventsc.Resumed):
 			sawResumed = true
 		}
@@ -771,7 +771,7 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 	if !sawFailed {
 		t.Error("missing smart-zone-recovery-failed event for a pane blocked at /compact submission")
 	}
-	if sawNeedsRepair {
+	if sawRepair {
 		t.Error("needs-repair event emitted, want none: a single gated give-up must not abort the run")
 	}
 	if sawResumed {
@@ -785,7 +785,7 @@ func TestRecoverSmartZoneBreach_ProductionCodexBlockedAtCompactSubmission(t *tes
 // compaction-boundary line. Each such dispatch is one Runner.Wait modeling
 // one smartZonePollMs (30s) tick, and waitForCompactionSignal starts at zero
 // elapsed, so the Nth dispatch corresponds to N*smartZonePollMs of elapsed
-// virtual time: 16 ticks lands completion at
+// virtual time: 16 ticks merges completion at
 // 480s (8 minutes) — comfortably past smartZoneCompactTimeoutMs (5 minutes,
 // tick 10) where the transcript check first engages, and comfortably short
 // of smartZoneCompactExtendedTimeoutMs (10 minutes, tick 20) where an

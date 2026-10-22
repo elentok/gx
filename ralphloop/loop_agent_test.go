@@ -306,7 +306,7 @@ func TestRun_ClaudeDoesNotRunCodexLaunchPreflight(t *testing.T) {
 	}
 }
 
-func TestRun_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
+func TestRun_CodexLaunchFailureAfterClaimRepair(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
@@ -317,9 +317,9 @@ func TestRun_CodexLaunchFailureAfterClaimNeedsRepair(t *testing.T) {
 		return errors.New("Herdr rejected Codex integration")
 	})
 	sink := newRecordingEventSink()
-	// The failed launch leaves the epic's only ticket needs-repair, so the
-	// run parks on it rather than returning.
-	runUntilParked(t, RunOptions{
+	// The failed launch leaves the epic's only ticket paused (repair), so the
+	// run pauses on it rather than returning.
+	runUntilPaused(t, RunOptions{
 		EpicName: "my-epic", Agent: AgentCodex, Skill: "implement",
 		ScratchDir: scratchDir, RepoDir: "/fake/repo",
 	}, d, sink)

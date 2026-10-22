@@ -20,7 +20,7 @@ import (
 )
 
 // fakeChatTransport records every text it's asked to send, in memory, so
-// chatEventSink's membership and park-cardinality behavior can be tested
+// chatEventSink's membership and pause-cardinality behavior can be tested
 // without a real HTTP round trip. sendSyncFunc, if set, overrides the
 // default always-succeeds-immediately behavior — used by the shutdown-redesign
 // tests to simulate a hung/failing send that respects ctx cancellation, the
@@ -135,7 +135,7 @@ func TestChatEventSink_CloseFlush_ConsolidatedSend_RetriesOnceLikeNormalPath(t *
 }
 
 // TestChatEventSink_Close_WaitsForInProgressFlush_BeforeCancellingInFlight
-// covers the ticket's second required seam: a flush that has drained the
+// covers the ticket's second required seam: a flush that has emptied the
 // queue but not yet reached sendRaw (so inFlight hasn't been incremented
 // yet) when Close is called must not lose its message. This uses
 // flushMidpointHook to pause a real ticker-driven flush at exactly that
@@ -220,9 +220,9 @@ func TestChatEventSink_ChatMembers_EachSendExactlyOneMessage(t *testing.T) {
 		{"IterationResumed", func(s *chatEventSink) { s.IterationResumed("04", "iter-04", PauseRateLimit) }},
 		{"IterationFinished", func(s *chatEventSink) { s.IterationFinished(ticket, "epic", stats) }},
 		{"TicketNeedsHuman", func(s *chatEventSink) {
-			s.TicketNeedsHuman("04", "epic", "needs-answer", "zero-commit", "no commits landed")
+			s.TicketNeedsHuman("04", "epic", "needs-answer", "zero-commit", "no commits merged")
 		}},
-		{"EpicParked", func(s *chatEventSink) { s.EpicParked("epic", []StalledTicket{{Identifier: "04"}}) }},
+		{"EpicPaused", func(s *chatEventSink) { s.EpicPaused("epic", []StalledTicket{{Identifier: "04"}}) }},
 		{"EpicComplete", func(s *chatEventSink) { s.EpicComplete("epic", 5, 300) }},
 	}
 
@@ -275,13 +275,13 @@ func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
 	sink.IterationPaused("01", "iter-01", PauseRateLimit, "rate limited")
 	sink.IterationResumed("01", "iter-01", PauseRateLimit)
 	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", IterationStats{})
-	sink.TicketNeedsHuman("01", "epic", "needs-answer", "zero-commit", "no commits landed")
-	sink.EpicParked("epic", []StalledTicket{{Identifier: "01"}})
+	sink.TicketNeedsHuman("01", "epic", "needs-answer", "zero-commit", "no commits merged")
+	sink.EpicPaused("epic", []StalledTicket{{Identifier: "01"}})
 	sink.EpicComplete("epic", 1, 0)
 
 	want := []string{
 		"EpicStarted", "IterationStarted", "IterationPaused", "IterationResumed",
-		"IterationFinished", "TicketNeedsHuman", "EpicParked", "EpicComplete",
+		"IterationFinished", "TicketNeedsHuman", "EpicPaused", "EpicComplete",
 	}
 	if got := inner.snapshot(); len(got) != len(want) {
 		t.Fatalf("inner events = %v, want %v", got, want)
@@ -294,21 +294,21 @@ func TestChatEventSink_EveryEvent_ForwardsToInner(t *testing.T) {
 	}
 }
 
-// TestChatEventSink_Park_ProducesExactlyOneChatMessage pins the park
-// cardinality rule: a park fires both IterationPaused(needs-repair) and
+// TestChatEventSink_Pause_ProducesExactlyOneChatMessage pins the pause
+// cardinality rule: a pause fires both IterationPaused(paused (repair)) and
 // TicketNeedsHuman on the underlying ticket, but only TicketNeedsHuman may
-// reach chat — otherwise a single park would read as two messages.
-func TestChatEventSink_Park_ProducesExactlyOneChatMessage(t *testing.T) {
+// reach chat — otherwise a single pause would read as two messages.
+func TestChatEventSink_Pause_ProducesExactlyOneChatMessage(t *testing.T) {
 	t.Parallel()
 	sink, transport := newFakeChatSink(t, &recordingSink{})
 
-	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "agent blocked on permission prompt")
+	sink.IterationPaused("04", "iter-04", PauseRepair, "agent blocked on permission prompt")
 	sink.TicketNeedsHuman("04", "epic", "needs-repair", "blocked-pane", "agent blocked on permission prompt")
 	sink.flush()
 
 	got := waitForSentCount(transport, 1)
 	if len(got) != 1 {
-		t.Fatalf("sent = %v, want exactly 1 message for the park", got)
+		t.Fatalf("sent = %v, want exactly 1 message for the pause", got)
 	}
 	want := slackStyle.ticketNeedsHumanText("04", "epic", "needs-repair", "blocked-pane", "agent blocked on permission prompt", EpicCounts{}).String()
 	if got[0] != want {
@@ -316,12 +316,12 @@ func TestChatEventSink_Park_ProducesExactlyOneChatMessage(t *testing.T) {
 	}
 }
 
-func TestChatEventSink_IterationPausedResumed_NeedsRepairKindNeverReachesChat(t *testing.T) {
+func TestChatEventSink_IterationPausedResumed_RepairKindNeverReachesChat(t *testing.T) {
 	t.Parallel()
 	sink, transport := newFakeChatSink(t, &recordingSink{})
 
-	sink.IterationPaused("04", "iter-04", PauseNeedsRepair, "blocked")
-	sink.IterationResumed("04", "iter-04", PauseNeedsRepair)
+	sink.IterationPaused("04", "iter-04", PauseRepair, "blocked")
+	sink.IterationResumed("04", "iter-04", PauseRepair)
 
 	time.Sleep(50 * time.Millisecond)
 	if got := transport.snapshot(); len(got) != 0 {
@@ -382,13 +382,13 @@ func newGateChatSink(t *testing.T, scratchDir, epicName string) (*chatEventSink,
 	return sink, transport
 }
 
-// TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket covers
+// TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndPausesTicket covers
 // two of ticket 04's test seams at once: the end-to-end trip (5 identical
 // events within 60s mutes the source and sends exactly one "muting this"
-// notice) and the loop-registry parkTicket wiring (the trip resolves the
-// ticket's real path and reaches markNeedsRepairWithReason with a
+// notice) and the loop-registry pauseTicket wiring (the trip resolves the
+// ticket's real path and reaches markRepairWithReason with a
 // storm-mute reason).
-func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket(t *testing.T) {
+func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndPausesTicket(t *testing.T) {
 	t.Parallel()
 	scratchDir := t.TempDir()
 	epicName := "epic"
@@ -431,19 +431,19 @@ func TestChatEventSink_RepeatedEvent_TripsPerSourceMuteAndParksTicket(t *testing
 		t.Errorf("ticket body = %q, want it to name the storm-mute reason", raw)
 	}
 
-	// Seam B: the quarantine writes exactly one park event.
+	// Seam B: the quarantine writes exactly one pause event.
 	evs, _, err := ReadEvents(scratchDir, epicName)
 	if err != nil {
 		t.Fatalf("ReadEvents: %v", err)
 	}
-	var parks []Event
+	var pauses []Event
 	for _, ev := range evs {
 		if ev.Type == string(events.Paused) {
-			parks = append(parks, ev)
+			pauses = append(pauses, ev)
 		}
 	}
-	if len(parks) != 1 || parks[0].Kind != string(events.IterationError) || parks[0].Address != canonicalAddr(scratchDir, epicName, "04") {
-		t.Errorf("park events = %+v, want one of kind iteration-error for 04", parks)
+	if len(pauses) != 1 || pauses[0].Kind != string(events.IterationError) || pauses[0].Address != canonicalAddr(scratchDir, epicName, "04") {
+		t.Errorf("pause events = %+v, want one of kind iteration-error for 04", pauses)
 	}
 }
 
@@ -708,7 +708,7 @@ func TestChatEventSink_RequeueRetryCycle_DoesNotDoubleChargeGateBudget(t *testin
 	sink.flush()
 	sink.inFlight.Wait()
 
-	sink.flush() // retry cycle: drains the requeued (all-requeued) batch
+	sink.flush() // retry cycle: empties the requeued (all-requeued) batch
 	sink.inFlight.Wait()
 
 	state, err := loadNotificationStateAt(sink.gateStatePath)

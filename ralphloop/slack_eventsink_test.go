@@ -61,7 +61,7 @@ func waitForSlackRequests(get func() []slackRequest, want int) []slackRequest {
 
 // TestSlackEventSink_EpicComplete_PostsSlackWireFormat exercises the real
 // slackTransport (POST body shape) end-to-end through a real event; the
-// membership/park-cardinality/message-content behavior is exercised
+// membership/pause-cardinality/message-content behavior is exercised
 // transport-agnostically in chat_eventsink_test.go.
 func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
 	t.Parallel()
@@ -89,9 +89,9 @@ func TestSlackEventSink_EpicComplete_PostsSlackWireFormat(t *testing.T) {
 }
 
 // TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones pins ticket
-// 27's placement rule: a counts line rides on epic started, ticket landed,
-// ticket parked, and epic complete — the messages where counts materially
-// moved — and on neither IterationPaused nor EpicParked, which chat also
+// 27's placement rule: a counts line rides on epic started, ticket merged,
+// ticket paused, and epic complete — the messages where counts materially
+// moved — and on neither IterationPaused nor EpicPaused, which chat also
 // sends text for but where the counts haven't changed since the prior
 // message.
 func TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones(t *testing.T) {
@@ -104,9 +104,9 @@ func TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones(t *testing.T
 
 	sink.EpicStarted("epic", 0, 3)
 	sink.IterationFinished(tickets.Ticket{Identifier: "01"}, "epic", IterationStats{Completed: 1, Total: 3})
-	sink.TicketNeedsHuman("02", "epic", "needs-answer", "zero-commit", "no commits landed")
+	sink.TicketNeedsHuman("02", "epic", "needs-answer", "zero-commit", "no commits merged")
 	sink.IterationPaused("03", "iter-03", PauseRateLimit, "rate limit hit")
-	sink.EpicParked("epic", []StalledTicket{{Identifier: "03"}})
+	sink.EpicPaused("epic", []StalledTicket{{Identifier: "03"}})
 	sink.EpicComplete("epic", 1, 300)
 	sink.flush()
 
@@ -115,9 +115,9 @@ func TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones(t *testing.T
 		t.Fatalf("requests = %v, want exactly 1 batched request", reqs)
 	}
 
-	// all six messages land in one flush, separator-joined (see renderBatch);
+	// all six messages merge in one flush, separator-joined (see renderBatch);
 	// match each by a marker unique to its message instead of assuming
-	// positional order. Emoji markers pick out EpicStarted/EpicParked/
+	// positional order. Emoji markers pick out EpicStarted/EpicPaused/
 	// EpicComplete, which otherwise share the same "[gx] epic" identity line.
 	segments := strings.Split(reqs[0].Text, "\n---\n")
 	cases := []struct {
@@ -129,7 +129,7 @@ func TestSlackEventSink_CountsLine_AppearsOnEpicAndTicketMilestones(t *testing.T
 		{"IterationFinished", "epic/01", true},
 		{"TicketNeedsHuman", "epic/02", true},
 		{"IterationPaused", "iter-03:", false},
-		{"EpicParked", "\U0001f17f", false},
+		{"EpicPaused", "\U0001f17f", false},
 		{"EpicComplete", "\U0001f389", true},
 	}
 	for _, tt := range cases {
@@ -170,7 +170,7 @@ func TestSlackEventSink_FailingServer_NeverErrorsOrBlocks(t *testing.T) {
 	}
 
 	waitForSlackRequests(getRequests, 1)
-	// Drain the retry-and-log goroutine sendNotification spawns (it sleeps
+	// Empty the retry-and-log goroutine sendNotification spawns (it sleeps
 	// notificationRetryBackoff then retries) so it doesn't outlive the test.
 	waitForRunLogEvent(t, dir, "epic")
 }
@@ -197,7 +197,7 @@ func TestSlackEventSink_UnreachableServer_NeverErrorsOrBlocks(t *testing.T) {
 	if got := inner.snapshot(); len(got) != 1 || got[0] != "EpicComplete" {
 		t.Errorf("inner events = %v, want [EpicComplete]", got)
 	}
-	// Drain the retry-and-log goroutine sendNotification spawns (it sleeps
+	// Empty the retry-and-log goroutine sendNotification spawns (it sleeps
 	// notificationRetryBackoff then retries) so it doesn't outlive the test.
 	waitForRunLogEvent(t, dir, "epic")
 }

@@ -15,7 +15,7 @@ import (
 // name the next fresh attempt tries to create — it first checks whether that
 // branch already holds commits the previous invocation never cherry-picked
 // (e.g. the agent finished a smart-zone-paused iteration while no operator/
-// process was alive to relay the resume signal). If so, it lands them through
+// process was alive to relay the resume signal). If so, it merges them through
 // the same cherry-pick-and-cleanup path a normal completion uses, so the
 // worktree/branch are only ever removed right after their commits are safely
 // on the feature branch. Only when there's nothing to lose — no iteration
@@ -39,20 +39,20 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 		if ahead > 0 {
 			p := rp.iterationParamsFor(featureBranch, t)
 
-			// Seed a live row so landCherryPick's CherryPickStarted/
+			// Seed a live row so mergeCherryPick's CherryPickStarted/
 			// ConflictResolutionStarted events below have a live entry to
 			// update — without this, the tickets tab shows nothing while
 			// this recovery cherry-pick runs.
 			rp.Sink.TicketRecovering(t.Identifier)
 
-			var landedSHA string
-			if err := withLandLock(d, p, func() (err error) {
-				landedSHA, err = landCherryPick(d, p, base, branch, "", "")
+			var mergedSHA string
+			if err := withMergeLock(d, p, func() (err error) {
+				mergedSHA, err = mergeCherryPick(d, p, base, branch, "", "")
 				return err
 			}); err != nil {
 				return fmt.Errorf("re-cherry-picking orphaned claim %s: %w", t.Identifier, err)
 			}
-			p.logTicketEventSHA(string(events.CherryPicked), "", "", path, "", landedSHA)
+			p.logTicketEventSHA(string(events.CherryPicked), "", "", path, "", mergedSHA)
 
 			if err := markDoneStampingCloseMetadata(d, p, path, ""); err != nil {
 				return fmt.Errorf("marking recovered ticket %s done: %w", t.Identifier, err)
@@ -62,7 +62,7 @@ func reconcileOrphanedClaim(d Deps, rp reconcileParams, featureBranch string, t 
 				return fmt.Errorf("cleaning up orphaned claim %s: %w", t.Identifier, err)
 			}
 
-			rp.Sink.TicketRecovered(t.Identifier, featureBranch, branch, landedSHA)
+			rp.Sink.TicketRecovered(t.Identifier, featureBranch, branch, mergedSHA)
 			return nil
 		}
 	}

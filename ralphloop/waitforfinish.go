@@ -17,7 +17,7 @@ import (
 const smartZonePollMs = 30_000
 
 // waitForFinishStates are the states that end one waitForFinish poll. Blocked
-// is among them because it needs its own quota/park handling.
+// is among them because it needs its own quota/pause handling.
 var waitForFinishStates = append(append([]agentrunner.State{}, runnerFinishStates...), agentrunner.StateBlocked)
 
 // finishDebounceMs is how long waitForFinish and finishIteration each pause
@@ -27,8 +27,8 @@ var waitForFinishStates = append(append([]agentrunner.State{}, runnerFinishState
 // end-of-turn signal, so an agent that briefly stops producing output mid-turn
 // (e.g. between its last tool call and a commit) can look finished for an
 // instant. Without this debounce the loop would declare the iteration done,
-// mark it needs-answer (no commits yet), and abandon the worktree/tab while the
-// agent went on to actually finish and commit — orphaning real, landed work.
+// mark it paused (answer) (no commits yet), and abandon the worktree/tab while the
+// agent went on to actually finish and commit — orphaning real, merged work.
 const (
 	finishDebounceMs = 3_000
 	finishConfirmMs  = 2_000
@@ -39,7 +39,7 @@ const (
 // that times out rather than settling. A breach interrupts the pane
 // (Ctrl-C, not killed), then auto-recovers via recoverSmartZoneBreach
 // (compact + finish-up re-prompt) and falls back into normal polling —
-// unlike rate-limit/needs-repair pauses, this never blocks the
+// unlike rate-limit/paused (repair) pauses, this never blocks the
 // scheduler via Gate.pause.
 func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	smartZone := p.SmartZone
@@ -95,12 +95,12 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 						continue
 					}
 				}
-				parked, err := parkOnBlockedPane(d, p, sessionID)
+				paused, err := pauseOnBlockedPane(d, p, sessionID)
 				if err != nil {
 					return err
 				}
-				if parked {
-					return errBlockedPaneParked
+				if paused {
+					return errBlockedPanePaused
 				}
 				elapsedMs = 0
 				continue
@@ -251,7 +251,7 @@ const smartZoneCompactExtendedTimeoutMs = 600_000
 // errCompactNeverConfirmed marks the one recovery failure that means "the pane
 // kept claiming the compaction was done and the transcript never agreed" — as
 // opposed to a transport error, an unconfirmed submission, or a finish-up
-// prompt that never landed, which are all equally "recovery failed" from
+// prompt that never merged, which are all equally "recovery failed" from
 // outside. waitForFinish absorbs this one and keeps polling; every other error
 // still aborts the iteration.
 var errCompactNeverConfirmed = errors.New("compaction never confirmed by the transcript")
@@ -275,7 +275,7 @@ const maxConsecutiveGatedGiveUps = 2
 // recovery kept giving up gated. It needs an operator, not another retry, which
 // is why it leaves waitForFinish as an error: that routes it through Run's
 // per-result handling (see loop.go), which persists the ticket
-// needs-repair with this error's text as the reason. Both this message and
+// paused (repair) with this error's text as the reason. Both this message and
 // the errCompactNeverConfirmed it wraps are load-bearing there — the operator
 // reading the ticket needs to know the agent's own /compact never completed,
 // not merely that some recovery failed.
@@ -283,7 +283,7 @@ var errCompactRecoveryExhausted = errors.New("smart-zone compaction recovery exh
 
 // gatedGiveUpsExhausted builds the escalation error for an iteration that hit
 // maxConsecutiveGatedGiveUps, wrapping cause so the operator reading the
-// needs-repair ticket still sees that it was the agent's own /compact that
+// paused (repair) ticket still sees that it was the agent's own /compact that
 // never completed.
 func gatedGiveUpsExhausted(label string, giveUps int, cause error) error {
 	return fmt.Errorf("%s: %w after %d consecutive attempts: %w",
@@ -307,7 +307,7 @@ func gatedGiveUpsExhausted(label string, giveUps int, cause error) error {
 // waited out any confirmation the agent asks for and checked the submission
 // rendered. Recovery then waits for the compaction to actually finish before
 // sending the finish-up prompt: sending it as soon as the turn started let the
-// finish-up text land mid-compaction and get swallowed as fresh input,
+// finish-up text merge mid-compaction and get swallowed as fresh input,
 // canceling compaction. recoverSmartZoneBreach's bool return reports whether
 // the compact/finish-up contract actually completed (true) or was abandoned
 // as best-effort (false) — callers that must not silently treat a failed
@@ -344,7 +344,7 @@ func recoverSmartZoneBreach(d Deps, p launchAndPromptParams, sessionID, reason s
 	case compactTimeoutConfirmed:
 		p.logAgentEvent(string(events.SmartZoneWaitExpired), sessionID, fmt.Sprintf("compact wait for %s expired but the transcript confirmed compaction completed", p.Label))
 	case compactGateConfirmed:
-		p.logAgentEvent(string(events.SmartZoneGateReleased), sessionID, fmt.Sprintf("the pane reported %s finished compacting before the transcript did; the gate held until the boundary landed", p.Label))
+		p.logAgentEvent(string(events.SmartZoneGateReleased), sessionID, fmt.Sprintf("the pane reported %s finished compacting before the transcript did; the gate held until the boundary merged", p.Label))
 	}
 
 	p.sink().SmartZoneFinishingUp(p.Ticket)
@@ -394,7 +394,7 @@ type compactBoundarySnapshot struct {
 // readCompactBoundaries classifies one read of the agent's compaction-boundary
 // count. An empty session id is unavailable rather than unsupported: the
 // session exists and will be identified shortly, and calling it unsupported
-// would fail a Claude agent open — the single most likely way one lands in the
+// would fail a Claude agent open — the single most likely way one merges in the
 // trust-the-pane bucket by accident.
 func readCompactBoundaries(d Deps, agent AgentKind, cwd, sessionID string) compactBoundarySnapshot {
 	if agent == AgentCodex || d.ReadCompactions == nil {
@@ -426,7 +426,7 @@ func (s compactBoundarySnapshot) unresolved(d Deps, p launchAndPromptParams, ses
 }
 
 // advancedPast reports whether a fresh read proves a compaction boundary
-// landed since s was taken. Anything short of a confirmed, higher count —
+// merged since s was taken. Anything short of a confirmed, higher count —
 // including a read that fails now — is "not yet", never "close enough".
 func (s compactBoundarySnapshot) advancedPast(d Deps, p launchAndPromptParams, sessionID string) bool {
 	if s.state != compactBoundaryConfirmed {
@@ -440,16 +440,16 @@ func (s compactBoundarySnapshot) advancedPast(d Deps, p launchAndPromptParams, s
 // "/compact" was submitted: the boundary snapshot taken then, and the instant
 // it was taken. It is never rebased mid-recovery. The gate's count predicate is
 // "count is greater than baseline", so a baseline adopted after the compaction
-// boundary has already landed is permanently greater than or equal to the
+// boundary has already merged is permanently greater than or equal to the
 // count and the gate can never open again — re-reading a count to stand in for
 // an unreadable baseline converts a transient read failure into a deadlock,
 // reporting a genuinely successful compaction as a give-up and driving the
-// ticket to needs-repair.
+// ticket to paused (repair).
 //
 // An unavailable baseline therefore doesn't get a substitute count at all; it
 // switches predicates instead, to "a boundary was written at or after since" (see
-// boundaryLandedSince), which needs no pre-submission count to compare
-// against. That reads an auto-compaction landing in the gap between the
+// boundaryMergedSince), which needs no pre-submission count to compare
+// against. That reads an auto-compaction merging in the gap between the
 // baseline read and submission as ours, which is the right call anyway: the
 // context did get compacted, and the alternative — waiting for a second
 // boundary that will never come — is the deadlock this type exists to rule
@@ -478,23 +478,23 @@ func (b *stickyBaseline) gates() bool {
 }
 
 // advancedPast reports whether the transcript now proves this recovery's
-// compaction landed.
+// compaction merged.
 func (b *stickyBaseline) advancedPast(d Deps, p launchAndPromptParams, sessionID string) bool {
 	switch b.snapshot.state {
 	case compactBoundaryConfirmed:
 		return b.snapshot.advancedPast(d, p, sessionID)
 	case compactBoundaryUnavailable:
-		return b.boundaryLandedSince(d, p, sessionID)
+		return b.boundaryMergedSince(d, p, sessionID)
 	}
 	return false
 }
 
-// boundaryLandedSince is the unavailable baseline's predicate. An agent with no
+// boundaryMergedSince is the unavailable baseline's predicate. An agent with no
 // boundary signal is excluded here as it is in readCompactBoundaries: its
 // completion is decided by failing the gate open, never by this read. A read
 // that fails proves nothing and holds the gate closed, like every other
 // unconfirmed observation.
-func (b *stickyBaseline) boundaryLandedSince(d Deps, p launchAndPromptParams, sessionID string) bool {
+func (b *stickyBaseline) boundaryMergedSince(d Deps, p launchAndPromptParams, sessionID string) bool {
 	if p.Agent == AgentCodex || d.ReadCompactionsAfter == nil || sessionID == "" {
 		return false
 	}
@@ -515,7 +515,7 @@ const (
 	// worth no event of its own.
 	compactPaneConfirmed compactCompletion = iota
 	// compactGateConfirmed: the pane reported completion early, the gate
-	// refused it, and the boundary landed within the compact timeout.
+	// refused it, and the boundary merged within the compact timeout.
 	compactGateConfirmed
 	// compactTimeoutConfirmed: the pane-status wait kept timing out past
 	// smartZoneCompactTimeoutMs and only the transcript ever confirmed.
@@ -531,7 +531,7 @@ const (
 // authoritative in both directions. A pane that reports completion is believed
 // only once the boundary count has advanced past baseline — Claude Code panes
 // go idle mid-compaction, and trusting that report is what let the finish-up
-// prompt land as queued input and cancel the compaction outright. A pane-status
+// prompt merge as queued input and cancel the compaction outright. A pane-status
 // wait that keeps timing out past smartZoneCompactTimeoutMs is conversely still
 // reported as success once the count advances, since a herdr observation gap is
 // not a stuck compaction. A transcript that can't be read at all right now
@@ -625,7 +625,7 @@ func confirmFinished(d Deps, s agentrunner.Session, until []agentrunner.State) (
 // fails open with no markers to hold on.
 //
 // A held gate's release only proves that one background task's own
-// completion notification landed — not that the agent's overall turn is
+// completion notification merged — not that the agent's overall turn is
 // over; seeing that result is exactly when an agent is likely to resume real
 // work. So once a gate that actually held releases (or ages out), this
 // re-runs confirmFinished before reporting finished=true, the same debounced
@@ -728,7 +728,7 @@ func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID string, r
 	p.Gate.ForceResume(p.Label)
 
 	if err := promptIdle(d, p, sessionID, "continue"); err != nil {
-		if errors.Is(err, errBlockedPaneParked) {
+		if errors.Is(err, errBlockedPanePaused) {
 			return err
 		}
 		return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
@@ -757,24 +757,24 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, re
 		return nil
 	}
 
-	return parkBlockedAfterCodexQuotaReset(p, sessionID, st.BlockedReason)
+	return pauseBlockedAfterCodexQuotaReset(p, sessionID, st.BlockedReason)
 }
 
-// parkBlockedAfterCodexQuotaReset handles a Codex pane that comes back
+// pauseBlockedAfterCodexQuotaReset handles a Codex pane that comes back
 // blocked once its quota reset: unlike waitForClaudeRateLimitReset's plain
 // "continue" re-prompt, a blocked pane here is sitting on its own dialog, not
 // waiting for the iteration to resume — "continue" is a prompt, not a dialog
 // answer, and gx never raised the dialog in the first place, so it must not
 // be sent. There is also no trust_directory branch to try: the directory was
 // already trusted at launch and gx was asleep for the reset, so the only
-// answerable-dialog case (see ticket 01) can't occur here. This parks for a
+// answerable-dialog case (see ticket 01) can't occur here. This pauses for a
 // human instead, naming the unanswered dialog by the runner's
-// Status.BlockedReason — unlike parkOnBlockedPane, whose park reason names no
+// Status.BlockedReason — unlike pauseOnBlockedPane, whose pause reason names no
 // dialog at all.
-func parkBlockedAfterCodexQuotaReset(p launchAndPromptParams, sessionID, blockedReason string) error {
+func pauseBlockedAfterCodexQuotaReset(p launchAndPromptParams, sessionID, blockedReason string) error {
 	reason := fmt.Sprintf("%s came back blocked on dialog %q after a Codex quota reset; answer it in the pane", p.Label, blockedReason)
-	p.parkBlockedPane(sessionID, reason)
-	return errBlockedPaneParked
+	p.pauseBlockedPane(sessionID, reason)
+	return errBlockedPanePaused
 }
 
 // contextOccupancy reads the selected agent's own local session data. A
@@ -798,7 +798,7 @@ func contextOccupancy(d Deps, agent AgentKind, cwd, sessionID string) (int, bool
 
 // smartZoneOccupancy reads the session's occupancy for one poll tick and
 // reports separately what the tick may display and what it may decide a breach
-// on. The two diverge in the window between a compaction landing and the
+// on. The two diverge in the window between a compaction merging and the
 // agent's next turn: the transcript still holds only the pre-compaction
 // figure, which is right to keep showing and wrong to breach on again — doing
 // so interrupts the agent and starts a second /compact on top of the finish-up
@@ -860,14 +860,14 @@ func runnerRateLimit(d Deps, p launchAndPromptParams) (resetAt time.Time, limite
 // a classified native Codex context exhaustion and turns an incomplete
 // recovery into a durable, actionable error instead of letting the caller
 // fall back into ordinary polling. Without this, a recovery whose /compact or
-// finish-up prompt never lands (the agent's context is already too far gone
+// finish-up prompt never merges (the agent's context is already too far gone
 // to process either) leaves the pane sitting idle post-interrupt with no
 // further evidence of what happened — waitForFinish would then read that as
 // a plain finish, and finishIteration would mark it done (if a stray commit
-// happened to land) or generic needs-answer (if not), losing the exhaustion
+// happened to merge) or generic paused (answer) (if not), losing the exhaustion
 // reason entirely. Returning an error here instead routes through the same
 // path every other iteration-level failure takes (see Run's per-result
-// handling in loop.go), which marks the ticket needs-repair with this
+// handling in loop.go), which marks the ticket paused (repair) with this
 // specific reason and leaves its worktree/tab for inspection.
 func recoverOrFailCodexContextExhaustion(d Deps, p launchAndPromptParams, sessionID, evidence string, smartZone int) error {
 	reason := fmt.Sprintf("Codex context exhaustion detected: %s", evidence)

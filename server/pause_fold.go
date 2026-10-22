@@ -45,7 +45,7 @@ func (f *pauseFold) flush() []string {
 }
 
 func (s *Server) flushPauseFold() {
-	s.chat.ParkDigest(s.pauseFold.flush())
+	s.chat.PauseDigest(s.pauseFold.flush())
 }
 
 // holdPause queues the pause line for the digest.

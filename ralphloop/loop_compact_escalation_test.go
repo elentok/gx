@@ -40,13 +40,13 @@ func readTicket(t *testing.T, scratchDir, epicName, filename string) string {
 	return string(raw)
 }
 
-// TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair asserts the
+// TestRun_UnconfirmedCompactionEscalation_PersistsRepair asserts the
 // half of the escalation a waitForFinish unit test structurally cannot: that
 // the error it returns is carried by Run's per-result handling all the way to
-// the ticket file, as needs-repair with a reason an operator can act on.
+// the ticket file, as paused (repair) with a reason an operator can act on.
 // Without this the escalation would only end the iteration, and a stuck agent
 // would look like a run that quietly stopped.
-func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
+func TestRun_UnconfirmedCompactionEscalation_PersistsRepair(t *testing.T) {
 	t.Parallel()
 	const epicName = "my-epic"
 	scratchDir := writeEpic(t, epicName, map[string]string{
@@ -54,9 +54,9 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
 	})
 	d := stuckCompactionDeps(nil)
 
-	// The escalated iteration leaves the epic's only ticket needs-repair, so
-	// the run parks on it rather than returning.
-	runUntilParked(t, RunOptions{
+	// The escalated iteration leaves the epic's only ticket paused (repair), so
+	// the run pauses on it rather than returning.
+	runUntilPaused(t, RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: "/fake/repo", SmartZone: 100,
 	}, d, noopEventSink{})
@@ -72,11 +72,11 @@ func TestRun_UnconfirmedCompactionEscalation_PersistsNeedsRepair(t *testing.T) {
 	}
 }
 
-// TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason pins the
+// TestRun_OrdinaryIterationError_KeepsItsOwnRepairReason pins the
 // discrimination: the escalation reason is specific to a compaction that never
 // confirmed, so an unrelated failure at the same point in the loop must not
 // acquire it.
-func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason(t *testing.T) {
+func TestRun_OrdinaryIterationError_KeepsItsOwnRepairReason(t *testing.T) {
 	t.Parallel()
 	const epicName = "my-epic"
 	scratchDir := writeEpic(t, epicName, map[string]string{
@@ -84,7 +84,7 @@ func TestRun_OrdinaryIterationError_KeepsItsOwnNeedsRepairReason(t *testing.T) {
 	})
 	d := stuckCompactionDeps(errors.New("herdr pane vanished"))
 
-	runUntilParked(t, RunOptions{
+	runUntilPaused(t, RunOptions{
 		EpicName: epicName, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: "/fake/repo", SmartZone: 100,
 	}, d, noopEventSink{})

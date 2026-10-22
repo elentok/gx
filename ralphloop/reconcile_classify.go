@@ -5,7 +5,7 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// doneMismatchClass is how a done ticket's recorded landed commit compares
+// doneMismatchClass is how a done ticket's recorded merged commit compares
 // against the feature branch's current tip, plus whether its iteration state
 // was left behind — see classifyDoneTicket.
 type doneMismatchClass int
@@ -18,11 +18,11 @@ const (
 )
 
 // classifyDoneTicket folds a ticket's TicketVerification (see VerifyEpic for
-// the three-rung landing ladder) into one of four classifications:
+// the three-rung merging ladder) into one of four classifications:
 //
-//   - doneOK: the commit landed and nothing was left behind.
-//   - doneStaleCleanup: the commit landed, but a tab/worktree/branch is
-//     still around — the crash landed between marking done and the cleanup
+//   - doneOK: the commit merged and nothing was left behind.
+//   - doneStaleCleanup: the commit merged, but a tab/worktree/branch is
+//     still around — the crash merged between marking done and the cleanup
 //     step right after it.
 //   - doneRecoverable: the commit is missing, but the iteration branch still
 //     holds it.
@@ -31,23 +31,23 @@ const (
 //
 // A verification whose checks couldn't run leaves the ticket untouched
 // (doneOK) unless a check failed outright, which surfaces as an error.
-func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []Event, live map[string]bool, landed map[string]bool) (doneMismatchClass, error) {
-	return foldVerification(verifyTicket(d.verifyDeps(), paths, featureBranch, t, events, live, landed, nil))
+func classifyDoneTicket(d Deps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []Event, live map[string]bool, merged map[string]bool) (doneMismatchClass, error) {
+	return foldVerification(verifyTicket(d.verifyDeps(), paths, featureBranch, t, events, live, merged, nil))
 }
 
 func foldVerification(v TicketVerification) (doneMismatchClass, error) {
 	if v.err != nil {
 		return doneOK, v.err
 	}
-	switch v.Landing {
-	case LandingLanded:
+	switch v.Merging {
+	case MergingMerged:
 		if isTrue(v.Leftovers.Tab) || isTrue(v.Leftovers.Worktree) || isTrue(v.Leftovers.Branch) {
 			return doneStaleCleanup, nil
 		}
 		return doneOK, nil
-	case LandingRecoverable:
+	case MergingRecoverable:
 		return doneRecoverable, nil
-	case LandingUnrecoverable:
+	case MergingUnrecoverable:
 		return doneUnrecoverable, nil
 	default:
 		return doneOK, nil

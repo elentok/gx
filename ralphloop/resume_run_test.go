@@ -68,7 +68,7 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 		t.Fatalf("interrupted %s, want iter-01", label)
 	}
 
-	// Drain the two iterations' initial launch prompts (order not
+	// Empty the two iterations' initial launch prompts (order not
 	// guaranteed) before the breach recovery's own /compact prompt shows up.
 	for {
 		if got := <-promptCh; got == "/compact" {
@@ -134,7 +134,7 @@ func TestRun_SmartZoneBreach_AutoRecoversWithoutBlockingScheduler(t *testing.T) 
 // each breach fires its own Ctrl-C -> /compact -> finish-up cycle, and the
 // scheduler's Gate is never paused by either one, matching the "no retry
 // cap" and "Gate.isPaused() stays false throughout" requirements that
-// distinguish this recovery path from rate-limit/needs-repair pauses.
+// distinguish this recovery path from rate-limit/paused (repair) pauses.
 func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -187,7 +187,7 @@ func TestRun_SmartZoneBreach_RepeatsWithNoRetryCap(t *testing.T) {
 		if label := <-interruptCh; !strings.Contains(label, "iter-01") {
 			t.Fatalf("breach %d: interrupted %s, want iter-01", i, label)
 		}
-		// Drain the iteration's own initial launch prompt (only present
+		// Empty the iteration's own initial launch prompt (only present
 		// ahead of the very first breach) before the recovery's /compact.
 		for {
 			if got := <-promptCh; got == "/compact" {

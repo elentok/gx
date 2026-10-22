@@ -153,9 +153,9 @@ func gitSubject(t *testing.T, dir, ref string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// realLandingDeps is realGitDeps plus the rest of landing's git operations,
+// realMergingDeps is realGitDeps plus the rest of merging's git operations,
 // for driving a genuine cherry-pick conflict.
-func realLandingDeps() Deps {
+func realMergingDeps() Deps {
 	d := realGitDeps()
 	real := DefaultDeps()
 	d.CommitsAhead = real.CommitsAhead
@@ -223,7 +223,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	const resolvedText = "resolved by fake conflict resolver\n"
 
 	resolver := newConflictResolver(dir, resolvedText)
-	d := realLandingDeps()
+	d := realMergingDeps()
 	d.Sleep = func(time.Duration) {}
 	d.Now = func() time.Time { return time.Unix(0, 0) }
 	onRunnerStart(d, resolver.onStart)
@@ -238,8 +238,8 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cherryPickWithConflictResolution: %v", err)
 	}
-	if res.Outcome != Landed {
-		t.Errorf("outcome = %q, want %q", res.Outcome, Landed)
+	if res.Outcome != Merged {
+		t.Errorf("outcome = %q, want %q", res.Outcome, Merged)
 	}
 	if gotResolutionSessionID != resolutionSessionID {
 		t.Errorf("resolution session = %q, want %q", gotResolutionSessionID, resolutionSessionID)
@@ -262,7 +262,7 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	}
 
 	if gotSubject := gitSubject(t, dir, "HEAD"); gotSubject != wantSubject {
-		t.Errorf("landed commit subject = %q, want original cherry-picked subject %q preserved", gotSubject, wantSubject)
+		t.Errorf("merged commit subject = %q, want original cherry-picked subject %q preserved", gotSubject, wantSubject)
 	}
 
 	evs, ok, err := ReadEvents(p.ScratchDir, "main")

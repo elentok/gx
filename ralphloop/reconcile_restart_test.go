@@ -48,7 +48,7 @@ func TestRun_RestartWithClaimedTicketButNoLiveTab_RerunsFromScratch(t *testing.T
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if !strings.Contains(string(raw), "status: done") {
-		t.Errorf("ticket not landed after restart:\n%s", raw)
+		t.Errorf("ticket not merged after restart:\n%s", raw)
 	}
 
 	ticket, err := schema.ParseTicket(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
@@ -127,17 +127,17 @@ func TestRun_RestartWithClaimedTicketAndLiveTab_ReattachesWithoutReplayingPrompt
 	}
 }
 
-// TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutReforking
-// covers the needs-repair retry path's counterpart to conflict-lifecycle/
-// 02a's guard: a needs-repair ticket is reattached to its still-live
+// TestRun_RestartWithRepairTicketAndLiveResolver_ReattachesWithoutReforking
+// covers the paused (repair) retry path's counterpart to conflict-lifecycle/
+// 02a's guard: a paused (repair) ticket is reattached to its still-live
 // iter-NN tab (like the claimed-ticket case above) and driven through
-// reattachIteration -> finishIteration -> landCherryPick ->
+// reattachIteration -> finishIteration -> mergeCherryPick ->
 // cherryPickWithConflictResolution. That cherry-pick finds the sequencer
 // already mid-conflict, with the conflict-resolution agent forked for it
 // still live in a second, stray tab from before the crash. It must reattach
 // to that live resolver instead of aborting the stale sequencer state and
 // forking a second one under the same conflict-labeled tab.
-func TestRun_RestartWithNeedsRepairTicketAndLiveResolver_ReattachesWithoutReforking(t *testing.T) {
+func TestRun_RestartWithRepairTicketAndLiveResolver_ReattachesWithoutReforking(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md":                    "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
@@ -346,8 +346,8 @@ func TestRun_ReattachedCodexSessionIdentityFailureStopsSafely(t *testing.T) {
 			})
 
 			// The failed reattach leaves the epic's only ticket
-			// needs-repair, so the run parks on it.
-			runUntilParked(t, RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+			// paused (repair), so the run pauses on it.
+			runUntilPaused(t, RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 			raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
 			if err != nil {
@@ -498,7 +498,7 @@ func idleReattachDeps(t *testing.T, agentSession string) (Deps, *[]string) {
 // covers ticket 04's core fix: the alreadyFinished short-circuit must consult
 // the same background-task gate confirmFinished/waitForBackgroundTasks apply
 // in waitForFinish, not skip it - this is the mechanism both real incidents
-// looped through (false park -> reopen -> reattach -> immediate re-finish).
+// looped through (false pause -> reopen -> reattach -> immediate re-finish).
 func TestRun_ReattachAlreadyIdle_BackgroundTaskOutstanding_HoldsShortCircuit(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{

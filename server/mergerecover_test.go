@@ -20,14 +20,14 @@ import (
 // owner, no marker.
 func orphanMergeLock(t *testing.T, store string) string {
 	t.Helper()
-	dir, err := ralphloop.LandLockDir(filepath.Join(store, "proj", "epic-a"))
+	dir, err := ralphloop.MergeLockDir(filepath.Join(store, "proj", "epic-a"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	owner, _ := json.Marshal(ralphloop.LandLockOwner{PID: 2147483646, Time: time.Now().UTC(), Epic: "epic-a", Ticket: "01"})
+	owner, _ := json.Marshal(ralphloop.MergeLockOwner{PID: 2147483646, Time: time.Now().UTC(), Epic: "epic-a", Ticket: "01"})
 	if err := os.WriteFile(filepath.Join(dir, "land.lock"), owner, 0o644); err != nil {
 		t.Fatal(err)
 	}

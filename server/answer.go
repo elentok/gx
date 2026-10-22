@@ -195,7 +195,7 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 		if queued {
 			// Open again for gx to claim; the dead run has nothing to settle.
 			s.registry.delete(address)
-			if err := ralphloop.UnparkTicket(ref.ticket.Path, time.Now()); err != nil {
+			if err := ralphloop.ResumeTicket(ref.ticket.Path, time.Now()); err != nil {
 				return QueueResult{}, fmt.Errorf("reopen %s: %w", ref.addr, err)
 			}
 			s.rescan()

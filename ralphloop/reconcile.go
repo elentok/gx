@@ -67,9 +67,9 @@ type reconcileParams struct {
 // tab in the epic's workspace — returned here so the caller reattaches and
 // resumes it — or doesn't, meaning nothing survived and the ticket is
 // reverted to open so normal scheduling picks it up fresh. It also verifies
-// every already-done ticket's landed commit is still reachable from the
+// every already-done ticket's merged commit is still reachable from the
 // feature branch's current tip (see classifyDoneTicket) — status alone can
-// silently drift from what's actually landed, since it lives in a file
+// silently drift from what's actually merged, since it lives in a file
 // independent of which worktree touches it. Mismatches are only reported
 // here, not repaired: that's later tickets' job.
 func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket, error) {
@@ -87,10 +87,10 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		liveSessions[key] = s
 	}
 
-	// First, so a landing it records is in the run log read below and in
-	// every ticket landing's own already-applied check.
-	if err := recoverInterruptedLanding(d, rp, epic); err != nil {
-		return nil, fmt.Errorf("recovering an interrupted landing: %w", err)
+	// First, so a merging it records is in the run log read below and in
+	// every ticket merging's own already-applied check.
+	if err := recoverInterruptedMerging(d, rp, epic); err != nil {
+		return nil, fmt.Errorf("recovering an interrupted merging: %w", err)
 	}
 
 	events, _, err := ReadEvents(paths.ScratchDir, epic.Name)
@@ -118,7 +118,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	for _, t := range epic.Tickets {
 		if !rp.Scope.Contains(t, epic) {
 			// Belongs to a different (or not yet requested) run — leave its
-			// claim/needs-repair state exactly as found rather than
+			// claim/paused (repair) state exactly as found rather than
 			// reattaching, reverting, or reporting on it here.
 			continue
 		}
@@ -139,7 +139,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			// A conflict-resolution child ticket never has its own iterLabel
 			// tab (see conflictLabel's doc) — it's keyed off the parent's
 			// identifier instead, since resolveCherryPickConflict launches its
-			// pane inline inside the parent's own landCherryPick call. Check
+			// pane inline inside the parent's own mergeCherryPick call. Check
 			// liveness there rather than falling through to the generic
 			// iterLabel check below, which would always read "not live" for
 			// this ticket type and send a still-running resolver's child
@@ -163,11 +163,11 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		reattached = append(reattached, t)
 	}
 
-	// Only in-scope done tickets with a commit to land are verified, in one
+	// Only in-scope done tickets with a commit to merge are verified, in one
 	// VerifyEpic call (so the trailer lookup runs once per run, and not at all
 	// when nothing is done yet). A commitless done ticket never had a commit
-	// to land, and an out-of-scope one belongs to a different (or not yet
-	// requested) run — same skip as the claim/needs-repair loop above, so a
+	// to merge, and an out-of-scope one belongs to a different (or not yet
+	// requested) run — same skip as the claim/paused (repair) loop above, so a
 	// scoped run never rewrites a done ticket's status outside what it was
 	// asked to touch.
 	var toVerify []tickets.Ticket
@@ -179,12 +179,12 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 	vd := d.verifyDeps()
 	vd.ListSessions = func(string) ([]agentrunner.Session, error) { return sessions, nil }
 	// A transient git failure on the trailer lookup degrades to "no trailer
-	// evidence" rather than parking the ticket as unknown: the SHA and
+	// evidence" rather than pausing the ticket as unknown: the SHA and
 	// patch-id rungs still resolve the common cases, and aborting reconcile
 	// over a fallback rung would be worse than the miss.
-	vd.LandedTickets = func(dir, branch string) (map[string]bool, error) {
-		landed, _ := landedTickets(dir, branch)
-		return landed, nil
+	vd.MergedTickets = func(dir, branch string) (map[string]bool, error) {
+		merged, _ := mergedTickets(dir, branch)
+		return merged, nil
 	}
 	verifications, err := VerifyEpic(vd, VerifyParams{
 		Epic:            epic.Name,
@@ -205,7 +205,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 		}
 		switch class {
 		case doneOK:
-			// Commits landed, nothing left behind: the common case, left
+			// Commits merged, nothing left behind: the common case, left
 			// untouched.
 		case doneStaleCleanup:
 			if err := finishStaleCleanup(d, rp, epic.Name, t, liveSessions); err != nil {

@@ -26,7 +26,7 @@ func TestReads_HistoryLocksAndProjects(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := ralphloop.AcquireLandLockFor(filepath.Join(projectDir, "epic-a"), "epic-a", "01"); err != nil {
+	if err := ralphloop.AcquireMergeLockFor(filepath.Join(projectDir, "epic-a"), "epic-a", "01"); err != nil {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store)

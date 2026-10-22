@@ -64,16 +64,16 @@ func TestWithConfig(t *testing.T) {
 	}
 }
 
-func TestDefaultR1MatchesOnlyTheSpinningPark(t *testing.T) {
+func TestDefaultR1MatchesOnlyTheSpinningPause(t *testing.T) {
 	tests := []struct {
 		name string
 		seq  []Event
 		want bool
 	}{
-		{"spinning park", []Event{{Type: events.IterationStarted}, {Type: events.Paused, Kind: events.Spinning}}, true},
+		{"spinning pause", []Event{{Type: events.IterationStarted}, {Type: events.Paused, Kind: events.Spinning}}, true},
 		{"other repair kind", []Event{{Type: events.Paused, Kind: events.RetryExhausted}}, false},
 		{"spinning kind on another type", []Event{{Type: events.IterationFinished, Kind: events.Spinning}}, false},
-		{"manual park", []Event{{Type: events.Paused, Kind: events.Manual}}, false},
+		{"manual pause", []Event{{Type: events.Paused, Kind: events.Manual}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -100,18 +100,18 @@ func TestDefaultNoEntryRunsARemedyItDoesNotOwn(t *testing.T) {
 	}
 }
 
-func TestDefaultR5MatchesAStalledParkAfterAStalledLaunch(t *testing.T) {
+func TestDefaultR5MatchesAStalledPauseAfterAStalledLaunch(t *testing.T) {
 	stalledLaunch := Event{Type: events.LaunchFailed, Kind: events.AgentPromptStalled}
-	stalledPark := Event{Type: events.Paused, Kind: events.AgentPromptStalled}
+	stalledPause := Event{Type: events.Paused, Kind: events.AgentPromptStalled}
 	tests := []struct {
 		name string
 		seq  []Event
 		want bool
 	}{
-		{"stalled park after stalled launch", []Event{{Type: events.IterationStarted}, stalledLaunch, stalledLaunch, stalledPark}, true},
-		{"no prior launch-failed", []Event{{Type: events.IterationStarted}, stalledPark}, false},
-		{"prior launch-failed of another kind", []Event{{Type: events.LaunchFailed, Kind: events.AgentPaneBusy}, stalledPark}, false},
-		{"other park kind", []Event{stalledLaunch, {Type: events.Paused, Kind: events.AgentPaneBusy}}, false},
+		{"stalled pause after stalled launch", []Event{{Type: events.IterationStarted}, stalledLaunch, stalledLaunch, stalledPause}, true},
+		{"no prior launch-failed", []Event{{Type: events.IterationStarted}, stalledPause}, false},
+		{"prior launch-failed of another kind", []Event{{Type: events.LaunchFailed, Kind: events.AgentPaneBusy}, stalledPause}, false},
+		{"other pause kind", []Event{stalledLaunch, {Type: events.Paused, Kind: events.AgentPaneBusy}}, false},
 		{"stalled kind on another type", []Event{stalledLaunch, {Type: events.IterationFinished, Kind: events.AgentPromptStalled}}, false},
 		{"the launch-failed itself", []Event{stalledLaunch}, false},
 	}
@@ -150,20 +150,20 @@ func TestDefaultR7MatchesAnIterationErrorAfterATimedOutCompaction(t *testing.T) 
 	reprompt := Event{Type: events.SmartZoneRecoveryFailed, Reason: "re-prompting p after smart-zone compact: herdr agent prompt --until working: timed out waiting for agent status"}
 	refused := Event{Type: events.SmartZoneRecoveryFailed, Reason: "confirming /compact submitted for p: pane not found"}
 	started := Event{Type: events.IterationStarted}
-	park := Event{Type: events.Paused, Kind: events.IterationError, Reason: "compact recovery exhausted"}
+	pause := Event{Type: events.Paused, Kind: events.IterationError, Reason: "compact recovery exhausted"}
 	tests := []struct {
 		name string
 		seq  []Event
 		want bool
 	}{
-		{"wait timeout", []Event{started, timedOut, park}, true},
-		{"re-prompt timeout", []Event{started, reprompt, park}, true},
-		{"timeout then other events", []Event{started, timedOut, {Type: events.SmartZoneWaitExpired}, park}, true},
-		{"failure that is not a timeout", []Event{started, refused, park}, false},
-		{"compaction that expired but confirmed", []Event{started, {Type: events.SmartZoneWaitExpired, Reason: "timed out"}, park}, false},
-		{"timeout in an earlier iteration", []Event{timedOut, started, park}, false},
-		{"no smart-zone event", []Event{started, park}, false},
-		{"timeout before another park kind", []Event{started, timedOut, {Type: events.Paused, Kind: events.Spinning}}, false},
+		{"wait timeout", []Event{started, timedOut, pause}, true},
+		{"re-prompt timeout", []Event{started, reprompt, pause}, true},
+		{"timeout then other events", []Event{started, timedOut, {Type: events.SmartZoneWaitExpired}, pause}, true},
+		{"failure that is not a timeout", []Event{started, refused, pause}, false},
+		{"compaction that expired but confirmed", []Event{started, {Type: events.SmartZoneWaitExpired, Reason: "timed out"}, pause}, false},
+		{"timeout in an earlier iteration", []Event{timedOut, started, pause}, false},
+		{"no smart-zone event", []Event{started, pause}, false},
+		{"timeout before another pause kind", []Event{started, timedOut, {Type: events.Paused, Kind: events.Spinning}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -229,7 +229,7 @@ func (s *stubVerbs) LaunchPrompt(string) (string, error) { return s.prompt, nil 
 func TestApplyRefusesAVerbOutsideTheEntrysVerbs(t *testing.T) {
 	e := Entry{ID: "T1", Verbs: []string{VerbNudge}, Remedy: func(f Failure, v Verbs) error {
 		// A remedy that swallows the refusal still fails.
-		_, _ = v.Do(Call{Verb: VerbPark, Address: f.Address, Text: "stop"})
+		_, _ = v.Do(Call{Verb: VerbPause, Address: f.Address, Text: "stop"})
 		return Run(v, Call{Verb: VerbNudge, Address: f.Address, Text: "go"})
 	}}
 	v := &stubVerbs{}
@@ -320,7 +320,7 @@ func TestR2MatchesOnlyAZeroCommitEndingInABareCallLiteral(t *testing.T) {
 	}
 }
 
-func TestDefaultR3LaunchesDisabledAsMediumAgentEntriesWithVerifyAndLand(t *testing.T) {
+func TestDefaultR3LaunchesDisabledAsMediumAgentEntriesWithVerifyAndMerge(t *testing.T) {
 	c := Default()
 	var n int
 	for _, e := range c.Entries {
@@ -335,7 +335,7 @@ func TestDefaultR3LaunchesDisabledAsMediumAgentEntriesWithVerifyAndLand(t *testi
 		}
 		n++
 		if e.Authority != AuthorityMedium || !slices.Equal(e.Verbs, []string{"verify", "merge"}) {
-			t.Errorf("R3 = %+v, want medium agent entry with verify and land", e)
+			t.Errorf("R3 = %+v, want medium agent entry with verify and merge", e)
 		}
 	}
 	if n != 2 {
@@ -387,7 +387,7 @@ func enabledDefault() Catalog {
 	return c
 }
 
-func TestR3ProposesCommitlessDoneWhenTheWorkLandedInAnotherTicket(t *testing.T) {
+func TestR3ProposesCommitlessDoneWhenTheWorkMergedInAnotherTicket(t *testing.T) {
 	f := Failure{Address: "p:e/01", Type: events.Paused, Kind: events.ZeroCommit}
 	e, ok := enabledDefault().Match([]Event{{Type: f.Type, Kind: f.Kind, Text: "Already implemented by the sibling ticket 04."}})
 	if !ok || e.ID != "R3" {
@@ -406,15 +406,15 @@ func TestR3LostCommitsOnlyEscalate(t *testing.T) {
 	f := Failure{Type: events.Paused, Kind: events.AmbiguousMerge}
 	for _, reason := range []string{
 		"done but commits missing from epic-a and iteration branch ralph-loop/epic-a-item-01 no longer exists to recover them",
-		"land interrupted by a crash (lock owner pid 1) and verify cannot tell whether it landed: unrecoverable",
+		"merge interrupted by a crash (lock owner pid 1) and verify cannot tell whether it merged: unrecoverable",
 	} {
 		e, ok := enabledDefault().Match([]Event{{Type: f.Type, Kind: f.Kind, Reason: reason}})
 		if !ok || e.ID != "R3" || e.Executor != ExecutorPerson || e.Runnable(f) || e.Proposable(f) {
 			t.Errorf("reason %q matched (%+v, %v), want an escalate-only R3", reason, e, ok)
 		}
 	}
-	if e, _ := enabledDefault().Match([]Event{{Type: f.Type, Kind: f.Kind, Reason: "verify cannot tell whether it landed: unknown"}}); e.Executor != ExecutorAgent {
-		t.Errorf("an ambiguous land with its branch = %+v, want the agent entry", e)
+	if e, _ := enabledDefault().Match([]Event{{Type: f.Type, Kind: f.Kind, Reason: "verify cannot tell whether it merged: unknown"}}); e.Executor != ExecutorAgent {
+		t.Errorf("an ambiguous merge with its branch = %+v, want the agent entry", e)
 	}
 }
 
@@ -488,27 +488,27 @@ func TestDefaultR6LaunchesDisabledAsABusyRetryAndATakenNameAgent(t *testing.T) {
 	}
 }
 
-func TestR6MatchesAParkedLaunchCollisionOfTheSameKind(t *testing.T) {
+func TestR6MatchesAPausedLaunchCollisionOfTheSameKind(t *testing.T) {
 	c := Default()
 	for i := range c.Entries {
 		c.Entries[i].Enabled = true
 	}
 	failed := func(k events.Kind) Event { return Event{Type: events.LaunchFailed, Kind: k} }
-	park := func(k events.Kind) Event { return Event{Type: events.Paused, Kind: k} }
+	pause := func(k events.Kind) Event { return Event{Type: events.Paused, Kind: k} }
 	tests := []struct {
 		name     string
 		seq      []Event
 		want     bool
 		executor Executor
 	}{
-		{"pane busy", []Event{failed(events.AgentPaneBusy), park(events.AgentPaneBusy)}, true, ExecutorRule},
-		{"name taken", []Event{failed(events.AgentNameTaken), park(events.AgentNameTaken)}, true, ExecutorAgent},
-		{"retries before the park", []Event{failed(events.AgentNameTaken), failed(events.AgentNameTaken), {Type: events.IterationStarted}, park(events.AgentNameTaken)}, true, ExecutorAgent},
-		{"park with no launch-failed", []Event{park(events.AgentPaneBusy)}, false, ""},
-		{"launch-failed of another kind", []Event{failed(events.AgentPromptStalled), park(events.AgentNameTaken)}, false, ""},
-		{"busy failure, taken park", []Event{failed(events.AgentPaneBusy), park(events.AgentNameTaken)}, false, ""},
-		{"retry storm", []Event{failed(events.AgentPaneBusy), park(events.RetryExhausted)}, false, ""},
-		{"launch-failed with no park", []Event{failed(events.AgentPaneBusy)}, false, ""},
+		{"pane busy", []Event{failed(events.AgentPaneBusy), pause(events.AgentPaneBusy)}, true, ExecutorRule},
+		{"name taken", []Event{failed(events.AgentNameTaken), pause(events.AgentNameTaken)}, true, ExecutorAgent},
+		{"retries before the pause", []Event{failed(events.AgentNameTaken), failed(events.AgentNameTaken), {Type: events.IterationStarted}, pause(events.AgentNameTaken)}, true, ExecutorAgent},
+		{"pause with no launch-failed", []Event{pause(events.AgentPaneBusy)}, false, ""},
+		{"launch-failed of another kind", []Event{failed(events.AgentPromptStalled), pause(events.AgentNameTaken)}, false, ""},
+		{"busy failure, taken pause", []Event{failed(events.AgentPaneBusy), pause(events.AgentNameTaken)}, false, ""},
+		{"retry storm", []Event{failed(events.AgentPaneBusy), pause(events.RetryExhausted)}, false, ""},
+		{"launch-failed with no pause", []Event{failed(events.AgentPaneBusy)}, false, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -586,15 +586,15 @@ func TestDefaultR10LaunchesEnabledAsAMediumRule(t *testing.T) {
 	}
 }
 
-func TestR10NeverMatchesItsOwnPark(t *testing.T) {
-	park := Event{Type: events.Paused, Kind: events.BackgroundTaskGate, Reason: "dirty worktree"}
+func TestR10NeverMatchesItsOwnPause(t *testing.T) {
+	pause := Event{Type: events.Paused, Kind: events.BackgroundTaskGate, Reason: "dirty worktree"}
 	held := Event{Type: events.BackgroundTaskGateHeld, Kind: events.BackgroundTaskGate}
-	if got, ok := Default().Match([]Event{held, park}); ok {
-		t.Errorf("R10's own park matched %q", got.ID)
+	if got, ok := Default().Match([]Event{held, pause}); ok {
+		t.Errorf("R10's own pause matched %q", got.ID)
 	}
 	f := Failure{Address: "p:e/01", Type: events.Paused, Kind: events.BackgroundTaskGate}
 	if f.Triggers() {
-		t.Errorf("R10's own park %+v triggers recovery", f)
+		t.Errorf("R10's own pause %+v triggers recovery", f)
 	}
 }
 
@@ -668,23 +668,23 @@ func TestR11MatchesANameTakenRelaunchOfAStillLiveIteration(t *testing.T) {
 	}
 	started := Event{Type: events.IterationStarted}
 	taken := Event{Type: events.LaunchFailed, Kind: events.AgentNameTaken}
-	park := Event{Type: events.Paused, Kind: events.AgentNameTaken}
+	pause := Event{Type: events.Paused, Kind: events.AgentNameTaken}
 	tests := []struct {
 		name string
 		seq  []Event
 		want string
 	}{
-		{"live iteration, then a taken name", []Event{started, taken, park}, "R11"},
-		{"in-iteration retries", []Event{started, taken, taken, park}, "R11"},
-		{"rate-limit pause while live", []Event{started, {Type: events.PausedRateLimit}, taken, park}, "R11"},
-		{"no iteration ever started", []Event{taken, park}, "R6"},
-		{"start only after the failure", []Event{taken, started, park}, "R6"},
-		{"iteration finished first", []Event{started, {Type: events.IterationFinished}, taken, park}, "R6"},
-		{"iteration parked first", []Event{started, {Type: events.Paused, Kind: events.IterationError}, taken, park}, "R6"},
-		{"a person reset it", []Event{started, {Type: events.TicketStartedOver}, taken, park}, "R6"},
-		{"landed first", []Event{started, {Type: events.CherryPicked}, taken, park}, "R6"},
+		{"live iteration, then a taken name", []Event{started, taken, pause}, "R11"},
+		{"in-iteration retries", []Event{started, taken, taken, pause}, "R11"},
+		{"rate-limit pause while live", []Event{started, {Type: events.PausedRateLimit}, taken, pause}, "R11"},
+		{"no iteration ever started", []Event{taken, pause}, "R6"},
+		{"start only after the failure", []Event{taken, started, pause}, "R6"},
+		{"iteration finished first", []Event{started, {Type: events.IterationFinished}, taken, pause}, "R6"},
+		{"iteration paused first", []Event{started, {Type: events.Paused, Kind: events.IterationError}, taken, pause}, "R6"},
+		{"a person reset it", []Event{started, {Type: events.TicketStartedOver}, taken, pause}, "R6"},
+		{"merged first", []Event{started, {Type: events.CherryPicked}, taken, pause}, "R6"},
 		{"busy pane, not a taken name", []Event{started, {Type: events.LaunchFailed, Kind: events.AgentPaneBusy}, {Type: events.Paused, Kind: events.AgentPaneBusy}}, "R6"},
-		{"taken-name failure, other park", []Event{started, taken, {Type: events.Paused, Kind: events.RetryExhausted}}, ""},
+		{"taken-name failure, other pause", []Event{started, taken, {Type: events.Paused, Kind: events.RetryExhausted}}, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -728,23 +728,23 @@ func TestR12MatchesAQuickZeroCommitFinishOfAReclaimAfterAStall(t *testing.T) {
 	}
 	stall := at(events.LaunchFailed, events.AgentPromptStalled, 0)
 	reclaimed := at(events.Reclaimed, "", time.Minute)
-	park := at(events.Paused, events.ZeroCommit, time.Minute+time.Second)
+	pause := at(events.Paused, events.ZeroCommit, time.Minute+time.Second)
 	tests := []struct {
 		name string
 		seq  []Event
 		want string
 	}{
-		{"stall, reclaim, quick zero-commit park", []Event{stall, reclaimed, park}, "R12"},
-		{"stall parked, then reclaimed", []Event{stall, at(events.Paused, events.AgentPromptStalled, time.Second), reclaimed, park}, "R12"},
-		{"finished logged before the park", []Event{stall, reclaimed, at(events.IterationFinished, "", time.Minute+time.Second), park}, "R12"},
+		{"stall, reclaim, quick zero-commit pause", []Event{stall, reclaimed, pause}, "R12"},
+		{"stall paused, then reclaimed", []Event{stall, at(events.Paused, events.AgentPromptStalled, time.Second), reclaimed, pause}, "R12"},
+		{"finished logged before the pause", []Event{stall, reclaimed, at(events.IterationFinished, "", time.Minute+time.Second), pause}, "R12"},
 		{"reclaim finished slowly", []Event{stall, reclaimed, at(events.Paused, events.ZeroCommit, 2*time.Minute)}, ""},
-		{"no earlier stall", []Event{at(events.IterationStarted, "", 0), reclaimed, park}, ""},
-		{"fresh launch, not a reclaim", []Event{stall, at(events.IterationStarted, "", time.Minute), park}, ""},
-		{"reclaim of an older iteration", []Event{stall, reclaimed, at(events.IterationStarted, "", time.Minute), park}, ""},
-		{"a person reset after the stall", []Event{stall, at(events.TicketStartedOver, "", time.Second), reclaimed, park}, ""},
-		{"landed after the stall", []Event{stall, at(events.CherryPicked, "", time.Second), reclaimed, park}, ""},
-		{"reclaim with no time", []Event{stall, {Type: events.Reclaimed}, park}, ""},
-		{"stall of another kind", []Event{at(events.LaunchFailed, events.AgentPaneBusy, 0), reclaimed, park}, ""},
+		{"no earlier stall", []Event{at(events.IterationStarted, "", 0), reclaimed, pause}, ""},
+		{"fresh launch, not a reclaim", []Event{stall, at(events.IterationStarted, "", time.Minute), pause}, ""},
+		{"reclaim of an older iteration", []Event{stall, reclaimed, at(events.IterationStarted, "", time.Minute), pause}, ""},
+		{"a person reset after the stall", []Event{stall, at(events.TicketStartedOver, "", time.Second), reclaimed, pause}, ""},
+		{"merged after the stall", []Event{stall, at(events.CherryPicked, "", time.Second), reclaimed, pause}, ""},
+		{"reclaim with no time", []Event{stall, {Type: events.Reclaimed}, pause}, ""},
+		{"stall of another kind", []Event{at(events.LaunchFailed, events.AgentPaneBusy, 0), reclaimed, pause}, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

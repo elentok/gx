@@ -283,7 +283,7 @@ func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
 
 	s.chat.Close()
 	all := strings.Join(wait(-1), "\n") // the batcher may merge both into one send
-	if n := strings.Count(all, "parked while herdr was down"); n != 1 {
+	if n := strings.Count(all, "paused while herdr was down"); n != 1 {
 		t.Fatalf("digests = %d, want 1: %s", n, all)
 	}
 	for _, p := range []string{"p1", "p2", "p3", "p4"} {

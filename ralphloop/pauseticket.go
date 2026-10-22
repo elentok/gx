@@ -10,9 +10,9 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// parkRequest describes one park outcome. Kind is mandatory: every park event
+// pauseRequest describes one pause outcome. Kind is mandatory: every pause event
 // carries the failure fields (kind, address, reason) so a catalog can match it.
-type parkRequest struct {
+type pauseRequest struct {
 	ScratchDir string
 	EpicName   string
 	Ticket     string // identifier
@@ -23,22 +23,22 @@ type parkRequest struct {
 	// Repair is rendered into the ticket's "## Needs Repair" section.
 	Repair schema.FaultState
 	// Event carries optional agent context (runner, label, pane, session, cwd) merged
-	// into the appended event; park overwrites its type, ticket, kind and reason.
+	// into the appended event; pause overwrites its type, ticket, kind and reason.
 	Event Event
-	// AlreadyDone skips the ticket write of a manual-land whose ticket was
+	// AlreadyDone skips the ticket write of a manual-merge whose ticket was
 	// already done.
 	AlreadyDone bool
-	// ReparkDone lets a needs-repair park overwrite a done ticket, for the one
+	// RepauseDone lets a paused (repair) pause overwrite a done ticket, for the one
 	// caller whose finding is that the done itself is false (its commits never
-	// landed). Every other park on a done ticket is refused.
-	ReparkDone bool
+	// merged). Every other pause on a done ticket is refused.
+	RepauseDone bool
 }
 
-// gxQuestions is the fixed wording of the parks gx itself asks about. Other
+// gxQuestions is the fixed wording of the pauses gx itself asks about. Other
 // kinds carry the agent's own question or are not questions.
 var gxQuestions = map[events.Kind]string{
 	events.ZeroCommit:         "The agent finished with no commits. Adopt it as done, or reopen the ticket?",
-	events.StrandedCommits:    "The agent stopped with commits that never landed. Reopen the ticket to retry?",
+	events.StrandedCommits:    "The agent stopped with commits that never merged. Reopen the ticket to retry?",
 	events.BackgroundTaskGate: "The agent ended its turn with a background task still running. Reopen the ticket?",
 	events.AmbiguousBase:      "Several blockers have different branches. Pick the base branch.",
 }
@@ -48,9 +48,9 @@ var (
 	errQuestionGone = errors.New("question no longer open")
 )
 
-// logGxQuestion writes the by-gx park.question for kind before the status
+// logGxQuestion writes the by-gx pause.question for kind before the status
 // flips. A ticket that already has an open question keeps it. A blocked pane's
-// question lives only in the pane, so its summary is the park reason.
+// question lives only in the pane, so its summary is the pause reason.
 func logGxQuestion(ticketPath string, kind events.Kind, reason string) error {
 	summary, ok := gxQuestions[kind]
 	if kind == events.BlockedPane && reason != "" {
@@ -83,14 +83,14 @@ func logGxQuestion(ticketPath string, kind events.Kind, reason string) error {
 	return err
 }
 
-// Reasons a park.closed names: what ended the question without an answer.
+// Reasons a pause.closed names: what ended the question without an answer.
 const (
 	CloseBudgetKilled = "budget-killed"
 	CloseRelaunch     = "relaunch"
-	CloseUnparked     = "unparked"
+	CloseResumed      = "resumed"
 )
 
-// CloseOpenQuestion writes park.closed with reason for the ticket's open
+// CloseOpenQuestion writes pause.closed with reason for the ticket's open
 // question, so the log ends it before the status moves on. A ticket without an
 // open question is left alone.
 func CloseOpenQuestion(ticketPath, reason string) error {
@@ -102,7 +102,7 @@ func CloseOpenQuestion(ticketPath, reason string) error {
 	if q == nil {
 		return nil
 	}
-	// The guard re-checks under the ticket lock: an answer may have landed since the read.
+	// The guard re-checks under the ticket lock: an answer may have merged since the read.
 	_, err = tickets.AppendLogIf(ticketPath, tickets.LogEvent{
 		Type: tickets.EventPauseClosed, Question: q.Seq, Reason: reason,
 	}, func(evs []tickets.LogEvent) error {
@@ -117,13 +117,13 @@ func CloseOpenQuestion(ticketPath, reason string) error {
 	return err
 }
 
-// isParkType reports whether t is an event type a park writes for a person to
-// act on (as opposed to manual-land).
-func isParkType(t events.Type) bool {
+// isPauseType reports whether t is an event type a pause writes for a person to
+// act on (as opposed to manual-merge).
+func isPauseType(t events.Type) bool {
 	return t == events.Paused
 }
 
-// PauseStatus is the needs-answer / needs-repair label that notifications still
+// PauseStatus is the paused (answer) / paused (repair) label that notifications still
 // show for a pause of this kind.
 func PauseStatus(k events.Kind) string {
 	if k.AwaitsAnswer() {
@@ -132,58 +132,58 @@ func PauseStatus(k events.Kind) string {
 	return string(schema.StatusLegacyRepair)
 }
 
-// RecordManualLand writes done through the park path and appends the one
-// manual-merge event. Only the ticket write's error is returned, matching park.
-func RecordManualLand(scratchDir, epicName, ticket, path string, alreadyDone bool, ev Event) error {
-	_, err := park(noopEventSink{}, parkRequest{
+// RecordManualMerge writes done through the pause path and appends the one
+// manual-merge event. Only the ticket write's error is returned, matching pause.
+func RecordManualMerge(scratchDir, epicName, ticket, path string, alreadyDone bool, ev Event) error {
+	_, err := pause(noopEventSink{}, pauseRequest{
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
 		Type: events.ManualMerge, Reason: ev.Reason, AlreadyDone: alreadyDone, Event: ev,
 	})
 	return err
 }
 
-// Park parks the ticket through the park path: one status write, one event and
+// Pause pauses the ticket through the pause path: one status write, one event and
 // no live notification. The event type and the reason stub come from the kind.
 // A blank reason is refused before anything is written. ev carries the run's
-// agent context onto the event, as parkRequest.Event does.
-func Park(scratchDir, epicName, ticket, path string, kind events.Kind, reason string, ev Event) error {
-	_, err := park(noopEventSink{}, parkRequest{
+// agent context onto the event, as pauseRequest.Event does.
+func Pause(scratchDir, epicName, ticket, path string, kind events.Kind, reason string, ev Event) error {
+	_, err := pause(noopEventSink{}, pauseRequest{
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
 		Type: events.Paused, Kind: kind, Reason: reason, Event: ev,
 	})
 	return err
 }
 
-// park is the single park path: it writes the ticket, appends exactly one
+// pause is the single pause path: it writes the ticket, appends exactly one
 // event and notifies. Every status writer is routed here:
-// needs-repair, needs-answer and the CLI land's done write.
+// paused (repair), paused (answer) and the CLI merge's done write.
 //
 // A failed ticket write is folded into the notified/logged reason so the event
-// and notification still fire — a silent park is the bug this exists to
+// and notification still fire — a silent pause is the bug this exists to
 // remove — and is also returned, for callers whose flow must not continue past
-// an unwritten park.
-func park(sink EventSink, req parkRequest) (reason string, writeErr error) {
+// an unwritten pause.
+func pause(sink EventSink, req pauseRequest) (reason string, writeErr error) {
 	reason = req.Reason
 	switch {
 	case req.Type == events.Paused && !req.Kind.AwaitsAnswer():
-		writeErr = markNeedsRepairWithReason(req.Path, reason, schema.PauseKind(req.Kind), req.Repair, req.ReparkDone)
+		writeErr = markRepairWithReason(req.Path, reason, schema.PauseKind(req.Kind), req.Repair, req.RepauseDone)
 	case req.Type == events.Paused:
 		if err := logGxQuestion(req.Path, req.Kind, reason); err != nil {
-			// A silent park is the bug this path exists to remove: park anyway.
+			// A silent pause is the bug this path exists to remove: pause anyway.
 			reason = fmt.Sprintf("%s (also failed logging question: %v)", reason, err)
 		}
-		writeErr = markNeedsAnswer(req.Path, schema.PauseKind(req.Kind))
+		writeErr = markAsking(req.Path, schema.PauseKind(req.Kind))
 	case req.Type == events.ManualMerge:
 		if !req.AlreadyDone {
 			writeErr = MarkDone(req.Path)
 		}
 	default:
-		writeErr = fmt.Errorf("park: unsupported type %q", req.Type)
+		writeErr = fmt.Errorf("pause: unsupported type %q", req.Type)
 	}
-	// A park event on a done ticket would mislead recovery, which reads the
-	// latest park reason from the run log.
-	if errors.Is(writeErr, ErrParkDone) {
-		log.Printf("ralphloop: refused %s park of %s/%s (%s): ticket is done", req.Type, req.EpicName, req.Ticket, req.Kind)
+	// A pause event on a done ticket would mislead recovery, which reads the
+	// latest pause reason from the run log.
+	if errors.Is(writeErr, ErrPauseDone) {
+		log.Printf("ralphloop: refused %s pause of %s/%s (%s): ticket is done", req.Type, req.EpicName, req.Ticket, req.Kind)
 		return reason, writeErr
 	}
 	if writeErr != nil {

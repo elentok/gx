@@ -247,7 +247,7 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 	}
 
 	// A person answers and the ticket is picked back up.
-	if err := ralphloop.UnparkTicket(ticketPath, time.Now()); err != nil {
+	if err := ralphloop.ResumeTicket(ticketPath, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")

@@ -770,7 +770,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		s.events.publish(EventIterationFailed, ticketAddr)
 		return
 	}
-	if !out.Landed {
+	if !out.Merged {
 		// The finish path already wrote the pause; tell a person its own reason.
 		if one.KeepAskedAgent && out.Kind == events.SelfReported {
 			// The agent waits idle for the answer: its run, worktree and session stay.

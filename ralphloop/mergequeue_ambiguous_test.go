@@ -13,8 +13,8 @@ import (
 )
 
 // A feature branch carrying the ticket's trailer on a commit that is neither
-// the recorded SHA nor patch-equivalent must park, not count as landed.
-func TestLandOne_TrailerOnly_ParksAmbiguousLand(t *testing.T) {
+// the recorded SHA nor patch-equivalent must pause, not count as merged.
+func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
@@ -35,13 +35,13 @@ func TestLandOne_TrailerOnly_ParksAmbiguousLand(t *testing.T) {
 
 	d := DefaultDeps()
 	d.Runner = runnerfake.NewRunner()
-	lp := landQueueParams{
+	lp := mergeQueueParams{
 		RepoDir: repo, FeatureWorktree: repo, FeatureBranch: "epic", ScratchDir: scratchDir,
 		WorktreeLock: &sync.Mutex{}, Gate: NewGate(), Sink: noopEventSink{},
 	}
-	r := landOne(d, lp, landJob{ticket: tickets.Ticket{Identifier: "01", Path: path}, base: base, branch: "iter", path: repo})
-	if r.err != nil || r.landDeferred || r.parkedOnChild {
-		t.Fatalf("landOne = %+v (err %v), want a clean parked outcome", r, r.err)
+	r := mergeOne(d, lp, mergeJob{ticket: tickets.Ticket{Identifier: "01", Path: path}, base: base, branch: "iter", path: repo})
+	if r.err != nil || r.mergeDeferred || r.pausedOnChild {
+		t.Fatalf("mergeOne = %+v (err %v), want a clean paused outcome", r, r.err)
 	}
 	tk, err := schema.ParseTicket(path)
 	if err != nil {
@@ -51,12 +51,12 @@ func TestLandOne_TrailerOnly_ParksAmbiguousLand(t *testing.T) {
 	if t.Failed() {
 		t.FailNow()
 	}
-	if reason := latestParkReason(scratchDir, "epic", "01"); !strings.Contains(reason, base) {
-		t.Errorf("park reason %q does not name base %s", reason, base)
+	if reason := latestPauseReason(scratchDir, "epic", "01"); !strings.Contains(reason, base) {
+		t.Errorf("pause reason %q does not name base %s", reason, base)
 	}
 }
 
-func TestParkedOutcome_NoKindNoReason_FallsBackHonestly(t *testing.T) {
+func TestPausedOutcome_NoKindNoReason_FallsBackHonestly(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
 	})
@@ -67,11 +67,11 @@ func TestParkedOutcome_NoKindNoReason_FallsBackHonestly(t *testing.T) {
 	}
 	one := OneIteration{Epic: "epic", ScratchDir: scratchDir, Ticket: tickets.Ticket{Identifier: "01", Path: path}}
 
-	out := parkedOutcome(one, tk)
+	out := pausedOutcome(one, tk)
 	if out.Kind != events.IterationError {
 		t.Errorf("Kind = %q, want %q", out.Kind, events.IterationError)
 	}
-	if !strings.Contains(out.Reason, "no park reason") || !strings.Contains(out.Reason, RunLogPath(scratchDir, "epic")) {
+	if !strings.Contains(out.Reason, "no pause reason") || !strings.Contains(out.Reason, RunLogPath(scratchDir, "epic")) {
 		t.Errorf("Reason = %q, want it to name the run log", out.Reason)
 	}
 }

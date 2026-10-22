@@ -39,7 +39,7 @@ func consecutiveLaunchFailures(evs []Event, ticket string) int {
 	return n
 }
 
-// retryStormKind upgrades a launch failure's park kind to retry-exhausted once
+// retryStormKind upgrades a launch failure's pause kind to retry-exhausted once
 // the ticket's consecutive failed launches reach the cap.
 func retryStormKind(scratchDir, epicName, ticket string, kind events.Kind, reason string) (events.Kind, string) {
 	evs, _, err := ReadEvents(scratchDir, epicName)

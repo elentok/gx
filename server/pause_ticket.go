@@ -16,7 +16,7 @@ import (
 // lost a race with a merge) is not an error to the caller: nothing is left to pause.
 // run is the paused run, zero when none launched.
 func (s *Server) pauseTicket(scratchDir string, addr tickets.Address, ticketPath string, kind events.Kind, reason string, run Run) error {
-	if err := ralphloop.Park(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason, run.pauseEvent()); errors.Is(err, ralphloop.ErrParkDone) {
+	if err := ralphloop.Pause(scratchDir, addr.Epic, addr.ID, ticketPath, kind, reason, run.pauseEvent()); errors.Is(err, ralphloop.ErrPauseDone) {
 		s.log.Warn("pause refused: ticket is done", "ticket", addr.String(), "kind", kind, "reason", reason)
 		return nil
 	} else if err != nil {
@@ -37,7 +37,7 @@ func (s *Server) notifyPause(addr tickets.Address, ticketPath string, kind event
 		s.holdPause(addr, status, kind, reason)
 		return
 	}
-	s.chat.Park(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, pauseChatDetail(ticketPath, kind, reason), s.epicCounts(addr.Project, addr.Epic))
+	s.chat.Pause(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, pauseChatDetail(ticketPath, kind, reason), s.epicCounts(addr.Project, addr.Epic))
 }
 
 // pauseChatDetail is the chat line for a pause. A self-reported pause shows the

@@ -40,7 +40,7 @@ type Deps struct {
 	// starting at base (a ref or commit hash; "" for the repo's HEAD) — or,
 	// if branch already exists, attaches the worktree to that branch instead
 	// (base is then ignored), for a resume that reattaches to the iteration
-	// branch a prior park left intact. A no-op if path already exists, so a
+	// branch a prior pause left intact. A no-op if path already exists, so a
 	// resumed Run can call it again for a worktree a prior invocation already
 	// created.
 	AddWorktree func(repoDir, path, branch, base string) error
@@ -50,7 +50,7 @@ type Deps struct {
 	// RemoveWorktree removes the git worktree checked out at path.
 	RemoveWorktree func(repoDir, path string, force bool) error
 	// DeleteBranch force-deletes an iteration's now-redundant branch once its
-	// commits have landed on the feature branch (as different hashes, via
+	// commits have merged on the feature branch (as different hashes, via
 	// cherry-pick — never merged, so a non-force delete would refuse it).
 	DeleteBranch func(repoDir, branch string) error
 	// RenameBranch renames a local branch, for setting an iteration branch
@@ -65,11 +65,11 @@ type Deps struct {
 	// checks it out, so commits an agent made after detaching HEAD still count
 	// as the iteration's. nil skips it.
 	AttachDetachedHead func(dir, branch string) (bool, error)
-	// UncommittedChanges lists dir's dirty files, for a zero-commit park's
+	// UncommittedChanges lists dir's dirty files, for a zero-commit pause's
 	// reason.
 	UncommittedChanges func(dir string) ([]git.Change, error)
 	// CommitSubjects lists fromExclusive..toRef's subjects, oldest first, so
-	// startup reconciliation can tell an interrupted landing's commits from
+	// startup reconciliation can tell an interrupted merging's commits from
 	// anything else that reached the feature branch.
 	CommitSubjects func(dir, fromExclusive, toRef string) ([]string, error)
 	// UnreachableCommits lists dir's HEAD commits no branch, remote or tag
@@ -81,26 +81,26 @@ type Deps struct {
 	// the durable source iteration branch is unaffected.
 	AbortCherryPick func(dir string) error
 	// IsAncestor reports whether ancestor is reachable from descendant, used
-	// by startup reconciliation to confirm a done ticket's recorded landed
+	// by startup reconciliation to confirm a done ticket's recorded merged
 	// commit (Event.SHA) is still on the feature branch.
 	IsAncestor       func(dir, ancestor, descendant string) (bool, error)
 	RebaseInProgress func(dir string) (bool, error)
 	// PatchesApplied reports whether a done ticket's iteration commits
 	// (base..branch) are already patch-equivalent to commits on the feature
 	// branch, used by startup reconciliation as a fallback when IsAncestor
-	// says a recorded landed commit isn't reachable — which also happens
-	// harmlessly whenever the feature branch was rebased after landing it,
+	// says a recorded merged commit isn't reachable — which also happens
+	// harmlessly whenever the feature branch was rebased after merging it,
 	// not just when the commit is genuinely missing.
 	PatchesApplied func(dir, upstream, base, branch string) (bool, error)
 	// AppendTrailers amends HEAD's commit message to add one or more
 	// ticket-identifying/metrics trailers in a single amend, stamped onto
-	// every landed cherry-pick so classifyDoneTicket can still find the
+	// every merged cherry-pick so classifyDoneTicket can still find the
 	// ticket trailer later even if a subsequent rebase-plus-manual-conflict-
 	// resolution changes the commit's hash and patch-id both.
 	AppendTrailers func(dir string, trailers ...git.Trailer) error
 	// TrailerMap maps each value of trailer key on the commits of ref (any
-	// rev or range) to its commit; `land --continue` reads it to tell its own
-	// unstamped pick from other tickets' landings.
+	// rev or range) to its commit; `merge --continue` reads it to tell its own
+	// unstamped pick from other tickets' merges.
 	TrailerMap func(dir, ref, key string) (map[string]string, error)
 	// WorktreeExists reports whether an iteration worktree still exists at
 	// path, used by startup reconciliation to detect leftover state a crash
@@ -118,7 +118,7 @@ type Deps struct {
 	// assistant turn yet.
 	ReadOccupancy func(cwd, sessionID string) (occupancy int, ok bool, err error)
 	// ReadOccupancyReading returns the same occupancy plus whether a
-	// compaction boundary has landed since the turn it came from. Only the
+	// compaction boundary has merged since the turn it came from. Only the
 	// smart-zone breach check wants that second answer (see
 	// smartZoneOccupancy); every other consumer reads ReadOccupancy, which
 	// keeps reporting the number regardless.
@@ -130,7 +130,7 @@ type Deps struct {
 	// ReadCompactionsAfter returns how many of those boundaries were written
 	// strictly after since. The compact-completion gate needs this whenever it
 	// has no trustworthy pre-"/compact" count to compare against: a total count
-	// read after the boundary landed already includes it, so no comparison
+	// read after the boundary merged already includes it, so no comparison
 	// against it can prove the compaction happened (see stickyBaseline).
 	ReadCompactionsAfter func(cwd, sessionID string, since time.Time) (count int, ok bool, err error)
 	// ReadBackgroundTasks returns the Claude Code session's outstanding
@@ -146,7 +146,7 @@ type Deps struct {
 	// turn ended with a text block shaped like an unexecuted tool call
 	// instead of a real tool_use (see transcript.ReadUnexecutedToolCall) —
 	// used by finishIteration's zero-commit path to distinguish that bare
-	// model glitch from a genuine stall before parking needs-answer.
+	// model glitch from a genuine stall before pausing paused (answer).
 	ReadUnexecutedToolCall func(cwd, sessionID string) (bool, error)
 	// ReadCodexContext returns the latest context-token count for the Codex
 	// session launched in cwd, or ok=false until its local session data is
@@ -159,12 +159,12 @@ type Deps struct {
 	// Now returns the current time, injectable so a rate-limit reset
 	// deadline can be tested without a real wall-clock wait.
 	Now func() time.Time
-	// ParkTimer returns a channel that fires once the given duration has
-	// elapsed — one poll of a parked run's wait. It is a channel rather than
-	// a blocking sleep so the park can select on an operator's cosmetic wake
+	// PauseTimer returns a channel that fires once the given duration has
+	// elapsed — one poll of a paused run's wait. It is a channel rather than
+	// a blocking sleep so the pause can select on an operator's cosmetic wake
 	// at the same time without a goroutine per poll, and it is injectable so
-	// park tests drive polling with a timer that is ready immediately.
-	ParkTimer func(time.Duration) <-chan time.Time
+	// pause tests drive polling with a timer that is ready immediately.
+	PauseTimer func(time.Duration) <-chan time.Time
 }
 
 // DefaultDeps wires Deps to the real herdr, git, and transcript packages.
@@ -304,9 +304,9 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 				return codexsession.LastContextTokensIn(overrides.CodexHome, cwd, sessionID)
 			},
 		),
-		Sleep:     time.Sleep,
-		Now:       time.Now,
-		ParkTimer: time.After,
+		Sleep:      time.Sleep,
+		Now:        time.Now,
+		PauseTimer: time.After,
 	}
 }
 
@@ -468,9 +468,9 @@ func worktreeDir(repoDir string) (string, error) {
 
 // addWorktree implements Deps.AddWorktree against the real git package. When
 // branch already exists — a resumed iteration reattaching to the branch a
-// prior park left intact — it attaches the worktree to that branch instead
+// prior pause left intact — it attaches the worktree to that branch instead
 // of trying (and failing) to create it fresh, so a resume doesn't collide
-// with its own pre-park iteration branch.
+// with its own pre-pause iteration branch.
 func addWorktree(repoDir, path, branch, base string) error {
 	repo, err := git.FindRepo(repoDir)
 	if err != nil {

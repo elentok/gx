@@ -30,13 +30,13 @@ func retryTurnSelfReport(t *testing.T, d Deps, path string, mutate func(*schema.
 	})
 }
 
-// TestRun_RetryTurnSelfReportsNeedsAnswer_ZeroCommits_ParksSelfReported pins
+// TestRun_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported pins
 // ticket 04's first case: when the corrective retry's own turn ends
-// ahead == 0 and self-reports needs-answer, the ticket must park with the
+// ahead == 0 and self-reports paused (answer), the ticket must pause with the
 // self-reported kind and the agent's actual question, not
-// ParkKindZeroCommit/"no commits landed" — even though the pre-retry turn
+// ParkKindZeroCommit/"no commits merged" — even though the pre-retry turn
 // matched the unexecuted-tool-call detector and carried no report of its own.
-func TestRun_RetryTurnSelfReportsNeedsAnswer_ZeroCommits_ParksSelfReported(t *testing.T) {
+func TestRun_RetryTurnSelfReportsAsking_ZeroCommits_PausesSelfReported(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -56,7 +56,7 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_ZeroCommits_ParksSelfReported(t *te
 	})
 
 	sink := &recordingSink{}
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
 	wantPrompts := 2
 	if len(*prompts) != wantPrompts {
@@ -78,13 +78,13 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_ZeroCommits_ParksSelfReported(t *te
 	}
 }
 
-// TestRun_RetryTurnSelfReportsNeedsAnswer_LandsCommits_DoesNotSilentlyLand
+// TestRun_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentlyMerge
 // pins ticket 04's second case, ADR 0019's failure mode replayed on the
-// retry's own turn: when the corrective retry lands commits (ahead > 0)
-// alongside a needs-answer self-report, the ticket must park on the
+// retry's own turn: when the corrective retry merges commits (ahead > 0)
+// alongside a paused (answer) self-report, the ticket must pause on the
 // self-report rather than silently cherry-picking the partial work while
 // dropping the unanswered question.
-func TestRun_RetryTurnSelfReportsNeedsAnswer_LandsCommits_DoesNotSilentlyLand(t *testing.T) {
+func TestRun_RetryTurnSelfReportsAsking_MergesCommits_DoesNotSilentlyMerge(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -114,14 +114,14 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_LandsCommits_DoesNotSilentlyLand(t 
 	})
 
 	sink := &recordingSink{}
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
 	wantPrompts := 2
 	if len(*prompts) != wantPrompts {
 		t.Fatalf("prompts = %v, want %d (initial launch + one corrective retry)", *prompts, wantPrompts)
 	}
 	if cherryPickCalled {
-		t.Errorf("CherryPickRange called, want the retry's landed commits left unlanded behind the self-report")
+		t.Errorf("CherryPickRange called, want the retry's merged commits left unmerged behind the self-report")
 	}
 
 	raw, err := os.ReadFile(path)
@@ -137,7 +137,7 @@ func TestRun_RetryTurnSelfReportsNeedsAnswer_LandsCommits_DoesNotSilentlyLand(t 
 // TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone pins ticket 04's
 // third case: when the corrective retry's own turn self-reports
 // commitless-and-finished, the ticket is marked done via the existing
-// commitless path rather than parked as a stall.
+// commitless path rather than paused as a stall.
 func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -192,6 +192,6 @@ func TestRun_RetryTurnSelfReportsCommitlessFinished_MarkedDone(t *testing.T) {
 		t.Errorf("ticket not marked done for the retry's commitless-and-finished self-report:\n%s", raw)
 	}
 	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
-		t.Errorf("ticket must not be parked needs-answer for a declared-commitless retry finish:\n%s", raw)
+		t.Errorf("ticket must not be paused needs-answer for a declared-commitless retry finish:\n%s", raw)
 	}
 }

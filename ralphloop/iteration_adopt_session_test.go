@@ -69,7 +69,7 @@ func TestRun_AdoptedFinishedSession_IsNotPrompted(t *testing.T) {
 }
 
 // TestRun_AdoptedStalledSession_PromptRefusedWhileBusy_KeepsWaiting: the
-// stalled session picked up a turn before the re-prompt landed, so the
+// stalled session picked up a turn before the re-prompt merged, so the
 // refused prompt is skipped and the iteration waits for that turn.
 func TestRun_AdoptedStalledSession_PromptRefusedWhileBusy_KeepsWaiting(t *testing.T) {
 	t.Parallel()
@@ -94,10 +94,10 @@ func TestRun_AdoptedStalledSession_PromptRefusedWhileBusy_KeepsWaiting(t *testin
 	}
 }
 
-// TestRun_AdoptedStalledSession_PromptRefusedWhileBlocked_Parks: the stalled
+// TestRun_AdoptedStalledSession_PromptRefusedWhileBlocked_Pauses: the stalled
 // session sits on a dialog, so the re-prompt is refused and the iteration
-// parks blocked-pane.
-func TestRun_AdoptedStalledSession_PromptRefusedWhileBlocked_Parks(t *testing.T) {
+// pauses blocked-pane.
+func TestRun_AdoptedStalledSession_PromptRefusedWhileBlocked_Pauses(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -110,7 +110,7 @@ func TestRun_AdoptedStalledSession_PromptRefusedWhileBlocked_Parks(t *testing.T)
 		return agentrunner.ErrNotReady
 	})
 
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
 
 	raw, err := os.ReadFile(path)
 	if err != nil {

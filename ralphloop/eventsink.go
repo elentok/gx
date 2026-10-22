@@ -8,7 +8,7 @@ import (
 // PauseKind distinguishes why an iteration paused, since rendering (the
 // headless text sink today, a future TUI tomorrow) says something different
 // for each: a rate-limit pause clears itself on a timer, while a
-// needs-repair pause needs a human at the agent's pane. A smart-zone
+// paused (repair) pause needs a human at the agent's pane. A smart-zone
 // breach is deliberately not a PauseKind: recoverSmartZoneBreach never calls
 // Gate.pause (the scheduler keeps running other tickets throughout), so it
 // reports through SmartZoneCompactStarted/SmartZoneFinishingUp/
@@ -17,10 +17,10 @@ import (
 type PauseKind string
 
 // IterationStats carries the data IterationFinished needs beyond the ticket
-// and epic name: the landed iteration's own metrics plus the epic's live
+// and epic name: the merged iteration's own metrics plus the epic's live
 // progress counts, grouped into one type rather than five loose ints.
 // Completed and Total describe the epic as a whole — recomputed from the
-// scan loop's already-loaded epic on every landed iteration, not counted up
+// scan loop's already-loaded epic on every merged iteration, not counted up
 // by this Run call — so a resumed or scoped run reports the same numbers a
 // fresh run over the same epic would (see RunScope.DoneCount/TotalCount).
 type IterationStats struct {
@@ -34,20 +34,20 @@ type IterationStats struct {
 
 const (
 	PauseRateLimit PauseKind = "rate-limit"
-	// PauseNeedsRepair marks the fault-side recovery an iteration goroutine's
+	// PauseRepair marks the fault-side recovery an iteration goroutine's
 	// own error drives (loop.go's r.err handling): the ticket is flagged
-	// needs-repair and dropped out of the frontier for a human to clear, while
+	// paused (repair) and dropped out of the frontier for a human to clear, while
 	// the scheduler itself keeps running every other ticket. A renderer (see
-	// ticket 04a) treats it as its own "needs repair" state rather than a
-	// generic pause. A pane blocked on an operator prompt is a different park
-	// entirely (needs-answer, no pause — see parkOnBlockedPane).
-	PauseNeedsRepair PauseKind = "needs-repair"
+	// ticket 04a) treats it as its own "paused for repair" state rather than a
+	// generic pause. A pane blocked on an operator prompt is a different pause
+	// entirely (paused (answer), no pause — see pauseOnBlockedPane).
+	PauseRepair PauseKind = "needs-repair"
 )
 
-// StalledTicket names one human-clearable ticket a parked epic is waiting
+// StalledTicket names one human-clearable ticket a paused epic is waiting
 // on. Reattachable reports whether its prior iteration still has a live,
-// owned herdr tab/agent (see resumeReattachable) — the epic-parked half of
-// distinguishing a park a human clears by editing status alone from one a
+// owned herdr tab/agent (see resumeReattachable) — the epic-paused half of
+// distinguishing a pause a human clears by editing status alone from one a
 // live run can also self-heal from once cleared.
 type StalledTicket struct {
 	Identifier   string
@@ -79,20 +79,20 @@ type EventSink interface {
 	// (see UnresolvedBlockers) render distinctly.
 	TicketReverted(identifier string)
 	// TicketReattached reports that a ticket left `Status: claimed` or
-	// `Status: needs-repair` by a prior invocation still has a live
+	// `Status: paused (repair)` by a prior invocation still has a live
 	// iteration, being resumed under label. cwd/sessionID (best-effort,
 	// recovered from the run log's last iteration-started event; empty if
 	// none found) let a consumer resolve the session's transcript itself, so
 	// elapsed time survives a reattach instead of resetting to zero.
 	TicketReattached(identifier string, label string, cwd string, sessionID string)
-	// TicketNeedsHuman reports that a machine parked identifier on epicName
-	// for a person, fired at gx's parking write itself (the gate's write, the
+	// TicketNeedsHuman reports that a machine paused identifier on epicName
+	// for a person, fired at gx's pausing write itself (the gate's write, the
 	// adoption path's write, and each fault-side write) so coverage is total
-	// rather than incidental. status is a plain string ("needs-answer" /
-	// "needs-repair", matching schema.StatusNeedsAnswer/StatusNeedsRepair's
+	// rather than incidental. status is a plain string ("paused (answer)" /
+	// "paused (repair)", matching schema.StatusNeedsAnswer/StatusNeedsRepair's
 	// raw values) — ask-versus-fault is a rendering choice a consumer makes
 	// from status, not a plumbing fork into separate events the way
-	// TicketNeedsAnswer/TicketStillNeedsRepair/the park-flavored
+	// TicketNeedsAnswer/TicketStillNeedsRepair/the pause-flavored
 	// IterationPaused used to be.
 	TicketNeedsHuman(identifier, epicName, status string, kind events.Kind, reason string)
 
@@ -115,8 +115,8 @@ type EventSink interface {
 	// IterationResumed reports that identifier's iteration label resumed from
 	// a kind pause.
 	IterationResumed(identifier string, label string, kind PauseKind)
-	// IterationFinished reports that ticket's iteration landed its commits on
-	// epicName, along with stats about the landed iteration and the epic's
+	// IterationFinished reports that ticket's iteration merged its commits on
+	// epicName, along with stats about the merged iteration and the epic's
 	// live progress.
 	IterationFinished(ticket tickets.Ticket, epicName string, stats IterationStats)
 	// TranscriptLine reports one line of label's live agent transcript.
@@ -151,47 +151,47 @@ type EventSink interface {
 	SmartZoneRecovered(identifier string)
 
 	// TicketCleanupFinished reports that a done ticket's commits had already
-	// landed, but a crash left its worktree/tab/branch behind between marking
+	// merged, but a crash left its worktree/tab/branch behind between marking
 	// it done and cleaning up right after — startup reconciliation just
 	// finished that interrupted cleanup.
 	TicketCleanupFinished(identifier string)
 	// TicketRecovering reports that startup reconciliation is about to
 	// re-cherry-pick identifier's commits from a surviving iteration branch
-	// (a doneRecoverable ticket, or an orphaned claim with unlanded commits)
+	// (a doneRecoverable ticket, or an orphaned claim with unmerged commits)
 	// — fired before the CherryPickStarted/ConflictResolutionStarted events
 	// that follow, so a renderer has a live row to update: unlike a normal
 	// iteration, there's no LiveEventIterationStarted/TicketReattached ahead
 	// of this recovery to seed one.
 	TicketRecovering(identifier string)
 	// TicketRecovered reports that a done ticket's commits were missing from
-	// epicName (a crash landed between cherry-pick and marking done) but its
+	// epicName (a crash merged between cherry-pick and marking done) but its
 	// iteration branch still held them, so startup reconciliation
-	// re-cherry-picked and restored them as landedSHA.
-	TicketRecovered(identifier, epicName, branch, landedSHA string)
+	// re-cherry-picked and restored them as mergedSHA.
+	TicketRecovered(identifier, epicName, branch, mergedSHA string)
 	// TicketUnrecoverable reports that a done ticket's commits are missing
 	// from epicName and no iteration branch survived to recover them from —
-	// flagged needs-repair for a human to inspect.
+	// flagged paused (repair) for a human to inspect.
 	TicketUnrecoverable(identifier, epicName string)
 
-	// EpicParked reports that epicName has no runnable work left and is
+	// EpicPaused reports that epicName has no runnable work left and is
 	// waiting, without a timeout, on a person to clear one of the stalled
 	// tickets (identifiers, in file order). Unlike EpicComplete this is not
 	// the end of the run: the run keeps polling and carries on by itself once
 	// a status clears.
-	EpicParked(epicName string, stalled []StalledTicket)
+	EpicPaused(epicName string, stalled []StalledTicket)
 	// EpicComplete reports that every ticket in epicName is done, with
-	// completed tickets landed by this Run call, after elapsedSeconds of
+	// completed tickets merged by this Run call, after elapsedSeconds of
 	// total wall-clock run time.
 	EpicComplete(epicName string, completed int, elapsedSeconds int)
 
 	// EpicFailed reports that epicName's Run call returned err. Unlike every
 	// other event here, this one is not fired from inside the run: by the
 	// time the loop registry records a run's failure the run has already
-	// returned and its sink has been closed and drained, so there is no
+	// returned and its sink has been closed and emptied, so there is no
 	// live run-scoped emitter left to call this through. The registry's
 	// EpicFailureReporter (see epic_failure_reporter.go) is the one path
 	// that calls it — a chat message emitted straight to the transport
-	// after the drain, not through this interface — which is why
+	// after the empty, not through this interface — which is why
 	// EpicFailed exists on EventSink at all: purely so the contract test in
 	// eventsink_contract_test.go can record its chat membership, not
 	// because any EventSink implementation dispatches it.
@@ -234,9 +234,9 @@ func (noopEventSink) SmartZoneFinishingUp(identifier string)                    
 func (noopEventSink) SmartZoneRecovered(identifier string)                            {}
 func (noopEventSink) TicketCleanupFinished(identifier string)                         {}
 func (noopEventSink) TicketRecovering(identifier string)                              {}
-func (noopEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string)  {}
+func (noopEventSink) TicketRecovered(identifier, epicName, branch, mergedSHA string)  {}
 func (noopEventSink) TicketUnrecoverable(identifier, epicName string)                 {}
-func (noopEventSink) EpicParked(epicName string, stalled []StalledTicket)             {}
+func (noopEventSink) EpicPaused(epicName string, stalled []StalledTicket)             {}
 func (noopEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {}
 func (noopEventSink) EpicFailed(epicName string, err error)                           {}
 func (noopEventSink) NotificationFailed(channel, reason string)                       {}

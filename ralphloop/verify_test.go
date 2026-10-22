@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// verifyFixture returns a VerifyDeps where nothing has landed and nothing is
+// verifyFixture returns a VerifyDeps where nothing has merged and nothing is
 // left behind; each test overrides only the rung it exercises.
 func verifyFixture() VerifyDeps {
 	return VerifyDeps{
@@ -19,7 +19,7 @@ func verifyFixture() VerifyDeps {
 		RevParse:       func(dir, ref string) (string, error) { return "", errors.New("unknown revision") },
 		WorktreeExists: func(path string) (bool, error) { return false, nil },
 		ListSessions:   func(string) ([]agentrunner.Session, error) { return nil, nil },
-		LandedTickets:  func(dir, branch string) (map[string]bool, error) { return map[string]bool{}, nil },
+		MergedTickets:  func(dir, branch string) (map[string]bool, error) { return map[string]bool{}, nil },
 	}
 }
 
@@ -48,8 +48,8 @@ func TestVerifyEpic_SHARung(t *testing.T) {
 	vd := verifyFixture()
 	vd.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
 	v := verifyOne(t, vd, doneTicket(), pickedEvent())
-	if v.Landing != LandingLanded || v.Evidence != EvidenceSHA || v.SHA != "abc123" {
-		t.Errorf("got %+v, want landed via sha abc123", v)
+	if v.Merging != MergingMerged || v.Evidence != EvidenceSHA || v.SHA != "abc123" {
+		t.Errorf("got %+v, want merged via sha abc123", v)
 	}
 }
 
@@ -59,8 +59,8 @@ func TestVerifyEpic_PatchIDRung(t *testing.T) {
 	vd.RevParse = func(dir, ref string) (string, error) { return "deadbeef", nil }
 	vd.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) { return true, nil }
 	v := verifyOne(t, vd, doneTicket(), pickedEvent())
-	if v.Landing != LandingLanded || v.Evidence != EvidencePatchID {
-		t.Errorf("got %+v, want landed via patch-id", v)
+	if v.Merging != MergingMerged || v.Evidence != EvidencePatchID {
+		t.Errorf("got %+v, want merged via patch-id", v)
 	}
 	if v.Leftovers.Branch == nil || !*v.Leftovers.Branch {
 		t.Errorf("Leftovers.Branch = %v, want true", v.Leftovers.Branch)
@@ -70,41 +70,41 @@ func TestVerifyEpic_PatchIDRung(t *testing.T) {
 func TestVerifyEpic_TrailerRung(t *testing.T) {
 	t.Parallel()
 	vd := verifyFixture()
-	vd.LandedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
+	vd.MergedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
 	v := verifyOne(t, vd, doneTicket(), nil)
-	if v.Landing != LandingLanded || v.Evidence != EvidenceTrailer {
-		t.Errorf("got %+v, want landed via trailer", v)
+	if v.Merging != MergingMerged || v.Evidence != EvidenceTrailer {
+		t.Errorf("got %+v, want merged via trailer", v)
 	}
 }
 
-func TestVerifyEpic_NothingLanded(t *testing.T) {
+func TestVerifyEpic_NothingMerged(t *testing.T) {
 	t.Parallel()
 	vd := verifyFixture()
 	v := verifyOne(t, vd, doneTicket(), pickedEvent())
-	if v.Landing != LandingUnrecoverable || v.Evidence != EvidenceNone {
+	if v.Merging != MergingUnrecoverable || v.Evidence != EvidenceNone {
 		t.Errorf("got %+v, want unrecoverable with no evidence", v)
 	}
 
 	vd.RevParse = func(dir, ref string) (string, error) { return "deadbeef", nil }
 	v = verifyOne(t, vd, doneTicket(), pickedEvent())
-	if v.Landing != LandingRecoverable {
-		t.Errorf("Landing = %q, want recoverable while the iteration branch survives", v.Landing)
+	if v.Merging != MergingRecoverable {
+		t.Errorf("Merging = %q, want recoverable while the iteration branch survives", v.Merging)
 	}
 }
 
 func TestVerifyEpic_UnknownWhenCheckCannotRun(t *testing.T) {
 	t.Parallel()
 	vd := verifyFixture()
-	vd.LandedTickets = func(dir, branch string) (map[string]bool, error) { return nil, errors.New("not a git repo") }
+	vd.MergedTickets = func(dir, branch string) (map[string]bool, error) { return nil, errors.New("not a git repo") }
 	v := verifyOne(t, vd, doneTicket(), nil)
-	if v.Landing != LandingUnknown || !v.Unknown {
+	if v.Merging != MergingUnknown || !v.Unknown {
 		t.Errorf("got %+v, want unknown when the trailer rung cannot run", v)
 	}
 
 	vd = verifyFixture()
 	vd.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, errors.New("boom") }
 	v = verifyOne(t, vd, doneTicket(), pickedEvent())
-	if v.Landing != LandingUnknown || !v.Unknown {
+	if v.Merging != MergingUnknown || !v.Unknown {
 		t.Errorf("got %+v, want unknown when IsAncestor fails", v)
 	}
 }
@@ -113,10 +113,10 @@ func TestVerifyEpic_EarlierRungAnswersDespiteTrailerFailure(t *testing.T) {
 	t.Parallel()
 	vd := verifyFixture()
 	vd.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
-	vd.LandedTickets = func(dir, branch string) (map[string]bool, error) { return nil, errors.New("not a git repo") }
+	vd.MergedTickets = func(dir, branch string) (map[string]bool, error) { return nil, errors.New("not a git repo") }
 	v := verifyOne(t, vd, doneTicket(), pickedEvent())
-	if v.Landing != LandingLanded || v.Unknown {
-		t.Errorf("got %+v, want landed and not unknown", v)
+	if v.Merging != MergingMerged || v.Unknown {
+		t.Errorf("got %+v, want merged and not unknown", v)
 	}
 }
 
@@ -134,8 +134,8 @@ func TestVerifyEpic_ClaimedTicketWithLeftoversByDesign(t *testing.T) {
 	if l.Tab == nil || !*l.Tab || l.Worktree == nil || !*l.Worktree || l.Branch == nil || !*l.Branch {
 		t.Errorf("Leftovers = %+v, want tab, worktree and branch all true", l)
 	}
-	if v.Landing == LandingLanded {
-		t.Errorf("Landing = %q, a claimed ticket with nothing landed must not read landed", v.Landing)
+	if v.Merging == MergingMerged {
+		t.Errorf("Merging = %q, a claimed ticket with nothing merged must not read merged", v.Merging)
 	}
 }
 
@@ -143,12 +143,12 @@ func TestVerifyEpic_NotExpected(t *testing.T) {
 	t.Parallel()
 	vd := verifyFixture()
 	commitless := tickets.Ticket{Number: 3, Identifier: "03", Status: "done", Commitless: true}
-	if v := verifyOne(t, vd, commitless, nil); v.Landing != LandingNotExpected {
-		t.Errorf("commitless Landing = %q, want not-expected", v.Landing)
+	if v := verifyOne(t, vd, commitless, nil); v.Merging != MergingNotExpected {
+		t.Errorf("commitless Merging = %q, want not-expected", v.Merging)
 	}
 	open := tickets.Ticket{Number: 3, Identifier: "03", Status: "open"}
-	if v := verifyOne(t, vd, open, nil); v.Landing != LandingNotExpected {
-		t.Errorf("never-iterated Landing = %q, want not-expected", v.Landing)
+	if v := verifyOne(t, vd, open, nil); v.Merging != MergingNotExpected {
+		t.Errorf("never-iterated Merging = %q, want not-expected", v.Merging)
 	}
 }
 

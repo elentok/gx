@@ -16,7 +16,7 @@ import (
 )
 
 // An agent that ends its turn with a backgrounded test run still going reads as
-// idle. The server must keep waiting, or it parks the ticket zero-commit before
+// idle. The server must keep waiting, or it pauses the ticket zero-commit before
 // the agent commits.
 func TestWaitIterationFinished_HoldsWhileBackgroundTaskRuns(t *testing.T) {
 	t.Parallel()
@@ -208,30 +208,30 @@ func (r *blipRunner) Wait(s agentrunner.Session, states []agentrunner.State, tim
 	return r.Runner.Wait(s, states, timeout)
 }
 
-// A held land lock is routine; landBuilt retries instead of failing the finish.
-func TestLandBuilt_RetriesWhileLandLockHeld(t *testing.T) {
+// A held merge lock is routine; mergeBuilt retries instead of failing the finish.
+func TestMergeBuilt_RetriesWhileMergeLockHeld(t *testing.T) {
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
-	lockDir := mustLandLockDir(t, scratchDir, "epic")
-	if err := AcquireLandLock(lockDir); err != nil {
+	lockDir := mustMergeLockDir(t, scratchDir, "epic")
+	if err := AcquireMergeLock(lockDir); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = ReleaseLandLock(lockDir) })
+	t.Cleanup(func() { _ = ReleaseMergeLock(lockDir) })
 	d, _, _ := fakeDeps()
 	var sleeps int
 	d.Sleep = func(time.Duration) {
 		sleeps++
 		if sleeps == 3 {
-			_ = ReleaseLandLock(lockDir)
+			_ = ReleaseMergeLock(lockDir)
 		}
 	}
 	p := iterationParams{FeatureBranch: "epic", ScratchDir: scratchDir, WorktreeLock: &worktreeLock, Gate: NewGate(), Sink: noopEventSink{}}
-	built := &builtAwaitingLandError{job: landJob{ticket: tickets.Ticket{Identifier: "01"}}}
+	built := &builtAwaitingMergeError{job: mergeJob{ticket: tickets.Ticket{Identifier: "01"}}}
 
-	err := landBuilt(d, p, built)
-	if err != nil && strings.Contains(err.Error(), "land deferred") {
-		t.Fatalf("landBuilt gave up on a held lock: %v", err)
+	err := mergeBuilt(d, p, built)
+	if err != nil && strings.Contains(err.Error(), "merge deferred") {
+		t.Fatalf("mergeBuilt gave up on a held lock: %v", err)
 	}
 	if sleeps != 3 {
 		t.Errorf("retry sleeps = %d, want 3 (held 3 times, then the lock was free)", sleeps)

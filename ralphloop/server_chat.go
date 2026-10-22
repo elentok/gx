@@ -157,10 +157,10 @@ func newServerChatSink(style mrkdwnStyle, transport chatTransport, seams ServerC
 	return s
 }
 
-// Park notifies that a person must look at a ticket the server could not land.
+// Pause notifies that a person must look at a ticket the server could not merge.
 // Every message starts with the project name: one server notifies for many.
 // override is the project's own notification block, nil to use the global one.
-func (c *ServerChat) Park(project string, override *ServerChatConfig, epic, ticketPath, identifier, status string, kind events.Kind, reason string, counts EpicCounts) {
+func (c *ServerChat) Pause(project string, override *ServerChatConfig, epic, ticketPath, identifier, status string, kind events.Kind, reason string, counts EpicCounts) {
 	if c == nil {
 		return
 	}
@@ -172,8 +172,8 @@ func (c *ServerChat) Park(project string, override *ServerChatConfig, epic, tick
 
 // FinishSink is the EventSink the server's finish path reports through for
 // one ticket. It forwards only what the server cannot see from the outcome: a
-// conflict resolution starting, and the resolution child parking. The ticket's
-// own park is dropped, since the server notifies it from the outcome.
+// conflict resolution starting, and the resolution child pausing. The ticket's
+// own pause is dropped, since the server notifies it from the outcome.
 func (c *ServerChat) FinishSink(project string, override *ServerChatConfig, epic, ticketPath, ticketID string, counts func() EpicCounts) EventSink {
 	return finishSink{c: c, project: project, override: override, epic: epic, ticketPath: ticketPath, ticketID: ticketID, counts: counts}
 }
@@ -202,7 +202,7 @@ func (f finishSink) TicketNeedsHuman(identifier, _, status string, kind events.K
 		return
 	}
 	counts := f.counts()
-	// The child's path never reaches the sink, so a mute lands on the epic.
+	// The child's path never reaches the sink, so a mute merges on the epic.
 	source := epicSource(f.project + "/" + f.epic)
 	for _, s := range f.c.projectSinks(f.override) {
 		body := s.style.ticketNeedsHumanText(identifier, f.project+"/"+f.epic, status, kind, reason, counts)
@@ -228,8 +228,8 @@ func (c *ServerChat) Escalated(project string, override *ServerChatConfig, epic,
 }
 
 // EpicComplete tells the project's destinations that every ticket of epic
-// landed: "epic merged" when its branch went onto its target, "epic complete
-// (not merged)" otherwise, so chat never claims a land that did not happen.
+// merged: "epic merged" when its branch went onto its target, "epic complete
+// (not merged)" otherwise, so chat never claims a merge that did not happen.
 func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, epic string, counts EpicCounts, elapsedSeconds int, totalCost float64, merged bool) {
 	if c == nil {
 		return
@@ -244,8 +244,8 @@ func (c *ServerChat) EpicComplete(project string, override *ServerChatConfig, ep
 	}
 }
 
-// TicketDone tells the project's destinations that a ticket landed, with the
-// metrics the land wrote onto it and the epic's counts after it.
+// TicketDone tells the project's destinations that a ticket merged, with the
+// metrics the merge wrote onto it and the epic's counts after it.
 func (c *ServerChat) TicketDone(project string, override *ServerChatConfig, epic string, t tickets.Ticket, counts EpicCounts) {
 	if c == nil {
 		return
@@ -283,13 +283,13 @@ func (c *ServerChat) Result(project string, override *ServerChatConfig, projectD
 	}
 }
 
-// ParkDigest sends one message listing parks that were held back, each line
+// PauseDigest sends one message listing pauses that were held back, each line
 // carrying its own project name.
-func (c *ServerChat) ParkDigest(lines []string) {
+func (c *ServerChat) PauseDigest(lines []string) {
 	if c == nil || len(lines) == 0 {
 		return
 	}
-	title := fmt.Sprintf("%d parked while herdr was down", len(lines))
+	title := fmt.Sprintf("%d paused while herdr was down", len(lines))
 	for _, s := range c.globalSinks() {
 		s.send(s.style.chatStyle.Message("🅿️", title, "", strings.Join(lines, "\n"), s.style.identityLine("server", "")), notifyKindTicketNeedsHuman, serverSource, "")
 	}

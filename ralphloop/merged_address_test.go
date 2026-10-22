@@ -9,29 +9,29 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// addressTrailerValue is the trailer a ticket in writeEpic's layout lands with.
+// addressTrailerValue is the trailer a ticket in writeEpic's layout merges with.
 func addressTrailerValue(scratchDir, epicName, id string) string {
 	a, _ := tickets.AddressOfPath(filepath.Join(scratchDir, epicName, "issues", id+"-x.md"), id)
 	return a.String()
 }
 
-func TestLandTicket_TicketInTrackerLayout_StampsCanonicalAddress(t *testing.T) {
-	dir, lp := landFixture(t, false)
+func TestMergeTicket_TicketInTrackerLayout_StampsCanonicalAddress(t *testing.T) {
+	dir, lp := mergeFixture(t, false)
 	lp.TicketPath = filepath.Join(t.TempDir(), "proj", "main", "issues", "03-x.md")
 
-	res, err := LandTicket(landDepsFor(testDeps()), lp)
+	res, err := MergeTicket(mergeDepsFor(testDeps()), lp)
 	if err != nil {
-		t.Fatalf("LandTicket: %v", err)
+		t.Fatalf("MergeTicket: %v", err)
 	}
 	if want := "proj:main/03"; res.TrailerValue != want {
 		t.Errorf("TrailerValue = %q, want %q", res.TrailerValue, want)
 	}
 	if found, err := git.TrailerCommitExists(dir, "HEAD", ticketTrailerKey, "proj:main/03"); err != nil || !found {
-		t.Errorf("landed commit missing address trailer (found=%v err=%v)", found, err)
+		t.Errorf("merged commit missing address trailer (found=%v err=%v)", found, err)
 	}
 }
 
-func TestLandedTickets_ReadsOldAndNewTrailerForms(t *testing.T) {
+func TestMergedTickets_ReadsOldAndNewTrailerForms(t *testing.T) {
 	dir := testutil.TempRepo(t)
 	for i, value := range []string{
 		"main/01",       // legacy <featureBranch>/<id>
@@ -47,11 +47,11 @@ func TestLandedTickets_ReadsOldAndNewTrailerForms(t *testing.T) {
 		}
 	}
 
-	got, err := landedTickets(dir, "main")
+	got, err := mergedTickets(dir, "main")
 	if err != nil {
-		t.Fatalf("landedTickets: %v", err)
+		t.Fatalf("mergedTickets: %v", err)
 	}
 	if len(got) != 2 || !got["01"] || !got["02"] {
-		t.Errorf("landedTickets = %v, want exactly 01 and 02", got)
+		t.Errorf("mergedTickets = %v, want exactly 01 and 02", got)
 	}
 }

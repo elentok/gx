@@ -9,7 +9,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// repairRecoverableTicket re-lands a doneRecoverable ticket's commits: a
+// repairRecoverableTicket re-merges a doneRecoverable ticket's commits: a
 // prior crash left it marked done with its commits missing from the feature
 // branch, but its iteration branch still holds them. It resolves the same
 // base commit reattachIteration would (merge-base against the feature
@@ -50,25 +50,25 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 		Sink:            rp.Sink,
 	}
 
-	// Seed a live row so landCherryPick's CherryPickStarted/
+	// Seed a live row so mergeCherryPick's CherryPickStarted/
 	// ConflictResolutionStarted events below have a live entry to update —
 	// without this, the tickets tab shows a done ticket's stale disk status
 	// while this repair runs.
 	rp.Sink.TicketRecovering(t.Identifier)
 
-	var landedSHA string
-	if err := withLandLock(d, p, func() (err error) {
-		landedSHA, err = landCherryPick(d, p, base, branch, "", "")
+	var mergedSHA string
+	if err := withMergeLock(d, p, func() (err error) {
+		mergedSHA, err = mergeCherryPick(d, p, base, branch, "", "")
 		return err
 	}); err != nil {
 		return fmt.Errorf("re-cherry-picking ticket %s during startup repair: %w", t.Identifier, err)
 	}
 
-	p.logTicketEventSHA(string(events.CherryPicked), "", "", path, "", landedSHA)
-	rp.Sink.TicketRecovered(t.Identifier, featureBranch, branch, landedSHA)
+	p.logTicketEventSHA(string(events.CherryPicked), "", "", path, "", mergedSHA)
+	rp.Sink.TicketRecovered(t.Identifier, featureBranch, branch, mergedSHA)
 
 	// Branch deletion is left to finishStaleCleanup/finishCleanup elsewhere:
-	// this repair just re-landed the commits, so the branch that held them
+	// this repair just re-merged the commits, so the branch that held them
 	// stays until a later ticket cleans it up.
 	hasWorktree, err := d.WorktreeExists(path)
 	if err != nil {
@@ -92,8 +92,8 @@ func repairRecoverableTicket(d Deps, rp reconcileParams, featureBranch string, t
 }
 
 // finishStaleCleanup completes an interrupted cleanup for a done ticket whose
-// commits already landed on the feature branch, but whose iteration
-// worktree/tab/branch survived a crash that landed between marking done and
+// commits already merged on the feature branch, but whose iteration
+// worktree/tab/branch survived a crash that merged between marking done and
 // the cleanup step right after it — the same tail finishIteration runs on the
 // normal completion path.
 func finishStaleCleanup(d Deps, rp reconcileParams, featureBranch string, t tickets.Ticket, live map[string]agentrunner.Session) error {
@@ -106,9 +106,9 @@ func finishStaleCleanup(d Deps, rp reconcileParams, featureBranch string, t tick
 }
 
 // markDoneTicketUnrecoverable flags a doneUnrecoverable ticket for a human to
-// inspect: its commits never landed on featureBranch and no iteration branch
+// inspect: its commits never merged on featureBranch and no iteration branch
 // survived to recover them from, so — unlike doneRecoverable — there's
-// nothing here to auto-repair. It reuses the same needs-repair
+// nothing here to auto-repair. It reuses the same paused (repair)
 // status/event machinery as Codex's own operator-intervention path rather
 // than silently reverting the ticket to open (which would re-run it from
 // scratch without a human ever knowing the first run's result vanished).
@@ -121,16 +121,16 @@ func markDoneTicketUnrecoverable(sink EventSink, paths reconcilePaths, featureBr
 		Worktree: iterationWorktreePath(paths.WorktreeDir, featureBranch, t.Identifier),
 	}
 	sink.TicketUnrecoverable(t.Identifier, featureBranch)
-	if _, err := park(sink, parkRequest{
-		ScratchDir: paths.ScratchDir,
-		EpicName:   featureBranch,
-		Ticket:     t.Identifier,
-		Path:       t.Path,
-		Type:       events.Paused,
-		Kind:       events.AmbiguousMerge,
-		Reason:     reason,
-		Repair:     state,
-		ReparkDone: true,
+	if _, err := pause(sink, pauseRequest{
+		ScratchDir:  paths.ScratchDir,
+		EpicName:    featureBranch,
+		Ticket:      t.Identifier,
+		Path:        t.Path,
+		Type:        events.Paused,
+		Kind:        events.AmbiguousMerge,
+		Reason:      reason,
+		Repair:      state,
+		RepauseDone: true,
 	}); err != nil {
 		return fmt.Errorf("marking ticket needs-repair: %w", err)
 	}

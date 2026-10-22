@@ -21,8 +21,8 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// ticketTrailerKey is the commit-message trailer landCherryPick stamps onto
-// every landed commit (see Deps.AppendTrailer) and classifyDoneTicket's last-
+// ticketTrailerKey is the commit-message trailer mergeCherryPick stamps onto
+// every merged commit (see Deps.AppendTrailer) and classifyDoneTicket's last-
 // resort fallback searches for (Deps.TrailerCommitExists).
 const ticketTrailerKey = "Ralph-Loop-Ticket"
 
@@ -30,10 +30,10 @@ const ticketTrailerKey = "Ralph-Loop-Ticket"
 const TicketTrailerKey = ticketTrailerKey
 
 // tokensTrailerKey and elapsedTrailerKey are the commit-message trailers
-// landCherryPick stamps alongside ticketTrailerKey whenever the landing
-// session's own metrics are available (see writeLandedMetrics) — the same
+// mergeCherryPick stamps alongside ticketTrailerKey whenever the merging
+// session's own metrics are available (see writeMergedMetrics) — the same
 // actual_context_window/elapsed_time values written to the ticket's
-// frontmatter, surfaced on the landed commit too.
+// frontmatter, surfaced on the merged commit too.
 const (
 	tokensTrailerKey  = "Ralph-Loop-Tokens"
 	elapsedTrailerKey = "Ralph-Loop-Elapsed"
@@ -44,8 +44,8 @@ const (
 // bare ticket identifier repeats across every epic (each restarts numbering
 // from 01), and TrailerCommitExists searches the whole repo history, not just
 // commits under this epic. An unscoped value can match a same-numbered
-// ticket from a completely unrelated epic landed long ago, misreporting a
-// genuinely unlanded ticket as already present — classifyDoneTicket then
+// ticket from a completely unrelated epic merged long ago, misreporting a
+// genuinely unmerged ticket as already present — classifyDoneTicket then
 // deletes its worktree/branch without ever cherry-picking it, discarding
 // real work.
 func ticketTrailerValue(epicName, identifier string) string {
@@ -277,7 +277,7 @@ type RunOptions struct {
 	// sharing this process with Run. Headless callers leave this nil and get
 	// today's behavior unchanged.
 	Gate *Gate
-	// SpinCycles parks within SpinWindow quarantine a ticket as needs-repair
+	// SpinCycles pauses within SpinWindow quarantine a ticket as paused (repair)
 	// "spinning" instead of re-claiming it; zero values mean the defaults.
 	SpinCycles int
 	SpinWindow time.Duration
@@ -293,7 +293,7 @@ type RunOptions struct {
 	Permit Permit
 	// Ctx, if set, lets a caller request Run stop early: once canceled, Run
 	// stops claiming new tickets and returns as soon as every
-	// already-launched iteration and the land-queue worker have actually
+	// already-launched iteration and the merge-queue worker have actually
 	// finished — so no goroutine survives the call, without the caller
 	// having to know Run's internals to wait on. Unset means
 	// context.Background(), i.e. Run only stops when the epic is done or
@@ -311,33 +311,33 @@ type Permit interface {
 	Release()
 }
 
-// outcome is one iteration's or one land's result, sent on results (a build
-// goroutine) or landResults (the land-queue worker) respectively.
+// outcome is one iteration's or one merge's result, sent on results (a build
+// goroutine) or mergeResults (the merge-queue worker) respectively.
 type outcome struct {
 	ticket tickets.Ticket
 	err    error
 	// built is true when this outcome is a build that finished with commits
-	// ready to land (ahead > 0): iteration_status: finished is already
-	// written and the job is already queued in landJobs (see launch), so the
+	// ready to merge (ahead > 0): iteration_status: finished is already
+	// written and the job is already queued in mergeJobs (see launch), so the
 	// results-handling loop only needs to release this build's active slot
-	// and hand the ticket to the land queue — completed++/
-	// sink.IterationFinished wait for the worker's own landResults outcome
-	// once the land actually finishes. Never set on a landResults outcome.
+	// and hand the ticket to the merge queue — completed++/
+	// sink.IterationFinished wait for the worker's own mergeResults outcome
+	// once the merge actually finishes. Never set on a mergeResults outcome.
 	built bool
-	// parkedOnChild is true when this outcome is a landResults outcome whose
-	// cherry-pick hit errConflictResolutionUnresolved: the ticket was parked
-	// needs-repair on a conflict-resolution child, not landed — it stays
-	// claimed on disk. err is nil on this path (parking already handled the
+	// pausedOnChild is true when this outcome is a mergeResults outcome whose
+	// cherry-pick hit errConflictResolutionUnresolved: the ticket was paused
+	// paused (repair) on a conflict-resolution child, not merged — it stays
+	// claimed on disk. err is nil on this path (pausing already handled the
 	// failure), so without this flag the results loop can't tell it apart
-	// from a real completed land. Never set on a results (build) outcome.
-	parkedOnChild bool
+	// from a real completed merge. Never set on a results (build) outcome.
+	pausedOnChild bool
 	// childReason names the conflict-resolution child and why it failed, on a
-	// parkedOnChild outcome; the server parks the parent with it.
+	// pausedOnChild outcome; the server pauses the parent with it.
 	childReason string
-	// landDeferred is set by landOne when the land lock was held or a human's
-	// conflict marker is pending; runLandQueue re-queues the job and never
-	// forwards the outcome to landResults.
-	landDeferred bool
+	// mergeDeferred is set by mergeOne when the merge lock was held or a human's
+	// conflict marker is pending; runMergeQueue re-queues the job and never
+	// forwards the outcome to mergeResults.
+	mergeDeferred bool
 }
 
 // Run drives every unblocked ticket in the named epic to completion, up to
@@ -466,15 +466,15 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 
 	// scheduleMu guards reading the frontier and claiming a ticket, so two
 	// concurrently-running iterations never race each other onto the same
-	// ticket, and also guards the land-queue worker's own eligibility scan
-	// and landJobs map (see landQueue.go) — the same shape of operation.
+	// ticket, and also guards the merge-queue worker's own eligibility scan
+	// and mergeJobs map (see mergequeue.go) — the same shape of operation.
 	// worktreeMu guards every `git worktree add`/`git worktree remove`
 	// against RepoDir, since git's own worktree administrative files aren't
 	// safe under concurrent add/remove on the same repo. sink is safe for
 	// concurrent use on its own (see EventSink), since a paused iteration
-	// reports its pause/resume from its own goroutine. The land-queue
+	// reports its pause/resume from its own goroutine. The merge-queue
 	// worker's single-goroutine-ness is what now serializes cherry-pick
-	// landings onto the feature worktree — no lock needed for that anymore.
+	// merges onto the feature worktree — no lock needed for that anymore.
 	var scheduleMu sync.Mutex
 	var worktreeMu sync.Mutex
 
@@ -509,30 +509,30 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	}
 
 	results := make(chan outcome)
-	landResults := make(chan outcome)
+	mergeResults := make(chan outcome)
 
-	// landJobs holds the live-process handoff data (see landJob's doc) for
-	// every ticket a build goroutine has finished but the land-queue worker
-	// hasn't yet landed, keyed by ticket identifier. Written by launch's
+	// mergeJobs holds the live-process handoff data (see mergeJob's doc) for
+	// every ticket a build goroutine has finished but the merge-queue worker
+	// hasn't yet merged, keyed by ticket identifier. Written by launch's
 	// goroutine before it sends a built:true outcome, read and deleted by the
-	// land-queue worker once it starts landing that ticket. landJobsMu guards
+	// merge-queue worker once it starts merging that ticket. mergeJobsMu guards
 	// it since the two run concurrently.
-	landJobs := make(map[string]landJob)
-	var landJobsMu sync.Mutex
+	mergeJobs := make(map[string]mergeJob)
+	var mergeJobsMu sync.Mutex
 
-	// landWake nudges the land-queue worker to rescan immediately after a
+	// mergeWake nudges the merge-queue worker to rescan immediately after a
 	// fresh job is queued, rather than only on its own idle poll — a buffered
 	// size-1 channel so a wake that arrives while the worker is already
 	// mid-pass isn't lost, just coalesced into the next one.
-	landWake := make(chan struct{}, 1)
-	wakeLandQueue := func() {
+	mergeWake := make(chan struct{}, 1)
+	wakeMergeQueue := func() {
 		select {
-		case landWake <- struct{}{}:
+		case mergeWake <- struct{}{}:
 		default:
 		}
 	}
-	landQueueDone := make(chan struct{})
-	defer close(landQueueDone)
+	mergeQueueDone := make(chan struct{})
+	defer close(mergeQueueDone)
 
 	// claimNext claims and returns the next frontier ticket, or ok=false if
 	// none is available right now (every remaining ticket is blocked,
@@ -625,12 +625,12 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			} else {
 				err = runIteration(d, params)
 			}
-			var built *builtAwaitingLandError
+			var built *builtAwaitingMergeError
 			if errors.As(err, &built) {
-				landJobsMu.Lock()
-				landJobs[ticket.Identifier] = built.job
-				landJobsMu.Unlock()
-				wakeLandQueue()
+				mergeJobsMu.Lock()
+				mergeJobs[ticket.Identifier] = built.job
+				mergeJobsMu.Unlock()
+				wakeMergeQueue()
 				results <- outcome{ticket: ticket, built: true}
 				return
 			}
@@ -640,20 +640,20 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 
 	completed := 0
 	active := 0
-	// landing tracks builds that finished (ahead > 0, iteration_status:
-	// finished written) but haven't yet landed — queued in landJobs, waiting
-	// on the land-queue worker. Incremented when a results outcome arrives
+	// merging tracks builds that finished (ahead > 0, iteration_status:
+	// finished written) but haven't yet merged — queued in mergeJobs, waiting
+	// on the merge-queue worker. Incremented when a results outcome arrives
 	// with built == true, decremented when the worker reports that ticket's
-	// landing over landResults. Both the exit condition and the idle/
-	// deadlock branch below gate on active == 0 && landing == 0: a ticket
-	// queued behind an unlanded land is neither done nor a stall a human
+	// merging over mergeResults. Both the exit condition and the idle/
+	// deadlock branch below gate on active == 0 && merging == 0: a ticket
+	// queued behind an unmerged merge is neither done nor a stall a human
 	// needs to clear.
-	landing := 0
+	merging := 0
 	// liveDone tracks the epic-wide done count: seeded from disk once here so
 	// a resumed run reports what's true of the epic even though this run's
 	// own completed count starts back at zero, then incremented by exactly
-	// one per landed outcome this loop drains below (never re-derived from a
-	// live disk rescan — two near-simultaneous landings can both already be
+	// one per merged outcome this loop empties below (never re-derived from a
+	// live disk rescan — two near-simultaneous merges can both already be
 	// "done" on disk by the time either outcome is dequeued, which made a
 	// rescan double-count instead of reporting 1, then 2).
 	liveDone := scope.DoneCount(*initial)
@@ -681,9 +681,9 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	if err != nil {
 		return err
 	}
-	// A ticket found needs-repair at startup deliberately does not pause
+	// A ticket found paused (repair) at startup deliberately does not pause
 	// the gate: it's human-clearable, so the run schedules every other
-	// runnable ticket first and only parks on it once nothing is runnable.
+	// runnable ticket first and only pauses on it once nothing is runnable.
 	for _, ticket := range reattached {
 		launch(ticket, true)
 		active++
@@ -691,15 +691,15 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		everLaunched[ticket.Identifier] = true
 	}
 
-	// The land-queue worker is the sole serializer of cherry-pick landings
+	// The merge-queue worker is the sole serializer of cherry-pick merges
 	// for this Run call — replacing featureMu — and runs as a single
 	// goroutine decoupled from the build goroutines above, so a build's
-	// active slot never waits on a land (including up to 30 minutes of
+	// active slot never waits on a merge (including up to 30 minutes of
 	// conflict resolution). It requires no persisted state of its own: the
-	// in-memory landJobs map (pane/tab/sessionID/path) is what survives the
+	// in-memory mergeJobs map (pane/tab/sessionID/path) is what survives the
 	// build-goroutine-to-worker handoff, and is also the sole source of
-	// landing eligibility (see runLandQueue).
-	go runLandQueue(d, landQueueParams{
+	// merging eligibility (see runMergeQueue).
+	go runMergeQueue(d, mergeQueueParams{
 		RepoDir:         opts.RepoDir,
 		WorktreeDir:     wtDir,
 		FeatureWorktree: featurePath,
@@ -713,29 +713,29 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		SmartZone:       smartZone,
 		Gate:            gate,
 		Sink:            sink,
-	}, landJobs, &landJobsMu, landWake, landQueueDone, landResults)
+	}, mergeJobs, &mergeJobsMu, mergeWake, mergeQueueDone, mergeResults)
 
-	// parked records that the run has already announced this park, so the
-	// poll loop below notifies once per park rather than once per tick. It
+	// paused records that the run has already announced this pause, so the
+	// poll loop below notifies once per pause rather than once per tick. It
 	// resets the moment anything is running again, so a run that resumes and
-	// later parks on a different ticket announces that park too.
-	parked := false
+	// later pauses on a different ticket announces that pause too.
+	paused := false
 
 	for {
 		epic, err := loadNamedEpic(scratchDir, opts.EpicName)
 		if err != nil {
 			return err
 		}
-		// unparkAnswered runs on every pass through this loop — the initial
+		// resumeAnswered runs on every pass through this loop — the initial
 		// entry, each completed iteration, and (via the select below) every
-		// park-poll tick even while siblings are still running — reusing the
+		// pause-poll tick even while siblings are still running — reusing the
 		// epic load just above rather than scanning again on its own. See
-		// unparkAnswered's doc for why a live, unblocked pane is what makes
+		// resumeAnswered's doc for why a live, unblocked pane is what makes
 		// this safe with no ownership check.
-		if err := unparkAnswered(d, opts.EpicName, wtDir, agent, scope, *epic, d.Now()); err != nil {
+		if err := resumeAnswered(d, opts.EpicName, wtDir, agent, scope, *epic, d.Now()); err != nil {
 			return err
 		}
-		if scope.AllDone(*epic) && active == 0 && landing == 0 {
+		if scope.AllDone(*epic) && active == 0 && merging == 0 {
 			if allDone(*epic) {
 				if err := tickets.StampEpicCompleted(scratchDir, opts.EpicName, d.Now()); err != nil {
 					return fmt.Errorf("stamping epic %q completed_at: %w", opts.EpicName, err)
@@ -744,10 +744,10 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			break
 		}
 		// A canceled ctx with nothing left in flight is the shutdown path's
-		// own exit: nothing more to drain, so stop here rather than fall
-		// through to claiming (guarded below) or parking (which would just
+		// own exit: nothing more to empty, so stop here rather than fall
+		// through to claiming (guarded below) or pausing (which would just
 		// block again on the very thing being canceled).
-		if ctx.Err() != nil && active == 0 && landing == 0 {
+		if ctx.Err() != nil && active == 0 && merging == 0 {
 			break
 		}
 
@@ -755,8 +755,8 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			acquirePermit()
 		}
 		// Once canceled, stop recruiting new work — but every iteration and
-		// land already in flight keeps running to completion below, so their
-		// goroutines are drained rather than orphaned on a channel nobody
+		// merge already in flight keeps running to completion below, so their
+		// goroutines are emptied rather than orphaned on a channel nobody
 		// reads anymore.
 		if ctx.Err() == nil {
 			for active < maxParallel {
@@ -772,7 +772,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			}
 		}
 
-		if active == 0 && landing == 0 {
+		if active == 0 && merging == 0 {
 			releasePermit()
 			if gate.isPaused() {
 				// Nothing is left running to lift the pause from the inside,
@@ -793,77 +793,77 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				logDeadlocked(scratchDir, opts.EpicName, events.BlockedCycle, "nothing runnable and nothing a person could clear")
 				return fmt.Errorf("epic %q is deadlocked: no runnable tickets left, none done, and none a human could clear; check for a dependency cycle or a bad status", opts.EpicName)
 			}
-			if !parked {
+			if !paused {
 				logDeadlocked(scratchDir, opts.EpicName, events.AllPaused, "every remaining ticket is paused")
 				stalledForSink := make([]StalledTicket, len(stalled))
 				for i, t := range stalled {
 					stalledForSink[i] = StalledTicket{
 						Identifier:   t.Identifier,
-						Reattachable: everLaunched[t.Identifier] && clearableParkedTicket(d, opts.EpicName, wtDir, agent, *epic, t),
+						Reattachable: everLaunched[t.Identifier] && clearablePausedTicket(d, opts.EpicName, wtDir, agent, *epic, t),
 					}
 				}
-				sink.EpicParked(opts.EpicName, stalledForSink)
-				parked = true
+				sink.EpicPaused(opts.EpicName, stalledForSink)
+				paused = true
 			}
-			// No timeout: the notification has already fired, and the park
+			// No timeout: the notification has already fired, and the pause
 			// ends when a human clears one of the stalled tickets, which the
-			// next pass picks up off disk. gate.WakeParked() lets an operator
+			// next pass picks up off disk. gate.WakePaused() lets an operator
 			// cut the wait short cosmetically; ctx.Done() lets a caller stop
 			// the run outright.
 			select {
-			case <-d.ParkTimer(pausedPollInterval):
-			case <-gate.ParkWake():
+			case <-d.PauseTimer(pausedPollInterval):
+			case <-gate.PauseWake():
 			case <-ctx.Done():
 			}
 			continue
 		}
-		parked = false
+		paused = false
 
 		// With a sibling still running (active > 0, we're past the branch
 		// above), a plain receive would block until that sibling finishes even
-		// if some other ticket is already sitting needs-answer with its pane
-		// answered — the ticket-15 gap. Selecting the same park-timer seam the
+		// if some other ticket is already sitting paused (answer) with its pane
+		// answered — the ticket-15 gap. Selecting the same pause-timer seam the
 		// idle branch above already polls on catches that case: each tick
-		// loops back to the top, where the epic reload and unparkAnswered
-		// pick it up. Gated on hasLiveParkedTicket rather than "something is
-		// parked" at all: a needs-answer ticket with no live pane can only be
+		// loops back to the top, where the epic reload and resumeAnswered
+		// pick it up. Gated on hasLivePausedTicket rather than "something is
+		// paused" at all: a paused (answer) ticket with no live pane can only be
 		// cleared by a person editing the file (already caught by the next
 		// ordinary reload), and polling for it here would race an
-		// always-ready park-timer fake against the sibling's results send,
+		// always-ready pause-timer fake against the sibling's results send,
 		// starving it out forever.
-		// The select below always includes landResults alongside results —
-		// harmless even when landing == 0, since nothing sends on it until
-		// the worker has a job — so a land finishing never has to wait for a
+		// The select below always includes mergeResults alongside results —
+		// harmless even when merging == 0, since nothing sends on it until
+		// the worker has a job — so a merge finishing never has to wait for a
 		// sibling build's own results send.
 		var r outcome
-		var fromLand bool
-		if active > 0 && hasLiveParkedTicket(d, opts.EpicName, wtDir, agent, scope, *epic) {
+		var fromMerge bool
+		if active > 0 && hasLivePausedTicket(d, opts.EpicName, wtDir, agent, scope, *epic) {
 			select {
 			case r = <-results:
-			case r = <-landResults:
-				fromLand = true
-			case <-d.ParkTimer(pausedPollInterval):
+			case r = <-mergeResults:
+				fromMerge = true
+			case <-d.PauseTimer(pausedPollInterval):
 				continue
 			}
 		} else {
 			select {
 			case r = <-results:
-			case r = <-landResults:
-				fromLand = true
+			case r = <-mergeResults:
+				fromMerge = true
 			}
 		}
-		if fromLand {
-			landing--
+		if fromMerge {
+			merging--
 		} else {
 			active--
 		}
 		if r.err != nil {
-			// A single iteration (or land) erroring out (a herdr/git hiccup,
+			// A single iteration (or merge) erroring out (a herdr/git hiccup,
 			// an unexpected agent-wait failure, a cherry-pick conflict that
 			// couldn't be resolved, ...) shouldn't take down the whole
 			// epic's run — that leaves every other in-flight ticket's
 			// live-event stream dead too, with no way to recover short of
-			// restarting the loop. Flag just this ticket needs-repair
+			// restarting the loop. Flag just this ticket paused (repair)
 			// (out of the frontier, so never reclaimed until a human clears
 			// it) and keep scheduling the rest.
 			kind := events.IterationError
@@ -872,7 +872,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			if errors.As(r.err, &lf) {
 				kind, reason = retryStormKind(scratchDir, opts.EpicName, r.ticket.Identifier, lf.Kind, reason)
 			}
-			park(sink, parkRequest{
+			pause(sink, pauseRequest{
 				ScratchDir: scratchDir,
 				EpicName:   opts.EpicName,
 				Ticket:     r.ticket.Identifier,
@@ -891,49 +891,49 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		}
 
 		if r.built {
-			// This build finished with commits ready to land; its job is
-			// already queued in landJobs and the worker already woken (see
+			// This build finished with commits ready to merge; its job is
+			// already queued in mergeJobs and the worker already woken (see
 			// launch). The ticket stays in launched/everLaunched — it's
-			// still this run's, just queued behind landing, not available
+			// still this run's, just queued behind merging, not available
 			// for reclaim — and completed++/sink.IterationFinished wait for
-			// this same ticket's landResults outcome once the land actually
+			// this same ticket's mergeResults outcome once the merge actually
 			// finishes.
-			landing++
+			merging++
 			continue
 		}
 
-		if r.parkedOnChild {
-			// landOne already parked a conflict-resolution child
-			// needs-repair; the parent ticket's on-disk status is still
-			// claimed, not done, so this is not a completed land — no
+		if r.pausedOnChild {
+			// mergeOne already paused a conflict-resolution child
+			// paused (repair); the parent ticket's on-disk status is still
+			// claimed, not done, so this is not a completed merge — no
 			// completed++/sink.IterationFinished. Drop it from launched so a
 			// later run's reconcile can pick the orphaned claim back up
-			// (see tickets.Epic.IsParked: "claimed" itself is never parked, so
+			// (see tickets.Epic.IsParked: "claimed" itself is never paused, so
 			// nothing else would remove it here).
 			delete(launched, r.ticket.Identifier)
 			continue
 		}
 
-		// landCherryPick has already written elapsed/context metrics into the
+		// mergeCherryPick has already written elapsed/context metrics into the
 		// ticket's own frontmatter by the time results yields this outcome
-		// (see writeLandedMetrics), so re-parsing off disk here is simpler
+		// (see writeMergedMetrics), so re-parsing off disk here is simpler
 		// than threading a return value up through runIteration/finishIteration.
-		landedTicket := r.ticket
+		mergedTicket := r.ticket
 		liveTotal := total
-		parked := false
-		if landedEpic, err := loadNamedEpic(scratchDir, opts.EpicName); err != nil {
+		paused := false
+		if mergedEpic, err := loadNamedEpic(scratchDir, opts.EpicName); err != nil {
 			return err
-		} else if landedEpic != nil {
-			liveTotal = scope.TotalCount(*landedEpic)
-			for _, t := range landedEpic.Tickets {
+		} else if mergedEpic != nil {
+			liveTotal = scope.TotalCount(*mergedEpic)
+			for _, t := range mergedEpic.Tickets {
 				if t.Identifier == r.ticket.Identifier {
-					landedTicket = t
-					// An iteration that ended stalled (needs-answer, most
+					mergedTicket = t
+					// An iteration that ended stalled (paused (answer), most
 					// commonly) is no longer launched, so a human clearing
 					// its status puts it back in the frontier for this run
 					// instead of only for the next one.
-					if landedEpic.IsPaused(t) {
-						parked = true
+					if mergedEpic.IsPaused(t) {
+						paused = true
 						delete(launched, t.Identifier)
 					}
 					break
@@ -941,22 +941,22 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			}
 		}
 
-		if parked {
-			// A parked outcome (needs-answer/needs-repair, no commits) already
+		if paused {
+			// A paused outcome (paused (answer)/paused (repair), no commits) already
 			// got its own notification via sink.TicketNeedsHuman (fired from
-			// iteration.go/waitforfinish.go) — it never landed, so it must not
+			// iteration.go/waitforfinish.go) — it never merged, so it must not
 			// also count toward completed or emit a contradictory "done"
-			// sink.IterationFinished, mirroring the r.parkedOnChild early-exit
+			// sink.IterationFinished, mirroring the r.pausedOnChild early-exit
 			// above.
 			continue
 		}
 
 		liveDone++
 		completed++
-		sink.IterationFinished(landedTicket, opts.EpicName, IterationStats{
-			ElapsedSeconds:    landedTicket.ElapsedTime,
-			PeakContextTokens: landedTicket.ActualContextWindow,
-			Cost:              landedTicket.ActualCost,
+		sink.IterationFinished(mergedTicket, opts.EpicName, IterationStats{
+			ElapsedSeconds:    mergedTicket.ElapsedTime,
+			PeakContextTokens: mergedTicket.ActualContextWindow,
+			Cost:              mergedTicket.ActualCost,
 			InProgress:        active,
 			Completed:         liveDone,
 			Total:             liveTotal,
@@ -1026,7 +1026,7 @@ func AllDone(e tickets.Epic) bool { return allDone(e) }
 
 // allDone reports whether every ticket in e is done — the run's one exit
 // condition. A stalled ticket (see tickets.Epic.IsParked) is deliberately not an
-// exit condition: the run parks on it instead, so the agent's question is
+// exit condition: the run pauses on it instead, so the agent's question is
 // still answerable in its own pane.
 func allDone(e tickets.Epic) bool {
 	if len(e.Tickets) == 0 {
@@ -1041,7 +1041,7 @@ func allDone(e tickets.Epic) bool {
 }
 
 // stalledTickets lists every in-scope, human-clearable ticket in e, in file
-// order — what a park notification names as the thing waiting on a person.
+// order — what a pause notification names as the thing waiting on a person.
 func stalledTickets(e tickets.Epic, scope RunScope) []tickets.Ticket {
 	var stalled []tickets.Ticket
 	for _, t := range e.Tickets {

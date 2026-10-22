@@ -48,7 +48,7 @@ func TestAppendEvent_NewFieldsRoundTripAsOneLine(t *testing.T) {
 	dir := epicScratchDir(t, "epic")
 
 	err := AppendEvent(dir, "epic", Event{
-		Type: string(eventsc.ManualMerge), Ticket: "04", Outcome: "landed",
+		Type: string(eventsc.ManualMerge), Ticket: "04", Outcome: "merged",
 		TrailerValue: "epic/04", AtticRef: "refs/attic/04", Reason: "by hand",
 	})
 	if err != nil {
@@ -70,7 +70,7 @@ func TestAppendEvent_NewFieldsRoundTripAsOneLine(t *testing.T) {
 		t.Fatalf("ReadEvents = %v, %v, %v; want 2 events", events, ok, err)
 	}
 	got := events[0]
-	if got.Type != "manual-merge" || got.Outcome != "landed" || got.TrailerValue != "epic/04" || got.AtticRef != "refs/attic/04" {
+	if got.Type != "manual-merge" || got.Outcome != "merged" || got.TrailerValue != "epic/04" || got.AtticRef != "refs/attic/04" {
 		t.Errorf("event 0 = %+v, want new fields round-tripped", got)
 	}
 	if events[1].Type != "ticket-started-over" || strings.Contains(strings.Split(string(raw), "\n")[1], "outcome") {

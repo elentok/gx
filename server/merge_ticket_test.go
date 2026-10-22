@@ -132,7 +132,7 @@ func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T
 	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:"+schedEpic+"/01")
 	f.assertFeatureKept(t, "park")
 
-	if err := ralphloop.UnparkTicket(f.ticketFile(t, "01"), time.Now()); err != nil {
+	if err := ralphloop.ResumeTicket(f.ticketFile(t, "01"), time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")

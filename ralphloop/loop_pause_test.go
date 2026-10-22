@@ -16,7 +16,7 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// readyTimer is a Deps.ParkTimer that has already fired: a park test polls at
+// readyTimer is a Deps.PauseTimer that has already fired: a pause test polls at
 // full speed instead of waiting out a real interval.
 func readyTimer(time.Duration) <-chan time.Time {
 	ch := make(chan time.Time, 1)
@@ -24,27 +24,27 @@ func readyTimer(time.Duration) <-chan time.Time {
 	return ch
 }
 
-// assertParkInterval fails unless dur is the park poll interval — ParkTimer is
-// the park's own wait, so anything else means the run is waiting on something
+// assertPauseInterval fails unless dur is the pause poll interval — PauseTimer is
+// the pause's own wait, so anything else means the run is waiting on something
 // this test did not intend to script.
-func assertParkInterval(t *testing.T, dur time.Duration) {
+func assertPauseInterval(t *testing.T, dur time.Duration) {
 	t.Helper()
 	if dur != pausedPollInterval {
-		t.Errorf("ParkTimer duration = %v, want %v", dur, pausedPollInterval)
+		t.Errorf("PauseTimer duration = %v, want %v", dur, pausedPollInterval)
 	}
 }
 
-// clearOnPark returns a Deps.ParkTimer replacement for a parked run: the first
-// poll rewrites clearPath's status to newStatus, so the park's next pass sees
-// a ticket a "human" cleared while it was waiting. Without it a parked run
+// clearOnPause returns a Deps.PauseTimer replacement for a paused run: the first
+// poll rewrites clearPath's status to newStatus, so the pause's next pass sees
+// a ticket a "human" cleared while it was waiting. Without it a paused run
 // polls forever, which is the point of the feature and the hazard of testing
-// it — every park test needs some scripted clearing hand.
-func clearOnPark(t *testing.T, clearPath, newStatus string) (func(time.Duration) <-chan time.Time, *int) {
+// it — every pause test needs some scripted clearing hand.
+func clearOnPause(t *testing.T, clearPath, newStatus string) (func(time.Duration) <-chan time.Time, *int) {
 	t.Helper()
 	var mu sync.Mutex
 	calls := 0
 	return func(dur time.Duration) <-chan time.Time {
-		assertParkInterval(t, dur)
+		assertPauseInterval(t, dur)
 		mu.Lock()
 		defer mu.Unlock()
 		calls++
@@ -64,60 +64,60 @@ func ticketPath(scratchDir, epicName, file string) string {
 	return filepath.Join(scratchDir, epicName, "issues", file)
 }
 
-// TestRun_StalledTicket_ParksInsteadOfExiting covers ticket 08's core AC: a
-// run whose only remaining ticket is needs-answer neither exits nor errors — it
-// parks, notifies, and carries on once the status clears.
-func TestRun_StalledTicket_ParksInsteadOfExiting(t *testing.T) {
+// TestRun_StalledTicket_PausesInsteadOfExiting covers ticket 08's core AC: a
+// run whose only remaining ticket is paused (answer) neither exits nor errors — it
+// pauses, notifies, and carries on once the status clears.
+func TestRun_StalledTicket_PausesInsteadOfExiting(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
 	})
 	d, prompts, _ := fakeDeps()
-	// The park has no timeout: only the scripted clearing hand ends it.
-	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
-	d.ParkTimer = parkTimer
+	// The pause has no timeout: only the scripted clearing hand ends it.
+	pauseTimer, polls := clearOnPause(t, ticketPath(scratchDir, "my-epic", "01-stuck.md"), "open")
+	d.PauseTimer = pauseTimer
 	sink := &recordingSink{}
 
 	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 	if err != nil {
-		t.Fatalf("Run() error = %v, want nil (a stalled run parks, it doesn't error)", err)
+		t.Fatalf("Run() error = %v, want nil (a stalled run pauses, it doesn't error)", err)
 	}
 
 	if *polls == 0 {
-		t.Errorf("run never parked (no park poll), want it to park on the needs-answer ticket")
+		t.Errorf("run never paused (no pause poll), want it to pause on the needs-answer ticket")
 	}
-	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
-		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
+	if len(sink.pausedStalled) != 1 || len(sink.pausedStalled[0]) != 1 || sink.pausedStalled[0][0].Identifier != "01" {
+		t.Errorf("EpicPaused calls = %v, want one naming ticket 01", sink.pausedStalled)
 	}
 	if len(*prompts) != 1 {
 		t.Errorf("prompts = %v, want the cleared ticket to be claimed and run once", *prompts)
 	}
 }
 
-// TestRun_DraftOnlyEpic_Parks covers the other human-clearable status:
-// draft. Unlike needs-answer/needs-repair, IsParked matches it off
+// TestRun_DraftOnlyEpic_Pauses covers the other human-clearable status:
+// draft. Unlike paused (answer)/paused (repair), IsParked matches it off
 // the raw frontmatter Status: rather than RenderedStatus, so this proves a
-// draft ticket parks rather than deadlocking.
-func TestRun_DraftOnlyEpic_Parks(t *testing.T) {
+// draft ticket pauses rather than deadlocking.
+func TestRun_DraftOnlyEpic_Pauses(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-stub.md": "---\nid: \"01\"\nstatus: draft\ntype: implement\n---\n# Stub\n",
 	})
 	d, prompts, _ := fakeDeps()
-	parkTimer, polls := clearOnPark(t, ticketPath(scratchDir, "my-epic", "01-stub.md"), "open")
-	d.ParkTimer = parkTimer
+	pauseTimer, polls := clearOnPause(t, ticketPath(scratchDir, "my-epic", "01-stub.md"), "open")
+	d.PauseTimer = pauseTimer
 	sink := &recordingSink{}
 
 	err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 	if err != nil {
-		t.Fatalf("Run() error = %v, want nil (a draft-only epic parks, it doesn't error)", err)
+		t.Fatalf("Run() error = %v, want nil (a draft-only epic pauses, it doesn't error)", err)
 	}
 
 	if *polls == 0 {
-		t.Errorf("run never parked (no park poll), want it to park on the draft ticket")
+		t.Errorf("run never paused (no pause poll), want it to pause on the draft ticket")
 	}
-	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
-		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
+	if len(sink.pausedStalled) != 1 || len(sink.pausedStalled[0]) != 1 || sink.pausedStalled[0][0].Identifier != "01" {
+		t.Errorf("EpicPaused calls = %v, want one naming ticket 01", sink.pausedStalled)
 	}
 	if len(*prompts) != 1 {
 		t.Errorf("prompts = %v, want the cleared ticket to be claimed and run once", *prompts)
@@ -126,7 +126,7 @@ func TestRun_DraftOnlyEpic_Parks(t *testing.T) {
 
 // TestRun_StalledIteration_RegistryClearedAndRelaunched covers the other half
 // of ticket 08's registry-clearing claim: not a ticket that starts stalled at
-// reattach (see TestRun_StalledTicket_ParksInsteadOfExiting), but one that
+// reattach (see TestRun_StalledTicket_PausesInsteadOfExiting), but one that
 // stalls mid-run, whose launched-registry entry must be cleared so a human
 // clearing it back to open lets the same run reclaim and finish it. CommitsAhead
 // is scripted off whether the human has cleared the ticket yet, not a call
@@ -152,8 +152,8 @@ func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
 		return 0, nil
 	}
 	polls := 0
-	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
-		assertParkInterval(t, dur)
+	d.PauseTimer = func(dur time.Duration) <-chan time.Time {
+		assertPauseInterval(t, dur)
 		mu.Lock()
 		defer mu.Unlock()
 		polls++
@@ -171,7 +171,7 @@ func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
 		t.Fatalf("Run() error = %v, want nil", err)
 	}
 
-	// The relaunch adopts the parked iteration's still-live session, which has
+	// The relaunch adopts the paused iteration's still-live session, which has
 	// already had its turn, so it is not prompted again.
 	if len(*prompts) != 1 {
 		t.Errorf("prompts = %v, want 1 (the stalled iteration's only, adopted by the relaunch once the registry entry cleared)", *prompts)
@@ -180,19 +180,19 @@ func TestRun_StalledIteration_RegistryClearedAndRelaunched(t *testing.T) {
 	if got.Status != schema.StatusDone {
 		t.Errorf("final Status = %q, want done", got.Status)
 	}
-	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
-		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
+	if len(sink.pausedStalled) != 1 || len(sink.pausedStalled[0]) != 1 || sink.pausedStalled[0][0].Identifier != "01" {
+		t.Errorf("EpicPaused calls = %v, want one naming ticket 01", sink.pausedStalled)
 	}
 }
 
-// TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunching
+// TestRun_ClearedRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunching
 // covers ticket 09's core claim: iteration ownership decides resume, not the
 // ticket's status. Ticket 01's first launch errors out (a git hiccup) before
-// ever prompting, needs-repair with no goroutine left — but its herdr tab
+// ever prompting, paused (repair) with no goroutine left — but its herdr tab
 // is scripted to still be live once a human clears it back to open, so the
 // run must reattach rather than assume "open" means "never launched" and
 // double-launch a second iteration.
-func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunching(t *testing.T) {
+func TestRun_ClearedRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunching(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -219,8 +219,8 @@ func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunch
 	}
 
 	polls := 0
-	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
-		assertParkInterval(t, dur)
+	d.PauseTimer = func(dur time.Duration) <-chan time.Time {
+		assertPauseInterval(t, dur)
 		mu.Lock()
 		defer mu.Unlock()
 		polls++
@@ -253,8 +253,8 @@ func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunch
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches = %v, want exactly one removal", *removed)
 	}
-	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
-		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
+	if len(sink.pausedStalled) != 1 || len(sink.pausedStalled[0]) != 1 || sink.pausedStalled[0][0].Identifier != "01" {
+		t.Errorf("EpicPaused calls = %v, want one naming ticket 01", sink.pausedStalled)
 	}
 	want := [4]string{"01", "my-epic-iter-01", "/fake/worktrees/my-epic-item-01", "sess-pane-my-epic-iter-01"}
 	if len(sink.reattachedCalls) != 1 || sink.reattachedCalls[0] != want {
@@ -267,7 +267,7 @@ func TestRun_ClearedNeedsRepairWithLiveIteration_ReattachesInsteadOfDoubleLaunch
 
 // TestRun_NothingRunnableAndNothingClearable_Deadlocks keeps the genuine
 // corruption signal: a blocker naming a ticket that will never resolve has no
-// human-clearable ticket to park on, so it must still error.
+// human-clearable ticket to pause on, so it must still error.
 func TestRun_NothingRunnableAndNothingClearable_Deadlocks(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
@@ -281,18 +281,18 @@ func TestRun_NothingRunnableAndNothingClearable_Deadlocks(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Run() error = nil, want a deadlock error for a dependency cycle")
 	}
-	if len(sink.parkedStalled) != 0 {
-		t.Errorf("EpicParked calls = %v, want none for a deadlocked epic", sink.parkedStalled)
+	if len(sink.pausedStalled) != 0 {
+		t.Errorf("EpicPaused calls = %v, want none for a deadlocked epic", sink.pausedStalled)
 	}
 }
 
-// TestRun_StaysParked_NeverReportsEpicComplete pins the hazard the retired
-// test-only park-poll cap created: exhausting it broke out of the scheduling
+// TestRun_StaysPaused_NeverReportsEpicComplete pins the hazard the retired
+// test-only pause-poll cap created: exhausting it broke out of the scheduling
 // loop into the epic-complete path, letting a test seam fabricate a terminal
-// event for a run still waiting on a person. The Run goroutine here parks
+// event for a run still waiting on a person. The Run goroutine here pauses
 // forever by design — its timer never fires and nobody clears the ticket — so
-// it stays blocked in the park select rather than leaking work.
-func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
+// it stays blocked in the pause select rather than leaking work.
+func TestRun_StaysPaused_NeverReportsEpicComplete(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
@@ -301,8 +301,8 @@ func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 	polled := make(chan struct{})
 	never := make(chan time.Time)
 	var once sync.Once
-	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
-		assertParkInterval(t, dur)
+	d.PauseTimer = func(dur time.Duration) <-chan time.Time {
+		assertPauseInterval(t, dur)
 		once.Do(func() { close(polled) })
 		return never
 	}
@@ -318,19 +318,19 @@ func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 	select {
 	case <-polled:
 	case err := <-done:
-		t.Fatalf("Run() returned %v before parking, want it to park on the needs-answer ticket", err)
+		t.Fatalf("Run() returned %v before pausing, want it to pause on the needs-answer ticket", err)
 	case <-time.After(5 * time.Second):
-		t.Fatal("run never parked")
+		t.Fatal("run never paused")
 	}
 	select {
 	case err := <-done:
-		t.Fatalf("Run() returned %v while its only ticket was still needs-answer, want it to stay parked", err)
+		t.Fatalf("Run() returned %v while its only ticket was still needs-answer, want it to stay paused", err)
 	case <-time.After(100 * time.Millisecond):
 	}
 
 	for _, call := range sink.snapshot() {
 		if call == "EpicComplete" {
-			t.Fatalf("sink calls = %v, want no EpicComplete for a still-parked epic", sink.snapshot())
+			t.Fatalf("sink calls = %v, want no EpicComplete for a still-paused epic", sink.snapshot())
 		}
 	}
 
@@ -342,15 +342,15 @@ func TestRun_StaysParked_NeverReportsEpicComplete(t *testing.T) {
 	}
 }
 
-// TestRun_EpicParked_ZeroCommitParkReportsNotReattachable covers the third
-// of the ticket's three call sites: EpicParked's Reattachable flag (surfaced
-// in Telegram notifications) must not claim a zero-commit park is
+// TestRun_EpicPaused_ZeroCommitParkReportsNotReattachable covers the third
+// of the ticket's three call sites: EpicPaused's Reattachable flag (surfaced
+// in Telegram notifications) must not claim a zero-commit pause is
 // reattachable when gx will never auto-reattach it. Before this predicate
 // existed, Reattachable was liveness-only, so a live-but-idle zero-commit
-// park (nothing landed) would have wrongly reported true — the exact
-// mismatch this ticket closes between the notification and unparkAnswered's
+// pause (nothing merged) would have wrongly reported true — the exact
+// mismatch this ticket closes between the notification and resumeAnswered's
 // own refusal to clear the same ticket.
-func TestRun_EpicParked_ZeroCommitParkReportsNotReattachable(t *testing.T) {
+func TestRun_EpicPaused_ZeroCommitPauseReportsNotReattachable(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -359,24 +359,24 @@ func TestRun_EpicParked_ZeroCommitParkReportsNotReattachable(t *testing.T) {
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, nil }
 	sink := &recordingSink{}
 
-	runUntilParked(t, RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+	runUntilPaused(t, RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
-	if len(sink.parkedStalled) == 0 {
-		t.Fatalf("EpicParked calls = %v, want at least one", sink.parkedStalled)
+	if len(sink.pausedStalled) == 0 {
+		t.Fatalf("EpicPaused calls = %v, want at least one", sink.pausedStalled)
 	}
-	last := sink.parkedStalled[len(sink.parkedStalled)-1]
+	last := sink.pausedStalled[len(sink.pausedStalled)-1]
 	if len(last) != 1 || last[0].Identifier != "01" {
-		t.Fatalf("EpicParked stalled = %v, want exactly ticket 01", last)
+		t.Fatalf("EpicPaused stalled = %v, want exactly ticket 01", last)
 	}
 	if last[0].Reattachable {
 		t.Errorf("zero-commit ticket 01 Reattachable = true, want false (live pane but no new commits)")
 	}
 }
 
-// TestGate_WakeParked_ShortensParkWait proves the cosmetic-wake mechanism
-// loop.go's park branch relies on: WakeParked cuts a park wait short instead
-// of it running out a long parkPollInterval-equivalent wait.
-func TestGate_WakeParked_ShortensParkWait(t *testing.T) {
+// TestGate_WakePaused_ShortensParkWait proves the cosmetic-wake mechanism
+// loop.go's pause branch relies on: WakePaused cuts a pause wait short instead
+// of it running out a long pause-poll-interval wait.
+func TestGate_WakePaused_ShortensPauseWait(t *testing.T) {
 	t.Parallel()
 	gate := NewGate()
 	waiting := make(chan struct{})
@@ -384,22 +384,22 @@ func TestGate_WakeParked_ShortensParkWait(t *testing.T) {
 
 	go func() {
 		timer := time.After(time.Hour)
-		parkWake := gate.ParkWake()
+		pauseWake := gate.PauseWake()
 		close(waiting)
 		select {
 		case <-timer:
-		case <-parkWake:
+		case <-pauseWake:
 		}
 		close(woke)
 	}()
 
 	<-waiting
-	gate.WakeParked()
+	gate.WakePaused()
 
 	select {
 	case <-woke:
 	case <-time.After(5 * time.Second):
-		t.Fatal("WakeParked() did not interrupt an in-progress park wait")
+		t.Fatal("WakePaused() did not interrupt an in-progress pause wait")
 	}
 }
 
@@ -419,10 +419,10 @@ func deadlockedKinds(t *testing.T, scratchDir, epicName string) []string {
 	return kinds
 }
 
-// TestRun_Park_EmitsDeadlockedOncePerEntry is the all-parked half of the
-// deadlocked seam: entering the park emits one event, the repeated park polls
+// TestRun_Pause_EmitsDeadlockedOncePerEntry is the all-paused half of the
+// deadlocked seam: entering the pause emits one event, the repeated pause polls
 // do not, and the epic can enter deadlock again after it left.
-func TestRun_Park_EmitsDeadlockedOncePerEntry(t *testing.T) {
+func TestRun_Pause_EmitsDeadlockedOncePerEntry(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-stuck.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# Stuck\n",
@@ -430,8 +430,8 @@ func TestRun_Park_EmitsDeadlockedOncePerEntry(t *testing.T) {
 	d, _, _ := fakeDeps()
 	path := ticketPath(scratchDir, "my-epic", "01-stuck.md")
 	polls := 0
-	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
-		assertParkInterval(t, dur)
+	d.PauseTimer = func(dur time.Duration) <-chan time.Time {
+		assertPauseInterval(t, dur)
 		polls++
 		if polls == 3 {
 			if got := deadlockedKinds(t, scratchDir, "my-epic"); !slices.Equal(got, []string{"all-paused"}) {

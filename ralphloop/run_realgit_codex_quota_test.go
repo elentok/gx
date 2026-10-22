@@ -85,10 +85,10 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 			delete(openTabs, tabID)
 			mu.Unlock()
 			if tabID == "tab-"+iterLabel(epicName, "02") {
-				// Guaranteed-post-landing signal, same idiom as
-				// TestRun_ProductionRealGit_AThenBAndCConcurrently's bLanded:
+				// Guaranteed-post-merging signal, same idiom as
+				// TestRun_ProductionRealGit_AThenBAndCConcurrently's bMerged:
 				// 02's tab only closes once finishCleanup runs, strictly after
-				// 02's commit already landed and its worker slot is free.
+				// 02's commit already merged and its worker slot is free.
 				tab02ClosedOnce.Do(func() { close(tab02Closed) })
 			}
 			return []byte(`{"result":null}`), 0
@@ -208,7 +208,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 			return codexsession.RateLimit{Quota: "usage"}, true, nil
 		case 2:
 			// The core "slot free while paused" assertion: wait until 02's
-			// tab has closed (guaranteed-post-landing) and confirm 03 hasn't
+			// tab has closed (guaranteed-post-merging) and confirm 03 hasn't
 			// been claimed yet, strictly before Gate.ForceResume fires inside
 			// recoverCodexRateLimit — correct regardless of goroutine
 			// scheduling, since it's read here rather than after the fact.
@@ -244,7 +244,7 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 	}
 	for _, id := range []string{"01", "02", "03"} {
 		if trailers[addressTrailerValue(scratchDir, epicName, id)] == "" {
-			t.Errorf("landed trailers = %v, want a landed commit for ticket %s", trailers, id)
+			t.Errorf("merged trailers = %v, want a merged commit for ticket %s", trailers, id)
 		}
 	}
 
@@ -340,11 +340,11 @@ func waitForPausedRateLimitEvent(t *testing.T, scratchDir, epicName, ticketID st
 // ticket 29's combined scenario: ticket 01 (context) and ticket 02 (quota)
 // both claim a worker slot at once (defaultMaxParallel==2, see loop.go), so
 // ticket 03 (backfill) starts out ready but unclaimed. Ticket 01 hits a
-// smart-zone context breach, compacts, and lands — freeing a slot — while
+// smart-zone context breach, compacts, and merges — freeing a slot — while
 // ticket 02 sits on a typed Codex quota pause the whole time; per
 // Gate.claimIfRunning (pause.go), that pause blocks *every* new claim
 // (including 03) regardless of the free slot, until 02's typed quota resume.
-// Combines TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp's
+// Combines TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp's
 // smart-zone flow with TestRun_ProductionRealGit_CodexQuotaBackfillRecovers'
 // quota/backfill flow inside a single Run() call, on one raw
 // herdrfake.Start(t, handler) that dispatches per-pane: 01 runs a hand-rolled
@@ -426,7 +426,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 			if label == iterLabel(epicName, "01") {
 				// The context ticket's own work is already "done" by the time
 				// its tab exists — same idiom as
-				// TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp,
+				// TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp,
 				// which commits at tab-create so the rest of the scenario can
 				// focus purely on breach detection and recovery.
 				if err := commitIterationWork(dir01, "01"); err != nil {
@@ -445,10 +445,10 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 			delete(openTabs, tabID)
 			mu.Unlock()
 			if tabID == "tab-"+iterLabel(epicName, "01") {
-				// Guaranteed-post-landing signal, same idiom as
+				// Guaranteed-post-merging signal, same idiom as
 				// TestRun_ProductionRealGit_CodexQuotaBackfillRecovers'
 				// tab02Closed: 01's tab only closes once finishCleanup runs,
-				// strictly after 01's commit already landed and its worker
+				// strictly after 01's commit already merged and its worker
 				// slot is free.
 				tab01ClosedOnce.Do(func() { close(tab01Closed) })
 			}
@@ -516,7 +516,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 			pane := argv[2]
 			if pane == pane01 {
 				// 01's context-breach recovery must not race ahead of 02's
-				// quota pause: without this, 01 can compact and land (freeing
+				// quota pause: without this, 01 can compact and merge (freeing
 				// its slot) before 02 ever registers its pause, letting
 				// ticket 03 slip past Gate.claimIfRunning's "any label paused
 				// blocks every new claim" contract this test exists to
@@ -603,7 +603,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 			return codexsession.RateLimit{Quota: "usage"}, true, nil
 		case 2:
 			// The core "slot free while paused" assertion: wait until 01's
-			// tab has closed (guaranteed-post-landing) and confirm 03 hasn't
+			// tab has closed (guaranteed-post-merging) and confirm 03 hasn't
 			// been claimed yet, strictly before Gate.ForceResume fires
 			// inside recoverCodexRateLimit — correct regardless of goroutine
 			// scheduling, since it's read here rather than after the fact.
@@ -661,7 +661,7 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 	}
 	for _, id := range []string{"01", "02", "03"} {
 		if trailers[addressTrailerValue(scratchDir, epicName, id)] == "" {
-			t.Errorf("landed trailers = %v, want a landed commit for ticket %s", trailers, id)
+			t.Errorf("merged trailers = %v, want a merged commit for ticket %s", trailers, id)
 		}
 	}
 

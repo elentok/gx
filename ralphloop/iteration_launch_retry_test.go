@@ -35,16 +35,16 @@ const launchEpic = "my-epic"
 
 var launchLabel = iterLabel(launchEpic, "01")
 
-// runLaunchEpic runs a one-ticket epic on d, until it parks if parks is set,
+// runLaunchEpic runs a one-ticket epic on d, until it pauses if pauses is set,
 // and returns its scratch dir.
-func runLaunchEpic(t *testing.T, d Deps, parks bool) string {
+func runLaunchEpic(t *testing.T, d Deps, pauses bool) string {
 	t.Helper()
 	scratchDir := writeEpic(t, launchEpic, map[string]string{
 		"01-first.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
 	})
 	opts := RunOptions{EpicName: launchEpic, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}
-	if parks {
-		runUntilParked(t, opts, d, noopEventSink{})
+	if pauses {
+		runUntilPaused(t, opts, d, noopEventSink{})
 	} else if err := Run(opts, d, noopEventSink{}); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -140,7 +140,7 @@ func TestRunIteration_PromptNotDelivered_RetriesOnFreshSession(t *testing.T) {
 	}
 }
 
-func TestRunIteration_PromptNotDeliveredTwice_ParksPromptStalled(t *testing.T) {
+func TestRunIteration_PromptNotDeliveredTwice_PausesPromptStalled(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
@@ -163,7 +163,7 @@ func TestRunIteration_PromptNotDeliveredTwice_ParksPromptStalled(t *testing.T) {
 	}
 }
 
-func TestRunIteration_PromptNotReady_ParksBlockedPane(t *testing.T) {
+func TestRunIteration_PromptNotReady_PausesBlockedPane(t *testing.T) {
 	t.Parallel()
 	d, _, removed := fakeDeps()
 	r := fakeRunner(d)
@@ -181,14 +181,14 @@ func TestRunIteration_PromptNotReady_ParksBlockedPane(t *testing.T) {
 		t.Error("blocked session was stopped, want it live for a person to answer")
 	}
 	if len(*removed) != 0 {
-		t.Errorf("removed worktrees = %v, want the parked worktree kept", *removed)
+		t.Errorf("removed worktrees = %v, want the paused worktree kept", *removed)
 	}
 	if failed := launchFailedEvents(t, scratchDir); len(failed) != 0 {
-		t.Errorf("launch-failed events = %+v, want none for a park", failed)
+		t.Errorf("launch-failed events = %+v, want none for a pause", failed)
 	}
 }
 
-func TestRunIteration_MissingCapability_ParksWithDoctorHint(t *testing.T) {
+func TestRunIteration_MissingCapability_PausesWithDoctorHint(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
@@ -208,7 +208,7 @@ func TestRunIteration_MissingCapability_ParksWithDoctorHint(t *testing.T) {
 	}
 }
 
-func TestRunIteration_MissingCapabilityOnStart_ParksWithDoctorHint(t *testing.T) {
+func TestRunIteration_MissingCapabilityOnStart_PausesWithDoctorHint(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
@@ -241,7 +241,7 @@ func TestStartAndPrompt_MissingCapabilityOnStart_CarriesDoctorHint(t *testing.T)
 	}
 }
 
-func TestRunIteration_SessionDiedInWait_ParksNeedsRepairWithReason(t *testing.T) {
+func TestRunIteration_SessionDiedInWait_PausesRepairWithReason(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)
@@ -254,19 +254,19 @@ func TestRunIteration_SessionDiedInWait_ParksNeedsRepairWithReason(t *testing.T)
 	if err != nil {
 		t.Fatalf("ReadEvents() error = %v", err)
 	}
-	var parked []Event
+	var paused []Event
 	for _, ev := range evs {
 		if ev.Type == string(events.Paused) {
-			parked = append(parked, ev)
+			paused = append(paused, ev)
 		}
 	}
-	if len(parked) != 1 || parked[0].Kind != string(events.IterationError) ||
-		!strings.Contains(parked[0].Reason, "claude exited (code 1)") {
-		t.Errorf("needs-repair events = %+v, want one iteration_error carrying the died reason", parked)
+	if len(paused) != 1 || paused[0].Kind != string(events.IterationError) ||
+		!strings.Contains(paused[0].Reason, "claude exited (code 1)") {
+		t.Errorf("needs-repair events = %+v, want one iteration_error carrying the died reason", paused)
 	}
 }
 
-func TestRunIteration_OtherPromptError_ParksWithoutRetry(t *testing.T) {
+func TestRunIteration_OtherPromptError_PausesWithoutRetry(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	r := fakeRunner(d)

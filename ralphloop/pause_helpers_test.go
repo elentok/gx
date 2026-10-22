@@ -16,7 +16,7 @@ func parseRawTicket(t *testing.T, raw string) schema.Ticket {
 	return tk
 }
 
-// legacyClass is the pause class of an old needs-answer / needs-repair label.
+// legacyClass is the pause class of an old paused (answer) / paused (repair) label.
 func legacyClass(s schema.Status) schema.PauseClass {
 	return schema.Ticket{Status: s}.PausedClass()
 }

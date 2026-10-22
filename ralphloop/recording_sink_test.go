@@ -26,13 +26,13 @@ type recordingSink struct {
 	// iteration's fake AgentWait exactly once this ticket's stats have been
 	// captured, deterministically rather than via a polling loop.
 	onIterationFinished func(ticket tickets.Ticket)
-	// parkedStalled records the stalled-ticket list of every EpicParked
-	// call, so a test can assert both how many times a run parked and what
-	// it named as blocking each park.
-	parkedStalled [][]StalledTicket
+	// pausedStalled records the stalled-ticket list of every EpicPaused
+	// call, so a test can assert both how many times a run paused and what
+	// it named as blocking each pause.
+	pausedStalled [][]StalledTicket
 	// ticketNeedsHumanCalls records every TicketNeedsHuman call's
 	// (identifier, epicName, status, reason) tuple, for asserting both the
-	// count and the identity/status a parking-write transition reports.
+	// count and the identity/status a pausing-write transition reports.
 	ticketNeedsHumanCalls [][4]string
 	// reattachedCalls records every TicketReattached call's
 	// (identifier, label, cwd, sessionID) tuple, for asserting the live
@@ -102,17 +102,17 @@ func (s *recordingSink) TicketCleanupFinished(identifier string) {
 func (s *recordingSink) TicketRecovering(identifier string) {
 	s.record("TicketRecovering")
 }
-func (s *recordingSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {
+func (s *recordingSink) TicketRecovered(identifier, epicName, branch, mergedSHA string) {
 	s.record("TicketRecovered")
 }
 func (s *recordingSink) TicketUnrecoverable(identifier, epicName string) {
 	s.record("TicketUnrecoverable")
 }
-func (s *recordingSink) EpicParked(epicName string, stalled []StalledTicket) {
+func (s *recordingSink) EpicPaused(epicName string, stalled []StalledTicket) {
 	s.mu.Lock()
-	s.parkedStalled = append(s.parkedStalled, stalled)
+	s.pausedStalled = append(s.pausedStalled, stalled)
 	s.mu.Unlock()
-	s.record("EpicParked")
+	s.record("EpicPaused")
 }
 func (s *recordingSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
 	s.mu.Lock()

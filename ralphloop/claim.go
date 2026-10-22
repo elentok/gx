@@ -14,11 +14,11 @@ import (
 
 // Claim writes status: claimed into the ticket file at path, clearing any
 // iteration_status left over from a prior claim of this ticket — a stale
-// self-report must not survive into a fresh claim. It also clears park_kind:
+// self-report must not survive into a fresh claim. It also clears pause_kind:
 // Claim is the single choke point every reopen path funnels through (auto
-// unpark, a hand-edited status flip back to open, the queue tab's
-// suggested-actions menu), so clearing it only in UnparkTicket would miss
-// the hand-edited path and leave a stale park_kind for a future park to
+// resume, a hand-edited status flip back to open, the queue tab's
+// suggested-actions menu), so clearing it only in ResumeTicket would miss
+// the hand-edited path and leave a stale pause_kind for a future pause to
 // misread. It also demotes any "## Needs Repair" section into a dated "##
 // Comments" sub-entry: per the retirement principle (only a person reads a
 // fault section, so gx — not the next agent — retires it), and claim is the
@@ -52,69 +52,69 @@ func MarkDone(path string) error {
 	return SetStatus(path, "done")
 }
 
-// MarkBuiltAwaitingLand writes iteration_status: finished into the ticket
+// MarkBuiltAwaitingMerge writes iteration_status: finished into the ticket
 // file at path, leaving Status: claimed untouched — gx's own signal that a
-// build finished with commits ready to land, queued behind the land-queue
-// worker rather than landed inline. This widens IterationStatusFinished's
+// build finished with commits ready to merge, queued behind the merge-queue
+// worker rather than merged inline. This widens IterationStatusFinished's
 // meaning beyond an agent's own commitless self-report (see
 // schema.IterationStatus's doc); RenderedStatus keys only off Status, so a
 // claimed ticket bearing this never leaks into the frontier while it waits.
-func MarkBuiltAwaitingLand(path string) error {
+func MarkBuiltAwaitingMerge(path string) error {
 	return updateTicket(path, func(t *schema.Ticket) {
 		t.IterationStatus = schema.IterationStatusFinished
 	})
 }
 
-// markNeedsAnswer writes status: needs-answer into the ticket file at path,
-// stamping parkKind so a later reader can tell which of the three producers
-// parked it.
-func markNeedsAnswer(path string, parkKind schema.PauseKind) error {
-	return parkWrite(path, false, func(t *schema.Ticket, _ *string) {
+// markAsking writes status: paused (answer) into the ticket file at path,
+// stamping pauseKind so a later reader can tell which of the three producers
+// paused it.
+func markAsking(path string, pauseKind schema.PauseKind) error {
+	return pauseWrite(path, false, func(t *schema.Ticket, _ *string) {
 		t.Status = schema.StatusPaused
 		t.PauseKind = ""
-		t.PauseReason = schema.PausedReason(string(parkKind), schema.PauseClassAnswer)
+		t.PauseReason = schema.PausedReason(string(pauseKind), schema.PauseClassAnswer)
 	})
 }
 
-// ErrParkDone is returned by a park write on a ticket that is already done.
-var ErrParkDone = errors.New("refusing to park a done ticket")
+// ErrPauseDone is returned by a pause write on a ticket that is already done.
+var ErrPauseDone = errors.New("refusing to pause a done ticket")
 
-// parkWrite is the shared park write: a done ticket is refused and left
-// untouched, unless reparkDone says the done itself is what needs repair. The
-// check sits under the ticket lock so a land racing the park cannot slip a
+// pauseWrite is the shared pause write: a done ticket is refused and left
+// untouched, unless repauseDone says the done itself is what paused for repair. The
+// check sits under the ticket lock so a merge racing the pause cannot slip a
 // done between check and write.
-func parkWrite(path string, reparkDone bool, mutate func(*schema.Ticket, *string)) error {
+func pauseWrite(path string, repauseDone bool, mutate func(*schema.Ticket, *string)) error {
 	return rewriteTicket(path, false, func(t *schema.Ticket, body *string) error {
-		if t.Status == schema.StatusDone && !reparkDone {
-			return ErrParkDone
+		if t.Status == schema.StatusDone && !repauseDone {
+			return ErrPauseDone
 		}
 		mutate(t, body)
 		return nil
 	})
 }
 
-// markNeedsRepairWithReason writes status: needs-repair into the ticket file,
-// stamps parkKind (the same kind the park event carries), and appends a "## Needs Repair" section built by schema.FormatNeedsRepairBody
+// markRepairWithReason writes status: paused (repair) into the ticket file,
+// stamps pauseKind (the same kind the pause event carries), and appends a "## Needs Repair" section built by schema.FormatNeedsRepairBody
 // (summary/detail split from reason, plus state rendered best-effort), so the
 // full failure is readable by opening the ticket file even when the live
 // UI's status subtext truncates it. Fails without writing anything if reason
 // is empty — see FormatNeedsRepairBody's write-conditional validation.
-func markNeedsRepairWithReason(path, reason string, parkKind schema.PauseKind, state schema.FaultState, reparkDone bool) error {
+func markRepairWithReason(path, reason string, pauseKind schema.PauseKind, state schema.FaultState, repauseDone bool) error {
 	section, err := schema.FormatFaultBody(reason, state)
 	if err != nil {
 		return err
 	}
-	return parkWrite(path, reparkDone, func(t *schema.Ticket, body *string) {
+	return pauseWrite(path, repauseDone, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusPaused
 		t.PauseKind = ""
-		t.PauseReason = schema.PausedReason(string(parkKind), schema.PauseClassRepair)
+		t.PauseReason = schema.PausedReason(string(pauseKind), schema.PauseClassRepair)
 		*body += section
 	})
 }
 
 // MarkDoneWithMetadata marks a ticket done and records the closing
 // iteration's compaction count, in a single atomic write. It leaves
-// actual_context_window alone: writeLandedMetrics owns that field and stamps
+// actual_context_window alone: writeMergedMetrics owns that field and stamps
 // the transcript's peak, which the last turn's occupancy under-reports once a
 // session has compacted. sessionID is accepted for caller compatibility but
 // not persisted: per .scratch/ticket-frontmatter/spec.md, the Session field
@@ -182,7 +182,7 @@ func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) err
 // closes itself after the agent exits: MarkDone refuses a ticket that is
 // invalid on disk, but the agent may have hand-edited the child into an
 // invalid status (e.g. "resolved"). gx owns that field, so MarkChildDone
-// repairs status to done instead of failing the close and parking the parent.
+// repairs status to done instead of failing the close and pausing the parent.
 // Any other invalid field is still an error and nothing is written, since
 // writing it back would make the next Load fail on the child.
 func MarkChildDone(path string) error {
@@ -249,7 +249,7 @@ func rewriteTicketLocked(path string, repair bool, mutate func(*schema.Ticket, *
 }
 
 // commitStatusChange commits the store right away when t just reached done,
-// cancelled or a park status. Best-effort: a failed commit never fails the
+// cancelled or a pause status. Best-effort: a failed commit never fails the
 // ticket write, and the debounced loop picks the change up anyway.
 func commitStatusChange(path string, t schema.Ticket) {
 	switch t.Status {

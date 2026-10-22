@@ -35,7 +35,7 @@ type smartZoneRecovery struct {
 
 	// pending is the compaction-boundary snapshot taken just before the
 	// "/compact" of the most recent gated give-up, kept alive until some later
-	// read proves a boundary landed. While it is unresolved the pane's own
+	// read proves a boundary merged. While it is unresolved the pane's own
 	// "finished" report proves nothing: the shape that produces a gated
 	// give-up in the first place is a pane reporting idle throughout a
 	// running compaction, and that same pane answers the ordinary finish poll

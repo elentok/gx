@@ -15,8 +15,8 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-// landFixture is a repo whose main branch can land a commit from "iter".
-func landFixture(t *testing.T, conflicting bool) (dir string, lp LandParams) {
+// mergeFixture is a repo whose main branch can merge a commit from "iter".
+func mergeFixture(t *testing.T, conflicting bool) (dir string, lp MergeParams) {
 	t.Helper()
 	dir = testutil.TempRepo(t)
 	base, _ := git.RevParse(dir, "HEAD")
@@ -29,7 +29,7 @@ func landFixture(t *testing.T, conflicting bool) (dir string, lp LandParams) {
 		testutil.WriteFile(t, dir, "shared.txt", "main\n")
 		testutil.CommitAll(t, dir, "main shared")
 	}
-	return dir, LandParams{
+	return dir, MergeParams{
 		FeatureWorktree: dir,
 		FeatureBranch:   "main",
 		TicketID:        "03",
@@ -46,15 +46,15 @@ func headMessage(t *testing.T, dir string) string {
 	return string(out)
 }
 
-func TestLandTicket_Landed_StampsTrailerScopedByFeatureBranch(t *testing.T) {
-	dir, lp := landFixture(t, false)
+func TestMergeTicket_Merged_StampsTrailerScopedByFeatureBranch(t *testing.T) {
+	dir, lp := mergeFixture(t, false)
 
-	res, err := LandTicket(landDepsFor(testDeps()), lp)
+	res, err := MergeTicket(mergeDepsFor(testDeps()), lp)
 	if err != nil {
-		t.Fatalf("LandTicket: %v", err)
+		t.Fatalf("MergeTicket: %v", err)
 	}
-	if res.Outcome != Landed {
-		t.Fatalf("outcome = %q, want %q", res.Outcome, Landed)
+	if res.Outcome != Merged {
+		t.Fatalf("outcome = %q, want %q", res.Outcome, Merged)
 	}
 	if want := ticketTrailerValue("main", "03"); res.TrailerValue != want {
 		t.Errorf("TrailerValue = %q, want %q", res.TrailerValue, want)
@@ -67,12 +67,12 @@ func TestLandTicket_Landed_StampsTrailerScopedByFeatureBranch(t *testing.T) {
 	}
 }
 
-func TestLandTicket_NoRecoverableSession_OmitsMetrics(t *testing.T) {
-	dir, lp := landFixture(t, false)
+func TestMergeTicket_NoRecoverableSession_OmitsMetrics(t *testing.T) {
+	dir, lp := mergeFixture(t, false)
 
-	res, err := LandTicket(landDepsFor(testDeps()), lp)
+	res, err := MergeTicket(mergeDepsFor(testDeps()), lp)
 	if err != nil {
-		t.Fatalf("LandTicket: %v", err)
+		t.Fatalf("MergeTicket: %v", err)
 	}
 	if res.MetricsStamped {
 		t.Error("MetricsStamped = true with no session, want false")
@@ -82,19 +82,19 @@ func TestLandTicket_NoRecoverableSession_OmitsMetrics(t *testing.T) {
 	}
 }
 
-func TestLandTicket_SecondCall_IsAlreadyAppliedWithoutRestamp(t *testing.T) {
-	dir, lp := landFixture(t, false)
-	d := landDepsFor(testDeps())
+func TestMergeTicket_SecondCall_IsAlreadyAppliedWithoutRestamp(t *testing.T) {
+	dir, lp := mergeFixture(t, false)
+	d := mergeDepsFor(testDeps())
 
-	first, err := LandTicket(d, lp)
-	if err != nil || first.Outcome != Landed {
-		t.Fatalf("first LandTicket = (%+v, %v), want Landed", first, err)
+	first, err := MergeTicket(d, lp)
+	if err != nil || first.Outcome != Merged {
+		t.Fatalf("first MergeTicket = (%+v, %v), want Merged", first, err)
 	}
 	msg := headMessage(t, dir)
 
-	second, err := LandTicket(d, lp)
+	second, err := MergeTicket(d, lp)
 	if err != nil {
-		t.Fatalf("second LandTicket: %v", err)
+		t.Fatalf("second MergeTicket: %v", err)
 	}
 	if second.Outcome != AlreadyApplied {
 		t.Fatalf("second outcome = %q, want %q", second.Outcome, AlreadyApplied)
@@ -107,18 +107,18 @@ func TestLandTicket_SecondCall_IsAlreadyAppliedWithoutRestamp(t *testing.T) {
 	}
 }
 
-func TestLandTicket_TrailerOnly_IsAmbiguousNamingTheSHAs(t *testing.T) {
-	_, lp := landFixture(t, false)
+func TestMergeTicket_TrailerOnly_IsAmbiguousNamingTheSHAs(t *testing.T) {
+	_, lp := mergeFixture(t, false)
 	lp.RecordedSHA = "recorded"
-	d := landDepsFor(testDeps())
+	d := mergeDepsFor(testDeps())
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
 	d.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) { return false, nil }
-	d.LandedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
+	d.MergedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
 
-	res, err := LandTicket(d, lp)
-	var amb *ambiguousLandError
+	res, err := MergeTicket(d, lp)
+	var amb *ambiguousMergeError
 	if !errors.As(err, &amb) {
-		t.Fatalf("LandTicket = (%+v, %v), want an ambiguous-land error", res, err)
+		t.Fatalf("MergeTicket = (%+v, %v), want an ambiguous-merge error", res, err)
 	}
 	for _, want := range []string{"03", "main", "recorded", lp.SourceRange.Base, lp.SourceRange.Tip} {
 		if !strings.Contains(err.Error(), want) {
@@ -127,53 +127,53 @@ func TestLandTicket_TrailerOnly_IsAmbiguousNamingTheSHAs(t *testing.T) {
 	}
 }
 
-func TestLandTicket_TrailerOnlyWithoutRecordedSHA_SaysNone(t *testing.T) {
-	_, lp := landFixture(t, false)
-	d := landDepsFor(testDeps())
+func TestMergeTicket_TrailerOnlyWithoutRecordedSHA_SaysNone(t *testing.T) {
+	_, lp := mergeFixture(t, false)
+	d := mergeDepsFor(testDeps())
 	d.PatchesApplied = func(dir, upstream, base, branch string) (bool, error) { return false, nil }
-	d.LandedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
+	d.MergedTickets = func(dir, branch string) (map[string]bool, error) { return map[string]bool{"03": true}, nil }
 
-	_, err := LandTicket(d, lp)
+	_, err := MergeTicket(d, lp)
 	if err == nil || !strings.Contains(err.Error(), "recorded SHA none") {
-		t.Fatalf("LandTicket err = %v, want it to say recorded SHA none", err)
+		t.Fatalf("MergeTicket err = %v, want it to say recorded SHA none", err)
 	}
 }
 
-func TestLandTicket_RecordedSHARung_DetectsAlreadyApplied(t *testing.T) {
-	_, lp := landFixture(t, false)
+func TestMergeTicket_RecordedSHARung_DetectsAlreadyApplied(t *testing.T) {
+	_, lp := mergeFixture(t, false)
 	lp.RecordedSHA = "recorded"
-	d := landDepsFor(testDeps())
+	d := mergeDepsFor(testDeps())
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return ancestor == "recorded", nil }
 
-	res, err := LandTicket(d, lp)
+	res, err := MergeTicket(d, lp)
 	if err != nil || res.Outcome != AlreadyApplied || res.SHA != "recorded" {
-		t.Fatalf("LandTicket = (%+v, %v), want AlreadyApplied at recorded SHA", res, err)
+		t.Fatalf("MergeTicket = (%+v, %v), want AlreadyApplied at recorded SHA", res, err)
 	}
 }
 
-// A range whose commits are already on the feature branch (e.g. `land --from
-// X^ --to X` for a landed X) has no git cherry output at all, which
+// A range whose commits are already on the feature branch (e.g. `merge --from
+// X^ --to X` for a merged X) has no git cherry output at all, which
 // PatchesApplied reads as "unverified"; re-picking it would conflict with
 // itself or come up empty.
-func TestLandTicket_RangeAlreadyOnFeatureBranch_IsAlreadyApplied(t *testing.T) {
-	dir, lp := landFixture(t, false)
+func TestMergeTicket_RangeAlreadyOnFeatureBranch_IsAlreadyApplied(t *testing.T) {
+	dir, lp := mergeFixture(t, false)
 	testutil.MustGitExported(t, dir, "merge", "--ff-only", lp.SourceRange.Tip)
 
-	res, err := LandTicket(landDepsFor(testDeps()), lp)
+	res, err := MergeTicket(mergeDepsFor(testDeps()), lp)
 	if err != nil || res.Outcome != AlreadyApplied {
-		t.Fatalf("LandTicket = (%+v, %v), want AlreadyApplied", res, err)
+		t.Fatalf("MergeTicket = (%+v, %v), want AlreadyApplied", res, err)
 	}
 	if res.SHA != lp.SourceRange.Tip {
 		t.Errorf("SHA = %q, want the range's tip %q", res.SHA, lp.SourceRange.Tip)
 	}
 }
 
-func TestLandTicket_Conflict_IsAResultNotAnError(t *testing.T) {
-	dir, lp := landFixture(t, true)
+func TestMergeTicket_Conflict_IsAResultNotAnError(t *testing.T) {
+	dir, lp := mergeFixture(t, true)
 
-	res, err := LandTicket(landDepsFor(testDeps()), lp)
+	res, err := MergeTicket(mergeDepsFor(testDeps()), lp)
 	if err != nil {
-		t.Fatalf("LandTicket error = %v, want nil on conflict", err)
+		t.Fatalf("MergeTicket error = %v, want nil on conflict", err)
 	}
 	if res.Outcome != Conflicted {
 		t.Fatalf("outcome = %q, want %q", res.Outcome, Conflicted)
@@ -183,15 +183,15 @@ func TestLandTicket_Conflict_IsAResultNotAnError(t *testing.T) {
 	}
 }
 
-// appliedSessionFixture lands the fixture's commit, then points lp at a ticket
+// appliedSessionFixture merges the fixture's commit, then points lp at a ticket
 // file with the given frontmatter cost and a recoverable Claude session.
-func appliedSessionFixture(t *testing.T, cost string) (lp LandParams, d LandDeps, ticketPath string) {
+func appliedSessionFixture(t *testing.T, cost string) (lp MergeParams, d MergeDeps, ticketPath string) {
 	t.Helper()
 	setHomeEnv(t, t.TempDir())
-	_, lp = landFixture(t, false)
-	d = landDepsFor(testDeps())
-	if res, err := LandTicket(d, lp); err != nil || res.Outcome != Landed {
-		t.Fatalf("first LandTicket = (%+v, %v), want Landed", res, err)
+	_, lp = mergeFixture(t, false)
+	d = mergeDepsFor(testDeps())
+	if res, err := MergeTicket(d, lp); err != nil || res.Outcome != Merged {
+		t.Fatalf("first MergeTicket = (%+v, %v), want Merged", res, err)
 	}
 
 	ticketPath = filepath.Join(t.TempDir(), "03-a.md")
@@ -205,17 +205,17 @@ func appliedSessionFixture(t *testing.T, cost string) (lp LandParams, d LandDeps
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
 	lp.TicketPath = ticketPath
-	lp.Session = LandSession{Agent: AgentClaude, Cwd: cwd, ID: "sess-applied"}
+	lp.Session = MergeSession{Agent: AgentClaude, Cwd: cwd, ID: "sess-applied"}
 	return lp, d, ticketPath
 }
 
-func TestLandTicket_AlreadyApplied_ZeroCostWithSession_StampsMetrics(t *testing.T) {
+func TestMergeTicket_AlreadyApplied_ZeroCostWithSession_StampsMetrics(t *testing.T) {
 	lp, d, ticketPath := appliedSessionFixture(t, "")
 	msg := headMessage(t, lp.FeatureWorktree)
 
-	res, err := LandTicket(d, lp)
+	res, err := MergeTicket(d, lp)
 	if err != nil || res.Outcome != AlreadyApplied {
-		t.Fatalf("LandTicket = (%+v, %v), want AlreadyApplied", res, err)
+		t.Fatalf("MergeTicket = (%+v, %v), want AlreadyApplied", res, err)
 	}
 	if !res.MetricsStamped {
 		t.Error("MetricsStamped = false, want true")
@@ -230,12 +230,12 @@ func TestLandTicket_AlreadyApplied_ZeroCostWithSession_StampsMetrics(t *testing.
 	}
 }
 
-func TestLandTicket_AlreadyApplied_NonZeroCost_StampsNothing(t *testing.T) {
+func TestMergeTicket_AlreadyApplied_NonZeroCost_StampsNothing(t *testing.T) {
 	lp, d, ticketPath := appliedSessionFixture(t, "actual_cost: 1.5\n")
 
-	res, err := LandTicket(d, lp)
+	res, err := MergeTicket(d, lp)
 	if err != nil || res.Outcome != AlreadyApplied {
-		t.Fatalf("LandTicket = (%+v, %v), want AlreadyApplied", res, err)
+		t.Fatalf("MergeTicket = (%+v, %v), want AlreadyApplied", res, err)
 	}
 	if res.MetricsStamped {
 		t.Error("MetricsStamped = true with non-zero cost, want false")
@@ -246,13 +246,13 @@ func TestLandTicket_AlreadyApplied_NonZeroCost_StampsNothing(t *testing.T) {
 	}
 }
 
-func TestLandTicket_AlreadyApplied_NoSession_StampsNothing(t *testing.T) {
+func TestMergeTicket_AlreadyApplied_NoSession_StampsNothing(t *testing.T) {
 	lp, d, ticketPath := appliedSessionFixture(t, "")
-	lp.Session = LandSession{}
+	lp.Session = MergeSession{}
 
-	res, err := LandTicket(d, lp)
+	res, err := MergeTicket(d, lp)
 	if err != nil || res.Outcome != AlreadyApplied {
-		t.Fatalf("LandTicket = (%+v, %v), want AlreadyApplied", res, err)
+		t.Fatalf("MergeTicket = (%+v, %v), want AlreadyApplied", res, err)
 	}
 	if res.MetricsStamped {
 		t.Error("MetricsStamped = true with no session, want false")

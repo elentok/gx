@@ -10,106 +10,106 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// LandOutcome is what LandTicket did with a ticket's commits.
-type LandOutcome string
+// MergeOutcome is what MergeTicket did with a ticket's commits.
+type MergeOutcome string
 
 const (
-	// Landed: the source range was cherry-picked and stamped.
-	Landed LandOutcome = "landed"
+	// Merged: the source range was cherry-picked and stamped.
+	Merged MergeOutcome = "merged"
 	// AlreadyApplied: the evidence ladder found the commits on the feature
 	// branch already; nothing was picked and no trailer was re-stamped.
-	AlreadyApplied LandOutcome = "already_applied"
+	AlreadyApplied MergeOutcome = "already_applied"
 	// Conflicted: the pick stopped on a conflict. Sequencer state is left
 	// intact for the caller to resolve or abort; nothing was stamped.
-	Conflicted LandOutcome = "conflicted"
+	Conflicted MergeOutcome = "conflicted"
 )
 
-// SourceRange is the commit range base..Tip (base exclusive) a landing picks.
+// SourceRange is the commit range base..Tip (base exclusive) a merging picks.
 type SourceRange struct {
 	Base string
 	Tip  string
 }
 
-// LandSession locates the agent session whose metrics a landing stamps. A
+// MergeSession locates the agent session whose metrics a merging stamps. A
 // zero ID means no session is recoverable, so no metrics are stamped.
-type LandSession struct {
+type MergeSession struct {
 	Agent AgentKind
 	Cwd   string
 	ID    string
 }
 
-// LandDeps is the slice of Deps a landing needs.
-type LandDeps struct {
+// MergeDeps is the slice of Deps a merging needs.
+type MergeDeps struct {
 	RevParse             func(dir, ref string) (string, error)
 	IsAncestor           func(dir, ancestor, descendant string) (bool, error)
 	PatchesApplied       func(dir, upstream, base, branch string) (bool, error)
 	CherryPickRange      func(dir, fromExclusive, toInclusive string) error
 	CherryPickInProgress func(dir string) (bool, error)
 	AppendTrailers       func(dir string, trailers ...git.Trailer) error
-	LandedTickets        func(dir, featureBranch string) (map[string]bool, error)
+	MergedTickets        func(dir, featureBranch string) (map[string]bool, error)
 }
 
-// LandParams describes one ticket landing onto FeatureBranch.
-type LandParams struct {
+// MergeParams describes one ticket merging onto FeatureBranch.
+type MergeParams struct {
 	FeatureWorktree string
 	FeatureBranch   string
 	TicketID        string
 	TicketPath      string
 	SourceRange     SourceRange
-	// RecordedSHA is the SHA of a prior landing logged for this ticket, the
+	// RecordedSHA is the SHA of a prior merging logged for this ticket, the
 	// ladder's first rung; empty skips that rung.
 	RecordedSHA string
-	Session     LandSession
+	Session     MergeSession
 }
 
-// LandResult is LandTicket's outcome. SHA is empty for Conflicted.
-type LandResult struct {
-	Outcome        LandOutcome
+// MergeResult is MergeTicket's outcome. SHA is empty for Conflicted.
+type MergeResult struct {
+	Outcome        MergeOutcome
 	SHA            string
 	TrailerValue   string
 	MetricsStamped bool
 }
 
-func landDepsFor(d Deps) LandDeps {
-	return LandDeps{
+func mergeDepsFor(d Deps) MergeDeps {
+	return MergeDeps{
 		RevParse:             d.RevParse,
 		IsAncestor:           d.IsAncestor,
 		PatchesApplied:       d.PatchesApplied,
 		CherryPickRange:      d.CherryPickRange,
 		CherryPickInProgress: d.CherryPickInProgress,
 		AppendTrailers:       d.AppendTrailers,
-		LandedTickets:        landedTickets,
+		MergedTickets:        mergedTickets,
 	}
 }
 
-// LandTicket lands lp.SourceRange onto the feature branch: an already-applied
-// check (see alreadyApplied), the pick, then stampLanded. A conflict is a
+// MergeTicket merges lp.SourceRange onto the feature branch: an already-applied
+// check (see alreadyApplied), the pick, then stampMerged. A conflict is a
 // result, never an error.
-func LandTicket(d LandDeps, lp LandParams) (LandResult, error) {
+func MergeTicket(d MergeDeps, lp MergeParams) (MergeResult, error) {
 	outcome, err := pickRange(d, lp)
 	if err != nil {
-		return LandResult{}, err
+		return MergeResult{}, err
 	}
 	switch outcome {
 	case AlreadyApplied:
 		sha, err := alreadyAppliedSHA(d, lp)
 		if err != nil {
-			return LandResult{}, err
+			return MergeResult{}, err
 		}
 		stamped, err := stampAppliedMetrics(lp)
 		if err != nil {
-			return LandResult{}, err
+			return MergeResult{}, err
 		}
-		return LandResult{Outcome: AlreadyApplied, SHA: sha, TrailerValue: landTrailerValue(lp), MetricsStamped: stamped}, nil
+		return MergeResult{Outcome: AlreadyApplied, SHA: sha, TrailerValue: mergeTrailerValue(lp), MetricsStamped: stamped}, nil
 	case Conflicted:
-		return LandResult{Outcome: Conflicted, TrailerValue: landTrailerValue(lp)}, nil
+		return MergeResult{Outcome: Conflicted, TrailerValue: mergeTrailerValue(lp)}, nil
 	}
-	return stampLanded(d, lp)
+	return stampMerged(d, lp)
 }
 
 // pickRange runs the already-applied ladder, then the cherry-pick core. It
-// reports Landed for a clean pick that is not yet stamped.
-func pickRange(d LandDeps, lp LandParams) (LandOutcome, error) {
+// reports Merged for a clean pick that is not yet stamped.
+func pickRange(d MergeDeps, lp MergeParams) (MergeOutcome, error) {
 	applied, err := alreadyApplied(d, lp)
 	if err != nil {
 		return "", err
@@ -124,39 +124,39 @@ func pickRange(d LandDeps, lp LandParams) (LandOutcome, error) {
 	if conflicted {
 		return Conflicted, nil
 	}
-	return Landed, nil
+	return Merged, nil
 }
 
-// ambiguousLandError is a ticket whose trailer is on the feature branch while
-// neither its recorded SHA nor its patches are: something landed under its
-// name, but nothing proves it was these commits. Its Error is the park reason.
-type ambiguousLandError struct {
+// ambiguousMergeError is a ticket whose trailer is on the feature branch while
+// neither its recorded SHA nor its patches are: something merged under its
+// name, but nothing proves it was these commits. Its Error is the pause reason.
+type ambiguousMergeError struct {
 	TicketID      string
 	FeatureBranch string
 	RecordedSHA   string
 	SourceRange   SourceRange
 }
 
-func (e *ambiguousLandError) Error() string {
+func (e *ambiguousMergeError) Error() string {
 	recorded := e.RecordedSHA
 	if recorded == "" {
 		recorded = "none"
 	}
-	return fmt.Sprintf("ticket %s has a landed trailer on %s, but neither its recorded SHA %s nor the patches of %s..%s are there; check by hand whether it really landed",
+	return fmt.Sprintf("ticket %s has a merged trailer on %s, but neither its recorded SHA %s nor the patches of %s..%s are there; check by hand whether it really merged",
 		e.TicketID, e.FeatureBranch, recorded, e.SourceRange.Base, e.SourceRange.Tip)
 }
 
 // alreadyApplied is the evidence ladder: recorded-SHA reachability, then
-// patch-equivalence. A ticket trailer with neither is an ambiguousLandError,
+// patch-equivalence. A ticket trailer with neither is an ambiguousMergeError,
 // not proof: a re-resolved conflict and a different commit reusing the ticket
-// trailer look the same, and picking again could land it twice. An unreadable
+// trailer look the same, and picking again could merge it twice. An unreadable
 // trailer history is inconclusive, not an error: the pick itself still guards
-// against a double landing.
-func alreadyApplied(d LandDeps, lp LandParams) (bool, error) {
+// against a double merging.
+func alreadyApplied(d MergeDeps, lp MergeParams) (bool, error) {
 	if lp.RecordedSHA != "" {
 		reachable, err := d.IsAncestor(lp.FeatureWorktree, lp.RecordedSHA, lp.FeatureBranch)
 		if err != nil {
-			return false, fmt.Errorf("checking landed commit reachability for ticket %s: %w", lp.TicketID, err)
+			return false, fmt.Errorf("checking merged commit reachability for ticket %s: %w", lp.TicketID, err)
 		}
 		if reachable {
 			return true, nil
@@ -169,19 +169,19 @@ func alreadyApplied(d LandDeps, lp LandParams) (bool, error) {
 	if applied {
 		return true, nil
 	}
-	landed, err := d.LandedTickets(lp.FeatureWorktree, lp.FeatureBranch)
-	if err != nil || !landed[lp.TicketID] {
+	merged, err := d.MergedTickets(lp.FeatureWorktree, lp.FeatureBranch)
+	if err != nil || !merged[lp.TicketID] {
 		return false, nil
 	}
-	return false, &ambiguousLandError{TicketID: lp.TicketID, FeatureBranch: lp.FeatureBranch, RecordedSHA: lp.RecordedSHA, SourceRange: lp.SourceRange}
+	return false, &ambiguousMergeError{TicketID: lp.TicketID, FeatureBranch: lp.FeatureBranch, RecordedSHA: lp.RecordedSHA, SourceRange: lp.SourceRange}
 }
 
 // stampAppliedMetrics fills in the ticket's frontmatter metrics when commits
-// were landed by hand, so a zero actual_cost doesn't read as never landed. The
-// landed commit is already trailered, so nothing is amended. A nonzero cost
-// means a prior landing stamped it; no recoverable session means nothing to
+// were merged by hand, so a zero actual_cost doesn't read as never merged. The
+// merged commit is already trailered, so nothing is amended. A nonzero cost
+// means a prior merging stamped it; no recoverable session means nothing to
 // stamp.
-func stampAppliedMetrics(lp LandParams) (bool, error) {
+func stampAppliedMetrics(lp MergeParams) (bool, error) {
 	if lp.TicketPath == "" || lp.Session.ID == "" {
 		return false, nil
 	}
@@ -196,14 +196,14 @@ func stampAppliedMetrics(lp LandParams) (bool, error) {
 	if t.ActualCost != 0 {
 		return false, nil
 	}
-	_, _, _, ok, err := writeLandedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
+	_, _, _, ok, err := writeMergedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
 	if err != nil {
-		return false, fmt.Errorf("writing landed metrics for ticket %s: %w", lp.TicketID, err)
+		return false, fmt.Errorf("writing merged metrics for ticket %s: %w", lp.TicketID, err)
 	}
 	return ok, nil
 }
 
-func alreadyAppliedSHA(d LandDeps, lp LandParams) (string, error) {
+func alreadyAppliedSHA(d MergeDeps, lp MergeParams) (string, error) {
 	if lp.RecordedSHA != "" {
 		if reachable, err := d.IsAncestor(lp.FeatureWorktree, lp.RecordedSHA, lp.FeatureBranch); err == nil && reachable {
 			return lp.RecordedSHA, nil
@@ -220,7 +220,7 @@ func alreadyAppliedSHA(d LandDeps, lp LandParams) (string, error) {
 // whether it stopped on a conflict. On conflict the sequencer state is left
 // intact for the caller to resolve or abort; any other failure is returned as
 // an error.
-func cherryPickCore(d LandDeps, lp LandParams) (conflicted bool, err error) {
+func cherryPickCore(d MergeDeps, lp MergeParams) (conflicted bool, err error) {
 	pickErr := d.CherryPickRange(lp.FeatureWorktree, lp.SourceRange.Base, lp.SourceRange.Tip)
 	if pickErr == nil {
 		return false, nil
@@ -235,27 +235,27 @@ func cherryPickCore(d LandDeps, lp LandParams) (conflicted bool, err error) {
 	return true, nil
 }
 
-// landTrailerValue is the ticket's canonical address, so identity survives a
+// mergeTrailerValue is the ticket's canonical address, so identity survives a
 // retarget; a ticket outside the tracker layout has none and keeps the legacy
-// <featureBranch>/<id> form (landedTickets reads both).
-func landTrailerValue(lp LandParams) string {
+// <featureBranch>/<id> form (mergedTickets reads both).
+func mergeTrailerValue(lp MergeParams) string {
 	if a, ok := tickets.AddressOfPath(lp.TicketPath, lp.TicketID); ok {
 		return a.String()
 	}
 	return ticketTrailerValue(lp.FeatureBranch, lp.TicketID)
 }
 
-// stampLanded writes the landing session's metrics into the ticket's
+// stampMerged writes the merging session's metrics into the ticket's
 // frontmatter, then stamps the ticket trailer — plus the metrics trailers when
-// a session was recoverable — in a single amend, and resolves the landed SHA.
+// a session was recoverable — in a single amend, and resolves the merged SHA.
 // Metrics are omitted, never fabricated, when no session is recoverable.
-func stampLanded(d LandDeps, lp LandParams) (LandResult, error) {
-	contextWindow, elapsedSeconds, cost, hasMetrics, err := writeLandedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
+func stampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) {
+	contextWindow, elapsedSeconds, cost, hasMetrics, err := writeMergedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
 	if err != nil {
-		return LandResult{}, fmt.Errorf("writing landed metrics for ticket %s: %w", lp.TicketID, err)
+		return MergeResult{}, fmt.Errorf("writing merged metrics for ticket %s: %w", lp.TicketID, err)
 	}
 
-	trailerValue := landTrailerValue(lp)
+	trailerValue := mergeTrailerValue(lp)
 	trailers := []git.Trailer{{Key: ticketTrailerKey, Value: trailerValue}}
 	if hasMetrics {
 		trailers = append(trailers,
@@ -265,12 +265,12 @@ func stampLanded(d LandDeps, lp LandParams) (LandResult, error) {
 		)
 	}
 	if err := d.AppendTrailers(lp.FeatureWorktree, trailers...); err != nil {
-		return LandResult{}, fmt.Errorf("stamping trailers on landed commit: %w", err)
+		return MergeResult{}, fmt.Errorf("stamping trailers on merged commit: %w", err)
 	}
 
 	sha, err := d.RevParse(lp.FeatureWorktree, "HEAD")
 	if err != nil {
-		return LandResult{}, fmt.Errorf("resolving landed commit on %s: %w", lp.FeatureBranch, err)
+		return MergeResult{}, fmt.Errorf("resolving merged commit on %s: %w", lp.FeatureBranch, err)
 	}
-	return LandResult{Outcome: Landed, SHA: sha, TrailerValue: trailerValue, MetricsStamped: hasMetrics}, nil
+	return MergeResult{Outcome: Merged, SHA: sha, TrailerValue: trailerValue, MetricsStamped: hasMetrics}, nil
 }

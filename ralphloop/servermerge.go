@@ -15,13 +15,13 @@ import (
 )
 
 // FinishOutcome is how a finished iteration ended without an error: the ticket
-// landed, or it parked with a status and kind. A failed finish is the error
+// merged, or it paused with a status and kind. A failed finish is the error
 // return of FinishIteration, never an outcome.
 type FinishOutcome struct {
-	Landed bool
-	Status schema.Status // the park status; empty when Landed
+	Merged bool
+	Status schema.Status // the pause status; empty when Merged
 	Kind   events.Kind
-	// Reason is the park's own reason, as its run-log event recorded it.
+	// Reason is the pause's own reason, as its run-log event recorded it.
 	Reason string
 }
 
@@ -38,7 +38,7 @@ type OneIteration struct {
 	// RootBase is the ref the epic's feature branch is created from when it
 	// does not exist yet; "" starts it at the repo's HEAD.
 	RootBase string
-	// LeafBase is the identifier of the unlanded sibling whose iteration branch
+	// LeafBase is the identifier of the unmerged sibling whose iteration branch
 	// the ticket starts from; "" starts it at the feature tip.
 	LeafBase string
 	// Model and Effort are what the ticket's conflict-resolution agent starts
@@ -141,10 +141,10 @@ func DiscardIteration(d Deps, o OneIteration, w IterationWorktree) error {
 	return finishCleanup(d, &worktreeLock, o.RepoDir, w.featureWorktree, w.Path, w.Branch, agentrunner.Session{}, true)
 }
 
-// FinishIteration runs a finished agent through the shared finish path: park
-// on a needs-answer or zero-commit finish, otherwise land the commits onto the
-// feature branch, mark the ticket done and clean up. A deferred land (lock
-// held) is an error, like any failed finish; the caller parks it.
+// FinishIteration runs a finished agent through the shared finish path: pause
+// on a paused (answer) or zero-commit finish, otherwise merge the commits onto the
+// feature branch, mark the ticket done and clean up. A deferred merge (lock
+// held) is an error, like any failed finish; the caller pauses it.
 func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
 		WorkspaceID:     o.WorkspaceID,
@@ -168,12 +168,12 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
 	err := finishIteration(d, p, w.Path, pane, w.base, w.Branch, sessionID)
-	var built *builtAwaitingLandError
+	var built *builtAwaitingMergeError
 	if err != nil && !errors.As(err, &built) {
 		return FinishOutcome{}, err
 	}
 	if built != nil {
-		if err := landBuilt(d, p, built); err != nil {
+		if err := mergeBuilt(d, p, built); err != nil {
 			return FinishOutcome{}, err
 		}
 	}
@@ -182,55 +182,55 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (
 		return FinishOutcome{}, fmt.Errorf("reading finished ticket: %w", err)
 	}
 	if t.Status == schema.StatusDone {
-		return FinishOutcome{Landed: true}, nil
+		return FinishOutcome{Merged: true}, nil
 	}
-	// A ticket that neither landed nor parked is stuck with nobody told why;
-	// fail the finish so the caller parks it with a reason.
+	// A ticket that neither merged nor paused is stuck with nobody told why;
+	// fail the finish so the caller pauses it with a reason.
 	if t.PausedClass() == "" {
-		return FinishOutcome{}, fmt.Errorf("iteration ended with the ticket %s and no park recorded", t.Status)
+		return FinishOutcome{}, fmt.Errorf("iteration ended with the ticket %s and no pause recorded", t.Status)
 	}
-	return parkedOutcome(o, t), nil
+	return pausedOutcome(o, t), nil
 }
 
-// parkedOutcome is the outcome of a finish that left t parked. Kind is never
+// pausedOutcome is the outcome of a finish that left t paused. Kind is never
 // blank and Reason never empty, so a person is always told something true.
-func parkedOutcome(o OneIteration, t schema.Ticket) FinishOutcome {
+func pausedOutcome(o OneIteration, t schema.Ticket) FinishOutcome {
 	kind := events.Kind(t.PauseReason)
 	if kind == "" {
 		kind = events.IterationError
 	}
-	reason := latestParkReason(o.ScratchDir, o.Epic, o.Ticket.Identifier)
+	reason := latestPauseReason(o.ScratchDir, o.Epic, o.Ticket.Identifier)
 	if reason == "" {
-		reason = "the run log had no park reason; see " + RunLogPath(o.ScratchDir, o.Epic)
+		reason = "the run log had no pause reason; see " + RunLogPath(o.ScratchDir, o.Epic)
 	}
 	return FinishOutcome{Status: t.PausedClass().LegacyStatus(), Kind: kind, Reason: reason}
 }
 
-// latestParkReason is the reason of the ticket's most recent park event, or ""
+// latestPauseReason is the reason of the ticket's most recent pause event, or ""
 // when the run log has none.
-func latestParkReason(scratchDir, epic, ticket string) string {
-	ev, _ := LatestParkEvent(scratchDir, epic, ticket)
+func latestPauseReason(scratchDir, epic, ticket string) string {
+	ev, _ := LatestPauseEvent(scratchDir, epic, ticket)
 	return ev.Reason
 }
 
-// LatestParkEvent is the ticket's most recent park event; false when the run
+// LatestPauseEvent is the ticket's most recent pause event; false when the run
 // log has none.
-func LatestParkEvent(scratchDir, epic, ticket string) (Event, bool) {
+func LatestPauseEvent(scratchDir, epic, ticket string) (Event, bool) {
 	evs, ok, err := ReadEvents(scratchDir, epic)
 	if err != nil || !ok {
 		return Event{}, false
 	}
 	for i := len(evs) - 1; i >= 0; i-- {
-		if evs[i].Ticket == ticket && isParkType(events.Type(evs[i].Type)) {
+		if evs[i].Ticket == ticket && isPauseType(events.Type(evs[i].Type)) {
 			return evs[i], true
 		}
 	}
 	return Event{}, false
 }
 
-// LatestLandedSHA is the SHA of the ticket's most recent cherry-pick, "" when
+// LatestMergedSHA is the SHA of the ticket's most recent cherry-pick, "" when
 // none was logged.
-func LatestLandedSHA(scratchDir, epic, ticket string) string {
+func LatestMergedSHA(scratchDir, epic, ticket string) string {
 	evs, _, err := ReadEvents(scratchDir, epic)
 	if err != nil {
 		return ""
@@ -267,16 +267,16 @@ func recordLiveSession(d Deps, label, ticketPath string) string {
 	return status.SessionID
 }
 
-// landDeferCap bounds how long landBuilt waits out a held land lock before it
-// gives up and lets the caller park the ticket. It outlasts a whole conflict
+// mergeDeferCap bounds how long mergeBuilt waits out a held merge lock before it
+// gives up and lets the caller pause the ticket. It outlasts a whole conflict
 // resolution (conflictResolutionTimeoutMs) by the lock holder, plus its own.
-const landDeferCap = 2*conflictResolutionTimeoutMs*time.Millisecond + 10*time.Minute
+const mergeDeferCap = 2*conflictResolutionTimeoutMs*time.Millisecond + 10*time.Minute
 
 // WaitIterationFinished blocks until the agent in session s has really
 // finished its turn, the way the in-process loop does: a first idle/done is
 // debounced, and an outstanding backgrounded shell command in the transcript
 // keeps holding. Without this a long test run in the background reads as a
-// finish, and the ticket is parked zero-commit before the agent commits.
+// finish, and the ticket is paused zero-commit before the agent commits.
 func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
 	until := runnerFinishStates
 	p := launchAndPromptParams{Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink()}
@@ -347,7 +347,7 @@ func nudgeIfStalled(d Deps, o OneIteration, w IterationWorktree, s agentrunner.S
 }
 
 // agentReported reports whether the ticket carries an agent report: a question
-// (needs-answer) or a finished report.
+// (paused (answer)) or a finished report.
 func agentReported(ticketPath string) (bool, error) {
 	t, err := schema.ParseTicket(ticketPath)
 	if err != nil {
@@ -356,39 +356,39 @@ func agentReported(ticketPath string) (bool, error) {
 	return t.IterationStatus == schema.IterationStatusFinished || t.IterationStatus == schema.IterationStatusAsking, nil
 }
 
-// landBuilt lands a built iteration that was waiting on the land queue.
-func landBuilt(d Deps, p iterationParams, built *builtAwaitingLandError) error {
-	lp := landQueueParams{
+// mergeBuilt merges a built iteration that was waiting on the merge queue.
+func mergeBuilt(d Deps, p iterationParams, built *builtAwaitingMergeError) error {
+	lp := mergeQueueParams{
 		WorkspaceID: p.WorkspaceID, RepoDir: p.RepoDir, WorktreeDir: p.WorktreeDir,
 		FeatureWorktree: p.FeatureWorktree, FeatureBranch: p.FeatureBranch, Agent: p.Agent,
 		Model: p.Model, Effort: p.Effort, Skill: p.Skill, ScratchDir: p.ScratchDir, WorktreeLock: p.WorktreeLock,
 		SmartZone: p.SmartZone, Gate: p.Gate, Sink: p.Sink,
 	}
-	r := landOne(d, lp, built.job)
-	// A held land lock is routine (another landing, a person's conflict
-	// resolution), so retry as runLandQueue does instead of failing the finish.
+	r := mergeOne(d, lp, built.job)
+	// A held merge lock is routine (another merging, a person's conflict
+	// resolution), so retry as runMergeQueue does instead of failing the finish.
 	logged := false
-	for waited := time.Duration(0); r.landDeferred && waited < landDeferCap; waited += landDeferRetryInterval {
+	for waited := time.Duration(0); r.mergeDeferred && waited < mergeDeferCap; waited += mergeDeferRetryInterval {
 		if !logged {
 			logged = true
-			logLandDeferred(p)
+			logMergeDeferred(p)
 		}
-		d.Sleep(landDeferRetryInterval)
-		r = landOne(d, lp, built.job)
+		d.Sleep(mergeDeferRetryInterval)
+		r = mergeOne(d, lp, built.job)
 	}
 	switch {
 	case r.err != nil:
 		return r.err
-	case r.landDeferred:
-		return errors.New("land deferred: land lock held")
-	case r.parkedOnChild:
-		// The child's own park says why it failed; the parent would otherwise
+	case r.mergeDeferred:
+		return errors.New("merge deferred: merge lock held")
+	case r.pausedOnChild:
+		// The child's own pause says why it failed; the parent would otherwise
 		// stay claimed with nobody told. Its iteration branch is durable, so a
-		// person (or recovery) can land it again.
-		reason := "land conflict not resolved: " + r.childReason +
+		// person (or recovery) can merge it again.
+		reason := "merge conflict not resolved: " + r.childReason +
 			"\nThe cherry-pick was rolled back; the iteration branch " + built.job.branch +
 			" is intact. Merge it again with `gx server tickets merge`."
-		_, err := park(p.Sink, parkRequest{
+		_, err := pause(p.Sink, pauseRequest{
 			ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 			Type: events.Paused, Kind: events.MergeConflict, Reason: reason,
 			Repair: schema.FaultState{Label: iterLabel(p.FeatureBranch, p.Ticket.Identifier), Branch: built.job.branch, Worktree: built.job.path},

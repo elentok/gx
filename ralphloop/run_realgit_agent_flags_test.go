@@ -100,7 +100,7 @@ func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
 			deps.Sleep = func(time.Duration) {}
 
 			sink := newRecordingEventSink()
-			runUntilParked(t, RunOptions{
+			runUntilPaused(t, RunOptions{
 				EpicName: epicName, Agent: tc.agent, Agents: tc.agents, Skill: "implement",
 				ScratchDir: scratchDir, RepoDir: repoDir,
 			}, deps, sink)

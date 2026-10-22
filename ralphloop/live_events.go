@@ -25,7 +25,7 @@ const (
 	LiveEventTicketRecovering
 	LiveEventTicketRecovered
 	LiveEventTicketUnrecoverable
-	LiveEventEpicParked
+	LiveEventEpicPaused
 	LiveEventEpicComplete
 	LiveEventCherryPickStarted
 	LiveEventConflictResolutionStarted
@@ -56,7 +56,7 @@ type LiveEvent struct {
 	Total      int
 	Completed  int
 	Branch     string
-	LandedSHA  string
+	MergedSHA  string
 	// Cwd/SessionID (IterationStarted/TicketReattached only) let a consumer
 	// resolve the session's transcript itself (transcript.Path) to compute
 	// elapsed time from its first line's timestamp.
@@ -71,13 +71,13 @@ type LiveEvent struct {
 	// Tokens (ContextOccupancy only) is the session's current context-window
 	// token occupancy.
 	Tokens int
-	// Stats (IterationFinished only) carries the landed iteration's metrics
+	// Stats (IterationFinished only) carries the merged iteration's metrics
 	// and the epic's live progress counts.
 	Stats IterationStats
 	// ElapsedSeconds (EpicComplete only) is the run's total wall-clock
 	// duration.
 	ElapsedSeconds int
-	// Stalled (EpicParked only) names the human-clearable tickets the parked
+	// Stalled (EpicPaused only) names the human-clearable tickets the paused
 	// run is waiting on.
 	Stalled []StalledTicket
 	// Channel (NotificationFailed only) is which chat transport the failed
@@ -92,13 +92,13 @@ type LiveEvent struct {
 // (multiple running iterations report through the same sink), which a
 // channel send already is; the buffer just needs to be generous enough that
 // a burst of startup-reconciliation events doesn't block a launching
-// iteration on a TUI that hasn't started draining yet.
+// iteration on a TUI that hasn't started emptying yet.
 type ChannelEventSink struct {
 	events chan LiveEvent
 }
 
 // NewChannelEventSink returns a ChannelEventSink ready to use as an
-// EventSink; drain it with Events().
+// EventSink; empty it with Events().
 func NewChannelEventSink() *ChannelEventSink {
 	return &ChannelEventSink{events: make(chan LiveEvent, 256)}
 }
@@ -109,7 +109,7 @@ func (s *ChannelEventSink) Events() <-chan LiveEvent {
 	return s.events
 }
 
-// Close marks producer completion so the owner of Events can finish draining.
+// Close marks producer completion so the owner of Events can finish emptying.
 func (s *ChannelEventSink) Close() {
 	close(s.events)
 }
@@ -166,16 +166,16 @@ func (s *ChannelEventSink) TicketRecovering(identifier string) {
 	s.emit(LiveEvent{Kind: LiveEventTicketRecovering, Identifier: identifier})
 }
 
-func (s *ChannelEventSink) TicketRecovered(identifier, epicName, branch, landedSHA string) {
-	s.emit(LiveEvent{Kind: LiveEventTicketRecovered, Identifier: identifier, EpicName: epicName, Branch: branch, LandedSHA: landedSHA})
+func (s *ChannelEventSink) TicketRecovered(identifier, epicName, branch, mergedSHA string) {
+	s.emit(LiveEvent{Kind: LiveEventTicketRecovered, Identifier: identifier, EpicName: epicName, Branch: branch, MergedSHA: mergedSHA})
 }
 
 func (s *ChannelEventSink) TicketUnrecoverable(identifier, epicName string) {
 	s.emit(LiveEvent{Kind: LiveEventTicketUnrecoverable, Identifier: identifier, EpicName: epicName})
 }
 
-func (s *ChannelEventSink) EpicParked(epicName string, stalled []StalledTicket) {
-	s.emit(LiveEvent{Kind: LiveEventEpicParked, EpicName: epicName, Stalled: stalled})
+func (s *ChannelEventSink) EpicPaused(epicName string, stalled []StalledTicket) {
+	s.emit(LiveEvent{Kind: LiveEventEpicPaused, EpicName: epicName, Stalled: stalled})
 }
 
 func (s *ChannelEventSink) EpicComplete(epicName string, completed int, elapsedSeconds int) {
@@ -183,7 +183,7 @@ func (s *ChannelEventSink) EpicComplete(epicName string, completed int, elapsedS
 }
 
 // EpicFailed is a no-op here: a run's failure is recorded after this sink
-// has already been closed and drained, so there is no live channel left to
+// has already been closed and emptied, so there is no live channel left to
 // emit onto by the time this would ever be called.
 func (s *ChannelEventSink) EpicFailed(epicName string, err error) {}
 

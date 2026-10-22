@@ -45,18 +45,18 @@ func TestFailure_NeedsMatch(t *testing.T) {
 
 func TestEntry_Runnable(t *testing.T) {
 	remedy := func(Failure, Verbs) error { return nil }
-	park := Failure{Type: events.Paused, Kind: events.IterationError}
+	pause := Failure{Type: events.Paused, Kind: events.IterationError}
 	tests := []struct {
 		name  string
 		entry Entry
 		f     Failure
 		want  bool
 	}{
-		{"low rule", Entry{Executor: ExecutorRule, Authority: AuthorityLow, Remedy: remedy}, park, true},
-		{"medium rule", Entry{Executor: ExecutorRule, Authority: AuthorityMedium, Remedy: remedy}, park, true},
-		{"high rule", Entry{Executor: ExecutorRule, Authority: AuthorityHigh, Remedy: remedy}, park, false},
-		{"agent entry", Entry{Executor: ExecutorAgent, Authority: AuthorityLow, Remedy: remedy}, park, false},
-		{"rule without remedy", Entry{Executor: ExecutorRule, Authority: AuthorityLow}, park, false},
+		{"low rule", Entry{Executor: ExecutorRule, Authority: AuthorityLow, Remedy: remedy}, pause, true},
+		{"medium rule", Entry{Executor: ExecutorRule, Authority: AuthorityMedium, Remedy: remedy}, pause, true},
+		{"high rule", Entry{Executor: ExecutorRule, Authority: AuthorityHigh, Remedy: remedy}, pause, false},
+		{"agent entry", Entry{Executor: ExecutorAgent, Authority: AuthorityLow, Remedy: remedy}, pause, false},
+		{"rule without remedy", Entry{Executor: ExecutorRule, Authority: AuthorityLow}, pause, false},
 		{"deadlock is diagnosis only", Entry{Executor: ExecutorRule, Authority: AuthorityLow, Remedy: remedy}, Failure{Type: events.Deadlocked}, false},
 	}
 	for _, tt := range tests {

@@ -22,7 +22,7 @@ const (
 	ExecutorAgent Executor = "agent"
 	// ExecutorPerson entries only escalate: neither a rule nor an agent may act.
 	ExecutorPerson Executor = "person"
-	// ExecutorRecognize entries are matched and recorded, nothing more: the park
+	// ExecutorRecognize entries are matched and recorded, nothing more: the pause
 	// and its message stand, and a match never counts as recovered.
 	ExecutorRecognize Executor = "recognize"
 )
@@ -84,11 +84,11 @@ var NotCatalogued = map[string]string{
 }
 
 // Default is the shipped catalog: kill switch on, one entry per R-ticket as
-// they land. Match takes the first entry that fits, so a narrower signature
+// they merge. Match takes the first entry that fits, so a narrower signature
 // goes before a wider one of the same type and kind.
 func Default() Catalog {
 	return Catalog{Enabled: true, Entries: []Entry{
-		// R12 is a narrower zero-commit park than R2's and R3's.
+		// R12 is a narrower zero-commit pause than R2's and R3's.
 		r12StalledReclaim(),
 		r1Spin(),
 		r2UnexecutedToolCall(),
@@ -96,10 +96,10 @@ func Default() Catalog {
 		r7CompactionTimedOut(),
 		r3LostCommits(),
 		r3Unrecoverable(),
-		r3LandedElsewhere(),
+		r3MergedElsewhere(),
 		r3ClaimedPresent(),
 		r4BlockedPaneDialog(),
-		// R11 is a narrower name-taken park than R6's.
+		// R11 is a narrower name-taken pause than R6's.
 		r11ClaimClobbered(),
 		r6PaneBusy(),
 		r6NameTaken(),
@@ -144,9 +144,9 @@ func r14ParentDefect() Entry {
 // from a task still running: the remedy, not a predicate, must re-check the
 // agent is idle (a fresh read, never a cached status) before release-gate
 // force-releases the gate and the ordinary finish path runs. release-gate
-// decides what that finish does: lands commits, parks zero-commit, or parks a
-// dirty worktree with commits ahead as background-task-gate. That park is a
-// needs-answer, never a held-gate event, so R10 cannot match it again. Medium
+// decides what that finish does: merges commits, pauses zero-commit, or pauses a
+// dirty worktree with commits ahead as background-task-gate. That pause is a
+// paused (answer), never a held-gate event, so R10 cannot match it again. Medium
 // authority because releasing early finishes an agent that is still working.
 func r10BackgroundGateHeld() Entry {
 	return Entry{
@@ -165,7 +165,7 @@ func r10BackgroundGateHeld() Entry {
 // r11ClaimClobbered is a second launch of a ticket whose own iteration is still
 // live: an agent's full-file write reverted its claimed status to open, so the
 // scheduler launched it again and herdr refused the taken name. The run log
-// shows it as a name-taken park whose launch-failed follows an
+// shows it as a name-taken pause whose launch-failed follows an
 // iteration-started that nothing closed. The fix restores claimed with the live
 // iteration's session and keeps the duplicate from relaunching; the live tab is
 // never closed, it holds the real work. An agent acts because no server verb
@@ -203,7 +203,7 @@ func r11ClaimClobbered() Entry {
 const reclaimStallWindow = 2 * time.Second
 
 // r12StalledReclaim is a reclaim onto a pane that stalled earlier: the idle
-// pane reads as finished, so the reclaimed iteration parks zero-commit almost
+// pane reads as finished, so the reclaimed iteration pauses zero-commit almost
 // at once while the stalled agent sits untouched. The fix closes that stale tab
 // and relaunches fresh (R5's path). An agent acts because the run log carries
 // neither the pane's state_change_seq nor the stalled session, and it must see
@@ -215,7 +215,7 @@ func r12StalledReclaim() Entry {
 	return Entry{
 		ID: "R12", Type: events.Paused, Kind: events.ZeroCommit,
 		Predicate: func(seq []Event) bool {
-			park := seq[len(seq)-1]
+			pause := seq[len(seq)-1]
 			reclaimed := false
 			for _, e := range slices.Backward(seq[:len(seq)-1]) {
 				switch {
@@ -226,7 +226,7 @@ func r12StalledReclaim() Entry {
 						return true
 					}
 				case e.Type == events.Reclaimed:
-					if e.Time.IsZero() || park.Time.IsZero() || park.Time.Sub(e.Time) >= reclaimStallWindow {
+					if e.Time.IsZero() || pause.Time.IsZero() || pause.Time.Sub(e.Time) >= reclaimStallWindow {
 						return false
 					}
 					reclaimed = true
@@ -257,13 +257,13 @@ func r8RateLimitPause() Entry {
 	}
 }
 
-// r6PaneBusy and r6NameTaken are a ticket parked because herdr refused its launch. A busy
+// r6PaneBusy and r6NameTaken are a ticket paused because herdr refused its launch. A busy
 // pane is transient, so a rule relaunches once. A taken name needs herdr's
 // candidate block read: a leaked pane in this ticket's own worktree is closed
 // and the ticket relaunched, while another ticket's live agent means this
-// second launch is abandoned and the park stands. Clearing the ticket back to
+// second launch is abandoned and the pause stands. Clearing the ticket back to
 // open is high authority, so it is outside the grant and the agent may only
-// propose it. Both require a launch-failed event of the same kind, so a park
+// propose it. Both require a launch-failed event of the same kind, so a pause
 // that merely reuses the kind is not a collision. Launches disabled: there is
 // no S0 launch-failed event data behind it yet.
 func r6PaneBusy() Entry {
@@ -293,7 +293,7 @@ func afterLaunchFailed(kind events.Kind) func(seq []Event) bool {
 	}
 }
 
-// r4BlockedPaneDialog is a pane parked on a prompt gx did not send. The run
+// r4BlockedPaneDialog is a pane paused on a prompt gx did not send. The run
 // log carries no pane text, so the matcher cannot tell a known dialog from an
 // operator's own: an agent reads the pane and answers only an allow-listed,
 // content-free dialog (trust-this-folder, a benign "continue?"), escalating
@@ -309,11 +309,11 @@ func r4BlockedPaneDialog() Entry {
 }
 
 var (
-	claimsWorkPresentRE = regexp.MustCompile(`(?i)\balready (present|implemented|merged|landed|exists?|done|on the (feature )?branch)\b`)
-	landedElsewhereRE   = regexp.MustCompile(`(?i)\b(in|by|via|with|inside|as part of) (another|an? sibling|the sibling|sibling|an upstream|the upstream)\b`)
-	// lostCommitsRE is the reason of an ambiguous land whose iteration branch
-	// is gone, from reconcile and from the server's crashed-land verify.
-	lostCommitsRE = regexp.MustCompile(`no longer exists to recover them|cannot tell whether it landed: unrecoverable$`)
+	claimsWorkPresentRE = regexp.MustCompile(`(?i)\balready (present|implemented|merged|merged|exists?|done|on the (feature )?branch)\b`)
+	mergedElsewhereRE   = regexp.MustCompile(`(?i)\b(in|by|via|with|inside|as part of) (another|an? sibling|the sibling|sibling|an upstream|the upstream)\b`)
+	// lostCommitsRE is the reason of an ambiguous merge whose iteration branch
+	// is gone, from reconcile and from the server's crashed-merge verify.
+	lostCommitsRE = regexp.MustCompile(`no longer exists to recover them|cannot tell whether it merged: unrecoverable$`)
 )
 
 // r3Unrecoverable and r3ClaimedPresent are work that is on the feature branch (or a recoverable
@@ -321,7 +321,7 @@ var (
 // a zero-commit finish whose last turn claims the work is already present.
 // One catalogued failure with several signatures, so entries sharing the ID
 // (a disable by ID covers all), most specific first. An agent proves presence
-// with verify and the acceptance criteria before it lands a recoverable
+// with verify and the acceptance criteria before it merges a recoverable
 // branch. Launches disabled: there is no S0 event data showing it occurs yet.
 func r3Unrecoverable() Entry {
 	return Entry{
@@ -338,7 +338,7 @@ func r3ClaimedPresent() Entry {
 	}
 }
 
-// r3LostCommits and r3LandedElsewhere are the two R3 branches that never act
+// r3LostCommits and r3MergedElsewhere are the two R3 branches that never act
 // unattended. Lost commits with no iteration branch only escalate: finding
 // their range is out of scope, and recovery must never invent one.
 func r3LostCommits() Entry {
@@ -349,15 +349,15 @@ func r3LostCommits() Entry {
 	}
 }
 
-// r3LandedElsewhere is work that landed inside another ticket's commits: it has
+// r3MergedElsewhere is work that merged inside another ticket's commits: it has
 // no commit to attribute, so commitless-done is the only fix, and a false one
 // silently drops the ticket from the epic: high authority, so it is proposed.
-func r3LandedElsewhere() Entry {
+func r3MergedElsewhere() Entry {
 	return Entry{
 		ID: "R3", Type: events.Paused, Kind: events.ZeroCommit,
 		Predicate: func(seq []Event) bool {
 			text := seq[len(seq)-1].Text
-			return claimsWorkPresentRE.MatchString(text) && landedElsewhereRE.MatchString(text)
+			return claimsWorkPresentRE.MatchString(text) && mergedElsewhereRE.MatchString(text)
 		},
 		Executor: ExecutorRule, Authority: AuthorityHigh, Verbs: []string{VerbCommitlessDone},
 		Remedy: func(f Failure, v Verbs) error {
@@ -382,7 +382,7 @@ func r2UnexecutedToolCall() Entry {
 }
 
 // r5PromptNeverDelivered is a launch whose pane never took its initial prompt.
-// The park alone is ambiguous, so the predicate wants a stalled launch-failed
+// The pause alone is ambiguous, so the predicate wants a stalled launch-failed
 // before it. The remedy retypes the full prompt once (the per-kind guard rail
 // is the cap); when that cannot be delivered it closes the pane, so a reclaim
 // does not collide with the leftover agent. Launches enabled: S0 emits the
@@ -424,7 +424,7 @@ const FinishUpPrompt = "Your conversation was compacted after you exceeded the c
 // compaction wait timed out. A timeout cannot tell a slow compaction from a
 // dead pane, so the remedy waits once more, longer, then sends the finish-up.
 // It never re-sends /compact: queued input cancels a running compaction. When
-// the extended wait times out too the park stands and escalates; the per-kind
+// the extended wait times out too the pause stands and escalates; the per-kind
 // guard rail is the cap on repeats. Launches enabled: S0 emits the event it
 // matches, and it is one of the two failures that dominate the S0 data.
 func r7CompactionTimedOut() Entry {
@@ -454,10 +454,10 @@ func r7CompactionTimedOut() Entry {
 	}
 }
 
-// r1Spin records a park/re-claim spin. The S0 spinning park already carries
+// r1Spin records a pause/re-claim spin. The S0 spinning pause already carries
 // the count and window, so there is no predicate; it only recognizes the spin
-// because a nudge would only join it and the park already holds it. A person
-// still hears of the park. Launches enabled: S0 emits the event it matches.
+// because a nudge would only join it and the pause already holds it. A person
+// still hears of the pause. Launches enabled: S0 emits the event it matches.
 func r1Spin() Entry {
 	return Entry{
 		ID: "R1", Type: events.Paused, Kind: events.Spinning,

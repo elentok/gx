@@ -38,17 +38,17 @@ type Gate struct {
 	mu         sync.Mutex
 	reasons    map[string]string // iteration label -> pause reason
 	wake       chan struct{}
-	parkWake   chan struct{}
-	parked     chan struct{}
-	parkedOnce sync.Once
+	pauseWake  chan struct{}
+	paused     chan struct{}
+	pausedOnce sync.Once
 }
 
 func NewGate() *Gate {
 	return &Gate{
-		reasons:  map[string]string{},
-		wake:     make(chan struct{}),
-		parkWake: make(chan struct{}),
-		parked:   make(chan struct{}),
+		reasons:   map[string]string{},
+		wake:      make(chan struct{}),
+		pauseWake: make(chan struct{}),
+		paused:    make(chan struct{}),
 	}
 }
 
@@ -110,11 +110,11 @@ func (g *Gate) snapshot() map[string]string {
 // waitForResume blocks the calling iteration until ForceResume clears the
 // last paused label, releasing every iteration paused at that moment
 // together on the shared wake channel — or until ctx is done, letting Run's
-// own shutdown path unblock a run parked here without waiting on an operator.
+// own shutdown path unblock a run paused here without waiting on an operator.
 func (g *Gate) waitForResume(ctx context.Context) {
 	g.mu.Lock()
 	if len(g.reasons) == 0 {
-		// Nothing is paused: a ForceResume already landed between the
+		// Nothing is paused: a ForceResume already merged between the
 		// caller's pause() and this call (e.g. a TUI operator resuming the
 		// instant it observes the pause).
 		g.mu.Unlock()
@@ -123,7 +123,7 @@ func (g *Gate) waitForResume(ctx context.Context) {
 	myWake := g.wake
 	g.mu.Unlock()
 
-	g.parkedOnce.Do(func() { close(g.parked) })
+	g.pausedOnce.Do(func() { close(g.paused) })
 
 	select {
 	case <-myWake:
@@ -131,11 +131,11 @@ func (g *Gate) waitForResume(ctx context.Context) {
 	}
 }
 
-// Parked returns a channel closed the first time a caller actually blocks in
-// waitForResume, letting a test observe that a run's goroutine has parked
+// Paused returns a channel closed the first time a caller actually blocks in
+// waitForResume, letting a test observe that a run's goroutine has paused
 // there instead of racing it with a fixed sleep.
-func (g *Gate) Parked() <-chan struct{} {
-	return g.parked
+func (g *Gate) Paused() <-chan struct{} {
+	return g.paused
 }
 
 // ForceResume clears label's own pause without disturbing any other
@@ -160,24 +160,24 @@ func (g *Gate) ForceResume(label string) bool {
 	return wasPaused
 }
 
-// ParkWake returns the channel a parked run's poll wait selects on, closed
-// by WakeParked to cut that wait short without touching the underlying
+// PauseWake returns the channel a paused run's poll wait selects on, closed
+// by WakePaused to cut that wait short without touching the underlying
 // d.Sleep(pausedPollInterval) call itself.
-func (g *Gate) ParkWake() <-chan struct{} {
+func (g *Gate) PauseWake() <-chan struct{} {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	return g.parkWake
+	return g.pauseWake
 }
 
-// WakeParked interrupts a parked run's current poll wait — a cosmetic wake
+// WakePaused interrupts a paused run's current poll wait — a cosmetic wake
 // that skips the remainder of the current pausedPollInterval tick so a run
 // whose Run() goroutine is still alive rechecks the frontier immediately,
-// mirroring ForceResume's lock/close/replace shape so a second WakeParked
+// mirroring ForceResume's lock/close/replace shape so a second WakePaused
 // call doesn't panic on an already-closed channel.
-func (g *Gate) WakeParked() {
+func (g *Gate) WakePaused() {
 	g.mu.Lock()
-	wake := g.parkWake
-	g.parkWake = make(chan struct{})
+	wake := g.pauseWake
+	g.pauseWake = make(chan struct{})
 	g.mu.Unlock()
 
 	close(wake)

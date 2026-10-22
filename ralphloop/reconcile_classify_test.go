@@ -19,7 +19,7 @@ func classifyDoneTicketFixture() (Deps, tickets.Ticket) {
 	return d, tickets.Ticket{Number: 3, Identifier: "03", Status: "done"}
 }
 
-func TestClassifyDoneTicket_CommitLandedNoLeftover_OK(t *testing.T) {
+func TestClassifyDoneTicket_CommitMergedNoLeftover_OK(t *testing.T) {
 	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
@@ -36,7 +36,7 @@ func TestClassifyDoneTicket_CommitLandedNoLeftover_OK(t *testing.T) {
 	}
 }
 
-func TestClassifyDoneTicket_CommitLandedButBranchLeftover_StaleCleanup(t *testing.T) {
+func TestClassifyDoneTicket_CommitMergedButBranchLeftover_StaleCleanup(t *testing.T) {
 	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return true, nil }
@@ -125,16 +125,16 @@ func TestIterLabelIterBranch_DistinctForLetteredSiblingsSharingNumber(t *testing
 // covers the other half of ticket 08: classifyDoneTicket/latestCherryPickedSHA
 // must attribute a run-log cherry-picked event to the sibling that logged it
 // (by Identifier), not whichever sibling happens to share its Number. Two
-// done tickets, 04a and 04b, both Number 4: 04a's commit landed on the
+// done tickets, 04a and 04b, both Number 4: 04a's commit merged on the
 // feature branch, 04b's didn't (and its iteration branch is gone). If SHA
-// lookup were still keyed by Number, 04b would inherit 04a's landed SHA and
+// lookup were still keyed by Number, 04b would inherit 04a's merged SHA and
 // misreport doneOK instead of doneUnrecoverable.
 func TestClassifyDoneTicket_LetteredSiblingsShareNumber_NotCrossAttributed(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) {
-		return ancestor == "sha-04a", nil // only 04a's commit actually landed
+		return ancestor == "sha-04a", nil // only 04a's commit actually merged
 	}
 	d.RevParse = func(dir, ref string) (string, error) {
 		return "", fmt.Errorf("unknown revision") // neither iteration branch survives
@@ -151,7 +151,7 @@ func TestClassifyDoneTicket_LetteredSiblingsShareNumber_NotCrossAttributed(t *te
 		t.Fatalf("classifyDoneTicket(04a) error = %v", err)
 	}
 	if classA != doneOK {
-		t.Errorf("classA = %v, want doneOK for 04a's own landed commit", classA)
+		t.Errorf("classA = %v, want doneOK for 04a's own merged commit", classA)
 	}
 
 	classB, err := classifyDoneTicket(d, paths, "epic", tickets.Ticket{Number: 4, Identifier: "04b", Status: "done"}, events, map[string]bool{}, map[string]bool{})
@@ -159,7 +159,7 @@ func TestClassifyDoneTicket_LetteredSiblingsShareNumber_NotCrossAttributed(t *te
 		t.Fatalf("classifyDoneTicket(04b) error = %v", err)
 	}
 	if classB != doneUnrecoverable {
-		t.Errorf("classB = %v, want doneUnrecoverable — 04b must not inherit 04a's landed SHA just because they share Number 4", classB)
+		t.Errorf("classB = %v, want doneUnrecoverable — 04b must not inherit 04a's merged SHA just because they share Number 4", classB)
 	}
 }
 
@@ -182,14 +182,14 @@ func TestClassifyDoneTicket_LiveTabCountsAsLeftover(t *testing.T) {
 
 // TestReconcile_DoneTicketMismatch_ReportedNotRepaired exercises the full
 // reconcile() entrypoint (not just classifyDoneTicket in isolation): a done
-// ticket whose landed commit went missing is reported, but reconcile doesn't
+// ticket whose merged commit went missing is reported, but reconcile doesn't
 // touch its status or the reattached list — repair is a later ticket's job.
-// TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair exercises ticket
-// 03: a done ticket classified doneUnrecoverable (its landed commit missing
+// TestReconcile_DoneTicketUnrecoverable_MarkedRepair exercises ticket
+// 03: a done ticket classified doneUnrecoverable (its merged commit missing
 // from the feature branch, no iteration branch left to recover it from) must
 // not be silently reverted to open or left marked done — it's flagged
-// needs-repair for a human to inspect, with a reason and a logged event.
-func TestReconcile_DoneTicketUnrecoverable_MarkedNeedsRepair(t *testing.T) {
+// paused (repair) for a human to inspect, with a reason and a logged event.
+func TestReconcile_DoneTicketUnrecoverable_MarkedRepair(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",

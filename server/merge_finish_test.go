@@ -109,7 +109,7 @@ func reportMergeFinishedLate(t *testing.T, f *schedFixture) {
 	var pause ralphloop.Event
 	waitFor(t, func() bool {
 		var ok bool
-		pause, ok = ralphloop.LatestParkEvent(filepath.Join(f.store, "proj"), schedEpic, "01")
+		pause, ok = ralphloop.LatestPauseEvent(filepath.Join(f.store, "proj"), schedEpic, "01")
 		return ok
 	})
 	if err := schema.UpdateTicket(f.ticketFile(t, "01"), func(tk *schema.Ticket) {

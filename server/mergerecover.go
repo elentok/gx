@@ -38,15 +38,15 @@ func (s *Server) recoverMerges() {
 }
 
 func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
-	lockDir, err := ralphloop.LandLockDir(epicPath)
+	lockDir, err := ralphloop.MergeLockDir(epicPath)
 	if err != nil {
 		return err
 	}
-	owner, err := ralphloop.OrphanLandLock(lockDir)
+	owner, err := ralphloop.OrphanMergeLock(lockDir)
 	if err != nil || owner == nil || owner.Alive() {
 		return err
 	}
-	if err := ralphloop.ReleaseLandLock(lockDir); err != nil {
+	if err := ralphloop.ReleaseMergeLock(lockDir); err != nil {
 		return fmt.Errorf("clearing orphan merge lock: %w", err)
 	}
 	s.log.Info("cleared orphan merge lock", "epic", epicPath, "owner", owner.Describe())
@@ -76,21 +76,21 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 	addr := tickets.Address{Project: project, Epic: epic, ID: t.Identifier}.String()
 
 	v := res.Tickets[0]
-	s.log.Info("verified interrupted merge", "ticket", addr, "merging", v.Landing, "evidence", v.Evidence)
-	switch v.Landing {
-	case ralphloop.LandingLanded:
-		ev := ralphloop.Event{Outcome: string(ralphloop.Landed), SHA: v.SHA}
-		if err := ralphloop.RecordManualLand(projectDir, epic, t.Identifier, t.Path, t.IsDone(), ev); err != nil {
+	s.log.Info("verified interrupted merge", "ticket", addr, "merging", v.Merging, "evidence", v.Evidence)
+	switch v.Merging {
+	case ralphloop.MergingMerged:
+		ev := ralphloop.Event{Outcome: string(ralphloop.Merged), SHA: v.SHA}
+		if err := ralphloop.RecordManualMerge(projectDir, epic, t.Identifier, t.Path, t.IsDone(), ev); err != nil {
 			return fmt.Errorf("finishing merge of %s: %w", addr, err)
 		}
 		s.events.publish(EventTicketDone, addr)
-	case ralphloop.LandingRecoverable:
+	case ralphloop.MergingRecoverable:
 		if err := abortHalfPick(run.FeatureWorktree); err != nil {
 			return fmt.Errorf("rolling back merge of %s: %w", addr, err)
 		}
 		s.events.publish(EventMergeRolledBack, addr)
 	default:
-		reason := fmt.Sprintf("merge interrupted by a crash (lock owner %s) and verify cannot tell whether it merged: %s", owner.Describe(), v.Landing)
+		reason := fmt.Sprintf("merge interrupted by a crash (lock owner %s) and verify cannot tell whether it merged: %s", owner.Describe(), v.Merging)
 		if err := s.pauseTicket(projectDir, tickets.Address{Project: project, Epic: epic, ID: t.Identifier}, t.Path, events.AmbiguousMerge, reason, Run{}); err != nil {
 			return fmt.Errorf("pausing %s: %w", addr, err)
 		}

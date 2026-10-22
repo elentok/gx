@@ -42,7 +42,7 @@ func iterLabel(epicName, identifier string) string {
 
 // iterItemName scopes an iteration by epicName as a single flat path/branch
 // segment ("{epic}-item-{id}") rather than "{epic}/iter-{id}", so an
-// iteration's worktree never lands as a subdirectory of the epic's own
+// iteration's worktree never merges as a subdirectory of the epic's own
 // feature worktree (which lives at "{epic}") and its branch never nests
 // under the epic's own branch (named plain "{epic}").
 func iterItemName(epicName, identifier string) string {

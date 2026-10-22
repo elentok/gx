@@ -7,23 +7,23 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// Landing is whether a ticket's iteration commits made it onto the feature
+// Merging is whether a ticket's iteration commits made it onto the feature
 // branch. recoverable/unrecoverable keep the done-ticket classifier's
 // vocabulary without the "done" prefix.
-type Landing string
+type Merging string
 
 const (
-	LandingLanded        Landing = "landed"
-	LandingRecoverable   Landing = "recoverable"
-	LandingUnrecoverable Landing = "unrecoverable"
-	// LandingNotExpected covers commitless and never-iterated tickets.
-	LandingNotExpected Landing = "not-expected"
-	// LandingUnknown means a check couldn't run — never a stand-in for "not
-	// landed".
-	LandingUnknown Landing = "unknown"
+	MergingMerged        Merging = "merged"
+	MergingRecoverable   Merging = "recoverable"
+	MergingUnrecoverable Merging = "unrecoverable"
+	// MergingNotExpected covers commitless and never-iterated tickets.
+	MergingNotExpected Merging = "not-expected"
+	// MergingUnknown means a check couldn't run — never a stand-in for "not
+	// merged".
+	MergingUnknown Merging = "unknown"
 )
 
-// Evidence names the ladder rung that proved a landing.
+// Evidence names the ladder rung that proved a merging.
 type Evidence string
 
 const (
@@ -41,18 +41,18 @@ type Leftovers struct {
 	Branch   *bool
 }
 
-// TicketVerification is one ticket's landing truth. Landing and Leftovers are
+// TicketVerification is one ticket's merging truth. Merging and Leftovers are
 // orthogonal: a claimed ticket can have leftovers by design.
 type TicketVerification struct {
 	ID        string
 	Status    string
-	Landing   Landing
+	Merging   Merging
 	Evidence  Evidence
 	SHA       string
 	Leftovers Leftovers
 	Unknown   bool
 
-	// err is why Landing is unknown when a check failed outright (as opposed
+	// err is why Merging is unknown when a check failed outright (as opposed
 	// to a degraded-but-non-fatal source, see verifyTicket's trailer rung).
 	err error
 }
@@ -67,8 +67,8 @@ type VerifyDeps struct {
 	WorktreeExists func(path string) (bool, error)
 	// ListSessions may be nil (no runner): every Leftovers.Tab is then nil.
 	ListSessions func(epic string) ([]agentrunner.Session, error)
-	// LandedTickets defaults to landedTickets (the trailer rung).
-	LandedTickets func(dir, featureBranch string) (map[string]bool, error)
+	// MergedTickets defaults to mergedTickets (the trailer rung).
+	MergedTickets func(dir, featureBranch string) (map[string]bool, error)
 }
 
 func (d Deps) verifyDeps() VerifyDeps {
@@ -102,14 +102,14 @@ type VerifyParams struct {
 	Events          []Event
 }
 
-// VerifyEpic is the single landing-truth gatherer: for each ticket it climbs
+// VerifyEpic is the single merging-truth gatherer: for each ticket it climbs
 // a three-rung ladder — the recorded SHA still reachable, patch-equivalent
 // commits on the feature branch, the Ralph-Loop-Ticket trailer — and reports
 // the rung that answered plus any leftover tab/worktree/branch. Presence is
 // checked against the SHA recorded on the ticket's latest cherry-picked
 // event, not the iteration branch: CherryPickRange creates fresh commits, and
 // a later rebase can stale the SHA harmlessly, so later rungs exist to avoid
-// misclassifying landed work as recoverable (and re-cherry-picking it).
+// misclassifying merged work as recoverable (and re-cherry-picking it).
 func VerifyEpic(vd VerifyDeps, p VerifyParams) ([]TicketVerification, error) {
 	if len(p.Tickets) == 0 {
 		return nil, nil
@@ -125,27 +125,27 @@ func VerifyEpic(vd VerifyDeps, p VerifyParams) ([]TicketVerification, error) {
 		}
 	}
 
-	landedFn := vd.LandedTickets
-	if landedFn == nil {
-		landedFn = landedTickets
+	mergedFn := vd.MergedTickets
+	if mergedFn == nil {
+		mergedFn = mergedTickets
 	}
-	landed, landedErr := landedFn(p.FeatureWorktree, p.Epic)
+	merged, mergedErr := mergedFn(p.FeatureWorktree, p.Epic)
 
 	paths := reconcilePaths{FeatureWorktree: p.FeatureWorktree, WorktreeDir: p.WorktreeDir}
 	out := make([]TicketVerification, 0, len(p.Tickets))
 	for _, t := range p.Tickets {
-		out = append(out, verifyTicket(vd, paths, p.Epic, t, p.Events, live, landed, landedErr))
+		out = append(out, verifyTicket(vd, paths, p.Epic, t, p.Events, live, merged, mergedErr))
 	}
 	return out, nil
 }
 
 // verifyTicket verifies one ticket. live nil means herdr did not answer;
-// landedErr non-nil means the trailer rung couldn't run, which only matters
-// when no earlier rung already proved the landing.
-func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []Event, live, landed map[string]bool, landedErr error) TicketVerification {
+// mergedErr non-nil means the trailer rung couldn't run, which only matters
+// when no earlier rung already proved the merging.
+func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t tickets.Ticket, events []Event, live, merged map[string]bool, mergedErr error) TicketVerification {
 	v := TicketVerification{ID: t.Identifier, Status: t.Status, Evidence: EvidenceNone}
 	fail := func(err error) TicketVerification {
-		v.Landing, v.Unknown, v.err = LandingUnknown, true, err
+		v.Merging, v.Unknown, v.err = MergingUnknown, true, err
 		return v
 	}
 
@@ -166,7 +166,7 @@ func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t t
 	}
 
 	if t.Commitless {
-		v.Landing = LandingNotExpected
+		v.Merging = MergingNotExpected
 		return v
 	}
 
@@ -175,7 +175,7 @@ func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t t
 	if sha != "" {
 		ok, err := vd.IsAncestor(paths.FeatureWorktree, sha, featureBranch)
 		if err != nil {
-			return fail(fmt.Errorf("checking landed commit reachability: %w", err))
+			return fail(fmt.Errorf("checking merged commit reachability: %w", err))
 		}
 		if ok {
 			present, v.Evidence, v.SHA = true, EvidenceSHA, sha
@@ -192,7 +192,7 @@ func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t t
 		}
 		ok, err := vd.PatchesApplied(paths.FeatureWorktree, featureBranch, base, branch)
 		if err != nil {
-			return fail(fmt.Errorf("checking patch-equivalent landed commits: %w", err))
+			return fail(fmt.Errorf("checking patch-equivalent merged commits: %w", err))
 		}
 		if ok {
 			present, v.Evidence, v.SHA = true, EvidencePatchID, sha
@@ -203,23 +203,23 @@ func verifyTicket(vd VerifyDeps, paths reconcilePaths, featureBranch string, t t
 	// during a conflict (changing both hash and patch-id), and doesn't depend
 	// on the iteration branch surviving.
 	if !present {
-		if landed[t.Identifier] {
+		if merged[t.Identifier] {
 			present, v.Evidence, v.SHA = true, EvidenceTrailer, sha
-		} else if landedErr != nil {
-			v.Landing, v.Unknown = LandingUnknown, true
+		} else if mergedErr != nil {
+			v.Merging, v.Unknown = MergingUnknown, true
 			return v
 		}
 	}
 
 	switch {
 	case present:
-		v.Landing = LandingLanded
+		v.Merging = MergingMerged
 	case hasBranch:
-		v.Landing = LandingRecoverable
+		v.Merging = MergingRecoverable
 	case !t.IsDone() && sha == "":
-		v.Landing = LandingNotExpected
+		v.Merging = MergingNotExpected
 	default:
-		v.Landing = LandingUnrecoverable
+		v.Merging = MergingUnrecoverable
 	}
 	return v
 }

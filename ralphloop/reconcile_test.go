@@ -66,14 +66,14 @@ func TestReconcile_ClaimedWithNoLiveTab_RevertsToOpen(t *testing.T) {
 	}
 }
 
-// TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead covers
+// TestReconcile_ClaimedWithNoLiveTabButUnmergedCommits_RecoversInstead covers
 // the crash/restart scenario reconcileOrphanedClaim exists for: a claimed
 // ticket's agent finished and committed to its iteration branch, but the
 // invocation went away before the normal finishIteration cherry-pick ran (no
 // live tab survives to reattach to). Reverting straight to open would leave
 // that branch orphaned, only for a fresh attempt to collide with it later —
-// so those unlanded commits must be landed here instead.
-func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *testing.T) {
+// so those unmerged commits must be merged here instead.
+func TestReconcile_ClaimedWithNoLiveTabButUnmergedCommits_RecoversInstead(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
@@ -101,20 +101,20 @@ func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_RecoversInstead(t *tes
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if !strings.Contains(string(raw), "status: done") {
-		t.Errorf("orphaned claim with unlanded commits not recovered to done:\n%s", raw)
+		t.Errorf("orphaned claim with unmerged commits not recovered to done:\n%s", raw)
 	}
 
 	if len(*removed) != 1 {
-		t.Errorf("removed worktrees = %v, want exactly one removal (cleanup only after landing the recovered commits)", *removed)
+		t.Errorf("removed worktrees = %v, want exactly one removal (cleanup only after merging the recovered commits)", *removed)
 	}
 }
 
-// TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBeforeCherryPick
+// TestReconcile_ClaimedWithNoLiveTabButUnmergedCommits_ReportsRecoveringBeforeCherryPick
 // covers the same UI gap as the doneRecoverable case above, but for an
 // orphaned claim's synchronous re-cherry-pick: TicketRecovering must fire
 // before CherryPickStarted so a renderer has a live row to update instead of
 // showing nothing while the recovery runs.
-func TestReconcile_ClaimedWithNoLiveTabButUnlandedCommits_ReportsRecoveringBeforeCherryPick(t *testing.T) {
+func TestReconcile_ClaimedWithNoLiveTabButUnmergedCommits_ReportsRecoveringBeforeCherryPick(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
@@ -239,7 +239,7 @@ func TestReconcile_ClaimedWithLiveTab_TicketReattachedCarriesLiveSessionIdentity
 	}
 }
 
-func TestReconcile_NeedsRepairWithLiveTab_ReturnsReattached(t *testing.T) {
+func TestReconcile_RepairWithLiveTab_ReturnsReattached(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
@@ -299,9 +299,9 @@ func TestReconcile_ClaimedWithLiveTabOutsideScope_NotReattached(t *testing.T) {
 	}
 }
 
-// TestReconcile_NeedsRepairOutsideScope_NotReattached is the
-// needs-repair counterpart of the claimed case above.
-func TestReconcile_NeedsRepairOutsideScope_NotReattached(t *testing.T) {
+// TestReconcile_RepairOutsideScope_NotReattached is the
+// paused (repair) counterpart of the claimed case above.
+func TestReconcile_RepairOutsideScope_NotReattached(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# A\n",
@@ -324,11 +324,11 @@ func TestReconcile_NeedsRepairOutsideScope_NotReattached(t *testing.T) {
 	}
 }
 
-// TestRun_NeedsRepairWithoutLiveTab_SchedulesOtherTicketsThenParks covers
-// parking as a last resort: a needs-repair ticket with no live iteration
+// TestRun_RepairWithoutLiveTab_SchedulesOtherTicketsThenPauses covers
+// pausing as a last resort: a paused (repair) ticket with no live iteration
 // left to reattach to is human-clearable, so it must not hold up the open
-// ticket next to it — that one runs first, and only then does the run park.
-func TestRun_NeedsRepairWithoutLiveTab_SchedulesOtherTicketsThenParks(t *testing.T) {
+// ticket next to it — that one runs first, and only then does the run pause.
+func TestRun_RepairWithoutLiveTab_SchedulesOtherTicketsThenPauses(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# Attention\n",
@@ -337,24 +337,24 @@ func TestRun_NeedsRepairWithoutLiveTab_SchedulesOtherTicketsThenParks(t *testing
 	d, prompts, _ := fakeDeps()
 
 	sink := &recordingSink{}
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
 	if len(*prompts) != 1 {
-		t.Errorf("prompts = %v, want ticket 02 run before the park", *prompts)
+		t.Errorf("prompts = %v, want ticket 02 run before the pause", *prompts)
 	}
-	if len(sink.parkedStalled) != 1 || len(sink.parkedStalled[0]) != 1 || sink.parkedStalled[0][0].Identifier != "01" {
-		t.Errorf("EpicParked calls = %v, want one naming ticket 01", sink.parkedStalled)
+	if len(sink.pausedStalled) != 1 || len(sink.pausedStalled[0]) != 1 || sink.pausedStalled[0][0].Identifier != "01" {
+		t.Errorf("EpicPaused calls = %v, want one naming ticket 01", sink.pausedStalled)
 	}
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "02-open.md"))
 	if err != nil {
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if !strings.Contains(string(raw), "status: done") {
-		t.Errorf("ticket 02 = %s, want it landed done before the park", raw)
+		t.Errorf("ticket 02 = %s, want it merged done before the pause", raw)
 	}
 }
 
-func TestRun_RestartedNeedsRepairRecoversThenResumesScheduling(t *testing.T) {
+func TestRun_RestartedRepairRecoversThenResumesScheduling(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-attention.md": "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# Attention\n",
@@ -464,7 +464,7 @@ func TestReconcile_ConflictResolutionChildWithNoLiveParentTab_RevertsToOpen(t *t
 	d, _, _ := fakeDeps()
 	// A conflict-resolution child never has its own iteration branch (see
 	// conflictLabel's doc), so its orphaned-claim check must fall straight to
-	// the plain revert-to-open rather than the recover-unlanded-commits path.
+	// the plain revert-to-open rather than the recover-unmerged-commits path.
 	d.RevParse = func(dir, ref string) (string, error) {
 		return "", fmt.Errorf("unknown revision")
 	}

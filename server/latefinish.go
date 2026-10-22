@@ -122,7 +122,7 @@ func lateFinishOf(dir string, addr tickets.Address, path string) (lateFinish, bo
 	if err != nil || !adoptablePause(t.Status, t.PauseReason) || t.IterationStatus != schema.IterationStatusFinished {
 		return lateFinish{}, false
 	}
-	pause, ok := ralphloop.LatestParkEvent(dir, addr.Epic, addr.ID)
+	pause, ok := ralphloop.LatestPauseEvent(dir, addr.Epic, addr.ID)
 	if !ok || pause.Type != string(events.Paused) || pause.Kind != string(t.PauseReason) || !t.IterationFinishedAt.After(pause.Time) {
 		return lateFinish{}, false
 	}
@@ -224,7 +224,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 		s.events.publish(EventIterationFailed, addr.String())
 		return false
 	}
-	if !out.Landed {
+	if !out.Merged {
 		s.log.Warn("late finish re-paused", "ticket", addr, "kind", out.Kind, "reason", out.Reason)
 		s.events.publish(EventIterationPaused, addr.String())
 		return false
@@ -233,7 +233,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	if mode.feature {
 		outcome = "closed merge"
 	} else if ahead > 0 {
-		sha = ralphloop.LatestLandedSHA(lf.dir, addr.Epic, addr.ID)
+		sha = ralphloop.LatestMergedSHA(lf.dir, addr.Epic, addr.ID)
 		outcome = "merged " + sha
 	}
 	s.logEvent(addr, ralphloop.Event{

@@ -13,12 +13,12 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// TestClearableParkedTicket covers the shared predicate's full matrix: park
-// kind (including a missing park_kind, which must default to
-// zero-commit — the conservative choice for tickets parked before that field
+// TestClearablePausedTicket covers the shared predicate's full matrix: pause
+// kind (including a missing pause_kind, which must default to
+// zero-commit — the conservative choice for tickets paused before that field
 // existed) x rendered status x pane liveness x whether the iteration branch
 // has new commits.
-func TestClearableParkedTicket(t *testing.T) {
+func TestClearablePausedTicket(t *testing.T) {
 	t.Parallel()
 
 	live := func(t *testing.T, d *Deps) { hostLiveAgent(t, *d, "my-epic-iter-01") }
@@ -37,7 +37,7 @@ func TestClearableParkedTicket(t *testing.T) {
 	tests := []struct {
 		name      string
 		status    string
-		parkKind  string
+		pauseKind string
 		setupDeps func(*testing.T, *Deps)
 		want      bool
 	}{
@@ -61,12 +61,12 @@ func TestClearableParkedTicket(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			parkKindLine := ""
-			if tt.parkKind != "" {
-				parkKindLine = "park_kind: " + tt.parkKind + "\n"
+			pauseKindLine := ""
+			if tt.pauseKind != "" {
+				pauseKindLine = "park_kind: " + tt.pauseKind + "\n"
 			}
 			scratchDir := writeEpic(t, "my-epic", map[string]string{
-				"01-a.md": "---\nid: \"01\"\nstatus: " + tt.status + "\ntype: implement\n" + parkKindLine + "---\n# A\n",
+				"01-a.md": "---\nid: \"01\"\nstatus: " + tt.status + "\ntype: implement\n" + pauseKindLine + "---\n# A\n",
 			})
 			d, _, _ := fakeDeps()
 			tt.setupDeps(t, &d)
@@ -77,16 +77,16 @@ func TestClearableParkedTicket(t *testing.T) {
 			}
 			ticket := epic.Tickets[0]
 
-			got := clearableParkedTicket(d, "my-epic", "/fake/worktrees", AgentClaude, *epic, ticket)
+			got := clearablePausedTicket(d, "my-epic", "/fake/worktrees", AgentClaude, *epic, ticket)
 			if got != tt.want {
-				t.Errorf("clearableParkedTicket() = %v, want %v", got, tt.want)
+				t.Errorf("clearablePausedTicket() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
 // wholeScope resolves epic's whole-epic RunScope, for tests that call
-// unparkAnswered directly rather than through Run.
+// resumeAnswered directly rather than through Run.
 func wholeScope(t *testing.T, epic tickets.Epic) RunScope {
 	t.Helper()
 	scope, err := ResolveRunScope(epic, nil)
@@ -96,12 +96,12 @@ func wholeScope(t *testing.T, epic tickets.Epic) RunScope {
 	return scope
 }
 
-// TestUnparkAnswered_LivePaneUnblocked_ReopensAndDemotesStub covers test seam
-// 1: a needs-answer ticket whose pane is still live and has left the blocked
+// TestResumeAnswered_LivePaneUnblocked_ReopensAndDemotesStub covers test seam
+// 1: a paused (answer) ticket whose pane is still live and has left the blocked
 // state is set open and its "## Needs Answer" stub retired into "##
-// Comments" — the write unparkAnswered makes on its own, independent of the
+// Comments" — the write resumeAnswered makes on its own, independent of the
 // scan loop around it.
-func TestUnparkAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
+func TestResumeAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# A\n\n## Needs Answer\n\nmy-epic-iter-01 is blocked on a prompt gx did not send; answer it in the pane\n",
@@ -116,8 +116,8 @@ func TestUnparkAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
 	}
 	scope := wholeScope(t, *epic)
 
-	if err := unparkAnswered(d, "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
-		t.Fatalf("unparkAnswered: %v", err)
+	if err := resumeAnswered(d, "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
+		t.Fatalf("resumeAnswered: %v", err)
 	}
 
 	raw, err := os.ReadFile(path)
@@ -135,12 +135,12 @@ func TestUnparkAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
 	}
 }
 
-// TestUnparkAnswered_DeadPane_LeftForHuman covers test seam 3: a needs-answer
-// ticket whose pane is already gone — an announce-and-stop park, per
-// unparkAnswered's doc — is skipped and left needs-answer for a person to
+// TestResumeAnswered_DeadPane_LeftForHuman covers test seam 3: a paused (answer)
+// ticket whose pane is already gone — an announce-and-stop pause, per
+// resumeAnswered's doc — is skipped and left paused (answer) for a person to
 // answer in the file. The live-pane predicate is the only thing telling this
-// apart from the gate-park case above.
-func TestUnparkAnswered_DeadPane_LeftForHuman(t *testing.T) {
+// apart from the gate-pause case above.
+func TestResumeAnswered_DeadPane_LeftForHuman(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# A\n\n## Needs Answer\n\nunanswered\n",
@@ -154,8 +154,8 @@ func TestUnparkAnswered_DeadPane_LeftForHuman(t *testing.T) {
 	}
 	scope := wholeScope(t, *epic)
 
-	if err := unparkAnswered(d, "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
-		t.Fatalf("unparkAnswered: %v", err)
+	if err := resumeAnswered(d, "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
+		t.Fatalf("resumeAnswered: %v", err)
 	}
 
 	raw, err := os.ReadFile(path)
@@ -170,10 +170,10 @@ func TestUnparkAnswered_DeadPane_LeftForHuman(t *testing.T) {
 	}
 }
 
-// TestUnparkAnswered_LiveButStillBlocked_LeftParked is the live-pane
+// TestResumeAnswered_LiveButStillBlocked_LeftPaused is the live-pane
 // predicate's other half: a pane that is still live but still reporting
-// blocked hasn't actually been answered yet, so it must be left parked too.
-func TestUnparkAnswered_LiveButStillBlocked_LeftParked(t *testing.T) {
+// blocked hasn't actually been answered yet, so it must be left paused too.
+func TestResumeAnswered_LiveButStillBlocked_LeftPaused(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\n# A\n\n## Needs Answer\n\nstill waiting\n",
@@ -189,8 +189,8 @@ func TestUnparkAnswered_LiveButStillBlocked_LeftParked(t *testing.T) {
 	}
 	scope := wholeScope(t, *epic)
 
-	if err := unparkAnswered(d, "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
-		t.Fatalf("unparkAnswered: %v", err)
+	if err := resumeAnswered(d, "my-epic", "/fake/worktrees", AgentClaude, scope, *epic, time.Now()); err != nil {
+		t.Fatalf("resumeAnswered: %v", err)
 	}
 
 	raw, err := os.ReadFile(path)
@@ -202,16 +202,16 @@ func TestUnparkAnswered_LiveButStillBlocked_LeftParked(t *testing.T) {
 	}
 }
 
-// TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling
-// covers test seam 2 — "the case that matters most": ticket 01 gate-parks
-// (its pane stays live, per waitForFinish's parkOnBlockedPane) while ticket
+// TestRun_AnsweredPauseWithSiblingRunning_ResumesWithoutWaitingForSibling
+// covers test seam 2 — "the case that matters most": ticket 01 gate-pauses
+// (its pane stays live, per waitForFinish's pauseOnBlockedPane) while ticket
 // 02 is still genuinely running. Answering ticket 01's pane must reattach it
 // before ticket 02 finishes, not after — the ticket-15 wake-source gap a
 // plain blocking receive on results left open. ticket02Gate blocks ticket
 // 02's own finish until the test explicitly releases it, so a pass here can
 // only happen if the scheduler noticed ticket 01's answer on its own, not by
 // coincidentally waiting for ticket 02 anyway.
-func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *testing.T) {
+func TestRun_AnsweredPauseWithSiblingRunning_ResumesWithoutWaitingForSibling(t *testing.T) {
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
@@ -219,7 +219,7 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 	path01 := ticketPath(scratchDir, "my-epic", "01-a.md")
 	path02 := ticketPath(scratchDir, "my-epic", "02-b.md")
 	d, _, removed := fakeDeps()
-	// The "status: done" write lands before the worktree removal, so the
+	// The "status: done" write merges before the worktree removal, so the
 	// removal count is only meaningful once a removal has been signalled.
 	removedSignal := make(chan struct{}, 2)
 	removeWorktree := d.RemoveWorktree
@@ -256,7 +256,7 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 		}, d, sink)
 	}()
 
-	// Wait for ticket 01 to gate-park (its pane stays blocked and live).
+	// Wait for ticket 01 to gate-pause (its pane stays blocked and live).
 	waitForFileContains(t, path01, "status: paused")
 
 	// Answer the pane, but do NOT release ticket 02 yet.
@@ -273,10 +273,10 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 	select {
 	case <-removedSignal:
 	case <-time.After(5 * time.Second):
-		t.Fatal("ticket 01's worktree was never removed after it landed")
+		t.Fatal("ticket 01's worktree was never removed after it merged")
 	}
 	if len(*removed) != 1 {
-		t.Errorf("removed worktree branches after ticket 01 reattached+landed = %v, want exactly one (ticket 01), ticket 02 still running", *removed)
+		t.Errorf("removed worktree branches after ticket 01 reattached+merged = %v, want exactly one (ticket 01), ticket 02 still running", *removed)
 	}
 
 	close(ticket02Gate)
@@ -293,12 +293,12 @@ func TestRun_AnsweredParkWithSiblingRunning_UnparksWithoutWaitingForSibling(t *t
 	}
 }
 
-// TestUnmuteTicket_Parked_ClearsMutesDemotesReopens covers a mute that
-// actually parked its ticket (status: needs-repair, written by muteSource's
-// parkTicket callback): UnmuteTicket clears Mutes, demotes the "## Needs
+// TestUnmuteTicket_Paused_ClearsMutesDemotesReopens covers a mute that
+// actually paused its ticket (status: paused (repair), written by muteSource's
+// pauseTicket callback): UnmuteTicket clears Mutes, demotes the "## Needs
 // Repair" section into "## Comments", reopens the ticket, and appends its
 // own unmute audit note.
-func TestUnmuteTicket_Parked_ClearsMutesDemotesReopens(t *testing.T) {
+func TestUnmuteTicket_Paused_ClearsMutesDemotesReopens(t *testing.T) {
 	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\n## Needs Repair\n\nnotification storm tripped a mute\n")
 
@@ -326,11 +326,11 @@ func TestUnmuteTicket_Parked_ClearsMutesDemotesReopens(t *testing.T) {
 	}
 }
 
-// TestUnmuteTicket_Unparked_ClearsMutesLeavesStatus covers a mute that
-// tripped with no parkTicket callback available (see muteSource) — the
-// ticket's status was never touched, so there's no park to undo: clearing
+// TestUnmuteTicket_Resumed_ClearsMutesLeavesStatus covers a mute that
+// tripped with no pauseTicket callback available (see muteSource) — the
+// ticket's status was never touched, so there's no pause to undo: clearing
 // Mutes (plus the audit note) is the whole action.
-func TestUnmuteTicket_Unparked_ClearsMutesLeavesStatus(t *testing.T) {
+func TestUnmuteTicket_Resumed_ClearsMutesLeavesStatus(t *testing.T) {
 	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: open\ntype: implement\nmutes:\n    - event_type: notification-storm\n      tripped_at: 2026-01-01T00:00:00Z\n---\n# A\n\nBody text.\n")
 

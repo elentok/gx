@@ -10,7 +10,7 @@ import (
 type Call struct {
 	Verb    string
 	Address string
-	// Text is a park's reason or a nudge's text.
+	// Text is a pause's reason or a nudge's text.
 	Text string
 	// Parent is set-parent's new parent.
 	Parent string

@@ -62,7 +62,7 @@ func fakeValidatingTelegramServer(t *testing.T) (*httptest.Server, func() []tele
 
 // TestRun_FullEpicRealGit_TelegramNotifications_AllValidMarkdownV2 drives a
 // full two-ticket epic (01 -> 02, sequential so both an iteration-started
-// and iteration-finished land for each before the run completes) through
+// and iteration-finished merge for each before the run completes) through
 // Run with production Git/herdr wiring and a real chatEventSink/
 // telegramTransport pointed at a fake Telegram server, so every chat
 // notification a real epic run emits (epic started, iteration started ×2,

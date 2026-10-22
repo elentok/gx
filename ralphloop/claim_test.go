@@ -165,7 +165,7 @@ func TestClaim_ClearsIterationStatus(t *testing.T) {
 	}
 }
 
-func TestClaim_ClearsParkKind(t *testing.T) {
+func TestClaim_ClearsPauseKind(t *testing.T) {
 	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-answer\npark_kind: zero-commit\ntype: implement\n---\n# Ticket\n\nBody.\n")
 	if err := Claim(path); err != nil {
@@ -258,10 +258,10 @@ func TestMarkDoneWithMetadata_SetsStatusAndCompactions(t *testing.T) {
 	}
 }
 
-// TestClaim_DemotesNeedsRepairIntoDatedComments pins the ticket 19 behaviour:
+// TestClaim_DemotesRepairIntoDatedComments pins the ticket 19 behaviour:
 // claiming a ticket carrying "## Needs Repair" moves that reason into a
 // dated "## Comments" sub-entry and removes the "## Needs Repair" heading.
-func TestClaim_DemotesNeedsRepairIntoDatedComments(t *testing.T) {
+func TestClaim_DemotesRepairIntoDatedComments(t *testing.T) {
 	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
@@ -314,8 +314,8 @@ func TestClaim_RepeatedClaimsDoNotStackDuplicateComments(t *testing.T) {
 }
 
 // TestClaim_AppendsSecondDemotionAlongsideFirst pins the "repeated" case
-// this ticket actually cares about: a ticket parked, unparked, reclaimed,
-// and parked again a second time must accumulate two dated entries under
+// this ticket actually cares about: a ticket paused, resumed, reclaimed,
+// and paused again a second time must accumulate two dated entries under
 // one "## Comments" heading, not two "## Comments" headings.
 func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 	t.Parallel()
@@ -325,8 +325,8 @@ func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 	if err := Claim(path); err != nil {
 		t.Fatalf("first Claim: %v", err)
 	}
-	if err := markNeedsRepairWithReason(path, "second failure", schema.PauseKind(events.IterationError), schema.FaultState{}, false); err != nil {
-		t.Fatalf("markNeedsRepairWithReason: %v", err)
+	if err := markRepairWithReason(path, "second failure", schema.PauseKind(events.IterationError), schema.FaultState{}, false); err != nil {
+		t.Fatalf("markRepairWithReason: %v", err)
 	}
 	if err := Claim(path); err != nil {
 		t.Fatalf("second Claim: %v", err)
@@ -341,11 +341,11 @@ func TestClaim_AppendsSecondDemotionAlongsideFirst(t *testing.T) {
 	}
 }
 
-// TestClaim_UnparkedButUnclaimedKeepsNeedsRepairVisible pins that setting a
-// parked ticket's status directly to open (the unpark gesture) does not by
-// itself retire "## Needs Repair" — only Claim does. A person who unparks a
+// TestClaim_ResumedButUnclaimedKeepsRepairVisible pins that setting a
+// paused ticket's status directly to open (the resume gesture) does not by
+// itself retire "## Needs Repair" — only Claim does. A person who resumes a
 // ticket should still see what they were told, right up until it's claimed.
-func TestClaim_UnparkedButUnclaimedKeepsNeedsRepairVisible(t *testing.T) {
+func TestClaim_ResumedButUnclaimedKeepsRepairVisible(t *testing.T) {
 	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
@@ -356,17 +356,17 @@ func TestClaim_UnparkedButUnclaimedKeepsNeedsRepairVisible(t *testing.T) {
 
 	body := schema.ParseBody(mustRead(t, path))
 	if !strings.Contains(body, "## Needs Repair") {
-		t.Errorf("body = %q, want ## Needs Repair still present after unpark", body)
+		t.Errorf("body = %q, want ## Needs Repair still present after resume", body)
 	}
 }
 
-// TestReattach_ClearIterationStatusDoesNotRetireNeedsRepair pins the ticket
+// TestReattach_ClearIterationStatusDoesNotRetireRepair pins the ticket
 // 19 behaviour change: the ordinary reattach path (a still-claimed ticket
 // resumed via schema.ClearIterationStatus, see reattachIteration) does not
 // go through Claim, so it must not retire "## Needs Repair" — only an
 // actual claim does. A ticket can reattach several times within one claim;
 // retiring here would fire repeatedly instead of exactly once at claim.
-func TestReattach_ClearIterationStatusDoesNotRetireNeedsRepair(t *testing.T) {
+func TestReattach_ClearIterationStatusDoesNotRetireRepair(t *testing.T) {
 	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\niteration_status: working\ntype: implement\n---\n"+
 		"# Ticket\n\nBody text.\n\n## Needs Repair\n\nsomething broke\n")
@@ -461,13 +461,13 @@ func TestClaim_FrontmatterTicket_RoundTripsThroughSchema(t *testing.T) {
 	}
 }
 
-// TestMarkDoneWithMetadata_FrontmatterTicket_KeepsLandedContextWindow
+// TestMarkDoneWithMetadata_FrontmatterTicket_KeepsMergedContextWindow
 // verifies ticket 07's fix for the corruption described in its issue: a
 // frontmatter ticket already carrying actual_context_window/elapsed_time
-// (as landCherryPick writes) stays valid and gx-tickets-validate-passing
+// (as mergeCherryPick writes) stays valid and gx-tickets-validate-passing
 // after MarkDoneWithMetadata, with status: done — and, since
-// follow-ups-2026-10-11/04, the landed peak actual_context_window untouched.
-func TestMarkDoneWithMetadata_FrontmatterTicket_KeepsLandedContextWindow(t *testing.T) {
+// follow-ups-2026-10-11/04, the merged peak actual_context_window untouched.
+func TestMarkDoneWithMetadata_FrontmatterTicket_KeepsMergedContextWindow(t *testing.T) {
 	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: claimed\ntype: implement\nactual_context_window: 500\nelapsed_time: 10\n---\n# Ticket\n\nBody.\n")
 	if err := MarkDoneWithMetadata(path, 0, "sess-123"); err != nil {

@@ -11,14 +11,14 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands covers ticket 23's
+// TestRun_ReattachedSmartZoneBreach_AutoRecoversThenMerges covers ticket 23's
 // first requirement: a reattached iteration's wait still proactively observes
 // context occupancy against --smart-zone and auto-recovers a breach (Ctrl-C,
 // /compact, finish-up re-prompt), the same as a fresh iteration's wait —
 // because reattachIteration drives its wait through the same waitForFinish
-// call. Ends in an ordinary landing with the reattached worktree/tab/branch
+// call. Ends in an ordinary merging with the reattached worktree/tab/branch
 // cleaned up exactly once.
-func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
+func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenMerges(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
@@ -58,15 +58,15 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenLands(t *testing.T) {
 	}
 }
 
-// TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands covers ticket 23's
+// TestRun_ReattachedCodexQuota_StructuredRecoveryThenMerges covers ticket 23's
 // second requirement: a reattached Codex iteration's wait still detects a
 // structured (session-file-backed) quota exhaustion and pauses/resumes the
 // gate around the reset. Per ticket 04, a pane still blocked once that reset
-// completes must park for a human instead of being re-prompted — herdr
+// completes must pause for a human instead of being re-prompted — herdr
 // 0.8.2 hard-rejects a prompt into a blocked pane, and even without that
 // guard "continue" isn't an answer to whatever dialog the pane is sitting
 // on.
-func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
+func TestRun_ReattachedCodexQuota_StructuredRecoveryThenMerges(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
@@ -77,17 +77,17 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 	fakeRunner(d).SetRateLimit("epic-iter-01", time.Now().Add(-time.Second))
 	d.Sleep = func(time.Duration) { fakeRunner(d).SetRateLimit("epic-iter-01", time.Time{}) }
 	// The pane stays blocked forever in this fake — there is no dialog for a
-	// human to answer here, only a scripted proof that the park happened. The
-	// park poll is the run's only path to noticing an external status change,
+	// human to answer here, only a scripted proof that the pause happened. The
+	// pause poll is the run's only path to noticing an external status change,
 	// so it doubles as that "human" here: on the first poll it reads back the
-	// parked ticket to prove it landed on needs-answer with the reset's
+	// paused ticket to prove it merged on paused (answer) with the reset's
 	// pane never prompted, then marks it done directly, the same way a person
 	// resolving the dialog by hand would let the run settle.
 	path := ticketPath(scratchDir, "epic", "01-a.md")
-	var parkPolls int
-	d.ParkTimer = func(dur time.Duration) <-chan time.Time {
-		parkPolls++
-		if parkPolls == 1 {
+	var pausePolls int
+	d.PauseTimer = func(dur time.Duration) <-chan time.Time {
+		pausePolls++
+		if pausePolls == 1 {
 			raw, err := os.ReadFile(path)
 			if err != nil {
 				t.Errorf("ReadFile %s: %v", path, err)
@@ -109,9 +109,9 @@ func TestRun_ReattachedCodexQuota_StructuredRecoveryThenLands(t *testing.T) {
 		t.Errorf("prompts = %v, want none — a pane herdr reports blocked must never be prompted", *promptsPtr)
 	}
 	if len(*removed) != 0 {
-		t.Errorf("removed worktree branches = %v, want none — the ticket was resolved directly, not through the ordinary landing path", *removed)
+		t.Errorf("removed worktree branches = %v, want none — the ticket was resolved directly, not through the ordinary merging path", *removed)
 	}
-	if parkPolls == 0 {
-		t.Errorf("run never parked (no park poll), want it to park on the blocked-after-reset ticket")
+	if pausePolls == 0 {
+		t.Errorf("run never paused (no pause poll), want it to pause on the blocked-after-reset ticket")
 	}
 }

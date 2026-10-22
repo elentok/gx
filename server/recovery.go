@@ -483,7 +483,7 @@ type recoveryVerbs struct{ s *Server }
 // recoveryVerbHandlers are the server's verbs by name; each takes the request
 // a call makes, already stamped actor recovery.
 var recoveryVerbHandlers = map[string]func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error){
-	recovery.VerbPark: func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error) {
+	recovery.VerbPause: func(s *Server, req QueueRequest, c recovery.Call) (QueueResult, error) {
 		req.PauseReason = c.Text
 		return s.ticketPause(req)
 	},

@@ -38,10 +38,10 @@ func setHomeEnv(t *testing.T, dir string) {
 	})
 }
 
-// compactedLandingFixture writes a transcript whose occupancy peaks before a
+// compactedMergingFixture writes a transcript whose occupancy peaks before a
 // compaction and ends far lower, and wires d's live readers to report the
 // post-compaction (last) value, so a test can tell peak from last.
-func compactedLandingFixture(t *testing.T, cwd, sessionID string) (d Deps, peak int) {
+func compactedMergingFixture(t *testing.T, cwd, sessionID string) (d Deps, peak int) {
 	t.Helper()
 	writeFakeTranscript(t, "", cwd, sessionID, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		[3]any{"claude-sonnet-5", 1000, 129000},
@@ -53,27 +53,27 @@ func compactedLandingFixture(t *testing.T, cwd, sessionID string) (d Deps, peak 
 	return d, 130000
 }
 
-// TestLandAndMarkDone_CompactedSession_StampsPeakNotLast pins
+// TestMergeAndMarkDone_CompactedSession_StampsPeakNotLast pins
 // follow-ups-2026-10-11/04: closing a fresh iteration whose session compacted
-// keeps landCherryPick's peak actual_context_window instead of overwriting it
+// keeps mergeCherryPick's peak actual_context_window instead of overwriting it
 // with the post-compaction occupancy.
-func TestLandAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
+func TestMergeAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	setHomeEnv(t, t.TempDir())
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
-	sessionID := "sess-land-01"
+	sessionID := "sess-merge-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
-	d, peak := compactedLandingFixture(t, cwd, sessionID)
+	d, peak := compactedMergingFixture(t, cwd, sessionID)
 	p := iterationParams{
 		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: AgentClaude,
 		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: noopEventSink{},
 	}
 
-	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
-		t.Fatalf("landCherryPick() error = %v", err)
+	if _, err := mergeCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
+		t.Fatalf("mergeCherryPick() error = %v", err)
 	}
 	if err := markDoneStampingCloseMetadata(d, p, cwd, sessionID); err != nil {
 		t.Fatalf("markDoneStampingCloseMetadata() error = %v", err)
@@ -85,10 +85,10 @@ func TestLandAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
 	}
 }
 
-// TestLandAndMarkDone_ReattachedCompactedSession_BackfillsPeak covers the
-// reattached close: landCherryPick has no session to stamp from, so the
+// TestMergeAndMarkDone_ReattachedCompactedSession_BackfillsPeak covers the
+// reattached close: mergeCherryPick has no session to stamp from, so the
 // backfill recovers the run log's session and must stamp its peak itself.
-func TestLandAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T) {
+func TestMergeAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T) {
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	setHomeEnv(t, t.TempDir())
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -97,7 +97,7 @@ func TestLandAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T) 
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	sessionID := "sess-orig-01"
 	cwd := "/fake/worktrees/epic-item-01"
-	d, peak := compactedLandingFixture(t, cwd, sessionID)
+	d, peak := compactedMergingFixture(t, cwd, sessionID)
 	if err := logEvent(scratchDir, "epic", Event{
 		Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude, AgentSession: sessionID, Cwd: cwd,
 	}); err != nil {
@@ -108,8 +108,8 @@ func TestLandAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T) 
 		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: noopEventSink{},
 	}
 
-	if _, err := landCherryPick(d, p, "base", "branch", "", ""); err != nil {
-		t.Fatalf("landCherryPick() error = %v", err)
+	if _, err := mergeCherryPick(d, p, "base", "branch", "", ""); err != nil {
+		t.Fatalf("mergeCherryPick() error = %v", err)
 	}
 	if err := markDoneStampingCloseMetadata(d, p, cwd, ""); err != nil {
 		t.Fatalf("markDoneStampingCloseMetadata() error = %v", err)
@@ -122,8 +122,8 @@ func TestLandAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T) 
 }
 
 // TestRun_FreshIteration_FrontmatterTicket_EndsWithValidFrontmatter verifies
-// ticket 07: a frontmatter-format ticket landed via the real finishIteration
-// path (landCherryPick's writeLandedMetrics, then
+// ticket 07: a frontmatter-format ticket merged via the real finishIteration
+// path (mergeCherryPick's writeMergedMetrics, then
 // markDoneStampingCloseMetadata's MarkDoneWithMetadata, both writing into the
 // same ticket file in one run) ends up with valid, gx-tickets-validate
 // -passing frontmatter — rather than a corrupted YAML block from the old
@@ -186,13 +186,13 @@ func TestRun_FreshIteration_OmitsContextWindowWhenOccupancyUnavailable(t *testin
 	}
 }
 
-// TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatter
-// verifies ticket 05a: landCherryPick reads the landing session's own
+// TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatter
+// verifies ticket 05a: mergeCherryPick reads the merging session's own
 // transcript (report.go's sessionStats source, the same one `gx ralph-loop
 // report` reads) and writes its peak context occupancy and wall-clock
-// duration into the landed ticket's actual_context_window/elapsed_time
+// duration into the merged ticket's actual_context_window/elapsed_time
 // frontmatter fields.
-func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatter(t *testing.T) {
+func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatter(t *testing.T) {
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
 	setHomeEnv(t, home)
@@ -202,7 +202,7 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
-	sessionID := "sess-land-01"
+	sessionID := "sess-merge-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	writeFakeTranscript(t, "", cwd, sessionID, start,
@@ -221,8 +221,8 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 		Sink:            noopEventSink{},
 	}
 
-	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
-		t.Fatalf("landCherryPick() error = %v", err)
+	if _, err := mergeCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
+		t.Fatalf("mergeCherryPick() error = %v", err)
 	}
 
 	raw, err := os.ReadFile(ticketPath)
@@ -241,12 +241,12 @@ func TestLandCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatt
 	}
 }
 
-// TestLandCherryPick_StampsTokensAndElapsedTrailers verifies ticket 05b:
-// alongside the existing Ralph-Loop-Ticket trailer, landCherryPick stamps
+// TestMergeCherryPick_StampsTokensAndElapsedTrailers verifies ticket 05b:
+// alongside the existing Ralph-Loop-Ticket trailer, mergeCherryPick stamps
 // Ralph-Loop-Tokens/Ralph-Loop-Elapsed trailers whose values match what
-// writeLandedMetrics wrote to the ticket's frontmatter, all in the landed
+// writeMergedMetrics wrote to the ticket's frontmatter, all in the merged
 // commit's message via a single Deps.AppendTrailers call.
-func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
+func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
 	setHomeEnv(t, home)
@@ -256,7 +256,7 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 
-	sessionID := "sess-land-01"
+	sessionID := "sess-merge-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	writeFakeTranscript(t, "", cwd, sessionID, start,
@@ -280,8 +280,8 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 		Sink:            noopEventSink{},
 	}
 
-	if _, err := landCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
-		t.Fatalf("landCherryPick() error = %v", err)
+	if _, err := mergeCherryPick(d, p, "base", "branch", sessionID, "pane"); err != nil {
+		t.Fatalf("mergeCherryPick() error = %v", err)
 	}
 
 	raw, err := os.ReadFile(ticketPath)
@@ -298,25 +298,25 @@ func TestLandCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	if found, err := git.TrailerCommitExists(repoDir, "HEAD", tokensTrailerKey, wantTokens); err != nil {
 		t.Fatalf("TrailerCommitExists(%s): %v", tokensTrailerKey, err)
 	} else if !found {
-		t.Errorf("landed commit missing %s: %s trailer", tokensTrailerKey, wantTokens)
+		t.Errorf("merged commit missing %s: %s trailer", tokensTrailerKey, wantTokens)
 	}
 	if found, err := git.TrailerCommitExists(repoDir, "HEAD", elapsedTrailerKey, wantElapsed); err != nil {
 		t.Fatalf("TrailerCommitExists(%s): %v", elapsedTrailerKey, err)
 	} else if !found {
-		t.Errorf("landed commit missing %s: %s trailer", elapsedTrailerKey, wantElapsed)
+		t.Errorf("merged commit missing %s: %s trailer", elapsedTrailerKey, wantElapsed)
 	}
 	if found, err := git.TrailerCommitExists(repoDir, "HEAD", ticketTrailerKey, addressTrailerValue(scratchDir, "epic", "01")); err != nil {
 		t.Fatalf("TrailerCommitExists(%s): %v", ticketTrailerKey, err)
 	} else if !found {
-		t.Errorf("landed commit missing %s trailer", ticketTrailerKey)
+		t.Errorf("merged commit missing %s trailer", ticketTrailerKey)
 	}
 }
 
 // TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics exercises
 // ticket 03: IterationFinished's InProgress/Completed/Total counts track the
 // scheduling loop's actual state (not the fixed zero placeholder ticket 02
-// wired up), the landed ticket's ElapsedSeconds/PeakContextTokens come from
-// its own frontmatter (written by landCherryPick's writeLandedMetrics before
+// wired up), the merged ticket's ElapsedSeconds/PeakContextTokens come from
+// its own frontmatter (written by mergeCherryPick's writeMergedMetrics before
 // this event fires), and EpicComplete's elapsedSeconds is the run's real
 // wall-clock duration rather than a hardcoded 0. Ticket 01 is deliberately
 // held back from finishing (a Runner wait hook blocks on a channel) until
@@ -454,7 +454,7 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 
 // TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsedTime
 // verifies ticket 04: the commitless branch of finishIteration reads its own
-// finishing session's stats, the same way landCherryPick's writeLandedMetrics
+// finishing session's stats, the same way mergeCherryPick's writeMergedMetrics
 // does for a committed finish, and stamps them into the ticket's frontmatter.
 func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsedTime(t *testing.T) {
 	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.

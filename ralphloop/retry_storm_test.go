@@ -24,7 +24,7 @@ func TestConsecutiveLaunchFailures(t *testing.T) {
 	}
 }
 
-func TestRetryStormKind_ParksAtLimit(t *testing.T) {
+func TestRetryStormKind_PausesAtLimit(t *testing.T) {
 	scratch := epicScratchDir(t, "epic")
 	old := retryStormLaunches
 	retryStormLaunches = func() int { return 3 }

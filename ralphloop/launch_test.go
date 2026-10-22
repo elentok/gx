@@ -64,7 +64,7 @@ func TestPromptedLaunch_IterationStartedCarriesCwdAndSessionIDPlusImmediateOccup
 // Codex does not expose its native session ID when the interactive process is
 // first started, only once the first prompt begins working, so promptedLaunch
 // must read the session ID from the post-prompt status for monitoring,
-// logging, and landing.
+// logging, and merging.
 func TestPromptedLaunch_CodexAdoptsSessionIDFromStatusAfterPrompt(t *testing.T) {
 	t.Parallel()
 	var startedSessionID string

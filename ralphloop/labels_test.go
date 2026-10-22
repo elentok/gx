@@ -76,7 +76,7 @@ func TestIterLabel_LongEpicName_StaysDistinctAcrossEpics(t *testing.T) {
 
 // TestRun_TwoEpicsSameIterationNumber_DontCollideOnWorktreePath exercises
 // ticket 01's regression scenario end to end: two separate epics that both
-// reach an iteration numbered "04" must land on distinct worktree
+// reach an iteration numbered "04" must merge on distinct worktree
 // directories rather than the second epic silently reusing (or corrupting)
 // the first's.
 func TestRun_TwoEpicsSameIterationNumber_DontCollideOnWorktreePath(t *testing.T) {

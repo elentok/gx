@@ -57,7 +57,7 @@ func TestStartAndPrompt_NotDeliveredRetriesOnFreshSession(t *testing.T) {
 	}
 }
 
-func TestStartAndPrompt_NotDeliveredTwiceParksStalled(t *testing.T) {
+func TestStartAndPrompt_NotDeliveredTwicePausesStalled(t *testing.T) {
 	r := runnerfake.NewRunner()
 	r.FailNextPrompts("it-01", 2, agentrunner.ErrNotDelivered)
 	_, err, fails := startAndPromptFake(t, r)
@@ -99,7 +99,7 @@ func TestStartAndPrompt_ServerLaunchNeverAdopts(t *testing.T) {
 	}
 }
 
-func TestStartAndPrompt_NotReadyKeepsSessionForBlockedPark(t *testing.T) {
+func TestStartAndPrompt_NotReadyKeepsSessionForBlockedPause(t *testing.T) {
 	r := runnerfake.NewRunner()
 	r.FailNextPrompts("it-01", 1, agentrunner.ErrNotReady)
 	s, err, fails := startAndPromptFake(t, r)

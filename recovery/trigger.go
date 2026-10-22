@@ -65,7 +65,7 @@ type Result struct {
 }
 
 // Verbs are the server's own verbs as a remedy sees them: the same refusals,
-// land lock and events as a person's call, stamped actor recovery.
+// merge lock and events as a person's call, stamped actor recovery.
 type Verbs interface {
 	// Do makes one verb call (see the Verb constants).
 	Do(c Call) (Result, error)
@@ -76,7 +76,7 @@ type Verbs interface {
 
 // The verbs a rule remedy may call.
 const (
-	VerbPark           = "park"
+	VerbPause          = "pause"
 	VerbRelaunch       = "relaunch"
 	VerbCommitlessDone = "commitless-done"
 	VerbNudge          = "nudge"

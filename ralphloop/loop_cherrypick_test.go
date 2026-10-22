@@ -260,7 +260,7 @@ func TestRun_AlreadyAppliedIteration_CompletesWithoutCherryPickOrResolver(t *tes
 	}
 }
 
-func TestRun_StaleCherryPick_IsAbortedBeforeLandingCurrentTicket(t *testing.T) {
+func TestRun_StaleCherryPick_IsAbortedBeforeMergingCurrentTicket(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -290,7 +290,7 @@ func TestRun_StaleCherryPick_IsAbortedBeforeLandingCurrentTicket(t *testing.T) {
 	}
 }
 
-func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
+func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketMerges(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -315,9 +315,9 @@ func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
 		active = false
 		return nil
 	}
-	// Ticket 01's conflict leaves it needs-repair, so this run ends parked
-	// on it rather than exiting; ticket 02 still has to land first.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", MaxParallel: 1}, d, noopEventSink{})
+	// Ticket 01's conflict leaves it paused (repair), so this run ends paused
+	// on it rather than exiting; ticket 02 still has to merge first.
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo", MaxParallel: 1}, d, noopEventSink{})
 
 	if aborts != 1 {
 		t.Errorf("AbortCherryPick calls = %d, want 1", aborts)
@@ -331,7 +331,7 @@ func TestRun_UnfinishedConflict_IsAbortedBeforeNextTicketLands(t *testing.T) {
 	}
 }
 
-func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsRepairWithoutAbortingRun(t *testing.T) {
+func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksRepairWithoutAbortingRun(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -347,9 +347,9 @@ func TestRun_CherryPickConflict_ResolutionNeverFinishes_MarksNeedsRepairWithoutA
 	d.Runner = &blipRunner{Runner: fakeRunner(d), timeoutLabel: func(label string) bool {
 		return strings.HasPrefix(label, "conflict-")
 	}}
-	// A stuck conflict resolution marks the ticket needs-repair rather than
-	// aborting the run, which leaves the epic parked on it.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+	// A stuck conflict resolution marks the ticket paused (repair) rather than
+	// aborting the run, which leaves the epic paused on it.
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "epic", "issues", "01-a.md"))
 	if err != nil {
@@ -380,16 +380,16 @@ func findConflictResolutionChild(t *testing.T, scratchDir, epicName string) stri
 	return ""
 }
 
-// TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_ParksOnChildNotParent
+// TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_PausesOnChildNotParent
 // reproduces the 2.1.228 incident's first sub-case: herdr reports the
 // conflict-resolution agent's pane idle (a premature "done" signal — the
 // agent hadn't actually finished), but the git sequencer is still genuinely
 // conflicted. resolveCherryPickConflict must catch this via its own
 // CherryPickInProgress corroboration rather than trusting herdr, and must
-// park needs-repair on the conflict-resolution child ticket it forked —
+// pause paused (repair) on the conflict-resolution child ticket it forked —
 // never on the parent iteration ticket, so a person sees exactly which
 // conflict resolution needs attention instead of a generic iteration fault.
-func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_ParksOnChildNotParent(t *testing.T) {
+func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_PausesOnChildNotParent(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -408,7 +408,7 @@ func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_Parks
 	}
 
 	sink := &recordingSink{}
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
 	childRaw := findConflictResolutionChild(t, scratchDir, "epic")
 	// Premature done signal with the sequencer still conflicted.
@@ -422,14 +422,14 @@ func TestRun_ConflictResolution_PrematureTabClose_SequencerStillConflicted_Parks
 		t.Errorf("parent iteration ticket = %q, want it left alone (not needs-repair) — the failure belongs to the conflict-resolution child", parentRaw)
 	}
 
-	// The parent is parked on its conflict-resolution child, not landed: its
+	// The parent is paused on its conflict-resolution child, not merged: its
 	// on-disk status is still claimed (checked above via the absence of
-	// needs-repair), so Run must not report it as a completed iteration —
-	// see landOne's parkedOnChild outcome and the results loop's handling of
+	// paused (repair)), so Run must not report it as a completed iteration —
+	// see mergeOne's pausedOnChild outcome and the results loop's handling of
 	// it in loop.go.
 	got := sink.snapshot()
 	if slices.Contains(got, "IterationFinished") {
-		t.Errorf("events = %v, want no IterationFinished for a ticket parked on its conflict-resolution child, not landed", got)
+		t.Errorf("events = %v, want no IterationFinished for a ticket paused on its conflict-resolution child, not merged", got)
 	}
 }
 
@@ -600,7 +600,7 @@ type fakeConflictErr struct{}
 
 func (e *fakeConflictErr) Error() string { return "cherry-pick conflict" }
 
-func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T) {
+func TestRun_ZeroCommitIteration_MarksAskingAndLeavesWorktree(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -611,9 +611,9 @@ func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T)
 	}
 
 	sink := &recordingSink{}
-	// The zero-commit iteration leaves its ticket needs-answer, so the epic's
-	// only ticket is one a human must clear: the run parks on it.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+	// The zero-commit iteration leaves its ticket paused (answer), so the epic's
+	// only ticket is one a human must clear: the run pauses on it.
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
 	if len(*removed) != 0 {
 		t.Errorf("removed worktree branches = %v, want the zero-commit iteration's worktree left in place", *removed)
@@ -628,16 +628,16 @@ func TestRun_ZeroCommitIteration_MarksNeedsAnswerAndLeavesWorktree(t *testing.T)
 		t.Errorf("ticket must not be marked done after a zero-commit iteration:\n%s", raw)
 	}
 
-	// A parked ticket already gets its own notification via
+	// A paused ticket already gets its own notification via
 	// TicketNeedsHuman; it must not also fire IterationFinished (the
 	// spurious "done" notification) or count toward completed — see
-	// loop.go's parked early-continue in the results-handling loop.
+	// loop.go's paused early-continue in the results-handling loop.
 	got := sink.snapshot()
 	if !slices.Contains(got, "TicketNeedsHuman") {
-		t.Errorf("events = %v, want TicketNeedsHuman for the parked ticket", got)
+		t.Errorf("events = %v, want TicketNeedsHuman for the paused ticket", got)
 	}
 	if slices.Contains(got, "IterationFinished") {
-		t.Errorf("events = %v, want no IterationFinished for a parked (zero-commit) ticket", got)
+		t.Errorf("events = %v, want no IterationFinished for a paused (zero-commit) ticket", got)
 	}
 }
 
@@ -648,8 +648,8 @@ func TestRun_ZeroCommitIteration_ReasonNamesADirtyWorktree(t *testing.T) {
 		dirty []git.Change
 		want  string
 	}{
-		{"clean", nil, "no commits landed"},
-		{"dirty", []git.Change{{Path: "a"}, {Path: "b"}, {Path: "c"}}, "no commits landed; worktree has uncommitted changes (3 files)"},
+		{"clean", nil, "no commits merged"},
+		{"dirty", []git.Change{{Path: "a"}, {Path: "b"}, {Path: "c"}}, "no commits merged; worktree has uncommitted changes (3 files)"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -660,7 +660,7 @@ func TestRun_ZeroCommitIteration_ReasonNamesADirtyWorktree(t *testing.T) {
 			d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) { return 0, nil }
 			d.UncommittedChanges = func(string) ([]git.Change, error) { return tc.dirty, nil }
 			sink := &recordingSink{}
-			runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+			runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 			if len(sink.ticketNeedsHumanCalls) != 1 || sink.ticketNeedsHumanCalls[0][3] != tc.want {
 				t.Errorf("TicketNeedsHuman calls = %v, want one with reason %q", sink.ticketNeedsHumanCalls, tc.want)
 			}
@@ -668,7 +668,7 @@ func TestRun_ZeroCommitIteration_ReasonNamesADirtyWorktree(t *testing.T) {
 	}
 }
 
-func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
+func TestRun_ZeroCommitIteration_OtherTicketsStillMerge(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -676,7 +676,7 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 	})
 	d, _, removed := fakeDeps()
 	d.CommitsAhead = func(dir, fromExclusive, toRef string) (int, error) {
-		// The zero-commit park's clearable check asks about the iteration
+		// The zero-commit pause's clearable check asks about the iteration
 		// branch from the feature worktree.
 		if strings.Contains(dir, "epic-item-01") || strings.HasSuffix(toRef, "epic-item-01") {
 			return 0, nil
@@ -684,8 +684,8 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 		return 1, nil
 	}
 
-	// Ticket 01 ends needs-answer, so the run parks on it once 02 has landed.
-	runUntilParked(t, RunOptions{
+	// Ticket 01 ends paused (answer), so the run pauses on it once 02 has merged.
+	runUntilPaused(t, RunOptions{
 		EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
 		MaxParallel: 1,
 	}, d, noopEventSink{})
@@ -713,8 +713,8 @@ func TestRun_ZeroCommitIteration_OtherTicketsStillLand(t *testing.T) {
 // incident: herdr reported the agent idle for one poll, then it went back to
 // work and committed shortly after. waitForFinish's confirmFinished recheck
 // (loop.go) should catch that the first idle signal didn't hold and keep
-// waiting instead of the loop marking the ticket needs-answer and abandoning a
-// worktree that was about to land a commit.
+// waiting instead of the loop marking the ticket paused (answer) and abandoning a
+// worktree that was about to merge a commit.
 func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -750,13 +750,13 @@ func TestRun_TransientIdleBlip_DoesNotOrphanCommit(t *testing.T) {
 	}
 }
 
-// TestRun_CommitLandsDuringNeedsAnswerRecheck_MarksDoneNotNeedsAnswer covers
+// TestRun_CommitMergesDuringAskingRecheck_MarksDoneNotAsking covers
 // finishIteration's own recheck (loop.go): even after waitForFinish's
-// confirmFinished settles on "finished", a commit can still land in the
+// confirmFinished settles on "finished", a commit can still merge in the
 // window before CommitsAhead is checked (e.g. a reattached iteration, which
 // skips waitForFinish's debounce). The recheck should catch it instead of
-// orphaning the ticket as needs-answer.
-func TestRun_CommitLandsDuringNeedsAnswerRecheck_MarksDoneNotNeedsAnswer(t *testing.T) {
+// orphaning the ticket as paused (answer).
+func TestRun_CommitMergesDuringAskingRecheck_MarksDoneNotAsking(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -780,10 +780,10 @@ func TestRun_CommitLandsDuringNeedsAnswerRecheck_MarksDoneNotNeedsAnswer(t *test
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if !strings.Contains(string(raw), "status: done") {
-		t.Errorf("ticket not marked done after commit landed on recheck:\n%s", raw)
+		t.Errorf("ticket not marked done after commit merged on recheck:\n%s", raw)
 	}
 	if rawIsPaused(t, string(raw), schema.PauseClassAnswer) {
-		t.Errorf("ticket wrongly marked needs-answer despite commit landing on recheck:\n%s", raw)
+		t.Errorf("ticket wrongly marked needs-answer despite commit merging on recheck:\n%s", raw)
 	}
 	if len(*removed) != 1 {
 		t.Errorf("removed worktree branches = %v, want the iteration's worktree removed", *removed)

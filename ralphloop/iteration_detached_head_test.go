@@ -9,7 +9,7 @@ import (
 
 // An agent that ran `git checkout -q HEAD~0` and then committed leaves the
 // iteration branch at its base; the commit on the detached HEAD still counts,
-// so the finish lands it instead of parking it as a zero-commit finish.
+// so the finish merges it instead of pausing it as a zero-commit finish.
 func TestIterationCommitsAhead_CountsCommitsOnDetachedHead(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)

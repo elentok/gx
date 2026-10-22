@@ -121,7 +121,7 @@ func (s *Server) locks(w http.ResponseWriter, _ *http.Request) {
 		}
 		for _, issues := range epicDirs {
 			epicDir := filepath.Dir(issues)
-			owner, err := ralphloop.ReadLandLock(epicDir)
+			owner, err := ralphloop.ReadMergeLock(epicDir)
 			if err != nil || owner == nil {
 				continue
 			}

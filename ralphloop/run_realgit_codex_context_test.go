@@ -19,20 +19,20 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp drives
+// TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp drives
 // ticket 27's full Codex context-recovery E2E: one real-Git ticket through
 // production Run, with a real Codex rollout (ticket 26's herdrfake
 // infrastructure, read back through the real codexsession package rather
 // than a hand-rolled JSONL fixture as in ticket 15's test) proactively
 // breaching --smart-zone, recovering through blocked compact confirmation
-// and finish-up, then landing with full trailers, metadata, and cleanup.
+// and finish-up, then merging with full trailers, metadata, and cleanup.
 // The fake agent's only side effect — committing the ticket's one file — is
 // triggered from this test's own "tab create" handler (not from
 // herdrfake.RegisterCodexRollout's opaque prompt state machine, which has no
 // hook for it), which runs synchronously after runIteration's real
 // AddWorktree, so the commit is guaranteed to exist before any wait/finish
 // polling begins.
-func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T) {
+func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.T) {
 	// not parallel-safe: setProcessEnv mutates the process-wide $HOME/$CODEX_HOME
 	// env vars, and herdrfake.StartState calls t.Setenv for the helper socket
 	// path and PATH.
@@ -96,7 +96,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 		FinalUsage:     herdrfake.CodexUsage{ContextTokens: smartZone / 2, TotalTokens: smartZone + 25_000},
 		// Ticket 03's regression lock: herdr 0.8.2's agent_blocked guard stays
 		// on through the whole recovery. A pre-ticket-03 fake that modeled
-		// ctrl+c as landing in a blocked phase would have this guard reject
+		// ctrl+c as merging in a blocked phase would have this guard reject
 		// the "/compact" submission and fail this test; the real contract is
 		// that ctrl+c leaves the pane idle-and-promptable, so the guard never
 		// fires here.
@@ -177,7 +177,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 		t.Errorf("compact phases = %v, want compact-started, finishing-up, recovered", phases)
 	}
 
-	// Acceptance criterion: the implementation commit lands with all three
+	// Acceptance criterion: the implementation commit merges with all three
 	// Ralph-loop trailers.
 	featurePath := filepath.Join(wtDir, epicName)
 	trailers, err := git.TrailerMap(featurePath, "HEAD", ticketTrailerKey)
@@ -186,7 +186,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 	}
 	sha := trailers[addressTrailerValue(scratchDir, epicName, "01")]
 	if sha == "" {
-		t.Fatalf("landed trailers = %v, want a landed commit for ticket 01", trailers)
+		t.Fatalf("merged trailers = %v, want a merged commit for ticket 01", trailers)
 	}
 	show := exec.Command("git", "show", "-s", "--format=%B", sha)
 	show.Dir = featurePath
@@ -242,7 +242,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryLandsAndCleansUp(t *testing.T
 			gotEventOrder = append(gotEventOrder, event.Type)
 		}
 		if event.Type == string(eventsc.CherryPicked) && event.SHA != sha {
-			t.Errorf("cherry-picked SHA = %q, want landed SHA %q", event.SHA, sha)
+			t.Errorf("cherry-picked SHA = %q, want merged SHA %q", event.SHA, sha)
 		}
 	}
 	if !slices.Equal(gotEventOrder, wantEventOrder) {
@@ -312,7 +312,7 @@ func codexNativeContextFixture(t *testing.T) (repoDir, scratchDir, ticketPath, c
 // TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers exercises
 // ticket 31's successful-recovery path: exactly one classification (ctrl+c,
 // /compact, finish-up) fires off the native-exhaustion banner, the agent
-// finishes and commits, and the ticket lands normally.
+// finishes and commits, and the ticket merges normally.
 func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T) {
 	// not parallel-safe: herdrfake.StartState calls t.Setenv for the helper
 	// socket path and PATH.
@@ -494,9 +494,9 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 // TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails
 // exercises ticket 31's unsuccessful-recovery path: the same native
 // exhaustion banner is classified and the pane is interrupted, but the
-// /compact prompt itself never lands. That must turn into a durable,
-// actionable needs-repair failure — not a false "done" (no commit ever
-// lands) and not a generic zero-commit needs-answer that would lose the
+// /compact prompt itself never merges. That must turn into a durable,
+// actionable paused (repair) failure — not a false "done" (no commit ever
+// merges) and not a generic zero-commit paused (answer) that would lose the
 // exhaustion reason — and it must leave the iteration's worktree/branch/tab
 // in place for a human to inspect.
 func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *testing.T) {
@@ -557,7 +557,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		case text == "/compact":
 			compactCalls++
 			recoveryPrompts = append(recoveryPrompts, "/compact")
-			return nil, herdrfake.Identities{}, fmt.Errorf("compact never landed")
+			return nil, herdrfake.Identities{}, fmt.Errorf("compact never merged")
 		default:
 			return nil, herdrfake.Identities{}, fmt.Errorf("unexpected prompt %q", text)
 		}
@@ -602,10 +602,10 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC) }
-	sink := &needsRepairSink{}
-	// The failed recovery leaves the epic's only ticket needs-repair, so
-	// the run parks on it.
-	runUntilParked(t, RunOptions{
+	sink := &repairSink{}
+	// The failed recovery leaves the epic's only ticket paused (repair), so
+	// the run pauses on it.
+	runUntilPaused(t, RunOptions{
 		EpicName: epicName, Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir,
 		RepoDir: repoDir, SmartZone: smartZone,
 	}, deps, sink)
@@ -647,7 +647,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
-	var sawPaused, sawRecoveryFailed, sawFinished, sawCherryPicked, sawNeedsAnswer bool
+	var sawPaused, sawRecoveryFailed, sawFinished, sawCherryPicked, sawAsking bool
 	for _, event := range events {
 		switch event.Type {
 		case string(eventsc.PausedSmartZone):
@@ -662,7 +662,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		case string(eventsc.CherryPicked):
 			sawCherryPicked = true
 		case string(eventsc.Paused):
-			sawNeedsAnswer = sawNeedsAnswer || eventsc.Kind(event.Kind).AwaitsAnswer()
+			sawAsking = sawAsking || eventsc.Kind(event.Kind).AwaitsAnswer()
 		case string(eventsc.Resumed):
 			t.Error("unexpected resumed event: recovery never succeeded")
 		}
@@ -671,9 +671,9 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 		t.Errorf("event log missing classification/recovery-failure trail: paused=%v recoveryFailed=%v", sawPaused, sawRecoveryFailed)
 	}
 	if sawFinished || sawCherryPicked {
-		t.Error("iteration must not appear finished/cherry-picked: no commit ever landed")
+		t.Error("iteration must not appear finished/cherry-picked: no commit ever merged")
 	}
-	if sawNeedsAnswer {
+	if sawAsking {
 		t.Error("must not fall back to generic needs-answer: that would lose the exhaustion reason")
 	}
 
@@ -691,9 +691,9 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecoveryFails(t *test
 	}
 }
 
-// needsRepairSink records the single TicketNeedsHuman call ticket 31's
+// repairSink records the single TicketNeedsHuman call ticket 31's
 // failed-recovery scenario is expected to make.
-type needsRepairSink struct {
+type repairSink struct {
 	noopEventSink
 	mu     sync.Mutex
 	paused bool
@@ -701,7 +701,7 @@ type needsRepairSink struct {
 	reason string
 }
 
-func (s *needsRepairSink) TicketNeedsHuman(identifier, epicName, status string, _ eventsc.Kind, reason string) {
+func (s *repairSink) TicketNeedsHuman(identifier, epicName, status string, _ eventsc.Kind, reason string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.paused = true

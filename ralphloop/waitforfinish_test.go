@@ -76,7 +76,7 @@ func TestWaitForFinish_CodexNativeContextFailureRecoveryFailureIsDurable(t *test
 	t.Parallel()
 	const failure = "■ Codex ran out of room in the model's context window."
 	r := &blipRunner{Runner: idlePromptRunner("iter-21", "codex-session-21"), contextExhausted: failure}
-	r.FailNextPrompts("iter-21", 1, errors.New("compact never landed"))
+	r.FailNextPrompts("iter-21", 1, errors.New("compact never merged"))
 	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
@@ -101,7 +101,7 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 	// existing to fire — the native exhaustion text is itself the evidence.
 	const failure = `Error running remote compact task: {"error":{"code":"context_length_exceeded"}}`
 	r := &blipRunner{Runner: idlePromptRunner("iter-21", "codex-session-21"), contextExhausted: failure}
-	r.FailNextPrompts("iter-21", 1, errors.New("compact never landed"))
+	r.FailNextPrompts("iter-21", 1, errors.New("compact never merged"))
 	d := Deps{Runner: r, Sleep: func(time.Duration) {}}
 
 	err := waitForFinish(d, launchAndPromptParams{
@@ -113,7 +113,7 @@ func TestWaitForFinish_CodexNativeContextFailureFailsDurablyWithoutFreshTokenEve
 	}
 }
 
-func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfParking(t *testing.T) {
+func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfPausing(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	r := &blipRunner{
@@ -141,7 +141,7 @@ func TestWaitForFinish_CodexBlockedPaneContextExhaustionRecoversInsteadOfParking
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if strings.Contains(string(raw), "needs-answer") {
-		t.Errorf("ticket was parked despite recoverable context exhaustion:\n%s", raw)
+		t.Errorf("ticket was paused despite recoverable context exhaustion:\n%s", raw)
 	}
 }
 
@@ -400,7 +400,7 @@ func TestRecoverSmartZoneBreach_PrematureIdleFallsThroughToTranscriptCheck(t *te
 	var compactionCount int
 	r := breachRunner(func(wait int) bool {
 		if wait == 2 {
-			// The real compaction lands between the second and third poll
+			// The real compaction merges between the second and third poll
 			// tick, after the first tick's premature idle was refused.
 			compactionCount = 1
 			return true
@@ -524,7 +524,7 @@ func TestReadCompactBoundaries_ClassifiesEachState(t *testing.T) {
 }
 
 // gatedBreachParams is the launchAndPromptParams shape the compaction-gate
-// tests below share: a Claude iteration whose events land in scratchDir.
+// tests below share: a Claude iteration whose events merge in scratchDir.
 func gatedBreachParams(scratchDir string) launchAndPromptParams {
 	return launchAndPromptParams{
 		Label:      "iter-19",
@@ -586,7 +586,7 @@ func TestRecoverSmartZoneBreach_GateHoldsWhileBoundaryStaysAtBaseline(t *testing
 
 // TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances is the other
 // half: the same premature-idle pane, but with a compaction that genuinely
-// lands part-way through. Recovery must resume the moment the boundary count
+// merges part-way through. Recovery must resume the moment the boundary count
 // moves and send the finish-up prompt then, not before and not never.
 func TestRecoverSmartZoneBreach_GateReleasesOnceBoundaryAdvances(t *testing.T) {
 	t.Parallel()
@@ -641,7 +641,7 @@ func compactCompletionEvents(t *testing.T, scratchDir string) map[string]bool {
 
 // TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent covers the middle
 // state: the pane claimed completion immediately, the gate held it, and the
-// boundary landed a few ticks later. Nothing about that wait expired, so it
+// boundary merged a few ticks later. Nothing about that wait expired, so it
 // must log the gated event rather than borrowing the timeout one.
 func TestRecoverSmartZoneBreach_GatedCompletionLogsItsOwnEvent(t *testing.T) {
 	t.Parallel()
@@ -828,7 +828,7 @@ func TestWaitForFinish_AbsorbsGatedGiveUpAndKeepsPolling(t *testing.T) {
 		if wait == 1 {
 			return true
 		}
-		// The compaction lands for real once recovery has already given up
+		// The compaction merges for real once recovery has already given up
 		// on it, which is what makes the pane's idle report a genuine finish.
 		boundaries = 1
 		return false
@@ -972,7 +972,7 @@ func TestWaitForFinish_GatedGiveUpDeniesAPaneIdleToEveryPollKind(t *testing.T) {
 // iteration on two unrelated give-ups it had already recovered from.
 func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 	t.Parallel()
-	thirdLanded := false
+	thirdMerged := false
 	r := boundGiveUpRunner(nil)
 	compacts := func() int { return countPrompts(r.Prompts("iter-19"), "/compact") }
 	r.timeoutIf = func(int) bool {
@@ -981,18 +981,18 @@ func TestWaitForFinish_SuccessfulRecoveryResetsTheGiveUpCounter(t *testing.T) {
 		if compacts() < 3 {
 			return true
 		}
-		// The third compaction lands only once recovery has given up on it,
+		// The third compaction merges only once recovery has given up on it,
 		// so the finish the pane then reports is corroborated.
-		thirdLanded = true
+		thirdMerged = true
 		return false
 	}
 	d := Deps{
 		Runner:        r,
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
-		// Only the second compaction lands while its own recovery is watching.
+		// Only the second compaction merges while its own recovery is watching.
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			switch {
-			case thirdLanded:
+			case thirdMerged:
 				return 2, true, nil
 			case compacts() >= 2:
 				return 1, true, nil
@@ -1028,7 +1028,7 @@ func TestWaitForFinish_NonGatedRecoveryFailureNeitherCountsNorResets(t *testing.
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) { return 200, true, nil },
 		// The middle attempt compacts for real but its finish-up prompt fails,
 		// so recovery abandons it without completing. The first read after its
-		// "/compact" lands arms that failure.
+		// "/compact" merges arms that failure.
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
 			if countPrompts(r.Prompts("iter-19"), "/compact") < 2 {
 				return 0, true, nil
@@ -1247,17 +1247,17 @@ func TestWaitForFinish_EmitsContextOccupancyOnEachPollTimeout(t *testing.T) {
 	}
 }
 
-// TestWaitForFinish_BlockedPaneDwellsThenParks verifies ticket 14's core
+// TestWaitForFinish_BlockedPaneDwellsThenPauses verifies ticket 14's core
 // gate: a pane found blocked joins the wait's completion list (so the wait
 // returns immediately instead of re-looping to a timeout), a single 15s
 // dwell precedes a re-check via Runner.Status (a peek, not another Wait), and
 // — the pane still being blocked at the end of that window — the iteration
-// ends in a pane-answered park: needs-answer, a reason, and a "## Needs
+// ends in a pane-answered pause: paused (answer), a reason, and a "## Needs
 // Answer" stub, both naming the iteration label rather than the raw pane id.
 // It also covers the destructive-interrupt regression: no Prompt call
 // is ever made while the pane is blocked, since typing into a pane sitting
 // on an operator's own pending dialog would be exactly that.
-func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
+func TestWaitForFinish_BlockedPaneDwellsThenPauses(t *testing.T) {
 	t.Parallel()
 	for _, agentKind := range []AgentKind{AgentClaude, AgentCodex} {
 		t.Run(string(agentKind), func(t *testing.T) {
@@ -1275,8 +1275,8 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 				Label: "iter-01", Agent: agentKind, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 				ScratchDir: scratchDir, EpicName: "epic", Gate: NewGate(),
 			}, "sess-1")
-			if !errors.Is(err, errBlockedPaneParked) {
-				t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
+			if !errors.Is(err, errBlockedPanePaused) {
+				t.Fatalf("waitForFinish() err = %v, want errBlockedPanePaused", err)
 			}
 			if len(slept) != 1 || slept[0] != blockedDwellMs*time.Millisecond {
 				t.Errorf("Sleep calls = %v, want exactly one %v dwell", slept, blockedDwellMs*time.Millisecond)
@@ -1307,27 +1307,27 @@ func TestWaitForFinish_BlockedPaneDwellsThenParks(t *testing.T) {
 			}
 			last := events[len(events)-1]
 			if last.Type != string(eventsc.Paused) || !strings.Contains(last.Reason, "iter-01") {
-				t.Errorf("park event = %+v, want type needs-answer with reason naming iter-01", last)
+				t.Errorf("pause event = %+v, want type needs-answer with reason naming iter-01", last)
 			}
-			// Seam B: exactly one park event, kind matching the frontmatter park_kind.
-			var parks int
+			// Seam B: exactly one pause event, kind matching the frontmatter pause_kind.
+			var pauses int
 			for _, ev := range events {
 				if ev.Type == string(eventsc.Paused) {
-					parks++
+					pauses++
 				}
 			}
-			if parks != 1 || last.Kind != ticket.PauseReason.LegacyKind() || last.Kind != "blocked-pane" || last.Pane != "pane-1" {
-				t.Errorf("parks = %d, last = %+v, want one blocked-pane event matching park_kind with pane context", parks, last)
+			if pauses != 1 || last.Kind != ticket.PauseReason.LegacyKind() || last.Kind != "blocked-pane" || last.Pane != "pane-1" {
+				t.Errorf("pauses = %d, last = %+v, want one blocked-pane event matching park_kind with pane context", pauses, last)
 			}
 		})
 	}
 }
 
-// TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPark verifies
+// TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPause verifies
 // that the dwell's single re-check, not the initial observation, decides the
-// park: a pane that is no longer blocked by the time the 15s window ends
-// keeps the iteration running instead of parking it.
-func TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPark(t *testing.T) {
+// pause: a pane that is no longer blocked by the time the 15s window ends
+// keeps the iteration running instead of pausing it.
+func TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPause(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	r := blockedRunner("iter-01")
@@ -1349,15 +1349,15 @@ func TestWaitForFinish_BlockedPaneClearsBeforeDwellRecheck_DoesNotPark(t *testin
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if strings.Contains(string(raw), "needs-answer") {
-		t.Errorf("ticket was parked despite the pane clearing before the dwell recheck:\n%s", raw)
+		t.Errorf("ticket was paused despite the pane clearing before the dwell recheck:\n%s", raw)
 	}
 }
 
 // TestWaitForFinish_BlockedPaneDwellIsFixedWindow_NotASettleTimer verifies
-// the dwell's shape: parkOnBlockedPane sleeps once and re-checks once,
+// the dwell's shape: pauseOnBlockedPane sleeps once and re-checks once,
 // rather than polling the pane during the window. A pane that left and
 // re-entered the blocked state inside the window (indistinguishable from
-// this fixture, which never observes anything mid-window) still parks
+// this fixture, which never observes anything mid-window) still pauses
 // purely off the single end-of-window read — proven here by Runner.Wait never
 // being asked again once the dwell starts.
 func TestWaitForFinish_BlockedPaneDwellIsFixedWindow_NotASettleTimer(t *testing.T) {
@@ -1373,20 +1373,20 @@ func TestWaitForFinish_BlockedPaneDwellIsFixedWindow_NotASettleTimer(t *testing.
 		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		Gate: NewGate(),
 	}, "sess-1")
-	if !errors.Is(err, errBlockedPaneParked) {
-		t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
+	if !errors.Is(err, errBlockedPanePaused) {
+		t.Fatalf("waitForFinish() err = %v, want errBlockedPanePaused", err)
 	}
 	if r.waits != 1 {
 		t.Errorf("Runner.Wait calls = %d, want exactly 1 (dwell must not re-poll the pane)", r.waits)
 	}
 }
 
-// TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked
+// TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused
 // verifies ticket 14's inverse guard: gx's own smart-zone breach recovery
 // (ctrl+c, then /compact) can leave a pane reporting blocked as a side
 // effect, and the very next poll tick observing that must not be mistaken
-// for an operator-raised prompt and parked.
-func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t *testing.T) {
+// for an operator-raised prompt and paused.
+func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	var readCompactionsCalls int
@@ -1400,7 +1400,7 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t 
 				return true
 			case 2:
 				// The tick right after recoverSmartZoneBreach returns: blocked
-				// as its own artifact, must be guarded against parking.
+				// as its own artifact, must be guarded against pausing.
 				fake.SetState("iter-01", agentrunner.StateBlocked, "")
 			case 3:
 				fake.SetState("iter-01", agentrunner.StateIdle, "")
@@ -1436,15 +1436,15 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotParked(t 
 		t.Fatalf("ReadFile: %v", err)
 	}
 	if strings.Contains(string(raw), "needs-answer") {
-		t.Errorf("ticket was parked off a pane blocked by gx's own smart-zone recovery:\n%s", raw)
+		t.Errorf("ticket was paused off a pane blocked by gx's own smart-zone recovery:\n%s", raw)
 	}
 }
 
-// TestWaitForFinish_BlockedPane_ParksWithoutResend covers ticket 05: the
-// park-on-blocked resend hatch was unreachable dead code and has been
-// deleted, so a blocked pane always parks with no prompt attempted,
+// TestWaitForFinish_BlockedPane_PausesWithoutResend covers ticket 05: the
+// pause-on-blocked resend hatch was unreachable dead code and has been
+// deleted, so a blocked pane always pauses with no prompt attempted,
 // whatever its state_change_seq.
-func TestWaitForFinish_BlockedPane_ParksWithoutResend(t *testing.T) {
+func TestWaitForFinish_BlockedPane_PausesWithoutResend(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 
@@ -1455,8 +1455,8 @@ func TestWaitForFinish_BlockedPane_ParksWithoutResend(t *testing.T) {
 		Label: "iter-01", Agent: AgentClaude, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		Gate: NewGate(),
 	}, "sess-1")
-	if !errors.Is(err, errBlockedPaneParked) {
-		t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
+	if !errors.Is(err, errBlockedPanePaused) {
+		t.Fatalf("waitForFinish() err = %v, want errBlockedPanePaused", err)
 	}
 	if prompts := r.Prompts("iter-01"); len(prompts) != 0 {
 		t.Errorf("prompts = %v, want none; a blocked pane must never be prompted", prompts)
@@ -1471,12 +1471,12 @@ func TestWaitForFinish_BlockedPane_ParksWithoutResend(t *testing.T) {
 	}
 }
 
-// TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair covers a Codex pane
-// still blocked once its quota resets: per ticket 04, that must park for a
-// human (needs-answer), never a hard failure that stalled-agent detection
-// would flag needs-repair, and never a "continue" re-prompt into a pane the
+// TestWaitForFinish_CodexQuotaDoesNotBecomeRepair covers a Codex pane
+// still blocked once its quota resets: per ticket 04, that must pause for a
+// human (paused (answer)), never a hard failure that stalled-agent detection
+// would flag paused (repair), and never a "continue" re-prompt into a pane the
 // runner reports blocked.
-func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
+func TestWaitForFinish_CodexQuotaDoesNotBecomeRepair(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	scratchDir := t.TempDir()
@@ -1501,8 +1501,8 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		ScratchDir: scratchDir, EpicName: "epic", Gate: gate, Sink: sink,
 	}, "codex-session-1")
-	if !errors.Is(err, errBlockedPaneParked) {
-		t.Fatalf("waitForFinish() err = %v, want errBlockedPaneParked", err)
+	if !errors.Is(err, errBlockedPanePaused) {
+		t.Fatalf("waitForFinish() err = %v, want errBlockedPanePaused", err)
 	}
 	if prompts := r.Prompts("iter-01"); len(prompts) != 0 {
 		t.Errorf("prompts = %v, want none — a blocked pane must never be prompted", prompts)
@@ -1529,7 +1529,7 @@ func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepair(t *testing.T) {
 	}
 	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 	if got := openQuestionSummary(t, ticketPath); !strings.Contains(got, "approval_prompt") {
-		t.Errorf("open question summary %q, want the park reason to name the runner's blocked reason", got)
+		t.Errorf("open question summary %q, want the pause reason to name the runner's blocked reason", got)
 	}
 }
 
@@ -1555,7 +1555,7 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 	}
 }
 
-func TestWaitForFinish_CodexQuotaDoesNotBecomeNeedsRepairWhenPaneIdlesAfterReset(t *testing.T) {
+func TestWaitForFinish_CodexQuotaDoesNotBecomeRepairWhenPaneIdlesAfterReset(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	gate := NewGate()
@@ -1606,7 +1606,7 @@ func stickyBaselineDeps(
 }
 
 // noBoundarySinceSubmission is the after-submission read for a recovery whose
-// compaction never lands.
+// compaction never merges.
 func noBoundarySinceSubmission(string, string, time.Time) (int, bool, error) { return 0, true, nil }
 
 // TestRecoverSmartZoneBreach_UnavailableBaselineConfirmsOnABoundaryAfterSubmission
@@ -1617,10 +1617,10 @@ func noBoundarySinceSubmission(string, string, time.Time) (int, bool, error) { r
 func TestRecoverSmartZoneBreach_UnavailableBaselineConfirmsOnABoundaryAfterSubmission(t *testing.T) {
 	t.Parallel()
 	var sleeps int
-	landed := 0
+	merged := 0
 	r := breachRunner(func(wait int) bool {
 		if wait == 3 {
-			landed = 1
+			merged = 1
 		}
 		return false
 	})
@@ -1629,7 +1629,7 @@ func TestRecoverSmartZoneBreach_UnavailableBaselineConfirmsOnABoundaryAfterSubmi
 			return 0, false, errors.New("transcript read failed")
 		},
 		func(string, string, time.Time) (int, bool, error) {
-			return landed, true, nil
+			return merged, true, nil
 		},
 	)
 
@@ -1638,13 +1638,13 @@ func TestRecoverSmartZoneBreach_UnavailableBaselineConfirmsOnABoundaryAfterSubmi
 		t.Fatalf("recoverSmartZoneBreach: %v", err)
 	}
 	if !recovered {
-		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true: the boundary does land after submission")
+		t.Fatal("recoverSmartZoneBreach returned recovered=false, want true: the boundary does merge after submission")
 	}
 	if prompts := r.Prompts("iter-19"); len(prompts) != 2 || prompts[0] != "/compact" {
-		t.Errorf("prompts = %v, want [/compact, finish-up] once a boundary lands", prompts)
+		t.Errorf("prompts = %v, want [/compact, finish-up] once a boundary merges", prompts)
 	}
 	if sleeps == 0 {
-		t.Error("gated sleeps = 0, want the gate held closed until a boundary landed after submission")
+		t.Error("gated sleeps = 0, want the gate held closed until a boundary merged after submission")
 	}
 }
 
@@ -1679,7 +1679,7 @@ func TestRecoverSmartZoneBreach_FastCompactionUnderAnUnavailableBaselineIsConfir
 		t.Errorf("prompts = %v, want [/compact, finish-up]", prompts)
 	}
 	if r.waits != 1 || sleeps != 0 {
-		t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: an already-landed boundary confirms on the first poll tick", r.waits, sleeps)
+		t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: an already-merged boundary confirms on the first poll tick", r.waits, sleeps)
 	}
 }
 
@@ -1688,7 +1688,7 @@ func TestRecoverSmartZoneBreach_FastCompactionUnderAnUnavailableBaselineIsConfir
 // that only becomes readable mid-recovery is never adopted as the baseline. Its
 // value is already past the true submission-time one, so "count is greater than
 // baseline" would be unsatisfiable forever and a successful compaction would be
-// reported as a give-up. With no boundary landing after submission here, the
+// reported as a give-up. With no boundary merging after submission here, the
 // recovery must give up on the extended bound — never on that stale comparison.
 func TestRecoverSmartZoneBreach_UnavailableBaselineNeverRebasesOnALaterCount(t *testing.T) {
 	t.Parallel()
@@ -1997,7 +1997,7 @@ func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 
 // TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle covers the false-
 // finish this gate can otherwise produce: a background task resolving only
-// proves that one task's own notification landed, not that the agent's
+// proves that one task's own notification merged, not that the agent's
 // overall turn is over — seeing the result is exactly when it's likely to
 // resume real work. If the pane is back to "working" by the time the gate
 // releases, waitForFinish must not declare the iteration done off the stale
@@ -2056,7 +2056,7 @@ func TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle(t *testing.T) {
 }
 
 // TestWaitForFinish_BackgroundTaskGateHoldsUntilTheWokenTurnEnds covers the
-// race that parked a working agent as zero-commit: the task's notification
+// race that paused a working agent as zero-commit: the task's notification
 // woke the agent, but the pane still read idle through its first quick tool
 // calls, so an idle recheck alone passed. The transcript's turn end decides.
 func TestWaitForFinish_BackgroundTaskGateHoldsUntilTheWokenTurnEnds(t *testing.T) {

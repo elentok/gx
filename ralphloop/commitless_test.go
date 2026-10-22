@@ -85,15 +85,15 @@ func TestFinishCommitless_NoCommitsMarksDoneAndRemovesWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !out.Landed {
-		t.Errorf("outcome = %+v, want landed", out)
+	if !out.Merged {
+		t.Errorf("outcome = %+v, want merged", out)
 	}
 	if _, err := os.Stat(wt.Path); !os.IsNotExist(err) {
 		t.Errorf("worktree still exists: %v", err)
 	}
 }
 
-func TestFinishCommitless_StrandedCommitsParkAndKeepWorktree(t *testing.T) {
+func TestFinishCommitless_StrandedCommitsPauseAndKeepWorktree(t *testing.T) {
 	d, one, wt := finishedCommitlessOneOff(t)
 	gitIn(t, wt.Path, "commit", "--allow-empty", "-m", "the fix")
 	sha := gitIn(t, wt.Path, "rev-parse", "--short", "HEAD")
@@ -110,7 +110,7 @@ func TestFinishCommitless_StrandedCommitsParkAndKeepWorktree(t *testing.T) {
 	}
 	evs, _, _ := ReadEvents(one.ScratchDir, "fix-it")
 	if len(evs) != 1 || !strings.Contains(evs[0].Reason, sha+" the fix") {
-		t.Errorf("events = %+v, want one park naming %s", evs, sha)
+		t.Errorf("events = %+v, want one pause naming %s", evs, sha)
 	}
 }
 

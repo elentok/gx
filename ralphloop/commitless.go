@@ -59,9 +59,9 @@ func DiscardCommitless(d Deps, o OneIteration, w IterationWorktree) error {
 }
 
 // FinishCommitless settles a commitless one-off whose agent has gone idle: a
-// detached worktree holding commits nothing else reaches parks and stays, an
-// agent that reported finished is marked done, a needs-answer report parks, and
-// anything else parks as a zero-commit finish. Both reports take the worktree
+// detached worktree holding commits nothing else reaches pauses and stays, an
+// agent that reported finished is marked done, a paused (answer) report pauses, and
+// anything else pauses as a zero-commit finish. Both reports take the worktree
 // away; the tab always closes once the ticket is done.
 func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
@@ -69,13 +69,13 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) 
 		Ticket: o.Ticket, ScratchDir: o.ScratchDir, Sink: o.sink(), KeepAskedAgent: o.KeepAskedAgent,
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
-	stranded, err := parkStrandedCommits(d, p, w, pane, sessionID)
+	stranded, err := pauseStrandedCommits(d, p, w, pane, sessionID)
 	if err != nil {
 		return FinishOutcome{}, err
 	}
 	adopted, asked := false, false
 	if !stranded {
-		asked, err = adoptNeedsAnswerReport(p, w.Path, pane, sessionID)
+		asked, err = adoptAskingReport(p, w.Path, pane, sessionID)
 		adopted = asked
 		if err == nil && !adopted {
 			adopted, err = adoptCommitlessFinish(p, w.Path, pane, sessionID)
@@ -88,7 +88,7 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) 
 	case stranded:
 	case asked && p.KeepAskedAgent:
 	case !adopted:
-		if _, err := p.parkNeedsAnswer(events.ZeroCommit, "no result reported", pane, sessionID, w.Path); err != nil {
+		if _, err := p.pauseAsking(events.ZeroCommit, "no result reported", pane, sessionID, w.Path); err != nil {
 			return FinishOutcome{}, fmt.Errorf("marking ticket needs-answer: %w", err)
 		}
 	default:
@@ -101,16 +101,16 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) 
 		return FinishOutcome{}, fmt.Errorf("reading finished ticket: %w", err)
 	}
 	if t.Status == schema.StatusDone {
-		return FinishOutcome{Landed: true}, nil
+		return FinishOutcome{Merged: true}, nil
 	}
-	return parkedOutcome(o, t), nil
+	return pausedOutcome(o, t), nil
 }
 
-// parkStrandedCommits parks the ticket when w is a detached worktree whose HEAD
+// pauseStrandedCommits pauses the ticket when w is a detached worktree whose HEAD
 // carries commits nothing else reaches: removing it would leave them dangling,
-// so the worktree stays until a person lands or drops them. A scratch directory
+// so the worktree stays until a person merges or drops them. A scratch directory
 // has no commits to strand.
-func parkStrandedCommits(d Deps, p iterationParams, w IterationWorktree, pane, sessionID string) (bool, error) {
+func pauseStrandedCommits(d Deps, p iterationParams, w IterationWorktree, pane, sessionID string) (bool, error) {
 	if w.keep {
 		return false, nil
 	}
@@ -121,8 +121,8 @@ func parkStrandedCommits(d Deps, p iterationParams, w IterationWorktree, pane, s
 	if len(commits) == 0 {
 		return false, nil
 	}
-	reason := fmt.Sprintf("commitless ticket committed on its detached worktree %s; land or drop: %s", w.Path, strings.Join(commits, "; "))
-	if _, err := p.parkNeedsAnswer(events.StrandedCommits, reason, pane, sessionID, w.Path); err != nil {
+	reason := fmt.Sprintf("commitless ticket committed on its detached worktree %s; merge or drop: %s", w.Path, strings.Join(commits, "; "))
+	if _, err := p.pauseAsking(events.StrandedCommits, reason, pane, sessionID, w.Path); err != nil {
 		return false, fmt.Errorf("marking ticket needs-answer: %w", err)
 	}
 	return true, nil

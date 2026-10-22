@@ -130,7 +130,7 @@ func renderLiveTicketRow(icons ui.IconSet, sp spinner.Model, t tickets.Ticket, l
 	title := rowTitle(icons, t)
 
 	switch {
-	case live.paused && live.pauseKind == ralphloop.PauseNeedsRepair:
+	case live.paused && live.pauseKind == ralphloop.PauseRepair:
 		base = prefix + statusNeedsRepairStyle.Render(icons.TicketNeedsRepair) + " " + title
 		return base, live.reason, true
 

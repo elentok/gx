@@ -47,7 +47,7 @@ func TestConflictResolutionHandoff(t *testing.T) {
 			name:            "pick still conflicted is not closed done",
 			edit:            func(*testing.T, string) {},
 			stillConflicted: true,
-			// A fresh resolver parks its child needs-repair; a reattached one
+			// A fresh resolver pauses its child paused (repair); a reattached one
 			// leaves the child claimed and just fails the iteration.
 			wantChild:    schema.StatusClaimed,
 			wantFreshErr: func(err error) bool { return errors.Is(err, errConflictResolutionUnresolved) },
@@ -150,12 +150,12 @@ func loadChild(p iterationParams) (string, error) {
 	return matches[0], nil
 }
 
-// TestRun_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutParking covers a
+// TestRun_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPausing covers a
 // fork's placeholder authored with `base:` that the agent then closes as
 // `--iteration-status finished --commitless true`: the CLI drops base on that
 // transition (cmd's tickets set tests), so adoption must read it as a valid
-// commitless ticket and write done rather than parking on validation.
-func TestRun_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutParking(t *testing.T) {
+// commitless ticket and write done rather than pausing on validation.
+func TestRun_CommitlessFork_WithExplicitBase_IsAdoptedDoneWithoutPausing(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nbase: main\n---\n# A\n",

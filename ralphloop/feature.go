@@ -37,19 +37,19 @@ func ResumeFeature(d Deps, o OneIteration) (IterationWorktree, error) {
 	}, nil
 }
 
-// FinishMerge settles a merge ticket whose agent has gone idle. A needs-answer
-// report parks as for any ticket. Otherwise it is done only once the epic can
+// FinishMerge settles a merge ticket whose agent has gone idle. A paused (answer)
+// report pauses as for any ticket. Otherwise it is done only once the epic can
 // fast-forward onto target: no rebase in progress in the feature worktree, and
 // target an ancestor of the epic. Commits on the epic (a fixer's) are not
-// counted; they land with the epic's fast-forward. Anything else parks
-// needs-repair. The feature worktree always stays.
+// counted; they merge with the epic's fast-forward. Anything else pauses
+// paused (repair). The feature worktree always stays.
 func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target string) (FinishOutcome, error) {
 	p := iterationParams{
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Runner: runnerName(d), Label: w.Label,
 		Ticket: o.Ticket, ScratchDir: o.ScratchDir, Sink: o.sink(),
 	}
 	sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
-	adopted, err := adoptNeedsAnswerReport(p, w.Path, pane, sessionID)
+	adopted, err := adoptAskingReport(p, w.Path, pane, sessionID)
 	if err != nil {
 		return FinishOutcome{}, err
 	}
@@ -59,7 +59,7 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 			return FinishOutcome{}, err
 		}
 		if fault != "" {
-			reason, err := park(p.Sink, parkRequest{
+			reason, err := pause(p.Sink, pauseRequest{
 				ScratchDir: p.ScratchDir, EpicName: p.FeatureBranch, Ticket: p.Ticket.Identifier, Path: p.Ticket.Path,
 				Type: events.Paused, Kind: kind, Reason: fault,
 				Event: p.agentEvent(pane, sessionID, w.Path),
@@ -84,12 +84,12 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 		return FinishOutcome{}, fmt.Errorf("reading finished ticket: %w", err)
 	}
 	if t.Status == schema.StatusDone {
-		return FinishOutcome{Landed: true}, nil
+		return FinishOutcome{Merged: true}, nil
 	}
-	return parkedOutcome(o, t), nil
+	return pausedOutcome(o, t), nil
 }
 
-// MergeFinishFault is why a merge ticket cannot be done and the kind it parks
+// MergeFinishFault is why a merge ticket cannot be done and the kind it pauses
 // with, "" when it can be done.
 func MergeFinishFault(d Deps, o OneIteration, dir, target string) (events.Kind, string, error) {
 	t, err := schema.ParseTicket(o.Ticket.Path)

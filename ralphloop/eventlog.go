@@ -76,7 +76,7 @@ type ScanDecision struct {
 	// or maxParallel was already reached elsewhere in this Run call),
 	// "out-of-scope" (RunScope.Contains is false — e.g. a code-review
 	// ticket's child missing its own parent: back-edge), "blocked", or
-	// "settled" (already done/needs-answer/needs-repair).
+	// "settled" (already done/paused (answer)/paused (repair)).
 	Decision Decision `json:"decision"`
 	// Reason elaborates Decision — e.g. UnresolvedBlockers's tokens for
 	// "blocked". Empty when Decision is self-explanatory.
@@ -117,13 +117,13 @@ type Event struct {
 	// Kind (failure and recovery events) is the closed-enum cause from the
 	// events package; required on the types events.KindRequired names.
 	Kind string `json:"kind,omitempty"`
-	// Label is the iteration label (launch-failed, prompt-nudged and park events).
+	// Label is the iteration label (launch-failed, prompt-nudged and pause events).
 	Label string `json:"label,omitempty"`
-	// Runner (park events) names the agentrunner that hosted the agent: a park
+	// Runner (pause events) names the agentrunner that hosted the agent: a pause
 	// drops the runs.json entry, so late-finish adoption finds the agent here.
 	Runner string `json:"runner,omitempty"`
-	// Model and Effort (park events) are what the agent launched under, so an
-	// adopted late finish lands under the launch model, not the project default.
+	// Model and Effort (pause events) are what the agent launched under, so an
+	// adopted late finish merges under the launch model, not the project default.
 	Model  string `json:"model,omitempty"`
 	Effort string `json:"effort,omitempty"`
 	// Address is the ticket's canonical address ("project:epic/06"), filled by
@@ -134,7 +134,7 @@ type Event struct {
 	Iteration int `json:"iteration,omitempty"`
 	Attempt   int `json:"attempt,omitempty"`
 	// SHA is the feature branch's tip commit right after a cherry-picked
-	// event landed a ticket's iteration. Recorded because CherryPickRange
+	// event merged a ticket's iteration. Recorded because CherryPickRange
 	// creates fresh commits (different hashes than the iteration branch's
 	// originals), so it's the only durable record startup reconciliation can
 	// check for reachability from the feature branch's later tip — the
@@ -177,7 +177,7 @@ type Event struct {
 	// recovery command or remedy concluded: "ok" or the remedy's error.
 	Outcome string `json:"outcome,omitempty"`
 	// TrailerValue (manual-merge/ticket-started-over only) is the trailer value the
-	// command matched or wrote on the landed commits.
+	// command matched or wrote on the merged commits.
 	TrailerValue string `json:"trailer_value,omitempty"`
 	// AtticRef (manual-merge/ticket-started-over only) is the ref that preserves the
 	// commits the command set aside.
@@ -457,7 +457,7 @@ func retryDelay(result sendResult) (time.Duration, bool) {
 // by any caller-supplied context (context.Background()), so a slow or
 // unreachable notification endpoint never blocks the caller. This is
 // epicFailureReporter's path — by the time it sends, the run's own sink has
-// already closed and drained (see EventSink.EpicFailed), so there is no
+// already closed and emptied (see EventSink.EpicFailed), so there is no
 // shutdown-ordering concern to cancel against; chatEventSink.sendRaw instead
 // calls sendNotificationSync directly with its own cancellable context, so
 // Close() can cut an in-flight attempt short (see chat_eventsink.go).

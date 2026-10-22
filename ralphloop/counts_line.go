@@ -33,7 +33,7 @@ type EpicCounts struct {
 // Counts tallies epic's tickets into EpicCounts, restricted to s's
 // membership exactly like DoneCount/TotalCount. A done parent still waiting
 // on its fork subtree (Epic.RenderedStatus's StatusWaitingForChildren)
-// lands in Blocked, not Done, matching DoneCount's existing rule that an
+// merges in Blocked, not Done, matching DoneCount's existing rule that an
 // outstanding fork subtree is outstanding work.
 func (s RunScope) Counts(epic tickets.Epic) EpicCounts {
 	counts := EpicCounts{Total: s.TotalCount(epic)}
@@ -98,7 +98,7 @@ func loadEpicCounts(scratchDir, epicName string) EpicCounts {
 }
 
 // loadEpicTotalCost sums ActualCost across every ticket in epicName, the
-// epic-wide counterpart to a single landed ticket's IterationStats.Cost.
+// epic-wide counterpart to a single merged ticket's IterationStats.Cost.
 // Same load-fresh, zero-on-failure posture as loadEpicCounts.
 func loadEpicTotalCost(scratchDir, epicName string) float64 {
 	epic, err := loadNamedEpic(scratchDir, epicName)
@@ -126,7 +126,7 @@ func joinPausedIdentifiers(identifiers []string) string {
 // CountsOf tallies a whole epic the way the chat messages show it.
 func CountsOf(e tickets.Epic) EpicCounts { return RunScope{wholeEpic: true}.Counts(e) }
 
-// EpicTotals is the epic's summed landing time (seconds) and cost, for the
+// EpicTotals is the epic's summed merging time (seconds) and cost, for the
 // "epic complete" message of a run that did not time it itself.
 func EpicTotals(e tickets.Epic) (elapsedSeconds int, cost float64) {
 	for _, t := range e.Tickets {

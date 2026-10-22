@@ -5,7 +5,7 @@ import "testing"
 
 // TestRunScope_Counts_BucketsEveryStatus pins the mapping from
 // tickets.RenderedStatus to EpicCounts' buckets, including the
-// waiting-for-children overlay (ticket 26) landing in Blocked rather than
+// waiting-for-children overlay (ticket 26) merging in Blocked rather than
 // Done.
 func TestRunScope_Counts_BucketsEveryStatus(t *testing.T) {
 	t.Parallel()

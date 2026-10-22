@@ -11,9 +11,9 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// serverLandFixture is a claimed ticket built and waiting to land through the
-// server's landBuilt.
-func serverLandFixture(t *testing.T) (Deps, iterationParams, *builtAwaitingLandError, string) {
+// serverMergeFixture is a claimed ticket built and waiting to merge through the
+// server's mergeBuilt.
+func serverMergeFixture(t *testing.T) (Deps, iterationParams, *builtAwaitingMergeError, string) {
 	t.Helper()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
@@ -29,24 +29,24 @@ func serverLandFixture(t *testing.T) (Deps, iterationParams, *builtAwaitingLandE
 		FeatureBranch: "epic", Agent: AgentClaude, Skill: "implement", Ticket: tk, ScratchDir: scratchDir,
 		WorktreeLock: &sync.Mutex{}, SmartZone: defaultSmartZone, Gate: NewGate(), Sink: noopEventSink{},
 	}
-	built := &builtAwaitingLandError{job: landJob{
+	built := &builtAwaitingMergeError{job: mergeJob{
 		ticket: tk, base: "base", branch: iterBranch("epic", "01"), path: iterationWorktreePath("/fake/worktrees", "epic", "01"),
 	}}
 	return d, p, built, filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 }
 
-// A conflict the resolution child cannot clear must park the parent with a
+// A conflict the resolution child cannot clear must pause the parent with a
 // cause, not leave it claimed with nobody told.
-func TestLandBuilt_UnresolvedConflictParksParentAsLandConflict(t *testing.T) {
+func TestMergeBuilt_UnresolvedConflictPausesParentAsMergeConflict(t *testing.T) {
 	t.Parallel()
-	d, p, built, ticketPath := serverLandFixture(t)
+	d, p, built, ticketPath := serverMergeFixture(t)
 	picked := false
 	d.CherryPickRange = func(string, string, string) error { picked = true; return &fakeConflictErr{} }
 	// The resolver reports done but the sequencer stays conflicted.
 	d.CherryPickInProgress = func(string) (bool, error) { return picked, nil }
 
-	if err := landBuilt(d, p, built); err != nil {
-		t.Fatalf("landBuilt() error = %v", err)
+	if err := mergeBuilt(d, p, built); err != nil {
+		t.Fatalf("mergeBuilt() error = %v", err)
 	}
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
@@ -59,10 +59,10 @@ func TestLandBuilt_UnresolvedConflictParksParentAsLandConflict(t *testing.T) {
 }
 
 // The server's finish sink tells chat a conflict resolution started and that
-// its child parked, but leaves the parent's own park to the server.
-func TestLandBuilt_FinishSinkSendsConflictStartAndChildParkOnly(t *testing.T) {
+// its child paused, but leaves the parent's own pause to the server.
+func TestMergeBuilt_FinishSinkSendsConflictStartAndChildPauseOnly(t *testing.T) {
 	t.Parallel()
-	d, p, built, ticketPath := serverLandFixture(t)
+	d, p, built, ticketPath := serverMergeFixture(t)
 	picked := false
 	d.CherryPickRange = func(string, string, string) error { picked = true; return &fakeConflictErr{} }
 	d.CherryPickInProgress = func(string) (bool, error) { return picked, nil }
@@ -70,8 +70,8 @@ func TestLandBuilt_FinishSinkSendsConflictStartAndChildParkOnly(t *testing.T) {
 	c := NewServerChat(ServerChatConfig{SlackWebhookURL: srv.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json")})
 	p.Sink = c.FinishSink("alpha", nil, "epic", ticketPath, "01", func() EpicCounts { return EpicCounts{Total: 2} })
 
-	if err := landBuilt(d, p, built); err != nil {
-		t.Fatalf("landBuilt() error = %v", err)
+	if err := mergeBuilt(d, p, built); err != nil {
+		t.Fatalf("mergeBuilt() error = %v", err)
 	}
 	c.Close()
 
@@ -84,26 +84,26 @@ func TestLandBuilt_FinishSinkSendsConflictStartAndChildParkOnly(t *testing.T) {
 		t.Errorf("missing the conflict-started message:\n%s", text)
 	}
 	if n := strings.Count(text, "needs repair"); n != 1 || !strings.Contains(text, "epic/01a") {
-		t.Errorf("want exactly the child's park (01a), got %d needs-repair messages:\n%s", n, text)
+		t.Errorf("want exactly the child's pause (01a), got %d needs-repair messages:\n%s", n, text)
 	}
-	if strings.Contains(text, "land conflict not resolved") {
-		t.Errorf("parent's own park reached chat; the server already notifies it:\n%s", text)
+	if strings.Contains(text, "merge conflict not resolved") {
+		t.Errorf("parent's own pause reached chat; the server already notifies it:\n%s", text)
 	}
 }
 
 // A cherry-pick in progress that no iteration branch holds is a person's work:
-// the land refuses instead of aborting it.
-func TestLandBuilt_ForeignCherryPickIsNotAborted(t *testing.T) {
+// the merge refuses instead of aborting it.
+func TestMergeBuilt_ForeignCherryPickIsNotAborted(t *testing.T) {
 	t.Parallel()
-	d, p, built, _ := serverLandFixture(t)
+	d, p, built, _ := serverMergeFixture(t)
 	d.CherryPickInProgress = func(string) (bool, error) { return true, nil }
 	d.IsAncestor = func(string, string, string) (bool, error) { return false, nil }
 	aborted := false
 	d.AbortCherryPick = func(string) error { aborted = true; return nil }
 
-	err := landBuilt(d, p, built)
+	err := mergeBuilt(d, p, built)
 	if err == nil || !strings.Contains(err.Error(), "gx did not start") {
-		t.Fatalf("landBuilt() error = %v, want a refusal naming the foreign cherry-pick", err)
+		t.Fatalf("mergeBuilt() error = %v, want a refusal naming the foreign cherry-pick", err)
 	}
 	if aborted {
 		t.Error("aborted a cherry-pick gx did not start")

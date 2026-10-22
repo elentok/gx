@@ -13,18 +13,18 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// This file covers the "externally landed" ticket class of bug reported
+// This file covers the "externally merged" ticket class of bug reported
 // live: running `gx ralph-loop` (the "i" implement action) against an epic
-// whose done tickets were completed and landed on the feature branch outside
+// whose done tickets were completed and merged on the feature branch outside
 // ralph-loop's own iteration/cherry-pick flow (e.g. cherry-picked/merged by
-// hand, or by an agent session that never went through landCherryPick) — so
+// hand, or by an agent session that never went through mergeCherryPick) — so
 // they have no run-log event, no surviving iteration branch, and no
 // Ralph-Loop-Ticket trailer. classifyDoneTicket correctly has no way to
 // distinguish that from a ticket that was simply never implemented despite
 // being marked done (see
 // TestClassifyDoneTicket_RealRepo_TrailerScopedToEpic_NoCrossEpicFalsePositive,
 // a real prior incident in the other direction) — so it flags every one of
-// them doneUnrecoverable/needs-repair, and that's the intended, safe
+// them doneUnrecoverable/paused (repair), and that's the intended, safe
 // default. Downstream tickets blocked on them then flip open->blocked, the
 // frontier empties out, and Run fails with "has no unblocked tickets left
 // but isn't all done" — surprising, but not a bug in classification itself.
@@ -32,17 +32,17 @@ import (
 // The supported recovery path once a human (or an auditing agent) has
 // confirmed a flagged ticket's commit really is on the feature branch is to
 // backfill a cherry-picked event recording its SHA — the same durable
-// evidence classifyDoneTicket already trusts for tickets landed the normal
+// evidence classifyDoneTicket already trusts for tickets merged the normal
 // way. No new persistence mechanism needed; these tests document that the
 // existing one is sufficient once the SHA is known.
 
-// TestClassifyDoneTicket_IterationStartedButNeverLanded_StillUnrecoverable
+// TestClassifyDoneTicket_IterationStartedButNeverMerged_StillUnrecoverable
 // guards a related edge: once ralph-loop's own run log shows it actually
 // started an iteration for this ticket, "no cherry-pick event and no
 // surviving branch" is real signal of lost work (a crash between start and
-// land) — it must stay doneUnrecoverable regardless of what else is in the
+// merge) — it must stay doneUnrecoverable regardless of what else is in the
 // log.
-func TestClassifyDoneTicket_IterationStartedButNeverLanded_StillUnrecoverable(t *testing.T) {
+func TestClassifyDoneTicket_IterationStartedButNeverMerged_StillUnrecoverable(t *testing.T) {
 	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) { return false, nil }
@@ -58,17 +58,17 @@ func TestClassifyDoneTicket_IterationStartedButNeverLanded_StillUnrecoverable(t 
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
 	if class != doneUnrecoverable {
-		t.Errorf("class = %v, want doneUnrecoverable when ralph-loop's own log shows it started this ticket but no landing evidence survives", class)
+		t.Errorf("class = %v, want doneUnrecoverable when ralph-loop's own log shows it started this ticket but no merging evidence survives", class)
 	}
 }
 
-// TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently
+// TestReconcile_DoneTicketWithNoProvenance_FlaggedRepairNotSilently
 // exercises the full reconcile() entrypoint for the exact shape reported
 // live: a done ticket with no run-log history at all (ralph-loop has never
 // run against this scratch dir). It documents the intended behavior — this
 // is reported, not silently trusted or silently corrupted — with the
 // specific reason a human needs to see to know what to check.
-func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *testing.T) {
+func TestReconcile_DoneTicketWithNoProvenance_FlaggedRepairNotSilently(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"03-c.md": "---\nid: \"03\"\nstatus: done\ntype: implement\n---\n# C\n",
@@ -96,21 +96,21 @@ func TestReconcile_DoneTicketWithNoProvenance_FlaggedNeedsRepairNotSilently(t *t
 		t.Errorf("events = %+v, want an unrecoverable-mismatch event naming ticket 03", sink.Events())
 	}
 
-	// Seam B: the park writes exactly one event, carrying its kind.
+	// Seam B: the pause writes exactly one event, carrying its kind.
 	evs, _, err := ReadEvents(scratchDir, "epic")
 	if err != nil {
 		t.Fatalf("ReadEvents: %v", err)
 	}
 	if len(evs) != 1 || evs[0].Type != string(eventsc.Paused) || evs[0].Kind != string(eventsc.AmbiguousMerge) || evs[0].Address != canonicalAddr(scratchDir, "epic", "03") {
-		t.Errorf("events = %+v, want one needs-repair event of kind ambiguous-land for 03", evs)
+		t.Errorf("events = %+v, want one needs-repair event of kind ambiguous-merge for 03", evs)
 	}
 }
 
 // TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable is the
 // commitless counterpart to TestReconcile_DoneTicketWithNoProvenance_
 // FlaggedNeedsRepairNotSilently above: a done ticket with commitless: true
-// has no landed commit by design, so classifyDoneTicket's verification must
-// be skipped for it entirely rather than flagging it needs-repair for
+// has no merged commit by design, so classifyDoneTicket's verification must
+// be skipped for it entirely rather than flagging it paused (repair) for
 // having no provenance.
 func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 	t.Parallel()
@@ -145,7 +145,7 @@ func TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable(t *testing.T) {
 // TestReconcile_ResearchGrillingCodeReviewDoneTickets_NotFlaggedUnrecoverable
 // is the type-inferred counterpart to
 // TestReconcile_CommitlessDoneTicket_NotFlaggedUnrecoverable above:
-// research/grilling/code-review tickets never land a commit on the feature
+// research/grilling/code-review tickets never merge a commit on the feature
 // branch even when finished correctly (their deliverable is the ticket body
 // itself, or — for code-review — the follow-up tickets it opens), so
 // schema.Ticket.IsCommitless treats them as commitless by type — no
@@ -186,7 +186,7 @@ func TestReconcile_ResearchGrillingCodeReviewDoneTickets_NotFlaggedUnrecoverable
 
 // TestReconcile_PrototypeDoneTicket_StillFlaggedUnrecoverable is a
 // regression guard against over-broadening the type-inferred commitless fix
-// above: a prototype ticket can legitimately land a real spike/scaffold
+// above: a prototype ticket can legitimately merge a real spike/scaffold
 // commit as its actual output, so — unlike research/grilling/code-review —
 // it must stay on the crash-recovery path unless explicitly flagged
 // commitless: true, same as a plain task ticket.
@@ -218,9 +218,9 @@ func TestReconcile_PrototypeDoneTicket_StillFlaggedUnrecoverable(t *testing.T) {
 // TestReconcile_OutOfScopeDoneTicket_NotVerified covers the bug reported
 // live: a queue run scoped to a handful of tickets (e.g. via the Queue UI's
 // checked selection) still swept every done ticket in the whole epic for
-// landed-commit verification, flagging unrelated done tickets the run never
-// touched needs-repair. Scope now gates this loop the same way it already
-// gated claim/needs-repair reattachment above.
+// merged-commit verification, flagging unrelated done tickets the run never
+// touched paused (repair). Scope now gates this loop the same way it already
+// gated claim/paused (repair) reattachment above.
 func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
@@ -257,41 +257,41 @@ func TestReconcile_OutOfScopeDoneTicket_NotVerified(t *testing.T) {
 	}
 }
 
-// TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsLanded is the
-// recovery path for a ticket flagged needs-repair per the test above,
+// TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsMerged is the
+// recovery path for a ticket flagged paused (repair) per the test above,
 // once a human/auditing agent has confirmed its commit really is on the
 // feature branch: append a cherry-picked event recording that SHA to the run
-// log, exactly as landCherryPick does for a normal iteration. No new
+// log, exactly as mergeCherryPick does for a normal iteration. No new
 // persistence format needed — this is the same evidence classifyDoneTicket
 // already trusts.
-func TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsLanded(t *testing.T) {
+func TestClassifyDoneTicket_BackfilledCherryPickEvent_RecognizedAsMerged(t *testing.T) {
 	t.Parallel()
 	d, ticket := classifyDoneTicketFixture()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) {
-		return ancestor == "confirmed-landed-sha", nil
+		return ancestor == "confirmed-merged-sha", nil
 	}
 	d.RevParse = func(dir, ref string) (string, error) { return "", fmt.Errorf("unknown revision") }
 	d.WorktreeExists = func(path string) (bool, error) { return false, nil }
 
-	// A human/auditing agent confirmed 03's work landed at this SHA and
+	// A human/auditing agent confirmed 03's work merged at this SHA and
 	// backfilled the missing record.
-	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "confirmed-landed-sha"}}
+	events := []Event{{Type: string(eventsc.CherryPicked), Ticket: "03", SHA: "confirmed-merged-sha"}}
 
 	class, err := classifyDoneTicket(d, reconcilePaths{FeatureWorktree: "/fake/feature", WorktreeDir: "/fake/worktrees"}, "epic", ticket, events, map[string]bool{}, map[string]bool{})
 	if err != nil {
 		t.Fatalf("classifyDoneTicket() error = %v", err)
 	}
 	if class != doneOK {
-		t.Errorf("class = %v, want doneOK once the landed SHA is backfilled into the run log", class)
+		t.Errorf("class = %v, want doneOK once the merged SHA is backfilled into the run log", class)
 	}
 }
 
 // TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic is the
 // full end-to-end reproduction of the reported incident and its recovery: an
-// epic where a done ticket was landed outside ralph-loop's tracked flow (no
+// epic where a done ticket was merged outside ralph-loop's tracked flow (no
 // evidence), with a dependent ticket blocked on it. Before backfilling, Run
 // must fail loudly rather than corrupt/silently trust anything (asserted
-// first); after backfilling the confirmed landed SHA as a cherry-picked
+// first); after backfilling the confirmed merged SHA as a cherry-picked
 // event, Run must unblock the dependent and finish the epic — this is the
 // supported way out of the exact stuck state from the field report, not a
 // hand-edit of ticket frontmatter.
@@ -304,10 +304,10 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 
 	d, _, _ := fakeDeps()
 	d.IsAncestor = func(dir, ancestor, descendant string) (bool, error) {
-		return ancestor == "confirmed-landed-sha-02", nil
+		return ancestor == "confirmed-merged-sha-02", nil
 	}
 	// Ticket 02's iteration branch is gone (no evidence to recover it), but
-	// other RevParse calls — e.g. a fresh iteration landing ticket 03's own
+	// other RevParse calls — e.g. a fresh iteration merging ticket 03's own
 	// commit and recording its tip SHA — must resolve normally.
 	d.RevParse = func(dir, ref string) (string, error) {
 		if ref == iterBranch("my-epic", "02") {
@@ -316,10 +316,10 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 		return "deadbeef", nil
 	}
 
-	// Ticket 02 is flagged needs-repair, which blocks ticket 03 and leaves
-	// nothing runnable: the run parks on the flag rather than trusting the
+	// Ticket 02 is flagged paused (repair), which blocks ticket 03 and leaves
+	// nothing runnable: the run pauses on the flag rather than trusting the
 	// unproven done, and waits for the backfill below.
-	runUntilParked(t, RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+	runUntilPaused(t, RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 	raw, err := os.ReadFile(filepath.Join(scratchDir, "my-epic", "issues", "02-b.md"))
 	if err != nil {
@@ -331,13 +331,13 @@ func TestRun_BackfilledProvenance_UnblocksDependentsAndCompletesEpic(t *testing.
 
 	// Recovery: a human/auditing agent confirms ticket 02's work is really on
 	// the feature branch and backfills the run log accordingly. Also revert
-	// the needs-repair flag back to done — reconcile only reports
+	// the paused (repair) flag back to done — reconcile only reports
 	// mismatches, repairing the ticket file itself is this recovery step's
 	// job (mirrors gx tickets set --status done).
 	if err := SetStatus(filepath.Join(scratchDir, "my-epic", "issues", "02-b.md"), "done"); err != nil {
 		t.Fatalf("SetStatus: %v", err)
 	}
-	if err := logEvent(scratchDir, "my-epic", Event{Type: string(eventsc.CherryPicked), Ticket: "02", SHA: "confirmed-landed-sha-02"}); err != nil {
+	if err := logEvent(scratchDir, "my-epic", Event{Type: string(eventsc.CherryPicked), Ticket: "02", SHA: "confirmed-merged-sha-02"}); err != nil {
 		t.Fatalf("logEvent: %v", err)
 	}
 

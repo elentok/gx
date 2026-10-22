@@ -30,9 +30,9 @@ func newSpinPolicy(opts RunOptions) spinPolicy {
 	return p
 }
 
-// quarantined reports whether ticket id has parked at least cycles times
-// inside the window ending at now. Every park is followed by a re-claim (that
-// is how the ticket got back to the scheduler), so the park count is the cycle
+// quarantined reports whether ticket id has paused at least cycles times
+// inside the window ending at now. Every pause is followed by a re-claim (that
+// is how the ticket got back to the scheduler), so the pause count is the cycle
 // count; counting from the run log keeps it across a restart.
 func (p spinPolicy) quarantined(log []Event, id string, now time.Time) bool {
 	n := 0
@@ -40,7 +40,7 @@ func (p spinPolicy) quarantined(log []Event, id string, now time.Time) bool {
 		if ev.Ticket != id || now.Sub(ev.Time) > p.window {
 			continue
 		}
-		if isParkType(events.Type(ev.Type)) && ev.Kind != string(events.Spinning) {
+		if isPauseType(events.Type(ev.Type)) && ev.Kind != string(events.Spinning) {
 			n++
 		}
 	}
@@ -48,9 +48,9 @@ func (p spinPolicy) quarantined(log []Event, id string, now time.Time) bool {
 }
 
 // firstNonSpinning returns the first frontier candidate that is not skipped and
-// not spinning, quarantining each spinning one it passes as needs-repair/spinning.
+// not spinning, quarantining each spinning one it passes as paused (repair)/spinning.
 // It reads the run log at most once, however many candidates there are: the
-// parks it appends are Kind spinning, which the count ignores.
+// pauses it appends are Kind spinning, which the count ignores.
 func firstNonSpinning(opts RunOptions, now time.Time, sink EventSink, scratchDir, wtDir string, frontier []tickets.Ticket, skip func(tickets.Ticket) bool) (tickets.Ticket, error) {
 	policy := newSpinPolicy(opts)
 	var log []Event
@@ -74,10 +74,10 @@ func firstNonSpinning(opts RunOptions, now time.Time, sink EventSink, scratchDir
 		if !policy.quarantined(log, t.Identifier, now) {
 			return t, nil
 		}
-		_, err := park(sink, parkRequest{
+		_, err := pause(sink, pauseRequest{
 			ScratchDir: scratchDir, EpicName: opts.EpicName, Ticket: t.Identifier, Path: t.Path,
 			Type: events.Paused, Kind: events.Spinning,
-			Reason: fmt.Sprintf("parked and re-claimed %d times within %s", policy.cycles, policy.window),
+			Reason: fmt.Sprintf("paused and re-claimed %d times within %s", policy.cycles, policy.window),
 			Repair: schema.FaultState{
 				Label:    iterLabel(opts.EpicName, t.Identifier),
 				Branch:   iterBranch(opts.EpicName, t.Identifier),

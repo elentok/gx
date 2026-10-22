@@ -12,9 +12,9 @@ import (
 	"github.com/elentok/gx/storecommit"
 )
 
-// Seam B: a loop park leaves a commit in the store with the address-and-status
+// Seam B: a loop pause leaves a commit in the store with the address-and-status
 // message.
-func TestPark_CommitsStoreWithAddressAndStatus(t *testing.T) {
+func TestPause_CommitsStoreWithAddressAndStatus(t *testing.T) {
 	store := t.TempDir()
 	loop, err := storecommit.Start(store, time.Hour)
 	if err != nil {
@@ -31,7 +31,7 @@ func TestPark_CommitsStoreWithAddressAndStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := park(noopEventSink{}, parkRequest{
+	if _, err := pause(noopEventSink{}, pauseRequest{
 		ScratchDir: store, EpicName: "myepic", Ticket: "01", Path: path,
 		Type: events.Paused, Kind: events.Kind("ticket-answered"), Reason: "q",
 	}); err != nil {

@@ -85,7 +85,7 @@ func pauseZeroCommit(t *testing.T, headless bool) zeroCommitPaused {
 	// The pause writes the ticket's status before its run-log event.
 	waitFor(t, func() bool {
 		var ok bool
-		p.pause, ok = ralphloop.LatestParkEvent(filepath.Join(store, "proj"), "epic-a", "01")
+		p.pause, ok = ralphloop.LatestPauseEvent(filepath.Join(store, "proj"), "epic-a", "01")
 		return ok
 	})
 	r, err := git.FindRepo(repo)
@@ -173,7 +173,7 @@ func TestLateFinish_MergesLateCommit(t *testing.T) {
 		commitAgentWork(t, p.wtPath)
 		p.report(t, p.finishedLate(false))
 		reason := p.adopted(t)
-		sha := ralphloop.LatestLandedSHA(filepath.Join(p.store, "proj"), "epic-a", "01")
+		sha := ralphloop.LatestMergedSHA(filepath.Join(p.store, "proj"), "epic-a", "01")
 		if sha == "" || !strings.Contains(reason, "merged "+sha) || !strings.Contains(reason, "paused "+pausedAt(p)) {
 			t.Errorf("reason = %q, want paused %s and merged %q", reason, pausedAt(p), sha)
 		}

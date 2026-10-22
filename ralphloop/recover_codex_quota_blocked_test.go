@@ -12,14 +12,14 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// TestRecoverCodexRateLimit_BlockedAfterReset_ParksInsteadOfPrompting covers
+// TestRecoverCodexRateLimit_BlockedAfterReset_PausesInsteadOfPrompting covers
 // ticket 04: under herdr 0.8.2, a Codex pane that comes back blocked once its
 // quota resets must never be prompted with "continue" (a hard-rejected
 // agent_blocked submission before this fix, and the wrong recovery even if it
 // weren't — the pane is sitting on its own dialog, not waiting for the
-// iteration to resume). It must park for a human instead, naming the
+// iteration to resume). It must pause for a human instead, naming the
 // unanswered dialog by its matched_rule.id.
-func TestRecoverCodexRateLimit_BlockedAfterReset_ParksInsteadOfPrompting(t *testing.T) {
+func TestRecoverCodexRateLimit_BlockedAfterReset_PausesInsteadOfPrompting(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
 	scratchDir := epicScratchDir(t, "epic")
@@ -36,8 +36,8 @@ func TestRecoverCodexRateLimit_BlockedAfterReset_ParksInsteadOfPrompting(t *test
 		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
 		ScratchDir: scratchDir, EpicName: "epic", Gate: NewGate(),
 	}, "sess-1", time.Time{})
-	if !errors.Is(err, errBlockedPaneParked) {
-		t.Fatalf("recoverCodexRateLimit() err = %v, want errBlockedPaneParked", err)
+	if !errors.Is(err, errBlockedPanePaused) {
+		t.Fatalf("recoverCodexRateLimit() err = %v, want errBlockedPanePaused", err)
 	}
 
 	raw, readErr := os.ReadFile(ticketPath)
@@ -59,19 +59,19 @@ func TestRecoverCodexRateLimit_BlockedAfterReset_ParksInsteadOfPrompting(t *test
 		t.Fatalf("last event type = %q, want needs-answer", last.Type)
 	}
 	if !strings.Contains(last.Reason, "trust_directory") {
-		t.Errorf("park reason = %q, want it to name the matched_rule.id trust_directory", last.Reason)
+		t.Errorf("pause reason = %q, want it to name the matched_rule.id trust_directory", last.Reason)
 	}
 
-	// No trust_directory (or any other) auto-answer branch: parking is the
+	// No trust_directory (or any other) auto-answer branch: pausing is the
 	// only outcome, regardless of which rule herdr reports matched.
 	if strings.Contains(strings.ToLower(last.Reason), "answered") {
-		t.Errorf("park reason = %q, suggests an auto-answer happened; this path must never answer a dialog itself", last.Reason)
+		t.Errorf("pause reason = %q, suggests an auto-answer happened; this path must never answer a dialog itself", last.Reason)
 	}
 }
 
 // TestRecoverCodexRateLimit_NonBlockedAfterReset_ReturnsWithoutSendingAnything
 // covers this recovery's unaffected branch: a pane that comes back idle,
-// done, or working after the reset must return with no prompt or park at
+// done, or working after the reset must return with no prompt or pause at
 // all.
 func TestRecoverCodexRateLimit_NonBlockedAfterReset_ReturnsWithoutSendingAnything(t *testing.T) {
 	t.Parallel()
@@ -102,7 +102,7 @@ func TestRecoverCodexRateLimit_NonBlockedAfterReset_ReturnsWithoutSendingAnythin
 				t.Fatalf("ReadFile: %v", readErr)
 			}
 			if strings.Contains(string(raw), "needs-answer") {
-				t.Errorf("ticket was parked on the unaffected non-blocked branch:\n%s", raw)
+				t.Errorf("ticket was paused on the unaffected non-blocked branch:\n%s", raw)
 			}
 		})
 	}

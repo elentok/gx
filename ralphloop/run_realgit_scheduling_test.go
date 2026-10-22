@@ -21,9 +21,9 @@ import (
 
 // TestRun_ProductionRealGit_DiamondThroughFullEpic extends ticket 06's A ->
 // {B, C} scenario through a second parallel frontier and a final join:
-// A -> {B, C} -> {D, E} -> F. It reuses ticket 06's landing-order trick (an
+// A -> {B, C} -> {D, E} -> F. It reuses ticket 06's merging-order trick (an
 // agent blocks on a sibling's tab closing, which only happens once that
-// sibling's commit has already landed) to force B before C and, symmetrically,
+// sibling's commit has already merged) to force B before C and, symmetrically,
 // E before D — even though each pair is scheduled and runs concurrently. F is
 // left to the scheduler alone: it only becomes frontier once both D and E are
 // done, so no extra fake-agent blocking is needed to prove F starts last.
@@ -94,11 +94,11 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	var commitOrder []string
 	var conflictResolutionSessionID string
 	var ctrlCCalls, compactCalls, finishUpCalls int
-	var bLandedDuringCCompact bool
-	bLanded := make(chan struct{})
+	var bMergedDuringCCompact bool
+	bMerged := make(chan struct{})
 	dReady := make(chan struct{})
-	eLanded := make(chan struct{})
-	var bLandedOnce, dReadyOnce, eLandedOnce sync.Once
+	eMerged := make(chan struct{})
+	var bMergedOnce, dReadyOnce, eMergedOnce sync.Once
 
 	handler := func(argv []string) ([]byte, int) {
 		if len(argv) < 2 {
@@ -130,16 +130,16 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 			delete(openTabs, tabID)
 			mu.Unlock()
 			// B's and E's tabs only close once finishCleanup runs, i.e.
-			// strictly after their commits have already landed on the
+			// strictly after their commits have already merged on the
 			// feature branch (finishIteration cherry-picks before
 			// finishCleanup ever runs) — the point C's/D's own work must
 			// wait behind to make B-before-C and E-before-D guaranteed, not
 			// just racily likely.
 			if tabID == "tab-"+iterLabel(epicName, "02") {
-				bLandedOnce.Do(func() { close(bLanded) })
+				bMergedOnce.Do(func() { close(bMerged) })
 			}
 			if tabID == "tab-"+iterLabel(epicName, "05") {
-				eLandedOnce.Do(func() { close(eLanded) })
+				eMergedOnce.Do(func() { close(eMerged) })
 			}
 			return []byte(`{"result":null}`), 0
 		case "tab list":
@@ -199,14 +199,14 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 				if compactStatus, err := cCompact.Status(); err != nil || compactStatus != "working" {
 					return herdrfake.CommandError(fmt.Sprintf("C compact initial status = %q, %v", compactStatus, err))
 				}
-				<-bLanded
+				<-bMerged
 				if err := commitIterationWork(cwd, "03"); err != nil {
 					t.Errorf("commitIterationWork(03): %v", err)
 					return herdrfake.CommandError(err.Error())
 				}
 				mu.Lock()
 				commitOrder = append(commitOrder, "03")
-				bLandedDuringCCompact = true
+				bMergedDuringCCompact = true
 				virtualTime += herdrfake.CompactDurationMs * time.Millisecond
 				mu.Unlock()
 				compactStatus, err := cCompact.Status()
@@ -236,7 +236,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 				}
 				if id == "04" {
 					dReadyOnce.Do(func() { close(dReady) })
-					<-eLanded
+					<-eMerged
 				}
 				if id == "05" {
 					<-dReady
@@ -329,31 +329,31 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	for _, id := range []string{"01", "02", "03", "04", "05", "06"} {
 		sha := trailers[addressTrailerValue(scratchDir, epicName, id)]
 		if sha == "" {
-			t.Fatalf("landed trailers = %v, want a landed commit for ticket %s", trailers, id)
+			t.Fatalf("merged trailers = %v, want a merged commit for ticket %s", trailers, id)
 		}
 		shas[id] = sha
 	}
 	// Clean feature history is exactly A, B, C, E, D, F: each ticket's
-	// landed commit is an ancestor of the next in that order.
-	landingOrder := []string{"01", "02", "03", "05", "04", "06"}
-	for i := 1; i < len(landingOrder); i++ {
-		prev, cur := landingOrder[i-1], landingOrder[i]
+	// merged commit is an ancestor of the next in that order.
+	mergingOrder := []string{"01", "02", "03", "05", "04", "06"}
+	for i := 1; i < len(mergingOrder); i++ {
+		prev, cur := mergingOrder[i-1], mergingOrder[i]
 		if ok, err := git.IsAncestor(featurePath, shas[prev], shas[cur]); err != nil || !ok {
-			t.Errorf("%s's landed commit is not an ancestor of %s's (ok=%v err=%v): feature history isn't A, B, C, E, D, F", prev, cur, ok, err)
+			t.Errorf("%s's merged commit is not an ancestor of %s's (ok=%v err=%v): feature history isn't A, B, C, E, D, F", prev, cur, ok, err)
 		}
 	}
-	wantLandedSHAs := make([]string, 0, len(landingOrder))
-	for _, id := range landingOrder {
-		wantLandedSHAs = append(wantLandedSHAs, shas[id])
+	wantMergedSHAs := make([]string, 0, len(mergingOrder))
+	for _, id := range mergingOrder {
+		wantMergedSHAs = append(wantMergedSHAs, shas[id])
 	}
 	revList := exec.Command("git", "rev-list", "--reverse", baseSHA+"..HEAD")
 	revList.Dir = featurePath
-	rawLandedSHAs, err := revList.Output()
+	rawMergedSHAs, err := revList.Output()
 	if err != nil {
-		t.Fatalf("git rev-list landed history: %v", err)
+		t.Fatalf("git rev-list merged history: %v", err)
 	}
-	if got := strings.Fields(string(rawLandedSHAs)); !slices.Equal(got, wantLandedSHAs) {
-		t.Errorf("landed history = %v, want exactly %v", got, wantLandedSHAs)
+	if got := strings.Fields(string(rawMergedSHAs)); !slices.Equal(got, wantMergedSHAs) {
+		t.Errorf("merged history = %v, want exactly %v", got, wantMergedSHAs)
 	}
 	if got := gitSubject(t, featurePath, shas["04"]); got != "iteration 04" {
 		t.Errorf("D subject = %q, want %q", got, "iteration 04")
@@ -470,7 +470,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 			t.Errorf("ticket %s lifecycle positions = start:%d finish:%d cherry:%d", id, eventPositions[started], eventPositions[finished], eventPositions[cherryPicked])
 		}
 		if cherrySHAs[id] != shas[id] {
-			t.Errorf("ticket %s cherry-picked SHA = %q, want landed SHA %q", id, cherrySHAs[id], shas[id])
+			t.Errorf("ticket %s cherry-picked SHA = %q, want merged SHA %q", id, cherrySHAs[id], shas[id])
 		}
 	}
 	for _, eventType := range []string{string(eventsc.ConflictHit), string(eventsc.ConflictResolved)} {
@@ -480,7 +480,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		}
 	}
 	if conflictResolvedSHA != shas["04"] {
-		t.Errorf("D conflict-resolved SHA = %q, want landed SHA %q", conflictResolvedSHA, shas["04"])
+		t.Errorf("D conflict-resolved SHA = %q, want merged SHA %q", conflictResolvedSHA, shas["04"])
 	}
 	mu.Lock()
 	wantConflictResolutionSessionID := conflictResolutionSessionID
@@ -518,8 +518,8 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	if ctrlCCalls != 2 || compactCalls != 1 || finishUpCalls != 1 {
 		t.Errorf("C recovery calls = (ctrl-c:%d compact:%d finish-up:%d), want ctrl-c twice (interrupt, clear) and one of the others", ctrlCCalls, compactCalls, finishUpCalls)
 	}
-	if !bLandedDuringCCompact {
-		t.Error("B did not land while C was compacting")
+	if !bMergedDuringCCompact {
+		t.Error("B did not merge while C was compacting")
 	}
 	for id := range contracts {
 		tabID := "tab-" + iterLabel(epicName, id)

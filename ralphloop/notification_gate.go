@@ -17,11 +17,11 @@ const (
 	GloballyMuted
 )
 
-// ParkFunc is the optional callback NotificationGate calls when it trips a per-source
+// PauseFunc is the optional callback NotificationGate calls when it trips a per-source
 // mute, identifying the source and giving a human-readable reason. A bare
 // `gx notify` invocation with no loop context passes nil — the mute still
-// gets written, the park just gets skipped.
-type ParkFunc func(source, reason string) error
+// gets written, the pause just gets skipped.
+type PauseFunc func(source, reason string) error
 
 // GateResult is NotificationGate's return value: the decision plus whether this call is
 // the edge-triggered one that should also send a "muting this"/"globally
@@ -64,20 +64,20 @@ const (
 // onto it) or a ticket-less sentinel ("cli", "epic:<name>") — a ticket-less
 // source is counted toward both series but can never itself be
 // per-source-muted.
-func NotificationGate(transport, eventType, source string, now time.Time, recordSend bool, parkTicket ParkFunc) (GateResult, error) {
+func NotificationGate(transport, eventType, source string, now time.Time, recordSend bool, pauseTicket PauseFunc) (GateResult, error) {
 	path, err := notificationStateFilePathFn()
 	if err != nil {
 		return GateResult{}, err
 	}
-	return notificationGateAt(path, transport, eventType, source, now, recordSend, parkTicket)
+	return notificationGateAt(path, transport, eventType, source, now, recordSend, pauseTicket)
 }
 
-func notificationGateAt(path, transport, eventType, source string, now time.Time, recordSend bool, parkTicket ParkFunc) (GateResult, error) {
+func notificationGateAt(path, transport, eventType, source string, now time.Time, recordSend bool, pauseTicket PauseFunc) (GateResult, error) {
 	var result GateResult
 	var opErr error
 
 	err := updateNotificationStateAt(path, func(state *NotificationState) {
-		result, opErr = applyGate(state, transport, eventType, source, now, recordSend, parkTicket)
+		result, opErr = applyGate(state, transport, eventType, source, now, recordSend, pauseTicket)
 	})
 	if err != nil {
 		return GateResult{}, err
@@ -85,7 +85,7 @@ func notificationGateAt(path, transport, eventType, source string, now time.Time
 	return result, opErr
 }
 
-func applyGate(state *NotificationState, transport, eventType, source string, now time.Time, recordSend bool, parkTicket ParkFunc) (GateResult, error) {
+func applyGate(state *NotificationState, transport, eventType, source string, now time.Time, recordSend bool, pauseTicket PauseFunc) (GateResult, error) {
 	ts := state.Transports[transport]
 	defer func() { state.Transports[transport] = ts }()
 
@@ -114,7 +114,7 @@ func applyGate(state *NotificationState, transport, eventType, source string, no
 	case alreadyMuted:
 		result.Decision = PerSourceMuted
 	case !ticketless && countMatchingInWindow(ts.Events, now, perSourceWindow, eventType, source) >= perSourceThreshold:
-		edge, err := muteSource(source, eventType, now, parkTicket, "storm mute: per-source threshold crossed")
+		edge, err := muteSource(source, eventType, now, pauseTicket, "storm mute: per-source threshold crossed")
 		if err != nil {
 			return GateResult{}, err
 		}
@@ -132,7 +132,7 @@ func applyGate(state *NotificationState, transport, eventType, source string, no
 			if total == 0 || float64(sc.Count)/float64(total) < globalAttributionShare {
 				continue
 			}
-			if _, err := muteSource(sc.Source, eventType, now, parkTicket, "storm mute: global-trip attribution"); err != nil {
+			if _, err := muteSource(sc.Source, eventType, now, pauseTicket, "storm mute: global-trip attribution"); err != nil {
 				return GateResult{}, err
 			}
 		}
@@ -173,11 +173,11 @@ func ticketAlreadyMuted(source, eventType string) (bool, error) {
 }
 
 // muteSource writes a per-source mute onto source's ticket and, if supplied,
-// calls parkTicket. It's idempotent (re-reads the ticket's current mute
+// calls pauseTicket. It's idempotent (re-reads the ticket's current mute
 // state) and a no-op for a ticket-less source, so both the per-source
 // threshold trip and the global-attribution trip can call it without
-// double-writing or double-parking the same source.
-func muteSource(source, eventType string, now time.Time, parkTicket ParkFunc, reason string) (bool, error) {
+// double-writing or double-pausing the same source.
+func muteSource(source, eventType string, now time.Time, pauseTicket PauseFunc, reason string) (bool, error) {
 	if isTicketlessSource(source) {
 		return false, nil
 	}
@@ -196,8 +196,8 @@ func muteSource(source, eventType string, now time.Time, parkTicket ParkFunc, re
 		return false, err
 	}
 
-	if parkTicket != nil {
-		if err := parkTicket(source, reason); err != nil {
+	if pauseTicket != nil {
+		if err := pauseTicket(source, reason); err != nil {
 			return false, err
 		}
 	}

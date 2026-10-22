@@ -57,16 +57,16 @@ func TestNotificationGate_PerSourceThreshold_Trips(t *testing.T) {
 	ticketPath := writeGateTicket(t, dir, "01")
 	base := time.Date(2026, 8, 13, 12, 0, 0, 0, time.UTC)
 
-	var parked []string
-	parkTicket := func(source, reason string) error {
-		parked = append(parked, source+":"+reason)
+	var paused []string
+	pauseTicket := func(source, reason string) error {
+		paused = append(paused, source+":"+reason)
 		return nil
 	}
 
 	var last GateResult
 	for i := range 5 {
 		now := base.Add(time.Duration(i) * 10 * time.Second)
-		result, err := notificationGateAt(statePath, "telegram", "iteration-stalled", ticketPath, now, false, parkTicket)
+		result, err := notificationGateAt(statePath, "telegram", "iteration-stalled", ticketPath, now, false, pauseTicket)
 		if err != nil {
 			t.Fatalf("call %d: %v", i, err)
 		}
@@ -76,8 +76,8 @@ func TestNotificationGate_PerSourceThreshold_Trips(t *testing.T) {
 	if last.Decision != PerSourceMuted || !last.EdgeTriggered {
 		t.Fatalf("5th call result = %+v, want PerSourceMuted/edge", last)
 	}
-	if len(parked) != 1 {
-		t.Fatalf("parkTicket called %d times, want 1: %v", len(parked), parked)
+	if len(paused) != 1 {
+		t.Fatalf("pauseTicket called %d times, want 1: %v", len(paused), paused)
 	}
 
 	ticket := readGateTicket(t, ticketPath)
@@ -221,7 +221,7 @@ func TestNotificationGate_TicketlessSource_CountedNeverMuted(t *testing.T) {
 	}
 }
 
-func TestNotificationGate_NoParkTicketCallback_MutesWrittenParkSkipped(t *testing.T) {
+func TestNotificationGate_NoPauseTicketCallback_MutesWrittenPauseSkipped(t *testing.T) {
 	dir := t.TempDir()
 	statePath := filepath.Join(dir, "notifications-state.json")
 	ticketPath := writeGateTicket(t, dir, "01")
@@ -242,7 +242,7 @@ func TestNotificationGate_NoParkTicketCallback_MutesWrittenParkSkipped(t *testin
 	}
 	ticket := readGateTicket(t, ticketPath)
 	if len(ticket.Mutes) != 1 {
-		t.Fatalf("ticket.Mutes = %+v, want one mute written even without parkTicket", ticket.Mutes)
+		t.Fatalf("ticket.Mutes = %+v, want one mute written even without pauseTicket", ticket.Mutes)
 	}
 }
 

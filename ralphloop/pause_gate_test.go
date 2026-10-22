@@ -143,7 +143,7 @@ func TestPauseGate_ForceResume_UnknownLabelReturnsFalse(t *testing.T) {
 }
 
 // TestPauseGate_ForceResumeBeforePause_WaitForResumeReturnsImmediately covers
-// the race where ForceResume lands in the gap between a caller's pause() and
+// the race where ForceResume merges in the gap between a caller's pause() and
 // its own subsequent waitForResume() call (e.g. a TUI operator resuming the
 // instant it observes the pause). Without the len(reasons)==0 short-circuit
 // in waitForResume, that late arrival would make it the new leader for a

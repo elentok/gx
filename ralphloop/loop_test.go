@@ -27,7 +27,7 @@ import (
 // "NN-slug.md" -> content pair), and returns the scratch dir.
 func writeEpic(t *testing.T, epicName string, tickets map[string]string) string {
 	t.Helper()
-	// t.TempDir() always ends in "001", and the land lock dir is keyed by that
+	// t.TempDir() always ends in "001", and the merge lock dir is keyed by that
 	// basename, so parallel tests would share one lock. Use a unique name.
 	scratchDir, err := os.MkdirTemp("", "gx-epic-")
 	if err != nil {
@@ -54,11 +54,11 @@ func ticketAddr(scratchDir, epicName, id string) string {
 }
 
 // testDeps is DefaultDeps for a test: real behavior everywhere except that a
-// park polls at full speed rather than on the wall clock, so a test that parks
+// pause polls at full speed rather than on the wall clock, so a test that pauses
 // unexpectedly surfaces as its own failure instead of a multi-minute wait.
 func testDeps() Deps {
 	d := DefaultDeps()
-	d.ParkTimer = readyTimer
+	d.PauseTimer = readyTimer
 	return d
 }
 
@@ -67,7 +67,7 @@ func testDeps() Deps {
 // t.Setenv.
 func testDepsWithOverrides(overrides DepsOverrides) Deps {
 	d := DefaultDepsWithOverrides(overrides)
-	d.ParkTimer = readyTimer
+	d.PauseTimer = readyTimer
 	return d
 }
 
@@ -94,25 +94,25 @@ func setProcessEnv(t *testing.T, key, value string) {
 	})
 }
 
-// runUntilParked runs Run in the background, returns once it has parked —
+// runUntilPaused runs Run in the background, returns once it has paused —
 // the honest end of a test whose epic finishes on a human-clearable ticket
 // nobody clears — then cancels it and waits for Run to actually return
 // before handing control back to the caller, so no goroutine of Run's
-// (including the land-queue worker) survives the test. The run stays
-// blocked in its park select (the timer it is handed never fires) until
+// (including the merge-queue worker) survives the test. The run stays
+// blocked in its pause select (the timer it is handed never fires) until
 // that cancellation, so it neither spins nor reports a terminal event
-// while parked, and the close of the park signal orders everything Run
-// wrote before parking ahead of the caller's assertions.
-func runUntilParked(t *testing.T, opts RunOptions, d Deps, sink EventSink) {
+// while paused, and the close of the pause signal orders everything Run
+// wrote before pausing ahead of the caller's assertions.
+func runUntilPaused(t *testing.T, opts RunOptions, d Deps, sink EventSink) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	opts.Ctx = ctx
-	parked := make(chan struct{})
+	paused := make(chan struct{})
 	never := make(chan time.Time)
 	var once sync.Once
-	d.ParkTimer = func(time.Duration) <-chan time.Time {
-		once.Do(func() { close(parked) })
+	d.PauseTimer = func(time.Duration) <-chan time.Time {
+		once.Do(func() { close(paused) })
 		return never
 	}
 	done := make(chan error, 1)
@@ -120,11 +120,11 @@ func runUntilParked(t *testing.T, opts RunOptions, d Deps, sink EventSink) {
 		done <- Run(opts, d, sink)
 	}()
 	select {
-	case <-parked:
+	case <-paused:
 	case err := <-done:
-		t.Fatalf("Run() returned %v, want it to park on a ticket only a human can clear", err)
+		t.Fatalf("Run() returned %v, want it to pause on a ticket only a human can clear", err)
 	case <-time.After(30 * time.Second):
-		t.Fatal("Run() never parked")
+		t.Fatal("Run() never paused")
 	}
 
 	cancel()
@@ -225,9 +225,9 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		},
 		Sleep: func(time.Duration) {},
 		Now:   time.Now,
-		// A park polls at full speed; a test about the park itself replaces
+		// A pause polls at full speed; a test about the pause itself replaces
 		// this with a timer that scripts the human clearing the block.
-		ParkTimer: readyTimer,
+		PauseTimer: readyTimer,
 	}
 	return d, &promptsSlice, &removedSlice
 }
@@ -358,7 +358,7 @@ func hostLiveAgentWithSession(t *testing.T, d Deps, label, sessionID string) {
 	hostLiveAgent(t, d, label)
 }
 
-func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
+func TestRun_LinearChain_RunsTicketsInOrderAndMergesAll(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# First\n",
@@ -401,7 +401,7 @@ func TestRun_LinearChain_RunsTicketsInOrderAndLandsAll(t *testing.T) {
 }
 
 // TestRun_IterationCompletion_DeletesIterationBranch exercises ticket 04's
-// AC that the normal same-run success path deletes a landed iteration's
+// AC that the normal same-run success path deletes a merged iteration's
 // now-redundant branch — something it never did before this ticket.
 func TestRun_IterationCompletion_DeletesIterationBranch(t *testing.T) {
 	t.Parallel()
@@ -655,7 +655,7 @@ func TestRun_FreshIteration_OmitsCompactionsWhenUnavailable(t *testing.T) {
 	}
 }
 
-func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
+func TestRun_LogsAskingEvent_OnZeroCommitIteration(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -665,31 +665,31 @@ func TestRun_LogsNeedsAnswerEvent_OnZeroCommitIteration(t *testing.T) {
 		return 0, nil
 	}
 
-	// The needs-answer ticket is the epic's only one, so the run parks on it.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+	// The paused (answer) ticket is the epic's only one, so the run pauses on it.
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 	events, ok, err := ReadEvents(scratchDir, "epic")
 	if err != nil || !ok {
 		t.Fatalf("ReadEvents: ok=%v err=%v", ok, err)
 	}
-	var needsAnswer *Event
+	var asking *Event
 	for i, ev := range events {
 		if ev.Type == string(eventsc.Paused) && ev.Ticket == "01" {
-			needsAnswer = &events[i]
+			asking = &events[i]
 		}
 		if ev.Type == string(eventsc.CherryPicked) {
 			t.Errorf("events = %+v, want no cherry-picked event for a zero-commit iteration", events)
 		}
 	}
-	if needsAnswer == nil {
+	if asking == nil {
 		t.Fatalf("events = %+v, want a needs-answer event for ticket 1", events)
 	}
-	if needsAnswer.AgentSession == "" {
-		t.Errorf("needs-answer event = %+v, want a non-empty AgentSession (the agent_session that produced zero commits)", needsAnswer)
+	if asking.AgentSession == "" {
+		t.Errorf("needs-answer event = %+v, want a non-empty AgentSession (the agent_session that produced zero commits)", asking)
 	}
 }
 
-func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
+func TestRun_EventSink_TicketAsking_OnZeroCommitIteration(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -700,7 +700,7 @@ func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
 	}
 
 	sink := &recordingSink{}
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, sink)
 
 	if len(sink.ticketNeedsHumanCalls) != 1 {
 		t.Fatalf("TicketNeedsHuman calls = %v, want exactly 1", sink.ticketNeedsHumanCalls)
@@ -710,14 +710,14 @@ func TestRun_EventSink_TicketNeedsAnswer_OnZeroCommitIteration(t *testing.T) {
 	}
 }
 
-// TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer exercises the escape hatch from
+// TestRun_HonorsCommitlessFlag_SkipsAsking exercises the escape hatch from
 // the zero-commit path above: if the agent reports iteration_status: finished
 // with commitless: true before finishing, that's an intentional zero-commit
 // finish (e.g. exploration concluded no code change was warranted), not a
-// stalled agent — the ticket must not be forced back to needs-answer, gx
+// stalled agent — the ticket must not be forced back to paused (answer), gx
 // itself writes status: done, and its worktree/tab get cleaned up like a
 // normal completion.
-func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
+func TestRun_HonorsCommitlessFlag_SkipsAsking(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -772,7 +772,7 @@ func TestRun_HonorsCommitlessFlag_SkipsNeedsAnswer(t *testing.T) {
 	}
 }
 
-func TestRun_InstallDepsFailure_MarksNeedsRepairWithoutLaunchingAgentOrAbortingRun(t *testing.T) {
+func TestRun_InstallDepsFailure_MarksRepairWithoutLaunchingAgentOrAbortingRun(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -782,9 +782,9 @@ func TestRun_InstallDepsFailure_MarksNeedsRepairWithoutLaunchingAgentOrAbortingR
 		return "npm ci", errors.New("npm ci: exit status 1")
 	}
 
-	// A failed iteration marks needs-repair rather than aborting the run,
-	// which leaves the epic parked on its only ticket.
-	runUntilParked(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
+	// A failed iteration marks paused (repair) rather than aborting the run,
+	// which leaves the epic paused on its only ticket.
+	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 
 	if len(*prompts) != 0 {
 		t.Errorf("prompts = %v, want no agent launched after a failed dependency install", *prompts)
@@ -831,17 +831,17 @@ func TestRun_NoEpicFound_NoOpSummary(t *testing.T) {
 	}
 }
 
-// TestAllDone_NeedsRepairIsNotComplete covers ticket 08's central
-// inversion: a needs-repair ticket used to count as terminal and end the
-// run, and now must not — the run parks on it instead.
-func TestAllDone_NeedsRepairIsNotComplete(t *testing.T) {
+// TestAllDone_RepairIsNotComplete covers ticket 08's central
+// inversion: a paused (repair) ticket used to count as terminal and end the
+// run, and now must not — the run pauses on it instead.
+func TestAllDone_RepairIsNotComplete(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{Tickets: []tickets.Ticket{
 		{Number: 1, Status: "done"},
 		{Number: 2, Status: "needs-repair"},
 	}}
 	if allDone(epic) {
-		t.Errorf("allDone() = true, want false while ticket 2 needs repair")
+		t.Errorf("allDone() = true, want false while ticket 2 paused for repair")
 	}
 }
 
@@ -886,7 +886,7 @@ func TestAllDone_WaitingForChildrenNotDone(t *testing.T) {
 
 // TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset covers
 // ticket 02's requirement: a caller-supplied RunOptions.TicketIDs subset of a
-// larger epic runs and lands only those tickets, and Run exits once they're
+// larger epic runs and merges only those tickets, and Run exits once they're
 // done even though a third, unblocked epic ticket is left open.
 func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testing.T) {
 	t.Parallel()
@@ -944,12 +944,12 @@ func TestRun_TicketSubset_CompletesWithoutTouchingTicketsOutsideSubset(t *testin
 // notification total-count bug: total was captured once from the pre-run
 // scope snapshot, so a ticket added to a running epic's scope mid-run (via
 // the TUI's 'a' key widening RunScope) was counted in Completed once it
-// landed but never grew Total to match, producing nonsensical stats like
+// merged but never grew Total to match, producing nonsensical stats like
 // Completed > Total. Ticket 01 is the only ticket originally in scope;
 // while its iteration is still running, its Runner wait hook widens the
 // live scope to also include ticket 02 (simulating the TUI action), so by
 // the time ticket 01's IterationFinished fires, Total must already reflect
-// both tickets even though only one has landed.
+// both tickets even though only one has merged.
 func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
@@ -987,7 +987,7 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 		t.Fatalf("no IterationFinished recorded for ticket 01")
 	}
 	if firstStats.Total != 2 {
-		t.Errorf("ticket 01 stats.Total = %d, want 2 (mid-run Add must grow Total before it lands)", firstStats.Total)
+		t.Errorf("ticket 01 stats.Total = %d, want 2 (mid-run Add must grow Total before it merges)", firstStats.Total)
 	}
 	if firstStats.Completed > firstStats.Total {
 		t.Errorf("ticket 01 stats: Completed %d > Total %d", firstStats.Completed, firstStats.Total)
@@ -1007,7 +1007,7 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 	// The scheduler never promised which of the two concurrently-eligible
 	// tickets' IterationFinished fires first once 02 is widened into scope
 	// mid-run (both become runnable near-simultaneously) — only that,
-	// together, they land Completed={1,2} exactly once each. Asserting a
+	// together, they merge Completed={1,2} exactly once each. Asserting a
 	// fixed ticket-to-Completed mapping made this test an intermittent CI
 	// flake whenever 02 happened to finish first.
 	gotCompleted := []int{firstStats.Completed, secondStats.Completed}
@@ -1018,10 +1018,10 @@ func TestRun_ScopeWidenedMidRun_TotalGrowsWithIt(t *testing.T) {
 }
 
 // TestRun_ResumedRun_ReportsEpicWideDoneNotRunLocalCount is a regression
-// test for ticket 26: a resumed run only lands one ticket itself, but
+// test for ticket 26: a resumed run only merges one ticket itself, but
 // IterationStats.Completed must count every done ticket on disk (including
 // ones done before this Run call started), not just the ones this run
-// landed — otherwise a resumed run understates progress ("1/10 done" when
+// merged — otherwise a resumed run understates progress ("1/10 done" when
 // six of ten are already done).
 func TestRun_ResumedRun_ReportsEpicWideDoneNotRunLocalCount(t *testing.T) {
 	t.Parallel()
@@ -1054,11 +1054,11 @@ func TestRun_ResumedRun_ReportsEpicWideDoneNotRunLocalCount(t *testing.T) {
 	}
 }
 
-// TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun covers ticket 23's
-// requirement: a needs-repair ticket left outside the requested subset
+// TestRun_RepairOutsideSubset_DoesNotPauseRun covers ticket 23's
+// requirement: a paused (repair) ticket left outside the requested subset
 // must not gate-pause scheduling of the tickets the caller actually asked
 // for.
-func TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
+func TestRun_RepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# First\n",
@@ -1091,11 +1091,11 @@ func TestRun_NeedsRepairOutsideSubset_DoesNotPauseRun(t *testing.T) {
 	}
 }
 
-// TestRun_NeedsRepairInsideSubset_RunsTheRestThenParks covers the flip
-// side of the above: a needs-repair ticket the caller did select no longer
+// TestRun_RepairInsideSubset_RunsTheRestThenPauses covers the flip
+// side of the above: a paused (repair) ticket the caller did select no longer
 // stops the run outright. It's human-clearable, so the rest of the subset is
-// scheduled first and the run only parks once nothing else is runnable.
-func TestRun_NeedsRepairInsideSubset_RunsTheRestThenParks(t *testing.T) {
+// scheduled first and the run only pauses once nothing else is runnable.
+func TestRun_RepairInsideSubset_RunsTheRestThenPauses(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-first.md":  "---\nid: \"01\"\nstatus: needs-repair\ntype: implement\n---\n# First\n",
@@ -1104,7 +1104,7 @@ func TestRun_NeedsRepairInsideSubset_RunsTheRestThenParks(t *testing.T) {
 	d, prompts, _ := fakeDeps()
 
 	sink := &recordingSink{}
-	runUntilParked(t, RunOptions{
+	runUntilPaused(t, RunOptions{
 		EpicName:   "my-epic",
 		Skill:      "implement",
 		ScratchDir: scratchDir,
@@ -1235,7 +1235,7 @@ func TestRun_SelectingBlockedTicketThenEditingBlockersRunsCorrectMultiWave(t *te
 
 	// Edit 02's blockers to require 03 too — a dependency this run's
 	// selection never picked up. The plan must surface this as stuck, not a
-	// misleading runnable wave, once 01 lands.
+	// misleading runnable wave, once 01 merges.
 	if err := os.WriteFile(ticketPath, []byte("---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by: [\"01\", \"03\"]\n---\n# Second\n"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}

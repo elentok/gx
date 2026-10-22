@@ -10,14 +10,14 @@ import (
 	eventsc "github.com/elentok/gx/events"
 )
 
-// TestRun_QueuedBehindLandingBuild_ReleasesActiveSlotForNextTicket is the
-// land-queue's signature behavior: a build that finished (ahead > 0) must
-// hand off to the land-queue worker and free its active slot immediately,
-// rather than holding it for the duration of the land (which can take up to
+// TestRun_QueuedBehindMergingBuild_ReleasesActiveSlotForNextTicket is the
+// merge-queue's signature behavior: a build that finished (ahead > 0) must
+// hand off to the merge-queue worker and free its active slot immediately,
+// rather than holding it for the duration of the merge (which can take up to
 // 30 minutes on a conflict). With MaxParallel: 1, ticket 02 can only start
-// building while ticket 01's land is still blocked in CherryPickRange if
-// ticket 01's active slot was released at hand-off, not at land completion.
-func TestRun_QueuedBehindLandingBuild_ReleasesActiveSlotForNextTicket(t *testing.T) {
+// building while ticket 01's merge is still blocked in CherryPickRange if
+// ticket 01's active slot was released at hand-off, not at merge completion.
+func TestRun_QueuedBehindMergingBuild_ReleasesActiveSlotForNextTicket(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -25,12 +25,12 @@ func TestRun_QueuedBehindLandingBuild_ReleasesActiveSlotForNextTicket(t *testing
 	})
 	d, _, _ := fakeDeps()
 
-	landingStarted := make(chan struct{})
-	releaseLanding := make(chan struct{})
+	mergingStarted := make(chan struct{})
+	releaseMerging := make(chan struct{})
 	var once sync.Once
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
-		once.Do(func() { close(landingStarted) })
-		<-releaseLanding
+		once.Do(func() { close(mergingStarted) })
+		<-releaseMerging
 		return nil
 	}
 
@@ -49,34 +49,34 @@ func TestRun_QueuedBehindLandingBuild_ReleasesActiveSlotForNextTicket(t *testing
 	}()
 
 	select {
-	case <-landingStarted:
+	case <-mergingStarted:
 	case err := <-done:
-		t.Fatalf("Run() returned (err=%v) before ticket 01's land ever started", err)
+		t.Fatalf("Run() returned (err=%v) before ticket 01's merge ever started", err)
 	case <-time.After(10 * time.Second):
-		t.Fatal("ticket 01's land never started")
+		t.Fatal("ticket 01's merge never started")
 	}
 
 	select {
 	case <-ticket02Started:
-		// Ticket 02's build started while ticket 01's land was still in
+		// Ticket 02's build started while ticket 01's merge was still in
 		// flight — proof the build's active slot was released at hand-off
-		// rather than held through landing.
+		// rather than held through merging.
 	case <-time.After(2 * time.Second):
-		t.Fatal("ticket 02 never started building while ticket 01's land was still in flight — active slot held through landing")
+		t.Fatal("ticket 02 never started building while ticket 01's merge was still in flight — active slot held through merging")
 	}
 
-	close(releaseLanding)
+	close(releaseMerging)
 	if err := <-done; err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 }
 
-// TestRun_TwoLands_NeverRunConcurrently asserts the land-queue worker's
-// single-goroutine-ness is what now serializes cherry-pick landings onto the
+// TestRun_TwoMerges_NeverRunConcurrently asserts the merge-queue worker's
+// single-goroutine-ness is what now serializes cherry-pick merges onto the
 // feature branch, replacing featureMu: two independent tickets both
 // finishing their builds around the same time must never have their
 // CherryPickRange calls overlap.
-func TestRun_TwoLands_NeverRunConcurrently(t *testing.T) {
+func TestRun_TwoMerges_NeverRunConcurrently(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -87,7 +87,7 @@ func TestRun_TwoLands_NeverRunConcurrently(t *testing.T) {
 	var inFlight atomic.Int32
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
 		if inFlight.Add(1) > 1 {
-			t.Errorf("CherryPickRange called concurrently — land-queue worker must serialize landings")
+			t.Errorf("CherryPickRange called concurrently — merge-queue worker must serialize merges")
 		}
 		time.Sleep(20 * time.Millisecond)
 		inFlight.Add(-1)
@@ -99,22 +99,22 @@ func TestRun_TwoLands_NeverRunConcurrently(t *testing.T) {
 	}
 }
 
-// TestRun_ExitsOnlyAfterLastTicketsLandCompletes covers the new landing
+// TestRun_ExitsOnlyAfterLastTicketsMergeCompletes covers the new merging
 // counter: once the epic's only ticket finishes building, active drops to 0
-// while its land is still queued/in-flight. Before the landing counter, that
+// while its merge is still queued/in-flight. Before the merging counter, that
 // state (active == 0, nothing else runnable) looked identical to "done" or
-// "deadlocked" — Run must instead keep waiting for the land to actually
+// "deadlocked" — Run must instead keep waiting for the merge to actually
 // finish before exiting.
-func TestRun_ExitsOnlyAfterLastTicketsLandCompletes(t *testing.T) {
+func TestRun_ExitsOnlyAfterLastTicketsMergeCompletes(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
 
-	releaseLanding := make(chan struct{})
+	releaseMerging := make(chan struct{})
 	d.CherryPickRange = func(dir, fromExclusive, toInclusive string) error {
-		<-releaseLanding
+		<-releaseMerging
 		return nil
 	}
 
@@ -125,40 +125,40 @@ func TestRun_ExitsOnlyAfterLastTicketsLandCompletes(t *testing.T) {
 
 	select {
 	case err := <-done:
-		t.Fatalf("Run() returned early (err=%v) before the only ticket's land finished — active==0 with a land still in flight must not look like exit-ready or deadlocked", err)
+		t.Fatalf("Run() returned early (err=%v) before the only ticket's merge finished — active==0 with a merge still in flight must not look like exit-ready or deadlocked", err)
 	case <-time.After(300 * time.Millisecond):
 	}
 
-	close(releaseLanding)
+	close(releaseMerging)
 	select {
 	case err := <-done:
 		if err != nil {
 			t.Fatalf("Run() error = %v", err)
 		}
 	case <-time.After(10 * time.Second):
-		t.Fatal("Run() never returned after the land finished")
+		t.Fatal("Run() never returned after the merge finished")
 	}
 }
 
-func mustLandLockDir(t *testing.T, scratchDir, epic string) string {
+func mustMergeLockDir(t *testing.T, scratchDir, epic string) string {
 	t.Helper()
-	dir, err := landLockDir(scratchDir, epic)
+	dir, err := mergeLockDir(scratchDir, epic)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return dir
 }
 
-// TestRun_LandLockHeld_DefersThenLandsOnLaterTick covers a human's pending
-// land: the worker must not wait on the lock or fail the ticket, only retry.
-func TestRun_LandLockHeld_DefersThenLandsOnLaterTick(t *testing.T) {
-	landDeferRetryInterval = 10 * time.Millisecond // not parallel: shared package var
-	t.Cleanup(func() { landDeferRetryInterval = 2 * time.Second })
+// TestRun_MergeLockHeld_DefersThenMergesOnLaterTick covers a human's pending
+// merge: the worker must not wait on the lock or fail the ticket, only retry.
+func TestRun_MergeLockHeld_DefersThenMergesOnLaterTick(t *testing.T) {
+	mergeDeferRetryInterval = 10 * time.Millisecond // not parallel: shared package var
+	t.Cleanup(func() { mergeDeferRetryInterval = 2 * time.Second })
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
-	lockDir := mustLandLockDir(t, scratchDir, "epic")
-	if err := AcquireLandLock(lockDir); err != nil {
+	lockDir := mustMergeLockDir(t, scratchDir, "epic")
+	if err := AcquireMergeLock(lockDir); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ := fakeDeps()
@@ -175,14 +175,14 @@ func TestRun_LandLockHeld_DefersThenLandsOnLaterTick(t *testing.T) {
 
 	select {
 	case err := <-done:
-		t.Fatalf("Run() returned (err=%v) while the land lock was held", err)
+		t.Fatalf("Run() returned (err=%v) while the merge lock was held", err)
 	case <-time.After(300 * time.Millisecond):
 	}
 	if n := picks.Load(); n != 0 {
 		t.Fatalf("CherryPickRange calls = %d while lock held, want 0", n)
 	}
 
-	if err := ReleaseLandLock(lockDir); err != nil {
+	if err := ReleaseMergeLock(lockDir); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -191,23 +191,23 @@ func TestRun_LandLockHeld_DefersThenLandsOnLaterTick(t *testing.T) {
 			t.Fatalf("Run() error = %v", err)
 		}
 	case <-time.After(10 * time.Second):
-		t.Fatal("deferred land never retried after the lock was released")
+		t.Fatal("deferred merge never retried after the lock was released")
 	}
 	if n := picks.Load(); n != 1 {
 		t.Errorf("CherryPickRange calls = %d, want 1", n)
 	}
 }
 
-// TestRun_LandMarkerPresent_SkipsStaleAbort: with a marker, in-progress
+// TestRun_MergeMarkerPresent_SkipsStaleAbort: with a marker, in-progress
 // sequencer state is a human's pending conflict, so it must not be aborted.
-func TestRun_LandMarkerPresent_SkipsStaleAbort(t *testing.T) {
-	landDeferRetryInterval = 10 * time.Millisecond
-	t.Cleanup(func() { landDeferRetryInterval = 2 * time.Second })
+func TestRun_MergeMarkerPresent_SkipsStaleAbort(t *testing.T) {
+	mergeDeferRetryInterval = 10 * time.Millisecond
+	t.Cleanup(func() { mergeDeferRetryInterval = 2 * time.Second })
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
-	lockDir := mustLandLockDir(t, scratchDir, "epic")
-	if err := WriteLandMarker(lockDir, LandMarker{Epic: "epic", Ticket: "01"}); err != nil {
+	lockDir := mustMergeLockDir(t, scratchDir, "epic")
+	if err := WriteMergeMarker(lockDir, MergeMarker{Epic: "epic", Ticket: "01"}); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ := fakeDeps()
@@ -235,7 +235,7 @@ func TestRun_LandMarkerPresent_SkipsStaleAbort(t *testing.T) {
 	}
 
 	inProgress.Store(false)
-	if err := ClearLand(lockDir); err != nil {
+	if err := ClearMerge(lockDir); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -244,20 +244,20 @@ func TestRun_LandMarkerPresent_SkipsStaleAbort(t *testing.T) {
 			t.Fatalf("Run() error = %v", err)
 		}
 	case <-time.After(10 * time.Second):
-		t.Fatal("land never completed after the marker cleared")
+		t.Fatal("merge never completed after the marker cleared")
 	}
 }
 
-// TestRun_LandLockHeld_LogsDeferredOncePerEpisode: many retry ticks under one
-// contention episode produce a single land-deferred event.
-func TestRun_LandLockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
-	landDeferRetryInterval = 5 * time.Millisecond
-	t.Cleanup(func() { landDeferRetryInterval = 2 * time.Second })
+// TestRun_MergeLockHeld_LogsDeferredOncePerEpisode: many retry ticks under one
+// contention episode produce a single merge-deferred event.
+func TestRun_MergeLockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
+	mergeDeferRetryInterval = 5 * time.Millisecond
+	t.Cleanup(func() { mergeDeferRetryInterval = 2 * time.Second })
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
-	lockDir := mustLandLockDir(t, scratchDir, "epic")
-	if err := AcquireLandLock(lockDir); err != nil {
+	lockDir := mustMergeLockDir(t, scratchDir, "epic")
+	if err := AcquireMergeLock(lockDir); err != nil {
 		t.Fatal(err)
 	}
 	d, _, _ := fakeDeps()
@@ -268,7 +268,7 @@ func TestRun_LandLockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 		done <- Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{})
 	}()
 	time.Sleep(300 * time.Millisecond) // dozens of retry ticks
-	if err := ReleaseLandLock(lockDir); err != nil {
+	if err := ReleaseMergeLock(lockDir); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -291,6 +291,6 @@ func TestRun_LandLockHeld_LogsDeferredOncePerEpisode(t *testing.T) {
 		}
 	}
 	if n != 1 {
-		t.Errorf("land-deferred events = %d, want 1", n)
+		t.Errorf("merge-deferred events = %d, want 1", n)
 	}
 }
