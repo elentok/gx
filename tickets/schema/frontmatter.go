@@ -38,6 +38,7 @@ type ticketYAML struct {
 	DoneAt                time.Time    `yaml:"done_at,omitempty"`
 	CompletedAt           time.Time    `yaml:"completed_at,omitempty"`
 	ParkKind              string       `yaml:"park_kind,omitempty"`
+	PauseReason           string       `yaml:"pause_reason,omitempty"`
 	Mutes                 []MuteRecord `yaml:"mutes,omitempty"`
 	Base                  string       `yaml:"base,omitempty"`
 	ResolvedBase          string       `yaml:"resolved_base,omitempty"`
@@ -94,6 +95,7 @@ func (w ticketYAML) toTicket() Ticket {
 		DoneAt:                w.DoneAt,
 		CompletedAt:           w.CompletedAt,
 		ParkKind:              ParkKind(w.ParkKind),
+		PauseReason:           PauseReason(w.PauseReason),
 		Mutes:                 copyMutes(w.Mutes),
 		Base:                  w.Base,
 		ResolvedBase:          w.ResolvedBase,
@@ -133,6 +135,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		DoneAt:                t.DoneAt,
 		CompletedAt:           t.CompletedAt,
 		ParkKind:              string(t.ParkKind),
+		PauseReason:           string(t.PauseReason),
 		Mutes:                 copyMutes(t.Mutes),
 		Base:                  t.Base,
 		ResolvedBase:          t.ResolvedBase,

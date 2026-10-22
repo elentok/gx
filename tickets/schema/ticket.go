@@ -50,7 +50,11 @@ const (
 	StatusClaimed     Status = "claimed"
 	StatusNeedsAnswer Status = "needs-answer"
 	StatusNeedsRepair Status = "needs-repair"
-	StatusDone        Status = "done"
+	// StatusPaused is stopped and waiting; PauseReason says why and its class
+	// says whether a person answers or repairs. It replaces the two statuses
+	// above, which are still written until the read shim is wired in.
+	StatusPaused Status = "paused"
+	StatusDone   Status = "done"
 	// StatusCancelled is terminal like done, but means the ticket was
 	// withdrawn: it stops counting as outstanding without claiming the work
 	// was performed.
@@ -63,6 +67,7 @@ var validStatuses = map[Status]bool{
 	StatusClaimed:     true,
 	StatusNeedsAnswer: true,
 	StatusNeedsRepair: true,
+	StatusPaused:      true,
 	StatusDone:        true,
 	StatusCancelled:   true,
 }
@@ -278,6 +283,9 @@ type Ticket struct {
 	// the ParkKind type doc). Never checked by Validate, same as
 	// IterationStatus.
 	ParkKind ParkKind
+	// PauseReason is why a Paused ticket is paused (see the PauseReason type
+	// doc). Never checked by Validate, same as IterationStatus.
+	PauseReason PauseReason
 	// Mutes records notification event types that have tripped a throttle for
 	// this ticket, oldest first. Machine-written only, same posture as
 	// SessionIDs — no `gx tickets set --mutes` flag. EventType's shape is
