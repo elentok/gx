@@ -250,6 +250,12 @@ to a ticket.
 it because the ticket left `needs-answer` another way. The ticket's open question is the latest
 question with neither. Not an iteration, and not a `park` event in the run log.
 
+**Action card** — the part of a ticket's page that asks a person to act: the open question and its
+answer form, a pending permission prompt, the Needs Repair text, unpark, and the result of an answer
+or unpark just sent. It shows only while it holds one of these, or while the ticket is **answered**,
+so it can appear on a ticket that is not **parked**.
+_Avoid_: Park area
+
 ## Agent Runners
 
 **Agent runner** — the thing that hosts one agent session for an iteration: it starts the agent,
