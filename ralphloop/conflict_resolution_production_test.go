@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // conflictResolver is a fake stand-in for the real "/resolving-merge-
@@ -285,6 +286,37 @@ func TestCherryPickWithConflictResolution_ProductionRealConflict(t *testing.T) {
 	if got, want := runner.Prompts(label), []string{"/gx-resolving-merge-conflicts"}; !slices.Equal(got, want) {
 		t.Errorf("resolver prompts = %v, want %v", got, want)
 	}
+
+	epics, err := tickets.Load(p.ScratchDir)
+	if err != nil {
+		t.Fatalf("tickets.Load: %v", err)
+	}
+	var child *tickets.Ticket
+	for _, e := range epics {
+		for i, tk := range e.Tickets {
+			if tk.Type == string(schema.TypeConflictResolution) {
+				child = &e.Tickets[i]
+			}
+		}
+	}
+	if child == nil {
+		t.Fatal("no conflict-resolution child ticket found")
+	}
+	if child.CreatedAt.IsZero() {
+		t.Error("conflict-resolution child has no created_at")
+	}
+	wantAddr, _ := tickets.AddressOfPath(child.Path, child.Identifier)
+	if child.OriginalAddress != wantAddr.String() {
+		t.Errorf("child original address = %q, want %q", child.OriginalAddress, wantAddr.String())
+	}
+	parsed, err := schema.ParseTicket(child.Path)
+	if err != nil {
+		t.Fatalf("ParseTicket: %v", err)
+	}
+	if !slices.Equal(parsed.SessionIDs, []string{resolutionSessionID}) {
+		t.Errorf("child session_ids = %v, want [%s]", parsed.SessionIDs, resolutionSessionID)
+	}
+
 	// The resolver's session must actually end once it finishes — the gap
 	// tickets-queue-polish/04 found when the tab was never closed.
 	if _, live, _ := runner.Find(label); live {

@@ -184,10 +184,13 @@ func updateTicketWithBody(path string, mutate func(*schema.Ticket, *string)) err
 // invalid status (e.g. "resolved"). gx owns that field, so MarkChildDone
 // repairs status to done instead of failing the close and pausing the parent.
 // Any other invalid field is still an error and nothing is written, since
-// writing it back would make the next Load fail on the child.
-func MarkChildDone(path string) error {
+// writing it back would make the next Load fail on the child. It also records
+// the resolver's sessionID in the same write, because the agent's own edits
+// can leave the child invalid until this repair.
+func MarkChildDone(path, sessionID string) error {
 	return rewriteTicket(path, true, func(t *schema.Ticket, _ *string) error {
 		t.Status = schema.StatusDone
+		t.SessionIDs = append(t.SessionIDs, sessionID)
 		return nil
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -35,6 +36,8 @@ func forkConflictResolutionTicket(p iterationParams) (childPath, childID string,
 		Type:   schema.TypeConflictResolution,
 		Parent: &parentID,
 	}
+	addr, _ := tickets.AddressOfPath(stubPath, id)
+	stub.StampCreated(time.Now().UTC(), addr.String())
 	body := fmt.Sprintf(
 		"\n# %s — Conflict resolution for %s\n\n## What to build\n\nResolve the cherry-pick conflict blocking ticket %s and let the sequencer complete.\n\n## Acceptance criteria\n\n- [ ] Conflict resolved and `git cherry-pick --continue` completes cleanly\n",
 		id, parentID, parentID,

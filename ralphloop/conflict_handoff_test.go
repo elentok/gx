@@ -135,6 +135,9 @@ func TestConflictResolutionHandoff(t *testing.T) {
 				} else if child.Status != tc.wantChild {
 					t.Errorf("child status = %q, want %q", child.Status, tc.wantChild)
 				}
+				if tc.wantChild == schema.StatusDone && len(child.SessionIDs) != 1 {
+					t.Errorf("child session_ids = %v, want the resolver's session", child.SessionIDs)
+				}
 			})
 		}
 	}

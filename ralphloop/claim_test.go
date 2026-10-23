@@ -75,7 +75,7 @@ func TestClaimAndDone_StampClaimedAtAndDoneAt(t *testing.T) {
 	for name, markDone := range map[string]func(string) error{
 		"MarkDone":             MarkDone,
 		"MarkDoneWithMetadata": func(p string) error { return MarkDoneWithMetadata(p, 0, "") },
-		"MarkChildDone":        MarkChildDone,
+		"MarkChildDone":        func(p string) error { return MarkChildDone(p, "s1") },
 	} {
 		if err := Claim(path); err != nil {
 			t.Fatalf("%s: re-claim: %v", name, err)
@@ -218,7 +218,7 @@ func TestMarkChildDone_RepairsInvalidStatus(t *testing.T) {
 		if err := MarkDone(path); status == "resolved" && err == nil {
 			t.Fatalf("MarkDone accepted invalid status %q", status)
 		}
-		if err := MarkChildDone(path); err != nil {
+		if err := MarkChildDone(path, "s1"); err != nil {
 			t.Fatalf("MarkChildDone(%s): %v", status, err)
 		}
 		if got := mustParse(t, path).Status; got != schema.StatusDone {
@@ -231,7 +231,7 @@ func TestMarkChildDone_InvalidStatusPlusOtherInvalidFieldErrorsWithoutWriting(t 
 	t.Parallel()
 	path := writeTicket(t, "---\nid: \"01\"\nstatus: resolved\ntype: bogus-type\n---\n# Ticket\n")
 	before := mustRead(t, path)
-	err := MarkChildDone(path)
+	err := MarkChildDone(path, "s1")
 	if err == nil {
 		t.Fatal("MarkChildDone accepted a ticket with another invalid field")
 	}
