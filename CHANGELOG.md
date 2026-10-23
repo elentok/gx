@@ -4,7 +4,9 @@
 
 - Changed the ticket word "parked" to "paused". Read this before you upgrade.
   - The migration is a one-way door. An older gx rejects `status: paused`, so update all gx binaries first, then run `gx tickets migrate`.
+  - The same `gx tickets migrate <path>` run also moves each live `## Needs Answer` and `## Handoff` section into the ticket log. Until it runs, the web UI shows no open question on an old ticket without a log, and cannot answer it. If you skipped it, run it now. See `docs/web-ui-security.md`.
   - The `park`, `unpark`, `drain` and resume-on-start aliases still work. The next release removes them.
+- Added a host check to the web UI listener. If you open the UI by a MagicDNS name or any other hostname, add it to `server.web.allowed-hosts`, or the UI answers HTTP 403. IP addresses and `localhost` are unaffected. See `docs/web-ui-security.md`.
 
 ## v0.35.9 - 2026-10-22
 
