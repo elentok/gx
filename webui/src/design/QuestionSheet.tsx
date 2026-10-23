@@ -97,7 +97,7 @@ function Question({
           aria-pressed={noteOpen}
           onClick={() => setNoteOpen((o) => !o)}
         >
-          📝
+          📝 Note
         </Button>
       </Box>
       {noteOpen && (

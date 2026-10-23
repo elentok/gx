@@ -36,9 +36,10 @@ options:
 ```
 ````
 
-Every question carries a `gx-question` block (the `gx tickets ask` YAML), after the `➡️` line and before `---`. The format is defined in [gx-local-tracker.md](../gx-local-tracker.md) "The question block". Most questions are `yes-no` with `recommended: yes`. Use `options` only for real alternatives.
+Every question carries a `gx-question` block (the `gx tickets ask` YAML), after the `➡️` line and before `---`. The format is defined in [gx-local-tracker.md](../gx-local-tracker.md) "The question block".
 
-Word each question so "yes" accepts your recommended answer.
+- Pick the type from the question. A yes/no question ("Does...?", "Should...?") is `yes-no`. A "Which...?" or "What...?" question with real alternatives is `options`: list every alternative, with a short label each. Never use `yes-no` for a question that has more than two answers.
+- `recommended` must name the same answer as your `➡️` line. If the `➡️` line says "No", write `recommended: no`. For `options`, name the option id your `➡️` line picks. Check this before you send the round.
 
 Before asking each question, read [gx-unslop](../gx-unslop/SKILL.md) and apply it to the question and your recommendation.
 
