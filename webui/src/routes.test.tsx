@@ -304,6 +304,23 @@ test("a map epic shows only N of M done and rows with title and status", async (
   expect(screen.getByText("open")).toBeTruthy();
 });
 
+test("every live, fold, Error and map row links to its ticket page", async () => {
+  const hrefOf = (title: string) => screen.getByRole("link", { name: title }).getAttribute("href");
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
+  await screen.findByText("claimed · 1h 1m");
+  for (const n of ["01", "02", "03", "04", "05", "06"]) expect(hrefOf(`Title ${n}`)).toBe(`#/t/gx:e/${n}`);
+  cleanup();
+  renderAt(
+    "/e/gx:m",
+    okFor,
+    undefined,
+    epicFetch({ kind: "map", total: 2, done: 1, rows: [rowOf("01", "done"), rowOf("02", "open")] }),
+  );
+  await screen.findByText("1 of 2 done");
+  expect(hrefOf("Title 01")).toBe("#/t/gx:e/01");
+  expect(hrefOf("Title 02")).toBe("#/t/gx:e/02");
+});
+
 function eventFrame(seq: number, address: string) {
   return `id: ${seq}\nevent: ticket-changed\ndata: ${JSON.stringify({ seq, type: "ticket-changed", address })}\n\n`;
 }

@@ -54,6 +54,7 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
               <TicketLine
                 id={idOf(r.address)}
                 title={r.title}
+                address={r.address}
                 reason={foldedTail(r, ctx)}
                 tone={isCancelled(r) ? "muted" : "done"}
                 unclipped
@@ -69,6 +70,7 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
             <TicketLine
               id={idOf(r.address)}
               title={r.title}
+              address={r.address}
               reason={detailLine(r, ctx)}
               tone={toneOf(r)}
               unclipped

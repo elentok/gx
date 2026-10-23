@@ -10,6 +10,8 @@ interface TicketLineProps {
   tone?: Tone;
   // Shows the reason in full instead of clamping it to two lines.
   unclipped?: boolean;
+  // Links the title to this ticket's page.
+  address?: string;
   href?: string;
   hint?: string;
   state?: string;
@@ -30,6 +32,7 @@ export function TicketLine({
   reason,
   tone = "muted",
   unclipped,
+  address,
   href,
   hint,
   state,
@@ -60,7 +63,13 @@ export function TicketLine({
           {id}
         </Text>
         <Text as="span" fontSize="md" color={toneTitle ? `tone.${tone}.fg` : "text"}>
-          {title}
+          {address ? (
+            <Link href={`#/t/${address}`} color="inherit">
+              {title}
+            </Link>
+          ) : (
+            title
+          )}
         </Text>
         {state && (
           <Text as="span" data-state fontSize="sm" color={`tone.${tone}.fg`}>

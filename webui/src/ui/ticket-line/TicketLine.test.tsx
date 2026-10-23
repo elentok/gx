@@ -43,6 +43,19 @@ describe("TicketLine", () => {
     expect(getByText("1m · $1.37").parentElement).toBe(getByText("the title").parentElement);
   });
 
+  it("links the title to the ticket page and keeps the second link", () => {
+    const { getByRole } = renderThemed(
+      <TicketLine id="01" title="the title" address="gx:e/01" href="#/t/gx:e/01" linkLabel="Review →" />,
+    );
+    expect(getByRole("link", { name: "the title" }).getAttribute("href")).toBe("#/t/gx:e/01");
+    expect(getByRole("link", { name: "Review →" }).getAttribute("href")).toBe("#/t/gx:e/01");
+  });
+
+  it("leaves the title plain without an address", () => {
+    const { queryByRole } = renderThemed(<TicketLine id="01" title="the title" />);
+    expect(queryByRole("link")).toBeNull();
+  });
+
   it("puts the reason below the title row by default", () => {
     const { getByText } = renderThemed(<TicketLine id="a" title="the title" reason="1m · $1.37" />);
     expect(getByText("1m · $1.37").parentElement).not.toBe(getByText("the title").parentElement);
