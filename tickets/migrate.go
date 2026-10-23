@@ -52,21 +52,48 @@ type migratedTicketFile struct {
 // what failed. A ticket whose migration is a no-op is left byte-identical: a
 // second run over an already-migrated tree reports no changes and writes
 // nothing.
+//
+// The epics under scratchRoot's ".archive/" are migrated in the same
+// transaction: the store backfills read archived tickets too, and one
+// retired value there would otherwise fail the whole migrate run. Archived
+// tickets never fall back to the file's mtime for claimed_at and done_at:
+// archiving and earlier migrations rewrote those files, so the mtime is a
+// recent day, not the day the work happened.
 func Migrate(scratchRoot string) (MigrationResult, error) {
-	entries, err := os.ReadDir(scratchRoot)
-	if err != nil {
-		return MigrationResult{}, fmt.Errorf("reading tracker root %s: %w", scratchRoot, err)
-	}
-
 	var epics []Epic
 	var files []migratedTicketFile
+	if err := collectMigration(scratchRoot, false, &epics, &files); err != nil {
+		return MigrationResult{}, err
+	}
+	archive := ArchiveDir(scratchRoot)
+	if _, err := os.Stat(archive); err == nil {
+		if err := collectMigration(archive, true, &epics, &files); err != nil {
+			return MigrationResult{}, err
+		}
+	}
+
+	if err := validateMigration(files, epics); err != nil {
+		return MigrationResult{}, err
+	}
+
+	return writeMigration(files)
+}
+
+// collectMigration computes the migrated state of every ticket in the epics
+// directly under root, appending to epics and files. It writes nothing.
+// archived drops the mtime fallback for claimed_at and done_at.
+func collectMigration(root string, archived bool, epics *[]Epic, files *[]migratedTicketFile) error {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return fmt.Errorf("reading tracker root %s: %w", root, err)
+	}
 
 	for _, entry := range entries {
 		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
 
-		epicPath := filepath.Join(scratchRoot, entry.Name())
+		epicPath := filepath.Join(root, entry.Name())
 		issuesDir := filepath.Join(epicPath, "issues")
 		issueEntries, err := os.ReadDir(issuesDir)
 		if err != nil {
@@ -88,20 +115,24 @@ func Migrate(scratchRoot string) (MigrationResult, error) {
 			ticketPath := filepath.Join(issuesDir, issueEntry.Name())
 			raw, err := os.ReadFile(ticketPath)
 			if err != nil {
-				return MigrationResult{}, fmt.Errorf("reading %s: %w", ticketPath, err)
+				return fmt.Errorf("reading %s: %w", ticketPath, err)
 			}
 
 			old, err := schema.ParseTicketRaw(string(raw), ticketPath)
 			if err != nil {
-				return MigrationResult{}, fmt.Errorf("parsing %s: %w", ticketPath, err)
+				return fmt.Errorf("parsing %s: %w", ticketPath, err)
 			}
 			info, err := issueEntry.Info()
 			if err != nil {
-				return MigrationResult{}, fmt.Errorf("stat %s: %w", ticketPath, err)
+				return fmt.Errorf("stat %s: %w", ticketPath, err)
 			}
-			newTicket, notes := migrateTicket(old, info.ModTime().UTC())
+			mtime := info.ModTime().UTC()
+			if archived {
+				mtime = time.Time{}
+			}
+			newTicket, notes := migrateTicket(old, mtime)
 
-			files = append(files, migratedTicketFile{
+			*files = append(*files, migratedTicketFile{
 				path:      ticketPath,
 				body:      schema.ParseBody(string(raw)),
 				newTicket: newTicket,
@@ -121,14 +152,9 @@ func Migrate(scratchRoot string) (MigrationResult, error) {
 			})
 		}
 
-		epics = append(epics, epic)
+		*epics = append(*epics, epic)
 	}
-
-	if err := validateMigration(files, epics); err != nil {
-		return MigrationResult{}, err
-	}
-
-	return writeMigration(files)
+	return nil
 }
 
 // validateMigration checks every file's migrated ticket via schema.Validate
@@ -185,6 +211,7 @@ const (
 	legacyStatusReadyForHuman  schema.Status = "ready-for-human"
 	legacyStatusNeedsInfo      schema.Status = "needs-info"
 	legacyStatusNeedsAttention schema.Status = "needs-attention"
+	legacyStatusSuperseded     schema.Status = "superseded"
 )
 
 // migratedStatusOf maps the status values the lifecycle-refactor and
@@ -211,6 +238,8 @@ func migratedStatusOf(s schema.Status) schema.Status {
 		return schema.StatusLegacyAnswer
 	case legacyStatusNeedsAttention:
 		return schema.StatusLegacyRepair
+	case legacyStatusSuperseded:
+		return schema.StatusDone
 	default:
 		return s
 	}
@@ -252,6 +281,13 @@ func migrateTicket(old schema.RawTicket, mtime time.Time) (schema.Ticket, []stri
 			kept = append(kept, b)
 		}
 		out.BlockedBy = kept
+	}
+
+	// superseded carried nothing that done plus commitless does not, so it
+	// becomes exactly that.
+	if out.Status == legacyStatusSuperseded && !out.Commitless {
+		out.Commitless = true
+		notes = append(notes, "commitless: true")
 	}
 
 	if migrated := migratedStatusOf(out.Status); migrated != out.Status {

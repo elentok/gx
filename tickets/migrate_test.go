@@ -68,3 +68,49 @@ func TestMigrate_IterationStatusRoundTripsUnchanged(t *testing.T) {
 		t.Errorf("file changed by migration: got %q, want %q", string(raw), original)
 	}
 }
+
+func TestMigrate_RewritesSupersededInTheArchive(t *testing.T) {
+	dir := t.TempDir()
+	livePath := filepath.Join(dir, "live-epic", "issues", "01-live.md")
+	archivedPath := filepath.Join(dir, ".archive", "old-epic", "issues", "01-old.md")
+	writeFile(t, livePath, "---\nid: \"01\"\nstatus: superseded\ntype: implement\n---\nBody.\n")
+	writeFile(t, archivedPath, "---\nid: \"01\"\nstatus: superseded\ntype: implement\n---\nBody.\n")
+	archivedDonePath := filepath.Join(dir, ".archive", "old-epic", "issues", "02-done.md")
+	writeFile(t, archivedDonePath, "---\nid: \"02\"\nstatus: done\ntype: implement\n---\nBody.\n")
+
+	result, err := Migrate(dir)
+	if err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+	if len(result.Changes) != 2 {
+		t.Fatalf("Changes = %v, want the live and the archived ticket", result.Changes)
+	}
+	for _, path := range []string{livePath, archivedPath} {
+		got, err := schema.ParseTicket(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Status != schema.StatusDone || !got.Commitless {
+			t.Errorf("%s: Status = %q, Commitless = %v, want done and commitless", path, got.Status, got.Commitless)
+		}
+	}
+	// An archived file's mtime is the day it was rewritten, not the day the
+	// work happened, so it never becomes done_at.
+	for _, path := range []string{archivedPath, archivedDonePath} {
+		got, err := schema.ParseTicket(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !got.DoneAt.IsZero() || !got.ClaimedAt.IsZero() {
+			t.Errorf("%s: DoneAt = %v, ClaimedAt = %v, want none", path, got.DoneAt, got.ClaimedAt)
+		}
+	}
+
+	again, err := Migrate(dir)
+	if err != nil {
+		t.Fatalf("second Migrate: %v", err)
+	}
+	if len(again.Changes) != 0 {
+		t.Errorf("second run Changes = %v, want none", again.Changes)
+	}
+}
