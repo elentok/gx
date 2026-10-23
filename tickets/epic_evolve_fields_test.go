@@ -14,7 +14,7 @@ func TestEpicEvolveFields_LoadAndSurviveTimingWrite(t *testing.T) {
 	if err := os.MkdirAll(epicDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	fm := "---\nstatus: open\nevolved_at: 2026-01-02T03:04:05Z\nevolve_skipped: true\nevolve_ticket: p:epic/03\nprovisional_destination: true\n---\n\n# epic\n"
+	fm := "---\nstatus: open\nevolved_at: 2026-01-02T03:04:05Z\nevolve_skipped: true\nevolve_ticket: p:epic/03\ndestination_unconfirmed: true\n---\n\n# epic\n"
 	if err := os.WriteFile(filepath.Join(epicDir, "ticket.md"), []byte(fm), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestEpicEvolveFields_LoadAndSurviveTimingWrite(t *testing.T) {
 	if want := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC); !epic.EvolvedAt.Equal(want) {
 		t.Errorf("EvolvedAt = %v, want %v", epic.EvolvedAt, want)
 	}
-	if !epic.EvolveSkipped || epic.EvolveTicket != "p:epic/03" || !epic.ProvisionalDestination {
+	if !epic.EvolveSkipped || epic.EvolveTicket != "p:epic/03" || !epic.DestinationUnconfirmed {
 		t.Errorf("epic = %+v, want evolve fields kept", epic)
 	}
 }

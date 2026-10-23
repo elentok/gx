@@ -78,7 +78,7 @@ func newTicketsEpicCmd(d deps) *cobra.Command {
 	}
 	addCmd.Flags().StringVar(&kind, "kind", "", "map or loop (required unless the body's frontmatter sets it)")
 	addCmd.Flags().StringVar(&status, "status", "", "draft or open (default draft)")
-	addCmd.Flags().StringVar(&body, "body", "", "epic body, or - to read it from stdin; its frontmatter may set kind, status, provisional_destination")
+	addCmd.Flags().StringVar(&body, "body", "", "epic body, or - to read it from stdin; its frontmatter may set kind, status, destination_unconfirmed")
 	epicCmd.AddCommand(addCmd, newTicketsEpicSetCmd(d))
 	return epicCmd
 }
@@ -89,7 +89,7 @@ func newTicketsEpicCmd(d deps) *cobra.Command {
 func newTicketsEpicSetCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "set <project:epic>",
-		Short: "validated writes to an epic's ticket.md (kind, status, provisional_destination, blocked_by)",
+		Short: "validated writes to an epic's ticket.md (kind, status, destination_unconfirmed, blocked_by)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			cwd, err := d.getwd()
@@ -109,7 +109,7 @@ func newTicketsEpicSetCmd(d deps) *cobra.Command {
 	}
 	cmd.Flags().String("kind", "", "set kind (map or loop)")
 	cmd.Flags().String("status", "", "set status (draft or open)")
-	cmd.Flags().String("provisional-destination", "", "set provisional_destination (true/false)")
+	addDestinationUnconfirmedFlags(cmd, "set destination_unconfirmed (true/false)")
 	cmd.Flags().String("blocked-by", "", "set blocked_by (comma-separated whole-epic tokens, e.g. other or project:other)")
 	cmd.Flags().Bool("json", false, "emit {address, path, updated, via, actor} JSON instead of text")
 	return cmd

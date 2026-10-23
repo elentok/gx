@@ -60,7 +60,8 @@ func runTicketsMigrateToStore(cwd, oldRoot, projectFlag string, dryRun bool, w i
 // file untouched and this returns that validation error unchanged. It then
 // backfills merged_at on already-landed epics (see tickets.BackfillMergedAt)
 // and moves live "## Needs Answer" sections into the ticket log (see
-// tickets.MigrateParkSections). Last, it rewrites the old needs-answer and
+// tickets.MigrateParkSections). It renames the epic field provisional_destination
+// to destination_unconfirmed (see tickets.MigrateDestinationUnconfirmed). Last, it rewrites the old needs-answer and
 // needs-repair tickets to paused (see tickets.PlanPauseMigration); with dryRun
 // it only prints that plan.
 func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
@@ -86,6 +87,11 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		var timed []tickets.MigrationChange
 		timed, err = tickets.BackfillEpicTimes(scratchRoot)
 		changes = append(changes, timed...)
+	}
+	if err == nil {
+		var renamed []tickets.MigrationChange
+		renamed, err = tickets.MigrateDestinationUnconfirmed(scratchRoot)
+		changes = mergeChanges(changes, renamed)
 	}
 	if err == nil {
 		var moved []tickets.MigrationChange

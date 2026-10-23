@@ -164,9 +164,9 @@ conversation history.
 - **Create or edit an epic**: `gx tickets epic add <project:epic> --kind map|loop --status
   draft|open [--body -]` creates the epic's `ticket.md` and refuses an existing epic. A frontmatter
   block at the top of the body may carry the settable epic fields (e.g.
-  `provisional_destination: true`); any other field refuses the add. `gx tickets section` and
+  `destination_unconfirmed: true`); any other field refuses the add. `gx tickets section` and
   `gx tickets set` accept an epic address (`project:epic`, no ticket id) and validate it against the
-  epic schema: `set` writes `kind`, `status` and `provisional_destination`; `completed_at`,
+  epic schema: `set` writes `kind`, `status` and `destination_unconfirmed`; `completed_at`,
   `evolved_at`, `evolve_skipped` and `evolve_ticket` are server-stamped and read-only. Never
   hand-edit an epic's `ticket.md`.
 
@@ -232,10 +232,12 @@ writes the statuses directly:
 
 `paused` and `cancelled` stay server-only, even here.
 
-A map epic seeded by gx-resolve-follow-ups carries **`provisional_destination: true`** in its
+A map epic seeded by gx-resolve-follow-ups carries **`destination_unconfirmed: true`** in its
 `ticket.md`: the Destination is a guess from the follow-ups, not yet confirmed. gx-design confirms
-it with the person, then clears the flag with `gx tickets set <project:epic> --provisional-destination
-false`. Treat a map with the flag set as not ready to chart further.
+it with the person, then clears the flag with `gx tickets set <project:epic> --destination-unconfirmed
+false`. Treat a map with the flag set as not ready to chart further. (The old name,
+`provisional_destination` and `--provisional-destination`, is a deprecated alias for one release;
+`gx tickets migrate` renames the field.)
 
 ### Wayfinding operations
 
@@ -244,7 +246,7 @@ operations a map needs — chart, claim, close and frontier; a gap belongs here,
 that drives it.
 
 - **Chart**: `gx tickets epic add <project:epic> --kind map --status open --body -`, body = the map
-  (a frontmatter block at the top may set `provisional_destination: true`). Then run
+  (a frontmatter block at the top may set `destination_unconfirmed: true`). Then run
   `gx tickets validate` on any ticket of the epic. Later edits to the map body (Decisions so far,
   Not yet specified, Out of scope) go through `gx tickets section <project:epic> <heading> -`.
 - **Child ticket**: `gx tickets add <epic> --slug <slug> --type <type> [--blocked-by <ids>] --body

@@ -30,15 +30,27 @@ func setupEpicSetProject(t *testing.T) (d deps, ticketMD string) {
 func TestTicketsSet_EpicAddressWritesSettableFieldsAndKeepsTheRest(t *testing.T) {
 	d, ticketMD := setupEpicSetProject(t)
 
-	err := execute([]string{"tickets", "set", "mine:e", "--kind=map", "--status=open", "--provisional-destination=true"}, d)
+	err := execute([]string{"tickets", "set", "mine:e", "--kind=map", "--status=open", "--destination-unconfirmed=true"}, d)
 	if err != nil {
 		t.Fatalf("set: %v", err)
 	}
 	raw, _ := os.ReadFile(ticketMD)
-	for _, want := range []string{"kind: map", "status: open", "provisional_destination: true", "custom: keep-me", "started_at: 2026-01-02T03:04:05Z", "body words"} {
+	for _, want := range []string{"kind: map", "status: open", "destination_unconfirmed: true", "custom: keep-me", "started_at: 2026-01-02T03:04:05Z", "body words"} {
 		if !strings.Contains(string(raw), want) {
 			t.Errorf("ticket.md missing %q:\n%s", want, raw)
 		}
+	}
+}
+
+func TestTicketsSet_EpicAddressAcceptsDeprecatedProvisionalDestinationAlias(t *testing.T) {
+	d, ticketMD := setupEpicSetProject(t)
+
+	if err := execute([]string{"tickets", "set", "mine:e", "--provisional-destination=true"}, d); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	raw, _ := os.ReadFile(ticketMD)
+	if !strings.Contains(string(raw), "destination_unconfirmed: true") || strings.Contains(string(raw), "provisional_destination") {
+		t.Errorf("ticket.md should carry only destination_unconfirmed:\n%s", raw)
 	}
 }
 

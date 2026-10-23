@@ -101,7 +101,7 @@ it and use it for every later `set`, `section` and `--blocked-by`, never the pre
 **Area map epic** — one per area:
 
 - `gx tickets epic add <project>:<slug> --kind map --status open --body -`, the body opening with a
-  frontmatter block carrying `provisional_destination: true`, then: a **Destination** (provisional:
+  frontmatter block carrying `destination_unconfirmed: true`, then: a **Destination** (provisional:
   "decide these items, then a spec `docs/specs/<slug>.md`"), **Notes** ("Triaged from follow-ups on
   `<date>`" and the source addresses), and empty **Decisions so far** and **Not yet specified**.
 - A design item: move it in, then `gx tickets set <new-addr> --type grilling --status open`, and add

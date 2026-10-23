@@ -346,7 +346,7 @@ func loadEpicEvolveFields(epic *Epic, fm string) {
 	decode("evolved_at", &epic.EvolvedAt)
 	decode("evolve_skipped", &epic.EvolveSkipped)
 	decode("evolve_ticket", &epic.EvolveTicket)
-	decode("provisional_destination", &epic.ProvisionalDestination)
+	decode("destination_unconfirmed", &epic.DestinationUnconfirmed)
 }
 
 // epicTiming is an epic's optional started_at/completed_at pair, as stored in

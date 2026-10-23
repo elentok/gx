@@ -45,7 +45,7 @@ The Go side adds `gx tickets move`, `gx tickets close`, `gx tickets follow-up ad
 epic add`, cross-project addresses for the ticket verbs, `section` and `set` on epics, `category`
 and `status: draft` on `add`, the `evolve` setting, the server hook and its `completed_at` stamp,
 the `gx evolve` verbs (including the flag-table verb and the contributor export), new epic
-frontmatter (`evolved_at`, `evolve_skipped`, `evolve_ticket`, `provisional_destination`), subagent
+frontmatter (`evolved_at`, `evolve_skipped`, `evolve_ticket`, `destination_unconfirmed`), subagent
 cost tracking, and the `CONTEXT.md` → `GLOSSARY.md` rename.
 
 ## User Stories
@@ -201,7 +201,7 @@ cost tracking, and the `CONTEXT.md` → `GLOSSARY.md` rename.
     area map epic as `open` `grilling` tickets with a `## Question`, and research-only items moved
     there as `open` `research` tickets, so that design and research work has a home.
 62. As a gx user, I want those map epics seeded with a provisional Destination, Notes with the source
-    addresses, and `provisional_destination: true`, so that gx-design can pick them up.
+    addresses, and `destination_unconfirmed: true`, so that gx-design can pick them up.
 63. As a gx user, I want the run never to grill me, so that one approval step is all it asks.
 64. As a gx user, I want `follow-ups` to hold no tickets after a run, so that "done" is clear.
 65. As a gx user, I want closed items kept in `follow-ups-archived` with a `## Resolution` (reason,
@@ -229,7 +229,7 @@ cost tracking, and the `CONTEXT.md` → `GLOSSARY.md` rename.
 74. As a gx user, I want review findings kept as a `## Review findings` checklist on the map's
     `ticket.md`, so that they live in the ticket store, not an uncommitted scratch file.
 75. As a gx user, I want gx-design's first run on a provisional map to grill the Destination alone,
-    clear `provisional_destination`, then continue into the map in the same session, so that a
+    clear `destination_unconfirmed`, then continue into the map in the same session, so that a
     seeded map gets a real Destination before work starts.
 76. As a gx user, I want gx-design to stop after reworking the map when the new Destination forces
     tickets to change, so that I review the rework before going on.
@@ -278,7 +278,7 @@ cost tracking, and the `CONTEXT.md` → `GLOSSARY.md` rename.
   `cancelled`, limited to `follow-ups` epics.
 - The "Map epics" section (with its Wayfinding operations) is what gx-design hands wayfinder. It
   must cover chart, claim, close and frontier; any gap is filled there, not in gx-design. It also
-  documents `provisional_destination`.
+  documents `destination_unconfirmed`.
 - Epic `ticket.md` files are edited through verbs, not by hand: `gx tickets epic add` creates one,
   `section` and `set` change one. The Wayfinding operations and "no verb creates an epic" are
   updated to match.
@@ -297,8 +297,10 @@ cost tracking, and the `CONTEXT.md` → `GLOSSARY.md` rename.
     true`** next to it.
   - **`evolve_ticket`** (address of the retro's one-off). Not stamped by `skip`. A `--force`
     re-run overwrites it.
-  - **`provisional_destination`** (bool) on map epics seeded by gx-resolve-follow-ups. gx-design
-    clears it after confirming the Destination.
+  - **`destination_unconfirmed`** (bool) on map epics seeded by gx-resolve-follow-ups. gx-design
+    clears it after confirming the Destination. It was `provisional_destination`; `gx tickets
+    migrate` renames the old field, and `--provisional-destination` stays a deprecated alias for
+    one release.
 - No migration of existing follow-ups. gx-resolve-follow-ups infers a missing `category` and reads
   any section names.
 
@@ -332,14 +334,14 @@ cost tracking, and the `CONTEXT.md` → `GLOSSARY.md` rename.
 
 - `gx tickets epic add <project:epic> --kind map|loop --status draft|open [--body -]` creates an
   epic `ticket.md`. It refuses an existing epic. Like `tickets add --body`, a frontmatter block
-  at the top of the body may carry the settable epic fields (e.g. `provisional_destination: true`);
+  at the top of the body may carry the settable epic fields (e.g. `destination_unconfirmed: true`);
   any other field refuses the add.
 - `section` and `set` accept an epic address (`project:epic`, no ticket id) and validate it against
   an epic schema, not the ticket schema.
-  - Writable through `set`: `kind`, `status`, `provisional_destination`.
+  - Writable through `set`: `kind`, `status`, `destination_unconfirmed`.
   - Server-stamped and read-only to `set`: `completed_at`, `evolved_at`, `evolve_skipped`,
     `evolve_ticket`.
-- gx-design writes `## Review findings` with `section` and clears `provisional_destination` with
+- gx-design writes `## Review findings` with `section` and clears `destination_unconfirmed` with
   `set`. gx-resolve-follow-ups creates the ready epic and the seeded map epics with `epic add`.
 
 ### `gx tickets move <addr> <epic> [--slug s] [--dry-run] [--json]`
@@ -533,7 +535,7 @@ Produced epics:
   whose expected files overlap are chained with `blocked_by`. No size cap.
 - **Area map epics**: grouped by area of code/tool (not bug vs idea), 1–8 items, singletons fine,
   plain descriptive slug. Created in one call with `epic add --kind map --status open --body -`,
-  the body's frontmatter carrying `provisional_destination: true`. Body seeded
+  the body's frontmatter carrying `destination_unconfirmed: true`. Body seeded
   with a provisional Destination ("decide these items, then a spec `docs/specs/<slug>.md`"), Notes
   ("Triaged from follow-ups on <date>" + source addresses), empty Decisions so far and Not yet
   specified. A design item moves in as an `open` `grilling` ticket, keeps its follow-up sections
@@ -555,7 +557,7 @@ The `/myway` state machine, ported. `disable-model-invocation: true`. Tracker fi
   covers both "spec" and "review" of the Destination's map → spec → review → impl. Next-step
   detection, first match wins:
   1. No map epic → wayfinder "Chart the map".
-  2. Map has `provisional_destination: true` → grill the Destination alone, clear the field with
+  2. Map has `destination_unconfirmed: true` → grill the Destination alone, clear the field with
      `set`, then continue into step 3 in the same session, unless seeded tickets had to be edited, closed or
      added; then stop after reworking the map.
   3. Open tickets or non-empty Not yet specified → wayfinder "Work through the map", one ticket.

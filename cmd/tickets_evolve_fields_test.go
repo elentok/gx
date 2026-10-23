@@ -65,11 +65,11 @@ func TestExecute_TicketsValidate_EpicEvolveFields(t *testing.T) {
 		return execute([]string{"tickets", "validate", path}, d)
 	}
 
-	good := "evolved_at: 2026-01-02T03:04:05Z\nevolve_skipped: true\nevolve_ticket: gx:epic/03\nprovisional_destination: false\n"
+	good := "evolved_at: 2026-01-02T03:04:05Z\nevolve_skipped: true\nevolve_ticket: gx:epic/03\ndestination_unconfirmed: false\n"
 	if err := validate(good); err != nil {
 		t.Errorf("valid epic fields: %v", err)
 	}
-	for _, field := range []string{"evolved_at", "evolve_skipped", "provisional_destination"} {
+	for _, field := range []string{"evolved_at", "evolve_skipped", "destination_unconfirmed"} {
 		err := validate(field + ": not-a-value\n")
 		if err == nil || !strings.Contains(err.Error(), field) {
 			t.Errorf("bad %s: err = %v, want one naming the field", field, err)

@@ -26,7 +26,7 @@ const KindLoop = "loop"
 type EpicFields struct {
 	Kind                   string `yaml:"kind,omitempty"`
 	Status                 string `yaml:"status,omitempty"`
-	ProvisionalDestination bool   `yaml:"provisional_destination,omitempty"`
+	DestinationUnconfirmed bool   `yaml:"destination_unconfirmed,omitempty"`
 
 	// CreatedAt is stamped by CreateEpic. A caller-supplied value refuses.
 	CreatedAt time.Time `yaml:"created_at,omitempty"`
@@ -36,7 +36,7 @@ type EpicFields struct {
 // The land_block_* keys are stored epic frontmatter the server still writes.
 var EpicServerStamped = []string{"created_at", "completed_at", "merged_at", "land_block_kind", "land_block_reason", "evolved_at", "evolve_skipped", "evolve_ticket"}
 
-const epicSettableList = "kind, status, provisional_destination"
+const epicSettableList = "kind, status, destination_unconfirmed"
 
 // ParseEpicFields decodes a frontmatter block holding only settable epic
 // fields. A server-stamped or unknown key refuses, naming which it is. The
@@ -49,7 +49,7 @@ func ParseEpicFields(yamlPart string) (EpicFields, error) {
 	}
 	for key := range keys {
 		switch key {
-		case "kind", "status", "provisional_destination":
+		case "kind", "status", "destination_unconfirmed":
 		default:
 			if slices.Contains(EpicServerStamped, key) {
 				return f, fmt.Errorf("epic frontmatter: %s is server-stamped and cannot be set (settable: %s)", key, epicSettableList)
@@ -187,6 +187,6 @@ func mergeEpicFields(flags, body EpicFields) (EpicFields, error) {
 			return flags, fmt.Errorf("--%s %s conflicts with the body's %s: %s", p.name, *p.dst, p.name, p.src)
 		}
 	}
-	flags.ProvisionalDestination = flags.ProvisionalDestination || body.ProvisionalDestination
+	flags.DestinationUnconfirmed = flags.DestinationUnconfirmed || body.DestinationUnconfirmed
 	return flags, nil
 }

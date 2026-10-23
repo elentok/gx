@@ -29,7 +29,7 @@ func TestRunTicketsEpicAdd_CreatesEpics(t *testing.T) {
 		{"mine:m", "map", "draft", "", []string{"kind: map", "status: draft", "# m"}},
 		{"mine:l", "loop", "open", "", []string{"kind: loop", "status: open"}},
 		{"bare", "loop", "open", "# Title\n\nwords\n", []string{"kind: loop", "# Title", "words"}},
-		{"mine:p", "loop", "draft", "---\nprovisional_destination: true\n---\n\n# P\n", []string{"provisional_destination: true", "# P"}},
+		{"mine:p", "loop", "draft", "---\ndestination_unconfirmed: true\n---\n\n# P\n", []string{"destination_unconfirmed: true", "# P"}},
 	} {
 		var out bytes.Buffer
 		if err := runTicketsEpicAdd(cwd, tc.arg, tc.kind, tc.status, tc.body, &out); err != nil {

@@ -32,7 +32,7 @@ func ParseEpicAddress(s string) (project, epic string, ok bool) {
 type EpicUpdate struct {
 	Kind                   *string
 	Status                 *string
-	ProvisionalDestination *bool
+	DestinationUnconfirmed *bool
 	// BlockedBy is written as given; check it first with CheckEpicBlockedByWrite.
 	BlockedBy *[]string
 }
@@ -68,8 +68,8 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 				return err
 			}
 		}
-		if u.ProvisionalDestination != nil {
-			if err := setMappingValue(mapping, "provisional_destination", *u.ProvisionalDestination); err != nil {
+		if u.DestinationUnconfirmed != nil {
+			if err := setMappingValue(mapping, "destination_unconfirmed", *u.DestinationUnconfirmed); err != nil {
 				return err
 			}
 		}

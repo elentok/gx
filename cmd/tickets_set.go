@@ -75,7 +75,7 @@ An epic's ticket.md may set kind: map to mark a wayfinder map epic: hand-driven,
 never scheduled by the server.
 
 ` + "`tickets set project:epic`" + ` (or ` + "`tickets epic set`" + `) writes an epic's kind (map, loop), status
-(draft, open), provisional_destination and blocked_by (whole-epic tokens such as other or
+(draft, open), destination_unconfirmed and blocked_by (whole-epic tokens such as other or
 project:other: the whole epic waits on them, checked like a ticket's); created_at, completed_at, merged_at, evolved_at, evolve_skipped and
 evolve_ticket are refused (server-stamped). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
 
@@ -90,7 +90,7 @@ settable via ` + "`tickets set`" + `, and unset until gx stamps them.
 
 Evolve fields (optional, validated):
   evolved_at (RFC3339 timestamp), evolve_skipped (bool), evolve_ticket (address),
-  provisional_destination (bool)
+  destination_unconfirmed (bool)
 `
 
 func newTicketsSetCmd(d deps) *cobra.Command {
@@ -132,7 +132,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 
 	// Epic address only (project:epic): the settable epic fields.
 	cmd.Flags().String("kind", "", "epic only: set kind (map or loop)")
-	cmd.Flags().String("provisional-destination", "", "epic only: set provisional_destination (true/false)")
+	addDestinationUnconfirmedFlags(cmd, "epic only: set destination_unconfirmed (true/false)")
 	for _, field := range tickets.EpicServerStamped {
 		flag := strings.ReplaceAll(field, "_", "-")
 		cmd.Flags().String(flag, "", "refused: "+field+" is server-stamped")
@@ -142,6 +142,18 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().Bool("json", false, "emit {address, path, updated, via, actor} JSON instead of text")
 
 	return cmd
+}
+
+// legacyProvisionalDestinationFlag is the old name of --destination-unconfirmed,
+// kept as a deprecated alias for one release.
+const legacyProvisionalDestinationFlag = "provisional-destination"
+
+// addDestinationUnconfirmedFlags registers --destination-unconfirmed and its
+// deprecated alias on cmd.
+func addDestinationUnconfirmedFlags(cmd *cobra.Command, usage string) {
+	cmd.Flags().String("destination-unconfirmed", "", usage)
+	cmd.Flags().String(legacyProvisionalDestinationFlag, "", usage)
+	_ = cmd.Flags().MarkDeprecated(legacyProvisionalDestinationFlag, "use --destination-unconfirmed")
 }
 
 // runEpicSet is runTicketsSet for an epic's ticket.md, validated against the
@@ -168,14 +180,17 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 		update.Status = &v
 		changed = append(changed, "status="+v)
 	}
-	if c.Flags().Changed("provisional-destination") {
-		v, _ := c.Flags().GetString("provisional-destination")
+	for _, flag := range []string{"destination-unconfirmed", legacyProvisionalDestinationFlag} {
+		if !c.Flags().Changed(flag) {
+			continue
+		}
+		v, _ := c.Flags().GetString(flag)
 		b, err := strconv.ParseBool(v)
 		if err != nil {
-			return fmt.Errorf("%s: --provisional-destination %q: want true or false", ticketLabel(path), v)
+			return fmt.Errorf("%s: --%s %q: want true or false", ticketLabel(path), flag, v)
 		}
-		update.ProvisionalDestination = &b
-		changed = append(changed, "provisional_destination="+v)
+		update.DestinationUnconfirmed = &b
+		changed = append(changed, "destination_unconfirmed="+v)
 	}
 	var notices []string
 	if c.Flags().Changed("blocked-by") {
@@ -192,7 +207,7 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 		changed = append(changed, "blocked_by="+v)
 	}
 	if len(changed) == 0 {
-		return fmt.Errorf("%s: an epic takes --kind, --status, --provisional-destination and --blocked-by", ticketLabel(path))
+		return fmt.Errorf("%s: an epic takes --kind, --status, --destination-unconfirmed and --blocked-by", ticketLabel(path))
 	}
 	if err := tickets.UpdateEpicFields(path, update); err != nil {
 		return fmt.Errorf("%s: %w", ticketLabel(path), err)
