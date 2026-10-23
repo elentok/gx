@@ -86,10 +86,36 @@ func TUIInputPath(home, sessionID string) string {
 	return filepath.Join(home, ".claude", "agentfake", sessionID+".in")
 }
 
+// TUIAckPath logs one byte per control the TUI fake running sessionID under
+// home has handled.
+func TUIAckPath(home, sessionID string) string {
+	return filepath.Join(home, ".claude", "agentfake", sessionID+".ack")
+}
+
 // SendTUIControl writes c to the side channel of the TUI fake running
-// sessionID under home, waiting for the fake to create it.
+// sessionID under home, waiting for the fake to create it and then to handle
+// c. The control FIFO and the PTY's keys reach the fake on separate paths, so
+// a key sent before the ack can beat the control. ActionExit gets no ack.
 func SendTUIControl(home, sessionID string, c Control) error {
-	return sendControlWhenReady(TUIControlPath(home, sessionID), c)
+	ackPath := TUIAckPath(home, sessionID)
+	var handled int64
+	if st, err := os.Stat(ackPath); err == nil {
+		handled = st.Size()
+	}
+	if err := sendControlWhenReady(TUIControlPath(home, sessionID), c); err != nil {
+		return err
+	}
+	if c.Action == ActionExit {
+		return nil
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(time.Millisecond) {
+		if st, err := os.Stat(ackPath); err == nil && st.Size() > handled {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("agentfake: control %s not handled", c.Action)
+		}
+	}
 }
 
 // sendControlWhenReady writes c to the side-channel FIFO at path, waiting for
@@ -195,10 +221,16 @@ func runTUIClaude() (int, error) {
 		return 0, err
 	}
 	defer in.Close()
+	ack, err := os.Create(TUIAckPath(home, opts.sessionID))
+	if err != nil {
+		return 0, err
+	}
+	defer ack.Close()
 
 	now := time.Now()
 	t := &tui{
 		out:        os.Stdout,
+		ack:        ack,
 		opts:       opts,
 		pidPath:    PidFilePath(home, os.Getpid()),
 		transcript: transcript.PathIn(home, cwd, opts.sessionID),
@@ -217,7 +249,9 @@ func runTUIClaude() (int, error) {
 }
 
 type tui struct {
-	out        io.Writer
+	out io.Writer
+	// ack gets one byte after each handled control.
+	ack        io.Writer
 	opts       tuiOptions
 	pidPath    string
 	transcript string
@@ -271,6 +305,9 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 				return ev.control.Code, t.exit(ev.control.Code)
 			}
 			if err := t.handleControl(*ev.control); err != nil {
+				return 0, err
+			}
+			if _, err := t.ack.Write([]byte{'.'}); err != nil {
 				return 0, err
 			}
 		case t.opts.trust:

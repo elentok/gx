@@ -81,18 +81,12 @@ func TestPty_Conformance(t *testing.T) {
 			},
 			OpenDialogOnNextPrompt: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionDialog})
-				// Same as Stall: the control FIFO and the pty's keys take
-				// separate paths, so the prompt can beat the dialog.
-				time.Sleep(100 * time.Millisecond)
 			},
 			FastTurn: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionFast})
 			},
 			Stall: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
-				// The control FIFO and the pty's keys reach the fake on
-				// separate paths, so a key sent right away can beat the stall.
-				time.Sleep(100 * time.Millisecond)
 			},
 			BackgroundTask: func(t *testing.T, s agentrunner.Session, running bool) {
 				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBackground, Running: running})
