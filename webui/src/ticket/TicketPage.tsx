@@ -5,10 +5,11 @@ import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
-import { ActionCard } from "./ActionCard";
+import { ActionCard, needsActionCard } from "./ActionCard";
 import type { Sent } from "./answer";
 import { epicOfTicket, useTicketDetail, type FetchDetail } from "./detail";
 import { TicketHeader } from "./TicketHeader";
+import { hasSections, NothingHere, TicketSections } from "./TicketSections";
 
 export function TicketPage({ address, fetchDetail }: { address: string; fetchDetail?: FetchDetail }) {
   const conn = useConnectionContext();
@@ -41,6 +42,8 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
               onResumed={setResumed}
               refetch={refetch}
             />
+            <TicketSections detail={detail} />
+            {!hasSections(detail) && !needsActionCard(detail, sent, resumed) && <NothingHere />}
           </>
         ) : (
           <>
