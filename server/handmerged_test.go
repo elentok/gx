@@ -110,6 +110,29 @@ func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T)
 	}
 }
 
+func TestHandMerged_StampsLinesFromTheEpicsTrailerCommits(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	runGitIn(t, repo, "checkout", "-q", "-b", "blocker")
+	testutil.WriteFile(t, repo, "a.txt", "1\n2\n3\n4\n5\n")
+	testutil.CommitAll(t, repo, "work\n\nRalph-Loop-Ticket: blocker/01")
+	testutil.WriteFile(t, repo, "README.md", "changed\n")
+	testutil.CommitAll(t, repo, "other epic's work\n\nRalph-Loop-Ticket: elsewhere/01")
+	runGitIn(t, repo, "checkout", "-q", "main")
+	writeCompleteEpic(t, store, "blocker")
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
+	servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
+	runGitIn(t, repo, "merge", "-q", "--ff-only", "blocker")
+
+	waitUntil(t, "merged_at", func() bool {
+		return !tickets.LoadEpicTicketMD(filepath.Join(store, "proj", "blocker")).MergedAt.IsZero()
+	})
+	md := tickets.LoadEpicTicketMD(filepath.Join(store, "proj", "blocker"))
+	if md.LinesAdded == nil || *md.LinesAdded != 5 || md.LinesRemoved == nil || *md.LinesRemoved != 0 {
+		t.Errorf("lines = %v/%v, want 5/0", md.LinesAdded, md.LinesRemoved)
+	}
+}
+
 func TestHandMerged_EpicWithNoQueuedRootAndNoDependentIsNotChecked(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	writeCompleteEpic(t, store, "idle")

@@ -126,6 +126,11 @@ func DiffLines(dir, refA, refB string) (added, removed int, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
+	added, removed = sumNumstat(out)
+	return added, removed, nil
+}
+
+func sumNumstat(out string) (added, removed int) {
 	for _, line := range strings.Split(out, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 3 {
@@ -137,6 +142,29 @@ func DiffLines(dir, refA, refB string) (added, removed int, err error) {
 		if n, err := strconv.Atoi(fields[1]); err == nil {
 			removed += n
 		}
+	}
+	return added, removed
+}
+
+// TrailerLines sums the lines added and removed by the commits reachable from
+// ref whose key trailer value satisfies match. Other commits in ref's history
+// count for nothing.
+func TrailerLines(dir, ref, key string, match func(value string) bool) (added, removed int, err error) {
+	trailers, err := TrailerMap(dir, ref, key)
+	if err != nil {
+		return 0, 0, err
+	}
+	for value, sha := range trailers {
+		if !match(value) {
+			continue
+		}
+		out, _, err := run(dir, []string{"show", "--numstat", "--format=", sha})
+		if err != nil {
+			return 0, 0, err
+		}
+		a, r := sumNumstat(out)
+		added += a
+		removed += r
 	}
 	return added, removed, nil
 }

@@ -5,6 +5,16 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+// EpicTrailerLines counts the lines added and removed by the commits reachable
+// from ref whose Ralph-Loop-Ticket trailer names epic. It stamps an epic that
+// merged outside the server, where no trunk before/after pair exists.
+func EpicTrailerLines(dir, ref, epic string) (added, removed int, err error) {
+	return git.TrailerLines(dir, ref, ticketTrailerKey, func(value string) bool {
+		e, _, ok := tickets.SplitTrailerValue(value)
+		return ok && e == epic
+	})
+}
+
 // mergedTickets reports which tickets have a commit reachable from
 // featureBranch stamped with their Ralph-Loop-Ticket trailer (see
 // ticketTrailerValue), keyed by ticket identifier — a single git.TrailerMap
