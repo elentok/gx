@@ -1,8 +1,8 @@
-import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { SessionChatMessage, SessionChatResponse, SessionInfo } from "../generated/server";
+import type { SessionChatMessage, SessionChatResponse, SessionInfo, SessionRoundCard } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchChat } from "./chat";
@@ -196,4 +196,77 @@ test("the newest live session drives the chat, else the newest Exited one", asyn
     fetchChat,
   );
   await waitFor(() => expect(seen).toEqual(["new-exited"]));
+});
+
+const card = (over: Partial<SessionRoundCard>): SessionRoundCard => ({
+  number: 1,
+  title: "t",
+  body: "Which way?",
+  kind: "options",
+  options: [
+    { id: "a", label: "Alpha" },
+    { id: "b", label: "Beta" },
+  ],
+  ...over,
+});
+
+const roundChat = () =>
+  okChat(
+    chatOf([], {
+      round: [
+        card({ number: 1, body: "First?", recommended: "b" }),
+        card({ number: 2, body: "Second?", kind: "yes-no", options: undefined, yes: "Sure", no: "Nope" }),
+        card({ number: 3, body: "Third?", kind: "text", options: undefined }),
+        card({ number: 4, body: "Fourth?", kind: "text", options: undefined, note: "options could not be read" }),
+      ],
+    }),
+  );
+
+test("a round opens a sheet that folds, and its stepper marks and jumps", async () => {
+  renderChat([session()], roundChat());
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  expect(within(sheet).getByText("First?")).toBeTruthy();
+  expect(within(sheet).getByText("★ recommended")).toBeTruthy();
+  expect(within(sheet).getByRole("button", { name: "Question 1" }).getAttribute("aria-current")).toBe("step");
+
+  fireEvent.click(within(sheet).getByRole("button", { name: "Question 3" }));
+  expect(within(sheet).getByRole("button", { name: "Question 3" }).getAttribute("aria-current")).toBe("step");
+  expect(within(sheet).getByRole("textbox", { name: "Answer to question 3" })).toBeTruthy();
+
+  fireEvent.click(within(sheet).getByRole("button", { name: "Fold questions" }));
+  expect(within(sheet).queryByRole("textbox", { name: "Answer to question 3" })).toBeNull();
+  fireEvent.click(within(sheet).getByRole("button", { name: "Open questions" }));
+  expect(within(sheet).getByRole("textbox", { name: "Answer to question 3" })).toBeTruthy();
+});
+
+test("picking an option marks the circle answered and advances; Prev and Next move", async () => {
+  renderChat([session()], roundChat());
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
+  expect(within(sheet).getByRole("button", { name: "Question 1, answered" }).textContent).toBe("✓");
+  expect(within(sheet).getByRole("button", { name: "Question 2" }).getAttribute("aria-current")).toBe("step");
+  expect(within(sheet).getByRole("button", { name: "Sure" })).toBeTruthy();
+
+  fireEvent.click(within(sheet).getByRole("button", { name: "← Prev" }));
+  expect(within(sheet).getByRole("button", { name: "Question 1, answered" }).getAttribute("aria-current")).toBe("step");
+  fireEvent.click(within(sheet).getByRole("button", { name: "Next →" }));
+  fireEvent.click(within(sheet).getByRole("button", { name: "Next →" }));
+  fireEvent.click(within(sheet).getByRole("button", { name: "Next →" }));
+  expect(within(sheet).getByText("options could not be read")).toBeTruthy();
+  expect((within(sheet).getByRole("button", { name: "Next →" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("a question keeps a note behind a note icon", async () => {
+  renderChat([session()], roundChat());
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  expect(within(sheet).queryByRole("textbox", { name: "Note text for question 1" })).toBeNull();
+  fireEvent.click(within(sheet).getByRole("button", { name: "Note on question 1" }));
+  fireEvent.change(within(sheet).getByRole("textbox", { name: "Note text for question 1" }), { target: { value: "hm" } });
+  expect((within(sheet).getByRole("textbox", { name: "Note text for question 1" }) as HTMLTextAreaElement).value).toBe("hm");
+});
+
+test("no round, no sheet", async () => {
+  renderChat([session()], okChat(chatOf([msg({ text: "hi" })])));
+  await screen.findByText("hi");
+  expect(screen.queryByRole("group", { name: "Questions" })).toBeNull();
 });

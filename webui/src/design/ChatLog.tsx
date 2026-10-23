@@ -5,6 +5,7 @@ import { Markdown } from "../markdown/Markdown";
 import { useSessionChat, type FetchChat } from "./chat";
 import { Composer } from "./Composer";
 import type { PostPrompt } from "./prompt";
+import { QuestionSheet } from "./QuestionSheet";
 
 const KIND_NAMES: Record<string, string> = { shell: "shell", monitor: "Monitor", agent: "subagent" };
 
@@ -93,6 +94,7 @@ function ChatLog({
         <Entry key={m.id || i} m={m} tool={working && i === chat.messages.length - 1} />
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
+      {chat.round.length > 0 && <QuestionSheet key={chat.round.map((c) => `${c.number}:${c.title}`).join("|")} round={chat.round} />}
       <Composer
         session={session}
         lastMessage={chat.messages.at(-1)?.id}
