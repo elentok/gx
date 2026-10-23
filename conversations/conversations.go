@@ -119,6 +119,33 @@ func SaveTotals(root, id string, t Totals) error {
 	return write(path, r)
 }
 
+// SumTotals adds up the saved totals of the conversations recorded against
+// ticket. It reports false when the sum would undercount: recording began after
+// the ticket was created (or never began), or a conversation has no totals.
+// A ticket with no conversations sums to zero.
+func SumTotals(root, ticket string, createdAt time.Time) (Totals, bool, error) {
+	started, ok, err := Started(root)
+	if err != nil || !ok || createdAt.IsZero() || createdAt.Before(started) {
+		return Totals{}, false, err
+	}
+	records, err := List(root)
+	if err != nil {
+		return Totals{}, false, err
+	}
+	var sum Totals
+	for _, r := range records {
+		if r.Ticket != ticket {
+			continue
+		}
+		if r.Totals == nil {
+			return Totals{}, false, nil
+		}
+		sum.TotalTokens += r.Totals.TotalTokens
+		sum.Cost += r.Totals.Cost
+	}
+	return sum, true, nil
+}
+
 func recordPath(root, id string) (string, error) {
 	if id == "" || !filepath.IsLocal(id) || strings.ContainsRune(id, filepath.Separator) {
 		return "", fmt.Errorf("bad conversation id %q", id)

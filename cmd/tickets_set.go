@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -344,6 +345,27 @@ func inMapEpic(path string) bool {
 	return filepath.Base(issuesDir) == "issues" && tickets.IsMapEpic(filepath.Dir(issuesDir))
 }
 
+// mapDoneStamp is the tokens and cost to stamp when c closes a map epic's
+// ticket, from its recorded conversations; nil when nothing should be stamped.
+func mapDoneStamp(c *cobra.Command, path string) (*conversations.Totals, error) {
+	if v, _ := c.Flags().GetString("status"); !c.Flags().Changed("status") || schema.Status(v) != schema.StatusDone || !inMapEpic(path) {
+		return nil, nil
+	}
+	current, err := schema.ParseTicket(path)
+	if err != nil {
+		return nil, err
+	}
+	root, err := conversations.DefaultDir()
+	if err != nil {
+		return nil, err
+	}
+	sum, ok, err := conversations.SumTotals(root, ticketLabel(path), current.CreatedAt)
+	if err != nil || !ok {
+		return nil, err
+	}
+	return &sum, nil
+}
+
 // runTicketsSet applies every flag actually passed on c to path's ticket via
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
@@ -410,7 +432,11 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 
 	var changed []string
 
-	err := schema.UpdateTicket(path, func(t *schema.Ticket) {
+	stamp, err := mapDoneStamp(c, path)
+	if err != nil {
+		return err
+	}
+	err = schema.UpdateTicket(path, func(t *schema.Ticket) {
 		wasCommitless := t.IsCommitless()
 		defer func() {
 			// A fork closes its commitful placeholder as commitless; base is
@@ -427,6 +453,11 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 			value, _ := c.Flags().GetString(f.flag)
 			f.apply(t, value)
 			changed = append(changed, fmt.Sprintf("%s=%s", f.field, value))
+		}
+		if stamp != nil {
+			tokens := int64(stamp.TotalTokens)
+			t.TotalTokens = &tokens
+			t.ActualCost = stamp.Cost
 		}
 		if c.Flags().Changed("iteration-status") {
 			t.IterationFinishedAt = time.Time{}
