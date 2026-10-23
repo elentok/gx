@@ -99,6 +99,13 @@ func clearPresses(text string) int {
 	return 2*n - 1 + 2
 }
 
+// inputSettleWait bounds how long clearWhole rereads a not-empty input after
+// the clear keys, polling every inputSettlePoll.
+var (
+	inputSettleWait = time.Second
+	inputSettlePoll = 25 * time.Millisecond
+)
+
 // clearWhole empties the whole input, not just its current line, then checks
 // it when the Prompter can.
 func clearWhole(p Prompter, text string) error {
@@ -111,7 +118,14 @@ func clearWhole(p Prompter, text string) error {
 	if !ok {
 		return nil
 	}
+	// The agent redraws a moment after the keys land, so a read right away
+	// can still show the text.
+	settle := time.Now().Add(inputSettleWait)
 	empty, known, err := c.InputEmpty()
+	for err == nil && known && !empty && time.Now().Before(settle) {
+		time.Sleep(inputSettlePoll)
+		empty, known, err = c.InputEmpty()
+	}
 	if err != nil || !known || empty {
 		return nil
 	}

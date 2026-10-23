@@ -210,7 +210,16 @@ func TestPromptWithNudge_RetypeChecksInputAfterClear(t *testing.T) {
 	assertCalls(t, f.calls, want...)
 }
 
+// noInputSettle makes clearWhole check the input once, with no rereads.
+func noInputSettle(t *testing.T) {
+	t.Helper()
+	prev := inputSettleWait
+	inputSettleWait = 0
+	t.Cleanup(func() { inputSettleWait = prev })
+}
+
 func TestPromptWithNudge_NotEmptyAfterClear_IsStuck(t *testing.T) {
+	noInputSettle(t)
 	f := &checkingPrompter{fakePrompter: &fakePrompter{screens: []string{"empty"}}, known: true}
 	err := PromptWithNudge(f, "hi", DefaultNudgeCaps, time.Time{}, f.now, f.report)
 	if !errors.Is(err, ErrStuckSubmission) {
@@ -231,6 +240,7 @@ func TestPromptWithNudge_UnstyledRead_CountAloneDecides(t *testing.T) {
 }
 
 func TestPromptWithNudge_NeverPressesCtrlC(t *testing.T) {
+	noInputSettle(t)
 	f := &checkingPrompter{fakePrompter: &fakePrompter{screens: []string{"empty"}}, known: true}
 	_ = PromptWithNudge(f, "a\nb", DefaultNudgeCaps, time.Time{}, f.now, f.report)
 	for _, c := range f.calls {
@@ -307,4 +317,23 @@ func TestPromptWithNudge_ExpiredDeadline_NeverSubmits(t *testing.T) {
 	}
 	assertCalls(t, f.calls)
 	assertDecisions(t, f.decisions, NudgeTimeout)
+}
+
+// lateClearPrompter shows the input empty only from the given check on, as an
+// agent that redraws a moment after the clear keys.
+type lateClearPrompter struct {
+	*fakePrompter
+	emptyFrom, checks int
+}
+
+func (c *lateClearPrompter) InputEmpty() (bool, bool, error) {
+	c.checks++
+	return c.checks >= c.emptyFrom, true, nil
+}
+
+func TestClearInput_WaitsForTheRedraw(t *testing.T) {
+	f := &lateClearPrompter{fakePrompter: &fakePrompter{}, emptyFrom: 3}
+	if err := ClearInput(f, "hi"); err != nil {
+		t.Fatalf("ClearInput() error = %v, want the late redraw accepted", err)
+	}
 }
