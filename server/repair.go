@@ -304,6 +304,9 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 		if err != nil {
 			return repairRefusal(err), nil
 		}
+		if err := tickets.EndOpenRound(t.Path, req.origin, tickets.HowResume, ralphloop.CloseResumed); err != nil {
+			return RepairResult{}, fmt.Errorf("end pause round of %s: %w", addr, err)
+		}
 	}
 	if zeroCommit {
 		res.Message = repair.MessageReopened

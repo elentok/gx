@@ -149,6 +149,9 @@ func (s *Server) ticketUnmute(req QueueRequest) (QueueResult, error) {
 		if err := ralphloop.UnmuteTicket(ref.ticket.Path, time.Now()); err != nil {
 			return QueueResult{}, fmt.Errorf("unmute %s: %w", ref.addr, err)
 		}
+		if err := tickets.EndOpenRound(ref.ticket.Path, req.Source, tickets.HowResume, ralphloop.CloseResumed); err != nil {
+			return QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.addr, err)
+		}
 		s.rescan()
 		return QueueResult{}, nil
 	})

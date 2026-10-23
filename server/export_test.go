@@ -92,6 +92,12 @@ func (s *Server) ResumeAsWeb(req RepairRequest) (RepairResult, error) {
 	return s.repairResume(req)
 }
 
+// ResumeAs is the resume a client of the given origin sends over the socket.
+func (s *Server) ResumeAs(req RepairRequest, origin string) (RepairResult, error) {
+	req.origin = origin
+	return s.repairResume(req)
+}
+
 // Rescan rescans the store now, as a ping or the watch would.
 func (s *Server) Rescan() { s.rescan() }
 
