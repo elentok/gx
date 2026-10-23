@@ -320,6 +320,12 @@ test("Queue shows a pending label, then refetches at once and the row leaves", a
   vi.unstubAllGlobals();
 });
 
+test("a queueable epic found by search keeps its Queue button", async () => {
+  renderEpics(async () => listOf([row("x")]));
+  fireEvent.change(await screen.findByRole("searchbox", { name: "Search epics" }), { target: { value: "x" } });
+  expect(screen.getByRole("button", { name: "Queue" })).toBeTruthy();
+});
+
 test("a refused Queue shows the reason inline and keeps the row", async () => {
   stubQueueAdd(
     async () =>

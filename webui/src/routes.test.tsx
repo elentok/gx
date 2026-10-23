@@ -135,14 +135,14 @@ test("after a direct load the epic back link falls back to the Queue", async () 
   expect((await screen.findByRole("link", { name: "← Queue" })).getAttribute("href")).toBe("/q");
 });
 
-test("a page reached inside the app has a ← Back link", async () => {
+test("a page reached inside the app keeps its labelled back link", async () => {
   const router = createMemoryRouter(appRoutes({ ticket: okFor, epic: epicFetch() }), { initialEntries: ["/q", "/e/gx:e"], initialIndex: 1 });
   renderThemed(
     <ConnectionContext.Provider value={fakeConnection(true)}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   );
-  expect(await screen.findByRole("link", { name: "← Back" })).toBeTruthy();
+  expect((await screen.findByRole("link", { name: "← Queue" })).getAttribute("href")).toBe("/q");
 });
 
 const epicOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({

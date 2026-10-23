@@ -66,7 +66,7 @@ function EpicRow({
           {row.land_block_reason}
         </Text>
       )}
-      {!withBadge && row.queueable && <QueueButton address={row.address} state={row.state} onQueued={onQueued} />}
+      {row.queueable &&<QueueButton address={row.address} state={row.state} onQueued={onQueued} />}
     </Box>
   );
 }
