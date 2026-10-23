@@ -28,4 +28,11 @@ export function useFocusReport(conn: Connection, session: string | undefined, st
     if (streams === 0) return;
     void post({ client: conn.clientId, focused, session: session ?? "" }).catch(() => {});
   }, [conn, post, focused, session, streams]);
+  // Keyed on conn and post only: a stream or session change must not post a transient "left" that could land after the next report.
+  useEffect(
+    () => () => {
+      void post({ client: conn.clientId, focused: false, session: "" }).catch(() => {});
+    },
+    [conn, post],
+  );
 }
