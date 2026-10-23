@@ -1,4 +1,3 @@
-import { Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { BackLink } from "../nav/BackLink";
@@ -6,14 +5,10 @@ import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
+import { ActionCard } from "./ActionCard";
 import type { Sent } from "./answer";
-import { AnswerForm } from "./AnswerForm";
-import { AnswerResult } from "./AnswerResult";
 import { epicOfTicket, useTicketDetail, type FetchDetail } from "./detail";
-import { PermissionCard } from "./PermissionCard";
 import { TicketHeader } from "./TicketHeader";
-import { TicketReading } from "./TicketReading";
-import { ResumeForm } from "./ResumeForm";
 
 export function TicketPage({ address, fetchDetail }: { address: string; fetchDetail?: FetchDetail }) {
   const conn = useConnectionContext();
@@ -38,29 +33,13 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
             <PageHeader backTo={backTo} backLabel={backLabel} title={detail.title}>
               <TicketHeader detail={detail} now={Date.now()} />
             </PageHeader>
-            <TicketReading detail={detail} />
-            <PermissionCard detail={detail} onDone={refetch} onStale={refetch} />
-            <AnswerResult detail={detail} sent={sent} />
-            <AnswerForm
+            <ActionCard
               detail={detail}
-              onSent={(s) => {
-                setSent(s);
-                refetch();
-              }}
-              onStale={refetch}
-            />
-            {resumed && (
-              <Text role="status" aria-label="Resume result" mt="4">
-                Resumed ·{resumed}
-              </Text>
-            )}
-            <ResumeForm
-              detail={detail}
-              onDone={(words) => {
-                setResumed(words);
-                refetch();
-              }}
-              onStale={refetch}
+              sent={sent}
+              resumed={resumed}
+              onSent={setSent}
+              onResumed={setResumed}
+              refetch={refetch}
             />
           </>
         ) : (
