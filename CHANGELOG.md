@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Added a Stats page to the web UI, and a Stats section on each epic page. They show activity, cost and effort, and friction (pauses, run events and how pauses ended).
+  - Run `gx tickets migrate` (or `gx server restart --migrate`) soon after you upgrade. It backfills tokens, cost, lines and friction summaries on past tickets and merged epics from transcripts and run logs. Old transcripts age out, so the longer you wait, the more history is lost.
+  - Pause endings in old data show as `unknown`.
+  - Tickets older than the ticket store get the store's first day (2026-10-06) as their creation day. This shows as a spike on that day.
+
 ## v0.35.10 - 2026-10-23
 
 - Changed the ticket word "parked" to "paused". Read this before you upgrade.

@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // runTicketsMigrateToStore copies the old tracker tree at oldRoot into the
@@ -106,6 +107,11 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		var stamped []tickets.MigrationChange
 		stamped, err = tickets.BackfillTicketTotals(scratchRoot, ticketSessionTotals, conflictSessionsUnder(scratchRoot))
 		changes = mergeChanges(changes, stamped)
+	}
+	if err == nil {
+		var frictions []tickets.MigrationChange
+		frictions, err = tickets.BackfillFriction(scratchRoot, ticketFrictionUnder(scratchRoot))
+		changes = mergeChanges(changes, frictions)
 	}
 	if err == nil {
 		var totals []tickets.MigrationChange
@@ -258,6 +264,30 @@ func conflictSessionsUnder(root string) func(epicName, ticketID string) ([]strin
 			}
 		}
 		return ids, err
+	}
+}
+
+// earlyRunLogProject is the project that early run logs, written at
+// <store>/<epic>/run-log.jsonl before projects had directories, belong to.
+const earlyRunLogProject = "gx"
+
+// ticketFrictionUnder builds a ticket's Friction summary from its epic's run log
+// and its own log. The gx project falls back to an early run log in the store
+// root, which only a project directory's own log supersedes.
+func ticketFrictionUnder(root string) func(epicName string, t tickets.Ticket) (schema.FrictionSummary, error) {
+	return func(epicName string, t tickets.Ticket) (schema.FrictionSummary, error) {
+		runEvents, ok, err := ralphloop.ReadEvents(root, epicName)
+		if err == nil && !ok && tickets.ProjectName(root) == earlyRunLogProject {
+			runEvents, _, err = ralphloop.ReadEvents(filepath.Dir(root), epicName)
+		}
+		if err != nil {
+			return schema.FrictionSummary{}, fmt.Errorf("run log of %s: %w", epicName, err)
+		}
+		log, err := tickets.ReadLog(t.FilePath())
+		if err != nil {
+			return schema.FrictionSummary{}, err
+		}
+		return ralphloop.Friction(t.Identifier, runEvents, log), nil
 	}
 }
 
