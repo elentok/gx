@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -53,12 +54,18 @@ func turnCost(u transcript.Usage) float64 {
 		float64(u.CacheCreationInputTokens)/perMTok*p.cacheWrite
 }
 
+// turnTokens returns one assistant turn's total tokens: input, output, cache
+// writes and cache reads.
+func turnTokens(u transcript.Usage) int {
+	return u.InputTokens + u.OutputTokens + u.CacheReadInputTokens + u.CacheCreationInputTokens
+}
+
 // sessionStats are one Claude Code session's aggregate figures, computed
 // from its own transcript: peak per-turn context occupancy (the same
 // per-turn, never-summed calculation the smart-zone guardrail itself uses),
-// its wall-clock span (first transcript line's timestamp to last), and its
-// total cost (summed across every assistant turn, each turn priced by its
-// own model).
+// its wall-clock span (first transcript line's timestamp to last), its
+// total tokens and its total cost (both summed across every assistant turn,
+// subagents included; each turn priced by its own model).
 type sessionStats struct {
 	peakOccupancy int
 	totalTokens   int
@@ -109,40 +116,68 @@ func readSessionStats(cwd, sessionID string) (sessionStats, error) {
 			stats.peakOccupancy = occ
 		}
 		stats.cost += turnCost(l.Usage)
+		stats.totalTokens += turnTokens(l.Usage)
 	}
-	subCost, err := subagentCost(path)
+	subTokens, subCost, err := subagentUsage(path)
 	if err != nil {
 		return sessionStats{}, err
 	}
+	stats.totalTokens += subTokens
 	stats.cost += subCost
 	return stats, nil
 }
 
-// subagentCost sums the cost of the subagent transcripts stored in the
-// "<session>/subagents" directory next to the main transcript at path. They
-// feed cost only: a subagent's context is its own, so it never counts towards
-// the session's peak occupancy.
-func subagentCost(path string) (float64, error) {
+// subagentUsage sums the tokens and cost of the subagent transcripts stored in
+// the "<session>/subagents" directory next to the main transcript at path.
+// They feed totals only: a subagent's context is its own, so it never counts
+// towards the session's peak occupancy.
+func subagentUsage(path string) (tokens int, cost float64, err error) {
 	files, err := filepath.Glob(filepath.Join(strings.TrimSuffix(path, ".jsonl"), "subagents", "*.jsonl"))
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	var cost float64
 	for _, f := range files {
 		lines, ok, err := transcript.ReadAll(f)
 		if err != nil {
-			return 0, err
+			return 0, 0, err
 		}
 		if !ok {
 			continue
 		}
 		for _, l := range lines {
 			if l.Type == "assistant" {
+				tokens += turnTokens(l.Usage)
 				cost += turnCost(l.Usage)
 			}
 		}
 	}
-	return cost, nil
+	return tokens, cost, nil
+}
+
+// SessionRef names one agent session: the agent that ran it, the directory it
+// was launched in and its id.
+type SessionRef struct {
+	Agent     AgentKind
+	Cwd       string
+	SessionID string
+}
+
+// SessionsTotals sums the total tokens and cost of every session in refs.
+// All-or-nothing: if any session cannot be read or found, it returns an error
+// and no partial sum. A Codex session adds its reported total and no cost.
+func SessionsTotals(refs []SessionRef) (tokens int, cost float64, err error) {
+	for _, ref := range refs {
+		stats, err := readAgentSessionStats(sessionKey{agent: ref.Agent, cwd: ref.Cwd, sessionID: ref.SessionID})
+		if err != nil {
+			return 0, 0, fmt.Errorf("session %s: %w", ref.SessionID, err)
+		}
+		if !stats.ok {
+			return 0, 0, fmt.Errorf("session %s: transcript not found", ref.SessionID)
+		}
+		tokens += stats.totalTokens
+		cost += stats.cost
+	}
+	return tokens, cost, nil
 }
 
 // SessionCost returns the estimated API-equivalent cost of the Claude Code
