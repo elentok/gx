@@ -8,6 +8,7 @@ import { Markdown } from "../markdown/Markdown";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
 import { StatLine } from "../page/StatLine";
+import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
@@ -107,6 +108,16 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
               <Text data-reason mt="2" fontSize="sm" color="text.muted">
                 {detail.land_block_reason}
               </Text>
+            )}
+            {detail.draft && (
+              <Box mt="2" display="flex" alignItems="center" gap="2">
+                <Button tone="running" disabled>
+                  Queue
+                </Button>
+                <Text as="span" color="text.muted">
+                  Still publishing tickets
+                </Text>
+              </Box>
             )}
             {detail.queueable && (
               <Box mt="2" display="flex" alignItems="center" gap="2">

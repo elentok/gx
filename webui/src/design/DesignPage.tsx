@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Navigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { designHref } from "../hrefs";
+import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { DetailPage } from "../page/DetailPage";
 import { Button } from "../ui/button/Button";
@@ -11,6 +12,7 @@ import { Sidebar } from "../ui/sidebar/Sidebar";
 import { SidebarItem } from "../ui/sidebar/SidebarItem";
 import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
+import { ImplLink, Progress } from "./Progress";
 import { filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
 
 const NOT_STARTED = "not-started";
@@ -124,8 +126,33 @@ function MobilePicker({ groups, projects, current }: { groups: PickerGroup[]; pr
   );
 }
 
+// The Chat and Progress columns of one Design. Progress reads the Design's epic detail.
+function DesignColumns({ address, wide, fetchDetail }: { address: string; wide: boolean; fetchDetail?: FetchEpicDetail }) {
+  const conn = useConnectionContext();
+  const { detail } = useEpicDetail(address, conn, fetchDetail);
+  return (
+    <>
+      <Box aria-label="Chat" role="region">
+        {wide && detail?.impl_address && <ImplLink address={detail.impl_address} />}
+      </Box>
+      {/* On a phone Progress sits right under the picker, above the chat. */}
+      <Box aria-label="Progress" role="region" gridRow={{ base: 2, lg: "auto" }}>
+        {detail && <Progress detail={detail} wide={wide} />}
+      </Box>
+    </>
+  );
+}
+
 // `address` is the Design in the route; the bare route has none and opens the first In progress Design.
-export function DesignPage({ address, fetchList }: { address?: string; fetchList?: FetchEpicList }) {
+export function DesignPage({
+  address,
+  fetchList,
+  fetchDetail,
+}: {
+  address?: string;
+  fetchList?: FetchEpicList;
+  fetchDetail?: FetchEpicDetail;
+}) {
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   const { list, failed } = useEpicList(fetchList, conn);
@@ -150,10 +177,16 @@ export function DesignPage({ address, fetchList }: { address?: string; fetchList
           ) : (
             <MobilePicker groups={groups} projects={projects} current={address} />
           )}
-          <Box aria-label="Chat" role="region">
-            {!address && <EmptyState title="No Design in progress.">Run /gx-design to start one.</EmptyState>}
-          </Box>
-          <Box aria-label="Progress" role="region" />
+          {address ? (
+            <DesignColumns address={address} wide={wide} fetchDetail={fetchDetail} />
+          ) : (
+            <>
+              <Box aria-label="Chat" role="region">
+                <EmptyState title="No Design in progress.">Run /gx-design to start one.</EmptyState>
+              </Box>
+              <Box aria-label="Progress" role="region" />
+            </>
+          )}
         </Box>
       )}
     </DetailPage>

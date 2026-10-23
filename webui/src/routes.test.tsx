@@ -598,6 +598,13 @@ test("the epic page shows Queue only for a queueable epic", async () => {
   expect(await screen.findByRole("button", { name: "Queue" })).toBeTruthy();
 });
 
+test("a draft epic's Queue button is off and says tickets are still publishing", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ draft: true, queueable: false }));
+  const queue = (await screen.findByRole("button", { name: "Queue" })) as HTMLButtonElement;
+  expect(queue.disabled).toBe(true);
+  expect(screen.getByText("Still publishing tickets")).toBeTruthy();
+});
+
 test("the epic page Queue posts, then refetches; a refusal shows inline", async () => {
   const post = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ queue: [] })));
   vi.stubGlobal("fetch", post);

@@ -24,9 +24,9 @@ function EpicRoute({ fetchDetail }: { fetchDetail?: FetchEpicDetail }) {
   return <EpicPage address={useParams()["*"] ?? ""} fetchDetail={fetchDetail} />;
 }
 
-function DesignRoute({ fetchList }: { fetchList?: FetchEpicList }) {
+function DesignRoute({ fetchList, fetchDetail }: { fetchList?: FetchEpicList; fetchDetail?: FetchEpicDetail }) {
   // A Design's address holds a colon (project:epic), so it arrives as the splat; the bare route has none.
-  return <DesignPage address={useParams()["*"] || undefined} fetchList={fetchList} />;
+  return <DesignPage address={useParams()["*"] || undefined} fetchList={fetchList} fetchDetail={fetchDetail} />;
 }
 
 export interface RouteFetchers {
@@ -39,8 +39,8 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
   return [
     { path: "/q", element: <QueueRoute /> },
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} /> },
-    { path: "/designs", element: <DesignRoute fetchList={fetchers.epicList} /> },
-    { path: "/d/*", element: <DesignRoute fetchList={fetchers.epicList} /> },
+    { path: "/designs", element: <DesignRoute fetchList={fetchers.epicList} fetchDetail={fetchers.epic} /> },
+    { path: "/d/*", element: <DesignRoute fetchList={fetchers.epicList} fetchDetail={fetchers.epic} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} /> },
     { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} /> },
     // "/" and an unknown hash go to the Queue.
