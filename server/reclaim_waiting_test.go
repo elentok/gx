@@ -47,7 +47,7 @@ func startWaitingRestart(t *testing.T, hardLimit float64) (*servertest.Harness, 
 
 // startWaitingRestartFake is startWaitingRestart that also returns the runner
 // hosting the waiting agent, for tests that read its prompts.
-func startWaitingRestartFake(t *testing.T, hardLimit float64) (*servertest.Harness, string, *headlessFake) {
+func startWaitingRestartFake(t *testing.T, hardLimit float64, tweak ...func(*server.Config)) (*servertest.Harness, string, *headlessFake) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -58,6 +58,9 @@ func startWaitingRestartFake(t *testing.T, hardLimit float64) (*servertest.Harne
 		c.BudgetHardLimit = hardLimit
 		c.BudgetKillGrace = time.Millisecond
 		c.BudgetPollInterval = time.Hour
+		for _, f := range tweak {
+			f(c)
+		}
 	})
 	wtPath, ticketPath := leaveIteration(t, h, store, repo)
 	// The agent is still alive on the runner while the server is down.

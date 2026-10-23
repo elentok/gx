@@ -138,7 +138,7 @@ func TestAgentAnswer_DeliveredAllowLogsShownAndIgnoresNote(t *testing.T) {
 	e := startAnswerEnv(t, nil)
 	e.fake.SetPending(answerLabel, bashPending("req-1"))
 
-	res := e.answer(t, server.QueueRequest{Decision: "allow", RequestID: "req-1", Text: "ignored", Source: "web"})
+	res := e.answer(t, server.QueueRequest{Decision: "allow", RequestID: "req-1", Text: "ignored"})
 	if res.Refused {
 		t.Fatalf("answer = %+v", res)
 	}
@@ -150,7 +150,7 @@ func TestAgentAnswer_DeliveredAllowLogsShownAndIgnoresNote(t *testing.T) {
 		t.Fatalf("events = %+v; want one pause.permission", evs)
 	}
 	ev := evs[0]
-	if ev.Decision != "allow" || ev.Source != "web" || ev.Note != "" {
+	if ev.Decision != "allow" || ev.Source != "cli" || ev.Note != "" {
 		t.Errorf("event = %+v", ev)
 	}
 	if s := ev.Shown; s == nil || s.RequestID != "req-1" || s.Tool != "Bash" || s.Description != "list files" || s.Truncated {

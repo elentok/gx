@@ -45,6 +45,8 @@ type RepairRequest struct {
 	// RequireState is set by the web mux, never by a client: the resume then
 	// needs a State token that still matches the pause round.
 	RequireState bool `json:"-"`
+	// origin is web, tui or cli, set by repairWriteAs from the request.
+	origin string
 }
 
 // ReasonBadBase refuses an resume whose base is not one of the competing blockers.
@@ -496,6 +498,7 @@ func repairWriteAs(web bool, do func(RepairRequest) (RepairResult, error)) http.
 			return
 		}
 		req.RequireState = web
+		req.origin = requestOrigin(r, web)
 		if web && req.State == "" {
 			writeJSON(w, repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "a state token is required; review the current pause"}))
 			return

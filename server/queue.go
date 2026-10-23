@@ -103,7 +103,8 @@ type QueueRequest struct {
 	RequestID string `json:"request_id,omitempty"`
 	// Choice, Note, State and Source are an answer's choice (an option id, yes or
 	// no), its note, the state token of the question it answers and where it
-	// came from (cli or web). A free-text answer uses Text.
+	// came from. The server sets Source from the request's origin and ignores
+	// the body. A free-text answer uses Text.
 	Choice string `json:"choice,omitempty"`
 	Note   string `json:"note,omitempty"`
 	State  string `json:"state,omitempty"`
@@ -542,6 +543,7 @@ func queueWriteAs(web bool, do func(QueueRequest) (QueueResult, error)) http.Han
 			writeJSON(w, refusal(ReasonStale, "a state token is required; review the current question"))
 			return
 		}
+		req.Source = requestOrigin(r, web)
 		res, err := do(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

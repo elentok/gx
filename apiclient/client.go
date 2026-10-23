@@ -24,6 +24,21 @@ import (
 type Client struct {
 	http     *http.Client
 	readOnly bool
+	origin   string
+}
+
+// AsTUI marks the client's writes as coming from the TUI; an unmarked client
+// writes as the CLI.
+func (c *Client) AsTUI() *Client {
+	c.origin = server.OriginTUI
+	return c
+}
+
+// setOrigin tags a write request with the client's origin.
+func (c *Client) setOrigin(r *http.Request) {
+	if c.origin != "" {
+		r.Header.Set(server.OriginHeader, c.origin)
+	}
 }
 
 // ErrReadOnly is returned by CheckWrite after Negotiate found an API version
@@ -365,6 +380,7 @@ func (c *Client) TicketChanged(ctx context.Context, address string) error {
 		return err
 	}
 	hreq.Header.Set("Content-Type", "application/json")
+	c.setOrigin(hreq)
 	resp, err := c.http.Do(hreq)
 	if err != nil {
 		return err
@@ -580,6 +596,7 @@ func (c *Client) post(ctx context.Context, path string, req, res any) error {
 		return err
 	}
 	hreq.Header.Set("Content-Type", "application/json")
+	c.setOrigin(hreq)
 	resp, err := c.http.Do(hreq)
 	if err != nil {
 		return err
