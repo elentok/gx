@@ -156,6 +156,7 @@ const epicOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   rows: [],
   queueable: false,
   queued: false,
+  stats: {},
   ...over,
 });
 
@@ -247,6 +248,90 @@ test("a loop epic shows the stat sentence with no token counts", async () => {
   );
   expect(await screen.findByText("Running · 2 of 6 done · took 1h 6m · $1.75 · 2m of agent time")).toBeTruthy();
   expect(screen.queryByText(/token/i)).toBeNull();
+});
+
+const statRow = (container: HTMLElement, label: string) => container.querySelector(`[data-stat-row="${label}"]`)?.textContent;
+
+test("a merged loop epic shows every Stats row below the tickets", async () => {
+  const { container } = renderAt(
+    "/e/gx:e",
+    okFor,
+    undefined,
+    epicFetch({
+      total: 6,
+      done: 2,
+      rows: loopRows,
+      stats: {
+        lines_added: 3412,
+        lines_removed: 1208,
+        total_tokens: 2_500_000,
+        cost: 12.5,
+        lead_time: 3 * 86400,
+        friction: {
+          pauses_by_reason: { deadlock: 3, conflict: 2, other: 1 },
+          run_events: { stall: 4, retry: 1 },
+          paused_secs: 600,
+          web_share: 0.5,
+        },
+      },
+    }),
+  );
+  await screen.findByRole("heading", { name: "Stats" });
+  expect(statRow(container, "Lines")).toBe("Lines+3,412 −1,208");
+  expect(statRow(container, "Tokens")).toBe("Tokens2.5M");
+  expect(statRow(container, "Cost")).toBe("Cost$12.50");
+  expect(statRow(container, "Lead time")).toBe("Lead time3dcreated → merged to trunk");
+  expect(statRow(container, "Pauses")).toBe("Pauses6deadlock ×3, conflict ×2");
+  expect(statRow(container, "Run events")).toBe("Run events5stall ×4, retry ×1");
+  expect(statRow(container, "Paused time")).toBe("Paused time10m");
+  expect(statRow(container, "Pause endings")).toBe("Pause endings50% web");
+  const stats = screen.getByRole("heading", { name: "Stats" });
+  expect(screen.getByText("Title 06").compareDocumentPosition(stats) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("an unmerged loop epic shows only the lead time so far", async () => {
+  const { container } = renderAt(
+    "/e/gx:e",
+    okFor,
+    undefined,
+    epicFetch({ total: 6, done: 2, rows: loopRows, stats: { lead_time: 3 * 86400, lead_time_so_far: true } }),
+  );
+  await screen.findByRole("heading", { name: "Stats" });
+  expect(container.querySelectorAll("[data-stat-row]")).toHaveLength(1);
+  expect(statRow(container, "Lead time")).toBe("Lead time3d so far");
+});
+
+test("a loop epic with no stamp has no Stats section, and cost is missing when the payload has none", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
+  await screen.findByText("Title 06");
+  expect(screen.queryByRole("heading", { name: "Stats" })).toBeNull();
+  cleanup();
+  const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, rows: loopRows, stats: { total_tokens: 900 } }));
+  await screen.findByRole("heading", { name: "Stats" });
+  expect(statRow(container, "Tokens")).toBe("Tokens900");
+  expect(statRow(container, "Cost")).toBeUndefined();
+});
+
+test("a Design shows tokens, cost and lead time, or so far, only when stamped", async () => {
+  const design = { kind: "map", total: 2, done: 1, rows: [rowOf("01", "done"), rowOf("02", "open")] };
+  const { container } = renderAt(
+    "/e/gx:e",
+    okFor,
+    undefined,
+    epicFetch({ ...design, stats: { total_tokens: 12_000, cost: 0.5, lead_time: 7200 } }),
+  );
+  await screen.findByRole("heading", { name: "Stats" });
+  expect(statRow(container, "Tokens")).toBe("Tokens12.0k");
+  expect(statRow(container, "Cost")).toBe("Cost$0.50");
+  expect(statRow(container, "Lead time")).toBe("Lead time2h");
+  cleanup();
+  const open = renderAt("/e/gx:e", okFor, undefined, epicFetch({ ...design, stats: { lead_time: 7200, lead_time_so_far: true } }));
+  await screen.findByRole("heading", { name: "Stats" });
+  expect(statRow(open.container, "Lead time")).toBe("Lead time2h so far");
+  cleanup();
+  renderAt("/e/gx:e", okFor, undefined, epicFetch(design));
+  await screen.findByText("Title 02");
+  expect(screen.queryByRole("heading", { name: "Stats" })).toBeNull();
 });
 
 test("a loop epic with zero cost and agent time still shows both in the stat sentence", async () => {

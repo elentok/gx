@@ -18,6 +18,7 @@ import { Spinner } from "../ui/spinner/Spinner";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail";
+import { StatsSection } from "./StatsSection";
 import {
   detailLine,
   foldedTail,
@@ -170,6 +171,7 @@ export function EpicPage({
           ) : (
             <EpicBody detail={detail} now={Date.now()} />
           )}
+          <StatsSection detail={detail} />
         </>
       ) : (
         <Spinner label="Loading epic" />

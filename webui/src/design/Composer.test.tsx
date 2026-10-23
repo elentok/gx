@@ -55,7 +55,7 @@ function render(opts: { state?: string; background?: boolean; chat?: SessionChat
       }),
       epic: async () => ({
         kind: "ok",
-        detail: { address: "gx:a", kind: "map", summary: "", done: 0, total: 0, agent_time: 0, cost_total: 0, rows: [], queueable: false, queued: false, steps: [] },
+        detail: { address: "gx:a", kind: "map", summary: "", done: 0, total: 0, agent_time: 0, cost_total: 0, stats: {}, rows: [], queueable: false, queued: false, steps: [] },
       }),
       chat: opts.fetchChat ?? (async () => ({ kind: "ok", detail: opts.chat ?? chatOf() })),
       prompt: opts.post,

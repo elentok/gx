@@ -36,6 +36,7 @@ const detailOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   total: 0,
   agent_time: 0,
   cost_total: 0,
+  stats: {},
   rows: [],
   queueable: false,
   queued: false,
