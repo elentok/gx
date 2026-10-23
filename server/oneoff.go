@@ -166,12 +166,15 @@ func oneOffRefusal(reason, msg string) OneOffResult {
 // oneOffPlan is a fully validated submit, ready to write.
 type oneOffPlan struct {
 	project, dir, epic, slug, prompt string
-	// addr and path are set once the ticket is written.
-	addr  tickets.Address
-	path  string
-	tk    schema.Ticket
-	agent string
-	front bool
+	tk                               schema.Ticket
+	agent                            string
+	front                            bool
+}
+
+// writtenOneOff is where a plan's ticket landed on disk.
+type writtenOneOff struct {
+	addr tickets.Address
+	path string
 }
 
 // oneOff creates a top-level ticket carrying the prompt and appends it to the
@@ -183,10 +186,11 @@ func (s *Server) oneOff(req OneOffRequest) (OneOffResult, error) {
 	if res, err := s.oneOffValidate(req, &plan); err != nil || res.Refused {
 		return res, err
 	}
-	if err := oneOffWrite(&plan); err != nil {
+	written, err := oneOffWrite(plan)
+	if err != nil {
 		return OneOffResult{}, err
 	}
-	return s.oneOffEnqueue(plan)
+	return s.oneOffEnqueue(plan, written)
 }
 
 // oneOffValidate checks the submit and fills plan. A refusal (or error) means
@@ -264,26 +268,23 @@ func (s *Server) oneOffValidate(req OneOffRequest, plan *oneOffPlan) (OneOffResu
 	return OneOffResult{}, nil
 }
 
-// oneOffWrite puts the ticket on disk in the shared epic and records its address
-// and path on the plan.
-func oneOffWrite(p *oneOffPlan) error {
+// oneOffWrite puts the ticket on disk in the shared epic.
+func oneOffWrite(p oneOffPlan) (writtenOneOff, error) {
 	path, id, err := writeOneOffTicket(p.dir, p.slug, p.tk, p.prompt)
 	if err != nil {
-		return err
+		return writtenOneOff{}, err
 	}
-	p.addr = tickets.Address{Project: p.project, Epic: p.epic, ID: id}
-	p.path = path
-	return nil
+	return writtenOneOff{addr: tickets.Address{Project: p.project, Epic: p.epic, ID: id}, path: path}, nil
 }
 
 // oneOffEnqueue queues the written ticket and only then records `submitted`.
 // Any failure removes the new ticket file again so nothing unqueued stays
 // behind; the shared epic stays.
-func (s *Server) oneOffEnqueue(p oneOffPlan) (OneOffResult, error) {
-	res, err := s.oneOffQueue(p)
+func (s *Server) oneOffEnqueue(p oneOffPlan, w writtenOneOff) (OneOffResult, error) {
+	res, err := s.oneOffQueue(p, w)
 	if err != nil || res.Refused {
-		if rmErr := os.Remove(p.path); rmErr != nil {
-			s.log.Warn("remove unqueued one-off", "ticket", p.addr.String(), "err", rmErr)
+		if rmErr := os.Remove(w.path); rmErr != nil {
+			s.log.Warn("remove unqueued one-off", "ticket", w.addr.String(), "err", rmErr)
 		}
 		if refreshErr := s.idx.refresh(s.cfg.TicketStore); refreshErr != nil {
 			s.log.Warn("refresh after one-off cleanup", "err", refreshErr)
@@ -291,34 +292,36 @@ func (s *Server) oneOffEnqueue(p oneOffPlan) (OneOffResult, error) {
 		return res, err
 	}
 	if err := ralphloop.AppendEvent(p.dir, p.epic, ralphloop.Event{
-		Time: time.Now(), Type: string(events.Submitted), Ticket: p.addr.ID, Address: p.addr.String(),
+		Time: time.Now(), Type: string(events.Submitted), Ticket: w.addr.ID, Address: w.addr.String(),
 	}); err != nil {
 		return OneOffResult{}, err
 	}
 	return res, nil
 }
 
-func (s *Server) oneOffQueue(p oneOffPlan) (OneOffResult, error) {
+func (s *Server) oneOffQueue(p oneOffPlan, w writtenOneOff) (OneOffResult, error) {
 	// queueAdd checks the index, so it must see the new ticket first.
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
 		return OneOffResult{}, err
 	}
-	// The shared epic is queued once, as a root: a later submit only moves it.
-	root := rootOf(p.addr)
-	var q QueueResult
-	var err error
-	if s.rootQueued(root) {
-		q, err = s.withExtraUsage(s.queueRaise(root, p.front))
-	} else {
-		q, err = s.queueAdd(QueueRequest{Address: p.addr.String(), Agent: p.agent, Front: p.front})
-	}
+	q, err := s.queueRoot(w.addr, p.agent, p.front)
 	if err != nil {
 		return OneOffResult{}, err
 	}
 	if q.Refused {
 		return oneOffRefusal(q.Reason, q.Message), nil
 	}
-	return OneOffResult{Address: p.addr.String(), Status: OneOffStatusQueued}, nil
+	return OneOffResult{Address: w.addr.String(), Status: OneOffStatusQueued}, nil
+}
+
+// queueRoot queues the root of addr. The shared epic is queued once, as a root:
+// a later submit only moves it.
+func (s *Server) queueRoot(addr tickets.Address, agent string, front bool) (QueueResult, error) {
+	root := rootOf(addr)
+	if !s.rootQueued(root) {
+		return s.queueAdd(QueueRequest{Address: addr.String(), Agent: agent, Front: front})
+	}
+	return s.withExtraUsage(s.queueRaise(root, front))
 }
 
 // queueRaise moves every queued item of root to the head, keeping their order.
@@ -532,6 +535,24 @@ func IsOneOffEpic(e tickets.Epic) bool {
 	return false
 }
 
+// nextOneOffNumber is above the highest in the live epic and the archived one.
+func nextOneOffNumber(projectDir string, epic *tickets.Epic) (int, error) {
+	next := 1
+	if id, err := tickets.NextTicketID(*epic, ""); err != nil {
+		return 0, err
+	} else if n, err := strconv.Atoi(id); err == nil {
+		next = n
+	}
+	_, archived, err := tickets.LoadOneOffs(projectDir)
+	if err != nil {
+		return 0, err
+	}
+	for _, t := range archived.Tickets {
+		next = max(next, t.Number+1)
+	}
+	return next, nil
+}
+
 // writeOneOffTicket adds the ticket to the shared one-offs epic, creating the
 // epic as a draft on the first submit. The id is above the highest in both
 // one-offs epics, so an archived number is never reused.
@@ -545,18 +566,9 @@ func writeOneOffTicket(projectDir, slug string, tk schema.Ticket, prompt string)
 		return "", "", err
 	}
 	defer unlock()
-	next := 1
-	if id, err := tickets.NextTicketID(*epic, ""); err != nil {
-		return "", "", err
-	} else if n, err := strconv.Atoi(id); err == nil {
-		next = n
-	}
-	_, archived, err := tickets.LoadOneOffs(projectDir)
+	next, err := nextOneOffNumber(projectDir, epic)
 	if err != nil {
 		return "", "", err
-	}
-	for _, t := range archived.Tickets {
-		next = max(next, t.Number+1)
 	}
 	id = fmt.Sprintf("%02d", next)
 	tk.ID = schema.TicketID(id)
