@@ -67,19 +67,26 @@ func designActionable(text, ticket string) (SessionActionable, bool) {
 	if strings.Contains(text, grillingMarker) {
 		return SessionActionable{Reason: grillingReason}, true
 	}
+	_, a, ok := runEndNext(text, ticket)
+	return a, ok
+}
+
+// runEndNext is the next phase a gx-design run-end line names and the
+// Actionable that starts it.
+func runEndNext(text, ticket string) (phase string, a SessionActionable, ok bool) {
 	m := runEndLine.FindStringSubmatch(text)
 	if m == nil {
-		return SessionActionable{}, false
+		return "", SessionActionable{}, false
 	}
 	reason := strings.TrimSpace(m[0])
 	epic := ticketEpic(ticket)
 	switch m[1] {
 	case "map", "review":
-		return SessionActionable{Reason: reason, Action: []string{"/clear", "/gx-design " + epic}}, true
+		return m[1], SessionActionable{Reason: reason, Action: []string{"/clear", "/gx-design " + epic}}, true
 	case "implement":
-		return SessionActionable{Reason: reason, Kind: SessionActionableQueue, Target: epicAddress(ticket) + "-impl"}, true
+		return m[1], SessionActionable{Reason: reason, Kind: SessionActionableQueue, Target: epicAddress(ticket) + "-impl"}, true
 	}
-	return SessionActionable{}, false
+	return "", SessionActionable{}, false
 }
 
 // ticketEpic is the epic of a ticket address like "project:epic" or

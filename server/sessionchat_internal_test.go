@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/elentok/gx/transcript"
 )
 
 func TestChatCache_RereadsOnlyWhenTheFileChanged(t *testing.T) {
@@ -14,13 +12,13 @@ func TestChatCache_RereadsOnlyWhenTheFileChanged(t *testing.T) {
 		t.Fatal(err)
 	}
 	loads := 0
-	load := func(string) ([]transcript.ChatMessage, error) {
+	load := func(string) (chatSnapshot, error) {
 		loads++
-		return []transcript.ChatMessage{{ID: "m"}}, nil
+		return chatSnapshot{msgs: []SessionChatMessage{{ID: "m"}}}, nil
 	}
 	var c chatCache
 	for range 2 {
-		if _, _, err := c.read(path, load); err != nil {
+		if _, err := c.read(path, load); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -30,7 +28,7 @@ func TestChatCache_RereadsOnlyWhenTheFileChanged(t *testing.T) {
 	if err := os.WriteFile(path, []byte("a\nbb\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := c.read(path, load); err != nil {
+	if _, err := c.read(path, load); err != nil {
 		t.Fatal(err)
 	}
 	if loads != 2 {

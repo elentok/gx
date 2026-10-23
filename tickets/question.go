@@ -143,6 +143,16 @@ func splitQuestion(body string) (q Question, block string, hasBlock bool) {
 	return q, block, hasBlock
 }
 
+// ParseQuestionBlock checks a raw gx-question block with the rules `gx tickets
+// ask` applies and returns the question it describes (Summary and Detail empty).
+func ParseQuestionBlock(block string) (Question, error) {
+	q := Question{Kind: QuestionText}
+	if err := applyBlock(&q, block); err != nil {
+		return Question{}, err
+	}
+	return q, nil
+}
+
 // applyBlock decodes and validates block into q.
 func applyBlock(q *Question, block string) error {
 	var b questionBlock

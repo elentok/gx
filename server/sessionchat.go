@@ -31,15 +31,21 @@ const maxChatMessages = 300
 // SessionChatResponse is the visible messages of a session's newest
 // conversation. ConversationID changes after a /clear. Unsupported marks a
 // session of a harness that has no chat; its Messages stay empty. Truncated
-// says earlier messages were cut to fit maxChatMessages.
+// says earlier messages were cut to fit maxChatMessages. Round holds the cards
+// of a Grilling round the agent ended its last turn with and the person has not
+// answered; Next is the run-end line of that turn; Background lists the shells,
+// Monitors and subagents still running.
 type SessionChatResponse struct {
-	ConversationID string               `json:"conversation_id"`
-	Messages       []SessionChatMessage `json:"messages"`
-	Unsupported    bool                 `json:"unsupported,omitempty"`
-	Truncated      bool                 `json:"truncated,omitempty"`
+	ConversationID string                  `json:"conversation_id"`
+	Messages       []SessionChatMessage    `json:"messages"`
+	Unsupported    bool                    `json:"unsupported,omitempty"`
+	Truncated      bool                    `json:"truncated,omitempty"`
+	Round          []SessionRoundCard      `json:"round"`
+	Next           *SessionNext            `json:"next"`
+	Background     []SessionBackgroundTask `json:"background"`
 }
 
-// chatCache keeps each transcript's capped messages until its size or mtime
+// chatCache keeps each transcript's parsed chat until its size or mtime
 // changes, so polling a quiet session never rereads the file.
 type chatCache struct {
 	mu      sync.Mutex
@@ -47,44 +53,86 @@ type chatCache struct {
 }
 
 type chatCacheEntry struct {
-	size      int64
-	mtime     time.Time
-	msgs      []SessionChatMessage
-	truncated bool
+	size  int64
+	mtime time.Time
+	chat  chatSnapshot
 }
 
-func (c *chatCache) read(path string, load func(string) ([]transcript.ChatMessage, error)) ([]SessionChatMessage, bool, error) {
+// chatSnapshot is everything one read of a transcript yields. Tasks keeps the
+// unresolved markers, which age out at request time.
+type chatSnapshot struct {
+	msgs      []SessionChatMessage
+	truncated bool
+	round     []SessionRoundCard
+	next      *SessionNext
+	tasks     []transcript.BackgroundTaskMarker
+}
+
+func (c *chatCache) read(path string, load func(string) (chatSnapshot, error)) (chatSnapshot, error) {
 	info, err := os.Stat(path)
 	if err != nil {
-		return nil, false, err
+		return chatSnapshot{}, err
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if e, ok := c.entries[path]; ok && e.size == info.Size() && e.mtime.Equal(info.ModTime()) {
-		return e.msgs, e.truncated, nil
+		return e.chat, nil
 	}
-	loaded, err := load(path)
+	chat, err := load(path)
 	if err != nil {
-		return nil, false, err
-	}
-	e := chatCacheEntry{size: info.Size(), mtime: info.ModTime()}
-	if len(loaded) > maxChatMessages {
-		loaded, e.truncated = loaded[len(loaded)-maxChatMessages:], true
-	}
-	e.msgs = make([]SessionChatMessage, 0, len(loaded))
-	for _, m := range loaded {
-		e.msgs = append(e.msgs, SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: m.Text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool})
+		return chatSnapshot{}, err
 	}
 	if c.entries == nil {
 		c.entries = map[string]chatCacheEntry{}
 	}
-	c.entries[path] = e
-	return e.msgs, e.truncated, nil
+	c.entries[path] = chatCacheEntry{size: info.Size(), mtime: info.ModTime(), chat: chat}
+	return chat, nil
 }
 
-func loadChat(path string) ([]transcript.ChatMessage, error) {
-	msgs, _, err := transcript.ReadChat(path)
-	return msgs, err
+// chatLoader returns the load func for a session whose design ticket is ticket.
+func chatLoader(ticket string) func(string) (chatSnapshot, error) {
+	return func(path string) (chatSnapshot, error) {
+		loaded, _, err := transcript.ReadChat(path)
+		if err != nil {
+			return chatSnapshot{}, err
+		}
+		// Read before the cap and the fence strip: both cut what the parsers need.
+		snap := chatSnapshot{round: chatRound(loaded), next: chatNext(loaded, ticket)}
+		if len(loaded) > maxChatMessages {
+			loaded, snap.truncated = loaded[len(loaded)-maxChatMessages:], true
+		}
+		snap.msgs = make([]SessionChatMessage, 0, len(loaded))
+		for _, m := range loaded {
+			text := m.Text
+			if m.Role == transcript.ChatRoleAgent {
+				text, _ = splitFences(text)
+			}
+			snap.msgs = append(snap.msgs, SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool})
+		}
+		// A zero now keeps every unresolved marker fresh; the cache serves the
+		// read later, so ageing out waits for the request.
+		reading, err := transcript.ReadBackgroundTasks(path, transcript.BackgroundTaskAgedOutCap, time.Time{})
+		if err != nil {
+			return chatSnapshot{}, err
+		}
+		for _, mk := range reading.Markers {
+			if mk.Status != transcript.BackgroundTaskResolved {
+				snap.tasks = append(snap.tasks, mk)
+			}
+		}
+		return snap, nil
+	}
+}
+
+// background lists the tasks still within their cap at now.
+func (c chatSnapshot) background(now time.Time) []SessionBackgroundTask {
+	out := []SessionBackgroundTask{}
+	for _, mk := range c.tasks {
+		if now.Sub(mk.StartedAt) <= mk.Cap {
+			out = append(out, SessionBackgroundTask{Kind: mk.Kind, Label: mk.Label, StartedAt: mk.StartedAt.Format(time.RFC3339)})
+		}
+	}
+	return out
 }
 
 // chatHarness is the harness whose transcripts the chat reads.
@@ -107,21 +155,22 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	out := SessionChatResponse{ConversationID: meta.ConversationID, Messages: []SessionChatMessage{}}
+	out := SessionChatResponse{ConversationID: meta.ConversationID, Messages: []SessionChatMessage{}, Background: []SessionBackgroundTask{}}
 	if meta.Harness != s.settings.Load().chatHarness() {
 		out.Unsupported = true
 		writeJSON(w, out)
 		return
 	}
 	if path, ok := s.claudeTranscript(id, meta.ConversationID); ok {
-		msgs, truncated, err := s.chats.read(path, loadChat)
+		chat, err := s.chats.read(path, chatLoader(meta.Ticket))
 		switch {
 		case os.IsNotExist(err): // vanished since the lookup: no chat yet
 		case err != nil:
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		default:
-			out.Messages, out.Truncated = msgs, truncated
+			out.Messages, out.Truncated = chat.msgs, chat.truncated
+			out.Round, out.Next, out.Background = chat.round, chat.next, chat.background(time.Now())
 		}
 	}
 	writeJSON(w, out)

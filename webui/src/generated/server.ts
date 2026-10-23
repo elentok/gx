@@ -825,13 +825,62 @@ export interface SessionChatMessage {
  * SessionChatResponse is the visible messages of a session's newest
  * conversation. ConversationID changes after a /clear. Unsupported marks a
  * session of a harness that has no chat; its Messages stay empty. Truncated
- * says earlier messages were cut to fit maxChatMessages.
+ * says earlier messages were cut to fit maxChatMessages. Round holds the cards
+ * of a Grilling round the agent ended its last turn with and the person has not
+ * answered; Next is the run-end line of that turn; Background lists the shells,
+ * Monitors and subagents still running.
  */
 export interface SessionChatResponse {
   conversation_id: string;
   messages: SessionChatMessage[];
   unsupported?: boolean;
   truncated?: boolean;
+  round: SessionRoundCard[];
+  next?: SessionNext;
+  background: SessionBackgroundTask[];
+}
+
+//////////
+// source: sessionround.go
+
+/**
+ * SessionRoundOption is one choice of an options card.
+ */
+export interface SessionRoundOption {
+  id: string;
+  label: string;
+  consequence?: string;
+}
+/**
+ * SessionRoundCard is one question of a Grilling round. Kind is yes-no,
+ * options or text; Note says why a card fell back to text.
+ */
+export interface SessionRoundCard {
+  number: number /* int */;
+  title: string;
+  body: string;
+  kind: string;
+  yes?: string;
+  no?: string;
+  options?: SessionRoundOption[];
+  recommended?: string;
+  note?: string;
+}
+/**
+ * SessionNext is the phase a gx-design run-end line names and the Actionable
+ * that starts it.
+ */
+export interface SessionNext {
+  phase: string;
+  action: SessionActionable;
+}
+/**
+ * SessionBackgroundTask is a shell, Monitor or subagent still running.
+ */
+export interface SessionBackgroundTask {
+  kind: string; // transcript.BackgroundTaskShell, ...Monitor or ...Agent
+  label: string;
+  started_at: string;
 }
 
 //////////

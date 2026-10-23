@@ -3,6 +3,7 @@ package transcript
 import (
 	"bufio"
 	"encoding/json"
+	"maps"
 	"os"
 	"strings"
 	"time"
@@ -48,6 +49,83 @@ type BackgroundTaskMarker struct {
 	TaskID    string
 	Status    BackgroundTaskStatus
 	StartedAt time.Time
+	// Cap is how long the marker may stay outstanding before it ages out.
+	Cap time.Duration
+	// Kind is BackgroundTaskShell, BackgroundTaskMonitor or BackgroundTaskAgent.
+	Kind string
+	// Label is the launching tool call's description, else the first
+	// backgroundLabelLen characters of its command.
+	Label string
+}
+
+// Kinds of a BackgroundTaskMarker.
+const (
+	BackgroundTaskShell   = "shell"
+	BackgroundTaskMonitor = "monitor"
+	BackgroundTaskAgent   = "agent"
+)
+
+const backgroundLabelLen = 60
+
+// toolUseInput is the part of a tool_use block that names what it launched.
+type toolUseInput struct {
+	Description string `json:"description"`
+	Command     string `json:"command"`
+}
+
+func (in toolUseInput) label() string {
+	if in.Description != "" {
+		return in.Description
+	}
+	return truncateRunes(in.Command, backgroundLabelLen)
+}
+
+func truncateRunes(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}
+
+// toolUses reads the tool_use inputs of an assistant message by tool_use id.
+func toolUses(message json.RawMessage) map[string]toolUseInput {
+	var m struct {
+		Content []struct {
+			Type  string       `json:"type"`
+			ID    string       `json:"id"`
+			Input toolUseInput `json:"input"`
+		} `json:"content"`
+	}
+	if json.Unmarshal(message, &m) != nil {
+		return nil
+	}
+	out := map[string]toolUseInput{}
+	for _, c := range m.Content {
+		if c.Type == "tool_use" {
+			out[c.ID] = c.Input
+		}
+	}
+	return out
+}
+
+// toolResultIDs lists the tool_use ids a user message answers.
+func toolResultIDs(message json.RawMessage) []string {
+	var m struct {
+		Content []struct {
+			Type      string `json:"type"`
+			ToolUseID string `json:"tool_use_id"`
+		} `json:"content"`
+	}
+	if json.Unmarshal(message, &m) != nil {
+		return nil
+	}
+	var ids []string
+	for _, c := range m.Content {
+		if c.Type == "tool_result" {
+			ids = append(ids, c.ToolUseID)
+		}
+	}
+	return ids
 }
 
 // BackgroundTaskReading is ReadBackgroundTasks' result. FileStatus is set to
@@ -209,8 +287,11 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 		startedAt time.Time
 		resolved  bool
 		// cap is how long this marker may stay outstanding before it ages out.
-		cap time.Duration
+		cap   time.Duration
+		kind  string
+		label string
 	}
+	launches := map[string]toolUseInput{}
 	markers := map[string]*markerState{}
 	var order []string
 	awaitingTurnEnd := false
@@ -253,12 +334,16 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 			awaitingTurnEnd = false
 		}
 
-		taskID, markerCap := entry.ToolUseResult.BackgroundTaskID, cap
+		if entry.Type == "assistant" {
+			maps.Copy(launches, toolUses(entry.Message))
+		}
+
+		taskID, markerCap, kind := entry.ToolUseResult.BackgroundTaskID, cap, BackgroundTaskShell
 		if taskID == "" && entry.ToolUseResult.Status == "async_launched" {
-			taskID = entry.ToolUseResult.AgentID
+			taskID, kind = entry.ToolUseResult.AgentID, BackgroundTaskAgent
 		}
 		if taskID == "" && entry.ToolUseResult.TimeoutMs != nil {
-			taskID = entry.ToolUseResult.MonitorTaskID
+			taskID, kind = entry.ToolUseResult.MonitorTaskID, BackgroundTaskMonitor
 			// A Monitor expires on its own timeout; waiting longer than that
 			// (plus a minute for its notice) only strands a finished agent.
 			markerCap = min(cap, time.Duration(*entry.ToolUseResult.TimeoutMs)*time.Millisecond+time.Minute)
@@ -269,7 +354,14 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 				continue
 			}
 			if _, exists := markers[taskID]; !exists {
-				markers[taskID] = &markerState{taskID: taskID, startedAt: ts, cap: markerCap}
+				label := ""
+				for _, id := range toolResultIDs(entry.Message) {
+					if in, ok := launches[id]; ok {
+						label = in.label()
+						break
+					}
+				}
+				markers[taskID] = &markerState{taskID: taskID, startedAt: ts, cap: markerCap, kind: kind, label: label}
 				order = append(order, taskID)
 			}
 		}
@@ -295,6 +387,9 @@ func ReadBackgroundTasks(path string, cap time.Duration, now time.Time) (Backgro
 			TaskID:    taskID,
 			Status:    status,
 			StartedAt: m.startedAt,
+			Cap:       m.cap,
+			Kind:      m.kind,
+			Label:     m.label,
 		})
 	}
 	return reading, nil
