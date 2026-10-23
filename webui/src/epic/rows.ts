@@ -31,7 +31,7 @@ const BUCKET_TONES: Record<Bucket, Tone> = {
 const BUCKET_ICONS: Record<Bucket, StatusKind | undefined> = {
   done: "done",
   running: undefined,
-  asking: "needs-answer",
+  asking: "asking",
   waiting: "waiting",
   children: "children",
   attention: "attention",
