@@ -2,6 +2,7 @@ package ralphloop
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -96,6 +97,11 @@ func readSessionStats(cwd, sessionID string) (sessionStats, error) {
 	if err != nil {
 		return sessionStats{}, err
 	}
+	return readTranscriptStats(path)
+}
+
+// readTranscriptStats is readSessionStats for the transcript at path.
+func readTranscriptStats(path string) (sessionStats, error) {
 	lines, ok, err := transcript.ReadAll(path)
 	if err != nil || !ok || len(lines) == 0 {
 		return sessionStats{}, err
@@ -176,6 +182,36 @@ func SessionsTotals(refs []SessionRef) (tokens int, cost float64, err error) {
 		}
 		if !stats.ok {
 			return 0, 0, fmt.Errorf("session %s: transcript not found", ref.SessionID)
+		}
+		tokens += stats.totalTokens
+		cost += stats.cost
+	}
+	return tokens, cost, nil
+}
+
+// SessionIDsTotals sums the total tokens and cost of the Claude sessions in
+// ids, finding each transcript by id alone: the worktree a session ran in may
+// be gone. All-or-nothing, like SessionsTotals; an id with no transcript, or
+// with several, is an error.
+func SessionIDsTotals(ids []string) (tokens int, cost float64, err error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, id := range ids {
+		matches, err := transcript.FindByID(home, id)
+		if err != nil {
+			return 0, 0, fmt.Errorf("session %s: %w", id, err)
+		}
+		if len(matches) != 1 {
+			return 0, 0, fmt.Errorf("session %s: %d transcripts found", id, len(matches))
+		}
+		stats, err := readTranscriptStats(matches[0])
+		if err != nil {
+			return 0, 0, fmt.Errorf("session %s: %w", id, err)
+		}
+		if !stats.ok {
+			return 0, 0, fmt.Errorf("session %s: transcript not readable", id)
 		}
 		tokens += stats.totalTokens
 		cost += stats.cost

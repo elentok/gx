@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -100,6 +101,11 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		var timed []tickets.MigrationChange
 		timed, err = tickets.BackfillEpicTimes(scratchRoot)
 		changes = append(changes, timed...)
+	}
+	if err == nil {
+		var stamped []tickets.MigrationChange
+		stamped, err = tickets.BackfillTicketTotals(scratchRoot, ticketSessionTotals, conflictSessionsUnder(scratchRoot))
+		changes = mergeChanges(changes, stamped)
 	}
 	if err == nil {
 		var totals []tickets.MigrationChange
@@ -231,6 +237,27 @@ func epicLandedUnder(root string) func(tickets.Epic) (bool, error) {
 			target = trunk
 		}
 		return git.IsAncestor(repoRoot, e.Name, target)
+	}
+}
+
+func ticketSessionTotals(ids []string) (int64, float64, error) {
+	tokens, cost, err := ralphloop.SessionIDsTotals(ids)
+	return int64(tokens), cost, err
+}
+
+// conflictSessionsUnder reads the sessions that resolved conflicts for a
+// ticket from its epic's run log.
+func conflictSessionsUnder(root string) func(epicName, ticketID string) ([]string, error) {
+	return func(epicName, ticketID string) ([]string, error) {
+		evs, _, err := ralphloop.ReadEvents(root, epicName)
+		var ids []string
+		for _, ev := range evs {
+			if ev.Type == string(events.ConflictResolved) && ev.Ticket == ticketID &&
+				ev.AgentSession != "" && !slices.Contains(ids, ev.AgentSession) {
+				ids = append(ids, ev.AgentSession)
+			}
+		}
+		return ids, err
 	}
 }
 
