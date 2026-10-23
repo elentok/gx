@@ -2,6 +2,29 @@ package events
 
 import "testing"
 
+func TestLegacyKindRoundTrip(t *testing.T) {
+	for old, nu := range legacyKinds {
+		if got := CurrentKind(old); got != nu {
+			t.Errorf("CurrentKind(%q) = %q, want %q", old, got, nu)
+		}
+		if got := LegacyKind(nu); got != old {
+			t.Errorf("LegacyKind(%q) = %q, want %q", nu, got, old)
+		}
+	}
+	if got := LegacyKind(ZeroCommit); got != ZeroCommit {
+		t.Errorf("LegacyKind(%q) = %q, want it unchanged", ZeroCommit, got)
+	}
+}
+
+func TestCurrentLogType(t *testing.T) {
+	if got := CurrentLogType("park.question"); got != "pause.question" {
+		t.Errorf("CurrentLogType(park.question) = %q", got)
+	}
+	if got := CurrentLogType("pause.answer"); got != "pause.answer" {
+		t.Errorf("CurrentLogType(pause.answer) = %q", got)
+	}
+}
+
 func TestReadLegacy(t *testing.T) {
 	cases := []struct {
 		inType Type

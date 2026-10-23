@@ -3,6 +3,8 @@ package schema
 import (
 	"regexp"
 	"strings"
+
+	"github.com/elentok/gx/events"
 )
 
 // PauseReason says why a ticket is Paused. It is the stored `pause_reason`
@@ -141,21 +143,9 @@ func (c PauseClass) DefaultReason() PauseReason {
 	return defaultRepairReason
 }
 
-// legacyReasons maps the retired reason spellings (an old `park_kind`) to
-// their new ones. Part of the read shim.
-var legacyReasons = map[string]PauseReason{
-	"manual-park":    PauseManual,
-	"ambiguous-land": PauseAmbiguousMerge,
-	"land-conflict":  PauseMergeConflict,
-	"land-error":     PauseMergeError,
-}
-
 // ParsePauseReason reads a stored or legacy reason spelling.
 func ParsePauseReason(s string) PauseReason {
-	if r, ok := legacyReasons[s]; ok {
-		return r
-	}
-	return PauseReason(s)
+	return PauseReason(events.CurrentKind(events.Kind(s)))
 }
 
 // LegacyStatus is the stored status this class used before `paused`.
@@ -170,12 +160,7 @@ func (c PauseClass) LegacyStatus() Status {
 // LegacyKind is r spelled as the old event kind (the old `park_kind`). The
 // spellings differ from the current reasons for four reasons.
 func (r PauseReason) LegacyKind() string {
-	for old, nu := range legacyReasons {
-		if nu == r {
-			return old
-		}
-	}
-	return string(r)
+	return string(events.LegacyKind(events.Kind(r)))
 }
 
 // PausedReason returns the reason to store for a pause of class that was

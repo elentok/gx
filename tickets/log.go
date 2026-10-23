@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -20,15 +21,6 @@ const (
 	EventPausePermission = "pause.permission"
 	EventPauseClosed     = "pause.closed"
 )
-
-// legacyEventTypes maps the event types logs used to store to their current
-// spelling. readLog folds them on read, so a log is never rewritten.
-var legacyEventTypes = map[string]string{
-	"park.question":   EventPauseQuestion,
-	"park.answer":     EventPauseAnswer,
-	"park.permission": EventPausePermission,
-	"park.closed":     EventPauseClosed,
-}
 
 const (
 	// MaxLogTextChars caps every free-text field of a log event.
@@ -186,7 +178,7 @@ func readLog(logPath string) ([]LogEvent, int64, error) {
 		return nil, 0, err
 	}
 
-	var events []LogEvent
+	var evs []LogEvent
 	var validLen int64
 	for lineNo, rest := 1, data; len(rest) > 0; lineNo++ {
 		line := rest
@@ -204,20 +196,18 @@ func readLog(logPath string) ([]LogEvent, int64, error) {
 			}
 			return nil, 0, fmt.Errorf("%s line %d: malformed event: %w", logPath, lineNo, err)
 		}
-		if t, ok := legacyEventTypes[ev.Type]; ok {
-			ev.Type = t
-		}
+		ev.Type = events.CurrentLogType(ev.Type)
 		if ev.PauseKind == "" {
 			ev.PauseKind = ev.LegacyKind
 		}
 		ev.LegacyKind = ""
-		events = append(events, ev)
+		evs = append(evs, ev)
 		validLen += int64(len(line))
 		if terminated {
 			validLen++
 		}
 	}
-	return events, validLen, nil
+	return evs, validLen, nil
 }
 
 func validateLogEvent(ev LogEvent) error {
