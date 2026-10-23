@@ -497,6 +497,13 @@ func (c *Client) SessionChat(ctx context.Context, id string) (server.SessionChat
 	return res, err
 }
 
+// SessionScreen reads a session's screen as plain text rows.
+func (c *Client) SessionScreen(ctx context.Context, id string) (server.SessionScreenResponse, error) {
+	var res server.SessionScreenResponse
+	err := c.get(ctx, "/v1/sessions/screen?session="+url.QueryEscape(id), &res)
+	return res, err
+}
+
 // SetAFK sets AFK mode; a nil on toggles it.
 func (c *Client) SetAFK(ctx context.Context, on *bool) (server.AFKResult, error) {
 	var res server.AFKResult

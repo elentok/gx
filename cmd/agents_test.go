@@ -76,6 +76,23 @@ func TestAgentsChat_JSON(t *testing.T) {
 	}
 }
 
+func TestAgentsScreen_JSON(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	ctx := context.Background()
+	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	var out bytes.Buffer
+	if err := runAgentsSessionScreen(ctx, h.Client, &out, true, res.Session.ID); err != nil {
+		t.Fatal(err)
+	}
+	var screen server.SessionScreenResponse
+	if err := json.Unmarshal(out.Bytes(), &screen); err != nil || screen.Rows == nil {
+		t.Errorf("screen output %q: rows %v, %v; want a rows array", out.String(), screen.Rows, err)
+	}
+}
+
 func TestAgentsCreateCmd_WorktreeAndPrompt(t *testing.T) {
 	sock := filepath.Join(shortTempDir(t), "a.sock")
 	ln, err := net.Listen("unix", sock)

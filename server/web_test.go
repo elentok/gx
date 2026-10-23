@@ -179,6 +179,9 @@ func TestWeb_SessionReadsAreServed(t *testing.T) {
 	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/sessions/chat?session=../x"); code != http.StatusBadRequest {
 		t.Errorf("GET /v1/sessions/chat = %d, want 400", code)
 	}
+	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/sessions/screen?session=../x"); code != http.StatusBadRequest {
+		t.Errorf("GET /v1/sessions/screen = %d, want 400", code)
+	}
 }
 
 func TestWeb_EverythingElseIs404(t *testing.T) {
@@ -188,7 +191,7 @@ func TestWeb_EverythingElseIs404(t *testing.T) {
 		method, path, _ := strings.Cut(pattern, " ")
 		if pattern == "GET /v1/snapshot" || pattern == "GET /v1/events" || pattern == "GET /v1/tickets/detail" ||
 			pattern == "GET /v1/epics/detail" || pattern == "GET /v1/epics" ||
-			pattern == "GET /v1/sessions" || pattern == "GET /v1/sessions/chat" ||
+			pattern == "GET /v1/sessions" || pattern == "GET /v1/sessions/chat" || pattern == "GET /v1/sessions/screen" ||
 			pattern == "POST /v1/tickets/answer" || pattern == "POST /v1/tickets/unpark" || pattern == "POST /v1/tickets/resume" || pattern == "POST /v1/agents/answer" ||
 			pattern == "POST /v1/queue/add" || pattern == "POST /v1/epics/merge" {
 			continue

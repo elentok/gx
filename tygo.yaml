@@ -16,6 +16,7 @@ packages:
       - sessionchat.go
       - sessionfailure.go
       - sessionround.go
+      - sessionscreen.go
       - sessions.go
       - verdicts.go
     type_mappings:
