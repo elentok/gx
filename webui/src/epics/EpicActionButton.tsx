@@ -1,16 +1,16 @@
 import { Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { Button } from "../ui/button/Button";
-import type { PostQueueAdd } from "./queue";
+import type { PostEpicWrite } from "./queue";
 
 interface Props {
   address: string;
   state: string;
-  post: PostQueueAdd;
+  post: PostEpicWrite;
   label: string;
   pendingLabel: string;
-  /** The inline text for a request that failed before the server answered. */
-  failure: (err: unknown) => string;
+  /** The inline text for a request that failed before the server answered; the error message is appended. */
+  failure: string;
   onDone: () => void;
 }
 
@@ -27,7 +27,7 @@ export function EpicActionButton({ address, state, post, label, pendingLabel, fa
       if (res.refused) setRefusal(res.message || res.reason);
       else onDone();
     } catch (err) {
-      setRefusal(failure(err));
+      setRefusal(`${failure}: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setPending(false);
     }

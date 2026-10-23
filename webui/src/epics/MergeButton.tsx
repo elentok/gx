@@ -13,7 +13,7 @@ export function MergeButton({ address, state, onMerged }: { address: string; sta
       post={postEpicMerge}
       label="Merge"
       pendingLabel="Merging…"
-      failure={(err) => `Merge failed: ${err instanceof Error ? err.message : String(err)}`}
+      failure="Merge failed"
       onDone={onMerged}
     />
   );

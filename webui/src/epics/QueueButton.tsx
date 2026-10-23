@@ -9,7 +9,7 @@ export function QueueButton({ address, state, onQueued }: { address: string; sta
       post={postQueueAdd}
       label="Queue"
       pendingLabel="Queueing…"
-      failure={() => "Could not queue the epic"}
+      failure="Could not queue the epic"
       onDone={onQueued}
     />
   );

@@ -1,15 +1,15 @@
-export interface QueueAddBody {
+export interface EpicWriteBody {
   address: string;
   /** The web mux refuses a queue write without a state token; the epic's list state is enough. */
   state: string;
 }
 
-export type QueueAddResult = { refused?: false } | { refused: true; reason: string; message: string };
+export type EpicWriteResult = { refused?: false } | { refused: true; reason: string; message: string };
 
-export type PostQueueAdd = (body: QueueAddBody) => Promise<QueueAddResult>;
+export type PostEpicWrite = (body: EpicWriteBody) => Promise<EpicWriteResult>;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
-async function postEpicWrite(path: string, body: QueueAddBody): Promise<QueueAddResult> {
+async function postEpicWrite(path: string, body: EpicWriteBody): Promise<EpicWriteResult> {
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -20,7 +20,7 @@ async function postEpicWrite(path: string, body: QueueAddBody): Promise<QueueAdd
   throw new Error(`HTTP ${res.status}`);
 }
 
-export const postQueueAdd: PostQueueAdd = (body) => postEpicWrite("/v1/queue/add", body);
+export const postQueueAdd: PostEpicWrite = (body) => postEpicWrite("/v1/queue/add", body);
 
 /** The merge route takes the same address and state token as a queue add. */
-export const postEpicMerge: PostQueueAdd = (body) => postEpicWrite("/v1/epics/merge", body);
+export const postEpicMerge: PostEpicWrite = (body) => postEpicWrite("/v1/epics/merge", body);
