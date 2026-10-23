@@ -172,6 +172,16 @@ context overrun) rediscovering it, then misses shared fixtures and fails the ful
   which side of a package split (e.g. `server/` vs `ralphloop/`) each call site sits on.
 - **Regression data**: inline any transcript or fixture the ticket relies on. Never point at another
   ticket for it.
+- **Consumers of a changed field or enum**: when the ticket changes a wire field (JSON tag,
+  `omitempty`), a schema field or an enum, run `rg` for the symbol and list every consumer: loaders
+  and in-memory structs, server and CLI call sites, web code, and comments that mirror it (e.g. a
+  "must match" note). Put every existing test that mentions it in Test seams, so the agent re-runs
+  them instead of finding them by failure.
+- **Wiring**: name the hidden registration points (route tables, allowlists, parity tests, the
+  query-and-prop path that feeds a page) and give `file:func` for anything the ticket says only by
+  line number or role. For a new server route, point at `.ai/index.md` "Adding a server route".
+- **Behaviour that must not change**: list one seam per state or variant of that behaviour, not only
+  the ones the ticket edits.
 
 If no map applies, write an explicit `none — <rationale>`, as with test seams. Code-review fix
 tickets are out of scope here.
