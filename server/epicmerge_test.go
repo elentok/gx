@@ -168,6 +168,54 @@ func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T
 	}
 }
 
+// stampTicket adds frontmatter lines to the epic's ticket 01.
+func stampTicket(t *testing.T, f *schedFixture, extra string) {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join(f.store, "proj", schedEpic, "issues", "01-*.md"))
+	if err != nil || len(paths) != 1 {
+		t.Fatalf("ticket 01 files = %v, %v", paths, err)
+	}
+	testutil.WriteFile(t, filepath.Dir(paths[0]), filepath.Base(paths[0]), strings.Replace(readFile(t, paths[0]), "\n---\n\n", "\n"+extra+"---\n\n", 1))
+}
+
+func TestEpicMerge_StampsSummedTotalsWhenEveryDoneTicketIsStamped(t *testing.T) {
+	f := newFFFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+	stampTicket(t, f, "total_tokens: 1200\nactual_cost: 1.5\nhad_codex: true\nfriction:\n  total_paused_secs: 30\n")
+
+	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
+	}
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic))
+	if md.TotalTokens == nil || *md.TotalTokens != 1200 || md.ActualCost != 1.5 || !md.HadCodex {
+		t.Errorf("tokens/cost/codex = %v/%v/%v, want 1200/1.5/true", md.TotalTokens, md.ActualCost, md.HadCodex)
+	}
+	if md.Friction == nil || md.Friction.TotalPausedSecs != 30 {
+		t.Errorf("friction = %+v, want 30 paused secs", md.Friction)
+	}
+}
+
+func TestEpicMerge_UnstampedDoneTicketLeavesTokensAndCostOffButKeepsFriction(t *testing.T) {
+	f := newFFFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+	stampTicket(t, f, "friction:\n  total_paused_secs: 30\n")
+
+	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
+	}
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic))
+	if md.TotalTokens != nil || md.ActualCost != 0 {
+		t.Errorf("tokens/cost = %v/%v, want unstamped", md.TotalTokens, md.ActualCost)
+	}
+	if md.Friction == nil || md.Friction.TotalPausedSecs != 30 {
+		t.Errorf("friction = %+v, want 30 paused secs", md.Friction)
+	}
+}
+
 func TestEpicMerge_RecreatesARemovedFeatureWorktree(t *testing.T) {
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

@@ -149,6 +149,7 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 		}
 	case s.nothingToMerge(project, epics, one, repo):
 		s.stampLines(root, e.Path, 0, 0)
+		s.stampTotals(root, e)
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
 		first = true
 	case force || s.autoFFMerge(project) || hasManualMergeTicket(e):
@@ -172,6 +173,7 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 		} else {
 			s.stampLines(root, e.Path, added, removed)
 		}
+		s.stampTotals(root, e)
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
 		first = true
 	default:
@@ -298,6 +300,14 @@ func (s *Server) stampEpic(root rootRef, epicPath string, keys ...string) {
 		if _, err := tickets.MarkMapDone(epicPath, false); err != nil {
 			s.log.Warn("mark map done", "root", root, "err", err)
 		}
+	}
+}
+
+// stampTotals records the epic's summed tokens, cost, Codex marker and friction.
+// A failed stamp is logged, never fatal, like stampEpic's.
+func (s *Server) stampTotals(root rootRef, e tickets.Epic) {
+	if err := tickets.StampEpicFields(e.Path, tickets.SumEpicStats(e.Tickets).Fields()); err != nil {
+		s.log.Warn("stamp epic totals", "root", root, "err", err)
 	}
 }
 

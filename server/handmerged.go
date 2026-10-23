@@ -85,6 +85,7 @@ func (s *Server) stampMerged(root rootRef, e tickets.Epic, repo, target string) 
 	} else {
 		s.stampLines(root, e.Path, added, removed)
 	}
+	s.stampTotals(root, e)
 	s.stampEpic(root, e.Path, "merged_at")
 	s.log.Info("epic merged outside the server", "root", root, "target", target)
 	removed, err := s.queued.removeRoot(root)
