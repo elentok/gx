@@ -139,13 +139,19 @@ merge_skill() {
 }
 
 # Returns 0 when the skill may be synced. A changed upstream LICENSE blocks it unless the skill was
-# named with --accept-license; an accepted one is copied word for word.
+# named with --accept-license; an accepted one is copied word for word. --check only reports it.
 license_gate() {
 	local skill=$1 dir=$2 license=$3 pin=$4
 	local old="$work/license.old" new="$work/license.new"
 	git -C "$dir" show "$pin:$license" >"$old" 2>/dev/null || : >"$old"
 	git -C "$dir" show "$latest:$license" >"$new" 2>/dev/null || : >"$new"
 	cmp -s "$old" "$new" && return 0
+	if [ "$mode" = check ]; then
+		found=1
+		echo "$skill: license changed"
+		diff -u "$old" "$new" || true
+		return 0
+	fi
 	case " $accepted " in
 	*" $skill "*)
 		mkdir -p "$skills_dir/$skill"
@@ -171,9 +177,7 @@ while read -r skill repo path license pin strategy; do
 		echo "$skill: upstream path $path no longer exists at $latest; nothing written for this skill"
 		continue
 	fi
-	if [ "$mode" = merge ]; then
-		license_gate "$skill" "$dir" "$license" "$pin" || continue
-	fi
+	license_gate "$skill" "$dir" "$license" "$pin" || continue
 	count=$(git -C "$dir" rev-list --count "$pin..$latest" -- "$path")
 	if [ "$count" -eq 0 ]; then
 		continue

@@ -388,6 +388,32 @@ func TestSyncLicense(t *testing.T) {
 		assertSnapshotUnchanged(t, before, snapshot(t, filepath.Dir(f.gxSkill)))
 	})
 
+	t.Run("--check reports a change with its diff and writes nothing", func(t *testing.T) {
+		f := setup(t, "MIT v2\n")
+		before := snapshot(t, filepath.Dir(f.gxSkill))
+
+		out := f.runSync(t, "--check")
+
+		for _, want := range []string{"gx-alpha: license changed", "-MIT", "+MIT v2", "gx-alpha: 1 new upstream commits"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("report missing %q:\n%s", want, out)
+			}
+		}
+		assertSnapshotUnchanged(t, before, snapshot(t, filepath.Dir(f.gxSkill)))
+	})
+
+	t.Run("--check with --accept-license still writes nothing", func(t *testing.T) {
+		f := setup(t, "MIT v2\n")
+		before := snapshot(t, filepath.Dir(f.gxSkill))
+
+		out := f.runSync(t, "--check", "--accept-license", "gx-alpha")
+
+		if !strings.Contains(out, "gx-alpha: license changed") {
+			t.Errorf("report missing license change:\n%s", out)
+		}
+		assertSnapshotUnchanged(t, before, snapshot(t, filepath.Dir(f.gxSkill)))
+	})
+
 	t.Run("accepted change is copied and the skill updates", func(t *testing.T) {
 		f := setup(t, "MIT v2\n")
 
