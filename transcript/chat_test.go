@@ -42,6 +42,7 @@ func TestReadChat_ShowsVisibleAndHidesTheRest(t *testing.T) {
 		{"u0", ChatRolePerson, ChatKindCommand, "/clear"},
 		{"u3", ChatRolePerson, ChatKindCommand, "/gx-design proj:map"},
 		{"a2", ChatRoleAgent, ChatKindText, "Hello"},
+		{"a3", ChatRoleAgent, ChatKindTools, ""},
 		{"u5", ChatRolePerson, ChatKindPrompt, "Which store?"},
 	}
 	if !reflect.DeepEqual(got, want) {

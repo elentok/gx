@@ -17,20 +17,27 @@ const (
 	ChatKindText    = "text"
 	ChatKindPrompt  = "prompt"
 	ChatKindCommand = "command"
+	// ChatKindTools folds a run of tool calls; ChatKindCompacted marks a
+	// compaction.
+	ChatKindTools     = "tools"
+	ChatKindCompacted = "compacted"
 )
 
 // ChatMessage is one visible entry of a conversation. ID is the transcript
-// line's uuid.
+// line's uuid. A tools entry carries ToolCount and LastTool instead of Text.
 type ChatMessage struct {
-	ID   string
-	Role string
-	Kind string
-	Text string
-	At   time.Time
+	ID        string
+	Role      string
+	Kind      string
+	Text      string
+	ToolCount int
+	LastTool  string
+	At        time.Time
 }
 
 type chatLine struct {
 	Type             string `json:"type"`
+	Subtype          string `json:"subtype"`
 	UUID             string `json:"uuid"`
 	Timestamp        string `json:"timestamp"`
 	IsSidechain      bool   `json:"isSidechain"`
@@ -53,7 +60,9 @@ const localCommandPrefix = "<local-command"
 // ReadChat returns the transcript's visible messages in order: agent text,
 // the person's real prompts and slash commands. Thinking, system lines, meta
 // lines, attachments, compact summaries, sidechains and tool results stay
-// hidden. ok is false if the file doesn't exist yet.
+// hidden. Each run of tool calls between two visible messages folds into one
+// tools entry, and a compaction becomes a compacted entry. ok is false if the
+// file doesn't exist yet.
 func ReadChat(path string) (msgs []ChatMessage, ok bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -66,19 +75,59 @@ func ReadChat(path string) (msgs []ChatMessage, ok bool, err error) {
 
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	var run *ChatMessage
+	flush := func() {
+		if run != nil {
+			msgs = append(msgs, *run)
+			run = nil
+		}
+	}
 	for scanner.Scan() {
 		var line chatLine
 		if json.Unmarshal([]byte(strings.TrimSpace(scanner.Text())), &line) != nil {
 			continue
 		}
+		if line.Type == "system" && line.Subtype == compactBoundarySubtype {
+			flush()
+			msgs = append(msgs, ChatMessage{ID: line.UUID, Kind: ChatKindCompacted, At: line.at()})
+			continue
+		}
 		if msg, visible := line.message(); visible {
+			flush()
 			msgs = append(msgs, msg)
+		}
+		for _, name := range line.toolNames() {
+			if run == nil {
+				run = &ChatMessage{ID: line.UUID, Role: ChatRoleAgent, Kind: ChatKindTools, At: line.at()}
+			}
+			run.ToolCount++
+			run.LastTool = name
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, false, err
 	}
+	flush()
 	return msgs, true, nil
+}
+
+func (l chatLine) at() time.Time {
+	at, _ := time.Parse(time.RFC3339Nano, l.Timestamp)
+	return at
+}
+
+// toolNames lists the tools an agent line calls, in order.
+func (l chatLine) toolNames() []string {
+	if l.IsSidechain || l.Type != "assistant" {
+		return nil
+	}
+	var names []string
+	for _, b := range decodeContentBlocks(l.Message.Content) {
+		if b.Type == "tool_use" {
+			names = append(names, b.Name)
+		}
+	}
+	return names
 }
 
 func (l chatLine) message() (ChatMessage, bool) {
@@ -95,8 +144,7 @@ func (l chatLine) message() (ChatMessage, bool) {
 		return ChatMessage{}, false
 	}
 	text := strings.Join(texts, "\n\n")
-	at, _ := time.Parse(time.RFC3339Nano, l.Timestamp)
-	msg := ChatMessage{ID: l.UUID, Text: text, At: at}
+	msg := ChatMessage{ID: l.UUID, Text: text, At: l.at()}
 	if l.Type == "assistant" {
 		msg.Role, msg.Kind = ChatRoleAgent, ChatKindText
 		return msg, true

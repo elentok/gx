@@ -34,6 +34,7 @@ type unexecutedToolCallLine struct {
 type contentBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
+	Name string `json:"name"`
 }
 
 // isRealUserTurn reports whether l is the "user" line that opens a turn: a

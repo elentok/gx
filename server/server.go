@@ -313,6 +313,8 @@ type Server struct {
 	reloads  reloadHistory
 	// cpuSpikes holds the CPU ticket cooldown.
 	cpuSpikes cpuSpikes
+	// chats caches parsed session chats by transcript file.
+	chats chatCache
 	// storeCommits is nil until the store commit loop starts; guarded by
 	// reloadMu so a reload racing the start is never lost.
 	storeCommits *storecommit.Loop

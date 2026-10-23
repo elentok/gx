@@ -814,16 +814,24 @@ export interface SessionChatMessage {
   kind: string; // text, prompt or command
   text: string;
   at: string;
+  /**
+   * ToolCount and LastTool describe a tools entry, which folds a run of tool
+   * calls and carries no Text.
+   */
+  tool_count?: number /* int */;
+  last_tool?: string;
 }
 /**
  * SessionChatResponse is the visible messages of a session's newest
  * conversation. ConversationID changes after a /clear. Unsupported marks a
- * session of a harness that has no chat; its Messages stay empty.
+ * session of a harness that has no chat; its Messages stay empty. Truncated
+ * says earlier messages were cut to fit maxChatMessages.
  */
 export interface SessionChatResponse {
   conversation_id: string;
   messages: SessionChatMessage[];
   unsupported?: boolean;
+  truncated?: boolean;
 }
 
 //////////
