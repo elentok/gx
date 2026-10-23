@@ -40,7 +40,7 @@ const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => 
 
 async function renderTicket(detail: TicketDetail) {
   const fetchDetail: FetchDetail = async () => ({ kind: "ok", detail });
-  const router = createMemoryRouter(appRoutes(fetchDetail), { initialEntries: ["/t/gx:demo/12"] });
+  const router = createMemoryRouter(appRoutes({ ticket: fetchDetail }), { initialEntries: ["/t/gx:demo/12"] });
   renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />

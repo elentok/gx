@@ -5,16 +5,19 @@ import { readPageCache, writePageCache } from "../pageCache";
 
 export type { TicketDetail };
 
-export type DetailResult = { kind: "ok"; detail: TicketDetail } | { kind: "not-found" };
+export type DetailResult<T = TicketDetail> = { kind: "ok"; detail: T } | { kind: "not-found" };
 
 export type FetchDetail = (address: string) => Promise<DetailResult>;
 
-export const fetchDetail: FetchDetail = async (address) => {
-  const res = await fetch(`/v1/tickets/detail?address=${encodeURIComponent(address)}`);
+export async function fetchJson<T>(url: string, label: string): Promise<DetailResult<T>> {
+  const res = await fetch(url);
   if (res.status === 404 || res.status === 400) return { kind: "not-found" };
-  if (!res.ok) throw new Error(`detail: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`${label}: HTTP ${res.status}`);
   return { kind: "ok", detail: await res.json() };
-};
+}
+
+export const fetchDetail: FetchDetail = (address) =>
+  fetchJson(`/v1/tickets/detail?address=${encodeURIComponent(address)}`, "detail");
 
 export interface DetailState<T = TicketDetail> {
   detail: T | null;
@@ -34,7 +37,7 @@ export function useTicketDetail(address: string, conn: Connection, fetcher: Fetc
 export function useDetail<T>(
   address: string,
   conn: Connection,
-  fetcher: (address: string) => Promise<{ kind: "ok"; detail: T } | { kind: "not-found" }>,
+  fetcher: (address: string) => Promise<DetailResult<T>>,
   // The page also goes stale on an event whose address starts with this: an epic's tickets, a ticket's epic-mates.
   watchPrefix?: string,
   // Names the sessionStorage entry that repaints this page after a reload.

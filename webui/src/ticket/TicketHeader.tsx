@@ -1,5 +1,6 @@
 import { Box, Link } from "@chakra-ui/react";
 import type { TicketDetail } from "../generated/server";
+import { epicHref } from "../hrefs";
 import { StatLine } from "../page/StatLine";
 import { Arc } from "../ui/arc/Arc";
 import { Badge } from "../ui/badge/Badge";
@@ -14,7 +15,7 @@ export function TicketHeader({ detail, now }: { detail: TicketDetail; now: numbe
       <Box mt="2" display="flex" alignItems="center" gap="2">
         <Badge tone={tone}>{label}</Badge>
         {isRunning(detail) && <Arc label="Running" />}
-        <Link href={`#/e/${detail.epic}`} fontSize="sm">
+        <Link href={epicHref(detail.epic)} fontSize="sm">
           {detail.epic.slice(detail.epic.indexOf(":") + 1)}
         </Link>
       </Box>

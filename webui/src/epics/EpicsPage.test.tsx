@@ -53,7 +53,7 @@ function eventConn() {
 }
 
 function renderEpics(fetchList: FetchEpicList, withConn: Connection = conn) {
-  const router = createMemoryRouter(appRoutes(undefined, undefined, fetchList), { initialEntries: ["/epics"] });
+  const router = createMemoryRouter(appRoutes({ epicList: fetchList }), { initialEntries: ["/epics"] });
   return renderThemed(
     <ConnectionContext.Provider value={withConn}>
       <RouterProvider router={router} />

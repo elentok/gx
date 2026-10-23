@@ -1,19 +1,13 @@
 import type { Connection } from "../connection";
 import type { EpicDetail, EpicDetailRow } from "../generated/server";
-import { useDetail, type DetailState } from "../ticket/detail";
+import { fetchJson, useDetail, type DetailResult, type DetailState } from "../ticket/detail";
 
 export type { EpicDetail, EpicDetailRow };
 
-export type EpicDetailResult = { kind: "ok"; detail: EpicDetail } | { kind: "not-found" };
+export type FetchEpicDetail = (address: string) => Promise<DetailResult<EpicDetail>>;
 
-export type FetchEpicDetail = (address: string) => Promise<EpicDetailResult>;
-
-export const fetchEpicDetail: FetchEpicDetail = async (address) => {
-  const res = await fetch(`/v1/epics/detail?address=${encodeURIComponent(address)}`);
-  if (res.status === 404 || res.status === 400) return { kind: "not-found" };
-  if (!res.ok) throw new Error(`epic detail: HTTP ${res.status}`);
-  return { kind: "ok", detail: await res.json() };
-};
+export const fetchEpicDetail: FetchEpicDetail = (address) =>
+  fetchJson(`/v1/epics/detail?address=${encodeURIComponent(address)}`, "epic detail");
 
 export function useEpicDetail(
   address: string,

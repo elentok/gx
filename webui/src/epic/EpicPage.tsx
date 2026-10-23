@@ -2,6 +2,7 @@ import { Box, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { MergeButton, isMergeable } from "../epics/MergeButton";
+import { ticketHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
 import { Markdown } from "../markdown/Markdown";
 import { DetailPage } from "../page/DetailPage";
@@ -76,7 +77,7 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
               unclipped
               inlineReason
               hint={r.needs_answer ? r.question : undefined}
-              href={r.needs_answer ? `#/t/${r.address}` : undefined}
+              href={r.needs_answer ? ticketHref(r.address) : undefined}
               live={isRunning(r)}
               icon={iconOf(r)}
               toneTitle

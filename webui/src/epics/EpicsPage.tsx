@@ -2,6 +2,7 @@ import { Box, Input, Link, Text } from "@chakra-ui/react";
 import { Fragment, useState } from "react";
 import { useConnectionContext } from "../connection";
 import type { EpicListRow, FollowUpCount } from "../generated/server";
+import { epicHref } from "../hrefs";
 import { Arc } from "../ui/arc/Arc";
 import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
@@ -19,7 +20,6 @@ const Dim = ({ children }: { children: string }) => (
   </Text>
 );
 
-const epicLink = (address: string) => `#/e/${address}`;
 
 function EpicRow({
   row,
@@ -44,7 +44,7 @@ function EpicRow({
     <Box display="flex" alignItems="baseline" gap="2" py="1" fontFamily="condensed" fontSize="lg">
       {withBadge && <Badge tone={badge.tone}>{badge.label}</Badge>}
       {row.state === "running" && <Arc label="Running" />}
-      <Link href={epicLink(row.address)} color="inherit" fontWeight="600">
+      <Link href={epicHref(row.address)} color="inherit" fontWeight="600">
         {row.name}
       </Link>
       <Dim>{parts.join(" · ")}</Dim>
@@ -54,7 +54,7 @@ function EpicRow({
           {blockers.map((a, i) => (
             <Fragment key={a}>
               {i > 0 && ", "}
-              <Link href={epicLink(a)} color="inherit">
+              <Link href={epicHref(a)} color="inherit">
                 {a.slice(a.indexOf(":") + 1)}
               </Link>
             </Fragment>
@@ -81,7 +81,7 @@ function FollowUps({ counts }: { counts: FollowUpCount[] }) {
         counts.map((c) => (
           <Fragment key={c.project}>
             {" · "}
-            <Link href={epicLink(`${c.project}:follow-ups`)} color="inherit">
+            <Link href={epicHref(`${c.project}:follow-ups`)} color="inherit">
               {c.project}
             </Link>{" "}
             {c.open}

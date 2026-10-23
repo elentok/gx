@@ -23,19 +23,21 @@ function EpicRoute({ fetchDetail }: { fetchDetail?: FetchEpicDetail }) {
   return <EpicPage address={useParams()["*"] ?? ""} fetchDetail={fetchDetail} />;
 }
 
-export function appRoutes(
-  fetchDetail?: FetchDetail,
-  fetchEpicDetail?: FetchEpicDetail,
-  fetchEpicList?: FetchEpicList,
-): RouteObject[] {
+export interface RouteFetchers {
+  ticket?: FetchDetail;
+  epic?: FetchEpicDetail;
+  epicList?: FetchEpicList;
+}
+
+export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
   return [
     { path: "/q", element: <QueueRoute /> },
-    { path: "/epics", element: <EpicsPage fetchList={fetchEpicList} /> },
-    { path: "/t/*", element: <TicketRoute fetchDetail={fetchDetail} /> },
-    { path: "/e/*", element: <EpicRoute fetchDetail={fetchEpicDetail} /> },
+    { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} /> },
+    { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} /> },
+    { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} /> },
     // "/" and an unknown hash go to the Queue.
     { path: "*", loader: () => redirect("/q") },
   ];
 }
 
-export const createAppRouter = (fetchDetail?: FetchDetail) => createHashRouter(appRoutes(fetchDetail));
+export const createAppRouter = (fetchDetail?: FetchDetail) => createHashRouter(appRoutes({ ticket: fetchDetail }));

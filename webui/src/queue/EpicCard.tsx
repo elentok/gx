@@ -1,6 +1,7 @@
 import { Box, Link, Text } from "@chakra-ui/react";
 import type { EpicView } from "../view";
 import { MergeButton } from "../epics/MergeButton";
+import { epicHref } from "../hrefs";
 import { Arc } from "../ui/arc/Arc";
 import { Badge } from "../ui/badge/Badge";
 import { Card } from "../ui/card/Card";
@@ -18,7 +19,7 @@ export function EpicCard({ epic, onMerged }: { epic: EpicView; onMerged: () => v
       </Box>
       <Text fontFamily="condensed" fontSize="xl" fontWeight="600" mb="2" display="flex" alignItems="center" gap="2">
         {epic.live && <Arc tone={epic.tone} label="Running" />}
-        <Link href={`#/e/${epic.address}`} color="inherit">
+        <Link href={epicHref(epic.address)} color="inherit">
           {epic.name}
         </Link>
       </Text>

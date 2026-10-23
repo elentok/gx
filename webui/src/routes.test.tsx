@@ -52,7 +52,7 @@ function renderAt(
   conn: Connection = fakeConnection(true),
   fetchEpic?: FetchEpicDetail,
 ) {
-  const router = createMemoryRouter(appRoutes(fetchDetail, fetchEpic), { initialEntries: [path] });
+  const router = createMemoryRouter(appRoutes({ ticket: fetchDetail, epic: fetchEpic }), { initialEntries: [path] });
   return renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
@@ -136,7 +136,7 @@ test("after a direct load the epic back link falls back to the Queue", async () 
 });
 
 test("a page reached inside the app has a ← Back link", async () => {
-  const router = createMemoryRouter(appRoutes(okFor, epicFetch()), { initialEntries: ["/q", "/e/gx:e"], initialIndex: 1 });
+  const router = createMemoryRouter(appRoutes({ ticket: okFor, epic: epicFetch() }), { initialEntries: ["/q", "/e/gx:e"], initialIndex: 1 });
   renderThemed(
     <ConnectionContext.Provider value={fakeConnection(true)}>
       <RouterProvider router={router} />
