@@ -45,6 +45,20 @@ func TestRenderRounds_AnsweredRoundShowsAnswer(t *testing.T) {
 	}
 }
 
+func TestRenderRounds_FreeTextAnswerIsShown(t *testing.T) {
+	events := []LogEvent{
+		{Seq: 1, Type: EventPauseQuestion, Summary: "Which?", Text: "body"},
+		{Seq: 2, Type: EventPauseAnswer, Question: 1, Text: "use the proposed fix"},
+	}
+	want := "Pause rounds\n" +
+		"1. answered: Which?\n" +
+		"   body\n" +
+		"   answer: use the proposed fix\n"
+	if got := RenderRounds(events); got != want {
+		t.Errorf("RenderRounds =\n%s\nwant\n%s", got, want)
+	}
+}
+
 func TestRenderRounds_ClosedRoundShowsReason(t *testing.T) {
 	events := []LogEvent{
 		{Seq: 1, Type: EventPauseQuestion, Summary: "Which?"},

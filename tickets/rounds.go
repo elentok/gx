@@ -64,8 +64,8 @@ func roundOutcome(r PauseRound) string {
 		}
 		return "closed: " + r.End.Reason
 	}
-	parts := make([]string, 0, 2)
-	for _, p := range []string{r.End.Choice, r.End.Note} {
+	parts := make([]string, 0, 3)
+	for _, p := range []string{r.End.Choice, r.End.Note, r.End.Text} {
 		if p != "" {
 			parts = append(parts, p)
 		}
