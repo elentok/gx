@@ -212,7 +212,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 	}
 	defer unlock()
 	one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
-	if err := tickets.CloseOpenQuestion(lf.path, "adopted"); err != nil {
+	if err := tickets.EndOpenRound(lf.path, tickets.SourceGx, tickets.HowAuto, "adopted"); err != nil {
 		s.log.Warn("late finish: close question", "ticket", addr, "err", err)
 		return false
 	}

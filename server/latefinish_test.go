@@ -200,6 +200,9 @@ func TestLateFinish_ClosesQuestionAsAdopted(t *testing.T) {
 	if last.Type != tickets.EventPauseClosed || last.Question != q.Seq || last.Reason != "adopted" {
 		t.Errorf("last event = %+v, want pause.closed{question: %d, reason: adopted}", last, q.Seq)
 	}
+	if last.Source != tickets.SourceGx || last.How != tickets.HowAuto {
+		t.Errorf("last event = %+v, want source gx, how auto", last)
+	}
 }
 
 func TestLateFinish_ClosesCommitless(t *testing.T) {

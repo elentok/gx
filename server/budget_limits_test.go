@@ -307,6 +307,10 @@ func TestBudget_HardLimitKillClosesTheOpenQuestion(t *testing.T) {
 	if len(evs) != 3 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != 1 || evs[1].Reason != "budget-killed" ||
 		evs[2].Type != tickets.EventPauseRepair {
 		t.Errorf("log = %+v, want the question, pause.closed{question 1, budget-killed}, then the repair round", evs)
+		return
+	}
+	if evs[1].Source != tickets.SourceGx || evs[1].How != tickets.HowAuto {
+		t.Errorf("pause.closed = %+v, want source gx, how auto", evs[1])
 	}
 }
 
