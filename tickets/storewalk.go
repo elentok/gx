@@ -8,6 +8,35 @@ type StoreEpic struct {
 	Epic     Epic
 }
 
+// backfillEpics calls step on every non-map epic of the project at root, live
+// and archived, and collects the changes it reports (also on error, so a
+// partial run still reports what it wrote). step may fill in the epic's
+// tickets in memory for the steps that follow it on the same epic.
+func backfillEpics(root string, step func(epic *Epic) ([]MigrationChange, error)) ([]MigrationChange, error) {
+	live, err := Load(root)
+	if err != nil {
+		return nil, err
+	}
+	archived, err := LoadArchived(root)
+	if err != nil {
+		return nil, err
+	}
+	var changes []MigrationChange
+	for _, epics := range [][]Epic{live, archived} {
+		for i := range epics {
+			if epics[i].IsMap {
+				continue
+			}
+			got, err := step(&epics[i])
+			changes = append(changes, got...)
+			if err != nil {
+				return changes, err
+			}
+		}
+	}
+	return changes, nil
+}
+
 // LoadStoreEpics returns every epic of every project in the ticket store:
 // live epics (which include follow-ups-archived and one-offs-archived, being
 // ordinary epic directories) and each project's ".archive/" epics. Unlike the

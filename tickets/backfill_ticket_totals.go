@@ -22,16 +22,10 @@ func BackfillTicketTotals(
 	totals func(ids []string) (tokens int64, cost float64, err error),
 	conflictSessions func(epicName, ticketID string) ([]string, error),
 ) ([]MigrationChange, error) {
-	epics, err := Load(root)
-	if err != nil {
-		return nil, err
-	}
-	var changes []MigrationChange
-	for _, epic := range epics {
-		if epic.IsMap {
-			continue
-		}
-		for _, t := range epic.Tickets {
+	return backfillEpics(root, func(epic *Epic) ([]MigrationChange, error) {
+		var changes []MigrationChange
+		for i := range epic.Tickets {
+			t := &epic.Tickets[i]
 			if !t.IsDone() || t.TotalTokens != nil {
 				continue
 			}
@@ -61,11 +55,12 @@ func BackfillTicketTotals(
 			if err != nil {
 				return changes, err
 			}
+			t.TotalTokens, t.ActualCost = &tokens, cost
 			changes = append(changes, MigrationChange{
 				Path:  t.FilePath(),
 				Notes: []string{"tokens and cost backfilled from transcripts"},
 			})
 		}
-	}
-	return changes, nil
+		return changes, nil
+	})
 }

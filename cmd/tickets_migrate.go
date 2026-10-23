@@ -251,11 +251,22 @@ func ticketSessionTotals(ids []string) (int64, float64, error) {
 	return int64(tokens), cost, err
 }
 
+// epicLogRoot is the directory holding an epic's run log: root for a live
+// epic, its archive for an archived one.
+func epicLogRoot(root, epicName string) string {
+	if _, err := os.Stat(filepath.Join(root, epicName)); err != nil {
+		if _, err := os.Stat(filepath.Join(tickets.ArchiveDir(root), epicName)); err == nil {
+			return tickets.ArchiveDir(root)
+		}
+	}
+	return root
+}
+
 // conflictSessionsUnder reads the sessions that resolved conflicts for a
 // ticket from its epic's run log.
 func conflictSessionsUnder(root string) func(epicName, ticketID string) ([]string, error) {
 	return func(epicName, ticketID string) ([]string, error) {
-		evs, _, err := ralphloop.ReadEvents(root, epicName)
+		evs, _, err := ralphloop.ReadEvents(epicLogRoot(root, epicName), epicName)
 		var ids []string
 		for _, ev := range evs {
 			if ev.Type == string(events.ConflictResolved) && ev.Ticket == ticketID &&
@@ -276,7 +287,7 @@ const earlyRunLogProject = "gx"
 // root, which only a project directory's own log supersedes.
 func ticketFrictionUnder(root string) func(epicName string, t tickets.Ticket) (schema.FrictionSummary, error) {
 	return func(epicName string, t tickets.Ticket) (schema.FrictionSummary, error) {
-		runEvents, ok, err := ralphloop.ReadEvents(root, epicName)
+		runEvents, ok, err := ralphloop.ReadEvents(epicLogRoot(root, epicName), epicName)
 		if err == nil && !ok && tickets.ProjectName(root) == earlyRunLogProject {
 			runEvents, _, err = ralphloop.ReadEvents(filepath.Dir(root), epicName)
 		}
