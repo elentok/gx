@@ -658,6 +658,8 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 	}()
 	first := s.newFirstPrompt(dir, id, run)
 	defer first.stop()
+	chat := s.newChatPoll(dir, id)
+	defer chat.close()
 	for {
 		msg, err := stream.Next()
 		if err != nil {
@@ -706,6 +708,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 				return changed
 			})
 			first.noteState(st.State)
+			chat.setActive(st.State == SessionStarting || st.State == SessionWorking)
 			if design.Conversation != "" {
 				s.detectDesignActionable(dir, id, design)
 			}

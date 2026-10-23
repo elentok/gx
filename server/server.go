@@ -281,6 +281,9 @@ type Config struct {
 	// SessionBannerDelay is how long a session banner waits for triggers to
 	// merge; zero means defaultSessionBannerDelay.
 	SessionBannerDelay time.Duration
+	// ChatPollInterval is how often a working session's transcript size is
+	// checked; zero means defaultChatPollInterval.
+	ChatPollInterval time.Duration
 }
 
 // Defaults for the session-prompting timings in Config. A zero Config field
@@ -386,6 +389,9 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.SessionBannerDelay == 0 {
 		cfg.SessionBannerDelay = defaultSessionBannerDelay
+	}
+	if cfg.ChatPollInterval == 0 {
+		cfg.ChatPollInterval = defaultChatPollInterval
 	}
 	if cfg.SessionsDir == "" {
 		data, err := config.DataDir()

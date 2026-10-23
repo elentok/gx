@@ -37,6 +37,12 @@ func WithChatHarness(kind string) func(*server.Config) {
 	return func(c *server.Config) { c.ChatHarness = kind }
 }
 
+// WithChatPollInterval shortens how often a working session's transcript size
+// is checked.
+func WithChatPollInterval(d time.Duration) func(*server.Config) {
+	return func(c *server.Config) { c.ChatPollInterval = d }
+}
+
 // RunSessionProcesses registers the fake harness and, when the test binary
 // was started as a session's holder or as the fake harness's program, runs
 // that and exits. Call it first in TestMain.
