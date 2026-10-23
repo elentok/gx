@@ -131,7 +131,8 @@ func (s *Server) writeFollowUp(from tickets.Address, class, key, result string) 
 	if err := ensureDraftEpic(epicPath); err != nil {
 		return "", err
 	}
-	if path, found, err := noteOccurrence(epicPath, key, from); found || err != nil {
+	line := fmt.Sprintf("Seen again in %s on %s.", from, time.Now().Format("2006-01-02"))
+	if path, found, err := noteOccurrence(epicPath, key, line); found || err != nil {
 		return path, err
 	}
 	path, _, err := writeNewTicket(epicPath, "", class, func(id string) (schema.Ticket, string) {
@@ -145,9 +146,9 @@ func (s *Server) writeFollowUp(from tickets.Address, class, key, result string) 
 	return path, err
 }
 
-// noteOccurrence appends an occurrence line to the open draft carrying key.
+// noteOccurrence appends line to Evidence of the open draft carrying key.
 // Only a draft takes one: once a person opens the ticket a repeat is new work.
-func noteOccurrence(epicPath, key string, from tickets.Address) (path string, found bool, err error) {
+func noteOccurrence(epicPath, key, line string) (path string, found bool, err error) {
 	files, err := filepath.Glob(filepath.Join(epicPath, "issues", "*.md"))
 	if err != nil {
 		return "", false, err
@@ -162,7 +163,7 @@ func noteOccurrence(epicPath, key string, from tickets.Address) (path string, fo
 			continue
 		}
 		err = schema.UpdateTicketWithBody(f, func(_ *schema.Ticket, b *string) {
-			*b = schema.AppendToSection(*b, "Evidence", fmt.Sprintf("Seen again in %s on %s.", from, time.Now().Format("2006-01-02")))
+			*b = schema.AppendToSection(*b, "Evidence", line)
 		})
 		return f, true, err
 	}

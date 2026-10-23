@@ -21,9 +21,15 @@ import (
 // transcript path of its conversation.
 func startGrillingSession(t *testing.T, ticket string) (*servertest.Harness, context.Context, <-chan server.Event, string, string, string) {
 	t.Helper()
+	return startGrillingSessionIn(t, ticket, t.TempDir())
+}
+
+// startGrillingSessionIn is startGrillingSession on a store the caller has
+// already seeded.
+func startGrillingSessionIn(t *testing.T, ticket, store string) (*servertest.Harness, context.Context, <-chan server.Event, string, string, string) {
+	t.Helper()
 	cfg := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
-	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {

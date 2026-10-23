@@ -163,6 +163,7 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	if !ok {
 		return
 	}
+	s.fileBadRoundBlocks(id, design, text)
 	a, ok := designActionable(text, design.Ticket)
 	if !ok {
 		return

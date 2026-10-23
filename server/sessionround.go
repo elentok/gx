@@ -77,15 +77,16 @@ func splitFences(text string) (stripped string, blocks []string) {
 	return strings.TrimSpace(strings.Join(kept, "\n")), blocks
 }
 
-// roundCards splits an agent message holding a Grilling round into cards. A
-// segment runs from one marker to the next, or to a `---` line.
-func roundCards(text string) []SessionRoundCard {
-	var cards []SessionRoundCard
+// roundSegments splits an agent message holding a Grilling round into one
+// segment per question. A segment runs from one marker to the next, or to a
+// `---` line.
+func roundSegments(text string) []string {
+	var segs []string
 	rest := text
 	for {
 		_, after, found := strings.Cut(rest, grillingMarker)
 		if !found {
-			return cards
+			return segs
 		}
 		end := len(after)
 		if i := strings.Index(after, grillingMarker); i >= 0 {
@@ -93,8 +94,17 @@ func roundCards(text string) []SessionRoundCard {
 		}
 		rest = after[end:]
 		// The marker's trailing Q opens the header the number is read from.
-		cards = append(cards, roundCard(len(cards)+1, untilRule("Q"+after[:end])))
+		segs = append(segs, untilRule("Q"+after[:end]))
 	}
+}
+
+// roundCards splits an agent message holding a Grilling round into cards.
+func roundCards(text string) []SessionRoundCard {
+	var cards []SessionRoundCard
+	for i, seg := range roundSegments(text) {
+		cards = append(cards, roundCard(i+1, seg))
+	}
+	return cards
 }
 
 // untilRule cuts seg at its first `---` line.
