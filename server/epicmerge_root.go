@@ -148,9 +148,11 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 			s.stampEpic(root, e.Path, "completed_at")
 		}
 	case s.nothingToMerge(project, epics, one, repo):
+		s.stampLines(root, e.Path, 0, 0)
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
 		first = true
 	case force || s.autoFFMerge(project) || hasManualMergeTicket(e):
+		trunkBefore, _ := git.RevParse(repo, "refs/heads/"+target)
 		reason, kind := s.mergeRoot(project, epics, one, repo)
 		// A non-ff below the cap is not an outcome: the merge ticket makes the
 		// epic not all-done, so the root stays queued and its finish merges again.
@@ -164,6 +166,11 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 			s.stampEpic(root, e.Path, "completed_at")
 			s.storeMergeBlock(root, e.Path, kind, reason)
 			return pauseDecision(first, reason, kind)
+		}
+		if added, removed, err := git.DiffLines(repo, trunkBefore, "refs/heads/"+target); err != nil {
+			s.log.Warn("count merged lines", "root", root, "err", err)
+		} else {
+			s.stampLines(root, e.Path, added, removed)
 		}
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
 		first = true
@@ -291,6 +298,15 @@ func (s *Server) stampEpic(root rootRef, epicPath string, keys ...string) {
 		if _, err := tickets.MarkMapDone(epicPath, false); err != nil {
 			s.log.Warn("mark map done", "root", root, "err", err)
 		}
+	}
+}
+
+// stampLines records the lines the merge added to and removed from trunk. A
+// failed stamp is logged, never fatal, like stampEpic's.
+func (s *Server) stampLines(root rootRef, epicPath string, added, removed int) {
+	err := tickets.StampEpicFields(epicPath, map[string]any{"lines_added": added, "lines_removed": removed})
+	if err != nil {
+		s.log.Warn("stamp epic lines", "root", root, "err", err)
 	}
 }
 

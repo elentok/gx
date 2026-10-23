@@ -119,6 +119,28 @@ func DiffNames(dir, refA, refB string) ([]string, error) {
 	return strings.Split(out, "\n"), nil
 }
 
+// DiffLines counts the lines added and removed going from refA to refB. A
+// binary file has no line count and adds nothing.
+func DiffLines(dir, refA, refB string) (added, removed int, err error) {
+	out, _, err := run(dir, []string{"diff", "--numstat", refA, refB})
+	if err != nil {
+		return 0, 0, err
+	}
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		if n, err := strconv.Atoi(fields[0]); err == nil {
+			added += n
+		}
+		if n, err := strconv.Atoi(fields[1]); err == nil {
+			removed += n
+		}
+	}
+	return added, removed, nil
+}
+
 // CherryPickRange cherry-picks the commit range fromExclusive..toInclusive
 // (in order) onto dir's current branch via `git cherry-pick`. On a conflict,
 // the returned error is a *RunError and dir is left mid-cherry-pick with

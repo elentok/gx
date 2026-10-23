@@ -101,6 +101,9 @@ func TestEpicMerge_CommitlessEpicWithNoBranchIsStampedMerged(t *testing.T) {
 	if md.MergedAt.IsZero() {
 		t.Error("epic has no merged_at")
 	}
+	if md.LinesAdded == nil || *md.LinesAdded != 0 || md.LinesRemoved == nil || *md.LinesRemoved != 0 {
+		t.Errorf("lines = %v/%v, want 0/0", md.LinesAdded, md.LinesRemoved)
+	}
 }
 
 // completedUnmerged runs the epic to its completion with auto-ff-merge off,
@@ -143,6 +146,25 @@ func TestEpicMerge_FastForwardMergesDirectlyWithAutoFFMergeOff(t *testing.T) {
 	}
 	if files := f.mergeTicketFiles(t); len(files) != 0 {
 		t.Errorf("merge tickets = %v, want none", files)
+	}
+}
+
+func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, _ string) {
+		// README.md is one line on trunk: this adds three and removes one.
+		testutil.WriteFile(t, p.Cwd, "README.md", "a\nb\nc\n")
+		testutil.CommitAll(t, p.Cwd, "rewrite readme")
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+
+	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
+	}
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic))
+	if md.LinesAdded == nil || *md.LinesAdded != 3 || md.LinesRemoved == nil || *md.LinesRemoved != 1 {
+		t.Errorf("lines = %v/%v, want 3/1", md.LinesAdded, md.LinesRemoved)
 	}
 }
 
