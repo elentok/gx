@@ -136,11 +136,22 @@ func SumEpicTotals(root, epic string, createdAt time.Time) (Totals, bool, error)
 	})
 }
 
+// SumRecordedTotals adds up the saved totals of the conversations recorded
+// against ticket, without SumTotals' check that recording covered the ticket's
+// whole life. It reports false when a conversation has no totals.
+func SumRecordedTotals(root, ticket string) (Totals, bool, error) {
+	return sumRecords(root, func(addr string) bool { return addr == ticket })
+}
+
 func sumTotals(root string, createdAt time.Time, match func(addr string) bool) (Totals, bool, error) {
 	started, ok, err := Started(root)
 	if err != nil || !ok || createdAt.IsZero() || createdAt.Before(started) {
 		return Totals{}, false, err
 	}
+	return sumRecords(root, match)
+}
+
+func sumRecords(root string, match func(addr string) bool) (Totals, bool, error) {
 	records, err := List(root)
 	if err != nil {
 		return Totals{}, false, err

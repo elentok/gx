@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/conversations"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 )
@@ -240,6 +242,13 @@ func writeMergedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (m m
 		return mergedMetrics{}, false, err
 	}
 	tokens, cost, hadCodex, totalsErr := ticketSessionsTotals(agent, cwd, sessionID, current.SessionIDs)
+	if totalsErr == nil {
+		var convo conversations.Totals
+		if convo, totalsErr = recordedConversationTotals(ticketPath, string(current.ID)); totalsErr == nil {
+			tokens += convo.TotalTokens
+			cost += convo.Cost
+		}
+	}
 	if !stats.ok && totalsErr != nil {
 		return mergedMetrics{}, false, nil
 	}
@@ -273,6 +282,29 @@ type mergedMetrics struct {
 	contextWindow, elapsedSeconds int
 	cost                          float64
 	costStamped                   bool
+}
+
+// recordedConversationTotals sums the saved totals of the interactive
+// conversations recorded against the ticket at path. A ticket outside the
+// tracker layout has no address, so no conversations. An error means the sum
+// would undercount.
+func recordedConversationTotals(path, id string) (conversations.Totals, error) {
+	addr, ok := tickets.AddressOfPath(path, id)
+	if !ok {
+		return conversations.Totals{}, nil
+	}
+	root, err := conversations.DefaultDir()
+	if err != nil {
+		return conversations.Totals{}, err
+	}
+	sum, complete, err := conversations.SumRecordedTotals(root, addr.String())
+	if err != nil {
+		return conversations.Totals{}, err
+	}
+	if !complete {
+		return conversations.Totals{}, fmt.Errorf("conversation of %s has no saved totals", addr)
+	}
+	return sum, nil
 }
 
 // ticketSessionsTotals sums tokens and cost over ids plus current. A session's

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -69,6 +70,56 @@ func TestWriteMergedMetrics_UnreadableSession_LeavesTicketUnstamped(t *testing.T
 	}
 	if got.ActualContextWindow == 0 {
 		t.Error("ActualContextWindow = 0, want the merging session's peak still stamped")
+	}
+}
+
+func recordConversation(t *testing.T, ticketPath string, totals *conversations.Totals) {
+	t.Helper()
+	addr, ok := tickets.AddressOfPath(ticketPath, "01")
+	if !ok {
+		t.Fatalf("no address for %s", ticketPath)
+	}
+	root, err := conversations.DefaultDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := conversations.Save(root, conversations.Record{ID: "conv-1", Ticket: addr.String(), Totals: totals}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWriteMergedMetrics_RecordedConversation_AddsToStamp(t *testing.T) {
+	ticketPath, cwd := stampTotalsFixture(t, "[sess-1]")
+	writeFakeTranscript(t, "", cwd, "sess-1", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), [3]any{"claude-sonnet-5", 1000, 0})
+	sessTokens, sessCost, err := SessionsTotals([]SessionRef{{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-1"}})
+	if err != nil {
+		t.Fatalf("SessionsTotals: %v", err)
+	}
+	recordConversation(t, ticketPath, &conversations.Totals{TotalTokens: 300, Cost: 0.5})
+
+	if _, _, err := writeMergedMetrics(AgentClaude, cwd, "sess-1", ticketPath); err != nil {
+		t.Fatalf("writeMergedMetrics: %v", err)
+	}
+
+	got := mustParse(t, ticketPath)
+	if got.TotalTokens == nil || int(*got.TotalTokens) != sessTokens+300 || got.ActualCost != sessCost+0.5 {
+		t.Errorf("TotalTokens = %v, ActualCost = %v; want %d, %v", got.TotalTokens, got.ActualCost, sessTokens+300, sessCost+0.5)
+	}
+}
+
+func TestWriteMergedMetrics_RecordedConversationWithoutTotals_LeavesTicketUnstamped(t *testing.T) {
+	ticketPath, cwd := stampTotalsFixture(t, "[sess-1]")
+	writeFakeTranscript(t, "", cwd, "sess-1", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), [3]any{"claude-sonnet-5", 1000, 0})
+	recordConversation(t, ticketPath, nil)
+
+	m, _, err := writeMergedMetrics(AgentClaude, cwd, "sess-1", ticketPath)
+	if err != nil {
+		t.Fatalf("writeMergedMetrics: %v", err)
+	}
+
+	got := mustParse(t, ticketPath)
+	if got.TotalTokens != nil || got.ActualCost != 0 || m.costStamped {
+		t.Errorf("TotalTokens = %v, ActualCost = %v, costStamped = %v; want none stamped", got.TotalTokens, got.ActualCost, m.costStamped)
 	}
 }
 
