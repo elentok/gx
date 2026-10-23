@@ -941,10 +941,11 @@ export const ReasonSessionNotIdle = "session-not-idle";
 export const ReasonSessionNoAction = "no-action";
 export const ReasonSessionDirGone = "dir-gone";
 export const ReasonSessionNoResume = "no-resume";
+export const ReasonNotDesignSession = "not-design-session";
 /**
  * Refusal reasons of the interactive-session writes.
  */
-export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume;
+export type Reason = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonNotDesignSession;
 export const SessionStarting = "starting";
 export const SessionWorking = "working";
 export const SessionIdle = "idle";
@@ -1084,10 +1085,12 @@ export interface CreateSessionRequest {
   rows?: number /* int */;
 }
 /**
- * SessionRequest names the session a stop or remove acts on.
+ * SessionRequest names the session a stop or remove acts on. State is the
+ * token the web sends with a stop or Restore; see SessionStateToken.
  */
 export interface SessionRequest {
   id: string;
+  state?: string;
 }
 /**
  * SessionResult is a session write's outcome: the session, or a refusal.

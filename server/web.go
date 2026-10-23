@@ -107,12 +107,14 @@ func (s *Server) webHandler() http.Handler {
 // read-only GETs, each with the handler the web mux uses: the web variants
 // require a state token. There is deliberately no withdraw or undo route.
 var webWrites = map[string]func(*Server) http.HandlerFunc{
-	"POST /v1/tickets/answer": func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.ticketAnswer) },
-	"POST /v1/tickets/resume": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
-	"POST /v1/tickets/unpark": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
-	"POST /v1/queue/add":      func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.queueAdd) },
-	"POST /v1/epics/merge":    func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.epicMerge) },
-	"POST /v1/agents/answer":  func(s *Server) http.HandlerFunc { return s.queueWrite(s.agentAnswerWeb) },
+	"POST /v1/tickets/answer":  func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.ticketAnswer) },
+	"POST /v1/tickets/resume":  func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
+	"POST /v1/tickets/unpark":  func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
+	"POST /v1/queue/add":       func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.queueAdd) },
+	"POST /v1/epics/merge":     func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.epicMerge) },
+	"POST /v1/agents/answer":   func(s *Server) http.HandlerFunc { return s.queueWrite(s.agentAnswerWeb) },
+	"POST /v1/sessions/stop":   func(s *Server) http.HandlerFunc { return s.sessionWriteDesignWeb(s.stopSession) },
+	"POST /v1/sessions/resume": func(s *Server) http.HandlerFunc { return s.sessionWriteDesignWeb(s.resumeSession) },
 }
 
 // checkWriteRequest returns why a non-GET request is refused, or "". It is the
