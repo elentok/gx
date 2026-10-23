@@ -1,6 +1,6 @@
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { EpicList, EpicListRow, SessionInfo } from "../generated/server";
 import { appRoutes } from "../routes";
@@ -67,6 +67,7 @@ test("rows land in their four sections", async () => {
   await screen.findByText("Ready to queue");
   for (const [title, name] of [["In progress", "a"], ["Not started", "b"], ["Ready to queue", "c"], ["Recently finished", "d"]]) {
     expect(screen.getByText(title)).toBeTruthy();
+    if (title === "Not started") fireEvent.click(screen.getByRole("button", { name: /Not started/ }));
     expect(screen.getAllByRole("link", { name: new RegExp(`^${name}`) })).toHaveLength(1);
   }
   expect(screen.queryByRole("link", { name: /^old/ })).toBeNull();
@@ -136,6 +137,7 @@ test("the bare route shows the picker and an empty state when nothing is in prog
   const router = render([map("ns", "not-started")], []);
   expect(await screen.findByText("No Design in progress.")).toBeTruthy();
   expect(router.state.location.pathname).toBe("/designs");
+  fireEvent.click(screen.getByRole("button", { name: /Not started/ }));
   expect(screen.getByRole("link", { name: /^ns/ })).toBeTruthy();
 });
 
@@ -145,8 +147,63 @@ test("a Ready to queue row opens the implementation epic, any other row its Desi
     [],
     "/d/gx:ip",
   );
+  fireEvent.click(await screen.findByRole("button", { name: /Not started/ }));
   const href = async (n: string) => (await screen.findByRole("link", { name: new RegExp(`^${n}`) })).getAttribute("href");
   expect(await href("rdy")).toBe("#/e/gx:rdy-impl");
   expect(await href("ip")).toBe("#/d/gx:ip");
   expect(await href("ns")).toBe("#/d/gx:ns");
+});
+
+const filterBox = async () => (await screen.findByLabelText("Filter Designs")) as HTMLInputElement;
+
+test("Not started is collapsed with its count, opens on a filter match and closes when cleared", async () => {
+  render([map("ip", "in-progress"), map("alpha", "not-started"), map("beta", "not-started"), map("gamma", "not-started")], [], "/d/gx:ip");
+  await screen.findByText(/^Not started/);
+  expect(screen.getByRole("button", { name: /Not started.*3/ })).toBeTruthy();
+  expect(screen.queryByRole("link", { name: /^alpha/ })).toBeNull();
+
+  fireEvent.change(await filterBox(), { target: { value: "alp" } });
+  expect(screen.getByRole("button", { name: /Not started.*1/ })).toBeTruthy();
+  expect(screen.getByRole("link", { name: /^alpha/ })).toBeTruthy();
+  expect(screen.queryByRole("link", { name: /^beta/ })).toBeNull();
+  expect(screen.queryByRole("link", { name: /^ip/ })).toBeNull();
+
+  fireEvent.change(await filterBox(), { target: { value: "" } });
+  expect(screen.queryByRole("link", { name: /^alpha/ })).toBeNull();
+  expect(screen.getByRole("button", { name: /Not started.*3/ })).toBeTruthy();
+});
+
+test("the filter matches the epic slug", async () => {
+  render([map("Pretty title", "in-progress", { address: "gx:the-slug" }), map("other", "in-progress")], [], "/d/gx:other");
+  fireEvent.change(await filterBox(), { target: { value: "the-slug" } });
+  expect(screen.getByRole("link", { name: /^Pretty title/ })).toBeTruthy();
+  expect(screen.queryByRole("link", { name: /^other/ })).toBeNull();
+});
+
+test("rows show their project only with several projects", async () => {
+  render([map("a", "in-progress"), map("b", "in-progress", { project: "other", address: "other:b" })], [], "/d/gx:a");
+  expect(within(await screen.findByRole("link", { name: /^a/ })).getByText("gx")).toBeTruthy();
+  expect(within(screen.getByRole("link", { name: /^b/ })).getByText("other")).toBeTruthy();
+  cleanup();
+  render([map("a", "in-progress")], [], "/d/gx:a");
+  expect(within(await screen.findByRole("link", { name: /^a/ })).queryByText("gx")).toBeNull();
+});
+
+test("on a phone the picker is a dropdown with a count of other Designs that need you", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    render(
+      [map("cur", "in-progress"), map("ask", "in-progress"), map("bad", "in-progress"), map("calm", "in-progress")],
+      [session("ask", { actionable: { reason: "Grilling: waiting for your answers" } }), session("bad", { failure: { kind: "crashed", label: "Crashed" } })],
+      "/d/gx:cur",
+    );
+    const button = await screen.findByRole("button", { name: /^cur/ });
+    expect(screen.getByText("? 2 more")).toBeTruthy();
+    expect(screen.queryByLabelText("Filter Designs")).toBeNull();
+    fireEvent.click(button);
+    expect(screen.getByLabelText("Filter Designs")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /^calm/ })).toBeTruthy();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

@@ -1,16 +1,19 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Input, Text } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 import { Navigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
-import type { EpicListRow } from "../generated/server";
 import { designHref } from "../hrefs";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { DetailPage } from "../page/DetailPage";
+import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Sidebar } from "../ui/sidebar/Sidebar";
 import { SidebarItem } from "../ui/sidebar/SidebarItem";
 import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
-import { IN_PROGRESS, pickerGroups, rowHref, type PickerRow } from "./view";
+import { filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
+
+const NOT_STARTED = "not-started";
 
 function Marks({ section, row }: { section: string; row: PickerRow }) {
   if (section === "ready-to-queue") return <Mark color="tone.done.fg" label="Ready to queue" glyph="▶" />;
@@ -39,24 +42,85 @@ function LiveMark() {
   );
 }
 
-function Picker({ list, current }: { list: EpicListRow[]; current?: string }) {
-  const sessions = useConnectionState(useConnectionContext()).snapshot?.sessions ?? [];
+// Chakra's `lg` breakpoint; below it the picker is a dropdown. Without matchMedia (tests) it is wide.
+const WIDE = "(min-width: 62em)";
+const useWide = () => {
+  const mq = () => (typeof window.matchMedia === "function" ? window.matchMedia(WIDE) : undefined);
+  const [wide, setWide] = useState(() => mq()?.matches ?? true);
+  useEffect(() => {
+    const m = mq();
+    if (!m) return;
+    const on = () => setWide(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return wide;
+};
+
+function Picker({ groups, projects, current }: { groups: PickerGroup[]; projects: number; current?: string }) {
+  const [query, setQuery] = useState("");
+  const filtering = query.trim() !== "";
   return (
     <Sidebar title="Designs">
-      {pickerGroups(list, sessions).map((g) => (
-        <SidebarSection key={g.key} title={g.title} count={g.rows.length}>
+      <Input
+        type="search"
+        aria-label="Filter Designs"
+        placeholder="Filter"
+        size="sm"
+        mb="3"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      {filterGroups(groups, query).map((g) => (
+        // The key remounts the section so a filter match opens Not started and clearing it collapses it again.
+        <SidebarSection
+          key={`${g.key}-${filtering}`}
+          title={g.title}
+          count={g.rows.length}
+          defaultCollapsed={g.key === NOT_STARTED && !filtering}
+        >
           {g.rows.map((r) => (
             <SidebarItem
               key={r.row.address}
               label={r.row.name}
               href={rowHref(g.key, r.row)}
               current={r.row.address === current}
-              marks={<Marks section={g.key} row={r} />}
+              marks={
+                <>
+                  {projects > 1 && (
+                    <Text as="span" fontSize="xs" color="text.dim">
+                      {r.row.project}
+                    </Text>
+                  )}
+                  <Marks section={g.key} row={r} />
+                </>
+              }
             />
           ))}
         </SidebarSection>
       ))}
     </Sidebar>
+  );
+}
+
+function MobilePicker({ groups, projects, current }: { groups: PickerGroup[]; projects: number; current?: string }) {
+  const [open, setOpen] = useState(false);
+  const name = groups.flatMap((g) => g.rows).find((r) => r.row.address === current)?.row.name ?? "Designs";
+  const more = needsYouCount(groups, current);
+  return (
+    <Box>
+      <Box display="flex" alignItems="center" gap="3">
+        <Button size="sm" variant="outline" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          {name} {open ? "▴" : "▾"}
+        </Button>
+        {more > 0 && (
+          <Text as="span" fontSize="sm" color="tone.waiting.fg">
+            ? {more} more
+          </Text>
+        )}
+      </Box>
+      {open && <Picker groups={groups} projects={projects} current={current} />}
+    </Box>
   );
 }
 
@@ -66,7 +130,11 @@ export function DesignPage({ address, fetchList }: { address?: string; fetchList
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   const { list, failed } = useEpicList(fetchList, conn);
 
-  const first = list && !address ? pickerGroups(list.epics, sessions).find((g) => g.key === IN_PROGRESS)?.rows[0] : undefined;
+  const wide = useWide();
+  const groups = list ? pickerGroups(list.epics, sessions) : [];
+  const projects = new Set(list?.epics.filter((e) => e.kind === "map").map((e) => e.project)).size;
+
+  const first = list && !address ? groups.find((g) => g.key === IN_PROGRESS)?.rows[0] : undefined;
   if (first) return <Navigate to={designHref(first.row.address).slice(1)} replace />;
 
   return (
@@ -77,7 +145,11 @@ export function DesignPage({ address, fetchList }: { address?: string; fetchList
         <Spinner label="Loading Designs" />
       ) : (
         <Box display="grid" gridTemplateColumns={{ base: "1fr", lg: "260px 1fr 300px" }} gap="4" minH="60vh">
-          <Picker list={list.epics} current={address} />
+          {wide ? (
+            <Picker groups={groups} projects={projects} current={address} />
+          ) : (
+            <MobilePicker groups={groups} projects={projects} current={address} />
+          )}
           <Box aria-label="Chat" role="region">
             {!address && <EmptyState title="No Design in progress.">Run /gx-design to start one.</EmptyState>}
           </Box>

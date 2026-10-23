@@ -64,6 +64,19 @@ export function pickerGroups(epics: EpicListRow[], sessions: SessionInfo[]): Pic
   })).filter((g) => g.rows.length > 0);
 }
 
+/** Keeps the rows whose slug or name contains the query, and drops sections left empty. */
+export function filterGroups(groups: PickerGroup[], query: string): PickerGroup[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return groups;
+  return groups
+    .map((g) => ({ ...g, rows: g.rows.filter((r) => `${r.row.address} ${r.row.name}`.toLowerCase().includes(q)) }))
+    .filter((g) => g.rows.length > 0);
+}
+
+/** A Design needs you when it has a waiting question or a failure. */
+export const needsYouCount = (groups: PickerGroup[], current?: string) =>
+  groups.reduce((n, g) => n + g.rows.filter((r) => needsYou(r) && r.row.address !== current).length, 0);
+
 /** A Ready to queue row opens its implementation epic; every other row opens its Design. */
 export const rowHref = (section: PickerSection, r: EpicListRow) =>
   section === READY_TO_QUEUE && r.impl_address ? epicHref(r.impl_address) : designHref(r.address);
