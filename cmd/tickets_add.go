@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -256,6 +257,12 @@ func createTicket(epicPath, parent, slug string, body *string, fm addFrontmatter
 		parentID := schema.TicketID(parent)
 		t.Parent = &parentID
 	}
+
+	address, ok := tickets.AddressOfPath(path, id)
+	if !ok {
+		return "", nil, fmt.Errorf("no address for new ticket %s", path)
+	}
+	t.StampCreated(time.Now().UTC(), address.String())
 
 	text := fmt.Sprintf(
 		"\n# %s\n\n## What to build\n\n\n## Test seams\n\n\n## Acceptance criteria\n\n- [ ] \n",

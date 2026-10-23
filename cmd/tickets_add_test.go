@@ -128,6 +128,31 @@ func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {
 	if ticket.Status != schema.StatusDraft {
 		t.Errorf("stub ticket status = %q, want %q", ticket.Status, schema.StatusDraft)
 	}
+	if want := strings.TrimSpace(stdout.String()); ticket.OriginalAddress != want || ticket.CreatedAt.IsZero() {
+		t.Errorf("stub created_at/original_address = %v/%q, want set/%q", ticket.CreatedAt, ticket.OriginalAddress, want)
+	}
+}
+
+func TestRunTicketsAddBody_StampsCreatedAndOriginalAddress(t *testing.T) {
+	t.Parallel()
+	epicPath := filepath.Join(t.TempDir(), "widget-epic")
+	testutil.Mkdir(t, filepath.Join(epicPath, "issues"))
+	testutil.EnsureEpicTicketMD(t, epicPath)
+
+	for _, parent := range []string{"", "01"} {
+		var stdout bytes.Buffer
+		if err := runTicketsAddBody(epicPath, parent, "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
+			t.Fatalf("runTicketsAddBody(parent %q): %v", parent, err)
+		}
+		printed := strings.TrimSpace(stdout.String())
+		tk, err := schema.ParseTicket(addedPath(t, epicPath, printed))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tk.OriginalAddress != printed || tk.CreatedAt.IsZero() {
+			t.Errorf("parent %q: created_at/original_address = %v/%q, want set/%q", parent, tk.CreatedAt, tk.OriginalAddress, printed)
+		}
+	}
 }
 
 func TestRunTicketsAdd_EmptySlugFails(t *testing.T) {
@@ -399,14 +424,14 @@ func TestExecute_TicketsAdd_FieldFlagErrors(t *testing.T) {
 	repo, project := setupShowProject(t)
 
 	for name, args := range map[string][]string{
-		"conflicts with body":   {"--body", "---\ntype: research\n---\n\n# X\n", "--type", "research"},
-		"bool conflict":         {"--body", "---\ncommitless: false\n---\n\n# X\n", "--commitless", "true"},
-		"bad type":              {"--body", "# X\n", "--type", "nope"},
-		"bad window":            {"--body", "# X\n", "--expected-context-window", "lots"},
-		"bad commitless":        {"--body", "# X\n", "--commitless", "maybe"},
-		"bad category":          {"--body", "# X\n", "--category", "nope"},
-		"dangling blocked_by":   {"--body", "# X\n", "--blocked-by", "07"},
-		"bad flag on a stub":    {"--type", "nope"},
+		"conflicts with body": {"--body", "---\ntype: research\n---\n\n# X\n", "--type", "research"},
+		"bool conflict":       {"--body", "---\ncommitless: false\n---\n\n# X\n", "--commitless", "true"},
+		"bad type":            {"--body", "# X\n", "--type", "nope"},
+		"bad window":          {"--body", "# X\n", "--expected-context-window", "lots"},
+		"bad commitless":      {"--body", "# X\n", "--commitless", "maybe"},
+		"bad category":        {"--body", "# X\n", "--category", "nope"},
+		"dangling blocked_by": {"--body", "# X\n", "--blocked-by", "07"},
+		"bad flag on a stub":  {"--type", "nope"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := runIn(t, repo, append([]string{"tickets", "add", "mine:inbox", "--slug", "x"}, args...)...); err == nil {
