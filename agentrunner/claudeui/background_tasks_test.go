@@ -53,6 +53,54 @@ func TestBackgroundTasks(t *testing.T) {
 	}
 }
 
+func writeTranscript(t *testing.T, home, cwd, id, line string) string {
+	t.Helper()
+	path := transcript.PathIn(home, cwd, id)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(line+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// The second probe must reuse the first probe's path: a duplicate transcript
+// makes a fresh search ambiguous (and so false).
+func TestBackgroundTasks_CachesTranscriptPath(t *testing.T) {
+	now := time.Now()
+	home := t.TempDir()
+	writeTranscript(t, home, "/work/repo", "sess-1", startMarker("task-1", now))
+	probe := claudeui.BackgroundTasks(home, func() time.Time { return now })
+	s := agentrunner.Session{Label: "a", SessionID: "sess-1"}
+	if !probe(s) {
+		t.Fatal("first probe = false, want true")
+	}
+	writeTranscript(t, home, "/work/other", "sess-1", startMarker("task-1", now))
+	if !probe(s) {
+		t.Fatal("second probe = false, want the cached path to be reused")
+	}
+}
+
+// A moved transcript drops the cached path and is found again.
+func TestBackgroundTasks_RefindsMovedTranscript(t *testing.T) {
+	now := time.Now()
+	home := t.TempDir()
+	old := writeTranscript(t, home, "/work/repo", "sess-1", startMarker("task-1", now))
+	probe := claudeui.BackgroundTasks(home, func() time.Time { return now })
+	s := agentrunner.Session{Label: "a", SessionID: "sess-1"}
+	if !probe(s) {
+		t.Fatal("first probe = false, want true")
+	}
+	if err := os.Remove(old); err != nil {
+		t.Fatal(err)
+	}
+	writeTranscript(t, home, "/work/moved", "sess-1", startMarker("task-1", now))
+	if !probe(s) {
+		t.Fatal("probe after move = false, want true")
+	}
+}
+
 // A session with no agent session id yet (or a Codex one, which has no
 // Claude transcript) must not match some other session's transcript.
 func TestBackgroundTasks_NoSessionID(t *testing.T) {
