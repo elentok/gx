@@ -572,6 +572,7 @@ func writeOneOffTicket(projectDir, slug string, tk schema.Ticket, prompt string)
 	}
 	id = fmt.Sprintf("%02d", next)
 	tk.ID = schema.TicketID(id)
+	tk.StampCreated(time.Now(), tickets.Address{Project: tickets.ProjectName(projectDir), Epic: OneOffsEpic, ID: id}.String())
 	out, err := schema.MarshalTicket(tk, "\n"+prompt+"\n")
 	if err != nil {
 		return "", "", err

@@ -61,6 +61,9 @@ func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 	if !strings.Contains(string(raw), "type: prompt") || !strings.Contains(string(raw), "fix the flaky test please") || !strings.Contains(string(raw), "agent: claude") {
 		t.Fatalf("ticket = %s", raw)
 	}
+	if !strings.Contains(string(raw), "created_at:") || !strings.Contains(string(raw), "original_address: "+res.Address+"\n") {
+		t.Fatalf("one-off ticket lacks created_at or original_address %s:\n%s", res.Address, raw)
+	}
 	if epicMD, err := os.ReadFile(filepath.Join(epicDir, "ticket.md")); err != nil || !strings.Contains(string(epicMD), "status: draft") {
 		t.Fatalf("epic ticket.md = %q, %v; want status: draft", epicMD, err)
 	}

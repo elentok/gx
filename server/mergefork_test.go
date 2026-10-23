@@ -142,6 +142,10 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 		t.Errorf("merge ticket is not a done top-level merge ticket:\n%s", body)
 	}
 	f.assertStamps(t, true)
+	wantAddr := "original_address: proj:" + schedEpic + "/" + strings.TrimSuffix(filepath.Base(files[0]), "-merge.md")
+	if !strings.Contains(body, "created_at:") || !strings.Contains(body, wantAddr) {
+		t.Errorf("merge ticket lacks created_at or %q:\n%s", wantAddr, body)
+	}
 	if got := f.git(t, "rev-parse", "main"); got != f.git(t, "rev-parse", schedEpic) {
 		t.Errorf("main at %s, want the rebased feature branch tip", got)
 	}

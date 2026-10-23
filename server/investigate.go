@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/recovery"
@@ -120,6 +121,7 @@ func writeNewTicket(epicPath, parent, slug string, build func(id string) (schema
 		return "", "", fmt.Errorf("allocate %s id: %w", slug, err)
 	}
 	tk, body := build(id)
+	tk.StampCreated(time.Now(), tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}.String())
 	out, err := schema.MarshalTicket(tk, body)
 	if err != nil {
 		return "", "", fmt.Errorf("marshal %s ticket %s: %w", slug, id, err)

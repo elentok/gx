@@ -72,6 +72,9 @@ func TestFileFollowUp_CatalogEntryFilesADraftResearchTicketAndCreatesTheEpicDraf
 			if _, err := os.Stat(epicPath); err != nil {
 				t.Error(err)
 			}
+			if tk.CreatedAt.IsZero() || tk.OriginalAddress != "proj:follow-ups/"+tk.Identifier {
+				t.Errorf("created_at = %v, original_address = %q, want a stamp and proj:follow-ups/%s", tk.CreatedAt, tk.OriginalAddress, tk.Identifier)
+			}
 		})
 	}
 }
