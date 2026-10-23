@@ -76,6 +76,10 @@ Then, while working:
   ticket while one is open.
 - **One check per Bash call.** A chained call (`rg ...; go test; gofmt -l`) can return the output
   of one segment only. Run each check in its own call.
+- **When a test fails, decide why before you fix anything.** If it caught a real bug, fix the
+  code. If it is flaky, or checks behaviour the ticket changed on purpose, fix the test: a flaky
+  test waits for the event (poll with a timeout), never a fixed sleep. Never weaken, skip or delete
+  an assertion just to get green.
 - **Never report a result you did not see.** If a check's output is missing or cut off, re-run it.
   Do not claim "no remaining imports" or "gofmt is clean" from silence.
 - **Read files with the `Read` tool, not a shell command.** If a read ends in "(exporter

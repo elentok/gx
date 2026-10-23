@@ -174,6 +174,18 @@ It returns one verdict per test, with the rerun results and the diff evidence.
   branch and, in ticket mode, `<addr>`; pass `unattended` and `category: bug`.
   Note the address it returns for each.
 
+### Fixing a failing test
+
+When a person's answer tells you to fix failing tests, first decide why each one fails:
+
+- **It caught a real bug** in the branch — fix the code, not the test.
+- **It is flaky, or checks behaviour the branch changed on purpose** — fix the test. A flaky test
+  waits for the event (poll with a timeout), never a fixed sleep.
+
+Never weaken, skip or delete an assertion just to get green. If you can't tell which case it is,
+stop and say so. Commit on the rebased branch as `<branch>: Fix <test> after rebase onto <target>`,
+then rerun **all** checks from the start.
+
 ### All checks pass
 
 Continue to Step 5.
