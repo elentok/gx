@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -99,6 +100,11 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		var timed []tickets.MigrationChange
 		timed, err = tickets.BackfillEpicTimes(scratchRoot)
 		changes = append(changes, timed...)
+	}
+	if err == nil {
+		var totals []tickets.MigrationChange
+		totals, err = tickets.BackfillEpicTotals(scratchRoot, epicTrailerLinesUnder(scratchRoot))
+		changes = mergeChanges(changes, totals)
 	}
 	if err == nil {
 		var renamed []tickets.MigrationChange
@@ -225,6 +231,34 @@ func epicLandedUnder(root string) func(tickets.Epic) (bool, error) {
 			target = trunk
 		}
 		return git.IsAncestor(repoRoot, e.Name, target)
+	}
+}
+
+// epicTrailerLinesUnder counts an epic's lines from the Ralph-Loop-Ticket
+// trailer commits in the tracker root's repo. A merged epic's branch may be
+// gone, so it falls back to the epic's target, where the commits landed. The
+// repo is resolved on first use, like epicLandedUnder's. A root with no repo
+// leaves lines unstamped rather than failing the migration.
+func epicTrailerLinesUnder(root string) func(tickets.Epic) (int, int, bool, error) {
+	var repoRoot, trunk string
+	var resolved bool
+	return func(e tickets.Epic) (int, int, bool, error) {
+		if !resolved {
+			resolved = true
+			repoRoot, trunk, _ = trackerRepo(root)
+		}
+		if repoRoot == "" {
+			return 0, 0, false, nil
+		}
+		ref := "refs/heads/" + e.Name
+		if !git.RefExists(repoRoot, ref) {
+			ref = e.Base
+			if ref == "" {
+				ref = trunk
+			}
+		}
+		added, removed, err := ralphloop.EpicTrailerLines(repoRoot, ref, e.Name)
+		return added, removed, err == nil, err
 	}
 }
 
