@@ -1,16 +1,17 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
-import { DESIGNS_HREF } from "../../hrefs";
+import { DESIGNS_HREF, STATS_HREF } from "../../hrefs";
 import type { QueueMode } from "../../snapshot";
 import { Chip } from "../chip/Chip";
 import { LiveDot } from "../live-dot/LiveDot";
 import type { Tone } from "../tone";
 
-export type TopBarTab = "queue" | "epics" | "designs";
+export type TopBarTab = "queue" | "epics" | "designs" | "stats";
 
 const TABS: { key: TopBarTab; label: string; href: string }[] = [
   { key: "queue", label: "Queue", href: "#/q" },
   { key: "epics", label: "Epics", href: "#/epics" },
   { key: "designs", label: "Designs", href: DESIGNS_HREF },
+  { key: "stats", label: "Stats", href: STATS_HREF },
 ];
 
 interface Props {

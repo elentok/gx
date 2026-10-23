@@ -11,6 +11,13 @@ describe("TopBar", () => {
     expect(getByRole("link", { name: "Queue" }).hasAttribute("aria-current")).toBe(false);
   });
 
+  it("orders the tabs Queue, Epics, Designs, Stats and marks Stats", () => {
+    const { getAllByRole, getByRole } = renderThemed(<TopBar active="stats" connected />);
+    expect(getAllByRole("link").map((l) => l.textContent)).toEqual(["Queue", "Epics", "Designs", "Stats"]);
+    expect(getByRole("link", { name: "Stats" }).getAttribute("href")).toBe("#/stats");
+    expect(getByRole("link", { name: "Stats" }).getAttribute("aria-current")).toBe("page");
+  });
+
   it("marks no tab without an active one", () => {
     const { container } = renderThemed(<TopBar connected />);
     expect(container.querySelector("[aria-current]")).toBeNull();

@@ -11,6 +11,8 @@ import { EpicPage } from "./epic/EpicPage";
 import { EpicsPage } from "./epics/EpicsPage";
 import type { FetchEpicList } from "./epics/list";
 import { QueueScreen } from "./queue/QueueScreen";
+import type { FetchStats } from "./stats/stats";
+import { StatsPage } from "./stats/StatsPage";
 import type { FetchDetail } from "./ticket/detail";
 import { TicketPage } from "./ticket/TicketPage";
 
@@ -55,6 +57,7 @@ export interface RouteFetchers {
   ticket?: FetchDetail;
   epic?: FetchEpicDetail;
   epicList?: FetchEpicList;
+  stats?: FetchStats;
   chat?: FetchChat;
   prompt?: PostPrompt;
   focus?: PostFocus;
@@ -65,6 +68,7 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
     { path: "/q", element: <QueueRoute /> },
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} /> },
     { path: "/designs", element: <DesignRoute fetchers={fetchers} /> },
+    { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} /> },
     { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} openDesign={fetchers.openDesign} /> },

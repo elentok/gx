@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Connection } from "../connection";
 import type { EpicList } from "../generated/server";
 import { readPageCache, writePageCache } from "../pageCache";
+import { useRefetchOnEvents } from "../refetch";
 
 export type { EpicList };
 
@@ -19,8 +20,6 @@ export interface EpicListState {
   failed: boolean;
   retry: () => void;
 }
-
-export const REFETCH_DEBOUNCE_MS = 500;
 
 export function useEpicList(fetcher: FetchEpicList = fetchEpicList, conn?: Connection): EpicListState {
   const [list, setList] = useState<EpicList | null>(() => readPageCache<EpicList>("epics"));
@@ -45,27 +44,7 @@ export function useEpicList(fetcher: FetchEpicList = fetchEpicList, conn?: Conne
   }, [fetcher, attempt]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-
-  useEffect(() => {
-    if (!conn) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const off = conn.onEvent(() => {
-      clearTimeout(timer);
-      timer = setTimeout(retry, REFETCH_DEBOUNCE_MS);
-    });
-    // A reconnect takes a new snapshot without notifying event listeners, so watch `connected` itself.
-    let wasConnected = conn.getState().connected;
-    const offState = conn.subscribe(() => {
-      const { connected } = conn.getState();
-      if (connected && !wasConnected) retry();
-      wasConnected = connected;
-    });
-    return () => {
-      off();
-      offState();
-      clearTimeout(timer);
-    };
-  }, [conn, retry]);
+  useRefetchOnEvents(conn, retry);
 
   return { list, failed: failed && list === null, retry };
 }

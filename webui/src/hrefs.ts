@@ -6,3 +6,5 @@ export const ticketHref = (address: string) => `#/t/${address}`;
 export const designHref = (address: string) => `#/d/${address}`;
 
 export const DESIGNS_HREF = "#/designs";
+
+export const STATS_HREF = "#/stats";
