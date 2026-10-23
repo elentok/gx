@@ -38,6 +38,7 @@ export function EpicCard({ epic, onMerged }: { epic: EpicView; onMerged: () => v
           key={t.address}
           id={t.id}
           title={t.title}
+          address={t.address}
           reason={t.detail}
           tone={t.tone}
           unclipped={t.href !== undefined}
