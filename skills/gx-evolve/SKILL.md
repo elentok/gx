@@ -45,7 +45,13 @@ Send **one message** with one `Agent` call per picked ticket (`general-purpose`,
 foreground). Each gets the ticket id, its flag row, and the digest paths for its sessions. Brief:
 "Read these digests. Report what in the tooling or process cost time, tokens or correctness —
 prompts, skills, agent docs, gx/ralph-loop behaviour — each with a quoted line or ticket id as
-evidence. Ignore project-code quality. Under 500 words."
+evidence. Also list loud or hand-built shell commands: one that printed far more output than the
+agent used, or a long pipeline built by hand again and again (`| rg`, `| tail`, `2>&1 | ...`).
+Quote the command and say what the agent was looking for. Ignore project-code quality. Under 500
+words."
+
+A loud or hand-built command seen in more than one session is a finding: its suggested fix is a
+`gx brief` helper that prints only what the agent was looking for (category `idea`).
 
 ## 4. Join by symptom
 

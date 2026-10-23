@@ -73,9 +73,8 @@ Then, while working:
   of one segment only. Run each check in its own call.
 - **Never report a result you did not see.** If a check's output is missing or cut off, re-run it.
   Do not claim "no remaining imports" or "gofmt is clean" from silence.
-- **On a test failure, re-run it with `rtk proxy go test ...`.** `rtk` truncates multi-line
-  assertion text and server logs. If a shell read of a file ends in "(exporter truncated)"
-  or has lost its indentation, use the `Read` tool instead.
+- **Read files with the `Read` tool, not a shell command.** If a read ends in "(exporter
+  truncated)" or has lost its indentation, read it again with `Read`.
 
 ## Forking when the ticket outgrows budget
 

@@ -14,7 +14,7 @@ This skill is repo-local. It is not in the bundle, so never copy it under `skill
 2. Run `scripts/sync-vendored-skills.sh --merge`. It prints, per skill, the upstream commits, the upstream diff, and for `merge` skills the clean and conflicted files. It edits gx's copy under `skills/` and does not move the pin.
 3. Review every upstream hunk, clean ones too. Resolve every conflict marker in `skills/`.
 4. Handle the cases below.
-5. Run the bundle tests: `rtk go test ./skills -timeout 60s`. They fail on a leftover conflict marker and on a call to a skill outside the bundle.
+5. Run the bundle tests: `go test ./skills -timeout 60s`. They fail on a leftover conflict marker and on a call to a skill outside the bundle.
 6. After the tests pass, set each synced skill's pin in `scripts/vendored-skills.manifest` to the newest commit in that skill's report (the first line of its commit list). Do not move the pin of a skill blocked by a license refusal.
 7. Commit the sync. The message lists every skipped upstream change (a change not ported, or a merge hunk you dropped) with a one-line reason. A skipped change still moves the pin.
 

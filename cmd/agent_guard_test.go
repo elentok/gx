@@ -15,7 +15,7 @@ func TestGuardBashCommand(t *testing.T) {
 		blocked bool
 	}{
 		{"sed -i", `sed -i 's/a/b/' queue.go`, true},
-		{"rtk sed -i", `rtk sed -i 's/a/b/' queue.go`, true},
+		{"sed -i", `sed -i 's/a/b/' queue.go`, true},
 		{"sed -i -E", `sed -i -E 's/a/b/' x_test.go`, true},
 		{"sed -Ei", `sed -Ei 's/a/b/' x_test.go`, true},
 		{"sed --in-place", `sed --in-place 's/a/b/' x.go`, true},
@@ -26,9 +26,9 @@ func TestGuardBashCommand(t *testing.T) {
 		{"sed pipe", `echo a | sed 's/a/b/'`, false},
 		{"plain redirect", `echo hi > out.txt`, false},
 		{"heredoc to stdin", "gx tickets section 1/2 Notes - <<'EOF'\nbody\nEOF", false},
-		{"heredoc with stderr merge", "rtk git commit -F - <<'EOF' 2>&1\nmsg\nEOF", false},
-		{"heredoc with dev null", "rtk git commit -F - <<'EOF' >/dev/null\nmsg\nEOF", false},
-		{"git status", `rtk git status`, false},
+		{"heredoc with stderr merge", "git commit -F - <<'EOF' 2>&1\nmsg\nEOF", false},
+		{"heredoc with dev null", "git commit -F - <<'EOF' >/dev/null\nmsg\nEOF", false},
+		{"git status", `git status`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -64,7 +64,7 @@ func TestAgentGuardBash_ExitCodes(t *testing.T) {
 	}
 
 	for name, in := range map[string]string{
-		"allowed command": `{"tool_input":{"command":"rtk git status"}}`,
+		"allowed command": `{"tool_input":{"command":"git status"}}`,
 		"unreadable json": `not json`,
 	} {
 		if _, err := run(in); err != nil {

@@ -4,9 +4,7 @@ description: "Use when you need to resolve an in-progress git merge/rebase confl
 ---
 
 1. **See the current state** of the merge/rebase. Check git history, and the conflicting files.
-   List the conflicts with `rtk proxy git diff --name-only --diff-filter=U` and
-   `rtk proxy git status --porcelain`. Plain `rtk git diff` and `rtk git status` hide conflicts
-   (they print "0 files changed" or nothing) and cut hunks short, so never trust them mid-conflict.
+   List the conflicts with `git diff --name-only --diff-filter=U` and `git status --porcelain`.
 
 2. **Find the primary sources** for each conflict. Understand deeply why each change was made, and
    what the original intent was. Read the commit messages, check the PRs, check original tickets
@@ -18,8 +16,8 @@ description: "Use when you need to resolve an in-progress git merge/rebase confl
    splice (python/sed heredocs, `cat >`).
 
 4. Discover the project's **automated checks** and run them — typically typecheck, then tests, then
-   format. Fix anything the merge broke. Run format checks through `rtk proxy`, or only on the files
-   the branch changed (`rtk proxy git diff --name-only <target>...HEAD`). A repo-wide `gofmt -l`
+   format. Fix anything the merge broke. Run format checks only on the files the branch changed
+   (`git diff --name-only <target>...HEAD`). A repo-wide `gofmt -l`
    lists files the branch never touched; those are out of scope.
 
 5. **Finish the merge/rebase.** Stage everything and commit. If rebasing, continue the rebase
