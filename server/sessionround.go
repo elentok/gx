@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -102,7 +103,7 @@ func roundSegments(text string) []string {
 func roundCards(text string) []SessionRoundCard {
 	var cards []SessionRoundCard
 	for i, seg := range roundSegments(text) {
-		cards = append(cards, roundCard(i+1, seg))
+		cards = append(cards, parseRoundSegment(i+1, seg).Card)
 	}
 	return cards
 }
@@ -119,28 +120,48 @@ func untilRule(seg string) string {
 	return strings.Join(kept, "\n")
 }
 
-// roundCard builds the card of one segment (the text after the marker).
-func roundCard(seq int, seg string) SessionRoundCard {
+// parsedRound is one parsed round segment. Err is set only when the segment
+// holds gx-question blocks that cannot be read (Raw is their text); a segment
+// with no block is plain text and has no Err.
+type parsedRound struct {
+	Card SessionRoundCard
+	Err  error
+	Raw  string
+}
+
+// parseRoundSegment parses one segment (the text after the marker). It is the
+// single place that decides whether a block is readable, so the card shown and
+// the bad block filed cannot disagree.
+func parseRoundSegment(seq int, seg string) parsedRound {
 	body, blocks := splitFences(seg)
 	header, _, _ := strings.Cut(body, "\n")
 	card := SessionRoundCard{Number: seq, Title: roundTitle(header), Body: body, Kind: tickets.QuestionText}
 	if m := roundNumberRE.FindStringSubmatch(header); m != nil {
 		card.Number, _ = strconv.Atoi(m[1])
 	}
-	if len(blocks) != 1 {
-		card.Note = roundBlockNote
-		return card
+	res := parsedRound{Card: card}
+	if len(blocks) == 0 {
+		res.Card.Note = roundBlockNote
+		return res
+	}
+	res.Raw = strings.TrimSpace(strings.Join(blocks, "\n"))
+	if len(blocks) > 1 {
+		res.Card.Note = roundBlockNote
+		res.Err = fmt.Errorf("%d gx-question blocks, want one", len(blocks))
+		return res
 	}
 	q, err := tickets.ParseQuestionBlock(blocks[0])
 	if err != nil {
-		card.Note = roundBlockNote
-		return card
+		res.Card.Note = roundBlockNote
+		res.Err = err
+		return res
 	}
-	card.Kind, card.Yes, card.No, card.Recommended = q.Kind, q.Yes, q.No, q.Recommended
+	c := &res.Card
+	c.Kind, c.Yes, c.No, c.Recommended = q.Kind, q.Yes, q.No, q.Recommended
 	for _, o := range q.Options {
-		card.Options = append(card.Options, SessionRoundOption{ID: o.ID, Label: o.Label, Consequence: o.Consequence})
+		c.Options = append(c.Options, SessionRoundOption{ID: o.ID, Label: o.Label, Consequence: o.Consequence})
 	}
-	return card
+	return res
 }
 
 // roundTitle reads a header leniently: the first bold span after the question

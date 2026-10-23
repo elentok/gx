@@ -7,11 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -34,22 +32,8 @@ type badRoundBlock struct {
 func badRoundBlocks(text string) []badRoundBlock {
 	var bad []badRoundBlock
 	for i, seg := range roundSegments(text) {
-		body, blocks := splitFences(seg)
-		if len(blocks) == 0 {
-			continue
-		}
-		header, _, _ := strings.Cut(body, "\n")
-		n := i + 1
-		if m := roundNumberRE.FindStringSubmatch(header); m != nil {
-			n, _ = strconv.Atoi(m[1])
-		}
-		raw := strings.TrimSpace(strings.Join(blocks, "\n"))
-		if len(blocks) > 1 {
-			bad = append(bad, badRoundBlock{n, fmt.Errorf("%d gx-question blocks, want one", len(blocks)), raw})
-			continue
-		}
-		if _, err := tickets.ParseQuestionBlock(blocks[0]); err != nil {
-			bad = append(bad, badRoundBlock{n, err, raw})
+		if p := parseRoundSegment(i+1, seg); p.Err != nil {
+			bad = append(bad, badRoundBlock{p.Card.Number, p.Err, p.Raw})
 		}
 	}
 	return bad
