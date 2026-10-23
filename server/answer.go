@@ -179,7 +179,7 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 					}
 				}
 			}
-			ev := tickets.LogEvent{Type: tickets.EventPauseAnswer, Source: req.Source, Question: open.Seq, Choice: answer, Note: note}
+			ev := tickets.LogEvent{Type: tickets.EventPauseAnswer, Source: req.Source, How: tickets.HowAnswer, Question: open.Seq, Choice: answer, Note: note}
 			if q.Kind == tickets.QuestionText {
 				ev.Choice, ev.Text = "", answer
 			}

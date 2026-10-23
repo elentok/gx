@@ -88,6 +88,7 @@ func (s *Server) SetMergedProbe(f func(repo, ancestor, descendant string) (bool,
 // ResumeAsWeb is the resume the web mux serves: it needs a state token.
 func (s *Server) ResumeAsWeb(req RepairRequest) (RepairResult, error) {
 	req.RequireState = true
+	req.origin = OriginWeb
 	return s.repairResume(req)
 }
 

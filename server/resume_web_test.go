@@ -118,8 +118,31 @@ func TestWebResume_ZeroCommitWithAGoneAgentReopensAndLogsTheAnswer(t *testing.T)
 		t.Errorf("ticket = %+v, %v; want open", tk, err)
 	}
 	got := answerEvents(t, e.ticket)
-	if len(got) != 1 || got[0].Choice != "unpark" || got[0].Source != "web" || got[0].Base != "" {
-		t.Errorf("answers = %+v; want one web pause.answer{choice: resume}", got)
+	if len(got) != 1 || got[0].Choice != "unpark" || got[0].Source != "web" || got[0].How != tickets.HowResume || got[0].Base != "" {
+		t.Errorf("answers = %+v; want one web pause.answer{choice: unpark, how: resume}", got)
+	}
+}
+
+func TestWebResume_SelfReportedWithAGoneAgentEndsTheRoundAsResume(t *testing.T) {
+	h, ticketPath, fake := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
+	sess, ok, err := fake.Find("epic-a-iter-01")
+	if err != nil || !ok {
+		t.Fatalf("Find = %v, %v", ok, err)
+	}
+	if err := fake.Stop(sess); err != nil {
+		t.Fatal(err)
+	}
+
+	resumeResult(t, webResume(t, h, server.RepairRequest{State: state}))
+	evs, err := tickets.ReadLog(ticketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rounds := tickets.Rounds(evs)
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowResume || rounds[0].End.Source != tickets.SourceWeb {
+		t.Errorf("rounds = %+v; want one ended by web resume", rounds)
 	}
 }
 

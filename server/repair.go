@@ -277,7 +277,7 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 		}
 		return repairOK(res)
 	}
-	if res, refused, err := s.resumeSelfReported(epicPath, id); refused || err != nil {
+	if res, refused, err := s.resumeSelfReported(epicPath, id, req.origin); refused || err != nil {
 		return res, err
 	}
 	if zeroCommit {
@@ -351,7 +351,7 @@ func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.ResumeResu
 			return tickets.LogEvent{}, resumeRefused{repairRefusal(err)}
 		}
 		return tickets.LogEvent{
-			Type: tickets.EventPauseAnswer, Source: "web", Question: open.Seq, Choice: "unpark", Base: req.Base,
+			Type: tickets.EventPauseAnswer, Source: req.origin, How: tickets.HowResume, Question: open.Seq, Choice: "unpark", Base: req.Base,
 		}, nil
 	})
 	var refused resumeRefused
@@ -434,7 +434,7 @@ func (s *Server) promptLiveAgent(dir string, addr tickets.Address, text string) 
 // agent's question is closed before the status moves on. Other tickets and kinds
 // pass through untouched. A direct run has no runner to ask and reads every
 // agent as gone, since no server is running to wait on an answer.
-func (s *Server) resumeSelfReported(epicPath, id string) (RepairResult, bool, error) {
+func (s *Server) resumeSelfReported(epicPath, id, origin string) (RepairResult, bool, error) {
 	_, t, err := repair.FindEpicTicket(epicPath, id)
 	if err != nil {
 		return RepairResult{}, false, nil
@@ -456,7 +456,7 @@ func (s *Server) resumeSelfReported(epicPath, id string) (RepairResult, bool, er
 		}
 		s.registry.delete(address)
 	}
-	if err := ralphloop.CloseOpenQuestion(t.Path, ralphloop.CloseResumed); err != nil {
+	if err := tickets.EndOpenRound(t.Path, origin, tickets.HowResume, ralphloop.CloseResumed); err != nil {
 		return RepairResult{}, false, fmt.Errorf("close question of %s: %w", address, err)
 	}
 	return RepairResult{}, false, nil

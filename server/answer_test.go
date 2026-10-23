@@ -73,6 +73,10 @@ func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 	if n := answerCount(t, ticketPath); n != 1 {
 		t.Errorf("pause.answer lines = %d, want 1", n)
 	}
+	// The body claims cli; the client's origin header decides, and an API client sets none.
+	if got := answerEvents(t, ticketPath); len(got) != 1 || got[0].How != tickets.HowAnswer || got[0].Source != tickets.SourceCLI {
+		t.Errorf("answers = %+v; want how: answer, source: cli", got)
+	}
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil || tk.Status != schema.StatusClaimed {
 		t.Errorf("ticket = %+v, %v; want claimed", tk, err)
