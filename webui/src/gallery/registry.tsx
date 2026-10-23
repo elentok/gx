@@ -7,6 +7,7 @@ import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
 import { Card } from "../ui/card/Card";
 import { Chip } from "../ui/chip/Chip";
+import { DayChart } from "../ui/day-chart/DayChart";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
@@ -33,7 +34,9 @@ export interface GalleryEntry {
 const ticket = canned.tickets[0];
 const longReason = "Waiting on a long chain of upstream tickets that all have to merge first. ".repeat(4);
 
-const perTone = (render: (tone: Tone) => ReactNode): GalleryCase[] =>
+const chartDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+const perTone =(render: (tone: Tone) => ReactNode): GalleryCase[] =>
   TONES.map((tone) => ({ label: tone, node: render(tone) }));
 
 // Add one entry per primitive; the gallery page renders every case.
@@ -138,6 +141,61 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "Paused", node: <TopBar active="queue" build="v1.2.3" mode="paused" connected /> },
       { label: "Offline", node: <TopBar active="queue" build="v1.2.3" connected={false} /> },
       { label: "no build string", node: <TopBar active="queue" connected /> },
+    ],
+  },
+  {
+    name: "DayChart",
+    cases: [
+      ...perTone((tone) => <DayChart days={chartDays} series={[{ key: tone, label: tone, tone, values: [3, 5, null, 0, 4, 2, 6] }]} />),
+      {
+        label: "stacked",
+        node: (
+          <DayChart
+            days={chartDays}
+            kind="stacked"
+            series={[
+              { key: "a", label: "Design", tone: "waiting", values: [2, 3, null, 0, 2, 1, 3] },
+              { key: "b", label: "Implementation", tone: "running", values: [1, 2, null, 0, 2, 1, 3] },
+            ]}
+          />
+        ),
+      },
+      {
+        label: "side by side",
+        node: (
+          <DayChart
+            days={chartDays}
+            kind="side-by-side"
+            series={[
+              { key: "a", label: "Created", tone: "waiting", values: [2, 3, null, 0, 2, 1, 3] },
+              { key: "b", label: "Resolved", tone: "running", values: [1, 2, null, 0, 2, 1, 3] },
+            ]}
+          />
+        ),
+      },
+      {
+        label: "added and removed",
+        node: (
+          <DayChart
+            days={chartDays}
+            kind="diverging"
+            series={[
+              { key: "a", label: "Added", tone: "done", values: [40, 10, null, 0, 25, 5, 30] },
+              { key: "b", label: "Removed", tone: "paused", values: [10, 4, null, 0, 12, 2, 8] },
+            ]}
+          />
+        ),
+      },
+      {
+        label: "folded series",
+        node: (
+          <DayChart
+            days={chartDays}
+            series={[{ key: "a", label: "Tickets", tone: "running", values: [3, 5, null, 0, 4, 2, 6] }]}
+            folded={[{ key: "x", label: "Other", values: [1, 0, null, 0, 1, 0, 2] }]}
+          />
+        ),
+      },
     ],
   },
   { name: "Chip", cases: perTone((tone) => <Chip tone={tone}>{tone}</Chip>) },
