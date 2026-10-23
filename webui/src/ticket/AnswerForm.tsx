@@ -1,7 +1,8 @@
-import { Box, Button, Text, Textarea } from "@chakra-ui/react";
+import { Box, Text, Textarea } from "@chakra-ui/react";
 import { useState } from "react";
 import { ActionAnswer, type DetailOption, type TicketDetail } from "../generated/server";
 import { Badge } from "../ui/badge/Badge";
+import { Button } from "../ui/button/Button";
 import { postAnswer, ReasonStale, sentOf, type PostAnswer, type Sent } from "./answer";
 
 interface Choice {

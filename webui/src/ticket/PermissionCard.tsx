@@ -1,7 +1,8 @@
-import { Box, Button, Code, Text, Textarea } from "@chakra-ui/react";
+import { Box, Code, Text, Textarea } from "@chakra-ui/react";
 import { useState } from "react";
 import type { TicketDetail } from "../generated/server";
 import { Badge } from "../ui/badge/Badge";
+import { Button } from "../ui/button/Button";
 import { postDecision, type Decision, type PostDecision } from "./permission";
 
 // The pending permission prompt of a blocked agent. Only Allow once and Deny: a standing

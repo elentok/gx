@@ -1,6 +1,7 @@
-import { Box, Button, Text } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { ActionResume, type TicketDetail } from "../generated/server";
+import { Button } from "../ui/button/Button";
 import { ReasonStale } from "./answer";
 import { postResume, resumeWords, type PostResume } from "./resume";
 

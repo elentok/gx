@@ -1,5 +1,6 @@
-import { Box, Button } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
+import { Button } from "../ui/button/Button";
 
 // Collapsed by default; a button instead of <details> so the state is testable and themable.
 export function Collapsible({ label, children }: { label: string; children: ReactNode }) {
