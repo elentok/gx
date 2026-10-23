@@ -28,7 +28,6 @@ const (
 	ticketsNotDone  = "tickets not done"
 	alreadyMerged   = "already merged"
 	nothingToQueue  = "nothing to queue"
-	actionCheckAll  = "check-all"
 	actionQueueEpic = "queue-epic"
 	actionEditEpic  = "edit-epic"
 	actionYankEpic  = "yank-epic"
@@ -41,8 +40,8 @@ type epicMenuInput struct {
 	epic tickets.Epic
 	// branch is the branch the epic merges into; "" when unknown.
 	branch string
-	// queueable is what Add epic to queue would send.
-	queueable    []string
+	// queueable is whether Add epic to queue has anything to send.
+	queueable    bool
 	serverReason string
 	archived     bool
 	// session is the design session Go to design session… opens; "" offers none.
@@ -94,8 +93,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 
 	items = append(items,
 		pick("Add epic to queue", "", actionQueueEpic, contextmenu.Queue,
-			firstReason(in.serverReason, reasonIf(len(in.queueable) == 0, nothingToQueue))),
-		pick("Check all", "", actionCheckAll, contextmenu.Queue, ""),
+			firstReason(in.serverReason, reasonIf(!in.queueable, nothingToQueue))),
 		pick("Edit ticket.md", "e e", actionEditEpic, contextmenu.EditCopy, ""),
 		pick("Yank", "y y", actionYankEpic, contextmenu.EditCopy, ""))
 
@@ -115,7 +113,7 @@ func (m Model) openEpicMenu(epic tickets.Epic, archived bool) Model {
 	m.ticketMenu = openEpicContextMenu(m.ticketMenu, epicMenuInput{
 		epic:         epic,
 		branch:       epic.MergeTarget,
-		queueable:    queueableAddresses(epic, m.vm.Queue),
+		queueable:    epicQueueable(epic, m.vm.Queue),
 		serverReason: serverReason(m.serverAPI, m.link),
 		archived:     archived,
 		session:      epicSession(m.vm.Sessions, epic.Path),
@@ -150,11 +148,8 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 		return m, cmdApplyEpicStatus(m.serverAPI, m.settings.TicketStore, epic, msg.status)
 	}
 	switch msg.action {
-	case actionCheckAll:
-		m.setPathsChecked(eligibleEpicPaths(epic), true)
-		return m, nil
 	case actionQueueEpic:
-		return m, cmdQueueEpic(m.serverAPI, queueableAddresses(epic, m.vm.Queue))
+		return m, cmdQueueEpic(m.serverAPI, epic.Path)
 	case actionEditEpic:
 		return m, m.cmdEditSelectedFile(terminalrun.InPlace)
 	case actionYankEpic:
@@ -163,21 +158,20 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }
 
-// queueableAddresses is every open, not-yet-queued ticket of epic in ticket
-// order. It goes by the frontmatter status, not the rendered one, so blocked
-// tickets are sent and the server decides on them.
-func queueableAddresses(epic tickets.Epic, queue []string) []string {
-	var addrs []string
-	for _, t := range epic.Tickets {
-		open := schema.Status(strings.ToLower(strings.TrimSpace(t.Status))) == schema.StatusOpen
-		if open && !slices.Contains(queue, t.Path) {
-			addrs = append(addrs, t.Path)
-		}
+// epicQueueable reports whether epic has an open ticket and no queue entry
+// yet. It goes by the frontmatter status, not the rendered one, so blocked
+// tickets count and the server decides on them.
+func epicQueueable(epic tickets.Epic, queue []string) bool {
+	if slices.Contains(queue, epic.Path) {
+		return false
 	}
-	return addrs
+	return slices.ContainsFunc(epic.Tickets, func(t tickets.Ticket) bool {
+		open := schema.Status(strings.ToLower(strings.TrimSpace(t.Status))) == schema.StatusOpen
+		return open && !slices.Contains(queue, t.Path)
+	})
 }
 
-// epicQueuedMsg reports a finished Add epic to queue: how many tickets the
+// epicQueuedMsg reports a finished Add epic to queue: how many addresses the
 // server took and the refusals as "address: reason".
 type epicQueuedMsg struct {
 	queued   int
@@ -198,10 +192,11 @@ func QueuedToast(queued int, refusals []string) tea.Cmd {
 	return notify.Warning(text + " (" + strings.Join(refusals, "; ") + ")")
 }
 
-// cmdQueueEpic queues addrs and reports the outcome as an epicQueuedMsg.
-func cmdQueueEpic(api ServerAPI, addrs []string) tea.Cmd {
+// cmdQueueEpic queues the epic as one entry and reports the outcome as an
+// epicQueuedMsg.
+func cmdQueueEpic(api ServerAPI, epicAddress string) tea.Cmd {
 	return func() tea.Msg {
-		queued, refusals := QueueAddresses(context.Background(), api.QueueAdd, addrs)
+		queued, refusals := QueueAddresses(context.Background(), api.QueueAdd, []string{epicAddress})
 		return epicQueuedMsg{queued: queued, refusals: refusals}
 	}
 }

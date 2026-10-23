@@ -94,11 +94,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, tea.Batch(notifyCmd, cmd)
 	}
 
-	if req, ok := msg.(ticketsui.CheckPathsMsg); ok {
-		next, cmd := m.checkOnTicketsTab(req)
-		return next, tea.Batch(notifyCmd, cmd)
-	}
-
 	if nav.IsRepoMutated(msg) {
 		m.gate.Mutated()
 		// Trust-the-self-reload invariant: the page that emitted RepoMutated

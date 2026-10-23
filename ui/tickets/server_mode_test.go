@@ -289,80 +289,6 @@ func TestServerMode_PendingRowRendersVerdictSubtext(t *testing.T) {
 	}
 }
 
-// Seam D: the "a" confirm renders the agent picker and the client call carries
-// the chosen agent.
-func TestServerMode_EnqueueKeyPicksAgent(t *testing.T) {
-	var adds []server.QueueItem
-	m := newServerModel(t).WithServer(fakeServerAPI{adds: &adds})
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "open"},
-		{Address: "gx:alpha/02", Title: "Second", Status: "done"},
-	}})
-	m.checked = map[string]bool{"gx:alpha/01": true, "gx:alpha/02": true}
-
-	next, _ := m.handleServerEnqueueKey()
-	m = next.(Model)
-	if !m.confirm.IsOpen {
-		t.Fatal("confirm not open")
-	}
-	if view := m.confirm.View(80); !strings.Contains(view, "Agent: claude") || !strings.Contains(view, "Enqueue 1 ticket") {
-		t.Fatalf("confirm view = %q", view)
-	}
-
-	m.confirm, _, _ = m.confirm.Update(tea.KeyPressMsg{Code: tea.KeyTab})
-	if got := m.confirm.Choice(); got != "codex" {
-		t.Fatalf("choice after tab = %q", got)
-	}
-	var cmd tea.Cmd
-	m.confirm, cmd, _ = m.confirm.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
-	if cmd == nil {
-		t.Fatal("accept produced no command")
-	}
-	if _, ok := cmd().(serverEnqueuedMsg); !ok {
-		t.Fatal("accept did not enqueue")
-	}
-	want := []server.QueueItem{{Address: "gx:alpha/01", Agent: "codex"}}
-	if !slices.Equal(adds, want) {
-		t.Fatalf("adds = %+v, want %+v", adds, want)
-	}
-}
-
-// Seam D: "r" replaces with the chosen agent; a ticket-live refusal becomes an
-// error toast.
-func TestServerMode_ReplaceKeyPicksAgentAndShowsRefusal(t *testing.T) {
-	var replaced []server.QueueItem
-	api := fakeServerAPI{replaced: &replaced}
-	m := newServerModel(t).WithServer(api)
-	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "First", Status: "open"},
-	}})
-	m.checked = map[string]bool{"gx:alpha/01": true}
-
-	next, _ := m.handleServerReplaceKey()
-	m = next.(Model)
-	if !m.confirm.IsOpen {
-		t.Fatal("confirm not open")
-	}
-	m.confirm, _, _ = m.confirm.Update(tea.KeyPressMsg{Code: tea.KeyTab})
-	_, cmd, _ := m.confirm.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
-	if cmd == nil {
-		t.Fatal("accept produced no command")
-	}
-	if _, ok := cmd().(serverReplacedMsg); !ok {
-		t.Fatal("accept did not replace")
-	}
-	want := []server.QueueItem{{Address: "gx:alpha/01", Agent: "codex"}}
-	if !slices.Equal(replaced, want) {
-		t.Fatalf("replaced = %+v, want %+v", replaced, want)
-	}
-
-	api.replaceRes = server.QueueResult{Refused: true, Reason: server.ReasonTicketLive, Message: "gx:alpha/01 has a live iteration"}
-	msg := m.WithServer(api).cmdServerReplace("gx", []string{"gx:alpha/01"}, "claude")()
-	if got := msg.(serverReplacedMsg).problem; !strings.Contains(got, "live iteration") {
-		t.Fatalf("problem = %q", got)
-	}
-}
-
 // Seam D: "enter" on a paused row issues resume.
 func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 	var calls []string
@@ -558,20 +484,5 @@ func TestEpicsFromViewModel_MultiLevelForkKeepsItsNumber(t *testing.T) {
 	}
 	if got := epic.RenderedStatus(epic.Tickets[3]); got != gxtickets.StatusClaimed {
 		t.Errorf("27a3 RenderedStatus = %v, want claimed: its parent 27a1 is done", got)
-	}
-}
-
-func TestServerMode_EnqueueConfirmShowsExtraUsageBanner(t *testing.T) {
-	m := newServerModel(t)
-	open := func(extra bool) string {
-		m.vm.ExtraUsage = extra
-		m.confirm = m.openAgentConfirm("Enqueue 1 ticket(s)?", func(string) tea.Cmd { return nil })
-		return m.confirm.View(200)
-	}
-	if got := open(true); !strings.Contains(got, "auto-purchase extra usage") {
-		t.Fatalf("confirm lacks the banner:\n%s", got)
-	}
-	if got := open(false); strings.Contains(got, "extra usage") {
-		t.Fatalf("confirm shows the banner while extra usage is off:\n%s", got)
 	}
 }

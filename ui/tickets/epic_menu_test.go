@@ -64,17 +64,6 @@ func TestEpicMenu_SetStatusWritesTheEpicFileAndPingsTheServer(t *testing.T) {
 	}
 }
 
-func TestEpicMenu_CheckAllChecksEveryTicket(t *testing.T) {
-	m, _ := epicMenuModel(t, fakeServerAPI{calls: &[]string{}})
-	m, _ = chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:alpha"), "Check all")
-	if !m.isChecked("gx:alpha/02") {
-		t.Errorf("checked = %v, want gx:alpha/02", m.checked)
-	}
-	if !m.epicChecked(m.epics[0]) {
-		t.Error("epic not fully checked")
-	}
-}
-
 func TestEpicMenu_MergeDimReasons(t *testing.T) {
 	m, _ := epicMenuModel(t, fakeServerAPI{calls: &[]string{}})
 	if !menuHasReason(openEpicMenuOn(t, m, "gx:alpha"), ticketsNotDone) {
@@ -125,11 +114,9 @@ func queueEpicModel(t *testing.T, api fakeServerAPI) Model {
 	return updated.(Model)
 }
 
-func TestEpicMenu_AddEpicToQueueAddsOpenUnqueuedTicketsInOrder(t *testing.T) {
+func TestEpicMenu_AddEpicToQueueSendsTheEpicAddressOnce(t *testing.T) {
 	var adds []server.QueueItem
-	m := queueEpicModel(t, fakeServerAPI{adds: &adds, addRes: map[string]server.QueueResult{
-		"gx:alpha/07": {Refused: true, Message: "blocked by gx:alpha/02"},
-	}})
+	m := queueEpicModel(t, fakeServerAPI{adds: &adds})
 	m, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:alpha"), "Add epic to queue")
 	if cmd == nil {
 		t.Fatal("Add epic to queue issued nothing")
@@ -139,7 +126,7 @@ func TestEpicMenu_AddEpicToQueueAddsOpenUnqueuedTicketsInOrder(t *testing.T) {
 	for _, a := range adds {
 		got = append(got, a.Address)
 	}
-	if want := []string{"gx:alpha/03", "gx:alpha/07"}; !slices.Equal(got, want) {
+	if want := []string{"gx:alpha"}; !slices.Equal(got, want) {
 		t.Errorf("queue-adds = %v, want %v", got, want)
 	}
 	var toast notify.NotifyMsg
@@ -154,7 +141,7 @@ func TestEpicMenu_AddEpicToQueueAddsOpenUnqueuedTicketsInOrder(t *testing.T) {
 			}
 		}
 	}
-	if want := "queued 1, refused 1 (gx:alpha/07: blocked by gx:alpha/02)"; toast.Message != want {
+	if want := "queued 1, refused 0"; toast.Message != want {
 		t.Errorf("toast = %#v, want %q", toast, want)
 	}
 	if !switched {
@@ -167,11 +154,11 @@ func TestEpicMenu_AddEpicToQueueDimReasons(t *testing.T) {
 	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != nothingToQueue {
 		t.Errorf("no queueable tickets: disabled = %q, want %q", got, nothingToQueue)
 	}
-	items = epicMenuItems(epicMenuInput{queueable: []string{"gx:alpha/03"}, serverReason: serverNotRunning})
+	items = epicMenuItems(epicMenuInput{queueable: true, serverReason: serverNotRunning})
 	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != serverNotRunning {
 		t.Errorf("no server: disabled = %q, want %q", got, serverNotRunning)
 	}
-	items = epicMenuItems(epicMenuInput{queueable: []string{"gx:alpha/03"}})
+	items = epicMenuItems(epicMenuInput{queueable: true})
 	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != "" {
 		t.Errorf("queueable: disabled = %q, want enabled", got)
 	}

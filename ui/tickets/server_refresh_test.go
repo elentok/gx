@@ -48,8 +48,8 @@ func TestRefresh_NoClientStartsDown(t *testing.T) {
 	if !m.readsDisk() {
 		t.Fatal("a tab with no client does not read the store")
 	}
-	if _, blocked := m.serverKeyGuard(bindingTicketsAddToQueue); !blocked {
-		t.Fatal(`"a" is not blocked without a server`)
+	if _, blocked := m.serverKeyGuard(bindingTicketsFinishAndPause); !blocked {
+		t.Fatal(`"D" is not blocked without a server`)
 	}
 }
 

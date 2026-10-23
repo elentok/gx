@@ -85,13 +85,7 @@ type Model struct {
 	// rendering. Epic done/total header counts read epic.Tickets directly
 	// (renderEpicRow), so they're unaffected by this filter.
 	hideDone bool
-	// checked is the Tickets tab's own selection (ticket 04), independent of
-	// queue membership: tickets the user has marked with "space", keyed by
-	// Ticket.Path so it survives a reload's re-sorting/index-shuffling. Held
-	// in memory only (see setPathsChecked).
-	checked map[string]bool
-
-	search search.Model
+	search   search.Model
 
 	// previewFocus backs the preview panel's own focus/scroll/search state
 	// (see preview_focus.go and model_preview_focus.go); embedded so callers
@@ -147,7 +141,6 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 		search:            search.NewModel(),
 		previewFocus:      newPreviewFocus(),
 		confirm:           confirm.New(),
-		checked:           map[string]bool{},
 		explicitCollapsed: map[string]bool{},
 		archivedLazy:      archivedLazy,
 	}
@@ -227,7 +220,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// A disk read that outlived down mode must not overwrite stream rows.
 			return m, nil
 		}
-		m.autoCheckForkedChildren(msg.epics)
 		firstLoad := !m.loaded
 		m.loaded = true
 		m.epics = msg.epics
@@ -255,9 +247,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editFileFinishedMsg:
 		return m.handleEditFileFinished(msg)
 
-	case checkAddConfirmedMsg:
-		return m.handleCheckAddConfirmed(msg)
-
 	case watchLoadedMsg:
 		m.watch = m.watch.Open(msg, m.width, m.height)
 		return m, m.watch.tick()
@@ -274,10 +263,6 @@ func (m Model) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case epicMenuPickMsg:
 		return m.handleEpicMenuPick(msg)
-
-	case CheckPathsMsg:
-		m.setPathsChecked(msg.Paths, true)
-		return m, nil
 
 	case tea.KeyPressMsg:
 		if m.help.IsOpen {

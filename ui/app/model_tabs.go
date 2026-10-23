@@ -9,7 +9,6 @@ import (
 	"github.com/elentok/gx/ui/nav"
 	"github.com/elentok/gx/ui/navstate"
 	"github.com/elentok/gx/ui/notify"
-	ticketsui "github.com/elentok/gx/ui/tickets"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -262,25 +261,6 @@ func replayKeys(model tea.Model, msgs ...tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return current, tea.Batch(cmds...)
-}
-
-// checkOnTicketsTab hands msg to the Tickets tab's page, which owns the
-// checked set. A never-opened Tickets tab gets its page built now, with the
-// view state a switch from here would pick, so that switch keeps the page
-// (and its checks) instead of rebuilding it; the page inits on that switch.
-func (m Model) checkOnTicketsTab(msg ticketsui.CheckPathsMsg) (Model, tea.Cmd) {
-	m.ensureLivePages()
-	live := m.livePageByTab[nav.TabTickets]
-	var cmd tea.Cmd
-	if live.model == nil {
-		vs := m.navState.TabViewStateForViewContext(nav.ViewContext{Tab: nav.TabTickets})
-		vs.WorktreeRoot = m.navState.Active().WorktreeRoot
-		live, cmd = m.newLivePage(vs)
-		live.viewState = vs
-	}
-	live.model, _ = live.model.Update(msg)
-	m.livePageByTab[nav.TabTickets] = live
-	return m, cmd
 }
 
 func (m Model) newLivePage(viewState nav.ViewState) (livePage, tea.Cmd) {

@@ -51,15 +51,6 @@ var (
 	sessionMarkerStyle        = lipgloss.NewStyle().Foreground(ui.ColorTeal)
 
 	sectionHeaderStyle = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
-
-	// checkedGlyphStyle/uncheckedGlyphStyle render the execution queue's
-	// checkbox marker (ticket 04), distinct from every status color so a
-	// checked row reads the same regardless of its ticket status.
-	// uncheckedGlyphStyle deliberately isn't ui.StyleDim/StyleMuted — those are
-	// reserved for the search-non-match/done-row dim treatment elsewhere in
-	// this file, which must stay independent of a row's checked state.
-	checkedGlyphStyle   = lipgloss.NewStyle().Foreground(ui.ColorGreen)
-	uncheckedGlyphStyle = lipgloss.NewStyle().Foreground(ui.ColorOverlay)
 )
 
 // sidebarRenderOpts builds the tree.RenderOpts m.sidebarTree.RenderLines
@@ -68,7 +59,7 @@ var (
 // entry.Value.kind by Label alone (Icon/MetaText/RowColor/Faint stay
 // nil — ticket 01's "Row rendering" spec). A section header (ticket 02)
 // renders with the same expand-glyph-led shape as an epic/ticket row, minus
-// the checkbox slot — no separate Icon/glyph-column plumbing, since epic and
+// the status icon — no separate Icon/glyph-column plumbing, since epic and
 // ticket rows bake their own glyph into the Label string too. --all mode
 // behaves the same as single-worktree: it just interleaves every worktree's
 // epics into this one grouping, each epic row labeled with its worktree
@@ -138,7 +129,7 @@ func (m Model) renderEpicRow(epic tickets.Epic) string {
 	if m.isCollapsed(epic) {
 		glyph = m.icons().TriangleCollapsed
 	}
-	line := fmt.Sprintf("%s %s %s%s (%d done / %d)", glyph, m.checkboxGlyph(m.epicChecked(epic)), epic.Name, m.sessionMarker(epic.Name), epic.DoneCount(), epic.TotalCount())
+	line := fmt.Sprintf("%s %s%s (%d done / %d)", glyph, epic.Name, m.sessionMarker(epic.Name), epic.DoneCount(), epic.TotalCount())
 	// Dimming tracks "every ticket done", not the current collapse toggle —
 	// a fully-done epic stays dimmed even if manually expanded, and a
 	// manually-collapsed in-progress epic doesn't borrow its dimming.
@@ -203,7 +194,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 		style = ui.StyleDim
 	}
 
-	line := triangle + m.checkboxGlyph(m.isChecked(t.Path)) + " " + style.Render(icon)
+	line := triangle + style.Render(icon)
 	if m.rowHasSuggestedActions(epic, t, r.archived) {
 		badgeStyle := suggestedActionBadgeStyle
 		if searchDim {
@@ -238,15 +229,6 @@ func (m Model) sessionMarker(address string) string {
 		}
 	}
 	return ""
-}
-
-// checkboxGlyph renders the execution-queue checkbox marker for a checked or
-// unchecked row (ticket 04's visible selection state).
-func (m Model) checkboxGlyph(checked bool) string {
-	if checked {
-		return checkedGlyphStyle.Render(m.icons().CheckboxChecked)
-	}
-	return uncheckedGlyphStyle.Render(m.icons().CheckboxUnchecked)
 }
 
 func (m Model) icons() ui.IconSet {

@@ -65,15 +65,9 @@ func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 
 	m = selectArchivedTicketRow(t, m)
 	selectionBefore, _ := m.selectedRow()
-	ticket := m.epicAt(selectionBefore).Tickets[selectionBefore.ticketIdx]
-
-	checkedBefore := len(m.checked)
 
 	presses := []tea.KeyPressMsg{
-		{Code: 'r', Text: "r"},
-		{Code: 'a', Text: "a"},
 		{Code: 'D', Text: "D"},
-		{Code: ' ', Text: " "},
 	}
 	for _, press := range presses {
 		updated, cmd := m.Update(press)
@@ -91,12 +85,6 @@ func TestModel_MutatingKeysAreNoOpOnArchivedRow(t *testing.T) {
 		}
 	}
 
-	if len(m.checked) != checkedBefore {
-		t.Fatalf("expected checked set unaffected by mutating keys on archived row, before=%d after=%d", checkedBefore, len(m.checked))
-	}
-	if m.isChecked(ticket.Path) {
-		t.Fatalf("expected archived ticket to remain unchecked after space")
-	}
 }
 
 // TestModel_ReadOnlyKeysStillWorkOnArchivedRow covers 05's other half: edit,

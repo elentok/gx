@@ -24,10 +24,8 @@ func assertOnlyToast(t *testing.T, name string, cmd tea.Cmd) {
 func TestWrites_TicketsTabOnlyToasts(t *testing.T) {
 	m := newServerModel(t)
 	for name, msg := range map[string]tea.Msg{
-		"enqueue": serverEnqueuedMsg{problem: "gx:a/01: refused"},
-		"replace": serverReplacedMsg{count: 1},
-		"epic":    epicQueuedMsg{refusals: []string{"gx:a/01: refused"}},
-		"action":  serverDoneMsg{ok: "paused"},
+		"epic":   epicQueuedMsg{refusals: []string{"gx:a/01: refused"}},
+		"action": serverDoneMsg{ok: "paused"},
 	} {
 		_, cmd := m.Update(msg)
 		assertOnlyToast(t, name, cmd)
@@ -69,8 +67,7 @@ func TestWrites_QueueTabOnlyToasts(t *testing.T) {
 func TestWrites_AddToQueueSwitchesToQueueTab(t *testing.T) {
 	m := newServerModel(t)
 	for name, msg := range map[string]tea.Msg{
-		"enqueue": serverEnqueuedMsg{added: 1},
-		"epic":    epicQueuedMsg{queued: 2},
+		"epic": epicQueuedMsg{queued: 2},
 	} {
 		_, cmd := m.Update(msg)
 		if cmd == nil {

@@ -19,10 +19,7 @@ const (
 	bindingTicketsEditVSplit         keys.BindingID = "edit-vsplit"
 	bindingTicketsEditTab            keys.BindingID = "edit-tab"
 	bindingTicketsCancelChord        keys.BindingID = "cancel-chord"
-	bindingTicketsReplaceQueue       keys.BindingID = "replace-queue"
-	bindingTicketsAddToQueue         keys.BindingID = "add-to-queue"
 	bindingTicketsFinishAndPause     keys.BindingID = "finish-and-pause-queue"
-	bindingTicketsToggleCheck        keys.BindingID = "toggle-check"
 	bindingTicketsToggleHideDone     keys.BindingID = "toggle-hide-done"
 	bindingTicketsToggleProjectScope keys.BindingID = "toggle-project-scope"
 	bindingTicketsTogglePreview      keys.BindingID = "toggle-preview"
@@ -39,10 +36,7 @@ const (
 // here to be guarded — nothing else enforces that. The "m" menu is not here:
 // it opens on an archived row with its writes dim.
 var archivedBlockedBindings = map[keys.BindingID]bool{
-	bindingTicketsReplaceQueue:   true,
-	bindingTicketsAddToQueue:     true,
 	bindingTicketsFinishAndPause: true,
-	bindingTicketsToggleCheck:    true,
 }
 
 // newTicketsManager builds the key manager for the sidebar's "extra"
@@ -60,10 +54,7 @@ func newTicketsManager() keys.Manager {
 		{ID: bindingTicketsEditVSplit, Seq: []string{"e", "v"}, Categories: []string{"Navigation"}, Title: "edit file (vsplit)"},
 		{ID: bindingTicketsEditTab, Seq: []string{"e", "t"}, Categories: []string{"Navigation"}, Title: "edit file (tab)"},
 		{ID: bindingTicketsCancelChord, Seq: []string{"e", "esc"}, Categories: []string{}, Title: ""},
-		{ID: bindingTicketsReplaceQueue, Seq: []string{"r"}, Categories: []string{"Navigation"}, Title: "replace queue"},
-		{ID: bindingTicketsAddToQueue, Seq: []string{"a"}, Categories: []string{"Navigation"}, Title: "add to queue"},
 		{ID: bindingTicketsFinishAndPause, Seq: []string{"D"}, Categories: []string{"Navigation"}, Title: "finish and pause queue"},
-		{ID: bindingTicketsToggleCheck, Seq: []string{"space"}, Categories: []string{"Navigation"}, Title: "check/uncheck"},
 		{ID: bindingTicketsToggleHideDone, Seq: []string{"t", "c"}, Categories: []string{"Navigation"}, Title: "hide completed"},
 		{ID: bindingTicketsToggleProjectScope, Seq: []string{"t", "p"}, Categories: []string{"Navigation"}, Title: "cwd project / all projects"},
 		{ID: bindingTicketsTogglePreview, Seq: []string{"t", "v"}, Categories: []string{"Navigation"}, Title: "toggle preview"},
@@ -139,14 +130,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.cmdEditSelectedFile(terminalrun.Tab)
 		case bindingTicketsCancelChord:
 			return m, nil
-		case bindingTicketsReplaceQueue:
-			return m.handleServerReplaceKey()
-		case bindingTicketsAddToQueue:
-			return m.handleServerEnqueueKey()
 		case bindingTicketsFinishAndPause:
 			return m.handleServerFinishAndPauseKey()
-		case bindingTicketsToggleCheck:
-			return m.handleToggleCheck()
 		case bindingTicketsToggleHideDone:
 			m.toggleHideDone()
 		case bindingTicketsToggleProjectScope:

@@ -603,9 +603,10 @@ func TestQueueModelRowsRenderWithNoCheckbox(t *testing.T) {
 	m := loadQueueModel(t, withChecked(NewQueueModel(root, ui.Settings{}, keys.Manager{}), checked))
 
 	content := m.View().Content
-	icons := ui.Icons(false)
-	if strings.Contains(content, icons.CheckboxChecked) || strings.Contains(content, icons.CheckboxUnchecked) {
-		t.Fatalf("expected no checkbox glyph in Queue tab rows:\n%s", content)
+	for _, glyph := range []string{"[x]", "[ ]", "󰄲", "󰄱"} {
+		if strings.Contains(content, glyph) {
+			t.Fatalf("expected no checkbox glyph %q in Queue tab rows:\n%s", glyph, content)
+		}
 	}
 }
 

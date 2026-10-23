@@ -16,8 +16,8 @@ import (
 	"github.com/elentok/gx/ui/nav"
 )
 
-// Without server deps the Tickets tab reads the store and "r" is disabled.
-func TestTicketsReplaceQueueWithoutServerIsDisabled(t *testing.T) {
+// Without server deps the Tickets tab reads the store and "D" is disabled.
+func TestTicketsFinishAndPauseWithoutServerIsDisabled(t *testing.T) {
 	// not parallel-safe: points XDG_DATA_HOME at a temp ticket store
 	repoDir := testutil.TempRepo(t)
 	t.Setenv("HOME", t.TempDir())
@@ -53,8 +53,7 @@ func TestTicketsReplaceQueueWithoutServerIsDisabled(t *testing.T) {
 
 	waitForAppText(t, tm, "my-epic")
 	tm.Send(tea.KeyPressMsg{Code: 'j', Text: "j"})
-	tm.Send(tea.KeyPressMsg{Code: tea.KeySpace, Text: " "})
-	tm.Send(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	tm.Send(tea.KeyPressMsg{Code: 'D', Text: "D"})
 
 	waitForAppText(t, tm, "disabled: server is down")
 }

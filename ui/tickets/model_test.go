@@ -638,7 +638,6 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 		t.Fatalf("expected selection at entry 3 after two downs, got %d", m.sidebarTree.SelectedIndex())
 	}
 	line := selectedSidebarLine(t, m)
-	checkedBefore := len(m.checked)
 
 	// Entry 1 (the epic) is the reset baseline below.
 	m.sidebarTree.SetSelectedIndex(1)
@@ -649,9 +648,6 @@ func TestModel_MouseClickSelectsSidebarRowOnly(t *testing.T) {
 	}
 	if m.confirm.IsOpen {
 		t.Fatalf("expected click-to-select to not open the confirm modal")
-	}
-	if len(m.checked) != checkedBefore {
-		t.Fatalf("expected click-to-select to leave checked state untouched, before=%d after=%d", checkedBefore, len(m.checked))
 	}
 
 	// A click landing on the preview panel (past the sidebar's width) is a no-op.
