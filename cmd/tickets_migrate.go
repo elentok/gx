@@ -143,28 +143,51 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 // (see tickets.BackfillTicketCreation). A root that is not a project of a
 // git-tracked store has no history to read and is skipped.
 func backfillTicketCreation(root string, dryRun bool) ([]tickets.MigrationChange, error) {
-	if _, err := config.ReadProjectFile(root); err != nil {
-		return nil, nil
+	storeRoot, epics, err := storeProjectEpics(root)
+	if err != nil || epics == nil {
+		return nil, err
 	}
-	storeRoot := filepath.Dir(root)
+	created, err := tickets.BackfillTicketCreation(epics, storeRoot, func(rel string) (tickets.TicketOrigin, bool, error) {
+		o, ok, err := git.FirstCommitOfFile(storeRoot, rel)
+		return tickets.TicketOrigin{Path: o.Path, At: o.At, Root: o.Root}, ok, err
+	}, dryRun)
+	if err != nil {
+		return created, err
+	}
+	// Reload: the creation step may have rewritten tickets this one reads.
+	_, epics, err = storeProjectEpics(root)
+	if err != nil {
+		return created, err
+	}
+	cancelled, err := tickets.BackfillCancelledAt(epics, storeRoot, func(rel string) (tickets.TicketOrigin, bool, error) {
+		o, ok, err := git.LastCommitChangingLine(storeRoot, rel, "^status: cancelled$")
+		return tickets.TicketOrigin{Path: o.Path, At: o.At, Root: o.Root}, ok, err
+	}, dryRun)
+	return mergeChanges(created, cancelled), err
+}
+
+// storeProjectEpics loads the epics of the ticket-store project at root. A root
+// that is not a project of a git-tracked store has no history to read: it
+// returns nil epics.
+func storeProjectEpics(root string) (storeRoot string, epics []tickets.Epic, err error) {
+	if _, err := config.ReadProjectFile(root); err != nil {
+		return "", nil, nil
+	}
+	storeRoot = filepath.Dir(root)
 	if _, err := os.Stat(filepath.Join(storeRoot, ".git")); err != nil {
-		return nil, nil
+		return "", nil, nil
 	}
 	all, err := tickets.LoadStoreEpics(storeRoot)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	project := tickets.ProjectName(root)
-	var epics []tickets.Epic
 	for _, se := range all {
 		if se.Project == project {
 			epics = append(epics, se.Epic)
 		}
 	}
-	return tickets.BackfillTicketCreation(epics, storeRoot, func(rel string) (tickets.TicketOrigin, bool, error) {
-		o, ok, err := git.FirstCommitOfFile(storeRoot, rel)
-		return tickets.TicketOrigin{Path: o.Path, At: o.At, Root: o.Root}, ok, err
-	}, dryRun)
+	return storeRoot, epics, nil
 }
 
 // mergeChanges adds extra to changes, folding a file that already has an entry

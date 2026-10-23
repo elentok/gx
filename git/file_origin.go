@@ -47,3 +47,26 @@ func FirstCommitOfFile(repoRoot, path string) (origin FileOrigin, ok bool, err e
 	fields := strings.Split(status, "\t")
 	return FileOrigin{Path: fields[len(fields)-1], At: at, Root: parents == ""}, true, nil
 }
+
+// LastCommitChangingLine returns the newest commit, following renames, that
+// added or removed a line of path (relative to repoRoot) matching the regexp
+// line. For a file whose current content has such a line, that commit is the
+// one that put it there. ok is false when no commit touches such a line.
+func LastCommitChangingLine(repoRoot, path, line string) (origin FileOrigin, ok bool, err error) {
+	out, _, err := run(repoRoot, []string{
+		"log", "--follow", "-G", line, "--format=@%cI\t%P", "--", path,
+	})
+	if err != nil {
+		return FileOrigin{}, false, err
+	}
+	header, _, _ := strings.Cut(out, "\n")
+	if !strings.HasPrefix(header, "@") {
+		return FileOrigin{}, false, nil
+	}
+	when, parents, _ := strings.Cut(header[1:], "\t")
+	at, err := time.Parse(time.RFC3339, when)
+	if err != nil {
+		return FileOrigin{}, false, fmt.Errorf("parsing commit time %q: %w", when, err)
+	}
+	return FileOrigin{Path: path, At: at, Root: parents == ""}, true, nil
+}
