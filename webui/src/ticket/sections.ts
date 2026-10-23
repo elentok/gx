@@ -30,10 +30,11 @@ export interface PageText {
   description: string;
 }
 
-// The Paused section shows in the action card. A map ticket's Resolution and Question headings are
+// A Paused ticket shows its Paused section in the action card; on any other ticket the section is
+// a leftover and stays in the Description. A map ticket's Resolution and Question headings are
 // the section headings, so they are not repeated.
 export function pageText(d: TicketDetail): PageText {
-  const parts = partsOf(d.body ?? "").filter((p) => p.heading !== "Paused");
+  const parts = partsOf(d.body ?? "").filter((p) => !(d.pause_text && p.heading === "Paused"));
   if (!d.map_epic) return { resolution: "", description: text(parts) };
   const resolution = parts.find((p) => p.heading === "Resolution");
   const rest = parts

@@ -95,6 +95,7 @@ test("Related tones each status word like the epic page", async () => {
 test("Description renders the body as markdown without the Paused section", async () => {
   renderTicket({
     ...plain,
+    pause_text: "waiting on a person",
     body: "Intro **bold**.\n\n## Paused\n\nwaiting on a person\n\n## Comments\n\nA comment.",
   });
   await screen.findByText("bold");
@@ -103,6 +104,16 @@ test("Description renders the body as markdown without the Paused section", asyn
   expect(section.textContent).toContain("A comment.");
   expect(section.textContent).not.toContain("waiting on a person");
   expect(section.textContent).not.toContain("Paused");
+});
+
+test("Description keeps a leftover Paused section on a ticket that is not Paused", async () => {
+  renderTicket({
+    ...plain,
+    body: "Intro.\n\n## Paused\n\nleftover text",
+  });
+  await screen.findByText("Intro.");
+  const section = screen.getByRole("region", { name: "Description" });
+  expect(section.textContent).toContain("leftover text");
 });
 
 test("a closed map ticket shows Resolution then Question, with no repeated headings and no stat line", async () => {
