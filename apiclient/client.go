@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -236,6 +237,21 @@ func (c *Client) EpicDetail(ctx context.Context, address string) (server.EpicDet
 	var d server.EpicDetail
 	err := c.get(ctx, "/v1/epics/detail?address="+url.QueryEscape(address), &d)
 	return d, err
+}
+
+// Stats returns the per-day stats for one range in days (0 is the server's
+// default) and one project (empty means all).
+func (c *Client) Stats(ctx context.Context, days int, project string) (server.Stats, error) {
+	q := url.Values{}
+	if days > 0 {
+		q.Set("range", strconv.Itoa(days))
+	}
+	if project != "" {
+		q.Set("project", project)
+	}
+	var s server.Stats
+	err := c.get(ctx, "/v1/stats?"+q.Encode(), &s)
+	return s, err
 }
 
 // Iterations returns the live iterations.

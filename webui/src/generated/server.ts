@@ -1202,6 +1202,68 @@ export interface SessionScreenResponse {
 }
 
 //////////
+// source: stats.go
+
+/**
+ * StatsAmount is one day of a token or spend series. NoData marks a day that
+ * had finished items and none carried a stamp; Value is then 0.
+ */
+export interface StatsAmount {
+  value: number /* float64 */;
+  no_data?: boolean;
+}
+/**
+ * StatsThroughput is the Throughput section. Every series has one point per
+ * entry of Stats.Days.
+ */
+export interface StatsThroughput {
+  tickets_merged: number /* int */[];
+  epics_merged: number /* int */[];
+  lines_added: number /* int */[];
+  lines_removed: number /* int */[];
+  follow_ups_created: number /* int */[];
+  follow_ups_finished: number /* int */[];
+  waiting_for_design: number /* int */[];
+}
+/**
+ * StatsCost is the Tokens and spend section, each split into Design (map
+ * epics and their tickets) and Implementation (everything else).
+ */
+export interface StatsCost {
+  tokens_design: StatsAmount[];
+  tokens_implementation: StatsAmount[];
+  spend_design: StatsAmount[];
+  spend_implementation: StatsAmount[];
+}
+/**
+ * StatsFriction is the Friction section. The per-day maps are keyed by
+ * reason, event type or ending source.
+ */
+export interface StatsFriction {
+  /**
+   * PauseReasons lists the top reasons of the range; the rest are "other" in
+   * PausesByReason, which carries every reason for the tooltip.
+   */
+  pause_reasons: string[];
+  pauses_by_reason: { [key: string]: number /* int */}[];
+  run_events: { [key: string]: number /* int */}[];
+  pause_endings: { [key: string]: number /* int */}[];
+  web_share?: number /* float64 */;
+  median_resume_secs?: number /* int */;
+}
+/**
+ * Stats is the /v1/stats payload.
+ */
+export interface Stats {
+  range: number /* int */;
+  project?: string;
+  days: string[];
+  throughput: StatsThroughput;
+  cost: StatsCost;
+  friction: StatsFriction;
+}
+
+//////////
 // source: verdicts.go
 
 /**
