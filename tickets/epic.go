@@ -51,6 +51,9 @@ type Epic struct {
 	// MergedAt is when the epic's branch merged into its target; a Merged epic
 	// is one with it set.
 	MergedAt time.Time
+	// QueuedAt is when the epic was first added to the queue; zero on an epic
+	// queued before the field existed.
+	QueuedAt time.Time
 	// MergeBlockKind and MergeBlockReason are why the last merge paused the epic;
 	// the merge step clears both before it decides. The kind is empty for a
 	// needs-rebase pause.

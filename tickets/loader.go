@@ -264,6 +264,7 @@ type ticketMDYAML struct {
 	CompletedAt *time.Time `yaml:"completed_at"`
 	CreatedAt   *time.Time `yaml:"created_at"`
 	MergedAt    *time.Time `yaml:"merged_at"`
+	QueuedAt    *time.Time `yaml:"queued_at"`
 
 	MergeBlockKind   string `yaml:"land_block_kind"`
 	MergeBlockReason string `yaml:"land_block_reason"`
@@ -320,6 +321,9 @@ func loadEpicTicketMD(epic *Epic) {
 	}
 	if wire.MergedAt != nil {
 		epic.MergedAt = *wire.MergedAt
+	}
+	if wire.QueuedAt != nil {
+		epic.QueuedAt = *wire.QueuedAt
 	}
 	epic.MergeBlockKind = wire.MergeBlockKind
 	epic.MergeBlockReason = wire.MergeBlockReason

@@ -416,6 +416,10 @@ export interface EpicListRow {
   merged_at?: string;
   created_at?: string;
   /**
+   * QueuedAt is the epic's first enqueue, else started_at, else merged_at.
+   */
+  queued_at?: string;
+  /**
    * Queued is set while a queue item holds the epic.
    */
   queued: boolean;

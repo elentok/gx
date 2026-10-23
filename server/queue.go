@@ -317,7 +317,7 @@ func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 	if badAgent != nil {
 		return *badAgent, nil
 	}
-	return s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
+	res, err := s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
 		if r := s.refusal(target); r != nil {
 			return nil, r
 		}
@@ -333,6 +333,29 @@ func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 		}
 		return append(items, item), nil
 	})
+	if err == nil && !res.Refused {
+		s.stampQueuedAt(target)
+	}
+	return res, err
+}
+
+// stampQueuedAt records the epic's first enqueue. StampEpicFields never
+// overwrites, so a later remove and add keeps the first time. A failed stamp is
+// logged, never fatal: the item is already queued.
+func (s *Server) stampQueuedAt(t queueTarget) {
+	epic := t.epic
+	if !t.isEpic() {
+		a, err := parseQueuedAddress(t.address)
+		if err != nil {
+			return
+		}
+		epic = a.Epic
+	}
+	dir, err := s.projectDir(t.project)
+	if err != nil {
+		return
+	}
+	s.stampEpic(rootRef{Project: t.project, Epic: epic}, filepath.Join(dir, epic), "queued_at")
 }
 
 func (s *Server) queueRemove(req QueueRequest) (QueueResult, error) {

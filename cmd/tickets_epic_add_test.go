@@ -100,6 +100,7 @@ func TestRunTicketsEpicAdd_RefusalsWriteNothing(t *testing.T) {
 		{"server-stamped", "mine:x", "loop", "---\ncompleted_at: 2026-01-01T00:00:00Z\n---\n\n# X\n", "server-stamped"},
 		{"created_at", "mine:x", "loop", "---\ncreated_at: 2026-01-01T00:00:00Z\n---\n\n# X\n", "server-stamped"},
 		{"merged_at", "mine:x", "loop", "---\nmerged_at: 2026-01-01T00:00:00Z\n---\n\n# X\n", "server-stamped"},
+		{"queued_at", "mine:x", "loop", "---\nqueued_at: 2026-01-01T00:00:00Z\n---\n\n# X\n", "server-stamped"},
 		{"merged_at cleared", "mine:x", "loop", "---\nmerged_at:\n---\n\n# X\n", "server-stamped"},
 		{"unknown field", "mine:x", "loop", "---\nbogus: 1\n---\n\n# X\n", "unknown field"},
 		{"existing", "mine:exists", "map", "", "already exists"},

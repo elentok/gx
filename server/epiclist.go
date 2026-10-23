@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"net/http"
 	"slices"
 	"strings"
@@ -47,6 +48,8 @@ type EpicListRow struct {
 	CompletedAt time.Time     `json:"completed_at,omitzero"`
 	MergedAt    time.Time     `json:"merged_at,omitzero"`
 	CreatedAt   time.Time     `json:"created_at,omitzero"`
+	// QueuedAt is the epic's first enqueue, else started_at, else merged_at.
+	QueuedAt time.Time `json:"queued_at,omitzero"`
 	// Queued is set while a queue item holds the epic.
 	Queued bool `json:"queued"`
 	// Queueable is set when the Queue action applies; see epicQueueable.
@@ -200,7 +203,8 @@ func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 		Address: root.String(), Project: project, Name: e.Name, Kind: EpicKindLoop,
 		Done: e.DoneCount(), Total: e.TotalCount(),
 		CompletedAt: e.CompletedAt, MergedAt: e.MergedAt, CreatedAt: e.CreatedAt,
-		Queued: queued, Queueable: queueable,
+		QueuedAt: cmp.Or(e.QueuedAt, e.StartedAt, e.MergedAt),
+		Queued:   queued, Queueable: queueable,
 		LastActivityAt: lastActivity(e),
 	}
 	if e.IsMap {
