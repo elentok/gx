@@ -6,7 +6,7 @@ import { Button } from "../ui/button/Button";
 import { postOpenDesign, postStopSession, stateToken, type OpenDesign, type StopSession } from "./open";
 
 /** Runs one write at a time: a second click while one is in flight does nothing. */
-function useWrite() {
+export function useWrite() {
   const conn = useConnectionContext();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -30,7 +30,7 @@ function useWrite() {
   return { run, pending, error };
 }
 
-const Failure = ({ children }: { children: string }) =>
+export const Failure = ({ children }: { children: string }) =>
   children ? (
     <Text role="alert" fontSize="sm" color="tone.deadlocked.fg">
       {children}

@@ -13,6 +13,8 @@ export interface PickerRow {
   question: boolean;
   /** The session failed for a reason other than a rate limit. */
   failed: boolean;
+  /** No map yet: the row is built from the Design's session and sits at the Chart step. */
+  chart?: boolean;
 }
 
 export interface PickerGroup {
@@ -31,8 +33,8 @@ const SECTIONS: { key: PickerSection; title: string }[] = [
 // The server raises a Grilling round's Actionable with this reason prefix (server/sessionactionable.go).
 const GRILLING_REASON_PREFIX = "Grilling";
 
-/** A Design's session sits on a ticket of its map epic, so the epic is the ticket address before the slash. */
-const designOf = (s: SessionInfo) => (s.design && s.ticket ? s.ticket.slice(0, s.ticket.indexOf("/")) : undefined);
+/** A Design's session sits on a ticket of its map epic, or on the epic itself before Chart makes the map. */
+const designOf = (s: SessionInfo) => (s.design && s.ticket ? s.ticket.split("/")[0] : undefined);
 
 const byNewest = (a: SessionInfo, b: SessionInfo) => Date.parse(b.status_changed_at) - Date.parse(a.status_changed_at);
 
@@ -68,14 +70,38 @@ export const compareRows = (a: PickerRow, b: PickerRow) =>
 /** The non-empty sections of the Designs picker. */
 export function pickerGroups(epics: EpicListRow[], sessions: SessionInfo[]): PickerGroup[] {
   const maps = epics.filter((e) => e.kind === "map");
+  const known = new Set(epics.map((e) => e.address));
   return SECTIONS.map(({ key, title }) => ({
     key,
     title,
-    rows: maps
-      .filter((e) => e.picker_section === key)
-      .map((e) => pickerRow(e, sessions))
-      .sort(compareRows),
+    rows: [
+      ...maps.filter((e) => e.picker_section === key).map((e) => pickerRow(e, sessions)),
+      ...(key === IN_PROGRESS ? sessionOnlyRows(known, sessions) : []),
+    ].sort(compareRows),
   })).filter((g) => g.rows.length > 0);
+}
+
+/** Designs whose map Chart has not made yet: one row per address, from its newest session. */
+function sessionOnlyRows(known: Set<string>, sessions: SessionInfo[]): PickerRow[] {
+  const addresses = new Set(sessions.flatMap((s) => designOf(s) ?? []).filter((a) => !known.has(a)));
+  return [...addresses].map((address) => {
+    const newest = designSession(address, sessions)!;
+    const row: EpicListRow = {
+      address,
+      project: newest.project,
+      name: address.slice(address.indexOf(":") + 1),
+      kind: "map",
+      state: "designing",
+      done: 0,
+      total: 0,
+      queued: false,
+      queueable: false,
+      blocked_by_epics: [],
+      picker_section: IN_PROGRESS,
+      picker_sort_at: newest.status_changed_at,
+    };
+    return { ...pickerRow(row, sessions), chart: true };
+  });
 }
 
 /** Keeps the rows whose slug or name contains the query, and drops sections left empty. */

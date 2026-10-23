@@ -1,6 +1,6 @@
 import { Box, Input, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router";
+import { Navigate, useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { designHref } from "../hrefs";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
@@ -14,6 +14,7 @@ import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
 import { DesignChat } from "./ChatLog";
+import { NewDesignForm, type NewDesignDraft } from "./NewDesignForm";
 import type { OpenDesign, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress } from "./Progress";
@@ -27,6 +28,11 @@ function Marks({ section, row }: { section: string; row: PickerRow }) {
   if (section === "recently-finished") return <Mark color="tone.done.fg" label="Finished" glyph="✓" />;
   return (
     <Box display="flex" gap="1.5" alignItems="center">
+      {row.chart && (
+        <Text as="span" fontSize="xs" color="text.dim">
+          Chart
+        </Text>
+      )}
       {row.failed && <Mark color="tone.deadlocked.fg" label="Needs attention" glyph="!" />}
       {row.question && <Mark color="tone.waiting.fg" label="Waiting for your answer" glyph="?" />}
       {row.live && <LiveMark />}
@@ -64,11 +70,25 @@ const useWide = () => {
   return wide;
 };
 
-function Picker({ groups, projects, current }: { groups: PickerGroup[]; projects: number; current?: string }) {
+interface PickerProps {
+  groups: PickerGroup[];
+  projects: number;
+  current?: string;
+  onNew: () => void;
+}
+
+function Picker({ groups, projects, current, onNew }: PickerProps) {
   const [query, setQuery] = useState("");
   const filtering = query.trim() !== "";
   return (
-    <Sidebar title="Designs">
+    <Sidebar
+      title="Designs"
+      action={
+        <Button variant="ghost" onClick={onNew}>
+          + New
+        </Button>
+      }
+    >
       <Input
         type="search"
         aria-label="Filter Designs"
@@ -110,7 +130,7 @@ function Picker({ groups, projects, current }: { groups: PickerGroup[]; projects
   );
 }
 
-function MobilePicker({ groups, projects, current }: { groups: PickerGroup[]; projects: number; current?: string }) {
+function MobilePicker({ groups, projects, current, onNew }: PickerProps) {
   const [open, setOpen] = useState(false);
   const name = groups.flatMap((g) => g.rows).find((r) => r.row.address === current)?.row.name ?? "Designs";
   const more = needsYouCount(groups, current);
@@ -126,7 +146,7 @@ function MobilePicker({ groups, projects, current }: { groups: PickerGroup[]; pr
           </Text>
         )}
       </Box>
-      {open && <Picker groups={groups} projects={projects} current={current} />}
+      {open && <Picker groups={groups} projects={projects} current={current} onNew={onNew} />}
     </Box>
   );
 }
@@ -140,6 +160,8 @@ function DesignColumns({
   post,
   open,
   stop,
+  chart,
+  onNewSession,
 }: {
   address: string;
   wide: boolean;
@@ -148,6 +170,9 @@ function DesignColumns({
   post?: PostPrompt;
   open?: OpenDesign;
   stop?: StopSession;
+  /** The Design has no map yet, so only its session can be started again, from the New Design form. */
+  chart?: boolean;
+  onNewSession: () => void;
 }) {
   const conn = useConnectionContext();
   const { detail } = useEpicDetail(address, conn, fetchDetail);
@@ -160,7 +185,15 @@ function DesignColumns({
     <>
       <Box aria-label="Chat" role="region" display="flex" flexDirection="column" gap="3">
         {wide && detail?.impl_address && <ImplLink address={detail.impl_address} />}
-        {session ? (
+        {session && chart ? (
+          session.status.state === "exited" && (
+            <Box display="flex" justifyContent="flex-end">
+              <Button size="sm" variant="outline" onClick={onNewSession}>
+                New session
+              </Button>
+            </Box>
+          )
+        ) : session ? (
           <SessionHeader address={address} shown={session} live={live} onSelect={setSelected} open={open} stop={stop} />
         ) : (
           <Box display="flex" justifyContent="center" py="4">
@@ -199,15 +232,40 @@ export function DesignPage({
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   const { list, failed } = useEpicList(fetchList, conn);
 
+  const navigate = useNavigate();
+  const [draft, setDraft] = useState<NewDesignDraft>();
+
   const wide = useWide();
   const groups = list ? pickerGroups(list.epics, sessions) : [];
+  const projectNames = [...new Set([...(list?.epics ?? []).map((e) => e.project), ...groups.flatMap((g) => g.rows.map((r) => r.row.project))])];
   const projects = new Set(list?.epics.filter((e) => e.kind === "map").map((e) => e.project)).size;
+  // The form's project select starts on the Design on screen.
+  const currentProject = address?.split(":")[0];
+  const formProjects = currentProject ? [currentProject, ...projectNames.filter((p) => p !== currentProject)] : projectNames;
+  const chartRow = groups.flatMap((g) => g.rows).find((r) => r.row.address === address)?.chart;
+  const onNew = () => setDraft({});
+  const onNewSession = () => {
+    if (address) setDraft({ slug: address.slice(address.indexOf(":") + 1), project: currentProject });
+  };
 
   const first = list && !address ? groups.find((g) => g.key === IN_PROGRESS)?.rows[0] : undefined;
   if (first) return <Navigate to={designHref(first.row.address).slice(1)} replace />;
 
   return (
     <DetailPage active="designs">
+      {draft && (
+        <NewDesignForm
+          key={`${draft.slug}|${draft.project}`}
+          projects={formProjects}
+          initial={draft}
+          open={open}
+          onStarted={(started) => {
+            setDraft(undefined);
+            navigate(designHref(started).slice(1));
+          }}
+          onCancel={() => setDraft(undefined)}
+        />
+      )}
       {failed ? (
         <Text color="text.muted">Could not load Designs</Text>
       ) : !list ? (
@@ -215,16 +273,30 @@ export function DesignPage({
       ) : (
         <Box display="grid" gridTemplateColumns={{ base: "1fr", lg: "260px 1fr 300px" }} gap="4" minH="60vh">
           {wide ? (
-            <Picker groups={groups} projects={projects} current={address} />
+            <Picker groups={groups} projects={projects} current={address} onNew={onNew} />
           ) : (
-            <MobilePicker groups={groups} projects={projects} current={address} />
+            <MobilePicker groups={groups} projects={projects} current={address} onNew={onNew} />
           )}
           {address ? (
-            <DesignColumns address={address} wide={wide} fetchDetail={fetchDetail} fetchChat={fetchChat} post={post} open={open} stop={stop} />
+            <DesignColumns
+              address={address}
+              wide={wide}
+              fetchDetail={fetchDetail}
+              fetchChat={fetchChat}
+              post={post}
+              open={open}
+              stop={stop}
+              chart={chartRow}
+              onNewSession={onNewSession}
+            />
           ) : (
             <>
               <Box aria-label="Chat" role="region">
-                <EmptyState title="No Design in progress.">Run /gx-design to start one.</EmptyState>
+                <EmptyState title="No Design in progress.">
+                  <Button tone="running" onClick={onNew}>
+                    New Design
+                  </Button>
+                </EmptyState>
               </Box>
               <Box aria-label="Progress" role="region" />
             </>
