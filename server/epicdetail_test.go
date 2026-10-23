@@ -290,6 +290,41 @@ func TestEpicDetail_MergedLoopEpicCarriesEveryStamp(t *testing.T) {
 	}
 }
 
+func TestEpicDetail_WebShareCountsPersonEndingsOnly(t *testing.T) {
+	cases := []struct {
+		name    string
+		endings string
+		want    float64
+		hasWant bool
+	}{
+		{"only unknown and gx", "    unknown: 4\n    gx: 2\n", 0, false},
+		{"web and tui ignore gx", "    web: 1\n    tui: 3\n    gx: 5\n    unknown: 7\n", 0.25, true},
+		{"cli counts", "    web: 1\n    cli: 1\n", 0.5, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fm := "status: open\ncreated_at: 2026-01-01T00:00:00Z\nmerged_at: 2026-01-01T01:00:00Z\nfriction:\n  total_paused_secs: 1\n  pause_endings:\n" + c.endings
+			h, base := startEpicDetail(t, func(store string) {
+				writeEpicFiles(t, store, "work", "---\n"+fm+"---\n", map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
+			})
+			code, d, body := getEpicDetail(t, h, base, "proj:work")
+			if code != http.StatusOK {
+				t.Fatalf("status %d: %s", code, body)
+			}
+			f := d.Stats.Friction
+			if f == nil {
+				t.Fatalf("no friction: %s", body)
+			}
+			switch {
+			case !c.hasWant && f.WebShare != nil:
+				t.Errorf("web share = %v, want none", *f.WebShare)
+			case c.hasWant && (f.WebShare == nil || *f.WebShare != c.want):
+				t.Errorf("web share = %v, want %v", f.WebShare, c.want)
+			}
+		})
+	}
+}
+
 func TestEpicDetail_UnmergedLoopEpicShowsOnlyLeadTimeSoFar(t *testing.T) {
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\ncreated_at: 2026-01-01T00:00:00Z\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})

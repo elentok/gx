@@ -313,15 +313,13 @@ func (f *frictionTally) fill(out *StatsFriction) {
 	}
 	out.PauseReasons = append(out.PauseReasons, reasons...)
 
-	var web, person int
+	total := map[string]int{}
 	for _, day := range f.endings {
-		web += day[tickets.SourceWeb]
-		person += day[tickets.SourceWeb] + day[tickets.SourceTUI] + day[tickets.SourceCLI]
+		for src, n := range day {
+			total[src] += n
+		}
 	}
-	if person > 0 {
-		share := float64(web) / float64(person)
-		out.WebShare = &share
-	}
+	out.WebShare = webShare(total)
 	if len(f.personSecs) > 0 {
 		secs := slices.Clone(f.personSecs)
 		slices.Sort(secs)

@@ -243,15 +243,20 @@ func epicFriction(f *schema.FrictionSummary) *EpicFriction {
 		return nil
 	}
 	out := &EpicFriction{PausesByReason: f.PausesByReason, RunEvents: f.RunEvents, PausedSecs: f.TotalPausedSecs}
-	total := 0
-	for _, n := range f.PauseEndings {
-		total += n
-	}
-	if total > 0 {
-		share := float64(f.PauseEndings[tickets.SourceWeb]) / float64(total)
-		out.WebShare = &share
-	}
+	out.WebShare = webShare(f.PauseEndings)
 	return out
+}
+
+// webShare is web / (web + TUI + CLI) over pause endings by source; gx- and
+// unknown-ended pauses are not person endings, so with none it returns nil.
+func webShare(endings map[string]int) *float64 {
+	web := endings[tickets.SourceWeb]
+	person := web + endings[tickets.SourceTUI] + endings[tickets.SourceCLI]
+	if person == 0 {
+		return nil
+	}
+	share := float64(web) / float64(person)
+	return &share
 }
 
 // rowFor builds a loop epic's full row for t.
