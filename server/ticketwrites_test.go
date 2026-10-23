@@ -12,11 +12,43 @@ import (
 	"github.com/elentok/gx/ralphloop"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/tickets"
 )
+
+func TestCancel_EndsThePausedTicketsRoundWithTheRequestsSource(t *testing.T) {
+	h, path := startTicketWrites(t)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.MergeConflict, "stuck"); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+		t.Fatalf("cancel = %+v, %v", res, err)
+	}
+	rounds := endedRounds(t, path)
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowCancel || rounds[0].End.Source != server.OriginCLI {
+		t.Errorf("rounds = %+v; want one ended by cli cancel", rounds)
+	}
+}
+
+func TestCancel_WithoutAnOpenRoundWritesNoEnd(t *testing.T) {
+	h, path := startTicketWrites(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+		t.Fatalf("cancel = %+v, %v", res, err)
+	}
+	if rounds := endedRounds(t, path); len(rounds) != 0 {
+		t.Errorf("rounds = %+v; want none", rounds)
+	}
+}
 
 func startTicketWrites(t *testing.T) (*servertest.Harness, string) {
 	t.Helper()

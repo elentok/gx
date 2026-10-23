@@ -250,6 +250,9 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 			return res, err
 		}
 		for _, t := range targets {
+			if err := tickets.EndOpenRound(t.Path, req.Source, tickets.HowCancel, "cancelled"); err != nil {
+				return QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.address(t), err)
+			}
 			if err := ralphloop.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {
 				return QueueResult{}, fmt.Errorf("cancel %s: %w", ref.address(t), err)
 			}

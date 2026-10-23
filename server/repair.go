@@ -156,7 +156,7 @@ func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
 	}
 	res, _, err := repair.Merge(repair.MergeInput{
 		EpicPath: epicPath, ID: id, From: req.From, To: req.To,
-		IgnoreLiveTab: req.IgnoreLiveTab, Continue: req.Continue, Abort: req.Abort, Cwd: cwd,
+		IgnoreLiveTab: req.IgnoreLiveTab, Continue: req.Continue, Abort: req.Abort, Source: req.origin, Cwd: cwd,
 	}, ralphloop.DefaultDeps())
 	if err != nil {
 		return repairRefusal(err), nil

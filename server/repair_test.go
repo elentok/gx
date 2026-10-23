@@ -13,8 +13,25 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+func TestRepair_MergeEndsThePauseRoundAsAManualMerge(t *testing.T) {
+	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.ZeroCommit, "no commits"); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	if err != nil || res.Refused {
+		t.Fatalf("merge = %+v, %v; want merged", res, err)
+	}
+	rounds := endedRounds(t, ticketPath)
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowManualMerge || rounds[0].End.Source != server.OriginCLI {
+		t.Errorf("rounds = %+v; want one ended by cli manual-merge", rounds)
+	}
+}
 
 func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 	store := t.TempDir()

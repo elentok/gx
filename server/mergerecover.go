@@ -80,6 +80,9 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 	switch v.Merging {
 	case ralphloop.MergingMerged:
 		ev := ralphloop.Event{Outcome: string(ralphloop.Merged), SHA: v.SHA}
+		if err := tickets.EndOpenRound(t.Path, tickets.SourceGx, tickets.HowManualMerge, "manual-merge"); err != nil {
+			return fmt.Errorf("end pause round of %s: %w", addr, err)
+		}
 		if err := ralphloop.RecordManualMerge(projectDir, epic, t.Identifier, t.Path, t.IsDone(), ev); err != nil {
 			return fmt.Errorf("finishing merge of %s: %w", addr, err)
 		}

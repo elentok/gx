@@ -26,8 +26,10 @@ type MergeInput struct {
 	IgnoreLiveTab bool
 	Continue      bool
 	Abort         bool
-	Cwd           string
-	Getwd         func() (string, error)
+	// Source is who asked for the merge: it ends the ticket's open Pause round.
+	Source string
+	Cwd    string
+	Getwd  func() (string, error)
 }
 
 // Merge lands a stuck ticket's commits (or continues/aborts a conflicted land)
@@ -127,7 +129,7 @@ func Merge(in MergeInput, d ralphloop.Deps) (MergeResult, string, error) {
 		return out, fmt.Sprintf("%s: conflict landing %s; resolve it in %s, then --continue or --abort", EpicTicketLabel(in.EpicPath, in.ID), marker.SourceRange, featurePath), nil
 	}
 
-	if err := recordLanded(in.EpicPath, epic, t, parsed.Status, res, session); err != nil {
+	if err := recordLanded(in.EpicPath, epic, in.Source, t, parsed.Status, res, session); err != nil {
 		return MergeResult{}, "", err
 	}
 	return out, fmt.Sprintf("%s: %s (%s)", EpicTicketLabel(in.EpicPath, in.ID), jsonOutcome(res.Outcome), res.SHA), nil
@@ -164,8 +166,12 @@ func abortOrphanLock(epicPath, lockDir, id string) (MergeResult, string, error) 
 }
 
 // recordLanded writes status: done (unless already) and the manual-merge event
-// through the pause path.
-func recordLanded(epicPath, epic string, t tickets.Ticket, status schema.Status, res ralphloop.MergeResult, session ralphloop.MergeSession) error {
+// through the pause path. The ticket's open Pause round ends first, so a crash
+// between the two leaves a closed round on a paused ticket, not an open one on a done ticket.
+func recordLanded(epicPath, epic, source string, t tickets.Ticket, status schema.Status, res ralphloop.MergeResult, session ralphloop.MergeSession) error {
+	if err := tickets.EndOpenRound(t.Path, source, tickets.HowManualMerge, "manual-merge"); err != nil {
+		return fmt.Errorf("end pause round of %s: %w", t.Identifier, err)
+	}
 	ev := ralphloop.Event{
 		Outcome:      string(res.Outcome),
 		SHA:          res.SHA,
@@ -266,7 +272,7 @@ func resolveMerge(in MergeInput, d ralphloop.Deps) (MergeResult, string, error) 
 	if err != nil {
 		return MergeResult{}, "", err
 	}
-	if err := recordLanded(in.EpicPath, epic, t, parsed.Status, res, session); err != nil {
+	if err := recordLanded(in.EpicPath, epic, in.Source, t, parsed.Status, res, session); err != nil {
 		return MergeResult{}, "", err
 	}
 	if err := ralphloop.ClearMerge(lockDir); err != nil {
