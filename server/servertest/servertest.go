@@ -38,8 +38,10 @@ type Harness struct {
 	Herdr       *herdrfake.State
 	StateDir    string
 	SessionsDir string // the interactive sessions' state dirs
-	TicketStore string
-	TCPAddr     string // empty unless started with StartWithTCP
+	// ConversationsDir holds the linked sessions' conversation records.
+	ConversationsDir string
+	TicketStore      string
+	TCPAddr          string // empty unless started with StartWithTCP
 	// Banners records the OS banners the server sent, unless an option set
 	// its own Notifier. A harness never shows a real banner.
 	Banners *Banners
@@ -407,6 +409,8 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		StateDir:    filepath.Join(stateDir, "state"),
 		SessionsDir: filepath.Join(stateDir, "sessions"),
 		TicketStore: store,
+
+		ConversationsDir: filepath.Join(stateDir, "conversations"),
 	}
 	// Runs before the temp dir goes, so no session holder outlives the test.
 	t.Cleanup(func() { stopSessionHolders(h.SessionsDir) })
@@ -435,7 +439,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		}
 	}
 
-	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
+	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
 	// Every merge pauses on ralphloop's 3s finish debounce; the fake agents
 	// settle at once, so a hundredth keeps the order without the wait.

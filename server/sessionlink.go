@@ -42,6 +42,7 @@ func (s *Server) linkSession(req LinkSessionRequest) (SessionResult, error) {
 	var info SessionInfo
 	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		m.Ticket, m.Design = ticket, design
+		s.recordConversation(*m)
 		info = m.info()
 		return true
 	}); err != nil {

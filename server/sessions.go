@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
@@ -372,6 +373,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		return SessionResult{}, err
 	}
 	id := meta.ID
+	s.recordConversation(meta)
 	s.sessionWatches.metaMu.Lock()
 	err = s.startSessionHolder(dir, &meta, req.Cols, req.Rows, false)
 	if err != nil {
@@ -385,6 +387,21 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	s.events.publish(EventSessionChanged, id)
 	info := meta.info()
 	return SessionResult{Session: &info}, nil
+}
+
+// recordConversation keeps the session's current conversation on the record,
+// counted toward its current Session ticket. A session with no ticket records
+// nothing.
+func (s *Server) recordConversation(m sessionMeta) {
+	if m.Ticket == "" || m.ConversationID == "" {
+		return
+	}
+	err := conversations.Save(s.cfg.ConversationsDir, conversations.Record{
+		ID: m.ConversationID, Dir: m.Dir, Harness: m.Harness, Ticket: m.Ticket, RecordedAt: time.Now(),
+	})
+	if err != nil {
+		s.log.Warn("record conversation", "session", m.ID, "err", err)
+	}
 }
 
 // addSessionWorktree makes worktree name from the project's trunk, as the
@@ -722,6 +739,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 				}
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
 					m.ConversationID = msg.ConversationID
+					s.recordConversation(*m)
 					changed = true
 				}
 				if m.AutoName && msg.DisplayName != "" && msg.DisplayName != m.Name {

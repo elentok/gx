@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
@@ -194,6 +195,9 @@ type Config struct {
 	// SessionsDir holds one state dir per interactive session; empty means
 	// <gx data dir>/sessions.
 	SessionsDir string
+	// ConversationsDir holds the conversation records of linked sessions;
+	// empty means <gx data dir>/conversations.
+	ConversationsDir string
 	// Holder is the command that hosts an interactive session; nil means
 	// this executable's agent-holder.
 	Holder []string
@@ -406,6 +410,16 @@ func New(cfg Config) (*Server, error) {
 			return nil, err
 		}
 		cfg.SessionsDir = filepath.Join(data, "sessions")
+	}
+	if cfg.ConversationsDir == "" {
+		dir, err := conversations.DefaultDir()
+		if err != nil {
+			return nil, err
+		}
+		cfg.ConversationsDir = dir
+	}
+	if err := conversations.MarkStarted(cfg.ConversationsDir, time.Now()); err != nil {
+		return nil, err
 	}
 	if err := os.MkdirAll(cfg.StateDir, 0o700); err != nil {
 		return nil, err
