@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -284,6 +285,12 @@ func (s *Server) stampEpic(root rootRef, epicPath string, keys ...string) {
 	}
 	if err := tickets.StampEpicFields(epicPath, fields); err != nil {
 		s.log.Warn("stamp epic", "root", root, "keys", keys, "err", err)
+	}
+	// Every merge path stamps merged_at here, so an <map>-impl merge completes its map here.
+	if slices.Contains(keys, "merged_at") {
+		if _, err := tickets.MarkMapDone(epicPath, false); err != nil {
+			s.log.Warn("mark map done", "root", root, "err", err)
+		}
 	}
 }
 

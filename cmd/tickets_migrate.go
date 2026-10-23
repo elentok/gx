@@ -70,11 +70,18 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		return err
 	}
 	if dryRun {
-		fmt.Fprintln(w, "dry run: pause migration only, nothing written")
+		mapsDone, err := tickets.MigrateMapDone(scratchRoot, true)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(w, "dry run: pause and map-done migration only, nothing written")
 		for _, s := range steps {
 			fmt.Fprintf(w, "%s: %s\n", s.Path, s.Note())
 		}
-		fmt.Fprintf(w, "%d file(s) would change\n", len(steps))
+		for _, c := range mapsDone {
+			fmt.Fprintf(w, "%s: %s\n", c.Path, strings.Join(c.Notes, ", "))
+		}
+		fmt.Fprintf(w, "%d file(s) would change\n", len(steps)+len(mapsDone))
 		return nil
 	}
 	result, err := tickets.Migrate(scratchRoot)
@@ -92,6 +99,11 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		var renamed []tickets.MigrationChange
 		renamed, err = tickets.MigrateDestinationUnconfirmed(scratchRoot)
 		changes = mergeChanges(changes, renamed)
+	}
+	if err == nil {
+		var done []tickets.MigrationChange
+		done, err = tickets.MigrateMapDone(scratchRoot, false)
+		changes = mergeChanges(changes, done)
 	}
 	if err == nil {
 		var moved []tickets.MigrationChange
