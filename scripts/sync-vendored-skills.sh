@@ -19,14 +19,14 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 manifest="$script_dir/vendored-skills.manifest"
 skills_dir="$script_dir/../skills"
 mode=""
-accepted=""
+accepted=()
 
 while [ $# -gt 0 ]; do
 	case "$1" in
 	--check) mode=check ;;
 	--merge) mode=merge ;;
 	--accept-license)
-		accepted="$accepted ${2:?--accept-license needs a skill name}"
+		accepted+=("${2:?--accept-license needs a skill name}")
 		shift
 		;;
 	--manifest)
@@ -76,7 +76,7 @@ upstream_files() {
 # 3-way merges one skill into gx's copy: base = upstream at the pin, ours = gx, theirs = latest.
 # The pin does not move.
 merge_skill() {
-	local skill=$1 dir=$2 path=$3 pin=$4 ours_dir="$skills_dir/$1"
+	local skill=$1 dir=$2 path=$3 pin=$4 latest=$5 skills_dir=$6 ours_dir="$6/$1"
 	local clean=() conflicted=() f b o t rc
 	local tmp="$work/merge"
 	rm -rf "$tmp"
@@ -141,29 +141,32 @@ merge_skill() {
 # Returns 0 when the skill may be synced. A changed upstream LICENSE blocks it unless the skill was
 # named with --accept-license; an accepted one is copied word for word. --check only reports it.
 license_gate() {
-	local skill=$1 dir=$2 license=$3 pin=$4
+	local skill=$1 dir=$2 license=$3 pin=$4 latest=$5 skills_dir=$6 accept=$7
 	local old="$work/license.old" new="$work/license.new"
 	git -C "$dir" show "$pin:$license" >"$old" 2>/dev/null || : >"$old"
 	git -C "$dir" show "$latest:$license" >"$new" 2>/dev/null || : >"$new"
 	cmp -s "$old" "$new" && return 0
 	if [ "$mode" = check ]; then
-		found=1
 		echo "$skill: license changed"
 		diff -u "$old" "$new" || true
-		return 0
+		return 2
 	fi
-	case " $accepted " in
-	*" $skill "*)
+	if [ "$accept" = 1 ]; then
 		mkdir -p "$skills_dir/$skill"
 		cp "$new" "$skills_dir/$skill/LICENSE"
 		echo "$skill: license change accepted, LICENSE updated"
-		found=1
-		return 0
-		;;
-	esac
-	found=1
+		return 2
+	fi
 	echo "$skill: license changed; nothing written for this skill"
 	diff -u "$old" "$new" || true
+	return 1
+}
+
+is_accepted() {
+	local a
+	for a in "${accepted[@]+"${accepted[@]}"}"; do
+		[ "$a" = "$1" ] && return 0
+	done
 	return 1
 }
 
@@ -177,7 +180,12 @@ while read -r skill repo path license pin strategy; do
 		echo "$skill: upstream path $path no longer exists at $latest; nothing written for this skill"
 		continue
 	fi
-	license_gate "$skill" "$dir" "$license" "$pin" || continue
+	accept=0
+	is_accepted "$skill" && accept=1
+	gate=0
+	license_gate "$skill" "$dir" "$license" "$pin" "$latest" "$skills_dir" "$accept" || gate=$?
+	[ "$gate" -eq 0 ] || found=1
+	[ "$gate" -ne 1 ] || continue
 	count=$(git -C "$dir" rev-list --count "$pin..$latest" -- "$path")
 	if [ "$count" -eq 0 ]; then
 		continue
@@ -192,7 +200,7 @@ while read -r skill repo path license pin strategy; do
 	echo "upstream diff:"
 	git -C "$dir" diff "$pin" "$latest" -- "$path"
 	if [ "${strategy:-merge}" = merge ]; then
-		merge_skill "$skill" "$dir" "$path" "$pin"
+		merge_skill "$skill" "$dir" "$path" "$pin" "$latest" "$skills_dir"
 	fi
 done <"$manifest"
 
