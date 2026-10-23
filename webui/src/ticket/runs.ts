@@ -1,5 +1,5 @@
 import { formatDuration } from "../epic/rows";
-import { RunPaused, RunRunning, StartNewSession, type DetailRun } from "../generated/server";
+import { RunAgentGoneAfterRestart, RunPaused, RunRunning, StartNewSession, type DetailRun } from "../generated/server";
 
 export const formatStart = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -7,6 +7,7 @@ export const formatStart = (iso: string) =>
 // The server sends "agent-lost" and the like; the page reads them as words.
 function outcomeOf(r: DetailRun): string {
   if (r.outcome === RunPaused) return r.pause_label ? `paused · ${r.pause_label}` : "paused";
+  if (r.outcome === RunAgentGoneAfterRestart) return "agent gone after server restart, no work to keep, back in the queue";
   return r.outcome.replaceAll("-", " ");
 }
 

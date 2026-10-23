@@ -149,6 +149,7 @@ test("Runs lists each run in order with start, duration, outcome and session wor
     run("2026-01-01T09:00:00Z", { outcome: "paused", pause_label: "Needs an answer", duration: 600 }),
     run("2026-01-01T09:30:00Z", { start_kind: "same-session" }),
     run("2026-01-01T10:00:00Z", { outcome: "agent-lost", duration: undefined }),
+    run("2026-01-01T10:30:00Z", { outcome: "agent-gone-after-restart", duration: undefined }),
   ];
   renderTicket({ ...plain, runs });
   const section = await screen.findByRole("region", { name: "Runs" });
@@ -157,6 +158,7 @@ test("Runs lists each run in order with start, duration, outcome and session wor
     `${formatStart(runs[0].start)} · 10m · paused · Needs an answer · new session`,
     `${formatStart(runs[1].start)} · 1m · merged · same session`,
     `${formatStart(runs[2].start)} · agent lost · new session`,
+    `${formatStart(runs[3].start)} · agent gone after server restart, no work to keep, back in the queue · new session`,
   ]);
   expect(section.textContent).not.toMatch(/resumed|claim|reopen/i);
 });
