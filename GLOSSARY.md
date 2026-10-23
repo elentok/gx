@@ -235,7 +235,8 @@ They survive only in one read shim and a few hidden aliases, until `gx:follow-up
 
 **Recently finished** — the last few completed loop epics (by `completed_at`), listed apart from and
 dimmer than the live epics so a finished epic does not just vanish from the Queue. Map epics never
-appear.
+appear. Not the Designs picker's "Recently finished" section, which lists Designs whose `<epic>-impl`
+epic was queued in the last 7 days.
 
 **Background task** — a shell command, Monitor or async subagent a Claude agent moved off its own
 foreground turn (recorded as a `backgroundTaskId`, Monitor `taskId` or async `agentId` in the session
@@ -349,12 +350,24 @@ when the session is created, and shown with the session. It never changes the ti
 person in the session works the ticket. _Avoid_: assignee, claim (a claim is a ticket status).
 
 **Design** — the web UI's name for a map epic. A Design is **Live** while one of its design sessions
-has not Exited. _Avoid_: "design session" for the map epic itself (a design session is the agent
-session working on it).
+has not Exited. A Design is **Not started** while its Destination is unconfirmed and none of its
+tickets is resolved. _Avoid_: "design session" for the map epic itself (a design session is the agent
+session working on it); draft for a Not started Design (a draft is work set aside deliberately).
 
 **Design session** — an interactive session with a **Session ticket**: where gx-design runs on a
 map. It runs in the project's trunk checkout. A map epic or map ticket can have more than one at a
 time. _Avoid_: planning session.
+
+**Progress** — the list of gx-design steps for a Design (Chart, Resolve tickets, Spec, Review, Grill
+findings, Create tickets, Branch, Done), derived by the server from the tracker, the trunk checkout
+and the repo's refs. It shows current state only and has no round counter. A "step" is one of these;
+a run is one gx-design invocation, and many runs can stay in one step. _Avoid_: "next step" for the
+run-end Continue action.
+
+**Session failure** — the `failure` the server derives on an interactive session: `crashed`, `ended`,
+`auth`, `rate-limit`, `stalled` or `blocked`, with a plain label and a button named after what the
+person does (Restore, New session, Retry, Screen, or none). It clears when its condition clears. An
+unreadable Question block is not a session failure. _Avoid_: error, broken.
 
 **Session status** — what an interactive session is doing now: Starting, Working, Idle, Blocked,
 Rate-limited or Exited. Finer than an agent runner's working/idle/blocked, which the loop keeps
