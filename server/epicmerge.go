@@ -44,7 +44,7 @@ func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
 	if e.IsMap {
 		return refusal(ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand"), nil
 	}
-	if root.Epic == OneOffsEpic {
+	if !isMergeableEpic(root) {
 		return refusal(ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges"), nil
 	}
 	// The web page sends the state it shows; the socket route sends none.
