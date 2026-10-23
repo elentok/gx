@@ -213,7 +213,7 @@ func (s *Server) repairStartOver(req RepairRequest) (RepairResult, error) {
 	}
 	res, err := repair.StartOver(repair.StartOverInput{
 		EpicPath: epicPath, ID: id, Reason: req.Reason, Force: req.Force,
-		DeleteBranch: req.DeleteBranch, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
+		DeleteBranch: req.DeleteBranch, Source: req.origin, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
 	}, s.startOverDeps(req.Address))
 	if err != nil {
 		return repairRefusal(err), nil

@@ -12,11 +12,15 @@ import (
 // blocked_by, parent, type, expected_context_window) and every other body
 // section are left as written. A non-empty note is appended to "## Comments"
 // in the same write, so the file never shows the restart without its note.
-func StartOver(path string, now time.Time, note string) error {
-	// Before the status write, so a crash between them leaves a closed question
+// A non-empty source is who asked for the start over: it ends the ticket's open
+// Pause round. The automatic reopen of an empty claim passes "" and writes no end.
+func StartOver(path string, now time.Time, note, source string) error {
+	// Before the status write, so a crash between them leaves a closed round
 	// on a still-paused ticket rather than an open one on an open ticket.
-	if err := CloseOpenQuestion(path, "start-over"); err != nil {
-		return err
+	if source != "" {
+		if err := EndOpenRound(path, source, HowStartOver, "start-over"); err != nil {
+			return err
+		}
 	}
 	return schema.UpdateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Status = schema.StatusOpen

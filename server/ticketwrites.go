@@ -179,8 +179,12 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if res, refused, err := s.settleLive([]tickets.Address{ref.addr}, req.Stop, isWorking); refused || err != nil {
 			return res, err
 		}
-		if err := ralphloop.CloseOpenQuestion(ref.ticket.Path, ralphloop.CloseRelaunch); err != nil {
-			return QueueResult{}, fmt.Errorf("closing question of %s: %w", ref.addr, err)
+		source := req.Source
+		if req.actor == recovery.ActorRecovery {
+			source = tickets.SourceGx
+		}
+		if err := tickets.EndOpenRound(ref.ticket.Path, source, tickets.HowRelaunch, ralphloop.CloseRelaunch); err != nil {
+			return QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.addr, err)
 		}
 		if req.actor != recovery.ActorRecovery {
 			err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ralphloop.Event{

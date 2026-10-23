@@ -116,8 +116,23 @@ func TestRelaunch_ClosesTheOpenQuestion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(evs) != 2 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != 1 || evs[1].Reason != "relaunch" {
-		t.Errorf("log = %+v, want the question then pause.closed{question 1, relaunch}", evs)
+	if len(evs) != 2 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != 1 || evs[1].Reason != "relaunch" || evs[1].How != tickets.HowRelaunch || evs[1].Source != server.OriginCLI {
+		t.Errorf("log = %+v, want the question then pause.closed{question 1, relaunch, cli}", evs)
+	}
+}
+
+func TestRelaunch_RecoveryEndsTheRoundWithSourceGx(t *testing.T) {
+	h, _, _, path := startWithLeftover(t, agentrunner.StateDone)
+	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseRepair, Summary: "stuck"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := h.Server.RecoveryDo(recovery.Call{Verb: recovery.VerbRelaunch, Address: "proj:epic-a/01"}); err != nil {
+		t.Fatal(err)
+	}
+	rounds := endedRounds(t, path)
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowRelaunch || rounds[0].End.Source != tickets.SourceGx {
+		t.Errorf("rounds = %+v; want the repair round ended by a gx relaunch", rounds)
 	}
 }
 

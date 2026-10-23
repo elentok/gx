@@ -32,9 +32,11 @@ type StartOverInput struct {
 	Force    bool
 	// DeleteBranch deletes the iteration branch instead of setting it aside.
 	DeleteBranch bool
-	JSON         bool
-	Cwd          string
-	Now          time.Time
+	// Source is who asked, a tickets.Source* value; it ends the ticket's open Pause round.
+	Source string
+	JSON   bool
+	Cwd    string
+	Now    time.Time
 	// Subjects lists the commit subjects on branch since its merge-base with
 	// base, newest first.
 	Subjects func(dir, base, branch string) ([]string, error)
@@ -92,7 +94,7 @@ func StartOver(in StartOverInput, d ralphloop.Deps) (StartOverResult, error) {
 		return StartOverResult{}, err
 	}
 
-	if err := tickets.StartOver(t.Path, in.Now, startOverNote(in, attic)); err != nil {
+	if err := tickets.StartOver(t.Path, in.Now, startOverNote(in, attic), in.Source); err != nil {
 		return StartOverResult{}, fmt.Errorf("starting ticket %s over: %w", in.ID, err)
 	}
 

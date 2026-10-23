@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets"
 )
 
 // startOverFixture is a claimed ticket 01 of epic-a whose agent is live in
@@ -57,6 +58,27 @@ func TestStartOver_ClosesAnIdleOrDoneAgentAndStartsOver(t *testing.T) {
 				t.Error("the agent's pane is still open")
 			}
 		})
+	}
+}
+
+func TestStartOver_EndsTheOpenRoundWithTheRequestsSource(t *testing.T) {
+	in, d, _, _ := startOverFixture(t, agentrunner.StateIdle)
+	in.Source = tickets.SourceWeb
+	path := filepath.Join(in.EpicPath, "issues", "01-first.md")
+	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseRepair, Summary: "stuck"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := repair.StartOver(in, d); err != nil {
+		t.Fatalf("StartOver: %v", err)
+	}
+	evs, err := tickets.ReadLog(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rounds := tickets.AllRounds(evs)
+	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowStartOver || rounds[0].End.Source != tickets.SourceWeb {
+		t.Errorf("rounds = %+v; want one ended by a web start-over", rounds)
 	}
 }
 
