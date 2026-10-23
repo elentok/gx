@@ -24,6 +24,8 @@ import { SessionHeader, StartDesignButton } from "./SessionControls";
 import { designSession, liveSessions,filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
 
 const NOT_STARTED = "not-started";
+// Sections that start collapsed, unless a filter matches in them or they hold the open Design.
+const COLLAPSED = [NOT_STARTED, "recently-finished"];
 
 function Marks({ section, row }: { section: string; row: PickerRow }) {
   if (section === "ready-to-queue") return <Mark color="tone.done.fg" label="Ready to queue" glyph="▶" />;
@@ -106,7 +108,7 @@ function Picker({ groups, projects, current, onNew }: PickerProps) {
           key={`${g.key}-${filtering}`}
           title={g.title}
           count={g.rows.length}
-          defaultCollapsed={g.key === NOT_STARTED && !filtering}
+          defaultCollapsed={COLLAPSED.includes(g.key) && !filtering && !g.rows.some((r) => r.row.address === current)}
         >
           {g.rows.map((r) => (
             <SidebarItem

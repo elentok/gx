@@ -76,7 +76,7 @@ function Tickets({ rows }: { rows: EpicDetailRow[] }) {
 function Steps({ steps, rows }: { steps: MapStep[]; rows: EpicDetailRow[] }) {
   const tickets = ticketsOf(steps, rows);
   return (
-    <Box as="ol" listStyleType="none" m="0" p="0" borderLeftWidth="2px" borderColor="border" pl="3" display="flex" flexDirection="column" gap="1">
+    <Box as="ol" fontSize="sm" listStyleType="none" m="0" p="0" display="flex" flexDirection="column" gap="1">
       {steps.map((s) => {
         const { glyph, tone } = markOf(s);
         return (
@@ -127,5 +127,12 @@ function MobileProgress({ detail, steps }: { detail: EpicDetail; steps: MapStep[
 /** The Design's Progress: its eight steps, and the map's tickets under Resolve tickets. On desktop the impl link sits in the chat header. */
 export function Progress({ detail, wide }: { detail: EpicDetail; wide: boolean }) {
   const steps = detail.steps ?? [];
-  return wide ? <Steps steps={steps} rows={detail.rows} /> : <MobileProgress detail={detail} steps={steps} />;
+  // On desktop a panel like the Designs sidebar, only as tall as its steps.
+  return wide ? (
+    <Box bg="surface.raised" px="3" py="4">
+      <Steps steps={steps} rows={detail.rows} />
+    </Box>
+  ) : (
+    <MobileProgress detail={detail} steps={steps} />
+  );
 }

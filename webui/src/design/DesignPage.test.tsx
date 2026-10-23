@@ -109,7 +109,7 @@ test("rows land in their four sections", async () => {
   await screen.findByText("Ready to queue");
   for (const [title, name] of [["In progress", "a"], ["Not started", "b"], ["Ready to queue", "c"], ["Recently finished", "d"]]) {
     expect(screen.getByText(title)).toBeTruthy();
-    if (title === "Not started") fireEvent.click(screen.getByRole("button", { name: /Not started/ }));
+    if (title === "Not started" || title === "Recently finished") fireEvent.click(screen.getByRole("button", { name: new RegExp(title) }));
     expect(screen.getAllByRole("link", { name: new RegExp(`^${name}`) })).toHaveLength(1);
   }
   expect(screen.queryByRole("link", { name: /^old/ })).toBeNull();
@@ -139,6 +139,7 @@ test("each mark shows", async () => {
   expect(within(await link("bad")).getByLabelText("Needs attention")).toBeTruthy();
   expect(within(await link("limited")).queryByLabelText("Needs attention")).toBeNull();
   expect(within(await link("rdy")).getByText("▶")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Recently finished/ }));
   expect(within(await link("fin")).getByText("✓")).toBeTruthy();
 });
 
@@ -194,6 +195,15 @@ test("a Ready to queue row opens the implementation epic, any other row its Desi
   expect(await href("rdy")).toBe("#/e/gx:rdy-impl");
   expect(await href("ip")).toBe("#/d/gx:ip");
   expect(await href("ns")).toBe("#/d/gx:ns");
+});
+
+test("Recently finished starts collapsed unless it holds the open Design", async () => {
+  render([map("ip", "in-progress"), map("fin", "recently-finished")], [], "/d/gx:ip");
+  await screen.findByRole("button", { name: /Recently finished/ });
+  expect(screen.queryByRole("link", { name: /^fin/ })).toBeNull();
+  cleanup();
+  render([map("ip", "in-progress"), map("fin", "recently-finished")], [], "/d/gx:fin");
+  expect(await screen.findByRole("link", { name: /^fin/ })).toBeTruthy();
 });
 
 const filterBox = async () => (await screen.findByLabelText("Filter Designs")) as HTMLInputElement;

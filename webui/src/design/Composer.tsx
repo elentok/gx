@@ -77,18 +77,24 @@ export function Composer({
   };
 
   const phase = next?.phase ?? "";
+  const sendButton = (
+    <Button disabled={!enabled || (!inRound && text.trim() === "")} onClick={onSend} height="auto">
+      Send
+    </Button>
+  );
   return (
     <Box position="sticky" bottom="0" bg="surface" borderTopWidth="1px" py="3" display="flex" flexDirection="column" gap="2" role="form" aria-label="Composer">
-      {CONTINUE_PHASES.includes(phase) && (
-        <Button disabled={!enabled} onClick={() => send({ continue: true })} flexDirection="column" height="auto" py="2">
-          <Text as="span">Continue</Text>
-          <Text as="span" fontSize="xs" fontWeight="normal">
-            {nextTitle ?? (phase === "review" ? "Review" : "Map")}
-          </Text>
-        </Button>
-      )}
       {open && (
-        <Textarea aria-label="Message" value={text} disabled={!enabled} onChange={(e) => setText(e.target.value)} />
+        // The note is one unit: its box, then Close and Send right under it.
+        <Box display="flex" flexDirection="column" gap="2">
+          <Textarea aria-label="Message" value={text} disabled={!enabled} onChange={(e) => setText(e.target.value)} autoFocus />
+          <Box display="flex" gap="2" justifyContent="flex-end">
+            <Button variant="ghost" tone="muted" onClick={() => setOpen(false)}>
+              Close
+            </Button>
+            {sendButton}
+          </Box>
+        </Box>
       )}
       {error && <Text role="alert">{error}</Text>}
       {unanswered.length > 0 && (
@@ -113,15 +119,22 @@ export function Composer({
           </Box>
         </Box>
       )}
-      <Box display="flex" gap="2">
-        <Button variant="outline" aria-label="Note" aria-pressed={open} onClick={() => setOpen((o) => !o)}>
-          📝
-        </Button>
-        {(open || inRound) && (
-          <Button disabled={!enabled || (!inRound && text.trim() === "")} onClick={onSend}>
-            Send
+      {/* Under the note: its toggle and Continue; a round with no note open sends from here. */}
+      <Box display="flex" gap="2" alignItems="stretch">
+        {!open && (
+          <Button variant="outline" aria-label="Note" onClick={() => setOpen(true)} height="auto">
+            ✎ Note
           </Button>
         )}
+        {CONTINUE_PHASES.includes(phase) && (
+          <Button disabled={!enabled} onClick={() => send({ continue: true })} flex="1" flexDirection="column" height="auto" py="2">
+            <Text as="span">Continue</Text>
+            <Text as="span" fontSize="xs" fontWeight="normal">
+              {nextTitle ?? (phase === "review" ? "Review" : "Map")}
+            </Text>
+          </Button>
+        )}
+        {inRound && !open && sendButton}
       </Box>
     </Box>
   );
