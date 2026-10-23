@@ -54,7 +54,12 @@ Then, while working:
   verify. Repeat reads are the largest leak. The one exception: re-read the exact range (`offset`/
   `limit`) after an `Edit` fails with `String to replace not found`.
 - **Never edit code you have not read, and copy indentation exactly from the Read.** Don't guess
-  tabs or spaces.
+  tabs or spaces. Read the exact lines you will edit, in full: a Read that says "(N lines omitted)"
+  over them does not count - re-read that range with `offset`/`limit`.
+- **Send Edits to one file one after another, never in parallel.** One failed Edit makes the rest of
+  the batch fail, and a later Edit may depend on text an earlier one changed.
+- **Never run a test in the same batch as the Edits it should cover.** It can return green before
+  the Edits apply, so the result covers only some of them.
 - **Never read source through a shell command** (`cat`, `sed -n`, `head`, `tail`). Same tokens as a
   direct file read, no benefit.
 - **Prefer the project's LSP tooling to grepping**. A references lookup answers in 3 lines what a
