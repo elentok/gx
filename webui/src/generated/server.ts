@@ -423,6 +423,18 @@ export const ProgressPhaseReview = "review";
 export const ProgressPhaseImplement = "implement";
 export type ProgressPhase = typeof ProgressPhaseMap | typeof ProgressPhaseReview | typeof ProgressPhaseImplement;
 /**
+ * PickerSection is the Designs picker section a map row belongs to.
+ */
+export type PickerSection = string;
+export const PickerInProgress: PickerSection = "in-progress";
+export const PickerNotStarted: PickerSection = "not-started";
+export const PickerReadyToQueue: PickerSection = "ready-to-queue";
+export const PickerRecentlyFinished: PickerSection = "recently-finished";
+/**
+ * PickerNone: finished more than 7 days ago; the row stays on the Epics page.
+ */
+export const PickerNone: PickerSection = "none";
+/**
  * EpicListRow is one epic of the /v1/epics payload.
  */
 export interface EpicListRow {
@@ -468,6 +480,14 @@ export interface EpicListRow {
    */
   progress_step?: ProgressStep;
   progress_phase?: ProgressPhase;
+  /**
+   * PickerSection, PickerSortAt and ImplAddress are set only on a map row.
+   * PickerSortAt is the time the section sorts by; ImplAddress is the
+   * implementation epic's address when it exists.
+   */
+  picker_section?: PickerSection;
+  picker_sort_at?: string;
+  impl_address?: string;
 }
 /**
  * FollowUpCount is the number of draft and open tickets in one project's

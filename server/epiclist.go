@@ -57,6 +57,18 @@ const (
 	ProgressPhaseImplement ProgressPhase = "implement"
 )
 
+// PickerSection is the Designs picker section a map row belongs to.
+type PickerSection string
+
+const (
+	PickerInProgress       PickerSection = "in-progress"
+	PickerNotStarted       PickerSection = "not-started"
+	PickerReadyToQueue     PickerSection = "ready-to-queue"
+	PickerRecentlyFinished PickerSection = "recently-finished"
+	// PickerNone: finished more than 7 days ago; the row stays on the Epics page.
+	PickerNone PickerSection = "none"
+)
+
 // followUpsEpicName is every project's contributor outbox epic.
 const followUpsEpicName = "follow-ups"
 
@@ -90,6 +102,12 @@ type EpicListRow struct {
 	// ProgressStep and ProgressPhase are set only on a map row.
 	ProgressStep  ProgressStep  `json:"progress_step,omitempty"`
 	ProgressPhase ProgressPhase `json:"progress_phase,omitempty"`
+	// PickerSection, PickerSortAt and ImplAddress are set only on a map row.
+	// PickerSortAt is the time the section sorts by; ImplAddress is the
+	// implementation epic's address when it exists.
+	PickerSection PickerSection `json:"picker_section,omitempty"`
+	PickerSortAt  time.Time     `json:"picker_sort_at,omitzero"`
+	ImplAddress   string        `json:"impl_address,omitempty"`
 }
 
 // FollowUpCount is the number of draft and open tickets in one project's
@@ -176,15 +194,19 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 			}
 		}
 		var probe mapProbe
+		var designs map[string]designActivity
 		if hasMap {
 			probe = s.mapProbeFor(project)
+			designs = s.designActivities()
 		}
+		now := time.Now()
 		for _, e := range epics {
 			if epicListed(e) {
 				row := s.epicListRow(project, e)
 				row.BlockedByEpics = unmergedBlockers(project, e, merged)
 				if e.IsMap {
 					row.ProgressStep, row.ProgressPhase = mapProgress(e, byName, probe)
+					row.PickerSection, row.PickerSortAt, row.ImplAddress = s.mapPicker(project, e, row.ProgressStep, byName, designs[row.Address], now)
 				}
 				list.Epics = append(list.Epics, row)
 			}
