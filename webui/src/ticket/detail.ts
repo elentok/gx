@@ -11,7 +11,7 @@ export type FetchDetail = (address: string) => Promise<DetailResult>;
 
 export const fetchDetail: FetchDetail = async (address) => {
   const res = await fetch(`/v1/tickets/detail?address=${encodeURIComponent(address)}`);
-  if (res.status === 404) return { kind: "not-found" };
+  if (res.status === 404 || res.status === 400) return { kind: "not-found" };
   if (!res.ok) throw new Error(`detail: HTTP ${res.status}`);
   return { kind: "ok", detail: await res.json() };
 };
@@ -23,8 +23,11 @@ export interface DetailState<T = TicketDetail> {
   refetch: () => void;
 }
 
+// A ticket address is <project>:<epic>/<id>; the page refetches for any ticket of its epic.
+export const epicOfTicket = (address: string) => address.slice(0, Math.max(0, address.lastIndexOf("/")));
+
 export function useTicketDetail(address: string, conn: Connection, fetcher: FetchDetail = fetchDetail): DetailState {
-  return useDetail(address, conn, fetcher, false, "ticket");
+  return useDetail(address, conn, fetcher, `${epicOfTicket(address)}/`, "ticket");
 }
 
 // A failed fetch keeps the last detail on screen: the Offline strip says why it may be stale.
@@ -32,8 +35,8 @@ export function useDetail<T>(
   address: string,
   conn: Connection,
   fetcher: (address: string) => Promise<{ kind: "ok"; detail: T } | { kind: "not-found" }>,
-  // An epic's detail also goes stale when one of its tickets (`address/NN`) changes.
-  includeChildren = false,
+  // The page also goes stale on an event whose address starts with this: an epic's tickets, a ticket's epic-mates.
+  watchPrefix?: string,
   // Names the sessionStorage entry that repaints this page after a reload.
   cacheKey?: string,
 ): DetailState<T> {
@@ -63,13 +66,13 @@ export function useDetail<T>(
   useEffect(() => {
     refetch();
     const off = conn.onEvent((a) => {
-      if (a === address || (includeChildren && a?.startsWith(`${address}/`))) refetch();
+      if (a === address || (watchPrefix && a?.startsWith(watchPrefix))) refetch();
     });
     return () => {
       off();
       latest.current++;
     };
-  }, [address, conn, refetch, includeChildren]);
+  }, [address, conn, refetch, watchPrefix]);
 
   // Another ticket's detail must never show under this address while it loads.
   const mine = state.address === address;

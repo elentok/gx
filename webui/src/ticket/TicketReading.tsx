@@ -1,6 +1,5 @@
-import { Box, Heading, Text } from "@chakra-ui/react";
-import { RoundOpen, type DetailRound, type TicketDetail } from "../generated/server";
-import { Badge } from "../ui/badge/Badge";
+import { Box, Text } from "@chakra-ui/react";
+import type { DetailRound, TicketDetail } from "../generated/server";
 import { Card } from "../ui/card/Card";
 import { Collapsible } from "./Collapsible";
 
@@ -21,17 +20,10 @@ function EarlierRound({ round }: { round: DetailRound }) {
 // The reading view; the answer area (ticket 49) and permission card (ticket 52) join it later.
 export function TicketReading({ detail }: { detail: TicketDetail }) {
   const { latest } = detail;
-  const waiting = latest?.outcome === RoundOpen && !detail.answered;
   const asker = latest?.by === "gx" ? "GX ASKS" : "THE AGENT ASKS";
 
   return (
     <Box mt="4" display="flex" flexDirection="column" gap="4">
-      <Box>
-        <Badge tone={waiting ? "waiting" : "muted"}>{detail.status}</Badge>
-        <Heading as="h1" fontFamily="condensed" size="lg" mt="2">
-          {detail.title}
-        </Heading>
-      </Box>
       {latest && (
         <>
           <Box>

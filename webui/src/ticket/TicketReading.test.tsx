@@ -13,7 +13,7 @@ const html = () => document.body.textContent ?? "";
 test("sections appear in order with the agent label", () => {
   renderThemed(<TicketReading detail={base} />);
   const text = html();
-  const order = ["Pick a storage backend", "THE AGENT ASKS", "Agent's notes", "Earlier rounds (2)"].map((s) =>
+  const order = ["THE AGENT ASKS", "Agent's notes", "Earlier rounds (2)"].map((s) =>
     text.indexOf(s),
   );
   expect(order.every((i) => i >= 0)).toBe(true);

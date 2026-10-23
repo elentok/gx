@@ -328,7 +328,7 @@ function eventFrame(seq: number, address: string) {
   return `id: ${seq}\nevent: ticket-changed\ndata: ${JSON.stringify({ seq, type: "ticket-changed", address })}\n\n`;
 }
 
-test("an event for the page's address refetches the detail once, another address does not", async () => {
+test("an event for the page's address refetches the detail once, another epic's address does not", async () => {
   let push!: (chunk: string) => void;
   const conn = createConnection({
     fetchSnapshot: async () => emptySnapshot,
@@ -351,12 +351,101 @@ test("an event for the page's address refetches the detail once, another address
   await waitFor(() => expect(push).toBeDefined());
   expect(fetched).toHaveLength(1);
 
-  await act(async () => push(eventFrame(2, "gx:e/02")));
+  await act(async () => push(eventFrame(2, "gx:other/02")));
   await act(async () => push(eventFrame(3, "gx:e/01")));
   await waitFor(() => expect(fetched).toHaveLength(2));
   // The foreign event came first and was processed, so a stray refetch would show as 3 by now.
-  await act(async () => push(eventFrame(4, "gx:e/02")));
+  await act(async () => push(eventFrame(4, "gx:other/02")));
   expect(fetched).toEqual(["gx:e/01", "gx:e/01"]);
+  conn.stop();
+});
+
+const withDetail = (over: Partial<TicketDetail>): FetchDetail => async (address) => ({
+  kind: "ok",
+  detail: { ...detailOf(address), ...over },
+});
+
+test("the ticket header shows the epic link, the badge and only the stats the ticket has", async () => {
+  renderAt("/t/proj:work/01", withDetail({ type: "implement" }));
+  await screen.findByRole("heading", { level: 1, name: "Title of proj:work/01" });
+  expect(screen.getByText("open")).toBeTruthy();
+  expect(screen.getByText("implement")).toBeTruthy();
+  expect(screen.getByRole("link", { name: "work" }).getAttribute("href")).toBe("#/e/proj:work");
+  expect(screen.queryByRole("img", { name: "Running" })).toBeNull();
+});
+
+test("a merged ticket's stat line adds elapsed, cost and context; a map ticket has none", async () => {
+  const stats = { elapsed: 600, cost: 1.5, context_window: 85000 };
+  renderAt("/t/proj:work/01", withDetail({ type: "implement", status: "done", stats }));
+  expect(await screen.findByText("implement · 10m · $1.50 · 85K context")).toBeTruthy();
+  cleanup();
+  renderAt("/t/proj:work/02", withDetail({ map_epic: true, type: "implement" }));
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByText("implement")).toBeNull();
+});
+
+test("a Paused ticket's badge carries the reason label", async () => {
+  renderAt("/t/proj:work/01", withDetail({ status: "paused", pause_label: "Needs an answer" }));
+  const badge = await screen.findByText("Paused · Needs an answer");
+  expect(badge.getAttribute("data-tone")).toBe("paused");
+});
+
+test("a running ticket shows the arc and its elapsed time ticks", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+  try {
+    vi.setSystemTime(new Date("2026-01-01T10:00:00Z"));
+    const conn = createConnection({ fetchSnapshot: async () => emptySnapshot, openStream: () => new Promise(() => {}) });
+    conn.start();
+    renderAt(
+      "/t/proj:work/01",
+      withDetail({ status: "claimed", type: "implement", stats: { claimed_at: "2026-01-01T09:58:00Z" } }),
+      conn,
+    );
+    expect(await screen.findByText("implement · 2m")).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Running" })).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TICK_MS * 2);
+    });
+    expect(screen.getByText("implement · 4m")).toBeTruthy();
+    conn.stop();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test.each(["gx:e/99", "nonsense"])("an unknown or malformed ticket address (%s) shows Ticket not found", async (a) => {
+  renderAt(`/t/${a}`, async () => ({ kind: "not-found" }));
+  expect(await screen.findByText("Ticket not found")).toBeTruthy();
+  expect(screen.getByText(`${a} does not exist.`)).toBeTruthy();
+  expect(screen.getByRole("link", { name: /^←/ })).toBeTruthy();
+});
+
+test("the ticket page refetches on an event for any ticket of its epic, not another epic's", async () => {
+  let push!: (chunk: string) => void;
+  const conn = createConnection({
+    fetchSnapshot: async () => emptySnapshot,
+    openStream: async () =>
+      (async function* () {
+        for (;;) yield await new Promise<string>((r) => (push = r));
+      })(),
+  });
+  conn.start();
+  let fetched = 0;
+  renderAt(
+    "/t/gx:e/01",
+    async (address) => {
+      fetched++;
+      return { kind: "ok", detail: detailOf(address) };
+    },
+    conn,
+  );
+  await screen.findByRole("heading", { name: "Title of gx:e/01" });
+  await waitFor(() => expect(push).toBeDefined());
+  await act(async () => push(eventFrame(2, "gx:e/02")));
+  await waitFor(() => expect(fetched).toBe(2));
+  await act(async () => push(eventFrame(3, "gx:other/01")));
+  await act(async () => push(eventFrame(4, "gx:e/03")));
+  await waitFor(() => expect(fetched).toBe(3));
   conn.stop();
 });
 
