@@ -27,7 +27,8 @@ const session = (state = "idle", background = false): SessionInfo => ({
 const chatOf = (over: Partial<SessionChatResponse> = {}): SessionChatResponse => ({
   conversation_id: "c1",
   messages: [{ id: "m9", role: "agent", kind: "text", text: "hi", at: new Date().toISOString() }],
-  round: [],
+  // The server sends null, not [], when the last turn holds no round.
+  round: null,
   background: [],
   ...over,
 });

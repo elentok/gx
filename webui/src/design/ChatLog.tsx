@@ -93,9 +93,10 @@ function ChatTail({
   const [answers, setAnswers] = useState<Answers>({});
   const [focus, setFocus] = useState<{ index: number }>();
   const failure = visibleFailure(session.failure, done);
+  const round = chat.round ?? [];
   return (
     <>
-      {chat.round.length > 0 && <QuestionSheet round={chat.round} answers={answers} onAnswers={setAnswers} focus={focus} />}
+      {round.length > 0 && <QuestionSheet round={round} answers={answers} onAnswers={setAnswers} focus={focus} />}
       {failure && (
         <FailureBanner
           failure={failure}
@@ -114,7 +115,7 @@ function ChatTail({
           connected={connected}
           post={post}
           onStale={onStale}
-          round={chat.round}
+          round={round}
           answers={answers}
           onReview={(index) => setFocus({ index })}
         />
@@ -154,7 +155,7 @@ function ChatLog({
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       <ChatTail
-        key={chat.round.map((c) => `${c.number}:${c.title}`).join("|")}
+        key={(chat.round ?? []).map((c) => `${c.number}:${c.title}`).join("|")}
         session={session}
         chat={chat}
         connected={connected}

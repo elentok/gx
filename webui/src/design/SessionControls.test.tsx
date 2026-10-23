@@ -43,7 +43,7 @@ const detailOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   ...over,
 });
 
-const chat: SessionChatResponse = { conversation_id: "c", messages: [], round: [], background: [], truncated: false } as unknown as SessionChatResponse;
+const chat: SessionChatResponse = { conversation_id: "c", messages: [], round: null, background: [], truncated: false } as unknown as SessionChatResponse;
 const ok: SessionResult = { session: session("new") };
 
 function render(path: string, sessions: SessionInfo[], over: Partial<RouteFetchers> = {}, detail = detailOf()) {

@@ -40,7 +40,7 @@ type SessionChatResponse struct {
 	Messages       []SessionChatMessage    `json:"messages"`
 	Unsupported    bool                    `json:"unsupported,omitempty"`
 	Truncated      bool                    `json:"truncated,omitempty"`
-	Round          []SessionRoundCard      `json:"round"`
+	Round          []SessionRoundCard      `json:"round" tstype:"SessionRoundCard[] | null"`
 	Next           *SessionNext            `json:"next"`
 	Background     []SessionBackgroundTask `json:"background"`
 	// Failure is the session's, as on its SessionInfo.

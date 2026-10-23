@@ -874,7 +874,7 @@ export interface SessionChatResponse {
   messages: SessionChatMessage[];
   unsupported?: boolean;
   truncated?: boolean;
-  round: SessionRoundCard[];
+  round: SessionRoundCard[] | null;
   next?: SessionNext;
   background: SessionBackgroundTask[];
   /**

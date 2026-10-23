@@ -59,7 +59,7 @@ function render(focus: PostFocus) {
         kind: "ok",
         detail: { address: "gx:a", kind: "map", summary: "", done: 0, total: 0, agent_time: 0, cost_total: 0, rows: [], queueable: false, queued: false, steps: [] },
       }),
-      chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round: [], background: [] } }),
+      chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round: null, background: [] } }),
       focus,
     }),
     { initialEntries: ["/d/gx:a"] },

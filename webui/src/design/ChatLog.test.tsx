@@ -38,7 +38,7 @@ const msg = (over: Partial<SessionChatMessage>): SessionChatMessage => ({
 const chatOf = (messages: SessionChatMessage[], over: Partial<SessionChatResponse> = {}): SessionChatResponse => ({
   conversation_id: "c1",
   messages,
-  round: [],
+  round: null,
   background: [],
   ...over,
 });

@@ -29,7 +29,7 @@ const session = (state: string, failure?: SessionFailure, harness = "claude"): S
 const chat: SessionChatResponse = {
   conversation_id: "c1",
   messages: [{ id: "m9", role: "agent", kind: "text", text: "hi", at: new Date().toISOString() }],
-  round: [],
+  round: null,
   background: [],
 };
 
