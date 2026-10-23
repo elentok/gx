@@ -289,8 +289,12 @@ func TestCancel_CascadesToNonTerminalDescendants(t *testing.T) {
 		t.Fatalf("cancel = %+v, %v", res, err)
 	}
 	for p, want := range map[string]string{path: "cancelled", open: "cancelled", done: "done"} {
-		if data, _ := os.ReadFile(p); !strings.Contains(string(data), "status: "+want) {
+		data, _ := os.ReadFile(p)
+		if !strings.Contains(string(data), "status: "+want) {
 			t.Errorf("%s lacks status %s:\n%s", filepath.Base(p), want, data)
+		}
+		if stamped := strings.Contains(string(data), "cancelled_at:"); stamped != (want == "cancelled") {
+			t.Errorf("%s cancelled_at stamped = %v:\n%s", filepath.Base(p), stamped, data)
 		}
 	}
 }

@@ -54,9 +54,10 @@ func UpdateTicketWithBody(path string, mutate func(*Ticket, *string)) error {
 	return fsutil.WriteFileAtomic(path, out)
 }
 
-// StampStatusChange stamps ClaimedAt or DoneAt when t.Status just moved from
-// before into claimed or done. An unchanged status stamps nothing, so a
-// rewrite of a done ticket keeps its original DoneAt. A new claim clears DoneAt.
+// StampStatusChange stamps ClaimedAt, DoneAt or CancelledAt when t.Status just
+// moved from before into claimed, done or cancelled. An unchanged status stamps
+// nothing, so a rewrite of a done ticket keeps its original DoneAt. A new claim
+// clears DoneAt.
 func (t *Ticket) StampStatusChange(before Status, now time.Time) {
 	if t.Status == before {
 		return
@@ -67,6 +68,8 @@ func (t *Ticket) StampStatusChange(before Status, now time.Time) {
 		t.DoneAt = time.Time{}
 	case StatusDone:
 		t.DoneAt = now
+	case StatusCancelled:
+		t.CancelledAt = now
 	}
 }
 

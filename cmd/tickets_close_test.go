@@ -67,6 +67,9 @@ func TestExecute_TicketsClose_EachReasonArchivesWithResolution(t *testing.T) {
 			if got.Status != schema.StatusCancelled {
 				t.Errorf("status = %q, want cancelled", got.Status)
 			}
+			if got.CancelledAt.IsZero() {
+				t.Error("cancelled_at not stamped on the archived ticket")
+			}
 			raw, _ := os.ReadFile(path)
 			res := schema.Section(schema.ParseBody(string(raw)), "Resolution")
 			for _, want := range []string{"reason: " + tc.reason, "original: mine:follow-ups/01", tc.note} {

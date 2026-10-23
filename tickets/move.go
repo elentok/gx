@@ -158,7 +158,9 @@ func PlanMove(root string, a Address, src Ticket, dstEpic, slug string, opts Mov
 	}
 
 	if opts.Resolution != "" {
+		before := p.ticket.Status
 		p.ticket.Status = schema.StatusCancelled
+		p.ticket.StampStatusChange(before, time.Now().UTC())
 	}
 	if p.ticket.Status == schema.StatusDone && p.ticket.CompletedAt.IsZero() {
 		p.ticket.CompletedAt = opts.CompletedAt
