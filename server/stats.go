@@ -127,7 +127,11 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	win := newStatsWindow(n, time.Now().In(time.Local))
+	writeJSON(w, buildStats(all, n, project, time.Now().In(time.Local)))
+}
+
+func buildStats(all []tickets.StoreEpic, n int, project string, now time.Time) Stats {
+	win := newStatsWindow(n, now)
 	out := Stats{
 		Range: n, Project: project, Days: win.days,
 		Throughput: StatsThroughput{
@@ -166,7 +170,7 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
 	friction.fill(&out.Friction)
 	out.Cost.TokensDesign, out.Cost.SpendDesign = design.amounts()
 	out.Cost.TokensImplementation, out.Cost.SpendImplementation = impl.amounts()
-	writeJSON(w, out)
+	return out
 }
 
 // costDay is one day of one cost series while it is being summed.

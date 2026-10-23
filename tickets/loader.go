@@ -34,15 +34,34 @@ func Load(scratchDir string) ([]Epic, error) {
 		return nil, err
 	}
 
-	var epics []Epic
+	var names []string
 	for _, entry := range entries {
-		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
-			continue
+		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+			names = append(names, entry.Name())
 		}
-		epics = append(epics, loadEpic(scratchDir, entry.Name()))
 	}
+	// The scan is bound by file syscalls, so epics load in parallel; each
+	// goroutine fills its own slot to keep the directory order.
+	if len(names) == 0 {
+		return nil, nil
+	}
+	epics := make([]Epic, len(names))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, loadEpicWorkers)
+	for i, name := range names {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			epics[i] = loadEpic(scratchDir, name)
+			<-sem
+		}()
+	}
+	wg.Wait()
 	return epics, nil
 }
+
+const loadEpicWorkers = 8
 
 func loadEpic(scratchDir, name string) Epic {
 	epicPath := filepath.Join(scratchDir, name)
