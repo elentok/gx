@@ -219,6 +219,33 @@ func TestEpicMerge_StampsSummedTotalsWhenEveryDoneTicketIsStamped(t *testing.T) 
 	}
 }
 
+func TestEpicMerge_FrictionIncludesACancelledTicket(t *testing.T) {
+	f := newFFFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+	tokens := int64(1200)
+	stampTicket(t, f, func(tk *schema.Ticket) {
+		tk.TotalTokens = &tokens
+		tk.Friction = &schema.FrictionSummary{TotalPausedSecs: 30}
+	})
+	gone := "---\nid: \"99\"\nstatus: cancelled\ntype: implement\nfriction:\n  total_paused_secs: 12\n---\nBody.\n"
+	if err := os.WriteFile(filepath.Join(f.store, "proj", schedEpic, "issues", "99-gone.md"), []byte(gone), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
+		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
+	}
+	md := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic))
+	if md.Friction == nil || md.Friction.TotalPausedSecs != 42 {
+		t.Errorf("friction = %+v, want 42 paused secs", md.Friction)
+	}
+	if md.TotalTokens == nil || *md.TotalTokens != 1200 {
+		t.Errorf("tokens = %v, want 1200", md.TotalTokens)
+	}
+}
+
 func TestEpicMerge_UnstampedDoneTicketLeavesTokensAndCostOffButKeepsFriction(t *testing.T) {
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

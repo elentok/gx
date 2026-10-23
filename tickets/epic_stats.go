@@ -2,7 +2,8 @@ package tickets
 
 import "github.com/elentok/gx/tickets/schema"
 
-// EpicStats is the sum of an epic's done tickets' stats stamps.
+// EpicStats is the sum of an epic's done tickets' stats stamps, plus the
+// friction of its cancelled tickets.
 type EpicStats struct {
 	// TotalTokens is nil unless every done ticket is stamped, so an epic never
 	// shows an undercount; ActualCost is only meaningful with it.
@@ -12,13 +13,17 @@ type EpicStats struct {
 	Friction    schema.FrictionSummary
 }
 
-// SumEpicStats adds up the stamps of the done tickets in ts.
+// SumEpicStats adds up the stamps of the done tickets in ts. Friction also
+// counts cancelled tickets, so the epic agrees with the Stats page.
 func SumEpicStats(ts []Ticket) EpicStats {
 	var stats EpicStats
 	var tokens int64
 	var frictions []schema.FrictionSummary
 	done, allStamped := 0, true
 	for _, t := range ts {
+		if t.IsCancelled() && t.Friction != nil {
+			frictions = append(frictions, *t.Friction)
+		}
 		if !t.IsDone() {
 			continue
 		}

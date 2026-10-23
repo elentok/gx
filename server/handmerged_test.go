@@ -157,6 +157,32 @@ func TestHandMerged_StampsSummedTotalsFromTheEpicsTickets(t *testing.T) {
 	}
 }
 
+func TestHandMerged_FrictionIncludesACancelledTicket(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	commitOnBranch(t, repo, "blocker")
+	writeCompleteEpic(t, store, "blocker")
+	path := filepath.Join(store, "proj", "blocker", "issues", "01-t.md")
+	stamps := "\ntotal_tokens: 700\nactual_cost: 0.25\nfriction:\n  total_paused_secs: 9\n---\n\n"
+	testutil.WriteFile(t, filepath.Dir(path), filepath.Base(path), strings.Replace(readFile(t, path), "\n---\n\n", stamps, 1))
+	gone := "---\nid: \"02\"\nstatus: cancelled\ntype: implement\nfriction:\n  total_paused_secs: 4\n---\nBody.\n"
+	testutil.WriteFile(t, filepath.Dir(path), "02-gone.md", gone)
+	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
+	servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
+	runGitIn(t, repo, "merge", "-q", "--ff-only", "blocker")
+
+	waitUntil(t, "merged_at", func() bool {
+		return !tickets.LoadEpicTicketMD(filepath.Join(store, "proj", "blocker")).MergedAt.IsZero()
+	})
+	md := tickets.LoadEpicTicketMD(filepath.Join(store, "proj", "blocker"))
+	if md.Friction == nil || md.Friction.TotalPausedSecs != 13 {
+		t.Errorf("friction = %+v, want 13 paused secs", md.Friction)
+	}
+	if md.TotalTokens == nil || *md.TotalTokens != 700 {
+		t.Errorf("tokens = %v, want 700", md.TotalTokens)
+	}
+}
+
 func TestHandMerged_EpicWithNoQueuedRootAndNoDependentIsNotChecked(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	writeCompleteEpic(t, store, "idle")

@@ -8,7 +8,7 @@ import (
 
 // BackfillFriction stamps a Friction summary on every done or cancelled ticket
 // of the project at root, archived epics included, that lacks one, then on every
-// merged loop epic that lacks one, as the sum of its done tickets' summaries.
+// merged loop epic that lacks one, as the sum of its done and cancelled tickets' summaries.
 // friction builds a ticket's summary from its epic's run log and its own log.
 // Only a missing summary is stamped, so a rerun changes nothing.
 func BackfillFriction(root string, friction func(epicName string, t Ticket) (schema.FrictionSummary, error)) ([]MigrationChange, error) {
