@@ -2,8 +2,9 @@ import { createHashRouter, redirect, useParams, type RouteObject } from "react-r
 import { useConnectionContext, useConnectionState } from "./connection";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
-import type { OpenDesign, StopSession } from "./design/open";
+import type { OpenDesign, ResumeSession, StopSession } from "./design/open";
 import type { PostPrompt } from "./design/prompt";
+import type { FetchScreen } from "./design/screen";
 import type { FetchEpicDetail } from "./epic/detail";
 import { EpicPage } from "./epic/EpicPage";
 import { EpicsPage } from "./epics/EpicsPage";
@@ -38,6 +39,8 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
       post={fetchers.prompt}
       open={fetchers.openDesign}
       stop={fetchers.stop}
+      resume={fetchers.resume}
+      fetchScreen={fetchers.screen}
     />
   );
 }
@@ -45,6 +48,8 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
 export interface RouteFetchers {
   openDesign?: OpenDesign;
   stop?: StopSession;
+  resume?: ResumeSession;
+  screen?: FetchScreen;
   ticket?: FetchDetail;
   epic?: FetchEpicDetail;
   epicList?: FetchEpicList;

@@ -15,9 +15,10 @@ import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
 import { DesignChat } from "./ChatLog";
 import { NewDesignForm, type NewDesignDraft } from "./NewDesignForm";
-import type { OpenDesign, StopSession } from "./open";
+import type { OpenDesign, ResumeSession, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress } from "./Progress";
+import type { FetchScreen } from "./screen";
 import { SessionHeader, StartDesignButton } from "./SessionControls";
 import { designSession, liveSessions,filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
 
@@ -160,6 +161,8 @@ function DesignColumns({
   post,
   open,
   stop,
+  resume,
+  fetchScreen,
   chart,
   onNewSession,
 }: {
@@ -170,6 +173,8 @@ function DesignColumns({
   post?: PostPrompt;
   open?: OpenDesign;
   stop?: StopSession;
+  resume?: ResumeSession;
+  fetchScreen?: FetchScreen;
   /** The Design has no map yet, so only its session can be started again, from the New Design form. */
   chart?: boolean;
   onNewSession: () => void;
@@ -201,7 +206,7 @@ function DesignColumns({
             <StartDesignButton address={address} open={open} />
           </Box>
         )}
-        <DesignChat session={session} fetchChat={fetchChat} post={post} done={done} actions={{ onNewSession }} />
+        <DesignChat session={session} fetchChat={fetchChat} post={post} done={done} actions={{ onNewSession, resume, fetchScreen }} />
       </Box>
       {/* On a phone Progress sits right under the picker, above the chat. */}
       <Box aria-label="Progress" role="region" gridRow={{ base: 2, lg: "auto" }}>
@@ -220,6 +225,8 @@ export function DesignPage({
   post,
   open,
   stop,
+  resume,
+  fetchScreen,
 }: {
   address?: string;
   fetchList?: FetchEpicList;
@@ -228,6 +235,8 @@ export function DesignPage({
   post?: PostPrompt;
   open?: OpenDesign;
   stop?: StopSession;
+  resume?: ResumeSession;
+  fetchScreen?: FetchScreen;
 }) {
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -287,6 +296,8 @@ export function DesignPage({
               post={post}
               open={open}
               stop={stop}
+              resume={resume}
+              fetchScreen={fetchScreen}
               chart={chartRow}
               onNewSession={onNewSession}
             />

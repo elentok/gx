@@ -1,9 +1,13 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import type { SessionFailure } from "../generated/server";
+import { useConnectionContext } from "../connection";
+import type { SessionFailure, SessionInfo } from "../generated/server";
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
+import { postResumeSession, stateToken, type ResumeSession } from "./open";
 import { postPrompt, type PostPrompt } from "./prompt";
+import type { FetchScreen } from "./screen";
+import { ScreenModal } from "./ScreenModal";
 
 // The generated file is imported for types only: its tygo constants are not runtime values.
 const CRASHED = "crashed";
@@ -11,6 +15,8 @@ const ENDED = "ended";
 const AUTH = "auth";
 const STALLED = "stalled";
 const BLOCKED = "blocked";
+const ReasonSessionDirGone = "dir-gone";
+const ReasonSessionNoResume = "no-resume";
 
 /** Crashed and ended sessions are gone: the banner takes the composer's place. */
 export const replacesComposer = (f?: SessionFailure) => f?.kind === CRASHED || f?.kind === ENDED;
@@ -32,30 +38,52 @@ const BUTTONS: Record<string, ButtonName[]> = {
 };
 
 export interface FailureActions {
-  // Restore and Screen are wired by the Restore and Screen-modal ticket; until then they do nothing.
-  onRestore?: () => void;
-  onScreen?: () => void;
   onNewSession?: () => void;
+  resume?: ResumeSession;
+  fetchScreen?: FetchScreen;
 }
 
 /** Why the session needs the person, with a button named after what they do about it. */
 export function FailureBanner({
   failure,
-  sessionId,
+  session,
   lastMessage,
   post = postPrompt,
   onStale,
-  ...actions
+  resume = postResumeSession,
+  fetchScreen,
+  onNewSession,
 }: {
   failure: SessionFailure;
-  sessionId: string;
+  session: SessionInfo;
   /** The id of the last chat message the page saw, for Retry's stale guard. */
   lastMessage?: string;
   post?: PostPrompt;
   onStale?: () => void;
 } & FailureActions) {
+  const conn = useConnectionContext();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [screen, setScreen] = useState(false);
+  // A refusal that no retry can fix: the page stops offering Restore, as it does after a quick re-crash.
+  const [cannotRestore, setCannotRestore] = useState(false);
+  const sessionId = session.id;
+  const restoreHidden = failure.recrashed || cannotRestore;
+
+  const restore = async () => {
+    setPending(true);
+    setError("");
+    try {
+      const res = await resume({ id: sessionId, state: stateToken(session) });
+      if (!res.refused) conn.refresh();
+      else if (res.reason === ReasonSessionDirGone || res.reason === ReasonSessionNoResume) setCannotRestore(true);
+      else setError(res.message ?? "The session could not be restored.");
+    } catch {
+      setError("Could not reach gx. Try again.");
+    } finally {
+      setPending(false);
+    }
+  };
 
   const retry = async () => {
     setPending(true);
@@ -74,12 +102,12 @@ export function FailureBanner({
   };
 
   const onClick: Record<ButtonName, () => void> = {
-    Restore: () => actions.onRestore?.(),
-    "New session": () => actions.onNewSession?.(),
-    Screen: () => actions.onScreen?.(),
+    Restore: restore,
+    "New session": () => onNewSession?.(),
+    Screen: () => setScreen(true),
     Retry: retry,
   };
-  const buttons = BUTTONS[failure.kind] ?? [];
+  const buttons = (BUTTONS[failure.kind] ?? []).filter((name) => !(name === "Restore" && restoreHidden));
 
   return (
     <Box
@@ -107,12 +135,19 @@ export function FailureBanner({
       {buttons.length > 0 && (
         <Box display="flex" gap="2">
           {buttons.map((name) => (
-            <Button key={name} variant="outline" disabled={pending} onClick={onClick[name]}>
+            <Button
+              key={name}
+              variant={name === "New session" && restoreHidden ? "tinted" : "outline"}
+              tone={name === "New session" && restoreHidden ? "running" : undefined}
+              disabled={pending}
+              onClick={onClick[name]}
+            >
               {name}
             </Button>
           ))}
         </Box>
       )}
+      {screen && <ScreenModal sessionId={sessionId} fetcher={fetchScreen} onClose={() => setScreen(false)} />}
     </Box>
   );
 }

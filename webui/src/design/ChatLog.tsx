@@ -99,7 +99,7 @@ function ChatTail({
       {failure && (
         <FailureBanner
           failure={failure}
-          sessionId={session.id}
+          session={session}
           lastMessage={chat.messages.at(-1)?.id}
           post={post}
           onStale={onStale}
@@ -187,7 +187,7 @@ export function DesignChat({
     const failure = visibleFailure(session.failure, done);
     return (
       <>
-        {failure && !needsTranscript(failure) && <FailureBanner failure={failure} sessionId={session.id} {...actions} />}
+        {failure && !needsTranscript(failure) && <FailureBanner failure={failure} session={session} {...actions} />}
         <Text color="text.muted" fontSize="sm">
           Chat works for Claude sessions only. Open it in gx, Agents tab.
         </Text>
