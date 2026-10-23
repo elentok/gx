@@ -14,9 +14,11 @@ import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
 import { DesignChat } from "./ChatLog";
+import type { OpenDesign, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress } from "./Progress";
-import { designSession, filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
+import { SessionHeader, StartDesignButton } from "./SessionControls";
+import { designSession, liveSessions,filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
 
 const NOT_STARTED = "not-started";
 
@@ -136,21 +138,36 @@ function DesignColumns({
   fetchDetail,
   fetchChat,
   post,
+  open,
+  stop,
 }: {
   address: string;
   wide: boolean;
   fetchDetail?: FetchEpicDetail;
   fetchChat?: FetchChat;
   post?: PostPrompt;
+  open?: OpenDesign;
+  stop?: StopSession;
 }) {
   const conn = useConnectionContext();
   const { detail } = useEpicDetail(address, conn, fetchDetail);
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
+  const [selected, setSelected] = useState<string>();
+  const live = liveSessions(address, sessions);
+  // Switching shows an older live session; once it is gone the newest drives the page again.
+  const session = live.find((s) => s.id === selected) ?? designSession(address, sessions);
   return (
     <>
       <Box aria-label="Chat" role="region" display="flex" flexDirection="column" gap="3">
         {wide && detail?.impl_address && <ImplLink address={detail.impl_address} />}
-        <DesignChat session={designSession(address, sessions)} fetchChat={fetchChat} post={post} />
+        {session ? (
+          <SessionHeader address={address} shown={session} live={live} onSelect={setSelected} open={open} stop={stop} />
+        ) : (
+          <Box display="flex" justifyContent="center" py="4">
+            <StartDesignButton address={address} open={open} />
+          </Box>
+        )}
+        <DesignChat session={session} fetchChat={fetchChat} post={post} />
       </Box>
       {/* On a phone Progress sits right under the picker, above the chat. */}
       <Box aria-label="Progress" role="region" gridRow={{ base: 2, lg: "auto" }}>
@@ -167,12 +184,16 @@ export function DesignPage({
   fetchDetail,
   fetchChat,
   post,
+  open,
+  stop,
 }: {
   address?: string;
   fetchList?: FetchEpicList;
   fetchDetail?: FetchEpicDetail;
   fetchChat?: FetchChat;
   post?: PostPrompt;
+  open?: OpenDesign;
+  stop?: StopSession;
 }) {
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -199,7 +220,7 @@ export function DesignPage({
             <MobilePicker groups={groups} projects={projects} current={address} />
           )}
           {address ? (
-            <DesignColumns address={address} wide={wide} fetchDetail={fetchDetail} fetchChat={fetchChat} post={post} />
+            <DesignColumns address={address} wide={wide} fetchDetail={fetchDetail} fetchChat={fetchChat} post={post} open={open} stop={stop} />
           ) : (
             <>
               <Box aria-label="Chat" role="region">

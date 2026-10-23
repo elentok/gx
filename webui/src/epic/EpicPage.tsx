@@ -1,8 +1,12 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
+import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
+import type { OpenDesign } from "../design/open";
+import { StartDesignButton } from "../design/SessionControls";
+import { hasDesignSession } from "../design/view";
 import { MergeButton, isMergeable } from "../epics/MergeButton";
-import { ticketHref } from "../hrefs";
+import { designHref, ticketHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
 import { Markdown } from "../markdown/Markdown";
 import { DetailPage } from "../page/DetailPage";
@@ -90,7 +94,30 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
   );
 }
 
-export function EpicPage({ address, fetchDetail }: { address: string; fetchDetail?: FetchEpicDetail }) {
+// Start while the Design has no session, Open after; neither on a Done Design. Open makes no call.
+function DesignSessionButton({ detail, open }: { detail: EpicDetail; open?: OpenDesign }) {
+  const navigate = useNavigate();
+  const sessions = useConnectionState(useConnectionContext()).snapshot?.sessions ?? [];
+  if (detail.steps?.find((s) => s.step === "done")?.state === "done") return null;
+  const goToDesign = () => navigate(designHref(detail.address).slice(1));
+  return hasDesignSession(detail.address, sessions) ? (
+    <Button tone="running" onClick={goToDesign}>
+      Open design session
+    </Button>
+  ) : (
+    <StartDesignButton address={detail.address} open={open} onStarted={goToDesign} />
+  );
+}
+
+export function EpicPage({
+  address,
+  fetchDetail,
+  openDesign,
+}: {
+  address: string;
+  fetchDetail?: FetchEpicDetail;
+  openDesign?: OpenDesign;
+}) {
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps the running clocks counting.
   useConnectionState(conn);
@@ -117,6 +144,11 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
                 <Text as="span" color="text.muted">
                   Still publishing tickets
                 </Text>
+              </Box>
+            )}
+            {detail.kind === "map" && (
+              <Box mt="2">
+                <DesignSessionButton detail={detail} open={openDesign} />
               </Box>
             )}
             {detail.queueable && (

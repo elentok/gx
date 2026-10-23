@@ -1,0 +1,128 @@
+import { Box, Text } from "@chakra-ui/react";
+import { useState } from "react";
+import { useConnectionContext } from "../connection";
+import type { DesignOpenRequest, SessionInfo } from "../generated/server";
+import { Button } from "../ui/button/Button";
+import { postOpenDesign, postStopSession, stateToken, type OpenDesign, type StopSession } from "./open";
+
+/** Runs one write at a time: a second click while one is in flight does nothing. */
+function useWrite() {
+  const conn = useConnectionContext();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const run = async (call: () => Promise<{ refused?: boolean; message?: string }>, onDone?: () => void) => {
+    if (pending) return;
+    setPending(true);
+    setError("");
+    try {
+      const res = await call();
+      if (res.refused) setError(res.message ?? "The request was refused.");
+      else {
+        conn.refresh();
+        onDone?.();
+      }
+    } catch {
+      setError("Could not reach gx. Try again.");
+    } finally {
+      setPending(false);
+    }
+  };
+  return { run, pending, error };
+}
+
+const Failure = ({ children }: { children: string }) =>
+  children ? (
+    <Text role="alert" fontSize="sm" color="tone.deadlocked.fg">
+      {children}
+    </Text>
+  ) : null;
+
+/** Starts the Design's session. `onStarted` runs once it exists, e.g. to go to the Design page. */
+export function StartDesignButton({
+  address,
+  open = postOpenDesign,
+  onStarted,
+}: {
+  address: string;
+  open?: OpenDesign;
+  onStarted?: () => void;
+}) {
+  const { run, pending, error } = useWrite();
+  return (
+    <Box display="flex" alignItems="center" gap="2">
+      <Button tone="running" disabled={pending} onClick={() => run(() => open({ epic: address }), onStarted)}>
+        Start design session
+      </Button>
+      <Failure>{error}</Failure>
+    </Box>
+  );
+}
+
+/** The chat header: the live-session menu, and New session. */
+export function SessionHeader({
+  address,
+  shown,
+  live,
+  onSelect,
+  open = postOpenDesign,
+  stop = postStopSession,
+}: {
+  address: string;
+  shown: SessionInfo;
+  /** Live design sessions, newest first. */
+  live: SessionInfo[];
+  onSelect: (id: string) => void;
+  open?: OpenDesign;
+  stop?: StopSession;
+}) {
+  const { run, pending, error } = useWrite();
+  const [menu, setMenu] = useState(false);
+  const isLive = shown.status.state !== "exited";
+
+  const startNew = () => {
+    if (isLive && !window.confirm("Stop the current session and start a new one?")) return;
+    const body: DesignOpenRequest = { epic: address, new: true, ...(isLive ? { state: stateToken(shown) } : {}) };
+    run(() => open(body));
+  };
+
+  return (
+    <Box display="flex" flexDirection="column" gap="1">
+      <Box display="flex" alignItems="center" gap="2" justifyContent="flex-end">
+        {live.length > 1 && (
+          <Button size="sm" variant="outline" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
+            {live.length} live {menu ? "▴" : "▾"}
+          </Button>
+        )}
+        <Button size="sm" variant="outline" disabled={pending} onClick={startNew}>
+          New session
+        </Button>
+      </Box>
+      {menu && (
+        <Box role="menu" aria-label="Live sessions" display="flex" flexDirection="column" gap="1" fontSize="sm">
+          {live.map((s) => (
+            <Box key={s.id} display="flex" alignItems="center" gap="2" justifyContent="space-between">
+              <Button
+                role="menuitem"
+                variant="ghost"
+                aria-current={s.id === shown.id}
+                onClick={() => {
+                  onSelect(s.id);
+                  setMenu(false);
+                }}
+              >
+                {s.name || s.id}
+                {s.id === shown.id && " ✓"}
+              </Button>
+              {s.id !== shown.id && (
+                <Button size="sm" tone="deadlocked" disabled={pending} onClick={() => run(() => stop({ id: s.id, state: stateToken(s) }))}>
+                  Stop {s.name || s.id}
+                </Button>
+              )}
+            </Box>
+          ))}
+        </Box>
+      )}
+      <Failure>{error}</Failure>
+    </Box>
+  );
+}

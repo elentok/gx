@@ -2,6 +2,7 @@ import { createHashRouter, redirect, useParams, type RouteObject } from "react-r
 import { useConnectionContext, useConnectionState } from "./connection";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
+import type { OpenDesign, StopSession } from "./design/open";
 import type { PostPrompt } from "./design/prompt";
 import type { FetchEpicDetail } from "./epic/detail";
 import { EpicPage } from "./epic/EpicPage";
@@ -22,8 +23,8 @@ function TicketRoute({ fetchDetail }: { fetchDetail?: FetchDetail }) {
   return <TicketPage address={address} fetchDetail={fetchDetail} />;
 }
 
-function EpicRoute({ fetchDetail }: { fetchDetail?: FetchEpicDetail }) {
-  return <EpicPage address={useParams()["*"] ?? ""} fetchDetail={fetchDetail} />;
+function EpicRoute({ fetchDetail, openDesign }: { fetchDetail?: FetchEpicDetail; openDesign?: OpenDesign }) {
+  return <EpicPage address={useParams()["*"] ?? ""} fetchDetail={fetchDetail} openDesign={openDesign} />;
 }
 
 function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
@@ -35,11 +36,15 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
       fetchDetail={fetchers.epic}
       fetchChat={fetchers.chat}
       post={fetchers.prompt}
+      open={fetchers.openDesign}
+      stop={fetchers.stop}
     />
   );
 }
 
 export interface RouteFetchers {
+  openDesign?: OpenDesign;
+  stop?: StopSession;
   ticket?: FetchDetail;
   epic?: FetchEpicDetail;
   epicList?: FetchEpicList;
@@ -54,7 +59,7 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
     { path: "/designs", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} /> },
-    { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} /> },
+    { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} openDesign={fetchers.openDesign} /> },
     // "/" and an unknown hash go to the Queue.
     { path: "*", loader: () => redirect("/q") },
   ];
