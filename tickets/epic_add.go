@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
 )
@@ -128,7 +129,7 @@ func CreateEpic(projectDir, name string, fields EpicFields, body string) (string
 	}
 	// Stamp the map before creating anything, so a failure leaves no new epic.
 	if mapPath, ok := mapCompletedBy(projectDir, name, fields.Kind); ok {
-		if err := StampEpicFields(mapPath, map[string]any{"completed_at": fields.CreatedAt}); err != nil {
+		if err := StampMapCompletion(mapPath, fields.CreatedAt); err != nil {
 			return "", err
 		}
 	}
@@ -152,6 +153,29 @@ func CreateEpic(projectDir, name string, fields EpicFields, body string) (string
 		return epicPath, err
 	}
 	return epicPath, nil
+}
+
+// StampMapCompletion stamps the map at mapPath as completed at at: its
+// completed_at, plus the tokens and cost of the conversations recorded against
+// it or its tickets. A map created before gx recorded conversations, or with a
+// conversation lacking totals, gets no tokens or cost. Stamping never
+// overwrites, so the first completion wins.
+func StampMapCompletion(mapPath string, at time.Time) error {
+	fields := map[string]any{"completed_at": at}
+	root, err := conversations.DefaultDir()
+	if err != nil {
+		return err
+	}
+	label := ProjectName(filepath.Dir(mapPath)) + ":" + filepath.Base(mapPath)
+	sum, ok, err := conversations.SumEpicTotals(root, label, LoadEpicTicketMD(mapPath).CreatedAt)
+	if err != nil {
+		return err
+	}
+	if ok {
+		fields["total_tokens"] = int64(sum.TotalTokens)
+		fields["actual_cost"] = sum.Cost
+	}
+	return StampEpicFields(mapPath, fields)
 }
 
 // implEpicPath is where a map's <map>-impl epic lives.

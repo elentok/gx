@@ -124,6 +124,19 @@ func SaveTotals(root, id string, t Totals) error {
 // the ticket was created (or never began), or a conversation has no totals.
 // A ticket with no conversations sums to zero.
 func SumTotals(root, ticket string, createdAt time.Time) (Totals, bool, error) {
+	return sumTotals(root, createdAt, func(addr string) bool { return addr == ticket })
+}
+
+// SumEpicTotals is SumTotals for an epic: it adds up the conversations
+// recorded against the epic (label "project:epic") or any of its tickets
+// (label "project:epic/id").
+func SumEpicTotals(root, epic string, createdAt time.Time) (Totals, bool, error) {
+	return sumTotals(root, createdAt, func(addr string) bool {
+		return addr == epic || strings.HasPrefix(addr, epic+"/")
+	})
+}
+
+func sumTotals(root string, createdAt time.Time, match func(addr string) bool) (Totals, bool, error) {
 	started, ok, err := Started(root)
 	if err != nil || !ok || createdAt.IsZero() || createdAt.Before(started) {
 		return Totals{}, false, err
@@ -134,7 +147,7 @@ func SumTotals(root, ticket string, createdAt time.Time) (Totals, bool, error) {
 	}
 	var sum Totals
 	for _, r := range records {
-		if r.Ticket != ticket {
+		if !match(r.Ticket) {
 			continue
 		}
 		if r.Totals == nil {

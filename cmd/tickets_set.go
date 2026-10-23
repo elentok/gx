@@ -251,7 +251,7 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 	}
 	if completedAt != nil {
 		// Stamping never overwrites, so a map completed earlier keeps its first value.
-		if err := tickets.StampEpicFields(epicDir, map[string]any{"completed_at": *completedAt}); err != nil {
+		if err := tickets.StampMapCompletion(epicDir, *completedAt); err != nil {
 			return fmt.Errorf("%s: %w", ticketLabel(path), err)
 		}
 	}
