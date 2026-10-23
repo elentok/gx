@@ -467,6 +467,14 @@ func (c *Client) ResumeSession(ctx context.Context, id string) (server.SessionRe
 	return res, err
 }
 
+// PromptSession types text into an Idle design session. A refusal is a result
+// (Refused set), not an error.
+func (c *Client) PromptSession(ctx context.Context, req server.SessionPromptRequest) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/prompt", req, &res)
+	return res, err
+}
+
 // MarkSessionActionable raises an agent's Actionable on its session. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) MarkSessionActionable(ctx context.Context, req server.MarkActionableRequest) (server.SessionResult, error) {

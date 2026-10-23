@@ -185,6 +185,13 @@ type Event struct {
 	// TaskID (background-task gate events only) is the gated task, so readers
 	// never parse it out of Reason.
 	TaskID string `json:"task_id,omitempty"`
+	// Session, Source, Action and Bytes (session-prompted only) name the
+	// session, where the send came from (web or cli), what it did (text) and
+	// how many bytes it typed.
+	Session string `json:"session,omitempty"`
+	Source  string `json:"source,omitempty"`
+	Action  string `json:"action,omitempty"`
+	Bytes   int    `json:"bytes,omitempty"`
 }
 
 // eventLogMu serializes appends across every goroutine in the process (each

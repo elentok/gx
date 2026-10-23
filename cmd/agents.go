@@ -27,7 +27,36 @@ func newAgentsCmd(d deps) *cobra.Command {
 		newAgentsSessionCmd("resume", "resume an Exited session's conversation", (*apiclient.Client).ResumeSession),
 		newAgentsSessionCmd("run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Client).RunSessionAction),
 		newAgentsSessionCmd("focus", "show a session in the most recently focused TUI", (*apiclient.Client).FocusSession),
-		newAgentsReportFocusCmd())
+		newAgentsReportFocusCmd(), newAgentsPromptCmd())
+	return cmd
+}
+
+// runAgentsPrompt never starts the server: a dead socket is a refusal.
+func runAgentsPrompt(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.SessionPromptRequest) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	res, err := cl.PromptSession(ctx, req)
+	return printSessionResult(w, jsonOut, res, err)
+}
+
+func newAgentsPromptCmd() *cobra.Command {
+	var jsonOut bool
+	var req server.SessionPromptRequest
+	cmd := &cobra.Command{
+		Use:   "prompt <id> <text>",
+		Short: "type text into an Idle design session",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			req.ID, req.Text = args[0], args[1]
+			return runAgentsPrompt(c.Context(), cl, c.OutOrStdout(), jsonOut, req)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	return cmd
 }
 

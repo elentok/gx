@@ -903,6 +903,27 @@ export interface SessionFailure {
 }
 
 //////////
+// source: sessionprompt.go
+
+export const ReasonHarnessNotSupported = "harness-not-supported";
+export const ReasonPrefixNotAllowed = "prefix-not-allowed";
+export const ReasonTextTooLong = "text-too-long";
+/**
+ * Refusal reasons of the session prompt route, beside the session ones.
+ */
+export type Reason = typeof ReasonHarnessNotSupported | typeof ReasonPrefixNotAllowed | typeof ReasonTextTooLong;
+/**
+ * SessionPromptRequest is the body of POST /v1/sessions/prompt. LastMessage is
+ * the id of the last chat message the page saw; the web mux refuses a send once
+ * the transcript has moved past it.
+ */
+export interface SessionPromptRequest {
+  id: string;
+  text: string;
+  last_message?: string;
+}
+
+//////////
 // source: sessionround.go
 
 /**
