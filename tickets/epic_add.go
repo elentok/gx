@@ -27,6 +27,9 @@ type EpicFields struct {
 	Kind                   string `yaml:"kind,omitempty"`
 	Status                 string `yaml:"status,omitempty"`
 	ProvisionalDestination bool   `yaml:"provisional_destination,omitempty"`
+
+	// CreatedAt is stamped by CreateEpic. A caller-supplied value refuses.
+	CreatedAt time.Time `yaml:"created_at,omitempty"`
 }
 
 // EpicServerStamped are the epic fields only the server writes.
@@ -66,6 +69,9 @@ func ParseEpicFields(yamlPart string) (EpicFields, error) {
 // validate checks the values: kind is map or loop, status is draft or open
 // (either may be empty, meaning not given).
 func (f EpicFields) validate() error {
+	if !f.CreatedAt.IsZero() {
+		return errors.New("created_at is server-stamped and cannot be set")
+	}
 	switch f.Kind {
 	case "", KindMap, KindLoop:
 	default:
@@ -115,13 +121,16 @@ func CreateEpic(projectDir, name string, fields EpicFields, body string) (string
 		return "", err
 	}
 
-	now := time.Now().UTC()
-	fm, err := yaml.Marshal(struct {
-		EpicFields `yaml:",inline"`
-		CreatedAt  time.Time `yaml:"created_at"`
-	}{fields, now})
+	fields.CreatedAt = time.Now().UTC()
+	fm, err := yaml.Marshal(fields)
 	if err != nil {
 		return "", err
+	}
+	// Stamp the map before creating anything, so a failure leaves no new epic.
+	if mapPath, ok := mapCompletedBy(projectDir, name, fields.Kind); ok {
+		if err := StampEpicFields(mapPath, map[string]any{"completed_at": fields.CreatedAt}); err != nil {
+			return "", err
+		}
 	}
 	text := strings.Trim(body, "\n")
 	if text == "" {
@@ -142,13 +151,24 @@ func CreateEpic(projectDir, name string, fields EpicFields, body string) (string
 	if err != nil {
 		return epicPath, err
 	}
-	// Creating <map>-impl is what completes the map.
-	if mapName, ok := strings.CutSuffix(name, ImplEpicSuffix); ok && fields.Kind == KindLoop {
-		if mapPath := filepath.Join(projectDir, mapName); IsMapEpic(mapPath) {
-			err = StampEpicFields(mapPath, map[string]any{"completed_at": now})
-		}
+	return epicPath, nil
+}
+
+// implEpicPath is where a map's <map>-impl epic lives.
+func implEpicPath(root, mapName string) string {
+	return filepath.Join(root, mapName+ImplEpicSuffix)
+}
+
+// mapCompletedBy returns the map that creating the loop epic name completes.
+// Creating <map>-impl is what completes the map; BackfillEpicTimes applies the
+// same rule to epics that already exist.
+func mapCompletedBy(root, name, kind string) (string, bool) {
+	mapName, ok := strings.CutSuffix(name, ImplEpicSuffix)
+	if !ok || kind != KindLoop {
+		return "", false
 	}
-	return epicPath, err
+	mapPath := filepath.Join(root, mapName)
+	return mapPath, IsMapEpic(mapPath)
 }
 
 // mergeEpicFields combines the flag-supplied and body-supplied fields; a
