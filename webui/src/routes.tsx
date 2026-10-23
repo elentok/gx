@@ -1,5 +1,6 @@
 import { createHashRouter, redirect, useParams, type RouteObject } from "react-router";
 import { useConnectionContext, useConnectionState } from "./connection";
+import { DesignPage } from "./design/DesignPage";
 import type { FetchEpicDetail } from "./epic/detail";
 import { EpicPage } from "./epic/EpicPage";
 import { EpicsPage } from "./epics/EpicsPage";
@@ -23,6 +24,11 @@ function EpicRoute({ fetchDetail }: { fetchDetail?: FetchEpicDetail }) {
   return <EpicPage address={useParams()["*"] ?? ""} fetchDetail={fetchDetail} />;
 }
 
+function DesignRoute({ fetchList }: { fetchList?: FetchEpicList }) {
+  // A Design's address holds a colon (project:epic), so it arrives as the splat; the bare route has none.
+  return <DesignPage address={useParams()["*"] || undefined} fetchList={fetchList} />;
+}
+
 export interface RouteFetchers {
   ticket?: FetchDetail;
   epic?: FetchEpicDetail;
@@ -33,6 +39,8 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
   return [
     { path: "/q", element: <QueueRoute /> },
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} /> },
+    { path: "/designs", element: <DesignRoute fetchList={fetchers.epicList} /> },
+    { path: "/d/*", element: <DesignRoute fetchList={fetchers.epicList} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} /> },
     { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} /> },
     // "/" and an unknown hash go to the Queue.

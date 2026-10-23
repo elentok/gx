@@ -415,12 +415,15 @@ export interface EpicDetail {
  * names the epics the Epics page lists that no queue item holds.
  */
 export type EpicListState = string;
-export const EpicListFinished = any;
-export const EpicListRunning = any;
-export const EpicListAwaitingMerge = any;
-export const EpicListMerging = any;
-export const EpicListPaused = any;
-export type EpicList = typeof EpicListFinished | typeof EpicListRunning | typeof EpicListAwaitingMerge | typeof EpicListMerging | typeof EpicListPaused;
+/**
+ * Spelled as literals, not EpicListState(EpicState...): tygo emits a conversion as `any`,
+ * which throws when the web app imports the generated file.
+ */
+export const EpicListFinished: EpicListState = "finished";
+export const EpicListRunning: EpicListState = "running";
+export const EpicListAwaitingMerge: EpicListState = "awaiting-merge";
+export const EpicListMerging: EpicListState = "merging";
+export const EpicListPaused: EpicListState = "paused";
 export const EpicListReady: EpicListState = "ready";
 export const EpicListDesigning: EpicListState = "designing";
 export const EpicListWaitingToDesign: EpicListState = "waiting-to-design";
@@ -530,6 +533,13 @@ export interface FollowUpCount {
 /**
  * EpicList is the /v1/epics payload.
  */
+export interface EpicList {
+  epics: EpicListRow[];
+  /**
+   * FollowUps lists only the projects with at least one open follow-up.
+   */
+  follow_ups: FollowUpCount[];
+}
 
 //////////
 // source: epicsummary.go

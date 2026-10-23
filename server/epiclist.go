@@ -16,11 +16,13 @@ import (
 type EpicListState string
 
 const (
-	EpicListFinished      = EpicListState(EpicStateFinished)
-	EpicListRunning       = EpicListState(EpicStateRunning)
-	EpicListAwaitingMerge = EpicListState(EpicStateAwaitingMerge)
-	EpicListMerging       = EpicListState(EpicStateMerging)
-	EpicListPaused        = EpicListState(EpicStatePaused)
+	// Spelled as literals, not EpicListState(EpicState...): tygo emits a conversion as `any`,
+	// which throws when the web app imports the generated file.
+	EpicListFinished      EpicListState = "finished"
+	EpicListRunning       EpicListState = "running"
+	EpicListAwaitingMerge EpicListState = "awaiting-merge"
+	EpicListMerging       EpicListState = "merging"
+	EpicListPaused        EpicListState = "paused"
 
 	EpicListReady           EpicListState = "ready"
 	EpicListDesigning       EpicListState = "designing"

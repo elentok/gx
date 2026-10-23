@@ -9,13 +9,19 @@ interface SidebarItemProps {
   // Slot on the right for marks such as a question or live dot.
   marks?: ReactNode;
   current?: boolean;
+  // Renders an anchor instead of a button.
+  href?: string;
   onClick?: () => void;
 }
 
+// chakra.button's props have no href, so the anchor variant is typed loosely.
+const anchorProps = (href: string): object => ({ as: "a", href });
+
 // The current item uses the page background, so it reads as cut out of the raised sidebar.
-export function SidebarItem({ label, hint, tone = "muted", marks, current, onClick }: SidebarItemProps) {
+export function SidebarItem({ label, hint, tone = "muted", marks, current, href, onClick }: SidebarItemProps) {
   return (
     <chakra.button
+      {...(href ? anchorProps(href) : {})}
       data-tone={tone}
       display="flex"
       w="100%"
