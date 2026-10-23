@@ -10,6 +10,7 @@ export function badgeOf(d: TicketDetail): { tone: Tone; label: string } {
   }
   if (isRunning(d)) return { tone: "running", label: d.status };
   if (d.status === "done") return { tone: "done", label: d.status };
+  if (d.error_reason) return { tone: "deadlocked", label: d.status };
   const waiting = d.latest?.outcome === RoundOpen && !d.answered;
   return { tone: waiting ? "waiting" : "muted", label: d.status };
 }
@@ -23,7 +24,7 @@ function elapsedOf(d: TicketDetail, now: number): number | undefined {
 
 // Only the values the ticket has; a map ticket has no stat line.
 export function statValues(d: TicketDetail, now: number): string[] {
-  if (d.map_epic) return [];
+  if (d.map_epic || d.parse_error) return [];
   const elapsed = elapsedOf(d, now);
   const { cost, context_window: ctx } = d.stats ?? {};
   return [
