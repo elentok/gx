@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -74,14 +75,18 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(w, "dry run: pause and map-done migration only, nothing written")
+		created, err := backfillTicketCreation(scratchRoot, true)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(w, "dry run: pause, map-done and ticket-creation migration only, nothing written")
 		for _, s := range steps {
 			fmt.Fprintf(w, "%s: %s\n", s.Path, s.Note())
 		}
-		for _, c := range mapsDone {
+		for _, c := range append(mapsDone, created...) {
 			fmt.Fprintf(w, "%s: %s\n", c.Path, strings.Join(c.Notes, ", "))
 		}
-		fmt.Fprintf(w, "%d file(s) would change\n", len(steps)+len(mapsDone))
+		fmt.Fprintf(w, "%d file(s) would change\n", len(steps)+len(mapsDone)+len(created))
 		return nil
 	}
 	result, err := tickets.Migrate(scratchRoot)
@@ -106,6 +111,11 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		changes = mergeChanges(changes, done)
 	}
 	if err == nil {
+		var created []tickets.MigrationChange
+		created, err = backfillTicketCreation(scratchRoot, false)
+		changes = mergeChanges(changes, created)
+	}
+	if err == nil {
 		var moved []tickets.MigrationChange
 		moved, err = tickets.MigrateQuestionSections(scratchRoot, time.Now())
 		changes = append(changes, moved...)
@@ -126,6 +136,35 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 	}
 	fmt.Fprintf(w, "%d file(s) changed\n", len(changes))
 	return err
+}
+
+// backfillTicketCreation stamps created_at and the original address on the
+// tickets of the ticket-store project at root from the store's git history
+// (see tickets.BackfillTicketCreation). A root that is not a project of a
+// git-tracked store has no history to read and is skipped.
+func backfillTicketCreation(root string, dryRun bool) ([]tickets.MigrationChange, error) {
+	if _, err := config.ReadProjectFile(root); err != nil {
+		return nil, nil
+	}
+	storeRoot := filepath.Dir(root)
+	if _, err := os.Stat(filepath.Join(storeRoot, ".git")); err != nil {
+		return nil, nil
+	}
+	all, err := tickets.LoadStoreEpics(storeRoot)
+	if err != nil {
+		return nil, err
+	}
+	project := tickets.ProjectName(root)
+	var epics []tickets.Epic
+	for _, se := range all {
+		if se.Project == project {
+			epics = append(epics, se.Epic)
+		}
+	}
+	return tickets.BackfillTicketCreation(epics, storeRoot, func(rel string) (tickets.TicketOrigin, bool, error) {
+		o, ok, err := git.FirstCommitOfFile(storeRoot, rel)
+		return tickets.TicketOrigin{Path: o.Path, At: o.At, Root: o.Root}, ok, err
+	}, dryRun)
 }
 
 // mergeChanges adds extra to changes, folding a file that already has an entry
