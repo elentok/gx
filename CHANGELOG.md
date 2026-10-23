@@ -1,12 +1,38 @@
 # Changelog
 
-## Unreleased
+## v0.35.10 - 2026-10-23
 
 - Changed the ticket word "parked" to "paused". Read this before you upgrade.
   - The migration is a one-way door. An older gx rejects `status: paused`, so update all gx binaries first, then run `gx tickets migrate`.
   - The same `gx tickets migrate <path>` run also moves each live `## Needs Answer` and `## Handoff` section into the ticket log. Until it runs, the web UI shows no open question on an old ticket without a log, and cannot answer it. If you skipped it, run it now. See `docs/web-ui-security.md`.
   - The `park`, `unpark`, `drain` and resume-on-start aliases still work. The next release removes them.
 - Added a host check to the web UI listener. If you open the UI by a MagicDNS name or any other hostname, add it to `server.web.allowed-hosts`, or the UI answers HTTP 403. IP addresses and `localhost` are unaffected. See `docs/web-ui-security.md`.
+- Added the new pause words across gx, on top of the `paused` status.
+  - New `pause` and `resume` verbs. Epics show as `Paused` with a reason, and the TUI and web UI label every pause reason and offer actions by reason.
+  - The queue's pause and drain are replaced by `Finish and pause`. The web `Unpark` form is replaced by action forms by reason.
+  - "Land" is now "merge", "reset" is now "start over", and session relaunch is now `Restore`.
+  - The agent-facing iteration status `needs-answer` is now `asking`.
+  - The skills, glossary and docs use the new words.
+- Added a ticket page to the web UI.
+  - It has a header, a stat line, a link to the epic, and refreshes when anything in the epic changes.
+  - An action card groups everything you act on. `Resolution`, `Related` and `Description` sections show the ticket body, and `Runs` shows one line per run, including runs with no normal end and work after a pause.
+  - A broken (`Error`) ticket shows a working page, and a malformed address returns 404.
+  - Ticket titles on ticket lines, the epic page, the Queue and one-off finished rows link to the page.
+  - The shared Markdown component now renders GFM and ticket links.
+- Added `gx server restart --migrate`.
+- Added a warning when a ticket body names a sibling ticket that is missing from `blocked_by`.
+- Changed epic-scoped verbs to accept `project:epic` addresses, and `queue remove` and `queue move` to accept an epic address.
+- Changed the TUI to queue whole epics only.
+- Changed the web UI to swap the running and done colors, and to drop cards from epic tickets.
+- Changed the wire field `provisional_destination` to `destination_unconfirmed`.
+- Changed the Agents tab to skip the render when a frame has not changed.
+- Fixed gx queueing a draft epic. It now refuses, and `gx-to-tickets` creates new epics as draft.
+- Fixed the Pause rounds block showing `answer: (empty)` for a free-text answer.
+- Fixed a leftover `Paused` section being lost from the Description of a ticket that is not paused.
+- Fixed a long ticket title not wrapping beside the id in the web UI.
+- Fixed `guard-bash` flagging file redirects that sit inside a heredoc body.
+- Fixed the Claude UI agent runner checking for an empty prompt before the screen redraws.
+- Fixed the vendored skill sync not reporting a license change in `--check`.
 
 ## v0.35.9 - 2026-10-22
 
