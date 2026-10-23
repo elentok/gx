@@ -2,6 +2,7 @@ import { createHashRouter, redirect, useParams, type RouteObject } from "react-r
 import { useConnectionContext, useConnectionState } from "./connection";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
+import type { PostPrompt } from "./design/prompt";
 import type { FetchEpicDetail } from "./epic/detail";
 import { EpicPage } from "./epic/EpicPage";
 import { EpicsPage } from "./epics/EpicsPage";
@@ -33,6 +34,7 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
       fetchList={fetchers.epicList}
       fetchDetail={fetchers.epic}
       fetchChat={fetchers.chat}
+      post={fetchers.prompt}
     />
   );
 }
@@ -42,6 +44,7 @@ export interface RouteFetchers {
   epic?: FetchEpicDetail;
   epicList?: FetchEpicList;
   chat?: FetchChat;
+  prompt?: PostPrompt;
 }
 
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {

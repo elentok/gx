@@ -1,8 +1,10 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useConnectionContext } from "../connection";
+import { useConnectionContext, useConnectionState } from "../connection";
 import type { SessionBackgroundTask, SessionChatMessage, SessionInfo } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { useSessionChat, type FetchChat } from "./chat";
+import { Composer } from "./Composer";
+import type { PostPrompt } from "./prompt";
 
 const KIND_NAMES: Record<string, string> = { shell: "shell", monitor: "Monitor", agent: "subagent" };
 
@@ -66,8 +68,18 @@ function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
 }
 
 // The chat of a Claude session. Other harnesses have no chat, so DesignChat never mounts this for them.
-function ChatLog({ session, fetchChat }: { session: SessionInfo; fetchChat?: FetchChat }) {
-  const chat = useSessionChat(session.id, useConnectionContext(), fetchChat);
+function ChatLog({
+  session,
+  fetchChat,
+  post,
+}: {
+  session: SessionInfo;
+  fetchChat?: FetchChat;
+  post?: PostPrompt;
+}) {
+  const conn = useConnectionContext();
+  const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
+  const connected = useConnectionState(conn).connected;
   if (!chat) return null;
   const working = session.status.state === "working";
   return (
@@ -81,12 +93,28 @@ function ChatLog({ session, fetchChat }: { session: SessionInfo; fetchChat?: Fet
         <Entry key={m.id || i} m={m} tool={working && i === chat.messages.length - 1} />
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
+      <Composer
+        session={session}
+        lastMessage={chat.messages.at(-1)?.id}
+        next={chat.next}
+        connected={connected}
+        post={post}
+        onStale={refetch}
+      />
     </Box>
   );
 }
 
 /** The center column of a Design: its session's chat, or an empty chat when it has none. */
-export function DesignChat({ session, fetchChat }: { session?: SessionInfo; fetchChat?: FetchChat }) {
+export function DesignChat({
+  session,
+  fetchChat,
+  post,
+}: {
+  session?: SessionInfo;
+  fetchChat?: FetchChat;
+  post?: PostPrompt;
+}) {
   if (!session) return null;
   if (session.harness !== "claude") {
     return (
@@ -95,5 +123,5 @@ export function DesignChat({ session, fetchChat }: { session?: SessionInfo; fetc
       </Text>
     );
   }
-  return <ChatLog key={session.id} session={session} fetchChat={fetchChat} />;
+  return <ChatLog key={session.id} session={session} fetchChat={fetchChat} post={post} />;
 }

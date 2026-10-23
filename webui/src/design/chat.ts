@@ -9,4 +9,4 @@ export const fetchChat: FetchChat = (sessionId) =>
 
 /** The chat refetches on any event addressed to the session: its chat grew (session-chat-changed) or it changed (session-changed). */
 export const useSessionChat = (sessionId: string, conn: Connection, fetcher: FetchChat = fetchChat) =>
-  useDetail(sessionId, conn, fetcher).detail;
+  useDetail(sessionId, conn, fetcher);

@@ -14,6 +14,7 @@ import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
 import { DesignChat } from "./ChatLog";
+import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress } from "./Progress";
 import { designSession, filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
 
@@ -134,11 +135,13 @@ function DesignColumns({
   wide,
   fetchDetail,
   fetchChat,
+  post,
 }: {
   address: string;
   wide: boolean;
   fetchDetail?: FetchEpicDetail;
   fetchChat?: FetchChat;
+  post?: PostPrompt;
 }) {
   const conn = useConnectionContext();
   const { detail } = useEpicDetail(address, conn, fetchDetail);
@@ -147,7 +150,7 @@ function DesignColumns({
     <>
       <Box aria-label="Chat" role="region" display="flex" flexDirection="column" gap="3">
         {wide && detail?.impl_address && <ImplLink address={detail.impl_address} />}
-        <DesignChat session={designSession(address, sessions)} fetchChat={fetchChat} />
+        <DesignChat session={designSession(address, sessions)} fetchChat={fetchChat} post={post} />
       </Box>
       {/* On a phone Progress sits right under the picker, above the chat. */}
       <Box aria-label="Progress" role="region" gridRow={{ base: 2, lg: "auto" }}>
@@ -163,11 +166,13 @@ export function DesignPage({
   fetchList,
   fetchDetail,
   fetchChat,
+  post,
 }: {
   address?: string;
   fetchList?: FetchEpicList;
   fetchDetail?: FetchEpicDetail;
   fetchChat?: FetchChat;
+  post?: PostPrompt;
 }) {
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -194,7 +199,7 @@ export function DesignPage({
             <MobilePicker groups={groups} projects={projects} current={address} />
           )}
           {address ? (
-            <DesignColumns address={address} wide={wide} fetchDetail={fetchDetail} fetchChat={fetchChat} />
+            <DesignColumns address={address} wide={wide} fetchDetail={fetchDetail} fetchChat={fetchChat} post={post} />
           ) : (
             <>
               <Box aria-label="Chat" role="region">
