@@ -246,13 +246,13 @@ func (f *firstPrompt) deliver(prompt string) error {
 	if err != nil {
 		return err
 	}
-	// Before the draft check: vim NORMAL has to reach INSERT first. The nudge
+	// Before the draft clear: vim NORMAL has to reach INSERT first. The nudge
 	// runs the same step again, which presses nothing once in INSERT.
 	if !sessionTyping.ReadyToType(nativerunner.HolderTypingIO(c)) {
 		return claudeui.ErrNotReadyToType
 	}
-	if f.s.inputHoldsDraft(f.dir, c) {
-		return errDraft
+	if err := f.s.clearDraft(f.dir, c); err != nil {
+		return err
 	}
 	caps := claudeui.DefaultNudgeCaps
 	caps.Grace = cmp.Or(f.s.cfg.FirstPromptGrace, caps.Grace)

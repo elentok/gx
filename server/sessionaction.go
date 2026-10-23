@@ -96,7 +96,7 @@ func (s *Server) sendAction(dir string, action []string) error {
 
 // refuseForDraft raises the Actionable that keeps the prompts gx did not type.
 func (s *Server) refuseForDraft(dir string, unsent []string) {
-	s.log.Info("refused to type over a draft", "session", filepath.Base(dir), "unsent", len(unsent))
+	s.log.Info("draft would not clear", "session", filepath.Base(dir), "unsent", len(unsent))
 	s.raiseGxActionable(dir, draftReason, unsent)
 }
 
@@ -144,8 +144,8 @@ func (r *actionRun) step(i int, prompt string) error {
 	if !sessionTyping.ReadyToType(nativerunner.HolderTypingIO(r.holder)) {
 		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
 	}
-	if r.s.inputHoldsDraft(r.dir, r.holder) {
-		return errDraft
+	if err := r.s.clearDraft(r.dir, r.holder); err != nil {
+		return err
 	}
 	r.convChanged = false
 	begin := time.Now()

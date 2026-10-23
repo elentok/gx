@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"path/filepath"
+	"time"
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
@@ -11,20 +12,57 @@ import (
 // sessionTyping is the only harness the server types into.
 var sessionTyping = harness.ClaudeTyping()
 
-// draftReason is the reason of the Actionable gx raises instead of typing
-// into a draft.
-const draftReason = "input holds a draft"
+// errDraft means a person's draft would not clear, so gx did not type.
+var errDraft = errors.New("input would not clear")
 
-// errDraft stops a prompt gx would have typed over a person's draft.
-var errDraft = errors.New(draftReason)
+// draftReason is the reason of the Actionable gx raises when a draft would
+// not clear.
+const draftReason = "input would not clear"
 
-// inputHoldsDraft runs the harness empty check before gx types. Only a
-// definite "not empty" refuses; a check that can't decide types as before.
-func (s *Server) inputHoldsDraft(dir string, c *nativerunner.HolderClient) bool {
-	state, _ := inputState(c)
-	holds := state == harness.InputNotEmpty
-	s.log.Debug("draft check", "session", filepath.Base(dir), "holds_draft", holds)
-	return holds
+// Clearing a draft: each round presses the clear key draftClearPresses times
+// (Ctrl+U on an empty input does nothing), then rereads the input until it
+// reads empty or draftSettleWait passes. The 32 presses clear a draft of up to
+// 16 lines.
+const (
+	draftClearRounds  = 4
+	draftClearPresses = 8
+	draftSettleWait   = time.Second
+	draftSettlePoll   = 25 * time.Millisecond
+)
+
+// clearDraft empties a person's draft before gx types. The placeholder is not
+// a draft: the harness check tells them apart by its dim style. A check that
+// can't decide types as before.
+func (s *Server) clearDraft(dir string, c *nativerunner.HolderClient) error {
+	log := s.log.With("session", filepath.Base(dir))
+	if state, _ := inputState(c); state != harness.InputNotEmpty {
+		log.Debug("draft check", "holds_draft", false)
+		return nil
+	}
+	for range draftClearRounds {
+		for range draftClearPresses {
+			if err := c.SendKeys(sessionTyping.ClearKey()); err != nil {
+				return err
+			}
+		}
+		// The agent redraws a moment after the keys land.
+		settle := time.Now().Add(draftSettleWait)
+		for {
+			state, err := inputState(c)
+			if err != nil {
+				return err
+			}
+			if state != harness.InputNotEmpty {
+				log.Info("cleared a draft before typing")
+				return nil
+			}
+			if time.Now().After(settle) {
+				break
+			}
+			time.Sleep(draftSettlePoll)
+		}
+	}
+	return errDraft
 }
 
 // inputState runs the harness empty check when the holder serves styled rows.

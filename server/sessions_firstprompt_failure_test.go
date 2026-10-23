@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/sound"
@@ -93,4 +94,32 @@ func TestFirstPromptFailure_NeverStartedClearsLeftoverText(t *testing.T) {
 	if rows, _, err := holder.Screen(0); err != nil || strings.Contains(strings.Join(rows, "\n"), "fix the bug") {
 		t.Errorf("screen = %q, %v, want the input cleared", rows, err)
 	}
+}
+
+func TestFirstPromptFailure_GxRaisedSurvivesInputAndAgentRaisedDoesNot(t *testing.T) {
+	f := startFailingFirstPrompt(t, "fix the bug")
+	f.gxActionable(t)
+
+	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
+	att, err := c.Attach()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer att.Close()
+	if err := att.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
+		t.Fatal(err)
+	}
+	// A later status change orders the check after the holder saw the input.
+	report(t, f.conv, agentfake.Control{State: "working"})
+	if got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking }); !got.Actionable.GxRaised {
+		t.Errorf("actionable = %+v after input, want the gx-raised one kept", got.Actionable)
+	}
+
+	if res, err := f.h.Client.MarkSessionActionable(f.ctx, server.MarkActionableRequest{ID: f.id, Reason: "agent says"}); err != nil || res.Refused || res.Session.Actionable.GxRaised {
+		t.Fatalf("mark actionable = %+v, %v", res, err)
+	}
+	if err := att.SendKey(screen.Key{Code: 'y', Text: "y"}); err != nil {
+		t.Fatal(err)
+	}
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Actionable.Reason == "" })
 }

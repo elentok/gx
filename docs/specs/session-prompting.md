@@ -41,9 +41,11 @@ is fast, checks what it can, and never types over text it didn't write.
   commands.
 - **Ready to type.** Before any typed text, the harness makes sure its input accepts text. Claude
   with vim mode on and no `-- INSERT --` marker gets `i`, then a short re-check.
-- **Draft check.** Before the first prompt and each Action step, gx checks the input is empty. If a
-  person's draft is there, gx doesn't type and raises the session as **Actionable** with the unsent
-  prompts.
+- **Draft clear.** Before the first prompt and each Action step, gx checks the input is empty. The
+  dim placeholder is not a draft. If a person's draft is there, gx clears it (Ctrl+U until the
+  input reads empty) and types. Only a draft that won't clear raises the session as **Actionable**
+  with the unsent prompts and the reason "input would not clear". (Changed 2026-10-23: gx used to
+  refuse on any draft, which left a stale `/clear` blocking Continue with no visible reason.)
 - **Whole-input clear.** The nudge's retype clears the whole input (repeated Ctrl+U, then an empty
   check), never Ctrl+C.
 - **Failures are one key away.** Every first-prompt failure raises the prompt as a one-step
@@ -183,15 +185,15 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 
 ### Draft check
 
-44. As a person with a draft in the input, I want gx not to type its first prompt or Action step
-    into it, and never to clear it, so that my text is never lost or mixed. [06]
-45. As a person, I want the session raised as Actionable with only the unsent steps and the reason
-    "input holds a draft", so that steps already sent never run twice. [06]
+44. As a person with a draft in the input, I want gx to clear it before it types its first prompt
+    or Action step, so that the texts never mix and a leftover draft never blocks gx. [06]
+45. As a person, when the draft won't clear, I want the session raised as Actionable with only the
+    unsent steps and the reason "input would not clear", so that steps already sent never run
+    twice. [06]
 46. As a person, I want the same for the first prompt, raised as a one-step Action. [06]
 47. As a person, I want my clearing or sending of the draft not to clear gx's Actionable, so that
     `a` still finds its steps. [07]
-48. As a person, I want `a` with the draft still there to refuse again and raise the same
-    Actionable with the same steps. [07]
+48. As a person, I want `a` with the draft still there to clear it and send the same steps. [07]
 49. As a person, I want a gx-raised Actionable replaced only by `a`, a newer Actionable or exit,
     while an agent-raised one is still cleared by my input as today. [07]
 50. As a person, I want gx to type as today when the empty check can't decide, so that a missing
@@ -299,7 +301,8 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
     the input.
   - A turn that starts late after a timeout could make `a` send the prompt twice. Accepted: Actions
     need Idle, and the person chooses when to press `a`.
-- A draft at first-prompt time raises the same one-step Actionable with "input holds a draft".
+- A draft at first-prompt time is cleared; one that won't clear raises a one-step Actionable with
+  "input would not clear".
 
 ### Actions
 
@@ -318,9 +321,9 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
   and whether a user config key sets it, are the implementer's choice.
 - The next step is typed at once after a conversation-id change. A delay is added only if the
   measurement finds keys lost while Claude redraws.
-- Each step, in order: ready to type, draft check, type. A draft found before step K stops the
-  Action and raises a gx-raised Actionable with steps K onward and "input holds a draft". Steps
-  already sent never run again. A draft before step 1 keeps the whole Action.
+- Each step, in order: ready to type, draft clear, type. A draft that won't clear before step K
+  stops the Action and raises a gx-raised Actionable with steps K onward and "input would not
+  clear". Steps already sent never run again.
 - A vim give-up stops the remaining steps like any other step failure (logged, no Actionable).
 
 ### gx-raised Actionable
@@ -375,7 +378,7 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 - Action slash step: a debug line when the settle-window Enter is pressed.
 - Action step: typed, first status, conversation-id change, done (naming the signal: turn,
   new-conversation, settle, start-timeout; with elapsed time).
-- Draft check: one debug line per check; Info when gx refuses for a draft.
+- Draft check: one debug line per check; Info when gx clears a draft or one won't clear.
 - Vim: debug when `i` is pressed; warning on give-up.
 - First-prompt failure: warning.
 - Exact text and keys of each line are the implementer's choice.
