@@ -31,6 +31,12 @@ func WithTestHolder() func(*server.Config) {
 	return func(c *server.Config) { c.Holder = []string{os.Args[0], holderArg} }
 }
 
+// WithChatHarness makes the session chat read transcripts of kind's sessions
+// instead of claude's.
+func WithChatHarness(kind string) func(*server.Config) {
+	return func(c *server.Config) { c.ChatHarness = kind }
+}
+
 // RunSessionProcesses registers the fake harness and, when the test binary
 // was started as a session's holder or as the fake harness's program, runs
 // that and exits. Call it first in TestMain.

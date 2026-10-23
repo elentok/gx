@@ -802,6 +802,31 @@ export interface FinishedEpic {
 }
 
 //////////
+// source: sessionchat.go
+
+/**
+ * SessionChatMessage is one visible message of a session's conversation. ID is
+ * the transcript line's uuid.
+ */
+export interface SessionChatMessage {
+  id: string;
+  role: string; // transcript.ChatRoleAgent or ChatRolePerson
+  kind: string; // text, prompt or command
+  text: string;
+  at: string;
+}
+/**
+ * SessionChatResponse is the visible messages of a session's newest
+ * conversation. ConversationID changes after a /clear. Unsupported marks a
+ * session of a harness that has no chat; its Messages stay empty.
+ */
+export interface SessionChatResponse {
+  conversation_id: string;
+  messages: SessionChatMessage[];
+  unsupported?: boolean;
+}
+
+//////////
 // source: sessions.go
 
 /**

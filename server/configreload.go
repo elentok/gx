@@ -143,6 +143,7 @@ func (s *Server) applyBudgetLimits(old, next Settings) {
 // reloadableSettings is next with the chat test seams, which are not config
 // keys, carried over from the live settings.
 func reloadableSettings(old, next Settings) Settings {
+	next.ChatHarness = old.ChatHarness
 	next.Chat.TelegramBaseURL, next.Chat.GateStatePath, next.Chat.FlushInterval = old.Chat.TelegramBaseURL, old.Chat.GateStatePath, old.Chat.FlushInterval
 	return next
 }

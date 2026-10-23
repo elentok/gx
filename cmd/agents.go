@@ -20,7 +20,7 @@ import (
 func newAgentsCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "agents", Short: "interactive agent sessions owned by the server", Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error { return d.runTab(nav.TabAgents) }}
-	cmd.AddCommand(newAgentsCreateCmd(serverClient), newAgentsListCmd(),
+	cmd.AddCommand(newAgentsCreateCmd(serverClient), newAgentsListCmd(), newAgentsChatCmd(),
 		newAgentsSessionCmd("stop", "end a live session's agent (it stays, Exited)", (*apiclient.Client).StopSession),
 		newAgentsSessionCmd("remove", "delete an Exited session", (*apiclient.Client).RemoveSession),
 		newAgentsSessionCmd("mark-read", "clear a session's Unread", (*apiclient.Client).MarkSessionRead),
@@ -245,6 +245,43 @@ func printSessionResult(w io.Writer, jsonOut bool, res server.SessionResult, err
 	}
 	_, err = fmt.Fprintln(w, res.Session.ID)
 	return err
+}
+
+func newAgentsChatCmd() *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "chat <session>",
+		Short: "show a session's chat: the visible messages of its newest conversation",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			return runAgentsChat(c.Context(), cl, c.OutOrStdout(), jsonOut, args[0])
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
+	return cmd
+}
+
+func runAgentsChat(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	chat, err := cl.SessionChat(ctx, id)
+	if err != nil {
+		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
+	}
+	if jsonOut {
+		return encodeProvenance(w, chat, viaServer, callerActor(os.Getwd))
+	}
+	for _, m := range chat.Messages {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\n", m.Role, m.Kind, m.Text); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func newAgentsListCmd() *cobra.Command {

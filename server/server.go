@@ -137,6 +137,11 @@ type Settings struct {
 	// WebAllowedHosts is config server.web.allowed-hosts: names, besides IP
 	// literals and localhost, that the web listener accepts in Host.
 	WebAllowedHosts []string
+
+	// ChatHarness names the harness whose transcripts the session chat reads;
+	// empty means claude. Not a config key: servertest points it at the fake
+	// harness.
+	ChatHarness string
 }
 
 // SettingsFromConfig maps the user config to the server's reloadable
@@ -575,6 +580,7 @@ var routeTable = []struct {
 	{"POST /v1/agents/answer", func(s *Server, w http.ResponseWriter, r *http.Request) { s.queueWrite(s.agentAnswer)(w, r) }},
 	// Interactive sessions; /v1/agents/* is the loop agents'.
 	{"GET /v1/sessions", (*Server).sessionsRead},
+	{"GET /v1/sessions/chat", (*Server).sessionChatRead},
 	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
 	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.stopSession)(w, r) }},
 	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.removeSession)(w, r) }},

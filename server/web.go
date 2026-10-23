@@ -81,6 +81,10 @@ func (s *Server) webHandler() http.Handler {
 			s.snapshot(w, r)
 		case r.URL.Path == "/v1/tickets/detail":
 			s.detail(w, r)
+		case r.URL.Path == "/v1/sessions":
+			s.sessionsRead(w, r)
+		case r.URL.Path == "/v1/sessions/chat":
+			s.sessionChatRead(w, r)
 		case r.URL.Path == "/v1/epics":
 			s.epicList(w, r)
 		case r.URL.Path == "/v1/epics/detail":

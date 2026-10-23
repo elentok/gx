@@ -103,30 +103,40 @@ type designRef struct {
 	Conversation, Ticket string
 }
 
-// lastAssistantText reads the session's last assistant message from its claude
-// transcript. A missing transcript (a codex session, or one not written yet)
-// stays silent; real errors and an ambiguous id are logged.
-func (s *Server) lastAssistantText(id, conversationID string) (string, bool) {
+// claudeTranscript finds the claude transcript of a session's conversation. A
+// missing transcript (a codex session, or one not written yet) stays silent;
+// real errors and an ambiguous id are logged.
+func (s *Server) claudeTranscript(id, conversationID string) (string, bool) {
 	if conversationID == "" {
 		return "", false
 	}
 	projects, err := harness.ClaudeProjectsDir()
 	if err != nil {
-		s.log.Warn("design actionable: claude projects dir", "session", id, "err", err)
+		s.log.Warn("claude projects dir", "session", id, "err", err)
 		return "", false
 	}
 	paths, err := transcript.FindByIDIn(projects, conversationID)
 	if err != nil {
-		s.log.Warn("design actionable: find transcript", "session", id, "err", err)
+		s.log.Warn("find transcript", "session", id, "err", err)
 		return "", false
 	}
 	if len(paths) > 1 {
-		s.log.Warn("design actionable: several transcripts", "session", id, "conversation", conversationID, "count", len(paths))
+		s.log.Warn("several transcripts", "session", id, "conversation", conversationID, "count", len(paths))
 	}
 	if len(paths) != 1 {
 		return "", false
 	}
-	text, ok, err := transcript.LastAssistantText(paths[0])
+	return paths[0], true
+}
+
+// lastAssistantText reads the session's last assistant message from its claude
+// transcript.
+func (s *Server) lastAssistantText(id, conversationID string) (string, bool) {
+	path, ok := s.claudeTranscript(id, conversationID)
+	if !ok {
+		return "", false
+	}
+	text, ok, err := transcript.LastAssistantText(path)
 	if err != nil {
 		s.log.Warn("design actionable: read transcript", "session", id, "err", err)
 	}

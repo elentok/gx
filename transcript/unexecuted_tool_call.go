@@ -57,15 +57,19 @@ func (l unexecutedToolCallLine) isRealUserTurn() bool {
 // than dropped, matching decodeMessageText's leniency elsewhere in this
 // codebase.
 func (l unexecutedToolCallLine) contentBlocks() []contentBlock {
-	if len(l.Message.Content) == 0 {
+	return decodeContentBlocks(l.Message.Content)
+}
+
+func decodeContentBlocks(raw json.RawMessage) []contentBlock {
+	if len(raw) == 0 {
 		return nil
 	}
 	var s string
-	if err := json.Unmarshal(l.Message.Content, &s); err == nil {
+	if err := json.Unmarshal(raw, &s); err == nil {
 		return []contentBlock{{Type: "text", Text: s}}
 	}
 	var blocks []contentBlock
-	if err := json.Unmarshal(l.Message.Content, &blocks); err != nil {
+	if err := json.Unmarshal(raw, &blocks); err != nil {
 		return nil
 	}
 	return blocks

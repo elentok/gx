@@ -55,6 +55,27 @@ func TestAgentsCreateAndList_JSON(t *testing.T) {
 	}
 }
 
+func TestAgentsChat_JSON(t *testing.T) {
+	t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
+	ctx := context.Background()
+	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	var out bytes.Buffer
+	if err := runAgentsChat(ctx, h.Client, &out, true, res.Session.ID); err != nil {
+		t.Fatal(err)
+	}
+	var chat server.SessionChatResponse
+	if err := json.Unmarshal(out.Bytes(), &chat); err != nil {
+		t.Fatalf("chat output %q: %v", out.String(), err)
+	}
+	if chat.ConversationID == "" || !chat.Unsupported {
+		t.Errorf("chat = %s, want the conversation id and unsupported (fake harness is not claude)", out.String())
+	}
+}
+
 func TestAgentsCreateCmd_WorktreeAndPrompt(t *testing.T) {
 	sock := filepath.Join(shortTempDir(t), "a.sock")
 	ln, err := net.Listen("unix", sock)

@@ -13,6 +13,7 @@ packages:
       - index.go
       - pause.go
       - recentlyfinished.go
+      - sessionchat.go
       - sessions.go
       - verdicts.go
     type_mappings:
