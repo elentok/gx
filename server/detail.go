@@ -173,7 +173,7 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	}
 	if !ref.epic.IsMap {
 		d.Stats = s.detailStats(ref)
-		if d.Runs, err = s.ticketRuns(ref.addr, t); err != nil {
+		if d.Runs, err = s.ticketRuns(ref, t, evs); err != nil {
 			return TicketDetail{}, err
 		}
 	}
