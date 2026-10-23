@@ -49,7 +49,7 @@ func TestTicketsSchemaText_HasTicketAndEpicSections(t *testing.T) {
 	if !strings.Contains(ticketsSchemaText, "completed_at") {
 		t.Error("schema text missing completed_at")
 	}
-	for _, field := range []string{"claimed_at", "done_at"} {
+	for _, field := range []string{"claimed_at", "done_at", "created_at", "original_address", "cancelled_at", "total_tokens", "had_codex", "friction"} {
 		if !strings.Contains(ticketsSchemaText, field) {
 			t.Errorf("schema text missing %s", field)
 		}

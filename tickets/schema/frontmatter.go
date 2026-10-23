@@ -15,35 +15,41 @@ import (
 // from the typed in-memory representation (TicketID, Status, etc.) without
 // yaml struct tags leaking into schema's public API.
 type ticketYAML struct {
-	ID                    string       `yaml:"id"`
-	Status                string       `yaml:"status"`
-	BlockedBy             []string     `yaml:"blocked_by,omitempty"`
-	Parent                string       `yaml:"parent,omitempty"`
-	Type                  string       `yaml:"type"`
-	ExpectedContextWindow int          `yaml:"expected_context_window,omitempty"`
-	ActualContextWindow   int          `yaml:"actual_context_window,omitempty"`
-	ElapsedTime           int          `yaml:"elapsed_time,omitempty"`
-	ActualCost            float64      `yaml:"actual_cost,omitempty"`
-	Compactions           int          `yaml:"compactions,omitempty"`
-	Commitless            bool         `yaml:"commitless,omitempty"`
-	Notify                bool         `yaml:"notify,omitempty"`
-	Manual                bool         `yaml:"manual,omitempty"`
-	Recover               *bool        `yaml:"recover,omitempty"`
-	Unique                string       `yaml:"unique,omitempty"`
-	Agent                 string       `yaml:"agent,omitempty"`
-	SessionIDs            []string     `yaml:"session_ids,omitempty"`
-	IterationStatus       string       `yaml:"iteration_status,omitempty"`
-	IterationFinishedAt   time.Time    `yaml:"iteration_finished_at,omitempty"`
-	ClaimedAt             time.Time    `yaml:"claimed_at,omitempty"`
-	DoneAt                time.Time    `yaml:"done_at,omitempty"`
-	CompletedAt           time.Time    `yaml:"completed_at,omitempty"`
-	LegacyKind            string       `yaml:"park_kind,omitempty"`
-	PauseReason           string       `yaml:"pause_reason,omitempty"`
-	Mutes                 []MuteRecord `yaml:"mutes,omitempty"`
-	Base                  string       `yaml:"base,omitempty"`
-	ResolvedBase          string       `yaml:"resolved_base,omitempty"`
-	Category              string       `yaml:"category,omitempty"`
-	ExportedAt            time.Time    `yaml:"exported_at,omitempty"`
+	ID                    string           `yaml:"id"`
+	Status                string           `yaml:"status"`
+	BlockedBy             []string         `yaml:"blocked_by,omitempty"`
+	Parent                string           `yaml:"parent,omitempty"`
+	Type                  string           `yaml:"type"`
+	ExpectedContextWindow int              `yaml:"expected_context_window,omitempty"`
+	ActualContextWindow   int              `yaml:"actual_context_window,omitempty"`
+	ElapsedTime           int              `yaml:"elapsed_time,omitempty"`
+	ActualCost            float64          `yaml:"actual_cost,omitempty"`
+	Compactions           int              `yaml:"compactions,omitempty"`
+	Commitless            bool             `yaml:"commitless,omitempty"`
+	Notify                bool             `yaml:"notify,omitempty"`
+	Manual                bool             `yaml:"manual,omitempty"`
+	Recover               *bool            `yaml:"recover,omitempty"`
+	Unique                string           `yaml:"unique,omitempty"`
+	Agent                 string           `yaml:"agent,omitempty"`
+	SessionIDs            []string         `yaml:"session_ids,omitempty"`
+	IterationStatus       string           `yaml:"iteration_status,omitempty"`
+	IterationFinishedAt   time.Time        `yaml:"iteration_finished_at,omitempty"`
+	ClaimedAt             time.Time        `yaml:"claimed_at,omitempty"`
+	DoneAt                time.Time        `yaml:"done_at,omitempty"`
+	CompletedAt           time.Time        `yaml:"completed_at,omitempty"`
+	LegacyKind            string           `yaml:"park_kind,omitempty"`
+	PauseReason           string           `yaml:"pause_reason,omitempty"`
+	Mutes                 []MuteRecord     `yaml:"mutes,omitempty"`
+	Base                  string           `yaml:"base,omitempty"`
+	ResolvedBase          string           `yaml:"resolved_base,omitempty"`
+	Category              string           `yaml:"category,omitempty"`
+	ExportedAt            time.Time        `yaml:"exported_at,omitempty"`
+	CreatedAt             time.Time        `yaml:"created_at,omitempty"`
+	OriginalAddress       string           `yaml:"original_address,omitempty"`
+	CancelledAt           time.Time        `yaml:"cancelled_at,omitempty"`
+	TotalTokens           *int64           `yaml:"total_tokens,omitempty"`
+	HadCodex              bool             `yaml:"had_codex,omitempty"`
+	Friction              *FrictionSummary `yaml:"friction,omitempty"`
 
 	// Children is the retired field, declared here and nowhere else: the wire
 	// struct is the only place that has to recognize it (yaml.v3 silently
@@ -101,6 +107,12 @@ func (w ticketYAML) toTicket() Ticket {
 		ResolvedBase:          w.ResolvedBase,
 		Category:              Category(w.Category),
 		ExportedAt:            w.ExportedAt,
+		CreatedAt:             w.CreatedAt,
+		OriginalAddress:       w.OriginalAddress,
+		CancelledAt:           w.CancelledAt,
+		TotalTokens:           w.TotalTokens,
+		HadCodex:              w.HadCodex,
+		Friction:              w.Friction,
 	}
 	if t.IterationFinishedAt.IsZero() {
 		t.IterationFinishedAt = w.LegacyFinishedAt
@@ -140,6 +152,12 @@ func ticketToYAML(t Ticket) ticketYAML {
 		ResolvedBase:          t.ResolvedBase,
 		Category:              string(t.Category),
 		ExportedAt:            t.ExportedAt,
+		CreatedAt:             t.CreatedAt,
+		OriginalAddress:       t.OriginalAddress,
+		CancelledAt:           t.CancelledAt,
+		TotalTokens:           t.TotalTokens,
+		HadCodex:              t.HadCodex,
+		Friction:              t.Friction,
 	}
 	if t.Parent != nil {
 		w.Parent = string(*t.Parent)

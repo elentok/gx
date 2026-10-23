@@ -62,6 +62,14 @@ Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   done_at (RFC3339 timestamp) — stamped when the ticket moves into done, cleared by
     a new claim
   exported_at (RFC3339 timestamp) — when gx exported the ticket
+  created_at (RFC3339 timestamp) — when the ticket was created
+  original_address — the address the ticket was created under; kept when it moves
+  cancelled_at (RFC3339 timestamp) — when the ticket was cancelled
+  total_tokens — input + output + cache writes + cache reads over every session; a
+    stamped 0 is different from unset, and actual_cost is stamped whenever it is
+  had_codex — true when the ticket had a Codex session
+  friction — pauses by reason, run events by type, pause endings by source, total
+    paused time and the durations of person-ended pauses
 
 Other frontmatter fields:
   category (enum): bug, idea. Optional on any ticket.

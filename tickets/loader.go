@@ -173,6 +173,12 @@ func loadTicketFile(ticketPath string, number int, identifier, title string, isM
 	ticket.Category = string(parsed.Category)
 	ticket.ExportedAt = parsed.ExportedAt
 	ticket.CompletedAt = parsed.CompletedAt
+	ticket.CreatedAt = parsed.CreatedAt
+	ticket.OriginalAddress = parsed.OriginalAddress
+	ticket.CancelledAt = parsed.CancelledAt
+	ticket.TotalTokens = parsed.TotalTokens
+	ticket.HadCodex = parsed.HadCodex
+	ticket.Friction = parsed.Friction
 	ticket.ClaimedAt = parsed.ClaimedAt
 	ticket.DoneAt = parsed.DoneAt
 	ticket.Notify = parsed.Notify

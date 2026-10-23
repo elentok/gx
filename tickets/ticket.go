@@ -74,6 +74,14 @@ type Ticket struct {
 	ExportedAt  time.Time
 	CompletedAt time.Time
 
+	// The stats fields mirror schema.Ticket's fields of the same name.
+	CreatedAt       time.Time
+	OriginalAddress string
+	CancelledAt     time.Time
+	TotalTokens     *int64
+	HadCodex        bool
+	Friction        *schema.FrictionSummary
+
 	// Notify mirrors schema.Ticket.Notify.
 	Notify bool
 

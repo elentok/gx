@@ -316,6 +316,28 @@ type Ticket struct {
 	// ExportedAt is when gx exported this ticket. gx-managed: `tickets set`
 	// refuses to write it.
 	ExportedAt time.Time
+	// CreatedAt and OriginalAddress are stamped once, at creation, by
+	// StampCreated; OriginalAddress survives a move to another epic.
+	CreatedAt       time.Time
+	OriginalAddress string
+	// CancelledAt is when the ticket entered cancelled.
+	CancelledAt time.Time
+	// TotalTokens is input + output + cache writes + cache reads over every
+	// session. A pointer so a stamped zero reads differently from no stamp;
+	// ActualCost is stamped whenever TotalTokens is non-nil, so it needs no
+	// pointer of its own.
+	TotalTokens *int64
+	// HadCodex marks a ticket that had a Codex session.
+	HadCodex bool
+	// Friction is the ticket's friction summary; nil until gx stamps it.
+	Friction *FrictionSummary
+}
+
+// StampCreated records when and under which address the ticket was created.
+// Every creation path calls it so the two fields never drift apart.
+func (t *Ticket) StampCreated(now time.Time, address string) {
+	t.CreatedAt = now
+	t.OriginalAddress = address
 }
 
 // MuteRecord is one tripped notification throttle: the event type that
@@ -378,6 +400,9 @@ func Validate(t Ticket) error {
 	}
 	if t.ActualCost < 0 {
 		errs = append(errs, fmt.Errorf("actual_cost: must be non-negative, got %g", t.ActualCost))
+	}
+	if t.TotalTokens != nil && *t.TotalTokens < 0 {
+		errs = append(errs, fmt.Errorf("total_tokens: must be non-negative, got %d", *t.TotalTokens))
 	}
 	for _, b := range t.BlockedBy {
 		if b == t.ID {
