@@ -2,8 +2,10 @@ package server_test
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -221,6 +223,62 @@ func TestStats_WaitingForDesignCountsOpenMapDays(t *testing.T) {
 	for day, want := range map[int]int{9: 1, 8: 2, 6: 2, 5: 3, 4: 2, 0: 2} {
 		if got := statsAt(t, s, s.Throughput.WaitingForDesign, day); got != want {
 			t.Errorf("waiting for design on day %d = %d, want %d", day, got, want)
+		}
+	}
+}
+
+func statsAmountAt(t *testing.T, s server.Stats, series []server.StatsAmount, n int) server.StatsAmount {
+	t.Helper()
+	i := slices.Index(s.Days, statsDate(n))
+	if i < 0 {
+		t.Fatalf("day %s not in %v", statsDate(n), s.Days)
+	}
+	return series[i]
+}
+
+func TestStats_TokensAndSpendSplitDesignAndImplementation(t *testing.T) {
+	stamp := func(tokens int, cost string) string {
+		return "total_tokens: " + strconv.Itoa(tokens) + "\nactual_cost: " + cost + "\n"
+	}
+	done := func(day int) string { return "done_at: " + statsStamp(day) + "\n" }
+	s := statsStore(t, func(store string) {
+		writeProjectEpic(t, store, "proj", "design", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(2)+"\n"+stamp(100, "1.0")+"---\n", map[string]string{
+			"01-a.md": issueMD("01", "done", done(3)+stamp(30, "0.3"), "A"),
+			"02-b.md": issueMD("02", "done", done(2)+stamp(20, "0.2"), "B"),
+		})
+		writeProjectEpic(t, store, "proj", "old-map", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(8)+"\n---\n", nil)
+		writeProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": issueMD("01", "done", done(4)+stamp(100, "1.0"), "A"),
+			"02-b.md": issueMD("02", "done", done(4), "B"),
+			"03-c.md": issueMD("03", "done", done(5), "C"),
+			"04-d.md": issueMD("04", "cancelled", "cancelled_at: "+statsStamp(6)+"\n", "D"),
+			"05-e.md": issueMD("05", "done", done(7)+stamp(0, "0"), "E"),
+		})
+	})("")
+	cases := []struct {
+		name   string
+		series []server.StatsAmount
+		day    int
+		want   server.StatsAmount
+	}{
+		{"design tokens: ticket", s.Cost.TokensDesign, 3, server.StatsAmount{Value: 30}},
+		{"design tokens: ticket plus map remainder", s.Cost.TokensDesign, 2, server.StatsAmount{Value: 70}},
+		{"design spend: ticket plus map remainder", s.Cost.SpendDesign, 2, server.StatsAmount{Value: 0.7}},
+		{"design: unstamped pre-recording map", s.Cost.TokensDesign, 8, server.StatsAmount{NoData: true}},
+		{"design: no finished items", s.Cost.TokensDesign, 4, server.StatsAmount{}},
+		{"impl tokens: mixed day is data", s.Cost.TokensImplementation, 4, server.StatsAmount{Value: 100}},
+		{"impl spend: mixed day is data", s.Cost.SpendImplementation, 4, server.StatsAmount{Value: 1}},
+		{"impl: only unstamped is no data", s.Cost.TokensImplementation, 5, server.StatsAmount{NoData: true}},
+		{"impl spend: only unstamped is no data", s.Cost.SpendImplementation, 5, server.StatsAmount{NoData: true}},
+		{"impl: only a cancel is zero", s.Cost.TokensImplementation, 6, server.StatsAmount{}},
+		{"impl: stamped zero is data", s.Cost.TokensImplementation, 7, server.StatsAmount{}},
+		{"impl: no finished items", s.Cost.TokensImplementation, 9, server.StatsAmount{}},
+		{"impl: map days are not implementation", s.Cost.TokensImplementation, 2, server.StatsAmount{}},
+	}
+	for _, c := range cases {
+		got := statsAmountAt(t, s, c.series, c.day)
+		if math.Abs(got.Value-c.want.Value) > 1e-9 || got.NoData != c.want.NoData {
+			t.Errorf("%s on day %d = %+v, want %+v", c.name, c.day, got, c.want)
 		}
 	}
 }

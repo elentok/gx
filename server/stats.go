@@ -144,16 +144,102 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
 			PausesByReason: emptyCounts(n), RunEvents: emptyCounts(n), PauseEndings: emptyCounts(n),
 		},
 	}
+	design, impl := make(costSeries, n), make(costSeries, n)
 	for _, se := range all {
 		if project != "" && se.Project != project {
 			continue
 		}
+		countCost(design, impl, win, se.Epic)
 		countMerged(&out.Throughput, win, se.Epic)
 		countLines(&out.Throughput, win, se.Epic)
 		countFollowUps(&out.Throughput, win, se.Epic)
 		countWaiting(&out.Throughput, win, se.Epic)
 	}
+	out.Cost.TokensDesign, out.Cost.SpendDesign = design.amounts()
+	out.Cost.TokensImplementation, out.Cost.SpendImplementation = impl.amounts()
 	writeJSON(w, out)
+}
+
+// costDay is one day of one cost series while it is being summed.
+type costDay struct {
+	finished bool // an item finished on this day, stamped or not
+	stamped  bool // at least one finished item carries the stamp
+	tokens   int64
+	spend    float64
+}
+
+func (d *costDay) add(tokens *int64, spend float64) {
+	d.finished = true
+	if tokens == nil {
+		return
+	}
+	d.stamped = true
+	d.tokens += *tokens
+	d.spend += spend
+}
+
+// costSeries is the Design or Implementation side of the cost charts.
+type costSeries []costDay
+
+// addTicket counts a done ticket on its done_at. Cancelled tickets are not
+// finished items.
+func (c costSeries) addTicket(win statsWindow, tk tickets.Ticket) {
+	if !tk.IsDone() {
+		return
+	}
+	if i := win.bucket(tk.DoneAt); i >= 0 {
+		c[i].add(tk.TotalTokens, tk.ActualCost)
+	}
+}
+
+// addMapRemainder counts a completed map epic on its stamp day: the epic's
+// stamp minus its tickets' stamps, which the tickets already count. An
+// unstamped map still finishes an item that day.
+func (c costSeries) addMapRemainder(win statsWindow, e tickets.Epic) {
+	i := win.bucket(e.CompletedAt)
+	if i < 0 {
+		return
+	}
+	if e.TotalTokens == nil {
+		c[i].add(nil, 0)
+		return
+	}
+	tokens, spend := *e.TotalTokens, e.ActualCost
+	for _, tk := range e.Tickets {
+		if tk.IsDone() && tk.TotalTokens != nil {
+			tokens -= *tk.TotalTokens
+			spend -= tk.ActualCost
+		}
+	}
+	tokens = max(tokens, 0)
+	c[i].add(&tokens, max(spend, 0))
+}
+
+// amounts returns the tokens and spend series. Stamps are all or nothing, so
+// both share the same "no data" days.
+func (c costSeries) amounts() (tokens, spend []StatsAmount) {
+	tokens, spend = emptyAmounts(len(c)), emptyAmounts(len(c))
+	for i, d := range c {
+		if d.finished && !d.stamped {
+			tokens[i].NoData, spend[i].NoData = true, true
+			continue
+		}
+		tokens[i].Value, spend[i].Value = float64(d.tokens), d.spend
+	}
+	return tokens, spend
+}
+
+// countCost sums the ticket stamps of every epic into design and
+// implementation. Epic stamps count only as a map's remainder.
+func countCost(design, impl costSeries, win statsWindow, e tickets.Epic) {
+	target := impl
+	if e.IsMap {
+		target = design
+		design.addMapRemainder(win, e)
+	}
+	for _, tk := range e.Tickets {
+		target.addTicket(win, tk)
+	}
 }
 
 // countLines adds a merged epic's lines to its merge day.
