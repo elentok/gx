@@ -42,11 +42,29 @@ export function TicketLine({
   icon,
   toneTitle,
 }: TicketLineProps) {
+  const titleText = (
+    <Text as="span" fontSize="md" color={toneTitle ? `tone.${tone}.fg` : "text"}>
+      {address ? (
+        // Chakra's Link is inline-flex, which would move a long title to its own line instead of wrapping it.
+        <Link href={`#/t/${address}`} color="inherit" display="inline">
+          {title}
+        </Link>
+      ) : (
+        title
+      )}
+    </Text>
+  );
+  const stateText = state && (
+    <Text as="span" data-state fontSize="sm" color={`tone.${tone}.fg`} ml={inlineReason ? "2" : undefined}>
+      {state}
+    </Text>
+  );
   return (
     <Box data-tone={tone}>
-      <Box display={inlineReason ? "block" : "flex"} gap="2" alignItems="baseline">
+      <Box display="flex" gap="2" alignItems="baseline">
         {(live || icon) && (
-          <Box as="span" mr={inlineReason ? "2" : undefined} alignSelf="center" verticalAlign="middle" position="relative" top="-1px" display="inline-flex" w="4" h="4" alignItems="center" justifyContent="center">
+          // An inline-reason row can wrap, so the icon sits on its first line instead of the row's middle.
+          <Box as="span" alignSelf={inlineReason ? "flex-start" : "center"} flexShrink={0} position="relative" top="-1px" display="inline-flex" w="4" h={inlineReason ? "1lh" : "4"} fontSize="md" alignItems="center" justifyContent="center">
             {live ? <Arc label="Running" /> : <StatusIcon kind={icon!} tone={tone} />}
           </Box>
         )}
@@ -55,35 +73,33 @@ export function TicketLine({
           fontFamily="condensed"
           fontSize="sm"
           color={`tone.${tone}.fg`}
-          mr={inlineReason ? (toneTitle ? "1" : "2") : undefined}
+          flexShrink={0}
           // Ids differ in width, so a tone-titled list gives them one column to start the titles at the same x.
           display={toneTitle ? "inline-block" : undefined}
           minW={toneTitle ? "5" : undefined}
         >
           {id}
         </Text>
-        <Text as="span" fontSize="md" color={toneTitle ? `tone.${tone}.fg` : "text"}>
-          {address ? (
-            <Link href={`#/t/${address}`} color="inherit">
-              {title}
-            </Link>
-          ) : (
-            title
-          )}
-        </Text>
-        {state && (
-          <Text as="span" data-state fontSize="sm" color={`tone.${tone}.fg`}>
-            {state}
-          </Text>
-        )}
-        {inlineReason && reason && (
+        {inlineReason ? (
+          // One text block after the id, so a long title wraps under itself rather than under the id.
+          <Box as="span" minW="0">
+            {titleText}
+            {stateText}
+            {reason && (
+              <>
+                <Text as="span" aria-hidden color="text.muted">
+                  {" · "}
+                </Text>
+                <Text as="span" data-reason fontSize="sm" color="text.muted">
+                  {reason}
+                </Text>
+              </>
+            )}
+          </Box>
+        ) : (
           <>
-            <Text as="span" aria-hidden color="text.muted">
-              {" · "}
-            </Text>
-            <Text as="span" data-reason fontSize="sm" color="text.muted">
-              {reason}
-            </Text>
+            {titleText}
+            {stateText}
           </>
         )}
       </Box>

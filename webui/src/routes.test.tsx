@@ -482,7 +482,7 @@ test("live forks nest under a live parent, the indent stops at 2, and a fork of 
   const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 7, done: 2, rows }));
   await screen.findByText("Title 01");
   const live = [...container.querySelectorAll("[data-indent]")].map((el) => [
-    [...el.querySelectorAll("span")].find((s) => s.textContent?.startsWith("Title"))?.textContent,
+    el.querySelector("a")?.textContent,
     el.getAttribute("data-indent"),
   ]);
   expect(live).toEqual([
@@ -505,7 +505,7 @@ test("done forks nest under a done parent in the fold, and only a fork whose par
   const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 4, done: 3, rows }));
   await screen.findByText("Title 01");
   const fold = [...container.querySelectorAll("[data-fold-indent]")].map((el) => [
-    el.querySelector("span + span")?.textContent,
+    el.querySelector("a")?.textContent,
     el.getAttribute("data-fold-indent"),
   ]);
   expect(fold).toEqual([
