@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/tickets"
 )
@@ -404,6 +405,27 @@ func (s *Server) recordConversation(m sessionMeta) {
 	}
 }
 
+// saveConversationTotals saves the tokens and cost of the ended conversation
+// on its record, so stamps never re-read a transcript that may have aged out.
+// An unreadable transcript leaves the record without totals.
+func (s *Server) saveConversationTotals(m sessionMeta, conversation string) {
+	if m.Ticket == "" || conversation == "" {
+		return
+	}
+	agent := ralphloop.AgentClaude
+	if m.Harness == string(ralphloop.AgentCodex) {
+		agent = ralphloop.AgentCodex
+	}
+	tokens, cost, err := ralphloop.SessionsTotals([]ralphloop.SessionRef{{Agent: agent, Cwd: m.Dir, SessionID: conversation}})
+	if err != nil {
+		s.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
+		return
+	}
+	if err := conversations.SaveTotals(s.cfg.ConversationsDir, conversation, conversations.Totals{TotalTokens: tokens, Cost: cost}); err != nil {
+		s.log.Warn("save conversation totals", "session", m.ID, "conversation", conversation, "err", err)
+	}
+}
+
 // addSessionWorktree makes worktree name from the project's trunk, as the
 // Worktrees tab does: at <linked worktree dir>/<name> on branch <name>. It
 // returns the new worktree's path, or why it could not be made.
@@ -738,6 +760,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 					}
 				}
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
+					s.saveConversationTotals(*m, m.ConversationID)
 					m.ConversationID = msg.ConversationID
 					s.recordConversation(*m)
 					changed = true
@@ -871,6 +894,7 @@ func (s *Server) recordSessionExit(m *sessionMeta, exit string) bool {
 			s.triggerBanner(m.ID, sound.Done, "")
 		}
 	}
+	s.saveConversationTotals(*m, m.ConversationID)
 	m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
 	m.RestoreCrashed = exit == SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < restoreCrashWindow
 	m.FirstPrompt = ""

@@ -2,14 +2,18 @@ package server_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/transcript"
 )
 
 // clearFakeSession makes the fake report a new conversation, as /clear does,
@@ -89,5 +93,58 @@ func TestSessionConversations_SurviveRemoveAndSkipUnlinked(t *testing.T) {
 	h2, _, _, _, _ := startFakeSession(t)
 	if recs := recordsByID(t, h2.ConversationsDir); len(recs) != 0 {
 		t.Errorf("unlinked session recorded %+v; want none", recs)
+	}
+}
+
+// writeTranscriptTurns writes a Claude transcript for the conversation, one
+// assistant turn per input-token count, each with 10 output tokens.
+func writeTranscriptTurns(t *testing.T, dir, conv string, inputs ...int) {
+	t.Helper()
+	path, err := transcript.Path(dir, conv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var lines []string
+	for i, in := range inputs {
+		ts := time.Now().Add(time.Duration(i) * time.Second).UTC().Format(time.RFC3339Nano)
+		lines = append(lines, fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"model":"claude-sonnet-4-5","usage":{"input_tokens":%d,"output_tokens":10}}}`, ts, in))
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSessionConversations_TotalsSavedWhenAConversationEnds(t *testing.T) {
+	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
+	dir, _ := readMeta(t, h, id)["dir"].(string)
+	newer := conv + "-cleared"
+	writeTranscriptTurns(t, dir, conv, 100, 200)
+	clearFakeSession(ctx, t, h, evs, id, conv, newer)
+
+	recs := recordsByID(t, h.ConversationsDir)
+	first := recs[conv].Totals
+	if first == nil || first.TotalTokens != 320 || first.Cost <= 0 {
+		t.Errorf("first totals = %+v; want 320 tokens and a cost after /clear", first)
+	}
+	if recs[newer].Totals != nil {
+		t.Errorf("running conversation totals = %+v; want none yet", recs[newer].Totals)
+	}
+
+	writeTranscriptTurns(t, dir, newer, 50)
+	stopFakeSession(ctx, t, h, evs, id)
+	second := recordsByID(t, h.ConversationsDir)[newer].Totals
+	if second == nil || second.TotalTokens != 60 || second.Cost <= 0 {
+		t.Errorf("second totals = %+v; want 60 tokens and a cost after exit", second)
+	}
+}
+
+func TestSessionConversations_NoTranscriptLeavesNoTotals(t *testing.T) {
+	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
+	stopFakeSession(ctx, t, h, evs, id)
+	if r := recordsByID(t, h.ConversationsDir)[conv]; r.Totals != nil {
+		t.Errorf("totals = %+v; want none without a transcript", r.Totals)
 	}
 }

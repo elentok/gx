@@ -28,6 +28,15 @@ type Record struct {
 	Ticket  string `json:"ticket"`
 	// RecordedAt is when the conversation was first recorded.
 	RecordedAt time.Time `json:"recorded_at"`
+	// Totals is set once the conversation ends; nil while it runs or when its
+	// transcript could not be read.
+	Totals *Totals `json:"totals,omitempty"`
+}
+
+// Totals are a finished conversation's tokens and cost, subagents included.
+type Totals struct {
+	TotalTokens int     `json:"total_tokens"`
+	Cost        float64 `json:"cost"`
 }
 
 // DefaultDir is where the server keeps the records: <data>/conversations.
@@ -76,18 +85,50 @@ func Started(root string) (time.Time, bool, error) {
 	return t, true, nil
 }
 
-// Save writes r, keeping the RecordedAt of an earlier save of the same
-// conversation, so a re-link moves it to the new ticket.
+// Save writes r, keeping the RecordedAt and Totals of an earlier save of the
+// same conversation, so a re-link moves it to the new ticket.
 func Save(root string, r Record) error {
-	if r.ID == "" || !filepath.IsLocal(r.ID) || strings.ContainsRune(r.ID, filepath.Separator) {
-		return fmt.Errorf("bad conversation id %q", r.ID)
-	}
-	if err := os.MkdirAll(root, 0o700); err != nil {
+	path, err := recordPath(root, r.ID)
+	if err != nil {
 		return err
 	}
-	path := filepath.Join(root, r.ID+".json")
 	if prev, err := read(path); err == nil {
 		r.RecordedAt = prev.RecordedAt
+		if r.Totals == nil {
+			r.Totals = prev.Totals
+		}
+	}
+	return write(path, r)
+}
+
+// SaveTotals adds totals to the saved record of conversation id. A
+// conversation with no record (an unlinked session) is skipped.
+func SaveTotals(root, id string, t Totals) error {
+	path, err := recordPath(root, id)
+	if err != nil {
+		return err
+	}
+	r, err := read(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	r.Totals = &t
+	return write(path, r)
+}
+
+func recordPath(root, id string) (string, error) {
+	if id == "" || !filepath.IsLocal(id) || strings.ContainsRune(id, filepath.Separator) {
+		return "", fmt.Errorf("bad conversation id %q", id)
+	}
+	return filepath.Join(root, id+".json"), nil
+}
+
+func write(path string, r Record) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
 	}
 	data, err := json.Marshal(r)
 	if err != nil {
