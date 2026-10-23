@@ -294,9 +294,16 @@ ends when gx claims the ticket. Not a status value.
 the pause rounds and the person's permission decisions. Not the run log, which records what happened
 to a ticket.
 
-**Pause round** — one question a Paused ticket asks and what ends it: a person's answer, or gx
-closing it because the ticket left the `self-reported` pause another way. The ticket's open question
-is the latest question with neither. Not an iteration, and not a `pause` event in the run log.
+**Pause round** — one pause of a ticket, from the moment it becomes Paused to what ends it. An
+answer pause opens with a question; a repair pause has none. Every round records how it ended
+(answer, resume, start over, manual merge, relaunch, cancel, or gx on its own) and where (web, TUI,
+CLI, or gx). The ticket's open question is the latest question whose round has not ended. Not an
+iteration, and not a `pause` event in the run log.
+
+**Friction summary** — the counts gx stamps on a ticket when it becomes done or cancelled: pauses by
+reason, run events by type, pause endings by where they ended, and total paused time. A merged loop
+epic carries the sum of its tickets' summaries. The Stats page reads these stamps, never the logs
+(ADR 0041).
 
 **Action card** — the part of a ticket's page that asks a person to act: the open question and its
 answer form, a pending permission prompt, the text that says why the ticket stopped, the action that
@@ -406,6 +413,10 @@ index rebuilt from it (ADR 0026). Agents, the CLI and humans never run git in it
 `epic/06`) are input only and are resolved before anything is stored. _Avoid_: path (agents name
 tickets by address, never by file path).
 
+**Original address** — the address a ticket was created at, stamped once at creation. A move or a
+close never changes it. A ticket is a **Follow-up** when its original address is in a `follow-ups`
+epic.
+
 **Project** / **project name** / **project file** — a registered repo (or `scratch`, which has no
 repo), named by the first address segment and defined by `<ticket store>/<project>/project.json`.
 
@@ -509,8 +520,8 @@ Each follow-up has a **category**: a **bug** (something that works wrongly) or a
 missing or painful). The category is not the ticket's type: the type still picks which skill works
 it. A follow-up leaves the epic in one of two ways: it is **resolved** into a real epic, or it is
 **closed** with a reason (fixed already, obsolete, duplicate, not worth it) and kept in the project's
-**follow-ups archive** so the same finding is not filed again. _Avoid_: process, triage (for the
-whole run).
+**follow-ups archive** so the same finding is not filed again. A ticket stays a follow-up after it
+moves. What makes it one is the epic it was filed in. _Avoid_: process, triage (for the whole run).
 
 **Retro** — a look back at one finished loop epic's run, judging the tooling and process (not the
 project's code) and filing follow-ups for what went wrong. An epic gets at most one retro; once it
