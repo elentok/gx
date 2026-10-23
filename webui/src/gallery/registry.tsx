@@ -11,6 +11,9 @@ import { EmptyState } from "../ui/empty-state/EmptyState";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
+import { Sidebar } from "../ui/sidebar/Sidebar";
+import { SidebarItem } from "../ui/sidebar/SidebarItem";
+import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
 import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
@@ -145,6 +148,66 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [
       ...perTone((tone) => <EmptyState tone={tone} title="All quiet" />),
       { label: "with body", node: <EmptyState title="All quiet">Nothing is running.</EmptyState> },
+    ],
+  },
+  {
+    name: "Sidebar",
+    cases: [
+      ...perTone((tone) => (
+        <Sidebar title={tone} tone={tone}>
+          <SidebarItem label={ticket.title} tone={tone} current />
+        </Sidebar>
+      )),
+      {
+        label: "with action",
+        node: (
+          <Sidebar
+            title="Designs"
+            action={
+              <Button variant="ghost" tone="running">
+                + New
+              </Button>
+            }
+          >
+            <SidebarItem label={ticket.title} />
+          </Sidebar>
+        ),
+      },
+    ],
+  },
+  {
+    name: "SidebarSection",
+    cases: [
+      ...perTone((tone) => (
+        <SidebarSection title={tone} count={2} tone={tone}>
+          <SidebarItem label={ticket.title} />
+        </SidebarSection>
+      )),
+      {
+        label: "collapsed",
+        node: (
+          <SidebarSection title="Finished" count={5} defaultCollapsed>
+            <SidebarItem label={ticket.title} />
+          </SidebarSection>
+        ),
+      },
+      {
+        label: "no count",
+        node: (
+          <SidebarSection title="Ready">
+            <SidebarItem label={ticket.title} />
+          </SidebarSection>
+        ),
+      },
+    ],
+  },
+  {
+    name: "SidebarItem",
+    cases: [
+      ...perTone((tone) => <SidebarItem label={ticket.title} tone={tone} current />),
+      { label: "plain", node: <SidebarItem label={ticket.title} /> },
+      { label: "current", node: <SidebarItem label={ticket.title} current /> },
+      { label: "with marks", node: <SidebarItem label={ticket.title} marks={<LiveDot tone="running" label="live" />} /> },
     ],
   },
 ];
