@@ -1,8 +1,8 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { SessionChatResponse, SessionInfo, SessionResult } from "../generated/server";
+import type { SessionChatResponse, SessionInfo, SessionResult, SessionRoundCard } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchChat } from "./chat";
@@ -131,4 +131,81 @@ test("while disconnected the page says so and the buttons are off", async () => 
   expect(((await screen.findByRole("button", { name: /Continue/ })) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText("Offline, reconnecting…")).toBeTruthy();
   expect((await openNote()).disabled).toBe(true);
+});
+
+const askCard = (n: number, over: Partial<SessionRoundCard> = {}): SessionRoundCard => ({
+  number: n,
+  title: `T${n}`,
+  body: `Body ${n}?`,
+  kind: "options",
+  options: [
+    { id: "a", label: "Alpha" },
+    { id: "b", label: "Beta" },
+  ],
+  ...over,
+});
+
+const round = (): SessionRoundCard[] => [
+  askCard(1),
+  askCard(2, { kind: "yes-no", options: undefined, yes: "Sure", no: "Nope" }),
+  askCard(3, { kind: "text", options: undefined }),
+];
+
+const sheet = () => screen.findByRole("group", { name: "Questions" });
+
+test("Send answers the whole round in one prompt", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ round: round() }) });
+  const s = within(await sheet());
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
+  fireEvent.click(s.getByRole("button", { name: "Nope" }));
+  fireEvent.change(s.getByRole("textbox", { name: "Answer to question 3" }), { target: { value: "free text" } });
+  fireEvent.click(s.getByRole("button", { name: "Question 1, answered" }));
+  fireEvent.click(s.getByRole("button", { name: "Note on question 1" }));
+  fireEvent.change(s.getByRole("textbox", { name: "Note text for question 1" }), { target: { value: "because" } });
+  fireEvent.change(await openNote(), { target: { value: "overall" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post).toHaveBeenCalledWith({
+    id: "s-a",
+    text: "Q1 - T1: Alpha\n  Note: because\nQ2 - T2: No\nQ3 - T3: free text\n\nNote:\noverall",
+    last_message: "m9",
+  });
+});
+
+test("unanswered questions ask before sending; Answer them opens the first one", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ round: round() }) });
+  const s = within(await sheet());
+  fireEvent.click(s.getByRole("button", { name: "Beta" }));
+  fireEvent.click(s.getByRole("button", { name: "Question 3" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  expect(screen.getByText(/2 questions are unanswered \(Q2, Q3\)\. Send anyway\?/)).toBeTruthy();
+  expect(post).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "Answer them" }));
+  expect(screen.queryByRole("alertdialog")).toBeNull();
+  expect(s.getByRole("button", { name: "Question 2" }).getAttribute("aria-current")).toBe("step");
+
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send anyway" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0].text).toBe("Q1 - T1: Beta\nQ2 - T2: (unanswered)\nQ3 - T3: (unanswered)");
+});
+
+test("a stale refusal keeps every answer and note of the round", async () => {
+  const post = vi.fn<PostPrompt>(async () => ({ refused: true, reason: "stale", message: "the conversation moved" }));
+  const fetchChat = vi.fn<FetchChat>(async () => ({ kind: "ok", detail: chatOf({ round: round() }) }));
+  render({ post, fetchChat });
+  const s = within(await sheet());
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
+  const box = await openNote();
+  fireEvent.change(box, { target: { value: "keep" } });
+  const before = fetchChat.mock.calls.length;
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send anyway" }));
+  expect(await screen.findByRole("alert")).toBeTruthy();
+  await waitFor(() => expect(fetchChat.mock.calls.length).toBeGreaterThan(before));
+  expect(screen.getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
+  expect(box.value).toBe("keep");
 });

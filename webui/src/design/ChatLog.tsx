@@ -1,11 +1,13 @@
 import { Box, Text } from "@chakra-ui/react";
+import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
-import type { SessionBackgroundTask, SessionChatMessage, SessionInfo } from "../generated/server";
+import type { SessionBackgroundTask, SessionChatMessage, SessionChatResponse, SessionInfo } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { useSessionChat, type FetchChat } from "./chat";
 import { Composer } from "./Composer";
 import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
+import type { Answers } from "./round";
 
 const KIND_NAMES: Record<string, string> = { shell: "shell", monitor: "Monitor", agent: "subagent" };
 
@@ -68,6 +70,41 @@ function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
   );
 }
 
+// The sheet and the composer share the round's answers. The caller keys it by round, so a new round starts blank
+// while a refetch of the same round keeps every answer.
+function ChatTail({
+  session,
+  chat,
+  connected,
+  post,
+  onStale,
+}: {
+  session: SessionInfo;
+  chat: SessionChatResponse;
+  connected: boolean;
+  post?: PostPrompt;
+  onStale: () => void;
+}) {
+  const [answers, setAnswers] = useState<Answers>({});
+  const [focus, setFocus] = useState<{ index: number }>();
+  return (
+    <>
+      {chat.round.length > 0 && <QuestionSheet round={chat.round} answers={answers} onAnswers={setAnswers} focus={focus} />}
+      <Composer
+        session={session}
+        lastMessage={chat.messages.at(-1)?.id}
+        next={chat.next}
+        connected={connected}
+        post={post}
+        onStale={onStale}
+        round={chat.round}
+        answers={answers}
+        onReview={(index) => setFocus({ index })}
+      />
+    </>
+  );
+}
+
 // The chat of a Claude session. Other harnesses have no chat, so DesignChat never mounts this for them.
 function ChatLog({
   session,
@@ -94,11 +131,10 @@ function ChatLog({
         <Entry key={m.id || i} m={m} tool={working && i === chat.messages.length - 1} />
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
-      {chat.round.length > 0 && <QuestionSheet key={chat.round.map((c) => `${c.number}:${c.title}`).join("|")} round={chat.round} />}
-      <Composer
+      <ChatTail
+        key={chat.round.map((c) => `${c.number}:${c.title}`).join("|")}
         session={session}
-        lastMessage={chat.messages.at(-1)?.id}
-        next={chat.next}
+        chat={chat}
         connected={connected}
         post={post}
         onStale={refetch}

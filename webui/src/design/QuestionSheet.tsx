@@ -2,18 +2,7 @@ import { Box, chakra, Text, Textarea } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import type { SessionRoundCard } from "../generated/server";
 import { Button } from "../ui/button/Button";
-
-type Answer = { choice?: string; text?: string; note?: string };
-
-const choicesOf = (c: SessionRoundCard) =>
-  c.kind === "yes-no"
-    ? [
-        { id: "yes", label: c.yes || "Yes" },
-        { id: "no", label: c.no || "No" },
-      ]
-    : (c.options ?? []);
-
-const isAnswered = (a?: Answer) => !!a?.choice || !!a?.text?.trim();
+import { choicesOf, isAnswered, type Answer, type Answers } from "./round";
 
 function Choice({ label, on, recommended, onClick }: { label: string; on: boolean; recommended: boolean; onClick: () => void }) {
   return (
@@ -123,12 +112,29 @@ function Question({
   );
 }
 
-// A Grilling round docked above the composer. The caller keys it by round, so a new round opens a fresh sheet.
-export function QuestionSheet({ round }: { round: SessionRoundCard[] }) {
+// A Grilling round docked above the composer. The caller keys it by round, so a new round opens a fresh sheet,
+// and owns the answers, since the composer's Send reads them.
+export function QuestionSheet({
+  round,
+  answers,
+  onAnswers,
+  focus,
+}: {
+  round: SessionRoundCard[];
+  answers: Answers;
+  onAnswers: (update: (all: Answers) => Answers) => void;
+  /** A new object opens the sheet at that question. */
+  focus?: { index: number };
+}) {
   const [open, setOpen] = useState(true);
   const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, Answer>>({});
   const row = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!focus) return;
+    setIndex(focus.index);
+    setOpen(true);
+  }, [focus]);
 
   // Keep the scroll position on the current question; scrolling by hand sets the question.
   useEffect(() => {
@@ -212,7 +218,7 @@ export function QuestionSheet({ round }: { round: SessionRoundCard[] }) {
               <Question
                 card={c}
                 answer={answers[c.number] ?? {}}
-                onChange={(a) => setAnswers((all) => ({ ...all, [c.number]: a }))}
+                onChange={(a) => onAnswers((all) => ({ ...all, [c.number]: a }))}
                 onPicked={() => setIndex(Math.min(k + 1, round.length - 1))}
               />
             </Box>
