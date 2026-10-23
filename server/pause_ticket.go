@@ -23,20 +23,37 @@ func (s *Server) pauseTicket(scratchDir string, addr tickets.Address, ticketPath
 		return err
 	}
 	s.events.publish(EventTicketPaused, addr.String())
-	if !s.holdPauseForRecovery(addr, ticketPath, kind, reason) {
-		s.notifyPause(addr, ticketPath, kind, reason)
-	}
+	s.announcePause(addr, ticketPath, kind, reason)
 	return nil
 }
 
-// notifyPause sends the one chat message for a pause that is already written.
-// A pause herdr's outage can cause is held for the digest instead.
+// announcePause is the one place that routes a pause already written: held for
+// recovery, held for herdr's digest, or sent to chat now. Every caller that has
+// just written a pause goes through it; a recovery hold's release is the only
+// path that skips the recovery choice.
+func (s *Server) announcePause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
+	switch {
+	case s.holdPauseForRecovery(addr, ticketPath, kind, reason):
+	case kind.CauseHerdr() && s.herdr.isUnavailable():
+		s.holdPause(addr, ralphloop.PauseStatus(kind), kind, reason)
+	default:
+		s.sendPause(addr, ticketPath, kind, reason)
+	}
+}
+
+// notifyPause releases a pause recovery was holding: herdr's outage is still
+// checked, the recovery hold is not.
 func (s *Server) notifyPause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
-	status := ralphloop.PauseStatus(kind)
 	if kind.CauseHerdr() && s.herdr.isUnavailable() {
-		s.holdPause(addr, status, kind, reason)
+		s.holdPause(addr, ralphloop.PauseStatus(kind), kind, reason)
 		return
 	}
+	s.sendPause(addr, ticketPath, kind, reason)
+}
+
+// sendPause sends the one chat message for a pause.
+func (s *Server) sendPause(addr tickets.Address, ticketPath string, kind events.Kind, reason string) {
+	status := ralphloop.PauseStatus(kind)
 	s.chat.Pause(addr.Project, s.chatOverride(addr.Project), addr.Epic, ticketPath, addr.ID, status, kind, pauseChatDetail(ticketPath, kind, reason), s.epicCounts(addr.Project, addr.Epic))
 }
 

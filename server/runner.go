@@ -778,9 +778,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 			s.registry.markWaiting(ticketAddr, time.Now())
 		}
 		s.events.publish(EventIterationPaused, ticketAddr)
-		if !s.holdPauseForRecovery(addr, one.Ticket.Path, out.Kind, out.Reason) {
-			s.notifyPause(addr, one.Ticket.Path, out.Kind, out.Reason)
-		}
+		s.announcePause(addr, one.Ticket.Path, out.Kind, out.Reason)
 		return
 	}
 	// Stop already cleans an adopted session; a run found finished at reattach
