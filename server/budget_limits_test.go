@@ -415,16 +415,18 @@ func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harn
 // The grace counts from the stop decision and the Interrupts run side by side:
 // stopping N slow runs takes about the grace, not the sum of their Interrupts.
 func TestBudget_HardLimitInterruptsRunInParallelInsideGrace(t *testing.T) {
-	h, fake, over, labels := startBudgetRuns(t, 3, 400*time.Millisecond)
+	h, fake, over, labels := startBudgetRuns(t, 3, 600*time.Millisecond)
 	for _, l := range labels {
-		fake.SetInterruptDelay(l, 300*time.Millisecond)
+		fake.SetInterruptDelay(l, 500*time.Millisecond)
 	}
 	over.Store(true)
 	start := time.Now()
 	h.Server.PollBudget()
 	elapsed := time.Since(start)
-	if elapsed < 400*time.Millisecond || elapsed >= 800*time.Millisecond {
-		t.Errorf("stop took %v, want about the 400ms grace (serial Interrupts would take 900ms)", elapsed)
+	// The upper bound sits well below the serial total so a loaded machine
+	// does not look like serial Interrupts.
+	if elapsed < 600*time.Millisecond || elapsed >= 1200*time.Millisecond {
+		t.Errorf("stop took %v, want about the 600ms grace (serial Interrupts would take 1500ms)", elapsed)
 	}
 	assertNoLiveSessions(t, fake)
 }
