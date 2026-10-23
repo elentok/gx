@@ -405,12 +405,9 @@ func ClearEpicFields(epicPath string, keys ...string) error {
 	return editEpicFrontmatter(epicPath, func(mapping *yaml.Node) (bool, error) {
 		changed := false
 		for _, key := range keys {
-			for i := 0; i+1 < len(mapping.Content); i += 2 {
-				if mapping.Content[i].Value == key {
-					mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
-					changed = true
-					break
-				}
+			if i := mappingKeyIndex(mapping, key); i >= 0 {
+				mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
+				changed = true
 			}
 		}
 		return changed, nil
@@ -421,20 +418,16 @@ func stampEpicFields(epicPath string, fields map[string]any, overwrite bool) err
 	return editEpicFrontmatter(epicPath, func(mapping *yaml.Node) (bool, error) {
 		changed := false
 		for key, value := range fields {
-			exists := hasMappingKey(mapping, key)
-			if exists && !overwrite {
+			idx := mappingKeyIndex(mapping, key)
+			if idx >= 0 && !overwrite {
 				continue
 			}
 			var val yaml.Node
 			if err := val.Encode(value); err != nil {
 				return false, fmt.Errorf("encoding %s: %w", key, err)
 			}
-			if exists {
-				for i := 0; i+1 < len(mapping.Content); i += 2 {
-					if mapping.Content[i].Value == key {
-						mapping.Content[i+1] = &val
-					}
-				}
+			if idx >= 0 {
+				mapping.Content[idx+1] = &val
 			} else {
 				mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &val)
 			}
@@ -486,13 +479,15 @@ func editEpicFrontmatter(epicPath string, edit func(mapping *yaml.Node) (bool, e
 	return fsutil.WriteFileAtomic(ticketPath, []byte("---\n"+string(out)+"---\n"+body))
 }
 
-func hasMappingKey(mapping *yaml.Node, key string) bool {
+// mappingKeyIndex returns the index of key in mapping.Content, or -1 when absent.
+// The value node sits at the returned index + 1.
+func mappingKeyIndex(mapping *yaml.Node, key string) int {
 	for i := 0; i+1 < len(mapping.Content); i += 2 {
 		if mapping.Content[i].Value == key {
-			return true
+			return i
 		}
 	}
-	return false
+	return -1
 }
 
 // stampEpicTiming reads scratchDir/epicName's ticket.md timing, hands it to
@@ -558,11 +553,9 @@ func stampTicketMDTiming(path, raw string, mutate func(*epicTiming) bool) error 
 func setMappingTime(mapping *yaml.Node, key string, t time.Time) {
 	var val yaml.Node
 	_ = val.Encode(t)
-	for i := 0; i+1 < len(mapping.Content); i += 2 {
-		if mapping.Content[i].Value == key {
-			mapping.Content[i+1] = &val
-			return
-		}
+	if i := mappingKeyIndex(mapping, key); i >= 0 {
+		mapping.Content[i+1] = &val
+		return
 	}
 	mapping.Content = append(mapping.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &val)
 }
