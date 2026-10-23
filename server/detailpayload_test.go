@@ -62,10 +62,10 @@ func TestTicketDetail_LoopTicketPayload(t *testing.T) {
 		}
 	}
 	want := []server.RelatedTicket{
-		{Relation: server.RelationBlocker, Address: "proj:work/01", Title: "Own blocker", Status: "done"},
-		{Relation: server.RelationBlocker, Address: "proj:other/06", Title: "Cross blocker", Status: "claimed"},
-		{Relation: server.RelationParent, Address: "proj:work/02", Title: "The parent", Status: "waiting-for-children"},
-		{Relation: server.RelationFork, Address: "proj:work/04", Title: "A fork", Status: "blocked"},
+		{Relation: server.RelationBlocker, Address: "proj:work/01", Linkable: true, Title: "Own blocker", Status: "done"},
+		{Relation: server.RelationBlocker, Address: "proj:other/06", Linkable: true, Title: "Cross blocker", Status: "claimed"},
+		{Relation: server.RelationParent, Address: "proj:work/02", Linkable: true, Title: "The parent", Status: "waiting-for-children"},
+		{Relation: server.RelationFork, Address: "proj:work/04", Linkable: true, Title: "A fork", Status: "blocked"},
 	}
 	if !slices.Equal(d.Related, want) {
 		t.Fatalf("related = %+v, want %+v", d.Related, want)

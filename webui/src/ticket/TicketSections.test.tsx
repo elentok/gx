@@ -46,6 +46,7 @@ const headings = () => screen.getAllByRole("heading", { level: 2 }).map((h) => h
 const related = (relation: string, address: string, status: string): RelatedTicket => ({
   relation,
   address,
+  linkable: address.includes(":"),
   title: `Title of ${address.slice(address.indexOf(":") + 1)}`,
   status,
 });

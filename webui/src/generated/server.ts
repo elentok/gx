@@ -229,6 +229,10 @@ export interface RelatedTicket {
    * names no ticket keeps the token as written.
    */
   address: string;
+  /**
+   * Linkable is false for a blocker that names no ticket, which has nothing to link to.
+   */
+  linkable: boolean;
   title: string;
   /**
    * Status is the rendered-status word the epic rows use.

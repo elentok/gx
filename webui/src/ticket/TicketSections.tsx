@@ -6,7 +6,7 @@ import { TicketLine } from "../ui/ticket-line/TicketLine";
 import type { Tone } from "../ui/tone";
 import { runLine } from "./runs";
 import { toneOfStatus } from "../epic/rows";
-import { isLinkable, pageText, reasonOf, relatedId } from "./sections";
+import { pageText, reasonOf, relatedId } from "./sections";
 
 function Section({ id, tone, title, children }: { id: string; tone: Tone; title: string; children: React.ReactNode }) {
   return (
@@ -50,7 +50,7 @@ export function TicketSections({ detail, now }: { detail: TicketDetail; now: num
                 title={r.title}
                 reason={reasonOf(r)}
                 tone={toneOfStatus(r.status)}
-                address={isLinkable(r) ? r.address : undefined}
+                address={r.linkable ? r.address : undefined}
                 inlineReason
               />
             ))}

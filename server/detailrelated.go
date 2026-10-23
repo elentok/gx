@@ -21,7 +21,9 @@ type RelatedTicket struct {
 	// Address is canonical for a ticket of the same project. A blocker that
 	// names no ticket keeps the token as written.
 	Address string `json:"address"`
-	Title   string `json:"title"`
+	// Linkable is false for a blocker that names no ticket, which has nothing to link to.
+	Linkable bool   `json:"linkable"`
+	Title    string `json:"title"`
 	// Status is the rendered-status word the epic rows use.
 	Status string `json:"status"`
 }
@@ -51,7 +53,7 @@ func (s *Server) detailStats(ref ticketRef) *DetailStats {
 func relatedTickets(ref ticketRef, epics []tickets.Epic) []RelatedTicket {
 	own := func(t tickets.Ticket, relation string) RelatedTicket {
 		addr := tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.DisplayNumber()}
-		return RelatedTicket{Relation: relation, Address: addr.String(), Title: t.Title, Status: ref.epic.RenderedStatus(t).Word()}
+		return RelatedTicket{Relation: relation, Address: addr.String(), Linkable: true, Title: t.Title, Status: ref.epic.RenderedStatus(t).Word()}
 	}
 	related := []RelatedTicket{}
 	for _, token := range ref.ticket.BlockedBy {
@@ -81,6 +83,7 @@ func blockerEntry(ref ticketRef, epics []tickets.Epic, token string) RelatedTick
 		for _, e := range epics {
 			if e.Name == name {
 				entry.Address = rootRef{Project: ref.addr.Project, Epic: name}.String()
+				entry.Linkable = true
 				entry.Title, entry.Status = e.Name, tickets.StatusOpen.Word()
 				if !e.MergedAt.IsZero() {
 					entry.Status = tickets.StatusDone.Word()
@@ -99,6 +102,7 @@ func blockerEntry(ref ticketRef, epics []tickets.Epic, token string) RelatedTick
 	}
 	if t, ok := findInEpic(epic, id); ok {
 		entry.Address = tickets.Address{Project: ref.addr.Project, Epic: epic.Name, ID: t.DisplayNumber()}.String()
+		entry.Linkable = true
 		entry.Title, entry.Status = t.Title, epic.RenderedStatus(t).Word()
 	}
 	return entry

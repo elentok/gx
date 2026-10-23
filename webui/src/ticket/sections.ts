@@ -49,12 +49,9 @@ const REASONS: Record<string, string> = {
 
 export const reasonOf = (r: RelatedTicket) => `${REASONS[r.relation] ?? RelationFork} · ${r.status}`;
 
-// A blocker that names no ticket has no address to link and keeps its text.
-export const isLinkable = (r: RelatedTicket) => r.address.includes(":");
-
 // A ticket of the page's own epic reads NN; another epic's reads epic/NN, with no project prefix.
 export function relatedId(r: RelatedTicket, epic: string): string {
-  if (!isLinkable(r)) return r.address;
+  if (!r.linkable) return r.address;
   const own = epicOfTicket(r.address) === epic;
   const tail = r.address.slice(r.address.indexOf(":") + 1);
   return own ? tail.slice(tail.lastIndexOf("/") + 1) : tail;
