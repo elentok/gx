@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/elentok/gx/agentrunner"
 )
@@ -136,10 +137,11 @@ func inputState(rows []string, m markerTyping) InputState {
 
 // hasDraftText reports whether cells hold a visible rune that is neither dim
 // nor reverse video. Reverse video is the cursor block, which sits on the
-// first placeholder rune or past the end of a draft.
+// first placeholder rune or past the end of a draft. Any space counts as
+// blank: Claude draws a no-break space after its marker.
 func hasDraftText(cells []cell) bool {
 	for _, c := range cells {
-		if c.r != ' ' && !c.style.dim && !c.style.reverse {
+		if !unicode.IsSpace(c.r) && !c.style.dim && !c.style.reverse {
 			return true
 		}
 	}

@@ -50,6 +50,14 @@ func TestTyping_InputIsEmpty(t *testing.T) {
 			want: harness.InputEmpty, plain: true,
 		},
 		{
+			// Claude draws a no-break space after the marker and the next-prompt
+			// suggestion dim, with the terminal cursor rather than a reverse cell.
+			name: "claude suggestion after a no-break space",
+			kind: "claude",
+			rows: []string{rule, "❯\u00a0" + dim + "/clear" + rst, rule},
+			want: harness.InputEmpty, plain: true,
+		},
+		{
 			name: "claude draft",
 			kind: "claude",
 			rows: []string{rule, "❯ fix the bug" + rev + " " + rst, rule, dim + "  ? for shortcuts" + rst},
