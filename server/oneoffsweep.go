@@ -115,7 +115,7 @@ func archiveOneOff(projectDir string, archived tickets.Epic, addr tickets.Addres
 		return nil
 	}
 	for _, c := range archived.Tickets {
-		if tickets.NamesOriginal(c.Body, addr) {
+		if tickets.IsOriginal(c, addr) {
 			to := tickets.Address{Project: addr.Project, Epic: OneOffsArchivedEpic, ID: c.Identifier}
 			return tickets.ResumeMove(projectDir, addr, to, t.Path, c.Path)
 		}

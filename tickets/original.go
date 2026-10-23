@@ -32,6 +32,16 @@ func NamesOriginal(body string, addr Address) bool {
 	return false
 }
 
+// IsOriginal reports whether t was first created under addr: its
+// original_address frontmatter field, or, for a ticket from before the field,
+// the Resolution line a move left behind.
+func IsOriginal(t Ticket, addr Address) bool {
+	if t.OriginalAddress != "" {
+		return t.OriginalAddress == addr.String()
+	}
+	return NamesOriginal(t.Body, addr)
+}
+
 // IsTerminalStatus reports whether a raw ticket status is done or cancelled.
 func IsTerminalStatus(status string) bool {
 	return status == string(schema.StatusDone) || status == string(schema.StatusCancelled)
@@ -60,7 +70,7 @@ func LoadOneOffs(projectDir string) (live, archived Epic, err error) {
 func archivedFrom(archive Epic, addr Address) []Ticket {
 	var found []Ticket
 	for _, t := range archive.Tickets {
-		if NamesOriginal(t.Body, addr) {
+		if IsOriginal(t, addr) {
 			found = append(found, t)
 		}
 	}

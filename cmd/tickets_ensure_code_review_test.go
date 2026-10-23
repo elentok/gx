@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -139,6 +140,13 @@ func TestRunTicketsEnsureCodeReview_CreatesValidStubWhenNoneExists(t *testing.T)
 	}
 	if ticket.ID != "04" {
 		t.Errorf("stub ticket id = %q, want next sequential id 04", ticket.ID)
+	}
+	if ticket.CreatedAt.IsZero() {
+		t.Error("stub ticket has no created_at")
+	}
+	wantAddr := tickets.ProjectName(scratchDir) + ":widget-epic/04"
+	if ticket.OriginalAddress != wantAddr {
+		t.Errorf("stub original_address = %q, want %q", ticket.OriginalAddress, wantAddr)
 	}
 }
 

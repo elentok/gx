@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -89,6 +90,11 @@ func runTicketsEnsureCodeReview(epicPath string, w io.Writer) error {
 		Type:                  schema.TypeCodeReview,
 		ExpectedContextWindow: 30000,
 	}
+	address, ok := tickets.AddressOfPath(stubPath, id)
+	if !ok {
+		return fmt.Errorf("no address for new ticket %s", stubPath)
+	}
+	stub.StampCreated(time.Now().UTC(), address.String())
 	body := fmt.Sprintf(
 		"\n# %s — Code review: %s\n\n## What to review\n\n\n## Test seams\n\nnone — review ticket, opens fix tickets as children (`parent:` pointing back here) if it finds anything.\n\n## Acceptance criteria\n\n- [ ] Full epic reviewed for correctness and cross-ticket consistency\n- [ ] Any findings opened as child fix tickets\n",
 		id, epic.Name,
