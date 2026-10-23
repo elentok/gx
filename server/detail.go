@@ -114,10 +114,22 @@ type TicketDetail struct {
 	// the resume sends the chosen one back as its base.
 	Bases   []string `json:"bases,omitempty"`
 	Actions []string `json:"actions"`
+	// ErrorReason, ParseError and Path are set for an Error ticket. ParseError is
+	// set only when the file fails to parse, and then the payload carries no body
+	// or stats.
+	ErrorReason string `json:"error_reason,omitempty"`
+	ParseError  string `json:"parse_error,omitempty"`
+	Path        string `json:"path,omitempty"`
 }
 
 func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
-	ref, ok, err := s.findTicket(r.URL.Query().Get("address"))
+	address := r.URL.Query().Get("address")
+	// A malformed address is a ticket nobody has, the same as an unknown one.
+	if _, err := tickets.ParseAddress(address, tickets.AddressContext{}); err != nil {
+		http.Error(w, "no ticket "+address, http.StatusNotFound)
+		return
+	}
+	ref, ok, err := s.findTicket(address)
 	switch {
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -137,7 +149,7 @@ func (s *Server) detail(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	t, err := schema.ParseTicket(ref.ticket.Path)
 	if err != nil {
-		return TicketDetail{}, err
+		return brokenDetail(ref, err), nil
 	}
 	evs, err := tickets.ReadLog(ref.ticket.Path)
 	if err != nil {
@@ -148,6 +160,11 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{},
 		PauseLabel: t.PauseReason.Label(), Type: ref.ticket.Type, Epic: rootOf(ref.addr).String(),
 		MapEpic: ref.epic.IsMap, Body: ref.ticket.Body,
+	}
+	if ref.epic.RenderedStatus(ref.ticket) == tickets.StatusError {
+		d.Status = tickets.StatusError.Word()
+		d.ErrorReason = tickets.PauseDetail(ref.epic, ref.ticket)
+		d.Path = ref.ticket.Path
 	}
 	if t.PausedClass() != "" {
 		d.PauseText = schema.Section(ref.ticket.Body, "Paused")
@@ -190,6 +207,17 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		d.Bases = s.ambiguousBlockers(ref.addr)
 	}
 	return d, nil
+}
+
+// brokenDetail is the small payload of a file that fails to parse: nothing the
+// body or the log could add.
+func brokenDetail(ref ticketRef, parseErr error) TicketDetail {
+	return TicketDetail{
+		Address: ref.addr.String(), Title: ref.ticket.Title, Status: tickets.StatusError.Word(),
+		Epic: rootOf(ref.addr).String(), MapEpic: ref.epic.IsMap,
+		ErrorReason: tickets.PauseDetail(ref.epic, ref.ticket), ParseError: parseErr.Error(), Path: ref.ticket.Path,
+		Related: []RelatedTicket{}, Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{},
+	}
 }
 
 // permissionCard is the pending prompt of addr's live agent, or nil. It reads

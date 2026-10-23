@@ -195,6 +195,14 @@ export interface TicketDetail {
    */
   bases?: string[];
   actions: string[];
+  /**
+   * ErrorReason, ParseError and Path are set for an Error ticket. ParseError is
+   * set only when the file fails to parse, and then the payload carries no body
+   * or stats.
+   */
+  error_reason?: string;
+  parse_error?: string;
+  path?: string;
 }
 
 //////////
