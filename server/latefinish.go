@@ -242,7 +242,7 @@ func (s *Server) adoptLateFinish(lf lateFinish) bool {
 			lf.pause.Time.UTC().Format(time.RFC3339), lf.finishedAt.UTC().Format(time.RFC3339), outcome),
 	})
 	s.events.publish(EventTicketDone, addr.String())
-	s.stampRetro(addr, lf.path, false)
+	s.stampFinished(addr, lf.path, false)
 	s.cancelUnstartedInvestigations(lf.dir, addr)
 	unlock()
 	// The adopted ticket may be the epic's last; settleRun would have completed it.
@@ -274,7 +274,7 @@ func (s *Server) cancelUnstartedInvestigations(dir string, addr tickets.Address)
 				continue
 			}
 			child := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}
-			s.stampRetro(child, t.Path, true)
+			s.stampFinished(child, t.Path, true)
 			s.events.publish(EventTicketCancelled, child.String())
 		}
 	}

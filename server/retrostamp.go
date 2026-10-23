@@ -5,9 +5,42 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+// stampFinished is the one hook every done and cancel path calls once the
+// ticket's status is written.
+func (s *Server) stampFinished(addr tickets.Address, ticketPath string, cancelled bool) {
+	s.stampFriction(addr, ticketPath)
+	s.stampRetro(addr, ticketPath, cancelled)
+}
+
+// stampFriction writes the ticket's Friction summary from its own log and the
+// epic's run log. A missing log counts as empty.
+func (s *Server) stampFriction(addr tickets.Address, ticketPath string) {
+	dir, err := s.projectDir(addr.Project)
+	if err != nil {
+		s.log.Warn("stamp friction", "ticket", addr.String(), "err", err)
+		return
+	}
+	runEvents, _, err := ralphloop.ReadEvents(dir, addr.Epic)
+	if err != nil {
+		s.log.Warn("stamp friction", "ticket", addr.String(), "err", err)
+		return
+	}
+	log, err := tickets.ReadLog(ticketPath)
+	if err != nil {
+		s.log.Warn("stamp friction", "ticket", addr.String(), "err", err)
+		return
+	}
+	// Replaces any earlier summary, so a ticket done again after a new claim gets a fresh one.
+	friction := ralphloop.Friction(addr.ID, runEvents, log)
+	if err := schema.UpdateTicket(ticketPath, func(t *schema.Ticket) { t.Friction = &friction }); err != nil {
+		s.log.Warn("stamp friction", "ticket", addr.String(), "err", err)
+	}
+}
 
 // retroKeyPrefix is how RetroSubmit's dedupe key names the epic a retro covers.
 const retroKeyPrefix = "evolve:"

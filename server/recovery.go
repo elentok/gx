@@ -708,7 +708,7 @@ func (s *Server) ticketCommitlessDone(req QueueRequest) (QueueResult, error) {
 		if err != nil {
 			return QueueResult{}, fmt.Errorf("commitless-done %s: %w", ref.addr, err)
 		}
-		s.stampRetro(ref.addr, ref.ticket.Path, false)
+		s.stampFinished(ref.addr, ref.ticket.Path, false)
 		s.events.publish(EventTicketDone, ref.addr.String())
 		return QueueResult{}, nil
 	})

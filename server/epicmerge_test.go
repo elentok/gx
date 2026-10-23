@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // ticketFiles is every epic's ticket.md and ticket file in the store, by path.
@@ -168,14 +169,31 @@ func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T
 	}
 }
 
-// stampTicket adds frontmatter lines to the epic's ticket 01.
-func stampTicket(t *testing.T, f *schedFixture, extra string) {
+// stampTicket rewrites the epic's ticket 01 once the server's own friction
+// stamp, which lands just after the done event, is on it.
+func stampTicket(t *testing.T, f *schedFixture, mutate func(*schema.Ticket)) {
 	t.Helper()
 	paths, err := filepath.Glob(filepath.Join(f.store, "proj", schedEpic, "issues", "01-*.md"))
 	if err != nil || len(paths) != 1 {
 		t.Fatalf("ticket 01 files = %v, %v", paths, err)
 	}
-	testutil.WriteFile(t, filepath.Dir(paths[0]), filepath.Base(paths[0]), strings.Replace(readFile(t, paths[0]), "\n---\n\n", "\n"+extra+"---\n\n", 1))
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		tk, err := schema.ParseTicket(paths[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tk.Friction != nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("ticket 01 never got its friction stamp")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err := schema.UpdateTicket(paths[0], mutate); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestEpicMerge_StampsSummedTotalsWhenEveryDoneTicketIsStamped(t *testing.T) {
@@ -183,7 +201,11 @@ func TestEpicMerge_StampsSummedTotalsWhenEveryDoneTicketIsStamped(t *testing.T) 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	completedUnmerged(ctx, t, f)
-	stampTicket(t, f, "total_tokens: 1200\nactual_cost: 1.5\nhad_codex: true\nfriction:\n  total_paused_secs: 30\n")
+	tokens := int64(1200)
+	stampTicket(t, f, func(tk *schema.Ticket) {
+		tk.TotalTokens, tk.ActualCost, tk.HadCodex = &tokens, 1.5, true
+		tk.Friction = &schema.FrictionSummary{TotalPausedSecs: 30}
+	})
 
 	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
@@ -202,7 +224,10 @@ func TestEpicMerge_UnstampedDoneTicketLeavesTokensAndCostOffButKeepsFriction(t *
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	completedUnmerged(ctx, t, f)
-	stampTicket(t, f, "friction:\n  total_paused_secs: 30\n")
+	stampTicket(t, f, func(tk *schema.Ticket) {
+		tk.TotalTokens, tk.ActualCost = nil, 0
+		tk.Friction = &schema.FrictionSummary{TotalPausedSecs: 30}
+	})
 
 	if res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil || !res.Merged {
 		t.Fatalf("merge = %+v, %v, want a direct merge", res, err)
