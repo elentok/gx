@@ -161,7 +161,7 @@ func TestSessionPrompt_ContinueTypesClearThenGxDesign(t *testing.T) {
 	}
 	waitForSubmitted(t, f.conv, "\"/clear\"\n\"/gx-design map\"\n")
 	evs, ok, err := ralphloop.ReadServerEvents(f.h.TicketStore)
-	if err != nil || !ok || len(evs) != 1 || evs[0].Action != "continue" || evs[0].Bytes != 0 {
+	if err != nil || !ok || len(evs) != 1 || evs[0].Action != "continue" || evs[0].Bytes != len("/clear")+len("/gx-design map") {
 		t.Errorf("server events = %+v, ok=%v, err=%v; want one continue", evs, ok, err)
 	}
 }

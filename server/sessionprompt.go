@@ -118,7 +118,10 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 				s.log.Info("continue stopped", "session", req.ID, "err", err)
 			}
 		})
-		ev.Action, ev.Bytes = "continue", 0
+		ev.Action = "continue"
+		for _, a := range action {
+			ev.Bytes += len(a)
+		}
 	} else if err := typeSessionPrompt(dir, text); err != nil {
 		return SessionResult{}, err
 	}
