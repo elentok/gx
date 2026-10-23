@@ -230,12 +230,12 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 ### Vocabulary
 
 - **Design session**, **Session ticket**, **Actionable** and **Action** as in `GLOSSARY.md`. The
-  Actionable entry already covers a gx-raised one (draft or failed first prompt).
+  Actionable entry already covers a gx-raised one (draft, failed first prompt or failed Action).
 - **Typing path**: any code that types text into a session: the first prompt, Action steps,
   `Prompt` and `PromptNudged` in the herdr and PTY runners, and deny-with-reason.
 - **Slash prompt**: a prompt whose first character is `/`. The only test gx makes on a prompt's
   text.
-- **gx-raised Actionable**: an Actionable gx raised itself (draft or failed first prompt), as
+- **gx-raised Actionable**: an Actionable gx raised itself (draft, failed first prompt or failed Action), as
   opposed to one an agent raised with `gx agent actionable` or one derived from Blocked.
 
 ### Harness typing seam
@@ -324,7 +324,10 @@ Targets, which a person measures by hand once the epic lands (see Measurement):
 - Each step, in order: ready to type, draft clear, type. A draft that won't clear before step K
   stops the Action and raises a gx-raised Actionable with steps K onward and "input would not
   clear". Steps already sent never run again.
-- A vim give-up stops the remaining steps like any other step failure (logged, no Actionable).
+- Any other step failure (vim give-up, a prompt that never goes Working, a dead holder) stops the
+  Action and raises a gx-raised Actionable with the unsent steps and "Action failed: <reason>"
+  (or "Continue failed: <reason>" for the web's Continue). Server shutdown, Blocked and a session
+  that is no longer Idle only log: each already shows, or is not a failure.
 
 ### gx-raised Actionable
 

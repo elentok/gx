@@ -34,9 +34,7 @@ func (s *Server) runSessionAction(req SessionRequest) (SessionResult, error) {
 	}
 	s.events.publish(EventSessionChanged, req.ID)
 	s.sessionWatches.start(func() {
-		if err := s.sendAction(dir, action); err != nil {
-			s.log.Info("action stopped", "session", req.ID, "err", err)
-		}
+		s.sendAction(dir, "Action", action)
 	})
 	info := meta.info()
 	return SessionResult{Session: &info}, nil
@@ -69,35 +67,52 @@ type actionRunOpts struct {
 
 // sendAction sends each prompt once the one before it has finished its turn;
 // a step that finds the session not Idle, or whose prompt never starts,
-// drops the rest.
-func (s *Server) sendAction(dir string, action []string) error {
+// drops the rest. A step that fails raises a gx Actionable named after label
+// with the prompts it did not send, so the failure shows instead of only
+// reaching the log.
+func (s *Server) sendAction(dir, label string, action []string) {
+	i, err := s.runAction(dir, action)
+	switch {
+	case err == nil:
+	case errors.Is(err, errDraft):
+		s.log.Info("draft would not clear", "session", filepath.Base(dir), "unsent", len(action)-i)
+		s.raiseGxActionable(dir, draftReason, action[i:])
+	case errors.Is(err, errServerStopping), errors.Is(err, errWentBlocked), errors.Is(err, errNotIdle):
+		// Shutdown is not a failure, and Blocked or a busy session already shows.
+		s.log.Info(strings.ToLower(label)+" stopped", "session", filepath.Base(dir), "err", err)
+	default:
+		s.log.Warn(strings.ToLower(label)+" failed", "session", filepath.Base(dir), "err", err)
+		s.raiseGxActionable(dir, fmt.Sprintf("%s failed: %v", label, err), action[i:])
+	}
+}
+
+// Errors that end an Action without raising an Actionable.
+var (
+	errServerStopping = errors.New("server stopping")
+	errWentBlocked    = errors.New("session went blocked")
+	errNotIdle        = errors.New("session is not idle")
+)
+
+// runAction sends the prompts and returns the index of the step it stopped
+// at, with the error it stopped on.
+func (s *Server) runAction(dir string, action []string) (int, error) {
 	run, closeRun, err := s.openActionRun(dir, actionRunOpts{})
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer closeRun()
 	for i, prompt := range action {
 		if err := run.catchUp(); err != nil {
-			return err
+			return i, err
 		}
 		if run.state != SessionIdle {
-			return fmt.Errorf("step %d: session is %s", i, run.state)
+			return i, fmt.Errorf("step %d: %w (%s)", i, errNotIdle, run.state)
 		}
 		if err := run.step(i, prompt); err != nil {
-			if errors.Is(err, errDraft) {
-				s.refuseForDraft(dir, action[i:])
-				return nil
-			}
-			return err
+			return i, err
 		}
 	}
-	return nil
-}
-
-// refuseForDraft raises the Actionable that keeps the prompts gx did not type.
-func (s *Server) refuseForDraft(dir string, unsent []string) {
-	s.log.Info("draft would not clear", "session", filepath.Base(dir), "unsent", len(unsent))
-	s.raiseGxActionable(dir, draftReason, unsent)
+	return len(action), nil
 }
 
 // openActionRun dials the session's holder and starts following its watch;
@@ -202,7 +217,7 @@ func (r *actionRun) waitForStep(slash bool) (string, error) {
 func (r *actionRun) nextStatus(timer <-chan time.Time) (expired bool, signal string, err error) {
 	select {
 	case <-r.s.sessionWatches.stop:
-		return false, "", errors.New("server stopping")
+		return false, "", errServerStopping
 	case <-r.cancel:
 		return false, signalPersonInput, nil
 	case <-timer:
@@ -212,7 +227,7 @@ func (r *actionRun) nextStatus(timer <-chan time.Time) (expired bool, signal str
 			return false, "", err
 		}
 		if r.state == SessionBlocked {
-			return false, "", errors.New("session went blocked")
+			return false, "", errWentBlocked
 		}
 		return false, "", nil
 	}

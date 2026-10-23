@@ -275,6 +275,7 @@ Failure field
 - Restore relaunches the same conversation through `POST /v1/sessions/resume`. If a Restore crashes again within 1 minute, or the server refuses it (`dir-gone`, `no-resume`), the page hides Restore and makes New session primary. The implementer picks how the server reports the quick re-crash.
 - When Progress is Done, the page hides the composer and the `ended` banner and shows "Open implementation epic". A `crashed` banner still shows.
 - The banner offers no attach command. It says "Open it in gx, Agents tab" (gx:follow-ups/98).
+- A gx-raised Actionable (a Continue that failed, a draft that would not clear) shows as a "gx stopped" note above the composer, with its reason and "Continue tries again." It shows only when no failure banner does. An agent-raised Actionable shows no note.
 
 Screen snapshot
 

@@ -65,7 +65,13 @@ func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 	}
 	c := waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	waitForScreen(t, c, "first-step")
-	time.Sleep(3 * timeout)
+	raised := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.GxRaised })
+	if want := "Action failed: step 0: prompt never went working"; raised.Actionable.Reason != want {
+		t.Errorf("reason = %q, want %q", raised.Actionable.Reason, want)
+	}
+	if got := raised.Actionable.Action; len(got) != 2 || got[0] != "first-step" || got[1] != "second-step" {
+		t.Errorf("action = %q, want both unsent steps", got)
+	}
 	report(t, conv, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
 	report(t, conv, agentfake.Control{State: "done"})
@@ -196,6 +202,9 @@ func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
 	time.Sleep(3 * timeout)
 	if screenHas(t, c, "second-step") {
 		t.Error("second prompt sent after the first went blocked")
+	}
+	if a := readMeta(t, h, id)["actionable"]; a != nil {
+		t.Errorf("actionable = %v after a blocked step, want none", a)
 	}
 }
 

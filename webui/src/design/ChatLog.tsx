@@ -5,7 +5,7 @@ import type { SessionBackgroundTask, SessionChatMessage, SessionChatResponse, Se
 import { Markdown } from "../markdown/Markdown";
 import { useSessionChat, type FetchChat } from "./chat";
 import { Composer } from "./Composer";
-import { FailureBanner, needsTranscript, replacesComposer, visibleFailure, type FailureActions } from "./FailureBanner";
+import { FailureBanner, GxStopped, needsTranscript, replacesComposer, visibleFailure, type FailureActions } from "./FailureBanner";
 import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
 import type { Answers } from "./round";
@@ -109,6 +109,7 @@ function ChatTail({
           {...actions}
         />
       )}
+      {!failure && session.actionable.gx_raised && session.actionable.reason && <GxStopped reason={session.actionable.reason} />}
       {!done && !replacesComposer(failure) && (
         <Composer
           session={session}

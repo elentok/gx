@@ -151,3 +151,28 @@ export function FailureBanner({
     </Box>
   );
 }
+
+/** A step gx could not finish, such as a Continue that never started: its reason, so it shows outside the log. */
+export function GxStopped({ reason }: { reason: string }) {
+  return (
+    <Box
+      role="region"
+      aria-label="gx stopped"
+      borderWidth="1px"
+      borderColor="tone.waiting.fg"
+      borderRadius="md"
+      p="3"
+      display="flex"
+      flexDirection="column"
+      gap="1"
+    >
+      <Text fontWeight="700" color="tone.waiting.fg">
+        gx stopped
+      </Text>
+      <Text fontSize="sm">{reason}</Text>
+      <Text fontSize="sm" color="text.muted">
+        Continue tries again.
+      </Text>
+    </Box>
+  );
+}

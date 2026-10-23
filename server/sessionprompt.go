@@ -114,9 +114,7 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		}
 		s.events.publish(EventSessionChanged, req.ID)
 		s.sessionWatches.start(func() {
-			if err := s.sendAction(dir, action); err != nil {
-				s.log.Info("continue stopped", "session", req.ID, "err", err)
-			}
+			s.sendAction(dir, "Continue", action)
 		})
 		ev.Action = "continue"
 		for _, a := range action {

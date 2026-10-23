@@ -224,7 +224,8 @@ func (f *firstPrompt) start(signal, prompt string) {
 		case errors.Is(err, errNudgeCancelled):
 			f.log.Debug(errNudgeCancelled.Error())
 		case errors.Is(err, errDraft):
-			f.s.refuseForDraft(f.dir, []string{prompt})
+			f.log.Info("draft would not clear")
+			f.s.raiseGxActionable(f.dir, draftReason, []string{prompt})
 		case errors.Is(err, claudeui.ErrStuckSubmission), errors.Is(err, claudeui.ErrStartTimeout),
 			errors.Is(err, claudeui.ErrNotReadyToType), errors.Is(err, errSessionBlocked):
 			f.failed(prompt, err)

@@ -190,3 +190,16 @@ test("Screen shows the rows and Refresh fetches them again", async () => {
   await within(dialog).findByText(/changed row/);
   expect(fetchRows).toHaveBeenCalledTimes(2);
 });
+
+test("a gx-raised Actionable shows why gx stopped, above the composer", async () => {
+  render({ ...session("idle"), actionable: { reason: "Continue failed: step 0: prompt never went working", gx_raised: true } });
+  const el = await screen.findByRole("region", { name: "gx stopped" });
+  expect(within(el).getByText("Continue failed: step 0: prompt never went working")).toBeTruthy();
+  expect(composer()).toBeTruthy();
+});
+
+test("an agent-raised Actionable shows no gx stopped banner", async () => {
+  render({ ...session("idle"), actionable: { reason: "Grilling: waiting for your answers" } });
+  await screen.findByRole("form", { name: "Composer" });
+  expect(screen.queryByRole("region", { name: "gx stopped" })).toBeNull();
+});
