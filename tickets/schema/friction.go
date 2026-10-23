@@ -15,3 +15,26 @@ type FrictionSummary struct {
 	// PersonPauseSecs holds the duration of each pause a person ended.
 	PersonPauseSecs []int `yaml:"person_pause_secs,omitempty" json:"person_pause_secs,omitempty"`
 }
+
+// SumFriction adds summaries key by key, for an epic.
+func SumFriction(summaries ...FrictionSummary) FrictionSummary {
+	var sum FrictionSummary
+	for _, s := range summaries {
+		sum.PausesByReason = addCounts(sum.PausesByReason, s.PausesByReason)
+		sum.RunEvents = addCounts(sum.RunEvents, s.RunEvents)
+		sum.PauseEndings = addCounts(sum.PauseEndings, s.PauseEndings)
+		sum.TotalPausedSecs += s.TotalPausedSecs
+		sum.PersonPauseSecs = append(sum.PersonPauseSecs, s.PersonPauseSecs...)
+	}
+	return sum
+}
+
+func addCounts(into, from map[string]int) map[string]int {
+	if len(from) > 0 && into == nil {
+		into = map[string]int{}
+	}
+	for k, n := range from {
+		into[k] += n
+	}
+	return into
+}
