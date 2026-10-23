@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
 
@@ -47,6 +48,21 @@ func newServerCmd(_ deps) *cobra.Command {
 		},
 	}
 	status.Flags().BoolVar(&statusJSON, "json", false, "emit structured JSON instead of human-readable text")
+	var restartMigrate bool
+	restartCmd := &cobra.Command{
+		Use:   "restart",
+		Short: "stop the server and start it again (use after upgrading gx)",
+		Long: `Stop the server and start it again.
+
+With --migrate, run "gx tickets migrate" on every project in the ticket store
+between the stop and the start. The stop does not wait for running tickets. If
+a migration fails, the failed store is named and the server stays stopped.`,
+		Args: cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runServerRestart(c.Context(), c.OutOrStdout(), restartMigrate)
+		},
+	}
+	restartCmd.Flags().BoolVar(&restartMigrate, "migrate", false, "migrate every project's ticket store while the server is stopped")
 	cmd.AddCommand(status, &cobra.Command{
 		Use:   "install",
 		Short: "register a launchd agent that starts the server at login and after a crash (macOS)",
@@ -61,14 +77,7 @@ func newServerCmd(_ deps) *cobra.Command {
 		RunE: func(c *cobra.Command, _ []string) error {
 			return runServerStartCmd(c.Context(), c.OutOrStdout())
 		},
-	}, &cobra.Command{
-		Use:   "restart",
-		Short: "stop the server and start it again (use after upgrading gx)",
-		Args:  cobra.NoArgs,
-		RunE: func(c *cobra.Command, _ []string) error {
-			return runServerRestart(c.Context(), c.OutOrStdout())
-		},
-	}, &cobra.Command{
+	}, restartCmd, &cobra.Command{
 		Use:   "stop",
 		Short: "stop the running server (SIGTERM) and wait for it to exit",
 		Args:  cobra.NoArgs,
@@ -438,11 +447,49 @@ func serverStarter(c *apiclient.Client) func(context.Context) error {
 	}
 }
 
-func runServerRestart(ctx context.Context, w io.Writer) error {
-	if err := runServerStop(ctx, w); err != nil {
+func runServerRestart(ctx context.Context, w io.Writer, migrate bool) error {
+	return restartSteps(migrate,
+		func() error { return runServerStop(ctx, w) },
+		func() error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			return migrateAllProjects(cfg.TicketStore.Path, w)
+		},
+		func() error { return runServerStartCmd(ctx, w) },
+	)
+}
+
+// restartSteps stops, optionally migrates, then starts. A failed migration
+// leaves the server stopped, so the person can retry or start without it.
+func restartSteps(migrate bool, stop, migrateStores, start func() error) error {
+	if err := stop(); err != nil {
 		return err
 	}
-	return runServerStartCmd(ctx, w)
+	if migrate {
+		if err := migrateStores(); err != nil {
+			return fmt.Errorf("%w (server left stopped: fix and retry, or run `gx server start` to skip migrating)", err)
+		}
+	}
+	return start()
+}
+
+// migrateAllProjects runs `gx tickets migrate` on every project in the store
+// and stops at the first failure.
+func migrateAllProjects(storePath string, w io.Writer) error {
+	dirs, err := tickets.ProjectDirs(storePath)
+	if err != nil {
+		return err
+	}
+	for _, dir := range dirs {
+		name := filepath.Base(dir)
+		fmt.Fprintf(w, "migrating %s\n", name)
+		if err := runTicketsMigrate(dir, false, w); err != nil {
+			return fmt.Errorf("migrate %s: %w", name, err)
+		}
+	}
+	return nil
 }
 
 func runServerStop(ctx context.Context, w io.Writer) error {
