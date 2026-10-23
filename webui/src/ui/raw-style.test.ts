@@ -9,10 +9,13 @@ const allowed = new Set(["ui/theme.ts"]);
 const rawHex = /#[0-9a-fA-F]{3,8}\b/;
 const fontTokens = new Set(["condensed", "text", "mono", "inherit"]);
 const fontFamilyValue = /font-?family\s*[:=]?\s*\{?\s*["'`]([^"'`]*)/gi;
+// Chakra's built-in bg.* tokens are light-mode colors; this dark-only theme defines its own surfaces.
+const chakraBgToken = /["'`]bg\.[a-z]/;
 
 function violations(source: string): string[] {
   const found: string[] = [];
   if (rawHex.test(source)) found.push("raw hex color");
+  if (chakraBgToken.test(source)) found.push("chakra bg token");
   for (const m of source.matchAll(fontFamilyValue)) {
     if (!fontTokens.has(m[1])) found.push("font-family literal");
   }
@@ -40,6 +43,10 @@ describe("raw style guard", () => {
   it("fails on a planted raw hex color", () => {
     expect(violations('<Box bg="#ff00aa" />')).toEqual(["raw hex color"]);
     expect(violations("const c = '#fff';")).toEqual(["raw hex color"]);
+  });
+
+  it("fails on a planted Chakra bg token", () => {
+    expect(violations('<Box bg="bg.subtle" />')).toEqual(["chakra bg token"]);
   });
 
   it("fails on a planted font-family literal", () => {

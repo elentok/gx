@@ -39,6 +39,7 @@ export const themeConfig = defineConfig({
     tokens: {
       colors: {
         surface: { DEFAULT: { value: "#0a0d11" }, raised: { value: "#141920" } },
+        overlay: { value: "rgba(0, 0, 0, 0.7)" },
         text: {
           DEFAULT: { value: "#ffffff" },
           muted: { value: "#c9d0da" },

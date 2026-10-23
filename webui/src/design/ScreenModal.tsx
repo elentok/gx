@@ -29,7 +29,7 @@ export function ScreenModal({ sessionId, fetcher = fetchScreen, onClose }: { ses
   }, [sessionId]);
 
   return (
-    <Box position="fixed" inset="0" zIndex="modal" bg="bg.subtle"display="flex" alignItems="center" justifyContent="center" p="4" onClick={onClose}>
+    <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4" onClick={onClose}>
       <Box
         role="dialog"
         aria-modal="true"

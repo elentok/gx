@@ -35,7 +35,7 @@ function Entry({ m, tool }: { m: SessionChatMessage; tool: boolean }) {
   }
   if (m.kind === "prompt") {
     return (
-      <Box alignSelf="flex-end" maxW="85%" bg="bg.subtle" borderRadius="lg" px="3" py="2" fontSize="sm" whiteSpace="pre-wrap">
+      <Box alignSelf="flex-end" maxW="85%" bg="surface.raised" borderRadius="lg" px="3" py="2" fontSize="sm" whiteSpace="pre-wrap">
         {m.text}
       </Box>
     );
