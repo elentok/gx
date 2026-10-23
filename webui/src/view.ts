@@ -150,7 +150,7 @@ export function finishedView(f: FinishedEpic, now: Date): FinishedView {
     done: f.done,
     total: f.total,
     oneOff: f.one_off,
-    finished: when === "just now" ? "finished just now" : `finished ${when}`,
+    finished: when,
   };
 }
 

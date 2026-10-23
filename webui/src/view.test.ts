@@ -87,7 +87,7 @@ describe("snapshotView", () => {
 
   it("formats recently finished rows", () => {
     expect(view().recentlyFinished).toEqual([
-      { address: "gx:old", name: "old", project: "gx", done: 4, total: 4, oneOff: false, finished: "finished 2h ago" },
+      { address: "gx:old", name: "old", project: "gx", done: 4, total: 4, oneOff: false, finished: "2h ago" },
       {
         address: "gx:one-offs/07",
         name: "fix-flaky-test",
@@ -95,7 +95,7 @@ describe("snapshotView", () => {
         done: 0,
         total: 0,
         oneOff: true,
-        finished: "finished 1h ago",
+        finished: "1h ago",
       },
     ]);
   });

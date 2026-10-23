@@ -269,7 +269,7 @@ test("while Resolve tickets is current its tickets show: closed folded, current 
   ];
   render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ rows, total: 4, done: 2 }));
   const p = await progress();
-  expect(await p.findByText("✓ 2 closed · 1 cancelled")).toBeTruthy();
+  expect(await p.findByText("2 closed · 1 cancelled")).toBeTruthy();
   expect(p.queryByText("Chart it")).toBeNull();
   const current = (await p.findByText("Chat content")).closest("[data-current]");
   expect(current).toBeTruthy();

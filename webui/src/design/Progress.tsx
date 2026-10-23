@@ -1,5 +1,5 @@
 import { Box, Link, Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { EpicDetail } from "../epic/detail";
 import { idOf, isCancelled, isFolded } from "../epic/rows";
 import type { EpicDetailRow, MapStep } from "../generated/server";
@@ -21,31 +21,52 @@ const markOf = (s: MapStep) => STEP_MARKS[s.state] ?? STEP_MARKS.todo;
 const ticketsOf = (steps: MapStep[], rows: EpicDetailRow[]) =>
   steps.some((s) => s.step === RESOLVE_TICKETS && s.state === "current") ? rows : [];
 
+// The mark column is one fixed width, so every label in the tree starts at the same x.
+const MARK_W = "1.25em";
+const GAP = "2";
+
+function Row({ glyph, tone, children }: { glyph: string; tone: Tone; children: ReactNode }) {
+  return (
+    <Box display="flex" alignItems="baseline" gap={GAP}>
+      <Text as="span" aria-hidden w={MARK_W} flexShrink="0" textAlign="center" color={`tone.${tone}.fg`}>
+        {glyph}
+      </Text>
+      <Box as="span" minW="0">
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
 function Tickets({ rows }: { rows: EpicDetailRow[] }) {
   const closed = rows.filter(isFolded);
   const cancelled = closed.filter(isCancelled).length;
   return (
-    <Box ml="6" mt="1" mb="2" display="flex" flexDirection="column" gap="1" fontSize="sm">
+    <Box pl={`calc(${MARK_W} + var(--chakra-spacing-${GAP}))`} mt="1" mb="2" display="flex" flexDirection="column" gap="1">
       {closed.length > 0 && (
-        <Text color="tone.done.fg">
-          ✓ {closed.length} closed{cancelled > 0 && ` · ${cancelled} cancelled`}
-        </Text>
+        <Row glyph="✓" tone="done">
+          <Text as="span" color="text.muted">
+            {closed.length} closed{cancelled > 0 && ` · ${cancelled} cancelled`}
+          </Text>
+        </Row>
       )}
       {rows
         .filter((r) => !isFolded(r))
         .map((r) => (
-          <Box key={r.address} data-current={r.current || undefined} display="flex" gap="2" alignItems="baseline">
-            <Text as="span" fontFamily="condensed" color={r.current ? "tone.running.fg" : "text.muted"}>
-              {idOf(r.address)}
-            </Text>
-            <Link href={ticketHref(r.address)} color={r.current ? "tone.running.fg" : "text"} fontWeight={r.current ? "700" : undefined} display="inline">
-              {r.title}
-            </Link>
-            {r.blocked && (
-              <Text as="span" role="img" aria-label="Blocked" title="Blocked" color="text.muted">
-                🔒
+          <Box key={r.address} data-current={r.current || undefined}>
+            <Row glyph={r.current ? "▸" : "·"} tone={r.current ? "running" : "muted"}>
+              <Text as="span" color="text.dim" mr="2">
+                {idOf(r.address)}
               </Text>
-            )}
+              <Link href={ticketHref(r.address)} color={r.current ? "tone.running.fg" : "text"} display="inline">
+                {r.title}
+              </Link>
+              {r.blocked && (
+                <Text as="span" role="img" aria-label="Blocked" title="Blocked" color="text.muted" ml="2">
+                  🔒
+                </Text>
+              )}
+            </Row>
           </Box>
         ))}
     </Box>
@@ -55,17 +76,16 @@ function Tickets({ rows }: { rows: EpicDetailRow[] }) {
 function Steps({ steps, rows }: { steps: MapStep[]; rows: EpicDetailRow[] }) {
   const tickets = ticketsOf(steps, rows);
   return (
-    <Box as="ol" listStyleType="none" m="0" p="0" borderLeftWidth="2px" borderColor="border" pl="3">
+    <Box as="ol" listStyleType="none" m="0" p="0" borderLeftWidth="2px" borderColor="border" pl="3" display="flex" flexDirection="column" gap="1">
       {steps.map((s) => {
         const { glyph, tone } = markOf(s);
         return (
           <Box as="li" key={s.step} data-step={s.step} data-state={s.state}>
-            <Text color={s.state === "todo" ? "text.muted" : "text"} fontWeight={s.state === "current" ? "700" : undefined}>
-              <Text as="span" aria-hidden color={`tone.${tone}.fg`} mr="2">
-                {glyph}
+            <Row glyph={glyph} tone={tone}>
+              <Text as="span" color={s.state === "todo" ? "text.muted" : "text"} fontWeight={s.state === "current" ? "700" : undefined}>
+                {s.label}
               </Text>
-              {s.label}
-            </Text>
+            </Row>
             {s.step === RESOLVE_TICKETS && tickets.length > 0 && <Tickets rows={tickets} />}
           </Box>
         );
