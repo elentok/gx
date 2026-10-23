@@ -505,6 +505,7 @@ func New(cfg Config) (*Server, error) {
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}
+	s.pauseFold.onCap = s.flushPauseFold
 	s.settings.Store(&cfg.Settings)
 	mux := http.NewServeMux()
 	for _, r := range routeTable {

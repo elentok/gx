@@ -18,16 +18,17 @@ type pauseFold struct {
 	mu    sync.Mutex
 	lines []string
 	timer *time.Timer
+	// onCap runs when the cap expires; set once in New, before any hold.
+	onCap func()
 }
 
-// hold queues a pause line and arms the cap timer on the first one; flush runs
-// when the cap expires.
-func (f *pauseFold) hold(line string, flush func()) {
+// hold queues a pause line and arms the cap timer on the first one.
+func (f *pauseFold) hold(line string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.lines = append(f.lines, line)
 	if f.timer == nil {
-		f.timer = time.AfterFunc(pauseFoldCap, flush)
+		f.timer = time.AfterFunc(pauseFoldCap, f.onCap)
 	}
 }
 
@@ -50,5 +51,5 @@ func (s *Server) flushPauseFold() {
 
 // holdPause queues the pause line for the digest.
 func (s *Server) holdPause(addr tickets.Address, status string, kind events.Kind, reason string) {
-	s.pauseFold.hold(fmt.Sprintf("[%s] %s/%s — %s (%s): %s", addr.Project, addr.Epic, addr.ID, status, kind, reason), s.flushPauseFold)
+	s.pauseFold.hold(fmt.Sprintf("[%s] %s/%s — %s (%s): %s", addr.Project, addr.Epic, addr.ID, status, kind, reason))
 }
