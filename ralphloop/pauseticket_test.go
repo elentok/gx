@@ -186,7 +186,7 @@ func TestPause_LogsGxQuestionPerKind(t *testing.T) {
 	}
 }
 
-func TestPause_SelfReportedLogsNoQuestion(t *testing.T) {
+func TestPause_RepairKindOpensRepairRoundWithNoQuestion(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
@@ -194,12 +194,16 @@ func TestPause_SelfReportedLogsNoQuestion(t *testing.T) {
 	path := ticketPath(scratchDir, "my-epic", "01-a.md")
 	if _, err := pause(&recordingSink{}, pauseRequest{
 		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
-		Type: events.Paused, Kind: events.SelfReported, Reason: "why",
+		Type: events.Paused, Kind: events.BudgetKilled, Reason: "why",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if evs, _ := tickets.ReadLog(path); len(evs) != 0 {
-		t.Errorf("log = %+v, want empty", evs)
+	evs, _ := tickets.ReadLog(path)
+	if len(evs) != 1 || evs[0].Type != tickets.EventPauseRepair || evs[0].Summary != "" || evs[0].Text != "" {
+		t.Fatalf("log = %+v, want one question-less pause.repair", evs)
+	}
+	if tickets.OpenQuestion(evs) != nil {
+		t.Error("a repair round must not read as an open question")
 	}
 }
 

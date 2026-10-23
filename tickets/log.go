@@ -20,6 +20,27 @@ const (
 	EventPauseAnswer     = "pause.answer"
 	EventPausePermission = "pause.permission"
 	EventPauseClosed     = "pause.closed"
+	// EventPauseRepair opens a round that has no question (a repair pause).
+	EventPauseRepair = "pause.repair"
+)
+
+// Round-end sources: who ended the round.
+const (
+	SourceWeb = "web"
+	SourceTUI = "tui"
+	SourceCLI = "cli"
+	SourceGx  = "gx"
+)
+
+// Round-end hows: what ended the round.
+const (
+	HowAnswer      = "answer"
+	HowResume      = "resume"
+	HowStartOver   = "start-over"
+	HowManualMerge = "manual-merge"
+	HowRelaunch    = "relaunch"
+	HowCancel      = "cancel"
+	HowAuto        = "auto"
 )
 
 const (
@@ -68,6 +89,8 @@ type LogEvent struct {
 	Shown    *PermissionShown `json:"shown,omitempty"`
 	Reason   string           `json:"reason,omitempty"`
 	Base     string           `json:"base,omitempty"`
+	// How is what ended the round (a How* constant); Source says who did it.
+	How string `json:"how,omitempty"`
 }
 
 // ClipLogText cuts text to MaxLogTextChars and says whether it cut anything.
@@ -255,21 +278,55 @@ func CloseOpenQuestion(ticketPath, reason string) error {
 	return err
 }
 
-// PauseRound is a pause.question and the event that ended it, if any.
+// EndOpenRound writes pause.closed{question, source, how} for the latest round
+// (question or repair) that has no end. A ticket with no open round gets no
+// write and no error.
+func EndOpenRound(ticketPath, source, how, reason string) error {
+	_, err := appendLogWith(ticketPath, func(evs []LogEvent) (LogEvent, error) {
+		rounds := AllRounds(evs)
+		n := len(rounds)
+		if n == 0 || rounds[n-1].End != nil {
+			return LogEvent{}, errNoOpenQuestion
+		}
+		return LogEvent{
+			Type: EventPauseClosed, Question: rounds[n-1].Question.Seq,
+			Source: source, How: how, Reason: reason,
+		}, nil
+	})
+	if errors.Is(err, errNoOpenQuestion) {
+		return nil
+	}
+	return err
+}
+
+// PauseRound is the event that opened a round and the event that ended it, if any.
 type PauseRound struct {
+	// Question is the pause.question, or the pause.repair of a round with no question.
 	Question LogEvent
 	// End is the pause.answer or pause.closed naming Question, nil while open.
 	End *LogEvent
 }
 
-// Rounds pairs each pause.question with the pause.answer or pause.closed that
-// names its seq. Other events (pause.permission) belong to no round.
+// Rounds is AllRounds without the repair rounds: the rounds that asked a question.
 func Rounds(events []LogEvent) []PauseRound {
+	var rounds []PauseRound
+	for _, r := range AllRounds(events) {
+		if r.Question.Type == EventPauseQuestion {
+			rounds = append(rounds, r)
+		}
+	}
+	return rounds
+}
+
+// AllRounds pairs each pause.question and pause.repair with the pause.answer or
+// pause.closed that names its seq. Other events (pause.permission) belong to no
+// round.
+func AllRounds(events []LogEvent) []PauseRound {
 	var rounds []PauseRound
 	bySeq := map[int]int{}
 	for _, ev := range events {
 		switch ev.Type {
-		case EventPauseQuestion:
+		case EventPauseQuestion, EventPauseRepair:
 			bySeq[ev.Seq] = len(rounds)
 			rounds = append(rounds, PauseRound{Question: ev})
 		case EventPauseAnswer, EventPauseClosed:

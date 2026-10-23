@@ -304,15 +304,16 @@ func TestBudget_HardLimitKillClosesTheOpenQuestion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(evs) != 2 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != 1 || evs[1].Reason != "budget-killed" {
-		t.Errorf("log = %+v, want the question then pause.closed{question 1, budget-killed}", evs)
+	if len(evs) != 3 || evs[1].Type != tickets.EventPauseClosed || evs[1].Question != 1 || evs[1].Reason != "budget-killed" ||
+		evs[2].Type != tickets.EventPauseRepair {
+		t.Errorf("log = %+v, want the question, pause.closed{question 1, budget-killed}, then the repair round", evs)
 	}
 }
 
-func TestBudget_HardLimitKillWithoutQuestionWritesNoLog(t *testing.T) {
+func TestBudget_HardLimitKillWithoutQuestionOpensOnlyARepairRound(t *testing.T) {
 	path := runBudgetKill(t, func() float64 { return 6 }, servertest.TicketOpts{}, nil)
-	if evs, _ := tickets.ReadLog(path); len(evs) != 0 {
-		t.Errorf("log = %+v, want empty", evs)
+	if evs, _ := tickets.ReadLog(path); len(evs) != 1 || evs[0].Type != tickets.EventPauseRepair {
+		t.Errorf("log = %+v, want one pause.repair", evs)
 	}
 }
 

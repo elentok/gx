@@ -147,6 +147,39 @@ func TestAppendLog_AgentQuestionNeedsHandoff(t *testing.T) {
 	}
 }
 
+func TestEndOpenRound_PairsRepairRoundWithSourceAndHow(t *testing.T) {
+	path := logTicketPath(t)
+	if _, err := AppendLog(path, LogEvent{Type: EventPauseRepair, By: "gx", PauseKind: "manual", Reason: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	evs, _ := ReadLog(path)
+	if rounds := AllRounds(evs); len(rounds) != 1 || rounds[0].End != nil {
+		t.Fatalf("AllRounds = %+v, want one open round", rounds)
+	}
+	if len(Rounds(evs)) != 0 || OpenQuestion(evs) != nil {
+		t.Fatal("a repair round must not read as a question round")
+	}
+
+	if err := EndOpenRound(path, SourceCLI, HowResume, ""); err != nil {
+		t.Fatal(err)
+	}
+	evs, _ = ReadLog(path)
+	rounds := AllRounds(evs)
+	if len(rounds) != 1 || rounds[0].End == nil {
+		t.Fatalf("AllRounds = %+v, want one ended round", rounds)
+	}
+	if end := rounds[0].End; end.Source != SourceCLI || end.How != HowResume {
+		t.Errorf("end = %+v, want source cli, how resume", end)
+	}
+
+	if err := EndOpenRound(path, SourceCLI, HowResume, ""); err != nil {
+		t.Fatalf("ending with no open round: %v", err)
+	}
+	if after, _ := ReadLog(path); len(after) != len(evs) {
+		t.Errorf("second EndOpenRound wrote %d extra events", len(after)-len(evs))
+	}
+}
+
 func TestOpenQuestionAndRounds(t *testing.T) {
 	mk := func(seq int, typ string, q int) LogEvent { return LogEvent{Seq: seq, Type: typ, Question: q} }
 	events := []LogEvent{

@@ -189,6 +189,13 @@ func pause(sink EventSink, req pauseRequest) (reason string, writeErr error) {
 	if writeErr != nil {
 		reason = fmt.Sprintf("%s (also failed marking %s: %v)", reason, req.Type, writeErr)
 	}
+	if req.Type == events.Paused && !req.Kind.AwaitsAnswer() && writeErr == nil {
+		if _, err := tickets.AppendLog(req.Path, tickets.LogEvent{
+			Type: tickets.EventPauseRepair, By: "gx", PauseKind: string(req.Kind), Reason: reason,
+		}); err != nil {
+			reason = fmt.Sprintf("%s (also failed logging repair round: %v)", reason, err)
+		}
+	}
 	ev := req.Event
 	ev.Type, ev.Ticket, ev.Kind, ev.Reason = string(req.Type), req.Ticket, string(req.Kind), reason
 	if err := logEvent(req.ScratchDir, req.EpicName, ev); err != nil {
