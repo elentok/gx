@@ -52,7 +52,8 @@ function Question({
   const text = card.kind === "text" || choicesOf(card).length === 0;
   return (
     <Box display="flex" flexDirection="column" gap="2">
-      <Markdown fontSize="md">{card.body}</Markdown>
+      <Markdown inline fontSize="md" fontWeight="600">{`Q${card.number} - ${card.title}`}</Markdown>
+      {card.body && <Markdown fontSize="md">{card.body}</Markdown>}
       {text ? (
         <>
           {card.note && (

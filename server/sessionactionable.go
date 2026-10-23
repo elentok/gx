@@ -170,7 +170,7 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	}
 	raised := false
 	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
-		if m.Status.State != SessionIdle || m.Actionable.Reason != "" {
+		if !m.Status.Promptable() || m.Actionable.Reason != "" {
 			return false
 		}
 		m.Actionable = a

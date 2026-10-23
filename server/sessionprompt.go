@@ -97,8 +97,8 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 			return sessionRefusal(ReasonStale, "the conversation moved; review it first"), nil
 		}
 	}
-	if st := meta.info().Status.State; st != SessionIdle {
-		return sessionRefusal(ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st)), nil
+	if st := meta.info().Status; !st.Promptable() {
+		return sessionRefusal(ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
 	}
 	ev := ralphloop.Event{
 		Time: time.Now(), Type: string(events.SessionPrompted),

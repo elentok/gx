@@ -141,7 +141,7 @@ function ChatLog({
   const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
   const connected = useConnectionState(conn).connected;
   if (!chat) return null;
-  const working = session.status.state === "working";
+  const working = session.status.state === "working" && !session.status.background;
   return (
     <Box display="flex" flexDirection="column" gap="3">
       {chat.truncated && (

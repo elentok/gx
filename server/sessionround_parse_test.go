@@ -33,3 +33,20 @@ func TestParseRoundSegment_BadBlockAndCleanCardAreExclusive(t *testing.T) {
 		})
 	}
 }
+
+func TestParseRoundSegment_BodyDropsTheHeader(t *testing.T) {
+	cases := map[string]struct{ seg, title, body string }{
+		"strict":     {"Q3** - **Blocking edges**: Should I publish?\n\n➡️ Yes.", "Blocking edges", "Should I publish?\n\n➡️ Yes."},
+		"no colon":   {"Q1** **Store** Which one?", "Store", "Which one?"},
+		"plain":      {"Q1 Which store? Pick one.", "Which store?", "Which store? Pick one."},
+		"title only": {"Q2** - **Keep going?**", "Keep going?", ""},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			card := parseRoundSegment(1, c.seg).Card
+			if card.Title != c.title || card.Body != c.body {
+				t.Errorf("title, body = %q, %q; want %q, %q", card.Title, card.Body, c.title, c.body)
+			}
+		})
+	}
+}

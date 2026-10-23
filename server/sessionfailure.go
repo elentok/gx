@@ -83,6 +83,10 @@ func (s *Server) transcriptFailure(m sessionMeta) *SessionFailure {
 			return &SessionFailure{Kind: FailureKindAuth, Label: "Claude login needed", Text: "Run `claude /login` on this computer, then Retry."}
 		}
 	case SessionWorking:
+		// A background task outlives the turn; the session waits, it is not stalled.
+		if m.Status.Background {
+			break
+		}
 		if fi, err := os.Stat(path); err == nil && time.Since(fi.ModTime()) >= s.cfg.StallThreshold {
 			return &SessionFailure{Kind: FailureKindStalled, Label: stalledLabel}
 		}

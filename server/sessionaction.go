@@ -21,8 +21,8 @@ func (s *Server) runSessionAction(req SessionRequest) (SessionResult, error) {
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if st := meta.info().Status.State; st != SessionIdle {
-		return sessionRefusal(ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st)), nil
+	if st := meta.info().Status; !st.Promptable() {
+		return sessionRefusal(ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st.State)), nil
 	}
 	action := meta.Actionable.Action
 	if len(action) == 0 {

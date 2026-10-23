@@ -10,14 +10,14 @@ import type { PostPrompt } from "./prompt";
 
 afterEach(cleanup);
 
-const session = (state = "idle"): SessionInfo => ({
+const session = (state = "idle", background = false): SessionInfo => ({
   id: "s-a",
   project: "gx",
   dir: "/x",
   harness: "claude",
   ticket: "gx:a/01",
   design: true,
-  status: { state } as SessionInfo["status"],
+  status: { state, background } as SessionInfo["status"],
   status_changed_at: new Date().toISOString(),
   run_started_at: new Date().toISOString(),
   unread: {},
@@ -36,9 +36,9 @@ const nextOf = (phase: string): SessionChatResponse["next"] => ({ phase, action:
 
 const ok: SessionResult = { session: session() };
 
-function render(opts: { state?: string; chat?: SessionChatResponse; connected?: boolean; post?: PostPrompt; fetchChat?: FetchChat }) {
+function render(opts: { state?: string; background?: boolean; chat?: SessionChatResponse; connected?: boolean; post?: PostPrompt; fetchChat?: FetchChat }) {
   const state = {
-    snapshot: { sessions: [session(opts.state)] },
+    snapshot: { sessions: [session(opts.state, opts.background)] },
     connected: opts.connected ?? true,
     loadedOnce: true,
     tick: 0,
@@ -226,4 +226,20 @@ test("question bodies and option labels render their markdown", async () => {
   const option = within(s).getByRole("button", { name: "Use designs/open" });
   expect(within(option).getByText("designs/open").tagName).toBe("CODE");
   expect(option.querySelector("p, div")).toBeNull();
+});
+
+test("a finished turn with a background task still takes answers", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ state: "working", background: true, post, chat: chatOf({ round: [askCard(1)] }) });
+  const s = within(await sheet());
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+});
+
+test("a question card shows its number and title above the body", async () => {
+  render({ chat: chatOf({ round: [askCard(1, { title: "Pick `one`" })] }) });
+  const s = within(await sheet());
+  expect(s.getByText((_, el) => el?.textContent === "Q1 - Pick one" && el.tagName === "SPAN")).toBeTruthy();
+  expect(s.getByText("Body 1?")).toBeTruthy();
 });

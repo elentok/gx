@@ -134,8 +134,8 @@ type parsedRound struct {
 // the bad block filed cannot disagree.
 func parseRoundSegment(seq int, seg string) parsedRound {
 	body, blocks := splitFences(seg)
-	header, _, _ := strings.Cut(body, "\n")
-	card := SessionRoundCard{Number: seq, Title: roundTitle(header), Body: body, Kind: tickets.QuestionText}
+	header, rest, _ := strings.Cut(body, "\n")
+	card := SessionRoundCard{Number: seq, Title: roundTitle(header), Body: strings.TrimSpace(roundHeaderText(header) + "\n" + rest), Kind: tickets.QuestionText}
 	if m := roundNumberRE.FindStringSubmatch(header); m != nil {
 		card.Number, _ = strconv.Atoi(m[1])
 	}
@@ -167,11 +167,7 @@ func parseRoundSegment(seq int, seg string) parsedRound {
 // roundTitle reads a header leniently: the first bold span after the question
 // number, else the first sentence.
 func roundTitle(header string) string {
-	rest := header
-	if loc := roundNumberRE.FindStringIndex(header); loc != nil {
-		rest = header[loc[1]:]
-	}
-	rest = strings.TrimLeft(rest, "* ")
+	rest := afterRoundNumber(header)
 	if m := boldSpanRE.FindStringSubmatch(rest); m != nil {
 		return strings.TrimSpace(m[1])
 	}
@@ -180,6 +176,27 @@ func roundTitle(header string) string {
 		rest = rest[:loc[0]+1]
 	}
 	return strings.Trim(rest, "* :")
+}
+
+// roundHeaderText is what a header says after its number and leading bold
+// title, which the card shows on their own: "Q3** - **Title**: Should I?"
+// gives "Should I?". A header with no leading bold title keeps its text.
+func roundHeaderText(header string) string {
+	rest := afterRoundNumber(header)
+	if loc := boldSpanRE.FindStringIndex(rest); loc != nil && loc[0] == 0 {
+		rest = rest[loc[1]:]
+	}
+	return strings.TrimLeft(rest, "*-:– ")
+}
+
+// afterRoundNumber is a header after its question number, the bold that closes
+// the number, and the separator before the title.
+func afterRoundNumber(header string) string {
+	rest := header
+	if loc := roundNumberRE.FindStringIndex(header); loc != nil {
+		rest = strings.TrimPrefix(header[loc[1]:], "**")
+	}
+	return strings.TrimLeft(rest, "-:– ")
 }
 
 // trailingAgentTexts lists the agent text messages after the person's last

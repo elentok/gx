@@ -5,6 +5,7 @@ import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
 import { postPrompt, type PostPrompt } from "./prompt";
 import { roundPrompt, unansweredOf, type Answers } from "./round";
+import { promptable } from "./view";
 
 const CONTINUE_PHASES = ["map", "review"];
 
@@ -39,7 +40,7 @@ export function Composer({
   const [text, setText] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const enabled = connected && session.status.state === "idle" && !pending;
+  const enabled = connected && promptable(session) && !pending;
 
   const send = async (body: Partial<SessionPromptRequest>, onSent?: () => void) => {
     if (!enabled) return;

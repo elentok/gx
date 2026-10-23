@@ -107,6 +107,12 @@ type SessionStatus struct {
 	Background bool   `json:"background,omitempty"`
 }
 
+// Promptable reports whether the session waits for the person: Idle, or a
+// finished turn that left a background task running (Working with Background).
+func (st SessionStatus) Promptable() bool {
+	return st.State == SessionIdle || st.State == SessionWorking && st.Background
+}
+
 // SessionUnread is a session's Unread; Resumed marks one raised by a resume.
 type SessionUnread struct {
 	Unread  bool `json:"unread,omitempty"`
