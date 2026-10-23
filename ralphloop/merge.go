@@ -193,10 +193,10 @@ func stampAppliedMetrics(lp MergeParams) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("parsing ticket %s: %w", lp.TicketID, err)
 	}
-	if t.ActualCost != 0 {
+	if t.TotalTokens != nil {
 		return false, nil
 	}
-	_, _, _, ok, err := writeMergedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
+	_, ok, err := writeMergedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
 	if err != nil {
 		return false, fmt.Errorf("writing merged metrics for ticket %s: %w", lp.TicketID, err)
 	}
@@ -250,7 +250,7 @@ func mergeTrailerValue(lp MergeParams) string {
 // a session was recoverable — in a single amend, and resolves the merged SHA.
 // Metrics are omitted, never fabricated, when no session is recoverable.
 func stampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) {
-	contextWindow, elapsedSeconds, cost, hasMetrics, err := writeMergedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
+	m, hasMetrics, err := writeMergedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
 	if err != nil {
 		return MergeResult{}, fmt.Errorf("writing merged metrics for ticket %s: %w", lp.TicketID, err)
 	}
@@ -259,10 +259,12 @@ func stampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) {
 	trailers := []git.Trailer{{Key: ticketTrailerKey, Value: trailerValue}}
 	if hasMetrics {
 		trailers = append(trailers,
-			git.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(contextWindow)},
-			git.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(elapsedSeconds) + "s"},
-			git.Trailer{Key: costTrailerKey, Value: tickets.FormatCost(cost)},
+			git.Trailer{Key: tokensTrailerKey, Value: strconv.Itoa(m.contextWindow)},
+			git.Trailer{Key: elapsedTrailerKey, Value: strconv.Itoa(m.elapsedSeconds) + "s"},
 		)
+		if m.costStamped {
+			trailers = append(trailers, git.Trailer{Key: costTrailerKey, Value: tickets.FormatCost(m.cost)})
+		}
 	}
 	if err := d.AppendTrailers(lp.FeatureWorktree, trailers...); err != nil {
 		return MergeResult{}, fmt.Errorf("stamping trailers on merged commit: %w", err)

@@ -230,15 +230,15 @@ func TestMergeTicket_AlreadyApplied_ZeroCostWithSession_StampsMetrics(t *testing
 	}
 }
 
-func TestMergeTicket_AlreadyApplied_NonZeroCost_StampsNothing(t *testing.T) {
-	lp, d, ticketPath := appliedSessionFixture(t, "actual_cost: 1.5\n")
+func TestMergeTicket_AlreadyApplied_AlreadyStamped_StampsNothing(t *testing.T) {
+	lp, d, ticketPath := appliedSessionFixture(t, "total_tokens: 100\nactual_cost: 1.5\n")
 
 	res, err := MergeTicket(d, lp)
 	if err != nil || res.Outcome != AlreadyApplied {
 		t.Fatalf("MergeTicket = (%+v, %v), want AlreadyApplied", res, err)
 	}
 	if res.MetricsStamped {
-		t.Error("MetricsStamped = true with non-zero cost, want false")
+		t.Error("MetricsStamped = true with total_tokens already stamped, want false")
 	}
 	raw, _ := os.ReadFile(ticketPath)
 	if !strings.Contains(string(raw), "actual_cost: 1.5") {

@@ -3,6 +3,7 @@ package ralphloop
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -221,26 +222,88 @@ func readAgentSessionStats(key sessionKey) (sessionStats, error) {
 // read yet: a repair/reattached merging (see reconcile.go) has no fresh
 // session of its own to read, and these metrics are a merging-time
 // convenience, not a precondition for the cherry-pick itself to succeed.
-func writeMergedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (contextWindow, elapsedSeconds int, cost float64, ok bool, err error) {
+//
+// Tokens and cost are stamped over every session in the ticket's session_ids
+// plus sessionID, independent of whether sessionID's own transcript was
+// readable: all-or-nothing, so one unreadable session leaves total_tokens and
+// actual_cost unstamped. A ticket with no session stamps zero.
+func writeMergedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (m mergedMetrics, ok bool, err error) {
 	stats, err := readAgentSessionStats(sessionKey{agent: agent, cwd: cwd, sessionID: sessionID})
-	if err != nil || !stats.ok {
-		return 0, 0, 0, false, nil
+	if err != nil {
+		stats = sessionStats{}
 	}
-	elapsedSeconds = int(stats.end.Sub(stats.start).Seconds())
-	if err := writeTicketMetrics(ticketPath, stats.peakOccupancy, elapsedSeconds, stats.cost); err != nil {
-		return 0, 0, 0, false, err
+	current, err := schema.ParseTicket(ticketPath)
+	if err != nil {
+		if !stats.ok {
+			return mergedMetrics{}, false, nil
+		}
+		return mergedMetrics{}, false, err
 	}
-	return stats.peakOccupancy, elapsedSeconds, stats.cost, true, nil
+	tokens, cost, hadCodex, totalsErr := ticketSessionsTotals(agent, cwd, sessionID, current.SessionIDs)
+	if !stats.ok && totalsErr != nil {
+		return mergedMetrics{}, false, nil
+	}
+	m.costStamped = totalsErr == nil
+	if stats.ok {
+		m.contextWindow = stats.peakOccupancy
+		m.elapsedSeconds = int(stats.end.Sub(stats.start).Seconds())
+	}
+	m.cost = cost
+	err = updateTicket(ticketPath, func(t *schema.Ticket) {
+		if stats.ok {
+			t.ActualContextWindow = m.contextWindow
+			t.ElapsedTime = m.elapsedSeconds
+		}
+		if m.costStamped {
+			total := int64(tokens)
+			t.TotalTokens = &total
+			t.ActualCost = cost
+			t.HadCodex = hadCodex
+		}
+	})
+	if err != nil {
+		return mergedMetrics{}, false, err
+	}
+	return m, stats.ok, nil
 }
 
-// writeTicketMetrics rewrites ticketPath's frontmatter with contextWindow/
-// elapsedSeconds/cost in actual_context_window/elapsed_time/actual_cost,
-// round-tripping through schema's typed parse/marshal so every other field
-// and the markdown body are carried through unchanged.
-func writeTicketMetrics(ticketPath string, contextWindow, elapsedSeconds int, cost float64) error {
-	return updateTicket(ticketPath, func(t *schema.Ticket) {
-		t.ActualContextWindow = contextWindow
-		t.ElapsedTime = elapsedSeconds
-		t.ActualCost = cost
-	})
+// mergedMetrics are the figures writeMergedMetrics stamped. cost is the sum over
+// every session and is only meaningful when costStamped.
+type mergedMetrics struct {
+	contextWindow, elapsedSeconds int
+	cost                          float64
+	costStamped                   bool
+}
+
+// ticketSessionsTotals sums tokens and cost over ids plus current. A session's
+// agent is only known for current; any other is tried as Claude, then Codex.
+func ticketSessionsTotals(agent AgentKind, cwd, current string, ids []string) (tokens int, cost float64, hadCodex bool, err error) {
+	if current != "" && !slices.Contains(ids, current) {
+		ids = append(slices.Clone(ids), current)
+	}
+	for _, id := range ids {
+		kinds := []AgentKind{AgentClaude, AgentCodex}
+		if id == current {
+			kinds = []AgentKind{agent}
+		}
+		found := false
+		for _, kind := range kinds {
+			stats, err := readAgentSessionStats(sessionKey{agent: kind, cwd: cwd, sessionID: id})
+			if err != nil {
+				return 0, 0, false, fmt.Errorf("session %s: %w", id, err)
+			}
+			if !stats.ok {
+				continue
+			}
+			tokens += stats.totalTokens
+			cost += stats.cost
+			hadCodex = hadCodex || kind == AgentCodex
+			found = true
+			break
+		}
+		if !found {
+			return 0, 0, false, fmt.Errorf("session %s: transcript not found", id)
+		}
+	}
+	return tokens, cost, hadCodex, nil
 }

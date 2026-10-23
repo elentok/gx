@@ -625,7 +625,7 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 	if !ok {
 		return MarkDone(p.Ticket.Path)
 	}
-	if _, _, _, _, err := writeMergedMetrics(agent, sessionCwd, sessionID, p.Ticket.Path); err != nil {
+	if _, _, err := writeMergedMetrics(agent, sessionCwd, sessionID, p.Ticket.Path); err != nil {
 		return fmt.Errorf("writing merged metrics for ticket %s: %w", p.Ticket.Identifier, err)
 	}
 	return markDoneWithCompactions(d, agent, p.Ticket.Path, sessionCwd, sessionID)
@@ -666,6 +666,9 @@ func stampCommitlessMetrics(p iterationParams, cwd, sessionID string) {
 	}
 	sid, sessionCwd, agent, ok := recoverIterationSession(p)
 	if !ok {
+		// No session to recover: still stamp the ticket's own session_ids
+		// (zero when it has none).
+		writeMergedMetrics(p.Agent, "", "", p.Ticket.Path)
 		return
 	}
 	writeMergedMetrics(agent, sessionCwd, sid, p.Ticket.Path)

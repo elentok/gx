@@ -32,6 +32,8 @@ func StartOver(path string, now time.Time, note, source string) error {
 		t.ActualContextWindow = 0
 		t.ElapsedTime = 0
 		t.ActualCost = 0
+		t.TotalTokens = nil
+		t.HadCodex = false
 		t.Compactions = 0
 		t.Commitless = false
 		*body = schema.DemoteSection(*body, "## Needs Repair", now)
