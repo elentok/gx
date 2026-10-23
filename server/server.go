@@ -374,6 +374,7 @@ type Server struct {
 	trunkMissing   missingTrunks
 	kick           chan struct{} // wakes keepClaiming
 	sessionWatches *sessionWatches
+	designOpens    sync.Map // epic address -> *sync.Mutex, serializing designs open
 	focus          *focusReports
 	sessionBanners sessionBanners
 	settling       sync.WaitGroup // goSettle goroutines; Serve's stop leaves them running
@@ -606,6 +607,7 @@ var routeTable = []struct {
 	{"POST /v1/sessions/link", (*Server).sessionLinkWrite},
 	{"POST /v1/sessions/run-action", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.runSessionAction)(w, r) }},
 	{"POST /v1/sessions/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.resumeSession)(w, r) }},
+	{"POST /v1/designs/open", (*Server).designOpenWrite},
 	{"POST /v1/afk", (*Server).afkWrite},
 }
 

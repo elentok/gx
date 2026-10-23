@@ -58,6 +58,27 @@ export interface BudgetIncreaseRequest {
 export const ReasonNotAnIncrease = "not-an-increase";
 
 //////////
+// source: designs.go
+
+export const ReasonNotMapEpic = "not-map-epic";
+export const ReasonUnknownEpic = "unknown-epic";
+/**
+ * Refusal reasons of the designs open route, beside the session ones.
+ */
+export type Reason = typeof ReasonNotMapEpic | typeof ReasonUnknownEpic;
+/**
+ * DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
+ * epic's address ("project:epic") or one of its tickets ("project:epic/NN").
+ * New stops the Design's live session and starts a fresh one; State is the
+ * token of the live session the web saw, required on the web mux for New.
+ */
+export interface DesignOpenRequest {
+  epic: string;
+  new?: boolean;
+  state?: string;
+}
+
+//////////
 // source: detail.go
 
 export const ActionAnswer = "answer";

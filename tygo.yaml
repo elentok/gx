@@ -4,6 +4,7 @@ packages:
     output_path: "webui/src/generated/server.ts"
     include_files:
       - budget.go
+      - designs.go
       - detail.go
       - detailrelated.go
       - detailruns.go

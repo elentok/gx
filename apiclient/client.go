@@ -411,6 +411,14 @@ func (c *Client) CreateSession(ctx context.Context, req server.CreateSessionRequ
 	return res, err
 }
 
+// OpenDesign returns the Design's live session or starts one. A refusal is a
+// result (Refused set), not an error.
+func (c *Client) OpenDesign(ctx context.Context, req server.DesignOpenRequest) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/designs/open", req, &res)
+	return res, err
+}
+
 // StopSession ends a live session's holder. A refusal is a result (Refused
 // set), not an error.
 func (c *Client) StopSession(ctx context.Context, id string) (server.SessionResult, error) {
