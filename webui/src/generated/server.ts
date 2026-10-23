@@ -186,6 +186,10 @@ export interface TicketDetail {
   permission?: PermissionCard;
   chat: ChatMessage[];
   /**
+   * Runs is one line per run, oldest first; a map ticket has none.
+   */
+  runs: DetailRun[];
+  /**
    * State is the token an answer or resume sends back; empty without a round.
    */
   state?: string;

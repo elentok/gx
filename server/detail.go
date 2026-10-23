@@ -108,6 +108,8 @@ type TicketDetail struct {
 	// Permission is empty until a headless or pty agent reports a pending prompt.
 	Permission *PermissionCard `json:"permission,omitempty"`
 	Chat       []ChatMessage   `json:"chat"`
+	// Runs is one line per run, oldest first; a map ticket has none.
+	Runs []DetailRun `json:"runs"`
 	// State is the token an answer or resume sends back; empty without a round.
 	State string `json:"state,omitempty"`
 	// Bases are the competing blockers an ambiguous-base pause chooses between;
@@ -157,7 +159,7 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	}
 	d := TicketDetail{
 		Address: ref.addr.String(), Title: ref.ticket.Title, Status: string(storedStatus(t)), PauseReason: string(t.PauseReason),
-		Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{},
+		Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{}, Runs: []DetailRun{},
 		PauseLabel: t.PauseReason.Label(), Type: ref.ticket.Type, Epic: rootOf(ref.addr).String(),
 		MapEpic: ref.epic.IsMap, Body: ref.ticket.Body,
 	}
@@ -171,6 +173,9 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	}
 	if !ref.epic.IsMap {
 		d.Stats = s.detailStats(ref)
+		if d.Runs, err = s.ticketRuns(ref.addr, t); err != nil {
+			return TicketDetail{}, err
+		}
 	}
 	epics, err := s.projectEpics(ref.addr.Project)
 	if err != nil {
@@ -216,7 +221,7 @@ func brokenDetail(ref ticketRef, parseErr error) TicketDetail {
 		Address: ref.addr.String(), Title: ref.ticket.Title, Status: tickets.StatusError.Word(),
 		Epic: rootOf(ref.addr).String(), MapEpic: ref.epic.IsMap,
 		ErrorReason: tickets.PauseDetail(ref.epic, ref.ticket), ParseError: parseErr.Error(), Path: ref.ticket.Path,
-		Related: []RelatedTicket{}, Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{},
+		Related: []RelatedTicket{}, Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{}, Runs: []DetailRun{},
 	}
 }
 

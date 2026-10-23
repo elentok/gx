@@ -54,9 +54,10 @@ func reasonOf(t *testing.T, body string) string {
 
 func TestWeb_DetailIsServed(t *testing.T) {
 	h, base := startWeb(t)
-	code, _ := webDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address=nope")
-	if code == http.StatusNotFound || code == http.StatusUnauthorized {
-		t.Errorf("GET /v1/tickets/detail = %d, want it routed", code)
+	// The handler answers 404 for a malformed address; the mux's own 404 has another body.
+	code, body := webDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address=nope")
+	if code == http.StatusUnauthorized || (code == http.StatusNotFound && !strings.Contains(body, "no ticket nope")) {
+		t.Errorf("GET /v1/tickets/detail = %d %q, want it routed", code, body)
 	}
 	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/tickets/detail", nil); code != http.StatusUnauthorized {
 		t.Errorf("GET /v1/tickets/detail without cookie = %d, want 401", code)
