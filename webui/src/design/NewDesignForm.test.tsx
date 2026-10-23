@@ -36,6 +36,7 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
   design: true,
   status: { state: "idle" },
   status_changed_at: "2026-10-23T10:00:00.123456789Z",
+  run_started_at: "2026-10-23T10:00:00.123456789Z",
   unread: {},
   actionable: {},
   ...over,

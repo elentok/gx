@@ -1062,6 +1062,11 @@ export interface SessionInfo {
   status: SessionStatus;
   status_changed_at: string;
   /**
+   * RunStartedAt is when the current run began: the last Restore, else the
+   * creation. Unlike StatusChangedAt it ignores Idle/Working flips.
+   */
+  run_started_at: string;
+  /**
    * Exit is how an Exited session ended.
    */
   exit?: string;

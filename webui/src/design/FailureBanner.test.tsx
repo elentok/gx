@@ -20,6 +20,7 @@ const session = (state: string, failure?: SessionFailure, harness = "claude"): S
   design: true,
   status: { state } as SessionInfo["status"],
   status_changed_at: new Date().toISOString(),
+  run_started_at: new Date().toISOString(),
   unread: {},
   actionable: {},
   failure,

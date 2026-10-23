@@ -173,17 +173,21 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 	})
 }
 
-// liveDesignSession is the newest session of the Design at epicAddr that has
-// not exited, or nil.
+// liveDesignSession is the session of the Design at epicAddr that has not
+// exited and has the latest RunStartedAt, or nil. The Design page picks by the
+// same key (webui/src/design/view.ts).
 func (s *Server) liveDesignSession(epicAddr string) (*SessionInfo, error) {
 	list, err := s.listSessions()
 	if err != nil {
 		return nil, err
 	}
-	for i := len(list) - 1; i >= 0; i-- {
-		if in := list[i]; in.Design && in.Status.State != SessionExited && epicAddress(in.Ticket) == epicAddr {
-			return &in, nil
+	var live *SessionInfo
+	for i := range list {
+		in := &list[i]
+		if in.Design && in.Status.State != SessionExited && epicAddress(in.Ticket) == epicAddr &&
+			(live == nil || !in.RunStartedAt.Before(live.RunStartedAt)) {
+			live = in
 		}
 	}
-	return nil, nil
+	return live, nil
 }

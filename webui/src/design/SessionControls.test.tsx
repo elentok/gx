@@ -22,6 +22,7 @@ const session = (id: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   design: true,
   status: { state: "idle" },
   status_changed_at: "2026-10-23T10:00:00.123456789Z",
+  run_started_at: "2026-10-23T10:00:00.123456789Z",
   unread: {},
   actionable: {},
   ...over,
@@ -140,8 +141,9 @@ test("the state token has the server's shape", () => {
 });
 
 test("the N live menu switches the page and stops another session with a token", async () => {
-  const older = session("old", { status_changed_at: "2026-10-23T09:00:00Z" });
-  const newer = session("new", { status_changed_at: "2026-10-23T10:00:00Z" });
+  // The older run flipped state last; the newer run start still wins.
+  const older = session("old", { run_started_at: "2026-10-23T09:00:00Z", status_changed_at: "2026-10-23T11:00:00Z" });
+  const newer = session("new", { run_started_at: "2026-10-23T10:00:00Z", status_changed_at: "2026-10-23T10:00:00Z" });
   const stop = vi.fn(async () => ({}) as SessionResult);
   const chatFor = vi.fn(async () => ({ kind: "ok" as const, detail: chat }));
   render("/d/gx:a", [older, newer], { stop, chat: chatFor });
@@ -155,8 +157,9 @@ test("the N live menu switches the page and stops another session with a token",
 });
 
 test("a send goes to the session on screen", async () => {
-  const older = session("old", { status_changed_at: "2026-10-23T09:00:00Z" });
-  const newer = session("new", { status_changed_at: "2026-10-23T10:00:00Z" });
+  // The older run flipped state last; the newer run start still wins.
+  const older = session("old", { run_started_at: "2026-10-23T09:00:00Z", status_changed_at: "2026-10-23T11:00:00Z" });
+  const newer = session("new", { run_started_at: "2026-10-23T10:00:00Z", status_changed_at: "2026-10-23T10:00:00Z" });
   const prompt = vi.fn(async (_body: SessionPromptRequest) => ({}) as SessionResult);
   const withContinue = { ...chat, next: { phase: "map", action: {} } } as SessionChatResponse;
   render("/d/gx:a", [older, newer], { prompt, chat: async () => ({ kind: "ok", detail: withContinue }) });

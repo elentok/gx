@@ -38,9 +38,11 @@ const designOf = (s: SessionInfo) => (s.design && s.ticket ? s.ticket.split("/")
 
 const byNewest = (a: SessionInfo, b: SessionInfo) => Date.parse(b.status_changed_at) - Date.parse(a.status_changed_at);
 
-/** A Design's live sessions, newest first. */
+const byNewestRun = (a: SessionInfo, b: SessionInfo) => Date.parse(b.run_started_at) - Date.parse(a.run_started_at);
+
+/** A Design's live sessions, latest run start first: the order designs/open picks by (server/designs.go). */
 export const liveSessions = (address: string, sessions: SessionInfo[]) =>
-  sessions.filter((s) => designOf(s) === address && s.status.state !== "exited").sort(byNewest);
+  sessions.filter((s) => designOf(s) === address && s.status.state !== "exited").sort(byNewestRun);
 
 /** The session that drives a Design: the newest live one, else the newest Exited one. */
 export const designSession = (address: string, sessions: SessionInfo[]): SessionInfo | undefined =>

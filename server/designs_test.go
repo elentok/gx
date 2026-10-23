@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -104,6 +105,32 @@ func TestDesignsOpen_ReturnsTheNewestLiveSession(t *testing.T) {
 	newest := mk()
 	if res := f.open(t, "proj:map", false); res.Session == nil || res.Session.ID != newest {
 		t.Errorf("open = %+v, want session %s", res, newest)
+	}
+}
+
+func TestDesignsOpen_ARestoredSessionCountsFromItsRestore(t *testing.T) {
+	f := startDesigns(t)
+	mk := func() string {
+		res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
+		if err != nil || res.Session == nil {
+			t.Fatalf("create = %+v, %v", res, err)
+		}
+		return res.Session.ID
+	}
+	older := mk()
+	mk()
+	metaPath := filepath.Join(f.h.SessionsDir, older, "meta.json")
+	meta := readMeta(t, f.h, older)
+	meta["restored_at"] = time.Now().Add(time.Hour).UTC().Format(time.RFC3339Nano)
+	data, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if res := f.open(t, "proj:map", false); res.Session == nil || res.Session.ID != older {
+		t.Errorf("open = %+v, want the restored session %s", res, older)
 	}
 }
 

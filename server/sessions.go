@@ -85,6 +85,9 @@ type SessionInfo struct {
 	Design          bool          `json:"design,omitempty"`
 	Status          SessionStatus `json:"status"`
 	StatusChangedAt time.Time     `json:"status_changed_at"`
+	// RunStartedAt is when the current run began: the last Restore, else the
+	// creation. Unlike StatusChangedAt it ignores Idle/Working flips.
+	RunStartedAt time.Time `json:"run_started_at"`
 	// Exit is how an Exited session ended.
 	Exit string `json:"exit,omitempty"`
 	// Stopped marks a session the person stopped; it is never auto-resumed.
@@ -252,6 +255,7 @@ func (m sessionMeta) info() SessionInfo {
 		Design:          m.Design,
 		Status:          m.Status,
 		StatusChangedAt: m.StatusChangedAt,
+		RunStartedAt:    cmp.Or(m.RestoredAt, m.CreatedAt),
 		Exit:            m.Exit,
 		Stopped:         m.Stopped,
 		Unread:          m.Unread,

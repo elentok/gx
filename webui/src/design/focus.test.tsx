@@ -18,6 +18,7 @@ const session = (id: string, changed: string): SessionInfo => ({
   design: true,
   status: { state: "idle" } as SessionInfo["status"],
   status_changed_at: changed,
+  run_started_at: changed,
   unread: {},
   actionable: {},
 });
