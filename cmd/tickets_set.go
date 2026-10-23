@@ -85,7 +85,8 @@ never scheduled by the server.
 ` + "`tickets set project:epic`" + ` (or ` + "`tickets epic set`" + `) writes an epic's kind (map, loop), status
 (draft, open), destination_unconfirmed and blocked_by (whole-epic tokens such as other or
 project:other: the whole epic waits on them, checked like a ticket's); created_at, completed_at, merged_at, queued_at, evolved_at, evolve_skipped,
-evolve_ticket and the stats fields below are refused (server-stamped). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
+evolve_ticket and the stats fields below are refused (server-stamped), except that a map epic
+takes completed_at (an RFC3339 timestamp or now; a map already completed keeps its first value). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
 
 An epic's ticket.md also holds epic-level timing. These fields are gx-managed, not
 settable via ` + "`tickets set`" + `, and unset until gx stamps them.
@@ -176,7 +177,13 @@ func addDestinationUnconfirmedFlags(cmd *cobra.Command, usage string) {
 // epic schema rather than the ticket one. A server-stamped field refuses with
 // tickets.CodeServerStamped before anything is written.
 func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string, error)) error {
+	epicDir := filepath.Dir(path)
+	// Nothing completes a map by itself unless a -impl epic appears, so a person may.
+	handCompletable := tickets.IsMapEpic(epicDir)
 	for _, field := range tickets.EpicServerStamped {
+		if field == "completed_at" && handCompletable {
+			continue
+		}
 		if c.Flags().Changed(strings.ReplaceAll(field, "_", "-")) {
 			return &tickets.AddressError{Code: tickets.CodeServerStamped, Msg: fmt.Sprintf("%s: %s is server-stamped and not settable via `tickets set`", ticketLabel(path), field)}
 		}
@@ -208,6 +215,19 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 		update.DestinationUnconfirmed = &b
 		changed = append(changed, "destination_unconfirmed="+v)
 	}
+	var completedAt *time.Time
+	if handCompletable && c.Flags().Changed("completed-at") {
+		v, _ := c.Flags().GetString("completed-at")
+		at := time.Now().UTC()
+		if v != "now" {
+			var err error
+			if at, err = time.Parse(time.RFC3339, v); err != nil {
+				return fmt.Errorf("%s: --completed-at %q: want an RFC3339 timestamp or now", ticketLabel(path), v)
+			}
+		}
+		completedAt = &at
+		changed = append(changed, "completed_at="+at.Format(time.RFC3339))
+	}
 	var notices []string
 	if c.Flags().Changed("blocked-by") {
 		v, _ := c.Flags().GetString("blocked-by")
@@ -223,10 +243,16 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 		changed = append(changed, "blocked_by="+v)
 	}
 	if len(changed) == 0 {
-		return fmt.Errorf("%s: an epic takes --kind, --status, --destination-unconfirmed and --blocked-by", ticketLabel(path))
+		return fmt.Errorf("%s: an epic takes --kind, --status, --destination-unconfirmed and --blocked-by (a map also --completed-at)", ticketLabel(path))
 	}
 	if err := tickets.UpdateEpicFields(path, update); err != nil {
 		return fmt.Errorf("%s: %w", ticketLabel(path), err)
+	}
+	if completedAt != nil {
+		// Stamping never overwrites, so a map completed earlier keeps its first value.
+		if err := tickets.StampEpicFields(epicDir, map[string]any{"completed_at": *completedAt}); err != nil {
+			return fmt.Errorf("%s: %w", ticketLabel(path), err)
+		}
 	}
 	printNotices(c.ErrOrStderr(), notices)
 

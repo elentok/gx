@@ -68,6 +68,26 @@ func TestTicketsSet_EpicAddressRefusesServerStampedFields(t *testing.T) {
 	}
 }
 
+func TestTicketsSet_MapEpicTakesCompletedAtAndKeepsTheFirstValue(t *testing.T) {
+	d, ticketMD := setupEpicSetProject(t)
+	if err := execute([]string{"tickets", "set", "mine:e", "--kind=map"}, d); err != nil {
+		t.Fatalf("set kind: %v", err)
+	}
+	if err := execute([]string{"tickets", "set", "mine:e", "--completed-at=2026-02-03T04:05:06Z"}, d); err != nil {
+		t.Fatalf("set completed-at: %v", err)
+	}
+	if err := execute([]string{"tickets", "set", "mine:e", "--completed-at=now"}, d); err != nil {
+		t.Fatalf("set completed-at now: %v", err)
+	}
+	raw, _ := os.ReadFile(ticketMD)
+	if !strings.Contains(string(raw), "completed_at: 2026-02-03T04:05:06Z") || strings.Count(string(raw), "completed_at:") != 1 {
+		t.Errorf("want the first completed_at kept:\n%s", raw)
+	}
+	if err := execute([]string{"tickets", "set", "mine:e", "--completed-at=yesterday"}, d); err == nil {
+		t.Error("bad timestamp: want a refusal")
+	}
+}
+
 func TestTicketsSet_EpicAddressValidatesAgainstTheEpicSchema(t *testing.T) {
 	d, ticketMD := setupEpicSetProject(t)
 	// done is a valid ticket status but not an epic one.
