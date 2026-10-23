@@ -4,7 +4,7 @@ import type { SessionInfo, SessionNext, SessionPromptRequest, SessionRoundCard }
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
 import { postPrompt, type PostPrompt } from "./prompt";
-import { roundPrompt, unansweredOf, type Answers } from "./round";
+import { nameOf, roundPrompt, unansweredOf, type Answers } from "./round";
 import { promptable } from "./view";
 
 const CONTINUE_PHASES = ["map", "review"];
@@ -101,13 +101,13 @@ export function Composer({
         <Box role="alertdialog" aria-label="Unanswered questions" display="flex" flexDirection="column" gap="2">
           <Text>
             {unanswered.length} {unanswered.length === 1 ? "question is" : "questions are"} unanswered (
-            {unanswered.map((c) => `Q${c.number}`).join(", ")}). Send anyway?
+            {unanswered.map(nameOf).join(", ")}). Send anyway?
           </Text>
           <Box display="flex" gap="2">
             <Button
               variant="outline"
               onClick={() => {
-                onReview?.(round.findIndex((c) => c.number === unanswered[0].number));
+                onReview?.(round.findIndex((c) => c.label === unanswered[0].label));
                 setUnanswered([]);
               }}
             >

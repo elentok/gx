@@ -1015,7 +1015,7 @@ export interface SessionRoundOption {
  * options or text; Note says why a card fell back to text.
  */
 export interface SessionRoundCard {
-  number: number /* int */;
+  label: string; // the header's question id without the Q: "8", or "8b"
   title: string;
   body: string;
   kind: string;
@@ -1280,8 +1280,9 @@ export interface StatsCost {
  */
 export interface StatsFriction {
   /**
-   * PauseReasons lists the top reasons of the range; the rest are "other" in
-   * PausesByReason, which carries every reason for the tooltip.
+   * PauseReasons lists the top reasons of the range, then "other" when more
+   * exist. PausesByReason keeps every reason, so the tooltip can list them and
+   * the chart folds the ones outside PauseReasons into "other".
    */
   pause_reasons: string[];
   pauses_by_reason: { [key: string]: number /* int */}[];

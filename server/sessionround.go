@@ -26,7 +26,7 @@ type SessionRoundOption struct {
 // SessionRoundCard is one question of a Grilling round. Kind is yes-no,
 // options or text; Note says why a card fell back to text.
 type SessionRoundCard struct {
-	Number      int                  `json:"number"`
+	Label       string               `json:"label"` // the header's question id without the Q: "8", or "8b"
 	Title       string               `json:"title"`
 	Body        string               `json:"body"`
 	Kind        string               `json:"kind"`
@@ -52,7 +52,7 @@ type SessionBackgroundTask struct {
 }
 
 var (
-	roundNumberRE = regexp.MustCompile(`Q(\d+)`)
+	roundNumberRE = regexp.MustCompile(`Q(\d+)([a-z]?)`)
 	boldSpanRE    = regexp.MustCompile(`\*\*(.+?)\*\*`)
 	sentenceEndRE = regexp.MustCompile(`[.?!:](\s|$)`)
 )
@@ -135,9 +135,9 @@ type parsedRound struct {
 func parseRoundSegment(seq int, seg string) parsedRound {
 	body, blocks := splitFences(seg)
 	header, rest, _ := strings.Cut(body, "\n")
-	card := SessionRoundCard{Number: seq, Title: roundTitle(header), Body: strings.TrimSpace(roundHeaderText(header) + "\n" + rest), Kind: tickets.QuestionText}
+	card := SessionRoundCard{Label: strconv.Itoa(seq), Title: roundTitle(header), Body: strings.TrimSpace(roundHeaderText(header) + "\n" + rest), Kind: tickets.QuestionText}
 	if m := roundNumberRE.FindStringSubmatch(header); m != nil {
-		card.Number, _ = strconv.Atoi(m[1])
+		card.Label = m[1] + m[2]
 	}
 	res := parsedRound{Card: card}
 	if len(blocks) == 0 {

@@ -42,10 +42,10 @@ func TestSessionChat_RoundParsesCardsAndStripsFences(t *testing.T) {
 		t.Fatalf("round = %+v, want 2 cards", got.Round)
 	}
 	c1, c2 := got.Round[0], got.Round[1]
-	if c1.Number != 1 || c1.Title != "Which store?" || c1.Kind != "options" || c1.Recommended != "a" || len(c1.Options) != 2 || c1.Note != "" {
+	if c1.Label != "1" || c1.Title != "Which store?" || c1.Kind != "options" || c1.Recommended != "a" || len(c1.Options) != 2 || c1.Note != "" {
 		t.Errorf("card 1 = %+v", c1)
 	}
-	if c2.Number != 2 || c2.Title != "Keep going?" || c2.Kind != "yes-no" || c2.Recommended != "yes" {
+	if c2.Label != "2" || c2.Title != "Keep going?" || c2.Kind != "yes-no" || c2.Recommended != "yes" {
 		t.Errorf("card 2 = %+v", c2)
 	}
 	if strings.Contains(c1.Body, "---") || strings.Contains(c1.Body, "gx-question") || !strings.Contains(c1.Body, "➡️ SQLite") {
@@ -64,7 +64,7 @@ func TestSessionChat_RoundReadsDriftedHeadersLeniently(t *testing.T) {
 			"❓ **Q3** - **Bold title** body"+yesNo))
 	var titles []string
 	for _, c := range got.Round {
-		titles = append(titles, fmt.Sprintf("%d=%s", c.Number, c.Title))
+		titles = append(titles, fmt.Sprintf("%s=%s", c.Label, c.Title))
 	}
 	if want := "1=Plain title,2=Third thing?,3=Bold title"; strings.Join(titles, ",") != want {
 		t.Errorf("cards = %v, want %s", titles, want)
@@ -83,7 +83,7 @@ func TestSessionChat_RoundBadOrMissingBlockGivesFreeTextCard(t *testing.T) {
 	}
 	for _, c := range got.Round[:3] {
 		if c.Kind != "text" || c.Note == "" || len(c.Options) != 0 || c.Recommended != "" {
-			t.Errorf("card %d = %+v, want a free-text card with a note", c.Number, c)
+			t.Errorf("card %s = %+v, want a free-text card with a note", c.Label, c)
 		}
 	}
 	if c := got.Round[3]; c.Kind != "yes-no" || c.Recommended != "yes" || c.Note != "" {

@@ -22,9 +22,9 @@ const (
 // badRoundBlock is one question of a round whose gx-question block cannot be
 // read.
 type badRoundBlock struct {
-	Number int
-	Err    error
-	Raw    string
+	Label string
+	Err   error
+	Raw   string
 }
 
 // badRoundBlocks lists the questions of a round with an unreadable block. A
@@ -33,7 +33,7 @@ func badRoundBlocks(text string) []badRoundBlock {
 	var bad []badRoundBlock
 	for i, seg := range roundSegments(text) {
 		if p := parseRoundSegment(i+1, seg); p.Err != nil {
-			bad = append(bad, badRoundBlock{p.Card.Number, p.Err, p.Raw})
+			bad = append(bad, badRoundBlock{p.Card.Label, p.Err, p.Raw})
 		}
 	}
 	return bad
@@ -76,7 +76,7 @@ func (s *Server) writeBadBlockFollowUp(id string, design designRef, round string
 	var ev strings.Builder
 	fmt.Fprintf(&ev, "%s, session %s, Design %s. %s\n", time.Now().Format("2006-01-02"), id, design.Ticket, round)
 	for _, b := range bad {
-		fmt.Fprintf(&ev, "\nQ%d: %v\n\n```gx-question\n%s\n```\n", b.Number, b.Err, b.Raw)
+		fmt.Fprintf(&ev, "\nQ%s: %v\n\n```gx-question\n%s\n```\n", b.Label, b.Err, b.Raw)
 	}
 	if path, found, err := noteOccurrence(epicPath, badBlockKey, "Seen again: "+ev.String()); found || err != nil {
 		return path, err

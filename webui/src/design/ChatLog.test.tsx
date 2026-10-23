@@ -201,7 +201,7 @@ test("the newest live session drives the chat, else the newest Exited one", asyn
 });
 
 const card = (over: Partial<SessionRoundCard>): SessionRoundCard => ({
-  number: 1,
+  label: "1",
   title: "t",
   body: "Which way?",
   kind: "options",
@@ -216,10 +216,10 @@ const roundChat = () =>
   okChat(
     chatOf([], {
       round: [
-        card({ number: 1, body: "First?", recommended: "b" }),
-        card({ number: 2, body: "Second?", kind: "yes-no", options: undefined, yes: "Sure", no: "Nope" }),
-        card({ number: 3, body: "Third?", kind: "text", options: undefined }),
-        card({ number: 4, body: "Fourth?", kind: "text", options: undefined, note: "options could not be read" }),
+        card({ label: "1", body: "First?", recommended: "b" }),
+        card({ label: "2", body: "Second?", kind: "yes-no", options: undefined, yes: "Sure", no: "Nope" }),
+        card({ label: "3", body: "Third?", kind: "text", options: undefined }),
+        card({ label: "4", body: "Fourth?", kind: "text", options: undefined, note: "options could not be read" }),
       ],
     }),
   );

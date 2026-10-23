@@ -1,7 +1,7 @@
 import type { SessionRoundCard } from "../generated/server";
 
 export type Answer = { choice?: string; text?: string; note?: string };
-export type Answers = Record<number, Answer>;
+export type Answers = Record<string, Answer>;
 
 export const choicesOf = (c: SessionRoundCard) =>
   c.kind === "yes-no"
@@ -22,13 +22,16 @@ const answerText = (c: SessionRoundCard, a: Answer) => {
 };
 
 /** The cards of the round the person has not answered yet. */
-export const unansweredOf = (round: SessionRoundCard[], answers: Answers) => round.filter((c) => !isAnswered(answers[c.number]));
+/** The title a card shows for its question: "Q8", or "Q8b". */
+export const nameOf = (c: SessionRoundCard) => `Q${c.label}`;
+
+export const unansweredOf = (round: SessionRoundCard[], answers: Answers) => round.filter((c) => !isAnswered(answers[c.label]));
 
 /** One line per question, a per-question note on the next line, then the composer's notes. */
 export function roundPrompt(round: SessionRoundCard[], answers: Answers, notes: string) {
   const lines = round.flatMap((c) => {
-    const a = answers[c.number] ?? {};
-    const out = [`Q${c.number} - ${c.title}: ${isAnswered(a) ? answerText(c, a) : "(unanswered)"}`];
+    const a = answers[c.label] ?? {};
+    const out = [`${nameOf(c)} - ${c.title}: ${isAnswered(a) ? answerText(c, a) : "(unanswered)"}`];
     if (a.note?.trim()) out.push(`  Note: ${a.note.trim()}`);
     return out;
   });

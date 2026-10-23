@@ -159,7 +159,7 @@ test("while disconnected the page says so and the buttons are off", async () => 
 });
 
 const askCard = (n: number, over: Partial<SessionRoundCard> = {}): SessionRoundCard => ({
-  number: n,
+  label: String(n),
   title: `T${n}`,
   body: `Body ${n}?`,
   kind: "options",

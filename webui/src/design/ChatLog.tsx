@@ -161,7 +161,7 @@ function ChatLog({
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       <ChatTail
-        key={(chat.round ?? []).map((c) => `${c.number}:${c.title}`).join("|")}
+        key={(chat.round ?? []).map((c) => `${c.label}:${c.title}`).join("|")}
         session={session}
         chat={chat}
         connected={connected}

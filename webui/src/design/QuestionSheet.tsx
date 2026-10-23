@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { SessionRoundCard } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { Button } from "../ui/button/Button";
-import { choicesOf, isAnswered, type Answer, type Answers } from "./round";
+import { choicesOf, isAnswered, nameOf, type Answer, type Answers } from "./round";
 
 function Choice({ label, on, recommended, onClick }: { label: string; on: boolean; recommended: boolean; onClick: () => void }) {
   return (
@@ -52,7 +52,7 @@ function Question({
   const text = card.kind === "text" || choicesOf(card).length === 0;
   return (
     <Box display="flex" flexDirection="column" gap="2">
-      <Markdown inline fontSize="md" fontWeight="600">{`Q${card.number} - ${card.title}`}</Markdown>
+      <Markdown inline fontSize="md" fontWeight="600">{`${nameOf(card)} - ${card.title}`}</Markdown>
       {card.body && <Markdown fontSize="md">{card.body}</Markdown>}
       {text ? (
         <>
@@ -64,7 +64,7 @@ function Question({
           <Textarea
             size="sm"
             rows={2}
-            aria-label={`Answer to question ${card.number}`}
+            aria-label={`Answer to question ${card.label}`}
             placeholder="Your answer"
             value={answer.text ?? ""}
             onChange={(e) => onChange({ ...answer, text: e.target.value })}
@@ -93,7 +93,7 @@ function Question({
         <Button
           variant="ghost"
           size="sm"
-          aria-label={`Note on question ${card.number}`}
+          aria-label={`Note on question ${card.label}`}
           aria-pressed={noteOpen}
           onClick={() => setNoteOpen((o) => !o)}
         >
@@ -104,7 +104,7 @@ function Question({
         <Textarea
           size="sm"
           rows={2}
-          aria-label={`Note text for question ${card.number}`}
+          aria-label={`Note text for question ${card.label}`}
           placeholder="Note on this question"
           value={answer.note ?? ""}
           onChange={(e) => onChange({ ...answer, note: e.target.value })}
@@ -156,7 +156,7 @@ export function QuestionSheet({
     setIndex(Math.min(round.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth))));
   };
 
-  const done = round.filter((c) => isAnswered(answers[c.number])).length;
+  const done = round.filter((c) => isAnswered(answers[c.label])).length;
   const goto = (k: number) => {
     setIndex(k);
     setOpen(true);
@@ -167,19 +167,19 @@ export function QuestionSheet({
       <Box px="3" pt="2" pb="2" display="flex" alignItems="center" gap="2">
         <Box display="flex" gap="1.5" flex="1" flexWrap="wrap">
           {round.map((c, k) => {
-            const answered = isAnswered(answers[c.number]);
+            const answered = isAnswered(answers[c.label]);
             const current = open && k === index;
             return (
               <chakra.button
-                key={c.number}
+                key={c.label}
                 type="button"
-                aria-label={`Question ${c.number}${answered ? ", answered" : ""}`}
+                aria-label={`Question ${c.label}${answered ? ", answered" : ""}`}
                 aria-current={current ? "step" : undefined}
                 w="7"
                 h="7"
                 borderRadius="full"
                 borderWidth="2px"
-                fontSize="xs"
+                fontSize={c.label.length > 2 ? "2xs" : "xs"}
                 fontWeight="600"
                 cursor="pointer"
                 borderColor={answered ? "tone.done.fg" : current ? "tone.waiting.fg" : "border"}
@@ -187,7 +187,7 @@ export function QuestionSheet({
                 color={answered || current ? "surface" : "text.muted"}
                 onClick={() => goto(k)}
               >
-                {answered ? "✓" : c.number}
+                {answered ? "✓" : c.label}
               </chakra.button>
             );
           })}
@@ -214,18 +214,18 @@ export function QuestionSheet({
         >
           {round.map((c, k) => (
             <Box
-              key={c.number}
+              key={c.label}
               flex="0 0 100%"
               minW="0"
               css={{ scrollSnapAlign: "start" }}
               role="group"
-              aria-label={`Question ${c.number} of ${round.length}`}
+              aria-label={`Question ${c.label} of ${round.length}`}
               aria-hidden={k !== index}
             >
               <Question
                 card={c}
-                answer={answers[c.number] ?? {}}
-                onChange={(a) => onAnswers((all) => ({ ...all, [c.number]: a }))}
+                answer={answers[c.label] ?? {}}
+                onChange={(a) => onAnswers((all) => ({ ...all, [c.label]: a }))}
                 onPicked={() => setIndex(Math.min(k + 1, round.length - 1))}
               />
             </Box>

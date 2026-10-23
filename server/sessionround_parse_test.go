@@ -40,6 +40,7 @@ func TestParseRoundSegment_BodyDropsTheHeader(t *testing.T) {
 		"no colon":   {"Q1** **Store** Which one?", "Store", "Which one?"},
 		"plain":      {"Q1 Which store? Pick one.", "Which store?", "Which store? Pick one."},
 		"title only": {"Q2** - **Keep going?**", "Keep going?", ""},
+		"lettered":   {"Q8b** - **Bedrock proof**: Extend it?", "Bedrock proof", "Extend it?"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -48,5 +49,11 @@ func TestParseRoundSegment_BodyDropsTheHeader(t *testing.T) {
 				t.Errorf("title, body = %q, %q; want %q, %q", card.Title, card.Body, c.title, c.body)
 			}
 		})
+	}
+}
+
+func TestParseRoundSegment_KeepsTheNumberLetter(t *testing.T) {
+	if got := parseRoundSegment(1, "Q8b** - **Bedrock proof**: Extend it?").Card; got.Label != "8b" {
+		t.Errorf("label = %q; want %q", got.Label, "8b")
 	}
 }

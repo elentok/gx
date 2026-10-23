@@ -141,7 +141,7 @@ test("Restore sends the state token and keeps a half-answered round's draft", as
   const resume = vi.fn<ResumeSession>(async () => ok);
   const round: SessionChatResponse = {
     ...chat,
-    round: [{ number: 1, title: "Name", body: "What name?", kind: "text" }],
+    round: [{ label: "1", title: "Name", body: "What name?", kind: "text" }],
   };
   render(crashed(), { resume, chat: round });
   const answer = (await screen.findByLabelText("Answer to question 1")) as HTMLTextAreaElement;
