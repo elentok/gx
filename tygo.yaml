@@ -16,6 +16,7 @@ packages:
       - recentlyfinished.go
       - sessionchat.go
       - sessionfailure.go
+      - sessionfocus.go
       - sessionprompt.go
       - sessionround.go
       - sessionscreen.go

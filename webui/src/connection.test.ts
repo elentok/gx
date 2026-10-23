@@ -30,6 +30,7 @@ function setup(opts: { snapshotFails?: () => boolean } = {}) {
   const streams: FakeStream[] = [];
   let seq = 0;
   const conn = createConnection({
+    clientId: "tab-1",
     fetchSnapshot: async () => {
       log.push("snapshot");
       if (opts.snapshotFails?.()) throw new Error("down");
@@ -80,7 +81,7 @@ test("connects snapshot first, then events since the snapshot seq", async () => 
   const { conn, log } = setup();
   conn.start();
   await vi.advanceTimersByTimeAsync(0);
-  expect(log).toEqual(["snapshot", "events /v1/events?since=1"]);
+  expect(log).toEqual(["snapshot", "events /v1/events?since=1&client=tab-1"]);
   expect(conn.getState().loadedOnce).toBe(true);
   conn.stop();
 });
@@ -91,7 +92,7 @@ test("an event frame refetches the snapshot without reconnecting", async () => {
   await vi.advanceTimersByTimeAsync(0);
   streams[0].push("id: 2\nevent: ticket\ndata: {}\n\n");
   await vi.advanceTimersByTimeAsync(0);
-  expect(log).toEqual(["snapshot", "events /v1/events?since=1", "snapshot"]);
+  expect(log).toEqual(["snapshot", "events /v1/events?since=1&client=tab-1", "snapshot"]);
   expect(conn.getState().snapshot?.seq).toBe(2);
   conn.stop();
 });
@@ -194,7 +195,7 @@ test("becoming visible leaves a live stream alone, online reconnects", async () 
   window.dispatchEvent(new Event("online"));
   await vi.advanceTimersByTimeAsync(0);
   expect(log.filter((l) => l === "snapshot").length).toBe(2);
-  expect(log[log.length - 1]).toBe("events /v1/events?since=2");
+  expect(log[log.length - 1]).toBe("events /v1/events?since=2&client=tab-1");
   conn.stop();
 });
 

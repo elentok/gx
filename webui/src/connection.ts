@@ -15,9 +15,13 @@ export interface ConnectionState {
   loadedOnce: boolean;
   /** Bumps every TICK_MS while the tab is visible so relative times re-render. */
   tick: number;
+  /** Counts event streams opened so far; a focus report counts only while a stream is open. */
+  streams: number;
 }
 
 export interface ConnectionDeps {
+  /** Names this tab on the event stream. Defaults to a random id per connection. */
+  clientId?: string;
   fetchSnapshot?: () => Promise<Snapshot>;
   openStream?: (url: string, signal: AbortSignal) => Promise<AsyncIterable<string>>;
   /** Seeds the first render with the last snapshot and saves each new one. */
@@ -62,9 +66,10 @@ export type Connection = ReturnType<typeof createConnection>;
 export function createConnection(deps: ConnectionDeps = {}) {
   const getSnapshot = deps.fetchSnapshot ?? fetchSnapshot;
   const openStream = deps.openStream ?? openEventStream;
+  const clientId = deps.clientId ?? `web-${crypto.randomUUID()}`;
 
   const cached = deps.cache?.load() ?? null;
-  let state: ConnectionState = { snapshot: cached, connected: true, loadedOnce: cached !== null, tick: 0 };
+  let state: ConnectionState = { snapshot: cached, connected: true, loadedOnce: cached !== null, tick: 0, streams: 0 };
   const listeners = new Set<() => void>();
   const eventListeners = new Set<EventListener>();
   let gen = 0;
@@ -151,10 +156,11 @@ export function createConnection(deps: ConnectionDeps = {}) {
     // Armed before the connect so a hung connect trips the watchdog too.
     arm(g);
     try {
-      const stream = await openStream(`/v1/events?since=${since}`, ctl.signal);
+      const stream = await openStream(`/v1/events?since=${since}&client=${encodeURIComponent(clientId)}`, ctl.signal);
       if (g !== gen) return;
       live = true;
       markUp();
+      set({ streams: state.streams + 1 });
       arm(g);
       let buf = "";
       for await (const chunk of stream) {
@@ -213,6 +219,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
   }
 
   return {
+    clientId,
     getState: () => state,
     subscribe(l: () => void) {
       listeners.add(l);

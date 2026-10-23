@@ -3,6 +3,7 @@ import { useConnectionContext, useConnectionState } from "./connection";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
 import type { OpenDesign, ResumeSession, StopSession } from "./design/open";
+import type { PostFocus } from "./design/focus";
 import type { PostPrompt } from "./design/prompt";
 import type { FetchScreen } from "./design/screen";
 import type { FetchEpicDetail } from "./epic/detail";
@@ -41,6 +42,7 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
       stop={fetchers.stop}
       resume={fetchers.resume}
       fetchScreen={fetchers.screen}
+      focus={fetchers.focus}
     />
   );
 }
@@ -55,6 +57,7 @@ export interface RouteFetchers {
   epicList?: FetchEpicList;
   chat?: FetchChat;
   prompt?: PostPrompt;
+  focus?: PostFocus;
 }
 
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {

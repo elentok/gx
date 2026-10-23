@@ -13,6 +13,7 @@ import { SidebarItem } from "../ui/sidebar/SidebarItem";
 import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
+import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
 import { NewDesignForm, type NewDesignDraft } from "./NewDesignForm";
 import type { OpenDesign, ResumeSession, StopSession } from "./open";
@@ -163,6 +164,7 @@ function DesignColumns({
   stop,
   resume,
   fetchScreen,
+  focus,
   chart,
   onNewSession,
 }: {
@@ -175,18 +177,21 @@ function DesignColumns({
   stop?: StopSession;
   resume?: ResumeSession;
   fetchScreen?: FetchScreen;
+  focus?: PostFocus;
   /** The Design has no map yet, so only its session can be started again, from the New Design form. */
   chart?: boolean;
   onNewSession: () => void;
 }) {
   const conn = useConnectionContext();
   const { detail } = useEpicDetail(address, conn, fetchDetail);
-  const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
+  const connState = useConnectionState(conn);
+  const sessions = connState.snapshot?.sessions ?? [];
   const [selected, setSelected] = useState<string>();
   const done = detail?.steps?.some((s) => s.step === "done" && s.state === "done");
   const live = liveSessions(address, sessions);
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session = live.find((s) => s.id === selected) ?? designSession(address, sessions);
+  useFocusReport(conn, session?.id, connState.streams, focus);
   return (
     <>
       <Box aria-label="Chat" role="region" display="flex" flexDirection="column" gap="3">
@@ -227,6 +232,7 @@ export function DesignPage({
   stop,
   resume,
   fetchScreen,
+  focus,
 }: {
   address?: string;
   fetchList?: FetchEpicList;
@@ -237,6 +243,7 @@ export function DesignPage({
   stop?: StopSession;
   resume?: ResumeSession;
   fetchScreen?: FetchScreen;
+  focus?: PostFocus;
 }) {
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -298,6 +305,7 @@ export function DesignPage({
               stop={stop}
               resume={resume}
               fetchScreen={fetchScreen}
+              focus={focus}
               chart={chartRow}
               onNewSession={onNewSession}
             />
