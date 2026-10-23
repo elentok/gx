@@ -69,8 +69,11 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
    - **Design question** (behaviour, scope, parity, which runners or harnesses it covers): the
      subagent writes no spec and returns the questions instead.
 
-   If it returns any design question, file each as a `grilling` map ticket (Map epics → Child
-   ticket) and stop, without chaining: the next run matches step 3 and resumes the map. Write the
+   If it returns any design question, file them as `grilling` map tickets (Map epics → Child
+   ticket) and stop, without chaining: the next run matches step 3 and resumes the map. Each ticket
+   costs a run, so by default file one ticket that lists every question with the subagent's
+   suggested answer. Give a question its own ticket only when it needs research or a prototype, or
+   is too big to settle in the same grilling round as the rest. Write the
    spec only on a run that returns none. A spec never carries open design questions to the review.
 5. **No `## Review findings` section on the map** → dispatch a design-review subagent against the
    spec (rubric below). It writes the findings as a markdown checklist (`- [ ] …`) with
