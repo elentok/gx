@@ -23,6 +23,8 @@ type FocusReport struct {
 	Focused     bool   `json:"focused,omitempty"`
 	Session     string `json:"session,omitempty"`
 	TermProgram string `json:"term_program,omitempty"`
+	// Web marks a web tab's report. Only the web mux sets it, never the body.
+	Web bool `json:"-"`
 }
 
 // focusReports holds the latest report of each connected TUI.
@@ -68,7 +70,8 @@ func (f *focusReports) report(r FocusReport) bool {
 		return false
 	}
 	f.reports[r.Client] = r
-	if r.Focused {
+	// Web reports never move the click target.
+	if r.Focused && !r.Web {
 		f.lastFocused = r.Client
 		f.lastTerm = cmp.Or(r.TermProgram, f.lastTerm)
 	}
@@ -95,12 +98,21 @@ func (f *focusReports) clickTarget() (termProgram string, connected bool) {
 	return f.lastTerm, connected
 }
 
-// onScreen reports whether a focused TUI has the session on screen.
+// onScreen reports whether a focused TUI or web tab has the session on screen.
 func (f *focusReports) onScreen(session string) bool {
+	return f.anyFocused(session, false)
+}
+
+// webOnScreen reports whether a visible web tab has the session on screen.
+func (f *focusReports) webOnScreen(session string) bool {
+	return f.anyFocused(session, true)
+}
+
+func (f *focusReports) anyFocused(session string, webOnly bool) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, r := range f.reports {
-		if r.Focused && r.Session == session {
+		if r.Focused && r.Session == session && (r.Web || !webOnly) {
 			return true
 		}
 	}
@@ -108,11 +120,22 @@ func (f *focusReports) onScreen(session string) bool {
 }
 
 func (s *Server) sessionFocusWrite(w http.ResponseWriter, r *http.Request) {
+	s.focusWrite(w, r, false)
+}
+
+// sessionFocusWriteWeb is sessionFocusWrite for the web mux: the report is a
+// web tab's.
+func (s *Server) sessionFocusWriteWeb(w http.ResponseWriter, r *http.Request) {
+	s.focusWrite(w, r, true)
+}
+
+func (s *Server) focusWrite(w http.ResponseWriter, r *http.Request, web bool) {
 	var req FocusReport
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	req.Web = web
 	res, err := s.reportFocus(req)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

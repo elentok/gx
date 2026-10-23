@@ -69,7 +69,7 @@ func (s *Server) fireBanner(id string) {
 	delete(b.pending, id)
 	b.mu.Unlock()
 	afk, onScreen := s.afk.isOn(), s.focus.onScreen(id)
-	if s.sessionWatches.isStopped() || (onScreen && !afk) {
+	if s.sessionWatches.isStopped() || s.focus.webOnScreen(id) || (onScreen && !afk) {
 		return
 	}
 	_, m, res, err := s.sessionDir(id)

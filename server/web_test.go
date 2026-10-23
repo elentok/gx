@@ -193,7 +193,7 @@ func TestWeb_EverythingElseIs404(t *testing.T) {
 			pattern == "GET /v1/epics/detail" || pattern == "GET /v1/epics" ||
 			pattern == "GET /v1/sessions" || pattern == "GET /v1/sessions/chat" || pattern == "GET /v1/sessions/screen" ||
 			pattern == "POST /v1/tickets/answer" || pattern == "POST /v1/tickets/unpark" || pattern == "POST /v1/tickets/resume" || pattern == "POST /v1/agents/answer" ||
-			pattern == "POST /v1/sessions/stop" || pattern == "POST /v1/sessions/resume" || pattern == "POST /v1/designs/open" || pattern == "POST /v1/sessions/prompt" ||
+			pattern == "POST /v1/sessions/stop" || pattern == "POST /v1/sessions/resume" || pattern == "POST /v1/designs/open" || pattern == "POST /v1/sessions/prompt" || pattern == "POST /v1/sessions/focus" ||
 			pattern == "POST /v1/queue/add" || pattern == "POST /v1/epics/merge" {
 			continue
 		}
