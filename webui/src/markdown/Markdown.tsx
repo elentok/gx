@@ -2,6 +2,8 @@ import { Box, type BoxProps } from "@chakra-ui/react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+const inlineElements = ["strong", "em", "del", "code", "a"];
+
 const siblingTicketLink = /^(?:issues\/)?(\d+)-[^/]*\.md$/;
 
 function linkComponent(epic: string | undefined): Components["a"] {
@@ -22,15 +24,18 @@ function linkComponent(epic: string | undefined): Components["a"] {
 // Server text written in markdown, such as an epic summary or a ticket body. react-markdown builds
 // React elements and ignores raw HTML, so the text cannot inject markup. `epic` is the "project:epic"
 // address that sibling ticket links resolve against. `smallHeadings` shrinks its own `##` headings
-// below the page's section headings.
+// below the page's section headings. `inline` keeps only inline markup inside a span, for text that
+// sits in a button or a line, such as an option label.
 export function Markdown({
   children,
   epic,
   smallHeadings,
+  inline,
   ...box
-}: { children: string; epic?: string; smallHeadings?: boolean } & BoxProps) {
+}: { children: string; epic?: string; smallHeadings?: boolean; inline?: boolean } & BoxProps) {
   return (
     <Box
+      as={inline ? "span" : undefined}
       {...box}
       data-small-headings={smallHeadings ? "" : undefined}
       css={{
@@ -53,7 +58,12 @@ export function Markdown({
         },
       }}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: linkComponent(epic) }}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{ a: linkComponent(epic) }}
+        allowedElements={inline ? inlineElements : undefined}
+        unwrapDisallowed={inline}
+      >
         {children}
       </ReactMarkdown>
     </Box>

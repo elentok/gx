@@ -210,3 +210,20 @@ test("a stale refusal keeps every answer and note of the round", async () => {
   expect(screen.getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
   expect(box.value).toBe("keep");
 });
+
+test("question bodies and option labels render their markdown", async () => {
+  const card = askCard(1, {
+    body: "Keep **the old route**?\n\n- one\n- two",
+    options: [
+      { id: "a", label: "Use `designs/open`" },
+      { id: "b", label: "Beta" },
+    ],
+  });
+  render({ chat: chatOf({ round: [card] }) });
+  const s = await sheet();
+  expect(within(s).getByText("the old route").tagName).toBe("STRONG");
+  expect(within(s).getAllByRole("listitem")).toHaveLength(2);
+  const option = within(s).getByRole("button", { name: "Use designs/open" });
+  expect(within(option).getByText("designs/open").tagName).toBe("CODE");
+  expect(option.querySelector("p, div")).toBeNull();
+});

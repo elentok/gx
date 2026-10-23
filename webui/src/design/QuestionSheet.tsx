@@ -1,6 +1,7 @@
 import { Box, chakra, Text, Textarea } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import type { SessionRoundCard } from "../generated/server";
+import { Markdown } from "../markdown/Markdown";
 import { Button } from "../ui/button/Button";
 import { choicesOf, isAnswered, type Answer, type Answers } from "./round";
 
@@ -24,9 +25,9 @@ function Choice({ label, on, recommended, onClick }: { label: string; on: boolea
       cursor="pointer"
       onClick={onClick}
     >
-      <Text flex="1" fontSize="sm">
+      <Markdown inline flex="1" fontSize="sm">
         {label}
-      </Text>
+      </Markdown>
       {recommended && (
         <Text fontSize="xs" color={on ? "surface" : "tone.waiting.fg"}>
           ★ recommended
@@ -51,7 +52,7 @@ function Question({
   const text = card.kind === "text" || choicesOf(card).length === 0;
   return (
     <Box display="flex" flexDirection="column" gap="2">
-      <Text fontSize="md">{card.body}</Text>
+      <Markdown fontSize="md">{card.body}</Markdown>
       {text ? (
         <>
           {card.note && (
