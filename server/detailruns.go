@@ -65,93 +65,117 @@ type runSources struct {
 // claimed the ticket again for the live agent. A reclaim writes no run-log
 // line, so it never splits a run.
 func detailRuns(src runSources) []DetailRun {
-	runs := []DetailRun{}
-	open := false
-	// answeredAt is when the last pause was answered, until a run takes it up.
-	var answeredAt time.Time
-	begin := func(at time.Time, kind string) {
-		runs = append(runs, DetailRun{Start: at, StartKind: kind})
-		open = true
-		answeredAt = time.Time{}
-	}
-	end := func(at time.Time, outcome string) {
-		last := &runs[len(runs)-1]
-		last.Outcome = outcome
-		last.Duration = int(at.Sub(last.Start).Seconds())
-		open = false
-	}
+	b := runBuilder{runs: []DetailRun{}}
 	answers := src.answers
-	// noteAnswers takes in the answers up to until; only the first one after a
-	// pause counts.
-	noteAnswers := func(until func(time.Time) bool) {
-		for len(answers) > 0 && until(answers[0]) {
-			if !open && len(runs) > 0 && runs[len(runs)-1].Outcome == RunPaused && answeredAt.IsZero() {
-				answeredAt = answers[0]
-			}
+	for _, ev := range src.events {
+		// An answer at the same instant as an event comes first.
+		for len(answers) > 0 && !answers[0].After(ev.Time) {
+			b.answer(answers[0])
 			answers = answers[1:]
 		}
+		b.event(ev)
 	}
-	for _, ev := range src.events {
-		noteAnswers(func(at time.Time) bool { return !at.After(ev.Time) })
-		switch events.Type(ev.Type) {
-		case events.IterationStarted:
-			if open {
-				end(ev.Time, RunAgentLost)
-			}
-			kind := StartNewSession
-			if ev.Path == "resumed" {
-				kind = StartSameSession
-			}
-			begin(ev.Time, kind)
-		case events.ClaimReopened:
-			if open {
-				end(ev.Time, RunAgentGoneAfterRestart)
-			}
-			answeredAt = time.Time{}
-		case events.HumanRelaunch:
-			if open {
-				end(ev.Time, RunRelaunched)
-			}
-			answeredAt = time.Time{}
-		case events.LateFinishAdopted:
-			if !open {
-				begin(ev.Time, StartSameSession)
-			}
-		default:
-			outcome := runEnd(ev)
-			if outcome == "" {
-				continue
-			}
-			if !open && !answeredAt.IsZero() {
-				begin(answeredAt, StartSameSession)
-			}
-			if !open {
-				continue
-			}
-			end(ev.Time, outcome)
-			if outcome == RunPaused {
-				runs[len(runs)-1].PauseLabel = schema.PauseReason(ev.Kind).Label()
-			}
+	for _, at := range answers {
+		b.answer(at)
+	}
+	b.finish(src.ticket, src.statusWrittenAt)
+	return b.runs
+}
+
+// runBuilder folds events and pause answers, oldest first, into run lines.
+type runBuilder struct {
+	runs []DetailRun
+	open bool
+	// answeredAt is when the last pause was answered, until a run takes it up.
+	answeredAt time.Time
+}
+
+func (b *runBuilder) begin(at time.Time, kind string) {
+	b.runs = append(b.runs, DetailRun{Start: at, StartKind: kind})
+	b.open = true
+	b.answeredAt = time.Time{}
+}
+
+func (b *runBuilder) end(at time.Time, outcome string) {
+	last := &b.runs[len(b.runs)-1]
+	last.Outcome = outcome
+	last.Duration = int(at.Sub(last.Start).Seconds())
+	b.open = false
+}
+
+// reopen ends an open run with outcome and forgets a pending answer: the ticket
+// was put back in the queue, so the answer no longer starts a run.
+func (b *runBuilder) reopen(at time.Time, outcome string) {
+	if b.open {
+		b.end(at, outcome)
+	}
+	b.answeredAt = time.Time{}
+}
+
+// answer notes a pause answer; only the first one after a pause counts.
+func (b *runBuilder) answer(at time.Time) {
+	if !b.open && len(b.runs) > 0 && b.runs[len(b.runs)-1].Outcome == RunPaused && b.answeredAt.IsZero() {
+		b.answeredAt = at
+	}
+}
+
+func (b *runBuilder) event(ev ralphloop.Event) {
+	switch events.Type(ev.Type) {
+	case events.IterationStarted:
+		if b.open {
+			b.end(ev.Time, RunAgentLost)
+		}
+		kind := StartNewSession
+		if ev.Path == "resumed" {
+			kind = StartSameSession
+		}
+		b.begin(ev.Time, kind)
+	case events.ClaimReopened:
+		b.reopen(ev.Time, RunAgentGoneAfterRestart)
+	case events.HumanRelaunch:
+		b.reopen(ev.Time, RunRelaunched)
+	case events.LateFinishAdopted:
+		if !b.open {
+			b.begin(ev.Time, StartSameSession)
+		}
+	default:
+		outcome := runEnd(ev)
+		if outcome == "" {
+			return
+		}
+		if !b.open && !b.answeredAt.IsZero() {
+			b.begin(b.answeredAt, StartSameSession)
+		}
+		if !b.open {
+			return
+		}
+		b.end(ev.Time, outcome)
+		if outcome == RunPaused {
+			b.runs[len(b.runs)-1].PauseLabel = schema.PauseReason(ev.Kind).Label()
 		}
 	}
-	// An answer after the last run-log event claimed the ticket again only if
-	// the claim is newer than the answer.
-	noteAnswers(func(time.Time) bool { return true })
-	if !open && !answeredAt.IsZero() && !src.ticket.ClaimedAt.Before(answeredAt) &&
-		(src.ticket.Status == schema.StatusClaimed || src.ticket.Status == schema.StatusCancelled) {
-		begin(answeredAt, StartSameSession)
+}
+
+// finish settles the last run from the ticket as stored. An answer after the
+// last run-log event claimed the ticket again only if the claim is newer than
+// the answer. cancelledAt is when a cancelled ticket's status was written.
+func (b *runBuilder) finish(t schema.Ticket, cancelledAt time.Time) {
+	if !b.open && !b.answeredAt.IsZero() && !t.ClaimedAt.Before(b.answeredAt) &&
+		(t.Status == schema.StatusClaimed || t.Status == schema.StatusCancelled) {
+		b.begin(b.answeredAt, StartSameSession)
 	}
-	if open {
-		switch src.ticket.Status {
-		case schema.StatusCancelled:
-			end(src.statusWrittenAt, RunCancelled)
-		case schema.StatusClaimed:
-			runs[len(runs)-1].Outcome = RunRunning
-		default:
-			runs[len(runs)-1].Outcome = RunAgentLost
-		}
+	if !b.open {
+		return
 	}
-	return runs
+	last := &b.runs[len(b.runs)-1]
+	switch t.Status {
+	case schema.StatusCancelled:
+		b.end(cancelledAt, RunCancelled)
+	case schema.StatusClaimed:
+		last.Outcome = RunRunning
+	default:
+		last.Outcome = RunAgentLost
+	}
 }
 
 // runEnd is the outcome an event ends a run with, or "" for an event that does not.
@@ -170,21 +194,26 @@ func runEnd(ev ralphloop.Event) string {
 }
 
 // ticketRuns reads the ticket's run lines from its epic's run log.
-func (s *Server) ticketRuns(ref ticketRef, t schema.Ticket, log []tickets.LogEvent) ([]DetailRun, error) {
+func (s *Server) ticketRuns(ref ticketRef, t schema.Ticket, log []tickets.LogEvent, statusWrittenAt time.Time) ([]DetailRun, error) {
 	evs, err := s.readHistory(ref.addr)
 	if err != nil {
 		return nil, err
 	}
-	src := runSources{events: evs, ticket: t}
+	src := runSources{events: evs, ticket: t, statusWrittenAt: statusWrittenAt}
 	for _, ev := range log {
 		if ev.Type == tickets.EventPauseAnswer {
 			src.answers = append(src.answers, ev.TS)
 		}
 	}
-	if t.Status == schema.StatusCancelled {
-		if fi, err := os.Stat(ref.ticket.Path); err == nil {
-			src.statusWrittenAt = fi.ModTime()
-		}
-	}
 	return detailRuns(src), nil
+}
+
+// ticketWrittenAt is when the ticket file was last written, or zero if it
+// cannot be read.
+func ticketWrittenAt(path string) time.Time {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return time.Time{}
+	}
+	return fi.ModTime()
 }

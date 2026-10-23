@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/tickets"
@@ -157,23 +158,15 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	if err != nil {
 		return TicketDetail{}, err
 	}
-	d := TicketDetail{
-		Address: ref.addr.String(), Title: ref.ticket.Title, Status: string(storedStatus(t)), PauseReason: string(t.PauseReason),
-		Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{}, Runs: []DetailRun{},
-		PauseLabel: t.PauseReason.Label(), Type: ref.ticket.Type, Epic: rootOf(ref.addr).String(),
-		MapEpic: ref.epic.IsMap, Body: ref.ticket.Body,
-	}
-	if ref.epic.RenderedStatus(ref.ticket) == tickets.StatusError {
-		d.Status = tickets.StatusError.Word()
-		d.ErrorReason = tickets.PauseDetail(ref.epic, ref.ticket)
-		d.Path = ref.ticket.Path
-	}
-	if t.PausedClass() != "" {
-		d.PauseText = schema.Section(ref.ticket.Body, "Paused")
-	}
+	d := newTicketDetail(ref)
+	fillHeader(&d, ref, t)
 	if !ref.epic.IsMap {
 		d.Stats = s.detailStats(ref)
-		if d.Runs, err = s.ticketRuns(ref, t, evs); err != nil {
+		var writtenAt time.Time
+		if t.Status == schema.StatusCancelled {
+			writtenAt = ticketWrittenAt(ref.ticket.Path)
+		}
+		if d.Runs, err = s.ticketRuns(ref, t, evs, writtenAt); err != nil {
 			return TicketDetail{}, err
 		}
 	}
@@ -217,11 +210,38 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 // brokenDetail is the small payload of a file that fails to parse: nothing the
 // body or the log could add.
 func brokenDetail(ref ticketRef, parseErr error) TicketDetail {
+	d := newTicketDetail(ref)
+	d.Status = tickets.StatusError.Word()
+	d.ErrorReason = "ticket file format is invalid"
+	d.ParseError = parseErr.Error()
+	d.Path = ref.ticket.Path
+	return d
+}
+
+// newTicketDetail is the payload every ticket starts from: what the address
+// alone gives, with every list empty rather than null.
+func newTicketDetail(ref ticketRef) TicketDetail {
 	return TicketDetail{
-		Address: ref.addr.String(), Title: ref.ticket.Title, Status: tickets.StatusError.Word(),
-		Epic: rootOf(ref.addr).String(), MapEpic: ref.epic.IsMap,
-		ErrorReason: "ticket file format is invalid", ParseError: parseErr.Error(), Path: ref.ticket.Path,
+		Address: ref.addr.String(), Title: ref.ticket.Title, Epic: rootOf(ref.addr).String(), MapEpic: ref.epic.IsMap,
 		Related: []RelatedTicket{}, Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{}, Runs: []DetailRun{},
+	}
+}
+
+// fillHeader sets the fields of a ticket that parsed: its status, pause, body
+// and, for an Error ticket, the reason.
+func fillHeader(d *TicketDetail, ref ticketRef, t schema.Ticket) {
+	d.Status = string(storedStatus(t))
+	d.PauseReason = string(t.PauseReason)
+	d.PauseLabel = t.PauseReason.Label()
+	d.Type = ref.ticket.Type
+	d.Body = ref.ticket.Body
+	if ref.epic.RenderedStatus(ref.ticket) == tickets.StatusError {
+		d.Status = tickets.StatusError.Word()
+		d.ErrorReason = tickets.PauseDetail(ref.epic, ref.ticket)
+		d.Path = ref.ticket.Path
+	}
+	if t.PausedClass() != "" {
+		d.PauseText = schema.Section(ref.ticket.Body, "Paused")
 	}
 }
 
