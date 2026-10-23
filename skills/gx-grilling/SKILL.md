@@ -9,17 +9,34 @@ Work the tree in **rounds**. The **frontier** is every decision whose prerequisi
 
 Format a round like so:
 
-```
+````
 ❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
 
 ➡️ <your recommended answer>
+
+```gx-question
+type: yes-no
+recommended: yes
+```
 
 ---
 
 ❓ **Q2** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
 
 ➡️ <your recommended answer>
+
+```gx-question
+type: options
+recommended: b
+options:
+  - id: a
+    label: <first alternative>
+  - id: b
+    label: <second alternative>
 ```
+````
+
+Every question carries a `gx-question` block (the `gx tickets ask` YAML), after the `➡️` line and before `---`. The format is defined in [gx-local-tracker.md](../gx-local-tracker.md) "The question block". Most questions are `yes-no` with `recommended: yes`. Use `options` only for real alternatives.
 
 Word each question so "yes" accepts your recommended answer.
 

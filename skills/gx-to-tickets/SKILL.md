@@ -222,8 +222,8 @@ tickets exist:
 gx tickets epic add <project:epic> --kind loop --status draft
 ```
 
-Skip this when publishing into an epic that already exists. Once every ticket below is written and
-validated, open the epic with `gx tickets set <project:epic> --status open`.
+Skip this when publishing into an epic that already exists. Opening the epic is the very last step,
+after the Summary and `ensure-code-review` (see the end of this step).
 
 Create one ticket per call (see [gx-local-tracker.md](../gx-local-tracker.md)), in dependency order
 (blockers first); it allocates the ID and prints the ticket's address:
@@ -275,6 +275,10 @@ If the breakdown appends a trailing `type: code-review` ticket, run
 `gx tickets ensure-code-review <epic-slug>` instead of publishing it by hand — it's a no-op if the
 epic already has a code-review ticket among its published issues, else it stamps out the stub. Skip
 running it only if the user has explicitly asked for a second code-review ticket.
+
+Last, once every ticket is written and validated, the Summary is written and `ensure-code-review`
+has run, open the epic you created as a draft: `gx tickets set <project:epic>-impl --status open`.
+Nothing comes after this call.
 
 <ticket-template>
 
