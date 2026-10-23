@@ -16,7 +16,12 @@ func newOSAScript(run Runner) osascript {
 	return osascript{run: run}
 }
 
-// Notify ignores Group, Execute and Activate: osascript has no click action.
+// Notify ignores Group, Execute and Activate: osascript has no click action,
+// so a Link goes in the body.
 func (n osascript) Notify(ctx context.Context, note Notification) error {
-	return runWithTimeout(ctx, n.run, "osascript", "-e", osascriptSource, note.Title, note.Body)
+	body := note.Body
+	if note.Link != "" {
+		body += "\n" + note.Link
+	}
+	return runWithTimeout(ctx, n.run, "osascript", "-e", osascriptSource, note.Title, body)
 }

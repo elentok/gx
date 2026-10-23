@@ -69,6 +69,8 @@ func (p *chatPoll) run(stop <-chan struct{}, done chan<- struct{}) {
 			return
 		case <-ticker.C:
 		}
+		// A stall is only time passing, so no status change reports it.
+		p.s.noteFailure(p.id)
 		if path == "" {
 			path = p.transcript()
 		}

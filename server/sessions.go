@@ -727,6 +727,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 				return changed
 			})
 			first.noteState(st.State)
+			s.noteFailure(id)
 			chat.setActive(st.State == SessionStarting || st.State == SessionWorking)
 			if design.Conversation != "" {
 				s.detectDesignActionable(dir, id, design)

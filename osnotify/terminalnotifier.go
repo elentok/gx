@@ -13,9 +13,14 @@ func newTerminalNotifier(path string, run Runner) terminalNotifier {
 
 func (n terminalNotifier) Notify(ctx context.Context, note Notification) error {
 	args := []string{"-title", note.Title, "-message", note.Body}
+	link := note.Link
+	if note.Execute != "" {
+		link = ""
+	}
 	for _, opt := range []struct{ flag, value string }{
 		{"-group", note.Group},
 		{"-execute", note.Execute},
+		{"-open", link},
 		{"-activate", note.Activate},
 	} {
 		if opt.value != "" {

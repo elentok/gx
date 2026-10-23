@@ -52,6 +52,12 @@ func TestTerminalNotifier_Argv(t *testing.T) {
 		{"empty optional fields", Notification{Title: "gx title", Body: quotedBody}, []string{
 			"-title", "gx title", "-message", quotedBody,
 		}},
+		{"link opens on click", Notification{Title: "gx title", Body: quotedBody, Link: "http://x/#/d/p:e"}, []string{
+			"-title", "gx title", "-message", quotedBody, "-open", "http://x/#/d/p:e",
+		}},
+		{"execute wins over the link", Notification{Title: "gx title", Body: quotedBody, Execute: "gx agent focus a", Link: "http://x/#/d/p:e"}, []string{
+			"-title", "gx title", "-message", quotedBody, "-execute", "gx agent focus a",
+		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -75,6 +81,19 @@ func TestOSAScript_Argv(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []call{{"osascript", []string{"-e", osascriptSource, "gx title", quotedBody}}}
+	if !reflect.DeepEqual(r.calls, want) {
+		t.Fatalf("calls = %#v, want %#v", r.calls, want)
+	}
+}
+
+func TestOSAScript_PutsTheLinkInTheBody(t *testing.T) {
+	r := &fakeRunner{}
+	missing := func(string) (string, error) { return "", exec.ErrNotFound }
+	note := Notification{Title: "gx title", Body: "Done", Link: "http://x/#/d/p:e"}
+	if err := Select("darwin", missing, r.run).Notify(context.Background(), note); err != nil {
+		t.Fatal(err)
+	}
+	want := []call{{"osascript", []string{"-e", osascriptSource, "gx title", "Done\nhttp://x/#/d/p:e"}}}
 	if !reflect.DeepEqual(r.calls, want) {
 		t.Fatalf("calls = %#v, want %#v", r.calls, want)
 	}

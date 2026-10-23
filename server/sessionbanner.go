@@ -24,6 +24,8 @@ var termBundleIDs = map[string]string{
 type sessionBanners struct {
 	mu      sync.Mutex
 	pending map[string]*bannerTrigger
+	// failing is the failure kind each failing session last raised a banner for.
+	failing map[string]string
 }
 
 type bannerTrigger struct {
@@ -62,6 +64,56 @@ func (s *Server) triggerBanner(id string, snd sound.Name, reason string) {
 	})
 }
 
+// noteFailure triggers a banner when the session's failure is a new kind, and
+// forgets it once the failure clears so a later one banners again. Auth and
+// stalled come from the transcript, not the status, so they carry their label
+// as the reason; a status failure already has its banner text.
+func (s *Server) noteFailure(id string) {
+	_, m, res, err := s.sessionDir(id)
+	if res.Refused || err != nil {
+		return
+	}
+	f := s.sessionInfo(m).Failure
+	kind := ""
+	if f != nil {
+		kind = f.Kind
+	}
+	b := &s.sessionBanners
+	b.mu.Lock()
+	prev := b.failing[id]
+	if kind == "" {
+		delete(b.failing, id)
+	} else {
+		if b.failing == nil {
+			b.failing = map[string]string{}
+		}
+		b.failing[id] = kind
+	}
+	b.mu.Unlock()
+	if kind == "" || kind == prev {
+		return
+	}
+	reason := ""
+	if kind == FailureKindAuth || kind == FailureKindStalled {
+		reason = f.Label
+	}
+	s.triggerBanner(id, sound.Attention, reason)
+}
+
+// designLink is the Design page of a Design session, without the token; empty
+// when the web listener is off or the session is not a Design.
+func (s *Server) designLink(m sessionMeta) string {
+	base := s.WebURL()
+	if base == "" || !m.Design || m.Ticket == "" {
+		return ""
+	}
+	addr, err := parseQueuedAddress(m.Ticket)
+	if err != nil {
+		return ""
+	}
+	return base + "/#/d/" + rootOf(addr).String()
+}
+
 func (s *Server) fireBanner(id string) {
 	b := &s.sessionBanners
 	b.mu.Lock()
@@ -77,23 +129,28 @@ func (s *Server) fireBanner(id string) {
 		return
 	}
 	info := m.info()
-	if quiet := info.Status.State == SessionWorking || info.Status.State == SessionStarting; quiet && m.Actionable.Reason == "" {
+	if quiet := info.Status.State == SessionWorking || info.Status.State == SessionStarting; quiet && m.Actionable.Reason == "" && t.reason == "" {
 		return
 	}
 	title, body := bannerTitle(info), t.reason
 	if body == "" {
 		body = sessionStatusText(info)
 	}
+	link := s.designLink(m)
 	// AFK adds chat without the focus check; the banner and sound keep theirs.
 	if afk {
-		s.chat.SessionAlert(info.Project, s.chatOverride(info.Project), title, body)
+		chatBody := body
+		if link != "" {
+			chatBody += "\n" + link
+		}
+		s.chat.SessionAlert(info.Project, s.chatOverride(info.Project), title, chatBody)
 	}
 	if onScreen {
 		return
 	}
 	set := s.settings.Load()
 	if set.AgentsBanners {
-		s.sendSessionBanner(info, title, body)
+		s.sendSessionBanner(info, title, body, link)
 	}
 	if set.AgentsSounds.Enabled {
 		s.sessionWatches.start(func() { s.cfg.Player.Play(context.Background(), set.AgentsSounds, t.sound) })
@@ -102,13 +159,14 @@ func (s *Server) fireBanner(id string) {
 
 func bannerTitle(info SessionInfo) string { return info.Project + " · " + info.Name }
 
-func (s *Server) sendSessionBanner(info SessionInfo, title, body string) {
+func (s *Server) sendSessionBanner(info SessionInfo, title, body, link string) {
 	term, connected := s.focus.clickTarget()
 	note := osnotify.Notification{
 		Title:    title,
 		Body:     body,
 		Group:    "gx-agent-" + info.ID,
 		Activate: termBundleIDs[term],
+		Link:     link,
 	}
 	if connected {
 		note.Execute = "gx agents focus " + info.ID

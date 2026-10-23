@@ -14,12 +14,15 @@ import (
 
 // Notification is one banner. Banners sharing a Group replace each other.
 // Execute is a shell command run on click; Activate is the bundle ID of the
-// app brought to the front on click. Empty fields are left out.
+// app brought to the front on click. Link is a URL: a notifier that can open
+// one does so on click unless Execute is set, and one that cannot puts it in
+// the body. Empty fields are left out.
 type Notification struct {
 	Title, Body string
 	Group       string
 	Execute     string
 	Activate    string
+	Link        string
 }
 
 // Notifier shows a banner.
