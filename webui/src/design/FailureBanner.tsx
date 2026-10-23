@@ -1,0 +1,118 @@
+import { Box, Text } from "@chakra-ui/react";
+import { useState } from "react";
+import type { SessionFailure } from "../generated/server";
+import { ReasonStale } from "../ticket/answer";
+import { Button } from "../ui/button/Button";
+import { postPrompt, type PostPrompt } from "./prompt";
+
+// The generated file is imported for types only: its tygo constants are not runtime values.
+const CRASHED = "crashed";
+const ENDED = "ended";
+const AUTH = "auth";
+const STALLED = "stalled";
+const BLOCKED = "blocked";
+
+/** Crashed and ended sessions are gone: the banner takes the composer's place. */
+export const replacesComposer = (f?: SessionFailure) => f?.kind === CRASHED || f?.kind === ENDED;
+
+/** A finished Design ends its session on purpose, so only the other failures still show. */
+export const visibleFailure = (f?: SessionFailure, done?: boolean) => (done && f?.kind === ENDED ? undefined : f);
+
+/** Auth and stalled are read from the transcript, which only Claude sessions have. */
+export const needsTranscript = (f: SessionFailure) => f.kind === AUTH || f.kind === STALLED;
+
+type ButtonName = "Restore" | "New session" | "Screen" | "Retry";
+
+const BUTTONS: Record<string, ButtonName[]> = {
+  [CRASHED]: ["Restore", "New session"],
+  [ENDED]: ["Restore", "New session"],
+  [AUTH]: ["Retry"],
+  [STALLED]: ["Screen", "New session"],
+  [BLOCKED]: ["Screen"],
+};
+
+export interface FailureActions {
+  // Restore and Screen are wired by the Restore and Screen-modal ticket; until then they do nothing.
+  onRestore?: () => void;
+  onScreen?: () => void;
+  onNewSession?: () => void;
+}
+
+/** Why the session needs the person, with a button named after what they do about it. */
+export function FailureBanner({
+  failure,
+  sessionId,
+  lastMessage,
+  post = postPrompt,
+  onStale,
+  ...actions
+}: {
+  failure: SessionFailure;
+  sessionId: string;
+  /** The id of the last chat message the page saw, for Retry's stale guard. */
+  lastMessage?: string;
+  post?: PostPrompt;
+  onStale?: () => void;
+} & FailureActions) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+
+  const retry = async () => {
+    setPending(true);
+    setError("");
+    try {
+      const res = await post({ id: sessionId, text: "continue", last_message: lastMessage });
+      if (res.refused) {
+        setError(res.message ?? "The message was refused.");
+        if (res.reason === ReasonStale) onStale?.();
+      }
+    } catch {
+      setError("Could not send. Try again.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const onClick: Record<ButtonName, () => void> = {
+    Restore: () => actions.onRestore?.(),
+    "New session": () => actions.onNewSession?.(),
+    Screen: () => actions.onScreen?.(),
+    Retry: retry,
+  };
+  const buttons = BUTTONS[failure.kind] ?? [];
+
+  return (
+    <Box
+      role="region"
+      aria-label="Session failure"
+      data-kind={failure.kind}
+      borderWidth="1px"
+      borderColor="tone.deadlocked.fg"
+      borderRadius="md"
+      p="3"
+      display="flex"
+      flexDirection="column"
+      gap="2"
+    >
+      <Text fontWeight="700" color="tone.deadlocked.fg">
+        {failure.label}
+      </Text>
+      {failure.text && <Text fontSize="sm">{failure.text}</Text>}
+      {failure.kind === BLOCKED && (
+        <Text fontSize="sm" color="text.muted">
+          Open it in gx, Agents tab.
+        </Text>
+      )}
+      {error && <Text role="alert">{error}</Text>}
+      {buttons.length > 0 && (
+        <Box display="flex" gap="2">
+          {buttons.map((name) => (
+            <Button key={name} variant="outline" disabled={pending} onClick={onClick[name]}>
+              {name}
+            </Button>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}

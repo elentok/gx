@@ -178,6 +178,7 @@ function DesignColumns({
   const { detail } = useEpicDetail(address, conn, fetchDetail);
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   const [selected, setSelected] = useState<string>();
+  const done = detail?.steps?.some((s) => s.step === "done" && s.state === "done");
   const live = liveSessions(address, sessions);
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session = live.find((s) => s.id === selected) ?? designSession(address, sessions);
@@ -200,7 +201,7 @@ function DesignColumns({
             <StartDesignButton address={address} open={open} />
           </Box>
         )}
-        <DesignChat session={session} fetchChat={fetchChat} post={post} />
+        <DesignChat session={session} fetchChat={fetchChat} post={post} done={done} actions={{ onNewSession }} />
       </Box>
       {/* On a phone Progress sits right under the picker, above the chat. */}
       <Box aria-label="Progress" role="region" gridRow={{ base: 2, lg: "auto" }}>

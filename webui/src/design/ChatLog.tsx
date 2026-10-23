@@ -5,6 +5,7 @@ import type { SessionBackgroundTask, SessionChatMessage, SessionChatResponse, Se
 import { Markdown } from "../markdown/Markdown";
 import { useSessionChat, type FetchChat } from "./chat";
 import { Composer } from "./Composer";
+import { FailureBanner, needsTranscript, replacesComposer, visibleFailure, type FailureActions } from "./FailureBanner";
 import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
 import type { Answers } from "./round";
@@ -78,29 +79,46 @@ function ChatTail({
   connected,
   post,
   onStale,
+  done,
+  actions,
 }: {
   session: SessionInfo;
   chat: SessionChatResponse;
   connected: boolean;
   post?: PostPrompt;
   onStale: () => void;
+  done?: boolean;
+  actions: FailureActions;
 }) {
   const [answers, setAnswers] = useState<Answers>({});
   const [focus, setFocus] = useState<{ index: number }>();
+  const failure = visibleFailure(session.failure, done);
   return (
     <>
       {chat.round.length > 0 && <QuestionSheet round={chat.round} answers={answers} onAnswers={setAnswers} focus={focus} />}
-      <Composer
-        session={session}
-        lastMessage={chat.messages.at(-1)?.id}
-        next={chat.next}
-        connected={connected}
-        post={post}
-        onStale={onStale}
-        round={chat.round}
-        answers={answers}
-        onReview={(index) => setFocus({ index })}
-      />
+      {failure && (
+        <FailureBanner
+          failure={failure}
+          sessionId={session.id}
+          lastMessage={chat.messages.at(-1)?.id}
+          post={post}
+          onStale={onStale}
+          {...actions}
+        />
+      )}
+      {!done && !replacesComposer(failure) && (
+        <Composer
+          session={session}
+          lastMessage={chat.messages.at(-1)?.id}
+          next={chat.next}
+          connected={connected}
+          post={post}
+          onStale={onStale}
+          round={chat.round}
+          answers={answers}
+          onReview={(index) => setFocus({ index })}
+        />
+      )}
     </>
   );
 }
@@ -110,10 +128,14 @@ function ChatLog({
   session,
   fetchChat,
   post,
+  done,
+  actions,
 }: {
   session: SessionInfo;
   fetchChat?: FetchChat;
   post?: PostPrompt;
+  done?: boolean;
+  actions: FailureActions;
 }) {
   const conn = useConnectionContext();
   const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
@@ -138,6 +160,8 @@ function ChatLog({
         connected={connected}
         post={post}
         onStale={refetch}
+        done={done}
+        actions={actions}
       />
     </Box>
   );
@@ -148,18 +172,27 @@ export function DesignChat({
   session,
   fetchChat,
   post,
+  done,
+  actions = {},
 }: {
   session?: SessionInfo;
   fetchChat?: FetchChat;
   post?: PostPrompt;
+  /** The Design's Progress is Done: no composer, no `ended` banner. */
+  done?: boolean;
+  actions?: FailureActions;
 }) {
   if (!session) return null;
   if (session.harness !== "claude") {
+    const failure = visibleFailure(session.failure, done);
     return (
-      <Text color="text.muted" fontSize="sm">
-        Chat works for Claude sessions only. Open it in gx, Agents tab.
-      </Text>
+      <>
+        {failure && !needsTranscript(failure) && <FailureBanner failure={failure} sessionId={session.id} {...actions} />}
+        <Text color="text.muted" fontSize="sm">
+          Chat works for Claude sessions only. Open it in gx, Agents tab.
+        </Text>
+      </>
     );
   }
-  return <ChatLog key={session.id} session={session} fetchChat={fetchChat} post={post} />;
+  return <ChatLog key={session.id} session={session} fetchChat={fetchChat} post={post} done={done} actions={actions} />;
 }
