@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -88,19 +89,23 @@ func TestStop_LeavesALiveAgentRunningAndUnmerged(t *testing.T) {
 		closed <- struct{}{}
 		return map[string]any{}, herdrfake.Identities{}, nil
 	})
-	// The agent keeps working: its second wait (the finish wait) blocks until
-	// the test ends. A cleanup, not a defer, so the release merges before the
-	// harness waits for the run to settle.
+	// The agent keeps working: its finish wait, the first wait after the launch
+	// prompt's wait for "working", blocks until the test ends. Counting waits
+	// instead would also catch the start's own wait, which can repeat, and hang
+	// Stop on the launch. A cleanup, not a defer, so the release merges before
+	// the harness waits for the run to settle; the timeout turns a miss into a
+	// failure, not a hang.
 	block := make(chan struct{})
 	t.Cleanup(func() { close(block) })
-	waits := 0
+	var prompted atomic.Bool
 	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		// A wait for "working" is the launch prompt's, not the finish wait.
-		if !slices.Contains(argv, "working") {
-			waits++
-		}
-		if waits > 1 {
-			<-block
+		if slices.Contains(argv, "working") {
+			prompted.Store(true)
+		} else if prompted.Load() {
+			select {
+			case <-block:
+			case <-time.After(30 * time.Second):
+			}
 		}
 		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
