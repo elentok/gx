@@ -1,15 +1,14 @@
-import { Box, Heading, Text } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { MergeButton, isMergeable } from "../epics/MergeButton";
 import { QueueButton } from "../epics/QueueButton";
-import { BackLink } from "../nav/BackLink";
-import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { Markdown } from "../markdown/Markdown";
+import { DetailPage } from "../page/DetailPage";
+import { PageHeader } from "../page/PageHeader";
+import { StatLine } from "../page/StatLine";
 import { EmptyState } from "../ui/empty-state/EmptyState";
-import { PageContainer } from "../ui/PageContainer";
 import { Spinner } from "../ui/spinner/Spinner";
-import { Strip } from "../ui/strip/Strip";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail";
@@ -25,7 +24,7 @@ import {
   nestLive,
   rowContext,
   segmentsOf,
-  statSentence,
+  statValues,
   toneOf,
 } from "./rows";
 
@@ -44,9 +43,7 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
       <Box mt="4">
         <SegmentedBar segments={segmentsOf(detail.rows)} value={detail.done} label="Epic progress" />
       </Box>
-      <Text mt="2" fontSize="sm" color="text.muted">
-        {statSentence({ ...detail, wall_clock: wallClock })}
-      </Text>
+      <StatLine values={statValues({ ...detail, wall_clock: wallClock })} />
       {folded.length > 0 && (
         <Box as="details" mt="4">
           <Box as="summary" color="tone.done.fg">
@@ -91,23 +88,18 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
 
 export function EpicPage({ address, fetchDetail }: { address: string; fetchDetail?: FetchEpicDetail }) {
   const conn = useConnectionContext();
-  const { connected } = useConnectionState(conn);
+  // Subscribing re-renders the page every tick, which keeps the running clocks counting.
+  useConnectionState(conn);
   const { detail, notFound, refetch } = useEpicDetail(address, conn, fetchDetail);
 
   return (
-    <Box>
-      {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
-      <PageContainer>
-        <ConnectedTopBar />
-        <BackLink to="/q" label="← Queue" />
-        {notFound ? (
-          <EmptyState title="Epic not found">{address} does not exist.</EmptyState>
-        ) : detail ? (
-          <Box mt="4">
-            {/* The payload has no name field: the epic name is the address after the project. */}
-            <Heading as="h1" fontFamily="condensed" fontSize="2xl">
-              {address.slice(address.indexOf(":") + 1)}
-            </Heading>
+    <DetailPage>
+      {notFound ? (
+        <EmptyState title="Epic not found">{address} does not exist.</EmptyState>
+      ) : detail ? (
+        <>
+          {/* The payload has no name field: the epic name is the address after the project. */}
+          <PageHeader backTo="/q" backLabel="← Queue" title={address.slice(address.indexOf(":") + 1)}>
             {detail.state === "paused" && detail.land_block_reason && (
               <Text data-reason mt="2" fontSize="sm" color="text.muted">
                 {detail.land_block_reason}
@@ -124,18 +116,18 @@ export function EpicPage({ address, fetchDetail }: { address: string; fetchDetai
               </Box>
             )}
             {detail.summary && <Markdown mt="2">{detail.summary}</Markdown>}
-            {detail.total === 0 ? (
-              <Text mt="4" color="text.muted">
-                No tickets yet
-              </Text>
-            ) : (
-              <EpicBody detail={detail} now={Date.now()} />
-            )}
-          </Box>
-        ) : (
-          <Spinner label="Loading epic" />
-        )}
-      </PageContainer>
-    </Box>
+          </PageHeader>
+          {detail.total === 0 ? (
+            <Text mt="4" color="text.muted">
+              No tickets yet
+            </Text>
+          ) : (
+            <EpicBody detail={detail} now={Date.now()} />
+          )}
+        </>
+      ) : (
+        <Spinner label="Loading epic" />
+      )}
+    </DetailPage>
   );
 }

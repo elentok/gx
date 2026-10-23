@@ -1,15 +1,14 @@
-import { Box, Heading, Input, Link, Text } from "@chakra-ui/react";
+import { Box, Input, Link, Text } from "@chakra-ui/react";
 import { Fragment, useState } from "react";
-import { useConnectionContext, useConnectionState } from "../connection";
+import { useConnectionContext } from "../connection";
 import type { EpicListRow, FollowUpCount } from "../generated/server";
-import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { Arc } from "../ui/arc/Arc";
 import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
+import { DetailPage } from "../page/DetailPage";
+import { SectionHeading } from "../page/SectionHeading";
 import { EmptyState } from "../ui/empty-state/EmptyState";
-import { PageContainer } from "../ui/PageContainer";
 import { Spinner } from "../ui/spinner/Spinner";
-import { Strip } from "../ui/strip/Strip";
 import { useEpicList, type FetchEpicList } from "./list";
 import { QueueButton } from "./QueueButton";
 import { searchEpics, sectionsOf, stateBadge, timePart } from "./view";
@@ -94,7 +93,6 @@ function FollowUps({ counts }: { counts: FollowUpCount[] }) {
 
 export function EpicsPage({ fetchList }: { fetchList?: FetchEpicList }) {
   const conn = useConnectionContext();
-  const { connected } = useConnectionState(conn);
   const { list, failed, retry } = useEpicList(fetchList, conn);
   const [query, setQuery] = useState("");
   const now = new Date();
@@ -102,10 +100,7 @@ export function EpicsPage({ fetchList }: { fetchList?: FetchEpicList }) {
   const sections = list ? sectionsOf(list.epics) : [];
 
   return (
-    <Box>
-      {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
-      <PageContainer>
-        <ConnectedTopBar active="epics" />
+    <DetailPage active="epics">
         <Box display="flex" alignItems="center" gap="4" mt="4">
           <Input
             type="search"
@@ -139,16 +134,15 @@ export function EpicsPage({ fetchList }: { fetchList?: FetchEpicList }) {
         ) : (
           sections.map((s) => (
             <Box key={s.key} mt="6" aria-labelledby={`epics-${s.key}`} role="region">
-              <Heading as="h2" id={`epics-${s.key}`} mb="2">
-                <Badge tone={s.tone}>{s.title}</Badge>
-              </Heading>
+              <SectionHeading id={`epics-${s.key}`} tone={s.tone}>
+                {s.title}
+              </SectionHeading>
               {s.rows.map((r) => (
                 <EpicRow key={r.address} row={r} now={now} onQueued={retry} />
               ))}
             </Box>
           ))
         )}
-      </PageContainer>
-    </Box>
+    </DetailPage>
   );
 }

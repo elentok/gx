@@ -1,12 +1,10 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { useConnectionContext, useConnectionState } from "../connection";
+import { useConnectionContext } from "../connection";
 import { BackLink } from "../nav/BackLink";
-import { ConnectedTopBar } from "../nav/ConnectedTopBar";
+import { DetailPage } from "../page/DetailPage";
 import { EmptyState } from "../ui/empty-state/EmptyState";
-import { PageContainer } from "../ui/PageContainer";
 import { Spinner } from "../ui/spinner/Spinner";
-import { Strip } from "../ui/strip/Strip";
 import type { Sent } from "./answer";
 import { AnswerForm } from "./AnswerForm";
 import { AnswerResult } from "./AnswerResult";
@@ -17,7 +15,6 @@ import { ResumeForm } from "./ResumeForm";
 
 export function TicketPage({ address, fetchDetail }: { address: string; fetchDetail?: FetchDetail }) {
   const conn = useConnectionContext();
-  const { connected } = useConnectionState(conn);
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
   const [sent, setSent] = useState<Sent | null>(null);
   const [resumed, setResumed] = useState("");
@@ -25,10 +22,7 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
   const epicAddress = address.slice(0, address.lastIndexOf("/"));
 
   return (
-    <Box>
-      {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
-      <PageContainer>
-        <ConnectedTopBar />
+    <DetailPage>
         <BackLink to={`/e/${epicAddress}`} label={`← ${epicAddress.slice(epicAddress.indexOf(":") + 1)}`} />
         {notFound ? (
           <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
@@ -62,7 +56,6 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
         ) : (
           <Spinner label="Loading ticket" />
         )}
-      </PageContainer>
-    </Box>
+    </DetailPage>
   );
 }

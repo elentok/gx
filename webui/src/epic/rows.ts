@@ -65,18 +65,16 @@ export const formatCost = (dollars: number) => `$${dollars.toFixed(2)}`;
 // A Waiting epic that holds no queue item is not waiting for a slot.
 const stateLabel = (d: EpicDetail) => (d.state === "waiting" && !d.queued ? "Not queued" : d.state && epicBadge(d.state));
 
-export function statSentence(d: EpicDetail): string {
+export function statValues(d: EpicDetail): string[] {
   const done = `${d.done} of ${d.total} done`;
-  if (d.kind === "map") return done;
+  if (d.kind === "map") return [done];
   return [
     stateLabel(d),
     done,
     d.wall_clock !== undefined && `took ${formatDuration(d.wall_clock)}`,
     formatCost(d.cost_total),
     `${formatDuration(d.agent_time)} of agent time`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  ].filter((v): v is string => !!v);
 }
 
 export const idOf = (address: string) => address.slice(address.lastIndexOf("/") + 1);

@@ -16,9 +16,10 @@ export function Arc({ tone = "running", label }: { tone?: Tone; label: string })
       verticalAlign="middle"
       borderRadius="full"
       borderWidth="2px"
-      borderColor={`tone.${tone}.bg`}
+      borderColor="transparent"
       borderTopColor={`tone.${tone}.fg`}
-      animation="spin 1.6s linear infinite"
+      borderRightColor={`tone.${tone}.fg`}
+      animation="spin 1.05s linear infinite"
       _motionReduce={{ animation: "none" }}
     />
   );
