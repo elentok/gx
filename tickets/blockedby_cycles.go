@@ -146,21 +146,31 @@ func (g *projectGraph) archivedOriginal(addr Address) (string, bool) {
 	return "", false
 }
 
+// BlockedByEpicRef parses a blocked_by token that names a whole epic ("epic"
+// or "project:epic"). A bare name belongs to defaultProject. ok is false for a
+// ticket reference.
+func BlockedByEpicRef(defaultProject, ref string) (project, epic string, ok bool) {
+	if strings.Contains(ref, "/") || ticketIDRe.MatchString(ref) {
+		return "", "", false
+	}
+	if p, e, isAddr := ParseEpicAddress(ref); isAddr {
+		return p, e, true
+	}
+	return defaultProject, ref, true
+}
+
 // resolveBlocker is resolve widened to blocked_by's whole-epic tokens: a
 // token that is not in ticket-id form names an epic ("epic" or
 // "project:epic"), keyed by its bare name. A ticket in another epic that has
 // commits widens to that whole epic (see widen).
 func (g *projectGraph) resolveBlocker(epic, ref string) (string, error) {
-	if strings.Contains(ref, "/") || ticketIDRe.MatchString(ref) {
+	project, name, isEpic := BlockedByEpicRef(g.project, ref)
+	if !isEpic {
 		key, err := g.resolve(epic, ref)
 		if err != nil {
 			return "", err
 		}
 		return g.widen(epic, key), nil
-	}
-	project, name := g.project, ref
-	if p, e, ok := ParseEpicAddress(ref); ok {
-		project, name = p, e
 	}
 	switch target, ok := g.epics[name]; {
 	case project != g.project:

@@ -59,7 +59,7 @@ func TestEpicListState_EveryEpicStateHasItsOwn(t *testing.T) {
 			// on the queue and its tickets; it has no list state of its own.
 			continue
 		}
-		if got := epicListState(e, false, s); got != want {
+		if got := epicListState(e, false, false, s); got != want {
 			t.Errorf("epicListState(%q) = %q, want %q", s, got, want)
 		}
 	}

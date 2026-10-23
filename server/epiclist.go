@@ -10,21 +10,22 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// EpicListState is EpicListRow.State. It is wider than EpicState: it also
+// EpicListState is EpicListRow.State. It is a superset of EpicState: it also
 // names the epics the Epics page lists that no queue item holds.
 type EpicListState string
 
 const (
+	EpicListFinished      = EpicListState(EpicStateFinished)
+	EpicListRunning       = EpicListState(EpicStateRunning)
+	EpicListAwaitingMerge = EpicListState(EpicStateAwaitingMerge)
+	EpicListMerging       = EpicListState(EpicStateMerging)
+	EpicListPaused        = EpicListState(EpicStatePaused)
+
 	EpicListReady           EpicListState = "ready"
 	EpicListDesigning       EpicListState = "designing"
 	EpicListWaitingToDesign EpicListState = "waiting-to-design"
-	EpicListFinished        EpicListState = "finished"
 	EpicListQueued          EpicListState = "queued"
-	EpicListRunning         EpicListState = "running"
-	EpicListAwaitingMerge   EpicListState = "awaiting-merge"
 	EpicListMergeBlocked    EpicListState = "merge-blocked"
-	EpicListMerging         EpicListState = "merging"
-	EpicListPaused          EpicListState = "paused"
 	EpicListDraft           EpicListState = "draft"
 	// EpicListNoOpenTickets is an open, unqueued loop epic with no open ticket:
 	// nothing to queue, yet not finished.
@@ -84,7 +85,7 @@ func epicListed(e tickets.Epic) bool {
 // epicListState is the one rule for a listed epic's state. A map has no
 // queue state, and a loop epic is draft, finished or whatever the queue and
 // its tickets say.
-func epicListState(e tickets.Epic, queued bool, loopState EpicState) EpicListState {
+func epicListState(e tickets.Epic, queued, queueable bool, loopState EpicState) EpicListState {
 	switch {
 	case e.IsMap:
 		return mapListState(e)
@@ -92,24 +93,13 @@ func epicListState(e tickets.Epic, queued bool, loopState EpicState) EpicListSta
 		return EpicListFinished
 	case e.Status == string(schema.StatusDraft):
 		return EpicListDraft
-	}
-	switch loopState {
-	case EpicStateAwaitingMerge:
-		return EpicListAwaitingMerge
-	case EpicStateMerging:
-		return EpicListMerging
-	case EpicStateRunning:
-		return EpicListRunning
-	case EpicStatePaused:
-		if epicMergeBlocked(e) {
-			return EpicListMergeBlocked
-		}
-		return EpicListPaused
-	}
-	switch {
+	case loopState == EpicStatePaused && epicMergeBlocked(e):
+		return EpicListMergeBlocked
+	case loopState != EpicStateWaiting && loopState != EpicStateFinished:
+		return EpicListState(loopState)
 	case queued:
 		return EpicListQueued
-	case epicQueueable(e, false):
+	case queueable:
 		return EpicListReady
 	}
 	return EpicListNoOpenTickets
@@ -164,9 +154,13 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 
 // openFollowUps counts the draft and open tickets of a follow-ups epic.
 func openFollowUps(e tickets.Epic) int {
-	return len(slices.DeleteFunc(slices.Clone(e.Tickets), func(t tickets.Ticket) bool {
-		return t.Status != string(schema.StatusDraft) && t.Status != string(schema.StatusOpen)
-	}))
+	n := 0
+	for _, t := range e.Tickets {
+		if t.Status == string(schema.StatusDraft) || t.Status == string(schema.StatusOpen) {
+			n++
+		}
+	}
+	return n
 }
 
 // unmergedBlockers returns the addresses of the epics in e's blocked_by that
@@ -174,15 +168,9 @@ func openFollowUps(e tickets.Epic) int {
 func unmergedBlockers(project string, e tickets.Epic, merged map[string]bool) []string {
 	out := []string{}
 	for _, ref := range e.BlockedBy {
-		if strings.Contains(ref, "/") {
+		p, name, isEpic := tickets.BlockedByEpicRef(project, ref)
+		if !isEpic || p != project {
 			continue
-		}
-		name := ref
-		if p, n, ok := tickets.ParseEpicAddress(ref); ok {
-			if p != project {
-				continue
-			}
-			name = n
 		}
 		if isMerged, exists := merged[name]; exists && !isMerged {
 			out = append(out, rootRef{Project: project, Epic: name}.String())
@@ -207,17 +195,18 @@ func lastActivity(e tickets.Epic) time.Time {
 func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 	root := rootRef{Project: project, Epic: e.Name}
 	queued := s.rootQueued(root)
+	queueable := epicQueueable(e, queued)
 	row := EpicListRow{
 		Address: root.String(), Project: project, Name: e.Name, Kind: EpicKindLoop,
 		Done: e.DoneCount(), Total: e.TotalCount(),
 		CompletedAt: e.CompletedAt, MergedAt: e.MergedAt, CreatedAt: e.CreatedAt,
-		Queued: queued, Queueable: epicQueueable(e, queued),
+		Queued: queued, Queueable: queueable,
 		LastActivityAt: lastActivity(e),
 	}
 	if e.IsMap {
 		row.Kind = EpicKindMap
 	}
-	row.State = epicListState(e, queued, epicStateFor(root, e, s.registry.startedAtOf))
+	row.State = epicListState(e, queued, queueable, epicStateFor(root, e, s.registry.startedAtOf))
 	if row.State == EpicListMergeBlocked {
 		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}
