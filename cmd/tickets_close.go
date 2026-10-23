@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/spf13/cobra"
@@ -53,11 +54,21 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	}
 	resolution += tickets.OriginalLine(a) + "\n"
 
+	runEvents, _, err := ralphloop.ReadEvents(root, a.Epic)
+	if err != nil {
+		return err
+	}
+	log, err := tickets.ReadLog(src.Path)
+	if err != nil {
+		return err
+	}
+	friction := ralphloop.Friction(a.ID, runEvents, log)
+
 	created, err := ensureArchiveEpic(root, filepath.Join(root, followUpsEpic))
 	if err != nil {
 		return err
 	}
-	p, err := archiveTicket(root, a, src, tickets.MoveOpts{Archive: true, Resolution: resolution})
+	p, err := archiveTicket(root, a, src, tickets.MoveOpts{Archive: true, Resolution: resolution, Friction: &friction})
 	if err != nil {
 		if created {
 			_ = os.RemoveAll(filepath.Join(root, followUpsArchivedEpic))

@@ -81,6 +81,20 @@ func TestExecute_TicketsClose_EachReasonArchivesWithResolution(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsClose_StampsZeroFrictionOnANeverRunTicket(t *testing.T) {
+	f := setupCloseProject(t)
+	if _, err := runIn(t, f.repo, "tickets", "close", "follow-ups/01", "--reason", "fixed"); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	got, err := schema.ParseTicket(filepath.Join(f.project, followUpsArchivedEpic, "issues", "01-one.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Friction == nil || got.Friction.TotalPausedSecs != 0 || len(got.Friction.PausesByReason) != 0 {
+		t.Errorf("friction = %+v, want a zero summary", got.Friction)
+	}
+}
+
 func TestExecute_TicketsClose_CreatesArchiveDraftOnce(t *testing.T) {
 	f := setupCloseProject(t)
 	if _, err := runIn(t, f.repo, "tickets", "close", "follow-ups/01", "--reason", "fixed"); err != nil {

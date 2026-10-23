@@ -56,6 +56,23 @@ func Friction(ticket string, runEvents []Event, log []tickets.LogEvent) schema.F
 	return f
 }
 
+// StampFriction writes the ticket's Friction summary from its own log and the
+// epic's run log; scratchDir is where the run log lives. A missing log counts as
+// empty. It replaces any earlier summary, so a ticket finished again after a
+// new claim gets a fresh one.
+func StampFriction(scratchDir, epic, ticket, ticketPath string) error {
+	runEvents, _, err := ReadEvents(scratchDir, epic)
+	if err != nil {
+		return err
+	}
+	log, err := tickets.ReadLog(ticketPath)
+	if err != nil {
+		return err
+	}
+	friction := Friction(ticket, runEvents, log)
+	return schema.UpdateTicket(ticketPath, func(t *schema.Ticket) { t.Friction = &friction })
+}
+
 func frictionRound(f *schema.FrictionSummary, r tickets.PauseRound) {
 	bump(&f.PausesByReason, orUnknown(string(events.CurrentKind(events.Kind(r.Question.PauseKind)))))
 	if r.End == nil {

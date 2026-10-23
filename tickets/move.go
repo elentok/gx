@@ -62,6 +62,8 @@ type MoveOpts struct {
 	// Resolution, when set, cancels the ticket and records it as its
 	// ## Resolution section.
 	Resolution string
+	// Friction, when set with Resolution, is stamped on the cancelled ticket.
+	Friction *schema.FrictionSummary
 	// RecordOriginal adds a ## Resolution naming the old address when the
 	// ticket has none, leaving its status alone.
 	RecordOriginal bool
@@ -161,6 +163,7 @@ func PlanMove(root string, a Address, src Ticket, dstEpic, slug string, opts Mov
 		before := p.ticket.Status
 		p.ticket.Status = schema.StatusCancelled
 		p.ticket.StampStatusChange(before, time.Now().UTC())
+		p.ticket.Friction = opts.Friction
 	}
 	if p.ticket.Status == schema.StatusDone && p.ticket.CompletedAt.IsZero() {
 		p.ticket.CompletedAt = opts.CompletedAt

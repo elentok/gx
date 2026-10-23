@@ -139,7 +139,11 @@ func RecordManualMerge(scratchDir, epicName, ticket, path string, alreadyDone bo
 		ScratchDir: scratchDir, EpicName: epicName, Ticket: ticket, Path: path,
 		Type: events.ManualMerge, Reason: ev.Reason, AlreadyDone: alreadyDone, Event: ev,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	// After the pause path, so the manual-merge event is in the summary.
+	return StampFriction(scratchDir, epicName, ticket, path)
 }
 
 // Pause pauses the ticket through the pause path: one status write, one event and
