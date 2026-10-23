@@ -167,6 +167,9 @@ type CreateSessionRequest struct {
 	Harness string `json:"harness,omitempty"`
 	Cols    int    `json:"cols,omitempty"`
 	Rows    int    `json:"rows,omitempty"`
+
+	// design marks the session Design although Ticket has no map epic yet.
+	design bool
 }
 
 // SessionRequest names the session a stop or remove acts on. State is the
@@ -349,7 +352,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		MadeWorktree:   req.Worktree != "",
 		Name:           req.Name,
 		Ticket:         req.Ticket,
-		Design:         req.Ticket != "" && s.onMapEpic(req.Ticket),
+		Design:         req.design || (req.Ticket != "" && s.onMapEpic(req.Ticket)),
 		FirstPrompt:    req.Prompt,
 		ConversationID: conv,
 		CreatedAt:      time.Now(),

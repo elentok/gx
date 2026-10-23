@@ -62,10 +62,11 @@ export const ReasonNotAnIncrease = "not-an-increase";
 
 export const ReasonNotMapEpic = "not-map-epic";
 export const ReasonUnknownEpic = "unknown-epic";
+export const ReasonEpicExists = "epic-exists";
 /**
  * Refusal reasons of the designs open route, beside the session ones.
  */
-export type Reason = typeof ReasonNotMapEpic | typeof ReasonUnknownEpic;
+export type Reason = typeof ReasonNotMapEpic | typeof ReasonUnknownEpic | typeof ReasonEpicExists;
 /**
  * DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
  * epic's address ("project:epic") or one of its tickets ("project:epic/NN").
@@ -76,6 +77,13 @@ export interface DesignOpenRequest {
   epic: string;
   new?: boolean;
   state?: string;
+  /**
+   * NewDesign starts a Design for Idea that has no map yet: Epic is then the
+   * slug the map will take in Project, and no epic is created.
+   */
+  new_design?: boolean;
+  idea?: string;
+  project?: string;
 }
 
 //////////

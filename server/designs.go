@@ -17,6 +17,7 @@ import (
 const (
 	ReasonNotMapEpic  = "not-map-epic"
 	ReasonUnknownEpic = "unknown-epic"
+	ReasonEpicExists  = "epic-exists"
 )
 
 // DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
@@ -27,9 +28,17 @@ type DesignOpenRequest struct {
 	Epic  string `json:"epic"`
 	New   bool   `json:"new,omitempty"`
 	State string `json:"state,omitempty"`
+	// NewDesign starts a Design for Idea that has no map yet: Epic is then the
+	// slug the map will take in Project, and no epic is created.
+	NewDesign bool   `json:"new_design,omitempty"`
+	Idea      string `json:"idea,omitempty"`
+	Project   string `json:"project,omitempty"`
 }
 
-var designTicketRe = regexp.MustCompile(`^\d+[[:alpha:]]?\d*$`)
+var (
+	designTicketRe = regexp.MustCompile(`^\d+[[:alpha:]]?\d*$`)
+	designSlugRe   = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+)
 
 func (s *Server) designOpenWrite(w http.ResponseWriter, r *http.Request) {
 	s.designOpenHandler(false)(w, r)
@@ -57,6 +66,9 @@ func (s *Server) designOpenHandler(web bool) http.HandlerFunc {
 // openDesign returns the Design's newest live session, or creates one. Calls
 // for one epic run one at a time, so a double click starts one session.
 func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, error) {
+	if req.NewDesign {
+		return s.openNewDesign(req)
+	}
 	epicAddr, ticket, _ := strings.Cut(req.Epic, "/")
 	project, epic, ok := strings.Cut(epicAddr, ":")
 	if !ok || project == "" || epic == "" || (strings.Contains(req.Epic, "/") && !designTicketRe.MatchString(ticket)) {
@@ -109,6 +121,55 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		Ticket:  epicAddr,
 		Prompt:  prompt,
 		Harness: s.settings.Load().chatHarness(),
+	})
+}
+
+// openNewDesign starts a design session for an idea with no map yet: Epic is
+// the slug the map will take in Project. It creates no epic; Chart writes it.
+func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
+	slug := req.Epic
+	if !designSlugRe.MatchString(slug) {
+		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("%q is not a slug (want lowercase words joined by -)", slug)), nil
+	}
+	idea := strings.TrimSpace(normalizeAnswer(req.Idea))
+	switch {
+	case idea == "":
+		return sessionRefusal(ReasonEmptyPrompt, "an idea is required"), nil
+	case len(idea) > maxSessionPromptBytes:
+		return sessionRefusal(ReasonTextTooLong, fmt.Sprintf("idea is over %d bytes", maxSessionPromptBytes)), nil
+	}
+	dir, err := s.projectDir(req.Project)
+	if err != nil {
+		return sessionRefusal(ReasonSessionBadRequest, err.Error()), nil
+	}
+	addr := req.Project + ":" + slug
+
+	mu, _ := s.designOpens.LoadOrStore(addr, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	defer mu.(*sync.Mutex).Unlock()
+
+	live, err := s.liveDesignSession(addr)
+	if err != nil {
+		return SessionResult{}, err
+	}
+	if live != nil {
+		return SessionResult{Session: live}, nil
+	}
+	if _, err := os.Stat(filepath.Join(dir, slug)); err == nil {
+		return sessionRefusal(ReasonEpicExists, fmt.Sprintf("%s already has an epic %s", req.Project, slug)), nil
+	}
+	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, req.Project)
+	if checkout == "" {
+		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", req.Project)), nil
+	}
+	return s.createSession(CreateSessionRequest{
+		Project: req.Project,
+		Dir:     checkout,
+		Name:    slug,
+		Ticket:  addr,
+		Prompt:  "/gx-design " + slug + " " + idea,
+		Harness: s.settings.Load().chatHarness(),
+		design:  true,
 	})
 }
 
