@@ -245,6 +245,97 @@ func TestEpicDetail_LoopEpicWithoutCostKeepsZeroTotals(t *testing.T) {
 	}
 }
 
+const stampedEpicFrontmatter = `status: open
+created_at: 2026-01-01T00:00:00Z
+merged_at: 2026-01-01T01:00:00Z
+lines_added: 120
+lines_removed: 30
+total_tokens: 4500
+actual_cost: 1.25
+friction:
+  pauses_by_reason:
+    ask: 2
+  run_events:
+    stall: 3
+  pause_endings:
+    web: 1
+    tui: 3
+  total_paused_secs: 90
+`
+
+func TestEpicDetail_MergedLoopEpicCarriesEveryStamp(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "work", "---\n"+stampedEpicFrontmatter+"---\n", map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
+	})
+	code, d, body := getEpicDetail(t, h, base, "proj:work")
+	if code != http.StatusOK {
+		t.Fatalf("status %d: %s", code, body)
+	}
+	st := d.Stats
+	if st.LinesAdded == nil || *st.LinesAdded != 120 || st.LinesRemoved == nil || *st.LinesRemoved != 30 {
+		t.Errorf("lines = %v/%v, want 120/30", st.LinesAdded, st.LinesRemoved)
+	}
+	if st.TotalTokens == nil || *st.TotalTokens != 4500 || st.Cost == nil || *st.Cost != 1.25 {
+		t.Errorf("tokens/cost = %v/%v, want 4500/1.25", st.TotalTokens, st.Cost)
+	}
+	if st.LeadTime == nil || *st.LeadTime != 3600 || st.LeadTimeSoFar {
+		t.Errorf("lead time = %v so far %v, want 3600 final", st.LeadTime, st.LeadTimeSoFar)
+	}
+	f := st.Friction
+	if f == nil || f.PausesByReason["ask"] != 2 || f.RunEvents["stall"] != 3 || f.PausedSecs != 90 {
+		t.Fatalf("friction = %+v", f)
+	}
+	if f.WebShare == nil || *f.WebShare != 0.25 {
+		t.Errorf("web share = %v, want 0.25", f.WebShare)
+	}
+}
+
+func TestEpicDetail_UnmergedLoopEpicShowsOnlyLeadTimeSoFar(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "work", "---\nstatus: open\ncreated_at: 2026-01-01T00:00:00Z\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+	})
+	_, d, _ := getEpicDetail(t, h, base, "proj:work")
+	st := d.Stats
+	if st.LeadTime == nil || *st.LeadTime <= 0 || !st.LeadTimeSoFar {
+		t.Errorf("lead time = %v so far %v, want running", st.LeadTime, st.LeadTimeSoFar)
+	}
+	if st.LinesAdded != nil || st.LinesRemoved != nil || st.TotalTokens != nil || st.Cost != nil || st.Friction != nil {
+		t.Errorf("stats = %+v, want only lead time", st)
+	}
+}
+
+func TestEpicDetail_CodexDropsCost(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "work", "---\n"+stampedEpicFrontmatter+"had_codex: true\n---\n", map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
+	})
+	_, d, _ := getEpicDetail(t, h, base, "proj:work")
+	if d.Stats.Cost != nil || d.Stats.TotalTokens == nil {
+		t.Errorf("cost/tokens = %v/%v, want no cost and tokens kept", d.Stats.Cost, d.Stats.TotalTokens)
+	}
+}
+
+func TestEpicDetail_MapEpicStats(t *testing.T) {
+	stamped := "---\nstatus: open\nkind: map\ncreated_at: 2026-01-01T00:00:00Z\ncompleted_at: 2026-01-01T02:00:00Z\ntotal_tokens: 900\nactual_cost: 0.5\n---\n"
+	unstamped := "---\nstatus: open\nkind: map\ncreated_at: 2026-01-01T00:00:00Z\n---\n"
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "atlas", stamped, map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+		writeEpicFiles(t, store, "bare", unstamped, map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+	})
+	_, d, _ := getEpicDetail(t, h, base, "proj:atlas")
+	st := d.Stats
+	if st.TotalTokens == nil || *st.TotalTokens != 900 || st.Cost == nil || *st.Cost != 0.5 {
+		t.Errorf("tokens/cost = %v/%v, want 900/0.5", st.TotalTokens, st.Cost)
+	}
+	if st.LeadTime == nil || *st.LeadTime != 7200 || st.LeadTimeSoFar || st.Friction != nil {
+		t.Errorf("stats = %+v, want 7200 final and no friction", st)
+	}
+	_, d, _ = getEpicDetail(t, h, base, "proj:bare")
+	st = d.Stats
+	if st.TotalTokens != nil || st.Cost != nil || st.LeadTime == nil || !st.LeadTimeSoFar {
+		t.Errorf("stats = %+v, want only lead time so far", st)
+	}
+}
+
 func TestEpicDetail_UnknownAddress(t *testing.T) {
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})

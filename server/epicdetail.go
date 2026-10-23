@@ -56,8 +56,34 @@ type MapStep struct {
 	State MapStepState `json:"state"`
 }
 
+// EpicStats is an epic page's Stats section. Every field is absent when it is
+// not stamped, never zero by default.
+type EpicStats struct {
+	LinesAdded   *int   `json:"lines_added,omitempty"`
+	LinesRemoved *int   `json:"lines_removed,omitempty"`
+	TotalTokens  *int64 `json:"total_tokens,omitempty"`
+	// Cost is absent when any ticket had a Codex session.
+	Cost *float64 `json:"cost,omitempty"`
+	// LeadTime is in seconds, from created_at to the merge (loop) or completion
+	// (map); LeadTimeSoFar is set while that end is unset and LeadTime runs to now.
+	LeadTime      *int `json:"lead_time,omitempty"`
+	LeadTimeSoFar bool `json:"lead_time_so_far,omitempty"`
+	// Friction is a loop epic's summed friction values.
+	Friction *EpicFriction `json:"friction,omitempty"`
+}
+
+// EpicFriction is the Friction part of EpicStats.
+type EpicFriction struct {
+	// PausesByReason counts pauses by reason, so the client can show the top ones.
+	PausesByReason map[string]int `json:"pauses_by_reason,omitempty"`
+	RunEvents      map[string]int `json:"run_events,omitempty"`
+	PausedSecs     int            `json:"paused_secs"`
+	// WebShare is the fraction of pause endings made on the web; absent with no endings.
+	WebShare *float64 `json:"web_share,omitempty"`
+}
+
 // EpicDetail is the /v1/epics/detail payload. Seconds and dollars throughout;
-// the payload carries no token counts.
+// the payload carries no token counts outside Stats.
 type EpicDetail struct {
 	Address string `json:"address"`
 	Kind    string `json:"kind"`
@@ -87,7 +113,8 @@ type EpicDetail struct {
 	Steps       []MapStep `json:"steps,omitempty"`
 	ImplAddress string    `json:"impl_address,omitempty"`
 	// Draft is set on a loop epic that is still being published into.
-	Draft bool `json:"draft,omitempty"`
+	Draft bool      `json:"draft,omitempty"`
+	Stats EpicStats `json:"stats"`
 }
 
 // epicQueueable reports whether an epic can be queued: an unqueued, unmerged
@@ -126,12 +153,12 @@ func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) buildEpicDetail(root rootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) EpicDetail {
 	if e.IsMap {
-		return s.buildMapDetail(root, epics, e)
+		return s.buildMapDetail(root, epics, e, now)
 	}
 	return s.buildLoopDetail(root, e, now)
 }
 
-func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Epic) EpicDetail {
+func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) EpicDetail {
 	byName := map[string]tickets.Epic{}
 	for _, other := range epics {
 		byName[other.Name] = other
@@ -143,6 +170,7 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 		Queueable: epicQueueable(e, queued), Queued: queued,
 	}
 	d.Steps = mapSteps(e, byName, s.mapProbeFor(root.Project))
+	d.Stats = epicStats(e, e.CompletedAt, now)
 	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
 		d.ImplAddress = rootRef{Project: root.Project, Epic: e.Name + tickets.ImplEpicSuffix}.String()
 	}
@@ -184,7 +212,46 @@ func (s *Server) buildLoopDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 		}
 		d.WallClock = int(end.Sub(e.StartedAt).Seconds())
 	}
+	d.Stats = epicStats(e, e.MergedAt, now)
+	d.Stats.Friction = epicFriction(e.Friction)
+	d.Stats.LinesAdded, d.Stats.LinesRemoved = e.LinesAdded, e.LinesRemoved
 	return d
+}
+
+// epicStats fills the stamps both epic kinds share. end is when the lead time
+// stops: the merge for a loop epic, the completion for a map epic.
+func epicStats(e tickets.Epic, end, now time.Time) EpicStats {
+	var st EpicStats
+	st.TotalTokens = e.TotalTokens
+	if e.TotalTokens != nil && !e.HadCodex {
+		cost := e.ActualCost
+		st.Cost = &cost
+	}
+	if !e.CreatedAt.IsZero() {
+		st.LeadTimeSoFar = end.IsZero()
+		if st.LeadTimeSoFar {
+			end = now
+		}
+		lead := int(end.Sub(e.CreatedAt).Seconds())
+		st.LeadTime = &lead
+	}
+	return st
+}
+
+func epicFriction(f *schema.FrictionSummary) *EpicFriction {
+	if f == nil {
+		return nil
+	}
+	out := &EpicFriction{PausesByReason: f.PausesByReason, RunEvents: f.RunEvents, PausedSecs: f.TotalPausedSecs}
+	total := 0
+	for _, n := range f.PauseEndings {
+		total += n
+	}
+	if total > 0 {
+		share := float64(f.PauseEndings[tickets.SourceWeb]) / float64(total)
+		out.WebShare = &share
+	}
+	return out
 }
 
 // rowFor builds a loop epic's full row for t.

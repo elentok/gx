@@ -385,8 +385,46 @@ export interface MapStep {
   state: MapStepState;
 }
 /**
+ * EpicStats is an epic page's Stats section. Every field is absent when it is
+ * not stamped, never zero by default.
+ */
+export interface EpicStats {
+  lines_added?: number /* int */;
+  lines_removed?: number /* int */;
+  total_tokens?: number /* int64 */;
+  /**
+   * Cost is absent when any ticket had a Codex session.
+   */
+  cost?: number /* float64 */;
+  /**
+   * LeadTime is in seconds, from created_at to the merge (loop) or completion
+   * (map); LeadTimeSoFar is set while that end is unset and LeadTime runs to now.
+   */
+  lead_time?: number /* int */;
+  lead_time_so_far?: boolean;
+  /**
+   * Friction is a loop epic's summed friction values.
+   */
+  friction?: EpicFriction;
+}
+/**
+ * EpicFriction is the Friction part of EpicStats.
+ */
+export interface EpicFriction {
+  /**
+   * PausesByReason counts pauses by reason, so the client can show the top ones.
+   */
+  pauses_by_reason?: { [key: string]: number /* int */};
+  run_events?: { [key: string]: number /* int */};
+  paused_secs: number /* int */;
+  /**
+   * WebShare is the fraction of pause endings made on the web; absent with no endings.
+   */
+  web_share?: number /* float64 */;
+}
+/**
  * EpicDetail is the /v1/epics/detail payload. Seconds and dollars throughout;
- * the payload carries no token counts.
+ * the payload carries no token counts outside Stats.
  */
 export interface EpicDetail {
   address: string;
@@ -434,6 +472,7 @@ export interface EpicDetail {
    * Draft is set on a loop epic that is still being published into.
    */
   draft?: boolean;
+  stats: EpicStats;
 }
 
 //////////
