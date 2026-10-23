@@ -91,6 +91,7 @@ test("the Throughput cards follow their headline rules", async () => {
   expect(followUps).toContain("0.7/day created · 0.7/day finished");
   const waiting = await cardText("Waiting for design");
   expect(waiting).toContain("7");
+  expect(waiting).toContain("maps open now");
   expect(waiting).not.toContain("/day");
 });
 

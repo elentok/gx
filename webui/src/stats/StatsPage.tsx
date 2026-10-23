@@ -62,8 +62,8 @@ function Throughput({ stats }: { stats: Stats }) {
           days={days}
           chart="line"
           headline={t.waiting_for_design.at(-1) ?? 0}
-          small=""
-          series={[{ key: "waiting", label: "Epics", tone: "waiting", values: t.waiting_for_design }]}
+          small="maps open now"
+          series={[{ key: "waiting", label: "Open maps", tone: "waiting", values: t.waiting_for_design }]}
         />
     </Section>
   );
