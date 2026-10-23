@@ -56,6 +56,9 @@ type Model struct {
 	afk         bool
 	hideSidebar bool
 	spinner     spinner.Model
+	// sidebarMemo, mainMemo and joinMemo let a frame that changes nothing
+	// visible skip the render and its width measuring.
+	sidebarMemo, mainMemo, joinMemo *ui.Memo
 	// ticking: a spinner tick chain is in flight, so another must not start.
 	ticking bool
 	// terminalFocused: the embedded terminal takes every key, so the shell
@@ -107,7 +110,7 @@ type Model struct {
 func NewModel(client SessionClient, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	m := Model{client: client, settings: settings, spinner: sp, dial: dialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: listFormProjects,
+	m := Model{client: client, settings: settings, spinner: sp, sidebarMemo: &ui.Memo{}, mainMemo: &ui.Memo{}, joinMemo: &ui.Memo{}, dial: dialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: listFormProjects,
 		focused: true, termProgram: os.Getenv("TERM_PROGRAM")}
 	if client != nil {
 		m.reporter = &focusReporter{client: client}
@@ -401,8 +404,10 @@ func (m Model) render() string {
 	}
 	var out string
 	if m.sidebarOnScreen() {
-		out = lipgloss.JoinHorizontal(lipgloss.Top,
-			m.renderSidebar(), ui.RenderSeamColumn(m.height, ui.SeamColor), m.renderMain(m.mainWidth(), lines))
+		sidebar, main := m.renderSidebar(), m.renderMain(m.mainWidth(), lines)
+		out = m.joinMemo.Get([3]any{sidebar, main, m.height}, func() string {
+			return lipgloss.JoinHorizontal(lipgloss.Top, sidebar, ui.RenderSeamColumn(m.height, ui.SeamColor), main)
+		})
 	} else {
 		out = m.renderMain(m.width, lines)
 	}
@@ -441,13 +446,14 @@ func (m Model) mainWidth() int {
 func (m Model) renderMain(width int, lines []string) string {
 	active := m.terminalFocused || !m.sidebarShown()
 	if lines != nil || m.selectedID() == "" {
-		return ui.RenderPanel(ui.PanelOptionsFor(width, m.height, "agents", "", lines, active, ui.ColorText, ui.ColorOrange, false))
+		opts := ui.PanelOptionsFor(width, m.height, "agents", "", lines, active, ui.ColorText, ui.ColorOrange, false)
+		return m.mainMemo.Get(opts, func() string { return ui.RenderPanel(opts) })
 	}
 	s := m.sessions[m.cursor]
 	titleColor, headerBg := headerColors(active)
 	title := ui.RenderRowWithBackground(m.terminalTitle(s, lipgloss.NewStyle().Foreground(titleColor).Bold(active)), headerBg)
 	opts := ui.PanelOptionsFor(width, m.height, title, m.terminalRightTitle(s, width-2), m.terminalLines(s), active, titleColor, titleColor, false)
-	return ui.RenderPanel(opts)
+	return m.mainMemo.Get(opts, func() string { return ui.RenderPanel(opts) })
 }
 
 func (m Model) lines() []string {

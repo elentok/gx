@@ -196,7 +196,8 @@ func (m Model) renderSidebar() string {
 	if m.afk {
 		live = "AFK · " + live
 	}
-	return ui.RenderPanel(ui.PanelOptionsFor(sidebarWidth, m.height, title, live, lines, active, titleColor, titleColor, true))
+	opts := ui.PanelOptionsFor(sidebarWidth, m.height, title, live, lines, active, titleColor, titleColor, true)
+	return m.sidebarMemo.Get(opts, func() string { return ui.RenderPanel(opts) })
 }
 
 // headerColors are the title colour and header fill of a focused or
