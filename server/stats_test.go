@@ -31,13 +31,8 @@ func statsAt(t *testing.T, s server.Stats, series []int, n int) int {
 
 func statsFixture(t *testing.T) (get func(query string) server.Stats) {
 	t.Helper()
-	// A zone away from UTC, so a UTC-day bucket would disagree with the local one.
-	old := time.Local
-	time.Local = time.FixedZone("test", 5*3600)
-	t.Cleanup(func() { time.Local = old })
-
 	loop := "---\nstatus: open\n---\n"
-	h, base := startEpicDetail(t, func(store string) {
+	return statsStore(t, func(store string) {
 		writeProjectEpic(t, store, "proj", "loop", loop, map[string]string{
 			"01-a.md": issueMD("01", "done", "done_at: "+statsStamp(1)+"\n", "A"),
 			"02-b.md": issueMD("02", "done", "done_at: "+statsStamp(1)+"\n", "B"),
@@ -63,6 +58,16 @@ func statsFixture(t *testing.T) (get func(query string) server.Stats) {
 			"01-a.md": issueMD("01", "done", "done_at: "+statsStamp(1)+"\n", "A"),
 		})
 	})
+}
+
+// statsStore serves the store built by setup, in a zone away from UTC so a
+// UTC-day bucket would disagree with the local one.
+func statsStore(t *testing.T, setup func(store string)) (get func(query string) server.Stats) {
+	t.Helper()
+	old := time.Local
+	time.Local = time.FixedZone("test", 5*3600)
+	t.Cleanup(func() { time.Local = old })
+	h, base := startEpicDetail(t, setup)
 	return func(query string) server.Stats {
 		t.Helper()
 		code, body := webDo(t, h, http.MethodGet, base+"/v1/stats"+query)
@@ -140,5 +145,82 @@ func TestStats_NeedsTheWebCookie(t *testing.T) {
 	_, base := startWeb(t)
 	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/stats", nil); code != http.StatusUnauthorized {
 		t.Errorf("GET /v1/stats without cookie = %d, want 401", code)
+	}
+}
+
+func TestStats_LinesOfCodeLandOnTheMergeDay(t *testing.T) {
+	s := statsStore(t, func(store string) {
+		writeProjectEpic(t, store, "proj", "a", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\nlines_added: 120\nlines_removed: 30\n---\n", nil)
+		writeProjectEpic(t, store, "proj", "b", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\nlines_added: 5\nlines_removed: 1\n---\n", nil)
+		writeProjectEpic(t, store, "proj", "unmerged", "---\nstatus: open\nlines_added: 999\nlines_removed: 999\n---\n", nil)
+	})("")
+	if got := statsAt(t, s, s.Throughput.LinesAdded, 2); got != 125 {
+		t.Errorf("lines added on day 2 = %d, want 125", got)
+	}
+	if got := statsAt(t, s, s.Throughput.LinesRemoved, 2); got != 31 {
+		t.Errorf("lines removed on day 2 = %d, want 31", got)
+	}
+	if got := statsAt(t, s, s.Throughput.LinesAdded, 1); got != 0 {
+		t.Errorf("lines added on day 1 = %d, want 0", got)
+	}
+}
+
+func TestStats_FollowUpsCountByOriginalAddress(t *testing.T) {
+	s := statsStore(t, func(store string) {
+		created := func(n int) string { return "created_at: " + statsStamp(n) + "\n" }
+		writeProjectEpic(t, store, "proj", "follow-ups", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": issueMD("01", "open", created(1), "A"),
+			"02-b.md": issueMD("02", "done", created(1)+"done_at: "+statsStamp(0)+"\n", "B"),
+			"03-c.md": issueMD("03", "cancelled", created(2)+"cancelled_at: "+statsStamp(1)+"\n", "C"),
+		})
+		writeProjectEpic(t, store, "proj", "follow-ups-archived", "---\nstatus: open\n---\n", map[string]string{
+			"10-j.md": issueMD("10", "cancelled", "original_address: proj:follow-ups/10\n"+created(2)+"cancelled_at: "+statsStamp(1)+"\n", "J"),
+			"12-l.md": issueMD("12", "done", created(1)+"done_at: "+statsStamp(0)+"\n", "L"),
+		})
+		writeProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			// moved into another epic: counts by where it began.
+			"09-i.md": issueMD("09", "done", "original_address: proj:follow-ups/09\n"+created(1)+"done_at: "+statsStamp(0)+"\n", "I"),
+			// a move alone does not finish it.
+			"11-k.md": issueMD("11", "open", "original_address: proj:follow-ups/11\n"+created(1), "K"),
+			"13-m.md": issueMD("13", "done", created(1)+"done_at: "+statsStamp(0)+"\n", "M"),
+		})
+	})("")
+	for _, c := range []struct {
+		name   string
+		series []int
+		day    int
+		want   int
+	}{
+		{"created", s.Throughput.FollowUpsCreated, 1, 4},
+		{"created", s.Throughput.FollowUpsCreated, 2, 2},
+		{"finished", s.Throughput.FollowUpsFinished, 0, 2},
+		{"finished", s.Throughput.FollowUpsFinished, 1, 2},
+	} {
+		if got := statsAt(t, s, c.series, c.day); got != c.want {
+			t.Errorf("follow-ups %s on day %d = %d, want %d", c.name, c.day, got, c.want)
+		}
+	}
+}
+
+func TestStats_WaitingForDesignCountsOpenMapDays(t *testing.T) {
+	mapMD := func(status string, created int, completed int) string {
+		md := "---\nkind: map\nstatus: " + status + "\ncreated_at: " + statsStamp(created) + "\n"
+		if completed >= 0 {
+			md += "completed_at: " + statsStamp(completed) + "\n"
+		}
+		return md + "---\n"
+	}
+	s := statsStore(t, func(store string) {
+		writeProjectEpic(t, store, "proj", "draft", mapMD("draft", 10, -1), nil)
+		writeProjectEpic(t, store, "proj", "open", mapMD("open", 5, -1), nil)
+		writeProjectEpic(t, store, "proj", "done", mapMD("done", 8, 4), nil)
+		writeProjectEpic(t, store, "proj", "old", mapMD("open", 100, -1), nil)
+		writeProjectEpic(t, store, "proj", "not-a-map", "---\nstatus: open\ncreated_at: "+statsStamp(5)+"\n---\n", nil)
+	})("")
+	// old always; open from day 5; done from day 8 until it completes on day 4.
+	for day, want := range map[int]int{9: 1, 8: 2, 6: 2, 5: 3, 4: 2, 0: 2} {
+		if got := statsAt(t, s, s.Throughput.WaitingForDesign, day); got != want {
+			t.Errorf("waiting for design on day %d = %d, want %d", day, got, want)
+		}
 	}
 }
