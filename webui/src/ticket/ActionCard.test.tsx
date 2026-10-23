@@ -70,7 +70,7 @@ test("a permission prompt on a running ticket shows the card", async () => {
 test("a Paused ticket shows its pause text in the card next to its action", async () => {
   const detail: TicketDetail = {
     ...plain,
-    status: "paused",
+    status: "needs-repair",
     pause_reason: "merge-conflict",
     pause_text: "Conflict in main.go",
     state: "tok-2",
@@ -125,7 +125,7 @@ test("a sent answer keeps its result on screen after the refetch", async () => {
 test("a sent action keeps its result on screen after the refetch", async () => {
   let detail: TicketDetail = {
     ...plain,
-    status: "paused",
+    status: "needs-answer",
     pause_reason: "manual",
     state: "tok-3",
     actions: ["resume"],

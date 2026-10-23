@@ -4,8 +4,11 @@ import type { Tone } from "../ui/tone";
 
 export const isRunning = (d: TicketDetail) => d.status === "claimed";
 
+// The server sends a paused ticket under its legacy status words, never "paused".
+const PAUSED_STATUSES = ["needs-answer", "needs-repair"];
+
 export function badgeOf(d: TicketDetail): { tone: Tone; label: string } {
-  if (d.status === "paused") {
+  if (PAUSED_STATUSES.includes(d.status)) {
     return { tone: "paused", label: d.pause_label ? `Paused · ${d.pause_label}` : "Paused" };
   }
   if (isRunning(d)) return { tone: "running", label: d.status };

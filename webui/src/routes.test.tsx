@@ -385,8 +385,8 @@ test("a merged ticket's stat line adds elapsed, cost and context; a map ticket h
   expect(screen.queryByText("implement")).toBeNull();
 });
 
-test("a Paused ticket's badge carries the reason label", async () => {
-  renderAt("/t/proj:work/01", withDetail({ status: "paused", pause_label: "Needs an answer" }));
+test.each(["needs-answer", "needs-repair"])("a %s ticket's badge carries the reason label", async (status) => {
+  renderAt("/t/proj:work/01", withDetail({ status, pause_label: "Needs an answer" }));
   const badge = await screen.findByText("Paused · Needs an answer");
   expect(badge.getAttribute("data-tone")).toBe("paused");
 });
