@@ -23,7 +23,7 @@ web-dev-proxy:
 	cd webui && pnpm install --frozen-lockfile && GX_WEBUI_PROXY=1 pnpm dev
 
 web-test:
-	cd webui && pnpm install --frozen-lockfile && pnpm test
+	cd webui && pnpm install --frozen-lockfile && pnpm exec tsc --noEmit && pnpm test
 
 # Regenerates webui/src/generated/server.ts from the server's wire types.
 web-types:

@@ -66,7 +66,7 @@ export type Connection = ReturnType<typeof createConnection>;
 export function createConnection(deps: ConnectionDeps = {}) {
   const getSnapshot = deps.fetchSnapshot ?? fetchSnapshot;
   const openStream = deps.openStream ?? openEventStream;
-  const clientId = deps.clientId ?? `web-${crypto.randomUUID()}`;
+  const clientId = deps.clientId ?? `web-${randomId()}`;
 
   const cached = deps.cache?.load() ?? null;
   let state: ConnectionState = { snapshot: cached, connected: true, loadedOnce: cached !== null, tick: 0, streams: 0 };
@@ -272,4 +272,11 @@ export function useConnectionContext(): Connection {
   const conn = useContext(ConnectionContext);
   if (!conn) throw new Error("ConnectionContext is missing");
   return conn;
+}
+
+// crypto.randomUUID exists only in secure contexts (HTTPS or localhost), and the
+// web UI is often opened over plain HTTP from another device.
+function randomId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }

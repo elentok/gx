@@ -7,7 +7,7 @@ const srcDir = join(__dirname, "..");
 const allowed = new Set(["ui/theme.ts"]);
 
 const rawHex = /#[0-9a-fA-F]{3,8}\b/;
-const fontTokens = new Set(["condensed", "text", "inherit"]);
+const fontTokens = new Set(["condensed", "text", "mono", "inherit"]);
 const fontFamilyValue = /font-?family\s*[:=]?\s*\{?\s*["'`]([^"'`]*)/gi;
 
 function violations(source: string): string[] {

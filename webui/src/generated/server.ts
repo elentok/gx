@@ -60,13 +60,13 @@ export const ReasonNotAnIncrease = "not-an-increase";
 //////////
 // source: designs.go
 
-export const ReasonNotMapEpic = "not-map-epic";
-export const ReasonUnknownEpic = "unknown-epic";
-export const ReasonEpicExists = "epic-exists";
+export const ReasonDesignNotMapEpic = "not-map-epic";
+export const ReasonDesignUnknownEpic = "unknown-epic";
+export const ReasonDesignEpicExists = "epic-exists";
 /**
  * Refusal reasons of the designs open route, beside the session ones.
  */
-export type Reason = typeof ReasonNotMapEpic | typeof ReasonUnknownEpic | typeof ReasonEpicExists;
+export type ReasonDesign = typeof ReasonDesignNotMapEpic | typeof ReasonDesignUnknownEpic | typeof ReasonDesignEpicExists;
 /**
  * DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
  * epic's address ("project:epic") or one of its tickets ("project:epic/NN").
@@ -938,13 +938,13 @@ export interface FocusReport {
 //////////
 // source: sessionprompt.go
 
-export const ReasonHarnessNotSupported = "harness-not-supported";
-export const ReasonPrefixNotAllowed = "prefix-not-allowed";
-export const ReasonTextTooLong = "text-too-long";
+export const ReasonPromptHarnessNotSupported = "harness-not-supported";
+export const ReasonPromptPrefixNotAllowed = "prefix-not-allowed";
+export const ReasonPromptTextTooLong = "text-too-long";
 /**
  * Refusal reasons of the session prompt route, beside the session ones.
  */
-export type Reason = typeof ReasonHarnessNotSupported | typeof ReasonPrefixNotAllowed | typeof ReasonTextTooLong;
+export type ReasonPrompt = typeof ReasonPromptHarnessNotSupported | typeof ReasonPromptPrefixNotAllowed | typeof ReasonPromptTextTooLong;
 /**
  * SessionPromptRequest is the body of POST /v1/sessions/prompt. LastMessage is
  * the id of the last chat message the page saw; the web mux refuses a send once
@@ -1020,11 +1020,11 @@ export const ReasonSessionNotIdle = "session-not-idle";
 export const ReasonSessionNoAction = "no-action";
 export const ReasonSessionDirGone = "dir-gone";
 export const ReasonSessionNoResume = "no-resume";
-export const ReasonNotDesignSession = "not-design-session";
+export const ReasonSessionNotDesign = "not-design-session";
 /**
  * Refusal reasons of the interactive-session writes.
  */
-export type Reason = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonNotDesignSession;
+export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign;
 export const SessionStarting = "starting";
 export const SessionWorking = "working";
 export const SessionIdle = "idle";

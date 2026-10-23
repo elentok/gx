@@ -60,9 +60,9 @@ func TestSessionPrompt_Refusals(t *testing.T) {
 	f := startPromptSession(t)
 	for name, tc := range map[string]struct{ text, want string }{
 		"empty":    {"  \n", server.ReasonEmptyPrompt},
-		"slash":    {"/clear", server.ReasonPrefixNotAllowed},
-		"bang":     {" !ls", server.ReasonPrefixNotAllowed},
-		"too long": {strings.Repeat("a", 32*1024+1), server.ReasonTextTooLong},
+		"slash":    {"/clear", server.ReasonPromptPrefixNotAllowed},
+		"bang":     {" !ls", server.ReasonPromptPrefixNotAllowed},
+		"too long": {strings.Repeat("a", 32*1024+1), server.ReasonPromptTextTooLong},
 	} {
 		if res := f.prompt(t, tc.text); !res.Refused || res.Reason != tc.want {
 			t.Errorf("%s: prompt = %+v, want reason %q", name, res, tc.want)
@@ -86,8 +86,8 @@ func TestSessionPrompt_NotADesignSession(t *testing.T) {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	got, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: res.Session.ID, Text: "hello"})
-	if err != nil || !got.Refused || got.Reason != server.ReasonNotDesignSession {
-		t.Errorf("prompt = %+v, %v; want %s", got, err, server.ReasonNotDesignSession)
+	if err != nil || !got.Refused || got.Reason != server.ReasonSessionNotDesign {
+		t.Errorf("prompt = %+v, %v; want %s", got, err, server.ReasonSessionNotDesign)
 	}
 }
 
@@ -98,8 +98,8 @@ func TestSessionPrompt_HarnessWithoutChat(t *testing.T) {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	got, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: res.Session.ID, Text: "hello"})
-	if err != nil || !got.Refused || got.Reason != server.ReasonHarnessNotSupported {
-		t.Errorf("prompt = %+v, %v; want %s", got, err, server.ReasonHarnessNotSupported)
+	if err != nil || !got.Refused || got.Reason != server.ReasonPromptHarnessNotSupported {
+		t.Errorf("prompt = %+v, %v; want %s", got, err, server.ReasonPromptHarnessNotSupported)
 	}
 }
 
@@ -173,8 +173,8 @@ func TestSessionPrompt_ContinueRefusedOnANonDesignSession(t *testing.T) {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	got, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: res.Session.ID, Continue: true})
-	if err != nil || !got.Refused || got.Reason != server.ReasonNotDesignSession {
-		t.Errorf("continue = %+v, %v; want %s", got, err, server.ReasonNotDesignSession)
+	if err != nil || !got.Refused || got.Reason != server.ReasonSessionNotDesign {
+		t.Errorf("continue = %+v, %v; want %s", got, err, server.ReasonSessionNotDesign)
 	}
 }
 

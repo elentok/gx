@@ -17,6 +17,7 @@ const state: ConnectionState = {
   connected: true,
   loadedOnce: true,
   tick: 0,
+  streams: 0,
 };
 const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
 

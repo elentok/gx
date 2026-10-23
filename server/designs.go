@@ -15,9 +15,9 @@ import (
 
 // Refusal reasons of the designs open route, beside the session ones.
 const (
-	ReasonNotMapEpic  = "not-map-epic"
-	ReasonUnknownEpic = "unknown-epic"
-	ReasonEpicExists  = "epic-exists"
+	ReasonDesignNotMapEpic  = "not-map-epic"
+	ReasonDesignUnknownEpic = "unknown-epic"
+	ReasonDesignEpicExists  = "epic-exists"
 )
 
 // DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
@@ -76,14 +76,14 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	}
 	dir, err := s.projectDir(project)
 	if err != nil {
-		return sessionRefusal(ReasonUnknownEpic, err.Error()), nil
+		return sessionRefusal(ReasonDesignUnknownEpic, err.Error()), nil
 	}
 	epicDir := filepath.Join(dir, epic)
 	if fi, err := os.Stat(epicDir); err != nil || !fi.IsDir() {
-		return sessionRefusal(ReasonUnknownEpic, fmt.Sprintf("no epic %s", epicAddr)), nil
+		return sessionRefusal(ReasonDesignUnknownEpic, fmt.Sprintf("no epic %s", epicAddr)), nil
 	}
 	if !tickets.IsMapEpic(epicDir) {
-		return sessionRefusal(ReasonNotMapEpic, fmt.Sprintf("%s is not a map epic", epicAddr)), nil
+		return sessionRefusal(ReasonDesignNotMapEpic, fmt.Sprintf("%s is not a map epic", epicAddr)), nil
 	}
 
 	mu, _ := s.designOpens.LoadOrStore(epicAddr, &sync.Mutex{})
@@ -136,7 +136,7 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 	case idea == "":
 		return sessionRefusal(ReasonEmptyPrompt, "an idea is required"), nil
 	case len(idea) > maxSessionPromptBytes:
-		return sessionRefusal(ReasonTextTooLong, fmt.Sprintf("idea is over %d bytes", maxSessionPromptBytes)), nil
+		return sessionRefusal(ReasonPromptTextTooLong, fmt.Sprintf("idea is over %d bytes", maxSessionPromptBytes)), nil
 	}
 	dir, err := s.projectDir(req.Project)
 	if err != nil {
@@ -156,7 +156,7 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 		return SessionResult{Session: live}, nil
 	}
 	if _, err := os.Stat(filepath.Join(dir, slug)); err == nil {
-		return sessionRefusal(ReasonEpicExists, fmt.Sprintf("%s already has an epic %s", req.Project, slug)), nil
+		return sessionRefusal(ReasonDesignEpicExists, fmt.Sprintf("%s already has an epic %s", req.Project, slug)), nil
 	}
 	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, req.Project)
 	if checkout == "" {

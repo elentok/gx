@@ -41,7 +41,7 @@ const (
 	ReasonSessionNoAction       = "no-action"
 	ReasonSessionDirGone        = "dir-gone"
 	ReasonSessionNoResume       = "no-resume"
-	ReasonNotDesignSession      = "not-design-session"
+	ReasonSessionNotDesign      = "not-design-session"
 )
 
 // sessionMetaFile holds a session's meta in its state dir.
@@ -897,7 +897,7 @@ func (s *Server) checkDesignWrite(req SessionRequest) (SessionResult, error) {
 		return res, err
 	}
 	if !meta.Design {
-		return sessionRefusal(ReasonNotDesignSession, fmt.Sprintf("session %s is not a design session", req.ID)), nil
+		return sessionRefusal(ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	if req.State != SessionStateToken(meta.info()) {
 		return sessionRefusal(ReasonStale, "the session changed; review its current state"), nil

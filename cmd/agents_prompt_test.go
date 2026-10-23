@@ -25,7 +25,7 @@ func TestAgentsPrompt_JSON(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &res); err != nil {
 		t.Fatalf("output %q: %v", out.String(), err)
 	}
-	if !res.Refused || res.Reason != server.ReasonNotDesignSession {
-		t.Errorf("prompt = %+v, want %s", res, server.ReasonNotDesignSession)
+	if !res.Refused || res.Reason != server.ReasonSessionNotDesign {
+		t.Errorf("prompt = %+v, want %s", res, server.ReasonSessionNotDesign)
 	}
 }

@@ -38,7 +38,7 @@ const okFor: FetchDetail = async (address) => ({ kind: "ok", detail: detailOf(ad
 
 // A connection that never touches the network: the state is whatever the test sets.
 function fakeConnection(connected: boolean) {
-  const state: ConnectionState = { snapshot: emptySnapshot, connected, loadedOnce: true, tick: 0 };
+  const state: ConnectionState = { snapshot: emptySnapshot, connected, loadedOnce: true, tick: 0, streams: 0 };
   return {
     getState: () => state,
     subscribe: () => () => {},

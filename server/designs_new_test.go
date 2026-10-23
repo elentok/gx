@@ -66,10 +66,10 @@ func TestDesignsOpenNew_Refusals(t *testing.T) {
 	for name, tc := range map[string]struct{ slug, idea, want string }{
 		"bad slug":     {"Bad Slug", "idea", server.ReasonSessionBadRequest},
 		"path slug":    {"a/b", "idea", server.ReasonSessionBadRequest},
-		"epic exists":  {"plain", "idea", server.ReasonEpicExists},
-		"map exists":   {"map", "idea", server.ReasonEpicExists},
+		"epic exists":  {"plain", "idea", server.ReasonDesignEpicExists},
+		"map exists":   {"map", "idea", server.ReasonDesignEpicExists},
 		"empty idea":   {"fresh-idea", " \n", server.ReasonEmptyPrompt},
-		"idea too big": {"fresh-idea", strings.Repeat("a", 32*1024+1), server.ReasonTextTooLong},
+		"idea too big": {"fresh-idea", strings.Repeat("a", 32*1024+1), server.ReasonPromptTextTooLong},
 	} {
 		if res := f.openNew(t, tc.slug, tc.idea); !res.Refused || res.Reason != tc.want {
 			t.Errorf("%s: open = %+v, want reason %q", name, res, tc.want)

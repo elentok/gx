@@ -14,9 +14,9 @@ import (
 
 // Refusal reasons of the session prompt route, beside the session ones.
 const (
-	ReasonHarnessNotSupported = "harness-not-supported"
-	ReasonPrefixNotAllowed    = "prefix-not-allowed"
-	ReasonTextTooLong         = "text-too-long"
+	ReasonPromptHarnessNotSupported = "harness-not-supported"
+	ReasonPromptPrefixNotAllowed    = "prefix-not-allowed"
+	ReasonPromptTextTooLong         = "text-too-long"
 )
 
 // maxSessionPromptBytes caps the text one send types.
@@ -72,10 +72,10 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		return res, err
 	}
 	if !meta.Design {
-		return sessionRefusal(ReasonNotDesignSession, fmt.Sprintf("session %s is not a design session", req.ID)), nil
+		return sessionRefusal(ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	if meta.Harness != s.settings.Load().chatHarness() {
-		return sessionRefusal(ReasonHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
+		return sessionRefusal(ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
 	}
 	text := strings.TrimSpace(normalizeAnswer(req.Text))
 	if !req.Continue {
@@ -83,9 +83,9 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		case text == "":
 			return sessionRefusal(ReasonEmptyPrompt, "text to type is required"), nil
 		case strings.HasPrefix(text, "/") || strings.HasPrefix(text, "!"):
-			return sessionRefusal(ReasonPrefixNotAllowed, "text may not start with / or !"), nil
+			return sessionRefusal(ReasonPromptPrefixNotAllowed, "text may not start with / or !"), nil
 		case len(text) > maxSessionPromptBytes:
-			return sessionRefusal(ReasonTextTooLong, fmt.Sprintf("text is over %d bytes", maxSessionPromptBytes)), nil
+			return sessionRefusal(ReasonPromptTextTooLong, fmt.Sprintf("text is over %d bytes", maxSessionPromptBytes)), nil
 		}
 	}
 	if source == promptSourceWeb {

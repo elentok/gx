@@ -14,6 +14,7 @@ const state = (patch: Partial<ConnectionState> = {}): ConnectionState => ({
   connected: true,
   loadedOnce: true,
   tick: 0,
+  streams: 0,
   ...patch,
 });
 

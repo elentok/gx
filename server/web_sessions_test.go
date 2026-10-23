@@ -74,14 +74,14 @@ func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T)
 	for _, tc := range []struct{ name, id, state, want string }{
 		{"no token", design, "", server.ReasonStale},
 		{"old token", design, design + ":starting:1", server.ReasonStale},
-		{"plain session", plain, sessionToken(ctx, t, h, plain), server.ReasonNotDesignSession},
+		{"plain session", plain, sessionToken(ctx, t, h, plain), server.ReasonSessionNotDesign},
 	} {
 		code, body := webSessionWrite(t, base, cookie, "stop", tc.id, tc.state)
 		if code != http.StatusOK || reasonOf(t, body) != tc.want {
 			t.Errorf("stop with %s = %d %s, want %s", tc.name, code, body, tc.want)
 		}
 	}
-	if code, body := webSessionWrite(t, base, cookie, "resume", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || reasonOf(t, body) != server.ReasonNotDesignSession {
+	if code, body := webSessionWrite(t, base, cookie, "resume", plain, sessionToken(ctx, t, h, plain)); code != http.StatusOK || reasonOf(t, body) != server.ReasonSessionNotDesign {
 		t.Errorf("restore of a plain session = %d %s, want not-design-session", code, body)
 	}
 

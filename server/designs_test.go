@@ -198,9 +198,9 @@ func TestDesignsOpen_TicketAddressPromptsOnCreateAndSendsNothingToALiveSession(t
 func TestDesignsOpen_Refusals(t *testing.T) {
 	f := startDesigns(t)
 	for epic, want := range map[string]string{
-		"proj:plain":   server.ReasonNotMapEpic,
-		"proj:nope":    server.ReasonUnknownEpic,
-		"nope:map":     server.ReasonUnknownEpic,
+		"proj:plain":   server.ReasonDesignNotMapEpic,
+		"proj:nope":    server.ReasonDesignUnknownEpic,
+		"nope:map":     server.ReasonDesignUnknownEpic,
 		"map":          server.ReasonSessionBadRequest,
 		"proj:map/abc": server.ReasonSessionBadRequest,
 	} {

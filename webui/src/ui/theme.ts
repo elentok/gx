@@ -49,6 +49,7 @@ export const themeConfig = defineConfig({
       fonts: {
         condensed: { value: "'Saira Condensed', sans-serif" },
         text: { value: "'Saira', sans-serif" },
+        mono: { value: "ui-monospace, SFMono-Regular, Menlo, monospace" },
       },
       fontSizes: {
         xs: { value: "13px" },
