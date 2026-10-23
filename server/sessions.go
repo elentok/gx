@@ -90,6 +90,8 @@ type SessionInfo struct {
 	Stopped    bool              `json:"stopped,omitempty"`
 	Unread     SessionUnread     `json:"unread"`
 	Actionable SessionActionable `json:"actionable"`
+	// Failure is set while the session is in one of the failure states.
+	Failure *SessionFailure `json:"failure,omitempty"`
 }
 
 // SessionStatus is a Session status.
@@ -220,6 +222,10 @@ type sessionMeta struct {
 	// Actionable is the agent-raised one, which the person's next input clears,
 	// or a gx-raised one, which it spares. Exit clears either.
 	Actionable SessionActionable `json:"actionable,omitzero"`
+	// RestoredAt is when the person last Restored the session; RestoreCrashed
+	// marks that run crashing within restoreCrashWindow.
+	RestoredAt     time.Time `json:"restored_at,omitzero"`
+	RestoreCrashed bool      `json:"restore_crashed,omitempty"`
 }
 
 func (m sessionMeta) info() SessionInfo {
@@ -562,7 +568,7 @@ func (s *Server) listSessions() ([]SessionInfo, error) {
 	slices.SortFunc(metas, func(a, b sessionMeta) int { return a.CreatedAt.Compare(b.CreatedAt) })
 	out := make([]SessionInfo, len(metas))
 	for i, m := range metas {
-		out[i] = m.info()
+		out[i] = s.sessionInfo(m)
 	}
 	return out, nil
 }
@@ -821,6 +827,7 @@ func (s *Server) recordSessionExit(m *sessionMeta, exit string) bool {
 		s.triggerBanner(m.ID, sound.Done, "")
 	}
 	m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
+	m.RestoreCrashed = exit == SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < restoreCrashWindow
 	m.FirstPrompt = ""
 	m.Actionable = SessionActionable{}
 	return true

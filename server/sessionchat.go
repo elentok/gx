@@ -43,6 +43,8 @@ type SessionChatResponse struct {
 	Round          []SessionRoundCard      `json:"round"`
 	Next           *SessionNext            `json:"next"`
 	Background     []SessionBackgroundTask `json:"background"`
+	// Failure is the session's, as on its SessionInfo.
+	Failure *SessionFailure `json:"failure,omitempty"`
 }
 
 // chatCache keeps each transcript's parsed chat until its size or mtime
@@ -155,7 +157,7 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	out := SessionChatResponse{ConversationID: meta.ConversationID, Messages: []SessionChatMessage{}, Background: []SessionBackgroundTask{}}
+	out := SessionChatResponse{ConversationID: meta.ConversationID, Messages: []SessionChatMessage{}, Background: []SessionBackgroundTask{}, Failure: s.sessionInfo(meta).Failure}
 	if meta.Harness != s.settings.Load().chatHarness() {
 		out.Unsupported = true
 		writeJSON(w, out)

@@ -36,6 +36,7 @@ func (s *Server) resumeSession(req SessionRequest) (SessionResult, error) {
 	if res := resumeRefusal(meta); res.Refused {
 		return res, nil
 	}
+	meta.RestoredAt = time.Now()
 	if err := s.startResumedHolder(dir, &meta, time.Time{}); err != nil {
 		s.endFailedStart(dir, &meta)
 		return SessionResult{}, err
@@ -68,6 +69,7 @@ func (s *Server) startResumedHolder(dir string, meta *sessionMeta, crashUntil ti
 	}
 	meta.Run++
 	meta.Status, meta.StatusChangedAt, meta.Exit, meta.Stopped = SessionStatus{}, time.Now(), "", false
+	meta.RestoreCrashed = false
 	if err := s.startSessionHolder(dir, meta, 0, 0, true); err != nil {
 		return err
 	}
@@ -167,6 +169,7 @@ func (s *Server) autoResumeSession(id string) {
 	}
 	if reason == "" {
 		ended := meta
+		meta.RestoredAt = time.Time{}
 		if meta.Status.State == SessionWorking {
 			s.raiseUnread(&meta)
 			meta.Unread.Resumed = meta.Unread.Unread

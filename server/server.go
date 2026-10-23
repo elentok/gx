@@ -284,6 +284,9 @@ type Config struct {
 	// ChatPollInterval is how often a working session's transcript size is
 	// checked; zero means defaultChatPollInterval.
 	ChatPollInterval time.Duration
+	// StallThreshold is how long a Working session's transcript may stay
+	// untouched before it counts as stalled; zero means defaultStallThreshold.
+	StallThreshold time.Duration
 }
 
 // Defaults for the session-prompting timings in Config. A zero Config field
@@ -392,6 +395,9 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.ChatPollInterval == 0 {
 		cfg.ChatPollInterval = defaultChatPollInterval
+	}
+	if cfg.StallThreshold == 0 {
+		cfg.StallThreshold = defaultStallThreshold
 	}
 	if cfg.SessionsDir == "" {
 		data, err := config.DataDir()

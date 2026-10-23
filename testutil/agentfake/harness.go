@@ -143,6 +143,8 @@ func (w *programWatcher) Program(r harness.ProgramReport) {
 		// idle without done is an Esc-cancel, but only of a turn or a dialog.
 		cancelled := w.status.State == harness.Working || w.status.State == harness.Blocked
 		w.status = harness.Status{State: harness.Idle, Cancelled: cancelled}
+	case "ratelimited":
+		w.status = harness.Status{State: harness.RateLimited, Message: r.Message}
 	case "blocked":
 		kind := harness.BlockedQuestion
 		if r.Kind == string(harness.BlockedPermission) {

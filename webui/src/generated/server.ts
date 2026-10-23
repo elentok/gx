@@ -838,6 +838,37 @@ export interface SessionChatResponse {
   round: SessionRoundCard[];
   next?: SessionNext;
   background: SessionBackgroundTask[];
+  /**
+   * Failure is the session's, as on its SessionInfo.
+   */
+  failure?: SessionFailure;
+}
+
+//////////
+// source: sessionfailure.go
+
+export const FailureKindCrashed = "crashed";
+export const FailureKindEnded = "ended";
+export const FailureKindAuth = "auth";
+export const FailureKindRateLimit = "rate-limit";
+export const FailureKindStalled = "stalled";
+export const FailureKindBlocked = "blocked";
+/**
+ * Kinds of SessionFailure. Not named SessionFailure*: tygo would read them as
+ * the struct's own enum.
+ */
+export type FailureKind = typeof FailureKindCrashed | typeof FailureKindEnded | typeof FailureKindAuth | typeof FailureKindRateLimit | typeof FailureKindStalled | typeof FailureKindBlocked;
+/**
+ * SessionFailure is why a session needs the person, derived from its status
+ * and, for auth and stalled, from its transcript. It clears with its
+ * condition. Recrashed marks a crashed session whose Restore crashed again
+ * within restoreCrashWindow, so the page can stop offering Restore.
+ */
+export interface SessionFailure {
+  kind: string;
+  label: string;
+  text?: string;
+  recrashed?: boolean;
 }
 
 //////////
@@ -950,6 +981,10 @@ export interface SessionInfo {
   stopped?: boolean;
   unread: SessionUnread;
   actionable: SessionActionable;
+  /**
+   * Failure is set while the session is in one of the failure states.
+   */
+  failure?: SessionFailure;
 }
 /**
  * SessionStatus is a Session status.
