@@ -73,6 +73,11 @@ to the ready epic in this same step, in one message. Write each answer into that
 (`gx tickets section <addr> "Open questions" -`, or a `## Decisions` section). Never ask a `design`
 question: it travels with its ticket into the map epic.
 
+Make each question answerable on its own; the user should not have to match numbers back to the
+table. Group the questions by ticket. For each ticket, give its address and title, one or two lines
+on what the ticket is about and what the fix changes, then each question with the options and a
+default.
+
 Do not write anything before approval.
 
 ## 5. Execute
