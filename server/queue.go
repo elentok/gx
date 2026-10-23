@@ -254,30 +254,53 @@ func resolveAgent(name string) (ralphloop.AgentKind, *QueueResult) {
 	return agent, nil
 }
 
-// epicRefusal checks that an epic address names an epic with a ticket left to
-// run, or returns the refusal.
-func (s *Server) epicRefusal(addr string, project, epic string) *QueueResult {
-	epics, err := s.projectEpics(project)
-	if err != nil {
-		r := refusal(ReasonUnknownTicket, "no epic "+addr)
-		return &r
+// queueTarget is what a queue request names: one ticket, or a whole epic.
+type queueTarget struct {
+	address string // canonical form, the queue key
+	project string
+	epic    string // set only for an epic target
+}
+
+func (t queueTarget) isEpic() bool { return t.epic != "" }
+
+// parseQueueTarget parses a request address once, or returns the refusal.
+func parseQueueTarget(raw string) (queueTarget, *QueueResult) {
+	if project, epic, ok := tickets.ParseEpicAddress(raw); ok {
+		return queueTarget{address: raw, project: project, epic: epic}, nil
 	}
-	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == epic })
-	if i < 0 {
-		r := refusal(ReasonUnknownTicket, "no epic "+addr)
+	addr, bad := canonical(raw)
+	if bad != nil {
+		return queueTarget{}, bad
+	}
+	return queueTarget{address: addr, project: projectOfAddress(addr)}, nil
+}
+
+// refusal returns why t cannot be queued, or nil.
+func (s *Server) refusal(t queueTarget) *QueueResult {
+	if !t.isEpic() {
+		if !s.hasTicket(t.address) {
+			r := refusal(ReasonUnknownTicket, "no ticket "+t.address)
+			return &r
+		}
+		return s.mapEpicRefusal(t.address)
+	}
+	epics, err := s.projectEpics(t.project)
+	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == t.epic })
+	if err != nil || i < 0 {
+		r := refusal(ReasonUnknownTicket, "no epic "+t.address)
 		return &r
 	}
 	e := epics[i]
 	var r QueueResult
 	switch {
 	case e.IsMap:
-		r = refusal(ReasonMapEpic, addr+" is a map epic; its tickets are resolved by hand, not scheduled")
+		r = refusal(ReasonMapEpic, t.address+" is a map epic; its tickets are resolved by hand, not scheduled")
 	case !e.MergedAt.IsZero():
-		r = refusal(ReasonAlreadyMerged, addr+" is already merged")
+		r = refusal(ReasonAlreadyMerged, t.address+" is already merged")
 	case e.Status == string(schema.StatusDraft):
-		r = refusal(ReasonEpicDraft, addr+" is a draft; its tickets are still being created")
+		r = refusal(ReasonEpicDraft, t.address+" is a draft; its tickets are still being created")
 	case !epicQueueable(e, false):
-		r = refusal(ReasonNoOpenTickets, addr+" has no open ticket")
+		r = refusal(ReasonNoOpenTickets, t.address+" has no open ticket")
 	default:
 		return nil
 	}
@@ -285,31 +308,18 @@ func (s *Server) epicRefusal(addr string, project, epic string) *QueueResult {
 }
 
 func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
-	project, epic, isEpic := tickets.ParseEpicAddress(req.Address)
-	addr := req.Address
-	if !isEpic {
-		var bad *QueueResult
-		if addr, bad = canonical(req.Address); bad != nil {
-			return *bad, nil
-		}
+	target, bad := parseQueueTarget(req.Address)
+	if bad != nil {
+		return *bad, nil
 	}
+	addr := target.address
 	agent, badAgent := resolveAgent(req.Agent)
 	if badAgent != nil {
 		return *badAgent, nil
 	}
 	return s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
-		if isEpic {
-			if r := s.epicRefusal(addr, project, epic); r != nil {
-				return nil, r
-			}
-		} else {
-			if !s.hasTicket(addr) {
-				r := refusal(ReasonUnknownTicket, "no ticket "+addr)
-				return nil, &r
-			}
-			if r := s.mapEpicRefusal(addr); r != nil {
-				return nil, r
-			}
+		if r := s.refusal(target); r != nil {
+			return nil, r
 		}
 		for _, it := range items {
 			if it.Address == addr {
@@ -326,10 +336,11 @@ func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 }
 
 func (s *Server) queueRemove(req QueueRequest) (QueueResult, error) {
-	addr, bad := canonical(req.Address)
+	target, bad := parseQueueTarget(req.Address)
 	if bad != nil {
 		return *bad, nil
 	}
+	addr := target.address
 	return s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
 		if indexOfAddr(items, addr) < 0 {
 			r := refusal(ReasonNotQueued, addr+" is not queued")
@@ -453,10 +464,11 @@ func dropAddresses(items []QueueItem, drop map[string]bool) []QueueItem {
 }
 
 func (s *Server) queueMove(req QueueRequest) (QueueResult, error) {
-	addr, bad := canonical(req.Address)
+	target, bad := parseQueueTarget(req.Address)
 	if bad != nil {
 		return *bad, nil
 	}
+	addr := target.address
 	return s.writeQueue(addr, func(items []QueueItem) ([]QueueItem, *QueueResult) {
 		from := -1
 		for i, it := range items {

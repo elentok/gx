@@ -73,6 +73,32 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 	}
 }
 
+func TestQueue_MoveAndRemoveAcceptAnEpicAddress(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "second", "")
+	h := servertest.StartWithStore(t, store)
+	for _, a := range []string{"proj:epic-a", "proj:epic-b"} {
+		if res, err := h.Client.QueueAdd(t.Context(), a, ""); err != nil || res.Refused {
+			t.Fatalf("add %s = %+v, %v", a, res, err)
+		}
+	}
+
+	if res, err := h.Client.QueueMove(t.Context(), "proj:epic-b", 1); err != nil || res.Refused {
+		t.Fatalf("move = %+v, %v; want accepted", res, err)
+	}
+	if got := queueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-b", "proj:epic-a"}) {
+		t.Errorf("queue after move = %v", got)
+	}
+
+	if res, err := h.Client.QueueRemove(t.Context(), "proj:epic-b"); err != nil || res.Refused {
+		t.Fatalf("remove = %+v, %v; want accepted", res, err)
+	}
+	if got := queueAddresses(t, h); !reflect.DeepEqual(got, []string{"proj:epic-a"}) {
+		t.Errorf("queue after remove = %v", got)
+	}
+}
+
 func TestQueue_AddEpicAddressQueuesOneEntry(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
