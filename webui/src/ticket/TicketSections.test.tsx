@@ -73,6 +73,24 @@ test("Related shows reason and status, links to the ticket page, and names other
   expect(screen.getByRole("link", { name: "Title of other-epic/07" }).getAttribute("href")).toBe("#/t/gx:other-epic/07");
 });
 
+test("Related tones each status word like the epic page", async () => {
+  renderTicket({
+    ...plain,
+    related: [
+      related("blocker", "gx:demo/03", "needs-answer"),
+      related("blocker", "gx:demo/04", "needs-repair"),
+      related("blocker", "gx:demo/05", "done"),
+      related("blocker", "gx:demo/06", "error"),
+    ],
+  });
+  await screen.findByText("Title of demo/03");
+  const toneOf = (title: string) => screen.getByText(title).closest("[data-tone]")!.getAttribute("data-tone");
+  expect(toneOf("Title of demo/03")).toBe("paused");
+  expect(toneOf("Title of demo/04")).toBe("deadlocked");
+  expect(toneOf("Title of demo/05")).toBe("done");
+  expect(toneOf("Title of demo/06")).toBe("deadlocked");
+});
+
 test("Description renders the body as markdown without the Paused section", async () => {
   renderTicket({
     ...plain,

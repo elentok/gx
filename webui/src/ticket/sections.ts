@@ -1,6 +1,5 @@
 import type { RelatedTicket, TicketDetail } from "../generated/server";
-import { RelationBlocker, RelationParent } from "../generated/server";
-import type { Tone } from "../ui/tone";
+import { RelationBlocker, RelationFork, RelationParent } from "../generated/server";
 import { epicOfTicket } from "./detail";
 
 const FENCE = /^\s*(```|~~~)/;
@@ -48,14 +47,7 @@ const REASONS: Record<string, string> = {
   [RelationParent]: "forked from",
 };
 
-export const reasonOf = (r: RelatedTicket) => `${REASONS[r.relation] ?? "fork"} · ${r.status}`;
-
-export function toneOfStatus(status: string): Tone {
-  if (status === "done") return "done";
-  if (status === "claimed") return "running";
-  if (status === "paused") return "paused";
-  return "muted";
-}
+export const reasonOf = (r: RelatedTicket) => `${REASONS[r.relation] ?? RelationFork} · ${r.status}`;
 
 // A blocker that names no ticket has no address to link and keeps its text.
 export const isLinkable = (r: RelatedTicket) => r.address.includes(":");

@@ -5,7 +5,8 @@ import { SectionHeading } from "../page/SectionHeading";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import type { Tone } from "../ui/tone";
 import { runLine } from "./runs";
-import { isLinkable, pageText, reasonOf, relatedId, toneOfStatus } from "./sections";
+import { toneOfStatus } from "../epic/rows";
+import { isLinkable, pageText, reasonOf, relatedId } from "./sections";
 
 function Section({ id, tone, title, children }: { id: string; tone: Tone; title: string; children: React.ReactNode }) {
   return (

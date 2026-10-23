@@ -17,7 +17,8 @@ const BUCKETS: Record<string, Bucket> = {
 };
 
 // Everything else (blocked, open, draft) waits. A row waiting for children is not stuck, so it is muted.
-const bucketOf = (row: EpicDetailRow): Bucket => BUCKETS[row.rendered_status] ?? "waiting";
+const bucketOfStatus = (status: string): Bucket => BUCKETS[status] ?? "waiting";
+const bucketOf = (row: EpicDetailRow): Bucket => bucketOfStatus(row.rendered_status);
 
 const BUCKET_TONES: Record<Bucket, Tone> = {
   done: "done",
@@ -41,7 +42,8 @@ export const iconOf = (row: EpicDetailRow) => BUCKET_ICONS[bucketOf(row)];
 export const isCancelled = (row: EpicDetailRow) => row.rendered_status === "cancelled";
 export const isFolded = (row: EpicDetailRow) => bucketOf(row) === "done";
 export const isRunning = (row: EpicDetailRow) => bucketOf(row) === "running";
-export const toneOf = (row: EpicDetailRow): Tone => BUCKET_TONES[bucketOf(row)];
+export const toneOfStatus = (status: string): Tone => BUCKET_TONES[bucketOfStatus(status)];
+export const toneOf = (row: EpicDetailRow): Tone => toneOfStatus(row.rendered_status);
 
 export function segmentsOf(rows: EpicDetailRow[]): Segment[] {
   return (Object.keys(BUCKET_TONES) as Bucket[]).map((key) => ({
