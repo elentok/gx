@@ -921,6 +921,10 @@ export interface SessionPromptRequest {
   id: string;
   text: string;
   last_message?: string;
+  /**
+   * Continue replaces Text: the server types /clear and /gx-design <epic>.
+   */
+  continue?: boolean;
 }
 
 //////////

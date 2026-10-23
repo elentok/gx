@@ -79,14 +79,18 @@ func runEndNext(text, ticket string) (phase string, a SessionActionable, ok bool
 		return "", SessionActionable{}, false
 	}
 	reason := strings.TrimSpace(m[0])
-	epic := ticketEpic(ticket)
 	switch m[1] {
 	case "map", "review":
-		return m[1], SessionActionable{Reason: reason, Action: []string{"/clear", "/gx-design " + epic}}, true
+		return m[1], SessionActionable{Reason: reason, Action: designContinueAction(ticket)}, true
 	case "implement":
 		return m[1], SessionActionable{Reason: reason, Kind: SessionActionableQueue, Target: epicAddress(ticket) + "-impl"}, true
 	}
 	return "", SessionActionable{}, false
+}
+
+// designContinueAction starts the next gx-design phase in a fresh conversation.
+func designContinueAction(ticket string) []string {
+	return []string{"/clear", "/gx-design " + ticketEpic(ticket)}
 }
 
 // ticketEpic is the epic of a ticket address like "project:epic" or

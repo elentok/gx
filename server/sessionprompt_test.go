@@ -145,6 +145,61 @@ func TestWebSessionPrompt_StaleWhenTheTranscriptMoved(t *testing.T) {
 	waitForSubmitted(t, f.conv, "\"SQLite\"\n")
 }
 
+func (f promptFixture) cont(t *testing.T) server.SessionResult {
+	t.Helper()
+	res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Continue: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func TestSessionPrompt_ContinueTypesClearThenGxDesign(t *testing.T) {
+	f := startPromptSession(t)
+	if res := f.cont(t); res.Refused {
+		t.Fatalf("continue = %+v", res)
+	}
+	waitForSubmitted(t, f.conv, "\"/clear\"\n\"/gx-design map\"\n")
+	evs, ok, err := ralphloop.ReadServerEvents(f.h.TicketStore)
+	if err != nil || !ok || len(evs) != 1 || evs[0].Action != "continue" || evs[0].Bytes != 0 {
+		t.Errorf("server events = %+v, ok=%v, err=%v; want one continue", evs, ok, err)
+	}
+}
+
+func TestSessionPrompt_ContinueRefusedOnANonDesignSession(t *testing.T) {
+	f := startPromptSession(t)
+	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	got, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: res.Session.ID, Continue: true})
+	if err != nil || !got.Refused || got.Reason != server.ReasonNotDesignSession {
+		t.Errorf("continue = %+v, %v; want %s", got, err, server.ReasonNotDesignSession)
+	}
+}
+
+func TestWebSessionPrompt_StaleContinueIsRefused(t *testing.T) {
+	f := startPromptSession(t)
+	writeTranscript(t, f.transcript,
+		`{"type":"assistant","uuid":"a1","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"Which store?"}]}}`,
+		`{"type":"assistant","uuid":"a2","timestamp":"2026-01-01T10:00:01Z","message":{"content":[{"type":"text","text":"Or files?"}]}}`,
+	)
+	post := func(last string) (int, string) {
+		body := fmt.Sprintf(`{"id":%q,"continue":true,"last_message":%q}`, f.id, last)
+		return webPostJSON(t, f.base+"/v1/sessions/prompt", body, f.ck, "", jsonPost(f.base))
+	}
+	if code, out := post("a1"); code != http.StatusOK || reasonOf(t, out) != server.ReasonStale {
+		t.Errorf("old message id = %d %s, want stale", code, out)
+	}
+	if got := submitted(t, f.conv); got != "" {
+		t.Errorf("stale continue typed %q", got)
+	}
+	if code, out := post("a2"); code != http.StatusOK || reasonOf(t, out) != "" {
+		t.Errorf("current message id = %d %s, want sent", code, out)
+	}
+	waitForSubmitted(t, f.conv, "\"/clear\"\n\"/gx-design map\"\n")
+}
+
 func TestWebSessionPrompt_KeepsTheWriteChecks(t *testing.T) {
 	f := startPromptSession(t)
 	url := f.base + "/v1/sessions/prompt"

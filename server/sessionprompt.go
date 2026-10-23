@@ -35,6 +35,8 @@ type SessionPromptRequest struct {
 	ID          string `json:"id"`
 	Text        string `json:"text"`
 	LastMessage string `json:"last_message,omitempty"`
+	// Continue replaces Text: the server types /clear and /gx-design <epic>.
+	Continue bool `json:"continue,omitempty"`
 }
 
 func (s *Server) sessionPromptWrite(w http.ResponseWriter, r *http.Request) {
@@ -76,13 +78,15 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		return sessionRefusal(ReasonHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
 	}
 	text := strings.TrimSpace(normalizeAnswer(req.Text))
-	switch {
-	case text == "":
-		return sessionRefusal(ReasonEmptyPrompt, "text to type is required"), nil
-	case strings.HasPrefix(text, "/") || strings.HasPrefix(text, "!"):
-		return sessionRefusal(ReasonPrefixNotAllowed, "text may not start with / or !"), nil
-	case len(text) > maxSessionPromptBytes:
-		return sessionRefusal(ReasonTextTooLong, fmt.Sprintf("text is over %d bytes", maxSessionPromptBytes)), nil
+	if !req.Continue {
+		switch {
+		case text == "":
+			return sessionRefusal(ReasonEmptyPrompt, "text to type is required"), nil
+		case strings.HasPrefix(text, "/") || strings.HasPrefix(text, "!"):
+			return sessionRefusal(ReasonPrefixNotAllowed, "text may not start with / or !"), nil
+		case len(text) > maxSessionPromptBytes:
+			return sessionRefusal(ReasonTextTooLong, fmt.Sprintf("text is over %d bytes", maxSessionPromptBytes)), nil
+		}
 	}
 	if source == promptSourceWeb {
 		last, err := s.lastChatMessageID(req.ID, meta)
@@ -96,12 +100,27 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 	if st := meta.info().Status.State; st != SessionIdle {
 		return sessionRefusal(ReasonSessionNotIdle, fmt.Sprintf("session %s is %s, not idle", req.ID, st)), nil
 	}
-	if err := typeSessionPrompt(dir, text); err != nil {
-		return SessionResult{}, err
-	}
 	ev := ralphloop.Event{
 		Time: time.Now(), Type: string(events.SessionPrompted),
 		Session: req.ID, Source: source, Action: "text", Bytes: len(text),
+	}
+	if req.Continue {
+		// The server builds the slash commands, so the prefix rule stays closed
+		// to the page.
+		action := designContinueAction(meta.Ticket)
+		meta.Actionable = SessionActionable{}
+		if err := writeSessionMeta(dir, meta); err != nil {
+			return SessionResult{}, err
+		}
+		s.events.publish(EventSessionChanged, req.ID)
+		s.sessionWatches.start(func() {
+			if err := s.sendAction(dir, action); err != nil {
+				s.log.Info("continue stopped", "session", req.ID, "err", err)
+			}
+		})
+		ev.Action, ev.Bytes = "continue", 0
+	} else if err := typeSessionPrompt(dir, text); err != nil {
+		return SessionResult{}, err
 	}
 	if err := ralphloop.AppendServerEvent(s.cfg.TicketStore, ev); err != nil {
 		s.log.Warn("logging session prompt", "session", req.ID, "err", err)
