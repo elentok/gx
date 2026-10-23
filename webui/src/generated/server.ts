@@ -150,6 +150,27 @@ export interface TicketDetail {
    */
   pause_reason?: string;
   /**
+   * PauseLabel is PauseReason in the plain words the summaries and Queue show.
+   */
+  pause_label?: string;
+  /**
+   * PauseText is the body's "## Paused" section; the body keeps it too, so the
+   * client leaves it out of the description.
+   */
+  pause_text?: string;
+  type?: string;
+  epic: string;
+  /**
+   * MapEpic is set for a ticket of a map epic, which has no stats and never pauses.
+   */
+  map_epic: boolean;
+  /**
+   * Body is the whole body markdown, comments included.
+   */
+  body?: string;
+  related: RelatedTicket[];
+  stats?: DetailStats;
+  /**
    * Answered is derived, never stored: the ticket is open again and its
    * latest question has an answer.
    */
@@ -174,6 +195,47 @@ export interface TicketDetail {
    */
   bases?: string[];
   actions: string[];
+}
+
+//////////
+// source: detailrelated.go
+
+export const RelationBlocker = "blocker";
+export const RelationParent = "parent";
+export const RelationFork = "fork";
+/**
+ * Relations a related ticket has to the one on the page.
+ */
+export type Relation = typeof RelationBlocker | typeof RelationParent | typeof RelationFork;
+/**
+ * RelatedTicket is one ticket line of the detail page's Related section.
+ */
+export interface RelatedTicket {
+  relation: string;
+  /**
+   * Address is canonical for a ticket of the same project. A blocker that
+   * names no ticket keeps the token as written.
+   */
+  address: string;
+  title: string;
+  /**
+   * Status is the rendered-status word the epic rows use.
+   */
+  status: string;
+}
+/**
+ * DetailStats is the stat line of a loop ticket. Cost and ContextWindow come
+ * from the merge stamps and stay empty until the ticket merges. A map ticket
+ * has no stats.
+ */
+export interface DetailStats {
+  /**
+   * Elapsed is in seconds; a claimed ticket ticks on the client from ClaimedAt.
+   */
+  elapsed?: number /* int */;
+  claimed_at?: string;
+  cost?: number /* float64 */;
+  context_window?: number /* int */;
 }
 
 //////////

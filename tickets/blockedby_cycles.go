@@ -25,6 +25,11 @@ func crossEpicRef(ref string) bool {
 	return strings.Contains(ref, "/") || !ticketIDRe.MatchString(ref)
 }
 
+// IsWholeEpicRef reports whether a blocked_by token names a whole epic.
+func IsWholeEpicRef(ref string) bool {
+	return !strings.Contains(ref, "/") && !ticketIDRe.MatchString(ref)
+}
+
 // EpicRelease is when a whole-epic blocker releases its dependents, from the
 // project's merge-release policy and auto-ff-merge. The zero value is the
 // default on-merge policy.

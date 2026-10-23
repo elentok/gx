@@ -86,6 +86,19 @@ type TicketDetail struct {
 	Status  string `json:"status"`
 	// PauseReason picks the action the page labels: Answer, Choose base, Retry or Resume.
 	PauseReason string `json:"pause_reason,omitempty"`
+	// PauseLabel is PauseReason in the plain words the summaries and Queue show.
+	PauseLabel string `json:"pause_label,omitempty"`
+	// PauseText is the body's "## Paused" section; the body keeps it too, so the
+	// client leaves it out of the description.
+	PauseText string `json:"pause_text,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Epic      string `json:"epic"`
+	// MapEpic is set for a ticket of a map epic, which has no stats and never pauses.
+	MapEpic bool `json:"map_epic"`
+	// Body is the whole body markdown, comments included.
+	Body    string          `json:"body,omitempty"`
+	Related []RelatedTicket `json:"related"`
+	Stats   *DetailStats    `json:"stats,omitempty"`
 	// Answered is derived, never stored: the ticket is open again and its
 	// latest question has an answer.
 	Answered bool `json:"answered"`
@@ -133,7 +146,20 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	d := TicketDetail{
 		Address: ref.addr.String(), Title: ref.ticket.Title, Status: string(storedStatus(t)), PauseReason: string(t.PauseReason),
 		Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{},
+		PauseLabel: t.PauseReason.Label(), Type: ref.ticket.Type, Epic: rootOf(ref.addr).String(),
+		MapEpic: ref.epic.IsMap, Body: ref.ticket.Body,
 	}
+	if t.PausedClass() != "" {
+		d.PauseText = schema.Section(ref.ticket.Body, "Paused")
+	}
+	if !ref.epic.IsMap {
+		d.Stats = s.detailStats(ref)
+	}
+	epics, err := s.projectEpics(ref.addr.Project)
+	if err != nil {
+		return TicketDetail{}, err
+	}
+	d.Related = relatedTickets(ref, epics)
 	if t.Status == schema.StatusClaimed {
 		if d.Permission, err = s.permissionCard(ref.addr); err != nil {
 			return TicketDetail{}, err
