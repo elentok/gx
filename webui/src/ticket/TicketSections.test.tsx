@@ -3,10 +3,11 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test } from "vitest";
 import canned from "../canned-detail.json";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { RelatedTicket, TicketDetail } from "../generated/server";
+import type { DetailRun, RelatedTicket, TicketDetail } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchDetail } from "./detail";
+import { formatStart } from "./runs";
 
 afterEach(cleanup);
 
@@ -17,6 +18,7 @@ const plain: TicketDetail = {
   status: "open",
   body: "",
   related: [],
+  runs: [],
   pause_text: undefined,
   rounds: [],
   latest: undefined,
@@ -114,4 +116,39 @@ test("a closed map ticket with no resolution text hides Resolution", async () =>
   renderTicket({ ...plain, map_epic: true, status: "done", body: "## Question\n\nWhich store?\n\n## Resolution\n" });
   await screen.findByText("Which store?");
   expect(headings()).toEqual(["Question"]);
+});
+
+const run = (start: string, over: Partial<DetailRun> = {}): DetailRun => ({
+  start,
+  duration: 90,
+  outcome: "merged",
+  start_kind: "new-session",
+  ...over,
+});
+
+test("Runs lists each run in order with start, duration, outcome and session word", async () => {
+  const runs = [
+    run("2026-01-01T09:00:00Z", { outcome: "paused", pause_label: "Needs an answer", duration: 600 }),
+    run("2026-01-01T09:30:00Z", { start_kind: "same-session" }),
+    run("2026-01-01T10:00:00Z", { outcome: "agent-lost", duration: undefined }),
+  ];
+  renderTicket({ ...plain, runs });
+  const section = await screen.findByRole("region", { name: "Runs" });
+  const lines = screen.getAllByRole("listitem").map((l) => l.textContent);
+  expect(lines).toEqual([
+    `${formatStart(runs[0].start)} · 10m · paused · Needs an answer · new session`,
+    `${formatStart(runs[1].start)} · 1m · merged · same session`,
+    `${formatStart(runs[2].start)} · agent lost · new session`,
+  ]);
+  expect(section.textContent).not.toMatch(/resumed|claim|reopen/i);
+});
+
+test("Runs is hidden for a ticket with no runs and for a map ticket", async () => {
+  renderTicket({ ...plain, body: "Some text." });
+  await screen.findByText("Some text.");
+  expect(screen.queryByRole("region", { name: "Runs" })).toBeNull();
+  cleanup();
+  renderTicket({ ...plain, map_epic: true, body: "## Question\n\nWhich store?", runs: [run("2026-01-01T09:00:00Z")] });
+  await screen.findByText("Which store?");
+  expect(screen.queryByRole("region", { name: "Runs" })).toBeNull();
 });

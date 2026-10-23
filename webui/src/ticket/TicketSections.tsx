@@ -4,6 +4,7 @@ import { Markdown } from "../markdown/Markdown";
 import { SectionHeading } from "../page/SectionHeading";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import type { Tone } from "../ui/tone";
+import { runLine } from "./runs";
 import { isLinkable, pageText, reasonOf, relatedId, toneOfStatus } from "./sections";
 
 function Section({ id, tone, title, children }: { id: string; tone: Tone; title: string; children: React.ReactNode }) {
@@ -17,14 +18,16 @@ function Section({ id, tone, title, children }: { id: string; tone: Tone; title:
   );
 }
 
+const showsRuns = (d: TicketDetail) => !d.map_epic && d.runs.length > 0;
+
 /** Whether any section shows, so the page can say it has nothing. */
 export const hasSections = (d: TicketDetail) => {
   const { resolution, description } = pageText(d);
-  return !!resolution || !!description || d.related.length > 0;
+  return !!resolution || !!description || d.related.length > 0 || showsRuns(d);
 };
 
-// Resolution (map tickets), Related, then the description, each hidden when empty.
-export function TicketSections({ detail }: { detail: TicketDetail }) {
+// Resolution (map tickets), Related, the description, then Runs, each hidden when empty.
+export function TicketSections({ detail, now }: { detail: TicketDetail; now: number }) {
   const { resolution, description } = pageText(detail);
   const epic = detail.epic;
   return (
@@ -58,6 +61,17 @@ export function TicketSections({ detail }: { detail: TicketDetail }) {
           <Markdown epic={epic} smallHeadings>
             {description}
           </Markdown>
+        </Section>
+      )}
+      {showsRuns(detail) && (
+        <Section id="ticket-runs" tone="muted" title="Runs">
+          <Box as="ul" listStyleType="none" display="flex" flexDirection="column" gap="1">
+            {detail.runs.map((r) => (
+              <Text as="li" key={r.start} fontSize="sm">
+                {runLine(r, now)}
+              </Text>
+            ))}
+          </Box>
         </Section>
       )}
     </>

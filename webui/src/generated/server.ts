@@ -251,6 +251,50 @@ export interface DetailStats {
 }
 
 //////////
+// source: detailruns.go
+
+export const RunMerged = "merged";
+export const RunMergedNoCommits = "merged-no-commits";
+export const RunPaused = "paused";
+export const RunStartedOver = "started-over";
+export const RunRunning = "running";
+export const RunAgentLost = "agent-lost";
+/**
+ * RunAgentGoneAfterRestart is a run a restarted server found dead with no
+ * work to keep, and put back in the queue.
+ */
+export const RunAgentGoneAfterRestart = "agent-gone-after-restart";
+export const RunRelaunched = "relaunched";
+export const RunCancelled = "cancelled";
+/**
+ * Outcomes of a run line.
+ */
+export type Run = typeof RunMerged | typeof RunMergedNoCommits | typeof RunPaused | typeof RunStartedOver | typeof RunRunning | typeof RunAgentLost | typeof RunAgentGoneAfterRestart | typeof RunRelaunched | typeof RunCancelled;
+export const StartNewSession = "new-session";
+export const StartSameSession = "same-session";
+/**
+ * How a run began. The run log keeps cold-start and resumed; the page labels
+ * them "new session" and "same session".
+ */
+export type Start = typeof StartNewSession | typeof StartSameSession;
+/**
+ * DetailRun is one run line of the Runs section.
+ */
+export interface DetailRun {
+  start: string;
+  /**
+   * Duration is in seconds; a running or lost run has none.
+   */
+  duration?: number /* int */;
+  outcome: string;
+  /**
+   * PauseLabel is the reason label of a run that ended in a pause.
+   */
+  pause_label?: string;
+  start_kind: string;
+}
+
+//////////
 // source: epicdetail.go
 
 export const EpicKindLoop = "loop";

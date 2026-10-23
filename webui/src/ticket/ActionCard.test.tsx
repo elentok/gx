@@ -13,7 +13,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const base = { ...canned, epic: "gx:demo", map_epic: false, related: [] } as TicketDetail;
+const base = { ...canned, epic: "gx:demo", map_epic: false, related: [], runs: [] } as TicketDetail;
 const plain: TicketDetail = {
   ...base,
   status: "open",

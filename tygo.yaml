@@ -6,6 +6,7 @@ packages:
       - budget.go
       - detail.go
       - detailrelated.go
+      - detailruns.go
       - epicdetail.go
       - epiclist.go
       - epicsummary.go

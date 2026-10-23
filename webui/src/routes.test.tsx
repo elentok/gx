@@ -27,6 +27,7 @@ const detailOf = (address: string): TicketDetail => ({
   epic: "proj:work",
   map_epic: false,
   related: [],
+  runs: [],
   answered: false,
   rounds: [],
   chat: [],
@@ -407,6 +408,25 @@ test("a running ticket shows the arc and its elapsed time ticks", async () => {
       await vi.advanceTimersByTimeAsync(TICK_MS * 2);
     });
     expect(screen.getByText("implement · 4m")).toBeTruthy();
+    conn.stop();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("the running last run's duration ticks", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+  try {
+    vi.setSystemTime(new Date("2026-01-01T10:00:00Z"));
+    const conn = createConnection({ fetchSnapshot: async () => emptySnapshot, openStream: () => new Promise(() => {}) });
+    conn.start();
+    const runs = [{ start: "2026-01-01T09:58:00Z", outcome: "running", start_kind: "new-session" }];
+    renderAt("/t/proj:work/01", withDetail({ status: "claimed", runs }), conn);
+    expect(await screen.findByText(/· 2m · running · new session/)).toBeTruthy();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(TICK_MS * 2);
+    });
+    expect(screen.getByText(/· 4m · running · new session/)).toBeTruthy();
     conn.stop();
   } finally {
     vi.useRealTimers();

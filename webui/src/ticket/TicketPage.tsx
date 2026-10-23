@@ -42,7 +42,7 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
               onResumed={setResumed}
               refetch={refetch}
             />
-            <TicketSections detail={detail} />
+            <TicketSections detail={detail} now={Date.now()} />
             {!hasSections(detail) && !needsActionCard(detail, sent, resumed) && <NothingHere />}
           </>
         ) : (
