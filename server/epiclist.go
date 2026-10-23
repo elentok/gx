@@ -33,6 +33,30 @@ const (
 	EpicListNoOpenTickets EpicListState = "no-open-tickets"
 )
 
+// ProgressStep is the step a map's design has reached; see mapProgress.
+type ProgressStep string
+
+const (
+	ProgressChart          ProgressStep = "chart"
+	ProgressResolveTickets ProgressStep = "resolve-tickets"
+	ProgressSpec           ProgressStep = "spec"
+	ProgressReview         ProgressStep = "review"
+	ProgressGrillFindings  ProgressStep = "grill-findings"
+	ProgressCreateTickets  ProgressStep = "create-tickets"
+	ProgressBranch         ProgressStep = "branch"
+	ProgressDone           ProgressStep = "done"
+)
+
+// ProgressPhase groups the steps: Map is Chart and Resolve tickets, Review is
+// Spec through Branch, Implement is Done.
+type ProgressPhase string
+
+const (
+	ProgressPhaseMap       ProgressPhase = "map"
+	ProgressPhaseReview    ProgressPhase = "review"
+	ProgressPhaseImplement ProgressPhase = "implement"
+)
+
 // followUpsEpicName is every project's contributor outbox epic.
 const followUpsEpicName = "follow-ups"
 
@@ -63,6 +87,9 @@ type EpicListRow struct {
 	// see EpicDetail.
 	MergeBlockKind   string `json:"land_block_kind,omitempty"`
 	MergeBlockReason string `json:"land_block_reason,omitempty"`
+	// ProgressStep and ProgressPhase are set only on a map row.
+	ProgressStep  ProgressStep  `json:"progress_step,omitempty"`
+	ProgressPhase ProgressPhase `json:"progress_phase,omitempty"`
 }
 
 // FollowUpCount is the number of draft and open tickets in one project's
@@ -136,18 +163,29 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 			continue
 		}
 		merged := map[string]bool{}
+		byName := map[string]tickets.Epic{}
+		hasMap := false
 		for _, e := range epics {
 			merged[e.Name] = !e.MergedAt.IsZero()
+			byName[e.Name] = e
+			hasMap = hasMap || (e.IsMap && epicListed(e))
 			if e.Name == followUpsEpicName {
 				if open := openFollowUps(e); open > 0 {
 					list.FollowUps = append(list.FollowUps, FollowUpCount{Project: project, Open: open})
 				}
 			}
 		}
+		var probe mapProbe
+		if hasMap {
+			probe = s.mapProbeFor(project)
+		}
 		for _, e := range epics {
 			if epicListed(e) {
 				row := s.epicListRow(project, e)
 				row.BlockedByEpics = unmergedBlockers(project, e, merged)
+				if e.IsMap {
+					row.ProgressStep, row.ProgressPhase = mapProgress(e, byName, probe)
+				}
 				list.Epics = append(list.Epics, row)
 			}
 		}

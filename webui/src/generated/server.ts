@@ -381,26 +381,47 @@ export interface EpicDetail {
 // source: epiclist.go
 
 /**
- * EpicListState is EpicListRow.State. It is wider than EpicState: it also
+ * EpicListState is EpicListRow.State. It is a superset of EpicState: it also
  * names the epics the Epics page lists that no queue item holds.
  */
 export type EpicListState = string;
+export const EpicListFinished = any;
+export const EpicListRunning = any;
+export const EpicListAwaitingMerge = any;
+export const EpicListMerging = any;
+export const EpicListPaused = any;
+export type EpicList = typeof EpicListFinished | typeof EpicListRunning | typeof EpicListAwaitingMerge | typeof EpicListMerging | typeof EpicListPaused;
 export const EpicListReady: EpicListState = "ready";
 export const EpicListDesigning: EpicListState = "designing";
 export const EpicListWaitingToDesign: EpicListState = "waiting-to-design";
-export const EpicListFinished: EpicListState = "finished";
 export const EpicListQueued: EpicListState = "queued";
-export const EpicListRunning: EpicListState = "running";
-export const EpicListAwaitingMerge: EpicListState = "awaiting-merge";
 export const EpicListMergeBlocked: EpicListState = "merge-blocked";
-export const EpicListMerging: EpicListState = "merging";
-export const EpicListPaused: EpicListState = "paused";
 export const EpicListDraft: EpicListState = "draft";
 /**
  * EpicListNoOpenTickets is an open, unqueued loop epic with no open ticket:
  * nothing to queue, yet not finished.
  */
 export const EpicListNoOpenTickets: EpicListState = "no-open-tickets";
+/**
+ * ProgressStep is the step a map's design has reached; see mapProgress.
+ */
+export type ProgressStep = string;
+export const ProgressChart: ProgressStep = "chart";
+export const ProgressResolveTickets: ProgressStep = "resolve-tickets";
+export const ProgressSpec: ProgressStep = "spec";
+export const ProgressReview: ProgressStep = "review";
+export const ProgressGrillFindings: ProgressStep = "grill-findings";
+export const ProgressCreateTickets: ProgressStep = "create-tickets";
+export const ProgressBranch: ProgressStep = "branch";
+export const ProgressDone: ProgressStep = "done";
+/**
+ * ProgressPhase groups the steps: Map is Chart and Resolve tickets, Review is
+ * Spec through Branch, Implement is Done.
+ */
+export const ProgressPhaseMap = "map";
+export const ProgressPhaseReview = "review";
+export const ProgressPhaseImplement = "implement";
+export type ProgressPhase = typeof ProgressPhaseMap | typeof ProgressPhaseReview | typeof ProgressPhaseImplement;
 /**
  * EpicListRow is one epic of the /v1/epics payload.
  */
@@ -442,6 +463,11 @@ export interface EpicListRow {
    */
   land_block_kind?: string;
   land_block_reason?: string;
+  /**
+   * ProgressStep and ProgressPhase are set only on a map row.
+   */
+  progress_step?: ProgressStep;
+  progress_phase?: ProgressPhase;
 }
 /**
  * FollowUpCount is the number of draft and open tickets in one project's
@@ -454,13 +480,6 @@ export interface FollowUpCount {
 /**
  * EpicList is the /v1/epics payload.
  */
-export interface EpicList {
-  epics: EpicListRow[];
-  /**
-   * FollowUps lists only the projects with at least one open follow-up.
-   */
-  follow_ups: FollowUpCount[];
-}
 
 //////////
 // source: epicsummary.go

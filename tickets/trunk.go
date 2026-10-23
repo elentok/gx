@@ -109,6 +109,30 @@ func checkTrunk(candidate *ErrTrunkMissing) (string, error) {
 	return "", candidate
 }
 
+// ProjectRepoRoot is the root of the project's registered repo, or "" when the
+// project has none or the repo is gone.
+func ProjectRepoRoot(storePath, project string) string {
+	projectDir, err := ProjectDirByName(storePath, project)
+	if err != nil {
+		return ""
+	}
+	pf, err := config.ReadProjectFile(projectDir)
+	if err != nil || pf.Repo == nil {
+		return ""
+	}
+	repo, err := git.FindRepo(*pf.Repo)
+	if err != nil {
+		return ""
+	}
+	return repo.Root
+}
+
+// BranchExists reports whether repo has a local branch of that name. It is
+// cached on the ref files, so a listing can ask once per epic.
+func BranchExists(repo, branch string) bool {
+	return refExists(repo, "refs/heads/"+branch)
+}
+
 // TrunkCheckout is the directory a design session runs in: the repo root of a
 // normal repo, or the worktree with trunk checked out in a bare one. It is empty
 // when the project, its repo, its trunk or the trunk's worktree is missing, so

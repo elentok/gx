@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -53,6 +54,14 @@ func Section(body, heading string) string {
 		}
 	}
 	return ""
+}
+
+// HasSection reports whether body has a "## heading" section, even an empty one.
+func HasSection(body, heading string) bool {
+	_, sections := splitBodySections(body)
+	return slices.ContainsFunc(sections, func(s bodySection) bool {
+		return strings.TrimSpace(strings.TrimPrefix(s.heading, "## ")) == heading
+	})
 }
 
 // joinBodySections is splitBodySections's inverse.
