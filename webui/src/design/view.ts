@@ -34,6 +34,17 @@ const GRILLING_REASON_PREFIX = "Grilling";
 /** A Design's session sits on a ticket of its map epic, so the epic is the ticket address before the slash. */
 const designOf = (s: SessionInfo) => (s.design && s.ticket ? s.ticket.slice(0, s.ticket.indexOf("/")) : undefined);
 
+/** The session that drives a Design: the newest live one, else the newest Exited one. */
+export function designSession(address: string, sessions: SessionInfo[]): SessionInfo | undefined {
+  const newest = (list: SessionInfo[]) =>
+    list.reduce<SessionInfo | undefined>(
+      (a, s) => (!a || Date.parse(s.status_changed_at) > Date.parse(a.status_changed_at) ? s : a),
+      undefined,
+    );
+  const mine = sessions.filter((s) => designOf(s) === address);
+  return newest(mine.filter((s) => s.status.state !== "exited")) ?? newest(mine);
+}
+
 function pickerRow(row: EpicListRow, sessions: SessionInfo[]): PickerRow {
   const mine = sessions.filter((s) => designOf(s) === row.address);
   return {

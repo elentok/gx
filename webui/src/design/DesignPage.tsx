@@ -12,8 +12,10 @@ import { Sidebar } from "../ui/sidebar/Sidebar";
 import { SidebarItem } from "../ui/sidebar/SidebarItem";
 import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
+import type { FetchChat } from "./chat";
+import { DesignChat } from "./ChatLog";
 import { ImplLink, Progress } from "./Progress";
-import { filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
+import { designSession, filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
 
 const NOT_STARTED = "not-started";
 
@@ -127,13 +129,25 @@ function MobilePicker({ groups, projects, current }: { groups: PickerGroup[]; pr
 }
 
 // The Chat and Progress columns of one Design. Progress reads the Design's epic detail.
-function DesignColumns({ address, wide, fetchDetail }: { address: string; wide: boolean; fetchDetail?: FetchEpicDetail }) {
+function DesignColumns({
+  address,
+  wide,
+  fetchDetail,
+  fetchChat,
+}: {
+  address: string;
+  wide: boolean;
+  fetchDetail?: FetchEpicDetail;
+  fetchChat?: FetchChat;
+}) {
   const conn = useConnectionContext();
   const { detail } = useEpicDetail(address, conn, fetchDetail);
+  const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   return (
     <>
-      <Box aria-label="Chat" role="region">
+      <Box aria-label="Chat" role="region" display="flex" flexDirection="column" gap="3">
         {wide && detail?.impl_address && <ImplLink address={detail.impl_address} />}
+        <DesignChat session={designSession(address, sessions)} fetchChat={fetchChat} />
       </Box>
       {/* On a phone Progress sits right under the picker, above the chat. */}
       <Box aria-label="Progress" role="region" gridRow={{ base: 2, lg: "auto" }}>
@@ -148,10 +162,12 @@ export function DesignPage({
   address,
   fetchList,
   fetchDetail,
+  fetchChat,
 }: {
   address?: string;
   fetchList?: FetchEpicList;
   fetchDetail?: FetchEpicDetail;
+  fetchChat?: FetchChat;
 }) {
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -178,7 +194,7 @@ export function DesignPage({
             <MobilePicker groups={groups} projects={projects} current={address} />
           )}
           {address ? (
-            <DesignColumns address={address} wide={wide} fetchDetail={fetchDetail} />
+            <DesignColumns address={address} wide={wide} fetchDetail={fetchDetail} fetchChat={fetchChat} />
           ) : (
             <>
               <Box aria-label="Chat" role="region">
