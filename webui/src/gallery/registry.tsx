@@ -8,6 +8,7 @@ import { Button } from "../ui/button/Button";
 import { Card } from "../ui/card/Card";
 import { Chip } from "../ui/chip/Chip";
 import { DayChart } from "../ui/day-chart/DayChart";
+import { LineChart } from "../ui/day-chart/LineChart";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
@@ -16,6 +17,7 @@ import { Sidebar } from "../ui/sidebar/Sidebar";
 import { SidebarItem } from "../ui/sidebar/SidebarItem";
 import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
+import { StatCard } from "../ui/stat-card/StatCard";
 import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { TopBar } from "../ui/top-bar/TopBar";
@@ -195,6 +197,40 @@ export const galleryEntries: GalleryEntry[] = [
             folded={[{ key: "x", label: "Other", values: [1, 0, null, 0, 1, 0, 2] }]}
           />
         ),
+      },
+    ],
+  },
+  {
+    name: "LineChart",
+    cases: [
+      ...perTone((tone) => <LineChart days={chartDays} tone={tone} values={[3, 5, null, 0, 4, 2, 6]} />),
+    ],
+  },
+  {
+    name: "StatCard",
+    cases: [
+      ...perTone((tone) => (
+        <StatCard title={tone} days={chartDays} series={[{ key: tone, label: tone, tone, values: [3, 5, 2, 0, 4, 2, 6] }]} />
+      )),
+      {
+        label: "partial",
+        node: <StatCard title="Tickets merged" days={chartDays} series={[{ key: "a", label: "Tickets", tone: "running", values: [3, 5, null, 0, 4, 2, 6] }]} />,
+      },
+      {
+        label: "override",
+        node: (
+          <StatCard
+            title="Cost"
+            days={chartDays}
+            headline="$12.40"
+            small="of $50 budget"
+            series={[{ key: "a", label: "Cost", tone: "done", values: [1, 2, 3, 1, 2, 1, 2] }]}
+          />
+        ),
+      },
+      {
+        label: "line",
+        node: <StatCard title="Waiting for design" days={chartDays} chart="line" series={[{ key: "a", label: "Waiting", tone: "waiting", values: [3, 5, null, 0, 4, 2, 6] }]} />,
       },
     ],
   },
