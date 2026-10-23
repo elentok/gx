@@ -272,6 +272,13 @@ type ticketMDYAML struct {
 	MergedAt    *time.Time `yaml:"merged_at"`
 	QueuedAt    *time.Time `yaml:"queued_at"`
 
+	LinesAdded   *int                    `yaml:"lines_added"`
+	LinesRemoved *int                    `yaml:"lines_removed"`
+	TotalTokens  *int64                  `yaml:"total_tokens"`
+	ActualCost   float64                 `yaml:"actual_cost"`
+	HadCodex     bool                    `yaml:"had_codex"`
+	Friction     *schema.FrictionSummary `yaml:"friction"`
+
 	MergeBlockKind   string `yaml:"land_block_kind"`
 	MergeBlockReason string `yaml:"land_block_reason"`
 }
@@ -331,6 +338,12 @@ func loadEpicTicketMD(epic *Epic) {
 	if wire.QueuedAt != nil {
 		epic.QueuedAt = *wire.QueuedAt
 	}
+	epic.LinesAdded = wire.LinesAdded
+	epic.LinesRemoved = wire.LinesRemoved
+	epic.TotalTokens = wire.TotalTokens
+	epic.ActualCost = wire.ActualCost
+	epic.HadCodex = wire.HadCodex
+	epic.Friction = wire.Friction
 	epic.MergeBlockKind = wire.MergeBlockKind
 	epic.MergeBlockReason = wire.MergeBlockReason
 	loadEpicEvolveFields(epic, fm)

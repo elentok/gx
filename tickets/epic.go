@@ -1,6 +1,10 @@
 package tickets
 
-import "time"
+import (
+	"time"
+
+	"github.com/elentok/gx/tickets/schema"
+)
 
 // KindMap is the ticket.md `kind:` of a wayfinder map epic. A map epic is
 // hand-driven: its tickets are decisions a person resolves, so the scheduler
@@ -54,6 +58,15 @@ type Epic struct {
 	// QueuedAt is when the epic was first added to the queue; zero on an epic
 	// queued before the field existed.
 	QueuedAt time.Time
+	// The stats fields come from ticket.md's frontmatter. The pointers read nil
+	// when unstamped, so a stamped zero differs from no stamp; ActualCost is
+	// stamped whenever TotalTokens is.
+	LinesAdded   *int
+	LinesRemoved *int
+	TotalTokens  *int64
+	ActualCost   float64
+	HadCodex     bool
+	Friction     *schema.FrictionSummary
 	// MergeBlockKind and MergeBlockReason are why the last merge paused the epic;
 	// the merge step clears both before it decides. The kind is empty for a
 	// needs-rebase pause.

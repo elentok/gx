@@ -84,8 +84,8 @@ never scheduled by the server.
 
 ` + "`tickets set project:epic`" + ` (or ` + "`tickets epic set`" + `) writes an epic's kind (map, loop), status
 (draft, open), destination_unconfirmed and blocked_by (whole-epic tokens such as other or
-project:other: the whole epic waits on them, checked like a ticket's); created_at, completed_at, merged_at, queued_at, evolved_at, evolve_skipped and
-evolve_ticket are refused (server-stamped). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
+project:other: the whole epic waits on them, checked like a ticket's); created_at, completed_at, merged_at, queued_at, evolved_at, evolve_skipped,
+evolve_ticket and the stats fields below are refused (server-stamped). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
 
 An epic's ticket.md also holds epic-level timing. These fields are gx-managed, not
 settable via ` + "`tickets set`" + `, and unset until gx stamps them.
@@ -97,6 +97,12 @@ settable via ` + "`tickets set`" + `, and unset until gx stamps them.
     (stamped by the server or ` + "`gx merge`" + `); a merged epic is one with merged_at set
   queued_at (RFC3339 timestamp) — when the epic was first added to the queue (stamped once
     by the server; epics queued earlier fall back to started_at, then merged_at)
+  lines_added, lines_removed — lines the epic's branch added and removed
+  total_tokens — input + output + cache writes + cache reads over every session of every
+    ticket; a stamped 0 is different from unset, and actual_cost is stamped whenever it is
+  had_codex — true when any of the epic's tickets had a Codex session
+  friction — pauses by reason, run events by type, pause endings by source, total
+    paused time and the durations of person-ended pauses, summed over the epic
 
 Evolve fields (optional, validated):
   evolved_at (RFC3339 timestamp), evolve_skipped (bool), evolve_ticket (address),
