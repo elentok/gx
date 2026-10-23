@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { DayChart, type DayChartKind, type DaySeries } from "../day-chart/DayChart";
 import { LineChart } from "../day-chart/LineChart";
 import { Card } from "../card/Card";
@@ -9,12 +9,14 @@ interface StatCardProps {
   days: string[];
   series: DaySeries[];
   chart?: DayChartKind | "line";
+  // Series folded into another one: listed in the hover tooltip, never drawn or counted.
+  folded?: ComponentProps<typeof DayChart>["folded"];
   // Overrides for the special cards; the defaults are the sum and the daily average over days with data.
   headline?: ReactNode;
   small?: ReactNode;
 }
 
-export function StatCard({ title, days, series, chart = "bars", headline, small }: StatCardProps) {
+export function StatCard({ title, days, series, chart = "bars", folded, headline, small }: StatCardProps) {
   const hasData = (i: number) => series.some((s) => s.values[i] !== null);
   const dataDays = days.filter((_, i) => hasData(i)).length;
   const partial = dataDays < days.length;
@@ -36,7 +38,7 @@ export function StatCard({ title, days, series, chart = "bars", headline, small 
       <Text fontSize="xs" color="text.muted" mb="2">
         {small ?? `${average.toFixed(1)}/day`}
       </Text>
-      {chart === "line" ? <LineChart days={days} tone={series[0].tone} values={series[0].values} /> : <DayChart days={days} series={series} kind={chart} />}
+      {chart === "line" ? <LineChart days={days} tone={series[0].tone} values={series[0].values} /> : <DayChart days={days} series={series} kind={chart} folded={folded} />}
       <Box as="ul" display="flex" gap="3" flexWrap="wrap" mt="2" fontSize="xs" listStyleType="none" aria-label="Legend">
         {series.map((s) => (
           <li key={s.key}>

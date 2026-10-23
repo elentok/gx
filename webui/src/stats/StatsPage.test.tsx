@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-libra
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicList } from "../generated/server";
+import type { EpicList, StatsFriction } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import { STATS_REFETCH_DEBOUNCE_MS, type FetchStats, type Stats } from "./stats";
@@ -92,6 +92,72 @@ test("the Throughput cards follow their headline rules", async () => {
   const waiting = await cardText("Waiting for design");
   expect(waiting).toContain("7");
   expect(waiting).not.toContain("/day");
+});
+
+const cardEl = async (title: string) => {
+  let el: HTMLElement | null = await screen.findByText(title);
+  while (el && !el.querySelector("svg")) el = el.parentElement;
+  return el as HTMLElement;
+};
+
+const amount = (value: number, no_data = false) => ({ value, no_data });
+
+test("the Cost cards hatch a no-data day and say partial", async () => {
+  const cost = {
+    tokens_design: [amount(100), amount(0, true), amount(300)],
+    tokens_implementation: [amount(1000), amount(0, true), amount(2000)],
+    spend_design: [amount(1), amount(0, true), amount(2)],
+    spend_implementation: [amount(3), amount(0, true), amount(4.5)],
+  };
+  renderStats(async () => statsOf({}, { cost }));
+  const tokens = await cardText("Tokens");
+  expect(tokens).toContain("3,400");
+  expect(tokens).toContain("partial");
+  expect((await cardEl("Tokens")).querySelectorAll("[data-nodata]")).toHaveLength(1);
+  const spend = await cardText("Spend");
+  expect(spend).toContain("$10.50");
+  expect(spend).toContain("Design");
+  expect(spend).toContain("Implementation");
+});
+
+test("Cost cards with data on every day are not partial", async () => {
+  const full = [amount(1), amount(1), amount(1)];
+  renderStats(async () => statsOf({}, { cost: { tokens_design: full, tokens_implementation: full, spend_design: full, spend_implementation: full } }));
+  expect(await cardText("Tokens")).not.toContain("partial");
+});
+
+test("the Pauses tooltip lists a reason folded into other", async () => {
+  const friction: StatsFriction = {
+    pause_reasons: ["question", "other"],
+    pauses_by_reason: [{ question: 2, stalled: 1 }, {}, { question: 1 }],
+    run_events: [{}, {}, {}],
+    pause_endings: [{}, {}, {}],
+  };
+  renderStats(async () => statsOf({}, { friction }));
+  const card = await cardEl("Pauses");
+  expect(card.textContent).toContain("other");
+  fireEvent.mouseEnter(card.querySelector("[data-hit='0']") as Element);
+  const tip = within(screen.getByRole("tooltip"));
+  expect(tip.getByText("question: 2")).toBeTruthy();
+  expect(tip.getByText("other: 1")).toBeTruthy();
+  expect(tip.getByText("stalled: 1")).toBeTruthy();
+  expect(card.querySelectorAll("[data-bar][data-series='stalled']")).toHaveLength(0);
+});
+
+test("Pause endings headline is the web share with the median on the small line", async () => {
+  const friction: StatsFriction = {
+    pause_reasons: [],
+    pauses_by_reason: [{}, {}, {}],
+    run_events: [{}, {}, {}],
+    pause_endings: [{ web: 5, tui: 2, gx: 4 }, {}, { web: 0, cli: 1 }],
+    web_share: 0.625,
+    median_resume_secs: 270,
+  };
+  renderStats(async () => statsOf({}, { friction }));
+  const ending = await cardText("Pause endings");
+  expect(ending).toContain("63% web");
+  expect(ending).toContain("median 5m to resume");
+  expect(ending).not.toContain("partial");
 });
 
 test("the URL filters drive the fetch and the controls", async () => {
