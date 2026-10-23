@@ -75,7 +75,7 @@ Chat
 45. As a person, I want the chat to show only the current conversation of the session, so that a `/clear` between runs starts a clean chat.
 46. As a person, I want at most the last 300 messages with an "Earlier messages hidden" line, so that the page stays fast on a long run.
 47. As a person, I want the chat to refresh by itself while the agent works, so that I don't reload the page.
-48. As a person, I want a Continue button, subtitled "Continue · map" or "Continue · review", after a run-end line that says `Next: map` or `Next: review`, so that I start the next run with one tap.
+48. As a person, I want a Continue button, subtitled with the title of the map's current ticket (or "Review" when none is left), after a run-end line that says `Next: map` or `Next: review`, so that I start the next run with one tap.
 49. As a person, I want "Open implementation epic" in place of Continue after `Next: implement`, so that the last step goes to the implementation epic.
 
 Answering a round

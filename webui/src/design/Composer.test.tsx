@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { SessionChatResponse, SessionInfo, SessionResult, SessionRoundCard } from "../generated/server";
+import type { EpicDetailRow, SessionChatResponse, SessionInfo, SessionResult, SessionRoundCard } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchChat } from "./chat";
@@ -37,7 +37,15 @@ const nextOf = (phase: string): SessionChatResponse["next"] => ({ phase, action:
 
 const ok: SessionResult = { session: session() };
 
-function render(opts: { state?: string; background?: boolean; chat?: SessionChatResponse; connected?: boolean; post?: PostPrompt; fetchChat?: FetchChat }) {
+function render(opts: {
+  state?: string;
+  background?: boolean;
+  chat?: SessionChatResponse;
+  connected?: boolean;
+  post?: PostPrompt;
+  fetchChat?: FetchChat;
+  rows?: EpicDetailRow[];
+}) {
   const state = {
     snapshot: { sessions: [session(opts.state, opts.background)] },
     connected: opts.connected ?? true,
@@ -55,7 +63,7 @@ function render(opts: { state?: string; background?: boolean; chat?: SessionChat
       }),
       epic: async () => ({
         kind: "ok",
-        detail: { address: "gx:a", kind: "map", summary: "", done: 0, total: 0, agent_time: 0, cost_total: 0, stats: {}, rows: [], queueable: false, queued: false, steps: [] },
+        detail: { address: "gx:a", kind: "map", summary: "", done: 0, total: 0, agent_time: 0, cost_total: 0, stats: {}, rows: opts.rows ?? [], queueable: false, queued: false, steps: [] },
       }),
       chat: opts.fetchChat ?? (async () => ({ kind: "ok", detail: opts.chat ?? chatOf() })),
       prompt: opts.post,
@@ -118,8 +126,23 @@ test("another refusal shows its message and keeps the draft", async () => {
 test.each(["map", "review"])("Continue after a %s run-end line sends the continue action", async (phase) => {
   const post = vi.fn<PostPrompt>(async () => ok);
   render({ post, chat: chatOf({ next: nextOf(phase) }) });
-  fireEvent.click(await screen.findByRole("button", { name: new RegExp(`Continue · ${phase}`) }));
+  fireEvent.click(await screen.findByRole("button", { name: /Continue/ }));
   await waitFor(() => expect(post).toHaveBeenCalledWith({ id: "s-a", text: "", last_message: "m9", continue: true }));
+});
+
+test("Continue names the map's current ticket and says Continue once", async () => {
+  const rows: EpicDetailRow[] = [
+    { address: "gx:a/01", title: "Done one", rendered_status: "done" },
+    { address: "gx:a/02", title: "Server pid lock", rendered_status: "open", current: true },
+  ];
+  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: nextOf("map") }), rows });
+  const button = await screen.findByRole("button", { name: "Continue Server pid lock" });
+  expect(button.textContent?.match(/Continue/g)).toHaveLength(1);
+});
+
+test("Continue to review with no current ticket says Review", async () => {
+  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: nextOf("review") }) });
+  expect(await screen.findByRole("button", { name: "Continue Review" })).toBeTruthy();
 });
 
 test("an implement run-end line shows no Continue", async () => {

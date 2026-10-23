@@ -80,6 +80,7 @@ function ChatTail({
   post,
   onStale,
   done,
+  nextTitle,
   actions,
 }: {
   session: SessionInfo;
@@ -88,6 +89,7 @@ function ChatTail({
   post?: PostPrompt;
   onStale: () => void;
   done?: boolean;
+  nextTitle?: string;
   actions: FailureActions;
 }) {
   const [answers, setAnswers] = useState<Answers>({});
@@ -112,6 +114,7 @@ function ChatTail({
           session={session}
           lastMessage={chat.messages.at(-1)?.id}
           next={chat.next}
+          nextTitle={nextTitle}
           connected={connected}
           post={post}
           onStale={onStale}
@@ -130,12 +133,14 @@ function ChatLog({
   fetchChat,
   post,
   done,
+  nextTitle,
   actions,
 }: {
   session: SessionInfo;
   fetchChat?: FetchChat;
   post?: PostPrompt;
   done?: boolean;
+  nextTitle?: string;
   actions: FailureActions;
 }) {
   const conn = useConnectionContext();
@@ -162,6 +167,7 @@ function ChatLog({
         post={post}
         onStale={refetch}
         done={done}
+        nextTitle={nextTitle}
         actions={actions}
       />
     </Box>
@@ -174,6 +180,7 @@ export function DesignChat({
   fetchChat,
   post,
   done,
+  nextTitle,
   actions = {},
 }: {
   session?: SessionInfo;
@@ -181,6 +188,8 @@ export function DesignChat({
   post?: PostPrompt;
   /** The Design's Progress is Done: no composer, no `ended` banner. */
   done?: boolean;
+  /** The title of the map's current ticket, which Continue works on next. */
+  nextTitle?: string;
   actions?: FailureActions;
 }) {
   if (!session) return null;
@@ -195,5 +204,5 @@ export function DesignChat({
       </>
     );
   }
-  return <ChatLog key={session.id} session={session} fetchChat={fetchChat} post={post} done={done} actions={actions} />;
+  return <ChatLog key={session.id} session={session} fetchChat={fetchChat} post={post} done={done} nextTitle={nextTitle} actions={actions} />;
 }

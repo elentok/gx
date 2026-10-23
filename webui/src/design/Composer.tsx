@@ -14,6 +14,7 @@ export function Composer({
   session,
   lastMessage,
   next,
+  nextTitle,
   connected,
   post = postPrompt,
   onStale,
@@ -25,6 +26,8 @@ export function Composer({
   /** The id of the last chat message the page saw. */
   lastMessage?: string;
   next?: SessionNext;
+  /** The title of the map's next ticket, shown under Continue. */
+  nextTitle?: string;
   connected: boolean;
   post?: PostPrompt;
   /** The conversation moved under the person: refetch the chat, keep the draft. */
@@ -80,7 +83,7 @@ export function Composer({
         <Button disabled={!enabled} onClick={() => send({ continue: true })} flexDirection="column" height="auto" py="2">
           <Text as="span">Continue</Text>
           <Text as="span" fontSize="xs" fontWeight="normal">
-            Continue · {phase}
+            {nextTitle ?? (phase === "review" ? "Review" : "Map")}
           </Text>
         </Button>
       )}
