@@ -598,11 +598,21 @@ test("the epic page shows Queue only for a queueable epic", async () => {
   expect(await screen.findByRole("button", { name: "Queue" })).toBeTruthy();
 });
 
-test("a draft epic's Queue button is off and says tickets are still publishing", async () => {
-  renderAt("/e/gx:e", okFor, undefined, epicFetch({ draft: true, queueable: false }));
+test("a draft impl epic's Queue button is off and says tickets are still publishing", async () => {
+  renderAt("/e/gx:foo-impl", okFor, undefined, epicFetch({ draft: true, queueable: false }));
   const queue = (await screen.findByRole("button", { name: "Queue" })) as HTMLButtonElement;
   expect(queue.disabled).toBe(true);
   expect(screen.getByText("Still publishing tickets")).toBeTruthy();
+});
+
+test("a draft non-impl epic and an open impl epic do not show the publishing block", async () => {
+  renderAt("/e/gx:follow-ups", okFor, undefined, epicFetch({ draft: true, queueable: false }));
+  await screen.findByRole("heading", { name: "follow-ups" });
+  expect(screen.queryByText("Still publishing tickets")).toBeNull();
+  cleanup();
+  renderAt("/e/gx:foo-impl", okFor, undefined, epicFetch({ draft: false, queueable: false }));
+  await screen.findByRole("heading", { name: "foo-impl" });
+  expect(screen.queryByText("Still publishing tickets")).toBeNull();
 });
 
 test("the epic page Queue posts, then refetches; a refusal shows inline", async () => {

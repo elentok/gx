@@ -136,7 +136,7 @@ export function EpicPage({
                 {detail.land_block_reason}
               </Text>
             )}
-            {detail.draft && (
+            {detail.draft && address.endsWith("-impl") && (
               <Box mt="2" display="flex" alignItems="center" gap="2">
                 <Button tone="running" disabled>
                   Queue
