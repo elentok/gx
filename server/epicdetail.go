@@ -100,48 +100,47 @@ func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) EpicDetail {
+	if e.IsMap {
+		return s.buildMapDetail(root, e)
+	}
+	return s.buildLoopDetail(root, e, now)
+}
+
+func (s *Server) buildMapDetail(root rootRef, e tickets.Epic) EpicDetail {
 	queued := s.rootQueued(root)
 	d := EpicDetail{
-		Address: root.String(), Kind: EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
+		Address: root.String(), Kind: EpicKindMap, Summary: schema.Section(e.Body, "Destination"),
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []EpicDetailRow{},
 		Queueable: epicQueueable(e, queued), Queued: queued,
 	}
-	if e.IsMap {
-		d.Kind, d.Summary = EpicKindMap, schema.Section(e.Body, "Destination")
-	} else {
-		d.State = epicStateFor(root, e, s.registry.startedAtOf)
-		if epicMergeBlocked(e) {
-			d.MergeBlockKind, d.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
-		}
+	for _, t := range e.Tickets {
+		d.Rows = append(d.Rows, EpicDetailRow{
+			Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title,
+			RenderedStatus: e.RenderedStatus(t).Word(),
+		})
 	}
-	addr := func(id string) string {
-		return tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()
+	return d
+}
+
+func (s *Server) buildLoopDetail(root rootRef, e tickets.Epic, now time.Time) EpicDetail {
+	queued := s.rootQueued(root)
+	d := EpicDetail{
+		Address: root.String(), Kind: EpicKindLoop, Summary: schema.Section(e.Body, "Summary"),
+		State: epicStateFor(root, e, s.registry.startedAtOf),
+		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []EpicDetailRow{},
+		Queueable: epicQueueable(e, queued), Queued: queued,
+	}
+	if epicMergeBlocked(e) {
+		d.MergeBlockKind, d.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}
 	for _, t := range e.Tickets {
-		status := e.RenderedStatus(t)
-		row := EpicDetailRow{Address: addr(t.DisplayNumber()), Title: t.Title, RenderedStatus: status.Word()}
-		if e.IsMap {
-			d.Rows = append(d.Rows, row)
-			continue
-		}
-		row.Type, row.Elapsed, row.Cost = t.Type, t.ElapsedTime, t.ActualCost
-		row.Blockers = e.UnresolvedBlockers(t)
-		if t.Parent != nil {
-			row.Parent = addr(*t.Parent)
-		}
-		if at, ok := s.registry.startedAtOf(row.Address); ok && status == tickets.StatusClaimed {
-			row.ClaimedAt = at
-		}
-		if open := tickets.OpenQuestion(readLogLenient(t)); open != nil && status == tickets.StatusPausedAnswer {
-			row.Asking, row.Question = true, open.Summary
-		}
+		d.Rows = append(d.Rows, s.rowFor(root, e, t))
 		if t.Status == string(schema.StatusDone) {
 			d.AgentTime += t.ElapsedTime
 			d.CostTotal += t.ActualCost
 		}
-		d.Rows = append(d.Rows, row)
 	}
-	if !e.IsMap && !e.StartedAt.IsZero() {
+	if !e.StartedAt.IsZero() {
 		end := e.CompletedAt
 		if end.IsZero() {
 			end = now
@@ -149,4 +148,27 @@ func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 		d.WallClock = int(end.Sub(e.StartedAt).Seconds())
 	}
 	return d
+}
+
+// rowFor builds a loop epic's full row for t.
+func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) EpicDetailRow {
+	status := e.RenderedStatus(t)
+	row := EpicDetailRow{
+		Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title, RenderedStatus: status.Word(),
+		Type: t.Type, Elapsed: t.ElapsedTime, Cost: t.ActualCost, Blockers: e.UnresolvedBlockers(t),
+	}
+	if t.Parent != nil {
+		row.Parent = ticketAddress(root, *t.Parent)
+	}
+	if at, ok := s.registry.startedAtOf(row.Address); ok && status == tickets.StatusClaimed {
+		row.ClaimedAt = at
+	}
+	if open := tickets.OpenQuestion(readLogLenient(t)); open != nil && status == tickets.StatusPausedAnswer {
+		row.Asking, row.Question = true, open.Summary
+	}
+	return row
+}
+
+func ticketAddress(root rootRef, id string) string {
+	return tickets.Address{Project: root.Project, Epic: root.Epic, ID: id}.String()
 }
