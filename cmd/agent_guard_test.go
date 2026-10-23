@@ -28,6 +28,9 @@ func TestGuardBashCommand(t *testing.T) {
 		{"heredoc to stdin", "gx tickets section 1/2 Notes - <<'EOF'\nbody\nEOF", false},
 		{"heredoc with stderr merge", "git commit -F - <<'EOF' 2>&1\nmsg\nEOF", false},
 		{"heredoc with dev null", "git commit -F - <<'EOF' >/dev/null\nmsg\nEOF", false},
+		{"ticket add body with arrows", "gx tickets add e --slug s --body - <<'EOF'\nBlock `>` and a -> b, not >>x\nEOF", false},
+		{"redirect after heredoc body", "gx tickets add e --body - <<'EOF'\nbody\nEOF\necho hi > out.txt", true},
+		{"heredoc start with redirect", "cat <<'EOF' > a.go\npackage a\nEOF", true},
 		{"git status", `git status`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

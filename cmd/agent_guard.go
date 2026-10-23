@@ -20,7 +20,28 @@ var (
 	fileRedirect = regexp.MustCompile(`(^|[^<>&0-9])>>?\s*[^\s>&]`)
 	devNull      = regexp.MustCompile(`>>?\s*/dev/null`)
 	scriptHeredc = regexp.MustCompile(`\b(python[0-9.]*|perl|ruby|node)\b[^\n]*<<`)
+	heredocStart = regexp.MustCompile(`<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)`)
 )
+
+// withoutHeredocBodies drops the lines a heredoc feeds to stdin, keeping the
+// command lines. A ">" in a body (a ticket's prose, say) is not a redirect.
+func withoutHeredocBodies(command string) string {
+	var kept []string
+	delim := ""
+	for _, line := range strings.Split(command, "\n") {
+		if delim != "" {
+			if strings.TrimSpace(line) == delim {
+				delim = ""
+			}
+			continue
+		}
+		kept = append(kept, line)
+		if m := heredocStart.FindStringSubmatch(line); m != nil {
+			delim = m[1]
+		}
+	}
+	return strings.Join(kept, "\n")
+}
 
 // guardBashCommand returns why command must not run, or "" when it may.
 // It blocks the ways agents edit files that bypass Edit's staleness check:
@@ -32,7 +53,7 @@ func guardBashCommand(command string) string {
 		return "sed -i edits files behind Edit's back. " + hint
 	case scriptHeredc.MatchString(command):
 		return "A heredoc script that rewrites files is invisible when it hangs. " + hint
-	case heredoc.MatchString(command) && fileRedirect.MatchString(devNull.ReplaceAllString(command, "")):
+	case heredoc.MatchString(command) && fileRedirect.MatchString(devNull.ReplaceAllString(withoutHeredocBodies(command), "")):
 		return "A heredoc written into a file skips imports and indentation checks. " + hint
 	}
 	return ""
