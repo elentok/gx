@@ -68,7 +68,7 @@ type EpicDetail struct {
 // epicQueueable reports whether an epic can be queued: an unqueued, unmerged
 // loop epic that still has an open ticket. The epic list shares this rule.
 func epicQueueable(e tickets.Epic, queued bool) bool {
-	if e.IsMap || queued || !e.MergedAt.IsZero() {
+	if e.IsMap || queued || !e.MergedAt.IsZero() || e.Status == string(schema.StatusDraft) {
 		return false
 	}
 	return slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool { return t.Status == string(schema.StatusOpen) })

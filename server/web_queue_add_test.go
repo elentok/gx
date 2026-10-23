@@ -21,6 +21,10 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "proj", "epic-merged", "ticket.md"), []byte("---\nstatus: done\nmerged_at: 2026-01-02T03:04:05Z\n---\n# Merged\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	servertest.WriteTicket(t, store, "proj", "epic-drafting", "01", "first", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "epic-drafting", "ticket.md"), []byte("---\nstatus: draft\n---\n# Drafting\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	servertest.WriteTicket(t, store, "proj", "map-epic", "01", "decide", "")
 	if err := os.WriteFile(filepath.Join(store, "proj", "map-epic", "ticket.md"), []byte("---\nkind: map\nstatus: open\n---\n# Map\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -50,6 +54,7 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 	for _, c := range []struct{ name, address, reason string }{
 		{"already queued", "proj:epic-a", server.ReasonAlreadyQueued},
 		{"map epic", "proj:map-epic", server.ReasonMapEpic},
+		{"draft epic", "proj:epic-drafting", server.ReasonEpicDraft},
 		{"no open tickets", "proj:epic-done", server.ReasonNoOpenTickets},
 		{"draft only", "proj:epic-draft", server.ReasonNoOpenTickets},
 		{"claimed only", "proj:epic-claimed", server.ReasonNoOpenTickets},

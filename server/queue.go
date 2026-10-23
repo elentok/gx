@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // EventQueueChanged is emitted once per queue write; Address is the ticket it
@@ -34,6 +35,7 @@ const (
 	ReasonTicketLive       = "ticket-live"
 	ReasonMapEpic          = "map-epic"
 	ReasonNoOpenTickets    = "no-open-tickets"
+	ReasonEpicDraft        = "epic-draft"
 	ReasonAlreadyMerged    = "already-merged"
 	ReasonMergePending     = "merge-pending"
 	ReasonNotComplete      = "not-complete"
@@ -272,6 +274,8 @@ func (s *Server) epicRefusal(addr string, project, epic string) *QueueResult {
 		r = refusal(ReasonMapEpic, addr+" is a map epic; its tickets are resolved by hand, not scheduled")
 	case !e.MergedAt.IsZero():
 		r = refusal(ReasonAlreadyMerged, addr+" is already merged")
+	case e.Status == string(schema.StatusDraft):
+		r = refusal(ReasonEpicDraft, addr+" is a draft; its tickets are still being created")
 	case !epicQueueable(e, false):
 		r = refusal(ReasonNoOpenTickets, addr+" has no open ticket")
 	default:

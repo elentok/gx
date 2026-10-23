@@ -215,6 +215,16 @@ what was decided.
 
 ### 6. Publish the tickets
 
+Create a new implementation epic as a `draft` first, so the scheduler cannot queue it before its
+tickets exist:
+
+```sh
+gx tickets epic add <project:epic> --kind loop --status draft
+```
+
+Skip this when publishing into an epic that already exists. Once every ticket below is written and
+validated, open the epic with `gx tickets set <project:epic> --status open`.
+
 Create one ticket per call (see [gx-local-tracker.md](../gx-local-tracker.md)), in dependency order
 (blockers first); it allocates the ID and prints the ticket's address:
 
