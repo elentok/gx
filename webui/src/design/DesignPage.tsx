@@ -197,7 +197,7 @@ function DesignColumns({
   useFocusReport(conn, session?.id, connState.streams, focus);
   return (
     <>
-      <Box aria-label="Chat" role="region" display="flex" flexDirection="column" gap="3">
+      <Box aria-label="Chat" role="region" minW="0" display="flex" flexDirection="column" gap="3">
         {wide && detail?.impl_address && <ImplLink address={detail.impl_address} />}
         {session && chart ? (
           session.status.state === "exited" && (
@@ -291,7 +291,7 @@ export function DesignPage({
       ) : !list ? (
         <Spinner label="Loading Designs" />
       ) : (
-        <Box display="grid" gridTemplateColumns={{ base: "1fr", lg: "260px 1fr 300px" }} gap="4" minH="60vh">
+        <Box display="grid" gridTemplateColumns={{ base: "1fr", lg: "260px minmax(0, 1fr) 300px" }} gap="4" minH="60vh">
           {wide ? (
             <Picker groups={groups} projects={projects} current={address} onNew={onNew} />
           ) : (

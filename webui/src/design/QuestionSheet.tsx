@@ -131,6 +131,8 @@ export function QuestionSheet({
   const [open, setOpen] = useState(true);
   const [index, setIndex] = useState(0);
   const row = useRef<HTMLDivElement>(null);
+  // Set while a smooth scroll we started is still moving, so its in-between frames don't set the question.
+  const scrolling = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!focus) return;
@@ -142,12 +144,15 @@ export function QuestionSheet({
   useEffect(() => {
     const el = row.current;
     if (el && typeof el.scrollTo === "function" && el.clientWidth > 0 && Math.round(el.scrollLeft / el.clientWidth) !== index) {
+      window.clearTimeout(scrolling.current);
+      scrolling.current = window.setTimeout(() => (scrolling.current = undefined), 600);
       el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" });
     }
   }, [index, open]);
+  useEffect(() => () => window.clearTimeout(scrolling.current), []);
   const onScroll = () => {
     const el = row.current;
-    if (!el || el.clientWidth === 0) return;
+    if (!el || el.clientWidth === 0 || scrolling.current !== undefined) return;
     setIndex(Math.min(round.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth))));
   };
 
