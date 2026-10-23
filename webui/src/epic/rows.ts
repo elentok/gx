@@ -73,10 +73,10 @@ export function statValues(d: EpicDetail): string[] {
   return [
     stateLabel(d),
     done,
-    d.wall_clock !== undefined && `took ${formatDuration(d.wall_clock)}`,
+    d.wall_clock === undefined ? undefined : `took ${formatDuration(d.wall_clock)}`,
     formatCost(d.cost_total),
     `${formatDuration(d.agent_time)} of agent time`,
-  ].filter((v): v is string => !!v);
+  ].filter((v): v is string => v !== undefined && v !== "");
 }
 
 export const idOf = (address: string) => address.slice(address.lastIndexOf("/") + 1);
@@ -104,37 +104,39 @@ function forkNote(row: EpicDetailRow, byAddress: Map<string, EpicDetailRow>): st
 }
 
 export interface RowContext {
-  kind: string;
+  detail: EpicDetail;
   now: number;
   byAddress: Map<string, EpicDetailRow>;
 }
 
 export const rowContext = (detail: EpicDetail, now: number): RowContext => ({
-  kind: detail.kind,
+  detail,
   now,
   byAddress: new Map(detail.rows.map((r) => [r.address, r])),
 });
 
+const joinDot = (...parts: (string | undefined)[]) => parts.filter((p): p is string => p !== undefined && p !== "").join(" · ");
+
+// A map epic's rows carry the status only, so only a loop epic has elapsed time and cost to show.
+function elapsedAndCost(row: EpicDetailRow, elapsed: number | undefined, ctx: RowContext): (string | undefined)[] {
+  if (ctx.detail.kind === "map") return [];
+  return [elapsed === undefined ? undefined : formatDuration(elapsed), row.cost === undefined ? undefined : formatCost(row.cost)];
+}
+
 // The dim detail line under a row: status word, elapsed time, cost, then the blockers and fork note.
-// A map epic's rows carry the status only.
 export function detailLine(row: EpicDetailRow, ctx: RowContext): string {
-  const parts: (string | false | undefined)[] = [row.rendered_status];
-  if (ctx.kind !== "map") {
-    const elapsed = elapsedOf(row, ctx.now);
-    parts.push(elapsed !== undefined && formatDuration(elapsed), row.cost !== undefined && formatCost(row.cost));
-  }
-  parts.push(row.blockers?.length ? blockerNote(row.blockers) : undefined, forkNote(row, ctx.byAddress));
-  return parts.filter(Boolean).join(" · ");
+  return joinDot(
+    row.rendered_status,
+    ...elapsedAndCost(row, elapsedOf(row, ctx.now), ctx),
+    row.blockers?.length ? blockerNote(row.blockers) : undefined,
+    forkNote(row, ctx.byAddress),
+  );
 }
 
 // A folded row's dim tail: elapsed time (or a muted "cancelled" word), then cost, then the fork note.
 export function foldedTail(row: EpicDetailRow, ctx: RowContext): string {
-  const parts: (string | false | undefined)[] = [];
-  if (isCancelled(row)) parts.push("cancelled");
-  else if (ctx.kind !== "map") parts.push(row.elapsed !== undefined && formatDuration(row.elapsed));
-  if (ctx.kind !== "map") parts.push(row.cost !== undefined && formatCost(row.cost));
-  parts.push(forkNote(row, ctx.byAddress));
-  return parts.filter(Boolean).join(" · ");
+  const [elapsed, cost] = elapsedAndCost(row, row.elapsed, ctx);
+  return joinDot(isCancelled(row) ? "cancelled" : elapsed, cost, forkNote(row, ctx.byAddress));
 }
 
 export const MAX_INDENT = 2;
