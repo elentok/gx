@@ -1,11 +1,28 @@
 # Changelog
 
-## Unreleased
+## v0.36.0 - 2026-10-23
 
+- Added a Design page to the web UI, so you can run design sessions from the browser.
+  - A Designs picker lists each map by progress. You can filter it, collapse "Not started", and use it on a phone. A Progress tree shows each map's step and phase.
+  - You can start a New Design (from a rough idea or a project), open or switch sessions, and restore or stop them. You can send messages and press Continue.
+  - The session chat shows tool calls folded, compaction marked, and the last 300 messages. It renders markdown in question cards.
+  - A Grilling round shows as a docked question sheet, and one Send answers the whole round.
+  - Session failures show as banners, and notifications link to the Design page. The page reports its focus to the server, which silences notifications for that session.
+  - Unreadable `gx-question` blocks are filed into one follow-up. A Done Design shows no banner after a clean exit.
+  - New `gx designs open --idea` and `--project` flags.
+  - A map is marked done when its implementation epic merges.
 - Added a Stats page to the web UI, and a Stats section on each epic page. They show activity, cost and effort, and friction (pauses, run events and how pauses ended).
   - Run `gx tickets migrate` (or `gx server restart --migrate`) soon after you upgrade. It backfills tokens, cost, lines and friction summaries on past tickets and merged epics from transcripts and run logs. Old transcripts age out, so the longer you wait, the more history is lost.
   - Pause endings in old data show as `unknown`.
   - Tickets older than the ticket store get the store's first day (2026-10-06) as their creation day. This shows as a spike on that day.
+- Changed the web UI pages to 1366px wide, and tidied the Design page sidebars and note composer.
+- Changed design skills to take a rough idea, write `gx-question` blocks, group spec-draft questions into one map ticket, and open the implementation epic last. Grilling questions now pick `yes-no` or `options` by shape, and `recommended` matches the proposed answer.
+- Fixed the Design page crashing when the chat has no round, white-on-white prompt bubbles, layout overflow, and question-sheet bounce.
+- Fixed design pages not answering while a background task runs.
+- Fixed typing into a session when a person has a draft. gx now clears the draft instead of refusing.
+- Fixed a Claude marker followed by a no-break space not counting as blank.
+- Fixed the web build and plain-http load, and added type-checking to `web-test`.
+- Fixed a failed Continue or Action step: the server now raises an Actionable.
 
 ## v0.35.10 - 2026-10-23
 
