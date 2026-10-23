@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/sound"
+	"github.com/elentok/gx/tickets"
 )
 
 const defaultSessionBannerDelay = time.Second
@@ -97,7 +98,36 @@ func (s *Server) noteFailure(id string) {
 	if kind == FailureKindAuth || kind == FailureKindStalled {
 		reason = f.Label
 	}
+	// A Done Design exiting cleanly is expected; the Design page hides it too.
+	if kind == FailureKindEnded && s.designDone(m) {
+		return
+	}
 	s.triggerBanner(id, sound.Attention, reason)
+}
+
+// designDone reports whether the session is a Design whose map's Progress is Done.
+func (s *Server) designDone(m sessionMeta) bool {
+	if !m.Design || m.Ticket == "" {
+		return false
+	}
+	addr, err := parseQueuedAddress(m.Ticket)
+	if err != nil {
+		return false
+	}
+	epics, err := s.projectEpics(addr.Project)
+	if err != nil {
+		return false
+	}
+	byName := map[string]tickets.Epic{}
+	for _, e := range epics {
+		byName[e.Name] = e
+	}
+	e, ok := byName[addr.Epic]
+	if !ok || !e.IsMap {
+		return false
+	}
+	step, _ := mapProgress(e, byName, s.mapProbeFor(addr.Project))
+	return step == ProgressDone
 }
 
 // designLink is the Design page of a Design session, without the token; empty

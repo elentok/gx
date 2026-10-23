@@ -842,7 +842,10 @@ func (s *Server) recordSessionExit(m *sessionMeta, exit string) bool {
 		exit = SessionExitClean
 	} else {
 		s.raiseUnread(m)
-		s.triggerBanner(m.ID, sound.Done, "")
+		// A Done Design exiting cleanly is expected: no banner.
+		if exit != SessionExitClean || !s.designDone(*m) {
+			s.triggerBanner(m.ID, sound.Done, "")
+		}
 	}
 	m.Status, m.StatusChangedAt, m.Exit = SessionStatus{State: SessionExited}, time.Now(), exit
 	m.RestoreCrashed = exit == SessionExitCrashed && !m.RestoredAt.IsZero() && time.Since(m.RestoredAt) < restoreCrashWindow
