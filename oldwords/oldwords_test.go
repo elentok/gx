@@ -82,6 +82,7 @@ var allowed = map[string]allowance{
 	"tickets/pausedetail.go":      allow("legacy Needs Answer and Needs Repair headings", "needsanswer", "needsrepair"),
 	"tickets/startover.go":        allow("demotes the legacy Needs Answer and Needs Repair sections", "needsanswer", "needsrepair"),
 	"ui/tickets/pause_labels.go":  allow("documents the legacy statuses it still labels", "needsanswer", "needsrepair"),
+	"ralphloop/friction_test.go":  allow("tests the legacy land-conflict kind mapping", "land"),
 	"ui/tickets/preview.go":       allow("highlights the legacy Needs Repair heading", "needsrepair"),
 	// Wire and persisted names kept for compatibility with running servers,
 	// stored logs and on-disk state.
