@@ -50,6 +50,10 @@ Server tests: build fixtures with `servertest.WriteTicketWith` (`server/serverte
 instead of hand-written helpers. A web test that needs a project repo also needs
 `SetProjectRepoNoAutoMerge`; `newFFFixture` does not provide one.
 
+`servertest` fake agents idle without sending a report. New idle-path or finish-path behaviour (a
+stall nudge, say) makes every fake agent hang until the test times out. Give it an off switch that
+is off by default in `servertest`.
+
 ## Package map
 
 There is no `internal/` directory. Top-level packages live at the repo root:
