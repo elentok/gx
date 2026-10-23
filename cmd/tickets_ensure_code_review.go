@@ -29,10 +29,17 @@ func completeEpicNames(cwd string) ([]string, error) {
 }
 
 // resolveEpicArg resolves the ensure-code-review command's single argument to
-// an epic path. arg is tried first as a bare epic name against the current
-// repo's ticket-store root (`gx tickets root`); if that directory doesn't
-// exist, arg is returned unchanged so a full path still works.
+// an epic path. A `project:epic` address resolves against that project, as
+// `gx tickets show` does. Otherwise arg is tried as a bare epic name against
+// the current repo's ticket-store root (`gx tickets root`); if that directory
+// doesn't exist, arg is returned unchanged so a full path still works.
 func resolveEpicArg(arg, cwd string) string {
+	if project, epic, ok := tickets.ParseEpicAddress(arg); ok {
+		if root, err := projectRoot(cwd, project); err == nil {
+			return filepath.Join(root, epic)
+		}
+		return arg
+	}
 	root, err := ticketRoot(cwd)
 	if err != nil {
 		return arg

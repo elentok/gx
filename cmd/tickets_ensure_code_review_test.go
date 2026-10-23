@@ -29,6 +29,23 @@ func TestResolveEpicArg_BareNameAndFullPathResolveToSameEpic(t *testing.T) {
 	}
 }
 
+func TestResolveEpicArg_ProjectEpicAddressResolvesInCurrentAndOtherProject(t *testing.T) {
+	store := isolateTicketStore(t)
+	repoDir := testutil.TempRepo(t)
+	otherRepoDir := testutil.TempRepo(t)
+	mine := addProject(t, store, "mine", repoDir)
+	other := addProject(t, store, "other", otherRepoDir)
+	testutil.Mkdir(t, filepath.Join(mine, "widget-epic"))
+	testutil.Mkdir(t, filepath.Join(other, "gadget-epic"))
+
+	if got, want := resolveEpicArg("mine:widget-epic", repoDir), filepath.Join(mine, "widget-epic"); got != want {
+		t.Errorf("resolveEpicArg(current project address) = %q, want %q", got, want)
+	}
+	if got, want := resolveEpicArg("other:gadget-epic", repoDir), filepath.Join(other, "gadget-epic"); got != want {
+		t.Errorf("resolveEpicArg(other project address) = %q, want %q", got, want)
+	}
+}
+
 func TestResolveEpicArg_UnknownBareNameReturnedUnchanged(t *testing.T) {
 	store := isolateTicketStore(t)
 	repoDir := testutil.TempRepo(t)
