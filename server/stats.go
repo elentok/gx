@@ -50,8 +50,9 @@ type StatsCost struct {
 // StatsFriction is the Friction section. The per-day maps are keyed by
 // reason, event type or ending source.
 type StatsFriction struct {
-	// PauseReasons lists the top reasons of the range; the rest are "other" in
-	// PausesByReason, which carries every reason for the tooltip.
+	// PauseReasons lists the top reasons of the range, then "other" when more
+	// exist. PausesByReason keeps every reason, so the tooltip can list them and
+	// the chart folds the ones outside PauseReasons into "other".
 	PauseReasons    []string         `json:"pause_reasons"`
 	PausesByReason  []map[string]int `json:"pauses_by_reason"`
 	RunEvents       []map[string]int `json:"run_events"`
@@ -145,6 +146,10 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	design, impl := make(costSeries, n), make(costSeries, n)
+	friction := frictionTally{
+		pauses: emptyCounts(n), events: emptyCounts(n), endings: emptyCounts(n),
+		reasonTotal: map[string]int{},
+	}
 	for _, se := range all {
 		if project != "" && se.Project != project {
 			continue
@@ -154,7 +159,11 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
 		countLines(&out.Throughput, win, se.Epic)
 		countFollowUps(&out.Throughput, win, se.Epic)
 		countWaiting(&out.Throughput, win, se.Epic)
+		for _, tk := range se.Epic.Tickets {
+			friction.addTicket(win, tk)
+		}
 	}
+	friction.fill(&out.Friction)
 	out.Cost.TokensDesign, out.Cost.SpendDesign = design.amounts()
 	out.Cost.TokensImplementation, out.Cost.SpendImplementation = impl.amounts()
 	writeJSON(w, out)
@@ -239,6 +248,85 @@ func countCost(design, impl costSeries, win statsWindow, e tickets.Epic) {
 	}
 	for _, tk := range e.Tickets {
 		target.addTicket(win, tk)
+	}
+}
+
+const (
+	statsTopReasons = 5
+	statsOtherLabel = "other"
+)
+
+// frictionTally is the Friction section while it is being summed.
+type frictionTally struct {
+	pauses      []map[string]int
+	events      []map[string]int
+	endings     []map[string]int
+	personSecs  []int
+	reasonTotal map[string]int
+}
+
+func (f *frictionTally) addTicket(win statsWindow, tk tickets.Ticket) {
+	if tk.Friction == nil {
+		return
+	}
+	finished := tk.DoneAt
+	if finished.IsZero() {
+		finished = tk.CancelledAt
+	}
+	i := win.bucket(finished)
+	if i < 0 {
+		return
+	}
+	for k, n := range tk.Friction.PausesByReason {
+		f.pauses[i][k] += n
+		f.reasonTotal[k] += n
+	}
+	for k, n := range tk.Friction.RunEvents {
+		f.events[i][k] += n
+	}
+	for k, n := range tk.Friction.PauseEndings {
+		f.endings[i][k] += n
+	}
+	f.personSecs = append(f.personSecs, tk.Friction.PersonPauseSecs...)
+}
+
+// fill writes the tally into the payload: the top reasons of the range plus
+// "other", and the headline values over person-ended pauses only.
+func (f *frictionTally) fill(out *StatsFriction) {
+	out.PausesByReason, out.RunEvents, out.PauseEndings = f.pauses, f.events, f.endings
+	reasons := make([]string, 0, len(f.reasonTotal))
+	for k := range f.reasonTotal {
+		reasons = append(reasons, k)
+	}
+	slices.SortFunc(reasons, func(a, b string) int {
+		if c := f.reasonTotal[b] - f.reasonTotal[a]; c != 0 {
+			return c
+		}
+		return strings.Compare(a, b)
+	})
+	if len(reasons) > statsTopReasons {
+		reasons = append(reasons[:statsTopReasons], statsOtherLabel)
+	}
+	out.PauseReasons = append(out.PauseReasons, reasons...)
+
+	var web, person int
+	for _, day := range f.endings {
+		web += day[tickets.SourceWeb]
+		person += day[tickets.SourceWeb] + day[tickets.SourceTUI] + day[tickets.SourceCLI]
+	}
+	if person > 0 {
+		share := float64(web) / float64(person)
+		out.WebShare = &share
+	}
+	if len(f.personSecs) > 0 {
+		secs := slices.Clone(f.personSecs)
+		slices.Sort(secs)
+		mid := len(secs) / 2
+		median := secs[mid]
+		if len(secs)%2 == 0 {
+			median = (secs[mid-1] + secs[mid]) / 2
+		}
+		out.MedianResumeSec = &median
 	}
 }
 

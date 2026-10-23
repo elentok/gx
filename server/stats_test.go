@@ -282,3 +282,67 @@ func TestStats_TokensAndSpendSplitDesignAndImplementation(t *testing.T) {
 		}
 	}
 }
+
+func frictionYAML(body string) string { return "friction:\n" + body }
+
+func TestStats_FrictionLandsOnTheStampDayAndSplitsReasons(t *testing.T) {
+	done := func(day int) string { return "done_at: " + statsStamp(day) + "\n" }
+	reasons := []string{"a", "b", "c", "d", "e", "f"}
+	s := statsStore(t, func(store string) {
+		var pauses string
+		for i, r := range reasons {
+			pauses += "    " + r + ": " + strconv.Itoa(10-i) + "\n"
+		}
+		writeProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": issueMD("01", "done", done(2)+frictionYAML("  pauses_by_reason:\n"+pauses+
+				"  run_events:\n    conflict_hit: 2\n  pause_endings:\n    web: 3\n    tui: 1\n    cli: 1\n    gx: 4\n    unknown: 1\n"+
+				"  person_pause_secs: [10, 30, 50, 70]\n"), "A"),
+			"02-b.md": issueMD("02", "cancelled", "cancelled_at: "+statsStamp(3)+"\n"+
+				frictionYAML("  pauses_by_reason:\n    f: 1\n"), "B"),
+			"03-c.md": issueMD("03", "done", done(2), "C"),
+			"04-d.md": issueMD("04", "done", done(100)+frictionYAML("  pauses_by_reason:\n    z: 9\n"), "D"),
+		})
+	})("")
+	f := s.Friction
+	if want := []string{"a", "b", "c", "d", "e", "other"}; !slices.Equal(f.PauseReasons, want) {
+		t.Errorf("pause reasons = %v, want %v", f.PauseReasons, want)
+	}
+	i2, i3 := slices.Index(s.Days, statsDate(2)), slices.Index(s.Days, statsDate(3))
+	if got := f.PausesByReason[i2]; got["a"] != 10 || got["f"] != 5 || len(got) != 6 {
+		t.Errorf("day 2 pauses = %v, want every reason kept", got)
+	}
+	if got := f.PausesByReason[i3]; got["f"] != 1 || len(got) != 1 {
+		t.Errorf("cancelled ticket pauses = %v, want f:1 on its cancel day", got)
+	}
+	if got := f.RunEvents[i2]["conflict_hit"]; got != 2 {
+		t.Errorf("conflict_hit = %d, want 2", got)
+	}
+	if got := f.PauseEndings[i2]; got["gx"] != 4 || got["unknown"] != 1 || got["web"] != 3 {
+		t.Errorf("endings = %v", got)
+	}
+	if f.WebShare == nil || math.Abs(*f.WebShare-0.6) > 1e-9 {
+		t.Errorf("web share = %v, want 0.6 (3 of 5 person-ended)", f.WebShare)
+	}
+	if f.MedianResumeSec == nil || *f.MedianResumeSec != 40 {
+		t.Errorf("median resume = %v, want 40", f.MedianResumeSec)
+	}
+}
+
+func TestStats_FrictionWithoutPersonEndingsHasNoHeadlines(t *testing.T) {
+	s := statsStore(t, func(store string) {
+		writeProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": issueMD("01", "done", "done_at: "+statsStamp(1)+"\n"+
+				frictionYAML("  pause_endings:\n    gx: 2\n"), "A"),
+			"02-b.md": issueMD("02", "done", "done_at: "+statsStamp(1)+"\n", "B"),
+		})
+	})("")
+	if s.Friction.WebShare != nil || s.Friction.MedianResumeSec != nil {
+		t.Errorf("headlines = %v, %v, want none", s.Friction.WebShare, s.Friction.MedianResumeSec)
+	}
+	if len(s.Friction.PauseReasons) != 0 {
+		t.Errorf("reasons = %v, want none", s.Friction.PauseReasons)
+	}
+	if got := s.Friction.PausesByReason[0]; got == nil || len(got) != 0 {
+		t.Errorf("empty day = %v, want {}", got)
+	}
+}
