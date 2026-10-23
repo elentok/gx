@@ -220,7 +220,7 @@ func brokenDetail(ref ticketRef, parseErr error) TicketDetail {
 	return TicketDetail{
 		Address: ref.addr.String(), Title: ref.ticket.Title, Status: tickets.StatusError.Word(),
 		Epic: rootOf(ref.addr).String(), MapEpic: ref.epic.IsMap,
-		ErrorReason: tickets.PauseDetail(ref.epic, ref.ticket), ParseError: parseErr.Error(), Path: ref.ticket.Path,
+		ErrorReason: "ticket file format is invalid", ParseError: parseErr.Error(), Path: ref.ticket.Path,
 		Related: []RelatedTicket{}, Rounds: []DetailRound{}, Chat: []ChatMessage{}, Actions: []string{}, Runs: []DetailRun{},
 	}
 }

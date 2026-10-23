@@ -41,7 +41,7 @@ func TestDetailWeb_BrokenFileGivesSmallPayload(t *testing.T) {
 	if d.Status != tickets.StatusError.Word() || d.Title == "" || d.Epic != "proj:work" {
 		t.Errorf("header = %+v", d)
 	}
-	if d.ErrorReason == "" || d.ParseError == "" || !strings.HasSuffix(d.Path, filepath.Join("work", "issues", "01-a.md")) {
+	if d.ErrorReason != "ticket file format is invalid" || d.ParseError == "" || strings.Contains(d.ParseError, "format is invalid") || !strings.HasSuffix(d.Path, filepath.Join("work", "issues", "01-a.md")) {
 		t.Errorf("error fields = reason %q parse %q path %q", d.ErrorReason, d.ParseError, d.Path)
 	}
 	if d.Body != "" || d.Stats != nil {

@@ -50,6 +50,7 @@ async function renderTicket(detail: TicketDetail) {
 }
 
 test("a file that fails to parse shows the reduced page and an action card with the parser error", async () => {
+  // Shaped like server/detail.go:brokenDetail: the server owns the phrase, the parser text rides separately.
   const card = await renderTicket({ ...broken, error_reason: "ticket file format is invalid", parse_error: "yaml: line 3: bad indent" });
 
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Broken");
