@@ -34,6 +34,26 @@ type EpicDetailRow struct {
 	// Asking is set on a paused ticket with an open question; Question is its summary line.
 	Asking   bool   `json:"needs_answer,omitempty"`
 	Question string `json:"question,omitempty"`
+	// Current and Blocked are set on a map epic's rows: Current is the claimed
+	// ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.
+	Current bool `json:"current,omitempty"`
+	Blocked bool `json:"blocked,omitempty"`
+}
+
+// MapStepState is where a Progress step stands.
+type MapStepState string
+
+const (
+	MapStepDone    MapStepState = "done"
+	MapStepCurrent MapStepState = "current"
+	MapStepTodo    MapStepState = "todo"
+)
+
+// MapStep is one of the eight Progress steps of a map epic.
+type MapStep struct {
+	Step  ProgressStep `json:"step"`
+	Label string       `json:"label"`
+	State MapStepState `json:"state"`
 }
 
 // EpicDetail is the /v1/epics/detail payload. Seconds and dollars throughout;
@@ -63,6 +83,11 @@ type EpicDetail struct {
 	// merge paused; the kind is empty for a needs-rebase pause.
 	MergeBlockKind   string `json:"land_block_kind,omitempty"`
 	MergeBlockReason string `json:"land_block_reason,omitempty"`
+	// Steps is a map epic's Progress, and ImplAddress the address of its impl epic once it exists.
+	Steps       []MapStep `json:"steps,omitempty"`
+	ImplAddress string    `json:"impl_address,omitempty"`
+	// Draft is set on a loop epic that is still being published into.
+	Draft bool `json:"draft,omitempty"`
 }
 
 // epicQueueable reports whether an epic can be queued: an unqueued, unmerged
@@ -96,27 +121,38 @@ func (s *Server) epicDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no epic "+address, http.StatusNotFound)
 		return
 	}
-	writeJSON(w, s.buildEpicDetail(root, epics[i], time.Now()))
+	writeJSON(w, s.buildEpicDetail(root, epics, epics[i], time.Now()))
 }
 
-func (s *Server) buildEpicDetail(root rootRef, e tickets.Epic, now time.Time) EpicDetail {
+func (s *Server) buildEpicDetail(root rootRef, epics []tickets.Epic, e tickets.Epic, now time.Time) EpicDetail {
 	if e.IsMap {
-		return s.buildMapDetail(root, e)
+		return s.buildMapDetail(root, epics, e)
 	}
 	return s.buildLoopDetail(root, e, now)
 }
 
-func (s *Server) buildMapDetail(root rootRef, e tickets.Epic) EpicDetail {
+func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Epic) EpicDetail {
+	byName := map[string]tickets.Epic{}
+	for _, other := range epics {
+		byName[other.Name] = other
+	}
 	queued := s.rootQueued(root)
 	d := EpicDetail{
 		Address: root.String(), Kind: EpicKindMap, Summary: schema.Section(e.Body, "Destination"),
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []EpicDetailRow{},
 		Queueable: epicQueueable(e, queued), Queued: queued,
 	}
+	d.Steps = mapSteps(e, byName, s.mapProbeFor(root.Project))
+	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
+		d.ImplAddress = rootRef{Project: root.Project, Epic: e.Name + tickets.ImplEpicSuffix}.String()
+	}
+	current, blocked := mapTicketFlags(e)
 	for _, t := range e.Tickets {
 		d.Rows = append(d.Rows, EpicDetailRow{
 			Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title,
 			RenderedStatus: e.RenderedStatus(t).Word(),
+			Current:        current.DisplayNumber() != "" && t.DisplayNumber() == current.DisplayNumber(),
+			Blocked:        blocked[t.DisplayNumber()],
 		})
 	}
 	return d
@@ -129,6 +165,7 @@ func (s *Server) buildLoopDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 		State: epicStateFor(root, e, s.registry.startedAtOf),
 		Done:  e.DoneCount(), Total: e.TotalCount(), Rows: []EpicDetailRow{},
 		Queueable: epicQueueable(e, queued), Queued: queued,
+		Draft: e.Status == string(schema.StatusDraft),
 	}
 	if epicMergeBlocked(e) {
 		d.MergeBlockKind, d.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason

@@ -333,6 +333,27 @@ export interface EpicDetailRow {
    */
   needs_answer?: boolean;
   question?: string;
+  /**
+   * Current and Blocked are set on a map epic's rows: Current is the claimed
+   * ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.
+   */
+  current?: boolean;
+  blocked?: boolean;
+}
+/**
+ * MapStepState is where a Progress step stands.
+ */
+export type MapStepState = string;
+export const MapStepDone: MapStepState = "done";
+export const MapStepCurrent: MapStepState = "current";
+export const MapStepTodo: MapStepState = "todo";
+/**
+ * MapStep is one of the eight Progress steps of a map epic.
+ */
+export interface MapStep {
+  step: ProgressStep;
+  label: string;
+  state: MapStepState;
 }
 /**
  * EpicDetail is the /v1/epics/detail payload. Seconds and dollars throughout;
@@ -375,6 +396,15 @@ export interface EpicDetail {
    */
   land_block_kind?: string;
   land_block_reason?: string;
+  /**
+   * Steps is a map epic's Progress, and ImplAddress the address of its impl epic once it exists.
+   */
+  steps?: MapStep[];
+  impl_address?: string;
+  /**
+   * Draft is set on a loop epic that is still being published into.
+   */
+  draft?: boolean;
 }
 
 //////////
