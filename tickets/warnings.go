@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -34,7 +35,11 @@ func ProjectWarnings(projectDir string) ([]Warning, error) {
 	for _, epic := range epics {
 		lastClaim := lastClaimBases(filepath.Join(epic.Path, "run-log.jsonl"))
 		for _, t := range epic.Tickets {
-			if t.IsTerminal() || t.Commitless {
+			if t.IsTerminal() {
+				continue
+			}
+			warnings = append(warnings, graph.mentionWarnings(epic.Name, t)...)
+			if t.Commitless {
 				continue
 			}
 			warnings = append(warnings, graph.baseWarnings(epic.Name, t)...)
@@ -72,6 +77,52 @@ func (g *projectGraph) baseWarnings(epic string, t Ticket) []Warning {
 			t.DisplayNumber(), unlanded)})
 	}
 	return warnings
+}
+
+// mentionRe matches "ticket N" and "#N" in a ticket body; a bare N is too
+// often not a ticket.
+var mentionRe = regexp.MustCompile(`(?i)(?:\bticket\s+#?|#)(\d+[a-z]?)\b`)
+
+// mentionWarnings flags live sibling tickets the body names that t does not
+// wait on, directly or transitively (parent edges and fork subtrees included):
+// the scheduler may then run t before the ticket it relies on lands.
+func (g *projectGraph) mentionWarnings(epic string, t Ticket) []Warning {
+	self := nodeKey(epic, t)
+	var covered map[string]bool
+	seen := map[string]bool{}
+	var warnings []Warning
+	for _, m := range mentionRe.FindAllStringSubmatch(t.Body, -1) {
+		key, err := g.resolve(epic, m[1])
+		if err != nil || key == self || seen[key] || g.tickets[key].IsTerminal() {
+			continue
+		}
+		seen[key] = true
+		if covered == nil {
+			covered = g.waitClosure(self)
+		}
+		if !covered[key] {
+			warnings = append(warnings, Warning{t.Path, fmt.Sprintf("ticket %s: body mentions ticket %s, which is not in blocked_by or parent",
+				t.DisplayNumber(), m[1])})
+		}
+	}
+	return warnings
+}
+
+// waitClosure is every node key reachable from start through g.wait.
+func (g *projectGraph) waitClosure(start string) map[string]bool {
+	reached := map[string]bool{}
+	stack := []string{start}
+	for len(stack) > 0 {
+		key := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		for _, next := range g.wait[key] {
+			if !reached[next] {
+				reached[next] = true
+				stack = append(stack, next)
+			}
+		}
+	}
+	return reached
 }
 
 // lastClaimBases maps each ticket in the run log to the resolved base of its
