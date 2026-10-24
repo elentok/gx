@@ -69,6 +69,40 @@ jobs:
       - name: Build
         run: go build ./...
 
+  web-e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: webui/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install the browser
+        run: |
+          cd webui && pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Web e2e
+        run: make web-e2e
+
+      - name: Upload traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-e2e-traces
+          path: webui/test-results
+          if-no-files-found: ignore
+
   herdr-e2e:
     runs-on: macos-latest
 

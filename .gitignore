@@ -6,5 +6,6 @@ web/demo/.work/
 .playwright-cli/
 .scratch/
 webui/node_modules/
+webui/test-results/
 webui/dist/*
 !webui/dist/.gitkeep

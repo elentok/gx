@@ -1,4 +1,4 @@
-.PHONY: build web-build web-dev web-dev-proxy web-test web-types install test test-race test-short test-server e2e test-docker-ubuntu run demos demo-seed
+.PHONY: build web-build web-dev web-dev-proxy web-test web-e2e web-types install test test-race test-short test-server e2e test-docker-ubuntu run demos demo-seed
 
 GO_VERSION := 1.25.0
 
@@ -24,6 +24,10 @@ web-dev-proxy:
 
 web-test:
 	cd webui && pnpm install --frozen-lockfile && pnpm exec tsc --noEmit && pnpm test
+
+# Browser flows against fixture servers (webui/e2e/CATALOG.md); the gx binary embeds the built UI.
+web-e2e: web-build
+	cd webui && pnpm exec playwright install chromium && pnpm e2e
 
 # Regenerates webui/src/generated/server.ts from the server's wire types.
 web-types:
