@@ -89,12 +89,18 @@ var scenarios = map[string]scenario{
 		queue:     []string{project + ":approve-epic"},
 	},
 	// design: a map epic at the Resolve tickets step, with open tickets. Its
-	// design session replays fakeclaude's scripted chat.
+	// design session replays fakeclaude's scripted chat. Its implementation
+	// epic exists, so Progress links to it at Branch and Done.
 	"design": {
-		epics: []epic{{project, "design-epic", []ticket{
-			{"01", "first", servertest.TicketOpts{}},
-			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
-		}}},
+		epics: []epic{
+			{project, "design-epic", []ticket{
+				{"01", "first", servertest.TicketOpts{}},
+				{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
+			}},
+			{project, "design-epic-impl", []ticket{
+				{"01", "build", servertest.TicketOpts{}},
+			}},
+		},
 		designSteps: map[string]string{project + ":design-epic": "resolve-tickets"},
 	},
 	// edge: a project with no epics, an epic with no tickets, and a ticket

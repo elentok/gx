@@ -5,7 +5,7 @@ Run with `make web-e2e`. Each flow starts its own fixture server (`testutil/gxfi
 Retries are off. Locators use roles and visible text; no `data-testid` is used yet.
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
-Code: `epics.e2e.ts` (flows 1, 2, 6), `pause.e2e.ts` (flow 3).
+Code: `epics.e2e.ts` (flows 1, 2, 6), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9).
 
 ## 1. Queue an epic
 
@@ -64,3 +64,35 @@ Code: `epics.e2e.ts` (flows 1, 2, 6), `pause.e2e.ts` (flow 3).
   1. Open the Queue page; it shows "All quiet".
   2. Run `gx server queue add demo:ready-epic` through the CLI against the fixture's server.
 - **Pass:** without any action in the page, the queue shows a card for `ready-epic`.
+
+## 4. Start a design session
+
+- **Scenario:** `design` (`design-epic`, a map at Resolve tickets, and its `design-epic-impl` epic)
+- **Steps:**
+  1. Click Designs in the nav; the epic opens with "Start design session".
+  2. Click Start design session.
+- **Pass:** Progress shows Resolve tickets as the current step, and the chat shows the first scripted
+  message ("Two questions before the spec.") in place of the start button.
+
+## 5. Answer a round
+
+- **Scenario:** `design`
+- **Steps:**
+  1. Start the session. Round one has `Q8` (options) and `Q8b` (yes/no).
+  2. Pick SQLite and Yes, then Send.
+  3. Click Continue.
+- **Pass:**
+  - The question dots and titles read `Q8` and `Q8b`.
+  - The chat shows the answers as the person's message, so the agent received them.
+  - Continue shows after the agent's run-end line.
+  - Continue brings a fresh round with `Q9`.
+
+## 9. Design progress to the end
+
+- **Scenario:** `design`
+- **Status:** written but skipped (`test.fixme`). The epic's `design_step` change publishes no
+  ticket-changed event, so the open page never refetches Progress.
+- **Steps:** run `gx tickets set demo:design-epic --design-step <step>` for spec, review,
+  grill-findings, create-tickets, branch, done.
+- **Pass:** each step becomes current in turn (Done becomes done), earlier steps read done, and
+  "Open implementation epic →" shows only at Branch and Done.
