@@ -126,6 +126,7 @@ func TestInstallDependencies_PackageManagerField_BeatsLockfile(t *testing.T) {
 		{"pnpm over npm lockfile", "pnpm@9.1.0", "package-lock.json", "{}", "pnpm install --frozen-lockfile", "pnpm"},
 		{"yarn 1 over berry lockfile", "yarn@1.22.19", "yarn.lock", "__metadata:\n", "yarn install --frozen-lockfile", "yarn"},
 		{"yarn 4 over classic lockfile", "yarn@4.1.0", "yarn.lock", "# yarn lockfile v1\n", "yarn install --immutable", "yarn"},
+		{"pnpm with hash", "pnpm@9.1.0+sha256.abc", "package-lock.json", "{}", "pnpm install --frozen-lockfile", "pnpm"},
 		{"yarn berry with hash", "yarn@3.6.0+sha224.abc", "yarn.lock", "", "yarn install --immutable", "yarn"},
 		{"bun", "bun@1.1.0", "package-lock.json", "{}", "bun install --frozen-lockfile", "bun"},
 		{"npm", "npm@10.2.0", "pnpm-lock.yaml", "", "npm ci", "npm"},
@@ -225,6 +226,21 @@ func TestInstallDependencies_Failures_ExplainThemselves(t *testing.T) {
 			name:    "unparseable packageManager",
 			files:   map[string]string{"package.json": `{"packageManager":"npm"}`, "package-lock.json": "{}"},
 			wantErr: `unsupported packageManager "npm"`,
+		},
+		{
+			name:    "packageManager with non-numeric yarn major",
+			files:   map[string]string{"package.json": `{"packageManager":"yarn@berry"}`, "yarn.lock": ""},
+			wantErr: `unsupported packageManager "yarn@berry"`,
+		},
+		{
+			name:    "packageManager with non-numeric pnpm major",
+			files:   map[string]string{"package.json": `{"packageManager":"pnpm@x"}`, "pnpm-lock.yaml": ""},
+			wantErr: `unsupported packageManager "pnpm@x"`,
+		},
+		{
+			name:    "packageManager with empty version",
+			files:   map[string]string{"package.json": `{"packageManager":"npm@"}`, "package-lock.json": "{}"},
+			wantErr: `unsupported packageManager "npm@"`,
 		},
 		{
 			name:    "two managers without packageManager",

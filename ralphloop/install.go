@@ -200,10 +200,17 @@ func writeInstallLog(logDir, installDir string, out []byte) string {
 func chooseCommand(dir string, lockfiles []string, packageManager string) ([]string, error) {
 	if packageManager != "" {
 		name, version, found := strings.Cut(packageManager, "@")
-		major, _ := strconv.Atoi(strings.SplitN(version, ".", 2)[0])
+		unsupported := fmt.Errorf("unsupported packageManager %q", packageManager)
+		if !found || version == "" {
+			return nil, unsupported
+		}
+		major, err := strconv.Atoi(strings.SplitN(version, ".", 2)[0])
+		if err != nil {
+			return nil, unsupported
+		}
 		command, ok := installCommand(name, major >= 2)
-		if !found || version == "" || !ok {
-			return nil, fmt.Errorf("unsupported packageManager %q", packageManager)
+		if !ok {
+			return nil, unsupported
 		}
 		return command, nil
 	}
