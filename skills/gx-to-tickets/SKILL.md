@@ -276,8 +276,16 @@ If the breakdown appends a trailing `type: code-review` ticket, run
 epic already has a code-review ticket among its published issues, else it stamps out the stub. Skip
 running it only if the user has explicitly asked for a second code-review ticket.
 
+Then run `gx tickets ensure-verify <epic-slug>` to stamp out the epic's `type: verify` ticket. Skip
+it when the epic has no user-visible behavior, meaning the spec changes no web, CLI or server
+behavior (a docs-only, skills-only or refactor epic).
+
+If the spec has a `## Verification` section that lists new flows or scenarios to write, turn each
+one into an implementation ticket in the breakdown, like any other piece of work. The verify ticket
+runs those flows; it only writes one itself when it is small (see gx-verify-epic).
+
 Last, once every ticket is written and validated, the Summary is written and `ensure-code-review`
-has run, open the epic you created as a draft: `gx tickets set <project:epic>-impl --status open`.
+(and `ensure-verify`, when it ran) have run, open the epic you created as a draft: `gx tickets set <project:epic>-impl --status open`.
 Nothing comes after this call.
 
 <ticket-template>

@@ -108,6 +108,8 @@ Review the spec against the map it came from and its own template, not in the ab
 
 - Does every user story trace back to the map's Destination and Decisions so far?
 - Is each user story testable?
+- Does every user story have an entry in the spec's `## Verification` section? A story with no
+  entry is a finding. An epic with no user-visible behavior may say so in one line instead.
 - Does anything creep past the map's `## Out of scope` or the Destination's boundary?
 - What did the spec silently assume that the map never decided?
 - What holes remain, or what question does the spec raise but not answer?

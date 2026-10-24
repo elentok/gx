@@ -64,6 +64,18 @@ A list of testing decisions that were made. Include:
 - Which modules will be tested
 - Prior art for the tests (i.e. similar types of tests in the codebase)
 
+## Verification
+
+One entry per user story, by number. A verify ticket runs these against a temporary gx server after
+the epic is built. Each entry lists:
+
+- The flow-catalog flows to run for the story.
+- The CLI and server verb checks (command, expected output or exit code).
+- The new flows or scenarios to write, if the catalog does not cover the story. These become
+  implementation tickets.
+
+If the epic has no user-visible behavior (no web, CLI or server change), write one line saying so.
+
 ## Out of Scope
 
 A description of the things that are out of scope for this spec.
