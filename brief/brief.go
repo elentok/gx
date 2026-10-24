@@ -86,6 +86,7 @@ func Run(tool Tool, o Options) int {
 		return cantRun(o.Out, "cannot write log: "+err.Error())
 	}
 	defer logFile.Close()
+	sweep(logDir, start)
 
 	var out bytes.Buffer
 	cmd := exec.Command(name, argv...)
@@ -93,12 +94,15 @@ func Run(tool Tool, o Options) int {
 	cmd.Stdout = &out
 	cmd.Stderr = &out
 	exit := 0
-	if err := cmd.Run(); err != nil {
+	if err := runForwardingSignals(cmd); err != nil {
 		var ee *exec.ExitError
 		if !errors.As(err, &ee) {
 			return cantRun(o.Out, fmt.Sprintf("cannot run %s: %v", name, err))
 		}
 		exit = ee.ExitCode()
+		if exit < 0 { // killed by a signal
+			exit = ExitFail
+		}
 	}
 	elapsed := time.Since(start)
 
@@ -165,6 +169,11 @@ func appendIndex(path string, e indexEntry) error {
 	if err != nil {
 		return err
 	}
+	unlock, err := lockIndex(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
