@@ -75,8 +75,7 @@ const defaultWorkerSkill = "gx-implement"
 // already resolved.
 const codeReviewSkill = "gx-code-review"
 
-// verifySkill is the skill launched for type: verify tickets. It does not
-// ship yet; until it does, preflight reports it as a missing skill.
+// verifySkill is the skill launched for type: verify tickets.
 const verifySkill = "gx-verify-epic"
 
 // launchSkill is the skill an iteration on t starts under: workerSkill,
