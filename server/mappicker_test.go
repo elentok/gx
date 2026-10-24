@@ -23,7 +23,8 @@ func TestEpicList_MapPickerSection(t *testing.T) {
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 	mapMD := func(front string) string { return "---\nstatus: open\nkind: map\n" + front + "---\n" }
-	unconfirmed := "destination_unconfirmed: true\ncreated_at: " + ts(30*day) + "\n"
+	unconfirmed := "design_step: chart\ndestination_unconfirmed: true\ncreated_at: " + ts(30*day) + "\n"
+	finished := func(ago time.Duration) string { return "design_step: done\ncompleted_at: " + ts(ago) + "\n" }
 	implMD := func(front string) string {
 		return "---\nstatus: open\ncreated_at: " + ts(20*day) + "\n" + front + "---\n"
 	}
@@ -34,25 +35,20 @@ func TestEpicList_MapPickerSection(t *testing.T) {
 	writeEpicFiles(t, store, "m-live", mapMD(unconfirmed), open)
 	writeEpicFiles(t, store, "m-wait", mapMD(unconfirmed), open)
 	// In progress: past Chart.
-	writeEpicFiles(t, store, "m-resolving", mapMD("created_at: "+ts(30*day)+"\n"), open)
+	writeEpicFiles(t, store, "m-resolving", mapMD("design_step: resolve-tickets\ncreated_at: "+ts(30*day)+"\n"), open)
 	// Impl epic created, not queued.
-	writeEpicFiles(t, store, "m-ready", mapMD("completed_at: "+ts(20*day)+"\n"), done)
+	writeEpicFiles(t, store, "m-ready", mapMD(finished(20*day)), done)
 	writeEpicFiles(t, store, "m-ready-impl", implMD(""), open)
 	// Impl queued inside and outside the window.
-	writeEpicFiles(t, store, "m-recent", mapMD("completed_at: "+ts(20*day)+"\n"), done)
+	writeEpicFiles(t, store, "m-recent", mapMD(finished(20*day)), done)
 	writeEpicFiles(t, store, "m-recent-impl", implMD("queued_at: "+ts(6*day+23*time.Hour)+"\n"), open)
-	writeEpicFiles(t, store, "m-old", mapMD("completed_at: "+ts(20*day)+"\n"), done)
+	writeEpicFiles(t, store, "m-old", mapMD(finished(20*day)), done)
 	writeEpicFiles(t, store, "m-old-impl", implMD("queued_at: "+ts(8*day)+"\n"), open)
 	// Finished by hand (no impl epic) inside and outside the window.
-	writeEpicFiles(t, store, "m-hand-new", mapMD("completed_at: "+ts(2*day)+"\n"), done)
-	writeEpicFiles(t, store, "m-hand-old", mapMD("completed_at: "+ts(8*day)+"\n"), done)
+	writeEpicFiles(t, store, "m-hand-new", mapMD(finished(2*day)), done)
+	writeEpicFiles(t, store, "m-hand-old", mapMD(finished(8*day)), done)
 
-	// The Branch step is done once the impl branch exists.
-	repo := testutil.TempRepo(t)
-	for _, b := range []string{"m-ready-impl", "m-recent-impl", "m-old-impl"} {
-		runGitIn(t, repo, "branch", b)
-	}
-	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
 
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	hs, err := h.Client.Handshake(t.Context())

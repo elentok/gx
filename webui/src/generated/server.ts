@@ -516,14 +516,6 @@ export const ProgressCreateTickets: ProgressStep = "create-tickets";
 export const ProgressBranch: ProgressStep = "branch";
 export const ProgressDone: ProgressStep = "done";
 /**
- * ProgressPhase groups the steps: Map is Chart and Resolve tickets, Review is
- * Spec through Branch, Implement is Done.
- */
-export const ProgressPhaseMap = "map";
-export const ProgressPhaseReview = "review";
-export const ProgressPhaseImplement = "implement";
-export type ProgressPhase = typeof ProgressPhaseMap | typeof ProgressPhaseReview | typeof ProgressPhaseImplement;
-/**
  * PickerSection is the Designs picker section a map row belongs to.
  */
 export type PickerSection = string;
@@ -577,10 +569,9 @@ export interface EpicListRow {
   land_block_kind?: string;
   land_block_reason?: string;
   /**
-   * ProgressStep and ProgressPhase are set only on a map row.
+   * ProgressStep is set only on a map row.
    */
   progress_step?: ProgressStep;
-  progress_phase?: ProgressPhase;
   /**
    * PickerSection, PickerSortAt and ImplAddress are set only on a map row.
    * PickerSortAt is the time the section sorts by; ImplAddress is the

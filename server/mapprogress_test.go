@@ -13,38 +13,30 @@ import (
 
 func TestEpicList_MapProgress(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	mapMD := func(front, body string) string { return "---\nstatus: open\nkind: map\n" + front + "---\n" + body }
-	writeSpec := func(name string) {
+	mapMD := func(front string) string { return "---\nstatus: open\nkind: map\n" + front + "---\n" }
+	stepMD := func(step string) string { return mapMD("design_step: " + step + "\n") }
+	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
+	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
+
+	steps := []server.ProgressStep{
+		server.ProgressChart, server.ProgressResolveTickets, server.ProgressSpec, server.ProgressReview,
+		server.ProgressGrillFindings, server.ProgressCreateTickets, server.ProgressBranch, server.ProgressDone,
+	}
+
+	h, base := startEpicDetail(t, func(store string) {
+		for _, s := range steps {
+			writeEpicFiles(t, store, "m-"+string(s), stepMD(string(s)), open)
+		}
+		writeEpicFiles(t, store, "m-no-field", mapMD(""), done)
+		writeEpicFiles(t, store, "m-status-done", "---\nstatus: done\nkind: map\n---\n", done)
+		// Files and refs that the old guess read must change nothing.
+		writeEpicFiles(t, store, "m-ignored", stepMD("resolve-tickets"), open)
+		writeEpicFiles(t, store, "m-ignored-impl", "---\nstatus: open\n---\n", open)
+		runGitIn(t, repo, "branch", "m-ignored-impl")
 		if err := os.MkdirAll(filepath.Join(repo, "docs", "specs"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		testutil.WriteFile(t, filepath.Join(repo, "docs", "specs"), name+".md", "# spec\n")
-	}
-	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
-	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
-	unchecked := "\n## Review findings\n\n- [ ] a\n- [x] b\n"
-	checked := "\n## Review findings\n\n- [x] a\n- [x] b\n"
-
-	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "m-chart", mapMD("destination_unconfirmed: true\n", ""), done)
-		writeEpicFiles(t, store, "m-resolve-open", mapMD("", ""), open)
-		writeEpicFiles(t, store, "m-resolve-nys", mapMD("", "\n## Not yet specified\n\n- the schema\n"), done)
-		writeEpicFiles(t, store, "m-spec", mapMD("", "\n## Not yet specified\n"), done)
-		writeEpicFiles(t, store, "m-review", mapMD("", ""), done)
-		writeSpec("m-review")
-		writeEpicFiles(t, store, "m-grill", mapMD("", unchecked), done)
-		writeSpec("m-grill")
-		writeEpicFiles(t, store, "m-create", mapMD("", checked), done)
-		writeSpec("m-create")
-		writeEpicFiles(t, store, "m-create-impl", "---\nstatus: draft\n---\n", open)
-		writeEpicFiles(t, store, "m-branch", mapMD("", checked), done)
-		writeSpec("m-branch")
-		writeEpicFiles(t, store, "m-branch-impl", "---\nstatus: open\n---\n", open)
-		writeEpicFiles(t, store, "m-merged", mapMD("", checked), done)
-		writeEpicFiles(t, store, "m-merged-impl", "---\nstatus: open\n---\n", open)
-		runGitIn(t, repo, "branch", "m-merged-impl")
-		writeEpicFiles(t, store, "m-status-done", "---\nstatus: done\nkind: map\n---\n", done)
-		writeEpicFiles(t, store, "m-by-hand", mapMD("completed_at: 2026-01-01T11:00:00Z\n", ""), done)
+		testutil.WriteFile(t, filepath.Join(repo, "docs", "specs"), "m-ignored.md", "# spec\n")
 		writeEpicFiles(t, store, "loop", "---\nstatus: open\n---\n", open)
 		servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	})
@@ -57,22 +49,14 @@ func TestEpicList_MapProgress(t *testing.T) {
 		got[r.Name] = r
 	}
 
-	want := map[string]struct {
-		step  server.ProgressStep
-		phase server.ProgressPhase
-	}{
-		"m-chart":        {server.ProgressChart, server.ProgressPhaseMap},
-		"m-resolve-open": {server.ProgressResolveTickets, server.ProgressPhaseMap},
-		"m-resolve-nys":  {server.ProgressResolveTickets, server.ProgressPhaseMap},
-		"m-spec":         {server.ProgressSpec, server.ProgressPhaseReview},
-		"m-review":       {server.ProgressReview, server.ProgressPhaseReview},
-		"m-grill":        {server.ProgressGrillFindings, server.ProgressPhaseReview},
-		"m-create":       {server.ProgressCreateTickets, server.ProgressPhaseReview},
-		"m-branch":       {server.ProgressBranch, server.ProgressPhaseReview},
-		"m-merged":       {server.ProgressDone, server.ProgressPhaseImplement},
-		"m-status-done":  {server.ProgressDone, server.ProgressPhaseImplement},
-		"m-by-hand":      {server.ProgressDone, server.ProgressPhaseImplement},
-		"loop":           {"", ""},
+	want := map[string]server.ProgressStep{
+		"m-no-field":    server.ProgressChart,
+		"m-status-done": server.ProgressDone,
+		"m-ignored":     server.ProgressResolveTickets,
+		"loop":          "",
+	}
+	for _, s := range steps {
+		want["m-"+string(s)] = s
 	}
 	for name, w := range want {
 		r, ok := got[name]
@@ -80,8 +64,8 @@ func TestEpicList_MapProgress(t *testing.T) {
 			t.Errorf("%s is missing from %s", name, body)
 			continue
 		}
-		if r.ProgressStep != w.step || r.ProgressPhase != w.phase {
-			t.Errorf("%s = step %q phase %q, want %q %q", name, r.ProgressStep, r.ProgressPhase, w.step, w.phase)
+		if r.ProgressStep != w {
+			t.Errorf("%s = step %q, want %q", name, r.ProgressStep, w)
 		}
 	}
 }

@@ -2,56 +2,23 @@ package server
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// mapProbe is what a project's maps share: its trunk checkout and repo root.
-// The listing resolves it once per project, not once per map.
-type mapProbe struct {
-	trunkDir string
-	repo     string
-}
-
-func (s *Server) mapProbeFor(project string) mapProbe {
-	return mapProbe{
-		trunkDir: tickets.TrunkCheckout(s.cfg.TicketStore, project),
-		repo:     tickets.ProjectRepoRoot(s.cfg.TicketStore, project),
+// mapProgress is a map's current Progress step. It comes from the epic's
+// design_step alone: status done always shows Done, and a missing field shows
+// Chart. It never looks at files or branch refs.
+func mapProgress(m tickets.Epic) ProgressStep {
+	if m.Status == string(schema.StatusDone) {
+		return ProgressDone
 	}
-}
-
-// mapProgress is a map's current Progress step and its phase. It checks from
-// the last step back and stops at the first step that is done, because the
-// Branch step deletes the spec file from the trunk checkout. It reads only the
-// trunk checkout and the repo's refs, never a worktree.
-func mapProgress(m tickets.Epic, byName map[string]tickets.Epic, p mapProbe) (ProgressStep, ProgressPhase) {
-	impl, hasImpl := byName[m.Name+tickets.ImplEpicSuffix]
-	switch {
-	case m.Status == string(schema.StatusDone),
-		!m.CompletedAt.IsZero() && !hasImpl,
-		p.repo != "" && tickets.BranchExists(p.repo, m.Name+tickets.ImplEpicSuffix):
-		return ProgressDone, ProgressPhaseImplement
-	case hasImpl && impl.Status != string(schema.StatusDraft):
-		return ProgressBranch, ProgressPhaseReview
-	case hasOpenTicket(m) && !m.DestinationUnconfirmed:
-		// A review that sent tickets back reopens the map's tickets.
-		return ProgressResolveTickets, ProgressPhaseMap
-	case schema.HasSection(m.Body, "Review findings") && findingsChecked(schema.Section(m.Body, "Review findings")):
-		return ProgressCreateTickets, ProgressPhaseReview
-	case schema.HasSection(m.Body, "Review findings"):
-		return ProgressGrillFindings, ProgressPhaseReview
-	case p.trunkDir != "" && fileExists(filepath.Join(p.trunkDir, "docs", "specs", m.Name+".md")):
-		return ProgressReview, ProgressPhaseReview
-	case !hasOpenTicket(m) && schema.Section(m.Body, "Not yet specified") == "" && !m.DestinationUnconfirmed:
-		return ProgressSpec, ProgressPhaseReview
-	case !m.DestinationUnconfirmed:
-		return ProgressResolveTickets, ProgressPhaseMap
+	if m.DesignStep == "" {
+		return ProgressChart
 	}
-	return ProgressChart, ProgressPhaseMap
+	return ProgressStep(m.DesignStep)
 }
 
 // progressSteps lists the Progress steps in order.
@@ -71,8 +38,8 @@ var progressSteps = []struct {
 
 // mapSteps lists all Progress steps with their state. The steps before the
 // current one are done, and all of them are once the map is Done.
-func mapSteps(m tickets.Epic, byName map[string]tickets.Epic, p mapProbe) []MapStep {
-	current, _ := mapProgress(m, byName, p)
+func mapSteps(m tickets.Epic, byName map[string]tickets.Epic) []MapStep {
+	current := mapProgress(m)
 	steps := make([]MapStep, 0, len(progressSteps))
 	state := MapStepDone
 	for _, s := range progressSteps {
@@ -169,9 +136,4 @@ func findingCounts(section string) (checked, total int) {
 		}
 	}
 	return checked, total
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }

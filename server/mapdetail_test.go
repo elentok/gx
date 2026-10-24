@@ -2,8 +2,6 @@ package server_test
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/elentok/gx/server"
@@ -14,41 +12,32 @@ import (
 func TestEpicDetail_MapProgress(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	mapMD := func(front, body string) string { return "---\nstatus: open\nkind: map\n" + front + "---\n" + body }
-	writeSpec := func(name string) {
-		if err := os.MkdirAll(filepath.Join(repo, "docs", "specs"), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		testutil.WriteFile(t, filepath.Join(repo, "docs", "specs"), name+".md", "# spec\n")
-	}
 	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 	findings := "\n## Review findings\n\n- [x] a\n- [x] b\n- [ ] c\n- [ ] d\n- [ ] e\n"
 	checked := "\n## Review findings\n\n- [x] a\n"
 
 	h, base := startEpicDetail(t, func(store string) {
-		writeEpicFiles(t, store, "m-chart", mapMD("destination_unconfirmed: true\n", ""), done)
-		writeEpicFiles(t, store, "m-claimed", mapMD("", ""), map[string]string{
+		writeEpicFiles(t, store, "m-chart", mapMD("design_step: chart\n", ""), done)
+		writeEpicFiles(t, store, "m-claimed", mapMD("design_step: resolve-tickets\n", ""), map[string]string{
 			"01-a.md": issueMD("01", "done", "", "A"),
 			"02-b.md": issueMD("02", "claimed", "", "B"),
 			"03-c.md": issueMD("03", "open", "blocked_by: [\"02\"]\n", "C"),
 		})
-		writeEpicFiles(t, store, "m-frontier", mapMD("", ""), map[string]string{
+		writeEpicFiles(t, store, "m-frontier", mapMD("design_step: resolve-tickets\n", ""), map[string]string{
 			"01-a.md": issueMD("01", "open", "", "A"),
 			"02-b.md": issueMD("02", "open", "blocked_by: [\"01\"]\n", "B"),
 		})
-		writeEpicFiles(t, store, "m-fog", mapMD("", "\n## Not yet specified\n\n- the schema\n"), done)
-		writeEpicFiles(t, store, "m-grill", mapMD("", findings), done)
-		writeSpec("m-grill")
-		writeEpicFiles(t, store, "m-create", mapMD("", checked), done)
-		writeSpec("m-create")
+		writeEpicFiles(t, store, "m-fog", mapMD("design_step: resolve-tickets\n", "\n## Not yet specified\n\n- the schema\n"), done)
+		writeEpicFiles(t, store, "m-grill", mapMD("design_step: grill-findings\n", findings), done)
+		writeEpicFiles(t, store, "m-create", mapMD("design_step: create-tickets\n", checked), done)
 		writeEpicFiles(t, store, "m-create-impl", "---\nstatus: draft\n---\n", map[string]string{
 			"01-a.md": issueMD("01", "open", "", "A"),
 			"02-b.md": issueMD("02", "open", "", "B"),
 		})
-		writeEpicFiles(t, store, "m-back", mapMD("", checked), map[string]string{
+		writeEpicFiles(t, store, "m-back", mapMD("design_step: resolve-tickets\n", checked), map[string]string{
 			"01-a.md": issueMD("01", "done", "", "A"),
 			"02-b.md": issueMD("02", "open", "", "B"),
 		})
-		writeSpec("m-back")
 		servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	})
 	detail := func(epic string) server.EpicDetail {

@@ -169,7 +169,7 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []EpicDetailRow{},
 		Queueable: epicQueueable(e, queued), Queued: queued,
 	}
-	d.Steps = mapSteps(e, byName, s.mapProbeFor(root.Project))
+	d.Steps = mapSteps(e, byName)
 	d.Stats = epicStats(e, e.CompletedAt, now)
 	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
 		d.ImplAddress = rootRef{Project: root.Project, Epic: e.Name + tickets.ImplEpicSuffix}.String()

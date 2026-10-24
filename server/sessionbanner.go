@@ -126,7 +126,7 @@ func (s *Server) designDone(m sessionMeta) bool {
 	if !ok || !e.IsMap {
 		return false
 	}
-	step, _ := mapProgress(e, byName, s.mapProbeFor(addr.Project))
+	step := mapProgress(e)
 	return step == ProgressDone
 }
 

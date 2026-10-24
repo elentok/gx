@@ -49,16 +49,6 @@ const (
 	ProgressDone           ProgressStep = "done"
 )
 
-// ProgressPhase groups the steps: Map is Chart and Resolve tickets, Review is
-// Spec through Branch, Implement is Done.
-type ProgressPhase string
-
-const (
-	ProgressPhaseMap       ProgressPhase = "map"
-	ProgressPhaseReview    ProgressPhase = "review"
-	ProgressPhaseImplement ProgressPhase = "implement"
-)
-
 // PickerSection is the Designs picker section a map row belongs to.
 type PickerSection string
 
@@ -101,9 +91,8 @@ type EpicListRow struct {
 	// see EpicDetail.
 	MergeBlockKind   string `json:"land_block_kind,omitempty"`
 	MergeBlockReason string `json:"land_block_reason,omitempty"`
-	// ProgressStep and ProgressPhase are set only on a map row.
-	ProgressStep  ProgressStep  `json:"progress_step,omitempty"`
-	ProgressPhase ProgressPhase `json:"progress_phase,omitempty"`
+	// ProgressStep is set only on a map row.
+	ProgressStep ProgressStep `json:"progress_step,omitempty"`
 	// PickerSection, PickerSortAt and ImplAddress are set only on a map row.
 	// PickerSortAt is the time the section sorts by; ImplAddress is the
 	// implementation epic's address when it exists.
@@ -195,10 +184,8 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 				}
 			}
 		}
-		var probe mapProbe
 		var designs map[string]designActivity
 		if hasMap {
-			probe = s.mapProbeFor(project)
 			designs = s.designActivities()
 		}
 		now := time.Now()
@@ -207,7 +194,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 				row := s.epicListRow(project, e)
 				row.BlockedByEpics = unmergedBlockers(project, e, merged)
 				if e.IsMap {
-					row.ProgressStep, row.ProgressPhase = mapProgress(e, byName, probe)
+					row.ProgressStep = mapProgress(e)
 					row.PickerSection, row.PickerSortAt, row.ImplAddress = s.mapPicker(project, e, row.ProgressStep, byName, designs[row.Address], now)
 				}
 				list.Epics = append(list.Epics, row)
