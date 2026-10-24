@@ -209,7 +209,7 @@ func checkPermissionRequestShape(in Input) (string, bool) {
 	return fmt.Sprintf("request_id %s for %s", e.RequestID, e.Request.ToolName), true
 }
 
-// checkPermissionBlocks: a can_use_tool request must park the runner in
+// checkPermissionBlocks: a can_use_tool request must pause the runner as
 // blocked, or a headless agent waits for an answer nobody is asked for.
 func checkPermissionBlocks(in Input) (string, bool) {
 	for _, st := range nativerunner.StatusTrail(in.Events) {
