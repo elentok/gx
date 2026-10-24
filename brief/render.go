@@ -13,13 +13,36 @@ const (
 	maxFullUnits = 5   // units shown with text; the rest are listed by name
 )
 
-// Unit is one failure: a failing test, or a package that fails to build.
+// UnitKind says what failed. The zero value is a failing test.
+type UnitKind int
+
+const (
+	KindTest          UnitKind = iota
+	KindBuildFailed            // a package that fails to build
+	KindPackageFailed          // a package that fails without a failing test
+	KindFileFailed             // a file that fails without a failing test
+)
+
+// label is the heading of a unit that is not a test; tests use their name.
+func (k UnitKind) label() string {
+	switch k {
+	case KindBuildFailed:
+		return "build failed"
+	case KindPackageFailed:
+		return "package failed"
+	case KindFileFailed:
+		return "file failed"
+	}
+	return ""
+}
+
+// Unit is one failure: a failing test, or a package or file that fails as a whole.
 // Field order is the display order: location, name, text.
 type Unit struct {
 	Location string // package (or file, for tools that report files)
-	Name     string // test name; the location again for a build failure
+	Name     string // test name; the location again for a non-test kind
 	Text     string
-	Build    bool // a build failure rather than a failing test
+	Kind     UnitKind
 }
 
 // renderUnits prints the units under their location. Units of one location
@@ -31,8 +54,8 @@ func renderUnits(w io.Writer, units []Unit) {
 			fmt.Fprintln(w, u.Location)
 			prev = u.Location
 		}
-		if u.Build {
-			fmt.Fprintln(w, "  build failed")
+		if u.Kind != KindTest {
+			fmt.Fprintf(w, "  %s\n", u.Kind.label())
 		} else {
 			fmt.Fprintf(w, "  %s\n", u.Name)
 		}

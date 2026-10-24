@@ -334,9 +334,8 @@ func TestBrief_GoTestPanicBeforeAnyTest(t *testing.T) {
 	if code != 1 {
 		t.Fatalf("exit = %d, out:\n%s", code, out)
 	}
-	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	// header + 10 raw lines + a cut notice + log path
-	if len(lines) > 13 || !strings.Contains(out, "boom") || strings.Contains(out, "re-run") {
+	if !strings.Contains(out, "panic: boom") || !strings.Contains(out, "package failed") ||
+		strings.Contains(out, `{"Time"`) || strings.Contains(out, "re-run") {
 		t.Errorf("unexpected report:\n%s", out)
 	}
 	if _, err := os.Stat(lastLine(out)); err != nil {

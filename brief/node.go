@@ -162,7 +162,7 @@ func (Vitest) Parse(out []byte, _ int) Outcome {
 		}
 		if failed == 0 && f.Status == "failed" {
 			// The file failed without a failing test, such as an import error.
-			failures = append(failures, Unit{Location: f.Name, Name: f.Name, Text: vitestText([]string{f.Message}), Build: true})
+			failures = append(failures, Unit{Location: f.Name, Name: f.Name, Text: vitestText([]string{f.Message}), Kind: KindFileFailed})
 		}
 	}
 	return Outcome{
@@ -191,7 +191,7 @@ func vitestText(msgs []string) string {
 func (Vitest) RerunArgs(args []string, failures []Unit) []string {
 	var names []string
 	for _, u := range failures {
-		if !u.Build {
+		if u.Kind == KindTest {
 			names = append(names, regexp.QuoteMeta(u.Name))
 		}
 	}

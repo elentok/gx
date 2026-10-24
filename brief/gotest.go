@@ -105,7 +105,7 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 		}
 	}
 
-	var failures, orphans []Unit
+	var failures []Unit
 	for _, p := range order {
 		leaves := 0
 		for _, t := range p.tests {
@@ -117,14 +117,11 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 		}
 		switch {
 		case p.failedBuild != "":
-			failures = append(failures, Unit{Location: p.name, Name: p.name, Text: strings.Join(buildText[p.failedBuild], "\n"), Build: true})
+			failures = append(failures, Unit{Location: p.name, Name: p.name, Text: strings.Join(buildText[p.failedBuild], "\n"), Kind: KindBuildFailed})
 		case p.failed && leaves == 0:
 			// The package failed without a failing test, such as a panic in TestMain.
-			orphans = append(orphans, Unit{Location: p.name, Name: p.name, Text: strings.Join(p.output, "\n"), Build: true})
+			failures = append(failures, Unit{Location: p.name, Name: p.name, Text: strings.Join(p.output, "\n"), Kind: KindPackageFailed})
 		}
-	}
-	if len(failures) > 0 {
-		failures = append(failures, orphans...)
 	}
 	return Outcome{
 		Units:    tests,
@@ -149,7 +146,7 @@ func hasFailingSubtest(failed []string, name string) bool {
 func (GoTest) RerunArgs(args []string, failures []Unit) []string {
 	var names []string
 	for _, u := range failures {
-		if u.Build {
+		if u.Kind != KindTest {
 			continue
 		}
 		top, _, _ := strings.Cut(u.Name, "/")

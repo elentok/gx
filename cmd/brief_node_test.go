@@ -245,6 +245,17 @@ func TestBrief_VitestRerunKeepsArgsAndC(t *testing.T) {
 	}
 }
 
+func TestBrief_VitestImportErrorIsLabelledFileFailed(t *testing.T) {
+	nodeEnv(t)
+	repo := testutil.TempRepo(t)
+	nodeStub(t, repo, "vitest", "vitest-import-error.json", 1)
+	out, code := runBriefCmd(t, repo, "vitest")
+	if code != 1 || !strings.Contains(out, "  file failed\n") || !strings.Contains(out, "Failed to resolve import") ||
+		strings.Contains(out, "build failed") || rerunOf(out) != "" {
+		t.Errorf("exit %d, out:\n%s", code, out)
+	}
+}
+
 func TestBrief_VitestCrashedReporterFallsBackToRawHead(t *testing.T) {
 	nodeEnv(t)
 	repo := testutil.TempRepo(t)
