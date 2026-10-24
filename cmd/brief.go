@@ -13,6 +13,8 @@ import (
 // briefTools lists the wrapped tools by subcommand name.
 var briefTools = map[string]brief.Tool{
 	"go-test": brief.GoTest{},
+	"vitest":  brief.Vitest{},
+	"tsc":     brief.Tsc{},
 }
 
 func newBriefCmd(d deps) *cobra.Command {
@@ -22,7 +24,8 @@ func newBriefCmd(d deps) *cobra.Command {
 		Long: `Run a dev tool and print one result line and the log path (always the last
 line). Exit 0 means pass, 1 fail, 2 brief could not run the tool.
 
-Tools: go-test
+Tools: go-test, vitest, tsc (vitest and tsc run from the node_modules/.bin found
+walking up to the git root)
 
 -C <dir> runs the tool in that directory. It must come before the tool name;
 everything after the tool name goes to the tool unchanged.`,

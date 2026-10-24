@@ -35,6 +35,13 @@ type Tool interface {
 	RerunArgs(args []string, failures []Unit) []string
 }
 
+// Preparer is implemented by tools that find their own executable instead of
+// using PATH. Prepare returns its path, an optional note to print before the
+// result, or an error that exits 2.
+type Preparer interface {
+	Prepare(dir string, args []string) (exe, note string, err error)
+}
+
 // Outcome is what a tool found in the output of one run.
 type Outcome struct {
 	// Units counts what ran (tests, files, ...). Zero means nothing ran.
@@ -70,12 +77,21 @@ type indexEntry struct {
 // code for the process.
 func Run(tool Tool, o Options) int {
 	name, argv := tool.Command(o.Args)
-	if _, err := exec.LookPath(name); err != nil {
-		return cantRun(o.Out, fmt.Sprintf("%s not found on PATH", name))
-	}
 	dir, err := filepath.Abs(o.Dir)
 	if err != nil {
 		return cantRun(o.Out, err.Error())
+	}
+	if p, ok := tool.(Preparer); ok {
+		exe, note, err := p.Prepare(dir, o.Args)
+		if err != nil {
+			return cantRun(o.Out, err.Error())
+		}
+		name = exe
+		if note != "" {
+			fmt.Fprintln(o.Out, note)
+		}
+	} else if _, err := exec.LookPath(name); err != nil {
+		return cantRun(o.Out, fmt.Sprintf("%s not found on PATH", name))
 	}
 
 	start := time.Now()
