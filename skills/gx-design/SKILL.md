@@ -22,6 +22,7 @@ state machine. The map's `design_step` field is what Progress shows. This skill 
 `gx tickets set <project:epic> --design-step <step>`:
 
 - `chart` when it charts a map (step 1).
+- `resolve-tickets`, `spec`, `review`, `grill-findings` and `create-tickets` in steps 3 to 7.
 - `branch` when it creates the `<epic>-impl` branch (step 8).
 - `done` only when this run itself closes the map. Reporting the `<epic>-impl` slug (step 9) does not.
 - A move to an earlier step needs `--allow-backward`. Pass it only when a review sends tickets back
@@ -67,7 +68,7 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
    question. Given a ticket address, resolve that ticket instead of the first frontier ticket. If it is not
    open, or its `blocked_by` are not all closed, say so and stop. A ticket address only ever runs
    this step: when step 1 or 2 matches first, run that step instead and name the ticket in the
-   "Next:" line.
+   "Next:" line. Set `--design-step resolve-tickets` before resolving the ticket.
 4. **No `docs/specs/<epic>.md`** → dispatch a subagent to read [gx-to-spec](../gx-to-spec/SKILL.md) and follow it. Seed it with
    the map body (Destination, Decisions so far) and each closed ticket's title and resolution gist,
    not full ticket bodies. The spec is where the map's gaps first show, so tell the subagent to sort
@@ -80,20 +81,21 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
    If it returns any design question, file them as `grilling` map tickets (Map epics → Child
    ticket) and stop, without chaining: the next run matches step 3 and resumes the map. Each ticket
    costs a run, so by default file one ticket that lists every question with the subagent's
-   suggested answer. (Tickets sent back to the map move the step back with `--allow-backward`.) Give a question its own ticket only when it needs research or a prototype, or
+   suggested answer. Give a question its own ticket only when it needs research or a prototype, or
    is too big to settle in the same grilling round as the rest. Write the
    spec only on a run that returns none. A spec never carries open design questions to the review.
+   Once the spec is written, set `--design-step spec`.
 5. **No `## Review findings` section on the map** → dispatch a design-review subagent against the
    spec (rubric below). It writes the findings as a markdown checklist (`- [ ] …`) with
-   `gx tickets section <project:epic> "Review findings" -`. Write `- [x] No findings` if there are none.
-6. **Unchecked findings** → run a `gx-grilling` session on them, resident in this same run. Amend
+   `gx tickets section <project:epic> "Review findings" -`. Write `- [x] No findings` if there are none. Then set `--design-step review`.
+6. **Unchecked findings** → set `--design-step grill-findings`, then run a `gx-grilling` session on them, resident in this same run. Amend
    `docs/specs/<epic>.md` as each finding resolves, and check it off with
    `gx tickets section <project:epic> "Review findings" -`. Do not `/clear` between rounds. When
    every finding is checked, continue to step 7 in the same run.
 7. **No `<epic>-impl` epic** → follow [gx-to-tickets](../gx-to-tickets/SKILL.md) on the amended
    spec, publishing into `<epic>-impl`. Never publish into the map epic: its tickets are
-   hand-resolved decisions, and implementation tickets belong to ralph-loop. Continue to step 8 in
-   the same run.
+   hand-resolved decisions, and implementation tickets belong to ralph-loop. Set
+   `--design-step create-tickets` before publishing, then continue to step 8 in the same run.
 8. **No `<epic>-impl` branch** (`git rev-parse --verify refs/heads/<epic>-impl` fails) → commit the
    design docs into the feature branch, so that implementation agents see them in their worktrees.
    The server adopts a branch that already exists, so creating it here is safe.
