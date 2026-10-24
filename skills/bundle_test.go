@@ -86,6 +86,7 @@ var requiredFiles = []string{
 	"gx-thermo-nuclear-code-quality-review/README.md",
 	"gx-verify/SKILL.md",
 	"gx-verify-epic/SKILL.md",
+	"gx-ui-check/SKILL.md",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
@@ -217,6 +218,7 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-thermo-nuclear-code-quality-review": true,
 	"gx-verify":                             false,
 	"gx-verify-epic":                        true,
+	"gx-ui-check":                           false,
 }
 
 func TestSkillMetadataAndInvocationPolicy(t *testing.T) {

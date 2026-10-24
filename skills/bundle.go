@@ -13,7 +13,7 @@ import (
 // installation method (release, Homebrew, go install, local build) ships the
 // same content.
 //
-//go:embed gx.md gx-local-tracker.md gx-to-tickets gx-tdd gx-implement gx-resolving-merge-conflicts gx-investigate gx-cleanup gx-merge gx-code-review gx-changelog gx-bump gx-one-off gx-evolve gx-resolve-follow-ups gx-design gx-follow-up gx-grilling gx-domain-modeling gx-unslop gx-research gx-prototype gx-wayfinder gx-to-spec gx-thermo-nuclear-code-quality-review gx-verify gx-verify-epic
+//go:embed gx.md gx-local-tracker.md gx-to-tickets gx-tdd gx-implement gx-resolving-merge-conflicts gx-investigate gx-cleanup gx-merge gx-code-review gx-changelog gx-bump gx-one-off gx-evolve gx-resolve-follow-ups gx-design gx-follow-up gx-grilling gx-domain-modeling gx-unslop gx-research gx-prototype gx-wayfinder gx-to-spec gx-thermo-nuclear-code-quality-review gx-verify gx-verify-epic gx-ui-check
 var Bundle embed.FS
 
 // BundleID identifies gx's canonical skill bundle in the manifest store

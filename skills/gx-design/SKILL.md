@@ -109,6 +109,12 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
      only the committed `GLOSSARY.md` hunks. Leave every other edit in place.
 9. **Otherwise** → report the `<epic>-impl` slug and stop. Launch it from the TUI Queue tab.
 
+## Researching existing UI behavior
+
+When a map ticket or the spec depends on how the web UI behaves today, read
+[gx-ui-check](../gx-ui-check/SKILL.md) and follow it inline to see it in a running fixture. Don't
+guess from the source, and don't call the Skill tool for it.
+
 ## Design-review rubric (step 5)
 
 Review the spec against the map it came from and its own template, not in the abstract:
