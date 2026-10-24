@@ -37,10 +37,8 @@ type SessionRoundCard struct {
 	Note        string               `json:"note,omitempty"`
 }
 
-// SessionNext is the phase a gx-design run-end line names and the Actionable
-// that starts it.
+// SessionNext is the Actionable a gx-design run-end line raises.
 type SessionNext struct {
-	Phase  string            `json:"phase"`
 	Action SessionActionable `json:"action"`
 }
 
@@ -223,8 +221,8 @@ func chatRound(msgs []transcript.ChatMessage) []SessionRoundCard {
 // chatNext is the run-end line of the agent's last turn, or nil.
 func chatNext(msgs []transcript.ChatMessage, ticket string) *SessionNext {
 	for _, text := range trailingAgentTexts(msgs) {
-		if phase, a, ok := runEndNext(text, ticket); ok {
-			return &SessionNext{Phase: phase, Action: a}
+		if a, ok := runEndNext(text, ticket); ok {
+			return &SessionNext{Action: a}
 		}
 	}
 	return nil

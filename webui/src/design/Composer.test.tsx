@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicDetailRow, SessionChatResponse, SessionInfo, SessionResult, SessionRoundCard } from "../generated/server";
+import type { EpicDetailRow, MapStep, SessionChatResponse, SessionInfo, SessionResult, SessionRoundCard } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchChat } from "./chat";
@@ -33,7 +33,22 @@ const chatOf = (over: Partial<SessionChatResponse> = {}): SessionChatResponse =>
   ...over,
 });
 
-const nextOf = (phase: string): SessionChatResponse["next"] => ({ phase, action: {} });
+const runEnd: SessionChatResponse["next"] = { action: {} };
+
+const STEP_LABELS: Record<string, string> = {
+  chart: "Chart",
+  "resolve-tickets": "Resolve tickets",
+  spec: "Spec",
+  review: "Review",
+  "grill-findings": "Grill findings",
+  "create-tickets": "Create tickets",
+  branch: "Branch",
+  done: "Done",
+};
+const stepsAt = (current: string): MapStep[] => {
+  const ids = Object.keys(STEP_LABELS);
+  return ids.map((step, i) => ({ step, label: STEP_LABELS[step], state: i < ids.indexOf(current) ? "done" : step === current ? "current" : "todo" }));
+};
 
 const ok: SessionResult = { session: session() };
 
@@ -45,6 +60,7 @@ function render(opts: {
   post?: PostPrompt;
   fetchChat?: FetchChat;
   rows?: EpicDetailRow[];
+  steps?: MapStep[];
 }) {
   const state = {
     snapshot: { sessions: [session(opts.state, opts.background)] },
@@ -63,7 +79,7 @@ function render(opts: {
       }),
       epic: async () => ({
         kind: "ok",
-        detail: { address: "gx:a", kind: "map", summary: "", done: 0, total: 0, agent_time: 0, cost_total: 0, stats: {}, rows: opts.rows ?? [], queueable: false, queued: false, steps: [] },
+        detail: { address: "gx:a", kind: "map", summary: "", done: 0, total: 0, agent_time: 0, cost_total: 0, stats: {}, rows: opts.rows ?? [], queueable: false, queued: false, steps: opts.steps ?? [], impl_address: "gx:a-impl" },
       }),
       chat: opts.fetchChat ?? (async () => ({ kind: "ok", detail: opts.chat ?? chatOf() })),
       prompt: opts.post,
@@ -94,7 +110,7 @@ test("a plain message posts its text with the last message id", async () => {
 });
 
 test("the composer is disabled while the session is Working", async () => {
-  render({ state: "working", post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: nextOf("map") }) });
+  render({ state: "working", post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }) });
   const box = await openNote();
   expect(box.disabled).toBe(true);
   expect((screen.getByRole("button", { name: /Continue/ }) as HTMLButtonElement).disabled).toBe(true);
@@ -123,36 +139,48 @@ test("another refusal shows its message and keeps the draft", async () => {
   expect(box.value).toBe("long");
 });
 
-test.each(["map", "review"])("Continue after a %s run-end line sends the continue action", async (phase) => {
+test("Continue after a run-end line sends the continue action", async () => {
   const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ next: nextOf(phase) }) });
+  render({ post, chat: chatOf({ next: runEnd }), steps: stepsAt("spec") });
   fireEvent.click(await screen.findByRole("button", { name: /Continue/ }));
   await waitFor(() => expect(post).toHaveBeenCalledWith({ id: "s-a", text: "", last_message: "m9", continue: true }));
 });
 
-test("Continue names the map's current ticket and says Continue once", async () => {
+test.each(["chart", "resolve-tickets", "spec", "review", "grill-findings", "create-tickets"])("Continue shows at the %s step", async (step) => {
+  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }), steps: stepsAt(step) });
+  expect(await screen.findByRole("button", { name: /Continue/ })).toBeTruthy();
+});
+
+test("while tickets resolve, Continue names the map's current ticket and says Continue once", async () => {
   const rows: EpicDetailRow[] = [
     { address: "gx:a/01", title: "Done one", rendered_status: "done" },
     { address: "gx:a/02", title: "Server pid lock", rendered_status: "open", current: true },
   ];
-  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: nextOf("map") }), rows });
+  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }), rows, steps: stepsAt("resolve-tickets") });
   const button = await screen.findByRole("button", { name: "Continue Server pid lock" });
   expect(button.textContent?.match(/Continue/g)).toHaveLength(1);
 });
 
-test("Continue to review with no current ticket says Review", async () => {
-  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: nextOf("review") }) });
-  expect(await screen.findByRole("button", { name: "Continue Review" })).toBeTruthy();
+test("outside Resolve tickets, Continue is subtitled with the step label", async () => {
+  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }), steps: stepsAt("grill-findings") });
+  expect(await screen.findByRole("button", { name: "Continue Grill findings" })).toBeTruthy();
 });
 
-test("an implement run-end line shows no Continue", async () => {
-  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: nextOf("implement") }) });
+test.each(["branch", "done"])("at the %s step there is no Continue, and Progress links to the implementation epic", async (step) => {
+  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }), steps: stepsAt(step) });
   await screen.findByRole("button", { name: "Note" });
   expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
+  expect((await screen.findAllByText(/Open implementation epic/)).length).toBeGreaterThan(0);
+});
+
+test("before Branch, Progress has no implementation epic link", async () => {
+  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }), steps: stepsAt("create-tickets") });
+  await screen.findByRole("button", { name: /Continue/ });
+  expect(screen.queryByText(/Open implementation epic/)).toBeNull();
 });
 
 test("while disconnected the page says so and the buttons are off", async () => {
-  render({ connected: false, post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: nextOf("map") }) });
+  render({ connected: false, post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }) });
   expect(((await screen.findByRole("button", { name: /Continue/ })) as HTMLButtonElement).disabled).toBe(true);
   expect(screen.getByText("Offline, reconnecting…")).toBeTruthy();
   expect((await openNote()).disabled).toBe(true);

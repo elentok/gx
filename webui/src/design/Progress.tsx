@@ -10,6 +10,8 @@ import type { Tone } from "../ui/tone";
 
 // The generated file is imported for types only: its tygo constants are not runtime values.
 const RESOLVE_TICKETS = "resolve-tickets";
+const BRANCH = "branch";
+const DONE = "done";
 
 const STEP_MARKS: Record<string, { glyph: string; tone: Tone }> = {
   done: { glyph: "✓", tone: "done" },
@@ -100,6 +102,10 @@ export const ImplLink = ({ address }: { address: string }) => (
   </Link>
 );
 
+/** Progress links to the implementation epic once the design is handed off: at Branch and Done. */
+export const showsImplLink = (detail: EpicDetail) =>
+  !!detail.impl_address && !!detail.steps?.some((s) => (s.step === BRANCH || s.step === DONE) && s.state !== "todo");
+
 /** "Resolve tickets · 03 Chat content (2 of 7)": the current step, and its current ticket while tickets resolve. */
 function summaryLine(steps: MapStep[], rows: EpicDetailRow[]): string {
   const step = steps.find((s) => s.state === "current") ?? steps.filter((s) => s.state === "done").at(-1);
@@ -119,7 +125,7 @@ function MobileProgress({ detail, steps }: { detail: EpicDetail; steps: MapStep[
         {summaryLine(steps, detail.rows)} {open ? "▴" : "▾"}
       </Button>
       {open && <Steps steps={steps} rows={detail.rows} />}
-      {detail.impl_address && <ImplLink address={detail.impl_address} />}
+      {showsImplLink(detail) && <ImplLink address={detail.impl_address!} />}
     </Box>
   );
 }

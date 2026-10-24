@@ -63,9 +63,10 @@ func hasGrillingMarker(text string) bool { return grillingMarkerRE.MatchString(t
 
 const grillingReason = "Grilling: waiting for your answers"
 
-// runEndLine matches the closing line of a gx-design run, capturing the next
-// phase.
-var runEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next: (\w+) —.*$`)
+// runEndLine matches the closing line of a gx-design run. It only marks that a
+// run ended: the text after "Next:" is the agent's own, and nothing reads a
+// phase from it.
+var runEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next:.*$`)
 
 // designActionable is what a Design session's last assistant message asks of
 // the person: the grilling question wins over the run-end line.
@@ -73,25 +74,17 @@ func designActionable(text, ticket string) (SessionActionable, bool) {
 	if hasGrillingMarker(text) {
 		return SessionActionable{Reason: grillingReason}, true
 	}
-	_, a, ok := runEndNext(text, ticket)
-	return a, ok
+	return runEndNext(text, ticket)
 }
 
-// runEndNext is the next phase a gx-design run-end line names and the
-// Actionable that starts it.
-func runEndNext(text, ticket string) (phase string, a SessionActionable, ok bool) {
-	m := runEndLine.FindStringSubmatch(text)
-	if m == nil {
-		return "", SessionActionable{}, false
+// runEndNext is the Actionable a gx-design run-end line raises: Continue in a
+// fresh conversation.
+func runEndNext(text, ticket string) (SessionActionable, bool) {
+	line := runEndLine.FindString(text)
+	if line == "" {
+		return SessionActionable{}, false
 	}
-	reason := strings.TrimSpace(m[0])
-	switch m[1] {
-	case "map", "review":
-		return m[1], SessionActionable{Reason: reason, Action: designContinueAction(ticket)}, true
-	case "implement":
-		return m[1], SessionActionable{Reason: reason, Kind: SessionActionableQueue, Target: epicAddress(ticket) + "-impl"}, true
-	}
-	return "", SessionActionable{}, false
+	return SessionActionable{Reason: strings.TrimSpace(line), Action: designContinueAction(ticket)}, true
 }
 
 // designContinueAction starts the next gx-design phase in a fresh conversation.

@@ -104,10 +104,10 @@ func TestSessionChat_RoundIsNullOnceThePersonAnswers(t *testing.T) {
 }
 
 func TestSessionChat_NextReadsTheRunEndLine(t *testing.T) {
-	for phase, want := range map[string]string{"map": "map", "review": "review", "implement": "implement"} {
-		got := chatOf(t, assistantText("a1", fmt.Sprintf("Done.\n\n✅ Design: all good. Next: %s — go on", phase)))
-		if got.Next == nil || got.Next.Phase != want || got.Next.Action.Reason == "" {
-			t.Errorf("Next: %s => %+v, want phase %s", phase, got.Next, want)
+	for _, next := range []string{"map — go on", "anything the agent picks", "implement"} {
+		got := chatOf(t, assistantText("a1", fmt.Sprintf("Done.\n\n✅ Design: all good. Next: %s", next)))
+		if got.Next == nil || got.Next.Action.Reason == "" || len(got.Next.Action.Action) == 0 {
+			t.Errorf("Next: %s => %+v, want a Continue action", next, got.Next)
 		}
 	}
 	if got := chatOf(t, assistantText("a1", "no run end here")); got.Next != nil {

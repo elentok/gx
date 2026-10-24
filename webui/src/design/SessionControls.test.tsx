@@ -162,7 +162,7 @@ test("a send goes to the session on screen", async () => {
   const older = session("old", { run_started_at: "2026-10-23T09:00:00Z", status_changed_at: "2026-10-23T11:00:00Z" });
   const newer = session("new", { run_started_at: "2026-10-23T10:00:00Z", status_changed_at: "2026-10-23T10:00:00Z" });
   const prompt = vi.fn(async (_body: SessionPromptRequest) => ({}) as SessionResult);
-  const withContinue = { ...chat, next: { phase: "map", action: {} } } as SessionChatResponse;
+  const withContinue = { ...chat, next: { action: {} } } as SessionChatResponse;
   render("/d/gx:a", [older, newer], { prompt, chat: async () => ({ kind: "ok", detail: withContinue }) });
   fireEvent.click(await screen.findByRole("button", { name: /2 live/ }));
   fireEvent.click(screen.getByRole("menuitem", { name: "old" }));

@@ -18,7 +18,7 @@ import { DesignChat } from "./ChatLog";
 import { NewDesignForm, type NewDesignDraft } from "./NewDesignForm";
 import type { OpenDesign, ResumeSession, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
-import { ImplLink, Progress } from "./Progress";
+import { ImplLink, Progress, showsImplLink } from "./Progress";
 import type { FetchScreen } from "./screen";
 import { SessionHeader, StartDesignButton } from "./SessionControls";
 import { designSession, liveSessions,filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
@@ -190,7 +190,9 @@ function DesignColumns({
   const sessions = connState.snapshot?.sessions ?? [];
   const [selected, setSelected] = useState<string>();
   const done = detail?.steps?.some((s) => s.step === "done" && s.state === "done");
-  const nextTitle = detail?.rows.find((r) => r.current)?.title;
+  const current = detail?.steps?.find((s) => s.state === "current");
+  // Continue's subtitle: the next ticket while tickets resolve, else the step.
+  const nextTitle = (current?.step === "resolve-tickets" && detail?.rows.find((r) => r.current)?.title) || current?.label;
   const live = liveSessions(address, sessions);
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session = live.find((s) => s.id === selected) ?? designSession(address, sessions);
@@ -198,7 +200,7 @@ function DesignColumns({
   return (
     <>
       <Box aria-label="Chat" role="region" minW="0" display="flex" flexDirection="column" gap="3">
-        {wide && detail?.impl_address && <ImplLink address={detail.impl_address} />}
+        {wide && detail && showsImplLink(detail) && <ImplLink address={detail.impl_address!} />}
         {session && chart ? (
           session.status.state === "exited" && (
             <Box display="flex" justifyContent="flex-end">
@@ -214,7 +216,7 @@ function DesignColumns({
             <StartDesignButton address={address} open={open} />
           </Box>
         )}
-        <DesignChat session={session} fetchChat={fetchChat} post={post} done={done} nextTitle={nextTitle} actions={{ onNewSession, resume, fetchScreen }} />
+        <DesignChat session={session} fetchChat={fetchChat} post={post} done={done} step={current?.step} nextTitle={nextTitle} actions={{ onNewSession, resume, fetchScreen }} />
       </Box>
       {/* On a phone Progress sits right under the picker, above the chat. */}
       <Box aria-label="Progress" role="region" gridRow={{ base: 2, lg: "auto" }}>

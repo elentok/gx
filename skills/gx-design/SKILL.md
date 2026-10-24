@@ -1,7 +1,7 @@
 ---
 name: gx-design
 description: >-
-  Walk one epic through map, review and implement: chart and resolve a wayfinder map, draft and
+  Walk one epic from idea to handoff: chart and resolve a wayfinder map, draft and
   review a spec, then publish an `<epic>-impl` epic. Detects the next step from tracker state; run
   `/gx-design <epic>`, or `/gx-design <epic/NN>` to resolve one map ticket. Manual.
 disable-model-invocation: true
@@ -17,9 +17,15 @@ Read
 [gx-local-tracker.md](../gx-local-tracker.md) for the ticket commands and the Map epics section;
 don't restate them here.
 
-Three phases: **map** (wayfinder charts and resolves the map) → **review** (spec drafted,
-design-reviewed, grilled) → **implement** (tickets published). Each run inspects tracker and disk
-state and runs the next step. There is no phase field: the detection list below is the state machine.
+Each run inspects tracker and disk state and runs the next step: the detection list below is the
+state machine. The map's `design_step` field is what Progress shows. This skill moves it with
+`gx tickets set <project:epic> --design-step <step>`:
+
+- `chart` when it charts a map (step 1).
+- `branch` when it creates the `<epic>-impl` branch (step 8).
+- `done` only when this run itself closes the map. Reporting the `<epic>-impl` slug (step 9) does not.
+- A move to an earlier step needs `--allow-backward`. Pass it only when a review sends tickets back
+  to the map (steps 5 and 6), never for any other move.
 
 ## Calling other skills
 
@@ -50,7 +56,7 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
 1. **No map epic** (`gx tickets epics --maps` doesn't list it) → follow gx-wayfinder's "Chart the map"
    for the epic, including its Destination grilling. Text after the epic address in
    `/gx-design <epic> <idea>` is the rough idea: pass it to that step as the loose idea instead of
-   asking for it.
+   asking for it. Once the map is charted, set `--design-step chart`.
 2. **`destination_unconfirmed: true`** → follow `gx-grilling` on the Destination alone, then clear the
    flag with `gx tickets set <project:epic> --destination-unconfirmed false`. Continue to step 3 in
    the same session, unless the grilling changed the Destination enough that seeded tickets must
@@ -74,7 +80,7 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
    If it returns any design question, file them as `grilling` map tickets (Map epics → Child
    ticket) and stop, without chaining: the next run matches step 3 and resumes the map. Each ticket
    costs a run, so by default file one ticket that lists every question with the subagent's
-   suggested answer. Give a question its own ticket only when it needs research or a prototype, or
+   suggested answer. (Tickets sent back to the map move the step back with `--allow-backward`.) Give a question its own ticket only when it needs research or a prototype, or
    is too big to settle in the same grilling round as the rest. Write the
    spec only on a run that returns none. A spec never carries open design questions to the review.
 5. **No `## Review findings` section on the map** → dispatch a design-review subagent against the
@@ -98,6 +104,7 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
      epic's `GLOSSARY.md` hunks. If the checkout has other uncommitted edits in those files, leave
      them out; ask when a hunk's owner is unclear.
    - Commit as `<epic>: Add spec, ADRs and glossary terms`, then `git worktree remove <tmp-dir>`.
+   - Set `--design-step branch`.
    - Remove the committed changes from the original checkout: delete the new files, and reverse
      only the committed `GLOSSARY.md` hunks. Leave every other edit in place.
 9. **Otherwise** → report the `<epic>-impl` slug and stop. Launch it from the TUI Queue tab.
@@ -126,19 +133,19 @@ reports under **50K** tokens used, go back to "Detecting the next step" in the s
 of stopping. If it reports 50K or more, or the command errors, stop as usual. Never chain out of
 steps 1–3: map runs stay one per session.
 
-End with one line, naming the phase, not a step number:
+End with one line:
 
 ```
-✅ <phase>: <what happened this run>. Next: <phase> — <how to trigger it>
+✅ <what ran>: <what happened this run>. Next: <what to do next>
 ```
 
 Examples:
 
 ```
-✅ Map: resolved ticket 04-foo. Next: map — start a fresh session (/clear in Claude, /new in Codex), run /gx-design <epic>
-✅ Map: the way is clear. Next: review — run /gx-design <epic> in a fresh session
-✅ Review: findings resolved, spec amended, epic <epic>-impl created. Next: implement — launch it from the TUI Queue tab
+✅ Resolve tickets: resolved ticket 04-foo. Next: start a fresh session (/clear in Claude, /new in Codex), run /gx-design <epic>
+✅ Create tickets: epic <epic>-impl created. Next: launch it from the TUI Queue tab
 ```
 
-This line must be the last output of the turn. gx reads it and raises the session as Actionable
-itself, so call nothing to raise it.
+`Next:` only marks that the run ended: gx reads no phase from the text after it. This line must be
+the last output of the turn. gx reads it and raises the session as Actionable itself, so call
+nothing to raise it.

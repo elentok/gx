@@ -84,6 +84,7 @@ function ChatTail({
   post,
   onStale,
   done,
+  step,
   nextTitle,
   actions,
 }: {
@@ -94,6 +95,7 @@ function ChatTail({
   post?: PostPrompt;
   onStale: () => void;
   done?: boolean;
+  step?: string;
   nextTitle?: string;
   actions: FailureActions;
 }) {
@@ -131,6 +133,7 @@ function ChatTail({
           session={session}
           lastMessage={chat.messages.at(-1)?.id}
           next={chat.next}
+          step={step}
           nextTitle={nextTitle}
           connected={connected}
           post={post}
@@ -152,6 +155,7 @@ function ChatLog({
   fetchChat,
   post,
   done,
+  step,
   nextTitle,
   actions,
 }: {
@@ -159,6 +163,7 @@ function ChatLog({
   fetchChat?: FetchChat;
   post?: PostPrompt;
   done?: boolean;
+  step?: string;
   nextTitle?: string;
   actions: FailureActions;
 }) {
@@ -188,6 +193,7 @@ function ChatLog({
         post={post}
         onStale={refetch}
         done={done}
+        step={step}
         nextTitle={nextTitle}
         actions={actions}
       />
@@ -201,6 +207,7 @@ export function DesignChat({
   fetchChat,
   post,
   done,
+  step,
   nextTitle,
   actions = {},
 }: {
@@ -209,7 +216,9 @@ export function DesignChat({
   post?: PostPrompt;
   /** The Design's Progress is Done: no composer, no `ended` banner. */
   done?: boolean;
-  /** The title of the map's current ticket, which Continue works on next. */
+  /** The Progress step the design is at. */
+  step?: string;
+  /** The subtitle under Continue: the next ticket's title, or the step label. */
   nextTitle?: string;
   actions?: FailureActions;
 }) {
@@ -225,5 +234,5 @@ export function DesignChat({
       </>
     );
   }
-  return <ChatLog key={session.id} session={session} fetchChat={fetchChat} post={post} done={done} nextTitle={nextTitle} actions={actions} />;
+  return <ChatLog key={session.id} session={session} fetchChat={fetchChat} post={post} done={done} step={step} nextTitle={nextTitle} actions={actions} />;
 }

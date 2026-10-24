@@ -1017,11 +1017,9 @@ export interface SessionRoundCard {
   note?: string;
 }
 /**
- * SessionNext is the phase a gx-design run-end line names and the Actionable
- * that starts it.
+ * SessionNext is the Actionable a gx-design run-end line raises.
  */
 export interface SessionNext {
-  phase: string;
   action: SessionActionable;
 }
 /**

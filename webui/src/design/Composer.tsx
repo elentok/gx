@@ -8,13 +8,15 @@ import { postPrompt, type PostPrompt } from "./prompt";
 import { isAnswered, nameOf, roundPrompt, unansweredOf, type Answers } from "./round";
 import { promptable } from "./view";
 
-const CONTINUE_PHASES = ["map", "review"];
+// At these steps Progress links to the implementation epic instead of offering Continue.
+const NO_CONTINUE_STEPS = ["branch", "done"];
 
 // Under the chat: the notes box behind a note icon, and Continue after a run-end line. Nothing sends unless the session is Idle.
 export function Composer({
   session,
   lastMessage,
   next,
+  step,
   nextTitle,
   connected,
   post = postPrompt,
@@ -29,7 +31,9 @@ export function Composer({
   /** The id of the last chat message the page saw. */
   lastMessage?: string;
   next?: SessionNext;
-  /** The title of the map's next ticket, shown under Continue. */
+  /** The Progress step the design is at. */
+  step?: string;
+  /** Shown under Continue: the map's next ticket title, or the step label. */
   nextTitle?: string;
   connected: boolean;
   post?: PostPrompt;
@@ -86,7 +90,7 @@ export function Composer({
     else sendRound();
   };
 
-  const phase = next?.phase ?? "";
+  const canContinue = !!next && !NO_CONTINUE_STEPS.includes(step ?? "");
   const sendButton = (
     <Button disabled={!enabled || (!inRound && text.trim() === "")} onClick={onSend} height="auto">
       Send
@@ -177,11 +181,11 @@ export function Composer({
             ✎ Note
           </Button>
         )}
-        {CONTINUE_PHASES.includes(phase) && (
+        {canContinue && (
           <Button disabled={!enabled} onClick={() => send({ continue: true })} flex="1" flexDirection="column" height="auto" py="2">
             <Text as="span">Continue</Text>
             <Text as="span" fontSize="xs" fontWeight="normal">
-              {nextTitle ?? (phase === "review" ? "Review" : "Map")}
+              {nextTitle}
             </Text>
           </Button>
         )}

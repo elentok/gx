@@ -294,12 +294,16 @@ test("the tickets show only while Resolve tickets is current", async () => {
   expect(p.queryByText("Chat content")).toBeNull();
 });
 
-test("the implementation epic link shows only once it exists", async () => {
-  render([map("a", "in-progress")], [], "/d/gx:a");
+test("the implementation epic link shows only at Branch and Done, once the epic exists", async () => {
+  render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ steps: stepsAt(6) }));
   await progress();
   expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
   cleanup();
-  render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ impl_address: "gx:a-impl" }));
+  render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ steps: stepsAt(5), impl_address: "gx:a-impl" }));
+  await progress();
+  expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
+  cleanup();
+  render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ steps: stepsAt(6), impl_address: "gx:a-impl" }));
   const link = await screen.findByRole("link", { name: /Open implementation epic/ });
   expect(link.getAttribute("href")).toBe("#/e/gx:a-impl");
   expect(within(screen.getByRole("region", { name: "Chat" })).getByRole("link", { name: /Open implementation epic/ })).toBeTruthy();
@@ -314,7 +318,7 @@ test("on a phone Progress is a segment bar and a line that expands on tap", asyn
     expect(await p.findByRole("progressbar", { name: "Design progress" })).toBeTruthy();
     const line = p.getByRole("button", { name: /^Resolve tickets · 03 Chat content \(2 of 3\)/ });
     expect(p.queryByText("Grill findings")).toBeNull();
-    expect(p.getByRole("link", { name: /Open implementation epic/ })).toBeTruthy();
+    expect(p.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
     fireEvent.click(line);
     expect(p.getByText("Grill findings")).toBeTruthy();
   } finally {
