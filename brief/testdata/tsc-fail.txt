@@ -1,0 +1,10 @@
+src/tmpbrief1.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+src/tmpbrief2.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+src/tmpbrief3.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+src/tmpbrief4.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+src/tmpbrief5.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+src/tmpbrief6.ts(1,14): error TS2322: Type 'string' is not assignable to type 'number'.
+src/tmpbrief7.ts(5,14): error TS2322: Type '{ a: { b: { c: number; d: string; }; e: boolean; }; f: { c: string; d: number; }[]; }' is not assignable to type 'Root'.
+  The types of 'a.b.c' are incompatible between these types.
+    Type 'number' is not assignable to type 'string'.
+src/tmpbrief7.ts(6,14): error TS2322: Type 'string' is not assignable to type 'number'.

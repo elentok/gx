@@ -268,6 +268,54 @@ func TestBrief_VitestLogHasFullOutputAndIsLast(t *testing.T) {
 	}
 }
 
+// tscFailRepo returns a repo whose stub tsc prints the recorded diagnostics of
+// 7 files, one error each except the last, which has two (one multi-line).
+func tscFailRepo(t *testing.T, sample string) string {
+	t.Helper()
+	nodeEnv(t)
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "tsconfig.json", "{}")
+	nodeStub(t, repo, "tsc", sample, 2)
+	return repo
+}
+
+func TestBrief_TscFailureGroupsByFileWithLimits(t *testing.T) {
+	out, code := runBriefCmd(t, tscFailRepo(t, "tsc-fail.txt"), "tsc", "--noEmit")
+	if code != 1 || !strings.HasPrefix(out, "FAIL tsc: 7 failed in ") {
+		t.Fatalf("exit %d, out:\n%s", code, out)
+	}
+
+	// Seam 1: per file, an error count, then its diagnostics; 5 in full.
+	if !strings.Contains(out, "src/tmpbrief1.ts\n  1 error\n    (1,14): error TS2322: Type 'string' is not assignable to type 'number'.\n") {
+		t.Errorf("file layout differs:\n%s", out)
+	}
+	if !strings.Contains(out, "src/tmpbrief5.ts\n  1 error\n    (1,14)") || strings.Contains(out, "src/tmpbrief6.ts\n  1 error\n    (1,14)") {
+		t.Errorf("not exactly 5 files in full:\n%s", out)
+	}
+	if !strings.Contains(out, "src/tmpbrief7.ts\n  2 errors\n") || !strings.Contains(out, "2 more failures are listed by name only") {
+		t.Errorf("by-name files missing:\n%s", out)
+	}
+
+	// Seam 3: no re-run line; the log path is last.
+	if rerunOf(out) != "" || !strings.HasSuffix(lastLine(out), "-tsc.log") {
+		t.Errorf("re-run line or log path wrong:\n%s", out)
+	}
+}
+
+func TestBrief_TscLongDiagnosticIsCut(t *testing.T) {
+	out, code := runBriefCmd(t, tscFailRepo(t, "tsc-long.txt"), "tsc")
+	if code != 1 || !strings.Contains(out, "src/tmpbrief1.ts\n  2 errors\n") {
+		t.Fatalf("exit %d, out:\n%s", code, out)
+	}
+	// Seam 2: 10 lines, then a notice; long lines are cut.
+	if !strings.Contains(out, "The types of 'i.j'") || strings.Contains(out, "The types of 'j.k'") || !strings.Contains(out, "more lines cut") {
+		t.Errorf("text not limited to 10 lines:\n%s", out)
+	}
+	if strings.Contains(out, strings.Repeat("x", 301)) {
+		t.Errorf("long line not cut:\n%s", out)
+	}
+}
+
 func TestBrief_NodeUnparsedFailureFallsBackToRawHead(t *testing.T) {
 	nodeEnv(t)
 	repo := testutil.TempRepo(t)

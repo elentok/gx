@@ -1,0 +1,13 @@
+src/tmpbrief1.ts(5,14): error TS2322: Type '{ a: { b: { c: { d: { e: { f: { g: { h: { i: { j: number; }; }; }; }; }; }; }; }; }; }' is not assignable to type 'Root'.
+  The types of 'a.b.c.d.e.f.g.h.i.j' are incompatible between these types.
+    The types of 'b.c' are incompatible between these types.
+      The types of 'c.d' are incompatible between these types.
+        The types of 'd.e' are incompatible between these types.
+          The types of 'e.f' are incompatible between these types.
+            The types of 'f.g' are incompatible between these types.
+              The types of 'g.h' are incompatible between these types.
+                The types of 'h.i' are incompatible between these types.
+                  The types of 'i.j' are incompatible between these types.
+                    The types of 'j.k' are incompatible between these types.
+                      Type 'number' is not assignable to type 'string'.
+src/tmpbrief1.ts(6,14): error TS2322: Type 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' is not assignable to type 'number'.

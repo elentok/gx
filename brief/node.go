@@ -242,12 +242,46 @@ func (Tsc) Command(args []string) (string, []string) {
 	return "tsc", append([]string{"--pretty", "false"}, args...)
 }
 
-// Parse treats a clean exit as a pass; tsc prints nothing then.
-func (Tsc) Parse(_ []byte, exit int) Outcome {
-	if exit != 0 {
-		return Outcome{}
+var tscDiagnostic = regexp.MustCompile(`^(.+?)(\(\d+,\d+\): (?:error|warning) TS\d+: .*)$`)
+
+// Parse treats a clean exit as a pass; tsc prints nothing then. Otherwise it
+// groups the diagnostics by file, in order of first appearance. Indented lines
+// continue the diagnostic above them; any other line is not part of a file.
+func (Tsc) Parse(out []byte, exit int) Outcome {
+	if exit == 0 {
+		return Outcome{Units: 1, Summary: "no type errors"}
 	}
-	return Outcome{Units: 1, Summary: "no type errors"}
+	var failures []Unit
+	byFile := map[string]int{}
+	counts := map[string]int{}
+	cur := -1
+	for _, l := range strings.Split(string(out), "\n") {
+		l = strings.TrimRight(l, "\r")
+		if m := tscDiagnostic.FindStringSubmatch(l); m != nil {
+			i, ok := byFile[m[1]]
+			if !ok {
+				i = len(failures)
+				byFile[m[1]] = i
+				failures = append(failures, Unit{Location: m[1]})
+			}
+			counts[m[1]]++
+			failures[i].Text += m[2] + "\n"
+			cur = i
+		} else if cur >= 0 && strings.HasPrefix(l, " ") {
+			failures[cur].Text += l + "\n"
+		} else {
+			cur = -1
+		}
+	}
+	for i := range failures {
+		u := &failures[i]
+		u.Name = fmt.Sprintf("%d errors", counts[u.Location])
+		if counts[u.Location] == 1 {
+			u.Name = "1 error"
+		}
+		u.Text = strings.TrimRight(u.Text, "\n")
+	}
+	return Outcome{Failures: failures}
 }
 
 func (Tsc) RerunArgs([]string, []Unit) []string { return nil }
