@@ -32,8 +32,8 @@ Run `gx tickets validate <addr>` on the ticket first. If it fails, stop and fix 
 
 ## 2. Start the server
 
-Start the temporary gx server on the fixture, using the command and instructions in the flow
-catalog's README. The fixture is isolated: it uses temp state dirs and never touches real gx state.
+Start the temporary gx server on the fixture, using the build-and-start steps in section 1 of the
+`gx-ui-check` skill. The fixture is isolated: it uses temp state dirs and never touches real gx state.
 Keep it in a background shell. Stop it before you finish (step 7).
 
 If the fixture does not start, that is a finding (step 4). Fix it if it is small, else open a
