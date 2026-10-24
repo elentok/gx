@@ -167,8 +167,12 @@ real assertion; if one cannot be observed, pause the ticket with `gx tickets ask
 Run typechecking regularly and single test files regularly. At the end, test only the packages you
 touched plus their direct importers (see `.ai/index.md` "Testing") — not the full suite.
 
-While iterating, always pass `-timeout 60s` and `-run <pattern>` to `go test`, and run one package
-per call. Run the whole package once at the end. `server/` is exempt from the 60s limit.
+Run Go tests with `gx brief go-test`, not raw `go test`. While iterating, always pass
+`-timeout 60s` and `-run <pattern>` to `gx brief go-test`, and run one package per call. Run the
+whole package once at the end. `server/` is exempt from the 60s limit.
+
+When a test fails, search the log path (the last line of the output) with `rg` for the details.
+Don't re-run the test to get raw output.
 
 Tests in `server/` take over 120s, the Bash default timeout. Start them with `run_in_background`
 up front, then wait for the completion notice. Don't poll with Monitor or Workflow, don't write
