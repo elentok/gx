@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -126,21 +127,89 @@ func dropReporter(args []string) ([]string, bool) {
 	return out, replaced
 }
 
-// Parse reads the test count from the JSON report. The report may follow
-// other output.
+// Parse reads the test count and the failing tests from the JSON report. The
+// report may follow other output; a report that does not decode (a crashed
+// reporter) yields an empty Outcome.
 func (Vitest) Parse(out []byte, _ int) Outcome {
 	i := bytes.Index(out, []byte(`{"numTotalTestSuites"`))
 	if i < 0 {
 		return Outcome{}
 	}
-	var rep struct{ NumTotalTests int }
+	var rep struct {
+		NumTotalTests int
+		TestResults   []struct {
+			Name             string
+			Status           string
+			Message          string
+			AssertionResults []struct {
+				FullName        string
+				Status          string
+				FailureMessages []string
+			}
+		}
+	}
 	if json.NewDecoder(bytes.NewReader(out[i:])).Decode(&rep) != nil {
 		return Outcome{}
 	}
-	return Outcome{Units: rep.NumTotalTests, Summary: fmt.Sprintf("%d tests", rep.NumTotalTests)}
+	var failures []Unit
+	for _, f := range rep.TestResults {
+		failed := 0
+		for _, a := range f.AssertionResults {
+			if a.Status == "failed" {
+				failed++
+				failures = append(failures, Unit{Location: f.Name, Name: a.FullName, Text: vitestText(a.FailureMessages)})
+			}
+		}
+		if failed == 0 && f.Status == "failed" {
+			// The file failed without a failing test, such as an import error.
+			failures = append(failures, Unit{Location: f.Name, Name: f.Name, Text: vitestText([]string{f.Message}), Build: true})
+		}
+	}
+	return Outcome{
+		Units:    rep.NumTotalTests,
+		Summary:  fmt.Sprintf("%d tests", rep.NumTotalTests),
+		Failures: failures,
+	}
 }
 
-func (Vitest) RerunArgs([]string, []Unit) []string { return nil }
+// vitestText joins failure messages and drops the stack frames, which would
+// use up the line limit before the message is read.
+func vitestText(msgs []string) string {
+	var lines []string
+	for _, m := range msgs {
+		for _, l := range strings.Split(strings.TrimRight(m, "\n"), "\n") {
+			if !strings.HasPrefix(strings.TrimSpace(l), "at ") {
+				lines = append(lines, l)
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// RerunArgs drops any test-name filter of the caller and adds an anchored one
+// covering all failing tests.
+func (Vitest) RerunArgs(args []string, failures []Unit) []string {
+	var names []string
+	for _, u := range failures {
+		if !u.Build {
+			names = append(names, regexp.QuoteMeta(u.Name))
+		}
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	var re []string
+	for i := 0; i < len(args); i++ {
+		switch a := args[i]; {
+		case a == "-t" || a == "--testNamePattern":
+			i++ // its value
+		case strings.HasPrefix(a, "--testNamePattern="):
+		default:
+			re = append(re, a)
+		}
+	}
+	return append(re, "-t", "^("+strings.Join(names, "|")+")$")
+}
 
 // Tsc wraps `tsc`.
 type Tsc struct{}

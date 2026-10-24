@@ -179,6 +179,95 @@ func TestBrief_NodeExit2Causes(t *testing.T) {
 	oneLine(t, out, code, "no tsconfig")
 }
 
+// vitestFailRepo returns a repo whose stub vitest prints the recorded report
+// of 9 failing tests (7 in "seven", one nested, one with a long message).
+func vitestFailRepo(t *testing.T) string {
+	t.Helper()
+	nodeEnv(t)
+	repo := testutil.TempRepo(t)
+	nodeStub(t, repo, "vitest", "vitest-fail.json", 1)
+	return repo
+}
+
+func rerunOf(out string) string {
+	for _, l := range strings.Split(out, "\n") {
+		if strings.HasPrefix(l, "re-run only the failing tests: ") {
+			return l
+		}
+	}
+	return ""
+}
+
+func TestBrief_VitestFailureLayoutAndLimits(t *testing.T) {
+	out, code := runBriefCmd(t, vitestFailRepo(t), "vitest")
+	if code != 1 || !strings.HasPrefix(out, "FAIL vitest: 9 failed in ") {
+		t.Fatalf("exit %d, out:\n%s", code, out)
+	}
+
+	// Seam 1: location, then name, then message; stack frames are dropped.
+	want := "/repo/webui/src/tmpbrief7.test.ts\n  long message\n    Error: line 0\n"
+	if !strings.Contains(out, want) || !strings.Contains(out, "  seven fails 1\n    AssertionError: expected 1 to be +0 // Object.is equality\n") {
+		t.Errorf("layout differs from the Go report:\n%s", out)
+	}
+	if strings.Contains(out, "    at ") {
+		t.Errorf("stack frames shown:\n%s", out)
+	}
+	if !strings.Contains(out, "  outer inner nested fails\n") {
+		t.Errorf("nested describe name missing:\n%s", out)
+	}
+	if !strings.Contains(out, "line 9") || strings.Contains(out, "line 10") || !strings.Contains(out, "more lines cut") {
+		t.Errorf("long message not limited to 10 lines:\n%s", out)
+	}
+
+	// Seam 2: 5 in full, the rest by name.
+	if !strings.Contains(out, "  seven fails 4\n    AssertionError") || strings.Contains(out, "  seven fails 5\n    AssertionError") {
+		t.Errorf("not exactly 5 units in full:\n%s", out)
+	}
+	if !strings.Contains(out, "  seven fails 7\n") || !strings.Contains(out, "4 more failures are listed by name only") {
+		t.Errorf("by-name units missing:\n%s", out)
+	}
+}
+
+func TestBrief_VitestRerunKeepsArgsAndC(t *testing.T) {
+	repo := vitestFailRepo(t)
+	out, code := runBriefCmd(t, t.TempDir(), "-C", repo, "vitest", "-t", "seven", "src/a.test.ts")
+	if code != 1 {
+		t.Fatalf("exit %d, out:\n%s", code, out)
+	}
+	rerun := rerunOf(out)
+	for _, want := range []string{"gx brief -C " + repo + " vitest src/a.test.ts -t '^(", "seven fails 1", "seven fails 7", "outer inner nested fails", "long message", ")$'"} {
+		if !strings.Contains(rerun, want) {
+			t.Errorf("re-run line lacks %q: %q", want, rerun)
+		}
+	}
+	if strings.Contains(rerun, "-t seven ") {
+		t.Errorf("caller's -t kept: %q", rerun)
+	}
+}
+
+func TestBrief_VitestCrashedReporterFallsBackToRawHead(t *testing.T) {
+	nodeEnv(t)
+	repo := testutil.TempRepo(t)
+	nodeStub(t, repo, "vitest", "vitest-truncated.json", 1)
+	out, code := runBriefCmd(t, repo, "vitest")
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if code != 1 || !strings.HasPrefix(out, "FAIL vitest: exit 1 in ") || len(lines) != 1+1+1 || rerunOf(out) != "" {
+		t.Errorf("exit %d, out:\n%s", code, out)
+	}
+}
+
+func TestBrief_VitestLogHasFullOutputAndIsLast(t *testing.T) {
+	out, _ := runBriefCmd(t, vitestFailRepo(t), "vitest")
+	logPath := lastLine(out)
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(logPath, "-vitest.log") || !strings.Contains(string(raw), "line 29") || !strings.Contains(string(raw), strings.Repeat("x", 1000)) {
+		t.Errorf("log %s lacks the cut text", logPath)
+	}
+}
+
 func TestBrief_NodeUnparsedFailureFallsBackToRawHead(t *testing.T) {
 	nodeEnv(t)
 	repo := testutil.TempRepo(t)
