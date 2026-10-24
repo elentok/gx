@@ -111,6 +111,9 @@ func (s *Server) agentAnswer(req QueueRequest) (QueueResult, error) {
 		if _, err := tickets.AppendLog(ref.ticket.Path, ev); err != nil {
 			return QueueResult{}, fmt.Errorf("log permission for %s: %w", ref.addr, err)
 		}
+		if err := s.leaveBlocked(ref.addr.String()); err != nil {
+			return QueueResult{}, err
+		}
 		// The prompt is gone, so open pages re-read the detail and the snapshot.
 		s.events.publish(EventTicketChanged, ref.addr.String())
 		return QueueResult{}, nil

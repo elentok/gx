@@ -99,3 +99,97 @@ func TestHeadlessBlock_HerdrStaysClaimed(t *testing.T) {
 		t.Errorf("status = %q, want claimed", tk.Status)
 	}
 }
+
+// pauseBlocked blocks the session of a headless run on a permission request
+// and returns once the ticket is paused and the run waits.
+func pauseBlocked(t *testing.T) (*servertest.Harness, string, *turnRunner) {
+	t.Helper()
+	h, ticketPath, turn := startBlockable(t, "headless")
+	turn.SetPending("epic-a-iter-01", &agentrunner.Pending{ID: "r1", Tool: "Bash", Input: []byte(`{"command":"ls"}`)})
+	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
+	waitFor(t, func() bool { return runsJSONHas(h, `"waiting_since"`) })
+	return h, ticketPath, turn
+}
+
+func runsJSONHas(h *servertest.Harness, s string) bool {
+	data, _ := os.ReadFile(filepath.Join(h.StateDir, "runs.json"))
+	return strings.Contains(string(data), s)
+}
+
+func TestHeadlessBlock_AnswerReturnsToClaimed(t *testing.T) {
+	h, ticketPath, turn := pauseBlocked(t)
+	res, err := h.Client.AgentAnswerRequest(context.Background(), server.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
+	if err != nil || res.Refused {
+		t.Fatalf("answer = %+v, %v", res, err)
+	}
+	waitStatus(t, ticketPath, schema.StatusClaimed)
+	// The wait is back on and the run takes its slot back.
+	waitFor(t, func() bool { return !runsJSONHas(h, `"waiting_since"`) })
+	if got := turn.Answers("epic-a-iter-01"); len(got) != 1 {
+		t.Errorf("answers = %+v, want one", got)
+	}
+}
+
+// A new block after the answer pauses again.
+func TestHeadlessBlock_PausesAgainAfterAnswer(t *testing.T) {
+	h, ticketPath, turn := pauseBlocked(t)
+	if res, err := h.Client.AgentAnswerRequest(context.Background(), server.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"}); err != nil || res.Refused {
+		t.Fatalf("answer = %+v, %v", res, err)
+	}
+	waitStatus(t, ticketPath, schema.StatusClaimed)
+	turn.SetPending("epic-a-iter-01", &agentrunner.Pending{ID: "r2", Tool: "Bash", Input: []byte(`{"command":"pwd"}`)})
+	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
+}
+
+// Every way out of blocked clears the pause the same way.
+func TestHeadlessBlock_AnyExitReturnsToClaimed(t *testing.T) {
+	exits := map[string]func(*servertest.Harness, *turnRunner){
+		"interrupt": func(h *servertest.Harness, _ *turnRunner) {
+			if res, err := h.Client.AgentInterrupt(context.Background(), answerAddr); err != nil || res.Refused {
+				t.Errorf("interrupt = %+v, %v", res, err)
+			}
+		},
+		"cancel request": func(_ *servertest.Harness, r *turnRunner) { r.SetState("epic-a-iter-01", agentrunner.StateWorking, "") },
+		"running":        func(_ *servertest.Harness, r *turnRunner) { r.SetState("epic-a-iter-01", agentrunner.StateWorking, "") },
+		"idle":           func(_ *servertest.Harness, r *turnRunner) { r.SetState("epic-a-iter-01", agentrunner.StateIdle, "") },
+		"result":         func(_ *servertest.Harness, r *turnRunner) { r.SetState("epic-a-iter-01", agentrunner.StateDone, "") },
+	}
+	for name, exit := range exits {
+		t.Run(name, func(t *testing.T) {
+			h, ticketPath, turn := pauseBlocked(t)
+			exit(h, turn)
+			waitFor(t, func() bool {
+				tk, err := schema.ParseTicket(ticketPath)
+				return err == nil && tk.Status != schema.StatusLegacyAnswer
+			})
+			waitFor(t, func() bool { return !runsJSONHas(h, `"waiting_since"`) })
+		})
+	}
+}
+
+func TestHeadlessBlock_ResumeRefusedWhileLiveAllowedOnceGone(t *testing.T) {
+	h, ticketPath, turn := pauseBlocked(t)
+	req := server.RepairRequest{Address: answerAddr}
+	res, err := h.Server.ResumeAs(req, server.OriginCLI)
+	if err != nil || !res.Refused || res.Reason != server.ReasonAgentWaiting || !strings.Contains(res.Message, "gx server agents answer") {
+		t.Fatalf("resume live = %+v, %v; want %s naming the answer verb", res, err, server.ReasonAgentWaiting)
+	}
+	sess, ok, err := turn.Find("epic-a-iter-01")
+	if err != nil || !ok {
+		t.Fatalf("Find = %v, %v", ok, err)
+	}
+	if err := turn.Stop(sess); err != nil {
+		t.Fatal(err)
+	}
+	res, err = h.Server.ResumeAs(req, server.OriginCLI)
+	if err != nil || res.Refused {
+		t.Fatalf("resume gone = %+v, %v", res, err)
+	}
+	tk, err := schema.ParseTicket(ticketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Status == schema.StatusLegacyAnswer {
+		t.Errorf("still paused after resume of a gone agent")
+	}
+}

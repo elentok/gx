@@ -443,11 +443,15 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (RepairResult, 
 		return RepairResult{}, false, nil
 	}
 	tk, err := schema.ParseTicket(t.Path)
-	if err != nil || tk.PausedClass() != schema.PauseClassAnswer || tk.PauseReason != schema.PauseSelfReported {
+	if err != nil || tk.PausedClass() != schema.PauseClassAnswer {
 		return RepairResult{}, false, nil
 	}
+	selfReported := tk.PauseReason == schema.PauseSelfReported
 	dir := filepath.Dir(epicPath)
 	address := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}.String()
+	if !selfReported && !s.waitsOnHeadlessBlock(tk, address) {
+		return RepairResult{}, false, nil
+	}
 	if s.registry != nil {
 		gone, err := s.agentGone(address)
 		if err != nil {
@@ -455,9 +459,15 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (RepairResult, 
 		}
 		if !gone {
 			msg := fmt.Sprintf("%s has a live agent waiting on its question; reply with `gx tickets answer`", address)
+			if !selfReported {
+				msg = fmt.Sprintf("%s has a live agent blocked on a request; reply with `gx server agents answer`, or `gx server agents interrupt` if there is nothing to answer", address)
+			}
 			return repairRefusal(&repair.RefusalError{Reason: ReasonAgentWaiting, Message: msg}), true, nil
 		}
 		s.registry.delete(address)
+	}
+	if !selfReported {
+		return RepairResult{}, false, nil
 	}
 	if err := tickets.EndOpenRound(t.Path, origin, tickets.HowResume, ralphloop.CloseResumed); err != nil {
 		return RepairResult{}, false, fmt.Errorf("close question of %s: %w", address, err)

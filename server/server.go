@@ -385,6 +385,7 @@ type Server struct {
 	focus          *focusReports
 	sessionBanners sessionBanners
 	settling       sync.WaitGroup // goSettle goroutines; Serve's stop leaves them running
+	unblockMu      sync.Mutex     // makes leaving a headless block happen once, whoever sees it first
 }
 
 // New prepares the state dir, takes the server lock and binds the socket.

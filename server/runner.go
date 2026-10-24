@@ -766,6 +766,7 @@ func (s *Server) settleRun(rc runContext, err error) {
 		s.registry.markWaiting(ticketAddr, time.Now())
 		s.events.publish(EventIterationPaused, ticketAddr)
 		s.announcePause(addr, one.Ticket.Path, events.BlockedPane, blocked.Reason)
+		go s.watchUnblock(deps.Runner, run.Session, ticketAddr)
 		return
 	}
 	var out ralphloop.FinishOutcome
