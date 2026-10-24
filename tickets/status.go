@@ -83,6 +83,11 @@ func (t Ticket) IsCodeReview() bool {
 	return t.Type == typeCodeReview
 }
 
+// IsVerify reports whether t's Type is verify.
+func (t Ticket) IsVerify() bool {
+	return t.Type == string(schema.TypeVerify)
+}
+
 // commitlessByDesignTypes lists the ticket types schema.Ticket.IsCommitless
 // treats as commitless regardless of the Commitless flag. It's an allowlist
 // (rather than excluding known-noisy types) so a new commitless-by-design
@@ -98,6 +103,7 @@ var commitlessByDesignTypes = map[string]bool{
 	string(schema.TypeEvolve):             true,
 	string(schema.TypeMerge):              true,
 	string(schema.TypeDiagnose):           true,
+	string(schema.TypeVerify):             true,
 }
 
 // ShowsCommitlessSuffix reports whether t's UI row should append
@@ -246,6 +252,9 @@ func (e Epic) ParentDone(t Ticket) bool {
 // claimed is picked up by the next call. Two code-review tickets never
 // block each other, since neither is included in the other's expansion.
 func (e Epic) effectiveBlockedBy(t Ticket) []string {
+	if t.IsVerify() {
+		return e.verifyBlockers(t)
+	}
 	if t.Type != typeCodeReview {
 		// Cross-epic refs name another epic; ExternalBlockers carries them.
 		return slices.DeleteFunc(slices.Clone(t.BlockedBy), crossEpicRef)
@@ -253,6 +262,11 @@ func (e Epic) effectiveBlockedBy(t Ticket) []string {
 	var tokens []string
 	for _, other := range e.Tickets {
 		if other.Type == typeCodeReview {
+			continue
+		}
+		// Verify runs after the review, so waiting on it (or on a ticket it
+		// opened) would deadlock both.
+		if e.inVerifySubtree(other) {
 			continue
 		}
 		if other.Number == t.Number && other.Identifier == t.Identifier {
@@ -267,6 +281,34 @@ func (e Epic) effectiveBlockedBy(t Ticket) []string {
 		tokens = append(tokens, siblingKey(other.Number, suffix))
 	}
 	return tokens
+}
+
+// verifyBlockers is a verify ticket's synthesized Blocked by: tokens: the
+// epic's code-review tickets and nothing else, so verify tickets never wait on
+// each other or on tickets they opened.
+func (e Epic) verifyBlockers(t Ticket) []string {
+	var tokens []string
+	for _, other := range e.Tickets {
+		if other.Type != typeCodeReview || e.descendsFrom(other, t) {
+			continue
+		}
+		_, suffix := splitBlockedByToken(other.Identifier)
+		tokens = append(tokens, siblingKey(other.Number, suffix))
+	}
+	return tokens
+}
+
+// inVerifySubtree reports whether t is a verify ticket or was forked from one.
+func (e Epic) inVerifySubtree(t Ticket) bool {
+	if t.IsVerify() {
+		return true
+	}
+	for _, other := range e.Tickets {
+		if other.IsVerify() && e.descendsFrom(t, other) {
+			return true
+		}
+	}
+	return false
 }
 
 // descendsFrom reports whether t is in ancestor's fork subtree, following

@@ -120,6 +120,9 @@ const (
 	// TypeDiagnose is a commitless, top-level-only run of gx-investigate on gx
 	// itself, filed by the server (a CPU spike) rather than by recovery.
 	TypeDiagnose TicketType = "diagnose"
+	// TypeVerify checks the finished epic in a running gx. It is commitless and
+	// waits only on the epic's code-review ticket.
+	TypeVerify TicketType = "verify"
 )
 
 var validTypes = map[TicketType]bool{
@@ -134,6 +137,7 @@ var validTypes = map[TicketType]bool{
 	TypeEvolve:             true,
 	TypeMerge:              true,
 	TypeDiagnose:           true,
+	TypeVerify:             true,
 }
 
 // Valid reports whether t is one of the canonical type values.
@@ -361,7 +365,7 @@ type MuteRecord struct {
 // a real spike/scaffold commit as its actual output, so it stays on the
 // crash-recovery path like TypeImplement unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
-	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve || t.Type == TypeMerge || t.Type == TypeDiagnose
+	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve || t.Type == TypeMerge || t.Type == TypeDiagnose || t.Type == TypeVerify
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a

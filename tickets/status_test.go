@@ -556,6 +556,49 @@ func TestEpic_RenderedStatus_CodeReviewStillWaitsOnUnrelatedSiblingOfItsFixTicke
 	}
 }
 
+func TestEpic_RenderedStatus_VerifyBlockedWhileCodeReviewNotDone(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 8, Identifier: "08", Type: typeCodeReview, Status: "open"},
+		{Number: 9, Identifier: "09", Type: "verify", Status: "open"},
+	}}
+	if got := epic.RenderedStatus(epic.Tickets[2]); got != StatusBlocked {
+		t.Errorf("RenderedStatus(verify) = %v, want StatusBlocked while code review is open", got)
+	}
+	epic.Tickets[1].Status = "done"
+	if got := epic.RenderedStatus(epic.Tickets[2]); got != StatusOpen {
+		t.Errorf("RenderedStatus(verify) = %v, want StatusOpen once code review is done", got)
+	}
+}
+
+func TestEpic_RenderedStatus_CodeReviewIgnoresVerifyTickets(t *testing.T) {
+	verifyID := "09"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 8, Identifier: "08", Type: typeCodeReview, Status: "open"},
+		{Number: 9, Identifier: "09", Type: "verify", Status: "open"},
+		{Number: 9, Identifier: "09a", Status: "open", Parent: &verifyID},
+	}}
+	if got := epic.RenderedStatus(epic.Tickets[1]); got != StatusOpen {
+		t.Errorf("RenderedStatus(code-review) = %v, want StatusOpen: verify tickets and their children don't count", got)
+	}
+}
+
+func TestEpic_RenderedStatus_VerifyTicketsDontBlockEachOtherOrWaitOnChildren(t *testing.T) {
+	parent := "09"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 8, Identifier: "08", Type: typeCodeReview, Status: "done"},
+		{Number: 9, Identifier: "09", Type: "verify", Status: "open"},
+		{Number: 10, Identifier: "10", Type: "verify", Status: "open"},
+		{Number: 9, Identifier: "09a", Status: "open", Parent: &parent},
+	}}
+	for _, i := range []int{1, 2} {
+		if got := epic.RenderedStatus(epic.Tickets[i]); got != StatusOpen {
+			t.Errorf("RenderedStatus(%s) = %v, want StatusOpen", epic.Tickets[i].Identifier, got)
+		}
+	}
+}
+
 func TestEpic_RenderedStatus_CodeReviewTicketsDontBlockEachOther(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},

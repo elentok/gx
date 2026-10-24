@@ -22,6 +22,8 @@ func launchSkill(t tickets.Ticket) string {
 	switch {
 	case t.IsCodeReview():
 		return codeReviewSkill
+	case t.IsVerify():
+		return verifySkill
 	case t.Type == string(schema.TypePrompt):
 		return oneOffSkill
 	case t.Type == string(schema.TypeEvolve):

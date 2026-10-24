@@ -46,6 +46,7 @@ const (
 
 	implementSkill   = "gx-implement"
 	codeReviewSkill  = "gx-code-review"
+	verifySkill      = "gx-verify-epic"
 	oneOffSkill      = "gx-one-off"
 	evolveSkill      = "gx-evolve"
 	investigateSkill = "gx-investigate"

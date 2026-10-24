@@ -317,6 +317,11 @@ log shows no open question on the web. A second run changes nothing.`,
 		func(epicPath string, _ []string, out io.Writer) error {
 			return runTicketsEnsureCodeReview(epicPath, out)
 		}))
+	cmd.AddCommand(newEpicScopedCmd(d, "ensure-verify <epic>",
+		"no-op if the epic has a verify ticket, else stamp out a stub",
+		func(epicPath string, _ []string, out io.Writer) error {
+			return runTicketsEnsureVerify(epicPath, out)
+		}))
 	cmd.AddCommand(&cobra.Command{
 		Use:   "schema",
 		Short: "print the ticket frontmatter schema (settable and read-only fields)",

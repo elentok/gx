@@ -75,11 +75,18 @@ const defaultWorkerSkill = "gx-implement"
 // already resolved.
 const codeReviewSkill = "gx-code-review"
 
+// verifySkill is the skill launched for type: verify tickets. It does not
+// ship yet; until it does, preflight reports it as a missing skill.
+const verifySkill = "gx-verify-epic"
+
 // launchSkill is the skill an iteration on t starts under: workerSkill,
 // unless t's type routes it to its own skill.
 func launchSkill(t tickets.Ticket, workerSkill string) string {
-	if t.IsCodeReview() {
+	switch {
+	case t.IsCodeReview():
 		return codeReviewSkill
+	case t.IsVerify():
+		return verifySkill
 	}
 	return workerSkill
 }

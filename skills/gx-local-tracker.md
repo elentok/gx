@@ -86,8 +86,8 @@ Fields:
   ticket it forked off, and a fix ticket opened by a `type: code-review` ticket names that review
   ticket. This is the only fork edge — it lives on the descendant, and nothing is recorded on the
   original. Omit entirely on a normally-authored ticket.
-- **`type`** (enum) — one of `implement` (the retired `task` fails validation; `gx tickets migrate` rewrites it), `research`, `prototype`, `grilling`, `code-review`, `conflict-resolution`. See
-  `code-review` below.
+- **`type`** (enum) — one of `implement` (the retired `task` fails validation; `gx tickets migrate` rewrites it), `research`, `prototype`, `grilling`, `code-review`, `verify`, `conflict-resolution`. See
+  `code-review` and `verify` below.
 - **`category`** (enum) — `bug` or `idea`. Optional on any ticket; required on a follow-up (see
   "Follow-ups"). Not named `kind`, which already means `kind: map` on an epic.
 - **`expected_context_window`** (non-negative int) — the estimated tokens the implementation will
@@ -114,8 +114,16 @@ Fields:
 A ticket with `type: code-review` reviews the whole epic once every other ticket in it has merged,
 rather than one specific piece of work — so it carries no `blocked_by` list of its own. Its
 frontier-eligibility rule is different from every other type: it becomes eligible once every *other*
-ticket in the epic is `done`, independent of any `blocked_by`. Fix tickets it opens (if any) name it
-as their `parent`.
+ticket in the epic is `done`, independent of any `blocked_by`. `verify` tickets (and tickets they
+opened) don't count. Fix tickets it opens (if any) name it as their `parent`.
+
+### The `verify` type
+
+A ticket with `type: verify` checks the finished epic in a running gx. Like `code-review` it carries
+no `blocked_by`: it becomes eligible once the epic's `code-review` ticket is `done`, and it never
+waits on other `verify` tickets or on children it opened (those name it as their `parent`). It is
+commitless by design. `gx tickets ensure-verify <epic>` stamps out the epic's verify ticket, and is a
+no-op when one exists.
 
 The body of the file (everything after the closing `---`) is free-form markdown: title, "What to
 build", acceptance criteria, test seams, and (appended over time) a `## Comments` section for

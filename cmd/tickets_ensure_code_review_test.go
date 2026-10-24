@@ -170,6 +170,40 @@ func TestExecute_TicketsEnsureCodeReview_StubLandsInStore(t *testing.T) {
 	}
 }
 
+func TestRunTicketsEnsureVerify_CreatesOneValidStubThenNoops(t *testing.T) {
+	t.Parallel()
+	epicPath := filepath.Join(t.TempDir(), "widget-epic")
+	issuesDir := filepath.Join(epicPath, "issues")
+	if err := os.MkdirAll(issuesDir, 0755); err != nil {
+		t.Fatalf("mkdir issues: %v", err)
+	}
+	writeTicket(t, filepath.Join(issuesDir, "01-do-thing.md"), "01", "done", "implement")
+
+	var stdout bytes.Buffer
+	if err := runTicketsEnsureVerify(epicPath, &stdout); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	ticket, err := schema.ParseTicket(filepath.Join(issuesDir, "02-verify.md"))
+	if err != nil {
+		t.Fatalf("stub failed validate: %v", err)
+	}
+	if ticket.Type != schema.TypeVerify || !ticket.IsCommitless() {
+		t.Errorf("stub type = %q commitless = %v, want commitless verify", ticket.Type, ticket.IsCommitless())
+	}
+
+	stdout.Reset()
+	if err := runTicketsEnsureVerify(epicPath, &stdout); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	entries, _ := os.ReadDir(issuesDir)
+	if len(entries) != 2 {
+		t.Errorf("issues dir has %d entries, want 2 (second run is a no-op)", len(entries))
+	}
+	if !strings.Contains(stdout.String(), "already has a verify ticket") {
+		t.Errorf("stdout = %q, want it to mention the existing verify ticket", stdout.String())
+	}
+}
+
 // writeTicket writes a minimal valid ticket fixture with the given id,
 // status, and type.
 func writeTicket(t *testing.T, path, id, status, ticketType string) {
