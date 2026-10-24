@@ -77,7 +77,7 @@ func (Vitest) Name() string { return "vitest" }
 // Prepare finds the binary and refuses watch mode.
 func (Vitest) Prepare(dir string, args []string) (string, string, error) {
 	for _, a := range args {
-		if a == "--watch" || a == "-w" || strings.HasPrefix(a, "--watch=") {
+		if a == "--watch" || a == "-w" || a == "--watch=true" {
 			return "", "", errors.New("vitest --watch is not supported; brief runs vitest once")
 		}
 	}

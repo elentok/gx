@@ -129,6 +129,19 @@ func TestBrief_NodeForcedArgs(t *testing.T) {
 	}
 }
 
+func TestBrief_VitestWatchFalseReachesVitest(t *testing.T) {
+	nodeEnv(t)
+	repo := testutil.TempRepo(t)
+	rec := nodeStub(t, repo, "vitest", "vitest-pass.json", 0)
+	out, code := runBriefCmd(t, repo, "vitest", "--watch=false")
+	if code != 0 {
+		t.Fatalf("exit %d, out:\n%s", code, out)
+	}
+	if got := strings.Join(recorded(t, rec)[1:], " "); got != "run --reporter=json --watch=false" {
+		t.Errorf("vitest args = %q", got)
+	}
+}
+
 func TestBrief_NodeExit2Causes(t *testing.T) {
 	nodeEnv(t)
 	repoWith := func(lock string) string {
@@ -145,7 +158,7 @@ func TestBrief_NodeExit2Causes(t *testing.T) {
 		}
 	}
 
-	for _, flag := range []string{"--watch", "-w"} {
+	for _, flag := range []string{"--watch", "-w", "--watch=true"} {
 		repo := repoWith("")
 		nodeStub(t, repo, "vitest", "", 0)
 		out, code := runBriefCmd(t, repo, "vitest", flag)
