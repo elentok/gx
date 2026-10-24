@@ -210,14 +210,14 @@ func (f *firstPrompt) personInput() {
 
 func (f *firstPrompt) markTyped() {
 	if f.typed.CompareAndSwap(false, true) {
-		f.log.Debug("first prompt typed")
+		f.log.Info("first prompt typed")
 	}
 }
 
 // start types the prompt in the background, so the watch keeps reading the
 // person's input.
 func (f *firstPrompt) start(signal, prompt string) {
-	f.log.Debug("first prompt ready", "signal", signal)
+	f.log.Info("first prompt ready", "signal", signal, "len", len(prompt), "head", promptHead(prompt))
 	f.s.sessionWatches.start(func() {
 		err := f.deliver(prompt)
 		switch {

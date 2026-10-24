@@ -164,19 +164,29 @@ func (r *actionRun) step(i int, prompt string) error {
 	}
 	r.convChanged = false
 	begin := time.Now()
+	before, _ := inputState(r.holder)
+	r.s.log.Info("action step typing", "session", filepath.Base(r.dir), "step", i, "len", len(prompt), "head", promptHead(prompt), "input_before", before)
 	if err := typeSessionPrompt(r.dir, prompt); err != nil {
 		return err
 	}
 	if r.onTyped != nil {
 		r.onTyped()
 	}
-	r.s.log.Debug("action step typed", "session", filepath.Base(r.dir), "step", i)
+	r.s.log.Info("action step typed", "session", filepath.Base(r.dir), "step", i)
 	signal, err := r.waitForStep(strings.HasPrefix(prompt, "/"))
-	r.s.log.Debug("action step done", "session", filepath.Base(r.dir), "step", i, "signal", signal, "elapsed", time.Since(begin))
+	r.s.log.Info("action step done", "session", filepath.Base(r.dir), "step", i, "signal", signal, "elapsed", time.Since(begin))
 	if err != nil {
 		return fmt.Errorf("step %d: %w", i, err)
 	}
 	return nil
+}
+
+// promptHead is the start of a prompt for a log line.
+func promptHead(prompt string) string {
+	if r := []rune(prompt); len(r) > 40 {
+		return string(r[:40]) + "…"
+	}
+	return prompt
 }
 
 // catchUp applies the statuses already sent.

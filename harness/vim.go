@@ -25,7 +25,7 @@ func (claudeHarness) ReadyToType(io TypingIO) bool {
 	if insertMarkerShown(io) {
 		return true
 	}
-	slog.Debug("claude vim mode has no INSERT marker, pressing i")
+	slog.Info("claude vim mode has no INSERT marker, pressing i")
 	if err := io.SendKeys("i"); err != nil {
 		slog.Warn("claude vim mode: could not press i, not typing", "err", err)
 		return false
