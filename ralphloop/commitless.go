@@ -30,10 +30,11 @@ func PrepareCommitless(d Deps, o OneIteration, scratchDir, ref string) (Iteratio
 	if err := addLockedDetachedWorktree(d, o, path, ref); err != nil {
 		return IterationWorktree{}, err
 	}
+	w := IterationWorktree{Path: path, Label: label, worktreeDir: wtDir}
 	if err := installDepsIn(d, o, path); err != nil {
-		return IterationWorktree{}, err
+		return IterationWorktree{}, discardAfterInstallFailure(err, DiscardCommitless(d, o, w))
 	}
-	return IterationWorktree{Path: path, Label: label, worktreeDir: wtDir}, nil
+	return w, nil
 }
 
 func addLockedDetachedWorktree(d Deps, o OneIteration, path, ref string) error {

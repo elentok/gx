@@ -215,6 +215,9 @@ type Config struct {
 	// Sleep paces the ralphloop waits (finish debounce, poll backoffs); nil
 	// means time.Sleep. Tests shrink it so each merge skips the real seconds.
 	Sleep func(time.Duration)
+	// InstallDeps replaces the dependency install a worktree gets before its
+	// agent starts; nil means the real one. Tests fake it so no package manager runs.
+	InstallDeps func(path, logDir string) ([]string, error)
 
 	// Runner is the configured agent runner; nil means herdr. Herdr health
 	// is only probed when it reports health (agentrunner.HealthChecker).

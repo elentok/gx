@@ -30,9 +30,11 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   outcomes). Call `claudeenv.Isolate()` (`testutil/claudeenv`) from every package's `TestMain`. It
   points `HOME` and a clean `CLAUDE_CONFIG_DIR` at a temp dir, unsets `XDG_*`, and leaves a vim-mode
   `~/.claude.json` as a canary: code that reads `HOME` instead of `CLAUDE_CONFIG_DIR` fails loudly.
-- Run web tests only through `make web-test`. A fresh worktree has no `node_modules`, so a bare
-  `npx vitest` fails with `Cannot find package '@vitejs/plugin-react'`. `make web-test` installs
-  dependencies first, at the cost of a slower run.
+- Run web tests through `make web-test`. gx installs dependencies when it creates an iteration
+  worktree, so web tests work in a fresh worktree. `make web-test` still installs first, at the cost
+  of a slower run.
+- Tests never read live machine state, such as sibling worktrees, real branches or the live
+  server's state. Use `t.TempDir()` and `testutil.TempRepo`.
 - If a test run moves to the background, wait for its completion notice. Don't poll its output
   file, and don't write `sleep` or `until ...; do sleep` loops.
 

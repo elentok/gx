@@ -16,7 +16,7 @@ type installRecorder struct {
 	err   error
 }
 
-func (r *installRecorder) install(path string) ([]string, error) {
+func (r *installRecorder) install(path, _ string) ([]string, error) {
 	r.paths = append(r.paths, path)
 	return []string{"fake install"}, r.err
 }

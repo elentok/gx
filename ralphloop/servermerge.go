@@ -91,7 +91,7 @@ var worktreeLock sync.Mutex
 // directory. It runs outside worktreeLock so a slow install does not hold up
 // another ticket's git worktree add.
 func installDepsIn(d Deps, o OneIteration, path string) error {
-	commands, err := d.InstallDeps(path)
+	commands, err := d.InstallDeps(path, o.ScratchDir)
 	if err != nil {
 		return err
 	}
@@ -105,6 +105,15 @@ func installDepsIn(d Deps, o OneIteration, path string) error {
 	return nil
 }
 
+// discardAfterInstallFailure joins a failed discard onto the install error, so a
+// retry that trips over the leftover worktree can be traced back.
+func discardAfterInstallFailure(installErr, discardErr error) error {
+	if discardErr != nil {
+		return errors.Join(installErr, fmt.Errorf("discard worktree: %w", discardErr))
+	}
+	return installErr
+}
+
 // PrepareIteration creates the epic's feature worktree and the ticket's
 // iteration worktree off the feature tip, and installs dependencies in the
 // iteration worktree.
@@ -114,7 +123,7 @@ func PrepareIteration(d Deps, o OneIteration) (IterationWorktree, error) {
 		return IterationWorktree{}, err
 	}
 	if err := installDepsIn(d, o, w.Path); err != nil {
-		return IterationWorktree{}, err
+		return IterationWorktree{}, discardAfterInstallFailure(err, DiscardIteration(d, o, w))
 	}
 	return w, nil
 }

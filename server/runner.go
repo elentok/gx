@@ -889,5 +889,8 @@ func (s *Server) depsWith(runner agentrunner.Runner) ralphloop.Deps {
 	if s.cfg.Sleep != nil {
 		deps.Sleep = s.cfg.Sleep
 	}
+	if s.cfg.InstallDeps != nil {
+		deps.InstallDeps = s.cfg.InstallDeps
+	}
 	return deps
 }
