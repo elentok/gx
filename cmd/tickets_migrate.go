@@ -124,6 +124,11 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		changes = mergeChanges(changes, renamed)
 	}
 	if err == nil {
+		var steps []tickets.MigrationChange
+		steps, err = tickets.MigrateDesignStep(scratchRoot, designProbeUnder(scratchRoot))
+		changes = mergeChanges(changes, steps)
+	}
+	if err == nil {
 		var done []tickets.MigrationChange
 		done, err = tickets.MigrateMapDone(scratchRoot, false)
 		changes = mergeChanges(changes, done)
@@ -154,6 +159,19 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 	}
 	fmt.Fprintf(w, "%d file(s) changed\n", len(changes))
 	return err
+}
+
+// designProbeUnder is the trunk checkout and repo of the project at root, for
+// the design step guess. A root that is not a store project has neither.
+func designProbeUnder(root string) tickets.DesignProbe {
+	probe := tickets.DesignProbe{BranchExists: tickets.BranchExists}
+	if _, err := config.ReadProjectFile(root); err != nil {
+		return probe
+	}
+	store, project := filepath.Dir(root), tickets.ProjectName(root)
+	probe.TrunkDir = tickets.TrunkCheckout(store, project)
+	probe.Repo = tickets.ProjectRepoRoot(store, project)
+	return probe
 }
 
 // backfillTicketCreation stamps created_at and the original address on the

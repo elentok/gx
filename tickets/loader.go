@@ -389,6 +389,12 @@ func loadEpicEvolveFields(epic *Epic, fm string) {
 	decode("evolve_skipped", &epic.EvolveSkipped)
 	decode("evolve_ticket", &epic.EvolveTicket)
 	decode("destination_unconfirmed", &epic.DestinationUnconfirmed)
+	decode("design_step", &epic.DesignStep)
+	if epic.DesignStep != "" {
+		if err := CheckDesignStep(epic.DesignStep); err != nil {
+			epic.FrontmatterErrs = append(epic.FrontmatterErrs, "design_step: "+err.Error())
+		}
+	}
 }
 
 // epicTiming is an epic's optional started_at/completed_at pair, as stored in

@@ -81,6 +81,9 @@ type Epic struct {
 	EvolveSkipped          bool
 	EvolveTicket           string // address of the epic's evolve ticket
 	DestinationUnconfirmed bool
+	// DesignStep is the Progress step a map has reached; empty on a loop epic
+	// and on a map not yet migrated.
+	DesignStep string
 
 	// FrontmatterErrs holds ticket.md field values that failed to parse, each
 	// prefixed with its field name; ValidateProject reports them.

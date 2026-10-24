@@ -84,7 +84,9 @@ An epic's ticket.md may set kind: map to mark a wayfinder map epic: hand-driven,
 never scheduled by the server.
 
 ` + "`tickets set project:epic`" + ` (or ` + "`tickets epic set`" + `) writes an epic's kind (map, loop), status
-(draft, open), destination_unconfirmed and blocked_by (whole-epic tokens such as other or
+(draft, open), destination_unconfirmed, design_step (map only: chart, resolve-tickets, spec,
+review, grill-findings, create-tickets, branch, done; --allow-backward to move to an earlier
+step) and blocked_by (whole-epic tokens such as other or
 project:other: the whole epic waits on them, checked like a ticket's); created_at, completed_at, merged_at, queued_at, evolved_at, evolve_skipped,
 evolve_ticket and the stats fields below are refused (server-stamped), except that a map epic
 takes completed_at (an RFC3339 timestamp or now; a map already completed keeps its first value). ` + "`tickets section project:epic`" + ` writes a body section of its ticket.md.
@@ -108,7 +110,7 @@ settable via ` + "`tickets set`" + `, and unset until gx stamps them.
 
 Evolve fields (optional, validated):
   evolved_at (RFC3339 timestamp), evolve_skipped (bool), evolve_ticket (address),
-  destination_unconfirmed (bool)
+  destination_unconfirmed (bool), design_step (map epics only)
 `
 
 func newTicketsSetCmd(d deps) *cobra.Command {
@@ -151,6 +153,8 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	// Epic address only (project:epic): the settable epic fields.
 	cmd.Flags().String("kind", "", "epic only: set kind (map or loop)")
 	addDestinationUnconfirmedFlags(cmd, "epic only: set destination_unconfirmed (true/false)")
+	cmd.Flags().String("design-step", "", "map epic only: set design_step ("+strings.Join(tickets.DesignSteps, ", ")+")")
+	cmd.Flags().Bool("allow-backward", false, "map epic only: allow --design-step to move to an earlier step")
 	for _, field := range tickets.EpicServerStamped {
 		flag := strings.ReplaceAll(field, "_", "-")
 		cmd.Flags().String(flag, "", "refused: "+field+" is server-stamped")
@@ -216,6 +220,12 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 		update.DestinationUnconfirmed = &b
 		changed = append(changed, "destination_unconfirmed="+v)
 	}
+	if c.Flags().Changed("design-step") {
+		v, _ := c.Flags().GetString("design-step")
+		update.DesignStep = &v
+		update.AllowBackward, _ = c.Flags().GetBool("allow-backward")
+		changed = append(changed, "design_step="+v)
+	}
 	var completedAt *time.Time
 	if handCompletable && c.Flags().Changed("completed-at") {
 		v, _ := c.Flags().GetString("completed-at")
@@ -244,7 +254,7 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 		changed = append(changed, "blocked_by="+v)
 	}
 	if len(changed) == 0 {
-		return fmt.Errorf("%s: an epic takes --kind, --status, --destination-unconfirmed and --blocked-by (a map also --completed-at)", ticketLabel(path))
+		return fmt.Errorf("%s: an epic takes --kind, --status, --destination-unconfirmed and --blocked-by (a map also --design-step and --completed-at)", ticketLabel(path))
 	}
 	if err := tickets.UpdateEpicFields(path, update); err != nil {
 		return fmt.Errorf("%s: %w", ticketLabel(path), err)

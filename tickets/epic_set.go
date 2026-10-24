@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/elentok/gx/fsutil"
@@ -33,6 +34,10 @@ type EpicUpdate struct {
 	Kind                   *string
 	Status                 *string
 	DestinationUnconfirmed *bool
+	// DesignStep is a map epic's step; a move to an earlier step refuses unless
+	// AllowBackward is set.
+	DesignStep    *string
+	AllowBackward bool
 	// BlockedBy is written as given; check it first with CheckEpicBlockedByWrite.
 	BlockedBy *[]string
 }
@@ -57,7 +62,23 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 	if err := fields.validate(); err != nil {
 		return err
 	}
+	if u.DesignStep != nil {
+		if err := CheckDesignStep(*u.DesignStep); err != nil {
+			return err
+		}
+		if !IsMapEpic(filepath.Dir(ticketPath)) {
+			return fmt.Errorf("design_step is for a map epic; this epic is not kind: map")
+		}
+	}
 	return editEpicTicketMD(ticketPath, func(mapping *yaml.Node, _ *string) error {
+		if u.DesignStep != nil {
+			if err := checkDesignStepMove(mapping, *u.DesignStep, u.AllowBackward); err != nil {
+				return err
+			}
+			if err := setMappingValue(mapping, "design_step", *u.DesignStep); err != nil {
+				return err
+			}
+		}
 		if u.Kind != nil {
 			if err := setMappingValue(mapping, "kind", *u.Kind); err != nil {
 				return err
@@ -78,6 +99,20 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 		}
 		return nil
 	})
+}
+
+// checkDesignStepMove refuses a move from the stored step to an earlier one
+// unless allowBackward is set.
+func checkDesignStepMove(mapping *yaml.Node, next string, allowBackward bool) error {
+	i := mappingKeyIndex(mapping, "design_step")
+	if i < 0 || allowBackward {
+		return nil
+	}
+	cur := mapping.Content[i+1].Value
+	if slices.Index(DesignSteps, next) < slices.Index(DesignSteps, cur) {
+		return fmt.Errorf("design_step %s is before the current %s; pass --allow-backward to move back", next, cur)
+	}
+	return nil
 }
 
 // SetEpicSection replaces (or appends) the "## heading" section of the epic

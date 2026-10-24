@@ -174,7 +174,9 @@ conversation history.
   block at the top of the body may carry the settable epic fields (e.g.
   `destination_unconfirmed: true`); any other field refuses the add. `gx tickets section` and
   `gx tickets set` accept an epic address (`project:epic`, no ticket id) and validate it against the
-  epic schema: `set` writes `kind`, `status` and `destination_unconfirmed`; `completed_at`,
+  epic schema: `set` writes `kind`, `status` and `destination_unconfirmed`, and on a map epic
+  `design_step` (`--design-step <step>`: chart, resolve-tickets, spec, review, grill-findings,
+  create-tickets, branch, done; a move to an earlier step needs `--allow-backward`); `completed_at`,
   `evolved_at`, `evolve_skipped` and `evolve_ticket` are server-stamped and read-only. Never
   hand-edit an epic's `ticket.md`.
 
