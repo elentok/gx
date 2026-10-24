@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { SessionBackgroundTask, SessionChatMessage, SessionChatResponse, SessionInfo } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
@@ -9,6 +9,7 @@ import { Composer } from "./Composer";
 import { FailureBanner, GxStopped, needsTranscript, replacesComposer, visibleFailure, type FailureActions } from "./FailureBanner";
 import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
+import { RoundFocus } from "./RoundFocus";
 import type { Answers } from "./round";
 
 const KIND_NAMES: Record<string, string> = { shell: "shell", monitor: "Monitor", agent: "subagent" };
@@ -100,11 +101,20 @@ function ChatTail({
   const [answers, setAnswers] = useState<Answers>(() => readPageCache<Answers>(cacheKey, roundKey) ?? {});
   useEffect(() => writePageCache(cacheKey, answers, roundKey), [cacheKey, answers, roundKey]);
   const [focus, setFocus] = useState<{ index: number }>();
+  // Full screen, the composer renders into the overlay's footer; the docked sheet stays mounted, hidden, so it keeps its place.
+  const [full, setFull] = useState(false);
+  const [footer, setFooter] = useState<HTMLDivElement | null>(null);
+  const close = useCallback(() => setFull(false), []);
   const failure = visibleFailure(session.failure, done);
   const round = chat.round ?? [];
   return (
     <>
-      {round.length > 0 && <QuestionSheet round={round} answers={answers} onAnswers={setAnswers} focus={focus} />}
+      {round.length > 0 && (
+        <Box hidden={full}>
+          <QuestionSheet round={round} answers={answers} onAnswers={setAnswers} focus={focus} />
+        </Box>
+      )}
+      {full && round.length > 0 && <RoundFocus round={round} answers={answers} onAnswers={setAnswers} focus={focus} onClose={close} footer={setFooter} />}
       {failure && (
         <FailureBanner
           failure={failure}
@@ -128,6 +138,8 @@ function ChatTail({
           round={round}
           answers={answers}
           onReview={(index) => setFocus({ index })}
+          fullScreen={full ? footer : undefined}
+          onFullScreen={setFull}
         />
       )}
     </>

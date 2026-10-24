@@ -13,7 +13,8 @@ export const choicesOf = (c: SessionRoundCard) =>
 
 export const isAnswered = (a?: Answer) => !!a?.choice || !!a?.text?.trim();
 
-const answerText = (c: SessionRoundCard, a: Answer) => {
+/** The answer as the prompt words it: the picked option's label, or the typed text. */
+export const answerText = (c: SessionRoundCard, a: Answer) => {
   if (a.choice) {
     if (c.kind === "yes-no") return a.choice === "yes" ? "Yes" : "No";
     return choicesOf(c).find((o) => o.id === a.choice)?.label ?? a.choice;

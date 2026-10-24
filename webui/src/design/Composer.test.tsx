@@ -267,3 +267,46 @@ test("a question card shows its number and title above the body", async () => {
   expect(s.getByText((_, el) => el?.textContent === "Q1 - Pick one" && el.tagName === "SPAN")).toBeTruthy();
   expect(s.getByText("Body 1?")).toBeTruthy();
 });
+
+const focusDialog = async () => {
+  fireEvent.click(await screen.findByRole("button", { name: "⤢ Focus" }));
+  return screen.findByRole("dialog", { name: "Questions, full screen" });
+};
+
+test("Focus opens the round full screen; Send there answers it and collapses back", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ round: [askCard(1), askCard(2)] }) });
+  const d = within(await focusDialog());
+  expect(screen.queryByRole("group", { name: "Questions" })).toBeNull();
+  fireEvent.click(d.getByRole("button", { name: "Alpha" }));
+  fireEvent.click(d.getByRole("button", { name: "Beta" }));
+  expect(d.getByText("2 of 2 answered")).toBeTruthy();
+  fireEvent.change(d.getByRole("textbox", { name: "Message" }), { target: { value: "overall" } });
+  fireEvent.click(d.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0].text).toBe("Q1 - T1: Alpha\nQ2 - T2: Beta\n\nNote:\noverall");
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(await sheet()).toBeTruthy();
+});
+
+test("full screen keeps the note draft and the answers, and Escape collapses back", async () => {
+  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ round: round() }) });
+  fireEvent.change(await openNote(), { target: { value: "draft" } });
+  const d = within(await focusDialog());
+  expect((d.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value).toBe("draft");
+  fireEvent.click(d.getByRole("button", { name: "Alpha" }));
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(within(await sheet()).getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
+  expect((screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value).toBe("draft");
+});
+
+test("Answer them in full screen moves to the first unanswered question", async () => {
+  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ round: round() }) });
+  const d = within(await focusDialog());
+  fireEvent.click(d.getByRole("button", { name: "Alpha" }));
+  fireEvent.click(d.getByRole("button", { name: "Question 1, answered" }));
+  fireEvent.click(d.getByRole("button", { name: "Send" }));
+  fireEvent.click(d.getByRole("button", { name: "Answer them" }));
+  expect(d.getByRole("button", { name: "Question 2" }).getAttribute("aria-current")).toBe("step");
+});

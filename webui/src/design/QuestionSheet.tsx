@@ -37,22 +37,25 @@ function Choice({ label, on, recommended, onClick }: { label: string; on: boolea
   );
 }
 
-function Question({
+// One question of a round. `big` is the full-screen size.
+export function Question({
   card,
   answer,
   onChange,
   onPicked,
+  big,
 }: {
   card: SessionRoundCard;
   answer: Answer;
   onChange: (a: Answer) => void;
   onPicked: () => void;
+  big?: boolean;
 }) {
-  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(!!answer.note);
   const text = card.kind === "text" || choicesOf(card).length === 0;
   return (
-    <Box display="flex" flexDirection="column" gap="2">
-      <Markdown inline fontSize="md" fontWeight="600">{`${nameOf(card)} - ${card.title}`}</Markdown>
+    <Box display="flex" flexDirection="column" gap={big ? "3" : "2"}>
+      <Markdown inline fontSize={big ? "xl" : "md"} fontWeight="600">{`${nameOf(card)} - ${card.title}`}</Markdown>
       {card.body && <Markdown fontSize="md">{card.body}</Markdown>}
       {text ? (
         <>
@@ -63,7 +66,7 @@ function Question({
           )}
           <Textarea
             size="sm"
-            rows={2}
+            rows={big ? 5 : 2}
             aria-label={`Answer to question ${card.label}`}
             placeholder="Your answer"
             value={answer.text ?? ""}
@@ -110,6 +113,49 @@ function Question({
           onChange={(e) => onChange({ ...answer, note: e.target.value })}
         />
       )}
+    </Box>
+  );
+}
+
+// A circle per question: ✓ once answered, filled for the current one. Clicking one opens it.
+export function QuestionDots({
+  round,
+  answers,
+  current,
+  onPick,
+}: {
+  round: SessionRoundCard[];
+  answers: Answers;
+  current?: number;
+  onPick: (k: number) => void;
+}) {
+  return (
+    <Box display="flex" gap="1.5" flexWrap="wrap">
+      {round.map((c, k) => {
+        const answered = isAnswered(answers[c.label]);
+        const on = k === current;
+        return (
+          <chakra.button
+            key={c.label}
+            type="button"
+            aria-label={`Question ${c.label}${answered ? ", answered" : ""}`}
+            aria-current={on ? "step" : undefined}
+            w="7"
+            h="7"
+            borderRadius="full"
+            borderWidth="2px"
+            fontSize={c.label.length > 2 ? "2xs" : "xs"}
+            fontWeight="600"
+            cursor="pointer"
+            borderColor={answered ? "tone.done.fg" : on ? "tone.waiting.fg" : "border"}
+            bg={answered ? "tone.done.fg" : on ? "tone.waiting.fg" : "transparent"}
+            color={answered || on ? "surface" : "text.muted"}
+            onClick={() => onPick(k)}
+          >
+            {answered ? "✓" : c.label}
+          </chakra.button>
+        );
+      })}
     </Box>
   );
 }
@@ -165,32 +211,8 @@ export function QuestionSheet({
   return (
     <Box role="group" aria-label="Questions" borderWidth="1px" borderColor="tone.waiting.fg" borderRadius="md" bg="surface.raised" overflow="hidden">
       <Box px="3" pt="2" pb="2" display="flex" alignItems="center" gap="2">
-        <Box display="flex" gap="1.5" flex="1" flexWrap="wrap">
-          {round.map((c, k) => {
-            const answered = isAnswered(answers[c.label]);
-            const current = open && k === index;
-            return (
-              <chakra.button
-                key={c.label}
-                type="button"
-                aria-label={`Question ${c.label}${answered ? ", answered" : ""}`}
-                aria-current={current ? "step" : undefined}
-                w="7"
-                h="7"
-                borderRadius="full"
-                borderWidth="2px"
-                fontSize={c.label.length > 2 ? "2xs" : "xs"}
-                fontWeight="600"
-                cursor="pointer"
-                borderColor={answered ? "tone.done.fg" : current ? "tone.waiting.fg" : "border"}
-                bg={answered ? "tone.done.fg" : current ? "tone.waiting.fg" : "transparent"}
-                color={answered || current ? "surface" : "text.muted"}
-                onClick={() => goto(k)}
-              >
-                {answered ? "✓" : c.label}
-              </chakra.button>
-            );
-          })}
+        <Box flex="1">
+          <QuestionDots round={round} answers={answers} current={open ? index : undefined} onPick={goto} />
         </Box>
         <Text fontSize="xs" color="text.dim">
           {done} of {round.length} answered
