@@ -363,6 +363,10 @@ export interface EpicDetailRow {
   needs_answer?: boolean;
   question?: string;
   /**
+   * Reason is the plain-words pause reason of a paused loop-epic ticket.
+   */
+  reason?: string;
+  /**
    * Current and Blocked are set on a map epic's rows: Current is the claimed
    * ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.
    */

@@ -622,6 +622,20 @@ test("an asking row shows its question and an Answer link to the ticket page; ot
   expect(links.map((l) => l.getAttribute("href"))).toEqual(["#/t/gx:e/02"]);
 });
 
+test("a paused row shows its reason and links to the ticket page; a repair-class row says Fix it in the TUI and has no link", async () => {
+  const rows = [
+    rowOf("02", "needs-repair", { reason: "Needs repair" }),
+    rowOf("03", "needs-repair", { reason: "Agent stalled" }),
+  ];
+  rows[1].rendered_status = "paused";
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 2, rows }));
+  expect(await screen.findByText("needs-repair · Needs repair")).toBeTruthy();
+  expect(screen.getAllByText("Fix it in the TUI")).toHaveLength(1);
+  expect(screen.getByText("paused · Agent stalled")).toBeTruthy();
+  const links = screen.getAllByRole("link", { name: "Open →" });
+  expect(links.map((l) => l.getAttribute("href"))).toEqual(["#/t/gx:e/03"]);
+});
+
 test("a running row's elapsed time and a running epic's wall clock tick", async () => {
   vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
   try {

@@ -2,7 +2,8 @@ import type { EpicDetail, EpicDetailRow } from "./detail";
 import type { Segment } from "../ui/progress-bar/SegmentedBar";
 import type { StatusKind } from "../ui/status-icon/StatusIcon";
 import type { Tone } from "../ui/tone";
-import { epicBadge } from "../view";
+import { ticketHref } from "../hrefs";
+import { REPAIR_HINT, epicBadge } from "../view";
 
 type Bucket = "done" | "running" | "asking" | "waiting" | "children" | "attention";
 
@@ -123,10 +124,20 @@ function elapsedAndCost(row: EpicDetailRow, elapsed: number | undefined, ctx: Ro
   return [elapsed === undefined ? undefined : formatDuration(elapsed), row.cost === undefined ? undefined : formatCost(row.cost)];
 }
 
-// The dim detail line under a row: status word, elapsed time, cost, then the blockers and fork note.
+// What a paused row offers under its line: an asking row its question and an Answer link, a repair-class
+// row the TUI hint and no link, any other paused row a link to the ticket page where recovery lives.
+export function pauseAction(row: EpicDetailRow): { hint?: string; href?: string; linkLabel?: string } {
+  if (row.needs_answer) return { hint: row.question, href: ticketHref(row.address) };
+  if (!row.reason) return {};
+  if (row.rendered_status === "needs-repair") return { hint: REPAIR_HINT };
+  return { href: ticketHref(row.address), linkLabel: "Open →" };
+}
+
+// The dim detail line under a row: status word, pause reason, elapsed time, cost, then the blockers and fork note.
 export function detailLine(row: EpicDetailRow, ctx: RowContext): string {
   return joinDot(
     row.rendered_status,
+    row.reason,
     ...elapsedAndCost(row, elapsedOf(row, ctx.now), ctx),
     row.blockers?.length ? blockerNote(row.blockers) : undefined,
     forkNote(row, ctx.byAddress),

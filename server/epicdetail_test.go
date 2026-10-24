@@ -136,6 +136,12 @@ func TestEpicDetail_LoopEpic(t *testing.T) {
 	if r := rowOf(t, d, "proj:work/04"); r.Asking || r.Question != "" {
 		t.Errorf("row 04 = %+v, want no answer flag", r)
 	}
+	if r := rowOf(t, d, "proj:work/06"); r.Reason == "" {
+		t.Errorf("row 06 = %+v, want a reason label on a paused ticket", r)
+	}
+	if r := rowOf(t, d, "proj:work/04"); r.Reason != "" {
+		t.Errorf("row 04 reason = %q, want none on an unpaused ticket", r.Reason)
+	}
 	if strings.Contains(strings.ToLower(body), "token") || strings.Contains(body, "context_window") {
 		t.Errorf("payload has token counts: %s", body)
 	}
@@ -210,7 +216,14 @@ func TestEpicDetail_MapEpic(t *testing.T) {
 			map[string]string{
 				"01-a.md": issueMD("01", "done", "elapsed_time: 60\nactual_cost: 1.5\n", "A"),
 				"02-b.md": issueMD("02", "open", "blocked_by: [\"01\"]\n", "B"),
+				"03-c.md": issueMD("03", "open", "", "C"),
 			})
+		path := filepath.Join(store, "proj", "atlas", "issues", "03-c.md")
+		if err := schema.UpdateTicket(path, func(tk *schema.Ticket) {
+			tk.Status, tk.PauseKind = schema.StatusLegacyAnswer, schema.PauseKindSelfReported
+		}); err != nil {
+			t.Fatal(err)
+		}
 	})
 	code, d, body := getEpicDetail(t, h, base, "proj:atlas")
 	if code != http.StatusOK {
@@ -227,6 +240,9 @@ func TestEpicDetail_MapEpic(t *testing.T) {
 	}
 	if r := rowOf(t, d, "proj:atlas/02"); r.Blockers != nil || r.Asking {
 		t.Errorf("row 02 = %+v, want no blockers and no answer flag", r)
+	}
+	if r := rowOf(t, d, "proj:atlas/03"); r.Reason != "" {
+		t.Errorf("row 03 reason = %q, want none on a map epic row", r.Reason)
 	}
 }
 

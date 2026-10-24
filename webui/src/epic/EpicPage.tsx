@@ -6,7 +6,7 @@ import type { OpenDesign } from "../design/open";
 import { StartDesignButton } from "../design/SessionControls";
 import { hasDesignSession } from "../design/view";
 import { MergeButton, isMergeable } from "../epics/MergeButton";
-import { designHref, ticketHref } from "../hrefs";
+import { designHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
 import { Markdown } from "../markdown/Markdown";
 import { DetailPage } from "../page/DetailPage";
@@ -29,6 +29,7 @@ import {
   isRunning,
   nestFolded,
   nestLive,
+  pauseAction,
   rowContext,
   segmentsOf,
   statValues,
@@ -82,8 +83,7 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
               tone={toneOf(r)}
               unclipped
               inlineReason
-              hint={r.needs_answer ? r.question : undefined}
-              href={r.needs_answer ? ticketHref(r.address) : undefined}
+              {...pauseAction(r)}
               live={isRunning(r)}
               icon={iconOf(r)}
               toneTitle

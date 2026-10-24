@@ -34,6 +34,8 @@ type EpicDetailRow struct {
 	// Asking is set on a paused ticket with an open question; Question is its summary line.
 	Asking   bool   `json:"needs_answer,omitempty"`
 	Question string `json:"question,omitempty"`
+	// Reason is the plain-words pause reason of a paused loop-epic ticket.
+	Reason string `json:"reason,omitempty"`
 	// Current and Blocked are set on a map epic's rows: Current is the claimed
 	// ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.
 	Current bool `json:"current,omitempty"`
@@ -274,6 +276,9 @@ func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) EpicDeta
 	}
 	if open := tickets.OpenQuestion(readLogLenient(t)); open != nil && status == tickets.StatusPausedAnswer {
 		row.Asking, row.Question = true, open.Summary
+	}
+	if t.PausedClass() != "" {
+		row.Reason = t.PauseReason.Label()
 	}
 	return row
 }
