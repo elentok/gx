@@ -40,7 +40,7 @@ func GuessDesignStep(m Epic, byName map[string]Epic, p DesignProbe) string {
 	impl, hasImpl := byName[m.Name+ImplEpicSuffix]
 	findings := schema.Section(m.Body, "Review findings")
 	hasFindings := schema.HasSection(m.Body, "Review findings")
-	open := hasOpenTicket(m)
+	open := HasOpenTicket(m)
 	switch {
 	case m.Status == string(schema.StatusDone),
 		!m.CompletedAt.IsZero() && !hasImpl,
@@ -65,8 +65,8 @@ func GuessDesignStep(m Epic, byName map[string]Epic, p DesignProbe) string {
 	return "chart"
 }
 
-// hasOpenTicket reports whether any of m's tickets is open or claimed.
-func hasOpenTicket(m Epic) bool {
+// HasOpenTicket reports whether any of m's tickets is open or claimed.
+func HasOpenTicket(m Epic) bool {
 	for _, t := range m.Tickets {
 		if t.Status == string(schema.StatusOpen) || t.Status == string(schema.StatusClaimed) {
 			return true

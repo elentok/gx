@@ -63,7 +63,7 @@ func currentStepNote(m tickets.Epic, byName map[string]tickets.Epic, step Progre
 	case ProgressChart:
 		return " · confirm destination"
 	case ProgressResolveTickets:
-		if !hasOpenTicket(m) && schema.Section(m.Body, "Not yet specified") != "" {
+		if !tickets.HasOpenTicket(m) && schema.Section(m.Body, "Not yet specified") != "" {
 			return " · fog left"
 		}
 	case ProgressGrillFindings:
@@ -104,23 +104,6 @@ func mapTicketFlags(m tickets.Epic) (current tickets.Ticket, blocked map[string]
 		return *frontier, blocked
 	}
 	return tickets.Ticket{}, blocked
-}
-
-// hasOpenTicket reports whether any of m's tickets is open or claimed.
-func hasOpenTicket(m tickets.Epic) bool {
-	for _, t := range m.Tickets {
-		if t.Status == string(schema.StatusOpen) || t.Status == string(schema.StatusClaimed) {
-			return true
-		}
-	}
-	return false
-}
-
-// findingsChecked reports whether every "- [ ]" or "- [x]" line of a findings
-// section is checked.
-func findingsChecked(section string) bool {
-	checked, total := findingCounts(section)
-	return checked == total
 }
 
 // findingCounts counts the checked and all "- [ ]" or "- [x]" lines of a findings section.
