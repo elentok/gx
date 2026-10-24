@@ -49,8 +49,11 @@ func main() {
 
 func run(args []string) (err error) {
 	var gxBin, fakeBin, name string
+	var hold bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--hold":
+			hold = true
 		case "--gx", "--fakeclaude":
 			if i+1 == len(args) {
 				return fmt.Errorf("%s needs a value", args[i])
@@ -132,6 +135,12 @@ func run(args []string) (err error) {
 	webURL, err := f.waitReady(ctx, exited)
 	if err != nil {
 		return fmt.Errorf("%w\n%s", err, f.serverOutput())
+	}
+	// --hold freezes every worker as running until the caller removes the hold file.
+	if hold {
+		if err := os.WriteFile(f.hold, nil, 0o644); err != nil {
+			return err
+		}
 	}
 	for _, addr := range sc.queue {
 		if out, err := f.cli("server", "queue", "add", addr); err != nil {

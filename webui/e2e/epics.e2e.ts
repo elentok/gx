@@ -43,6 +43,39 @@ test("2. Epic looks right", async ({ page, start }) => {
   await expect(page.getByText("Which option should the fake worker take?")).toBeVisible();
 });
 
+test("7. Epic completion", async ({ page, start }) => {
+  const fixture = await start("finishing", { hold: true });
+  await page.getByRole("link", nav("Queue")).click();
+  await expect(page.getByRole("link", { name: "finishing-epic" })).toBeVisible();
+  await expect(page.getByText("1/2")).toBeVisible();
+
+  await fixture.release();
+
+  // The last ticket merges; the epic leaves the active queue for Recently finished.
+  await expect(page.getByText("All quiet")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recently finished" })).toBeVisible();
+  await expect(page.getByText(/demo · 2\/2/)).toBeVisible();
+  await page.getByRole("link", { name: "finishing-epic" }).click();
+  await expect(page.getByText(/2 of 2 done/)).toBeVisible();
+});
+
+test("8. Edge states", async ({ page, start }) => {
+  await start("edge");
+  await page.getByRole("link", nav("Queue")).click();
+  await expect(page.getByText("All quiet")).toBeVisible();
+
+  // The Epics page lists no empty epic, so it is opened by its route.
+  await page.getByRole("link", nav("Epics")).click();
+  await expect(page.getByRole("link", { name: "empty-epic" })).toHaveCount(0);
+  await page.evaluate(() => (location.hash = "#/e/demo:empty-epic"));
+  await expect(page.getByText("No tickets yet")).toBeVisible();
+
+  await page.getByRole("link", nav("Epics")).click();
+  await page.getByRole("link", { name: "blocked-epic" }).click();
+  await expect(page.getByText("waiting · blocked · after 01")).toBeVisible();
+  await expect(page.getByText("unmerged · open")).toBeVisible();
+});
+
 test("6. Outside changes show up", async ({ page, start }) => {
   const fixture = await start("ready");
   await page.getByRole("link", nav("Queue")).click();

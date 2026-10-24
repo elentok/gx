@@ -5,7 +5,7 @@ Run with `make web-e2e`. Each flow starts its own fixture server (`testutil/gxfi
 Retries are off. Locators use roles and visible text; no `data-testid` is used yet.
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
-Code: `epics.e2e.ts` (flows 1, 2, 6), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9).
+Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9).
 
 ## 1. Queue an epic
 
@@ -64,6 +64,30 @@ Code: `epics.e2e.ts` (flows 1, 2, 6), `pause.e2e.ts` (flow 3), `design.e2e.ts` (
   1. Open the Queue page; it shows "All quiet".
   2. Run `gx server queue add demo:ready-epic` through the CLI against the fixture's server.
 - **Pass:** without any action in the page, the queue shows a card for `ready-epic`.
+
+## 7. Epic completion
+
+- **Scenario:** `finishing`, started with `--hold` so the last ticket stays running until the flow
+  releases it (`fixture.release()`).
+- **Steps:**
+  1. Open the Queue page; the `finishing-epic` card shows `1/2`.
+  2. Release the hold; the last ticket finishes and merges.
+- **Pass:** the queue shows "All quiet" and lists `finishing-epic` under "Recently finished" as
+  `2/2`; its epic page reads "2 of 2 done".
+
+## 8. Edge states
+
+- **Scenario:** `edge` (project `bare` with no epics, `empty-epic` with no tickets, `blocked-epic`
+  with ticket 02 blocked by the unmerged 01)
+- **Steps:**
+  1. Open the Queue page.
+  2. Open the Epics page; `empty-epic` is not listed. Open it by its route.
+  3. Open `blocked-epic` from the Epics page.
+- **Pass:**
+  - The queue shows "All quiet".
+  - `empty-epic` reads "No tickets yet".
+  - `blocked-epic` shows `waiting · blocked · after 01` and `unmerged · open`.
+- **Not covered:** the "No epics yet" state of the Epics page. `edge` has epics, so it never shows.
 
 ## 4. Start a design session
 
