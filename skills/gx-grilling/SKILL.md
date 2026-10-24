@@ -57,3 +57,16 @@ Each round the user answers reshapes the tree: settled decisions push the fronti
 Finding _facts_ is your job, never the user's. When a frontier question needs a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to find it; don't ask the user for anything you could look up yourself. Don't block on it: a running exploration is an unsettled prerequisite, so only the questions downstream of it wait for the sub-agent to report; ask the rest of the frontier now. The _decisions_ are the user's: put each to them and wait.
 
 The session is done when the frontier is empty: every branch of the design tree visited, nothing left silently assumed. Do not act on it until the user confirms you have reached a shared understanding.
+
+Ask for that confirmation as a one-question round, so the web shows it as a question. Write the summary first, then the question:
+
+````
+❓ **Qn** - **Shared understanding**: Is this a shared understanding I can record and close?
+
+➡️ Yes
+
+```gx-question
+type: yes-no
+recommended: yes
+```
+````
