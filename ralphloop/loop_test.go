@@ -214,7 +214,7 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		WorktreeExists: func(path string) (bool, error) {
 			return true, nil
 		},
-		InstallDeps: func(path string) ([]string, error) {
+		InstallDeps: func(path, logDir string) ([]string, error) {
 			return nil, nil
 		},
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
@@ -778,7 +778,7 @@ func TestRun_InstallDepsFailure_MarksRepairWithoutLaunchingAgentOrAbortingRun(t 
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, prompts, _ := fakeDeps()
-	d.InstallDeps = func(path string) ([]string, error) {
+	d.InstallDeps = func(path, logDir string) ([]string, error) {
 		return nil, errors.New("npm ci: exit status 1")
 	}
 

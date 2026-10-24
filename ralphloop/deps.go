@@ -111,7 +111,8 @@ type Deps struct {
 	// launched. commands holds one "<dir>: <command>" entry per directory;
 	// empty means no lockfile, which is a silent no-op rather than an error.
 	// A failure's text already reads "installing dependencies in <dir>: ...".
-	InstallDeps func(path string) (commands []string, err error)
+	// A failed install's full output is saved under logDir ("" skips it).
+	InstallDeps func(path, logDir string) (commands []string, err error)
 
 	// ReadOccupancy returns the current context occupancy for the Claude
 	// Code session launched in cwd, or ok=false if its transcript has no
@@ -241,8 +242,8 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		AppendTrailers:       git.AppendTrailers,
 		TrailerMap:           git.TrailerMap,
 		WorktreeExists:       worktreeExists,
-		InstallDeps: func(path string) ([]string, error) {
-			return installDependenciesWith(path, overrides.Path)
+		InstallDeps: func(path, logDir string) ([]string, error) {
+			return installDependenciesWith(path, overrides.Path, logDir)
 		},
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			path, err := transcriptPath(overrides.Home, cwd, sessionID)

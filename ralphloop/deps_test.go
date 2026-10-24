@@ -144,7 +144,7 @@ func TestInstallDependenciesWith_UsesExplicitPathInsteadOfProcessEnv(t *testing.
 
 	// Deliberately never t.Setenv PATH here — installDependenciesWith must
 	// not need it.
-	commands, err := installDependenciesWith(repo, binDir)
+	commands, err := installDependenciesWith(repo, binDir, "")
 	if err != nil {
 		t.Fatalf("installDependenciesWith() error = %v", err)
 	}

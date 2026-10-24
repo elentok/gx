@@ -2,7 +2,9 @@ package ralphloop
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // lockfileManagers maps each tracked lockfile name to the package manager that
@@ -49,13 +52,23 @@ func installCommand(manager string, yarnBerry bool) (command []string, ok bool) 
 // replaces the process PATH for finding the package manager. No tracked
 // lockfile is a no-op. go.mod is deliberately not a trigger: go build/go test
 // populate the module cache lazily, so a separate download step buys nothing.
-func installDependenciesWith(path, pathEnv string) (commands []string, err error) {
+//
+// All installs of one call share installTimeout. A failed install writes its
+// full output to a log file in logDir (outside the worktree, so it survives the
+// worktree's discard); "" skips the log.
+func installDependenciesWith(path, pathEnv, logDir string) (commands []string, err error) {
+	return installDependenciesWithin(path, pathEnv, logDir, installTimeout)
+}
+
+func installDependenciesWithin(path, pathEnv, logDir string, budget time.Duration) (commands []string, err error) {
 	dirs, err := lockfileDirs(path)
 	if err != nil {
 		return nil, installError(path, err)
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
+	defer cancel()
 	for _, dir := range dirs {
-		command, err := installIn(dir.path, dir.lockfiles, pathEnv)
+		command, err := installIn(ctx, dir.path, dir.lockfiles, pathEnv, logDir)
 		if err != nil {
 			return nil, installError(dir.path, err)
 		}
@@ -102,8 +115,8 @@ func lockfileDirs(path string) ([]lockfileDir, error) {
 	return dirs, nil
 }
 
-// installIn chooses dir's manager and runs its install there.
-func installIn(dir string, lockfiles []string, pathEnv string) ([]string, error) {
+// installIn chooses dir's manager and runs its install there until ctx ends.
+func installIn(ctx context.Context, dir string, lockfiles []string, pathEnv, logDir string) ([]string, error) {
 	raw, err := os.ReadFile(filepath.Join(dir, "package.json"))
 	var pkg struct {
 		PackageManager string `json:"packageManager"`
@@ -125,16 +138,61 @@ func installIn(dir string, lockfiles []string, pathEnv string) ([]string, error)
 			return nil, fmt.Errorf("%s: %w", strings.Join(command, " "), err)
 		}
 	}
-	cmd := exec.Command(name, command[1:]...)
+	cmd := exec.CommandContext(ctx, name, command[1:]...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "CI=true")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		if len(bytes.TrimSpace(out)) == 0 {
-			return nil, fmt.Errorf("%s: %w", strings.Join(command, " "), err)
-		}
-		return nil, fmt.Errorf("%s: %s", strings.Join(command, " "), out)
+	// A killed manager's children can keep the output pipe open; don't wait on them.
+	cmd.WaitDelay = time.Second
+	out, err := cmd.CombinedOutput()
+	if err == nil {
+		return command, nil
 	}
-	return command, nil
+	joined := strings.Join(command, " ")
+	if ctx.Err() != nil {
+		return nil, fmt.Errorf("%s: timed out after %dm", joined, int(installTimeout.Minutes()))
+	}
+	if len(bytes.TrimSpace(out)) == 0 {
+		return nil, fmt.Errorf("%s: %w", joined, err)
+	}
+	reason := fmt.Sprintf("%s: %s", joined, outputTail(out))
+	if logPath := writeInstallLog(logDir, dir, out); logPath != "" {
+		reason += " (full output: " + logPath + ")"
+	}
+	return nil, errors.New(reason)
+}
+
+// installTimeout is the budget all installs of one InstallDeps call share.
+const installTimeout = 5 * time.Minute
+
+// installTailBytes caps how much of a failed install's output reaches the error.
+const installTailBytes = 2000
+
+// outputTail is the last installTailBytes of out, starting on a line boundary
+// when it had to cut.
+func outputTail(out []byte) string {
+	out = bytes.TrimSpace(out)
+	if len(out) <= installTailBytes {
+		return string(out)
+	}
+	out = out[len(out)-installTailBytes:]
+	if i := bytes.IndexByte(out, '\n'); i >= 0 {
+		out = out[i+1:]
+	}
+	return "..." + "\n" + string(out)
+}
+
+// writeInstallLog saves out under logDir and returns the file's path, or ""
+// when there is no logDir or the write failed (the error text stands alone then).
+func writeInstallLog(logDir, installDir string, out []byte) string {
+	if logDir == "" || os.MkdirAll(logDir, 0o755) != nil {
+		return ""
+	}
+	name := fmt.Sprintf("install-%s-%d.log", filepath.Base(installDir), time.Now().UnixNano())
+	logPath := filepath.Join(logDir, name)
+	if os.WriteFile(logPath, out, 0o644) != nil {
+		return ""
+	}
+	return logPath
 }
 
 // chooseCommand picks the install command: packageManager when set, else the

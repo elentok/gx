@@ -69,7 +69,7 @@ func runIteration(d Deps, p iterationParams) error {
 	// Runs synchronously here, before the agent's tab/session exist, so an
 	// install failure surfaces as an iteration-lifecycle error immediately
 	// rather than eating into the agent's own turn or smart-zone budget.
-	commands, err := d.InstallDeps(path)
+	commands, err := d.InstallDeps(path, p.ScratchDir)
 	if err != nil {
 		return err
 	}

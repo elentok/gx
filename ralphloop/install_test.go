@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/testutil"
 )
@@ -60,7 +61,7 @@ func TestInstallDependencies_NoTrackedLockfile_IsNoOp(t *testing.T) {
 	)
 	binDir, logPath := stubManagers(t, 0, "npm")
 
-	commands, err := installDependenciesWith(repo, binDir)
+	commands, err := installDependenciesWith(repo, binDir, "")
 	if err != nil {
 		t.Fatalf("installDependenciesWith() error = %v", err)
 	}
@@ -98,7 +99,7 @@ func TestInstallDependencies_EachManager_RunsExpectedCommand(t *testing.T) {
 			repo := installRepo(t, files, nil)
 			binDir, logPath := stubManagers(t, 0, c.wantBin)
 
-			commands, err := installDependenciesWith(repo, binDir)
+			commands, err := installDependenciesWith(repo, binDir, "")
 			if err != nil {
 				t.Fatalf("installDependenciesWith() error = %v", err)
 			}
@@ -138,7 +139,7 @@ func TestInstallDependencies_PackageManagerField_BeatsLockfile(t *testing.T) {
 			}, nil)
 			binDir, _ := stubManagers(t, 0, c.wantBin)
 
-			commands, err := installDependenciesWith(repo, binDir)
+			commands, err := installDependenciesWith(repo, binDir, "")
 			if err != nil {
 				t.Fatalf("installDependenciesWith() error = %v", err)
 			}
@@ -163,7 +164,7 @@ func TestInstallDependencies_RootAndSubdirectory_InstallEachInItsOwnDirectory(t 
 	}, map[string]string{"untracked-dir/bun.lock": ""})
 	binDir, logPath := stubManagers(t, 0, "npm", "pnpm", "yarn", "bun")
 
-	commands, err := installDependenciesWith(repo, binDir)
+	commands, err := installDependenciesWith(repo, binDir, "")
 	if err != nil {
 		t.Fatalf("installDependenciesWith() error = %v", err)
 	}
@@ -189,7 +190,7 @@ func TestInstallDependencies_RunsWithCITrue(t *testing.T) {
 	repo := installRepo(t, map[string]string{"package.json": pkgJSON, "package-lock.json": "{}"}, nil)
 	binDir, logPath := stubManagers(t, 0, "npm")
 
-	if _, err := installDependenciesWith(repo, binDir); err != nil {
+	if _, err := installDependenciesWith(repo, binDir, ""); err != nil {
 		t.Fatalf("installDependenciesWith() error = %v", err)
 	}
 	if got := readLog(t, logPath); len(got) != 1 || !strings.Contains(got[0], " CI=true ") {
@@ -247,7 +248,7 @@ func TestInstallDependencies_Failures_ExplainThemselves(t *testing.T) {
 			}
 			binDir, logPath := stubManagers(t, 0, "npm", "pnpm")
 
-			commands, err := installDependenciesWith(repo, binDir)
+			commands, err := installDependenciesWith(repo, binDir, "")
 			if err == nil {
 				t.Fatalf("installDependenciesWith() = %v, nil error; want failure", commands)
 			}
@@ -267,7 +268,7 @@ func TestInstallDependencies_FailingCommand_ReportsCommandAndOutput(t *testing.T
 	repo := installRepo(t, map[string]string{"package.json": pkgJSON, "package-lock.json": "{}"}, nil)
 	binDir, _ := stubManagers(t, 1, "npm")
 
-	_, err := installDependenciesWith(repo, binDir)
+	_, err := installDependenciesWith(repo, binDir, "")
 	if err == nil {
 		t.Fatal("installDependenciesWith() error = nil, want failure surfaced")
 	}
@@ -277,11 +278,99 @@ func TestInstallDependencies_FailingCommand_ReportsCommandAndOutput(t *testing.T
 	}
 }
 
+func writeScriptStub(t *testing.T, binDir, name, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(binDir, name), []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile stub: %v", err)
+	}
+}
+
+func TestInstallDependencies_HungInstall_TimesOut(t *testing.T) {
+	t.Parallel()
+	repo := installRepo(t, map[string]string{"package.json": pkgJSON, "package-lock.json": "{}"}, nil)
+	binDir := t.TempDir()
+	writeScriptStub(t, binDir, "npm", "sleep 5")
+
+	start := time.Now()
+	_, err := installDependenciesWithin(repo, binDir, "", 200*time.Millisecond)
+	want := "installing dependencies in " + repo + ": npm ci: timed out after 5m"
+	if err == nil || err.Error() != want {
+		t.Fatalf("error = %v, want %q", err, want)
+	}
+	if elapsed := time.Since(start); elapsed > 3*time.Second {
+		t.Errorf("took %v, want the stub killed near the budget", elapsed)
+	}
+}
+
+func TestInstallDependencies_TwoDirectories_ShareOneBudget(t *testing.T) {
+	t.Parallel()
+	repo := installRepo(t, map[string]string{
+		"package.json":          pkgJSON,
+		"package-lock.json":     "{}",
+		"web/package.json":      pkgJSON,
+		"web/package-lock.json": "{}",
+	}, nil)
+	binDir := t.TempDir()
+	writeScriptStub(t, binDir, "npm", "sleep 0.4")
+
+	// Each install alone fits the budget; together they do not.
+	_, err := installDependenciesWithin(repo, binDir, "", 750*time.Millisecond)
+	want := "installing dependencies in " + filepath.Join(repo, "web") + ": npm ci: timed out after 5m"
+	if err == nil || err.Error() != want {
+		t.Fatalf("error = %v, want %q", err, want)
+	}
+}
+
+func TestInstallDependencies_LongFailure_KeepsTailAndLogsFullOutput(t *testing.T) {
+	t.Parallel()
+	repo := installRepo(t, map[string]string{"package.json": pkgJSON, "package-lock.json": "{}"}, nil)
+	binDir := t.TempDir()
+	writeScriptStub(t, binDir, "npm", "echo FIRST-LINE; i=0; while [ $i -lt 500 ]; do echo \"filler line $i\"; i=$((i+1)); done; echo LAST-LINE; exit 1")
+	logDir := filepath.Join(t.TempDir(), "logs")
+
+	_, err := installDependenciesWith(repo, binDir, logDir)
+	if err == nil {
+		t.Fatal("error = nil, want failure")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "FIRST-LINE") || !strings.Contains(msg, "LAST-LINE") {
+		t.Errorf("error = %q, want only the output tail", msg)
+	}
+	if len(msg) > installTailBytes+500 {
+		t.Errorf("error is %d bytes, want it trimmed", len(msg))
+	}
+	logs, _ := filepath.Glob(filepath.Join(logDir, "*.log"))
+	if len(logs) != 1 || !strings.Contains(msg, "(full output: "+logs[0]+")") {
+		t.Fatalf("logs = %v, want one named in %q", logs, msg)
+	}
+	full, err := os.ReadFile(logs[0])
+	if err != nil {
+		t.Fatalf("ReadFile log: %v", err)
+	}
+	if !strings.Contains(string(full), "FIRST-LINE") || !strings.Contains(string(full), "LAST-LINE") {
+		t.Errorf("log lacks the full output")
+	}
+}
+
+func TestInstallDependencies_Success_WritesNoLog(t *testing.T) {
+	t.Parallel()
+	repo := installRepo(t, map[string]string{"package.json": pkgJSON, "package-lock.json": "{}"}, nil)
+	binDir, _ := stubManagers(t, 0, "npm")
+	logDir := filepath.Join(t.TempDir(), "logs")
+
+	if _, err := installDependenciesWith(repo, binDir, logDir); err != nil {
+		t.Fatalf("installDependenciesWith() error = %v", err)
+	}
+	if _, err := os.Stat(logDir); !os.IsNotExist(err) {
+		t.Errorf("log dir stat err = %v, want it absent after a successful install", err)
+	}
+}
+
 func TestInstallDependencies_ManagerNotOnPath_Fails(t *testing.T) {
 	t.Parallel()
 	repo := installRepo(t, map[string]string{"package.json": pkgJSON, "package-lock.json": "{}"}, nil)
 
-	_, err := installDependenciesWith(repo, t.TempDir())
+	_, err := installDependenciesWith(repo, t.TempDir(), "")
 	if err == nil || !strings.HasPrefix(err.Error(), "installing dependencies in "+repo+": npm ci: ") {
 		t.Fatalf("error = %v, want npm ci lookup failure", err)
 	}

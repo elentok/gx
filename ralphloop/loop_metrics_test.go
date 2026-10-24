@@ -426,7 +426,7 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
-	d.InstallDeps = func(path string) ([]string, error) {
+	d.InstallDeps = func(path, logDir string) ([]string, error) {
 		return []string{"npm ci"}, nil
 	}
 
