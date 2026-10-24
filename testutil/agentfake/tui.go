@@ -40,6 +40,23 @@ const (
 	TUIMouseEnv = "GX_AGENTFAKE_TUI_MOUSE"
 )
 
+// PermissionPromptPrefix, at the start of a submitted prompt, makes the TUI
+// fake ask permission to run the rest of the prompt as a Bash command, with no
+// control needed.
+const PermissionPromptPrefix = "fakeclaude:permission "
+
+func bashPermissionDialog(command string) []string {
+	return []string{
+		"────────────────────",
+		"Bash command",
+		"  " + command,
+		"Do you want to proceed?",
+		"❯ 1. Yes",
+		"  2. No",
+		"Esc to cancel",
+	}
+}
+
 // ActionExit makes the TUI fake exit with Control.Code.
 const ActionExit = "exit"
 
@@ -451,6 +468,10 @@ func (t *tui) submit() error {
 			return t.slashCommand(text)
 		}
 		t.prompt = text
+		if command, ok := strings.CutPrefix(text, PermissionPromptPrefix); ok {
+			t.dialog = bashPermissionDialog(command)
+			return t.setStatus(StatusWaiting, "permission prompt")
+		}
 		if t.fast {
 			t.fast = false
 			writeReport(t.out, "working", "", "")
