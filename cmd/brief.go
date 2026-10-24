@@ -39,6 +39,13 @@ everything after the tool name goes to the tool unchanged.`,
 	return cmd
 }
 
+// briefUsageError prints one line and exits 2, so exit 1 keeps meaning "the
+// tool failed".
+func briefUsageError(c *cobra.Command, msg string) error {
+	fmt.Fprintf(c.OutOrStdout(), "brief: %s\n", msg)
+	return &ExitError{Code: brief.ExitCantRun}
+}
+
 func runBrief(c *cobra.Command, d deps, args []string) error {
 	dir := ""
 	if len(args) >= 2 && args[0] == "-C" {
@@ -47,12 +54,15 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 		dir, args = args[0][2:], args[1:]
 	}
 	cFlag := dir
+	if len(args) == 0 && cFlag != "" || len(args) == 1 && args[0] == "-C" {
+		return briefUsageError(c, "missing tool name after -C")
+	}
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" {
 		return c.Help()
 	}
 	tool, ok := briefTools[args[0]]
 	if !ok {
-		return fmt.Errorf("unknown brief tool %q", args[0])
+		return briefUsageError(c, fmt.Sprintf("unknown tool %q", args[0]))
 	}
 	if dir == "" {
 		cwd, err := d.getwd()

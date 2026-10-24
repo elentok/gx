@@ -165,6 +165,41 @@ func TestBrief_GoMissingExits2(t *testing.T) {
 	}
 }
 
+func TestBrief_UsageErrorsExit2WithOneLine(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"unknown tool", []string{"nosuch"}, "nosuch"},
+		{"bare -C", []string{"-C", "dir"}, "missing tool"},
+		{"bare -C glued", []string{"-Cdir"}, "missing tool"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, code := runBriefCmd(t, t.TempDir(), tc.args...)
+			if code != 2 {
+				t.Fatalf("exit = %d, out:\n%s", code, out)
+			}
+			if n := len(strings.Split(strings.TrimRight(out, "\n"), "\n")); n != 1 {
+				t.Errorf("want one line, got %d:\n%s", n, out)
+			}
+			if !strings.Contains(out, tc.want) {
+				t.Errorf("want %q in:\n%s", tc.want, out)
+			}
+		})
+	}
+}
+
+func TestBrief_NoArgsAndHelpPrintHelp(t *testing.T) {
+	for _, args := range [][]string{{}, {"-h"}} {
+		out, code := runBriefCmd(t, t.TempDir(), args...)
+		if code != 0 || !strings.Contains(out, "Exit 0 means pass") {
+			t.Errorf("args %v: exit = %d, out:\n%s", args, code, out)
+		}
+	}
+}
+
 func TestBrief_UnwritableLogExits2(t *testing.T) {
 	data := t.TempDir()
 	t.Setenv("XDG_DATA_HOME", data)
