@@ -69,11 +69,11 @@ func runIteration(d Deps, p iterationParams) error {
 	// Runs synchronously here, before the agent's tab/session exist, so an
 	// install failure surfaces as an iteration-lifecycle error immediately
 	// rather than eating into the agent's own turn or smart-zone budget.
-	command, err := d.InstallDeps(path)
+	commands, err := d.InstallDeps(path)
 	if err != nil {
-		return fmt.Errorf("installing dependencies in %s: %w", path, err)
+		return err
 	}
-	p.logTicketEventReason(string(events.DepsInstalled), "", "", path, command)
+	p.logTicketEventReason(string(events.DepsInstalled), "", "", path, strings.Join(commands, "; "))
 
 	prompt := skillPrompt(p.Agent, launchSkill(p.Ticket, p.Skill), ticketAddress(p.Ticket))
 

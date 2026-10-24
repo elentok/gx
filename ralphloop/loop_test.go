@@ -214,8 +214,8 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 		WorktreeExists: func(path string) (bool, error) {
 			return true, nil
 		},
-		InstallDeps: func(path string) (string, error) {
-			return "", nil
+		InstallDeps: func(path string) ([]string, error) {
+			return nil, nil
 		},
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return 0, false, nil
@@ -778,8 +778,8 @@ func TestRun_InstallDepsFailure_MarksRepairWithoutLaunchingAgentOrAbortingRun(t 
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, prompts, _ := fakeDeps()
-	d.InstallDeps = func(path string) (string, error) {
-		return "npm ci", errors.New("npm ci: exit status 1")
+	d.InstallDeps = func(path string) ([]string, error) {
+		return nil, errors.New("npm ci: exit status 1")
 	}
 
 	// A failed iteration marks paused (repair) rather than aborting the run,

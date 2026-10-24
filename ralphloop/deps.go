@@ -106,12 +106,12 @@ type Deps struct {
 	// path, used by startup reconciliation to detect leftover state a crash
 	// left uncleaned.
 	WorktreeExists func(path string) (bool, error)
-	// InstallDeps detects the package manager of a freshly created iteration
-	// worktree at path (from marker files at its root) and runs its
-	// non-interactive install/sync command before the agent is launched.
-	// command is the command run, joined with spaces ("" if no marker
-	// matched, which is a silent no-op rather than an error).
-	InstallDeps func(path string) (command string, err error)
+	// InstallDeps installs JS/TS dependencies in every directory of the
+	// worktree at path that holds a git-tracked lockfile, before the agent is
+	// launched. commands holds one "<dir>: <command>" entry per directory;
+	// empty means no lockfile, which is a silent no-op rather than an error.
+	// A failure's text already reads "installing dependencies in <dir>: ...".
+	InstallDeps func(path string) (commands []string, err error)
 
 	// ReadOccupancy returns the current context occupancy for the Claude
 	// Code session launched in cwd, or ok=false if its transcript has no
@@ -241,7 +241,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		AppendTrailers:       git.AppendTrailers,
 		TrailerMap:           git.TrailerMap,
 		WorktreeExists:       worktreeExists,
-		InstallDeps: func(path string) (string, error) {
+		InstallDeps: func(path string) ([]string, error) {
 			return installDependenciesWith(path, overrides.Path)
 		},
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
@@ -534,57 +534,4 @@ func worktreeExists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
-}
-
-// depsMarkers maps a package-manager marker file, checked in this order at
-// an iteration worktree's root, to its non-interactive install/sync command.
-// go.mod is deliberately not listed: go build/go test populate the module
-// cache lazily on first use, so a separate `go mod download` step ahead of
-// the agent's own turn buys nothing.
-var depsMarkers = []struct {
-	marker  string
-	command []string
-}{
-	{"package-lock.json", []string{"npm", "ci"}},
-	{"pnpm-lock.yaml", []string{"pnpm", "install", "--frozen-lockfile"}},
-	{"yarn.lock", []string{"yarn", "install", "--frozen-lockfile"}},
-	{"poetry.lock", []string{"poetry", "install"}},
-	{"uv.lock", []string{"uv", "sync"}},
-}
-
-// InstallDependencies implements Deps.InstallDeps: it detects path's package
-// manager from depsMarkers and runs its install/sync command with path as
-// its working directory. No marker matching is a silent no-op (command ""),
-// since not every worktree is a package-managed project.
-func InstallDependencies(path string) (command string, err error) {
-	return installDependenciesWith(path, "")
-}
-
-// installDependenciesWith is InstallDependencies with an explicit PATH
-// string in place of exec.Command's implicit process-PATH lookup — the seam
-// Deps.InstallDeps uses when a per-run PATH override is set. pathEnv == ""
-// keeps the real process-PATH lookup exec.Command performs on its own.
-func installDependenciesWith(path, pathEnv string) (command string, err error) {
-	for _, dm := range depsMarkers {
-		if _, statErr := os.Stat(filepath.Join(path, dm.marker)); statErr != nil {
-			continue
-		}
-		command = strings.Join(dm.command, " ")
-		name := dm.command[0]
-		if pathEnv != "" {
-			resolved, lookErr := lookPathIn(name, pathEnv)
-			if lookErr != nil {
-				return command, fmt.Errorf("running %q in %s: %w", command, path, lookErr)
-			}
-			name = resolved
-		}
-		cmd := exec.Command(name, dm.command[1:]...)
-		cmd.Dir = path
-		out, runErr := cmd.CombinedOutput()
-		if runErr != nil {
-			return command, fmt.Errorf("running %q in %s: %w\n%s", command, path, runErr, out)
-		}
-		return command, nil
-	}
-	return "", nil
 }

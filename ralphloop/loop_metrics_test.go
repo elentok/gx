@@ -426,8 +426,8 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
 	})
 	d, _, _ := fakeDeps()
-	d.InstallDeps = func(path string) (string, error) {
-		return "npm ci", nil
+	d.InstallDeps = func(path string) ([]string, error) {
+		return []string{"npm ci"}, nil
 	}
 
 	if err := Run(RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
