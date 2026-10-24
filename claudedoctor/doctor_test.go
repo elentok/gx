@@ -246,6 +246,41 @@ func TestCheckPermission_CountsRequiresAction(t *testing.T) {
 	}
 }
 
+func TestCheckPermissionBlocks(t *testing.T) {
+	t.Parallel()
+	src, _ := FixtureSource()
+	rec, err := src.Session("permission")
+	if err != nil {
+		t.Fatal(err)
+	}
+	detail, ok := checkPermissionBlocks(Input{Recording: rec})
+	if !ok || detail != "blocked on Bash" {
+		t.Errorf("checkPermissionBlocks = %q, %v", detail, ok)
+	}
+	if _, ok := checkPermissionBlocks(Input{Recording: Recording{Events: rec.Events[:2]}}); ok {
+		t.Error("a session without a permission request must fail")
+	}
+}
+
+func TestCheckRequiresActionBlocks(t *testing.T) {
+	t.Parallel()
+	src, _ := FixtureSource()
+	rec, err := src.Session("requires-action")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail, ok := checkRequiresActionBlocks(Input{Recording: rec}); !ok {
+		t.Errorf("checkRequiresActionBlocks = %q, want pass", detail)
+	}
+	// Cut before the interrupt: still blocked, so the clear is unproven.
+	if _, ok := checkRequiresActionBlocks(Input{Recording: Recording{Events: rec.Events[:3]}}); ok {
+		t.Error("a requires_action never cleared must fail")
+	}
+	if _, ok := checkRequiresActionBlocks(Input{Recording: Recording{Events: rec.Events[:2]}}); ok {
+		t.Error("a session without requires_action must fail")
+	}
+}
+
 func TestCheckSessionID_FailsOnMismatch(t *testing.T) {
 	t.Parallel()
 	events := []json.RawMessage{

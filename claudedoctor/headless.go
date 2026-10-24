@@ -12,6 +12,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/nativerunner"
 )
 
 // The headless checks. Fixture checks read the canned sessions in testdata/;
@@ -25,6 +28,8 @@ var headlessChecks = []Check{
 	{Runner: "headless", Name: "command-lifecycle", Mode: Fixture, Session: "turn", DependsOn: []string{"init-capabilities"}, Run: checkCommandLifecycle},
 	{Runner: "headless", Name: "permission-request-answer", Mode: Fixture, Session: "permission", DependsOn: []string{"init-capabilities"}, Run: checkPermission},
 	{Runner: "headless", Name: "permission-request-shape", Mode: Fixture, Session: "permission", DependsOn: []string{"init-capabilities"}, Run: checkPermissionRequestShape},
+	{Runner: "headless", Name: "permission-request-blocks", Mode: Fixture, Session: "permission", DependsOn: []string{"init-capabilities"}, Run: checkPermissionBlocks},
+	{Runner: "headless", Name: "requires-action-blocks", Mode: Fixture, Session: "requires-action", DependsOn: []string{"init-capabilities"}, Run: checkRequiresActionBlocks},
 	{Runner: "headless", Name: "interrupt", Mode: Fixture, Session: "interrupt", DependsOn: []string{"init-capabilities"}, Run: checkInterrupt},
 	{Runner: "headless", Name: "compact-same-session", Mode: Fixture, Session: "compact", DependsOn: []string{"init-capabilities"}, Run: checkCompact},
 	{Runner: "headless", Name: "survives-launcher-exit", Mode: Live, DependsOn: []string{"claude-version"}, Run: checkSurvivesLauncherExit},
@@ -202,6 +207,41 @@ func checkPermissionRequestShape(in Input) (string, bool) {
 		return "can_use_tool request has no tool_name", false
 	}
 	return fmt.Sprintf("request_id %s for %s", e.RequestID, e.Request.ToolName), true
+}
+
+// checkPermissionBlocks: a can_use_tool request must park the runner in
+// blocked, or a headless agent waits for an answer nobody is asked for.
+func checkPermissionBlocks(in Input) (string, bool) {
+	for _, st := range nativerunner.StatusTrail(in.Events) {
+		if st.State == agentrunner.StateBlocked && st.Pending != nil {
+			return "blocked on " + st.Pending.Tool, true
+		}
+	}
+	return "tracker never reached blocked with a pending request", false
+}
+
+// checkRequiresActionBlocks: a requires_action with no can_use_tool must still
+// read as blocked ("waiting on a prompt"), and an interrupt must clear it.
+func checkRequiresActionBlocks(in Input) (string, bool) {
+	blockedAt := -1
+	trail := nativerunner.StatusTrail(in.Events)
+	for i, st := range trail {
+		if st.State != agentrunner.StateBlocked {
+			continue
+		}
+		if st.BlockedReason != "waiting on a prompt" {
+			return fmt.Sprintf("blocked with reason %q", st.BlockedReason), false
+		}
+		blockedAt = i
+		break
+	}
+	if blockedAt < 0 {
+		return "bare requires_action never reached blocked", false
+	}
+	if !slices.ContainsFunc(trail[blockedAt:], func(st agentrunner.Status) bool { return st.State != agentrunner.StateBlocked }) {
+		return "interrupt did not leave blocked", false
+	}
+	return "blocked (waiting on a prompt); interrupt cleared it", true
 }
 
 func checkInterrupt(in Input) (string, bool) {

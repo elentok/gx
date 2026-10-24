@@ -233,6 +233,21 @@ func (t *tracker) apply(e event) {
 	}
 }
 
+// StatusTrail folds raw stream-json lines through the tracker and returns the
+// Status after each one that parsed as an event, so `gx claude doctor` can
+// assert on the same state machine the runner uses.
+func StatusTrail(lines []json.RawMessage) []agentrunner.Status {
+	t := tracker{answered: map[string]bool{}}
+	var trail []agentrunner.Status
+	for _, line := range lines {
+		if e, ok := parseEvent(line); ok {
+			t.apply(e)
+			trail = append(trail, t.status())
+		}
+	}
+	return trail
+}
+
 // ended reports a turn that ran to its result with no gx command left
 // waiting for the next one.
 func (t *tracker) ended() bool {
