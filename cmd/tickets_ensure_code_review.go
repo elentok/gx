@@ -1,11 +1,9 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -63,59 +61,9 @@ func resolveEpicArg(arg, cwd string) string {
 // gx-cleanup skill call this instead of each carrying their own copy of the
 // check-and-create logic.
 func runTicketsEnsureCodeReview(epicPath string, w io.Writer) error {
-	epicPath = filepath.Clean(epicPath)
-
-	epic, unlock, err := tickets.LoadLockedEpic(epicPath)
-	if err != nil {
-		return err
-	}
-	defer unlock()
-
-	for _, t := range epic.Tickets {
-		if t.Type == string(schema.TypeCodeReview) {
-			fmt.Fprintf(w, "%s: already has a code-review ticket (%s)\n", epicPath, t.DisplayNumber())
-			return nil
-		}
-	}
-
-	id, err := tickets.NextTicketID(*epic, "")
-	if err != nil {
-		return err
-	}
-	stubPath := filepath.Join(epicPath, "issues", fmt.Sprintf("%s-code-review.md", id))
-
-	stub := schema.Ticket{
-		ID:                    schema.TicketID(id),
-		Status:                schema.StatusOpen,
-		Type:                  schema.TypeCodeReview,
-		ExpectedContextWindow: 30000,
-	}
-	address, ok := tickets.AddressOfPath(stubPath, id)
-	if !ok {
-		return fmt.Errorf("no address for new ticket %s", stubPath)
-	}
-	stub.StampCreated(time.Now().UTC(), address.String())
-	body := fmt.Sprintf(
-		"\n# %s — Code review: %s\n\n## What to review\n\n\n## Test seams\n\nnone — review ticket, opens fix tickets as children (`parent:` pointing back here) if it finds anything.\n\n## Acceptance criteria\n\n- [ ] Full epic reviewed for correctness and cross-ticket consistency\n- [ ] Any findings opened as child fix tickets\n",
-		id, epic.Name,
-	)
-
-	out, err := schema.MarshalTicket(stub, body)
-	if err != nil {
-		return fmt.Errorf("marshaling stub ticket: %w", err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(stubPath), 0755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(stubPath, out, 0644); err != nil {
-		return fmt.Errorf("writing stub ticket %s: %w", stubPath, err)
-	}
-
-	if _, err := schema.ParseTicket(stubPath); err != nil {
-		return fmt.Errorf("stub ticket %s failed validation: %w", stubPath, err)
-	}
-
-	fmt.Fprintf(w, "%s: created code-review stub\n", stubPath)
-	return nil
+	return ensureTypedTicket(epicPath, w, typedTicketSpec{
+		ticketType: schema.TypeCodeReview,
+		name:       "code-review",
+		bodyFormat: "\n# %s — Code review: %s\n\n## What to review\n\n\n## Test seams\n\nnone — review ticket, opens fix tickets as children (`parent:` pointing back here) if it finds anything.\n\n## Acceptance criteria\n\n- [ ] Full epic reviewed for correctness and cross-ticket consistency\n- [ ] Any findings opened as child fix tickets\n",
+	})
 }
