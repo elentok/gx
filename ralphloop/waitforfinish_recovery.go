@@ -119,6 +119,20 @@ func pauseOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (paus
 	return true, nil
 }
 
+// pauseBlockedAtOnce is pauseOnBlockedPane without the dwell, for a headless
+// agent whose block st the tracker reported. The reason names the tool and its
+// input, with the verb that exits that block: a permission request is answered,
+// a bare requires_action (no request to answer) is interrupted.
+func pauseBlockedAtOnce(d Deps, p launchAndPromptParams, ticketPath string, st agentrunner.Status) error {
+	hint := "interrupt with `gx server agents interrupt`"
+	if st.Pending != nil {
+		hint = "answer with `gx server agents answer`"
+	}
+	reason := fmt.Sprintf("%s is blocked: %s; %s", p.Label, st.BlockedReason, hint)
+	p.pauseBlockedPane(recordLiveSession(d, p.Label, ticketPath), reason)
+	return &BlockedPausedError{Reason: reason}
+}
+
 // pauseBlockedPane routes a blocked-pane pause through the single pause path,
 // keeping the agent context on the event.
 func (p launchAndPromptParams) pauseBlockedPane(sessionID, reason string) {

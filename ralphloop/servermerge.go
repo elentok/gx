@@ -56,6 +56,18 @@ type OneIteration struct {
 	// StallNudgeDelay is how long an idle agent with no question and no finished
 	// report waits before the one stall nudge; zero sends none.
 	StallNudgeDelay time.Duration
+	// PauseOnBlock pauses the ticket the moment the agent blocks on a request,
+	// with no dwell: a headless agent's block is a tracker fact, not a pane
+	// guess. Herdr, pty and Codex leave it false and keep the dwell path.
+	PauseOnBlock bool
+}
+
+// BlockedPausedError ends WaitIterationFinished when the agent blocked and the
+// ticket was paused blocked-pane. The agent is alive, waiting for a person.
+type BlockedPausedError struct{ Reason string }
+
+func (e *BlockedPausedError) Error() string {
+	return "iteration paused: agent blocked on a request: " + e.Reason
 }
 
 // StallNudgeText is the fixed text of the stall nudge.
@@ -320,15 +332,26 @@ const mergeDeferCap = 2*conflictResolutionTimeoutMs*time.Millisecond + 10*time.M
 // finish, and the ticket is paused zero-commit before the agent commits.
 func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
 	until := runnerFinishStates
-	p := launchAndPromptParams{Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink()}
+	waitStates := until
+	if o.PauseOnBlock {
+		waitStates = append(slices.Clone(until), agentrunner.StateBlocked)
+	}
+	p := launchAndPromptParams{
+		Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink(),
+		ScratchDir: o.ScratchDir, EpicName: o.Epic, Ticket: o.Ticket.Identifier, TicketPath: o.Ticket.Path,
+	}
 	elapsedMs := 0
 	nudged := false
 	for {
-		if _, err := d.Runner.Wait(s, until, smartZonePollMs*time.Millisecond); err != nil {
+		st, err := d.Runner.Wait(s, waitStates, smartZonePollMs*time.Millisecond)
+		if err != nil {
 			if errors.Is(err, agentrunner.ErrTimeout) {
 				continue
 			}
 			return err
+		}
+		if st.State == agentrunner.StateBlocked {
+			return pauseBlockedAtOnce(d, p, o.Ticket.Path, st)
 		}
 		confirmed, err := confirmFinished(d, s, until)
 		if err != nil {

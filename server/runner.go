@@ -668,11 +668,21 @@ func (s *Server) prepareAndLaunch(
 // finishRun waits for the agent to settle, then merges (or pauses) the ticket and
 // moves the root on: the next frontier ticket, or the root's completion.
 func (s *Server) finishRun(rc runContext) {
+	rc.one.PauseOnBlock = pausesOnBlock(rc.run)
 	stop := make(chan struct{})
-	go s.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)
+	if !rc.one.PauseOnBlock {
+		go s.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)
+	}
 	err := ralphloop.WaitIterationFinished(rc.deps, rc.one, rc.wt, rc.run.Session)
 	close(stop)
 	s.settleRun(rc, err)
+}
+
+// pausesOnBlock reports whether run's block is a tracker fact the wait pauses
+// on at once: a Claude agent on the headless runner. Herdr, pty and Codex keep
+// the polled watcher and the dwell.
+func pausesOnBlock(run Run) bool {
+	return run.Agent == string(ralphloop.AgentClaude) && run.Runner == string(agentrunner.ChoiceHeadless)
 }
 
 // blockWatchPoll bounds each Wait of watchBlocked. A herdr Wait is one herdr
@@ -746,6 +756,16 @@ func (s *Server) settleRun(rc runContext, err error) {
 	}
 	addr, _ := tickets.ParseAddress(ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
 	if s.pauseReleasedGate(one.ScratchDir, addr, one.Ticket.Path, run) {
+		return
+	}
+	var blocked *ralphloop.BlockedPausedError
+	if errors.As(err, &blocked) {
+		// The wait already wrote the pause. The agent is alive and waits for a
+		// person: hand the run to the waiting-run machinery as a question does.
+		keepRun = true
+		s.registry.markWaiting(ticketAddr, time.Now())
+		s.events.publish(EventIterationPaused, ticketAddr)
+		s.announcePause(addr, one.Ticket.Path, events.BlockedPane, blocked.Reason)
 		return
 	}
 	var out ralphloop.FinishOutcome

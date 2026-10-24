@@ -329,7 +329,7 @@ func (r *Runner) SetPending(label string, p *agentrunner.Pending) {
 	ss.status.Pending = p
 	if p != nil {
 		ss.status.State = agentrunner.StateBlocked
-		ss.status.BlockedReason = "permission to use " + p.Tool
+		ss.status.BlockedReason = fmt.Sprintf("permission to use %s: %s", p.Tool, p.Input)
 	}
 	r.notify()
 }
