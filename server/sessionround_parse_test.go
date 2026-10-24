@@ -57,3 +57,19 @@ func TestParseRoundSegment_KeepsTheNumberLetter(t *testing.T) {
 		t.Errorf("label = %q; want %q", got.Label, "8b")
 	}
 }
+
+func TestRoundCards_InlineMarkerStaysInItsQuestion(t *testing.T) {
+	text := "❓ **Q8** - **Fixture**: Which one?\n\n" +
+		"- a) Replay a round with `❓ **Q1**`, then the next line.\n- b) Fixed reply.\n\n" +
+		"❓ **Q9** - **Packaging**: Where?"
+	cards := roundCards(text)
+	if len(cards) != 2 || cards[0].Label != "8" || cards[1].Label != "9" {
+		t.Fatalf("cards = %+v; want Q8 and Q9", cards)
+	}
+	if !strings.Contains(cards[0].Body, "b) Fixed reply.") {
+		t.Errorf("Q8 body = %q; want it to keep both options", cards[0].Body)
+	}
+	if hasGrillingMarker("Quote `❓ **Q1**` inline only.") {
+		t.Error("an inline marker opened a round")
+	}
+}

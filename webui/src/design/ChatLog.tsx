@@ -1,8 +1,9 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { SessionBackgroundTask, SessionChatMessage, SessionChatResponse, SessionInfo } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
+import { readPageCache, writePageCache } from "../pageCache";
 import { useSessionChat, type FetchChat } from "./chat";
 import { Composer } from "./Composer";
 import { FailureBanner, GxStopped, needsTranscript, replacesComposer, visibleFailure, type FailureActions } from "./FailureBanner";
@@ -72,9 +73,11 @@ function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
 }
 
 // The sheet and the composer share the round's answers. The caller keys it by round, so a new round starts blank
-// while a refetch of the same round keeps every answer.
+// while a refetch of the same round keeps every answer. The answers also survive a reload: sessionStorage keeps the
+// session's last round.
 function ChatTail({
   session,
+  roundKey,
   chat,
   connected,
   post,
@@ -84,6 +87,7 @@ function ChatTail({
   actions,
 }: {
   session: SessionInfo;
+  roundKey: string;
   chat: SessionChatResponse;
   connected: boolean;
   post?: PostPrompt;
@@ -92,7 +96,9 @@ function ChatTail({
   nextTitle?: string;
   actions: FailureActions;
 }) {
-  const [answers, setAnswers] = useState<Answers>({});
+  const cacheKey = `round.${session.id}`;
+  const [answers, setAnswers] = useState<Answers>(() => readPageCache<Answers>(cacheKey, roundKey) ?? {});
+  useEffect(() => writePageCache(cacheKey, answers, roundKey), [cacheKey, answers, roundKey]);
   const [focus, setFocus] = useState<{ index: number }>();
   const failure = visibleFailure(session.failure, done);
   const round = chat.round ?? [];
@@ -148,6 +154,7 @@ function ChatLog({
   const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
   const connected = useConnectionState(conn).connected;
   if (!chat) return null;
+  const roundKey = (chat.round ?? []).map((c) => `${c.label}:${c.title}`).join("|");
   const working = session.status.state === "working" && !session.status.background;
   return (
     <Box display="flex" flexDirection="column" gap="3">
@@ -161,8 +168,9 @@ function ChatLog({
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
       <ChatTail
-        key={(chat.round ?? []).map((c) => `${c.label}:${c.title}`).join("|")}
+        key={roundKey}
         session={session}
+        roundKey={roundKey}
         chat={chat}
         connected={connected}
         post={post}

@@ -79,24 +79,20 @@ func splitFences(text string) (stripped string, blocks []string) {
 }
 
 // roundSegments splits an agent message holding a Grilling round into one
-// segment per question. A segment runs from one marker to the next, or to a
-// `---` line.
+// segment per question. A segment runs from one line-start marker to the next,
+// or to a `---` line.
 func roundSegments(text string) []string {
 	var segs []string
-	rest := text
-	for {
-		_, after, found := strings.Cut(rest, grillingMarker)
-		if !found {
-			return segs
+	locs := grillingMarkerRE.FindAllStringIndex(text, -1)
+	for i, loc := range locs {
+		end := len(text)
+		if i+1 < len(locs) {
+			end = locs[i+1][0]
 		}
-		end := len(after)
-		if i := strings.Index(after, grillingMarker); i >= 0 {
-			end = i
-		}
-		rest = after[end:]
 		// The marker's trailing Q opens the header the number is read from.
-		segs = append(segs, untilRule("Q"+after[:end]))
+		segs = append(segs, untilRule("Q"+text[loc[1]:end]))
 	}
+	return segs
 }
 
 // roundCards splits an agent message holding a Grilling round into cards.
@@ -217,7 +213,7 @@ func trailingAgentTexts(msgs []transcript.ChatMessage) []string {
 // chatRound is the round the agent's last turn ended with, or nil.
 func chatRound(msgs []transcript.ChatMessage) []SessionRoundCard {
 	for _, text := range trailingAgentTexts(msgs) {
-		if strings.Contains(text, grillingMarker) {
+		if hasGrillingMarker(text) {
 			return roundCards(text)
 		}
 	}

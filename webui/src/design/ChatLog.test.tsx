@@ -272,3 +272,12 @@ test("no round, no sheet", async () => {
   await screen.findByText("hi");
   expect(screen.queryByRole("group", { name: "Questions" })).toBeNull();
 });
+
+test("a reload keeps the round's answers", async () => {
+  renderChat([session()], roundChat());
+  fireEvent.click(within(await screen.findByRole("group", { name: "Questions" })).getByRole("button", { name: "Alpha" }));
+  cleanup();
+  renderChat([session()], roundChat());
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  expect(within(sheet).getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
+});

@@ -52,8 +52,14 @@ func (s *Server) markSessionActionable(req MarkActionableRequest) (SessionResult
 	return SessionResult{Session: &info}, nil
 }
 
-// grillingMarker opens each question of a gx-design grilling round.
+// grillingMarker opens each question of a gx-design grilling round. It counts
+// only at the start of a line: a question may quote it inline, in backticks.
 const grillingMarker = "❓ **Q"
+
+var grillingMarkerRE = regexp.MustCompile(`(?m)^[ \t]*` + regexp.QuoteMeta(grillingMarker))
+
+// hasGrillingMarker reports whether text opens a grilling question.
+func hasGrillingMarker(text string) bool { return grillingMarkerRE.MatchString(text) }
 
 const grillingReason = "Grilling: waiting for your answers"
 
@@ -64,7 +70,7 @@ var runEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next: (\w+) —.*$`)
 // designActionable is what a Design session's last assistant message asks of
 // the person: the grilling question wins over the run-end line.
 func designActionable(text, ticket string) (SessionActionable, bool) {
-	if strings.Contains(text, grillingMarker) {
+	if hasGrillingMarker(text) {
 		return SessionActionable{Reason: grillingReason}, true
 	}
 	_, a, ok := runEndNext(text, ticket)
