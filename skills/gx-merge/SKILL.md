@@ -152,8 +152,8 @@ commit.
 Launch a triage subagent in `worktree_path` with the failing tests and their
 output. For each failing test it:
 
-1. Reruns **only that test** 3 times (e.g. Go: `go test -count=1 -run
-   '^TestName$' ./pkg`).
+1. Reruns **only that test** 3 times through `gx brief` (e.g. Go: `gx brief
+   go-test -count=1 -run '^TestName$' ./pkg`).
 2. Lists the branch's diff: `git diff --name-only <target>...HEAD`.
 3. Calls it **flaky** only if it passed at least once **and** the diff touches
    neither the test file nor any non-test file in the test's package (Go: the
