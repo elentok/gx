@@ -72,13 +72,27 @@ func scanWorktrees(repo git.Repo, epics []tickets.Epic) ([]WorktreeScan, error) 
 		epicByName[e.Name] = e
 	}
 
-	result := []WorktreeScan{}
+	names := []string{}
 	for _, b := range branches {
 		if b.IsRemote || b.Name == repo.Trunk {
 			continue
 		}
-		scan, err := classifyBranch(repo, b.Name, pathByBranch[b.Name], epicByName)
+		names = append(names, b.Name)
+	}
+	return classifyBranches(repo, names, pathByBranch, epicByName)
+}
+
+// classifyBranches classifies each named branch, sorted by name. A branch that
+// no longer exists (deleted by a concurrent cleanup or loop since it was
+// listed) is left out; any other failure fails the scan.
+func classifyBranches(repo git.Repo, names []string, pathByBranch map[string]string, epicByName map[string]tickets.Epic) ([]WorktreeScan, error) {
+	result := []WorktreeScan{}
+	for _, name := range names {
+		scan, err := classifyBranch(repo, name, pathByBranch[name], epicByName)
 		if err != nil {
+			if !git.IsLocalBranch(repo.Root, name) {
+				continue
+			}
 			return nil, err
 		}
 		result = append(result, scan)

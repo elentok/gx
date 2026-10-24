@@ -2,162 +2,183 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
 
-// realDevRepoScan runs scanWorktrees against the actual repo this test
-// itself is running inside (not a synthesized testutil.TempRepo). Per
-// ticket 02's test-seams note, this repo's own dev history already has a
-// real current-pattern iteration branch, a real legacy-pattern one, real
-// feature/other branches, and (via the very branch this ticket's commits
-// merge into) a real very-recent-commit worktree — exactly the fixtures the
-// ticket asks to assert against directly, instead of synthesizing new ones.
-// If a named branch is missing (e.g. it was since cleaned up), the caller
-// skips rather than failing, since this test's fixtures live outside the
-// repo's own control.
-func realDevRepoScan(t *testing.T) map[string]WorktreeScan {
+// scanGit runs git in dir with the commit dates pinned to when, so a test can
+// age a branch's tip past worktreeActiveWindow.
+func scanGit(t *testing.T, dir string, when time.Time, args ...string) string {
 	t.Helper()
-	byBranch, _ := realDevRepoScanWithEpics(t)
-	return byBranch
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	stamp := when.Format(time.RFC3339)
+	cmd.Env = append(os.Environ(), "GIT_AUTHOR_DATE="+stamp, "GIT_COMMITTER_DATE="+stamp)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v in %s: %v\n%s", args, dir, err, out)
+	}
+	return strings.TrimSpace(string(out))
 }
 
-// realDevRepoScanWithEpics is realDevRepoScan plus the loaded epic names, so
-// callers can tell a fixture epic that's been archived (tickets.Load excludes
-// `.archive/`, per its own doc comment) apart from one that's still live —
-// the branch can survive its epic's archival, which silently changes
-// scanWorktrees' classification (e.g. TicketDone/Kind) out from under a test
-// that only checked the branch was present.
-func realDevRepoScanWithEpics(t *testing.T) (map[string]WorktreeScan, []tickets.Epic) {
+// scanCommitOnBranch creates branch from main with one commit made at when,
+// then returns to main. It returns the new commit's hash.
+func scanCommitOnBranch(t *testing.T, dir, branch string, when time.Time) string {
 	t.Helper()
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("os.Getwd: %v", err)
-	}
-	repo, err := tickets.OpenRepo(cwd)
-	if err != nil {
-		t.Skipf("opening this repo: %v", err)
-	}
+	scanGit(t, dir, when, "checkout", "-b", branch, "main")
+	testutil.WriteFile(t, dir, strings.ReplaceAll(branch, "/", "_")+".txt", branch)
+	scanGit(t, dir, when, "add", ".")
+	scanGit(t, dir, when, "commit", "-m", "work on "+branch)
+	hash := scanGit(t, dir, when, "rev-parse", "HEAD")
+	scanGit(t, dir, when, "checkout", "main")
+	return hash
+}
 
-	epics, err := tickets.Load(repo.ScratchRoot())
-	if err != nil {
-		t.Skipf("loading .scratch epics: %v", err)
-	}
-
-	scans, err := scanWorktrees(*repo, epics)
+func scanByBranch(t *testing.T, repo git.Repo, epics []tickets.Epic) map[string]WorktreeScan {
+	t.Helper()
+	scans, err := scanWorktrees(repo, epics)
 	if err != nil {
 		t.Fatalf("scanWorktrees: %v", err)
 	}
-
 	byBranch := map[string]WorktreeScan{}
 	for _, s := range scans {
 		byBranch[s.Branch] = s
 	}
-	return byBranch, epics
+	return byBranch
 }
 
-func requireBranch(t *testing.T, byBranch map[string]WorktreeScan, branch string) WorktreeScan {
-	t.Helper()
-	scan, ok := byBranch[branch]
-	if !ok {
-		t.Skipf("fixture branch %q not present in this repo's current state", branch)
+func testEpic(name, ticketID, status string) tickets.Epic {
+	return tickets.Epic{
+		Name:    name,
+		Tickets: []tickets.Ticket{{Identifier: ticketID, Status: status}},
 	}
-	return scan
 }
 
-// requireEpic skips the test when epicName is no longer among this repo's
-// live (non-archived) epics, since scanWorktrees' TicketDone/Kind fixtures
-// depend on the epic being loaded, not just on the branch existing.
-func requireEpic(t *testing.T, epics []tickets.Epic, epicName string) {
-	t.Helper()
-	for _, e := range epics {
-		if e.Name == epicName {
-			return
-		}
-	}
-	t.Skipf("fixture epic %q not present in this repo's current (non-archived) state", epicName)
-}
-
-func TestScanWorktrees_RealRepo_CurrentPatternIterationBranch_MergedAndDone(t *testing.T) {
+func TestScanWorktrees_CurrentPatternIterationBranch_MergedAndDone(t *testing.T) {
 	t.Parallel()
-	byBranch, epics := realDevRepoScanWithEpics(t)
-	requireEpic(t, epics, "bugs-01")
-	scan := requireBranch(t, byBranch, "ralph-loop/bugs-01-item-04")
+	dir := testutil.TempRepo(t)
+	old := time.Now().Add(-10 * 24 * time.Hour)
+	hash := scanCommitOnBranch(t, dir, "ralph-loop/bugs-item-04", old)
+	// Cherry-picked, so the epic branch holds a fresh commit that is not
+	// reachable from the iteration branch.
+	scanGit(t, dir, old, "checkout", "-b", "bugs", "main")
+	scanGit(t, dir, old, "cherry-pick", hash)
+	scanGit(t, dir, old, "checkout", "main")
+
+	repo := git.Repo{Root: dir, Trunk: "main"}
+	scan := scanByBranch(t, repo, []tickets.Epic{testEpic("bugs", "04", "done")})["ralph-loop/bugs-item-04"]
 
 	if scan.Kind != "iteration" {
 		t.Fatalf("Kind = %q, want iteration", scan.Kind)
 	}
-	if scan.Epic != "bugs-01" || scan.TicketID != "04" {
-		t.Errorf("Epic/TicketID = %q/%q, want bugs-01/04", scan.Epic, scan.TicketID)
+	if scan.Epic != "bugs" || scan.TicketID != "04" {
+		t.Errorf("Epic/TicketID = %q/%q, want bugs/04", scan.Epic, scan.TicketID)
 	}
 	if !scan.TicketDone {
-		t.Errorf("TicketDone = false, want true (bugs-01 ticket 04 is done)")
+		t.Errorf("TicketDone = false, want true")
 	}
 	if !scan.Merged {
-		t.Errorf("Merged = false, want true (cherry-picked onto bugs-01)")
+		t.Errorf("Merged = false, want true (cherry-picked onto bugs)")
+	}
+	if scan.Recommendation != "delete" {
+		t.Errorf("Recommendation = %q, want delete", scan.Recommendation)
 	}
 }
 
-func TestScanWorktrees_RealRepo_LegacyPatternIterationBranch_MergedAndDone(t *testing.T) {
+func TestScanWorktrees_LegacyPatternIterationBranch_MergedAndDone(t *testing.T) {
 	t.Parallel()
-	byBranch, epics := realDevRepoScanWithEpics(t)
-	requireEpic(t, epics, "gx-tickets-set-retrofit")
-	scan := requireBranch(t, byBranch, "ralph-loop/gx-tickets-set-retrofit/iter-01")
+	dir := testutil.TempRepo(t)
+	old := time.Now().Add(-10 * 24 * time.Hour)
+	scanCommitOnBranch(t, dir, "ralph-loop/retrofit/iter-01", old)
+	scanGit(t, dir, old, "branch", "retrofit", "ralph-loop/retrofit/iter-01")
+
+	repo := git.Repo{Root: dir, Trunk: "main"}
+	scan := scanByBranch(t, repo, []tickets.Epic{testEpic("retrofit", "01", "done")})["ralph-loop/retrofit/iter-01"]
 
 	if scan.Kind != "iteration" {
 		t.Fatalf("Kind = %q, want iteration", scan.Kind)
 	}
-	if scan.Epic != "gx-tickets-set-retrofit" || scan.TicketID != "01" {
-		t.Errorf("Epic/TicketID = %q/%q, want gx-tickets-set-retrofit/01", scan.Epic, scan.TicketID)
+	if scan.Epic != "retrofit" || scan.TicketID != "01" {
+		t.Errorf("Epic/TicketID = %q/%q, want retrofit/01", scan.Epic, scan.TicketID)
 	}
 	if !scan.TicketDone {
-		t.Errorf("TicketDone = false, want true (gx-tickets-set-retrofit ticket 01 is done)")
+		t.Errorf("TicketDone = false, want true")
 	}
 	if !scan.Merged {
-		t.Errorf("Merged = false, want true (branch tip is an ancestor of gx-tickets-set-retrofit)")
+		t.Errorf("Merged = false, want true (branch tip is an ancestor of retrofit)")
+	}
+	if scan.Recommendation != "delete" {
+		t.Errorf("Recommendation = %q, want delete", scan.Recommendation)
 	}
 }
 
-func TestScanWorktrees_RealRepo_FeatureBranch(t *testing.T) {
+func TestScanWorktrees_FeatureBranch(t *testing.T) {
 	t.Parallel()
-	byBranch, epics := realDevRepoScanWithEpics(t)
-	requireEpic(t, epics, "gx-cleanup")
-	scan := requireBranch(t, byBranch, "gx-cleanup")
+	dir := testutil.TempRepo(t)
+	scanCommitOnBranch(t, dir, "cleanup", time.Now().Add(-10*24*time.Hour))
+
+	repo := git.Repo{Root: dir, Trunk: "main"}
+	scan := scanByBranch(t, repo, []tickets.Epic{testEpic("cleanup", "01", "open")})["cleanup"]
 
 	if scan.Kind != "feature" {
 		t.Fatalf("Kind = %q, want feature", scan.Kind)
 	}
-	if scan.Epic != "gx-cleanup" {
-		t.Errorf("Epic = %q, want gx-cleanup", scan.Epic)
+	if scan.Epic != "cleanup" {
+		t.Errorf("Epic = %q, want cleanup", scan.Epic)
 	}
 }
 
-func TestScanWorktrees_RealRepo_OtherBranch(t *testing.T) {
+func TestScanWorktrees_OtherBranch(t *testing.T) {
 	t.Parallel()
-	byBranch := realDevRepoScan(t)
-	// "wip" matches no epic under .scratch and no ralph-loop/ iteration
-	// naming - a real orphan/other branch from this repo's own history.
-	scan := requireBranch(t, byBranch, "wip")
+	dir := testutil.TempRepo(t)
+	scanCommitOnBranch(t, dir, "wip", time.Now().Add(-10*24*time.Hour))
+
+	repo := git.Repo{Root: dir, Trunk: "main"}
+	scan := scanByBranch(t, repo, nil)["wip"]
 
 	if scan.Kind != "other" {
 		t.Fatalf("Kind = %q, want other", scan.Kind)
 	}
 }
 
-// TestScanWorktrees_RealRepo_ActiveWorkNeverRecommended exercises the
-// active-work exclusion against this ticket's own branch: by the time this
-// test runs, ticket 01's commit was added to it moments ago, so it's a real
-// worktree with a genuinely recent commit - not a synthesized one.
-func TestScanWorktrees_RealRepo_ActiveWorkNeverRecommended(t *testing.T) {
+func TestScanWorktrees_ActiveWorkNeverRecommended(t *testing.T) {
 	t.Parallel()
-	byBranch := realDevRepoScan(t)
-	scan := requireBranch(t, byBranch, "ralph-loop/gx-cleanup-item-02")
+	dir := testutil.TempRepo(t)
+	// Merged into trunk and done, so only the recent tip suppresses "delete".
+	scanCommitOnBranch(t, dir, "ralph-loop/bugs-item-05", time.Now())
+	scanGit(t, dir, time.Now(), "merge", "--ff-only", "ralph-loop/bugs-item-05")
+
+	repo := git.Repo{Root: dir, Trunk: "main"}
+	scan := scanByBranch(t, repo, []tickets.Epic{testEpic("bugs", "05", "done")})["ralph-loop/bugs-item-05"]
 
 	if !scan.Active {
 		t.Fatalf("Active = false, want true (branch has a very recent commit)")
 	}
+	if !scan.TicketDone || !scan.Merged {
+		t.Fatalf("TicketDone/Merged = %v/%v, want both true", scan.TicketDone, scan.Merged)
+	}
 	if scan.Recommendation != "" {
 		t.Errorf("Recommendation = %q, want empty when Active is true", scan.Recommendation)
+	}
+}
+
+func TestClassifyBranches_SkipsVanishedBranch(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	scanCommitOnBranch(t, dir, "wip", time.Now().Add(-10*24*time.Hour))
+
+	repo := git.Repo{Root: dir, Trunk: "main"}
+	scans, err := classifyBranches(repo, []string{"wip", "gone"}, nil, nil)
+	if err != nil {
+		t.Fatalf("classifyBranches: %v", err)
+	}
+	if len(scans) != 1 || scans[0].Branch != "wip" {
+		t.Errorf("scans = %+v, want only wip", scans)
 	}
 }
