@@ -1,8 +1,11 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
+import { memo, useMemo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 const inlineElements = ["strong", "em", "del", "code", "a"];
+
+const remarkPlugins = [remarkGfm];
 
 const siblingTicketLink = /^(?:issues\/)?(\d+)-[^/]*\.md$/;
 
@@ -25,14 +28,16 @@ function linkComponent(epic: string | undefined): Components["a"] {
 // React elements and ignores raw HTML, so the text cannot inject markup. `epic` is the "project:epic"
 // address that sibling ticket links resolve against. `smallHeadings` shrinks its own `##` headings
 // below the page's section headings. `inline` keeps only inline markup inside a span, for text that
-// sits in a button or a line, such as an option label.
-export function Markdown({
+// sits in a button or a line, such as an option label. It is memoized: parsing is slow, and a page
+// that re-renders on each keystroke (a Grilling round) would re-parse every card.
+export const Markdown = memo(function Markdown({
   children,
   epic,
   smallHeadings,
   inline,
   ...box
 }: { children: string; epic?: string; smallHeadings?: boolean; inline?: boolean } & BoxProps) {
+  const components = useMemo(() => ({ a: linkComponent(epic) }), [epic]);
   return (
     <Box
       as={inline ? "span" : undefined}
@@ -59,8 +64,8 @@ export function Markdown({
       }}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{ a: linkComponent(epic) }}
+        remarkPlugins={remarkPlugins}
+        components={components}
         allowedElements={inline ? inlineElements : undefined}
         unwrapDisallowed={inline}
       >
@@ -68,4 +73,4 @@ export function Markdown({
       </ReactMarkdown>
     </Box>
   );
-}
+});
