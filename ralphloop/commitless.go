@@ -27,12 +27,22 @@ func PrepareCommitless(d Deps, o OneIteration, scratchDir, ref string) (Iteratio
 		return IterationWorktree{}, fmt.Errorf("resolving worktree directory for %q: %w", o.RepoDir, err)
 	}
 	path := iterationWorktreePath(wtDir, o.Epic, o.Ticket.Identifier)
+	if err := addLockedDetachedWorktree(d, o, path, ref); err != nil {
+		return IterationWorktree{}, err
+	}
+	if err := installDepsIn(d, o, path); err != nil {
+		return IterationWorktree{}, err
+	}
+	return IterationWorktree{Path: path, Label: label, worktreeDir: wtDir}, nil
+}
+
+func addLockedDetachedWorktree(d Deps, o OneIteration, path, ref string) error {
 	worktreeLock.Lock()
 	defer worktreeLock.Unlock()
 	if err := d.AddDetachedWorktree(o.RepoDir, path, ref); err != nil {
-		return IterationWorktree{}, fmt.Errorf("creating detached worktree at %s: %w", ref, err)
+		return fmt.Errorf("creating detached worktree at %s: %w", ref, err)
 	}
-	return IterationWorktree{Path: path, Label: label, worktreeDir: wtDir}, nil
+	return nil
 }
 
 // ResumeCommitless rebuilds the handle PrepareCommitless made, for a server that

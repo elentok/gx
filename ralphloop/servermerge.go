@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -85,9 +86,40 @@ type IterationWorktree struct {
 // worktreeMu does per run.
 var worktreeLock sync.Mutex
 
+// installDepsIn installs dependencies in the directory the agent will work in
+// and logs it. The error is returned as is: the install step already names the
+// directory. It runs outside worktreeLock so a slow install does not hold up
+// another ticket's git worktree add.
+func installDepsIn(d Deps, o OneIteration, path string) error {
+	commands, err := d.InstallDeps(path)
+	if err != nil {
+		return err
+	}
+	_ = logEvent(o.ScratchDir, o.Epic, Event{
+		Type:   string(events.DepsInstalled),
+		Ticket: o.Ticket.Identifier,
+		Agent:  o.Agent,
+		Cwd:    path,
+		Reason: strings.Join(commands, "; "),
+	})
+	return nil
+}
+
 // PrepareIteration creates the epic's feature worktree and the ticket's
-// iteration worktree off the feature tip.
+// iteration worktree off the feature tip, and installs dependencies in the
+// iteration worktree.
 func PrepareIteration(d Deps, o OneIteration) (IterationWorktree, error) {
+	w, err := addIterationWorktrees(d, o)
+	if err != nil {
+		return IterationWorktree{}, err
+	}
+	if err := installDepsIn(d, o, w.Path); err != nil {
+		return IterationWorktree{}, err
+	}
+	return w, nil
+}
+
+func addIterationWorktrees(d Deps, o OneIteration) (IterationWorktree, error) {
 	wtDir, err := d.WorktreeDir(o.RepoDir)
 	if err != nil {
 		return IterationWorktree{}, fmt.Errorf("resolving worktree directory for %q: %w", o.RepoDir, err)

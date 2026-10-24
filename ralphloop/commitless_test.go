@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -109,6 +110,7 @@ func TestFinishCommitless_StrandedCommitsPauseAndKeepWorktree(t *testing.T) {
 		t.Errorf("worktree gone: %v", err)
 	}
 	evs, _, _ := ReadEvents(one.ScratchDir, "fix-it")
+	evs = slices.DeleteFunc(evs, func(e Event) bool { return e.Type == string(events.DepsInstalled) })
 	if len(evs) != 1 || !strings.Contains(evs[0].Reason, sha+" the fix") {
 		t.Errorf("events = %+v, want one pause naming %s", evs, sha)
 	}
