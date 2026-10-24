@@ -27,7 +27,6 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
-	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -112,18 +111,44 @@ type TicketOpts struct {
 // WriteTicket it may also run after Start: that is how an agent's turn splits its ticket.
 func WriteTicketWith(t *testing.T, store, project, epic, id, slug string, opts TicketOpts) {
 	t.Helper()
-	projectDir := filepath.Join(store, project)
-	issues := filepath.Join(projectDir, epic, "issues")
-	if err := os.MkdirAll(issues, 0o755); err != nil {
+	if err := WriteTicketFile(store, project, epic, id, slug, opts); err != nil {
 		t.Fatal(err)
 	}
-	testutil.EnsureEpicTicketMD(t, filepath.Join(projectDir, epic))
+}
+
+// WriteEpic creates an epic with no tickets, and the project it lives in.
+// An empty epic name creates only the project.
+func WriteEpic(store, project, epic string) error {
+	projectDir := filepath.Join(store, project)
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		return err
+	}
 	// Keep an existing project.json: SetProjectRepo's repo must survive a mid-run write.
 	if _, err := os.Stat(filepath.Join(projectDir, "project.json")); os.IsNotExist(err) {
 		if err := os.WriteFile(filepath.Join(projectDir, "project.json"), []byte(`{"name":"`+project+`"}`), 0o644); err != nil {
-			t.Fatal(err)
+			return err
 		}
 	}
+	if epic == "" {
+		return nil
+	}
+	epicDir := filepath.Join(projectDir, epic)
+	if err := os.MkdirAll(filepath.Join(epicDir, "issues"), 0o755); err != nil {
+		return err
+	}
+	path := filepath.Join(epicDir, "ticket.md")
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+	return os.WriteFile(path, []byte("---\nstatus: open\n---\n"), 0o644)
+}
+
+// WriteTicketFile is WriteTicketWith for a caller with no *testing.T.
+func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) error {
+	if err := WriteEpic(store, project, epic); err != nil {
+		return err
+	}
+	issues := filepath.Join(store, project, epic, "issues")
 	if opts.Type == "" {
 		opts.Type = "implement"
 	}
@@ -144,9 +169,7 @@ func WriteTicketWith(t *testing.T, store, project, epic, id, slug string, opts T
 		fm += "agent: " + opts.Agent + "\n"
 	}
 	fm += "---\n\n# " + slug + "\n"
-	if err := os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	return os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644)
 }
 
 // Prompt is one `agent prompt` the server sent to a launched agent.
@@ -347,10 +370,16 @@ func SetProjectRepoNoAutoMerge(t *testing.T, store, project, repo string) {
 
 func writeProjectRepo(t *testing.T, store, project, repo, extra string) {
 	t.Helper()
-	body := `{"name":"` + project + `","repo":"` + repo + `"` + extra + `}`
-	if err := os.WriteFile(filepath.Join(store, project, "project.json"), []byte(body), 0o644); err != nil {
+	if err := WriteProjectRepo(store, project, repo, extra); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// WriteProjectRepo is SetProjectRepo for a caller with no *testing.T; extra is
+// raw JSON members appended to project.json, such as `,"auto-ff-merge":true`.
+func WriteProjectRepo(store, project, repo, extra string) error {
+	body := `{"name":"` + project + `","repo":"` + repo + `"` + extra + `}`
+	return os.WriteFile(filepath.Join(store, project, "project.json"), []byte(body), 0o644)
 }
 
 // SetHerdrDown makes the fake herdr fail (or answer again) from now on.

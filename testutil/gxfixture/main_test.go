@@ -1,0 +1,210 @@
+package main
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"testing"
+	"time"
+
+	"github.com/elentok/gx/server"
+)
+
+var gxBin, fixtureBin, fakeBin string
+
+func TestMain(m *testing.M) {
+	os.Exit(func() int {
+		dir, err := os.MkdirTemp("", "gxfb")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		defer os.RemoveAll(dir)
+		gxBin, fixtureBin, fakeBin = filepath.Join(dir, "gx"), filepath.Join(dir, "gxfixture"), filepath.Join(dir, "claude")
+		for out, pkg := range map[string]string{
+			gxBin:      "github.com/elentok/gx",
+			fixtureBin: "github.com/elentok/gx/testutil/gxfixture",
+			fakeBin:    "github.com/elentok/gx/testutil/agentfake/cmd/fakeclaude",
+		} {
+			if b, err := exec.Command("go", "build", "-o", out, pkg).CombinedOutput(); err != nil {
+				fmt.Fprintf(os.Stderr, "go build %s: %v\n%s", pkg, err, b)
+				return 1
+			}
+		}
+		return m.Run()
+	}())
+}
+
+// running is a started fixture.
+type running struct {
+	cmd     *exec.Cmd
+	stopped bool
+	Output
+}
+
+func start(t *testing.T, scenario string) *running {
+	t.Helper()
+	cmd := exec.Command(fixtureBin, "--gx", gxBin, "--fakeclaude", fakeBin, scenario)
+	cmd.Stderr = os.Stderr
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	r := &running{cmd: cmd}
+	t.Cleanup(func() {
+		if !r.stopped {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+		}
+	})
+	line, err := bufio.NewReader(stdout).ReadBytes('\n')
+	if err != nil {
+		t.Fatalf("no output line: %v", err)
+	}
+	if err := json.Unmarshal(line, &r.Output); err != nil {
+		t.Fatalf("output is not JSON: %v\n%s", err, line)
+	}
+	return r
+}
+
+// stop sends SIGTERM and waits for the fixture to exit.
+func (r *running) stop(t *testing.T) {
+	t.Helper()
+	r.stopped = true
+	if err := r.cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- r.cmd.Wait() }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("fixture exit: %v", err)
+		}
+	case <-time.After(30 * time.Second):
+		t.Fatal("fixture did not stop on SIGTERM")
+	}
+}
+
+func (r *running) gx(t *testing.T, args ...string) string {
+	t.Helper()
+	cmd := exec.Command(gxBin, args...)
+	cmd.Env = r.Env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("gx %s: %v\n%s", strings.Join(args, " "), err, out)
+	}
+	return string(out)
+}
+
+func (r *running) ticketStatus(t *testing.T, address string) string {
+	t.Helper()
+	var snap server.Snapshot
+	if err := json.Unmarshal([]byte(r.gx(t, "server", "snapshot", "--json")), &snap); err != nil {
+		t.Fatal(err)
+	}
+	for _, tk := range snap.Tickets {
+		if tk.Address == address {
+			return tk.Status
+		}
+	}
+	return ""
+}
+
+func get(t *testing.T, url string) int {
+	t.Helper()
+	// The token URL redirects after setting a cookie, so the client keeps cookies.
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := (&http.Client{Jar: jar}).Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return resp.StatusCode
+}
+
+func TestScenarios_StartAnswerAndStop(t *testing.T) {
+	for _, name := range scenarioNames() {
+		t.Run(name, func(t *testing.T) {
+			r := start(t, name)
+			if r.StateDir == "" || r.HoldFile == "" || r.Socket == "" {
+				t.Fatalf("output = %+v, want state dir, socket and hold file", r.Output)
+			}
+			if !strings.Contains(r.WebURL, "127.0.0.1") || !strings.Contains(r.WebURL, "token=") {
+				t.Fatalf("web_url = %q, want a loopback URL with the token", r.WebURL)
+			}
+			if code := get(t, r.WebURL); code != http.StatusOK {
+				t.Errorf("GET web_url = %d, want 200", code)
+			}
+			bare, _, _ := strings.Cut(r.WebURL, "?")
+			if code := get(t, bare); code == http.StatusOK {
+				t.Errorf("GET without the token = %d, want it refused", code)
+			}
+			var st struct {
+				Running bool `json:"running"`
+			}
+			if err := json.Unmarshal([]byte(r.gx(t, "server", "status", "--json")), &st); err != nil || !st.Running {
+				t.Fatalf("server status = %+v, %v; want running", st, err)
+			}
+			if _, err := os.Stat(r.Socket); err != nil {
+				t.Errorf("printed socket: %v", err)
+			}
+
+			r.stop(t)
+			if _, err := os.Stat(filepath.Dir(filepath.Dir(r.StateDir))); !os.IsNotExist(err) {
+				t.Errorf("temp dir after SIGTERM: %v, want it removed", err)
+			}
+			if err := exec.Command("pgrep", "-f", filepath.Dir(filepath.Dir(r.StateDir))).Run(); err == nil {
+				t.Errorf("a process still names the temp dir")
+			}
+		})
+	}
+}
+
+func TestFixture_NeverTouchesTheRealHomeOrState(t *testing.T) {
+	decoy := t.TempDir()
+	t.Setenv("HOME", decoy)
+	for _, k := range []string{"XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CONFIG_HOME"} {
+		t.Setenv(k, filepath.Join(decoy, k))
+	}
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(decoy, "claude"))
+	r := start(t, "ready")
+	r.gx(t, "server", "snapshot", "--json")
+	r.stop(t)
+	entries, err := os.ReadDir(decoy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		t.Errorf("the real HOME gained %s", e.Name())
+	}
+}
+
+func TestFinishingScenario_LastTicketFinishesAndMerges(t *testing.T) {
+	r := start(t, "finishing")
+	const last = "demo:finishing-epic/02"
+	deadline := time.Now().Add(90 * time.Second)
+	for r.ticketStatus(t, last) != "done" {
+		if status := r.ticketStatus(t, last); status == "needs-repair" || time.Now().After(deadline) {
+			t.Logf("history:\n%s", r.gx(t, "server", "tickets", "history", last))
+			t.Fatalf("ticket %s is %q, want done", last, status)
+		}
+		time.Sleep(time.Second)
+	}
+	r.stop(t)
+}

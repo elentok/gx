@@ -177,6 +177,9 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	fs.String("settings", "", "")
 	fs.String("disallowedTools", "", "")
 	fs.String("append-system-prompt", "", "")
+	fs.String("append-system-prompt-file", "", "")
+	fs.String("model", "", "")
+	fs.String("effort", "", "")
 	if err := fs.Parse(args); err != nil {
 		return tuiOptions{}, err
 	}
@@ -250,6 +253,7 @@ func runTUIClaude() (int, error) {
 		ack:        ack,
 		opts:       opts,
 		pidPath:    PidFilePath(home, os.Getpid()),
+		ctlPath:    ctlPath,
 		transcript: transcript.PathIn(home, cwd, opts.sessionID),
 		pid: PidFile{
 			Pid:        os.Getpid(),
@@ -271,6 +275,7 @@ type tui struct {
 	ack        io.Writer
 	opts       tuiOptions
 	pidPath    string
+	ctlPath    string
 	transcript string
 	pid        PidFile
 	stalled    bool
@@ -464,6 +469,11 @@ func (t *tui) submit() error {
 	}
 	switch t.pid.Status {
 	case StatusIdle:
+		if address, cfg, ok := t.workerPrompt(text); ok {
+			t.prompt = text
+			go t.work(cfg, address)
+			return t.setStatus(StatusBusy, "")
+		}
 		if strings.HasPrefix(text, "/") && text != "/compact" {
 			return t.slashCommand(text)
 		}
@@ -484,6 +494,30 @@ func (t *tui) submit() error {
 		return t.setStatus(StatusBusy, "")
 	}
 	return nil
+}
+
+// workerPrompt reports whether text is a skill prompt (`/skill <address>`) for
+// a fake that runs in a worktree carrying a worker config, and returns the
+// ticket address and that config.
+func (t *tui) workerPrompt(text string) (string, WorkerConfig, bool) {
+	fields := strings.Fields(text)
+	if len(fields) < 2 || !strings.HasPrefix(fields[0], "/") {
+		return "", WorkerConfig{}, false
+	}
+	cfg, err := LoadWorkerConfig(t.pid.Cwd)
+	if err != nil {
+		return "", WorkerConfig{}, false
+	}
+	return fields[len(fields)-1], cfg, true
+}
+
+// work does the ticket's work off the input loop, then sends the turn's end
+// down the control channel like a test would.
+func (t *tui) work(cfg WorkerConfig, address string) {
+	if err := WorkTicket(cfg, address); err != nil {
+		fmt.Fprintln(os.Stderr, "fakeclaude worker:", err)
+	}
+	_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
 }
 
 // slashCommand handles a "/" command at idle as claude does: it starts no

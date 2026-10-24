@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -26,6 +27,72 @@ type WorkerConfig struct {
 	Gx   string   `json:"gx"`             // gx binary used to report the iteration finished
 	Env  []string `json:"env,omitempty"`  // KEY=VALUE entries gx runs with (XDG dirs)
 	Hold string   `json:"hold,omitempty"` // while this file exists the agent stays "working"
+	// HoldTimeout is a Go duration after which the hold is ignored, so a flow
+	// that forgets to release it cannot hang; empty means no limit.
+	HoldTimeout string `json:"hold_timeout,omitempty"`
+	// Behaviour maps a ticket address to what the worker does with it:
+	// BehaviourFinish (the default), BehaviourAsk or BehaviourFail.
+	Behaviour map[string]string `json:"behaviour,omitempty"`
+}
+
+// What a worker does with a ticket.
+const (
+	// BehaviourFinish commits and reports the iteration finished.
+	BehaviourFinish = "finish"
+	// BehaviourAsk pauses the ticket with a question and commits nothing.
+	BehaviourAsk = "ask"
+	// BehaviourFail goes idle without a commit or a report, which the server
+	// reads as a stalled agent.
+	BehaviourFail = "fail"
+)
+
+const askBody = "## Question\nWhich option should the fake worker take?\n\n## Handoff\nNo files touched; the fake worker waits for an answer.\n"
+
+// LoadWorkerConfig reads WorkerConfigFile from dir.
+func LoadWorkerConfig(dir string) (WorkerConfig, error) {
+	var cfg WorkerConfig
+	raw, err := os.ReadFile(filepath.Join(dir, WorkerConfigFile))
+	if err != nil {
+		return cfg, err
+	}
+	return cfg, json.Unmarshal(raw, &cfg)
+}
+
+// WorkTicket does one ticket's work in the current directory as cfg says: it
+// marks the prompt received, holds the finish while the Hold file exists, then
+// finishes, asks or fails.
+func WorkTicket(cfg WorkerConfig, address string) error {
+	if cfg.Hold != "" {
+		if err := os.WriteFile(cfg.Hold+StartedSuffix, nil, 0o644); err != nil {
+			return err
+		}
+	}
+	switch cfg.Behaviour[address] {
+	case BehaviourFail:
+		return nil
+	case BehaviourAsk:
+		return askQuestion(cfg, address)
+	}
+	waitHold(cfg)
+	return finishTicket(cfg, address)
+}
+
+func waitHold(cfg WorkerConfig) {
+	limit, _ := time.ParseDuration(cfg.HoldTimeout)
+	start := time.Now()
+	for fileExists(cfg.Hold) && (limit <= 0 || time.Since(start) < limit) {
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func askQuestion(cfg WorkerConfig, address string) error {
+	cmd := exec.Command(cfg.Gx, "tickets", "ask", address, "--body", "-")
+	cmd.Env = append(os.Environ(), cfg.Env...)
+	cmd.Stdin = strings.NewReader(askBody)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("gx tickets ask: %w\n%s", err, out)
+	}
+	return nil
 }
 
 // RunWorker is a fake agent that does a ticket's work: for each submitted
@@ -49,15 +116,7 @@ func RunWorker(in io.Reader, out io.Writer) error {
 			continue
 		}
 		fmt.Fprint(out, workingTitle)
-		if cfg.Hold != "" {
-			if err := os.WriteFile(cfg.Hold+StartedSuffix, nil, 0o644); err != nil {
-				return err
-			}
-		}
-		for fileExists(cfg.Hold) {
-			time.Sleep(100 * time.Millisecond)
-		}
-		if err := finishTicket(cfg, fields[len(fields)-1]); err != nil {
+		if err := WorkTicket(cfg, fields[len(fields)-1]); err != nil {
 			return err
 		}
 		fmt.Fprint(out, idleTitle)
