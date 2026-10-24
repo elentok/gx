@@ -206,7 +206,9 @@ func TestServer_SecondServerOnSameStateDirIsRefused(t *testing.T) {
 	h := servertest.Start(t)
 
 	_, err := server.New(server.Config{StateDir: h.StateDir})
-	want := "already running (pid " + strconv.Itoa(os.Getpid()) + ")"
+	// The first server lives in this process, so the lock error names the
+	// same-process case after the retry window.
+	want := "lock still held by this process (pid " + strconv.Itoa(os.Getpid()) + ")"
 	if err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("err = %v, want %q", err, want)
 	}

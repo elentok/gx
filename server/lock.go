@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 // serverLock is an flock on a file holding the owner's pid. The kernel drops
@@ -15,18 +16,40 @@ import (
 // pid in the file is only for the "already running" message.
 type serverLock struct{ f *os.File }
 
+// samePidLockRetry bounds the wait when the lock file names this process. That
+// happens when a restart re-locks its state dir while a forked child still
+// holds the old fd. The child releases it shortly, so retry instead of failing.
+const (
+	samePidLockRetry     = 2 * time.Second
+	samePidLockRetryTick = 20 * time.Millisecond
+)
+
 func acquireLock(path string) (*serverLock, error) {
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o600)
 	if err != nil {
 		return nil, err
 	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		defer f.Close()
+	deadline := time.Now().Add(samePidLockRetry)
+	for {
+		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if err == nil {
+			break
+		}
 		if !errors.Is(err, syscall.EWOULDBLOCK) {
+			f.Close()
 			return nil, err
 		}
 		raw, _ := os.ReadFile(path)
-		return nil, fmt.Errorf("already running (pid %s)", strings.TrimSpace(string(raw)))
+		holder := strings.TrimSpace(string(raw))
+		if holder != strconv.Itoa(os.Getpid()) {
+			f.Close()
+			return nil, fmt.Errorf("already running (pid %s)", holder)
+		}
+		if !time.Now().Before(deadline) {
+			f.Close()
+			return nil, fmt.Errorf("lock still held by this process (pid %s) after %s", holder, samePidLockRetry)
+		}
+		time.Sleep(samePidLockRetryTick)
 	}
 	if err := f.Truncate(0); err != nil {
 		f.Close()
