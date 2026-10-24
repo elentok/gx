@@ -197,6 +197,7 @@ Run without a command to open the status UI.`,
 		newRunCmd(d),
 		newAgentHolderCmd(),
 		newTermCmd(d),
+		newBriefCmd(d),
 		newDoctorCmd(d),
 		newVersionCmd(d),
 	)
