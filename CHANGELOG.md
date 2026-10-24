@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.36.1 - 2026-10-24
+
+- Added a stall check for headless tickets that wait on a permission request. gx now pauses such a ticket at once, and returns it to claimed when the block clears. A restart re-pauses blocked tickets and leaves answered requests alone. `gx doctor` reports tickets blocked on permission requests.
+- Added a dependency install step to ticket worktrees. gx finds the lockfile, picks the package manager, and installs in the agent's worktree with a shared 5-minute budget. It logs the output tail on failure. A failed install pauses the ticket and discards the worktree. A `packageManager` whose version does not parse is rejected.
+- Added a full-screen view for a grilling round, opened from the composer on the Design page.
+- Changed grilling and investigate skills: every question is self-contained, the closing confirmation is asked as a round, and `gx-investigate` notes the missing Continue after a design run.
+- Changed the server to log the first prompt and action steps at info level.
+- Fixed the server lock: it is retried when the lock file names the current process.
+- Fixed a slash first prompt that sat unsent. The server now presses Enter again.
+- Fixed the Design page: round markers are read at line starts, answers survive a reload, and design questions are labelled by id (`Q8b` shows as `8b`).
+- Fixed typing in a round re-parsing every card. Markdown is now memoized.
+- Fixed the worktree scan: it skips vanished branches.
+
 ## v0.36.0 - 2026-10-23
 
 - Added a Design page to the web UI, so you can run design sessions from the browser.
