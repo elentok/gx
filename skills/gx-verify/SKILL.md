@@ -30,7 +30,8 @@ Run cheap, targeted verification for changed files.
 6. Report exactly one result:
    - `pass`: at least one check ran, every check that ran passed, and none failed
    - `fail`: any installed tool's command failed, or a frozen install failed (include the install
-     output)
+     output). A `gx brief` exit 2 is a `fail`, with brief's one-line reason as the detail. Never skip
+     it and never count it as a pass
    - `no applicable checks`: no file matched the check table, or every matching check was skipped.
      List each skipped tool or package with its reason. The commit goes ahead.
 
@@ -51,15 +52,16 @@ checks.
 - Go:
   - files matching `*.go`
   - run `gofmt -w <go-files>`
-  - for each unique directory containing a matched Go file, run `go test ./<dir>`; use `go test .`
-    for files in the repo root
+  - for each unique directory containing a matched Go file, run `gx brief go-test ./<dir>`; use
+    `gx brief go-test .` for files in the repo root
 - TypeScript and JavaScript:
   - files matching `*.ts`, `*.tsx`, `*.js`, `*.jsx`, `*.mjs`
   - group the files by their nearest `package.json` and run each check once per package, from the
     package directory
-  - run `tsc --noEmit -p <pkg>` when the package has a `tsconfig.json`
-  - run `prettier --write <files>`, `eslint <files>`, and `vitest related --run <files>`, each only
-    when the tool is listed. A tool is listed when the package's own `package.json` lists it, or when
+  - run `gx brief -C <pkg> tsc --noEmit` when the package has a `tsconfig.json`
+  - run `gx brief -C <pkg> vitest related <files>` (brief adds single-run mode), only when the tool
+    is listed
+  - run `prettier --write <files>` and `eslint <files>`, each only when the tool is listed. A tool is listed when the package's own `package.json` lists it, or when
     the `package.json` in the lockfile's directory (the workspace root) lists it
   - the lockfile is the nearest one at or above the package. It picks the runner and the frozen
     install:
