@@ -173,8 +173,43 @@ func (i *index) refresh(storePath string) error {
 	for _, addr := range changedAddresses(i.list, list) {
 		i.events.publish(EventTicketChanged, addr)
 	}
+	for _, addr := range changedEpicDesignSteps(i.loaded, loaded) {
+		i.events.publish(EventTicketChanged, addr)
+	}
 	i.list, i.loaded = list, loaded
 	return nil
+}
+
+// changedEpicDesignSteps lists, in address order, the epics whose design_step
+// differs between two scans. An epic's ticket.md edit changes no TicketInfo, so
+// without this a Progress view never learns the step moved.
+func changedEpicDesignSteps(old, next map[string][]tickets.Epic) []string {
+	steps := func(m map[string][]tickets.Epic) map[string]string {
+		out := map[string]string{}
+		for dir, epics := range m {
+			project := tickets.ProjectName(dir)
+			for _, e := range epics {
+				if e.DesignStep != "" {
+					out[project+":"+filepath.Base(e.Path)] = e.DesignStep
+				}
+			}
+		}
+		return out
+	}
+	prev, cur := steps(old), steps(next)
+	var changed []string
+	for addr, step := range cur {
+		if prev[addr] != step {
+			changed = append(changed, addr)
+		}
+	}
+	for addr := range prev {
+		if _, ok := cur[addr]; !ok {
+			changed = append(changed, addr)
+		}
+	}
+	sort.Strings(changed)
+	return changed
 }
 
 // epicsOf is the project's epics as of the last scan.

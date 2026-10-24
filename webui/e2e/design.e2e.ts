@@ -54,8 +54,7 @@ test.describe("5. Answer a round", () => {
 });
 
 test.describe("9. Design progress to the end", () => {
-  // Blocked: setting design_step on the epic publishes no ticket-changed event, so Progress never refetches.
-  test.fixme("walks every step to Done", async ({ page, start }) => {
+  test("walks every step to Done", async ({ page, start }) => {
     const fixture = await start("design");
     await openDesign(page);
     await expect(page.getByText("Open implementation epic →")).toHaveCount(0);
