@@ -53,6 +53,12 @@ test("options show consequences and the Recommended badge on the suggested one o
   expect(post).not.toHaveBeenCalled();
 });
 
+test("text shows no note box: the typed text is the answer", () => {
+  renderThemed(<AnswerForm detail={withLatest({ kind: "text" })} post={vi.fn(ok)} />);
+  expect(screen.getByLabelText("Your answer")).toBeTruthy();
+  expect(screen.queryByLabelText("Note (optional)")).toBeNull();
+});
+
 test("text posts the typed text", async () => {
   const post = vi.fn<(b: AnswerBody) => ReturnType<PostAnswer>>(ok);
   renderThemed(<AnswerForm detail={withLatest({ kind: "text" })} post={post} />);

@@ -64,7 +64,7 @@ export function AnswerForm({
         address: detail.address,
         state: detail.state ?? "",
         ...(isText ? { text } : { choice }),
-        ...(note.trim() ? { note } : {}),
+        ...(!isText && note.trim() ? { note } : {}),
       };
       const res = await post(body);
       if ("refused" in res) {
@@ -87,8 +87,7 @@ export function AnswerForm({
     <Box
       position="sticky"
       bottom="0"
-      bg="surface"
-      borderTopWidth="1px"
+      bg="surface.raised"
       py="3"
       display="flex"
       flexDirection="column"
@@ -99,6 +98,7 @@ export function AnswerForm({
       {isText ? (
         <Textarea
           aria-label="Your answer"
+          placeholder="Your answer"
           value={text}
           disabled={pending}
           onChange={(e) => setText(e.target.value)}
@@ -135,15 +135,18 @@ export function AnswerForm({
           </Button>
         ))
       )}
-      <Textarea
-        aria-label="Note (optional)"
-        placeholder="Note (optional)"
-        value={note}
-        disabled={pending}
-        onChange={(e) => setNote(e.target.value)}
-      />
+      {/* A free-text answer is the note already. */}
+      {!isText && (
+        <Textarea
+          aria-label="Note (optional)"
+          placeholder="Note (optional)"
+          value={note}
+          disabled={pending}
+          onChange={(e) => setNote(e.target.value)}
+        />
+      )}
       {error && <Text role="alert">{error}</Text>}
-      <Button disabled={!ready || pending} onClick={send}>
+      <Button variant="solid" size="md" alignSelf="flex-end" disabled={!ready || pending} onClick={send}>
         Send answer
       </Button>
     </Box>

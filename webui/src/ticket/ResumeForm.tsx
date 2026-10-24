@@ -6,6 +6,7 @@ import { ReasonStale } from "./answer";
 import { postResume, resumeWords, type PostResume } from "./resume";
 
 const REASON_MANUAL = "manual";
+const REASON_SELF_REPORTED = "self-reported";
 
 /** The action's name by pause reason: Resume lifts only a pause the person chose. */
 export function resumeLabel(reason: string | undefined): string {
@@ -18,6 +19,8 @@ export function resumeLabel(reason: string | undefined): string {
       return "Merge commits";
     case REASON_MANUAL:
       return "Resume";
+    case REASON_SELF_REPORTED:
+      return "Restart without answering";
     default:
       return "Retry";
   }
@@ -54,6 +57,8 @@ export function ResumeForm({
 
   const ready = bases.length === 0 || base !== "";
   const label = resumeLabel(detail.pause_reason);
+  // The agent asked, then its session ended: answering restarts it too, so this is the side road.
+  const besideAnswer = detail.pause_reason === REASON_SELF_REPORTED;
 
   const send = async () => {
     if (!ready || pending) return;
@@ -76,10 +81,9 @@ export function ResumeForm({
 
   return (
     <Box
-      position="sticky"
+      position={besideAnswer ? "static" : "sticky"}
       bottom="0"
-      bg="surface"
-      borderTopWidth="1px"
+      bg="surface.raised"
       py="3"
       display="flex"
       flexDirection="column"
@@ -105,8 +109,20 @@ export function ResumeForm({
           ))}
         </>
       )}
+      {besideAnswer && (
+        <Text fontSize="sm" color="text.muted">
+          The agent&apos;s session has ended. Sending an answer starts a new one with your reply. To skip the
+          question, restart it from its notes instead.
+        </Text>
+      )}
       {error && <Text role="alert">{error}</Text>}
-      <Button disabled={!ready || pending} onClick={send}>
+      <Button
+        variant={besideAnswer ? "outline" : "solid"}
+        size="md"
+        alignSelf="flex-end"
+        disabled={!ready || pending}
+        onClick={send}
+      >
         {label}
       </Button>
     </Box>

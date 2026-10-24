@@ -60,3 +60,11 @@ test("a closed round shows its reason read-only", () => {
   expect(screen.getByText("Closed: superseded")).toBeTruthy();
   expect(screen.queryByRole("textbox")).toBeNull();
 });
+
+test("the agent's notes render as markdown", () => {
+  const handoff = "- Committed **abc**\n- Removed the row";
+  renderThemed(<TicketReading detail={{ ...base, latest: { ...base.latest!, handoff } }} />);
+  fireEvent.click(screen.getByRole("button", { name: /Agent's notes/ }));
+  expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Committed abc", "Removed the row"]);
+  expect(screen.getByText("abc").tagName).toBe("STRONG");
+});

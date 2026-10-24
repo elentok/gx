@@ -29,7 +29,7 @@ test.each([
   ["stranded-commits", "Merge commits"],
   ["zero-commit", "Retry"],
   ["iteration-error", "Retry"],
-  ["self-reported", "Retry"],
+  ["self-reported", "Restart without answering"],
 ])("a %s pause shows the %s action", (pause_reason, label) => {
   renderThemed(<ResumeForm detail={resumable({ pause_reason })} post={vi.fn(ok)} />);
   expect(screen.getByRole("button", { name: label })).toBeTruthy();

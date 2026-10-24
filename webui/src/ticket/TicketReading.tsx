@@ -1,5 +1,6 @@
 import { Box, Text } from "@chakra-ui/react";
 import type { DetailRound, TicketDetail } from "../generated/server";
+import { Markdown } from "../markdown/Markdown";
 import { Card } from "../ui/card/Card";
 import { Collapsible } from "./Collapsible";
 
@@ -28,9 +29,15 @@ export function TicketReading({ detail }: { detail: TicketDetail }) {
         <>
           <Box>
             <Label>{asker}</Label>
-            <Text>{latest.text ?? latest.summary}</Text>
+            {latest.text ? <Markdown epic={detail.epic}>{latest.text}</Markdown> : <Text>{latest.summary}</Text>}
           </Box>
-          {latest.handoff && <Collapsible label="Agent's notes">{latest.handoff}</Collapsible>}
+          {latest.handoff && (
+            <Collapsible label="Agent's notes">
+              <Markdown epic={detail.epic} smallHeadings>
+                {latest.handoff}
+              </Markdown>
+            </Collapsible>
+          )}
           {detail.chat.length > 0 && (
             <Box display="flex" flexDirection="column" gap="2">
               {detail.chat.map((m, i) => (
