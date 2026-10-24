@@ -25,6 +25,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets"
 )
 
 // Output is the JSON gxfixture prints once the server answers.
@@ -228,6 +229,12 @@ func (f *fixture) seed(sc scenario) error {
 		for _, tk := range e.tickets {
 			if err := servertest.WriteTicketFile(f.store, e.project, e.name, tk.id, tk.slug, tk.opts); err != nil {
 				return err
+			}
+			if tk.opts.PauseReason != "" {
+				ticketPath := filepath.Join(f.store, e.project, e.name, "issues", tk.id+"-"+tk.slug+".md")
+				if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "Seeded pause: " + tk.opts.PauseReason}); err != nil {
+					return err
+				}
 			}
 		}
 		if err := servertest.WriteProjectRepo(f.store, e.project, repo, `,"auto-ff-merge":true`); err != nil {

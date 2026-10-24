@@ -105,6 +105,8 @@ type TicketOpts struct {
 	Base      string
 	Status    string // default "open"
 	Agent     string // the ticket's agent: frontmatter field, omitted when empty
+	// PauseReason writes status: paused with this pause_reason; Status is ignored.
+	PauseReason string
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -156,6 +158,9 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 		opts.Status = "open"
 	}
 	fm := "---\nid: \"" + id + "\"\nstatus: " + opts.Status + "\ntype: " + opts.Type + "\n"
+	if opts.PauseReason != "" {
+		fm = "---\nid: \"" + id + "\"\nstatus: paused\npause_reason: " + opts.PauseReason + "\ntype: " + opts.Type + "\n"
+	}
 	if opts.Parent != "" {
 		fm += "parent: \"" + opts.Parent + "\"\n"
 	}

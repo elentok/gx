@@ -63,6 +63,28 @@ var scenarios = map[string]scenario{
 		}}},
 		queue: []string{project + ":finishing-epic"},
 	},
+	// paused: one ticket per recovery path. Every paused ticket opens a pause
+	// round. The approve epic is queued, so its worker really blocks on a
+	// permission prompt in the pty runner; the other epic is not, so nothing
+	// launches under the paused tickets.
+	"paused": {
+		epics: []epic{
+			{project, "paused-epic", []ticket{
+				{"01", "blocker-a", servertest.TicketOpts{}},
+				{"02", "blocker-b", servertest.TicketOpts{}},
+				{"03", "answer", servertest.TicketOpts{PauseReason: "self-reported"}},
+				{"04", "choose-base", servertest.TicketOpts{PauseReason: "ambiguous-base", BlockedBy: []string{"01", "02"}}},
+				{"05", "resolve-conflict", servertest.TicketOpts{PauseReason: "merge-conflict"}},
+				{"06", "retry", servertest.TicketOpts{PauseReason: "zero-commit"}},
+				{"07", "repair", servertest.TicketOpts{PauseReason: "iteration-error"}},
+			}},
+			{project, "approve-epic", []ticket{
+				{"01", "approve", servertest.TicketOpts{}},
+			}},
+		},
+		behaviour: map[string]string{project + ":approve-epic/01": agentfake.BehaviourPermission},
+		queue:     []string{project + ":approve-epic"},
+	},
 	// edge: a project with no epics, an epic with no tickets, and a ticket
 	// blocked by a dependency that is not merged.
 	"edge": {

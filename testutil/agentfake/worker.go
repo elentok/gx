@@ -31,7 +31,7 @@ type WorkerConfig struct {
 	// that forgets to release it cannot hang; empty means no limit.
 	HoldTimeout string `json:"hold_timeout,omitempty"`
 	// Behaviour maps a ticket address to what the worker does with it:
-	// BehaviourFinish (the default), BehaviourAsk or BehaviourFail.
+	// BehaviourFinish (the default), BehaviourAsk, BehaviourFail or BehaviourPermission.
 	Behaviour map[string]string `json:"behaviour,omitempty"`
 }
 
@@ -44,6 +44,9 @@ const (
 	// BehaviourFail goes idle without a commit or a report, which the server
 	// reads as a stalled agent.
 	BehaviourFail = "fail"
+	// BehaviourPermission blocks the TUI fake on a Bash permission prompt, which
+	// only the pty runner can approve. WorkTicket itself does nothing for it.
+	BehaviourPermission = "permission"
 )
 
 const askBody = "## Question\nWhich option should the fake worker take?\n\n## Handoff\nNo files touched; the fake worker waits for an answer.\n"

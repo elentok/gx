@@ -7,15 +7,18 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 var gxBin, fixtureBin, fakeBin string
@@ -205,6 +208,148 @@ func TestFinishingScenario_LastTicketFinishesAndMerges(t *testing.T) {
 			t.Fatalf("ticket %s is %q, want done", last, status)
 		}
 		time.Sleep(time.Second)
+	}
+	r.stop(t)
+}
+
+// web is a client of the fixture's web server, with the cookie the token URL sets.
+type web struct {
+	client *http.Client
+	origin string
+}
+
+func (r *running) web(t *testing.T) *web {
+	t.Helper()
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &http.Client{Jar: jar}
+	resp, err := c.Get(r.WebURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	u, _ := url.Parse(r.WebURL)
+	return &web{client: c, origin: u.Scheme + "://" + u.Host}
+}
+
+// post sends a write as the web page does and fails on a refusal.
+func (w *web) post(t *testing.T, path string, body any) {
+	t.Helper()
+	raw, _ := json.Marshal(body)
+	req, err := http.NewRequest(http.MethodPost, w.origin+path, strings.NewReader(string(raw)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", w.origin)
+	resp, err := w.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(resp.Body)
+	var out struct {
+		Refused bool `json:"refused"`
+	}
+	if err := json.Unmarshal(data, &out); err != nil || resp.StatusCode != http.StatusOK || out.Refused {
+		t.Fatalf("POST %s = %d: %s", path, resp.StatusCode, data)
+	}
+}
+
+func (r *running) detail(t *testing.T, address string) server.TicketDetail {
+	t.Helper()
+	var d server.TicketDetail
+	if err := json.Unmarshal([]byte(r.gx(t, "server", "tickets", "detail", address, "--json")), &d); err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
+
+// waitPermission waits for the approve ticket's agent to block on a prompt the web can approve.
+func (r *running) waitPermission(t *testing.T, address string) server.TicketDetail {
+	t.Helper()
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		d := r.detail(t, address)
+		if d.Permission != nil && d.Permission.RequestID != "" {
+			return d
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no approvable permission prompt on %s; detail = %+v", address, d)
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+const (
+	pausedEpic  = "demo:paused-epic/"
+	approveAddr = "demo:approve-epic/01"
+)
+
+func TestPausedScenario_OneTicketPerRecoveryPath(t *testing.T) {
+	r := start(t, "paused")
+	cases := []struct {
+		id, reason, action string
+	}{
+		{"03", "self-reported", server.ActionAnswer},
+		{"04", "ambiguous-base", server.ActionResume},
+		{"05", "merge-conflict", server.ActionResume},
+		{"06", "zero-commit", server.ActionResume},
+	}
+	for _, c := range cases {
+		d := r.detail(t, pausedEpic+c.id)
+		if d.PauseReason != c.reason || d.PauseLabel == "" {
+			t.Errorf("%s: reason %q label %q, want reason %q", c.id, d.PauseReason, d.PauseLabel, c.reason)
+		}
+		if !slices.Contains(d.Actions, c.action) {
+			t.Errorf("%s: actions = %v, want %q", c.id, d.Actions, c.action)
+		}
+	}
+	if bases := r.detail(t, pausedEpic+"04").Bases; !slices.Equal(bases, []string{"01", "02"}) {
+		t.Errorf("choose-base bases = %v, want 01 and 02", bases)
+	}
+
+	repair := r.detail(t, pausedEpic+"07")
+	if repair.PauseReason != "iteration-error" || repair.Status != "needs-repair" {
+		t.Errorf("repair ticket: reason %q status %q, want iteration-error and needs-repair", repair.PauseReason, repair.Status)
+	}
+
+	d := r.waitPermission(t, approveAddr)
+	if d.Permission.Tool != "Bash command" || d.Permission.Description != agentfake.PermissionCommand || !slices.Contains(d.Actions, server.ActionApprove) {
+		t.Errorf("approve ticket: permission %+v actions %v, want the Bash prompt and approve", d.Permission, d.Actions)
+	}
+	r.stop(t)
+}
+
+func TestPausedScenario_WebRecoveryClearsEachPause(t *testing.T) {
+	r := start(t, "paused")
+	w := r.web(t)
+
+	d := r.detail(t, pausedEpic+"03")
+	w.post(t, "/v1/tickets/answer", map[string]any{"address": d.Address, "text": "go ahead", "state": d.State})
+
+	// 05 (merge conflict) is left out: repair.Resume refuses a repair-class pause,
+	// so the web's "Resolve conflict" cannot clear it. See the ticket's Spec deviations.
+	for _, c := range []struct{ id, base string }{{"04", "01"}, {"06", ""}} {
+		d := r.detail(t, pausedEpic+c.id)
+		body := map[string]any{"address": d.Address, "state": d.State}
+		if c.base != "" {
+			body["base"] = c.base
+		}
+		w.post(t, "/v1/tickets/resume", body)
+	}
+	for _, id := range []string{"03", "04", "06"} {
+		if d := r.detail(t, pausedEpic+id); d.Status != "open" {
+			t.Errorf("%s is %q (reason %q) after its recovery, want open", id, d.Status, d.PauseReason)
+		}
+	}
+
+	p := r.waitPermission(t, approveAddr).Permission
+	w.post(t, "/v1/agents/answer", map[string]any{"address": approveAddr, "decision": "allow", "request_id": p.RequestID})
+	if d := r.detail(t, approveAddr); d.Permission != nil {
+		t.Errorf("permission after approve = %+v, want it cleared", d.Permission)
 	}
 	r.stop(t)
 }

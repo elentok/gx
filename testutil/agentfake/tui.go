@@ -45,6 +45,9 @@ const (
 // control needed.
 const PermissionPromptPrefix = "fakeclaude:permission "
 
+// PermissionCommand is the Bash command a BehaviourPermission worker asks to run.
+const PermissionCommand = "rg fixture"
+
 func bashPermissionDialog(command string) []string {
 	return []string{
 		"────────────────────",
@@ -471,6 +474,10 @@ func (t *tui) submit() error {
 	case StatusIdle:
 		if address, cfg, ok := t.workerPrompt(text); ok {
 			t.prompt = text
+			if cfg.Behaviour[address] == BehaviourPermission {
+				t.dialog = bashPermissionDialog(PermissionCommand)
+				return t.setStatus(StatusWaiting, "permission prompt")
+			}
 			go t.work(cfg, address)
 			return t.setStatus(StatusBusy, "")
 		}
