@@ -57,6 +57,28 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Not covered yet:** Resolve conflict (`paused-epic/05`, `merge-conflict`). The server offers the
   button but refuses the resume ("ticket 05 is …, not asking").
 
+## 4. Start a design session
+
+- **Scenario:** `design` (`design-epic`, a map at Resolve tickets, and its `design-epic-impl` epic)
+- **Steps:**
+  1. Click Designs in the nav; the epic opens with "Start design session".
+  2. Click Start design session.
+- **Pass:** Progress shows Resolve tickets as the current step, and the chat shows the first scripted
+  message ("Two questions before the spec.") in place of the start button.
+
+## 5. Answer a round
+
+- **Scenario:** `design`
+- **Steps:**
+  1. Start the session. Round one has `Q8` (options) and `Q8b` (yes/no).
+  2. Pick SQLite and Yes, then Send.
+  3. Click Continue.
+- **Pass:**
+  - The question dots and titles read `Q8` and `Q8b`.
+  - The chat shows the answers as the person's message, so the agent received them.
+  - Continue shows after the agent's run-end line.
+  - Continue brings a fresh round with `Q9`.
+
 ## 6. Outside changes show up
 
 - **Scenario:** `ready`
@@ -89,33 +111,11 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   - `blocked-epic` shows `waiting · blocked · after 01` and `unmerged · open`.
 - **Not covered:** the "No epics yet" state of the Epics page. `edge` has epics, so it never shows.
 
-## 4. Start a design session
-
-- **Scenario:** `design` (`design-epic`, a map at Resolve tickets, and its `design-epic-impl` epic)
-- **Steps:**
-  1. Click Designs in the nav; the epic opens with "Start design session".
-  2. Click Start design session.
-- **Pass:** Progress shows Resolve tickets as the current step, and the chat shows the first scripted
-  message ("Two questions before the spec.") in place of the start button.
-
-## 5. Answer a round
-
-- **Scenario:** `design`
-- **Steps:**
-  1. Start the session. Round one has `Q8` (options) and `Q8b` (yes/no).
-  2. Pick SQLite and Yes, then Send.
-  3. Click Continue.
-- **Pass:**
-  - The question dots and titles read `Q8` and `Q8b`.
-  - The chat shows the answers as the person's message, so the agent received them.
-  - Continue shows after the agent's run-end line.
-  - Continue brings a fresh round with `Q9`.
-
 ## 9. Design progress to the end
 
 - **Scenario:** `design`
-- **Status:** written but skipped (`test.fixme`). The epic's `design_step` change publishes no
-  ticket-changed event, so the open page never refetches Progress.
+- **Status:** enabled. A `design_step` change publishes a ticket-changed event, so the open page
+  refetches Progress without a reload.
 - **Steps:** run `gx tickets set demo:design-epic --design-step <step>` for spec, review,
   grill-findings, create-tickets, branch, done.
 - **Pass:** each step becomes current in turn (Done becomes done), earlier steps read done, and
