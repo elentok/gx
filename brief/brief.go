@@ -30,6 +30,9 @@ type Tool interface {
 	Command(args []string) (name string, argv []string)
 	// Parse reads the raw output of a run that exited with the given code.
 	Parse(out []byte, exit int) Outcome
+	// RerunArgs returns the caller's args changed to run only the failing
+	// tests, or nil when the failures cannot be re-run on their own.
+	RerunArgs(args []string, failures []Unit) []string
 }
 
 // Outcome is what a tool found in the output of one run.
@@ -38,11 +41,14 @@ type Outcome struct {
 	Units int
 	// Summary is the noun phrase for a pass, such as "12 tests in 3 packages".
 	Summary string
+	// Failures are the failure units of a failing run, grouped by location.
+	Failures []Unit
 }
 
 // Options configure one run.
 type Options struct {
 	Dir     string // working directory of the tool
+	CDir    string // the -C value as the caller gave it, for the re-run line
 	Args    []string
 	DataDir string // gx data dir; logs and the index live under it
 	Out     io.Writer
@@ -100,6 +106,9 @@ func Run(tool Tool, o Options) int {
 		return cantRun(o.Out, "cannot write log: "+err.Error())
 	}
 	outcome := tool.Parse(out.Bytes(), exit)
+	if exit != 0 {
+		outcome.Units = len(outcome.Failures)
+	}
 	entry := indexEntry{
 		Time:       start.Format(time.RFC3339),
 		Tool:       tool.Name(),
@@ -117,7 +126,17 @@ func Run(tool Tool, o Options) int {
 	dur := elapsed.Round(10 * time.Millisecond)
 	switch {
 	case exit != 0:
-		fmt.Fprintf(o.Out, "FAIL %s: exit %d in %s\n%s\n", tool.Name(), exit, dur, logPath)
+		if len(outcome.Failures) == 0 {
+			fmt.Fprintf(o.Out, "FAIL %s: exit %d in %s\n", tool.Name(), exit, dur)
+			rawHead(o.Out, out.Bytes())
+		} else {
+			fmt.Fprintf(o.Out, "FAIL %s: %d failed in %s\n", tool.Name(), len(outcome.Failures), dur)
+			renderUnits(o.Out, outcome.Failures)
+			if re := tool.RerunArgs(o.Args, outcome.Failures); re != nil {
+				fmt.Fprintln(o.Out, rerunLine(tool.Name(), o.CDir, re))
+			}
+		}
+		fmt.Fprintln(o.Out, logPath)
 		return ExitFail
 	case outcome.Units == 0:
 		fmt.Fprintf(o.Out, "PASS %s: no tests ran in %s\n%s\n", tool.Name(), dur, logPath)

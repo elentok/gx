@@ -185,3 +185,161 @@ func TestBrief_UnwritableLogExits2(t *testing.T) {
 		t.Errorf("want one line without a log path:\n%s", out)
 	}
 }
+
+// failingModule has 7 failing tests in package a: one prints 30 lines, one a
+// 1000-character line. Package bad does not build.
+func failingModule(t *testing.T, withBuildError bool) string {
+	t.Helper()
+	dir := t.TempDir()
+	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
+	src := "package a\n\nimport (\n\t\"strings\"\n\t\"testing\"\n)\n\n" +
+		"func TestLong(t *testing.T) {\n\tfor i := 0; i < 30; i++ {\n\t\tt.Logf(\"long line %d\", i)\n\t}\n\tt.Fail()\n}\n" +
+		"func TestWide(t *testing.T) { t.Log(strings.Repeat(\"x\", 1000)); t.Fail() }\n"
+	for _, n := range []string{"C", "D", "E", "F", "G"} {
+		src += "func Test" + n + "(t *testing.T) { t.Error(\"boom " + n + "\") }\n"
+	}
+	for _, sub := range []string{"a", "bad"} {
+		if err := os.Mkdir(filepath.Join(dir, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	testutil.WriteFile(t, dir, "a/a_test.go", src)
+	if withBuildError {
+		testutil.WriteFile(t, dir, "bad/b.go", "package bad\n\nfunc F() int { return \"x\" }\n")
+		testutil.WriteFile(t, dir, "bad/b_test.go", "package bad\n\nimport \"testing\"\n\nfunc TestB(t *testing.T) {}\n")
+	}
+	return dir
+}
+
+func TestBrief_GoTestFailures(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	mod := failingModule(t, false)
+
+	out, code := runBriefCmd(t, mod, "go-test", "-count=1", "./...")
+	if code != 1 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+
+	// Seam 1: limits, order and the cut notice.
+	if !strings.Contains(out, "example.com/tiny/a\n") {
+		t.Errorf("no package heading:\n%s", out)
+	}
+	if !strings.Contains(out, "long line 9") || strings.Contains(out, "long line 10") {
+		t.Errorf("TestLong is not limited to 10 lines:\n%s", out)
+	}
+	if !strings.Contains(out, "more lines cut") {
+		t.Errorf("no cut notice for lines:\n%s", out)
+	}
+	if strings.Contains(out, strings.Repeat("x", 301)) || !strings.Contains(out, "x[") || !strings.Contains(out, "more chars cut, search the log]") {
+		t.Errorf("wide line not cut at 300:\n%s", out)
+	}
+	// Failures come in source order: Long, Wide, C, D, E are shown in full
+	// (C, D, E have "boom" text); F and G are by name only.
+	if n := strings.Count(out, "boom "); n != 3 {
+		t.Errorf("units with boom text = %d, want 3 (7 failing, 5 in full, 2 by name):\n%s", n, out)
+	}
+	if !strings.Contains(out, "2 more failures are listed by name only") {
+		t.Errorf("by-name notice missing:\n%s", out)
+	}
+
+	// Seam 3: the re-run line covers all 7 failing tests, anchored.
+	var rerun string
+	for _, l := range strings.Split(out, "\n") {
+		if strings.HasPrefix(l, "re-run only the failing tests: ") {
+			rerun = l
+		}
+	}
+	for _, want := range []string{"gx brief go-test -count=1 ./... -run '^(", "TestLong", "TestWide", "TestC", "TestG", ")$'"} {
+		if !strings.Contains(rerun, want) {
+			t.Errorf("re-run line lacks %q: %q", want, rerun)
+		}
+	}
+
+	// Seam 5: the log path is last, holds the cut text, and the index counts units.
+	logPath := lastLine(out)
+	raw, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), "long line 29") || !strings.Contains(string(raw), strings.Repeat("x", 1000)) {
+		t.Errorf("log lacks the cut text")
+	}
+	idx, err := os.ReadFile(filepath.Join(data, "gx", "brief", "index.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(string(idx))), &fields); err != nil {
+		t.Fatal(err)
+	}
+	if fields["exit"] != float64(1) || fields["units"] != float64(7) {
+		t.Errorf("index = %v", fields)
+	}
+}
+
+// Seam 2: a package that does not build is one unit named by the package, and
+// the other package's failures are still reported.
+func TestBrief_GoTestBuildErrorIsOneUnit(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	out, code := runBriefCmd(t, failingModule(t, true), "go-test", "-count=1", "./...")
+	if code != 1 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+	if !strings.Contains(out, "example.com/tiny/bad\n  build failed\n") || !strings.Contains(out, "cannot use") {
+		t.Errorf("build unit missing:\n%s", out)
+	}
+	if !strings.Contains(out, "TestLong") || !strings.Contains(out, "8 failed") {
+		t.Errorf("other package's failures lost:\n%s", out)
+	}
+	if !strings.Contains(out, "re-run only the failing tests: ") || strings.Contains(out, "|TestB)") || strings.Contains(out, "(TestB|") {
+		t.Errorf("re-run line should cover tests only:\n%s", out)
+	}
+}
+
+func TestBrief_GoTestRerunKeepsArgsAndC(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	mod := failingModule(t, false)
+
+	out, code := runBriefCmd(t, t.TempDir(), "-C", mod, "go-test", "-run", "TestC|TestD", "-count=1", "./a")
+	if code != 1 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+	want := "re-run only the failing tests: gx brief -C " + mod + " go-test -count=1 ./a -run '^(TestC|TestD)$'"
+	if !strings.Contains(out, want) {
+		t.Errorf("want %q in:\n%s", want, out)
+	}
+}
+
+func TestBrief_GoTestBuildErrorOnlyHasNoRerun(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	dir := t.TempDir()
+	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
+	testutil.WriteFile(t, dir, "b.go", "package bad\n\nfunc F() int { return \"x\" }\n")
+	testutil.WriteFile(t, dir, "b_test.go", "package bad\n\nimport \"testing\"\n\nfunc TestB(t *testing.T) {}\n")
+
+	out, code := runBriefCmd(t, dir, "go-test", "./...")
+	if code != 1 || strings.Contains(out, "re-run") || !strings.Contains(out, "build failed") {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+}
+
+func TestBrief_GoTestPanicBeforeAnyTest(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	dir := t.TempDir()
+	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
+	testutil.WriteFile(t, dir, "p_test.go", "package p\n\nimport \"testing\"\n\nfunc TestMain(m *testing.M) { panic(\"boom\") }\nfunc TestP(t *testing.T) {}\n")
+
+	out, code := runBriefCmd(t, dir, "go-test", "./...")
+	if code != 1 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	// header + 10 raw lines + a cut notice + log path
+	if len(lines) > 13 || !strings.Contains(out, "boom") || strings.Contains(out, "re-run") {
+		t.Errorf("unexpected report:\n%s", out)
+	}
+	if _, err := os.Stat(lastLine(out)); err != nil {
+		t.Errorf("last line is not the log: %v", err)
+	}
+}

@@ -43,6 +43,7 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 	} else if len(args) >= 1 && strings.HasPrefix(args[0], "-C") && len(args[0]) > 2 {
 		dir, args = args[0][2:], args[1:]
 	}
+	cFlag := dir
 	if len(args) == 0 || args[0] == "-h" || args[0] == "--help" {
 		return c.Help()
 	}
@@ -61,7 +62,7 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 	if err != nil {
 		return err
 	}
-	code := brief.Run(tool, brief.Options{Dir: dir, Args: args[1:], DataDir: dataDir, Out: c.OutOrStdout()})
+	code := brief.Run(tool, brief.Options{Dir: dir, Args: args[1:], CDir: cFlag, DataDir: dataDir, Out: c.OutOrStdout()})
 	if code != brief.ExitPass {
 		return &ExitError{Code: code}
 	}
