@@ -22,7 +22,8 @@ const ProgramReadyDelayEnv = "GX_AGENTFAKE_PROGRAM_READY_DELAY"
 
 // Actions only the fake program's input box takes.
 const (
-	// ActionSwallowEnter makes the next Enter do nothing, draft kept.
+	// ActionSwallowEnter makes one more Enter do nothing, draft kept; sending it
+	// twice swallows two.
 	ActionSwallowEnter = "swallow-enter"
 	// ActionVimNormal turns vim mode on and enters NORMAL: no INSERT marker,
 	// and keys other than "i" are not inserted.
@@ -56,7 +57,7 @@ const normalModeText = "normal mode"
 type inputBox struct {
 	out       io.Writer
 	lines     []string
-	swallow   bool
+	swallow   int
 	vim       bool
 	normal    bool
 	submitted string
@@ -101,8 +102,8 @@ func (b *inputBox) key(k byte) (submitted string, ok bool) {
 			b.normal = false
 		}
 	case k == '\r':
-		if b.swallow {
-			b.swallow = false
+		if b.swallow > 0 {
+			b.swallow--
 			return "", false
 		}
 		submitted = b.text()
@@ -131,7 +132,7 @@ func (b *inputBox) key(k byte) (submitted string, ok bool) {
 func (b *inputBox) control(c Control) bool {
 	switch c.Action {
 	case ActionSwallowEnter:
-		b.swallow = true
+		b.swallow++
 	case ActionVimNormal:
 		b.vim, b.normal = true, true
 		b.draw()

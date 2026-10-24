@@ -74,6 +74,17 @@ func TestFirstPrompt_SlashPromptIsTypedOnceAndGetsOneEnter(t *testing.T) {
 	}
 }
 
+func TestFirstPrompt_SlashPromptKeepsPressingEnterWhileItSitsUnsent(t *testing.T) {
+	_, _, _, _, conv := startFirstPromptSession(t, "/local")
+	for range 2 {
+		if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionSwallowEnter}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSubmitted(t, conv, "\"/local\"\n")
+}
+
 func TestFirstPrompt_PersonInputAfterTypingStopsTheNudge(t *testing.T) {
 	for name, prompt := range map[string]string{"real": "fix the bug", "slash": "/local"} {
 		t.Run(name, func(t *testing.T) {
