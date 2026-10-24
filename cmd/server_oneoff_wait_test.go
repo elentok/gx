@@ -116,6 +116,13 @@ func TestOneOffWait_ExitCodesByStatus(t *testing.T) {
 	}
 }
 
+// A blocked-pane pause travels as the answer status and stops --wait with 3.
+func TestWaitExitCode_BlockedPaneStopsWithThree(t *testing.T) {
+	if code, stop := waitExitCode(server.TicketInfo{Status: wireAnswer}); !stop || code != 3 {
+		t.Errorf("code, stop = %d, %v; want 3, true", code, stop)
+	}
+}
+
 func TestOneOffWait_WaitsThroughPendingRecovery(t *testing.T) {
 	const pending, escalated = server.RecoveryPending, server.RecoveryEscalated
 	for name, tc := range map[string]struct {

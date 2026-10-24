@@ -17,7 +17,7 @@ import (
 
 // startBlockable starts proj:epic-a/01 on a runner named runnerName whose agent
 // keeps working until the test blocks it, and returns once the session is live.
-func startBlockable(t *testing.T, runnerName string) (*servertest.Harness, string, *turnRunner) {
+func startBlockable(t *testing.T, runnerName string, opts ...func(*server.Config)) (*servertest.Harness, string, *turnRunner) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -26,12 +26,18 @@ func startBlockable(t *testing.T, runnerName string) (*servertest.Harness, strin
 	turn := newTurnRunner(func(_, _ string) {})
 	turn.PromptState = agentrunner.StateWorking
 	var fake agentrunner.Runner = codexNamed{turn}
-	if runnerName == "herdr" {
+	switch runnerName {
+	case "herdr":
 		fake = herdrNamed{turn}
+	case "pty":
+		fake = ptyNamed{turn}
 	}
 	h := servertest.StartWithStore(t, store, func(cfg *server.Config) {
 		cfg.Runner = fake
 		cfg.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
+		for _, o := range opts {
+			o(cfg)
+		}
 	})
 	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
@@ -86,11 +92,45 @@ func TestHeadlessBlock_PausesAtOnce(t *testing.T) {
 	}
 }
 
-// A herdr-hosted agent that blocks keeps the dwell path: the ticket stays claimed.
-func TestHeadlessBlock_HerdrStaysClaimed(t *testing.T) {
-	_, ticketPath, turn := startBlockable(t, "herdr")
-	turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
-	time.Sleep(500 * time.Millisecond)
+// ptyNamed is a turnRunner that answers to "pty", so its runs are pty-hosted.
+type ptyNamed struct{ *turnRunner }
+
+func (ptyNamed) Name() string { return "pty" }
+
+// A herdr or pty hosted agent that blocks keeps the dwell path: the ticket stays claimed.
+func TestHeadlessBlock_NonHeadlessStaysClaimed(t *testing.T) {
+	for _, runner := range []string{"herdr", "pty"} {
+		t.Run(runner, func(t *testing.T) {
+			_, ticketPath, turn := startBlockable(t, runner)
+			turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
+			time.Sleep(500 * time.Millisecond)
+			tk, err := schema.ParseTicket(ticketPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tk.Status != schema.StatusClaimed {
+				t.Errorf("status = %q, want claimed", tk.Status)
+			}
+		})
+	}
+}
+
+// The pause raises the chat notification, not only the paused run-log event.
+func TestHeadlessBlock_PauseRaisesNotification(t *testing.T) {
+	chat, count := chatRecorder(t)
+	_, ticketPath, turn := startBlockable(t, "headless", chat)
+	turn.SetPending("epic-a-iter-01", &agentrunner.Pending{ID: "r1", Tool: "Bash", Input: []byte(`{"command":"ls"}`)})
+	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
+	if got := waitForChat(count, "blocked-pane"); got != 1 {
+		t.Errorf("blocked-pane notification sent %d times, want once", got)
+	}
+}
+
+// answer on a ticket that is not paused blocked-pane leaves its status alone.
+func TestHeadlessBlock_AnswerOnClaimedLeavesStatus(t *testing.T) {
+	h, ticketPath, _ := startBlockable(t, "headless")
+	// The agent is working and the ticket claimed; the answer may be refused, but must not move it.
+	_, _ = h.Client.AgentAnswerRequest(context.Background(), server.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil {
 		t.Fatal(err)
