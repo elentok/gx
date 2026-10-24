@@ -79,14 +79,32 @@ func inputState(c *nativerunner.HolderClient) (harness.InputState, error) {
 	return sessionTyping.InputIsEmpty(rows), nil
 }
 
+// settleEnters caps the Enters pressEnterIfStillTyped presses, enterGap apart.
+// Claude holds a paste it stripped invisible characters from for review and
+// swallows an Enter or two before it sends.
+var (
+	settleEnters = 3
+	enterGap     = time.Second
+)
+
 // pressEnterIfStillTyped is the rule for a slash prompt that ended without
-// the session reacting: when the harness empty check says the prompt is still
-// in the input, press Enter once. An empty input, or a check that can't
-// decide, presses nothing.
+// the session reacting: while the harness empty check says the prompt is still
+// in the input, press Enter, up to settleEnters times. An empty input, or a
+// check that can't decide, presses nothing.
 func (r *actionRun) pressEnterIfStillTyped() (pressed bool, err error) {
-	state, err := inputState(r.holder)
-	if err != nil || state != harness.InputNotEmpty {
-		return false, err
+	log := r.s.log.With("session", filepath.Base(r.dir))
+	for i := range settleEnters {
+		state, err := inputState(r.holder)
+		if err != nil || state != harness.InputNotEmpty {
+			log.Info("input check at settle", "attempt", i, "state", state, "err", err)
+			return pressed, err
+		}
+		if err := r.holder.SendKeys("\r"); err != nil {
+			return pressed, err
+		}
+		pressed = true
+		log.Info("settle enter", "attempt", i)
+		time.Sleep(enterGap)
 	}
-	return true, r.holder.SendKeys("\r")
+	return pressed, nil
 }
