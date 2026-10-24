@@ -298,6 +298,10 @@ type tui struct {
 	// count the wheel events read.
 	seq                []byte
 	wheelUp, wheelDown int
+	// designMode is set once a /gx-design prompt arrives; designRounds counts
+	// the ones played.
+	designMode   bool
+	designRounds int
 }
 
 // tuiEvent is one key from the terminal, one control, or the end of input.
@@ -472,6 +476,10 @@ func (t *tui) submit() error {
 	}
 	switch t.pid.Status {
 	case StatusIdle:
+		// Before the worker check: a design prompt also looks like `/skill <address>`.
+		if isDesignPrompt(text) || (t.designMode && text != "" && !strings.HasPrefix(text, "/")) {
+			return t.designTurn(text)
+		}
 		if address, cfg, ok := t.workerPrompt(text); ok {
 			t.prompt = text
 			if cfg.Behaviour[address] == BehaviourPermission {

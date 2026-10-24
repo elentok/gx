@@ -27,6 +27,9 @@ type scenario struct {
 	epics    []epic
 	// behaviour is the fake worker's per-ticket behaviour, by address.
 	behaviour map[string]string
+	// designSteps makes each epic, by address, a map and sets its design step
+	// with the CLI verb, so no spec file is needed in trunk.
+	designSteps map[string]string
 	// queue lists the epics put on the queue once the server is up.
 	queue []string
 }
@@ -84,6 +87,15 @@ var scenarios = map[string]scenario{
 		},
 		behaviour: map[string]string{project + ":approve-epic/01": agentfake.BehaviourPermission},
 		queue:     []string{project + ":approve-epic"},
+	},
+	// design: a map epic at the Resolve tickets step, with open tickets. Its
+	// design session replays fakeclaude's scripted chat.
+	"design": {
+		epics: []epic{{project, "design-epic", []ticket{
+			{"01", "first", servertest.TicketOpts{}},
+			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
+		}}},
+		designSteps: map[string]string{project + ":design-epic": "resolve-tickets"},
 	},
 	// edge: a project with no epics, an epic with no tickets, and a ticket
 	// blocked by a dependency that is not merged.

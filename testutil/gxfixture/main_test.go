@@ -353,3 +353,121 @@ func TestPausedScenario_WebRecoveryClearsEachPause(t *testing.T) {
 	}
 	r.stop(t)
 }
+
+const designAddr = "demo:design-epic"
+
+func (r *running) currentStep(t *testing.T) server.ProgressStep {
+	t.Helper()
+	var d server.EpicDetail
+	if err := json.Unmarshal([]byte(r.gx(t, "server", "epics", "detail", designAddr, "--json")), &d); err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range d.Steps {
+		if s.State == server.MapStepCurrent {
+			return s.Step
+		}
+	}
+	t.Fatalf("no current step in %+v", d.Steps)
+	return ""
+}
+
+// waitChat polls the session's chat until ok accepts it.
+func (r *running) waitChat(t *testing.T, id string, ok func(server.SessionChatResponse) bool) server.SessionChatResponse {
+	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		var chat server.SessionChatResponse
+		if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", id, "--json")), &chat); err != nil {
+			t.Fatal(err)
+		}
+		if ok(chat) {
+			return chat
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("chat never reached the wanted state; round = %+v next = %+v", chat.Round, chat.Next)
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+}
+
+// waitStep polls until the epic detail shows step as current.
+func (r *running) waitStep(t *testing.T, step server.ProgressStep) {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for r.currentStep(t) != step {
+		if time.Now().After(deadline) {
+			t.Fatalf("current step = %q, want %q", r.currentStep(t), step)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// waitIdle waits for the session to end its turn: the scripted message is in
+// the chat while the turn is still ending, and a prompt typed then is refused.
+func (r *running) waitIdle(t *testing.T, id string) {
+	t.Helper()
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		var list []server.SessionInfo
+		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range list {
+			if s.ID == id && s.Status.State == server.SessionIdle {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("session %s never went idle", id)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+func roundLabels(chat server.SessionChatResponse) []string {
+	var labels []string
+	for _, c := range chat.Round {
+		labels = append(labels, c.Label)
+	}
+	return labels
+}
+
+func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
+	r := start(t, "design")
+	if step := r.currentStep(t); step != server.ProgressResolveTickets {
+		t.Errorf("current step = %q, want resolve-tickets", step)
+	}
+	// The verb moves the step the page shows.
+	r.gx(t, "tickets", "set", designAddr, "--design-step", "spec")
+	r.waitStep(t, server.ProgressSpec)
+	repo := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "repo")
+	tracked, err := exec.Command("git", "-C", repo, "ls-files").Output()
+	if err != nil || strings.TrimSpace(string(tracked)) != agentfake.WorkerConfigFile {
+		t.Errorf("trunk files = %q, %v; want only the worker config, so no spec", tracked, err)
+	}
+
+	var res server.SessionResult
+	if err := json.Unmarshal([]byte(r.gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
+		t.Fatalf("designs open = %+v, %v", res, err)
+	}
+	id := res.Session.ID
+
+	chat := r.waitChat(t, id, func(c server.SessionChatResponse) bool { return len(c.Round) > 0 })
+	if got := roundLabels(chat); !slices.Equal(got, []string{"8", "8b"}) {
+		t.Fatalf("round labels = %v, want 8 and 8b", got)
+	}
+
+	r.waitIdle(t, id)
+	r.gx(t, "agents", "prompt", id, "SQLite, and yes to the migration")
+	chat = r.waitChat(t, id, func(c server.SessionChatResponse) bool { return c.Next != nil })
+	if len(chat.Next.Action.Action) == 0 {
+		t.Errorf("next = %+v, want the Continue action", chat.Next)
+	}
+
+	// Continue as the page sends it; the CLI's run-action needs the session's
+	// Actionable, which an answer typed by the server does not clear.
+	r.waitIdle(t, id)
+	r.web(t).post(t, "/v1/sessions/prompt", map[string]any{"id": id, "continue": true, "last_message": chat.Messages[len(chat.Messages)-1].ID})
+	r.waitChat(t, id, func(c server.SessionChatResponse) bool { return slices.Equal(roundLabels(c), []string{"9"}) })
+	r.stop(t)
+}

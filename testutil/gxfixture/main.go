@@ -226,6 +226,14 @@ func (f *fixture) seed(sc scenario) error {
 		if err := servertest.WriteEpic(f.store, e.project, e.name); err != nil {
 			return err
 		}
+		addr := e.project + ":" + e.name
+		_, isMap := sc.designSteps[addr]
+		if isMap {
+			ticketMD := filepath.Join(f.store, e.project, e.name, "ticket.md")
+			if err := os.WriteFile(ticketMD, []byte("---\nstatus: open\nkind: map\n---\n"), 0o644); err != nil {
+				return err
+			}
+		}
 		for _, tk := range e.tickets {
 			if err := servertest.WriteTicketFile(f.store, e.project, e.name, tk.id, tk.slug, tk.opts); err != nil {
 				return err
@@ -239,6 +247,11 @@ func (f *fixture) seed(sc scenario) error {
 		}
 		if err := servertest.WriteProjectRepo(f.store, e.project, repo, `,"auto-ff-merge":true`); err != nil {
 			return err
+		}
+		if isMap {
+			if out, err := f.cli("tickets", "set", addr, "--design-step", sc.designSteps[addr]); err != nil {
+				return fmt.Errorf("set design step of %s: %w\n%s", addr, err, out)
+			}
 		}
 	}
 	return nil
