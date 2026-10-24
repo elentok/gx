@@ -728,7 +728,7 @@ type ptyPrompter struct {
 }
 
 func (pr *ptyPrompter) Submit(text string) error {
-	if err := pr.ss.holder.SendKeys(text); err != nil {
+	if err := pr.ss.holder.TypeText(text); err != nil {
 		return pr.p.died(pr.ss, err)
 	}
 	return pr.SendEnter()

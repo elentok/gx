@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
+
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/harness"
 )
@@ -53,8 +55,18 @@ const OpTurnOSC = "turn-osc"
 // The core screen op stays plain.
 const OpScreenStyled = "screen-styled"
 
+// OpPaste writes text to the child as one paste, bracketed when the child
+// turned bracketed paste on.
+const OpPaste = "paste"
+
 // holderOptionalOps are the optional ops this holder serves.
-var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC, OpScreenStyled}
+var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC, OpScreenStyled, OpPaste}
+
+// typedTextMax is the longest text that goes to the child as plain keys. A
+// tty read takes at most about 1 KB on macOS, and Claude Code keeps only the
+// last read of unbracketed input that spans more than one, so longer text
+// goes as a bracketed paste.
+const typedTextMax = 512
 
 const (
 	holderIOTimeout = 5 * time.Second
@@ -218,6 +230,15 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 	if req.Op == OpScreenStyled && slices.Contains(h.ops, OpScreenStyled) {
 		return holderResponse{Screen: h.scr.StyledRows()}, nil
 	}
+	if req.Op == OpPaste && slices.Contains(h.ops, OpPaste) {
+		if h.denying.Load() {
+			return holderResponse{Error: denyBusyMessage}, nil
+		}
+		if _, err := h.ptmx.Write(h.pasted(req.Keys)); err != nil {
+			return holderResponse{Error: err.Error()}, nil
+		}
+		return holderResponse{}, nil
+	}
 	if req.Op == OpDenyReason && slices.Contains(h.ops, OpDenyReason) {
 		if err := h.denyReason(req.Reason); err != nil {
 			return holderResponse{Error: err.Error()}, nil
@@ -263,7 +284,11 @@ func (h *holderServer) denyReason(reason string) error {
 	if !ready {
 		return errors.New("claude input not ready to type the reason")
 	}
-	if _, err := h.ptmx.Write([]byte(reason)); err != nil {
+	typed := []byte(reason)
+	if len(reason) > typedTextMax {
+		typed = h.pasted(reason)
+	}
+	if _, err := h.ptmx.Write(typed); err != nil {
 		return err
 	}
 	// Enter apart from the text, so claude reads it as a submit rather than
@@ -275,6 +300,15 @@ func (h *holderServer) denyReason(reason string) error {
 		return errors.New("claude did not take the reason")
 	}
 	return nil
+}
+
+// pasted is text as the child reads a paste of it: bracketed when the child
+// turned bracketed paste on.
+func (h *holderServer) pasted(text string) []byte {
+	if !h.scr.BracketedPaste() {
+		return []byte(text)
+	}
+	return []byte(ansi.BracketedPasteStart + text + ansi.BracketedPasteEnd)
 }
 
 // watch streams the Watch's status until the holder finishes, then the exit.
@@ -470,6 +504,22 @@ func (c *HolderClient) StyledScreen() ([]string, error) {
 func (c *HolderClient) SendKeys(keys string) error {
 	_, err := c.call(holderRequest{Op: opKeys, Keys: keys})
 	return err
+}
+
+// Paste runs the optional paste op; check Supports first.
+func (c *HolderClient) Paste(text string) error {
+	_, err := c.call(holderRequest{Op: OpPaste, Keys: text})
+	return err
+}
+
+// TypeText writes text to the child's input box. Text over typedTextMax goes
+// as a paste when the holder serves it, so the child reads all of it; an
+// older holder gets plain keys.
+func (c *HolderClient) TypeText(text string) error {
+	if len(text) > typedTextMax && c.Supports(OpPaste) {
+		return c.Paste(text)
+	}
+	return c.SendKeys(text)
 }
 
 // Stop ends the child; the holder then records its exit and exits.

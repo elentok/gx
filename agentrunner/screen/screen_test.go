@@ -528,3 +528,19 @@ func TestScreen_HeldInputWaitsForReleaseButRepliesDoNot(t *testing.T) {
 		t.Errorf("written = %q; want the DA1 reply first, then the held input in order", got)
 	}
 }
+
+func TestScreen_BracketedPasteFollowsMode(t *testing.T) {
+	s := screen.NewScreen(10, 2)
+	t.Cleanup(func() { _ = s.Close() })
+	if s.BracketedPaste() {
+		t.Error("BracketedPaste() = true before the child turned it on")
+	}
+	_, _ = s.Write([]byte("\x1b[?2004h"))
+	if !s.BracketedPaste() {
+		t.Error("BracketedPaste() = false after ?2004h")
+	}
+	_, _ = s.Write([]byte("\x1b[?2004l"))
+	if s.BracketedPaste() {
+		t.Error("BracketedPaste() = true after ?2004l")
+	}
+}

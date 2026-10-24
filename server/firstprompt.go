@@ -320,7 +320,7 @@ func (p *holderPrompter) Submit(text string) error {
 	if err := p.cancelled(); err != nil {
 		return err
 	}
-	if err := p.c.SendKeys(text); err != nil {
+	if err := p.c.TypeText(text); err != nil {
 		return err
 	}
 	p.f.markTyped()

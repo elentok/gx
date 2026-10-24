@@ -76,8 +76,10 @@ type Screen struct {
 	trimmed int
 	// mouse is the mouse reporting modes the child turned on.
 	mouse map[ansi.Mode]bool
-	st    stFilter
-	buf   []byte
+	// bracketedPaste is whether the child turned on bracketed paste.
+	bracketedPaste bool
+	st             stFilter
+	buf            []byte
 	// holding queues SendKey and Paste into held, as closures run under mu.
 	holding bool
 	held    []func()
@@ -102,8 +104,8 @@ func NewScreenWithReplies(cols, rows int, replies io.Writer) *Screen {
 	emu.SetCallbacks(vt.Callbacks{
 		CursorVisibility: func(visible bool) { s.cursorVisible = visible },
 		AltScreen:        func(bool) { s.allDirty = true },
-		EnableMode:       func(m ansi.Mode) { s.setMouseMode(m, true) },
-		DisableMode:      func(m ansi.Mode) { s.setMouseMode(m, false) },
+		EnableMode:       func(m ansi.Mode) { s.setMode(m, true) },
+		DisableMode:      func(m ansi.Mode) { s.setMode(m, false) },
 	})
 	// The emulator writes replies and encoded input into a pipe, and an
 	// unread pipe blocks the next Write that triggers one.
@@ -422,8 +424,10 @@ func modifiedNavSeq(k Key) (string, bool) {
 	return "", false
 }
 
-func (s *Screen) setMouseMode(m ansi.Mode, on bool) {
+func (s *Screen) setMode(m ansi.Mode, on bool) {
 	switch m {
+	case ansi.ModeBracketedPaste:
+		s.bracketedPaste = on
 	case ansi.ModeMouseX10, ansi.ModeMouseNormal, ansi.ModeMouseHighlight, ansi.ModeMouseButtonEvent, ansi.ModeMouseAnyEvent:
 		if on {
 			s.mouse[m] = true
@@ -431,6 +435,13 @@ func (s *Screen) setMouseMode(m ansi.Mode, on bool) {
 			delete(s.mouse, m)
 		}
 	}
+}
+
+// BracketedPaste reports whether the child turned on bracketed paste.
+func (s *Screen) BracketedPaste() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.bracketedPaste
 }
 
 // MouseReporting reports whether the child turned on mouse reporting, so it

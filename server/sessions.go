@@ -808,7 +808,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 func typeSessionPrompt(dir, prompt string) error {
 	c, err := nativerunner.DialHolder(dir)
 	if err == nil {
-		err = c.SendKeys(prompt)
+		err = c.TypeText(prompt)
 	}
 	if err == nil {
 		err = c.SendKeys("\r")

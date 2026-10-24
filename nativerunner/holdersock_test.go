@@ -2,6 +2,7 @@ package nativerunner_test
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -242,6 +243,67 @@ func TestHolderSocket_StatusFailsOnceClaudeExits(t *testing.T) {
 	if !errors.As(err, &exited) || exited.Code != 3 {
 		t.Errorf("status error = %v; want ClaudeExitedError with code 3", err)
 	}
+}
+
+// pasteChild turns bracketed paste on, then shows each line it reads with
+// control bytes visible.
+const pasteChild = `printf '\033[?2004hready\n'; while IFS= read -r l; do printf '%s\n' "$l" | cat -v; done`
+
+func TestHolderSocket_PasteIsBracketed(t *testing.T) {
+	_, c, _ := startHolder(t, pasteChild)
+	if !c.Supports(nativerunner.OpPaste) {
+		t.Fatal("ping does not list paste")
+	}
+	waitForScreen(t, c, "ready")
+	if err := c.Paste("hi"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SendKeys("\r"); err != nil {
+		t.Fatal(err)
+	}
+	waitForScreen(t, c, "^[[200~hi^[[201~")
+}
+
+// countChild turns bracketed paste on and counts the bytes of the first n it
+// reads in raw mode, so a tty line limit can't cut a long input.
+const countChild = `stty raw -echo; printf '\033[?2004hready\r\n'; n=$(head -c %d | wc -c | tr -d ' '); stty sane; printf 'count:%%s\n' "$n"; cat >/dev/null`
+
+func TestHolderClient_TypeTextPastesLongText(t *testing.T) {
+	long := strings.Repeat("x", 1500)
+	pasted := len(long) + len("\x1b[200~\x1b[201~")
+	_, c, _ := startHolder(t, fmt.Sprintf(countChild, pasted))
+	waitForScreen(t, c, "ready")
+	if err := c.TypeText(long); err != nil {
+		t.Fatal(err)
+	}
+	waitForScreen(t, c, fmt.Sprintf("count:%d", pasted))
+}
+
+func TestHolderClient_TypeTextSendsShortTextAsKeys(t *testing.T) {
+	_, c, _ := startHolder(t, pasteChild)
+	waitForScreen(t, c, "ready")
+	if err := c.TypeText("hi\r"); err != nil {
+		t.Fatal(err)
+	}
+	waitForScreen(t, c, "hi")
+	rows, _, err := c.Screen(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.Join(rows, "\n"), "200~") {
+		t.Errorf("short text went as a paste: %q", rows)
+	}
+}
+
+func TestHolderClient_TypeTextWithoutPasteOpSendsKeys(t *testing.T) {
+	nativerunner.SetHolderOptionalOps(t, nil)
+	_, c, _ := startHolder(t, echoChild)
+	waitForScreen(t, c, "ready")
+	long := strings.Repeat("y", 600)
+	if err := c.TypeText(long + "\r"); err != nil {
+		t.Fatal(err)
+	}
+	waitForScreen(t, c, "got:yyyy")
 }
 
 // dimChild prints "dimmed" with the SGR dim attribute on, then idles.
