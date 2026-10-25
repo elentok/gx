@@ -1,8 +1,12 @@
+import { Box } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
+import { fetchTicketScreen, type FetchScreen } from "../design/screen";
+import { ScreenModal } from "../design/ScreenModal";
 import { BackLink } from "../nav/BackLink";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
+import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
 import { ActionCard, needsActionCard } from "./ActionCard";
@@ -11,13 +15,22 @@ import { epicOfTicket, useTicketDetail, type FetchDetail } from "./detail";
 import { TicketHeader } from "./TicketHeader";
 import { hasSections, NothingHere, TicketSections } from "./TicketSections";
 
-export function TicketPage({ address, fetchDetail }: { address: string; fetchDetail?: FetchDetail }) {
+export function TicketPage({
+  address,
+  fetchDetail,
+  fetchScreen = fetchTicketScreen,
+}: {
+  address: string;
+  fetchDetail?: FetchDetail;
+  fetchScreen?: FetchScreen;
+}) {
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps a running ticket's clock counting.
   useConnectionState(conn);
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
   const [sent, setSent] = useState<Sent | null>(null);
   const [resumed, setResumed] = useState("");
+  const [showScreen, setShowScreen] = useState(false);
   const epicAddress = epicOfTicket(address);
   const backTo = `/e/${epicAddress}`;
   const backLabel = `← ${epicAddress.slice(epicAddress.indexOf(":") + 1)}`;
@@ -34,6 +47,14 @@ export function TicketPage({ address, fetchDetail }: { address: string; fetchDet
             <PageHeader backTo={backTo} backLabel={backLabel} title={detail.title}>
               <TicketHeader detail={detail} now={Date.now()} />
             </PageHeader>
+            {detail.has_screen && (
+              <Box mt="2">
+                <Button variant="outline" onClick={() => setShowScreen(true)}>
+                  Screen
+                </Button>
+              </Box>
+            )}
+            {showScreen && <ScreenModal target={address} fetcher={fetchScreen} onClose={() => setShowScreen(false)} />}
             <ActionCard
               detail={detail}
               sent={sent}

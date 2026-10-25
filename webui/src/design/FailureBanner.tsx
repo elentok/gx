@@ -147,7 +147,7 @@ export function FailureBanner({
           ))}
         </Box>
       )}
-      {screen && <ScreenModal sessionId={sessionId} fetcher={fetchScreen} onClose={() => setScreen(false)} />}
+      {screen && <ScreenModal target={sessionId} fetcher={fetchScreen} onClose={() => setScreen(false)} />}
     </Box>
   );
 }

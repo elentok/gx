@@ -1,0 +1,87 @@
+package server_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
+)
+
+func startTicketScreen(t *testing.T) *servertest.Harness {
+	t.Helper()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
+	return servertest.StartWithStore(t, store)
+}
+
+// ticketAgentDir writes a ticket agent directory of the given runner, with
+// the screen its holder saved when it ended.
+func ticketAgentDir(t *testing.T, stateDir, runner, screen string) {
+	t.Helper()
+	label, _, _ := ralphloop.IterationIdentity("epic-a", "01", "")
+	dir := filepath.Join(nativerunner.AgentsRoot(stateDir, "proj"), label)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := nativerunner.WriteMeta(dir, nativerunner.Meta{Runner: runner, Label: label}); err != nil {
+		t.Fatal(err)
+	}
+	if screen != "" {
+		if err := os.WriteFile(filepath.Join(dir, nativerunner.ScreenFile), []byte(screen), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestTicketScreen_PtyAgentReturnsItsSavedScreen(t *testing.T) {
+	h := startTicketScreen(t)
+	ticketAgentDir(t, h.StateDir, "pty", "saved one\nsaved two\n")
+	ctx := context.Background()
+
+	res, err := h.Client.TicketScreen(ctx, "proj:epic-a/01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(res.Rows, "|"); got != "saved one|saved two" {
+		t.Errorf("rows = %q, want the saved screen", got)
+	}
+	d, err := h.Client.Detail(ctx, "proj:epic-a/01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.HasScreen {
+		t.Error("detail.HasScreen = false for a pty agent, want true")
+	}
+}
+
+func TestTicketScreen_AgentWithoutPtyHasNoScreen(t *testing.T) {
+	h := startTicketScreen(t)
+	ticketAgentDir(t, h.StateDir, "headless", "")
+	ctx := context.Background()
+
+	if _, err := h.Client.TicketScreen(ctx, "proj:epic-a/01"); err == nil || !strings.Contains(err.Error(), "404") {
+		t.Errorf("headless agent err = %v, want a 404", err)
+	}
+	d, err := h.Client.Detail(ctx, "proj:epic-a/01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.HasScreen {
+		t.Error("detail.HasScreen = true for a headless agent, want false")
+	}
+}
+
+func TestTicketScreen_TicketWithoutAgentIsRefused(t *testing.T) {
+	h := startTicketScreen(t)
+
+	if _, err := h.Client.TicketScreen(context.Background(), "proj:epic-a/01"); err == nil || !strings.Contains(err.Error(), "404") {
+		t.Errorf("no-agent err = %v, want a 404", err)
+	}
+}

@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { Button } from "../ui/button/Button";
 import { fetchScreen, type FetchScreen } from "./screen";
 
-/** The session's screen as plain text rows. It reads once on open and again on Refresh, never on its own. */
-export function ScreenModal({ sessionId, fetcher = fetchScreen, onClose }: { sessionId: string; fetcher?: FetchScreen; onClose: () => void }) {
+/** A screen as plain text rows; the target is whatever the fetcher takes. It reads once on open and again on Refresh, never on its own. */
+export function ScreenModal({ target, fetcher = fetchScreen, onClose }: { target: string; fetcher?: FetchScreen; onClose: () => void }) {
   const [rows, setRows] = useState<string[]>();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -13,7 +13,7 @@ export function ScreenModal({ sessionId, fetcher = fetchScreen, onClose }: { ses
     setLoading(true);
     setError("");
     try {
-      const res = await fetcher(sessionId);
+      const res = await fetcher(target);
       if (res.kind === "ok") setRows(res.detail.rows);
       else setError("This session has no screen.");
     } catch {
@@ -24,9 +24,9 @@ export function ScreenModal({ sessionId, fetcher = fetchScreen, onClose }: { ses
   };
   useEffect(() => {
     void load();
-    // Only a different session reloads; Refresh is the other way in.
+    // Only a different target reloads; Refresh is the other way in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [target]);
 
   return (
     <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4" onClick={onClose}>

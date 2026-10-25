@@ -21,10 +21,10 @@ function QueueRoute() {
   return <QueueScreen state={useConnectionState(conn)} onChanged={conn.refresh} />;
 }
 
-function TicketRoute({ fetchDetail }: { fetchDetail?: FetchDetail }) {
+function TicketRoute({ fetchDetail, fetchScreen }: { fetchDetail?: FetchDetail; fetchScreen?: FetchScreen }) {
   // An address holds a slash (project:epic/NN), so it arrives as the splat.
   const address = useParams()["*"] ?? "";
-  return <TicketPage address={address} fetchDetail={fetchDetail} />;
+  return <TicketPage address={address} fetchDetail={fetchDetail} fetchScreen={fetchScreen} />;
 }
 
 function EpicRoute({ fetchDetail, openDesign }: { fetchDetail?: FetchEpicDetail; openDesign?: OpenDesign }) {
@@ -54,6 +54,7 @@ export interface RouteFetchers {
   stop?: StopSession;
   resume?: ResumeSession;
   screen?: FetchScreen;
+  ticketScreen?: FetchScreen;
   ticket?: FetchDetail;
   epic?: FetchEpicDetail;
   epicList?: FetchEpicList;
@@ -70,7 +71,7 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
     { path: "/designs", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
-    { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} /> },
+    { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },
     { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} openDesign={fetchers.openDesign} /> },
     // "/" and an unknown hash go to the Queue.
     { path: "*", loader: () => redirect("/q") },

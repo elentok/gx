@@ -219,6 +219,11 @@ export interface TicketDetail {
    */
   runs: DetailRun[];
   /**
+   * HasScreen is set when the latest run's agent ran in a pty, so
+   * /v1/sessions/screen?ticket= has a screen to show.
+   */
+  has_screen?: boolean;
+  /**
    * State is the token an answer or resume sends back; empty without a round.
    */
   state?: string;

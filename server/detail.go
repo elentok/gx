@@ -111,6 +111,9 @@ type TicketDetail struct {
 	Chat       []ChatMessage   `json:"chat"`
 	// Runs is one line per run, oldest first; a map ticket has none.
 	Runs []DetailRun `json:"runs"`
+	// HasScreen is set when the latest run's agent ran in a pty, so
+	// /v1/sessions/screen?ticket= has a screen to show.
+	HasScreen bool `json:"has_screen,omitempty"`
 	// State is the token an answer or resume sends back; empty without a round.
 	State string `json:"state,omitempty"`
 	// Bases are the competing blockers an ambiguous-base pause chooses between;
@@ -162,6 +165,7 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	fillHeader(&d, ref, t)
 	if !ref.epic.IsMap {
 		d.Stats = s.detailStats(ref)
+		_, d.HasScreen = s.ticketPtyDir(ref.addr)
 		var writtenAt time.Time
 		if t.Status == schema.StatusCancelled {
 			writtenAt = ticketWrittenAt(ref.ticket.Path)

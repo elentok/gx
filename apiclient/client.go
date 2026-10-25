@@ -552,6 +552,13 @@ func (c *Client) SessionScreen(ctx context.Context, id string) (server.SessionSc
 	return res, err
 }
 
+// TicketScreen reads a loop ticket agent's screen as plain text rows.
+func (c *Client) TicketScreen(ctx context.Context, address string) (server.SessionScreenResponse, error) {
+	var res server.SessionScreenResponse
+	err := c.get(ctx, "/v1/sessions/screen?ticket="+url.QueryEscape(address), &res)
+	return res, err
+}
+
 // SetAFK sets AFK mode; a nil on toggles it.
 func (c *Client) SetAFK(ctx context.Context, on *bool) (server.AFKResult, error) {
 	var res server.AFKResult
