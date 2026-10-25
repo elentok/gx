@@ -20,6 +20,7 @@ var (
 	fileRedirect = regexp.MustCompile(`(^|[^<>&0-9])>>?\s*[^\s>&]`)
 	devNull      = regexp.MustCompile(`>>?\s*/dev/null`)
 	scriptHeredc = regexp.MustCompile(`\b(python[0-9.]*|perl|ruby|node)\b[^\n]*<<`)
+	quoted       = regexp.MustCompile(`"[^"]*"|'[^']*'`)
 	heredocStart = regexp.MustCompile(`<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)`)
 )
 
@@ -43,6 +44,13 @@ func withoutHeredocBodies(command string) string {
 	return strings.Join(kept, "\n")
 }
 
+// withoutQuotedText empties quoted strings, keeping the quotes. A ">" inside
+// one (a commit trailer ending in `<noreply@x.com>"`) is not a redirect, while
+// `> "file"` still reads as one.
+func withoutQuotedText(command string) string {
+	return quoted.ReplaceAllStringFunc(command, func(s string) string { return s[:1] + s[len(s)-1:] })
+}
+
 // guardBashCommand returns why command must not run, or "" when it may.
 // It blocks the ways agents edit files that bypass Edit's staleness check:
 // sed -i, heredocs redirected into a file, and interpreter heredoc scripts.
@@ -53,7 +61,7 @@ func guardBashCommand(command string) string {
 		return "sed -i edits files behind Edit's back. " + hint
 	case scriptHeredc.MatchString(command):
 		return "A heredoc script that rewrites files is invisible when it hangs. " + hint
-	case heredoc.MatchString(command) && fileRedirect.MatchString(devNull.ReplaceAllString(withoutHeredocBodies(command), "")):
+	case heredoc.MatchString(command) && fileRedirect.MatchString(withoutQuotedText(devNull.ReplaceAllString(withoutHeredocBodies(command), ""))):
 		return "A heredoc written into a file skips imports and indentation checks. " + hint
 	}
 	return ""

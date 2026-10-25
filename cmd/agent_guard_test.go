@@ -31,6 +31,8 @@ func TestGuardBashCommand(t *testing.T) {
 		{"ticket add body with arrows", "gx tickets add e --slug s --body - <<'EOF'\nBlock `>` and a -> b, not >>x\nEOF", false},
 		{"redirect after heredoc body", "gx tickets add e --body - <<'EOF'\nbody\nEOF\necho hi > out.txt", true},
 		{"heredoc start with redirect", "cat <<'EOF' > a.go\npackage a\nEOF", true},
+		{"commit trailer ending in >\"", "gx tickets section 1/2 Notes - <<'EOF'\nbody\nEOF\ngit commit -m \"subj\n\nCo-Authored-By: Claude <noreply@anthropic.com>\"", false},
+		{"redirect into quoted path", "cat > \"a.go\" <<'EOF'\npackage a\nEOF", true},
 		{"git status", `git status`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
