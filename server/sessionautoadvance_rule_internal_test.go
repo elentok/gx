@@ -30,7 +30,7 @@ func TestCanAutoAdvance(t *testing.T) {
 		{"grilling", func(m *sessionMeta) { m.Actionable.Grilling = true }, false},
 		{"no action", func(m *sessionMeta) { m.Actionable.Action = nil }, false},
 		{"not promptable", func(m *sessionMeta) { m.Status = SessionStatus{State: SessionWorking} }, false},
-		{"codex", func(m *sessionMeta) { m.Harness = string(harness.Codex) }, false},
+		{"codex", func(m *sessionMeta) { m.Harness = string(harness.Codex) }, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestDecideActionable(t *testing.T) {
 		{"advance", nil, true, policy, actionableAdvance, "next"},
 		{"raised when not live", nil, true, actionablePolicy{MaxAutoSends: 5}, actionableRaised, "next"},
 		{"raised with the switch off", func(m *sessionMeta) { m.AutoAdvanceOff = true }, true, policy, actionableRaised, "next"},
-		{"raised on codex", func(m *sessionMeta) { m.Harness = string(harness.Codex) }, true, policy, actionableRaised, "next"},
+		{"advance on codex", func(m *sessionMeta) { m.Harness = string(harness.Codex) }, true, policy, actionableAdvance, "next"},
 		{"capped", func(m *sessionMeta) { m.AutoSends = 5 }, true, policy, actionableCapped, "next"},
 	}
 	for _, tt := range tests {

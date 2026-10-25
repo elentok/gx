@@ -61,7 +61,7 @@ func afterEveryRun(t *testing.T) (template string, examples []string) {
 }
 
 func continues(text string) bool {
-	a, ok := designActionable(text, "gx:epic/03", false)
+	a, ok := designActionable(text, "gx:epic/03", "claude", false)
 	return ok && !a.Grilling && len(a.Action) == 2
 }
 
@@ -112,7 +112,7 @@ func TestGxGrillingRoundTemplate_IsGrilling(t *testing.T) {
 	if len(blocks) == 0 {
 		t.Fatal("gx-grilling has no question-round template")
 	}
-	a, ok := designActionable(blocks[0], "gx:epic/03", false)
+	a, ok := designActionable(blocks[0], "gx:epic/03", "claude", false)
 	if !ok || !a.Grilling || a.Reason != grillingReason {
 		t.Errorf("round template yields (%+v, %v), want the grilling Actionable", a, ok)
 	}
@@ -149,7 +149,7 @@ func TestGxGrillingAllDefaultedTemplate_IsGrilling(t *testing.T) {
 	if found == "" {
 		t.Fatal("gx-grilling has no all-defaulted round template")
 	}
-	a, ok := designActionable(found, "gx:epic/03", false)
+	a, ok := designActionable(found, "gx:epic/03", "claude", false)
 	if !ok || !a.Grilling || a.Reason != grillingReason {
 		t.Errorf("all-defaulted template yields (%+v, %v), want the grilling Actionable", a, ok)
 	}

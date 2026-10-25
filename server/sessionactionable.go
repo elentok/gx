@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/transcript"
@@ -110,23 +111,23 @@ var runEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next:.*$`)
 
 // designActionable is what a Design session's last assistant message asks of
 // the person: the grilling question wins over the run-end line.
-func designActionable(text, ticket string, final bool) (SessionActionable, bool) {
+func designActionable(text, ticket, agent string, final bool) (SessionActionable, bool) {
 	if hasGrillingMarker(text) {
 		return SessionActionable{Reason: grillingReason, Grilling: true, Derived: true}, true
 	}
-	return runEndNext(text, ticket, final)
+	return runEndNext(text, ticket, agent, final)
 }
 
 // runEndNext is the Actionable a gx-design run-end line raises: Continue in a
 // fresh conversation, or just the line when the design is at its final step.
-func runEndNext(text, ticket string, final bool) (SessionActionable, bool) {
+func runEndNext(text, ticket, agent string, final bool) (SessionActionable, bool) {
 	line := runEndLine.FindString(text)
 	if line == "" {
 		return SessionActionable{}, false
 	}
 	a := SessionActionable{Reason: strings.TrimSpace(line), Derived: true}
 	if !final {
-		a.Action = designContinueAction(ticket)
+		a.Action = designContinueAction(ticket, agent)
 	}
 	return a, true
 }
@@ -150,9 +151,14 @@ func (s *Server) designFinal(ticket string) bool {
 	return false
 }
 
-// designContinueAction starts the next gx-design phase in a fresh conversation.
-func designContinueAction(ticket string) []string {
-	return []string{"/clear", "/gx-design " + ticketEpic(ticket)}
+// designContinueAction starts the next gx-design phase in a fresh conversation:
+// Codex resets with /new, Claude with /clear.
+func designContinueAction(ticket, agent string) []string {
+	reset := "/clear"
+	if agent == string(harness.Codex) {
+		reset = "/new"
+	}
+	return []string{reset, "/gx-design " + ticketEpic(ticket)}
 }
 
 // ticketEpic is the epic of a ticket address like "project:epic" or
@@ -214,8 +220,15 @@ func (s *Server) claudeTranscript(id string, meta sessionMeta) (string, bool) {
 }
 
 // lastAssistantText reads the session's last assistant message from its claude
-// transcript.
+// transcript, or from its codex rollout.
 func (s *Server) lastAssistantText(id string, meta sessionMeta) (string, bool) {
+	if meta.Harness == string(harness.Codex) {
+		text, ok, err := codexsession.LastAssistantText(meta.ConversationID)
+		if err != nil {
+			s.log.Warn("design actionable: read codex rollout", "session", id, "err", err)
+		}
+		return text, ok && err == nil
+	}
 	path, ok := s.claudeTranscript(id, meta)
 	if !ok {
 		return "", false
@@ -230,7 +243,7 @@ func (s *Server) lastAssistantText(id string, meta sessionMeta) (string, bool) {
 // detectDesignActionable recomputes the Actionable of a Design session from
 // its last assistant message: the newer turn supersedes an agent-raised one
 // and clears a derived one it no longer matches. A GxRaised one is never
-// touched. A harness without a claude transcript (codex) never matches.
+// touched.
 func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	meta, err := readSessionMeta(dir)
 	if err != nil {
@@ -242,7 +255,7 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 		return
 	}
 	s.fileBadRoundBlocks(id, design, text)
-	a, matched := designActionable(text, design.Ticket, s.designFinal(design.Ticket))
+	a, matched := designActionable(text, design.Ticket, meta.Harness, s.designFinal(design.Ticket))
 	outcome := actionableNone
 	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
 		var next SessionActionable
