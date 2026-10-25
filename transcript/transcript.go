@@ -249,7 +249,9 @@ func LastAssistantOccupancy(cwd, sessionID string) (occupancy int, ok bool, err 
 	if err != nil {
 		return 0, false, err
 	}
-	usage, ok, err := LastAssistantUsage(path)
+	// A session that started in another directory (the bare repo) and moved
+	// into the checkout is stored under the folder it started in.
+	usage, ok, err := LastAssistantUsage(Resolve(path))
 	if err != nil || !ok {
 		return 0, ok, err
 	}

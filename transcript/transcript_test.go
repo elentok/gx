@@ -3,6 +3,7 @@ package transcript
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -484,5 +485,38 @@ func TestLastAssistantOccupancy_ReadsThroughPath(t *testing.T) {
 	}
 	if occ != 6 {
 		t.Errorf("LastAssistantOccupancy() = %d, want 6", occ)
+	}
+}
+
+func TestLastAssistantOccupancy_FindsTranscriptUnderAnotherProjectFolder(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+	projects := filepath.Join(dir, ".claude", "projects")
+	line := func(input int) []byte {
+		return []byte(`{"type":"assistant","message":{"usage":{"input_tokens":` + strconv.Itoa(input) + `}}}` + "\n")
+	}
+	write := func(folder string, input int, mod time.Time) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Join(projects, folder), 0755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+		p := filepath.Join(projects, folder, "sess-1.jsonl")
+		if err := os.WriteFile(p, line(input), 0644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		if err := os.Chtimes(p, mod, mod); err != nil {
+			t.Fatalf("Chtimes: %v", err)
+		}
+	}
+	now := time.Now()
+	write("-old-start-dir", 11, now.Add(-time.Hour))
+	write("-newer-start-dir", 22, now)
+
+	occ, ok, err := LastAssistantOccupancy("/repo/checkout", "sess-1")
+	if err != nil || !ok {
+		t.Fatalf("LastAssistantOccupancy() = (%d, %v, %v), want ok", occ, ok, err)
+	}
+	if occ != 22 {
+		t.Errorf("occupancy = %d, want 22 (newest match)", occ)
 	}
 }

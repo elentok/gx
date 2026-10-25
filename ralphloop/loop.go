@@ -60,7 +60,11 @@ const defaultMaxParallel = 2
 // RunOptions.SmartZone is unset. It backstops the gx-implement skill's own
 // proactive 90K split threshold, so a session that misses that threshold
 // still gets paused before it runs away.
-const defaultSmartZone = 130_000
+const defaultSmartZone = SmartZoneCeiling
+
+// SmartZoneCeiling is the one context-token ceiling for every model; `gx agent
+// context-window --fits` shares it so chaining decisions match the pause point.
+const SmartZoneCeiling = 130_000
 
 // defaultWorkerSkill is the skill each iteration invokes when
 // RunOptions.Skill is unset.
