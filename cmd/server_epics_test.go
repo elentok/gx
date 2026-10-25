@@ -25,13 +25,13 @@ func TestPrintEpicDetail_ShowsQueueable(t *testing.T) {
 func TestPrintEpicList_OneLinePerEpic(t *testing.T) {
 	var out bytes.Buffer
 	l := server.EpicList{Epics: []server.EpicListRow{
-		{Address: "proj:a", Kind: server.EpicKindLoop, State: server.EpicListReady, Done: 1, Total: 2, Queueable: true},
+		{Address: "proj:a", Kind: server.EpicKindLoop, State: server.EpicListReady, Done: 1, Total: 2, Queueable: true, Section: server.SectionReadyToQueue},
 		{Address: "proj:b", Kind: server.EpicKindMap, State: server.EpicListDesigning},
 	}}
 	if err := printEpicList(&out, l); err != nil {
 		t.Fatal(err)
 	}
-	if want := "proj:a\tloop\tready\t1/2\tqueueable=true\nproj:b\tmap\tdesigning\t0/0\tqueueable=false\n"; out.String() != want {
+	if want := "proj:a\tloop\tready\t1/2\tqueueable=true\tready-to-queue\nproj:b\tmap\tdesigning\t0/0\tqueueable=false\t\n"; out.String() != want {
 		t.Errorf("output = %q, want %q", out.String(), want)
 	}
 }

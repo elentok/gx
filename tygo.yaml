@@ -8,12 +8,14 @@ packages:
       - detail.go
       - detailrelated.go
       - detailruns.go
+      - epiccard.go
       - epicdetail.go
       - epiclist.go
       - epicsummary.go
       - index.go
       - pause.go
       - recentlyfinished.go
+      - sessionautoadvance.go
       - sessionchat.go
       - sessionfailure.go
       - sessionfocus.go

@@ -100,6 +100,19 @@ type EpicListRow struct {
 	PickerSection PickerSection `json:"picker_section,omitempty"`
 	PickerSortAt  time.Time     `json:"picker_sort_at,omitzero"`
 	ImplAddress   string        `json:"impl_address,omitempty"`
+
+	// The card fields below are set on loop epic rows. A joined card carries both
+	// of its epics' addresses in Addresses, the active part first.
+	Addresses []string `json:"addresses,omitempty"`
+	CardKind  CardKind `json:"card_kind,omitempty"`
+	// Section is where the Epics page puts the card.
+	Section     CardSection `json:"section,omitempty"`
+	StatusWords string      `json:"status_words,omitempty"`
+	// RingProgress is the ring fill in percent, 0 to 100.
+	RingProgress int `json:"ring_progress,omitempty"`
+	// Reason is the line under the status words when there is something to say.
+	Reason  string       `json:"reason,omitempty"`
+	Actions []CardAction `json:"actions,omitempty"`
 }
 
 // FollowUpCount is the number of draft and open tickets in one project's
@@ -201,6 +214,9 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 			}
 		}
 	}
+	sortCards(list.Epics, func(r EpicListRow) int {
+		return s.rootQueuePosition(rootRef{Project: r.Project, Epic: r.Name})
+	})
 	writeJSON(w, list)
 }
 
@@ -268,6 +284,9 @@ func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 	row.State = epicListState(e, queued, queueable, epicStateFor(root, e, s.registry.startedAtOf))
 	if row.State == EpicListMergeBlocked {
 		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
+	}
+	if !e.IsMap {
+		decorateLoopCard(&row, s.rootQueuePosition(root))
 	}
 	return row
 }

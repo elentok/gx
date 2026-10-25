@@ -64,14 +64,18 @@ func newServerEpicsCmd() *cobra.Command {
 }
 
 // printEpicRow writes the one-line epic summary shared by the list and detail verbs.
-func printEpicRow(w io.Writer, address, kind, state string, done, total int, queueable bool) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d/%d\tqueueable=%t\n", address, kind, state, done, total, queueable)
+func printEpicRow(w io.Writer, address, kind, state string, done, total int, queueable bool, extra ...string) error {
+	line := fmt.Sprintf("%s\t%s\t%s\t%d/%d\tqueueable=%t", address, kind, state, done, total, queueable)
+	for _, col := range extra {
+		line += "\t" + col
+	}
+	_, err := fmt.Fprintln(w, line)
 	return err
 }
 
 func printEpicList(w io.Writer, l server.EpicList) error {
 	for _, e := range l.Epics {
-		if err := printEpicRow(w, e.Address, string(e.Kind), string(e.State), e.Done, e.Total, e.Queueable); err != nil {
+		if err := printEpicRow(w, e.Address, string(e.Kind), string(e.State), e.Done, e.Total, e.Queueable, string(e.Section)); err != nil {
 			return err
 		}
 	}

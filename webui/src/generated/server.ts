@@ -333,6 +333,52 @@ export interface DetailRun {
 }
 
 //////////
+// source: epiccard.go
+
+/**
+ * CardSection is the Epics page section a card belongs to. The server decides it;
+ * the web client does not derive sections.
+ */
+export type CardSection = string;
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionNeedsYou: CardSection = "needs-you";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionInProgress: CardSection = "in-progress";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionReadyToQueue: CardSection = "ready-to-queue";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionReadyToDesign: CardSection = "ready-to-design";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionFinished: CardSection = "finished";
+/**
+ * CardKind is the kind of an Epics page card.
+ */
+export type CardKind = string;
+export const CardKindImplementation: CardKind = "implementation";
+/**
+ * CardActionKind names what a card button does.
+ */
+export type CardActionKind = string;
+export const CardActionQueue: CardActionKind = "queue";
+/**
+ * CardAction is one button of a card.
+ */
+export interface CardAction {
+  kind: CardActionKind;
+  label: string;
+}
+
+//////////
 // source: epicdetail.go
 
 export const EpicKindLoop = "loop";
@@ -589,6 +635,26 @@ export interface EpicListRow {
   picker_section?: PickerSection;
   picker_sort_at?: string;
   impl_address?: string;
+  /**
+   * The card fields below are set on loop epic rows. A joined card carries both
+   * of its epics' addresses in Addresses, the active part first.
+   */
+  addresses?: string[];
+  card_kind?: CardKind;
+  /**
+   * Section is where the Epics page puts the card.
+   */
+  section?: CardSection;
+  status_words?: string;
+  /**
+   * RingProgress is the ring fill in percent, 0 to 100.
+   */
+  ring_progress?: number /* int */;
+  /**
+   * Reason is the line under the status words when there is something to say.
+   */
+  reason?: string;
+  actions?: CardAction[];
 }
 /**
  * FollowUpCount is the number of draft and open tickets in one project's
@@ -880,6 +946,20 @@ export interface FinishedEpic {
 }
 
 //////////
+// source: sessionautoadvance.go
+
+/**
+ * AutoAdvanceRequest is the body of POST /v1/sessions/auto-advance. State is
+ * the web's session state token. Off, not On, so a body without it leaves the
+ * switch on.
+ */
+export interface AutoAdvanceRequest {
+  id: string;
+  state?: string;
+  off?: boolean;
+}
+
+//////////
 // source: sessionchat.go
 
 /**
@@ -972,20 +1052,6 @@ export interface FocusReport {
   focused?: boolean;
   session?: string;
   term_program?: string;
-}
-
-//////////
-// source: sessionautoadvance.go
-
-/**
- * AutoAdvanceRequest is the body of POST /v1/sessions/auto-advance. State is
- * the web's session state token. Off, not On, so a body without it leaves the
- * switch on.
- */
-export interface AutoAdvanceRequest {
-  id: string;
-  state?: string;
-  off?: boolean;
 }
 
 //////////
@@ -1092,6 +1158,35 @@ export const SessionExitCrashed = "crashed";
  * How an Exited session ended, as SessionInfo.Exit.
  */
 export type SessionExitC = typeof SessionExitClean | typeof SessionExitCrashed;
+
+//////////
+// source: sessionscreen.go
+
+/**
+ * SessionScreenResponse is a session's screen as plain text rows, without
+ * colours: the live holder's, or the one saved when the session exited.
+ */
+export interface SessionScreenResponse {
+  rows: string[];
+}
+
+//////////
+// source: sessionstate.go
+
+/**
+ * SessionRequest names the session a stop or remove acts on. State is the
+ * token the web sends with a stop or Restore; see SessionStateToken. Only the
+ * web mux checks it (see checkDesignWrite): the plain mux ignores State, and on
+ * the web mux an empty State never matches a token, so it is refused as stale.
+ */
+export interface SessionRequest {
+  id: string;
+  state?: string;
+}
+
+//////////
+// source: sessiontypes.go
+
 /**
  * SessionInfo is an interactive session on the wire: everything the Agents
  * tab shows.
@@ -1267,31 +1362,6 @@ export interface SessionResult {
    * Client is the TUI a focus request went to; empty with no TUI connected.
    */
   client?: string;
-}
-
-//////////
-// source: sessionscreen.go
-
-/**
- * SessionScreenResponse is a session's screen as plain text rows, without
- * colours: the live holder's, or the one saved when the session exited.
- */
-export interface SessionScreenResponse {
-  rows: string[];
-}
-
-//////////
-// source: sessionstate.go
-
-/**
- * SessionRequest names the session a stop or remove acts on. State is the
- * token the web sends with a stop or Restore; see SessionStateToken. Only the
- * web mux checks it (see checkDesignWrite): the plain mux ignores State, and on
- * the web mux an empty State never matches a token, so it is refused as stale.
- */
-export interface SessionRequest {
-  id: string;
-  state?: string;
 }
 
 //////////
