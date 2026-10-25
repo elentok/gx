@@ -212,7 +212,7 @@ func (s *Server) saveConversationTotals(m sessionMeta, conversation string) {
 		s.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
 		return
 	}
-	if err := conversations.SaveTotals(s.cfg.ConversationsDir, conversation, conversations.Totals{TotalTokens: tokens, Cost: cost}); err != nil {
+	if err := conversations.SaveTotals(s.cfg.ConversationsDir, conversation, conversations.Totals{TotalTokens: int(tokens), Cost: cost}); err != nil {
 		s.log.Warn("save conversation totals", "session", m.ID, "conversation", conversation, "err", err)
 	}
 }

@@ -42,7 +42,7 @@ func TestWriteMergedMetrics_StampsTokensAndCostOverEverySession(t *testing.T) {
 	}
 
 	got := mustParse(t, ticketPath)
-	if got.TotalTokens == nil || int(*got.TotalTokens) != wantTokens {
+	if got.TotalTokens == nil || *got.TotalTokens != wantTokens {
 		t.Errorf("TotalTokens = %v, want %d", got.TotalTokens, wantTokens)
 	}
 	if got.ActualCost != wantCost || m.cost != wantCost || !m.costStamped {
@@ -102,7 +102,7 @@ func TestWriteMergedMetrics_RecordedConversation_AddsToStamp(t *testing.T) {
 	}
 
 	got := mustParse(t, ticketPath)
-	if got.TotalTokens == nil || int(*got.TotalTokens) != sessTokens+300 || got.ActualCost != sessCost+0.5 {
+	if got.TotalTokens == nil || *got.TotalTokens != sessTokens+300 || got.ActualCost != sessCost+0.5 {
 		t.Errorf("TotalTokens = %v, ActualCost = %v; want %d, %v", got.TotalTokens, got.ActualCost, sessTokens+300, sessCost+0.5)
 	}
 }
@@ -144,7 +144,7 @@ func TestWriteMergedMetrics_MixedCodexTicket_StampsClaudeCostAndMarker(t *testin
 	}
 
 	got := mustParse(t, ticketPath)
-	if got.TotalTokens == nil || int(*got.TotalTokens) != claudeTokens+7000 {
+	if got.TotalTokens == nil || *got.TotalTokens != claudeTokens+7000 {
 		t.Errorf("TotalTokens = %v, want %d", got.TotalTokens, claudeTokens+7000)
 	}
 	if got.ActualCost != claudeCost {
