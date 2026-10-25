@@ -11,8 +11,14 @@ already names.
 
 ### Issue tracker
 
-Issues live as local markdown files under `.scratch/`. See
-`~/.dotfiles/core/ai/skills/setup-elentok-skills/issue-tracker-local.md`.
+Issues live as local markdown files outside the repo. There is no `.scratch/` directory and no
+`gx tickets list` command. Use these instead:
+
+- `gx tickets root` prints the store path.
+- `gx tickets epics` lists the epics.
+- `gx tickets show <addr>` shows a ticket or an epic.
+
+See `~/.dotfiles/core/ai/skills/setup-elentok-skills/issue-tracker-local.md`.
 
 ### Domain docs
 
