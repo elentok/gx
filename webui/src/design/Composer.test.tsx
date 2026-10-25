@@ -614,6 +614,27 @@ test("Focus opens the round full screen; Send there answers it and collapses bac
   expect(await sheet()).toBeTruthy();
 });
 
+test("full screen shows the auto-advance switch and the countdown with Cancel", async () => {
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  render({
+    chat: chatOf({ round: [askCard(1)] }),
+    auto: { auto_advance_at: new Date(Date.now() + 9500).toISOString() },
+  });
+  const d = within(await focusDialog());
+  expect(d.getByRole("switch", { name: /Auto-advance on/ })).toBeTruthy();
+  expect(d.getByText(/Continuing in 10s/)).toBeTruthy();
+  fireEvent.click(d.getByRole("button", { name: "Cancel" }));
+  await waitFor(() =>
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/v1/sessions/auto-advance/cancel",
+      expect.objectContaining({ method: "POST" }),
+    ),
+  );
+  fetchSpy.mockRestore();
+});
+
 test("full screen keeps the note draft and the answers, and Escape collapses back", async () => {
   render({
     post: vi.fn<PostPrompt>(async () => ok),

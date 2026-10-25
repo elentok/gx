@@ -215,6 +215,16 @@ export function Composer({
     </>
   );
 
+  const autoAdvanceBar = (
+    <AutoAdvanceBar
+      session={session}
+      disabled={!connected || pending}
+      run={run}
+      setAutoAdvance={setAutoAdvance}
+      cancelAutoAdvance={cancelAutoAdvance}
+    />
+  );
+
   if (fullScreen) {
     const done = round.filter((c) => isAnswered(answers[c.label])).length;
     return createPortal(
@@ -230,6 +240,7 @@ export function Composer({
         aria-label="Composer"
       >
         {notices}
+        {autoAdvanceBar}
         <Box
           display="flex"
           gap="3"
@@ -302,13 +313,7 @@ export function Composer({
         </Box>
       )}
       {notices}
-      <AutoAdvanceBar
-        session={session}
-        disabled={!connected || pending}
-        run={run}
-        setAutoAdvance={setAutoAdvance}
-        cancelAutoAdvance={cancelAutoAdvance}
-      />
+      {autoAdvanceBar}
       {/* Under the note: its toggle and Continue; a round with no note open sends from here. */}
       <Box display="flex" gap="2" alignItems="stretch">
         {!open && (
