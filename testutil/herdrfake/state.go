@@ -179,6 +179,15 @@ func (s *State) Register(verb, noun string, fn CommandFunc) {
 	s.commands[verb+" "+noun] = fn
 }
 
+// Seed runs fn with mu held, so a test can add entities after the fake has
+// started serving without racing a dispatch's snapshot. fn must not call
+// State methods that take mu.
+func (s *State) Seed(fn func(s *State)) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	fn(s)
+}
+
 // AdvanceVirtualTime moves State's virtual clock forward by d. Nothing in
 // State advances it on its own; command implementations that model
 // timeouts, waits, or delays read the current value through VirtualTime and

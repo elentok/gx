@@ -27,9 +27,11 @@ func startKeyAgent(t *testing.T, kind string) (*State, string) {
 		return state, agent.PaneID
 	}
 	StartAgentHost(t, state)
-	state.Workspaces["w1"] = &Workspace{ID: "w1"}
-	state.Tabs["t1"] = &Tab{ID: "t1", WorkspaceID: "w1"}
-	state.Panes["p1"] = &Pane{ID: "p1", TabID: "t1"}
+	state.Seed(func(s *State) {
+		s.Workspaces["w1"] = &Workspace{ID: "w1"}
+		s.Tabs["t1"] = &Tab{ID: "t1", WorkspaceID: "w1"}
+		s.Panes["p1"] = &Pane{ID: "p1", TabID: "t1"}
+	})
 	agent, err := herdr.AgentStart(herdr.AgentStartOptions{Name: "agent", Kind: "claude", Pane: "p1"})
 	if err != nil {
 		t.Fatalf("AgentStart: %v", err)

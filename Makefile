@@ -43,7 +43,7 @@ install: web-build
 # The PTY-runner packages also run under -race: they share a vt emulator with
 # a background goroutine, and data races there only surface under the detector.
 # herdrrunner runs under it too, for its concurrent use of the herdr fake.
-RACE_PKGS := ./agentrunner/screen ./agentrunner/claudeui ./nativerunner ./claudedoctor ./agentrunner/herdrrunner
+RACE_PKGS := ./agentrunner/screen ./agentrunner/claudeui ./nativerunner ./claudedoctor ./agentrunner/herdrrunner ./testutil/herdrfake
 
 # The server package alone is most of the runtime and can't use t.Parallel (its
 # harness mutates PATH/HOME), so it runs sharded across processes instead; see
