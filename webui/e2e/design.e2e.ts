@@ -125,6 +125,55 @@ test.describe("11. Auto-advance, cancel", () => {
   });
 });
 
+test.describe("13. Defaulted questions", () => {
+  test("one asked question and two defaults: one card, defaults as plain text", async ({ page, start }) => {
+    await start("design-mixed", { autoAdvanceDelay: "1h" });
+    await openDesign(page);
+    await page.getByRole("button", nav("Start design session")).click();
+
+    const questions = page.getByRole("group", nav("Questions"));
+    await expect(questions.getByText("Q12 - Keep going?")).toBeVisible();
+    await expect(questions.getByRole("button", { name: /^Question \d/ })).toHaveCount(1);
+    await expect(page.getByText("Q10: keep the current store.")).toBeVisible();
+    await expect(page.getByText("Q11: migrate at startup.")).toBeVisible();
+
+    await questions.getByRole("button", { name: /Yes/ }).click();
+    await page.getByRole("button", nav("Send")).click();
+    await expect(page.getByText("Q12 - Keep going?: Yes")).toBeVisible();
+    // Send asked nothing about the defaults.
+    await expect(page.getByText(/Q1[01] - /)).toHaveCount(0);
+  });
+
+  test("an all-defaulted round: one Accept these defaults card and a grilling Actionable", async ({ page, start }) => {
+    const fixture = await start("design-defaulted", { autoAdvanceDelay: "1h" });
+    await openDesign(page);
+    await page.getByRole("button", nav("Start design session")).click();
+
+    const questions = page.getByRole("group", nav("Questions"));
+    await expect(questions.getByText("Q12 - Accept these defaults?")).toBeVisible();
+    await expect(questions.getByRole("button", { name: /^Question \d/ })).toHaveCount(1);
+    await expect(page.getByText("Q10: keep the current store.")).toBeVisible();
+    await expect
+      .poll(async () => /"grilling":\s*true/.test(await fixture.cli("agents", "list", "--json")))
+      .toBe(true);
+  });
+});
+
+test.describe("14. Working row", () => {
+  test("shows the step and ticket, then follows the step report", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    await openDesign(page);
+    await page.getByRole("button", nav("Start design session")).click();
+
+    const row = page.getByRole("status").filter({ hasText: "Working:" });
+    await expect(row).toHaveText(/Working: Resolve tickets · first/);
+
+    const id = (await fixture.cli("agents", "list")).split("\t")[0].trim();
+    await fixture.cliEnv({ GX_AGENT_SESSION: id }, "agent", "step", "spec");
+    await expect(row).toHaveText(/Working: Spec/);
+  });
+});
+
 test.describe("12. The auto-advance switch", () => {
   test("shows while working and idle; off, then on starts the countdown", async ({ page, start }) => {
     await start("design", { autoAdvanceDelay: "30s" });

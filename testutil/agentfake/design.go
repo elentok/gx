@@ -50,11 +50,19 @@ const (
 	// DesignTurnDefaulted is a round whose questions are all defaulted: plain
 	// text under a heading, and one yes/no card to accept them.
 	DesignTurnDefaulted = "defaulted"
+	// DesignTurnMixed is a round with one asked question and two defaulted ones.
+	DesignTurnMixed = "mixed"
+	// DesignTurnSlow is a plain-text turn that stays busy for designSlowTime.
+	DesignTurnSlow = "slow"
 )
 
 const defaultedRound = "Everything else has a clear answer.\n\n" +
 	"**Defaulted**\n\n- Q10: keep the current store.\n- Q11: migrate at startup.\n\n" +
 	"❓ **Q12** - **Accept these defaults?**: Say so, or object in the message box.\n\n" + yesNoBlock
+
+const mixedRound = "One question needs you.\n\n" +
+	"**Defaulted**\n\n- Q10: keep the current store.\n- Q11: migrate at startup.\n\n" +
+	"❓ **Q12** - **Keep going?**: Ready for the next step?\n\n" + yesNoBlock
 
 // designMessage is the assistant message for the turn-th prompt (from zero).
 // Without a script a /gx-design prompt gets the next round and any other text
@@ -78,6 +86,10 @@ func (t *tui) designMessage(text string, script []string) string {
 		return "Error: the spec step failed, so I retried it.\n\n" + DesignRunEnd
 	case DesignTurnDefaulted:
 		return defaultedRound
+	case DesignTurnMixed:
+		return mixedRound
+	case DesignTurnSlow:
+		return "Working through the tickets."
 	}
 	return "Thanks, that settles it.\n\n" + DesignRunEnd
 }
@@ -94,6 +106,10 @@ func (t *tui) designTurn(text string) error {
 	}
 	if isDesignPrompt(text) {
 		t.design.active = true
+	}
+	busy := designTurnTime
+	if t.design.turns < len(script) && script[t.design.turns] == DesignTurnSlow {
+		busy = designSlowTime
 	}
 	msg := t.designMessage(text, script)
 	// Busy comes first: a message that appears while the session still reads
@@ -117,14 +133,18 @@ func (t *tui) designTurn(text string) error {
 		return err
 	}
 	go func() {
-		time.Sleep(designTurnTime)
+		time.Sleep(busy)
 		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
 	}()
 	return nil
 }
 
-// designTurnTime is how long a scripted turn stays busy.
-const designTurnTime = 500 * time.Millisecond
+// designTurnTime is how long a scripted turn stays busy; designSlowTime is how
+// long a DesignTurnSlow turn does, enough for a test to report steps meanwhile.
+const (
+	designTurnTime = 500 * time.Millisecond
+	designSlowTime = 20 * time.Second
+)
 
 // appendMessage appends a transcript line of the given role to the file at path.
 func appendMessage(path, role string, content any) error {

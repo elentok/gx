@@ -18,6 +18,8 @@ interface FixtureOutput {
 export interface Fixture {
   /** Runs a gx CLI verb against this fixture's server and no other. */
   cli(...args: string[]): Promise<string>;
+  /** Like `cli`, with extra environment variables. */
+  cliEnv(extra: Record<string, string>, ...args: string[]): Promise<string>;
   /** Lets the workers frozen by `start(scenario, { hold: true })` finish. */
   release(): Promise<void>;
 }
@@ -56,6 +58,10 @@ async function startFixture(
   const fixture: Fixture = {
     async cli(...args) {
       const { stdout } = await run(out.gx, args, { env });
+      return stdout;
+    },
+    async cliEnv(extra, ...args) {
+      const { stdout } = await run(out.gx, args, { env: { ...env, ...extra } });
       return stdout;
     },
     async release() {

@@ -5,7 +5,7 @@ Run with `make web-e2e`. Each flow starts its own fixture server (`testutil/gxfi
 Retries are off. Locators use roles and visible text; no `data-testid` is used yet.
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
-Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12).
+Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14).
 
 ## 1. Queue an epic
 
@@ -146,3 +146,22 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   3. Turn it on.
 - **Pass:** with the switch off the run end shows Continue and no countdown; turning it on starts
   "Continuing in Ns".
+
+## 13. Defaulted questions
+
+- **Scenarios:** `design-mixed` (one asked question, two defaulted), `design-defaulted` (all defaulted)
+- **Steps:** start the session. In the mixed case answer the card Yes and Send.
+- **Pass:**
+  - Mixed: one card ("Q12 - Keep going?"); Q10 and Q11 show as plain text; the sent answer
+    names Q12 only, nothing about Q10 or Q11.
+  - All defaulted: one "Q12 - Accept these defaults?" card, the defaults as plain text, and the
+    session's Actionable has `grilling` set.
+
+## 14. Working row
+
+- **Scenario:** `design-working` (a plain turn that stays busy for 20s)
+- **Steps:**
+  1. Start the session while the agent is busy.
+  2. Run `gx agent step spec` with the session id in `GX_AGENT_SESSION`.
+- **Pass:** the chat shows the spinner row "Working: Resolve tickets · first" (the current ticket's
+  title), then "Working: Spec" after the report.

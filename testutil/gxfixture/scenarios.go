@@ -107,6 +107,12 @@ var scenarios = map[string]scenario{
 	// design-guard (V14): six run-end turns in a row.
 	"design-guard": designScript(tickets.StepResolveTickets,
 		slices.Repeat([]string{agentfake.DesignTurnRunEnd}, 6)...),
+	// design-mixed: one asked question and two defaulted ones.
+	"design-mixed": designScript(tickets.StepResolveTickets, agentfake.DesignTurnMixed),
+	// design-defaulted: every question of the round is defaulted.
+	"design-defaulted": designScript(tickets.StepResolveTickets, agentfake.DesignTurnDefaulted),
+	// design-working: a long busy turn, for the Working row.
+	"design-working": designScript(tickets.StepResolveTickets, agentfake.DesignTurnSlow),
 	// edge: a project with no epics, an epic with no tickets, and a ticket
 	// blocked by a dependency that is not merged.
 	"edge": {
