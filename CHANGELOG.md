@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.37.2 - 2026-10-25
+
+- Changed the `gx-investigate` skill to note that Retry only prompts a live agent.
+- Fixed sessions staying in "starting" forever when `claude` on `PATH` is a wrapper script. gx now also accepts a new pid file owned by a child process of the spawned one.
+- Fixed the Design page showing Continue next to Send while a grilling round is open. The round now wins.
+- Fixed the Design page's rows not staying at the top on a phone when the chat is short.
+- Fixed iOS zooming into focused text fields on touch screens.
+- Fixed background task notifications showing up in the chat as the person's reply and closing an open grilling round.
+
 ## v0.37.1 - 2026-10-25
 
 - Added a Screen button to the web ticket page. It shows the loop agent's live screen, or the saved screen once the agent has ended. If the live session goes away, the page falls back to the saved screen. The button is hidden for agents without a terminal.
