@@ -298,10 +298,14 @@ type tui struct {
 	// count the wheel events read.
 	seq                []byte
 	wheelUp, wheelDown int
-	// designMode is set once a /gx-design prompt arrives; designRounds counts
-	// the ones played.
-	designMode   bool
-	designRounds int
+	design             designState
+}
+
+// designState is set once a /gx-design prompt arrives; rounds counts the ones
+// played.
+type designState struct {
+	active bool
+	rounds int
 }
 
 // tuiEvent is one key from the terminal, one control, or the end of input.
@@ -476,11 +480,11 @@ func (t *tui) submit() error {
 	}
 	switch t.pid.Status {
 	case StatusIdle:
-		// Before the worker check: a design prompt also looks like `/skill <address>`.
-		if isDesignPrompt(text) || (t.designMode && text != "" && !strings.HasPrefix(text, "/")) {
+		kind, address, cfg := t.classify(text)
+		switch kind {
+		case promptDesign:
 			return t.designTurn(text)
-		}
-		if address, cfg, ok := t.workerPrompt(text); ok {
+		case promptWorker:
 			t.prompt = text
 			if cfg.Behaviour[address] == BehaviourPermission {
 				t.dialog = bashPermissionDialog(PermissionCommand)
@@ -488,15 +492,14 @@ func (t *tui) submit() error {
 			}
 			go t.work(cfg, address)
 			return t.setStatus(StatusBusy, "")
-		}
-		if strings.HasPrefix(text, "/") && text != "/compact" {
+		case promptSlash:
 			return t.slashCommand(text)
-		}
-		t.prompt = text
-		if command, ok := strings.CutPrefix(text, PermissionPromptPrefix); ok {
-			t.dialog = bashPermissionDialog(command)
+		case promptPermission:
+			t.prompt = text
+			t.dialog = bashPermissionDialog(strings.TrimPrefix(text, PermissionPromptPrefix))
 			return t.setStatus(StatusWaiting, "permission prompt")
 		}
+		t.prompt = text
 		if t.fast {
 			t.fast = false
 			writeReport(t.out, "working", "", "")
@@ -509,6 +512,37 @@ func (t *tui) submit() error {
 		return t.setStatus(StatusBusy, "")
 	}
 	return nil
+}
+
+// promptKind is how an idle fake handles a submitted prompt.
+type promptKind int
+
+const (
+	promptPlain promptKind = iota
+	promptDesign
+	promptWorker
+	promptSlash
+	promptPermission
+)
+
+// classify picks the prompt's handler. The order matters: a design prompt also
+// looks like `/skill <address>`, so it comes before the worker check, and a
+// worker prompt is also a slash command. For a worker prompt it returns the
+// ticket address and the worker config.
+func (t *tui) classify(text string) (promptKind, string, WorkerConfig) {
+	if isDesignPrompt(text) || (t.design.active && text != "" && !strings.HasPrefix(text, "/")) {
+		return promptDesign, "", WorkerConfig{}
+	}
+	if address, cfg, ok := t.workerPrompt(text); ok {
+		return promptWorker, address, cfg
+	}
+	if strings.HasPrefix(text, "/") && text != "/compact" {
+		return promptSlash, "", WorkerConfig{}
+	}
+	if strings.HasPrefix(text, PermissionPromptPrefix) {
+		return promptPermission, "", WorkerConfig{}
+	}
+	return promptPlain, "", WorkerConfig{}
 }
 
 // workerPrompt reports whether text is a skill prompt (`/skill <address>`) for

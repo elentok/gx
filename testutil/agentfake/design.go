@@ -46,9 +46,9 @@ func (t *tui) designTurn(text string) error {
 	t.prompt = text
 	msg := "Thanks, that settles it.\n\n" + DesignRunEnd
 	if isDesignPrompt(text) {
-		t.designMode = true
-		msg = designRounds[min(t.designRounds, len(designRounds)-1)]
-		t.designRounds++
+		t.design.active = true
+		msg = designRounds[min(t.design.rounds, len(designRounds)-1)]
+		t.design.rounds++
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
