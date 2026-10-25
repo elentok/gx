@@ -52,10 +52,12 @@ type deps struct {
 	readClaudeOccupancy  func(cwd, sessionID string) (occupancy int, ok bool, err error)
 	verifyCodexSession   func(cwd, sessionID string) (ok bool, err error)
 	readCodexContext     func(cwd, sessionID string) (tokens int, ok bool, err error)
-	skillsAgentRoots     func() ([]string, error)
-	skillsManifestPath   func() (string, error)
-	explainAgent         func(target string) (herdr.AgentExplainResult, error)
-	probeGhostty         func() error
+	// readAutoAdvance reads a gx session's auto-advance switch from the server.
+	readAutoAdvance    func(sessionID string) (bool, error)
+	skillsAgentRoots   func() ([]string, error)
+	skillsManifestPath func() (string, error)
+	explainAgent       func(target string) (herdr.AgentExplainResult, error)
+	probeGhostty       func() error
 	// serverClient dials the server; nil means the real one (tests inject a fake).
 	serverClient func() (*apiclient.Client, error)
 }
@@ -96,6 +98,7 @@ func defaultDeps() deps {
 		readClaudeOccupancy:  transcript.LastAssistantOccupancy,
 		verifyCodexSession:   codexsession.VerifyIdentity,
 		readCodexContext:     codexsession.LastContextTokens,
+		readAutoAdvance:      readServerAutoAdvance,
 		skillsAgentRoots:     defaultSkillsAgentRoots,
 		skillsManifestPath:   defaultSkillsManifestPath,
 		explainAgent:         herdr.AgentExplain,

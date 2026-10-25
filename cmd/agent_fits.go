@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"io"
 
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -29,6 +31,16 @@ func runAgentFits(d deps, out io.Writer, agent, session, cwd, stepName string) e
 	if !ok {
 		return tickets.CheckDesignStep(stepName)
 	}
+	if id := d.getenv(nativerunner.AgentSessionEnv); id != "" {
+		on, err := d.readAutoAdvance(id)
+		if err != nil {
+			return err
+		}
+		if !on {
+			fmt.Fprintln(out, "auto-advance is off")
+			return &ExitError{Code: 1}
+		}
+	}
 	used, err := runAgentContextWindow(d, agent, session, cwd)
 	if err != nil {
 		return err
@@ -40,4 +52,23 @@ func runAgentFits(d deps, out io.Writer, agent, session, cwd, stepName string) e
 		return &ExitError{Code: 1}
 	}
 	return nil
+}
+
+// readServerAutoAdvance reads the switch live from the server. A session the
+// server does not list is an error, so the caller stops instead of chaining.
+func readServerAutoAdvance(sessionID string) (bool, error) {
+	cl, err := serverClient()
+	if err != nil {
+		return false, err
+	}
+	sessions, err := cl.Sessions(context.Background())
+	if err != nil {
+		return false, fmt.Errorf("reading auto-advance for gx session %s: %w", sessionID, err)
+	}
+	for _, s := range sessions {
+		if s.ID == sessionID {
+			return s.AutoAdvance, nil
+		}
+	}
+	return false, fmt.Errorf("gx session %s not found on the server", sessionID)
 }

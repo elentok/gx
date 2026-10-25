@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/nativerunner"
 )
 
 func fitsDeps(stdout *bytes.Buffer, used int) deps {
@@ -81,6 +83,70 @@ func TestExecute_AgentContextWindow_FitsUnknownStepErrors(t *testing.T) {
 	var exitErr *ExitError
 	if err == nil || errors.As(err, &exitErr) {
 		t.Fatalf("err = %v, want a plain error", err)
+	}
+}
+
+func fitsExit(t *testing.T, args []string, d deps) (int, error) {
+	t.Helper()
+	err := execute(args, d)
+	var exitErr *ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.Code, nil
+	}
+	return 0, err
+}
+
+func TestExecute_AgentContextWindow_FitsSwitchOffStops(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := fitsDeps(&stdout, 1_000)
+	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", nativerunner.AgentSessionEnv: "gx-1"}
+	d.getenv = func(k string) string { return env[k] }
+	d.readAutoAdvance = func(id string) (bool, error) { return id != "gx-1", nil }
+	code, err := fitsExit(t, []string{"agent", "context-window", "--fits", "spec"}, d)
+	if err != nil || code != 1 {
+		t.Fatalf("code=%d err=%v, want exit 1", code, err)
+	}
+}
+
+func TestExecute_AgentContextWindow_FitsSwitchOnUsesTable(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := fitsDeps(&stdout, 1_000)
+	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", nativerunner.AgentSessionEnv: "gx-1"}
+	d.getenv = func(k string) string { return env[k] }
+	d.readAutoAdvance = func(string) (bool, error) { return true, nil }
+	code, err := fitsExit(t, []string{"agent", "context-window", "--fits", "spec"}, d)
+	if err != nil || code != 0 {
+		t.Fatalf("code=%d err=%v, want exit 0", code, err)
+	}
+}
+
+func TestExecute_AgentContextWindow_FitsSwitchUnreachableErrors(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := fitsDeps(&stdout, 1_000)
+	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", nativerunner.AgentSessionEnv: "gx-1"}
+	d.getenv = func(k string) string { return env[k] }
+	d.readAutoAdvance = func(string) (bool, error) { return false, errors.New("no server") }
+	code, err := fitsExit(t, []string{"agent", "context-window", "--fits", "spec"}, d)
+	if err == nil || code != 0 {
+		t.Fatalf("code=%d err=%v, want a plain error", code, err)
+	}
+}
+
+func TestExecute_AgentContextWindow_FitsCodexSwitchOffStops(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := fitsDeps(&stdout, 0)
+	env := map[string]string{nativerunner.AgentSessionEnv: "gx-1"}
+	d.getenv = func(k string) string { return env[k] }
+	d.verifyCodexSession = func(string, string) (bool, error) { return true, nil }
+	d.readCodexContext = func(string, string) (int, bool, error) { return 1_000, true, nil }
+	d.readAutoAdvance = func(string) (bool, error) { return false, nil }
+	code, err := fitsExit(t, []string{"agent", "context-window", "--agent", "codex", "--session", "c-1", "--fits", "spec"}, d)
+	if err != nil || code != 1 {
+		t.Fatalf("code=%d err=%v, want exit 1", code, err)
 	}
 }
 
