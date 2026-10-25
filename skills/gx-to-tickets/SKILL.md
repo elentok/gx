@@ -234,7 +234,9 @@ gx tickets add <epic-slug> --slug <slug> --type implement --expected-context-win
 ```
 
 `--blocked-by` lists the ticket IDs it depends on; leave it out when nothing gates the ticket. Use
-the per-ticket template below as the body — one ticket per call, never a single combined file.
+the per-ticket template below as the body — one ticket per call, never a single combined file. Write
+each body to a scratchpad file with Write and pipe it in; never a heredoc, never edit a ticket file
+by path (see "Write a body once" in the tracker).
 
 Always write a `## Summary` on the epic as part of publishing. Never skip it, never block publishing
 on it, and never copy a map Destination into it:

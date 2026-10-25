@@ -153,6 +153,11 @@ conversation history.
   `project:epic` form. Change a body section with `gx tickets section <addr> <heading> <content|->`,
   change fields with `gx tickets set <addr>`. Never read or write a ticket file by path —
   `gx tickets root` / `gx tickets epics` are for humans and scripts.
+- **Write a body once**: write the text to a scratchpad file with the Write tool, then pipe it in:
+  `gx tickets add ... --body - < <file>`, `gx tickets section <addr> <heading> - < <file>` or
+  `gx tickets follow-up add ... --body - < <file>`. Never build a body with `cat > file <<'EOF'`:
+  the guard-bash hook rejects it and you would write the text twice. Never Read or Edit the ticket
+  file by path, even to append a section.
 - **Allocate an ID atomically**: `gx tickets add <epic> [--parent <id>] --slug <descriptive-slug>` —
   picks the next free identifier under a filesystem lock (safe against a concurrent fork) and writes
   the stub straight to `<id>-<slug>.md`. The epic argument may be `project:epic`. Filing into a

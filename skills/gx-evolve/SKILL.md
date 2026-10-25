@@ -99,7 +99,8 @@ The skill decides the outcome (file, seen again, regression or drop) and prints 
 ## 7. Record in your own ticket
 
 Append to the ticket body with `gx tickets section <addr> <heading> -`; don't replace its existing
-sections. No repo file.
+sections. No repo file. Write the text to a scratchpad file with Write and pipe it in; never a
+heredoc, never edit the ticket file by path.
 
 - **Result** — never empty. It is the one message a person reads, so it has a fixed, short shape
   (detail belongs in the other sections):

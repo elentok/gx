@@ -72,7 +72,9 @@ Judge a match yourself, by title and `## Problem`: the same problem, not the sam
   questions from the conversation or the caller's input. No preview.
 - **Several problems** → one follow-up each, each through step 2. A caller's group of findings that
   name the same fix counts as one problem.
-- File each with `gx tickets follow-up add <project>:follow-ups --body -`, the body shaped as:
+- File each with `gx tickets follow-up add <project>:follow-ups --body -`. Write the body to a
+  scratchpad file with Write and pipe it in, never a heredoc (see "Write a body once" in
+  [gx-local-tracker.md](../gx-local-tracker.md)). The body is shaped as:
 
   ```
   ---

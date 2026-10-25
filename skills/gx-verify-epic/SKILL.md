@@ -55,7 +55,9 @@ The Verification section names the flows to run. As a backstop, also map the dif
 - A harness failure (the fixture crashes, a flow fails for a reason unrelated to the epic, a
   selector is stale) is a finding, like any other.
 - Write one line per user story into the ticket body, under a `## Round N` heading:
-  `- Story <n>: pass` or `- Story <n>: fail, <what failed>`. Findings go below the lines.
+  `- Story <n>: pass` or `- Story <n>: fail, <what failed>`. Findings go below the lines. Write the
+  text to a scratchpad file with Write, then `gx tickets section <addr> "Round N" - < <file>`; never
+  a heredoc, never edit the ticket file by path.
 
 Check the token count with `gx agent context-window` after each story. At 90K tokens, stop checking.
 Open tickets for the stories not yet checked (step 6) and close out the round.
