@@ -1,5 +1,5 @@
 import { createSystem, defaultConfig, defineConfig, type SystemStyleObject } from "@chakra-ui/react";
-import { TONES, type Tone } from "./tone";
+import { KINDS, TONES, type Kind, type Tone } from "./tone";
 
 // The only file allowed to hold raw colors and font names; see raw-style.test.ts.
 const toneColors: Record<Tone, { fg: string; bg: string }> = {
@@ -13,6 +13,17 @@ const toneColors: Record<Tone, { fg: string; bg: string }> = {
 
 const toneTokens = Object.fromEntries(
   TONES.map((t) => [t, { fg: { value: toneColors[t].fg }, bg: { value: toneColors[t].bg } }]),
+);
+
+const kindColors: Record<Kind, { fg: string; bg: string }> = {
+  design: { fg: "#c4a7ff", bg: "rgba(196, 167, 255, 0.13)" },
+  implementation: { fg: "#7ad8d0", bg: "rgba(122, 216, 208, 0.13)" },
+  oneoff: { fg: "#f0a6ca", bg: "rgba(240, 166, 202, 0.13)" },
+  followups: { fg: "#b4bcc8", bg: "rgba(180, 188, 200, 0.13)" },
+};
+
+const kindTokens = Object.fromEntries(
+  KINDS.map((k) => [k, { fg: { value: kindColors[k].fg }, bg: { value: kindColors[k].bg } }]),
 );
 
 export const themeConfig = defineConfig({
@@ -51,6 +62,7 @@ export const themeConfig = defineConfig({
           dim: { value: "#a3acba" },
         },
         tone: toneTokens,
+        kind: kindTokens,
       },
       fonts: {
         condensed: { value: "'Saira Condensed', sans-serif" },

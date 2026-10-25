@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { system, themeConfig } from "./theme";
-import { TONES } from "./tone";
+import { KINDS, TONES } from "./tone";
 
 const tokens = themeConfig.theme!.tokens!;
 
@@ -11,6 +11,11 @@ describe("theme", () => {
     expect(entry.bg.value).toBeTruthy();
     expect(system.token(`colors.tone.${tone}.fg`)).toBeTruthy();
     expect(system.token(`colors.tone.${tone}.bg`)).toBeTruthy();
+  });
+
+  it.each(KINDS)("has fg and bg tokens for kind %s", (kind) => {
+    expect(system.token(`colors.kind.${kind}.fg`)).toBeTruthy();
+    expect(system.token(`colors.kind.${kind}.bg`)).toBeTruthy();
   });
 
   it("defines every token group", () => {

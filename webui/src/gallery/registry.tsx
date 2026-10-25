@@ -12,6 +12,7 @@ import { LineChart } from "../ui/day-chart/LineChart";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
+import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
 import { Sidebar } from "../ui/sidebar/Sidebar";
 import { SidebarItem } from "../ui/sidebar/SidebarItem";
@@ -21,7 +22,7 @@ import { StatCard } from "../ui/stat-card/StatCard";
 import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { TopBar } from "../ui/top-bar/TopBar";
-import { TONES, type Tone } from "../ui/tone";
+import { KINDS, TONES, type Tone } from "../ui/tone";
 
 export interface GalleryCase {
   label: string;
@@ -45,6 +46,21 @@ const perTone =(render: (tone: Tone) => ReactNode): GalleryCase[] =>
 export const galleryEntries: GalleryEntry[] = [
   { name: "Spinner", cases: perTone((tone) => <Spinner label={`Loading ${tone}`} tone={tone} />) },
   { name: "Arc", cases: perTone((tone) => <Arc tone={tone} label={tone} />) },
+  {
+    name: "ProgressRing",
+    cases: [
+      ...perTone((tone) => <ProgressRing progress={0.6} tone={tone} kind="design" label="60%" />),
+      { label: "n/m", node: <ProgressRing progress={0.6} kind="implementation" label="3/5" /> },
+      { label: "pending", node: <ProgressRing progress={0} kind="implementation" label="…" /> },
+      { label: "no label", node: <ProgressRing progress={0.3} kind="implementation" /> },
+      ...KINDS.flatMap((kind) => [
+        { label: `${kind} still`, node: <ProgressRing progress={0.6} kind={kind} label="60%" /> },
+        { label: `${kind} live`, node: <ProgressRing progress={0.6} kind={kind} label="60%" live /> },
+      ]),
+      { label: "compact", node: <ProgressRing progress={0.6} kind="design" size="compact" label="3" /> },
+      { label: "compact live", node: <ProgressRing progress={0.6} kind="design" size="compact" live /> },
+    ],
+  },
   {
     name: "StatusIcon",
     cases: perTone((tone) => (
