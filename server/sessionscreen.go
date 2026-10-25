@@ -52,9 +52,14 @@ func (s *Server) ticketScreenRead(w http.ResponseWriter, address string) {
 		http.Error(w, "no screen for "+address, http.StatusNotFound)
 		return
 	}
-	// The holder is gone once the agent ended, and then only the saved screen is left.
-	_, derr := nativerunner.DialHolder(dir)
-	writeScreen(w, dir, derr != nil)
+	// The holder is gone once the agent ended, and then only the saved screen is
+	// left. It can also go between the dial and the read, so any failure to read
+	// the live screen falls back to the saved one.
+	rows, err := liveRows(dir)
+	if err != nil {
+		rows, err = savedRows(dir)
+	}
+	writeRows(w, rows, err)
 }
 
 // ticketPtyDir is the agent directory of addr's latest run, when that agent
@@ -90,6 +95,20 @@ func writeScreen(w http.ResponseWriter, dir string, saved bool) {
 	} else if c, derr := nativerunner.DialHolder(dir); derr == nil {
 		rows, _, err = c.Screen(0)
 	}
+	writeRows(w, rows, err)
+}
+
+// liveRows is the screen of the holder serving dir.
+func liveRows(dir string) ([]string, error) {
+	c, err := nativerunner.DialHolder(dir)
+	if err != nil {
+		return nil, err
+	}
+	rows, _, err := c.Screen(0)
+	return rows, err
+}
+
+func writeRows(w http.ResponseWriter, rows []string, err error) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
