@@ -57,6 +57,43 @@ func TestGxDesignSpecStepGrillsInPlace(t *testing.T) {
 	}
 }
 
+func TestGxDesignSecondReview(t *testing.T) {
+	text := readFile(t, "gx-design/SKILL.md")
+	for _, want := range []string{
+		"go back\n   to \"Detecting the next step\"",
+		"`(stories/scope changed)`",
+		"`## Re-review findings`",
+		"--design-step review\n   --allow-backward",
+		"the first checklist\n   with its resolutions and the full spec",
+		"only the changed stories and scope and what\n   they affect",
+		"`- [x] No findings`",
+		"Never run a third review",
+		"neither findings section has an unchecked finding",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("gx-design/SKILL.md lacks %q", want)
+		}
+	}
+	order := []string{"\n6. **", "\n6a. **", "\n6b. **", "\n7. **"}
+	last := -1
+	for _, marker := range order {
+		i := strings.Index(text, marker)
+		if i <= last {
+			t.Errorf("gx-design/SKILL.md: %q missing or out of order", marker)
+		}
+		last = i
+	}
+	if strings.Contains(text, "continue to step 7 in the same run.\n7.") {
+		t.Error("step 6 still continues straight to step 7")
+	}
+	if n := strings.Count(text, "--allow-backward` only for"); n != 1 {
+		t.Errorf("--allow-backward rule appears %d times, want 1", n)
+	}
+	if !strings.Contains(text, "and for the move back to `review` for the second review") {
+		t.Error("--allow-backward rule lacks the second case")
+	}
+}
+
 func TestGxGrillingLowRiskDefaults(t *testing.T) {
 	text := readFile(t, "gx-grilling/SKILL.md")
 	for _, want := range []string{

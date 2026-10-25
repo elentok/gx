@@ -26,7 +26,7 @@ state machine. The map's `design_step` field is what Progress shows. This skill 
 - `branch` when it creates the `<epic>-impl` branch (step 8).
 - `done` only when this run itself closes the map. Reporting the `<epic>-impl` slug (step 9) does not.
 - A move to an earlier step needs `--allow-backward`. Pass `--allow-backward` only for a review finding that becomes a map ticket
-  (steps 5 and 6), never for any other move.
+  (steps 5 and 6) and for the move back to `review` for the second review (step 6a), never for any other move.
 
 ## Calling other skills
 
@@ -113,9 +113,21 @@ the ticket title during `resolve-tickets`.
 6. **Unchecked findings** → set `--design-step grill-findings`, then run a `gx-grilling` session on them, resident in this same run. Amend
    `docs/specs/<epic>.md` as each finding resolves. A finding with no objection to its "(default)"
    resolution is checked off after the person's next reply. Check each finding off with
-   `gx tickets section <project:epic> "Review findings" -`. Do not `/clear` between rounds. When
-   every finding is checked, continue to step 7 in the same run.
-7. **No `<epic>-impl` epic** → follow [gx-to-tickets](../gx-to-tickets/SKILL.md) on the amended
+   `gx tickets section <project:epic> "Review findings" -`. Write a one-line resolution after each
+   checked finding. Add the marker `(stories/scope changed)` when the fix added or removed user
+   stories or changed scope. Do not `/clear` between rounds. When every finding is checked, go back
+   to "Detecting the next step".
+6a. **Every review finding is checked, at least one has the `(stories/scope changed)` marker, and the
+   map has no `## Re-review findings` section** → run `gx agent context-window --fits review`; on
+   stop, end the run. Otherwise move back with `gx tickets set <project:epic> --design-step review
+   --allow-backward` and dispatch the second design-review subagent. Give it the first checklist
+   with its resolutions and the full spec. It checks only the changed stories and scope and what
+   they affect, and writes the findings as a checklist with `gx tickets section <project:epic>
+   "Re-review findings" -`. It may write `- [x] No findings`.
+6b. **Unchecked findings in `## Re-review findings`** → set `--design-step grill-findings`, then run
+   one `gx-grilling` round on them, resident in this same run, checking each off as in step 6. Then
+   continue to step 7, even if this round changes stories again. Never run a third review.
+7. **No `<epic>-impl` epic, and neither findings section has an unchecked finding** → follow [gx-to-tickets](../gx-to-tickets/SKILL.md) on the amended
    spec, publishing into `<epic>-impl`. Never publish into the map epic: its tickets are
    hand-resolved decisions, and implementation tickets belong to ralph-loop. Set
    `--design-step create-tickets` before publishing, then continue to step 8 in the same run.
