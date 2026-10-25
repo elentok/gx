@@ -28,6 +28,16 @@ it("shows every primitive in every tone", () => {
   }
 });
 
+it("shows the Button in every role, tone and size", () => {
+  const labels = galleryEntries.find((e) => e.name === "Button")?.cases.map((c) => c.label) ?? [];
+  for (const role of ["main", "secondary", "ghost"]) {
+    for (const tone of TONES) {
+      for (const size of ["sm", "md"]) expect(labels, `${role} ${tone} ${size}`).toContain(`${role} ${tone} ${size}`);
+    }
+  }
+  expect(labels).toContain("disabled");
+});
+
 it("shows the TopBar in every state the spec lists", () => {
   const labels = galleryEntries.find((e) => e.name === "TopBar")?.cases.map((c) => c.label) ?? [];
   for (const label of ["Queue active", "Epics active", "none active", "Paused","Offline", "no build string"]) {

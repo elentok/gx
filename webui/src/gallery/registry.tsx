@@ -125,12 +125,24 @@ export const galleryEntries: GalleryEntry[] = [
     name: "Button",
     cases: [
       ...perTone((tone) => <Button tone={tone}>{tone}</Button>),
+      ...(["main", "secondary", "ghost"] as const).flatMap((emphasis) =>
+        TONES.flatMap((tone) =>
+          (["sm", "md"] as const).map((size) => ({
+            label: `${emphasis} ${tone} ${size}`,
+            node: (
+              <Button emphasis={emphasis} tone={tone} size={size}>
+                {emphasis}
+              </Button>
+            ),
+          })),
+        ),
+      ),
       ...(["solid", "tinted", "outline", "ghost"] as const).map((variant) => ({
         label: variant,
         node: <Button variant={variant}>{variant}</Button>,
       })),
-      { label: "md", node: <Button size="md">md</Button> },
       { label: "disabled", node: <Button disabled>disabled</Button> },
+      { label: "main disabled", node: <Button emphasis="main" disabled>disabled</Button> },
     ],
   },
   {
