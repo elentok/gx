@@ -25,6 +25,9 @@ export function Composer({
   onStale,
   round = [],
   answers = {},
+  initialText = "",
+  onText,
+  onRoundSent,
   onReview,
   fullScreen,
   onFullScreen,
@@ -45,6 +48,11 @@ export function Composer({
   /** The open Grilling round: Send answers all of it in one prompt. */
   round?: SessionRoundCard[];
   answers?: Answers;
+  /** The notes box starts with this text, and `onText` hears every change, so the caller can keep a draft. */
+  initialText?: string;
+  onText?: (text: string) => void;
+  /** The round went out. */
+  onRoundSent?: () => void;
   /** "Answer them" in the unanswered confirm: open the sheet at that question. */
   onReview?: (index: number) => void;
   /** The round is full screen: the composer renders into this element, its note always open. */
@@ -54,7 +62,11 @@ export function Composer({
 }) {
   const [open, setOpen] = useState(false);
   const [unanswered, setUnanswered] = useState<SessionRoundCard[]>([]);
-  const [text, setText] = useState("");
+  const [text, setTextState] = useState(initialText);
+  const setText = (t: string) => {
+    setTextState(t);
+    onText?.(t);
+  };
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const enabled = connected && promptable(session) && !pending;
@@ -99,6 +111,7 @@ export function Composer({
     setUnanswered([]);
     return send({ text: roundPrompt(round, answers, text) }, () => {
       setText("");
+      onRoundSent?.();
       onFullScreen?.(false);
     });
   };

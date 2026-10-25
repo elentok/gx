@@ -167,15 +167,21 @@ export function QuestionSheet({
   answers,
   onAnswers,
   focus,
+  initialIndex = 0,
+  onIndex,
 }: {
   round: SessionRoundCard[];
   answers: Answers;
   onAnswers: (update: (all: Answers) => Answers) => void;
   /** A new object opens the sheet at that question. */
   focus?: { index: number };
+  /** The question the sheet opens at, and a listener for every move, so the caller can keep a draft. */
+  initialIndex?: number;
+  onIndex?: (index: number) => void;
 }) {
   const [open, setOpen] = useState(true);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => Math.min(initialIndex, round.length - 1));
+  useEffect(() => onIndex?.(index), [index, onIndex]);
   const row = useRef<HTMLDivElement>(null);
   // Set while a smooth scroll we started is still moving, so its in-between frames don't set the question.
   const scrolling = useRef<number | undefined>(undefined);

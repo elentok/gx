@@ -6,6 +6,7 @@ import type { SessionChatMessage, SessionChatResponse, SessionInfo, SessionRound
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchChat } from "./chat";
+import type { PostPrompt } from "./prompt";
 
 afterEach(cleanup);
 
@@ -45,7 +46,7 @@ const chatOf = (messages: SessionChatMessage[], over: Partial<SessionChatRespons
 
 const okChat = (c: SessionChatResponse): FetchChat => async () => ({ kind: "ok", detail: c });
 
-function renderChat(sessions: SessionInfo[], fetchChat: FetchChat) {
+function renderChat(sessions: SessionInfo[], fetchChat: FetchChat, prompt?: PostPrompt) {
   const state = { snapshot: { sessions }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const listeners = new Set<(a?: string) => void>();
   const conn = {
@@ -94,6 +95,7 @@ function renderChat(sessions: SessionInfo[], fetchChat: FetchChat) {
         },
       }),
       chat: fetchChat,
+      prompt,
     }),
     { initialEntries: ["/d/gx:a"] },
   );
@@ -280,4 +282,46 @@ test("a reload keeps the round's answers", async () => {
   renderChat([session()], roundChat());
   const sheet = await screen.findByRole("group", { name: "Questions" });
   expect(within(sheet).getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
+});
+
+test("a reload keeps the notes box, the open question and the scroll", async () => {
+  renderChat([session()], roundChat());
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  fireEvent.click(within(sheet).getByRole("button", { name: "Question 3" }));
+  fireEvent.click(screen.getByRole("button", { name: "Note" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "for all" } });
+  Object.defineProperty(window, "scrollY", { value: 120, configurable: true });
+  fireEvent.scroll(window);
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  cleanup();
+  renderChat([session()], roundChat());
+  const again = await screen.findByRole("group", { name: "Questions" });
+  expect(within(again).getByRole("button", { name: "Question 3" }).getAttribute("aria-current")).toBe("step");
+  fireEvent.click(screen.getByRole("button", { name: "Note" }));
+  expect((screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value).toBe("for all");
+  expect(scrollTo).toHaveBeenCalledWith(0, 120);
+  scrollTo.mockRestore();
+});
+
+test("a new round starts with a clean sheet", async () => {
+  renderChat([session()], roundChat());
+  fireEvent.click(within(await screen.findByRole("group", { name: "Questions" })).getByRole("button", { name: "Alpha" }));
+  cleanup();
+  renderChat([session()], okChat(chatOf([], { round: [card({ label: "1", title: "other", body: "Else?" })] })));
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  expect(within(sheet).queryByRole("button", { name: "Question 1, answered" })).toBeNull();
+});
+
+test("sending the round drops its draft", async () => {
+  const post = vi.fn<PostPrompt>(async () => ({}));
+  renderChat([session()], roundChat(), post);
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  cleanup();
+  renderChat([session()], roundChat(), post);
+  const again = await screen.findByRole("group", { name: "Questions" });
+  expect(within(again).queryByRole("button", { name: "Question 1, answered" })).toBeNull();
 });

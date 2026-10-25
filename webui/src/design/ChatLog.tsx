@@ -1,16 +1,15 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { SessionBackgroundTask, SessionChatMessage, SessionChatResponse, SessionInfo } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
-import { readPageCache, writePageCache } from "../pageCache";
 import { useSessionChat, type FetchChat } from "./chat";
 import { Composer } from "./Composer";
 import { FailureBanner, GxStopped, needsTranscript, replacesComposer, visibleFailure, type FailureActions } from "./FailureBanner";
 import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
 import { RoundFocus } from "./RoundFocus";
-import type { Answers } from "./round";
+import { useRoundDraft } from "./roundDraft";
 
 const KIND_NAMES: Record<string, string> = { shell: "shell", monitor: "Monitor", agent: "subagent" };
 
@@ -74,8 +73,7 @@ function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
 }
 
 // The sheet and the composer share the round's answers. The caller keys it by round, so a new round starts blank
-// while a refetch of the same round keeps every answer. The answers also survive a reload: sessionStorage keeps the
-// session's last round.
+// while a refetch of the same round keeps every answer. The draft also survives a reload (see useRoundDraft).
 function ChatTail({
   session,
   roundKey,
@@ -99,9 +97,8 @@ function ChatTail({
   nextTitle?: string;
   actions: FailureActions;
 }) {
-  const cacheKey = `round.${session.id}`;
-  const [answers, setAnswers] = useState<Answers>(() => readPageCache<Answers>(cacheKey, roundKey) ?? {});
-  useEffect(() => writePageCache(cacheKey, answers, roundKey), [cacheKey, answers, roundKey]);
+  const { draft, setAnswers, setNotes, setIndex, clear } = useRoundDraft(session.id, roundKey);
+  const { answers } = draft;
   const [focus, setFocus] = useState<{ index: number }>();
   // Full screen, the composer renders into the overlay's footer; the docked sheet stays mounted, hidden, so it keeps its place.
   const [full, setFull] = useState(false);
@@ -113,7 +110,7 @@ function ChatTail({
     <>
       {round.length > 0 && (
         <Box hidden={full}>
-          <QuestionSheet round={round} answers={answers} onAnswers={setAnswers} focus={focus} />
+          <QuestionSheet round={round} answers={answers} onAnswers={setAnswers} focus={focus} initialIndex={draft.index} onIndex={setIndex} />
         </Box>
       )}
       {full && round.length > 0 && <RoundFocus round={round} answers={answers} onAnswers={setAnswers} focus={focus} onClose={close} footer={setFooter} />}
@@ -140,6 +137,9 @@ function ChatTail({
           onStale={onStale}
           round={round}
           answers={answers}
+          initialText={draft.notes}
+          onText={setNotes}
+          onRoundSent={clear}
           onReview={(index) => setFocus({ index })}
           fullScreen={full ? footer : undefined}
           onFullScreen={setFull}
