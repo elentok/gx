@@ -208,6 +208,12 @@ func (Tsc) Plan(dir string, args []string) (string, []string, string, error) {
 
 var tscDiagnostic = regexp.MustCompile(`^(.+?)(\(\d+,\d+\): (?:error|warning) TS\d+: .*)$`)
 
+// tscGlobalDiagnostic matches diagnostics that belong to no file, such as a
+// compiler option error. They are reported as one unit at tscGlobalLocation.
+var tscGlobalDiagnostic = regexp.MustCompile(`^(?:error|warning) TS\d+: `)
+
+const tscGlobalLocation = "(global)"
+
 // Parse treats a clean exit as a pass; tsc prints nothing then. Otherwise it
 // groups the diagnostics by file, in order of first appearance. Indented lines
 // continue the diagnostic above them; any other line is not part of a file.
@@ -225,15 +231,21 @@ func (Tsc) Parse(out []byte, exit int) Outcome {
 	var cur *fileErrors
 	for _, l := range strings.Split(string(out), "\n") {
 		l = strings.TrimRight(l, "\r")
+		file, text := "", ""
 		if m := tscDiagnostic.FindStringSubmatch(l); m != nil {
-			f := byFile[m[1]]
+			file, text = m[1], m[2]
+		} else if tscGlobalDiagnostic.MatchString(l) {
+			file, text = tscGlobalLocation, l
+		}
+		if file != "" {
+			f := byFile[file]
 			if f == nil {
-				f = &fileErrors{file: m[1]}
-				byFile[m[1]] = f
+				f = &fileErrors{file: file}
+				byFile[file] = f
 				files = append(files, f)
 			}
 			f.errors++
-			f.lines = append(f.lines, m[2])
+			f.lines = append(f.lines, text)
 			cur = f
 		} else if cur != nil && strings.HasPrefix(l, " ") {
 			cur.lines = append(cur.lines, l)
