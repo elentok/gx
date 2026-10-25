@@ -216,6 +216,31 @@ func TestAutoAdvance_RunEndingWithTheSwitchOffPlaysOneBanner(t *testing.T) {
 	}
 }
 
+func TestAutoAdvance_TurnSeenOnlyMidFlightStartsNoCountdown(t *testing.T) {
+	f := startAdvancing(t, storeWithMapStep(t, "spec"))
+	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
+	writeAssistantMessage(t, f.path, runEndText)
+	report(t, f.conv, agentfake.Control{State: "working"})
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+
+	f.h.Restart(t)
+	report(t, f.conv, agentfake.Control{State: "idle"})
+	deadline := time.Now().Add(10 * time.Second)
+	for sessionSnapshot(t, f).Status.State != server.SessionIdle {
+		if time.Now().After(deadline) {
+			t.Fatal("session never went idle after the restart")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	time.Sleep(2 * countdownDelay)
+	if s := sessionSnapshot(t, f); s.AutoAdvanceAt != nil {
+		t.Errorf("countdown = %v for a turn first seen mid-flight, want none", s.AutoAdvanceAt)
+	}
+	if screenHas(t, c, "/clear") {
+		t.Error("a turn first seen mid-flight still sent /clear")
+	}
+}
+
 func TestAutoAdvance_RestartDropsTheCountdownAndNeverStartsOne(t *testing.T) {
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
 	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))

@@ -175,7 +175,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	if err != nil {
 		return SessionResult{}, err
 	}
-	s.sessionWatches.start(func() { s.watchSession(dir, id, 0, time.Time{}) })
+	s.sessionWatches.start(func() { s.watchSession(dir, id, 0, time.Time{}, false) })
 	s.events.publish(EventSessionChanged, id)
 	info := meta.info()
 	return SessionResult{Session: &info}, nil
@@ -487,8 +487,10 @@ func (w *sessionWatches) close() {
 // watchSession records the session's status and conversation id from its
 // holder's watch stream until the stream ends. A stream that ends without an
 // exit while the server is up means the holder died: Exited crashed, with no
-// retry. Any exit before crashUntil is crashed too.
-func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
+// retry. Any exit before crashUntil is crashed too. A reconnect attaches to a
+// session that may already be mid-turn, so only an idle-to-busy edge it sees
+// makes a turn Live; a watch from launch sees every turn start.
+func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, reconnect bool) {
 	update := func(change func(*sessionMeta) bool) {
 		s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool { return m.Run == run && change(m) })
 	}
@@ -519,7 +521,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 	defer first.stop()
 	chat := s.newChatPoll(dir, id)
 	defer chat.close()
-	seenBusy := false
+	seenBusy, sawIdle := false, !reconnect
 	for {
 		msg, err := stream.Next()
 		if err != nil {
@@ -533,9 +535,12 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 			st := sessionStatusOf(msg.Status)
 			var prompt, signal string
 			var design designRef
-			// An idle whose turn start this watch did not see is not Live.
+			// An idle whose turn start this watch did not see (an idle-to-busy
+			// edge) is not Live, e.g. a turn already running at connect.
 			live := seenBusy
-			seenBusy = st.State != SessionIdle
+			busy := st.State != SessionIdle
+			seenBusy = busy && (seenBusy || sawIdle)
+			sawIdle = !busy
 			update(func(m *sessionMeta) bool {
 				// A stop records the exit itself, and a status the stream sent
 				// before it must not revive the session.

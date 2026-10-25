@@ -74,7 +74,7 @@ func (s *Server) startResumedHolder(dir string, meta *sessionMeta, crashUntil ti
 		return err
 	}
 	id, run := meta.ID, meta.Run
-	s.sessionWatches.start(func() { s.watchSession(dir, id, run, crashUntil) })
+	s.sessionWatches.start(func() { s.watchSession(dir, id, run, crashUntil, false) })
 	s.events.publish(EventSessionChanged, id)
 	return nil
 }
@@ -125,7 +125,7 @@ func (s *Server) restoreSessions() {
 				s.log.Warn("read session meta", "session", info.ID, "err", err)
 				continue
 			}
-			s.sessionWatches.start(func() { s.watchSession(dir, info.ID, meta.Run, time.Time{}) })
+			s.sessionWatches.start(func() { s.watchSession(dir, info.ID, meta.Run, time.Time{}, true) })
 			continue
 		}
 		if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err == nil || info.Stopped {
