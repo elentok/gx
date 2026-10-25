@@ -1,10 +1,11 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Navigate, useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { designHref } from "../hrefs";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { useEpicList, type FetchEpicList } from "../epics/list";
+import { readPageCache, writePageCache } from "../pageCache";
 import { DetailPage } from "../page/DetailPage";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -177,6 +178,8 @@ function DesignColumns({
 }
 
 // `address` is the Design in the route; the bare route has none and opens the first In progress Design.
+const NEW_DESIGN_CACHE = "design.new";
+
 export function DesignPage({
   address,
   fetchList,
@@ -191,7 +194,19 @@ export function DesignPage({
   const { list, failed } = useEpicList(fetchList, conn);
 
   const navigate = useNavigate();
-  const [draft, setDraft] = useState<NewDesignDraft>();
+  // The open form and its text survive a reload, like a half-answered round (see useRoundDraft).
+  const [draft, setDraftState] = useState<NewDesignDraft | undefined>(
+    () => readPageCache<NewDesignDraft>(NEW_DESIGN_CACHE) ?? undefined,
+  );
+  const setDraft = (d: NewDesignDraft | undefined) => {
+    writePageCache(NEW_DESIGN_CACHE, d ?? null);
+    setDraftState(d);
+  };
+  // Saves without touching state: the form's key comes from the draft, so a state change would remount it.
+  const saveDraft = useCallback(
+    (d: NewDesignDraft) => writePageCache(NEW_DESIGN_CACHE, d),
+    [],
+  );
 
   const wide = useWide();
   const groups = list ? pickerGroups(list.epics, sessions) : [];
@@ -241,6 +256,7 @@ export function DesignPage({
             navigate(designHref(started).slice(1));
           }}
           onCancel={() => setDraft(undefined)}
+          onChange={saveDraft}
         />
       )}
       {failed ? (

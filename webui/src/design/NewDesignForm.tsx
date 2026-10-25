@@ -1,5 +1,5 @@
 import { Box, chakra, Input, Textarea } from "@chakra-ui/react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { postOpenDesign, type OpenDesign } from "./open";
 import { Failure, useWrite } from "./SessionControls";
@@ -17,6 +17,7 @@ export function NewDesignForm({
   open = postOpenDesign,
   onStarted,
   onCancel,
+  onChange,
 }: {
   projects: string[];
   initial?: NewDesignDraft;
@@ -24,11 +25,14 @@ export function NewDesignForm({
   /** Runs with the new Design's address once the server started it. */
   onStarted: (address: string) => void;
   onCancel: () => void;
+  /** Hears every change to the fields, so the caller can keep a draft. */
+  onChange?: (draft: NewDesignDraft) => void;
 }) {
   const [slug, setSlug] = useState(initial.slug ?? "");
   const [idea, setIdea] = useState(initial.idea ?? "");
   const [project, setProject] = useState(initial.project ?? projects[0] ?? "");
   const { run, pending, error } = useWrite();
+  useEffect(() => onChange?.({ slug, idea, project }), [onChange, slug, idea, project]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();

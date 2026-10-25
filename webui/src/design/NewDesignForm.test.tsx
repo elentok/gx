@@ -132,3 +132,18 @@ test("an Exited session-only Design offers New session, which opens the form wit
   fireEvent.click(await screen.findByRole("button", { name: "New session" }));
   expect(((await screen.findByLabelText("Epic name")) as HTMLInputElement).value).toBe("idea");
 });
+
+test("the open form and its text survive a reload, and Cancel drops them", async () => {
+  render("/d/gx:a", [row("a")]);
+  fireEvent.click(await screen.findByRole("button", { name: "+ New" }));
+  await fill("idea", "make it fast");
+  cleanup();
+  render("/d/gx:a", [row("a")]);
+  expect(((await screen.findByLabelText("Epic name")) as HTMLInputElement).value).toBe("idea");
+  expect((screen.getByLabelText("Rough idea") as HTMLTextAreaElement).value).toBe("make it fast");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  cleanup();
+  render("/d/gx:a", [row("a")]);
+  await screen.findByRole("button", { name: "+ New" });
+  expect(screen.queryByRole("form", { name: "New Design" })).toBeNull();
+});
