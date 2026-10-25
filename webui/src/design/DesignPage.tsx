@@ -1,5 +1,5 @@
-import { Box, Input, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { Box, Text } from "@chakra-ui/react";
+import { useState } from "react";
 import { Navigate, useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { designHref } from "../hrefs";
@@ -8,173 +8,22 @@ import { useEpicList, type FetchEpicList } from "../epics/list";
 import { DetailPage } from "../page/DetailPage";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
-import { Sidebar } from "../ui/sidebar/Sidebar";
-import { SidebarItem } from "../ui/sidebar/SidebarItem";
-import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
 import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
 import { NewDesignForm, type NewDesignDraft } from "./NewDesignForm";
 import type { OpenDesign, ResumeSession, StopSession } from "./open";
+import { MobilePicker, Picker, useWide } from "./Picker";
 import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress, showsImplLink } from "./Progress";
 import type { FetchScreen } from "./screen";
 import { SessionHeader, StartDesignButton } from "./SessionControls";
-import { designSession, liveSessions,filterGroups, IN_PROGRESS, needsYouCount, pickerGroups, rowHref, type PickerGroup, type PickerRow } from "./view";
+import type { SessionInfo } from "../generated/server";
+import { designSession, liveSessions, IN_PROGRESS, pickerGroups } from "./view";
 
-const NOT_STARTED = "not-started";
-// Sections that start collapsed, unless a filter matches in them or they hold the open Design.
-const COLLAPSED = [NOT_STARTED, "recently-finished"];
-
-function Marks({ section, row }: { section: string; row: PickerRow }) {
-  if (section === "ready-to-queue") return <Mark color="tone.done.fg" label="Ready to queue" glyph="▶" />;
-  if (section === "recently-finished") return <Mark color="tone.done.fg" label="Finished" glyph="✓" />;
-  return (
-    <Box display="flex" gap="1.5" alignItems="center">
-      {row.chart && (
-        <Text as="span" fontSize="xs" color="text.dim">
-          Chart
-        </Text>
-      )}
-      {row.failed && <Mark color="tone.deadlocked.fg" label="Needs attention" glyph="!" />}
-      {row.question && <Mark color="tone.waiting.fg" label="Waiting for your answer" glyph="?" />}
-      {row.live && <LiveMark />}
-    </Box>
-  );
-}
-
-const Mark = ({ color, label, glyph }: { color: string; label: string; glyph: string }) => (
-  <Text as="span" role="img" aria-label={label} title={label} color={color} fontWeight="700" fontSize="sm">
-    {glyph}
-  </Text>
-);
-
-function LiveMark() {
-  return (
-    <Box as="span" role="img" aria-label="Live" title="Live session" position="relative" display="inline-flex" w="2.5" h="2.5">
-      <Box position="absolute" inset="0" borderRadius="full" bg="tone.running.fg" opacity={0.5} animation="ping 1.6s infinite" />
-      <Box position="relative" w="2.5" h="2.5" borderRadius="full" bg="tone.running.fg" />
-    </Box>
-  );
-}
-
-// Chakra's `lg` breakpoint; below it the picker is a dropdown. Without matchMedia (tests) it is wide.
-const WIDE = "(min-width: 62em)";
-const useWide = () => {
-  const mq = () => (typeof window.matchMedia === "function" ? window.matchMedia(WIDE) : undefined);
-  const [wide, setWide] = useState(() => mq()?.matches ?? true);
-  useEffect(() => {
-    const m = mq();
-    if (!m) return;
-    const on = () => setWide(m.matches);
-    m.addEventListener("change", on);
-    return () => m.removeEventListener("change", on);
-  }, []);
-  return wide;
-};
-
-interface PickerProps {
-  groups: PickerGroup[];
-  projects: number;
-  current?: string;
-  onNew: () => void;
-  // Called when a design is clicked; the mobile picker uses it to close itself.
-  onSelect?: () => void;
-}
-
-function Picker({ groups, projects, current, onNew, onSelect }: PickerProps) {
-  const [query, setQuery] = useState("");
-  const filtering = query.trim() !== "";
-  return (
-    <Sidebar
-      title="Designs"
-      action={
-        <Button variant="ghost" onClick={onNew}>
-          + New
-        </Button>
-      }
-    >
-      <Input
-        type="search"
-        aria-label="Filter Designs"
-        placeholder="Filter"
-        size="sm"
-        mb="3"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-      {filterGroups(groups, query).map((g) => (
-        // The key remounts the section so a filter match opens Not started and clearing it collapses it again.
-        <SidebarSection
-          key={`${g.key}-${filtering}`}
-          title={g.title}
-          count={g.rows.length}
-          defaultCollapsed={COLLAPSED.includes(g.key) && !filtering && !g.rows.some((r) => r.row.address === current)}
-        >
-          {g.rows.map((r) => (
-            <SidebarItem
-              key={r.row.address}
-              label={r.row.name}
-              href={rowHref(g.key, r.row)}
-              current={r.row.address === current}
-              onClick={onSelect}
-              marks={
-                <>
-                  {projects > 1 && (
-                    <Text as="span" fontSize="xs" color="text.dim">
-                      {r.row.project}
-                    </Text>
-                  )}
-                  <Marks section={g.key} row={r} />
-                </>
-              }
-            />
-          ))}
-        </SidebarSection>
-      ))}
-    </Sidebar>
-  );
-}
-
-function MobilePicker({ groups, projects, current, onNew }: PickerProps) {
-  const [open, setOpen] = useState(false);
-  const name = groups.flatMap((g) => g.rows).find((r) => r.row.address === current)?.row.name ?? "Designs";
-  const more = needsYouCount(groups, current);
-  return (
-    <Box>
-      <Box display="flex" alignItems="center" gap="3">
-        <Button size="sm" variant="outline" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          {name} {open ? "▴" : "▾"}
-        </Button>
-        {more > 0 && (
-          <Text as="span" fontSize="sm" color="tone.waiting.fg">
-            ? {more} more
-          </Text>
-        )}
-      </Box>
-      {open && <Picker groups={groups} projects={projects} current={current} onNew={onNew} onSelect={() => setOpen(false)} />}
-    </Box>
-  );
-}
-
-// The Chat and Progress columns of one Design. Progress reads the Design's epic detail.
-function DesignColumns({
-  address,
-  wide,
-  fetchDetail,
-  fetchChat,
-  post,
-  open,
-  stop,
-  resume,
-  fetchScreen,
-  focus,
-  chart,
-  onNewSession,
-}: {
-  address: string;
-  wide: boolean;
+/** The injected fetchers and actions the Design page talks to the server through. */
+export interface DesignDeps {
   fetchDetail?: FetchEpicDetail;
   fetchChat?: FetchChat;
   post?: PostPrompt;
@@ -183,12 +32,55 @@ function DesignColumns({
   resume?: ResumeSession;
   fetchScreen?: FetchScreen;
   focus?: PostFocus;
+}
+
+interface SessionStripProps {
+  address: string;
+  session?: SessionInfo;
+  live: SessionInfo[];
+  chart?: boolean;
+  deps: DesignDeps;
+  onSelect: (id: string) => void;
+  onNewSession: () => void;
+}
+
+// The header above the chat: switch/stop controls, a way to start again, or the first Start button.
+function SessionStrip({ address, session, live, chart, deps, onSelect, onNewSession }: SessionStripProps) {
+  if (!session) {
+    return (
+      <Box display="flex" justifyContent="center" py="4">
+        <StartDesignButton address={address} open={deps.open} />
+      </Box>
+    );
+  }
+  if (!chart) return <SessionHeader address={address} shown={session} live={live} onSelect={onSelect} open={deps.open} stop={deps.stop} />;
+  if (session.status.state !== "exited") return null;
+  return (
+    <Box display="flex" justifyContent="flex-end">
+      <Button size="sm" variant="outline" onClick={onNewSession}>
+        New session
+      </Button>
+    </Box>
+  );
+}
+
+// The Chat and Progress columns of one Design. Progress reads the Design's epic detail.
+function DesignColumns({
+  address,
+  wide,
+  deps,
+  chart,
+  onNewSession,
+}: {
+  address: string;
+  wide: boolean;
+  deps: DesignDeps;
   /** The Design has no map yet, so only its session can be started again, from the New Design form. */
   chart?: boolean;
   onNewSession: () => void;
 }) {
   const conn = useConnectionContext();
-  const { detail } = useEpicDetail(address, conn, fetchDetail);
+  const { detail } = useEpicDetail(address, conn, deps.fetchDetail);
   const connState = useConnectionState(conn);
   const sessions = connState.snapshot?.sessions ?? [];
   const [selected, setSelected] = useState<string>();
@@ -199,27 +91,21 @@ function DesignColumns({
   const live = liveSessions(address, sessions);
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session = live.find((s) => s.id === selected) ?? designSession(address, sessions);
-  useFocusReport(conn, session?.id, connState.streams, focus);
+  useFocusReport(conn, session?.id, connState.streams, deps.focus);
   return (
     <>
       <Box aria-label="Chat" role="region" minW="0" display="flex" flexDirection="column" gap="3">
         {wide && detail && showsImplLink(detail) && <ImplLink address={detail.impl_address!} />}
-        {session && chart ? (
-          session.status.state === "exited" && (
-            <Box display="flex" justifyContent="flex-end">
-              <Button size="sm" variant="outline" onClick={onNewSession}>
-                New session
-              </Button>
-            </Box>
-          )
-        ) : session ? (
-          <SessionHeader address={address} shown={session} live={live} onSelect={setSelected} open={open} stop={stop} />
-        ) : (
-          <Box display="flex" justifyContent="center" py="4">
-            <StartDesignButton address={address} open={open} />
-          </Box>
-        )}
-        <DesignChat session={session} fetchChat={fetchChat} post={post} done={done} step={current?.step} nextTitle={nextTitle} actions={{ onNewSession, resume, fetchScreen }} />
+        <SessionStrip address={address} session={session} live={live} chart={chart} deps={deps} onSelect={setSelected} onNewSession={onNewSession} />
+        <DesignChat
+          session={session}
+          fetchChat={deps.fetchChat}
+          post={deps.post}
+          done={done}
+          step={current?.step}
+          nextTitle={nextTitle}
+          actions={{ onNewSession, resume: deps.resume, fetchScreen: deps.fetchScreen }}
+        />
       </Box>
       {/* On a phone Progress sits right under the picker, above the chat. */}
       <Box aria-label="Progress" role="region" gridRow={{ base: 2, lg: "auto" }}>
@@ -230,29 +116,7 @@ function DesignColumns({
 }
 
 // `address` is the Design in the route; the bare route has none and opens the first In progress Design.
-export function DesignPage({
-  address,
-  fetchList,
-  fetchDetail,
-  fetchChat,
-  post,
-  open,
-  stop,
-  resume,
-  fetchScreen,
-  focus,
-}: {
-  address?: string;
-  fetchList?: FetchEpicList;
-  fetchDetail?: FetchEpicDetail;
-  fetchChat?: FetchChat;
-  post?: PostPrompt;
-  open?: OpenDesign;
-  stop?: StopSession;
-  resume?: ResumeSession;
-  fetchScreen?: FetchScreen;
-  focus?: PostFocus;
-}) {
+export function DesignPage({ address, fetchList, deps = {} }: { address?: string; fetchList?: FetchEpicList; deps?: DesignDeps }) {
   const conn = useConnectionContext();
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   const { list, failed } = useEpicList(fetchList, conn);
@@ -283,7 +147,7 @@ export function DesignPage({
           key={`${draft.slug}|${draft.project}`}
           projects={formProjects}
           initial={draft}
-          open={open}
+          open={deps.open}
           onStarted={(started) => {
             setDraft(undefined);
             navigate(designHref(started).slice(1));
@@ -303,20 +167,7 @@ export function DesignPage({
             <MobilePicker groups={groups} projects={projects} current={address} onNew={onNew} />
           )}
           {address ? (
-            <DesignColumns
-              address={address}
-              wide={wide}
-              fetchDetail={fetchDetail}
-              fetchChat={fetchChat}
-              post={post}
-              open={open}
-              stop={stop}
-              resume={resume}
-              fetchScreen={fetchScreen}
-              focus={focus}
-              chart={chartRow}
-              onNewSession={onNewSession}
-            />
+            <DesignColumns address={address} wide={wide} deps={deps} chart={chartRow} onNewSession={onNewSession} />
           ) : (
             <>
               <Box aria-label="Chat" role="region">

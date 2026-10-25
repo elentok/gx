@@ -37,14 +37,16 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
     <DesignPage
       address={useParams()["*"] || undefined}
       fetchList={fetchers.epicList}
-      fetchDetail={fetchers.epic}
-      fetchChat={fetchers.chat}
-      post={fetchers.prompt}
-      open={fetchers.openDesign}
-      stop={fetchers.stop}
-      resume={fetchers.resume}
-      fetchScreen={fetchers.screen}
-      focus={fetchers.focus}
+      deps={{
+        fetchDetail: fetchers.epic,
+        fetchChat: fetchers.chat,
+        post: fetchers.prompt,
+        open: fetchers.openDesign,
+        stop: fetchers.stop,
+        resume: fetchers.resume,
+        fetchScreen: fetchers.screen,
+        focus: fetchers.focus,
+      }}
     />
   );
 }
