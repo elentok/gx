@@ -375,8 +375,13 @@ func TestAttach_WriteErrorEndsTheAttach(t *testing.T) {
 	fa := h.attaches["a"]
 	fa.keyErr = errors.New("broken pipe")
 	m = update1(t, m, letter("x"))
-	if !fa.isClosed() {
-		t.Fatal("a failed write left the stream open")
+	// The writer goroutine closes the stream after the failed write, not Update.
+	deadline := time.Now().Add(time.Second)
+	for !fa.isClosed() {
+		if time.Now().After(deadline) {
+			t.Fatal("a failed write left the stream open")
+		}
+		time.Sleep(time.Millisecond)
 	}
 	m, _ = read(t, m, next)
 	if !m.attach.ended {
