@@ -148,12 +148,11 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 			s.stampEpic(root, e.Path, "completed_at")
 		}
 	case s.nothingToMerge(project, epics, one, repo):
-		s.stampLines(root, e.Path, 0, 0)
-		s.stampTotals(root, e)
+		s.stampMergedEpic(root, e, 0, 0, nil)
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
 		first = true
 	case force || s.autoFFMerge(project) || hasManualMergeTicket(e):
-		trunkBefore, _ := git.RevParse(repo, "refs/heads/"+target)
+		trunkBefore, revErr := git.RevParse(repo, "refs/heads/"+target)
 		reason, kind := s.mergeRoot(project, epics, one, repo)
 		// A non-ff below the cap is not an outcome: the merge ticket makes the
 		// epic not all-done, so the root stays queued and its finish merges again.
@@ -168,12 +167,12 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 			s.storeMergeBlock(root, e.Path, kind, reason)
 			return pauseDecision(first, reason, kind)
 		}
-		if added, removed, err := git.DiffLines(repo, trunkBefore, "refs/heads/"+target); err != nil {
-			s.log.Warn("count merged lines", "root", root, "err", err)
-		} else {
-			s.stampLines(root, e.Path, added, removed)
+		var added, removed int
+		countErr := revErr
+		if countErr == nil {
+			added, removed, countErr = git.DiffLines(repo, trunkBefore, "refs/heads/"+target)
 		}
-		s.stampTotals(root, e)
+		s.stampMergedEpic(root, e, added, removed, countErr)
 		s.stampEpic(root, e.Path, "merged_at", "completed_at")
 		first = true
 	default:
@@ -309,6 +308,17 @@ func (s *Server) stampTotals(root rootRef, e tickets.Epic) {
 	if err := tickets.StampEpicFields(e.Path, tickets.SumEpicStats(e.Tickets).Fields()); err != nil {
 		s.log.Warn("stamp epic totals", "root", root, "err", err)
 	}
+}
+
+// stampMergedEpic records a merged epic's line counts and totals. A failed
+// count (countErr) skips the line stamps; the totals are stamped regardless.
+func (s *Server) stampMergedEpic(root rootRef, e tickets.Epic, added, removed int, countErr error) {
+	if countErr != nil {
+		s.log.Warn("count merged lines", "root", root, "err", countErr)
+	} else {
+		s.stampLines(root, e.Path, added, removed)
+	}
+	s.stampTotals(root, e)
 }
 
 // stampLines records the lines the merge added to and removed from trunk. A

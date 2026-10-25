@@ -80,15 +80,11 @@ func (s *Server) stampMerged(root rootRef, e tickets.Epic, repo, target string) 
 	if merged, err := s.mergedProbe(repo, "refs/heads/"+e.Name, target); err != nil || !merged {
 		return false
 	}
-	if added, removed, err := ralphloop.EpicTrailerLines(repo, "refs/heads/"+e.Name, e.Name); err != nil {
-		s.log.Warn("count hand-merged lines", "root", root, "err", err)
-	} else {
-		s.stampLines(root, e.Path, added, removed)
-	}
-	s.stampTotals(root, e)
+	added, deleted, err := ralphloop.EpicTrailerLines(repo, "refs/heads/"+e.Name, e.Name)
+	s.stampMergedEpic(root, e, added, deleted, err)
 	s.stampEpic(root, e.Path, "merged_at")
 	s.log.Info("epic merged outside the server", "root", root, "target", target)
-	removed, err := s.queued.removeRoot(root)
+	removed, err = s.queued.removeRoot(root)
 	if err != nil {
 		s.log.Warn("dequeue merged root", "root", root, "err", err)
 		return false
