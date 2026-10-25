@@ -27,13 +27,21 @@ const (
 type Tool interface {
 	Name() string
 	// Plan finds the executable and builds its arguments for the caller's
-	// args. The optional note is printed before the result. An error exits 2.
-	Plan(dir string, args []string) (exe string, argv []string, note string, err error)
+	// args. An error exits 2.
+	Plan(dir string, args []string) (Invocation, error)
 	// Parse reads the raw output of a run that exited with the given code.
 	Parse(out []byte, exit int) Outcome
 	// RerunArgs returns the caller's args changed to run only the failing
 	// tests, or nil when the failures cannot be re-run on their own.
 	RerunArgs(args []string, failures []Unit) []string
+}
+
+// Invocation is the command a tool plans to run.
+type Invocation struct {
+	Bin  string
+	Argv []string
+	// Note is printed before the result when not empty.
+	Note string
 }
 
 // Outcome is what a tool found in the output of one run.
@@ -74,12 +82,12 @@ func Run(tool Tool, o Options) int {
 	if err != nil {
 		return cantRun(o.Out, err.Error())
 	}
-	exe, argv, note, err := tool.Plan(dir, o.Args)
+	plan, err := tool.Plan(dir, o.Args)
 	if err != nil {
 		return cantRun(o.Out, err.Error())
 	}
-	if note != "" {
-		fmt.Fprintln(o.Out, note)
+	if plan.Note != "" {
+		fmt.Fprintln(o.Out, plan.Note)
 	}
 
 	start := time.Now()
@@ -92,7 +100,7 @@ func Run(tool Tool, o Options) int {
 	defer logFile.Close()
 	sweep(logDir, start)
 
-	out, exit, err := execute(exe, argv, dir, logFile)
+	out, exit, err := execute(plan.Bin, plan.Argv, dir, logFile)
 	if err != nil {
 		return cantRun(o.Out, err.Error())
 	}

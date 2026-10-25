@@ -76,15 +76,15 @@ func (Vitest) Name() string { return "vitest" }
 
 // Plan finds the binary, refuses watch mode and runs vitest once with the JSON
 // reporter. `related` keeps its place as the subcommand.
-func (Vitest) Plan(dir string, args []string) (string, []string, string, error) {
+func (Vitest) Plan(dir string, args []string) (Invocation, error) {
 	for _, a := range args {
 		if a == "--watch" || a == "-w" || a == "--watch=true" {
-			return "", nil, "", errors.New("vitest --watch is not supported; brief runs vitest once")
+			return Invocation{}, errors.New("vitest --watch is not supported; brief runs vitest once")
 		}
 	}
 	bin, err := findNodeBin(dir, "vitest")
 	if err != nil {
-		return "", nil, "", err
+		return Invocation{}, err
 	}
 	rest, replaced := stripFlag(args, true, "reporter")
 	note := ""
@@ -101,7 +101,7 @@ func (Vitest) Plan(dir string, args []string) (string, []string, string, error) 
 			rest = rest[1:]
 		}
 	}
-	return bin, append(argv, rest...), note, nil
+	return Invocation{Bin: bin, Argv: append(argv, rest...), Note: note}, nil
 }
 
 // Parse reads the test count and the failing tests from the JSON report. The
@@ -185,10 +185,10 @@ type Tsc struct{}
 func (Tsc) Name() string { return "tsc" }
 
 // Plan finds the binary and checks that there is a tsconfig to compile.
-func (Tsc) Plan(dir string, args []string) (string, []string, string, error) {
+func (Tsc) Plan(dir string, args []string) (Invocation, error) {
 	bin, err := findNodeBin(dir, "tsc")
 	if err != nil {
-		return "", nil, "", err
+		return Invocation{}, err
 	}
 	config := filepath.Join(dir, "tsconfig.json")
 	if i := slices.IndexFunc(args, func(a string) bool { return a == "-p" || a == "--project" }); i >= 0 && i+1 < len(args) {
@@ -201,9 +201,9 @@ func (Tsc) Plan(dir string, args []string) (string, []string, string, error) {
 		config = filepath.Join(config, "tsconfig.json")
 	}
 	if _, err := os.Stat(config); err != nil {
-		return "", nil, "", fmt.Errorf("no tsconfig found at %s", config)
+		return Invocation{}, fmt.Errorf("no tsconfig found at %s", config)
 	}
-	return bin, append([]string{"--pretty", "false"}, args...), "", nil
+	return Invocation{Bin: bin, Argv: append([]string{"--pretty", "false"}, args...)}, nil
 }
 
 var tscDiagnostic = regexp.MustCompile(`^(.+?)(\(\d+,\d+\): (?:error|warning) TS\d+: .*)$`)
@@ -214,17 +214,19 @@ var tscGlobalDiagnostic = regexp.MustCompile(`^(?:error|warning) TS\d+: `)
 
 const tscGlobalLocation = "(global)"
 
+// fileErrors collects the tsc diagnostics of one file.
+type fileErrors struct {
+	file   string
+	errors int
+	lines  []string
+}
+
 // Parse treats a clean exit as a pass; tsc prints nothing then. Otherwise it
 // groups the diagnostics by file, in order of first appearance. Indented lines
 // continue the diagnostic above them; any other line is not part of a file.
 func (Tsc) Parse(out []byte, exit int) Outcome {
 	if exit == 0 {
 		return Outcome{Units: 1, Summary: "no type errors"}
-	}
-	type fileErrors struct {
-		file   string
-		errors int
-		lines  []string
 	}
 	var files []*fileErrors
 	byFile := map[string]*fileErrors{}

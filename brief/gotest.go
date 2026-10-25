@@ -18,15 +18,15 @@ func (GoTest) Name() string { return "go-test" }
 
 // Plan always adds -json and -v, once. Flags after -args belong to the test
 // binary and pass through untouched.
-func (GoTest) Plan(_ string, args []string) (string, []string, string, error) {
+func (GoTest) Plan(_ string, args []string) (Invocation, error) {
 	exe, err := exec.LookPath("go")
 	if err != nil {
-		return "", nil, "", errors.New("go not found on PATH")
+		return Invocation{}, errors.New("go not found on PATH")
 	}
 	rest, tail := splitArgs(args)
 	rest, _ = stripFlag(rest, false, "json", "v")
 	argv := append([]string{"test", "-json", "-v"}, rest...)
-	return exe, append(argv, tail...), "", nil
+	return Invocation{Bin: exe, Argv: append(argv, tail...)}, nil
 }
 
 type goTestEvent struct {
