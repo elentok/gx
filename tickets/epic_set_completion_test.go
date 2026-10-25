@@ -36,6 +36,25 @@ func TestUpdateEpicFields_CompletedAtWritesWithOtherFieldsAndKeepsFirst(t *testi
 	}
 }
 
+func TestUpdateEpicFields_DesignStepChecksTheKindTheCallLeavesBehind(t *testing.T) {
+	step := DesignSteps[0]
+	mapKind, loopKind := KindMap, "loop"
+
+	loop := writeEpic(t, t.TempDir(), "l", "kind: loop\nstatus: open\n", "# l\n")
+	if err := UpdateEpicFields(loop, EpicUpdate{Kind: &mapKind, DesignStep: &step}); err != nil {
+		t.Errorf("loop epic turned into a map in the same call: %v", err)
+	}
+
+	m := writeEpic(t, t.TempDir(), "m", "kind: map\nstatus: open\n", "# m\n")
+	before, _ := os.ReadFile(m)
+	if err := UpdateEpicFields(m, EpicUpdate{Kind: &loopKind, DesignStep: &step}); err == nil {
+		t.Error("want an error for a map epic turned into a loop in the same call")
+	}
+	if after, _ := os.ReadFile(m); string(after) != string(before) {
+		t.Errorf("a refused update changed the file:\n%s", after)
+	}
+}
+
 func TestUpdateEpicFields_CompletedAtRefusesLoopEpicBeforeWriting(t *testing.T) {
 	path := writeEpic(t, t.TempDir(), "l", "kind: loop\nstatus: open\n", "# l\n")
 	before, _ := os.ReadFile(path)

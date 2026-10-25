@@ -71,21 +71,24 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 		if err := CheckDesignStep(*u.DesignStep); err != nil {
 			return err
 		}
-		if !IsMapEpic(filepath.Dir(ticketPath)) {
-			return fmt.Errorf("design_step is for a map epic; this epic is not kind: map")
-		}
 	}
 	var completion map[string]any
 	if u.CompletedAt != nil {
-		if !IsMapEpic(filepath.Dir(ticketPath)) {
-			return fmt.Errorf("completed_at is for a map epic; this epic is not kind: map")
-		}
 		var err error
 		if completion, err = mapCompletionFields(filepath.Dir(ticketPath), *u.CompletedAt); err != nil {
 			return err
 		}
 	}
 	return editEpicTicketMD(ticketPath, func(mapping *yaml.Node, _ *string) error {
+		if u.DesignStep != nil || u.CompletedAt != nil {
+			kind := effectiveKind(mapping, u.Kind)
+			if u.DesignStep != nil && kind != KindMap {
+				return fmt.Errorf("design_step is for a map epic; this epic is not kind: map")
+			}
+			if u.CompletedAt != nil && kind != KindMap {
+				return fmt.Errorf("completed_at is for a map epic; this epic is not kind: map")
+			}
+		}
 		for key, value := range completion {
 			if mappingKeyIndex(mapping, key) >= 0 {
 				continue
@@ -122,6 +125,18 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 		}
 		return nil
 	})
+}
+
+// effectiveKind is the kind the epic has once this call lands: the new one if
+// set, else the stored one.
+func effectiveKind(mapping *yaml.Node, next *string) string {
+	if next != nil {
+		return *next
+	}
+	if i := mappingKeyIndex(mapping, "kind"); i >= 0 {
+		return mapping.Content[i+1].Value
+	}
+	return ""
 }
 
 // checkDesignStepMove refuses a move from the stored step to an earlier one
