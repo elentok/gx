@@ -6,6 +6,18 @@ export type RoundDraft = { answers: Answers; notes: string; index: number; scrol
 
 const EMPTY: RoundDraft = { answers: {}, notes: "", index: 0, scroll: 0 };
 
+// Scrolls to `initial` on mount, then reports every scroll position. Pass a stable `onScroll`.
+function useScrollRestore(initial: number, onScroll: (y: number) => void) {
+  useEffect(() => {
+    if (initial > 0) window.scrollTo(0, initial);
+    const listener = () => onScroll(window.scrollY);
+    window.addEventListener("scroll", listener, { passive: true });
+    return () => window.removeEventListener("scroll", listener);
+    // The restore is for the first render only; later drafts must not yank the page back.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onScroll]);
+}
+
 // A half-answered round survives a reload: its answers, the notes box, the open question and the page scroll.
 // pageCache keeps one entry per session, tagged with the round, so a new round never picks up an old draft.
 export function useRoundDraft(sessionId: string, roundKey: string) {
@@ -24,16 +36,16 @@ export function useRoundDraft(sessionId: string, roundKey: string) {
     [cacheKey, roundKey],
   );
   useEffect(() => save(draft), [save, draft]);
-
-  useEffect(() => {
-    if (scroll.current > 0) window.scrollTo(0, scroll.current);
-    const onScroll = () => {
-      scroll.current = window.scrollY;
-      save(latest.current);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, [save]);
+  useScrollRestore(
+    draft.scroll,
+    useCallback(
+      (y: number) => {
+        scroll.current = y;
+        save(latest.current);
+      },
+      [save],
+    ),
+  );
 
   return {
     draft,
