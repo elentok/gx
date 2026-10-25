@@ -16,22 +16,14 @@ func PrepareFeature(d Deps, o OneIteration) (IterationWorktree, error) {
 	if err != nil {
 		return IterationWorktree{}, err
 	}
-	if err := addFeatureWorktree(d, o, w.Path); err != nil {
-		return IterationWorktree{}, err
+	err = withWorktreeLock(func() error { return d.AddWorktree(o.RepoDir, w.Path, o.Epic, o.RootBase) })
+	if err != nil {
+		return IterationWorktree{}, fmt.Errorf("creating feature worktree for branch %q: %w", o.Epic, err)
 	}
 	if err := installDepsIn(d, o, w.Path); err != nil {
 		return IterationWorktree{}, err
 	}
 	return w, nil
-}
-
-func addFeatureWorktree(d Deps, o OneIteration, path string) error {
-	worktreeLock.Lock()
-	defer worktreeLock.Unlock()
-	if err := d.AddWorktree(o.RepoDir, path, o.Epic, o.RootBase); err != nil {
-		return fmt.Errorf("creating feature worktree for branch %q: %w", o.Epic, err)
-	}
-	return nil
 }
 
 // ResumeFeature rebuilds the handle PrepareFeature made, without touching git.

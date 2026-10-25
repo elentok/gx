@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/events"
 )
 
 // lockfileManagers maps each tracked lockfile name to the package manager that
@@ -47,7 +49,7 @@ func installCommand(manager string, yarnBerry bool) (command []string, ok bool) 
 	return nil, false
 }
 
-// installDependenciesWith installs dependencies in every directory of the
+// installDependenciesWithin installs dependencies in every directory of the
 // worktree at path that holds a git-tracked lockfile. pathEnv, when set,
 // replaces the process PATH for finding the package manager. No tracked
 // lockfile is a no-op. go.mod is deliberately not a trigger: go build/go test
@@ -56,10 +58,8 @@ func installCommand(manager string, yarnBerry bool) (command []string, ok bool) 
 // All installs of one call share installTimeout. A failed install writes its
 // full output to a log file in logDir (outside the worktree, so it survives the
 // worktree's discard); "" skips the log.
-func installDependenciesWith(path, pathEnv, logDir string) (commands []string, err error) {
-	return installDependenciesWithin(path, pathEnv, logDir, installTimeout)
-}
-
+//
+// budget is the shared timeout, installTimeout outside tests.
 func installDependenciesWithin(path, pathEnv, logDir string, budget time.Duration) (commands []string, err error) {
 	dirs, err := lockfileDirs(path)
 	if err != nil {
@@ -117,6 +117,23 @@ func lockfileDirs(path string) ([]lockfileDir, error) {
 
 // installIn chooses dir's manager and runs its install there until ctx ends.
 func installIn(ctx context.Context, dir string, lockfiles []string, pathEnv, logDir string) ([]string, error) {
+	packageManager, err := readPackageManager(dir)
+	if err != nil {
+		return nil, err
+	}
+	command, err := chooseCommand(dir, lockfiles, packageManager)
+	if err != nil {
+		return nil, err
+	}
+	out, err := runInstall(ctx, dir, command, pathEnv)
+	if err != nil {
+		return nil, describeInstallFailure(ctx, dir, command, out, err, logDir)
+	}
+	return command, nil
+}
+
+// readPackageManager is the packageManager field of dir's package.json, "" when unset.
+func readPackageManager(dir string) (string, error) {
 	raw, err := os.ReadFile(filepath.Join(dir, "package.json"))
 	var pkg struct {
 		PackageManager string `json:"packageManager"`
@@ -125,17 +142,18 @@ func installIn(ctx context.Context, dir string, lockfiles []string, pathEnv, log
 		err = json.Unmarshal(raw, &pkg)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("reading package.json: %w", err)
+		return "", fmt.Errorf("reading package.json: %w", err)
 	}
+	return pkg.PackageManager, nil
+}
 
-	command, err := chooseCommand(dir, lockfiles, pkg.PackageManager)
-	if err != nil {
-		return nil, err
-	}
+// runInstall runs command in dir and returns its combined output.
+func runInstall(ctx context.Context, dir string, command []string, pathEnv string) ([]byte, error) {
 	name := command[0]
 	if pathEnv != "" {
+		var err error
 		if name, err = lookPathIn(name, pathEnv); err != nil {
-			return nil, fmt.Errorf("%s: %w", strings.Join(command, " "), err)
+			return nil, err
 		}
 	}
 	cmd := exec.CommandContext(ctx, name, command[1:]...)
@@ -143,26 +161,57 @@ func installIn(ctx context.Context, dir string, lockfiles []string, pathEnv, log
 	cmd.Env = append(os.Environ(), "CI=true")
 	// A killed manager's children can keep the output pipe open; don't wait on them.
 	cmd.WaitDelay = time.Second
-	out, err := cmd.CombinedOutput()
-	if err == nil {
-		return command, nil
-	}
+	return cmd.CombinedOutput()
+}
+
+// describeInstallFailure turns a failed runInstall into the error callers see:
+// a timeout, the bare error when the manager printed nothing, or the output's
+// tail plus the path of the full log.
+func describeInstallFailure(ctx context.Context, dir string, command []string, out []byte, runErr error, logDir string) error {
 	joined := strings.Join(command, " ")
 	if ctx.Err() != nil {
-		return nil, fmt.Errorf("%s: timed out after %dm", joined, int(installTimeout.Minutes()))
+		return fmt.Errorf("%s: timed out after %dm", joined, int(installTimeout.Minutes()))
 	}
 	if len(bytes.TrimSpace(out)) == 0 {
-		return nil, fmt.Errorf("%s: %w", joined, err)
+		return fmt.Errorf("%s: %w", joined, runErr)
 	}
 	reason := fmt.Sprintf("%s: %s", joined, outputTail(out))
 	if logPath := writeInstallLog(logDir, dir, out); logPath != "" {
 		reason += " (full output: " + logPath + ")"
 	}
-	return nil, errors.New(reason)
+	return errors.New(reason)
 }
 
 // installTimeout is the budget all installs of one InstallDeps call share.
 const installTimeout = 5 * time.Minute
+
+// installDepsIn installs dependencies in the directory the agent will work in
+// and logs it. The error is returned as is: the install step already names the
+// directory. It runs outside worktreeLock so a slow install does not hold up
+// another ticket's git worktree add.
+func installDepsIn(d Deps, o OneIteration, path string) error {
+	commands, err := d.InstallDeps(path, o.ScratchDir)
+	if err != nil {
+		return err
+	}
+	_ = logEvent(o.ScratchDir, o.Epic, Event{
+		Type:   string(events.DepsInstalled),
+		Ticket: o.Ticket.Identifier,
+		Agent:  o.Agent,
+		Cwd:    path,
+		Reason: strings.Join(commands, "; "),
+	})
+	return nil
+}
+
+// discardAfterInstallFailure joins a failed discard onto the install error, so a
+// retry that trips over the leftover worktree can be traced back.
+func discardAfterInstallFailure(installErr, discardErr error) error {
+	if discardErr != nil {
+		return errors.Join(installErr, fmt.Errorf("discard worktree: %w", discardErr))
+	}
+	return installErr
+}
 
 // installTailBytes caps how much of a failed install's output reaches the error.
 const installTailBytes = 2000

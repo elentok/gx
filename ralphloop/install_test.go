@@ -12,6 +12,11 @@ import (
 
 const pkgJSON = `{"name":"x"}`
 
+// installDependenciesWith runs installDependenciesWithin on the real budget.
+func installDependenciesWith(path, pathEnv, logDir string) ([]string, error) {
+	return installDependenciesWithin(path, pathEnv, logDir, installTimeout)
+}
+
 // installRepo makes a committed repo holding files (path -> content), then
 // writes untracked on top of it uncommitted. Directories are created as needed.
 func installRepo(t *testing.T, files, untracked map[string]string) string {

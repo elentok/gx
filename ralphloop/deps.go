@@ -243,7 +243,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		TrailerMap:           git.TrailerMap,
 		WorktreeExists:       worktreeExists,
 		InstallDeps: func(path, logDir string) ([]string, error) {
-			return installDependenciesWith(path, overrides.Path, logDir)
+			return installDependenciesWithin(path, overrides.Path, logDir, installTimeout)
 		},
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			path, err := transcriptPath(overrides.Home, cwd, sessionID)

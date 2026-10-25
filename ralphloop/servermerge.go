@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -98,32 +97,11 @@ type IterationWorktree struct {
 // worktreeMu does per run.
 var worktreeLock sync.Mutex
 
-// installDepsIn installs dependencies in the directory the agent will work in
-// and logs it. The error is returned as is: the install step already names the
-// directory. It runs outside worktreeLock so a slow install does not hold up
-// another ticket's git worktree add.
-func installDepsIn(d Deps, o OneIteration, path string) error {
-	commands, err := d.InstallDeps(path, o.ScratchDir)
-	if err != nil {
-		return err
-	}
-	_ = logEvent(o.ScratchDir, o.Epic, Event{
-		Type:   string(events.DepsInstalled),
-		Ticket: o.Ticket.Identifier,
-		Agent:  o.Agent,
-		Cwd:    path,
-		Reason: strings.Join(commands, "; "),
-	})
-	return nil
-}
-
-// discardAfterInstallFailure joins a failed discard onto the install error, so a
-// retry that trips over the leftover worktree can be traced back.
-func discardAfterInstallFailure(installErr, discardErr error) error {
-	if discardErr != nil {
-		return errors.Join(installErr, fmt.Errorf("discard worktree: %w", discardErr))
-	}
-	return installErr
+// withWorktreeLock runs fn holding worktreeLock.
+func withWorktreeLock(fn func() error) error {
+	worktreeLock.Lock()
+	defer worktreeLock.Unlock()
+	return fn()
 }
 
 // PrepareIteration creates the epic's feature worktree and the ticket's
