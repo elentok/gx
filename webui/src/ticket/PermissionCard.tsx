@@ -97,7 +97,7 @@ export function PermissionCard({
             <Button disabled={pending} onClick={() => decide("allow")}>
               Allow once
             </Button>
-            <Button variant="outline" disabled={pending} onClick={() => decide("deny")}>
+            <Button emphasis="secondary" disabled={pending} onClick={() => decide("deny")}>
               Deny
             </Button>
           </Box>

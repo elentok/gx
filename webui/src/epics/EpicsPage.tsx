@@ -116,7 +116,7 @@ export function EpicsPage({ fetchList }: { fetchList?: FetchEpicList }) {
         {failed ? (
           <Box mt="6" display="flex" alignItems="center" gap="3">
             <Text color="text.muted">Could not load epics</Text>
-            <Button variant="ghost" onClick={retry}>
+            <Button emphasis="ghost" onClick={retry}>
               Retry
             </Button>
           </Box>

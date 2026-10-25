@@ -107,7 +107,7 @@ export function AnswerForm({
         choicesOf(latest).map((c) => (
           <Button
             key={c.id}
-            variant={choice === c.id ? "solid" : "outline"}
+            emphasis={choice === c.id ? "main" : "secondary"}
             aria-pressed={choice === c.id}
             disabled={pending}
             onClick={() => setChoice(c.id)}
@@ -146,7 +146,7 @@ export function AnswerForm({
         />
       )}
       {error && <Text role="alert">{error}</Text>}
-      <Button variant="solid" size="md" alignSelf="flex-end" disabled={!ready || pending} onClick={send}>
+      <Button emphasis="main" alignSelf="flex-end" disabled={!ready || pending} onClick={send}>
         Send answer
       </Button>
     </Box>

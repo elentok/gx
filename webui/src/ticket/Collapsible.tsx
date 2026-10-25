@@ -7,7 +7,7 @@ export function Collapsible({ label, children }: { label: string; children: Reac
   const [open, setOpen] = useState(false);
   return (
     <Box>
-      <Button variant="ghost" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <Button emphasis="ghost" size="sm" aria-expanded={open} onClick={() => setOpen(!open)}>
         {open ? "▾" : "▸"} {label}
       </Button>
       {open && <Box mt="2">{children}</Box>}

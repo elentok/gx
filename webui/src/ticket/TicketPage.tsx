@@ -49,7 +49,7 @@ export function TicketPage({
             </PageHeader>
             {detail.has_screen && (
               <Box mt="2">
-                <Button variant="outline" onClick={() => setShowScreen(true)}>
+                <Button emphasis="secondary" onClick={() => setShowScreen(true)}>
                   Screen
                 </Button>
               </Box>

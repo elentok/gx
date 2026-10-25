@@ -21,7 +21,7 @@ describe("Sidebar", () => {
 
   it("renders the action in the title row", () => {
     const { getByText } = renderThemed(
-      <Sidebar title="Designs" action={<Button variant="ghost">+ New</Button>}>
+      <Sidebar title="Designs" action={<Button emphasis="ghost">+ New</Button>}>
         body
       </Sidebar>,
     );

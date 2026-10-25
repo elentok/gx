@@ -97,7 +97,7 @@ export function ResumeForm({
           {bases.map((b) => (
             <Button
               key={b}
-              variant={base === b ? "solid" : "outline"}
+              emphasis={base === b ? "main" : "secondary"}
               aria-pressed={base === b}
               disabled={pending}
               onClick={() => setBase(b)}
@@ -117,7 +117,7 @@ export function ResumeForm({
       )}
       {error && <Text role="alert">{error}</Text>}
       <Button
-        variant={besideAnswer ? "outline" : "solid"}
+        emphasis={besideAnswer ? "secondary" : "main"}
         size="md"
         alignSelf="flex-end"
         disabled={!ready || pending}
