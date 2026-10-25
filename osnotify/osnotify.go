@@ -46,15 +46,21 @@ func NewSystemNotifier() Notifier {
 }
 
 // Select returns terminal-notifier on darwin when it is on PATH, osascript on
-// darwin without it, and a no-op everywhere else.
+// darwin without it, notify-send on linux when it is on PATH, and a no-op
+// everywhere else.
 func Select(goos string, lookPath func(string) (string, error), run Runner) Notifier {
-	if goos != "darwin" {
-		return noop{}
+	switch goos {
+	case "darwin":
+		if path, err := lookPath("terminal-notifier"); err == nil {
+			return newTerminalNotifier(path, run)
+		}
+		return newOSAScript(run)
+	case "linux":
+		if path, err := lookPath("notify-send"); err == nil {
+			return newNotifySend(path, run)
+		}
 	}
-	if path, err := lookPath("terminal-notifier"); err == nil {
-		return newTerminalNotifier(path, run)
-	}
-	return newOSAScript(run)
+	return noop{}
 }
 
 func execRunner(ctx context.Context, name string, args ...string) error {

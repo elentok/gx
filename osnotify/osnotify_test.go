@@ -99,6 +99,32 @@ func TestOSAScript_PutsTheLinkInTheBody(t *testing.T) {
 	}
 }
 
+func TestNotifySend_Argv(t *testing.T) {
+	tests := []struct {
+		name string
+		note Notification
+		want []string
+	}{
+		{"title and body", fullNote, []string{"--", "gx title", quotedBody}},
+		{"link goes in the body", Notification{Title: "gx title", Body: "Done", Link: "http://x/#/d/p:e"}, []string{
+			"--", "gx title", "Done\nhttp://x/#/d/p:e",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &fakeRunner{}
+			found := func(string) (string, error) { return "/usr/bin/notify-send", nil }
+			if err := Select("linux", found, r.run).Notify(context.Background(), tt.note); err != nil {
+				t.Fatal(err)
+			}
+			want := []call{{"/usr/bin/notify-send", tt.want}}
+			if !reflect.DeepEqual(r.calls, want) {
+				t.Fatalf("calls = %#v, want %#v", r.calls, want)
+			}
+		})
+	}
+}
+
 func TestNotify_ReturnsRunnerError(t *testing.T) {
 	r := &fakeRunner{err: errors.New("boom")}
 	if err := newTerminalNotifier("terminal-notifier", r.run).Notify(context.Background(), Notification{Title: "t", Body: "b"}); err == nil {
@@ -127,8 +153,8 @@ func TestSelect(t *testing.T) {
 	}{
 		{"darwin with terminal-notifier", "darwin", found, terminalNotifier{}},
 		{"darwin without terminal-notifier", "darwin", missing, osascript{}},
-		{"linux with terminal-notifier", "linux", found, noop{}},
-		{"linux without terminal-notifier", "linux", missing, noop{}},
+		{"linux with notify-send", "linux", found, notifySend{}},
+		{"linux without notify-send", "linux", missing, noop{}},
 		{"windows", "windows", missing, noop{}},
 	}
 	for _, tt := range tests {
