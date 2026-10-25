@@ -365,7 +365,9 @@ export const SectionFinished: CardSection = "finished";
  */
 export const CardKindImplementation = "implementation";
 export const CardKindDesign = "design";
-export type CardKind = typeof CardKindImplementation | typeof CardKindDesign;
+export const CardKindOneOff = "one-off";
+export const CardKindFollowUps = "follow-ups";
+export type CardKind = typeof CardKindImplementation | typeof CardKindDesign | typeof CardKindOneOff | typeof CardKindFollowUps;
 /**
  * CardActionKind names what a card button does.
  */
@@ -382,6 +384,10 @@ export const CardActionMerge: CardActionKind = "merge";
 export const CardActionDesign: CardActionKind = "design";
 export const CardActionContinue: CardActionKind = "continue";
 export const CardActionOpen: CardActionKind = "open";
+/**
+ * Triage targets the project whose follow-ups the card counts.
+ */
+export const CardActionTriage: CardActionKind = "triage";
 /**
  * CardAction is one button of a card. Target is the address the button opens (a
  * ticket for Answer and Open ticket, an epic for Open epic) or acts on (Merge).
@@ -573,6 +579,10 @@ export const EpicListDraft: EpicListState = "draft";
  */
 export const EpicListNoOpenTickets: EpicListState = "no-open-tickets";
 /**
+ * EpicListFollowUps is a project's follow-ups card; see followUpsCard.
+ */
+export const EpicListFollowUps: EpicListState = "follow-ups";
+/**
  * ProgressStep is the step a map's design has reached; see mapProgress. The
  * tickets package owns the list of steps.
  */
@@ -704,6 +714,11 @@ export interface EpicList {
    * FollowUps lists only the projects with at least one open follow-up.
    */
   follow_ups: FollowUpCount[];
+  /**
+   * RecentlyFinished is config server.recently-finished: how many Finished cards
+   * the page shows before a filter.
+   */
+  recently_finished?: number /* int */;
 }
 
 //////////

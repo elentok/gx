@@ -34,6 +34,8 @@ const (
 	// EpicListNoOpenTickets is an open, unqueued loop epic with no open ticket:
 	// nothing to queue, yet not finished.
 	EpicListNoOpenTickets EpicListState = "no-open-tickets"
+	// EpicListFollowUps is a project's follow-ups card; see followUpsCard.
+	EpicListFollowUps EpicListState = "follow-ups"
 )
 
 // ProgressStep is the step a map's design has reached; see mapProgress. The
@@ -138,6 +140,9 @@ type EpicList struct {
 	Epics []EpicListRow `json:"epics"`
 	// FollowUps lists only the projects with at least one open follow-up.
 	FollowUps []FollowUpCount `json:"follow_ups"`
+	// RecentlyFinished is config server.recently-finished: how many Finished cards
+	// the page shows before a filter.
+	RecentlyFinished int `json:"recently_finished,omitempty"`
 }
 
 // epicListed reports whether the Epics page can show e: one-offs, follow-ups
@@ -208,6 +213,14 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 				}
 			}
 		}
+		if fu, ok := byName[followUpsEpicName]; ok {
+			if row, ok := followUpsCard(project, fu); ok {
+				list.Epics = append(list.Epics, row)
+			}
+		}
+		for _, e := range epics {
+			list.Epics = append(list.Epics, s.oneOffCards(project, e)...)
+		}
 		now := time.Now()
 		for _, e := range epics {
 			if epicListed(e) && !joinedImpl(e, byName) {
@@ -226,6 +239,8 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 			}
 		}
 	}
+	list.RecentlyFinished = s.settings.Load().RecentlyFinished
+	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
 	sortCards(list.Epics, func(r EpicListRow) int {
 		// A joined card queues under its -impl epic, whichever part is active.
 		impl := r.Address

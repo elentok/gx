@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
 )
 
 func getEpicList(t *testing.T, code int, body string) server.EpicList {
@@ -78,6 +79,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 		"proj:designing-done":   {server.EpicListDesigning, server.EpicKindMap},
 		"proj:waiting":          {server.EpicListWaitingToDesign, server.EpicKindMap},
 		"proj:mapdone":          {server.EpicListFinished, server.EpicKindMap},
+		"proj:follow-ups":       {server.EpicListFollowUps, server.EpicKindLoop},
 	}
 	got := map[string]server.EpicListRow{}
 	for _, r := range list.Epics {
@@ -103,7 +105,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 		}
 	}
 	if len(got) != len(want) {
-		t.Errorf("listed %d epics, want %d (one-offs, follow-ups and archived are never listed): %s", len(got), len(want), body)
+		t.Errorf("listed %d epics, want %d (an unqueued one-off and archived epics are never listed): %s", len(got), len(want), body)
 	}
 }
 
@@ -203,6 +205,95 @@ func TestEpicList_FollowUpCounts(t *testing.T) {
 	}
 	if want := map[string]int{"proj": 2, "other": 1}; !maps.Equal(got, want) {
 		t.Errorf("follow_ups = %v, want %v: %s", got, want, body)
+	}
+}
+
+func TestEpicList_FollowUpsCardCountsByCategoryAndComesFirst(t *testing.T) {
+	loop := "---\nstatus: open\n---\n"
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "follow-ups", loop, map[string]string{
+			"01-a.md": issueMD("01", "open", "category: bug\n", "A"),
+			"02-b.md": issueMD("02", "open", "category: bug\n", "B"),
+			"03-c.md": issueMD("03", "draft", "category: idea\n", "C"),
+			"04-d.md": issueMD("04", "done", "category: bug\n", "D"),
+		})
+		writeEpicFiles(t, store, "aaa", "---\nstatus: draft\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
+		writeProjectEpic(t, store, "empty", "follow-ups", loop, map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
+	})
+	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	var cards, design []server.EpicListRow
+	for _, r := range getEpicList(t, code, body).Epics {
+		if r.Name == "follow-ups" {
+			cards = append(cards, r)
+		}
+		if r.Section == server.SectionReadyToDesign {
+			design = append(design, r)
+		}
+	}
+	if len(cards) != 1 {
+		t.Fatalf("follow-ups cards = %+v, want one (none for the project with nothing open): %s", cards, body)
+	}
+	c := cards[0]
+	if c.Address != "proj:follow-ups" || c.CardKind != server.CardKindFollowUps || c.StatusWords != "2 bugs, 1 idea" {
+		t.Errorf("card = %+v", c)
+	}
+	if len(c.Actions) != 1 || c.Actions[0].Kind != server.CardActionTriage || c.Actions[0].Target != "proj" {
+		t.Errorf("actions = %+v, want Triage on proj", c.Actions)
+	}
+	if len(design) != 2 || design[0].Address != "proj:follow-ups" {
+		t.Errorf("Ready to design = %+v, want the follow-ups card first", design)
+	}
+}
+
+func TestEpicList_OneOffCardsAndTheFinishedCap(t *testing.T) {
+	loop := "---\nstatus: open\n---\n"
+	archived := func(id, at string) string {
+		return issueMD(id, "done", "completed_at: "+at+"\n", "Old "+id)
+	}
+	store := t.TempDir()
+	writeEpicFiles(t, store, "one-offs", loop, map[string]string{
+		"01-queued.md": issueMD("01", "open", "", "Queued job"),
+		"02-paused.md": issueMD("02", "paused", "pause_reason: self-reported\n", "Paused job"),
+		"03-idle.md":   issueMD("03", "open", "", "Idle job"),
+	})
+	writeEpicFiles(t, store, "one-offs-archived", loop, map[string]string{
+		"01-a.md": archived("01", "2026-03-01T10:00:00Z"),
+		"02-b.md": archived("02", "2026-03-02T10:00:00Z"),
+		"03-c.md": archived("03", "2026-03-03T10:00:00Z"),
+	})
+	done := func(at string) string { return "---\nstatus: done\nmerged_at: " + at + "\n---\n" }
+	finished := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
+	writeEpicFiles(t, store, "newer-epic", done("2026-01-02T10:00:00Z"), finished)
+	writeEpicFiles(t, store, "older-epic", done("2025-01-02T10:00:00Z"), finished)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0"; c.RecentlyFinished = 2 })
+	hs, err := h.Client.Handshake(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, err := h.Client.QueueAdd(t.Context(), "proj:one-offs/01", ""); err != nil || res.Refused {
+		t.Fatalf("queue add = %+v, %v", res, err)
+	}
+	code, body := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/epics")
+	var addrs []string
+	bySection := map[server.CardSection][]server.EpicListRow{}
+	for _, r := range getEpicList(t, code, body).Epics {
+		addrs = append(addrs, r.Address)
+		bySection[r.Section] = append(bySection[r.Section], r)
+	}
+	if q := bySection[server.SectionInProgress]; len(q) != 1 || q[0].Address != "proj:one-offs/01" || q[0].CardKind != server.CardKindOneOff || q[0].State != server.EpicListQueued {
+		t.Errorf("In progress = %+v, want the queued one-off", q)
+	}
+	if n := bySection[server.SectionNeedsYou]; len(n) != 1 || n[0].Address != "proj:one-offs/02" || n[0].StatePill != server.PillPaused || len(n[0].Actions) != 1 || n[0].Actions[0].Kind != server.CardActionOpenTicket {
+		t.Errorf("Needs you = %+v, want the paused one-off with its pill and action", n)
+	}
+	var got []string
+	for _, r := range bySection[server.SectionFinished] {
+		got = append(got, r.Address)
+	}
+	// Every done epic stays; only the two newest Finished cards may be one-offs.
+	want := []string{"proj:one-offs-archived/03", "proj:one-offs-archived/02", "proj:newer-epic", "proj:older-epic"}
+	if !slices.Equal(got, want) {
+		t.Errorf("Finished = %v, want %v (all cards: %v)", got, want, addrs)
 	}
 }
 

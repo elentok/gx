@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+	"time"
 )
 
 // CardSection is the Epics page section a card belongs to. The server decides it;
@@ -30,6 +31,8 @@ type CardKind string
 const (
 	CardKindImplementation CardKind = "implementation"
 	CardKindDesign         CardKind = "design"
+	CardKindOneOff         CardKind = "one-off"
+	CardKindFollowUps      CardKind = "follow-ups"
 )
 
 // CardActionKind names what a card button does.
@@ -46,6 +49,8 @@ const (
 	CardActionDesign   CardActionKind = "design"
 	CardActionContinue CardActionKind = "continue"
 	CardActionOpen     CardActionKind = "open"
+	// Triage targets the project whose follow-ups the card counts.
+	CardActionTriage CardActionKind = "triage"
 )
 
 // CardAction is one button of a card. Target is the address the button opens (a
@@ -139,6 +144,16 @@ func inProgressRank(r EpicListRow) int {
 	return 2
 }
 
+func followUpsRank(r EpicListRow) int {
+	if r.CardKind == CardKindFollowUps {
+		return 0
+	}
+	return 1
+}
+
+// finishedAt is when a Finished card landed: its merge, else its completion.
+func finishedAt(r EpicListRow) time.Time { return cmp.Or(r.MergedAt, r.CompletedAt) }
+
 // sortCards orders rows by section, then by the section's rule. Rows without a
 // section keep their place after the sectioned ones.
 func sortCards(rows []EpicListRow, queuePosition func(EpicListRow) int) {
@@ -166,7 +181,13 @@ func sortCards(rows []EpicListRow, queuePosition func(EpicListRow) int) {
 		case SectionReadyToQueue:
 			return b.CreatedAt.Compare(a.CreatedAt)
 		case SectionReadyToDesign:
+			// Follow-ups cards come first, then the rest by name.
+			if c := cmp.Compare(followUpsRank(a), followUpsRank(b)); c != 0 {
+				return c
+			}
 			return cmp.Compare(a.Name, b.Name)
+		case SectionFinished:
+			return finishedAt(b).Compare(finishedAt(a))
 		}
 		return 0
 	})

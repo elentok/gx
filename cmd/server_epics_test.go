@@ -29,7 +29,7 @@ func TestPrintEpicList_OneLinePerEpic(t *testing.T) {
 		{Address: "proj:a", Kind: server.EpicKindLoop, State: server.EpicListReady, Done: 1, Total: 2, Queueable: true, Section: server.SectionReadyToQueue},
 		{Address: "proj:b", Kind: server.EpicKindMap, State: server.EpicListDesigning},
 	}}
-	if err := printEpicList(&out, l); err != nil {
+	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
 	}
 	if want := "proj:a\tloop\tready\t1/2\tqueueable=true\tready-to-queue\nproj:b\tmap\tdesigning\t0/0\tqueueable=false\t\n"; out.String() != want {
@@ -42,7 +42,7 @@ func TestPrintEpicList_JoinedCardPrintsTheActivePartsAddress(t *testing.T) {
 	l := server.EpicList{Epics: []server.EpicListRow{
 		{Address: "proj:m", Addresses: []string{"proj:m-impl", "proj:m"}, Kind: server.EpicKindMap, State: server.EpicListRunning, Section: server.SectionInProgress},
 	}}
-	if err := printEpicList(&out, l); err != nil {
+	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
 	}
 	if want := "proj:m-impl\tmap\trunning\t0/0\tqueueable=false\tin-progress\n"; out.String() != want {
@@ -56,7 +56,7 @@ func TestPrintEpicList_NeedsYouRowsKeepTheServersOldestWaitOrder(t *testing.T) {
 		{Address: "proj:old", Kind: server.EpicKindLoop, State: server.EpicListPaused, Section: server.SectionNeedsYou, WaitingSince: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
 		{Address: "proj:new", Kind: server.EpicKindLoop, State: server.EpicListMergeBlocked, Section: server.SectionNeedsYou, WaitingSince: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)},
 	}}
-	if err := printEpicList(&out, l); err != nil {
+	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
 	}
 	want := "proj:old\tloop\tpaused\t0/0\tqueueable=false\tneeds-you\nproj:new\tloop\tmerge-blocked\t0/0\tqueueable=false\tneeds-you\n"
@@ -70,11 +70,44 @@ func TestPrintEpicList_MapPendingDesignPrintsProjectAndEpic(t *testing.T) {
 	l := server.EpicList{Epics: []server.EpicListRow{
 		{Address: "proj:idea", Kind: server.EpicKindMap, State: server.EpicListDesigning, Section: server.SectionInProgress, MapPending: true},
 	}}
-	if err := printEpicList(&out, l); err != nil {
+	if err := printEpicList(&out, l, false); err != nil {
 		t.Fatal(err)
 	}
 	if want := "proj:idea\tmap\tdesigning\t0/0\tqueueable=false\tin-progress\n"; out.String() != want {
 		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+}
+
+func TestPrintEpicList_OneOffPrintsTicketAddressAndCardKind(t *testing.T) {
+	var out bytes.Buffer
+	l := server.EpicList{Epics: []server.EpicListRow{
+		{Address: "proj:one-offs/01", Addresses: []string{"proj:one-offs/01"}, Kind: server.EpicKindLoop, CardKind: server.CardKindOneOff, State: server.EpicListQueued, Section: server.SectionInProgress},
+	}}
+	if err := printEpicList(&out, l, false); err != nil {
+		t.Fatal(err)
+	}
+	if want := "proj:one-offs/01\tone-off\tqueued\t0/0\tqueueable=false\tin-progress\n"; out.String() != want {
+		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+}
+
+func TestPrintEpicList_FinishedIsCappedUnlessAllFinished(t *testing.T) {
+	l := server.EpicList{RecentlyFinished: 2, Epics: []server.EpicListRow{
+		{Address: "proj:a", Kind: server.EpicKindLoop, State: server.EpicListFinished, Section: server.SectionFinished},
+		{Address: "proj:b", Kind: server.EpicKindLoop, State: server.EpicListFinished, Section: server.SectionFinished},
+		{Address: "proj:c", Kind: server.EpicKindLoop, State: server.EpicListFinished, Section: server.SectionFinished},
+	}}
+	for _, tc := range []struct {
+		all  bool
+		want int
+	}{{false, 2}, {true, 3}} {
+		var out bytes.Buffer
+		if err := printEpicList(&out, l, tc.all); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Count(out.String(), "\n"); got != tc.want {
+			t.Errorf("all=%v printed %d lines, want %d: %q", tc.all, got, tc.want, out.String())
+		}
 	}
 }
 

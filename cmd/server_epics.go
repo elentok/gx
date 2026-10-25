@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
@@ -14,7 +15,7 @@ import (
 // newServerEpicsCmd lists the epics and holds the verbs that take an epic
 // address; every `gx server tickets` verb takes a ticket address.
 func newServerEpicsCmd() *cobra.Command {
-	var listJSON bool
+	var listJSON, allFinished bool
 	cmd := &cobra.Command{
 		Use:   "epics",
 		Short: "list every epic the Epics page shows, or act on a whole epic through the gx server",
@@ -24,10 +25,11 @@ func newServerEpicsCmd() *cobra.Command {
 				func(ctx context.Context, cl *apiclient.Client) (server.EpicList, error) {
 					return cl.Epics(ctx)
 				},
-				printEpicList)
+				func(w io.Writer, l server.EpicList) error { return printEpicList(w, l, allFinished) })
 		},
 	}
 	cmd.Flags().BoolVar(&listJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.Flags().BoolVar(&allFinished, "all-finished", false, "print every Finished card, not only the first server.recently-finished")
 	var jsonOut bool
 	merge := &cobra.Command{
 		Use:   "merge <project:epic>",
@@ -73,14 +75,23 @@ func printEpicRow(w io.Writer, address, kind, state string, done, total int, que
 	return err
 }
 
-func printEpicList(w io.Writer, l server.EpicList) error {
+// printEpicList writes one line per card. Finished cards come newest first, and
+// only the first l.RecentlyFinished print unless allFinished is set.
+func printEpicList(w io.Writer, l server.EpicList, allFinished bool) error {
+	finished := 0
 	for _, e := range l.Epics {
+		if e.Section == server.SectionFinished {
+			finished++
+			if !allFinished && finished > l.RecentlyFinished {
+				continue
+			}
+		}
 		// A joined card prints the active part's address, the first of Addresses.
 		address := e.Address
 		if len(e.Addresses) > 0 {
 			address = e.Addresses[0]
 		}
-		if err := printEpicRow(w, address, string(e.Kind), string(e.State), e.Done, e.Total, e.Queueable, string(e.Section)); err != nil {
+		if err := printEpicRow(w, address, string(cmp.Or(e.CardKind, server.CardKind(e.Kind))), string(e.State), e.Done, e.Total, e.Queueable, string(e.Section)); err != nil {
 			return err
 		}
 	}

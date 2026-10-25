@@ -71,35 +71,8 @@ func (s *Server) loopNeedsYou(root rootRef, e tickets.Epic, state EpicListState)
 func (s *Server) ticketNeedsYou(root rootRef, e tickets.Epic, fallback time.Time) (needsYou, bool) {
 	var waits []ticketWait
 	for _, t := range e.Tickets {
-		addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}.String()
-		status := e.RenderedStatus(t)
-		label := t.DisplayNumber() + " " + t.Title
-		switch {
-		case status == tickets.StatusDraft:
-		case isPaused(e, t):
-			evs := readLogLenient(t)
-			n := needsYou{
-				Pill: PillPaused, Reason: label + ": " + tickets.PauseDetail(e, t),
-				Action: CardAction{Kind: CardActionOpenTicket, Label: "Open ticket", Target: addr},
-			}
-			if rounds := tickets.AllRounds(evs); len(rounds) > 0 {
-				n.Since = rounds[len(rounds)-1].Question.TS
-			}
-			if open := tickets.OpenQuestion(evs); status == tickets.StatusPausedAnswer && open != nil {
-				n.Pill, n.Reason = PillQuestion, label+": "+open.Summary
-				n.Action = CardAction{Kind: CardActionAnswer, Label: "Answer", Target: addr}
-			}
+		if n, ok := s.ticketWaitOf(root, e, t); ok {
 			waits = append(waits, ticketWait{n, t})
-		case status == tickets.StatusClaimed:
-			card, err := s.permissionCard(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()})
-			if err != nil || card == nil {
-				continue
-			}
-			waits = append(waits, ticketWait{needsYou{
-				Pill: PillPermission, Reason: label + " wants to run: " + cmp.Or(card.Description, card.Tool),
-				Since:  permissionSince(readLogLenient(t)),
-				Action: CardAction{Kind: CardActionAnswer, Label: "Answer", Target: addr},
-			}, t})
 		}
 	}
 	if len(waits) == 0 {
@@ -116,6 +89,41 @@ func (s *Server) ticketNeedsYou(root rootRef, e tickets.Epic, fallback time.Time
 		n.Reason += fmt.Sprintf(" (+%d more)", more)
 	}
 	return n, true
+}
+
+// ticketWaitOf says whether t is paused, asking or blocked on a permission. The
+// wait's Since is zero when the log holds no time for it.
+func (s *Server) ticketWaitOf(root rootRef, e tickets.Epic, t tickets.Ticket) (needsYou, bool) {
+	addr := tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}
+	status := e.RenderedStatus(t)
+	label := t.DisplayNumber() + " " + t.Title
+	switch {
+	case isPaused(e, t) && status != tickets.StatusDraft:
+		evs := readLogLenient(t)
+		n := needsYou{
+			Pill: PillPaused, Reason: label + ": " + tickets.PauseDetail(e, t),
+			Action: CardAction{Kind: CardActionOpenTicket, Label: "Open ticket", Target: addr.String()},
+		}
+		if rounds := tickets.AllRounds(evs); len(rounds) > 0 {
+			n.Since = rounds[len(rounds)-1].Question.TS
+		}
+		if open := tickets.OpenQuestion(evs); status == tickets.StatusPausedAnswer && open != nil {
+			n.Pill, n.Reason = PillQuestion, label+": "+open.Summary
+			n.Action = CardAction{Kind: CardActionAnswer, Label: "Answer", Target: addr.String()}
+		}
+		return n, true
+	case status == tickets.StatusClaimed:
+		card, err := s.permissionCard(addr)
+		if err != nil || card == nil {
+			return needsYou{}, false
+		}
+		return needsYou{
+			Pill: PillPermission, Reason: label + " wants to run: " + cmp.Or(card.Description, card.Tool),
+			Since:  permissionSince(readLogLenient(t)),
+			Action: CardAction{Kind: CardActionAnswer, Label: "Answer", Target: addr.String()},
+		}, true
+	}
+	return needsYou{}, false
 }
 
 // permissionSince is the time of the newest permission request in a ticket's log.
