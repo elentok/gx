@@ -98,9 +98,9 @@ func printProjectWarnings(projectDir string, w io.Writer) error {
 	return nil
 }
 
-// printTicketWarnings writes the findings for the ticket at path to w, and
-// folds every other ticket's into one count: an agent validating its own
-// ticket shouldn't wade through the whole project's.
+// printTicketWarnings writes only the findings for the ticket at path to w: an
+// agent validating its own ticket shouldn't hear about the rest of the project
+// (`validate --all` lists those).
 func printTicketWarnings(projectDir, path string, w io.Writer) error {
 	warnings, err := tickets.ProjectWarnings(projectDir)
 	if err != nil {
@@ -110,20 +110,10 @@ func printTicketWarnings(projectDir, path string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	others := map[string]bool{}
 	for _, warning := range warnings {
 		if filepath.Clean(warning.Path) == abs {
 			fmt.Fprintf(w, "warning: %s\n", warning)
-		} else {
-			others[warning.Path] = true
 		}
-	}
-	switch len(others) {
-	case 0:
-	case 1:
-		fmt.Fprintln(w, "1 other ticket has warnings; run `gx tickets validate --all`")
-	default:
-		fmt.Fprintf(w, "%d other tickets have warnings; run `gx tickets validate --all`\n", len(others))
 	}
 	return nil
 }
