@@ -132,6 +132,9 @@ type SessionActionable struct {
 	Action   []string `json:"action,omitempty"`
 	Target   string   `json:"target,omitempty"`
 	GxRaised bool     `json:"gx_raised,omitempty"`
+	// Grilling marks the Actionable of a gx-design grilling round, so clients
+	// do not match its Reason text.
+	Grilling bool `json:"grilling,omitempty"`
 }
 
 // SessionActionableQueue is the Kind of an Actionable whose Action is a queue

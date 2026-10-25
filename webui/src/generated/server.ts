@@ -1145,6 +1145,11 @@ export interface SessionActionable {
   action?: string[];
   target?: string;
   gx_raised?: boolean;
+  /**
+   * Grilling marks the Actionable of a gx-design grilling round, so clients
+   * do not match its Reason text.
+   */
+  grilling?: boolean;
 }
 /**
  * SessionActionableQueue is the Kind of an Actionable whose Action is a queue

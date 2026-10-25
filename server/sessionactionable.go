@@ -72,7 +72,7 @@ var runEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next:.*$`)
 // the person: the grilling question wins over the run-end line.
 func designActionable(text, ticket string) (SessionActionable, bool) {
 	if hasGrillingMarker(text) {
-		return SessionActionable{Reason: grillingReason}, true
+		return SessionActionable{Reason: grillingReason, Grilling: true}, true
 	}
 	return runEndNext(text, ticket)
 }

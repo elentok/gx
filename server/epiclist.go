@@ -194,14 +194,19 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 				row := s.epicListRow(project, e)
 				row.BlockedByEpics = unmergedBlockers(project, e, merged)
 				if e.IsMap {
-					row.ProgressStep = mapProgress(e)
-					row.PickerSection, row.PickerSortAt, row.ImplAddress = s.mapPicker(project, e, row.ProgressStep, byName, designs[row.Address], now)
+					s.decorateMapRow(&row, project, e, byName, designs[row.Address], now)
 				}
 				list.Epics = append(list.Epics, row)
 			}
 		}
 	}
 	writeJSON(w, list)
+}
+
+// decorateMapRow adds the map-only fields to a listed map epic's row.
+func (s *Server) decorateMapRow(row *EpicListRow, project string, e tickets.Epic, byName map[string]tickets.Epic, design designActivity, now time.Time) {
+	row.ProgressStep = mapProgress(e)
+	row.PickerSection, row.PickerSortAt, row.ImplAddress = s.mapPicker(project, e, row.ProgressStep, byName, design, now)
 }
 
 // openFollowUps counts the draft and open tickets of a follow-ups epic.

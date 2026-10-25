@@ -127,7 +127,7 @@ test("each mark shows", async () => {
     ],
     [
       session("live", { status: { state: "working" } }),
-      session("ask", { actionable: { reason: "Grilling: waiting for your answers" } }),
+      session("ask", { actionable: { reason: "Grilling: waiting for your answers", grilling: true } }),
       session("bad", { failure: { kind: "crashed", label: "Crashed" } }),
       session("limited", { failure: { kind: "rate-limit", label: "Rate limited" } }),
     ],
@@ -155,7 +155,7 @@ test("waiting and failed Designs sort first, then live ones, then newest first",
     [
       session("live", { status: { state: "working" } }),
       session("bad", { failure: { kind: "crashed", label: "Crashed" } }),
-      session("ask", { actionable: { reason: "Grilling: waiting for your answers" } }),
+      session("ask", { actionable: { reason: "Grilling: waiting for your answers", grilling: true } }),
     ],
     "/d/gx:new",
   );
@@ -246,7 +246,7 @@ test("on a phone the picker is a dropdown with a count of other Designs that nee
   try {
     render(
       [map("cur", "in-progress"), map("ask", "in-progress"), map("bad", "in-progress"), map("calm", "in-progress")],
-      [session("ask", { actionable: { reason: "Grilling: waiting for your answers" } }), session("bad", { failure: { kind: "crashed", label: "Crashed" } })],
+      [session("ask", { actionable: { reason: "Grilling: waiting for your answers", grilling: true } }), session("bad", { failure: { kind: "crashed", label: "Crashed" } })],
       "/d/gx:cur",
     );
     const button = await screen.findByRole("button", { name: /^cur/ });

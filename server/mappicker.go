@@ -33,7 +33,7 @@ func (s *Server) designActivities() map[string]designActivity {
 		addr := epicAddress(info.Ticket)
 		a := out[addr]
 		a.live = true
-		a.waiting = a.waiting || info.Actionable.Reason == grillingReason
+		a.waiting = a.waiting || info.Actionable.Grilling
 		out[addr] = a
 	}
 	return out

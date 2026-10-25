@@ -30,9 +30,6 @@ const SECTIONS: { key: PickerSection; title: string }[] = [
   { key: "recently-finished", title: "Recently finished" },
 ];
 
-// The server raises a Grilling round's Actionable with this reason prefix (server/sessionactionable.go).
-const GRILLING_REASON_PREFIX = "Grilling";
-
 /** A Design's session sits on a ticket of its map epic, or on the epic itself before Chart makes the map. */
 const designOf = (s: SessionInfo) => (s.design && s.ticket ? s.ticket.split("/")[0] : undefined);
 
@@ -62,7 +59,7 @@ function pickerRow(row: EpicListRow, sessions: SessionInfo[]): PickerRow {
   return {
     row,
     live: mine.some((s) => s.status.state !== "exited"),
-    question: mine.some((s) => s.actionable.reason?.startsWith(GRILLING_REASON_PREFIX)),
+    question: mine.some((s) => s.actionable.grilling),
     failed: mine.some((s) => s.failure !== undefined && s.failure.kind !== "rate-limit"),
   };
 }
