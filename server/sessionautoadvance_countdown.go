@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/sound"
 )
 
 // DefaultAutoAdvanceDelay is how long a run-end Continue waits before the
@@ -99,6 +101,29 @@ func (s *Server) startAutoAdvance(id string) bool {
 		s.sendAutoAdvance(id)
 	})
 	return true
+}
+
+// cancelAutoAdvance stops the session's countdown, leaving the Continue raised,
+// and tells the person why it did not send. It reports whether one was running.
+func (s *Server) cancelAutoAdvance(id, why string) bool {
+	if !s.autoAdvances.stop(id) {
+		return false
+	}
+	s.events.publish(EventSessionChanged, id)
+	s.triggerBanner(id, sound.Attention, why)
+	return true
+}
+
+// cancelAutoAdvanceRoute is the cancel route: it stops a running countdown and
+// is a no-op with none.
+func (s *Server) cancelAutoAdvanceRoute(req SessionRequest) (SessionResult, error) {
+	_, meta, res, err := s.sessionDir(req.ID)
+	if res.Refused || err != nil {
+		return res, err
+	}
+	s.cancelAutoAdvance(req.ID, "Auto-advance cancelled")
+	info := meta.info()
+	return SessionResult{Session: &info}, nil
 }
 
 // sendAutoAdvance sends the Continue action if the session still waits on it

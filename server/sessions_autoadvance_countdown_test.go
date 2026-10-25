@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -116,6 +117,82 @@ func TestAutoAdvance_SwitchOffStartsNoCountdown(t *testing.T) {
 	time.Sleep(2 * countdownDelay)
 	if got.AutoAdvanceAt != nil || screenHas(t, c, "/clear") {
 		t.Errorf("session = %+v, want no countdown and nothing sent", got)
+	}
+}
+
+// startCountdown ends a run on a session so its countdown runs over a raised Continue.
+func startCountdown(t *testing.T) (*grillingFixture, *nativerunner.HolderClient) {
+	t.Helper()
+	f := startAdvancing(t, storeWithMapStep(t, "spec"))
+	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
+	writeAssistantMessage(t, f.path, runEndText)
+	endTurn(t, f)
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+	return f, c
+}
+
+// wantStopped checks that nothing was sent, the run-end Continue still stands
+// and exactly one banner told the person.
+func wantStopped(t *testing.T, f *grillingFixture, c *nativerunner.HolderClient) {
+	t.Helper()
+	time.Sleep(2 * countdownDelay)
+	if screenHas(t, c, "/clear") {
+		t.Error("a stopped countdown still sent /clear")
+	}
+	got := sessionSnapshot(t, f)
+	if got.AutoAdvanceAt != nil || got.Actionable.Reason == "" || len(got.Actionable.Action) == 0 {
+		t.Errorf("session = %+v, want no countdown and Continue raised", got)
+	}
+	if b, s := f.h.Banners.Sent(), f.h.Sounds.Played(); len(b) != 1 || len(s) != 1 {
+		t.Errorf("banners = %v, sounds = %v, want one of each", b, s)
+	}
+}
+
+func TestAutoAdvance_CancelStopsTheSend(t *testing.T) {
+	f, c := startCountdown(t)
+	if res, err := f.h.Client.CancelAutoAdvance(f.ctx, f.id); err != nil || res.Refused {
+		t.Fatalf("cancel = %+v, %v", res, err)
+	}
+	wantStopped(t, f, c)
+}
+
+func TestAutoAdvance_PaneInputStopsTheSendAndKeepsContinue(t *testing.T) {
+	f, c := startCountdown(t)
+	clearByInput(t, f.h, f.id)
+	wantStopped(t, f, c)
+}
+
+func TestAutoAdvance_PageNoteStopsTheSendAndKeepsContinue(t *testing.T) {
+	f, c := startCountdown(t)
+	if res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Text: "a note"}); err != nil || res.Refused {
+		t.Fatalf("prompt = %+v, %v", res, err)
+	}
+	wantStopped(t, f, c)
+}
+
+func TestAutoAdvance_SwitchOffDuringTheCountdownStopsTheSend(t *testing.T) {
+	f, c := startCountdown(t)
+	if res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, false); err != nil || res.Refused {
+		t.Fatalf("switch off = %+v, %v", res, err)
+	}
+	wantStopped(t, f, c)
+}
+
+func TestAutoAdvance_RunEndingWithTheSwitchOffPlaysOneBanner(t *testing.T) {
+	f := startAdvancing(t, storeWithMapStep(t, "spec"))
+	if res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, false); err != nil || res.Refused {
+		t.Fatalf("switch off = %+v, %v", res, err)
+	}
+	writeAssistantMessage(t, f.path, runEndText)
+	endTurn(t, f)
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
+	deadline := time.Now().Add(5 * time.Second)
+	for len(f.h.Banners.Sent()) == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	time.Sleep(countdownDelay)
+	if b := f.h.Banners.Sent(); len(b) != 1 {
+		t.Errorf("banners = %v, want one", b)
 	}
 }
 

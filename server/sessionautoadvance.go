@@ -50,8 +50,8 @@ func (s *Server) sessionAutoAdvanceHandler(web bool) http.HandlerFunc {
 	}
 }
 
-// setAutoAdvance flips a Design session's auto-advance switch. Nothing reads it
-// yet but the wire.
+// setAutoAdvance flips a Design session's auto-advance switch. Turning it off
+// stops a running countdown.
 func (s *Server) setAutoAdvance(req AutoAdvanceRequest) (SessionResult, error) {
 	dir, meta, res, err := s.sessionDir(req.ID)
 	if res.Refused || err != nil {
@@ -67,6 +67,9 @@ func (s *Server) setAutoAdvance(req AutoAdvanceRequest) (SessionResult, error) {
 		return true
 	}); err != nil {
 		return SessionResult{}, err
+	}
+	if req.Off {
+		s.cancelAutoAdvance(req.ID, "Auto-advance switched off")
 	}
 	return SessionResult{Session: &info}, nil
 }

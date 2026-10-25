@@ -28,7 +28,8 @@ func newAgentsCmd(d deps) *cobra.Command {
 		newAgentsSessionCmd("resume", "resume an Exited session's conversation", (*apiclient.Client).ResumeSession),
 		newAgentsSessionCmd("run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Client).RunSessionAction),
 		newAgentsSessionCmd("focus", "show a session in the most recently focused TUI", (*apiclient.Client).FocusSession),
-		newAgentsReportFocusCmd(), newAgentsPromptCmd(), newAgentsAutoAdvanceCmd())
+		newAgentsReportFocusCmd(), newAgentsPromptCmd(), newAgentsAutoAdvanceCmd(),
+		newAgentsSessionCmd("auto-advance-cancel", "stop a design session's running auto-advance countdown", (*apiclient.Client).CancelAutoAdvance))
 	return cmd
 }
 

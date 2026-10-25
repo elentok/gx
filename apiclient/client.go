@@ -475,6 +475,14 @@ func (c *Client) SetAutoAdvance(ctx context.Context, id string, on bool) (server
 	return res, err
 }
 
+// CancelAutoAdvance stops a session's running auto-advance countdown. A refusal
+// is a result (Refused set), not an error.
+func (c *Client) CancelAutoAdvance(ctx context.Context, id string) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/auto-advance/cancel", server.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
 // RemoveSession deletes an Exited session's state dir. A refusal is a result
 // (Refused set), not an error.
 func (c *Client) RemoveSession(ctx context.Context, id string) (server.SessionResult, error) {

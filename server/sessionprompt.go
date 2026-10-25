@@ -124,7 +124,8 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		if err := typeSessionPrompt(dir, text); err != nil {
 			return SessionResult{}, err
 		}
-		if !meta.Actionable.GxRaised && meta.Actionable.Reason != "" {
+		stopped := s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you typed")
+		if !stopped && !meta.Actionable.GxRaised && meta.Actionable.Reason != "" {
 			meta.Actionable = SessionActionable{}
 			if err := writeSessionMeta(dir, meta); err != nil {
 				return SessionResult{}, err
