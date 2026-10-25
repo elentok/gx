@@ -25,7 +25,8 @@ func (s *Server) sessionLinkWrite(w http.ResponseWriter, r *http.Request) {
 
 // linkSession sets the session's Session ticket, qualifying a bare address
 // with the session's project, and marks it Design when the ticket is on a
-// map epic.
+// map epic. An existing Design flag stays: a new design session links to an
+// epic Chart has not written yet.
 func (s *Server) linkSession(req LinkSessionRequest) (SessionResult, error) {
 	if req.Ticket == "" {
 		return sessionRefusal(ReasonSessionBadRequest, "a link needs a ticket address"), nil
@@ -41,7 +42,7 @@ func (s *Server) linkSession(req LinkSessionRequest) (SessionResult, error) {
 	design := s.onMapEpic(ticket)
 	var info SessionInfo
 	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
-		m.Ticket, m.Design = ticket, design
+		m.Ticket, m.Design = ticket, m.Design || design
 		s.recordConversation(*m)
 		info = m.info()
 		return true

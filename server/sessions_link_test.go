@@ -24,7 +24,6 @@ func TestLinkSession_MarksMapTicketsDesign(t *testing.T) {
 	if err != nil || created.Session == nil || !created.Session.Design {
 		t.Fatalf("create on a map = %+v, %v; want Design", created.Session, err)
 	}
-	id := created.Session.ID
 
 	for _, tc := range []struct {
 		ticket, want string
@@ -36,7 +35,11 @@ func TestLinkSession_MarksMapTicketsDesign(t *testing.T) {
 		{"proj:plain", "proj:plain", false},
 		{"proj:missing", "proj:missing", false},
 	} {
-		res, err := h.Client.LinkSession(ctx, server.LinkSessionRequest{ID: id, Ticket: tc.ticket})
+		plain, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+		if err != nil || plain.Session == nil || plain.Session.Design {
+			t.Fatalf("create plain = %+v, %v; want not Design", plain.Session, err)
+		}
+		res, err := h.Client.LinkSession(ctx, server.LinkSessionRequest{ID: plain.Session.ID, Ticket: tc.ticket})
 		if err != nil || res.Refused || res.Session.Ticket != tc.want || res.Session.Design != tc.design {
 			t.Errorf("link %s = %+v, %v; want ticket %s, design %v", tc.ticket, res.Session, err, tc.want, tc.design)
 		}

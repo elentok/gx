@@ -46,6 +46,15 @@ func TestDesignsOpenNew_CreatesDesignSessionWithoutAnEpic(t *testing.T) {
 	}
 }
 
+func TestDesignsOpenNew_LinkingToItsOwnAddressKeepsDesign(t *testing.T) {
+	f := startDesigns(t)
+	res := f.openNew(t, "fresh-idea", "a thing")
+	linked, err := f.h.Client.LinkSession(f.ctx, server.LinkSessionRequest{ID: res.Session.ID, Ticket: "fresh-idea"})
+	if err != nil || linked.Refused || !linked.Session.Design {
+		t.Fatalf("link = %+v, %v; want Design kept", linked.Session, err)
+	}
+}
+
 func TestDesignsOpenNew_SecondCallReturnsTheFirstSession(t *testing.T) {
 	f := startDesigns(t)
 	first := f.openNew(t, "fresh-idea", "one")
