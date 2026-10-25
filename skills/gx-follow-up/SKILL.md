@@ -63,14 +63,28 @@ Judge a match yourself, by title and `## Problem`: the same problem, not the sam
 
 ## 3. Fill and file
 
-- **Category**: the caller's, else infer `bug` (something behaves wrongly) or `idea` (something is
-  missing or painful). Ask only when truly unclear, and never when a target project was passed or
-  unattended: then pick `bug` when there is concrete evidence of wrong behaviour, else `idea`.
+- **Category**: required by the verb. Use the caller's, else infer `bug` (something behaves wrongly)
+  or `idea` (something is missing or painful). Ask only when truly unclear, and never when a target
+  project was passed or unattended: then pick `bug` when there is concrete evidence of wrong
+  behaviour, else `idea`. Put it in the body's frontmatter as `category: bug|idea`, or pass
+  `--category bug|idea`.
 - **Sections**: fill Source, Problem, Evidence, Suggested fix and (only when there are any) Open
   questions from the conversation or the caller's input. No preview.
 - **Several problems** → one follow-up each, each through step 2. A caller's group of findings that
   name the same fix counts as one problem.
-- File each with `gx tickets follow-up add <project>:follow-ups --body -`. If the verb refuses, fix
+- File each with `gx tickets follow-up add <project>:follow-ups --body -`, the body shaped as:
+
+  ```
+  ---
+  category: bug
+  ---
+  # <title>
+
+  ## Source
+  ...
+  ```
+
+  If the verb refuses, fix
   the gap its code names and retry. Never fall back to a plain `gx tickets add`.
 
 ## 4. Report
