@@ -142,6 +142,8 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "none active", node: <TopBar build="v1.2.3" connected /> },
       { label: "Paused", node: <TopBar active="queue" build="v1.2.3" mode="paused" connected /> },
       { label: "Offline", node: <TopBar active="queue" build="v1.2.3" connected={false} /> },
+      { label: "AFK off", node: <TopBar active="queue" build="v1.2.3" connected onToggleAfk={() => {}} /> },
+      { label: "AFK on", node: <TopBar active="queue" build="v1.2.3" connected afk onToggleAfk={() => {}} /> },
       { label: "no build string", node: <TopBar active="queue" connected /> },
     ],
   },

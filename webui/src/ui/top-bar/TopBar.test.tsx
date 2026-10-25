@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { fireEvent } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { renderThemed } from "../render";
 import { TopBar } from "./TopBar";
 
@@ -16,6 +17,20 @@ describe("TopBar", () => {
     expect(getAllByRole("link").map((l) => l.textContent)).toEqual(["Queue", "Epics", "Designs", "Stats"]);
     expect(getByRole("link", { name: "Stats" }).getAttribute("href")).toBe("#/stats");
     expect(getByRole("link", { name: "Stats" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("shows the AFK toggle only with a handler, pressed while AFK is on, and calls it on click", () => {
+    const none = renderThemed(<TopBar connected />);
+    expect(none.queryByRole("button", { name: "AFK" })).toBeNull();
+    none.unmount();
+    const onToggleAfk = vi.fn();
+    const off = renderThemed(<TopBar connected onToggleAfk={onToggleAfk} />);
+    expect(off.getByRole("button", { name: "AFK" }).getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(off.getByRole("button", { name: "AFK" }));
+    expect(onToggleAfk).toHaveBeenCalledOnce();
+    off.unmount();
+    const on = renderThemed(<TopBar connected afk onToggleAfk={onToggleAfk} />);
+    expect(on.getByRole("button", { name: "AFK" }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("marks no tab without an active one", () => {

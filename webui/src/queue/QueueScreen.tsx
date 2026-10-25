@@ -1,4 +1,5 @@
 import { Box, Heading } from "@chakra-ui/react";
+import { toggleAfk } from "../afk";
 import type { ConnectionState } from "../connection";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { PageContainer } from "../ui/PageContainer";
@@ -18,7 +19,14 @@ export function QueueScreen({ state, onChanged = () => {} }: { state: Connection
     <Box>
       {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
       <PageContainer>
-        <TopBar active="queue" build={snapshot?.build} mode={mode} connected={connected} />
+        <TopBar
+          active="queue"
+          build={snapshot?.build}
+          mode={mode}
+          connected={connected}
+          afk={snapshot?.afk}
+          onToggleAfk={() => toggleAfk(snapshot?.afk)}
+        />
         {view && (
           // Cards wrap into as many columns as fit, each at least 420px wide.
           <Box display="grid" gridTemplateColumns="repeat(auto-fill, minmax(min(100%, 420px), 1fr))" gap="3" alignItems="start">

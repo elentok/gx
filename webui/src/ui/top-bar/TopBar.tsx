@@ -21,10 +21,13 @@ interface Props {
   build?: string;
   mode?: QueueMode;
   connected: boolean;
+  afk?: boolean;
+  // The toggle shows only when the page can switch AFK mode.
+  onToggleAfk?: () => void;
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, afk = false, onToggleAfk }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
   return (
     <Box as="nav" display="flex" alignItems="center" justifyContent="space-between" mb="4">
@@ -53,6 +56,22 @@ export function TopBar({ active, tone = "running", build, mode, connected }: Pro
           </Text>
         )}
         {queueChip && <Chip tone="waiting">{queueChip}</Chip>}
+        {onToggleAfk && (
+          <chakra.button
+            type="button"
+            aria-pressed={afk}
+            onClick={onToggleAfk}
+            fontFamily="condensed"
+            fontSize="sm"
+            fontWeight="600"
+            textTransform="uppercase"
+            letterSpacing="wide"
+            cursor="pointer"
+            color={afk ? `tone.${tone}.fg` : "text.muted"}
+          >
+            AFK
+          </chakra.button>
+        )}
         <LiveDot tone={connected ? "running" : "muted"} label={connected ? "Live" : "Offline"} />
       </Box>
     </Box>
