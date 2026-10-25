@@ -48,7 +48,8 @@ type SessionChatResponse struct {
 }
 
 // chatCache keeps each transcript's parsed chat until its size or mtime
-// changes, so polling a quiet session never rereads the file.
+// changes, so polling a quiet session never rereads the file. The design's
+// final-step flag is part of the key: a step change alone must refresh Next.
 type chatCache struct {
 	mu      sync.Mutex
 	entries map[string]chatCacheEntry
@@ -57,6 +58,7 @@ type chatCache struct {
 type chatCacheEntry struct {
 	size  int64
 	mtime time.Time
+	final bool
 	chat  chatSnapshot
 }
 
@@ -70,14 +72,14 @@ type chatSnapshot struct {
 	tasks     []transcript.BackgroundTaskMarker
 }
 
-func (c *chatCache) read(path string, load func(string) (chatSnapshot, error)) (chatSnapshot, error) {
+func (c *chatCache) read(path string, final bool, load func(string) (chatSnapshot, error)) (chatSnapshot, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return chatSnapshot{}, err
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if e, ok := c.entries[path]; ok && e.size == info.Size() && e.mtime.Equal(info.ModTime()) {
+	if e, ok := c.entries[path]; ok && e.size == info.Size() && e.mtime.Equal(info.ModTime()) && e.final == final {
 		return e.chat, nil
 	}
 	chat, err := load(path)
@@ -87,12 +89,13 @@ func (c *chatCache) read(path string, load func(string) (chatSnapshot, error)) (
 	if c.entries == nil {
 		c.entries = map[string]chatCacheEntry{}
 	}
-	c.entries[path] = chatCacheEntry{size: info.Size(), mtime: info.ModTime(), chat: chat}
+	c.entries[path] = chatCacheEntry{size: info.Size(), mtime: info.ModTime(), final: final, chat: chat}
 	return chat, nil
 }
 
-// chatLoader returns the load func for a session whose design ticket is ticket.
-func chatLoader(ticket string) func(string) (chatSnapshot, error) {
+// chatLoader returns the load func for a session whose design ticket is ticket;
+// final is whether its map is at a step with no Continue.
+func chatLoader(ticket string, final bool) func(string) (chatSnapshot, error) {
 	return func(path string) (chatSnapshot, error) {
 		loaded, _, err := transcript.ReadChat(path)
 		if err != nil {
@@ -102,7 +105,7 @@ func chatLoader(ticket string) func(string) (chatSnapshot, error) {
 		// An open round wins over the run-end line, as in designActionable.
 		snap := chatSnapshot{round: chatRound(loaded)}
 		if snap.round == nil {
-			snap.next = chatNext(loaded, ticket)
+			snap.next = chatNext(loaded, ticket, final)
 		}
 		if len(loaded) > maxChatMessages {
 			loaded, snap.truncated = loaded[len(loaded)-maxChatMessages:], true
@@ -168,7 +171,8 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path, ok := s.claudeTranscript(id, meta.ConversationID); ok {
-		chat, err := s.chats.read(path, chatLoader(meta.Ticket))
+		final := s.designFinal(meta.Ticket)
+		chat, err := s.chats.read(path, final, chatLoader(meta.Ticket, final))
 		switch {
 		case os.IsNotExist(err): // vanished since the lookup: no chat yet
 		case err != nil:

@@ -10,7 +10,7 @@ import (
 // The fake agent and the server agree on the run-end text and the design
 // prompt prefix only by convention. This fails when either side drifts.
 func TestRunEndLine_MatchesAgentfakeDesignRunEnd(t *testing.T) {
-	got, ok := runEndNext("Thanks, that settles it.\n\n"+agentfake.DesignRunEnd, "gx:epic/03")
+	got, ok := runEndNext("Thanks, that settles it.\n\n"+agentfake.DesignRunEnd, "gx:epic/03", false)
 	if !ok {
 		t.Fatalf("runEndLine does not match agentfake.DesignRunEnd %q", agentfake.DesignRunEnd)
 	}

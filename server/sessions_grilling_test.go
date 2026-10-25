@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,10 +33,13 @@ func startGrillingSessionIn(t *testing.T, ticket, store string) (*servertest.Har
 	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
-	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
-		t.Fatal(err)
+	// A caller may seed the map with a design_step first.
+	if mapFile := filepath.Join(store, "proj", "map", "ticket.md"); !strings.Contains(string(mustRead(mapFile)), "kind: map") {
+		if err := os.WriteFile(mapFile, []byte("---\nkind: map\n---\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), withAlerts(true, true))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
 	evs, err := h.Client.Events(ctx, 0)
@@ -49,6 +53,26 @@ func startGrillingSessionIn(t *testing.T, ticket, store string) (*servertest.Har
 	id := res.Session.ID
 	conv, _ := readMeta(t, h, id)["conversation_id"].(string)
 	return h, ctx, evs, id, conv, filepath.Join(cfg, "projects", "-repo", conv+".jsonl")
+}
+
+// mustRead is a file's content, or nil when it does not exist yet.
+func mustRead(path string) []byte {
+	b, _ := os.ReadFile(path)
+	return b
+}
+
+// storeWithMapStep is a ticket store whose map epic is a map at step.
+func storeWithMapStep(t *testing.T, step string) string {
+	t.Helper()
+	store := t.TempDir()
+	dir := filepath.Join(store, "proj", "map")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ticket.md"), []byte("---\nkind: map\ndesign_step: "+step+"\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return store
 }
 
 func writeAssistantMessage(t *testing.T, path, text string) {
@@ -137,6 +161,83 @@ func TestRunEnd_DetectedOnIdleForDesignSessions(t *testing.T) {
 				t.Errorf("actionable = %+v, want reason %q kind %q target %q action %v", got, tc.reason, tc.kind, tc.target, tc.action)
 			}
 		})
+	}
+}
+
+func TestRunEnd_NoContinueAtBranchAndDone(t *testing.T) {
+	const line = "✅ Map: branch cut. Next: implement"
+	for name, tc := range map[string]struct {
+		step       string
+		wantAction bool
+	}{
+		"branch":     {step: "branch"},
+		"done":       {step: "done"},
+		"spec":       {step: "spec", wantAction: true},
+		"unreadable": {step: "no-such-step", wantAction: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h, ctx, evs, id, conv, path := startGrillingSessionIn(t, "proj:map", storeWithMapStep(t, tc.step))
+			writeAssistantMessage(t, path, line)
+			report(t, conv, agentfake.Control{State: "working"})
+			waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+			report(t, conv, agentfake.Control{State: "idle"})
+			got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" }).Actionable
+			if got.Reason != line || (len(got.Action) > 0) != tc.wantAction {
+				t.Errorf("actionable = %+v, want reason %q, action present = %v", got, line, tc.wantAction)
+			}
+			deadline := time.Now().Add(5 * time.Second)
+			for len(h.Banners.Sent()) == 0 || len(h.Sounds.Played()) == 0 {
+				if time.Now().After(deadline) {
+					t.Fatalf("banners = %v, sounds = %v, want both", h.Banners.Sent(), h.Sounds.Played())
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+		})
+	}
+}
+
+func TestSessionChat_NextHasNoActionAtBranch(t *testing.T) {
+	store := storeWithMapStep(t, "branch")
+	h, ctx, _, id, _, path := startGrillingSessionIn(t, "proj:map", store)
+	writeAssistantMessage(t, path, "✅ Map: branch cut. Next: implement")
+	got, err := h.Client.SessionChat(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Next == nil || len(got.Next.Action.Action) > 0 {
+		t.Errorf("next = %+v, want a run-end line with no action", got.Next)
+	}
+}
+
+// A design_step change alone, with the transcript untouched, must reach the
+// chat's next.
+func TestSessionChat_StepChangeAloneRefreshesNext(t *testing.T) {
+	store := storeWithMapStep(t, "spec")
+	h, ctx, _, id, _, path := startGrillingSessionIn(t, "proj:map", store)
+	writeAssistantMessage(t, path, "✅ Map: spec drafted. Next: review")
+	got, err := h.Client.SessionChat(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Next == nil || len(got.Next.Action.Action) == 0 {
+		t.Fatalf("next = %+v at spec, want Continue", got.Next)
+	}
+	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\ndesign_step: branch\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		got, err = h.Client.SessionChat(ctx, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Next != nil && len(got.Next.Action.Action) == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("next = %+v after the map moved to branch, want no action", got.Next)
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
 

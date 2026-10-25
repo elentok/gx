@@ -1,8 +1,25 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
-import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicDetailRow, MapStep, SessionChatResponse, SessionInfo, SessionResult, SessionRoundCard } from "../generated/server";
+import {
+  ConnectionContext,
+  type Connection,
+  type ConnectionState,
+} from "../connection";
+import type {
+  EpicDetailRow,
+  MapStep,
+  SessionChatResponse,
+  SessionInfo,
+  SessionResult,
+  SessionRoundCard,
+} from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchChat } from "./chat";
@@ -24,16 +41,31 @@ const session = (state = "idle", background = false): SessionInfo => ({
   actionable: {},
 });
 
-const chatOf = (over: Partial<SessionChatResponse> = {}): SessionChatResponse => ({
+const chatOf = (
+  over: Partial<SessionChatResponse> = {},
+): SessionChatResponse => ({
   conversation_id: "c1",
-  messages: [{ id: "m9", role: "agent", kind: "text", text: "hi", at: new Date().toISOString() }],
+  messages: [
+    {
+      id: "m9",
+      role: "agent",
+      kind: "text",
+      text: "hi",
+      at: new Date().toISOString(),
+    },
+  ],
   // The server sends null, not [], when the last turn holds no round.
   round: null,
   background: [],
   ...over,
 });
 
-const runEnd: SessionChatResponse["next"] = { action: {} };
+const runEnd: SessionChatResponse["next"] = {
+  action: { action: ["/clear", "/gx-design a"] },
+};
+const runEndNoAction: SessionChatResponse["next"] = {
+  action: { reason: "✅ Done: Next: nothing" },
+};
 
 const STEP_LABELS: Record<string, string> = {
   chart: "Chart",
@@ -47,7 +79,12 @@ const STEP_LABELS: Record<string, string> = {
 };
 const stepsAt = (current: string): MapStep[] => {
   const ids = Object.keys(STEP_LABELS);
-  return ids.map((step, i) => ({ step, label: STEP_LABELS[step], state: i < ids.indexOf(current) ? "done" : step === current ? "current" : "todo" }));
+  return ids.map((step, i) => ({
+    step,
+    label: STEP_LABELS[step],
+    state:
+      i < ids.indexOf(current) ? "done" : step === current ? "current" : "todo",
+  }));
 };
 
 const ok: SessionResult = { session: session() };
@@ -68,20 +105,52 @@ function render(opts: {
     loadedOnce: true,
     tick: 0,
   } as unknown as ConnectionState;
-  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+  const conn = {
+    getState: () => state,
+    subscribe: () => () => {},
+    onEvent: () => () => {},
+  } as unknown as Connection;
   const router = createMemoryRouter(
     appRoutes({
       epicList: async () => ({
         epics: [
-          { address: "gx:a", project: "gx", name: "a", kind: "map", state: "designing", done: 0, total: 0, queued: false, queueable: false, blocked_by_epics: [], picker_section: "in-progress" },
+          {
+            address: "gx:a",
+            project: "gx",
+            name: "a",
+            kind: "map",
+            state: "designing",
+            done: 0,
+            total: 0,
+            queued: false,
+            queueable: false,
+            blocked_by_epics: [],
+            picker_section: "in-progress",
+          },
         ],
         follow_ups: [],
       }),
       epic: async () => ({
         kind: "ok",
-        detail: { address: "gx:a", kind: "map", summary: "", done: 0, total: 0, agent_time: 0, cost_total: 0, stats: {}, rows: opts.rows ?? [], queueable: false, queued: false, steps: opts.steps ?? [], impl_address: "gx:a-impl" },
+        detail: {
+          address: "gx:a",
+          kind: "map",
+          summary: "",
+          done: 0,
+          total: 0,
+          agent_time: 0,
+          cost_total: 0,
+          stats: {},
+          rows: opts.rows ?? [],
+          queueable: false,
+          queued: false,
+          steps: opts.steps ?? [],
+          impl_address: "gx:a-impl",
+        },
       }),
-      chat: opts.fetchChat ?? (async () => ({ kind: "ok", detail: opts.chat ?? chatOf() })),
+      chat:
+        opts.fetchChat ??
+        (async () => ({ kind: "ok", detail: opts.chat ?? chatOf() })),
       prompt: opts.post,
     }),
     { initialEntries: ["/d/gx:a"] },
@@ -105,26 +174,47 @@ test("a plain message posts its text with the last message id", async () => {
   fireEvent.change(box, { target: { value: "hello there" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post).toHaveBeenCalledWith({ id: "s-a", text: "hello there", last_message: "m9" });
+  expect(post).toHaveBeenCalledWith({
+    id: "s-a",
+    text: "hello there",
+    last_message: "m9",
+  });
   await waitFor(() => expect(box.value).toBe(""));
 });
 
 test("the composer is disabled while the session is Working", async () => {
-  render({ state: "working", post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }) });
+  render({
+    state: "working",
+    post: vi.fn<PostPrompt>(async () => ok),
+    chat: chatOf({ next: runEnd }),
+  });
   const box = await openNote();
   expect(box.disabled).toBe(true);
-  expect((screen.getByRole("button", { name: /Continue/ }) as HTMLButtonElement).disabled).toBe(true);
+  expect(
+    (screen.getByRole("button", { name: /Continue/ }) as HTMLButtonElement)
+      .disabled,
+  ).toBe(true);
 });
 
 test("a Working session offers Interrupt in place of Send, posting the state token", async () => {
-  const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
   render({ state: "working", chat: chatOf() });
   const box = await openNote();
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   expect(box.disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Interrupt" }));
-  await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith("/v1/sessions/interrupt", expect.objectContaining({ method: "POST" })));
-  const body = JSON.parse(fetchSpy.mock.calls.find(([url]) => url === "/v1/sessions/interrupt")![1]!.body as string);
+  await waitFor(() =>
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/v1/sessions/interrupt",
+      expect.objectContaining({ method: "POST" }),
+    ),
+  );
+  const body = JSON.parse(
+    fetchSpy.mock.calls.find(([url]) => url === "/v1/sessions/interrupt")![1]!
+      .body as string,
+  );
   expect(body.id).toBe("s-a");
   expect(body.state).toMatch(/^s-a:working:\d+$/);
   fetchSpy.mockRestore();
@@ -137,8 +227,15 @@ test("an Idle session has no Interrupt", async () => {
 });
 
 test("a stale refusal keeps the draft and refetches the chat", async () => {
-  const post = vi.fn<PostPrompt>(async () => ({ refused: true, reason: "stale", message: "the conversation moved; review it first" }));
-  const fetchChat = vi.fn<FetchChat>(async () => ({ kind: "ok", detail: chatOf() }));
+  const post = vi.fn<PostPrompt>(async () => ({
+    refused: true,
+    reason: "stale",
+    message: "the conversation moved; review it first",
+  }));
+  const fetchChat = vi.fn<FetchChat>(async () => ({
+    kind: "ok",
+    detail: chatOf(),
+  }));
   render({ post, fetchChat });
   const box = await openNote();
   const before = fetchChat.mock.calls.length;
@@ -146,16 +243,24 @@ test("a stale refusal keeps the draft and refetches the chat", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(box.value).toBe("keep me");
-  await waitFor(() => expect(fetchChat.mock.calls.length).toBeGreaterThan(before));
+  await waitFor(() =>
+    expect(fetchChat.mock.calls.length).toBeGreaterThan(before),
+  );
 });
 
 test("another refusal shows its message and keeps the draft", async () => {
-  const post = vi.fn<PostPrompt>(async () => ({ refused: true, reason: "text-too-long", message: "text is over 32768 bytes" }));
+  const post = vi.fn<PostPrompt>(async () => ({
+    refused: true,
+    reason: "text-too-long",
+    message: "text is over 32768 bytes",
+  }));
   render({ post });
   const box = await openNote();
   fireEvent.change(box, { target: { value: "long" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect((await screen.findByRole("alert")).textContent).toBe("text is over 32768 bytes");
+  expect((await screen.findByRole("alert")).textContent).toBe(
+    "text is over 32768 bytes",
+  );
   expect(box.value).toBe("long");
 });
 
@@ -163,50 +268,112 @@ test("Continue after a run-end line sends the continue action", async () => {
   const post = vi.fn<PostPrompt>(async () => ok);
   render({ post, chat: chatOf({ next: runEnd }), steps: stepsAt("spec") });
   fireEvent.click(await screen.findByRole("button", { name: /Continue/ }));
-  await waitFor(() => expect(post).toHaveBeenCalledWith({ id: "s-a", text: "", last_message: "m9", continue: true }));
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledWith({
+      id: "s-a",
+      text: "",
+      last_message: "m9",
+      continue: true,
+    }),
+  );
 });
 
-test.each(["chart", "resolve-tickets", "spec", "review", "grill-findings", "create-tickets"])("Continue shows at the %s step", async (step) => {
-  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }), steps: stepsAt(step) });
+test.each([
+  "chart",
+  "resolve-tickets",
+  "spec",
+  "review",
+  "grill-findings",
+  "create-tickets",
+])("Continue shows at the %s step", async (step) => {
+  render({
+    post: vi.fn<PostPrompt>(async () => ok),
+    chat: chatOf({ next: runEnd }),
+    steps: stepsAt(step),
+  });
   expect(await screen.findByRole("button", { name: /Continue/ })).toBeTruthy();
 });
 
 test("while tickets resolve, Continue names the map's current ticket and says Continue once", async () => {
   const rows: EpicDetailRow[] = [
     { address: "gx:a/01", title: "Done one", rendered_status: "done" },
-    { address: "gx:a/02", title: "Server pid lock", rendered_status: "open", current: true },
+    {
+      address: "gx:a/02",
+      title: "Server pid lock",
+      rendered_status: "open",
+      current: true,
+    },
   ];
-  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }), rows, steps: stepsAt("resolve-tickets") });
-  const button = await screen.findByRole("button", { name: "Continue Server pid lock" });
+  render({
+    post: vi.fn<PostPrompt>(async () => ok),
+    chat: chatOf({ next: runEnd }),
+    rows,
+    steps: stepsAt("resolve-tickets"),
+  });
+  const button = await screen.findByRole("button", {
+    name: "Continue Server pid lock",
+  });
   expect(button.textContent?.match(/Continue/g)).toHaveLength(1);
 });
 
 test("outside Resolve tickets, Continue is subtitled with the step label", async () => {
-  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }), steps: stepsAt("grill-findings") });
-  expect(await screen.findByRole("button", { name: "Continue Grill findings" })).toBeTruthy();
+  render({
+    post: vi.fn<PostPrompt>(async () => ok),
+    chat: chatOf({ next: runEnd }),
+    steps: stepsAt("grill-findings"),
+  });
+  expect(
+    await screen.findByRole("button", { name: "Continue Grill findings" }),
+  ).toBeTruthy();
 });
 
-test.each(["branch", "done"])("at the %s step there is no Continue, and Progress links to the implementation epic", async (step) => {
-  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }), steps: stepsAt(step) });
-  await screen.findByRole("button", { name: "Note" });
-  expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
-  expect((await screen.findAllByText(/Open implementation epic/)).length).toBeGreaterThan(0);
-});
+test.each(["branch", "done"])(
+  "at the %s step the run-end line has no action, so no Continue, and Progress links to the implementation epic",
+  async (step) => {
+    render({
+      post: vi.fn<PostPrompt>(async () => ok),
+      chat: chatOf({ next: runEndNoAction }),
+      steps: stepsAt(step),
+    });
+    await screen.findByRole("button", { name: "Note" });
+    expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
+    expect(
+      (await screen.findAllByText(/Open implementation epic/)).length,
+    ).toBeGreaterThan(0);
+  },
+);
 
 test("before Branch, Progress has no implementation epic link", async () => {
-  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }), steps: stepsAt("create-tickets") });
+  render({
+    post: vi.fn<PostPrompt>(async () => ok),
+    chat: chatOf({ next: runEnd }),
+    steps: stepsAt("create-tickets"),
+  });
   await screen.findByRole("button", { name: /Continue/ });
   expect(screen.queryByText(/Open implementation epic/)).toBeNull();
 });
 
 test("while disconnected the page says so and the buttons are off", async () => {
-  render({ connected: false, post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ next: runEnd }) });
-  expect(((await screen.findByRole("button", { name: /Continue/ })) as HTMLButtonElement).disabled).toBe(true);
+  render({
+    connected: false,
+    post: vi.fn<PostPrompt>(async () => ok),
+    chat: chatOf({ next: runEnd }),
+  });
+  expect(
+    (
+      (await screen.findByRole("button", {
+        name: /Continue/,
+      })) as HTMLButtonElement
+    ).disabled,
+  ).toBe(true);
   expect(screen.getByText("Offline, reconnecting…")).toBeTruthy();
   expect((await openNote()).disabled).toBe(true);
 });
 
-const askCard = (n: number, over: Partial<SessionRoundCard> = {}): SessionRoundCard => ({
+const askCard = (
+  n: number,
+  over: Partial<SessionRoundCard> = {},
+): SessionRoundCard => ({
   label: String(n),
   title: `T${n}`,
   body: `Body ${n}?`,
@@ -232,10 +399,15 @@ test("Send answers the whole round in one prompt", async () => {
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Alpha" }));
   fireEvent.click(s.getByRole("button", { name: "Nope" }));
-  fireEvent.change(s.getByRole("textbox", { name: "Answer to question 3" }), { target: { value: "free text" } });
+  fireEvent.change(s.getByRole("textbox", { name: "Answer to question 3" }), {
+    target: { value: "free text" },
+  });
   fireEvent.click(s.getByRole("button", { name: "Question 1, answered" }));
   fireEvent.click(s.getByRole("button", { name: "Note on question 1" }));
-  fireEvent.change(s.getByRole("textbox", { name: "Note text for question 1" }), { target: { value: "because" } });
+  fireEvent.change(
+    s.getByRole("textbox", { name: "Note text for question 1" }),
+    { target: { value: "because" } },
+  );
   fireEvent.change(await openNote(), { target: { value: "overall" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
@@ -253,22 +425,35 @@ test("unanswered questions ask before sending; Answer them opens the first one",
   fireEvent.click(s.getByRole("button", { name: "Beta" }));
   fireEvent.click(s.getByRole("button", { name: "Question 3" }));
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect(screen.getByText(/2 questions are unanswered \(Q2, Q3\)\. Send anyway\?/)).toBeTruthy();
+  expect(
+    screen.getByText(/2 questions are unanswered \(Q2, Q3\)\. Send anyway\?/),
+  ).toBeTruthy();
   expect(post).not.toHaveBeenCalled();
 
   fireEvent.click(screen.getByRole("button", { name: "Answer them" }));
   expect(screen.queryByRole("alertdialog")).toBeNull();
-  expect(s.getByRole("button", { name: "Question 2" }).getAttribute("aria-current")).toBe("step");
+  expect(
+    s.getByRole("button", { name: "Question 2" }).getAttribute("aria-current"),
+  ).toBe("step");
 
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   fireEvent.click(screen.getByRole("button", { name: "Send anyway" }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0].text).toBe("Q1 - T1: Beta\nQ2 - T2: (unanswered)\nQ3 - T3: (unanswered)");
+  expect(post.mock.calls[0][0].text).toBe(
+    "Q1 - T1: Beta\nQ2 - T2: (unanswered)\nQ3 - T3: (unanswered)",
+  );
 });
 
 test("a stale refusal keeps every answer and note of the round", async () => {
-  const post = vi.fn<PostPrompt>(async () => ({ refused: true, reason: "stale", message: "the conversation moved" }));
-  const fetchChat = vi.fn<FetchChat>(async () => ({ kind: "ok", detail: chatOf({ round: round() }) }));
+  const post = vi.fn<PostPrompt>(async () => ({
+    refused: true,
+    reason: "stale",
+    message: "the conversation moved",
+  }));
+  const fetchChat = vi.fn<FetchChat>(async () => ({
+    kind: "ok",
+    detail: chatOf({ round: round() }),
+  }));
   render({ post, fetchChat });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Alpha" }));
@@ -278,8 +463,12 @@ test("a stale refusal keeps every answer and note of the round", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   fireEvent.click(screen.getByRole("button", { name: "Send anyway" }));
   expect(await screen.findByRole("alert")).toBeTruthy();
-  await waitFor(() => expect(fetchChat.mock.calls.length).toBeGreaterThan(before));
-  expect(screen.getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
+  await waitFor(() =>
+    expect(fetchChat.mock.calls.length).toBeGreaterThan(before),
+  );
+  expect(
+    screen.getByRole("button", { name: "Question 1, answered" }),
+  ).toBeTruthy();
   expect(box.value).toBe("keep");
 });
 
@@ -302,7 +491,12 @@ test("question bodies and option labels render their markdown", async () => {
 
 test("a finished turn with a background task still takes answers", async () => {
   const post = vi.fn<PostPrompt>(async () => ok);
-  render({ state: "working", background: true, post, chat: chatOf({ round: [askCard(1)] }) });
+  render({
+    state: "working",
+    background: true,
+    post,
+    chat: chatOf({ round: [askCard(1)] }),
+  });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Alpha" }));
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
@@ -312,7 +506,11 @@ test("a finished turn with a background task still takes answers", async () => {
 test("a question card shows its number and title above the body", async () => {
   render({ chat: chatOf({ round: [askCard(1, { title: "Pick `one`" })] }) });
   const s = within(await sheet());
-  expect(s.getByText((_, el) => el?.textContent === "Q1 - Pick one" && el.tagName === "SPAN")).toBeTruthy();
+  expect(
+    s.getByText(
+      (_, el) => el?.textContent === "Q1 - Pick one" && el.tagName === "SPAN",
+    ),
+  ).toBeTruthy();
   expect(s.getByText("Body 1?")).toBeTruthy();
 });
 
@@ -329,32 +527,51 @@ test("Focus opens the round full screen; Send there answers it and collapses bac
   fireEvent.click(d.getByRole("button", { name: "Alpha" }));
   fireEvent.click(d.getByRole("button", { name: "Beta" }));
   expect(d.getByText("2 of 2 answered")).toBeTruthy();
-  fireEvent.change(d.getByRole("textbox", { name: "Message" }), { target: { value: "overall" } });
+  fireEvent.change(d.getByRole("textbox", { name: "Message" }), {
+    target: { value: "overall" },
+  });
   fireEvent.click(d.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0].text).toBe("Q1 - T1: Alpha\nQ2 - T2: Beta\n\nNote:\noverall");
+  expect(post.mock.calls[0][0].text).toBe(
+    "Q1 - T1: Alpha\nQ2 - T2: Beta\n\nNote:\noverall",
+  );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(await sheet()).toBeTruthy();
 });
 
 test("full screen keeps the note draft and the answers, and Escape collapses back", async () => {
-  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ round: round() }) });
+  render({
+    post: vi.fn<PostPrompt>(async () => ok),
+    chat: chatOf({ round: round() }),
+  });
   fireEvent.change(await openNote(), { target: { value: "draft" } });
   const d = within(await focusDialog());
-  expect((d.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value).toBe("draft");
+  expect(
+    (d.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value,
+  ).toBe("draft");
   fireEvent.click(d.getByRole("button", { name: "Alpha" }));
   fireEvent.keyDown(window, { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();
-  expect(within(await sheet()).getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
-  expect((screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value).toBe("draft");
+  expect(
+    within(await sheet()).getByRole("button", { name: "Question 1, answered" }),
+  ).toBeTruthy();
+  expect(
+    (screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement)
+      .value,
+  ).toBe("draft");
 });
 
 test("Answer them in full screen moves to the first unanswered question", async () => {
-  render({ post: vi.fn<PostPrompt>(async () => ok), chat: chatOf({ round: round() }) });
+  render({
+    post: vi.fn<PostPrompt>(async () => ok),
+    chat: chatOf({ round: round() }),
+  });
   const d = within(await focusDialog());
   fireEvent.click(d.getByRole("button", { name: "Alpha" }));
   fireEvent.click(d.getByRole("button", { name: "Question 1, answered" }));
   fireEvent.click(d.getByRole("button", { name: "Send" }));
   fireEvent.click(d.getByRole("button", { name: "Answer them" }));
-  expect(d.getByRole("button", { name: "Question 2" }).getAttribute("aria-current")).toBe("step");
+  expect(
+    d.getByRole("button", { name: "Question 2" }).getAttribute("aria-current"),
+  ).toBe("step");
 });

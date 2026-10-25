@@ -71,21 +71,44 @@ var runEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next:.*$`)
 
 // designActionable is what a Design session's last assistant message asks of
 // the person: the grilling question wins over the run-end line.
-func designActionable(text, ticket string) (SessionActionable, bool) {
+func designActionable(text, ticket string, final bool) (SessionActionable, bool) {
 	if hasGrillingMarker(text) {
 		return SessionActionable{Reason: grillingReason, Grilling: true, Derived: true}, true
 	}
-	return runEndNext(text, ticket)
+	return runEndNext(text, ticket, final)
 }
 
 // runEndNext is the Actionable a gx-design run-end line raises: Continue in a
-// fresh conversation.
-func runEndNext(text, ticket string) (SessionActionable, bool) {
+// fresh conversation, or just the line when the design is at its final step.
+func runEndNext(text, ticket string, final bool) (SessionActionable, bool) {
 	line := runEndLine.FindString(text)
 	if line == "" {
 		return SessionActionable{}, false
 	}
-	return SessionActionable{Reason: strings.TrimSpace(line), Action: designContinueAction(ticket), Derived: true}, true
+	a := SessionActionable{Reason: strings.TrimSpace(line), Derived: true}
+	if !final {
+		a.Action = designContinueAction(ticket)
+	}
+	return a, true
+}
+
+// designFinal reports whether the map behind a design ticket is at Branch or
+// Done, where no step follows. A map that cannot be read is not final.
+func (s *Server) designFinal(ticket string) bool {
+	addr := epicAddress(ticket)
+	project, name, _ := strings.Cut(addr, ":")
+	epics, err := s.projectEpics(project)
+	if err != nil {
+		s.log.Warn("design step: read map", "ticket", ticket, "err", err)
+		return false
+	}
+	for _, e := range epics {
+		if e.Name == name {
+			step := mapProgress(e)
+			return step == ProgressBranch || step == ProgressDone
+		}
+	}
+	return false
 }
 
 // designContinueAction starts the next gx-design phase in a fresh conversation.
@@ -166,7 +189,7 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 		return
 	}
 	s.fileBadRoundBlocks(id, design, text)
-	a, matched := designActionable(text, design.Ticket)
+	a, matched := designActionable(text, design.Ticket, s.designFinal(design.Ticket))
 	raised := false
 	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
 		cur := m.Actionable

@@ -1,17 +1,33 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
-import type { SessionBackgroundTask, SessionChatMessage, SessionChatResponse, SessionInfo } from "../generated/server";
+import type {
+  SessionBackgroundTask,
+  SessionChatMessage,
+  SessionChatResponse,
+  SessionInfo,
+} from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { useSessionChat, type FetchChat } from "./chat";
 import { Composer } from "./Composer";
-import { FailureBanner, GxStopped, needsTranscript, replacesComposer, visibleFailure, type FailureActions } from "./FailureBanner";
+import {
+  FailureBanner,
+  GxStopped,
+  needsTranscript,
+  replacesComposer,
+  visibleFailure,
+  type FailureActions,
+} from "./FailureBanner";
 import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
 import { RoundFocus } from "./RoundFocus";
 import { useRoundDraft } from "./roundDraft";
 
-const KIND_NAMES: Record<string, string> = { shell: "shell", monitor: "Monitor", agent: "subagent" };
+const KIND_NAMES: Record<string, string> = {
+  shell: "shell",
+  monitor: "Monitor",
+  agent: "subagent",
+};
 
 function toolsLine(m: SessionChatMessage, latest: boolean) {
   const n = m.tool_count ?? 0;
@@ -22,7 +38,15 @@ function toolsLine(m: SessionChatMessage, latest: boolean) {
 function Entry({ m, tool }: { m: SessionChatMessage; tool: boolean }) {
   if (m.kind === "compacted") {
     return (
-      <Text role="separator" textAlign="center" fontSize="xs" color="text.dim" borderBlockStart="1px solid" borderColor="border" pt="1">
+      <Text
+        role="separator"
+        textAlign="center"
+        fontSize="xs"
+        color="text.dim"
+        borderBlockStart="1px solid"
+        borderColor="border"
+        pt="1"
+      >
         Context compacted
       </Text>
     );
@@ -36,7 +60,16 @@ function Entry({ m, tool }: { m: SessionChatMessage; tool: boolean }) {
   }
   if (m.kind === "prompt") {
     return (
-      <Box alignSelf="flex-end" maxW="85%" bg="surface.raised" borderRadius="lg" px="3" py="2" fontSize="sm" whiteSpace="pre-wrap">
+      <Box
+        alignSelf="flex-end"
+        maxW="85%"
+        bg="surface.raised"
+        borderRadius="lg"
+        px="3"
+        py="2"
+        fontSize="sm"
+        whiteSpace="pre-wrap"
+      >
         {m.text}
       </Box>
     );
@@ -62,9 +95,25 @@ function Entry({ m, tool }: { m: SessionChatMessage; tool: boolean }) {
 
 function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
   return (
-    <Box role="list" aria-label="Running in background" display="flex" flexWrap="wrap" gap="2" fontSize="xs" color="text.muted">
+    <Box
+      role="list"
+      aria-label="Running in background"
+      display="flex"
+      flexWrap="wrap"
+      gap="2"
+      fontSize="xs"
+      color="text.muted"
+    >
       {tasks.map((t, i) => (
-        <Box key={i} role="listitem" border="1px solid" borderColor="border" borderRadius="md" px="2" py="0.5">
+        <Box
+          key={i}
+          role="listitem"
+          border="1px solid"
+          borderColor="border"
+          borderRadius="md"
+          px="2"
+          py="0.5"
+        >
           {KIND_NAMES[t.kind] ?? t.kind}: {t.label}
         </Box>
       ))}
@@ -82,7 +131,6 @@ function ChatTail({
   post,
   onStale,
   done,
-  step,
   nextTitle,
   actions,
 }: {
@@ -93,11 +141,13 @@ function ChatTail({
   post?: PostPrompt;
   onStale: () => void;
   done?: boolean;
-  step?: string;
   nextTitle?: string;
   actions: FailureActions;
 }) {
-  const { draft, setAnswers, setNotes, setIndex, clear } = useRoundDraft(session.id, roundKey);
+  const { draft, setAnswers, setNotes, setIndex, clear } = useRoundDraft(
+    session.id,
+    roundKey,
+  );
   const { answers } = draft;
   const [focus, setFocus] = useState<{ index: number }>();
   // Full screen, the composer renders into the overlay's footer; the docked sheet stays mounted, hidden, so it keeps its place.
@@ -110,10 +160,26 @@ function ChatTail({
     <>
       {round.length > 0 && (
         <Box hidden={full}>
-          <QuestionSheet round={round} answers={answers} onAnswers={setAnswers} focus={focus} initialIndex={draft.index} onIndex={setIndex} />
+          <QuestionSheet
+            round={round}
+            answers={answers}
+            onAnswers={setAnswers}
+            focus={focus}
+            initialIndex={draft.index}
+            onIndex={setIndex}
+          />
         </Box>
       )}
-      {full && round.length > 0 && <RoundFocus round={round} answers={answers} onAnswers={setAnswers} focus={focus} onClose={close} footer={setFooter} />}
+      {full && round.length > 0 && (
+        <RoundFocus
+          round={round}
+          answers={answers}
+          onAnswers={setAnswers}
+          focus={focus}
+          onClose={close}
+          footer={setFooter}
+        />
+      )}
       {failure && (
         <FailureBanner
           failure={failure}
@@ -124,13 +190,16 @@ function ChatTail({
           {...actions}
         />
       )}
-      {!failure && session.actionable.gx_raised && session.actionable.reason && <GxStopped reason={session.actionable.reason} />}
+      {!failure &&
+        session.actionable.gx_raised &&
+        session.actionable.reason && (
+          <GxStopped reason={session.actionable.reason} />
+        )}
       {!done && !replacesComposer(failure) && (
         <Composer
           session={session}
           lastMessage={chat.messages.at(-1)?.id}
           next={chat.next}
-          step={step}
           nextTitle={nextTitle}
           connected={connected}
           post={post}
@@ -155,7 +224,6 @@ function ChatLog({
   fetchChat,
   post,
   done,
-  step,
   nextTitle,
   actions,
 }: {
@@ -163,7 +231,6 @@ function ChatLog({
   fetchChat?: FetchChat;
   post?: PostPrompt;
   done?: boolean;
-  step?: string;
   nextTitle?: string;
   actions: FailureActions;
 }) {
@@ -171,8 +238,11 @@ function ChatLog({
   const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
   const connected = useConnectionState(conn).connected;
   if (!chat) return null;
-  const roundKey = (chat.round ?? []).map((c) => `${c.label}:${c.title}`).join("|");
-  const working = session.status.state === "working" && !session.status.background;
+  const roundKey = (chat.round ?? [])
+    .map((c) => `${c.label}:${c.title}`)
+    .join("|");
+  const working =
+    session.status.state === "working" && !session.status.background;
   return (
     <Box display="flex" flexDirection="column" gap="3">
       {chat.truncated && (
@@ -181,9 +251,15 @@ function ChatLog({
         </Text>
       )}
       {chat.messages.map((m, i) => (
-        <Entry key={m.id || i} m={m} tool={working && i === chat.messages.length - 1} />
+        <Entry
+          key={m.id || i}
+          m={m}
+          tool={working && i === chat.messages.length - 1}
+        />
       ))}
-      {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}
+      {chat.background.length > 0 && (
+        <BackgroundStrip tasks={chat.background} />
+      )}
       <ChatTail
         key={roundKey}
         session={session}
@@ -193,7 +269,6 @@ function ChatLog({
         post={post}
         onStale={refetch}
         done={done}
-        step={step}
         nextTitle={nextTitle}
         actions={actions}
       />
@@ -207,7 +282,6 @@ export function DesignChat({
   fetchChat,
   post,
   done,
-  step,
   nextTitle,
   actions = {},
 }: {
@@ -216,8 +290,6 @@ export function DesignChat({
   post?: PostPrompt;
   /** The Design's Progress is Done: no composer, no `ended` banner. */
   done?: boolean;
-  /** The Progress step the design is at. */
-  step?: string;
   /** The subtitle under Continue: the next ticket's title, or the step label. */
   nextTitle?: string;
   actions?: FailureActions;
@@ -227,12 +299,24 @@ export function DesignChat({
     const failure = visibleFailure(session.failure, done);
     return (
       <>
-        {failure && !needsTranscript(failure) && <FailureBanner failure={failure} session={session} {...actions} />}
+        {failure && !needsTranscript(failure) && (
+          <FailureBanner failure={failure} session={session} {...actions} />
+        )}
         <Text color="text.muted" fontSize="sm">
           Chat works for Claude sessions only. Open it in gx, Agents tab.
         </Text>
       </>
     );
   }
-  return <ChatLog key={session.id} session={session} fetchChat={fetchChat} post={post} done={done} step={step} nextTitle={nextTitle} actions={actions} />;
+  return (
+    <ChatLog
+      key={session.id}
+      session={session}
+      fetchChat={fetchChat}
+      post={post}
+      done={done}
+      nextTitle={nextTitle}
+      actions={actions}
+    />
+  );
 }

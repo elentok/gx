@@ -219,9 +219,9 @@ func chatRound(msgs []transcript.ChatMessage) []SessionRoundCard {
 }
 
 // chatNext is the run-end line of the agent's last turn, or nil.
-func chatNext(msgs []transcript.ChatMessage, ticket string) *SessionNext {
+func chatNext(msgs []transcript.ChatMessage, ticket string, final bool) *SessionNext {
 	for _, text := range trailingAgentTexts(msgs) {
-		if a, ok := runEndNext(text, ticket); ok {
+		if a, ok := runEndNext(text, ticket, final); ok {
 			return &SessionNext{Action: a}
 		}
 	}
