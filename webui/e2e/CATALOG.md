@@ -133,7 +133,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Scenario:** `design`, with a 5s countdown
 - **Steps:**
   1. Answer round one and Send. During the countdown, click Cancel.
-  2. In a second test, open the Note box and type a note during the countdown instead.
+  2. In a second test, open the Note box, type a note and Send it during the countdown instead.
 - **Pass:** the countdown disappears, Continue stays, and after the old deadline no fresh round
   has been sent.
 

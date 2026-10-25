@@ -22,6 +22,20 @@ func TestTranscriptPaths_FoundPathIsGlobbedOnce(t *testing.T) {
 	}
 }
 
+func TestTranscriptPaths_ForgetMissGlobsAgain(t *testing.T) {
+	var c transcriptPaths
+	finds := 0
+	found := false
+	find := func() (string, bool) { finds++; return "/p/c.jsonl", found }
+	now := time.Now()
+	c.resolve("c", now, defaultTranscriptMissTTL, find)
+	found = true
+	c.forgetMiss("c")
+	if path, ok := c.resolve("c", now, defaultTranscriptMissTTL, find); !ok || path != "/p/c.jsonl" || finds != 2 {
+		t.Fatalf("after forgetMiss: %q, %v, finds=%d", path, ok, finds)
+	}
+}
+
 func TestTranscriptPaths_MissIsRememberedForTheTTL(t *testing.T) {
 	var c transcriptPaths
 	finds := 0

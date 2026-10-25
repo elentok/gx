@@ -170,6 +170,9 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, out)
 		return
 	}
+	// The page reads only on an event, so a remembered miss from before the
+	// transcript existed would hide the message the event announces.
+	s.transcripts.forgetMiss(meta.ConversationID)
 	if path, ok := s.claudeTranscript(id, meta.ConversationID); ok {
 		final := s.designFinal(meta.Ticket)
 		chat, err := s.chats.read(path, final, chatLoader(meta.Ticket, final))

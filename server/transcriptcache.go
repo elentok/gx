@@ -47,6 +47,13 @@ func (c *transcriptPaths) resolve(conversationID string, now time.Time, missTTL 
 	return "", false
 }
 
+// forgetMiss drops a remembered failed lookup, so the next resolve globs again.
+func (c *transcriptPaths) forgetMiss(conversationID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.missed, conversationID)
+}
+
 // authFailures keeps whether each transcript ends in an auth error until its
 // size or mtime changes, so listing a quiet session never rereads the file.
 type authFailures struct {

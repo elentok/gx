@@ -117,6 +117,7 @@ test.describe("11. Auto-advance, cancel", () => {
     await expect(page.getByText(/Continuing in/)).toBeVisible();
     await page.getByRole("button", nav("Note")).click();
     await page.getByRole("textbox", nav("Message")).fill("wait, one thing");
+    await page.getByRole("button", nav("Send")).click();
     await expect(page.getByText(/Continuing in/)).toHaveCount(0);
     await page.waitForTimeout(6000);
     await expect(page.getByText("A fresh round.")).toHaveCount(0);
