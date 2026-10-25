@@ -1,6 +1,8 @@
 import { Box } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import canned from "../canned-snapshot.json";
+import { EpicCard } from "../epics/EpicCard";
+import type { EpicListRow } from "../generated/server";
 import { Arc } from "../ui/arc/Arc";
 import { StatusIcon, STATUS_LABELS, type StatusKind } from "../ui/status-icon/StatusIcon";
 import { Badge } from "../ui/badge/Badge";
@@ -37,7 +39,27 @@ export interface GalleryEntry {
 const ticket = canned.tickets[0];
 const longReason = "Waiting on a long chain of upstream tickets that all have to merge first. ".repeat(4);
 
-const chartDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const cardRow = (over: Partial<EpicListRow> = {}): EpicListRow => ({
+  address: "demo:blog",
+  project: "demo",
+  name: "blog",
+  kind: "loop",
+  state: "running",
+  done: 2,
+  total: 5,
+  queued: false,
+  queueable: false,
+  blocked_by_epics: [],
+  addresses: ["demo:blog"],
+  card_kind: "implementation",
+  section: "in-progress",
+  status_words: "Implementing...",
+  ring_progress: 40,
+  actions: [],
+  ...over,
+});
+
+const chartDays =["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const perTone =(render: (tone: Tone) => ReactNode): GalleryCase[] =>
   TONES.map((tone) => ({ label: tone, node: render(tone) }));
@@ -328,6 +350,67 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "plain", node: <SidebarItem label={ticket.title} /> },
       { label: "current", node: <SidebarItem label={ticket.title} current /> },
       { label: "with marks", node: <SidebarItem label={ticket.title} marks={<LiveDot tone="running" label="live" />} /> },
+    ],
+  },
+  {
+    name: "EpicCard",
+    cases: [
+      { label: "running", node: <EpicCard row={cardRow()} /> },
+      { label: "queued", node: <EpicCard row={cardRow({ state: "queued", status_words: "Queued #2", reason: "Starts after agent-runner-phase2" })} /> },
+      { label: "merging", node: <EpicCard row={cardRow({ state: "merging", status_words: "Merging...", ring_progress: 100, done: 5 })} /> },
+      { label: "finished", node: <EpicCard row={cardRow({ state: "finished", section: "finished", status_words: "Merged", ring_progress: 100, done: 5 })} /> },
+      { label: "draft", node: <EpicCard row={cardRow({ state: "draft", section: "ready-to-design", status_words: "Draft", done: 0, ring_progress: 0 })} /> },
+      { label: "ready with Queue", node: <EpicCard row={cardRow({ state: "ready", section: "ready-to-queue", status_words: "Implementing...", actions: [{ kind: "queue", label: "Queue" }] })} /> },
+      {
+        label: "Needs you with buttons",
+        node: (
+          <EpicCard
+            row={cardRow({
+              state: "paused",
+              section: "needs-you",
+              state_pill: "Paused",
+              reason: "06 Retry the launch: zero commits after the iteration",
+              actions: [{ kind: "open-ticket", label: "Open ticket", target: "demo:blog/06" }],
+            })}
+          />
+        ),
+      },
+      {
+        label: "merge blocked",
+        node: (
+          <EpicCard
+            row={cardRow({
+              state: "merge-blocked",
+              section: "needs-you",
+              state_pill: "Merge blocked",
+              reason: "Conflicts with main in server/land.go",
+              actions: [{ kind: "merge", label: "Merge" }],
+            })}
+          />
+        ),
+      },
+      {
+        label: "design not started",
+        node: <EpicCard row={cardRow({ card_kind: "design", state: "waiting-to-design", section: "ready-to-design", status_words: "Not started", ring_progress: 0, actions: [{ kind: "design", label: "Design", target: "demo:blog" }] })} />,
+      },
+      {
+        label: "joined card",
+        node: <EpicCard row={cardRow({ card_kind: "implementation", addresses: ["demo:blog-impl", "demo:blog"], name: "blog" })} />,
+      },
+      { label: "one-off", node: <EpicCard row={cardRow({ card_kind: "one-off", state: "queued", status_words: "One-off", ring_progress: 0 })} /> },
+      {
+        label: "follow-ups",
+        node: <EpicCard row={cardRow({ card_kind: "follow-ups", state: "follow-ups", section: "ready-to-design", status_words: "5 bugs, 2 ideas", ring_progress: 0, actions: [{ kind: "triage", label: "Triage", target: "demo" }] })} />,
+      },
+      {
+        label: "two in a row, one footer",
+        node: (
+          <Box display="grid" gridTemplateColumns="repeat(2, 360px)" gap="20px">
+            <EpicCard row={cardRow({ name: "no buttons" })} />
+            <EpicCard row={cardRow({ state: "ready", section: "ready-to-queue", name: "with Queue", actions: [{ kind: "queue", label: "Queue" }] })} />
+          </Box>
+        ),
+      },
     ],
   },
 ];

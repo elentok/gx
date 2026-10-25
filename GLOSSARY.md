@@ -354,6 +354,13 @@ has not Exited. A Design is **Not started** while its Destination is unconfirmed
 tickets is resolved. _Avoid_: "design session" for the map epic itself (a design session is the agent
 session working on it); draft for a Not started Design (a draft is work set aside deliberately).
 
+**Epic card** — one card of the Epics page, rendered from one `/v1/epics` row: a progress ring, the
+title (the only link), a "project · status" line, a state pill and reason when the card needs
+attention, and a footer of at most two buttons. It has one of four **card kinds**: **Design** (a map
+epic, or a joined Design and its `-impl` epic until Branch), **Implementation** (a loop epic, or a
+joined card from Branch on), **One-off** (one ticket of the `one-offs` epic) and **Follow-ups** (one
+per project with open follow-ups). _Avoid_: tile, row (a row is the data behind a card).
+
 **Design session** — an interactive session with a **Session ticket**: where gx-design runs on a
 map. It runs in the project's trunk checkout. A map epic or map ticket can have more than one at a
 time. _Avoid_: planning session.

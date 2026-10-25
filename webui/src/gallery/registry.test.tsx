@@ -46,6 +46,27 @@ it("shows the TopBar in every state the spec lists", () => {
   }
 });
 
+it("shows the EpicCard in every state the spec lists", () => {
+  const labels = galleryEntries.find((e) => e.name === "EpicCard")?.cases.map((c) => c.label) ?? [];
+  for (const label of [
+    "running",
+    "queued",
+    "merging",
+    "finished",
+    "draft",
+    "ready with Queue",
+    "Needs you with buttons",
+    "merge blocked",
+    "design not started",
+    "joined card",
+    "one-off",
+    "follow-ups",
+    "two in a row, one footer",
+  ]) {
+    expect(labels, label).toContain(label);
+  }
+});
+
 it("keeps gallery.html out of the production build input", () => {
   expect(existsSync(join(__dirname, "../../gallery.html"))).toBe(true);
   expect(config.build?.rollupOptions?.input).toBe("index.html");
