@@ -118,10 +118,11 @@ function DesignColumns({
   // The busy row follows what the agent reported; Progress and Continue keep following the map.
   const running =
     detail?.steps?.find((s) => s.step === session?.reported_step) ?? current;
-  const working = running && {
-    step: running.label,
+  // Without the map detail there is no step to name, so the row reads a bare "Working".
+  const working = {
+    step: running?.label,
     title:
-      running.step === "resolve-tickets"
+      running?.step === "resolve-tickets"
         ? session?.reported_title ||
           detail?.rows.find((r) => r.current)?.title
         : undefined,

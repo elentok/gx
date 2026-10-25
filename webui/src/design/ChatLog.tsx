@@ -122,7 +122,7 @@ function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
 }
 
 export interface WorkingStep {
-  step: string;
+  step?: string;
   title?: string;
 }
 
@@ -139,7 +139,8 @@ function WorkingRow({ step, title }: WorkingStep) {
     >
       <ChakraSpinner size="sm" />
       <Text as="span">
-        Working: {step}
+        Working
+        {step && `: ${step}`}
         {title && ` · ${title}`}
       </Text>
     </Box>

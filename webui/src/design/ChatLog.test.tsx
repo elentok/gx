@@ -168,6 +168,11 @@ test("Resolve tickets adds the ticket title", async () => {
   expect(await screen.findByText("Working: Resolve tickets · Reported one")).toBeTruthy();
 });
 
+test("a busy turn without a map step shows a bare Working row", async () => {
+  renderChat([session({ status: { state: "working" } })], okChat(chatOf([msg({ text: "hi" })])));
+  expect(await screen.findByText("Working")).toBeTruthy();
+});
+
 test("an idle session shows no working row", async () => {
   renderChat([session({ reported_step: "spec" })], okChat(chatOf([msg({ text: "hi" })])), undefined, { steps });
   await screen.findByText("hi");
