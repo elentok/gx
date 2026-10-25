@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Spinner as ChakraSpinner, Text } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type {
@@ -121,6 +121,31 @@ function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
   );
 }
 
+export interface WorkingStep {
+  step: string;
+  title?: string;
+}
+
+// Inline, not the page-centered Spinner: this one sits at the bottom of the chat.
+function WorkingRow({ step, title }: WorkingStep) {
+  return (
+    <Box
+      role="status"
+      display="flex"
+      alignItems="center"
+      gap="2"
+      fontSize="sm"
+      color="text.muted"
+    >
+      <ChakraSpinner size="sm" />
+      <Text as="span">
+        Working: {step}
+        {title && ` · ${title}`}
+      </Text>
+    </Box>
+  );
+}
+
 // The sheet and the composer share the round's answers. The caller keys it by round, so a new round starts blank
 // while a refetch of the same round keeps every answer. The draft also survives a reload (see useRoundDraft).
 function ChatTail({
@@ -225,6 +250,7 @@ function ChatLog({
   post,
   done,
   nextTitle,
+  working: step,
   actions,
 }: {
   session: SessionInfo;
@@ -232,6 +258,7 @@ function ChatLog({
   post?: PostPrompt;
   done?: boolean;
   nextTitle?: string;
+  working?: WorkingStep;
   actions: FailureActions;
 }) {
   const conn = useConnectionContext();
@@ -241,7 +268,7 @@ function ChatLog({
   const roundKey = (chat.round ?? [])
     .map((c) => `${c.label}:${c.title}`)
     .join("|");
-  const working =
+  const busy =
     session.status.state === "working" && !session.status.background;
   return (
     <Box display="flex" flexDirection="column" gap="3">
@@ -254,12 +281,13 @@ function ChatLog({
         <Entry
           key={m.id || i}
           m={m}
-          tool={working && i === chat.messages.length - 1}
+          tool={busy && i === chat.messages.length - 1}
         />
       ))}
       {chat.background.length > 0 && (
         <BackgroundStrip tasks={chat.background} />
       )}
+      {busy && step && <WorkingRow {...step} />}
       <ChatTail
         key={roundKey}
         session={session}
@@ -283,6 +311,7 @@ export function DesignChat({
   post,
   done,
   nextTitle,
+  working,
   actions = {},
 }: {
   session?: SessionInfo;
@@ -292,6 +321,8 @@ export function DesignChat({
   done?: boolean;
   /** The subtitle under Continue: the next ticket's title, or the step label. */
   nextTitle?: string;
+  /** The step the busy row names, and the ticket during Resolve tickets. */
+  working?: WorkingStep;
   actions?: FailureActions;
 }) {
   if (!session) return null;
@@ -316,6 +347,7 @@ export function DesignChat({
       post={post}
       done={done}
       nextTitle={nextTitle}
+      working={working}
       actions={actions}
     />
   );

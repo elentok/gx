@@ -47,7 +47,7 @@ const chatOf = (messages: SessionChatMessage[], over: Partial<SessionChatRespons
 
 const okChat = (c: SessionChatResponse): FetchChat => async () => ({ kind: "ok", detail: c });
 
-function renderChat(sessions: SessionInfo[], fetchChat: FetchChat, prompt?: PostPrompt) {
+function renderChat(sessions: SessionInfo[], fetchChat: FetchChat, prompt?: PostPrompt, mapDetail: Record<string, unknown> = {}) {
   const state = { snapshot: { sessions }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const listeners = new Set<(a?: string) => void>();
   const conn = {
@@ -93,6 +93,7 @@ function renderChat(sessions: SessionInfo[], fetchChat: FetchChat, prompt?: Post
           queueable: false,
           queued: false,
           steps: [],
+          ...mapDetail,
         },
       }),
       chat: fetchChat,
@@ -141,7 +142,39 @@ test("the tools line names the latest tool only while Working", async () => {
   expect(await screen.findByText("· 3 tool calls")).toBeTruthy();
 });
 
-test("the background strip lists running tasks", async () => {
+const steps = [
+  { step: "chart", label: "Chart", state: "done" },
+  { step: "spec", label: "Spec", state: "current" },
+  { step: "resolve-tickets", label: "Resolve tickets", state: "todo" },
+];
+
+test("a busy turn shows the reported step, falling back to the map's", async () => {
+  const chat = okChat(chatOf([msg({ text: "hi" })]));
+  renderChat([session({ status: { state: "working" }, reported_step: "chart" })], chat, undefined, { steps });
+  expect(await screen.findByText("Working: Chart")).toBeTruthy();
+  cleanup();
+  renderChat([session({ status: { state: "working" } })], chat, undefined, { steps });
+  expect(await screen.findByText("Working: Spec")).toBeTruthy();
+});
+
+test("Resolve tickets adds the ticket title", async () => {
+  const rows = [{ address: "gx:a/03", title: "Wire it", current: true }];
+  renderChat(
+    [session({ status: { state: "working" }, reported_step: "resolve-tickets", reported_title: "Reported one" })],
+    okChat(chatOf([msg({ text: "hi" })])),
+    undefined,
+    { steps, rows },
+  );
+  expect(await screen.findByText("Working: Resolve tickets · Reported one")).toBeTruthy();
+});
+
+test("an idle session shows no working row", async () => {
+  renderChat([session({ reported_step: "spec" })], okChat(chatOf([msg({ text: "hi" })])), undefined, { steps });
+  await screen.findByText("hi");
+  expect(screen.queryByText(/Working:/)).toBeNull();
+});
+
+test("the background strip lists running tasks",async () => {
   renderChat(
     [session()],
     okChat(

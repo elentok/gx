@@ -115,6 +115,17 @@ function DesignColumns({
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session =
     live.find((s) => s.id === selected) ?? designSession(address, sessions);
+  // The busy row follows what the agent reported; Progress and Continue keep following the map.
+  const running =
+    detail?.steps?.find((s) => s.step === session?.reported_step) ?? current;
+  const working = running && {
+    step: running.label,
+    title:
+      running.step === "resolve-tickets"
+        ? session?.reported_title ||
+          detail?.rows.find((r) => r.current)?.title
+        : undefined,
+  };
   useFocusReport(conn, session?.id, connState.streams, deps.focus);
   return (
     <>
@@ -144,6 +155,7 @@ function DesignColumns({
           post={deps.post}
           done={done}
           nextTitle={nextTitle}
+          working={working}
           actions={{
             onNewSession,
             resume: deps.resume,
