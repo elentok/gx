@@ -384,7 +384,7 @@ From the person's view:
 - Server runner tests also cover a top-level `base: release-1.2` ticket starting from
   `release-1.2` and landing on trunk, and a stacked root retargeting to trunk once its blocker
   lands on trunk.
-- Run tests per package with `rtk go test ./<pkg>/...`; never the whole repo at once.
+- Run tests per package with `go test ./<pkg>/...`; never the whole repo at once.
 
 ## Out of Scope
 

@@ -538,7 +538,7 @@ From the person's view:
      conflict-resolution and the Tickets tab grouping tests.
 - The `gx-merge` skill text (ticket mode, fixer, flaky triage) has no automated test; it is checked
   by running a merge ticket against a temp repo with a real conflict and a real check failure.
-- Run tests per package with `rtk go test ./<pkg>/...`; never the whole repo at once.
+- Run tests per package with `go test ./<pkg>/...`; never the whole repo at once.
 
 ## Out of Scope
 

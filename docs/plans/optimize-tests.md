@@ -117,10 +117,10 @@ that exceeds the 5–15s `loadWait` timeouts. Unit tests were safe to paralleliz
 grep -n "t.Parallel\|t.Setenv" ui/status/model_test.go | head -30
 
 # Run the full suite and compare timing
-rtk proxy go test ./... -count=1 -timeout 300s 2>&1 | grep "^ok\|^FAIL"
+go test ./... -count=1 -timeout 300s 2>&1 | grep "^ok\|^FAIL"
 
 # Run the status package specifically (biggest bottleneck)
-rtk proxy go test ./ui/status/... -count=1 -timeout 120s 2>&1 | tail -5
+go test ./ui/status/... -count=1 -timeout 120s 2>&1 | tail -5
 
 # Confirm no data races
 go test ./... -race -timeout 300s
