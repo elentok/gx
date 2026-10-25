@@ -47,7 +47,7 @@ var requiredFiles = []string{
 	"gx-bump/SKILL.md",
 	"gx-one-off/SKILL.md",
 	"gx-evolve/SKILL.md",
-	"gx-resolve-follow-ups/SKILL.md",
+	"gx-triage-follow-ups/SKILL.md",
 	"gx-design/SKILL.md",
 	"gx-follow-up/SKILL.md",
 	"gx-grilling/SKILL.md",
@@ -204,7 +204,7 @@ var wantInvocationPolicy = map[string]bool{
 	"gx-bump":                      true,
 	"gx-one-off":                   true,
 	"gx-evolve":                    true,
-	"gx-resolve-follow-ups":        true,
+	"gx-triage-follow-ups":         true,
 	"gx-design":                    true,
 	"gx-follow-up":                 false,
 	"gx-grilling":                  false,
@@ -607,7 +607,7 @@ func TestInvestigateUnattendedVerbs(t *testing.T) {
 // use the address `move` prints: a move renumbers, so the pre-move address
 // targets nothing.
 func TestResolveFollowUpsUsesMovedAddress(t *testing.T) {
-	raw := readFile(t, "gx-resolve-follow-ups/SKILL.md")
+	raw := readFile(t, "gx-triage-follow-ups/SKILL.md")
 	if !strings.Contains(raw, "A move renumbers the ticket.") {
 		t.Error("skill must explain that a move renumbers the ticket")
 	}

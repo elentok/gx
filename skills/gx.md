@@ -72,7 +72,7 @@ deliberate, explicit-invoke-only, never something to trigger on the model's own 
 conversation. `gx-one-off` sets the same flag: the server launches it for `type: prompt` tickets,
 never the model on its own. One-offs never commit: `gx server one-off` has no `--commits` or
 `--base`. `gx-evolve` sets it too: the server launches it for `type: evolve`
-retros, never the model on its own. `gx-resolve-follow-ups` sets it as well: emptying a follow-ups
+retros, never the model on its own. `gx-triage-follow-ups` sets it as well: emptying a follow-ups
 epic closes, moves and creates tickets in bulk, so a person starts it, never the model. `gx-design`
 sets it too: a person walks one epic through map, review and implement. `gx-to-tickets`, `gx-tdd`,
 `gx-resolving-merge-conflicts`, and `gx-changelog` carry no such flag: it's fine for the model to reach for
@@ -178,7 +178,7 @@ skills/
     SKILL.md
   gx-evolve/
     SKILL.md
-  gx-resolve-follow-ups/
+  gx-triage-follow-ups/
     SKILL.md
   gx-design/
     SKILL.md

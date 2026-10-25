@@ -247,7 +247,7 @@ writes the statuses directly:
 
 `paused` and `cancelled` stay server-only, even here.
 
-A map epic seeded by gx-resolve-follow-ups carries **`destination_unconfirmed: true`** in its
+A map epic seeded by gx-triage-follow-ups carries **`destination_unconfirmed: true`** in its
 `ticket.md`: the Destination is a guess from the follow-ups, not yet confirmed. gx-design confirms
 it with the person, then clears the flag with `gx tickets set <project:epic> --destination-unconfirmed
 false`. Treat a map with the flag set as not ready to chart further. (The old field name,
@@ -277,7 +277,7 @@ that drives it.
 ## Follow-ups
 
 A **follow-up** is a diagnosis or an idea filed for a person to plan, not schedulable work. This
-section is the one place the format lives; gx-follow-up, gx-evolve and gx-resolve-follow-ups link
+section is the one place the format lives; gx-follow-up, gx-evolve and gx-triage-follow-ups link
 here rather than restating it. The filing procedure lives in the
 [gx-follow-up](gx-follow-up/SKILL.md) skill.
 
@@ -286,7 +286,7 @@ here rather than restating it. The filing procedure lives in the
 - **Routing**: a project-specific finding → `<project>:follow-ups`; a gx tooling finding →
   `gx:follow-ups`; a closed follow-up → `<project>:follow-ups-archived`. Ask: would this still exist
   if the epic you were working in had never been authored? If yes, it's tooling.
-- **Always `draft` + `research`.** Filers never guess `implement`; gx-resolve-follow-ups sets the
+- **Always `draft` + `research`.** Filers never guess `implement`; gx-triage-follow-ups sets the
   real type and status when it moves the ticket.
 - **Body sections**, for bugs and ideas alike:
   - `## Source` — the epic, ticket addresses, session ids, and which skill or person filed it.
@@ -303,7 +303,7 @@ here rather than restating it. The filing procedure lives in the
   [gx-follow-up](gx-follow-up/SKILL.md).
 - **Server recovery follow-ups** (filed from investigate reports) use the same format:
   `category: bug`, Source / Problem / Evidence / Suggested fix, and the same "seen again" entry for a
-  repeat. gx-resolve-follow-ups and `gx evolve export` then see one shape.
+  repeat. gx-triage-follow-ups and `gx evolve export` then see one shape.
 - **Closing**: `gx tickets close <addr> --reason fixed|obsolete|duplicate|not-worth-it [--note ...]`
   works only on a `draft`/`open` ticket in a `follow-ups` epic. In one step it writes
   `status: cancelled`, a `## Resolution` with the reason, note and original address, and moves the

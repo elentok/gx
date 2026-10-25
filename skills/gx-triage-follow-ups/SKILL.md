@@ -1,5 +1,5 @@
 ---
-name: gx-resolve-follow-ups
+name: gx-triage-follow-ups
 description: >-
   Empty a project's `follow-ups` epic: verify each item against the code, dedupe, route every item
   to a ready epic or an area map epic, and close what is fixed or obsolete. Manual; one approval of
