@@ -20,7 +20,6 @@ var (
 	fileRedirect = regexp.MustCompile(`(^|[^<>&0-9])>>?\s*[^\s>&]`)
 	devNull      = regexp.MustCompile(`>>?\s*/dev/null`)
 	scriptHeredc = regexp.MustCompile(`\b(python[0-9.]*|perl|ruby|node)\b[^\n]*<<`)
-	quoted       = regexp.MustCompile(`"[^"]*"|'[^']*'`)
 	heredocStart = regexp.MustCompile(`<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)`)
 )
 
@@ -46,9 +45,28 @@ func withoutHeredocBodies(command string) string {
 
 // withoutQuotedText empties quoted strings, keeping the quotes. A ">" inside
 // one (a commit trailer ending in `<noreply@x.com>"`) is not a redirect, while
-// `> "file"` still reads as one.
+// `> "file"` still reads as one. A quote that never closes (an apostrophe in
+// prose) makes the pairing unreliable, so the command comes back unstripped and
+// the redirect check fails closed.
 func withoutQuotedText(command string) string {
-	return quoted.ReplaceAllStringFunc(command, func(s string) string { return s[:1] + s[len(s)-1:] })
+	var out strings.Builder
+	var open rune
+	for _, r := range command {
+		switch {
+		case open == 0 && (r == '"' || r == '\''):
+			open = r
+			out.WriteRune(r)
+		case open != 0 && r == open:
+			open = 0
+			out.WriteRune(r)
+		case open == 0:
+			out.WriteRune(r)
+		}
+	}
+	if open != 0 {
+		return command
+	}
+	return out.String()
 }
 
 // guardBashCommand returns why command must not run, or "" when it may.

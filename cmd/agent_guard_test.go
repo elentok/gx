@@ -33,6 +33,8 @@ func TestGuardBashCommand(t *testing.T) {
 		{"heredoc start with redirect", "cat <<'EOF' > a.go\npackage a\nEOF", true},
 		{"commit trailer ending in >\"", "gx tickets section 1/2 Notes - <<'EOF'\nbody\nEOF\ngit commit -m \"subj\n\nCo-Authored-By: Claude <noreply@anthropic.com>\"", false},
 		{"redirect into quoted path", "cat > \"a.go\" <<'EOF'\npackage a\nEOF", true},
+		{"redirect after unbalanced apostrophe", "echo it's > a.go <<EOF\nx\nEOF", true},
+		{"redirect between stray and real quotes", "echo it's > a.go; echo 'x' <<EOF\nx\nEOF", true},
 		{"git status", `git status`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
