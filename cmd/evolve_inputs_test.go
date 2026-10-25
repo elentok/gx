@@ -25,7 +25,7 @@ func inputsFixture(t *testing.T) *evolveFixture {
 		}
 	}
 	// 01 (from the base fixture) has no metrics and is the slow-baseline-free one.
-	write("01-a.md", "id: \"01\"\nstatus: done\ntype: implement\nexpected_context_window: 40000\nactual_context_window: 90000\nelapsed_time: 100\nactual_cost: 1.5\nsession_ids: [s1]\n")
+	write("01-a.md", "id: \"01\"\nstatus: done\ntype: implement\nexpected_context_window: 40000\nactual_context_window: 150000\nelapsed_time: 100\nactual_cost: 1.5\nsession_ids: [s1]\n")
 	write("02-b.md", "id: \"02\"\nstatus: done\ntype: implement\nexpected_context_window: 40000\nactual_context_window: 30000\nelapsed_time: 100\nactual_cost: 1\nsession_ids: [s2]\n")
 	write("03-c.md", "id: \"03\"\nstatus: paused\npause_reason: merge-error\ntype: implement\nexpected_context_window: 40000\nactual_context_window: 30000\nelapsed_time: 900\nactual_cost: 2\nsession_ids: [s3]\n")
 	write("04-d.md", "id: \"04\"\nstatus: done\ntype: implement\nactual_context_window: 1\nelapsed_time: 100\nactual_cost: 1\n")
@@ -108,6 +108,28 @@ func TestEvolveInputs_FlagsAndSeverityOrder(t *testing.T) {
 	}
 	if rows["06"].Parent != "05" || !reflect.DeepEqual(rows["05"].FixTickets, []string{"06"}) {
 		t.Errorf("parent/fix edges wrong: %+v %+v", rows["06"], rows["05"])
+	}
+}
+
+func TestEvolveInputs_SmallEstimateBelowBaselineNotOverrun(t *testing.T) {
+	t.Parallel()
+	f := inputsFixture(t)
+	body := "---\nid: \"08\"\nstatus: done\ntype: implement\nexpected_context_window: 15000\nactual_context_window: 53974\nelapsed_time: 100\nactual_cost: 1\n---\nBody.\n"
+	if err := os.WriteFile(filepath.Join(f.epic, "issues", "08-small.md"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	if err := runEvolveInputs(f.env, &out, "proj:epic", true); err != nil {
+		t.Fatal(err)
+	}
+	var table InputsTable
+	if err := json.Unmarshal(out.Bytes(), &table); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range table.Rows {
+		if r.ID == "08" && slices.Contains(r.Flags, "context-overrun") {
+			t.Errorf("ticket 08 flagged: %v", r.Flags)
+		}
 	}
 }
 

@@ -35,6 +35,11 @@ const (
 	flagFixTickets    = "has-fix-tickets"
 )
 
+// sessionBaselineTokens is the fixed context every session starts with
+// (CLAUDE.md chain, memory index, skill list, tool schemas). It is removed
+// from the actual before the overrun check, so small estimates don't trip it.
+const sessionBaselineTokens = 50000
+
 // Severity tiers for the deep-read cap, highest first.
 const (
 	severityRest     = 0
@@ -219,7 +224,7 @@ func inputsFlags(tk tickets.Ticket, row InputsRow, median int) []string {
 	// Conflict sessions are listed apart, so any extra session here is a relaunch.
 	add(len(row.Sessions) > 1, flagRelaunch)
 	add(has(string(events.Nudged)), flagNudge)
-	add(row.ExpectedContext > 0 && row.ActualContext > 2*row.ExpectedContext, flagOverrun)
+	add(row.ExpectedContext > 0 && row.ActualContext-sessionBaselineTokens > 2*row.ExpectedContext, flagOverrun)
 	add(median > 0 && row.ElapsedSeconds > 2*median, flagSlow)
 	add(tk.Status == string(schema.StatusDone) && !tk.Commitless && (row.ActualContext == 0 || row.ElapsedSeconds == 0), flagMetricsAbsent)
 	add(len(row.FixTickets) > 0, flagFixTickets)
