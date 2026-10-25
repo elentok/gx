@@ -99,7 +99,8 @@ the ticket title during `resolve-tickets`.
    spec (rubric below). It writes the findings as a markdown checklist (`- [ ] …`) with
    `gx tickets section <project:epic> "Review findings" -`. Write `- [x] No findings` if there are none. Then set `--design-step review`.
 6. **Unchecked findings** → set `--design-step grill-findings`, then run a `gx-grilling` session on them, resident in this same run. Amend
-   `docs/specs/<epic>.md` as each finding resolves, and check it off with
+   `docs/specs/<epic>.md` as each finding resolves. A finding with no objection to its "(default)"
+   resolution is checked off after the person's next reply. Check each finding off with
    `gx tickets section <project:epic> "Review findings" -`. Do not `/clear` between rounds. When
    every finding is checked, continue to step 7 in the same run.
 7. **No `<epic>-impl` epic** → follow [gx-to-tickets](../gx-to-tickets/SKILL.md) on the amended

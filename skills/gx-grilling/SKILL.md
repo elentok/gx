@@ -42,6 +42,48 @@ Every question carries a `gx-question` block (the `gx tickets ask` YAML), after 
 - `recommended` must name the same answer as your `➡️` line. If the `➡️` line says "No", write `recommended: no`. For `options`, name the option id your `➡️` line picks. Check this before you send the round.
 - Wrap every `label`, `consequence`, `yes` and `no` value in double quotes. A bare value with `: ` or a backtick makes the block unreadable and the question loses its buttons.
 
+## Low-risk questions: decided unless you object
+
+In each round, mark the low-risk questions as decided and ask the rest. A question is low-risk only when all of these hold:
+
+- It changes no user story, no scope and not the Destination.
+- It is cheap to reverse.
+- It has one clear answer.
+
+When in doubt, ask. This applies to every grilling: map tickets, the spec's design questions and review findings.
+
+Put the defaulted questions after the asked ones, after a `---` line, in plain text under their own heading. They get no `❓` marker and no `gx-question` block. Without the `---` the server may fold them into the last card.
+
+```
+---
+
+**Decided unless you object**
+
+- <question title>: <the answer you chose, and why in a few words>
+```
+
+- A round where every question is defaulted prints one question card, "Accept these defaults?", so the round still waits for the person. List the defaults under the heading, after a `---` line that follows the card:
+
+````
+❓ **Q1** - **Accept these defaults?**: Do you accept the defaults below?
+
+➡️ Yes
+
+```gx-question
+type: yes-no
+recommended: yes
+```
+
+---
+
+**Decided unless you object**
+
+- <question title>: <the answer you chose>
+````
+- An objected default is asked like any other question in the next round.
+- In the Resolution, list the defaulted answers under their own heading, "Decided by default".
+- A review finding has no ticket. Tag a defaulted finding's one-line resolution with "(default)". Check it off after the person's next reply, if that reply does not object to it.
+
 Before asking each question, read [gx-unslop](../gx-unslop/SKILL.md) and apply it to the question and your recommendation.
 
 Write questions and recommendations at CEFR B2 level:

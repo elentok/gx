@@ -56,6 +56,22 @@ func TestSessionChat_RoundParsesCardsAndStripsFences(t *testing.T) {
 	}
 }
 
+func TestSessionChat_RoundDefaultsAreNotCards(t *testing.T) {
+	defaults := "\n\n**Decided unless you object**\n\n- Naming: use camelCase\n- Order: alphabetical"
+	for name, sep := range map[string]string{"with rule": "\n\n---", "without rule": ""} {
+		t.Run(name, func(t *testing.T) {
+			round := "❓ **Q1** - **Which store?**: SQLite or files?\n\n➡️ SQLite\n\n```gx-question\ntype: yes-no\nrecommended: yes\n```" + sep + defaults
+			got := chatOf(t, assistantText("a1", round))
+			if len(got.Round) != 1 {
+				t.Fatalf("round = %+v, want 1 card", got.Round)
+			}
+			if body := got.Round[0].Body; strings.Contains(body, "camelCase") || strings.Contains(body, "Decided") {
+				t.Errorf("card body = %q, want no defaults text", body)
+			}
+		})
+	}
+}
+
 func TestSessionChat_RoundReadsDriftedHeadersLeniently(t *testing.T) {
 	yesNo := "\n\n```gx-question\ntype: yes-no\n```"
 	got := chatOf(t, assistantText("a1",

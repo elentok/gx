@@ -30,6 +30,28 @@ func TestGxDesignChainingRules(t *testing.T) {
 	}
 }
 
+func TestGxGrillingLowRiskDefaults(t *testing.T) {
+	text := readFile(t, "gx-grilling/SKILL.md")
+	for _, want := range []string{
+		"decided unless you object",
+		"changes no user story, no scope and not the Destination",
+		"cheap to reverse",
+		"When in doubt, ask",
+		"**Decided unless you object**",
+		"Accept these defaults?",
+		"An objected default is asked like any other question",
+		"Decided by default",
+		"(default)",
+	} {
+		if !strings.Contains(strings.ToLower(text), strings.ToLower(want)) {
+			t.Errorf("gx-grilling/SKILL.md lacks %q", want)
+		}
+	}
+	if !strings.Contains(readFile(t, "gx-design/SKILL.md"), `"(default)"`) {
+		t.Error("gx-design/SKILL.md step 6 lacks the (default) rule")
+	}
+}
+
 func TestGxWayfinderLetsCallerAllowMoreTickets(t *testing.T) {
 	text := readFile(t, "gx-wayfinder/SKILL.md")
 	if !strings.Contains(text, "unless the calling skill allows more") {

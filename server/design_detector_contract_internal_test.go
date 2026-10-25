@@ -117,3 +117,22 @@ func TestGxGrillingRoundTemplate_IsGrilling(t *testing.T) {
 		t.Errorf("round template yields (%+v, %v), want the grilling Actionable", a, ok)
 	}
 }
+
+func TestGxGrillingAllDefaultedTemplate_IsGrilling(t *testing.T) {
+	var found string
+	for _, b := range fencedBlocks(skillText(t, "gx-grilling"), "````") {
+		if strings.Contains(b, "Accept these defaults?") {
+			found = b
+		}
+	}
+	if found == "" {
+		t.Fatal("gx-grilling has no all-defaulted round template")
+	}
+	a, ok := designActionable(found, "gx:epic/03", false)
+	if !ok || !a.Grilling || a.Reason != grillingReason {
+		t.Errorf("all-defaulted template yields (%+v, %v), want the grilling Actionable", a, ok)
+	}
+	if cards := roundCards(found); len(cards) != 1 || strings.Contains(cards[0].Body, "Decided unless") {
+		t.Errorf("all-defaulted template cards = %+v, want one card without the defaults", cards)
+	}
+}

@@ -102,11 +102,22 @@ func roundCards(text string) []SessionRoundCard {
 	return cards
 }
 
-// untilRule cuts seg at its first `---` line.
+// defaultsHeading is the heading gx-grilling puts over the questions it
+// decided unless the person objects. They are not cards.
+const defaultsHeading = "decided unless you object"
+
+// isDefaultsHeading reports whether line opens the defaults section, however
+// the agent dresses the heading (`#`, `**`, a trailing colon).
+func isDefaultsHeading(line string) bool {
+	line = strings.TrimLeft(strings.TrimSpace(line), "#* ")
+	return strings.HasPrefix(strings.ToLower(line), defaultsHeading)
+}
+
+// untilRule cuts seg at its first `---` line or defaults heading.
 func untilRule(seg string) string {
 	var kept []string
 	for line := range strings.SplitSeq(seg, "\n") {
-		if strings.TrimSpace(line) == "---" {
+		if strings.TrimSpace(line) == "---" || isDefaultsHeading(line) {
 			break
 		}
 		kept = append(kept, line)
