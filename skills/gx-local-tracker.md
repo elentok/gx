@@ -245,9 +245,9 @@ writes the statuses directly:
 A map epic seeded by gx-resolve-follow-ups carries **`destination_unconfirmed: true`** in its
 `ticket.md`: the Destination is a guess from the follow-ups, not yet confirmed. gx-design confirms
 it with the person, then clears the flag with `gx tickets set <project:epic> --destination-unconfirmed
-false`. Treat a map with the flag set as not ready to chart further. (The old name,
-`provisional_destination` and `--provisional-destination`, is a deprecated alias for one release;
-`gx tickets migrate` renames the field.)
+false`. Treat a map with the flag set as not ready to chart further. (The old field name,
+`provisional_destination`, is renamed by `gx tickets migrate`. The `--provisional-destination` flag
+is gone.)
 
 ### Wayfinding operations
 

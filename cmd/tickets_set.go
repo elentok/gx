@@ -152,7 +152,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 
 	// Epic address only (project:epic): the settable epic fields.
 	cmd.Flags().String("kind", "", "epic only: set kind (map or loop)")
-	addDestinationUnconfirmedFlags(cmd, "epic only: set destination_unconfirmed (true/false)")
+	cmd.Flags().String("destination-unconfirmed", "", "epic only: set destination_unconfirmed (true/false)")
 	cmd.Flags().String("design-step", "", "map epic only: set design_step ("+strings.Join(tickets.DesignSteps, ", ")+")")
 	cmd.Flags().Bool("allow-backward", false, "map epic only: allow --design-step to move to an earlier step")
 	for _, field := range tickets.EpicServerStamped {
@@ -164,18 +164,6 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().Bool("json", false, "emit {address, path, updated, via, actor} JSON instead of text")
 
 	return cmd
-}
-
-// legacyProvisionalDestinationFlag is the old name of --destination-unconfirmed,
-// kept as a deprecated alias for one release.
-const legacyProvisionalDestinationFlag = "provisional-destination"
-
-// addDestinationUnconfirmedFlags registers --destination-unconfirmed and its
-// deprecated alias on cmd.
-func addDestinationUnconfirmedFlags(cmd *cobra.Command, usage string) {
-	cmd.Flags().String("destination-unconfirmed", "", usage)
-	cmd.Flags().String(legacyProvisionalDestinationFlag, "", usage)
-	_ = cmd.Flags().MarkDeprecated(legacyProvisionalDestinationFlag, "use --destination-unconfirmed")
 }
 
 // runEpicSet is runTicketsSet for an epic's ticket.md, validated against the
@@ -208,14 +196,11 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 		update.Status = &v
 		changed = append(changed, "status="+v)
 	}
-	for _, flag := range []string{"destination-unconfirmed", legacyProvisionalDestinationFlag} {
-		if !c.Flags().Changed(flag) {
-			continue
-		}
-		v, _ := c.Flags().GetString(flag)
+	if c.Flags().Changed("destination-unconfirmed") {
+		v, _ := c.Flags().GetString("destination-unconfirmed")
 		b, err := strconv.ParseBool(v)
 		if err != nil {
-			return fmt.Errorf("%s: --%s %q: want true or false", ticketLabel(path), flag, v)
+			return fmt.Errorf("%s: --destination-unconfirmed %q: want true or false", ticketLabel(path), v)
 		}
 		update.DestinationUnconfirmed = &b
 		changed = append(changed, "destination_unconfirmed="+v)

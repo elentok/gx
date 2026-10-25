@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Removed the deprecated `--provisional-destination` flag. Use `--destination-unconfirmed`. `gx tickets migrate` still renames the old `provisional_destination` field.
+
 ## v0.37.0 - 2026-10-25
 
 - Added `gx brief`, a wrapper that runs tests and type checks and prints a short report instead of raw output.

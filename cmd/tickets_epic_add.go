@@ -109,7 +109,7 @@ func newTicketsEpicSetCmd(d deps) *cobra.Command {
 	}
 	cmd.Flags().String("kind", "", "set kind (map or loop)")
 	cmd.Flags().String("status", "", "set status (draft or open)")
-	addDestinationUnconfirmedFlags(cmd, "set destination_unconfirmed (true/false)")
+	cmd.Flags().String("destination-unconfirmed", "", "set destination_unconfirmed (true/false)")
 	cmd.Flags().String("blocked-by", "", "set blocked_by (comma-separated whole-epic tokens, e.g. other or project:other)")
 	cmd.Flags().Bool("json", false, "emit {address, path, updated, via, actor} JSON instead of text")
 	return cmd

@@ -42,15 +42,14 @@ func TestTicketsSet_EpicAddressWritesSettableFieldsAndKeepsTheRest(t *testing.T)
 	}
 }
 
-func TestTicketsSet_EpicAddressAcceptsDeprecatedProvisionalDestinationAlias(t *testing.T) {
+func TestTicketsSet_EpicAddressRejectsRemovedProvisionalDestinationFlag(t *testing.T) {
 	d, ticketMD := setupEpicSetProject(t)
 
-	if err := execute([]string{"tickets", "set", "mine:e", "--provisional-destination=true"}, d); err != nil {
-		t.Fatalf("set: %v", err)
+	if err := execute([]string{"tickets", "set", "mine:e", "--provisional-destination=true"}, d); err == nil {
+		t.Fatal("set --provisional-destination succeeded, want unknown-flag error")
 	}
-	raw, _ := os.ReadFile(ticketMD)
-	if !strings.Contains(string(raw), "destination_unconfirmed: true") || strings.Contains(string(raw), "provisional_destination") {
-		t.Errorf("ticket.md should carry only destination_unconfirmed:\n%s", raw)
+	if raw, _ := os.ReadFile(ticketMD); string(raw) != epicTicketMD {
+		t.Errorf("ticket.md changed:\n%s", raw)
 	}
 }
 
