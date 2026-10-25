@@ -1,5 +1,12 @@
 # AI Rules
 
+## Reading files
+
+The harness elides the middle of a long `Read` ("... (N lines omitted)"), and code you did not see
+gets edited blind. Read a whole file only when it is under 150 lines. Otherwise run `rg -n` first,
+then `Read` with `offset` and `limit` around the match. Use line numbers or symbols the ticket
+already names.
+
 ## Agent skills
 
 ### Issue tracker
