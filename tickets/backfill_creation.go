@@ -31,9 +31,9 @@ func BackfillTicketCreation(
 	origin func(rel string) (TicketOrigin, bool, error),
 	dryRun bool,
 ) ([]MigrationChange, error) {
-	return backfillFromHistory(epics, storeRoot, origin, dryRun,
-		func(t Ticket) bool { return !t.CreatedAt.IsZero() && t.OriginalAddress != "" },
-		func(t Ticket, o TicketOrigin) (notes []string, apply func(*schema.Ticket)) {
+	return backfillFromHistory(epics, storeRoot, origin, dryRun, backfillSpec{
+		skip: func(t Ticket) bool { return !t.CreatedAt.IsZero() && t.OriginalAddress != "" },
+		plan: func(t Ticket, o TicketOrigin) (notes []string, apply func(*schema.Ticket)) {
 			original, hasOriginal := originalAddressOf(o.Path)
 			if t.CreatedAt.IsZero() {
 				notes = append(notes, "created_at backfilled from store history")
@@ -49,7 +49,8 @@ func BackfillTicketCreation(
 					st.OriginalAddress = original
 				}
 			}
-		})
+		},
+	})
 }
 
 // BackfillCancelledAt stamps cancelled_at on every cancelled ticket of the
@@ -65,15 +66,16 @@ func BackfillCancelledAt(
 	cancelledIn func(rel string) (TicketOrigin, bool, error),
 	dryRun bool,
 ) ([]MigrationChange, error) {
-	return backfillFromHistory(epics, storeRoot, cancelledIn, dryRun,
-		func(t Ticket) bool { return !t.IsCancelled() || !t.CancelledAt.IsZero() },
-		func(_ Ticket, o TicketOrigin) ([]string, func(*schema.Ticket)) {
+	return backfillFromHistory(epics, storeRoot, cancelledIn, dryRun, backfillSpec{
+		skip: func(t Ticket) bool { return !t.IsCancelled() || !t.CancelledAt.IsZero() },
+		plan: func(_ Ticket, o TicketOrigin) ([]string, func(*schema.Ticket)) {
 			return []string{"cancelled_at backfilled from store history"}, func(st *schema.Ticket) {
 				if st.CancelledAt.IsZero() {
 					st.CancelledAt = o.day()
 				}
 			}
-		})
+		},
+	})
 }
 
 // day is the commit's time, or for the store's root commit, which predates the
@@ -85,22 +87,28 @@ func (o TicketOrigin) day() time.Time {
 	return o.At
 }
 
+// backfillSpec is what differs between the history backfills. skip passes over
+// tickets that need nothing. plan returns the notes to report (none means
+// nothing to do) and the stamp to write unless dryRun.
+type backfillSpec struct {
+	skip func(Ticket) bool
+	plan func(Ticket, TicketOrigin) ([]string, func(*schema.Ticket))
+}
+
 // backfillFromHistory is the shared walk of the two history backfills: for each
-// ticket not done(), it looks up the ticket's store history and asks plan what
-// to stamp. plan returns the notes to report (none means nothing to do) and the
-// stamp to write unless dryRun.
+// ticket spec does not skip, it looks up the ticket's store history and asks
+// spec.plan what to stamp.
 func backfillFromHistory(
 	epics []Epic,
 	storeRoot string,
 	lookup func(rel string) (TicketOrigin, bool, error),
 	dryRun bool,
-	done func(Ticket) bool,
-	plan func(Ticket, TicketOrigin) ([]string, func(*schema.Ticket)),
+	spec backfillSpec,
 ) ([]MigrationChange, error) {
 	var changes []MigrationChange
 	for _, epic := range epics {
 		for _, t := range epic.Tickets {
-			if done(t) {
+			if spec.skip(t) {
 				continue
 			}
 			rel, err := filepath.Rel(storeRoot, t.FilePath())
@@ -114,7 +122,7 @@ func backfillFromHistory(
 			if !ok {
 				continue
 			}
-			notes, stamp := plan(t, o)
+			notes, stamp := spec.plan(t, o)
 			if len(notes) == 0 {
 				continue
 			}
