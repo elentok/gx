@@ -79,9 +79,11 @@ interface PickerProps {
   projects: number;
   current?: string;
   onNew: () => void;
+  // Called when a design is clicked; the mobile picker uses it to close itself.
+  onSelect?: () => void;
 }
 
-function Picker({ groups, projects, current, onNew }: PickerProps) {
+function Picker({ groups, projects, current, onNew, onSelect }: PickerProps) {
   const [query, setQuery] = useState("");
   const filtering = query.trim() !== "";
   return (
@@ -116,6 +118,7 @@ function Picker({ groups, projects, current, onNew }: PickerProps) {
               label={r.row.name}
               href={rowHref(g.key, r.row)}
               current={r.row.address === current}
+              onClick={onSelect}
               marks={
                 <>
                   {projects > 1 && (
@@ -150,7 +153,7 @@ function MobilePicker({ groups, projects, current, onNew }: PickerProps) {
           </Text>
         )}
       </Box>
-      {open && <Picker groups={groups} projects={projects} current={current} onNew={onNew} />}
+      {open && <Picker groups={groups} projects={projects} current={current} onNew={onNew} onSelect={() => setOpen(false)} />}
     </Box>
   );
 }
