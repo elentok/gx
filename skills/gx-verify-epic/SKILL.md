@@ -23,7 +23,9 @@ Run `gx tickets validate <addr>` on the ticket first. If it fails, stop and fix 
   `gx tickets show <addr>`. Never open ticket files by path.
 - The round counter is a line `Round: N` at the top of the ticket body. No line means round 1.
 - The spec is `docs/specs/<epic-slug>.md`, then `<epic-dir>/spec.md`. Read only its User Stories and
-  Verification sections. If neither file exists, the epic's other tickets stand in for the spec.
+  Verification sections. Read them in full. Never cut the output with `head`, `tail` or a line limit,
+  and if the tool says lines were elided, read that range again. If neither file exists, the epic's
+  other tickets stand in for the spec.
 - Read the other tickets of the epic with `gx tickets show <addr>` to learn what was built.
   Their `## Spec deviations` bullets are deliberate, so do not report them as findings.
 - If the spec has no Verification section, derive one: for each user story, pick the catalog flows
@@ -54,8 +56,13 @@ The Verification section names the flows to run. As a backstop, also map the dif
 - Drive the browser by hand only for a gap no flow covers. Use text snapshots, not screenshots.
 - A harness failure (the fixture crashes, a flow fails for a reason unrelated to the epic, a
   selector is stale) is a finding, like any other.
+- Before you write a story's line, quote its text from your full read of the spec, and name the test
+  or check that covers it. Read that test or run that check; do not infer it from a file name. A
+  required check you skipped (such as a mutation check) leaves the story without a verdict.
 - Write one line per user story into the ticket body, under a `## Round N` heading:
-  `- Story <n>: pass` or `- Story <n>: fail, <what failed>`. Findings go below the lines. Write the
+  `- Story <n>: pass, <covering test or check>`, `- Story <n>: fail, <what failed>` or
+  `- Story <n>: unchecked, <why>`. Use `unchecked` when you named no covering test or check, or did
+  not run it. Never write `pass` for a story you did not read or verify. Findings go below the lines. Write the
   text to a scratchpad file with Write, then `gx tickets section <addr> "Round N" - < <file>`; never
   a heredoc, never edit the ticket file by path.
 
@@ -93,7 +100,7 @@ tickets for others.
   - what you did about findings: fixed inline (with the commit), tickets opened (with their
     addresses), or none
   - anything you skipped, such as stories left unchecked at the token limit
-- Clean round (every story passes, no findings): append the lines from step 4, then
+- Clean round (every story passes, none `unchecked`, no findings): append the lines from step 4, then
   `gx tickets set <addr> --iteration-status finished --commitless true`.
 - Inline fix: commit first. Report `finished` in a later tool call, with no `--commitless`.
 - Tickets opened: write the story lines and the findings into the body, then
