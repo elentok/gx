@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -458,5 +459,61 @@ func TestActions_WhichKeyListsThem(t *testing.T) {
 		if !strings.Contains(view, want) {
 			t.Fatalf("which-key lacks %q:\n%s", want, view)
 		}
+	}
+}
+
+// pickMenuItem runs the menu item labelled label for session id, as a pick,
+// and runs the call it starts.
+func pickMenuItem(t *testing.T, m Model, id, label string) {
+	t.Helper()
+	s := m.sessions[slices.IndexFunc(m.sessions, func(s server.SessionInfo) bool { return s.ID == id })]
+	i := slices.IndexFunc(sessionMenuItems(s), func(it contextmenu.Item[server.SessionInfo]) bool { return it.Label == label })
+	if i < 0 {
+		t.Fatalf("no menu item %q", label)
+	}
+	_, cmd := m.Update(sessionMenuItems(s)[i].Run(s)())
+	if cmd != nil {
+		cmd()
+	}
+}
+
+func TestActions_AutoAdvanceItemIsForDesignSessionsOnly(t *testing.T) {
+	has := func(s server.SessionInfo) bool {
+		return slices.ContainsFunc(sessionMenuItems(s), func(it contextmenu.Item[server.SessionInfo]) bool {
+			return strings.HasPrefix(it.Label, "Auto-advance")
+		})
+	}
+	for _, harness := range []string{"claude", "codex"} {
+		if !has(server.SessionInfo{ID: "d", Harness: harness, Design: true}) {
+			t.Errorf("%s Design session lacks the item", harness)
+		}
+	}
+	if has(server.SessionInfo{ID: "p", Harness: "claude"}) {
+		t.Error("plain session has the item")
+	}
+}
+
+func TestActions_AutoAdvanceItemFlipsTheSwitch(t *testing.T) {
+	for _, tc := range []struct {
+		on    bool
+		label string
+		want  string
+	}{{true, "Auto-advance: on", "auto-advance d false"}, {false, "Auto-advance: off", "auto-advance d true"}} {
+		f := &fakeSessionClient{}
+		m := openedModel(t, f, "", server.SessionInfo{ID: "d", Project: "gx", Design: true, AutoAdvance: tc.on, Status: idleStatus})
+		pickMenuItem(t, m, "d", tc.label)
+		if got := calls(f); !slices.Equal(got, []string{tc.want}) {
+			t.Errorf("calls = %v, want %q", got, tc.want)
+		}
+	}
+}
+
+func TestActions_CancelItemCancelsARunningCountdown(t *testing.T) {
+	at := time.Now().Add(5 * time.Second)
+	f := &fakeSessionClient{}
+	m := openedModel(t, f, "", server.SessionInfo{ID: "d", Project: "gx", Design: true, AutoAdvance: true, AutoAdvanceAt: &at, Status: idleStatus})
+	pickMenuItem(t, m, "d", "Cancel auto-advance")
+	if got := calls(f); !slices.Equal(got, []string{"cancel-auto-advance d"}) {
+		t.Errorf("calls = %v", got)
 	}
 }

@@ -102,9 +102,23 @@ func TestTerminal_HeaderShowsTimeSinceTheLastStatusChange(t *testing.T) {
 func TestTerminal_ActionableReasonWinsOverStatusDetail(t *testing.T) {
 	s := terminalSession(server.SessionStatus{State: server.SessionBlocked, Kind: "permission", Message: "Bash"})
 	s.Actionable = server.SessionActionable{Reason: "needs approval", Action: []string{"yes"}}
-	got := ansi.Strip(infoRow(s))
+	got := ansi.Strip(infoRow(s, time.Now()))
 	if got != "needs approval  <leader> a: yes" {
 		t.Fatalf("info row = %q", got)
+	}
+}
+
+func TestTerminal_InfoRowShowsTheCountdownAndCancel(t *testing.T) {
+	now := time.Now()
+	at := now.Add(7 * time.Second)
+	s := terminalSession(idleStatus)
+	s.Actionable = server.SessionActionable{Reason: "waiting", Action: []string{"Continue"}}
+	s.AutoAdvanceAt = &at
+	got := ansi.Strip(infoRow(s, now))
+	for _, want := range []string{"Continuing in 7s", "Cancel"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("info row %q lacks %q", got, want)
+		}
 	}
 }
 

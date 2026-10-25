@@ -172,13 +172,24 @@ func sessionMenuItems(s server.SessionInfo) []contextmenu.Item[server.SessionInf
 		}
 		return why
 	}
-	return []contextmenu.Item[server.SessionInfo]{
+	items := []contextmenu.Item[server.SessionInfo]{
 		item("Stop", "x", "x", reason(live, "exited")),
 		item("Restore session", "r", "r", reason(!live, "running")),
 		item("Remove", "d", "d", reason(!live, "running")),
 		item("Mark read", "", "mark-read", reason(s.Unread.Unread, "nothing unread")),
 		item("Run Action", "a", "a", reason(len(actionSteps(s.Actionable)) > 0, "no action")),
 	}
+	if s.Design {
+		label := "Auto-advance: off"
+		if s.AutoAdvance {
+			label = "Auto-advance: on"
+		}
+		items = append(items, item(label, "", "auto-advance", ""))
+		if s.AutoAdvanceAt != nil {
+			items = append(items, item("Cancel auto-advance", "", "cancel-auto-advance", ""))
+		}
+	}
+	return items
 }
 
 func (m Model) openMenu() (tea.Model, tea.Cmd) {
@@ -228,6 +239,13 @@ func (m Model) updateMenuPick(msg sessionMenuPickMsg) (tea.Model, tea.Cmd) {
 		return m.markReadSelected()
 	case "a":
 		return m.runActionSelected()
+	case "auto-advance":
+		s, _ := m.selected()
+		return m, sessionActionCmd("auto-advance", func(ctx context.Context, id string) (server.SessionResult, error) {
+			return m.client.SetAutoAdvance(ctx, id, !s.AutoAdvance)
+		}, s.ID)
+	case "cancel-auto-advance":
+		return m, sessionActionCmd("cancel auto-advance", m.client.CancelAutoAdvance, msg.id)
 	}
 	return m, nil
 }

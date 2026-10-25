@@ -121,7 +121,7 @@ func statusLabel(s server.SessionInfo) string {
 // terminalLines is the terminal panel body: the info row (then a blank row)
 // and the screen.
 func (m Model) terminalLines(s server.SessionInfo) []string {
-	lines := infoLines(s)
+	lines := infoLines(s, m.now())
 	live := m.attach
 	if live != nil && live.id != s.ID {
 		live = nil
@@ -170,7 +170,7 @@ func (m Model) terminalCursor() *tea.Cursor {
 func (m Model) screenOrigin() (x, y int) {
 	y = 1
 	if m.cursor < len(m.sessions) {
-		y += len(infoLines(m.sessions[m.cursor]))
+		y += len(infoLines(m.sessions[m.cursor], m.now()))
 	}
 	return m.width - m.mainWidth() + 1, y
 }
@@ -184,8 +184,8 @@ func (m Model) screenCell(mouse tea.Mouse) (x, y int, ok bool) {
 }
 
 // infoLines is the info row then a blank row, or none without an info row.
-func infoLines(s server.SessionInfo) []string {
-	if info := infoRow(s); info != "" {
+func infoLines(s server.SessionInfo, now time.Time) []string {
+	if info := infoRow(s, now); info != "" {
 		return []string{info, ""}
 	}
 	return nil
@@ -196,18 +196,24 @@ func infoLines(s server.SessionInfo) []string {
 func (m Model) screenSize() (cols, rows int) {
 	cols, rows = m.mainWidth()-2, m.height-1
 	if m.cursor < len(m.sessions) {
-		rows -= len(infoLines(m.sessions[m.cursor]))
+		rows -= len(infoLines(m.sessions[m.cursor], m.now()))
 	}
 	return max(cols, 1), max(rows, 1)
 }
 
 // infoRow is the Actionable reason with the prompts `<leader> a` would run,
-// else the status detail.
-func infoRow(s server.SessionInfo) string {
+// else the status detail. A running auto-advance countdown ends it, with the
+// way to cancel.
+func infoRow(s server.SessionInfo, now time.Time) string {
 	if s.Actionable.Reason != "" {
 		row := styleReason.Render(s.Actionable.Reason)
 		if len(s.Actionable.Action) > 0 {
 			row += styleAction.Render("  <leader> a: " + strings.Join(s.Actionable.Action, " → "))
+		}
+		if s.AutoAdvanceAt != nil {
+			left := max(s.AutoAdvanceAt.Sub(now), 0)
+			row += styleDetail.Render(fmt.Sprintf("  Continuing in %ds", int((left+time.Second-1)/time.Second)))
+			row += styleAction.Render("  Cancel: session menu (m)")
 		}
 		return row
 	}

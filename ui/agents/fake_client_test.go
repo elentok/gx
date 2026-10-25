@@ -63,6 +63,14 @@ func (f *fakeSessionClient) RunSessionAction(_ context.Context, id string) (serv
 	return f.record("action " + id)
 }
 
+func (f *fakeSessionClient) SetAutoAdvance(_ context.Context, id string, on bool) (server.SessionResult, error) {
+	return f.record("auto-advance " + id + " " + strconv.FormatBool(on))
+}
+
+func (f *fakeSessionClient) CancelAutoAdvance(_ context.Context, id string) (server.SessionResult, error) {
+	return f.record("cancel-auto-advance " + id)
+}
+
 func (f *fakeSessionClient) Snapshot(context.Context) (server.Snapshot, error) {
 	return f.snapshot, nil
 }
