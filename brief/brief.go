@@ -26,20 +26,14 @@ const (
 // Tool is one wrapped command.
 type Tool interface {
 	Name() string
-	// Command returns the executable and arguments for the caller's args.
-	Command(args []string) (name string, argv []string)
+	// Plan finds the executable and builds its arguments for the caller's
+	// args. The optional note is printed before the result. An error exits 2.
+	Plan(dir string, args []string) (exe string, argv []string, note string, err error)
 	// Parse reads the raw output of a run that exited with the given code.
 	Parse(out []byte, exit int) Outcome
 	// RerunArgs returns the caller's args changed to run only the failing
 	// tests, or nil when the failures cannot be re-run on their own.
 	RerunArgs(args []string, failures []Unit) []string
-}
-
-// Preparer is implemented by tools that find their own executable instead of
-// using PATH. Prepare returns its path, an optional note to print before the
-// result, or an error that exits 2.
-type Preparer interface {
-	Prepare(dir string, args []string) (exe, note string, err error)
 }
 
 // Outcome is what a tool found in the output of one run.
@@ -76,22 +70,16 @@ type indexEntry struct {
 // Run executes the tool and prints its report to o.Out. It returns the exit
 // code for the process.
 func Run(tool Tool, o Options) int {
-	name, argv := tool.Command(o.Args)
 	dir, err := filepath.Abs(o.Dir)
 	if err != nil {
 		return cantRun(o.Out, err.Error())
 	}
-	if p, ok := tool.(Preparer); ok {
-		exe, note, err := p.Prepare(dir, o.Args)
-		if err != nil {
-			return cantRun(o.Out, err.Error())
-		}
-		name = exe
-		if note != "" {
-			fmt.Fprintln(o.Out, note)
-		}
-	} else if _, err := exec.LookPath(name); err != nil {
-		return cantRun(o.Out, fmt.Sprintf("%s not found on PATH", name))
+	exe, argv, note, err := tool.Plan(dir, o.Args)
+	if err != nil {
+		return cantRun(o.Out, err.Error())
+	}
+	if note != "" {
+		fmt.Fprintln(o.Out, note)
 	}
 
 	start := time.Now()
@@ -104,28 +92,13 @@ func Run(tool Tool, o Options) int {
 	defer logFile.Close()
 	sweep(logDir, start)
 
-	var out bytes.Buffer
-	cmd := exec.Command(name, argv...)
-	cmd.Dir = dir
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	exit := 0
-	if err := runForwardingSignals(cmd); err != nil {
-		var ee *exec.ExitError
-		if !errors.As(err, &ee) {
-			return cantRun(o.Out, fmt.Sprintf("cannot run %s: %v", name, err))
-		}
-		exit = ee.ExitCode()
-		if exit < 0 { // killed by a signal
-			exit = ExitFail
-		}
+	out, exit, err := execute(exe, argv, dir)
+	if err != nil {
+		return cantRun(o.Out, err.Error())
 	}
 	elapsed := time.Since(start)
 
-	if _, err := logFile.Write(out.Bytes()); err != nil {
-		return cantRun(o.Out, "cannot write log: "+err.Error())
-	}
-	outcome := tool.Parse(out.Bytes(), exit)
+	outcome := tool.Parse(out, exit)
 	if exit != 0 {
 		outcome.Units = len(outcome.Failures)
 	}
@@ -139,16 +112,51 @@ func Run(tool Tool, o Options) int {
 		DurationMS: elapsed.Milliseconds(),
 		Log:        logPath,
 	}
-	if err := appendIndex(filepath.Join(logDir, "index.jsonl"), entry); err != nil {
-		return cantRun(o.Out, "cannot write index: "+err.Error())
+	if err := record(logFile, out, filepath.Join(logDir, "index.jsonl"), entry); err != nil {
+		return cantRun(o.Out, err.Error())
 	}
+	return report(tool, o, outcome, out, entry)
+}
 
-	dur := elapsed.Round(10 * time.Millisecond)
+// execute runs the command and returns its combined output and exit code.
+func execute(exe string, argv []string, dir string) (out []byte, exit int, err error) {
+	var buf bytes.Buffer
+	cmd := exec.Command(exe, argv...)
+	cmd.Dir = dir
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	if err := runForwardingSignals(cmd); err != nil {
+		var ee *exec.ExitError
+		if !errors.As(err, &ee) {
+			return nil, 0, fmt.Errorf("cannot run %s: %v", exe, err)
+		}
+		exit = ee.ExitCode()
+		if exit < 0 { // killed by a signal
+			exit = ExitFail
+		}
+	}
+	return buf.Bytes(), exit, nil
+}
+
+// record writes the raw output to the log and the entry to the index.
+func record(logFile *os.File, out []byte, indexPath string, e indexEntry) error {
+	if _, err := logFile.Write(out); err != nil {
+		return errors.New("cannot write log: " + err.Error())
+	}
+	if err := appendIndex(indexPath, e); err != nil {
+		return errors.New("cannot write index: " + err.Error())
+	}
+	return nil
+}
+
+// report prints the final lines of a run and returns the process exit code.
+func report(tool Tool, o Options, outcome Outcome, out []byte, e indexEntry) int {
+	dur := (time.Duration(e.DurationMS) * time.Millisecond).Round(10 * time.Millisecond)
 	switch {
-	case exit != 0:
+	case e.Exit != 0:
 		if len(outcome.Failures) == 0 {
-			fmt.Fprintf(o.Out, "FAIL %s: exit %d in %s\n", tool.Name(), exit, dur)
-			rawHead(o.Out, out.Bytes())
+			fmt.Fprintf(o.Out, "FAIL %s: exit %d in %s\n", tool.Name(), e.Exit, dur)
+			rawHead(o.Out, out)
 		} else {
 			fmt.Fprintf(o.Out, "FAIL %s: %d failed in %s\n", tool.Name(), len(outcome.Failures), dur)
 			renderUnits(o.Out, outcome.Failures)
@@ -156,12 +164,12 @@ func Run(tool Tool, o Options) int {
 				fmt.Fprintln(o.Out, rerunLine(tool.Name(), o.CDir, re))
 			}
 		}
-		fmt.Fprintln(o.Out, logPath)
+		fmt.Fprintln(o.Out, e.Log)
 		return ExitFail
 	case outcome.Units == 0:
-		fmt.Fprintf(o.Out, "PASS %s: no tests ran in %s\n%s\n", tool.Name(), dur, logPath)
+		fmt.Fprintf(o.Out, "PASS %s: no tests ran in %s\n%s\n", tool.Name(), dur, e.Log)
 	default:
-		fmt.Fprintf(o.Out, "PASS %s: %s in %s\n%s\n", tool.Name(), outcome.Summary, dur, logPath)
+		fmt.Fprintf(o.Out, "PASS %s: %s in %s\n%s\n", tool.Name(), outcome.Summary, dur, e.Log)
 	}
 	return ExitPass
 }

@@ -74,28 +74,23 @@ type Vitest struct{}
 
 func (Vitest) Name() string { return "vitest" }
 
-// Prepare finds the binary and refuses watch mode.
-func (Vitest) Prepare(dir string, args []string) (string, string, error) {
+// Plan finds the binary, refuses watch mode and runs vitest once with the JSON
+// reporter. `related` keeps its place as the subcommand.
+func (Vitest) Plan(dir string, args []string) (string, []string, string, error) {
 	for _, a := range args {
 		if a == "--watch" || a == "-w" || a == "--watch=true" {
-			return "", "", errors.New("vitest --watch is not supported; brief runs vitest once")
+			return "", nil, "", errors.New("vitest --watch is not supported; brief runs vitest once")
 		}
 	}
 	bin, err := findNodeBin(dir, "vitest")
 	if err != nil {
-		return "", "", err
+		return "", nil, "", err
 	}
+	rest, replaced := stripFlag(args, true, "reporter")
 	note := ""
-	if _, replaced := dropReporter(args); replaced {
+	if replaced {
 		note = "brief: --reporter replaced with json"
 	}
-	return bin, note, nil
-}
-
-// Command runs vitest once with the JSON reporter. `related` keeps its place
-// as the subcommand.
-func (Vitest) Command(args []string) (string, []string) {
-	rest, _ := dropReporter(args)
 	argv := []string{"run", "--reporter=json"}
 	if len(rest) > 0 {
 		switch rest[0] {
@@ -106,25 +101,7 @@ func (Vitest) Command(args []string) (string, []string) {
 			rest = rest[1:]
 		}
 	}
-	return "vitest", append(argv, rest...)
-}
-
-// dropReporter removes the caller's --reporter and reports whether there was one.
-func dropReporter(args []string) ([]string, bool) {
-	var out []string
-	replaced := false
-	for i := 0; i < len(args); i++ {
-		switch a := args[i]; {
-		case a == "--reporter":
-			i++ // its value
-			replaced = true
-		case strings.HasPrefix(a, "--reporter="):
-			replaced = true
-		default:
-			out = append(out, a)
-		}
-	}
-	return out, replaced
+	return bin, append(argv, rest...), note, nil
 }
 
 // Parse reads the test count and the failing tests from the JSON report. The
@@ -198,16 +175,7 @@ func (Vitest) RerunArgs(args []string, failures []Unit) []string {
 	if len(names) == 0 {
 		return nil
 	}
-	var re []string
-	for i := 0; i < len(args); i++ {
-		switch a := args[i]; {
-		case a == "-t" || a == "--testNamePattern":
-			i++ // its value
-		case strings.HasPrefix(a, "--testNamePattern="):
-		default:
-			re = append(re, a)
-		}
-	}
+	re, _ := stripFlag(args, true, "t", "testNamePattern")
 	return append(re, "-t", "^("+strings.Join(names, "|")+")$")
 }
 
@@ -216,11 +184,11 @@ type Tsc struct{}
 
 func (Tsc) Name() string { return "tsc" }
 
-// Prepare finds the binary and checks that there is a tsconfig to compile.
-func (Tsc) Prepare(dir string, args []string) (string, string, error) {
+// Plan finds the binary and checks that there is a tsconfig to compile.
+func (Tsc) Plan(dir string, args []string) (string, []string, string, error) {
 	bin, err := findNodeBin(dir, "tsc")
 	if err != nil {
-		return "", "", err
+		return "", nil, "", err
 	}
 	config := filepath.Join(dir, "tsconfig.json")
 	if i := slices.IndexFunc(args, func(a string) bool { return a == "-p" || a == "--project" }); i >= 0 && i+1 < len(args) {
@@ -233,13 +201,9 @@ func (Tsc) Prepare(dir string, args []string) (string, string, error) {
 		config = filepath.Join(config, "tsconfig.json")
 	}
 	if _, err := os.Stat(config); err != nil {
-		return "", "", fmt.Errorf("no tsconfig found at %s", config)
+		return "", nil, "", fmt.Errorf("no tsconfig found at %s", config)
 	}
-	return bin, "", nil
-}
-
-func (Tsc) Command(args []string) (string, []string) {
-	return "tsc", append([]string{"--pretty", "false"}, args...)
+	return bin, append([]string{"--pretty", "false"}, args...), "", nil
 }
 
 var tscDiagnostic = regexp.MustCompile(`^(.+?)(\(\d+,\d+\): (?:error|warning) TS\d+: .*)$`)
@@ -251,35 +215,39 @@ func (Tsc) Parse(out []byte, exit int) Outcome {
 	if exit == 0 {
 		return Outcome{Units: 1, Summary: "no type errors"}
 	}
-	var failures []Unit
-	byFile := map[string]int{}
-	counts := map[string]int{}
-	cur := -1
+	type fileErrors struct {
+		file   string
+		errors int
+		lines  []string
+	}
+	var files []*fileErrors
+	byFile := map[string]*fileErrors{}
+	var cur *fileErrors
 	for _, l := range strings.Split(string(out), "\n") {
 		l = strings.TrimRight(l, "\r")
 		if m := tscDiagnostic.FindStringSubmatch(l); m != nil {
-			i, ok := byFile[m[1]]
-			if !ok {
-				i = len(failures)
-				byFile[m[1]] = i
-				failures = append(failures, Unit{Location: m[1]})
+			f := byFile[m[1]]
+			if f == nil {
+				f = &fileErrors{file: m[1]}
+				byFile[m[1]] = f
+				files = append(files, f)
 			}
-			counts[m[1]]++
-			failures[i].Text += m[2] + "\n"
-			cur = i
-		} else if cur >= 0 && strings.HasPrefix(l, " ") {
-			failures[cur].Text += l + "\n"
+			f.errors++
+			f.lines = append(f.lines, m[2])
+			cur = f
+		} else if cur != nil && strings.HasPrefix(l, " ") {
+			cur.lines = append(cur.lines, l)
 		} else {
-			cur = -1
+			cur = nil
 		}
 	}
-	for i := range failures {
-		u := &failures[i]
-		u.Name = fmt.Sprintf("%d errors", counts[u.Location])
-		if counts[u.Location] == 1 {
-			u.Name = "1 error"
+	var failures []Unit
+	for _, f := range files {
+		name := fmt.Sprintf("%d errors", f.errors)
+		if f.errors == 1 {
+			name = "1 error"
 		}
-		u.Text = strings.TrimRight(u.Text, "\n")
+		failures = append(failures, Unit{Location: f.file, Name: name, Text: strings.Join(f.lines, "\n")})
 	}
 	return Outcome{Failures: failures}
 }

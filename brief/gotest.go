@@ -3,7 +3,9 @@ package brief
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"os/exec"
 	"regexp"
 	"slices"
 	"strings"
@@ -14,26 +16,17 @@ type GoTest struct{}
 
 func (GoTest) Name() string { return "go-test" }
 
-// Command always adds -json and -v, once. Flags after -args belong to the test
+// Plan always adds -json and -v, once. Flags after -args belong to the test
 // binary and pass through untouched.
-func (GoTest) Command(args []string) (string, []string) {
-	argv := []string{"test", "-json", "-v"}
-	rest := args
-	if i := slices.Index(args, "-args"); i >= 0 {
-		rest = args[:i]
+func (GoTest) Plan(_ string, args []string) (string, []string, string, error) {
+	exe, err := exec.LookPath("go")
+	if err != nil {
+		return "", nil, "", errors.New("go not found on PATH")
 	}
-	for i, a := range args {
-		if i >= len(rest) {
-			argv = append(argv, a)
-			continue
-		}
-		switch a {
-		case "-json", "-v", "-json=true", "-v=true":
-		default:
-			argv = append(argv, a)
-		}
-	}
-	return "go", argv
+	rest, tail := splitArgs(args)
+	rest, _ = stripFlag(rest, false, "json", "v")
+	argv := append([]string{"test", "-json", "-v"}, rest...)
+	return exe, append(argv, tail...), "", nil
 }
 
 type goTestEvent struct {
@@ -162,20 +155,8 @@ func (GoTest) RerunArgs(args []string, failures []Unit) []string {
 	}
 	pattern := "^(" + strings.Join(names, "|") + ")$"
 
-	rest, tail := args, []string(nil)
-	if i := slices.Index(args, "-args"); i >= 0 {
-		rest, tail = args[:i], args[i:]
-	}
-	var re []string
-	for i := 0; i < len(rest); i++ {
-		switch a := rest[i]; {
-		case a == "-run" || a == "--run":
-			i++ // its value
-		case strings.HasPrefix(a, "-run=") || strings.HasPrefix(a, "--run="):
-		default:
-			re = append(re, a)
-		}
-	}
+	rest, tail := splitArgs(args)
+	re, _ := stripFlag(rest, true, "run")
 	re = append(re, "-run", pattern)
 	return append(re, tail...)
 }
