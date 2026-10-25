@@ -123,7 +123,10 @@ The consultant only advises: it must not edit anything. Its output is the input 
 
 For every finding the consultant approved, call the `gx-to-tickets` skill, targeting the current
 epic, with the approved findings (one ticket per independent finding, grouped when several findings
-name the same fix) as the input spec instead of a plan/spec document. Follow gx-to-tickets's own
+name the same fix) as the input spec instead of a plan/spec document. Before filing, merge every
+small fix (about 10 changed lines or fewer, whether code, docs, skill text or comments) with its
+neighbours in the same area into one ticket: each ticket pays the full start-up context of a new
+session, which costs more than a few lines of change. Follow gx-to-tickets's own
 process, skipping its step 5 (quiz the user) since this runs unattended — publish the drafted
 breakdown directly, same as any other unattended `gx-to-tickets` run.
 
