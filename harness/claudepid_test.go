@@ -503,3 +503,51 @@ func TestPidWatcher_HoldFreezesStatus(t *testing.T) {
 		t.Fatalf("released: Status = %+v, want Idle", got)
 	}
 }
+
+func writePidFileAs(t *testing.T, dir string, pid int, startedAt time.Time, fields string) {
+	t.Helper()
+	data := fmt.Sprintf(`{"pid":%d,"sessionId":"conv-1","startedAt":%d%s}`, pid, startedAt.UnixMilli(), fields)
+	if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.json", pid)), []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPidWatcher_FollowsWrappedClaude(t *testing.T) {
+	dir := t.TempDir()
+	spawned := time.Now()
+	w := newPidWatcher(dir, 4242, spawned)
+	psRuns := 0
+	// 4242 is the wrapper on PATH; it runs 4300, which runs claude as 5000.
+	// 6000 is another claude, not below the wrapper.
+	w.parents = func() (map[int]int, error) {
+		psRuns++
+		return map[int]int{4300: 4242, 5000: 4300, 6000: 1}, nil
+	}
+
+	writePidFileAs(t, dir, 6000, spawned, `,"status":"idle"`)
+	w.poll()
+	if s, _ := w.PidState(); s != nil {
+		t.Fatalf("another claude's file read as %+v", *s)
+	}
+	clock := spawned.Add(time.Minute)
+	w.now = func() time.Time { return clock }
+	w.poll()
+	if psRuns != 1 {
+		t.Fatalf("ps ran %d times for one rejected file, want 1", psRuns)
+	}
+
+	writePidFileAs(t, dir, 5000, spawned, `,"status":"busy"`)
+	clock = clock.Add(time.Minute)
+	w.poll()
+	if got := w.Status(); got.State != Working {
+		t.Fatalf("grandchild busy: Status = %+v, want Working", got)
+	}
+	writePidFileAs(t, dir, 5000, spawned, `,"status":"idle"`)
+	w.poll()
+	if got := w.Status(); got.State != Idle {
+		t.Fatalf("grandchild idle: Status = %+v, want Idle", got)
+	}
+	if psRuns != 2 {
+		t.Fatalf("ps ran %d times, want 2: the found file is followed without a search", psRuns)
+	}
+}

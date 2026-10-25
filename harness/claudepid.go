@@ -3,8 +3,10 @@ package harness
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -83,7 +85,10 @@ func claudeConfigDirs() (configDir, globalDir string, err error) {
 // changes as turns, its OSC 7501 reports and its transcript's rate limits. It
 // is the claude harness's Watcher.
 type PidWatcher struct {
+	// path is the spawned pid's file until a descendant's is found.
 	path        string
+	pid         int
+	sessionsDir string
 	projectsDir string
 	// notBefore is the earliest startedAt, in Unix ms, of a file to trust.
 	notBefore int64
@@ -93,6 +98,19 @@ type PidWatcher struct {
 	inputBox func() bool
 	now      func() time.Time
 	find     func(projectsDir, conversationID string) ([]string, error)
+	// parents maps each running pid to its parent pid.
+	parents func() (map[int]int, error)
+
+	// found latches once a trusted file is read; the search stops there.
+	found bool
+	// descendant is the search for the file of a claude that a wrapper on
+	// PATH runs below the spawned pid. Only poll touches it.
+	descendant struct {
+		// rejected are pids whose fresh file is not ours.
+		rejected   map[int]bool
+		searchGap  time.Duration
+		nextSearch time.Time
+	}
 
 	// transcript is read only when its size changes; poll alone touches it.
 	transcript struct {
@@ -140,10 +158,13 @@ const pidStartSlack = 2 * time.Second
 func newPidWatcher(sessionsDir string, pid int, spawned time.Time) *PidWatcher {
 	return &PidWatcher{
 		path:        filepath.Join(sessionsDir, strconv.Itoa(pid)+".json"),
+		pid:         pid,
+		sessionsDir: sessionsDir,
 		projectsDir: filepath.Join(filepath.Dir(sessionsDir), "projects"),
 		notBefore:   spawned.Add(-pidStartSlack).UnixMilli(),
 		now:         time.Now,
 		find:        transcript.FindByIDIn,
+		parents:     processParents,
 	}
 }
 
@@ -164,18 +185,17 @@ func (w *PidWatcher) watch(stop <-chan struct{}) {
 // poll keeps the last status when the file is gone or half-written: claude
 // deletes it on a clean exit and rewrites it in place.
 func (w *PidWatcher) poll() {
-	data, err := os.ReadFile(w.path)
-	if err != nil {
+	f, ok := w.read(w.path)
+	if !ok && !w.found {
+		var path string
+		if path, f, ok = w.findDescendant(); ok {
+			w.path = path
+		}
+	}
+	if !ok {
 		return
 	}
-	var f struct {
-		PidStatus
-		SessionID string `json:"sessionId"`
-		StartedAt int64  `json:"startedAt"`
-	}
-	if json.Unmarshal(data, &f) != nil || f.StartedAt < w.notBefore {
-		return
-	}
+	w.found = true
 	s := f.PidStatus
 	w.mu.Lock()
 	changed := !w.live.seen || s != w.live.last || f.SessionID != w.live.conversationID
@@ -198,6 +218,132 @@ func (w *PidWatcher) poll() {
 		w.changed()
 	}
 	w.pollTranscript(f.SessionID)
+}
+
+type pidFile struct {
+	PidStatus
+	SessionID string `json:"sessionId"`
+	StartedAt int64  `json:"startedAt"`
+}
+
+// read reports false for a file that is missing, half-written or older than
+// the spawn.
+func (w *PidWatcher) read(path string) (pidFile, bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return pidFile{}, false
+	}
+	var f pidFile
+	if json.Unmarshal(data, &f) != nil || f.StartedAt < w.notBefore {
+		return pidFile{}, false
+	}
+	return f, true
+}
+
+// descendantSearchCap is the longest gap between searches for a descendant's
+// pid file.
+const descendantSearchCap = time.Second
+
+// findDescendant finds the file of a claude that a wrapper started as a child
+// or grandchild of the spawned pid. claude names the file after its own pid,
+// so the spawned pid's file never appears. A search reads only files written
+// since the spawn and runs ps only when one of them is new; it backs off so a
+// session that never writes a file costs little.
+func (w *PidWatcher) findDescendant() (string, pidFile, bool) {
+	d := &w.descendant
+	now := w.now()
+	if now.Before(d.nextSearch) {
+		return "", pidFile{}, false
+	}
+	if path, f, ok := w.searchDescendant(); ok {
+		return path, f, true
+	}
+	d.searchGap = min(max(2*d.searchGap, pidStatusPoll), descendantSearchCap)
+	d.nextSearch = now.Add(d.searchGap)
+	return "", pidFile{}, false
+}
+
+func (w *PidWatcher) searchDescendant() (string, pidFile, bool) {
+	entries, err := os.ReadDir(w.sessionsDir)
+	if err != nil {
+		return "", pidFile{}, false
+	}
+	type candidate struct {
+		pid  int
+		path string
+		f    pidFile
+	}
+	var candidates []candidate
+	for _, e := range entries {
+		name, ok := strings.CutSuffix(e.Name(), ".json")
+		pid, err := strconv.Atoi(name)
+		if !ok || err != nil || pid == w.pid || w.descendant.rejected[pid] {
+			continue
+		}
+		info, err := e.Info()
+		if err != nil || info.ModTime().UnixMilli() < w.notBefore {
+			continue
+		}
+		path := filepath.Join(w.sessionsDir, e.Name())
+		if f, ok := w.read(path); ok {
+			candidates = append(candidates, candidate{pid, path, f})
+		}
+	}
+	if len(candidates) == 0 {
+		return "", pidFile{}, false
+	}
+	parents, err := w.parents()
+	if err != nil {
+		return "", pidFile{}, false
+	}
+	for _, c := range candidates {
+		if descends(parents, c.pid, w.pid) {
+			return c.path, c.f, true
+		}
+		if w.descendant.rejected == nil {
+			w.descendant.rejected = map[int]bool{}
+		}
+		w.descendant.rejected[c.pid] = true
+	}
+	return "", pidFile{}, false
+}
+
+// descends reports whether pid is below ancestor in parents.
+func descends(parents map[int]int, pid, ancestor int) bool {
+	// The cap stops a cycle a ps snapshot taken mid-fork could show.
+	for range 64 {
+		ppid, ok := parents[pid]
+		if !ok || ppid <= 1 {
+			return false
+		}
+		if ppid == ancestor {
+			return true
+		}
+		pid = ppid
+	}
+	return false
+}
+
+// processParents reads the process table with ps, which works the same on
+// macOS and Linux and needs no cgo.
+func processParents() (map[int]int, error) {
+	out, err := exec.Command("ps", "-A", "-o", "pid=,ppid=").Output()
+	if err != nil {
+		return nil, err
+	}
+	parents := map[int]int{}
+	for line := range strings.Lines(string(out)) {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		pid, err1 := strconv.Atoi(fields[0])
+		ppid, err2 := strconv.Atoi(fields[1])
+		if err1 == nil && err2 == nil {
+			parents[pid] = ppid
+		}
+	}
+	return parents, nil
 }
 
 func (w *PidWatcher) OnChange(f func()) {
