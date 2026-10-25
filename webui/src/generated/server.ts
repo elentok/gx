@@ -1211,14 +1211,6 @@ export interface CreateSessionRequest {
   rows?: number /* int */;
 }
 /**
- * SessionRequest names the session a stop or remove acts on. State is the
- * token the web sends with a stop or Restore; see SessionStateToken.
- */
-export interface SessionRequest {
-  id: string;
-  state?: string;
-}
-/**
  * SessionResult is a session write's outcome: the session, or a refusal.
  */
 export interface SessionResult {
@@ -1244,8 +1236,31 @@ export interface SessionScreenResponse {
 }
 
 //////////
+// source: sessionstate.go
+
+/**
+ * SessionRequest names the session a stop or remove acts on. State is the
+ * token the web sends with a stop or Restore; see SessionStateToken. Only the
+ * web mux checks it (see checkDesignWrite): the plain mux ignores State, and on
+ * the web mux an empty State never matches a token, so it is refused as stale.
+ */
+export interface SessionRequest {
+  id: string;
+  state?: string;
+}
+
+//////////
 // source: stats.go
 
+/**
+ * The ranges the stats page offers, in days. The web UI reads them from the
+ * generated types. They stay separate declarations: tygo turns a const block
+ * into a union type named after the block.
+ */
+export const StatsRangeWeek = 7;
+export const StatsRangeMonth = 30;
+export const StatsRangeQuarter = 90;
+export const StatsDefaultRange = StatsRangeMonth;
 /**
  * StatsAmount is one day of a token or spend series. NoData marks a day that
  * had finished items and none carried a stamp; Value is then 0.

@@ -20,6 +20,7 @@ packages:
       - sessionprompt.go
       - sessionround.go
       - sessionscreen.go
+      - sessionstate.go
       - sessions.go
       - stats.go
       - verdicts.go

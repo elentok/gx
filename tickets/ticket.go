@@ -192,6 +192,15 @@ func (t Ticket) IsDone() bool {
 	return doneStatuses[strings.ToLower(strings.TrimSpace(t.Status))]
 }
 
+// FinishedAt is when the ticket ended: done_at, else cancelled_at. It is the
+// zero time while the ticket is still open.
+func (t Ticket) FinishedAt() time.Time {
+	if t.DoneAt.IsZero() {
+		return t.CancelledAt
+	}
+	return t.DoneAt
+}
+
 // FilePath is the ticket's markdown file: File when set, else Path.
 func (t Ticket) FilePath() string {
 	if t.File != "" {

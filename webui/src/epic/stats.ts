@@ -29,21 +29,24 @@ const topCounts = (counts: Record<string, number> = {}, limit = Infinity) =>
 export function statRows(d: EpicDetail): StatRow[] {
   const { stats: s } = d;
   const f = s.friction;
-  const rows: (StatRow | undefined)[] = [
-    s.lines_added === undefined ? undefined : { label: "Lines", value: `+${s.lines_added.toLocaleString("en-US")} −${(s.lines_removed ?? 0).toLocaleString("en-US")}` },
-    s.total_tokens === undefined ? undefined : { label: "Tokens", value: formatTokens(s.total_tokens) },
-    s.cost === undefined ? undefined : { label: "Cost", value: formatCost(s.cost) },
-    s.lead_time === undefined
-      ? undefined
-      : {
-          label: "Lead time",
-          value: s.lead_time_so_far ? `${formatLead(s.lead_time)} so far` : formatLead(s.lead_time),
-          note: d.kind === "map" || s.lead_time_so_far ? undefined : "created → merged to trunk",
-        },
-    f && { label: "Pauses", value: String(sum(f.pauses_by_reason)), note: topCounts(f.pauses_by_reason, TOP_REASONS) || undefined },
-    f && { label: "Run events", value: String(sum(f.run_events)), note: topCounts(f.run_events) || undefined },
-    f && { label: "Paused time", value: formatDuration(f.paused_secs) },
-    f?.web_share === undefined ? undefined : { label: "Pause endings", value: `${Math.round(f.web_share * 100)}% web` },
-  ];
-  return rows.filter((r): r is StatRow => r !== undefined);
+  const rows: StatRow[] = [];
+  if (s.lines_added !== undefined) {
+    rows.push({ label: "Lines", value: `+${s.lines_added.toLocaleString("en-US")} −${(s.lines_removed ?? 0).toLocaleString("en-US")}` });
+  }
+  if (s.total_tokens !== undefined) rows.push({ label: "Tokens", value: formatTokens(s.total_tokens) });
+  if (s.cost !== undefined) rows.push({ label: "Cost", value: formatCost(s.cost) });
+  if (s.lead_time !== undefined) {
+    rows.push({
+      label: "Lead time",
+      value: s.lead_time_so_far ? `${formatLead(s.lead_time)} so far` : formatLead(s.lead_time),
+      note: d.kind === "map" || s.lead_time_so_far ? undefined : "created → merged to trunk",
+    });
+  }
+  if (f) {
+    rows.push({ label: "Pauses", value: String(sum(f.pauses_by_reason)), note: topCounts(f.pauses_by_reason, TOP_REASONS) || undefined });
+    rows.push({ label: "Run events", value: String(sum(f.run_events)), note: topCounts(f.run_events) || undefined });
+    rows.push({ label: "Paused time", value: formatDuration(f.paused_secs) });
+    if (f.web_share !== undefined) rows.push({ label: "Pause endings", value: `${Math.round(f.web_share * 100)}% web` });
+  }
+  return rows;
 }
