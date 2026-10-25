@@ -31,56 +31,25 @@ func BackfillTicketCreation(
 	origin func(rel string) (TicketOrigin, bool, error),
 	dryRun bool,
 ) ([]MigrationChange, error) {
-	var changes []MigrationChange
-	for _, epic := range epics {
-		for _, t := range epic.Tickets {
-			if !t.CreatedAt.IsZero() && t.OriginalAddress != "" {
-				continue
-			}
-			rel, err := filepath.Rel(storeRoot, t.FilePath())
-			if err != nil {
-				return changes, err
-			}
-			o, ok, err := origin(filepath.ToSlash(rel))
-			if err != nil {
-				return changes, fmt.Errorf("history of %s: %w", t.FilePath(), err)
-			}
-			if !ok {
-				continue
-			}
-			created := o.At
-			if o.Root {
-				created = o.At.UTC().Truncate(24 * time.Hour)
-			}
+	return backfillFromHistory(epics, storeRoot, origin, dryRun,
+		func(t Ticket) bool { return !t.CreatedAt.IsZero() && t.OriginalAddress != "" },
+		func(t Ticket, o TicketOrigin) (notes []string, apply func(*schema.Ticket)) {
 			original, hasOriginal := originalAddressOf(o.Path)
-
-			var notes []string
 			if t.CreatedAt.IsZero() {
 				notes = append(notes, "created_at backfilled from store history")
 			}
 			if t.OriginalAddress == "" && hasOriginal {
 				notes = append(notes, "original address backfilled from store history")
 			}
-			if len(notes) == 0 {
-				continue
-			}
-			if !dryRun {
-				err = schema.UpdateTicket(t.FilePath(), func(st *schema.Ticket) {
-					if st.CreatedAt.IsZero() {
-						st.CreatedAt = created
-					}
-					if st.OriginalAddress == "" && hasOriginal {
-						st.OriginalAddress = original
-					}
-				})
-				if err != nil {
-					return changes, err
+			return notes, func(st *schema.Ticket) {
+				if st.CreatedAt.IsZero() {
+					st.CreatedAt = o.day()
+				}
+				if st.OriginalAddress == "" && hasOriginal {
+					st.OriginalAddress = original
 				}
 			}
-			changes = append(changes, MigrationChange{Path: t.FilePath(), Notes: notes})
-		}
-	}
-	return changes, nil
+		})
 }
 
 // BackfillCancelledAt stamps cancelled_at on every cancelled ticket of the
@@ -96,41 +65,65 @@ func BackfillCancelledAt(
 	cancelledIn func(rel string) (TicketOrigin, bool, error),
 	dryRun bool,
 ) ([]MigrationChange, error) {
+	return backfillFromHistory(epics, storeRoot, cancelledIn, dryRun,
+		func(t Ticket) bool { return !t.IsCancelled() || !t.CancelledAt.IsZero() },
+		func(_ Ticket, o TicketOrigin) ([]string, func(*schema.Ticket)) {
+			return []string{"cancelled_at backfilled from store history"}, func(st *schema.Ticket) {
+				if st.CancelledAt.IsZero() {
+					st.CancelledAt = o.day()
+				}
+			}
+		})
+}
+
+// day is the commit's time, or for the store's root commit, which predates the
+// store, only its day.
+func (o TicketOrigin) day() time.Time {
+	if o.Root {
+		return o.At.UTC().Truncate(24 * time.Hour)
+	}
+	return o.At
+}
+
+// backfillFromHistory is the shared walk of the two history backfills: for each
+// ticket not done(), it looks up the ticket's store history and asks plan what
+// to stamp. plan returns the notes to report (none means nothing to do) and the
+// stamp to write unless dryRun.
+func backfillFromHistory(
+	epics []Epic,
+	storeRoot string,
+	lookup func(rel string) (TicketOrigin, bool, error),
+	dryRun bool,
+	done func(Ticket) bool,
+	plan func(Ticket, TicketOrigin) ([]string, func(*schema.Ticket)),
+) ([]MigrationChange, error) {
 	var changes []MigrationChange
 	for _, epic := range epics {
 		for _, t := range epic.Tickets {
-			if !t.IsCancelled() || !t.CancelledAt.IsZero() {
+			if done(t) {
 				continue
 			}
 			rel, err := filepath.Rel(storeRoot, t.FilePath())
 			if err != nil {
 				return changes, err
 			}
-			o, ok, err := cancelledIn(filepath.ToSlash(rel))
+			o, ok, err := lookup(filepath.ToSlash(rel))
 			if err != nil {
 				return changes, fmt.Errorf("history of %s: %w", t.FilePath(), err)
 			}
 			if !ok {
 				continue
 			}
-			cancelled := o.At
-			if o.Root {
-				cancelled = o.At.UTC().Truncate(24 * time.Hour)
+			notes, stamp := plan(t, o)
+			if len(notes) == 0 {
+				continue
 			}
 			if !dryRun {
-				err = schema.UpdateTicket(t.FilePath(), func(st *schema.Ticket) {
-					if st.CancelledAt.IsZero() {
-						st.CancelledAt = cancelled
-					}
-				})
-				if err != nil {
+				if err := schema.UpdateTicket(t.FilePath(), stamp); err != nil {
 					return changes, err
 				}
 			}
-			changes = append(changes, MigrationChange{
-				Path:  t.FilePath(),
-				Notes: []string{"cancelled_at backfilled from store history"},
-			})
+			changes = append(changes, MigrationChange{Path: t.FilePath(), Notes: notes})
 		}
 	}
 	return changes, nil

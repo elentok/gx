@@ -59,7 +59,10 @@ func TestExecute_TicketsMigrate_BackfillsTicketTokensAndCost(t *testing.T) {
 		}
 		return stdout.String()
 	}
-	run()
+	out := run()
+	if !strings.Contains(out, "skipped: unreadable transcript") || strings.Count(out, "skipped: unreadable transcript") != 1 {
+		t.Errorf("want exactly one skip note, for the unreadable ticket:\n%s", out)
+	}
 
 	load := func(name string) tickets.Ticket {
 		t.Helper()

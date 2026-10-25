@@ -219,8 +219,9 @@ func readFoundSessionStats(ref SessionRef) (sessionStats, AgentKind, error) {
 // SessionIDsTotals sums the total tokens and cost of the Claude sessions in
 // ids, finding each transcript by id alone: the worktree a session ran in may
 // be gone. All-or-nothing, like SessionsTotals; an id with no transcript, or
-// with several, is an error.
-func SessionIDsTotals(ids []string) (tokens int, cost float64, err error) {
+// with several, wraps tickets.ErrUnreadable; so does one that cannot be parsed.
+// Any other error is a real I/O failure.
+func SessionIDsTotals(ids []string) (tokens int64, cost float64, err error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return 0, 0, err
@@ -235,18 +236,18 @@ func SessionIDsTotals(ids []string) (tokens int, cost float64, err error) {
 			return sessionStats{}, ref.Agent, err
 		}
 		if len(matches) != 1 {
-			return sessionStats{}, ref.Agent, fmt.Errorf("%d transcripts found", len(matches))
+			return sessionStats{}, ref.Agent, fmt.Errorf("%d transcripts found: %w", len(matches), tickets.ErrUnreadable)
 		}
 		stats, err := readTranscriptStats(matches[0])
 		if err != nil {
-			return sessionStats{}, ref.Agent, err
+			return sessionStats{}, ref.Agent, fmt.Errorf("%w: %w", tickets.ErrUnreadable, err)
 		}
 		if !stats.ok {
-			return sessionStats{}, ref.Agent, errors.New("transcript not readable")
+			return sessionStats{}, ref.Agent, tickets.ErrUnreadable
 		}
 		return stats, ref.Agent, nil
 	})
-	return sum.tokens, sum.cost, err
+	return int64(sum.tokens), sum.cost, err
 }
 
 // SessionCost returns the estimated API-equivalent cost of the Claude Code

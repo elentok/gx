@@ -1,17 +1,23 @@
 package tickets
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// ErrUnreadable marks a session transcript that is missing, ambiguous or cannot
+// be parsed. BackfillTicketTotals skips such a ticket; any other error from
+// totals aborts the backfill.
+var ErrUnreadable = errors.New("unreadable transcript")
+
 // BackfillTicketTotals stamps total_tokens and actual_cost on every done
 // ticket under root that lacks total_tokens, so a merged epic's sums can use
-// them. totals sums the sessions' tokens and cost and fails unless every
-// transcript can be read; such a ticket stays as it is, old actual_cost
-// included. conflictSessions gives the sessions the run log recorded for the
+// them. totals sums the sessions' tokens and cost and fails with ErrUnreadable
+// unless every transcript can be read; such a ticket stays as it is, old
+// actual_cost included, and is reported as skipped. conflictSessions gives the sessions the run log recorded for the
 // conflicts of an epic's ticket: a conflict-resolution child never recorded its
 // own, so it takes its parent's. A ticket with no sessions stamps zero only when
 // it is commitless or was done by hand (never claimed), and stays unstamped
@@ -45,8 +51,14 @@ func BackfillTicketTotals(
 				if !st.IsCommitless() && !st.ClaimedAt.IsZero() {
 					continue
 				}
-			} else if tokens, cost, err = totals(ids); err != nil {
+			} else if tokens, cost, err = totals(ids); errors.Is(err, ErrUnreadable) {
+				changes = append(changes, MigrationChange{
+					Path:  t.FilePath(),
+					Notes: []string{"skipped: unreadable transcript"},
+				})
 				continue
+			} else if err != nil {
+				return changes, fmt.Errorf("totals of %s: %w", t.FilePath(), err)
 			}
 			err = schema.UpdateTicket(t.FilePath(), func(st *schema.Ticket) {
 				st.TotalTokens = &tokens

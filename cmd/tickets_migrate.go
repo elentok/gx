@@ -86,10 +86,9 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		for _, s := range steps {
 			fmt.Fprintf(w, "%s: %s\n", s.Path, s.Note())
 		}
-		for _, c := range append(mapsDone, created...) {
-			fmt.Fprintf(w, "%s: %s\n", c.Path, strings.Join(c.Notes, ", "))
-		}
-		fmt.Fprintf(w, "%d file(s) would change\n", len(steps)+len(mapsDone)+len(created))
+		changes := slices.Concat(mapsDone, created)
+		printChanges(w, changes)
+		fmt.Fprintf(w, "%d file(s) would change\n", len(steps)+len(changes))
 		return nil
 	}
 	result, err := tickets.Migrate(scratchRoot)
@@ -105,7 +104,7 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 	}
 	if err == nil {
 		var stamped []tickets.MigrationChange
-		stamped, err = tickets.BackfillTicketTotals(scratchRoot, ticketSessionTotals, conflictSessionsUnder(scratchRoot))
+		stamped, err = tickets.BackfillTicketTotals(scratchRoot, ralphloop.SessionIDsTotals, conflictSessionsUnder(scratchRoot))
 		changes = mergeChanges(changes, stamped)
 	}
 	if err == nil {
@@ -154,11 +153,16 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		return nil
 	}
 
-	for _, change := range changes {
-		fmt.Fprintf(w, "%s: %s\n", change.Path, strings.Join(change.Notes, ", "))
-	}
+	printChanges(w, changes)
 	fmt.Fprintf(w, "%d file(s) changed\n", len(changes))
 	return err
+}
+
+// printChanges writes one "<path>: <notes>" line per change.
+func printChanges(w io.Writer, changes []tickets.MigrationChange) {
+	for _, c := range changes {
+		fmt.Fprintf(w, "%s: %s\n", c.Path, strings.Join(c.Notes, ", "))
+	}
 }
 
 // designProbeUnder is the trunk checkout and repo of the project at root, for
@@ -183,10 +187,9 @@ func backfillTicketCreation(root string, dryRun bool) ([]tickets.MigrationChange
 	if err != nil || epics == nil {
 		return nil, err
 	}
-	created, err := tickets.BackfillTicketCreation(epics, storeRoot, func(rel string) (tickets.TicketOrigin, bool, error) {
-		o, ok, err := git.FirstCommitOfFile(storeRoot, rel)
-		return tickets.TicketOrigin{Path: o.Path, At: o.At, Root: o.Root}, ok, err
-	}, dryRun)
+	created, err := tickets.BackfillTicketCreation(epics, storeRoot, ticketOrigin(func(rel string) (git.FileOrigin, bool, error) {
+		return git.FirstCommitOfFile(storeRoot, rel)
+	}), dryRun)
 	if err != nil {
 		return created, err
 	}
@@ -195,11 +198,18 @@ func backfillTicketCreation(root string, dryRun bool) ([]tickets.MigrationChange
 	if err != nil {
 		return created, err
 	}
-	cancelled, err := tickets.BackfillCancelledAt(epics, storeRoot, func(rel string) (tickets.TicketOrigin, bool, error) {
-		o, ok, err := git.LastCommitChangingLine(storeRoot, rel, "^status: cancelled$")
-		return tickets.TicketOrigin{Path: o.Path, At: o.At, Root: o.Root}, ok, err
-	}, dryRun)
+	cancelled, err := tickets.BackfillCancelledAt(epics, storeRoot, ticketOrigin(func(rel string) (git.FileOrigin, bool, error) {
+		return git.LastCommitChangingLine(storeRoot, rel, "^status: cancelled$")
+	}), dryRun)
 	return mergeChanges(created, cancelled), err
+}
+
+// ticketOrigin adapts a git history lookup to the origin func the backfills take.
+func ticketOrigin(lookup func(rel string) (git.FileOrigin, bool, error)) func(string) (tickets.TicketOrigin, bool, error) {
+	return func(rel string) (tickets.TicketOrigin, bool, error) {
+		o, ok, err := lookup(rel)
+		return tickets.TicketOrigin{Path: o.Path, At: o.At, Root: o.Root}, ok, err
+	}
 }
 
 // storeProjectEpics loads the epics of the ticket-store project at root. A root
@@ -262,11 +272,6 @@ func epicLandedUnder(root string) func(tickets.Epic) (bool, error) {
 		}
 		return git.IsAncestor(repoRoot, e.Name, target)
 	}
-}
-
-func ticketSessionTotals(ids []string) (int64, float64, error) {
-	tokens, cost, err := ralphloop.SessionIDsTotals(ids)
-	return int64(tokens), cost, err
 }
 
 // epicLogRoot is the directory holding an epic's run log: root for a live
