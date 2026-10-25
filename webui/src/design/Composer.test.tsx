@@ -27,7 +27,11 @@ import type { PostPrompt } from "./prompt";
 
 afterEach(cleanup);
 
-const session = (state = "idle", background = false): SessionInfo => ({
+const session = (
+  state = "idle",
+  background = false,
+  auto: Partial<SessionInfo> = {},
+): SessionInfo => ({
   id: "s-a",
   project: "gx",
   dir: "/x",
@@ -40,6 +44,7 @@ const session = (state = "idle", background = false): SessionInfo => ({
   unread: {},
   actionable: {},
   auto_advance: true,
+  ...auto,
 });
 
 const chatOf = (
@@ -93,6 +98,7 @@ const ok: SessionResult = { session: session() };
 function render(opts: {
   state?: string;
   background?: boolean;
+  auto?: Partial<SessionInfo>;
   chat?: SessionChatResponse;
   connected?: boolean;
   post?: PostPrompt;
@@ -101,7 +107,7 @@ function render(opts: {
   steps?: MapStep[];
 }) {
   const state = {
-    snapshot: { sessions: [session(opts.state, opts.background)] },
+    snapshot: { sessions: [session(opts.state, opts.background, opts.auto)] },
     connected: opts.connected ?? true,
     loadedOnce: true,
     tick: 0,
@@ -219,6 +225,74 @@ test("a Working session offers Interrupt in place of Send, posting the state tok
   expect(body.id).toBe("s-a");
   expect(body.state).toMatch(/^s-a:working:\d+$/);
   fetchSpy.mockRestore();
+});
+
+const postedTo = (
+  fetchSpy: { mock: { calls: Parameters<typeof fetch>[] } },
+  path: string,
+) =>
+  JSON.parse(
+    fetchSpy.mock.calls.find(([url]) => url === path)![1]!.body as string,
+  );
+
+test("the auto-advance switch shows on and off, idle or working, and posts a flip", async () => {
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  render({ state: "working" });
+  const on = await screen.findByRole("switch", { name: /Auto-advance on/ });
+  expect(on.getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(on);
+  await waitFor(() =>
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/v1/sessions/auto-advance",
+      expect.objectContaining({ method: "POST" }),
+    ),
+  );
+  expect(postedTo(fetchSpy, "/v1/sessions/auto-advance")).toMatchObject({
+    id: "s-a",
+    off: true,
+  });
+  fetchSpy.mockRestore();
+  cleanup();
+
+  const fetchOff = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  render({ auto: { auto_advance: false } });
+  const off = await screen.findByRole("switch", { name: /Auto-advance off/ });
+  expect(off.getAttribute("aria-checked")).toBe("false");
+  fireEvent.click(off);
+  await waitFor(() =>
+    expect(postedTo(fetchOff, "/v1/sessions/auto-advance").off).toBe(false),
+  );
+  fetchOff.mockRestore();
+});
+
+test("a countdown shows the seconds left and Cancel posts to the cancel route", async () => {
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  render({
+    auto: { auto_advance_at: new Date(Date.now() + 9500).toISOString() },
+  });
+  expect(await screen.findByText(/Continuing in 10s/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() =>
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/v1/sessions/auto-advance/cancel",
+      expect.objectContaining({ method: "POST" }),
+    ),
+  );
+  expect(postedTo(fetchSpy, "/v1/sessions/auto-advance/cancel").id).toBe("s-a");
+  fetchSpy.mockRestore();
+});
+
+test("without a countdown there is no countdown text or Cancel", async () => {
+  render({});
+  await screen.findByRole("switch");
+  expect(screen.queryByText(/Continuing in/)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
 });
 
 test("an Idle session has no Interrupt", async () => {

@@ -1,4 +1,4 @@
-import type { DesignOpenRequest, SessionInfo, SessionRequest, SessionResult } from "../generated/server";
+import type { AutoAdvanceRequest, DesignOpenRequest, SessionInfo, SessionRequest, SessionResult } from "../generated/server";
 
 export type OpenDesign = (body: DesignOpenRequest) => Promise<SessionResult>;
 export type StopSession = (body: SessionRequest) => Promise<SessionResult>;
@@ -17,6 +17,10 @@ export const postOpenDesign: OpenDesign = postJson("/v1/designs/open");
 export const postStopSession: StopSession = postJson("/v1/sessions/stop");
 export const postResumeSession: ResumeSession = postJson("/v1/sessions/resume");
 export const postInterruptSession: InterruptSession = postJson("/v1/sessions/interrupt");
+export type SetAutoAdvance = (body: AutoAdvanceRequest) => Promise<SessionResult>;
+export type CancelAutoAdvance = (body: SessionRequest) => Promise<SessionResult>;
+export const postAutoAdvance: SetAutoAdvance = postJson("/v1/sessions/auto-advance");
+export const postCancelAutoAdvance: CancelAutoAdvance = postJson("/v1/sessions/auto-advance/cancel");
 
 /** The server's SessionStateToken: id, state and the status time in Unix nanoseconds. */
 export function stateToken(s: SessionInfo): string {
