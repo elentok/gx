@@ -134,7 +134,7 @@ func (s *Server) cancelAutoAdvanceRoute(req SessionRequest) (SessionResult, erro
 // with the switch on.
 func (s *Server) sendAutoAdvance(id string) {
 	_, meta, res, err := s.sessionDir(id)
-	if res.Refused || err != nil || meta.AutoAdvanceOff || !meta.Actionable.Derived || meta.Actionable.Grilling {
+	if res.Refused || err != nil || !meta.canAutoAdvance() {
 		return
 	}
 	if res, err := s.sendSessionAction(SessionRequest{ID: id}, true); err != nil || res.Refused {

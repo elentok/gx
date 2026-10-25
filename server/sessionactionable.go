@@ -230,41 +230,80 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	}
 	s.fileBadRoundBlocks(id, design, text)
 	a, matched := designActionable(text, design.Ticket, s.designFinal(design.Ticket))
-	raised, advance, capped := false, false, false
+	outcome := actionableNone
 	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
-		cur := m.Actionable
-		if !m.Status.Promptable() || cur.GxRaised {
+		var next SessionActionable
+		next, outcome = decideActionable(*m, a, matched, actionablePolicy{Live: design.Live, MaxAutoSends: maxAutoSends})
+		if outcome == actionableNone {
 			return false
 		}
-		if !matched {
-			if !cur.Derived {
-				return false
-			}
-			m.Actionable = SessionActionable{}
-			return true
-		}
-		if cur.Derived && cur.Reason == a.Reason && cur.Grilling == a.Grilling {
-			return false
-		}
-		m.Actionable = a
-		raised = true
-		advance = design.Live && len(a.Action) > 0 && !m.AutoAdvanceOff && m.Harness != string(harness.Codex)
-		if capped = advance && m.AutoSends >= maxAutoSends; capped {
-			advance = false
-		}
+		m.Actionable = next
 		return true
 	})
-	// A countdown that starts is silent: the person is told only if it does not send.
-	if advance && s.startAutoAdvance(id) {
-		s.events.publish(EventSessionChanged, id)
-		return
-	}
-	switch {
-	case capped:
+	switch outcome {
+	case actionableAdvance:
+		// A countdown that starts is silent: the person is told only if it does not send.
+		if s.startAutoAdvance(id) {
+			s.events.publish(EventSessionChanged, id)
+			return
+		}
+		s.triggerBanner(id, sound.Attention, a.Reason)
+	case actionableCapped:
 		s.triggerBanner(id, sound.Attention, fmt.Sprintf("Auto-advance stopped after %d runs in a row: %s", maxAutoSends, a.Reason))
-	case raised:
+	case actionableRaised:
 		s.triggerBanner(id, sound.Attention, a.Reason)
 	}
+}
+
+// actionableOutcome is what decideActionable did to a session's Actionable.
+type actionableOutcome int
+
+const (
+	// actionableNone leaves the Actionable as it was.
+	actionableNone actionableOutcome = iota
+	// actionableCleared drops a derived Actionable the newer turn no longer matches.
+	actionableCleared
+	// actionableRaised saves a new Actionable the person is told about.
+	actionableRaised
+	// actionableAdvance saves it and starts the auto-advance countdown.
+	actionableAdvance
+	// actionableCapped saves it, but the auto-send cap is reached.
+	actionableCapped
+)
+
+// actionablePolicy is what decideActionable reads besides the meta: whether the
+// turn ended while this server watched it, and the auto-send cap.
+type actionablePolicy struct {
+	Live         bool
+	MaxAutoSends int
+}
+
+// decideActionable is the pure decision behind detectDesignActionable: the
+// Actionable cur's meta should hold after a turn that matched a (or did not),
+// and what to do about it. A GxRaised one, or a session not waiting for the
+// person, is never touched.
+func decideActionable(cur sessionMeta, a SessionActionable, matched bool, p actionablePolicy) (SessionActionable, actionableOutcome) {
+	old := cur.Actionable
+	if !cur.Status.Promptable() || old.GxRaised {
+		return old, actionableNone
+	}
+	if !matched {
+		if !old.Derived {
+			return old, actionableNone
+		}
+		return SessionActionable{}, actionableCleared
+	}
+	if old.Derived && old.Reason == a.Reason && old.Grilling == a.Grilling {
+		return old, actionableNone
+	}
+	cur.Actionable = a
+	if !p.Live || !cur.canAutoAdvance() {
+		return a, actionableRaised
+	}
+	if cur.AutoSends >= p.MaxAutoSends {
+		return a, actionableCapped
+	}
+	return a, actionableAdvance
 }
 
 // raiseGxActionable saves an Actionable gx raises itself, replacing any

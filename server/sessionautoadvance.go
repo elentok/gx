@@ -52,6 +52,17 @@ func (s *Server) sessionAutoAdvanceHandler(web bool) http.HandlerFunc {
 	}
 }
 
+// canAutoAdvance is the one rule for whether the session's raised Actionable
+// may be sent by the server: the switch is on, it is a derived Continue (not a
+// grilling round, not agent- or gx-raised), the session waits for the person,
+// and the harness is not Codex. Call sites add their own conditions: the
+// detector needs a live turn and the cap, the switch needs no countdown running.
+func (m sessionMeta) canAutoAdvance() bool {
+	a := m.Actionable
+	return !m.AutoAdvanceOff && a.Derived && !a.Grilling && len(a.Action) > 0 &&
+		m.Status.Promptable() && m.Harness != string(harness.Codex)
+}
+
 // setAutoAdvance flips a Design session's auto-advance switch. Turning it off
 // stops a running countdown.
 func (s *Server) setAutoAdvance(req AutoAdvanceRequest) (SessionResult, error) {
@@ -67,9 +78,7 @@ func (s *Server) setAutoAdvance(req AutoAdvanceRequest) (SessionResult, error) {
 	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		m.AutoAdvanceOff = req.Off
 		m.AutoSends = 0
-		a := m.Actionable
-		start = !req.Off && a.Derived && !a.Grilling && len(a.Action) > 0 && m.Status.Promptable() &&
-			m.Harness != string(harness.Codex) && s.autoAdvances.deadline(req.ID).IsZero()
+		start = m.canAutoAdvance() && s.autoAdvances.deadline(req.ID).IsZero()
 		info = m.info()
 		return true
 	}); err != nil {
