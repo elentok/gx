@@ -36,6 +36,7 @@ it("shows the Button in every role, tone and size", () => {
     }
   }
   expect(labels).toContain("disabled");
+  for (const old of ["solid", "tinted", "outline"]) expect(labels).not.toContain(old);
 });
 
 it("shows the TopBar in every state the spec lists", () => {

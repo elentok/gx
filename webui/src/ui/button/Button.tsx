@@ -2,21 +2,10 @@ import { chakra } from "@chakra-ui/react";
 import type { ComponentProps, ReactNode } from "react";
 import type { Tone } from "../tone";
 
-export type ButtonVariant = "solid" | "tinted" | "outline" | "ghost";
 export type ButtonSize = "sm" | "md";
 export type ButtonEmphasis = "main" | "secondary" | "ghost";
 
-// The old variants render as the role they become when call sites move to `emphasis`.
-const VARIANT_EMPHASIS: Record<ButtonVariant, ButtonEmphasis> = {
-  solid: "main",
-  tinted: "main",
-  outline: "secondary",
-  ghost: "ghost",
-};
-
 type Props = Omit<ComponentProps<typeof chakra.button>, "color" | "variant" | "size"> & {
-  /** @deprecated use `emphasis`. */
-  variant?: ButtonVariant;
   emphasis?: ButtonEmphasis;
   tone?: Tone;
   size?: ButtonSize;
@@ -24,9 +13,8 @@ type Props = Omit<ComponentProps<typeof chakra.button>, "color" | "variant" | "s
 };
 
 // Action button. Tone picks the color, emphasis picks how much of it fills the button.
-export function Button({ variant, emphasis, tone = "done", size = "md", children, ...rest }: Props) {
+export function Button({ emphasis = "main", tone = "done", size = "md", children, ...rest }: Props) {
   const fg = `tone.${tone}.fg`;
-  const role = emphasis ?? VARIANT_EMPHASIS[variant ?? "tinted"];
   const style = {
     main: { bg: fg, color: "surface", borderColor: fg, _hover: { filter: "brightness(1.12)" } },
     secondary: { bg: "surface.raised", color: "text", borderColor: "border", _hover: { borderColor: "text.dim" } },
@@ -36,11 +24,10 @@ export function Button({ variant, emphasis, tone = "done", size = "md", children
       borderColor: "transparent",
       _hover: { bg: `tone.${tone}.bg` },
     },
-  }[role];
+  }[emphasis];
   return (
     <chakra.button
-      data-variant={emphasis ? undefined : (variant ?? "tinted")}
-      data-emphasis={role}
+      data-emphasis={emphasis}
       data-size={size}
       data-tone={tone}
       display="inline-flex"

@@ -137,10 +137,6 @@ export const galleryEntries: GalleryEntry[] = [
           })),
         ),
       ),
-      ...(["solid", "tinted", "outline", "ghost"] as const).map((variant) => ({
-        label: variant,
-        node: <Button variant={variant}>{variant}</Button>,
-      })),
       { label: "disabled", node: <Button disabled>disabled</Button> },
       { label: "main disabled", node: <Button emphasis="main" disabled>disabled</Button> },
     ],
@@ -272,7 +268,7 @@ export const galleryEntries: GalleryEntry[] = [
           <Sidebar
             title="Designs"
             action={
-              <Button variant="ghost" tone="running">
+              <Button emphasis="ghost" tone="running">
                 + New
               </Button>
             }
