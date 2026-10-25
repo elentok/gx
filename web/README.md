@@ -16,10 +16,10 @@ replaced the original vanilla-TS choice.
 ## Develop
 
 ```bash
-npm install
-npm run dev      # http://localhost:5173 — renders the primitive preview
-npm run build    # type-check + production build into dist/
-npm run preview  # serve the production build locally
+pnpm install
+pnpm dev      # http://localhost:5173 — renders the primitive preview
+pnpm build    # type-check + production build into dist/
+pnpm preview  # serve the production build locally
 ```
 
 ## Deploy
@@ -27,7 +27,7 @@ npm run preview  # serve the production build locally
 Manual, mirroring the cryptowl workflow (not Git-connected — see ADR 0012):
 
 ```bash
-npm run deploy   # build + wrangler pages deploy dist --project-name=gx
+pnpm run deploy   # build + wrangler pages deploy dist --project-name=gx
 ```
 
 The `gx.elentok.com` custom domain is configured once in the Cloudflare Pages dashboard.

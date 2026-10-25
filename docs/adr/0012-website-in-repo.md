@@ -29,7 +29,7 @@ Pages (not Git-connected).
   time** (`@preact/preset-vite` `prerender`), then fully hydrated on the client (~8 KB gz). Styling
   stays **hand-written CSS** — no CSS-in-JS, Chakra, or Emotion. (This supersedes the original
   "vanilla TypeScript" choice; see Considered Options.)
-- Deploy is **manual**, mirroring cryptowl: `cd web && npm run deploy`
+- Deploy is **manual**, mirroring cryptowl: `cd web && pnpm run deploy`
   (`wrangler pages deploy dist --project-name=gx`). No CI/Git-connected build.
 - The custom domain `gx.elentok.com` is configured once in the Cloudflare Pages dashboard.
 
@@ -53,7 +53,7 @@ Pages (not Git-connected).
 - A Node/Vite toolchain now lives inside a Go repo, scoped entirely to `web/`. The two build systems
   do not collide because the site build is invoked manually from `web/`.
 - The demo GIFs in `docs/` are the single source consumed by both the README and `web/`.
-- Publishing a site update is a deliberate `npm run deploy`, not a side effect of pushing — acceptable
+- Publishing a site update is a deliberate `pnpm run deploy`, not a side effect of pushing — acceptable
   for a low-frequency marketing page.
 - If the site ever needs preview deploys per-PR or more frequent updates, switching to Git-connected
   deploy is a new decision, not a reversal of "in-repo."
