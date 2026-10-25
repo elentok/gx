@@ -92,7 +92,7 @@ func Run(tool Tool, o Options) int {
 	defer logFile.Close()
 	sweep(logDir, start)
 
-	out, exit, err := execute(exe, argv, dir)
+	out, exit, err := execute(exe, argv, dir, logFile)
 	if err != nil {
 		return cantRun(o.Out, err.Error())
 	}
@@ -112,19 +112,22 @@ func Run(tool Tool, o Options) int {
 		DurationMS: elapsed.Milliseconds(),
 		Log:        logPath,
 	}
-	if err := record(logFile, out, filepath.Join(logDir, "index.jsonl"), entry); err != nil {
-		return cantRun(o.Out, err.Error())
+	if err := appendIndex(filepath.Join(logDir, "index.jsonl"), entry); err != nil {
+		return cantRun(o.Out, "cannot write index: "+err.Error())
 	}
 	return report(tool, o, outcome, out, entry)
 }
 
-// execute runs the command and returns its combined output and exit code.
-func execute(exe string, argv []string, dir string) (out []byte, exit int, err error) {
+// execute runs the command and returns its combined output and exit code. The
+// output is also written to logFile as it arrives, so a killed run keeps its
+// partial log.
+func execute(exe string, argv []string, dir string, logFile io.Writer) (out []byte, exit int, err error) {
 	var buf bytes.Buffer
+	w := io.MultiWriter(&buf, logFile)
 	cmd := exec.Command(exe, argv...)
 	cmd.Dir = dir
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
+	cmd.Stdout = w
+	cmd.Stderr = w
 	if err := runForwardingSignals(cmd); err != nil {
 		var ee *exec.ExitError
 		if !errors.As(err, &ee) {
@@ -136,17 +139,6 @@ func execute(exe string, argv []string, dir string) (out []byte, exit int, err e
 		}
 	}
 	return buf.Bytes(), exit, nil
-}
-
-// record writes the raw output to the log and the entry to the index.
-func record(logFile *os.File, out []byte, indexPath string, e indexEntry) error {
-	if _, err := logFile.Write(out); err != nil {
-		return errors.New("cannot write log: " + err.Error())
-	}
-	if err := appendIndex(indexPath, e); err != nil {
-		return errors.New("cannot write index: " + err.Error())
-	}
-	return nil
 }
 
 // report prints the final lines of a run and returns the process exit code.
