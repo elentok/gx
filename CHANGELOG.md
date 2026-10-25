@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.37.0 - 2026-10-25
+
+- Added `gx brief`, a wrapper that runs tests and type checks and prints a short report instead of raw output.
+  - It supports `go test`, `vitest` and `tsc`. A passing run prints a one-line result. A failing run lists the failures with shared size limits and a line to re-run them. `tsc` errors are grouped by file.
+  - Package-level Go failures are labelled, and `TestMain` panics show as text.
+  - It runs `vitest` and `tsc` from the local `node_modules`, and lets `vitest --watch=false` through.
+  - It exits with code 2 for an unknown tool or a bare `-C`.
+  - It removes old reports after a retention period and handles signals.
+  - The `gx-verify`, `gx-implement` and `gx-merge` skills now run tests through `gx brief`.
+- Added a `design_step` field to design (map) epics. The Design page reads Progress from it, `gx-design` sets it at every step, and the page refreshes when it changes.
+- Added a `verify` ticket type, a `gx-verify-epic` skill and a Verification section in the spec. The skill writes a summary of each round to the ticket. Added a `gx-ui-check` skill, and `gx-design` points to it.
+- Added pause reasons to the epic page.
+- Added a Playwright web test suite with fixture scenarios (paused, design) and a fake Claude, `fakeclaude`, for end-to-end flows.
+- Fixed long prompts: the native runner now pastes them, so Claude gets the whole text.
+- Fixed the answer area on the ticket page.
+- Fixed the mobile design picker: it now closes when you pick a design.
+
 ## v0.36.1 - 2026-10-24
 
 - Added a stall check for headless tickets that wait on a permission request. gx now pauses such a ticket at once, and returns it to claimed when the block clears. A restart re-pauses blocked tickets and leaves answered requests alone. `gx doctor` reports tickets blocked on permission requests.
