@@ -212,7 +212,7 @@ func (s *Server) lastAssistantText(id, conversationID string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	text, ok, err := transcript.LastAssistantText(path)
+	text, ok, err := transcript.LastAssistantText(path, transcript.NoTextCap)
 	if err != nil {
 		s.log.Warn("design actionable: read transcript", "session", id, "err", err)
 	}

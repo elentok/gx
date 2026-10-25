@@ -87,6 +87,20 @@ func TestBadRoundBlock_FilesOneAggregatedFollowUp(t *testing.T) {
 	}
 }
 
+func TestBadRoundBlock_BlockPastTranscriptCapIsSeen(t *testing.T) {
+	store := seedGxProject(t)
+	h, ctx, evs, id, conv, path := startGrillingSessionIn(t, "proj:map", store)
+	settle(t, h, ctx, evs, id, conv)
+
+	long := "❓ **Q1** Which store?\n\n" + strings.Repeat("Background on the choice. ", 150) + "\n\n" +
+		strings.SplitN(badRoundText, "\n\n", 2)[1]
+	writeAssistantMessage(t, path, long)
+	goIdle(t, h, ctx, evs, id, conv)
+	if got := badBlockTickets(t, store); len(got) != 1 || !strings.Contains(got[0], "options: [unclosed") {
+		t.Fatalf("tickets = %q, want one for the bad block past the old 2048-byte cap", got)
+	}
+}
+
 func TestBadRoundBlock_NoGxProjectWritesNothing(t *testing.T) {
 	store := t.TempDir()
 	h, ctx, evs, id, conv, path := startGrillingSessionIn(t, "proj:map", store)

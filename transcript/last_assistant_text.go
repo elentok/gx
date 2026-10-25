@@ -7,19 +7,23 @@ import (
 	"unicode/utf8"
 )
 
-// MaxAssistantTextBytes caps what LastAssistantText returns, so a caller that
-// stores or logs the text never carries a whole long answer.
+// MaxAssistantTextBytes is the cap for a caller that stores or logs the text,
+// so it never carries a whole long answer.
 const MaxAssistantTextBytes = 2048
 
+// NoTextCap makes LastAssistantText return the whole block, for a caller that
+// parses the text and would misread a cut one.
+const NoTextCap = 0
+
 // LastAssistantText returns the last non-sidechain assistant text block in the
-// transcript at path, truncated to MaxAssistantTextBytes (on a rune boundary,
-// with a trailing "…" when cut). It is the only reader here that keeps message
+// transcript at path, truncated to maxBytes (on a rune boundary, with a
+// trailing "…" when cut; NoTextCap keeps it whole). It is the only reader here that keeps message
 // content, so it is opt-in: nothing on the polling path calls it. ok is false
 // if the file doesn't exist yet or holds no assistant text. Like
 // LastAssistantUsage it scans from the tail, so it reuses parseLine/tailScan
 // and the content-block decoding of ReadUnexecutedToolCall instead of a
 // second parser.
-func LastAssistantText(path string) (text string, ok bool, err error) {
+func LastAssistantText(path string, maxBytes int) (text string, ok bool, err error) {
 	err = tailScan(path, func(lines []string) bool {
 		for _, raw := range slices.Backward(lines) {
 			line, parsed := parseContentLine(raw)
@@ -29,7 +33,10 @@ func LastAssistantText(path string) (text string, ok bool, err error) {
 			blocks := line.contentBlocks()
 			for _, b := range slices.Backward(blocks) {
 				if b.Type == "text" && strings.TrimSpace(b.Text) != "" {
-					text, ok = truncateText(strings.TrimSpace(b.Text), MaxAssistantTextBytes), true
+					text, ok = strings.TrimSpace(b.Text), true
+					if maxBytes != NoTextCap {
+						text = truncateText(text, maxBytes)
+					}
 					return true
 				}
 			}

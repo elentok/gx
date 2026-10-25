@@ -461,7 +461,7 @@ func lastAssistantText(ev ralphloop.Event) string {
 	if err != nil {
 		return ""
 	}
-	text, _, _ := transcript.LastAssistantText(path)
+	text, _, _ := transcript.LastAssistantText(path, transcript.MaxAssistantTextBytes)
 	return text
 }
 
