@@ -53,7 +53,8 @@ checks.
   - files matching `*.go`
   - run `gofmt -w <go-files>`
   - for each unique directory containing a matched Go file, run `gx brief go-test ./<dir>`; use
-    `gx brief go-test .` for files in the repo root
+    `gx brief go-test .` for files in the repo root. For `server` in a repo whose `Makefile` has a
+    `test-server` target, run `make test-server` instead: it shards the slow package
 - TypeScript and JavaScript:
   - files matching `*.ts`, `*.tsx`, `*.js`, `*.jsx`, `*.mjs`
   - group the files by their nearest `package.json` and run each check once per package, from the

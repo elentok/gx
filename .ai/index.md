@@ -39,6 +39,8 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   hangs.
 - `server/` is the slowest package by far (minutes, close to the default `go test` timeout under
   load). Run it only when you touched `server/` or `server/servertest/`, and scope it with `-run`.
+  For the whole package, run `make test-server`: it shards the package across 5 processes, about
+  2 min.
 - Tests must never read the developer's real Claude config (their `editorMode: vim` changes
   outcomes). Call `claudeenv.Isolate()` (`testutil/claudeenv`) from every package's `TestMain`. It
   points `HOME` and a clean `CLAUDE_CONFIG_DIR` at a temp dir, unsets `XDG_*`, and leaves a vim-mode
