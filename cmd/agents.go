@@ -53,20 +53,26 @@ func newAgentsAutoAdvanceCmd() *cobra.Command {
 }
 
 func runAgentsAutoAdvance(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string, on bool) error {
+	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (server.SessionResult, error) {
+		return cl.SetAutoAdvance(ctx, id, on)
+	})
+}
+
+// runAgentsSessionCall runs a session write and prints its outcome. It is the
+// one place a nil command context becomes Background.
+func runAgentsSessionCall(ctx context.Context, w io.Writer, jsonOut bool, call func(context.Context) (server.SessionResult, error)) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	res, err := cl.SetAutoAdvance(ctx, id, on)
+	res, err := call(ctx)
 	return printSessionResult(w, jsonOut, res, err)
 }
 
 // runAgentsPrompt never starts the server: a dead socket is a refusal.
 func runAgentsPrompt(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.SessionPromptRequest) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	res, err := cl.PromptSession(ctx, req)
-	return printSessionResult(w, jsonOut, res, err)
+	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (server.SessionResult, error) {
+		return cl.PromptSession(ctx, req)
+	})
 }
 
 func newAgentsPromptCmd() *cobra.Command {
@@ -292,20 +298,16 @@ func newAgentsSessionCmd(verb, short string, write sessionWriteFunc) *cobra.Comm
 }
 
 func runAgentsSessionWrite(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, write sessionWriteFunc, id string) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	res, err := write(cl, ctx, id)
-	return printSessionResult(w, jsonOut, res, err)
+	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (server.SessionResult, error) {
+		return write(cl, ctx, id)
+	})
 }
 
 // runAgentsCreate never starts the server: a dead socket is a refusal.
 func runAgentsCreate(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.CreateSessionRequest) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	res, err := cl.CreateSession(ctx, req)
-	return printSessionResult(w, jsonOut, res, err)
+	return runAgentsSessionCall(ctx, w, jsonOut, func(ctx context.Context) (server.SessionResult, error) {
+		return cl.CreateSession(ctx, req)
+	})
 }
 
 // printSessionResult prints a session write's outcome, its session's id when

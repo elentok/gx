@@ -16,28 +16,34 @@ type AutoAdvanceRequest struct {
 }
 
 func (s *Server) sessionAutoAdvanceWrite(w http.ResponseWriter, r *http.Request) {
-	s.sessionAutoAdvanceHandler(false)(w, r)
+	s.sessionAutoAdvanceHandler(nil)(w, r)
 }
 
 // sessionAutoAdvanceWeb is sessionAutoAdvanceWrite for the web mux: it needs
 // the state token of the session the page saw.
-func (s *Server) sessionAutoAdvanceWeb() http.HandlerFunc { return s.sessionAutoAdvanceHandler(true) }
+func (s *Server) sessionAutoAdvanceWeb() http.HandlerFunc {
+	return s.sessionAutoAdvanceHandler(func(req AutoAdvanceRequest) (SessionResult, error) {
+		return s.checkDesignWrite(SessionRequest{ID: req.ID, State: req.State})
+	})
+}
 
-func (s *Server) sessionAutoAdvanceHandler(web bool) http.HandlerFunc {
+// sessionAutoAdvanceHandler serves the switch. A non-nil guard runs first; a
+// refusal from it is the response.
+func (s *Server) sessionAutoAdvanceHandler(guard func(AutoAdvanceRequest) (SessionResult, error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req AutoAdvanceRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		if web {
-			res, err := s.checkDesignWrite(SessionRequest{ID: req.ID, State: req.State})
-			if err == nil && res.Refused {
-				writeJSON(w, res)
-				return
-			}
+		if guard != nil {
+			res, err := guard(req)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if res.Refused {
+				writeJSON(w, res)
 				return
 			}
 		}

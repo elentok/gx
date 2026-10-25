@@ -1,5 +1,5 @@
 import { Box, Text, Textarea } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import type {
   SessionInfo,
@@ -9,6 +9,7 @@ import type {
 } from "../generated/server";
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
+import { AutoAdvanceBar, type RunCall } from "./AutoAdvanceBar";
 import {
   postAutoAdvance,
   postCancelAutoAdvance,
@@ -117,27 +118,8 @@ export function Composer({
 
   // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
   const working = session.status.state === "working" && !promptable(session);
-  const onInterrupt = async () => {
-    if (!connected || pending) return;
-    setPending(true);
-    setError("");
-    try {
-      const res = await interrupt({
-        id: session.id,
-        state: stateToken(session),
-      });
-      if (res.refused) setError(res.message ?? "The interrupt was refused.");
-    } catch {
-      setError("Could not interrupt. Try again.");
-    } finally {
-      setPending(false);
-    }
-  };
-
-  const autoCall = async (
-    call: () => Promise<{ refused?: boolean; message?: string }>,
-    failure: string,
-  ) => {
+  // The calls that are not a prompt: one pending flag, one error line; a refusal shows its message, a throw shows `failure`.
+  const run: RunCall = async (call, failure) => {
     if (!connected || pending) return;
     setPending(true);
     setError("");
@@ -150,22 +132,11 @@ export function Composer({
       setPending(false);
     }
   };
-
-  // Counts down to the server's deadline; undefined with no countdown running.
-  const deadline = session.auto_advance_at
-    ? Date.parse(session.auto_advance_at)
-    : undefined;
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (deadline === undefined) return;
-    setNow(Date.now());
-    const t = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(t);
-  }, [deadline]);
-  const secondsLeft =
-    deadline === undefined
-      ? undefined
-      : Math.max(0, Math.ceil((deadline - now) / 1000));
+  const onInterrupt = () =>
+    run(
+      () => interrupt({ id: session.id, state: stateToken(session) }),
+      "Could not interrupt. Try again.",
+    );
 
   const inRound = round.length > 0;
   const sendRound = () => {
@@ -331,49 +302,13 @@ export function Composer({
         </Box>
       )}
       {notices}
-      <Box display="flex" gap="3" alignItems="center">
-        <Button
-          variant="ghost"
-          tone="muted"
-          role="switch"
-          aria-checked={session.auto_advance}
-          disabled={!connected || pending}
-          onClick={() =>
-            autoCall(
-              () =>
-                setAutoAdvance({
-                  id: session.id,
-                  state: stateToken(session),
-                  off: session.auto_advance,
-                }),
-              "Could not switch auto-advance. Try again.",
-            )
-          }
-        >
-          Auto-advance {session.auto_advance ? "on" : "off"}
-        </Button>
-        {secondsLeft !== undefined && (
-          <>
-            <Text>Continuing in {secondsLeft}s</Text>
-            <Button
-              variant="outline"
-              disabled={!connected || pending}
-              onClick={() =>
-                autoCall(
-                  () =>
-                    cancelAutoAdvance({
-                      id: session.id,
-                      state: stateToken(session),
-                    }),
-                  "Could not cancel. Try again.",
-                )
-              }
-            >
-              Cancel
-            </Button>
-          </>
-        )}
-      </Box>
+      <AutoAdvanceBar
+        session={session}
+        disabled={!connected || pending}
+        run={run}
+        setAutoAdvance={setAutoAdvance}
+        cancelAutoAdvance={cancelAutoAdvance}
+      />
       {/* Under the note: its toggle and Continue; a round with no note open sends from here. */}
       <Box display="flex" gap="2" alignItems="stretch">
         {!open && (
