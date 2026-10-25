@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -175,18 +176,44 @@ type SessionRef struct {
 // All-or-nothing: if any session cannot be read or found, it returns an error
 // and no partial sum. A Codex session adds its reported total and no cost.
 func SessionsTotals(refs []SessionRef) (tokens int, cost float64, err error) {
+	sum, err := sumSessions(refs, readFoundSessionStats)
+	return sum.tokens, sum.cost, err
+}
+
+// sessionSum is the total over a set of sessions. hadCodex is true when any
+// counted session was a Codex one.
+type sessionSum struct {
+	tokens   int
+	cost     float64
+	hadCodex bool
+}
+
+// sumSessions adds up refs, all-or-nothing: resolve returns the stats of one
+// ref and the agent that ran it, or an error when it cannot be read or found.
+func sumSessions(refs []SessionRef, resolve func(SessionRef) (sessionStats, AgentKind, error)) (sessionSum, error) {
+	var sum sessionSum
 	for _, ref := range refs {
-		stats, err := readAgentSessionStats(sessionKey{agent: ref.Agent, cwd: ref.Cwd, sessionID: ref.SessionID})
+		stats, agent, err := resolve(ref)
 		if err != nil {
-			return 0, 0, fmt.Errorf("session %s: %w", ref.SessionID, err)
+			return sessionSum{}, fmt.Errorf("session %s: %w", ref.SessionID, err)
 		}
-		if !stats.ok {
-			return 0, 0, fmt.Errorf("session %s: transcript not found", ref.SessionID)
-		}
-		tokens += stats.totalTokens
-		cost += stats.cost
+		sum.tokens += stats.totalTokens
+		sum.cost += stats.cost
+		sum.hadCodex = sum.hadCodex || agent == AgentCodex
 	}
-	return tokens, cost, nil
+	return sum, nil
+}
+
+// readFoundSessionStats reads ref's own transcript; a missing one is an error.
+func readFoundSessionStats(ref SessionRef) (sessionStats, AgentKind, error) {
+	stats, err := readAgentSessionStats(sessionKey{agent: ref.Agent, cwd: ref.Cwd, sessionID: ref.SessionID})
+	if err != nil {
+		return sessionStats{}, ref.Agent, err
+	}
+	if !stats.ok {
+		return sessionStats{}, ref.Agent, errors.New("transcript not found")
+	}
+	return stats, ref.Agent, nil
 }
 
 // SessionIDsTotals sums the total tokens and cost of the Claude sessions in
@@ -198,25 +225,28 @@ func SessionIDsTotals(ids []string) (tokens int, cost float64, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	for _, id := range ids {
-		matches, err := transcript.FindByID(home, id)
+	refs := make([]SessionRef, len(ids))
+	for i, id := range ids {
+		refs[i] = SessionRef{Agent: AgentClaude, SessionID: id}
+	}
+	sum, err := sumSessions(refs, func(ref SessionRef) (sessionStats, AgentKind, error) {
+		matches, err := transcript.FindByID(home, ref.SessionID)
 		if err != nil {
-			return 0, 0, fmt.Errorf("session %s: %w", id, err)
+			return sessionStats{}, ref.Agent, err
 		}
 		if len(matches) != 1 {
-			return 0, 0, fmt.Errorf("session %s: %d transcripts found", id, len(matches))
+			return sessionStats{}, ref.Agent, fmt.Errorf("%d transcripts found", len(matches))
 		}
 		stats, err := readTranscriptStats(matches[0])
 		if err != nil {
-			return 0, 0, fmt.Errorf("session %s: %w", id, err)
+			return sessionStats{}, ref.Agent, err
 		}
 		if !stats.ok {
-			return 0, 0, fmt.Errorf("session %s: transcript not readable", id)
+			return sessionStats{}, ref.Agent, errors.New("transcript not readable")
 		}
-		tokens += stats.totalTokens
-		cost += stats.cost
-	}
-	return tokens, cost, nil
+		return stats, ref.Agent, nil
+	})
+	return sum.tokens, sum.cost, err
 }
 
 // SessionCost returns the estimated API-equivalent cost of the Claude Code
@@ -266,6 +296,8 @@ func readAgentSessionStats(key sessionKey) (sessionStats, error) {
 // readable: all-or-nothing, so one unreadable session leaves total_tokens and
 // actual_cost unstamped. A ticket with no session stamps zero.
 func writeMergedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (m mergedMetrics, ok bool, err error) {
+	// A read error is treated like a transcript that is not there yet: the
+	// no-op case above.
 	stats, err := readAgentSessionStats(sessionKey{agent: agent, cwd: cwd, sessionID: sessionID})
 	if err != nil {
 		stats = sessionStats{}
@@ -277,39 +309,47 @@ func writeMergedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (m m
 		}
 		return mergedMetrics{}, false, err
 	}
-	tokens, cost, hadCodex, totalsErr := ticketSessionsTotals(agent, cwd, sessionID, current.SessionIDs)
-	if totalsErr == nil {
-		var convo conversations.Totals
-		if convo, totalsErr = recordedConversationTotals(ticketPath, string(current.ID)); totalsErr == nil {
-			tokens += convo.TotalTokens
-			cost += convo.Cost
-		}
-	}
+	sum, totalsErr := collectTicketTotals(agent, cwd, sessionID, ticketPath, current)
 	if !stats.ok && totalsErr != nil {
 		return mergedMetrics{}, false, nil
 	}
-	m.costStamped = totalsErr == nil
+	m = mergedMetrics{cost: sum.cost, costStamped: totalsErr == nil}
 	if stats.ok {
 		m.contextWindow = stats.peakOccupancy
 		m.elapsedSeconds = int(stats.end.Sub(stats.start).Seconds())
 	}
-	m.cost = cost
 	err = updateTicket(ticketPath, func(t *schema.Ticket) {
 		if stats.ok {
 			t.ActualContextWindow = m.contextWindow
 			t.ElapsedTime = m.elapsedSeconds
 		}
 		if m.costStamped {
-			total := int64(tokens)
+			total := int64(sum.tokens)
 			t.TotalTokens = &total
-			t.ActualCost = cost
-			t.HadCodex = hadCodex
+			t.ActualCost = sum.cost
+			t.HadCodex = sum.hadCodex
 		}
 	})
 	if err != nil {
 		return mergedMetrics{}, false, err
 	}
 	return m, stats.ok, nil
+}
+
+// collectTicketTotals sums every session of the ticket plus its recorded
+// conversations. Any error means the sum would undercount.
+func collectTicketTotals(agent AgentKind, cwd, sessionID, ticketPath string, ticket schema.Ticket) (sessionSum, error) {
+	sum, err := ticketSessionsTotals(agent, cwd, sessionID, ticket.SessionIDs)
+	if err != nil {
+		return sessionSum{}, err
+	}
+	convo, err := recordedConversationTotals(ticketPath, string(ticket.ID))
+	if err != nil {
+		return sessionSum{}, err
+	}
+	sum.tokens += convo.TotalTokens
+	sum.cost += convo.Cost
+	return sum, nil
 }
 
 // mergedMetrics are the figures writeMergedMetrics stamped. cost is the sum over
@@ -345,33 +385,28 @@ func recordedConversationTotals(path, id string) (conversations.Totals, error) {
 
 // ticketSessionsTotals sums tokens and cost over ids plus current. A session's
 // agent is only known for current; any other is tried as Claude, then Codex.
-func ticketSessionsTotals(agent AgentKind, cwd, current string, ids []string) (tokens int, cost float64, hadCodex bool, err error) {
+func ticketSessionsTotals(agent AgentKind, cwd, current string, ids []string) (sessionSum, error) {
 	if current != "" && !slices.Contains(ids, current) {
 		ids = append(slices.Clone(ids), current)
 	}
-	for _, id := range ids {
+	refs := make([]SessionRef, len(ids))
+	for i, id := range ids {
+		refs[i] = SessionRef{Agent: AgentClaude, Cwd: cwd, SessionID: id}
+	}
+	return sumSessions(refs, func(ref SessionRef) (sessionStats, AgentKind, error) {
 		kinds := []AgentKind{AgentClaude, AgentCodex}
-		if id == current {
+		if ref.SessionID == current {
 			kinds = []AgentKind{agent}
 		}
-		found := false
 		for _, kind := range kinds {
-			stats, err := readAgentSessionStats(sessionKey{agent: kind, cwd: cwd, sessionID: id})
+			stats, err := readAgentSessionStats(sessionKey{agent: kind, cwd: cwd, sessionID: ref.SessionID})
 			if err != nil {
-				return 0, 0, false, fmt.Errorf("session %s: %w", id, err)
+				return sessionStats{}, kind, err
 			}
-			if !stats.ok {
-				continue
+			if stats.ok {
+				return stats, kind, nil
 			}
-			tokens += stats.totalTokens
-			cost += stats.cost
-			hadCodex = hadCodex || kind == AgentCodex
-			found = true
-			break
 		}
-		if !found {
-			return 0, 0, false, fmt.Errorf("session %s: transcript not found", id)
-		}
-	}
-	return tokens, cost, hadCodex, nil
+		return sessionStats{}, agent, errors.New("transcript not found")
+	})
 }
