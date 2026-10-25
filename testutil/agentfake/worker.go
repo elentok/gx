@@ -37,6 +37,9 @@ type WorkerConfig struct {
 	// in order. Empty means today's behaviour: a round per /gx-design prompt,
 	// the run-end message for any other text.
 	Design []string `json:"design,omitempty"`
+	// DesignByMap scripts the turns of one map's design session, by the map's
+	// address; it wins over Design for a /gx-design prompt naming that address.
+	DesignByMap map[string][]string `json:"design_by_map,omitempty"`
 }
 
 // What a worker does with a ticket.

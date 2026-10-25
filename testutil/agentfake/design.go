@@ -117,6 +117,16 @@ func (t *tui) designTurn(text string) error {
 	var script []string
 	if cfg, err := LoadWorkerConfig(t.pid.Cwd); err == nil {
 		script = cfg.Design
+		if isDesignPrompt(text) {
+			for addr, s := range cfg.DesignByMap {
+				if strings.Contains(text, addr) {
+					t.design.script = s
+				}
+			}
+		}
+		if t.design.script != nil {
+			script = t.design.script
+		}
 	}
 	if isDesignPrompt(text) {
 		t.design.active = true

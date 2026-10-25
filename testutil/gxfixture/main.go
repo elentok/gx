@@ -20,6 +20,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -122,7 +123,7 @@ func run(args []string) (err error) {
 		}
 		f.env = append(f.env, "GX_AUTO_ADVANCE_DELAY="+autoAdvance)
 	}
-	if err := f.writeConfig(port); err != nil {
+	if err := f.writeConfig(port, sc.recentlyFinished); err != nil {
 		return err
 	}
 	if err := f.seed(sc); err != nil {
@@ -151,7 +152,7 @@ func run(args []string) (err error) {
 		return fmt.Errorf("%w\n%s", err, f.serverOutput())
 	}
 	// --hold freezes every worker as running until the caller removes the hold file.
-	if hold {
+	if hold || sc.hold {
 		if err := os.WriteFile(f.hold, nil, 0o644); err != nil {
 			return err
 		}
@@ -159,6 +160,11 @@ func run(args []string) (err error) {
 	for _, addr := range sc.queue {
 		if out, err := f.cli("server", "queue", "add", addr); err != nil {
 			return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
+		}
+	}
+	for _, addr := range sc.openDesigns {
+		if out, err := f.cli("designs", "open", addr); err != nil {
+			return fmt.Errorf("open design %s: %w\n%s", addr, err, out)
 		}
 	}
 	out, err := json.Marshal(Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin})
@@ -210,12 +216,16 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 	return env, cliEnv
 }
 
-func (f *fixture) writeConfig(port int) error {
+func (f *fixture) writeConfig(port, recentlyFinished int) error {
 	dir := filepath.Join(f.root, "home", ".config", "gx")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	cfg := fmt.Sprintf(`{"agent-runner":"pty","runner-wait":"100ms","server":{"watch-config":false,"web":{"listen":"127.0.0.1:%d"}}}`, port)
+	finished := ""
+	if recentlyFinished > 0 {
+		finished = fmt.Sprintf(`"recently-finished":%d,`, recentlyFinished)
+	}
+	cfg := fmt.Sprintf(`{"agent-runner":"pty","runner-wait":"100ms","server":{%s"watch-config":false,"web":{"listen":"127.0.0.1:%d"}}}`, finished, port)
 	return os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0o644)
 }
 
@@ -226,7 +236,11 @@ func (f *fixture) seed(sc scenario) error {
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		return err
 	}
-	cfg, err := json.Marshal(agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: "30s", Behaviour: sc.behaviour, Design: sc.design})
+	holdTimeout := "30s"
+	if sc.hold {
+		holdTimeout = "1h"
+	}
+	cfg, err := json.Marshal(agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.behaviour, Design: sc.design, DesignByMap: sc.designByMap})
 	if err != nil {
 		return err
 	}
@@ -257,6 +271,12 @@ func (f *fixture) seed(sc scenario) error {
 				return err
 			}
 		}
+		if meta, ok := sc.epicMeta[addr]; ok {
+			ticketMD := filepath.Join(f.store, e.project, e.name, "ticket.md")
+			if err := os.WriteFile(ticketMD, []byte("---\n"+meta+"---\n"), 0o644); err != nil {
+				return err
+			}
+		}
 		for _, tk := range e.tickets {
 			if err := servertest.WriteTicketFile(f.store, e.project, e.name, tk.id, tk.slug, tk.opts); err != nil {
 				return err
@@ -268,7 +288,11 @@ func (f *fixture) seed(sc scenario) error {
 				}
 			}
 		}
-		if err := servertest.WriteProjectRepo(f.store, e.project, repo, `,"auto-ff-merge":true`); err != nil {
+		extra := sc.projectExtra[e.project]
+		if !slices.Contains(sc.manualMerge, e.project) {
+			extra += `,"auto-ff-merge":true`
+		}
+		if err := servertest.WriteProjectRepo(f.store, e.project, repo, extra); err != nil {
 			return err
 		}
 		if isMap {

@@ -307,6 +307,9 @@ type designState struct {
 	active bool
 	rounds int
 	turns  int
+	// script is the turn script of the map this session designs, from
+	// WorkerConfig.DesignByMap; nil falls back to WorkerConfig.Design.
+	script []string
 }
 
 // tuiEvent is one key from the terminal, one control, or the end of input.

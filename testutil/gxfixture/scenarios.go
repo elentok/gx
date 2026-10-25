@@ -34,8 +34,23 @@ type scenario struct {
 	// design scripts the design agent's turns (agentfake.DesignTurn*), one per
 	// prompt in order; none means the fake's default.
 	design []string
+	// designByMap scripts the design turns of one map, by address, over design.
+	designByMap map[string][]string
 	// queue lists the epics put on the queue once the server is up.
 	queue []string
+	// epicMeta replaces an epic's ticket.md frontmatter (the lines between the
+	// "---" fences), by address, e.g. "status: draft\n".
+	epicMeta map[string]string
+	// manualMerge lists the projects whose auto-ff-merge is off; the others have it on.
+	manualMerge []string
+	// projectExtra is raw project.json members (leading comma) added per project.
+	projectExtra map[string]string
+	// hold keeps every worker running until the hold file is removed, as --hold does.
+	hold bool
+	// recentlyFinished is the server.recently-finished cap; zero keeps the default.
+	recentlyFinished int
+	// openDesigns lists the maps whose design session is opened once the server is up.
+	openDesigns []string
 }
 
 var scenarios = map[string]scenario{
@@ -113,6 +128,36 @@ var scenarios = map[string]scenario{
 	"design-defaulted": designScript(tickets.StepResolveTickets, agentfake.DesignTurnDefaulted),
 	// design-working: a long busy turn, for the Working row.
 	"design-working": designScript(tickets.StepResolveTickets, agentfake.DesignTurnSlow),
+	// united: one card per Epics page section and per Needs-you reason, across
+	// two projects. demo has auto-merge off and a two-agent cap, so with the
+	// workers held the permission and running epics fill it and the queued
+	// epic and one-off wait. auto has auto-merge on.
+	"united": {
+		projects:         []string{"auto"},
+		epics:            unitedEpics(),
+		epicMeta:         unitedMeta(),
+		manualMerge:      []string{project},
+		projectExtra:     map[string]string{project: `,"max-agents":2`},
+		hold:             true,
+		recentlyFinished: 2,
+		behaviour:        map[string]string{project + ":perm-epic/01": agentfake.BehaviourPermission},
+		designSteps: map[string]string{
+			project + ":design-question": string(tickets.StepResolveTickets),
+			project + ":design-live":     string(tickets.StepResolveTickets),
+			project + ":design-stopped":  string(tickets.StepSpec),
+			project + ":design-new":      string(tickets.StepChart),
+		},
+		// design-question's session ends on a question; design-live's does not.
+		designByMap: map[string][]string{
+			project + ":design-question": {agentfake.DesignTurnRound},
+			project + ":design-live":     {agentfake.DesignTurnPlain},
+		},
+		queue: []string{
+			project + ":perm-epic", project + ":running-epic", project + ":queued-epic",
+			project + ":one-offs/02",
+		},
+		openDesigns: []string{project + ":design-question", project + ":design-live"},
+	},
 	// edge: a project with no epics, an epic with no tickets, and a ticket
 	// blocked by a dependency that is not merged.
 	"edge": {
@@ -147,6 +192,68 @@ func designScript(step tickets.DesignStep, turns ...string) scenario {
 	sc.designSteps = map[string]string{project + ":design-epic": string(step)}
 	sc.design = turns
 	return sc
+}
+
+// unitedEpics is the united scenario's epics, grouped by section.
+func unitedEpics() []epic {
+	open := []ticket{{"01", "first", servertest.TicketOpts{}}}
+	done := []ticket{{"01", "built", servertest.TicketOpts{Status: "done"}}}
+	return []epic{
+		// Needs you.
+		{project, "paused-epic", []ticket{{"01", "repair", servertest.TicketOpts{PauseReason: "iteration-error"}}}},
+		{project, "question-epic", []ticket{{"01", "answer", servertest.TicketOpts{PauseReason: "self-reported"}}}},
+		{project, "perm-epic", open},
+		// Its epic blocker is unmerged, so the ticket is blocked and nothing can
+		// run: the epic is deadlocked. A cycle would not do, since recovery pauses it.
+		{project, "deadlock-epic", open},
+		{project, "blocked-merge-epic", done},
+		{project, "awaiting-epic", done},
+		{project, "design-question", nil},
+		{project, "design-stopped", nil},
+		// In progress.
+		{project, "running-epic", open},
+		{project, "queued-epic", open},
+		{"auto", "awaiting-auto-epic", done},
+		{project, "design-live", nil},
+		// Ready to queue.
+		{project, "ready-epic", open},
+		// Ready to design.
+		{project, "follow-ups", []ticket{
+			{"01", "a-bug", servertest.TicketOpts{Category: "bug"}},
+			{"02", "an-idea", servertest.TicketOpts{Category: "idea"}},
+		}},
+		{project, "design-new", nil},
+		{project, "draft-epic", open},
+		{project, "idle-epic", []ticket{{"01", "stuck", servertest.TicketOpts{Status: "claimed"}}}},
+		// Finished: more than recentlyFinished, one-offs included.
+		{project, "finished-a", done},
+		{project, "finished-b", done},
+		{"auto", "finished-c", done},
+		// One-offs: queued, paused and finished.
+		{project, "one-offs", []ticket{
+			{"01", "paused", servertest.TicketOpts{PauseReason: "iteration-error"}},
+			{"02", "queued", servertest.TicketOpts{}},
+			{"03", "done-a", servertest.TicketOpts{Status: "done"}},
+			{"04", "done-b", servertest.TicketOpts{Status: "done"}},
+			{"05", "done-c", servertest.TicketOpts{Status: "done"}},
+		}},
+	}
+}
+
+// unitedMeta is the epic ticket.md frontmatter the united scenario overrides.
+func unitedMeta() map[string]string {
+	merged := func(day string) string {
+		return "status: open\ncompleted_at: 2026-01-" + day + "T10:00:00Z\nmerged_at: 2026-01-" + day + "T11:00:00Z\n"
+	}
+	return map[string]string{
+		project + ":blocked-merge-epic": "status: open\nland_block_reason: needs a rebase\n",
+		project + ":deadlock-epic":      "status: open\nblocked_by: [\"ready-epic\"]\n",
+		project + ":draft-epic":         "status: draft\n",
+		project + ":finished-a":         merged("01"),
+		project + ":finished-b":         merged("02"),
+		"auto:finished-c":               merged("03"),
+		project + ":one-offs":           "status: draft\n",
+	}
 }
 
 func scenarioNames() []string {

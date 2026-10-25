@@ -47,6 +47,74 @@ func TestMain(m *testing.M) {
 	}())
 }
 
+// cardsOf is `gx server epics --json`.
+func (r *running) cardsOf(t *testing.T) []server.EpicListRow {
+	t.Helper()
+	var list server.EpicList
+	if err := json.Unmarshal([]byte(r.gx(t, "server", "epics", "--json")), &list); err != nil {
+		t.Fatal(err)
+	}
+	return list.Epics
+}
+
+func TestUnitedScenarioHasACardPerSectionAndReason(t *testing.T) {
+	r := start(t, "united")
+	// name|section|pill. Running, queued and permission cards appear once the
+	// server has launched the workers, so the list is polled.
+	want := []string{
+		"deadlock-epic|needs-you|Deadlocked",
+		"awaiting-epic|needs-you|Awaiting merge",
+		"blocked-merge-epic|needs-you|Merge blocked",
+		"design-stopped|needs-you|Stopped",
+		"paused-epic|needs-you|Paused",
+		"question-epic|needs-you|Question",
+		"perm-epic|needs-you|Permission",
+		"design-question|needs-you|Question",
+		"paused|needs-you|Paused",
+		"running-epic|in-progress|",
+		"queued-epic|in-progress|",
+		"queued|in-progress|",
+		"awaiting-auto-epic|in-progress|",
+		"design-live|in-progress|",
+		"ready-epic|ready-to-queue|",
+		"follow-ups|ready-to-design|",
+		"design-new|ready-to-design|",
+		"draft-epic|ready-to-design|",
+		"idle-epic|ready-to-design|",
+		"finished-a|finished|",
+	}
+	var got []string
+	var missing []string
+	projects := map[string]bool{}
+	for deadline := time.Now().Add(40 * time.Second); time.Now().Before(deadline); time.Sleep(500 * time.Millisecond) {
+		got, projects = got[:0], map[string]bool{}
+		for _, c := range r.cardsOf(t) {
+			got = append(got, c.Name+"|"+string(c.Section)+"|"+c.StatePill)
+			projects[c.Project] = true
+		}
+		missing = slices.DeleteFunc(slices.Clone(want), func(w string) bool { return slices.Contains(got, w) })
+		if len(missing) == 0 {
+			break
+		}
+	}
+	if len(missing) > 0 {
+		t.Fatalf("missing cards %v\ngot:\n%s", missing, strings.Join(got, "\n"))
+	}
+	if !projects["demo"] || !projects["auto"] {
+		t.Errorf("cards span projects %v, want demo and auto", projects)
+	}
+	// Three finished one-offs exist and server.recently-finished is 2.
+	oneOffs := 0
+	for _, g := range got {
+		if strings.HasPrefix(g, "done-") {
+			oneOffs++
+		}
+	}
+	if oneOffs != 2 {
+		t.Errorf("%d finished one-offs listed, want 2:\n%s", oneOffs, strings.Join(got, "\n"))
+	}
+}
+
 // running is a started fixture.
 type running struct {
 	cmd     *exec.Cmd
