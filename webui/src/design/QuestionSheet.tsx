@@ -94,7 +94,7 @@ export function Question({
       )}
       <Box>
         <Button
-          variant="ghost"
+          emphasis="ghost"
           size="sm"
           aria-label={`Note on question ${card.label}`}
           aria-pressed={noteOpen}
@@ -223,7 +223,7 @@ export function QuestionSheet({
         <Text fontSize="xs" color="text.dim">
           {done} of {round.length} answered
         </Text>
-        <Button variant="ghost" size="sm" aria-expanded={open} aria-label={open ? "Fold questions" : "Open questions"} onClick={() => setOpen((o) => !o)}>
+        <Button emphasis="ghost" size="sm" aria-expanded={open} aria-label={open ? "Fold questions" : "Open questions"} onClick={() => setOpen((o) => !o)}>
           {open ? "▾" : "▴"}
         </Button>
       </Box>
@@ -260,10 +260,10 @@ export function QuestionSheet({
           ))}
         </Box>
         <Box display="flex" justifyContent="space-between" mt="2">
-          <Button variant="ghost" disabled={index === 0} onClick={() => setIndex(index - 1)}>
+          <Button emphasis="ghost" disabled={index === 0} onClick={() => setIndex(index - 1)}>
             ← Prev
           </Button>
-          <Button variant="ghost" disabled={index === round.length - 1} onClick={() => setIndex(index + 1)}>
+          <Button emphasis="ghost" disabled={index === round.length - 1} onClick={() => setIndex(index + 1)}>
             Next →
           </Button>
         </Box>

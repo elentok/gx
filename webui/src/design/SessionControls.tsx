@@ -89,11 +89,11 @@ export function SessionHeader({
     <Box display="flex" flexDirection="column" gap="1">
       <Box display="flex" alignItems="center" gap="2" justifyContent="flex-end">
         {live.length > 1 && (
-          <Button size="sm" variant="outline" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
+          <Button size="sm" emphasis="secondary" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
             {live.length} live {menu ? "▴" : "▾"}
           </Button>
         )}
-        <Button size="sm" variant="outline" disabled={pending} onClick={startNew}>
+        <Button size="sm" emphasis="secondary" disabled={pending} onClick={startNew}>
           New session
         </Button>
       </Box>
@@ -103,7 +103,7 @@ export function SessionHeader({
             <Box key={s.id} display="flex" alignItems="center" gap="2" justifyContent="space-between">
               <Button
                 role="menuitem"
-                variant="ghost"
+                emphasis="ghost"
                 aria-current={s.id === shown.id}
                 onClick={() => {
                   onSelect(s.id);

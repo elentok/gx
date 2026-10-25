@@ -59,7 +59,7 @@ export function NewDesignForm({
         <Button type="submit" tone="running" disabled={pending}>
           Start design
         </Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>
+        <Button type="button" emphasis="ghost" onClick={onCancel}>
           Cancel
         </Button>
       </Box>

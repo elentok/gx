@@ -121,7 +121,7 @@ function MobileProgress({ detail, steps }: { detail: EpicDetail; steps: MapStep[
   return (
     <Box display="flex" flexDirection="column" gap="2">
       <SegmentedBar segments={segments} value={steps.filter((s) => s.state === "done").length} label="Design progress" />
-      <Button variant="ghost" tone="muted" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+      <Button emphasis="ghost" tone="muted" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         {summaryLine(steps, detail.rows)} {open ? "▴" : "▾"}
       </Button>
       {open && <Steps steps={steps} rows={detail.rows} />}

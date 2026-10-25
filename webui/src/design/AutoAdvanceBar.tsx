@@ -49,7 +49,7 @@ export function AutoAdvanceBar({
   return (
     <Box display="flex" gap="3" alignItems="center">
       <Button
-        variant="ghost"
+        emphasis="ghost"
         tone="muted"
         role="switch"
         aria-checked={session.auto_advance}
@@ -72,7 +72,7 @@ export function AutoAdvanceBar({
         <>
           <Text>Continuing in {secondsLeft}s</Text>
           <Button
-            variant="outline"
+            emphasis="secondary"
             disabled={disabled}
             onClick={() =>
               run(

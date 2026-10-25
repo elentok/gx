@@ -76,7 +76,7 @@ function SessionStrip({
   if (session.status.state !== "exited") return null;
   return (
     <Box display="flex" justifyContent="flex-end">
-      <Button size="sm" variant="outline" onClick={onNewSession}>
+      <Button size="sm" emphasis="secondary" onClick={onNewSession}>
         New session
       </Button>
     </Box>

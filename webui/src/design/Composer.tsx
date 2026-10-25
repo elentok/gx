@@ -174,7 +174,7 @@ export function Composer({
     </Button>
   );
   const focusButton = inRound && onFullScreen && (
-    <Button variant="outline" onClick={() => onFullScreen(true)} height="auto">
+    <Button emphasis="secondary" onClick={() => onFullScreen(true)} height="auto">
       ⤢ Focus
     </Button>
   );
@@ -196,7 +196,7 @@ export function Composer({
           </Text>
           <Box display="flex" gap="2">
             <Button
-              variant="outline"
+              emphasis="secondary"
               onClick={() => {
                 onReview?.(
                   round.findIndex((c) => c.label === unanswered[0].label),
@@ -304,7 +304,7 @@ export function Composer({
             autoFocus
           />
           <Box display="flex" gap="2" justifyContent="flex-end">
-            <Button variant="ghost" tone="muted" onClick={() => setOpen(false)}>
+            <Button emphasis="ghost" tone="muted" onClick={() => setOpen(false)}>
               Close
             </Button>
             {focusButton}
@@ -318,7 +318,7 @@ export function Composer({
       <Box display="flex" gap="2" alignItems="stretch">
         {!open && (
           <Button
-            variant="outline"
+            emphasis="secondary"
             aria-label="Note"
             onClick={() => setOpen(true)}
             height="auto"

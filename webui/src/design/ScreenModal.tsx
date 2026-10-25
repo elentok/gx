@@ -47,10 +47,10 @@ export function ScreenModal({ target, fetcher = fetchScreen, onClose }: { target
         onClick={(e) => e.stopPropagation()}
       >
         <Box display="flex" gap="2" justifyContent="flex-end">
-          <Button variant="outline" disabled={loading} onClick={load}>
+          <Button emphasis="secondary" disabled={loading} onClick={load}>
             Refresh
           </Button>
-          <Button variant="ghost" onClick={onClose}>
+          <Button emphasis="ghost" onClick={onClose}>
             Close
           </Button>
         </Box>

@@ -137,7 +137,7 @@ export function FailureBanner({
           {buttons.map((name) => (
             <Button
               key={name}
-              variant={name === "New session" && restoreHidden ? "tinted" : "outline"}
+              emphasis={name === "New session" && restoreHidden ? "main" : "secondary"}
               tone={name === "New session" && restoreHidden ? "running" : undefined}
               disabled={pending}
               onClick={onClick[name]}

@@ -102,7 +102,7 @@ export function RoundFocus({
           <Text flex="1" display={{ base: "none", md: "block" }} color="text.dim" fontSize="sm">
             {index + 1} of {round.length}
           </Text>
-          <Button variant="ghost" size="sm" fontSize="lg" aria-label="Exit full screen" title="Exit full screen (Esc)" onClick={onClose}>
+          <Button emphasis="ghost" size="sm" fontSize="lg" aria-label="Exit full screen" title="Exit full screen (Esc)" onClick={onClose}>
             ⤡
           </Button>
         </Box>
@@ -117,10 +117,10 @@ export function RoundFocus({
               onPicked={() => setIndex(Math.min(index + 1, round.length - 1))}
             />
             <Box display="flex" justifyContent="space-between" mt="6">
-              <Button variant="ghost" disabled={index === 0} onClick={() => setIndex(index - 1)}>
+              <Button emphasis="ghost" disabled={index === 0} onClick={() => setIndex(index - 1)}>
                 ← Prev
               </Button>
-              <Button variant="ghost" disabled={index === round.length - 1} onClick={() => setIndex(index + 1)}>
+              <Button emphasis="ghost" disabled={index === round.length - 1} onClick={() => setIndex(index + 1)}>
                 Next →
               </Button>
             </Box>

@@ -73,7 +73,7 @@ export function Picker({ groups, projects, current, onNew, onSelect }: PickerPro
     <Sidebar
       title="Designs"
       action={
-        <Button variant="ghost" onClick={onNew}>
+        <Button emphasis="ghost" onClick={onNew}>
           + New
         </Button>
       }
@@ -127,7 +127,7 @@ export function MobilePicker({ groups, projects, current, onNew }: PickerProps) 
   return (
     <Box>
       <Box display="flex" alignItems="center" gap="3">
-        <Button size="sm" variant="outline" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <Button size="sm" emphasis="secondary" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
           {name} {open ? "▴" : "▾"}
         </Button>
         {more > 0 && (
