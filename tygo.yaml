@@ -22,6 +22,7 @@ packages:
       - sessionscreen.go
       - sessionstate.go
       - sessions.go
+      - sessiontypes.go
       - stats.go
       - verdicts.go
     type_mappings:
