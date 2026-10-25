@@ -5,7 +5,7 @@ Run with `make web-e2e`. Each flow starts its own fixture server (`testutil/gxfi
 Retries are off. Locators use roles and visible text; no `data-testid` is used yet.
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
-Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9).
+Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12).
 
 ## 1. Queue an epic
 
@@ -120,3 +120,29 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   grill-findings, create-tickets, branch, done.
 - **Pass:** each step becomes current in turn (Done becomes done), earlier steps read done, and
   "Open implementation epic →" shows only at Branch and Done.
+
+## 10. Auto-advance
+
+- **Scenario:** `design`, with a 3s countdown (`--auto-advance-delay`)
+- **Steps:** start the session, answer round one (SQLite, Yes), Send.
+- **Pass:** after the run-end line the Composer shows "Continuing in Ns" and Cancel; with no press
+  the fresh round ("A fresh round.", `Q9`) appears.
+
+## 11. Auto-advance, cancel
+
+- **Scenario:** `design`, with a 5s countdown
+- **Steps:**
+  1. Answer round one and Send. During the countdown, click Cancel.
+  2. In a second test, open the Note box and type a note during the countdown instead.
+- **Pass:** the countdown disappears, Continue stays, and after the old deadline no fresh round
+  has been sent.
+
+## 12. The auto-advance switch
+
+- **Scenario:** `design`, with a 30s countdown
+- **Steps:**
+  1. The switch reads "Auto-advance on" while the agent works.
+  2. Turn it off, answer round one, Send; the run ends.
+  3. Turn it on.
+- **Pass:** with the switch off the run end shows Continue and no countdown; turning it on starts
+  "Continuing in Ns".

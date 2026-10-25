@@ -27,10 +27,19 @@ async function startFixture(
   scenario: string,
   page: Page,
   hold: boolean,
+  autoAdvanceDelay?: string,
 ): Promise<{ fixture: Fixture; stop: () => Promise<void> }> {
   const proc = spawn(
     process.env.GX_E2E_GXFIXTURE!,
-    ["--gx", process.env.GX_E2E_GX!, "--fakeclaude", process.env.GX_E2E_FAKECLAUDE!, ...(hold ? ["--hold"] : []), scenario],
+    [
+      "--gx",
+      process.env.GX_E2E_GX!,
+      "--fakeclaude",
+      process.env.GX_E2E_FAKECLAUDE!,
+      ...(hold ? ["--hold"] : []),
+      ...(autoAdvanceDelay ? ["--auto-advance-delay", autoAdvanceDelay] : []),
+      scenario,
+    ],
     { stdio: ["ignore", "pipe", "inherit"] },
   );
   const exited = new Promise<void>((resolve) => proc.once("exit", () => resolve()));
@@ -69,11 +78,13 @@ async function startFixture(
  * `start(scenario)` boots a fixture server and opens the page on it. Every test
  * gets its own server, stopped when the test ends.
  */
-export const test = base.extend<{ start: (scenario: string, opts?: { hold?: boolean }) => Promise<Fixture> }>({
+export const test = base.extend<{
+  start: (scenario: string, opts?: { hold?: boolean; autoAdvanceDelay?: string }) => Promise<Fixture>;
+}>({
   start: async ({ page }, use) => {
     const stops: Array<() => Promise<void>> = [];
     await use(async (scenario, opts) => {
-      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false);
+      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay);
       stops.push(stop);
       return fixture;
     });

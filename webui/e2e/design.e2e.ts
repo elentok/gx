@@ -26,7 +26,8 @@ test.describe("4. Start a design session", () => {
 
 test.describe("5. Answer a round", () => {
   test("ids, answer, Continue and a fresh round", async ({ page, start }) => {
-    await start("design");
+    // A countdown that never ends in the test, so the press is the only Continue.
+    await start("design", { autoAdvanceDelay: "1h" });
     await openDesign(page);
     await page.getByRole("button", nav("Start design session")).click();
 
@@ -69,5 +70,79 @@ test.describe("9. Design progress to the end", () => {
       await expect(page.getByText("Open implementation epic →")).toHaveCount(linked ? 1 : 0);
     }
     for (const s of ["chart", ...steps]) await expect(step(page, s, "done")).toBeVisible();
+  });
+});
+
+// Starts the session and answers round one, ending at the run-end line.
+const answerFirstRound = async (page: Page) => {
+  await openDesign(page);
+  await page.getByRole("button", nav("Start design session")).click();
+  const questions = page.getByRole("group", nav("Questions"));
+  await questions.getByRole("button", { name: /SQLite/ }).click();
+  await questions.getByRole("button", { name: /Yes/ }).click();
+  await page.getByRole("button", nav("Send")).click();
+};
+
+const autoSwitch = (page: Page, state: "on" | "off") => page.getByRole("switch", { name: `Auto-advance ${state}` });
+
+test.describe("10. Auto-advance", () => {
+  test("a fresh round follows the run end with no press", async ({ page, start }) => {
+    await start("design", { autoAdvanceDelay: "3s" });
+    await answerFirstRound(page);
+
+    await expect(page.getByText(/Continuing in \ds/)).toBeVisible();
+    await expect(page.getByRole("button", nav("Cancel"))).toBeVisible();
+    await expect(page.getByText("A fresh round.")).toBeVisible();
+    await expect(page.getByRole("group", nav("Questions")).getByText("Q9 - Keep going?")).toBeVisible();
+  });
+});
+
+test.describe("11. Auto-advance, cancel", () => {
+  test("Cancel stops the send and Continue stays", async ({ page, start }) => {
+    await start("design", { autoAdvanceDelay: "5s" });
+    await answerFirstRound(page);
+
+    await page.getByRole("button", nav("Cancel")).click();
+    await expect(page.getByText(/Continuing in/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Continue/ })).toBeVisible();
+    // Wait past the old deadline: nothing was sent.
+    await page.waitForTimeout(6000);
+    await expect(page.getByText("A fresh round.")).toHaveCount(0);
+  });
+
+  test("a note typed during the countdown stops the send", async ({ page, start }) => {
+    await start("design", { autoAdvanceDelay: "5s" });
+    await answerFirstRound(page);
+
+    await expect(page.getByText(/Continuing in/)).toBeVisible();
+    await page.getByRole("button", nav("Note")).click();
+    await page.getByRole("textbox", nav("Message")).fill("wait, one thing");
+    await expect(page.getByText(/Continuing in/)).toHaveCount(0);
+    await page.waitForTimeout(6000);
+    await expect(page.getByText("A fresh round.")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Continue/ })).toBeVisible();
+  });
+});
+
+test.describe("12. The auto-advance switch", () => {
+  test("shows while working and idle; off, then on starts the countdown", async ({ page, start }) => {
+    await start("design", { autoAdvanceDelay: "30s" });
+    await openDesign(page);
+    await page.getByRole("button", nav("Start design session")).click();
+    await expect(autoSwitch(page, "on")).toBeVisible();
+
+    await autoSwitch(page, "on").click();
+    await expect(autoSwitch(page, "off")).toBeVisible();
+
+    const questions = page.getByRole("group", nav("Questions"));
+    await questions.getByRole("button", { name: /SQLite/ }).click();
+    await questions.getByRole("button", { name: /Yes/ }).click();
+    await page.getByRole("button", nav("Send")).click();
+    await expect(page.getByRole("button", { name: /^Continue/ })).toBeVisible();
+    await expect(page.getByText(/Continuing in/)).toHaveCount(0);
+
+    await autoSwitch(page, "off").click();
+    await expect(autoSwitch(page, "on")).toBeVisible();
+    await expect(page.getByText(/Continuing in/)).toBeVisible();
   });
 });
