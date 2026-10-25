@@ -286,6 +286,9 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 			return repairRefusal(err), nil
 		}
 		if prompted {
+			if err := tickets.EndOpenRound(t.Path, req.origin, tickets.HowResume, ralphloop.CloseResumed); err != nil {
+				return RepairResult{}, fmt.Errorf("end pause round of %s: %w", addr, err)
+			}
 			return repairOK(repair.ResumeResult{Ticket: id, Status: repair.ResumePrompted, Message: repair.MessagePrompted})
 		}
 	}
