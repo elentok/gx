@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
@@ -32,6 +33,21 @@ func TestPrintEpicList_OneLinePerEpic(t *testing.T) {
 		t.Fatal(err)
 	}
 	if want := "proj:a\tloop\tready\t1/2\tqueueable=true\tready-to-queue\nproj:b\tmap\tdesigning\t0/0\tqueueable=false\t\n"; out.String() != want {
+		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+}
+
+func TestPrintEpicList_NeedsYouRowsKeepTheServersOldestWaitOrder(t *testing.T) {
+	var out bytes.Buffer
+	l := server.EpicList{Epics: []server.EpicListRow{
+		{Address: "proj:old", Kind: server.EpicKindLoop, State: server.EpicListPaused, Section: server.SectionNeedsYou, WaitingSince: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)},
+		{Address: "proj:new", Kind: server.EpicKindLoop, State: server.EpicListMergeBlocked, Section: server.SectionNeedsYou, WaitingSince: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)},
+	}}
+	if err := printEpicList(&out, l); err != nil {
+		t.Fatal(err)
+	}
+	want := "proj:old\tloop\tpaused\t0/0\tqueueable=false\tneeds-you\nproj:new\tloop\tmerge-blocked\t0/0\tqueueable=false\tneeds-you\n"
+	if out.String() != want {
 		t.Errorf("output = %q, want %q", out.String(), want)
 	}
 }

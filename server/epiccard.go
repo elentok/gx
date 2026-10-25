@@ -35,13 +35,19 @@ const (
 type CardActionKind string
 
 const (
-	CardActionQueue CardActionKind = "queue"
+	CardActionQueue      CardActionKind = "queue"
+	CardActionAnswer     CardActionKind = "answer"
+	CardActionOpenTicket CardActionKind = "open-ticket"
+	CardActionOpenEpic   CardActionKind = "open-epic"
+	CardActionMerge      CardActionKind = "merge"
 )
 
-// CardAction is one button of a card.
+// CardAction is one button of a card. Target is the address the button opens (a
+// ticket for Answer and Open ticket, an epic for Open epic) or acts on (Merge).
 type CardAction struct {
-	Kind  CardActionKind `json:"kind"`
-	Label string         `json:"label"`
+	Kind   CardActionKind `json:"kind"`
+	Label  string         `json:"label"`
+	Target string         `json:"target,omitempty"`
 }
 
 // loopCardSection is the section of a loop epic row.
@@ -143,7 +149,7 @@ func sortCards(rows []EpicListRow, queuePosition func(EpicListRow) int) {
 		}
 		switch a.Section {
 		case SectionNeedsYou:
-			return a.LastActivityAt.Compare(b.LastActivityAt)
+			return a.WaitingSince.Compare(b.WaitingSince)
 		case SectionInProgress:
 			if c := cmp.Compare(inProgressRank(a), inProgressRank(b)); c != 0 {
 				return c

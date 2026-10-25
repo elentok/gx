@@ -370,12 +370,18 @@ export const CardKindImplementation: CardKind = "implementation";
  */
 export type CardActionKind = string;
 export const CardActionQueue: CardActionKind = "queue";
+export const CardActionAnswer: CardActionKind = "answer";
+export const CardActionOpenTicket: CardActionKind = "open-ticket";
+export const CardActionOpenEpic: CardActionKind = "open-epic";
+export const CardActionMerge: CardActionKind = "merge";
 /**
- * CardAction is one button of a card.
+ * CardAction is one button of a card. Target is the address the button opens (a
+ * ticket for Answer and Open ticket, an epic for Open epic) or acts on (Merge).
  */
 export interface CardAction {
   kind: CardActionKind;
   label: string;
+  target?: string;
 }
 
 //////////
@@ -655,6 +661,12 @@ export interface EpicListRow {
    */
   reason?: string;
   actions?: CardAction[];
+  /**
+   * StatePill and WaitingSince are set on a Needs-you card: the pill word and the
+   * start of the wait the section sorts by.
+   */
+  state_pill?: string;
+  waiting_since?: string;
 }
 /**
  * FollowUpCount is the number of draft and open tickets in one project's

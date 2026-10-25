@@ -42,6 +42,9 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 	}
 
 	queue := []server.CardAction{{Kind: server.CardActionQueue, Label: "Queue"}}
+	merge := func(target string) []server.CardAction {
+		return []server.CardAction{{Kind: server.CardActionMerge, Label: "Merge", Target: target}}
+	}
 	want := map[string]struct {
 		section server.CardSection
 		words   string
@@ -50,9 +53,9 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 	}{
 		"proj:ready":    {server.SectionReadyToQueue, "Not started", 50, queue},
 		"proj:queued":   {server.SectionInProgress, "Queued #1", 0, nil},
-		"proj:awaiting": {server.SectionInProgress, "Implemented", 100, nil},
-		"proj:paused":   {server.SectionNeedsYou, "Implementing...", 0, nil},
-		"proj:blocked":  {server.SectionNeedsYou, "Implemented", 100, nil},
+		"proj:awaiting": {server.SectionNeedsYou, "Implemented", 100, merge("proj:awaiting")},
+		"proj:paused":   {server.SectionNeedsYou, "Implementing...", 0, []server.CardAction{{Kind: server.CardActionOpenTicket, Label: "Open ticket", Target: "proj:paused/01"}}},
+		"proj:blocked":  {server.SectionNeedsYou, "Implemented", 100, merge("proj:blocked")},
 		"proj:merging":  {server.SectionInProgress, "Merging...", 50, nil},
 		"proj:draft":    {server.SectionReadyToDesign, "Draft", 0, nil},
 		"proj:noopen":   {server.SectionReadyToDesign, "No open tickets", 0, nil},

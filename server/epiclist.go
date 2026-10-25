@@ -113,6 +113,10 @@ type EpicListRow struct {
 	// Reason is the line under the status words when there is something to say.
 	Reason  string       `json:"reason,omitempty"`
 	Actions []CardAction `json:"actions,omitempty"`
+	// StatePill and WaitingSince are set on a Needs-you card: the pill word and the
+	// start of the wait the section sorts by.
+	StatePill    string    `json:"state_pill,omitempty"`
+	WaitingSince time.Time `json:"waiting_since,omitzero"`
 }
 
 // FollowUpCount is the number of draft and open tickets in one project's
@@ -287,6 +291,10 @@ func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 	}
 	if !e.IsMap {
 		decorateLoopCard(&row, s.rootQueuePosition(root))
+		if n, ok := s.loopNeedsYou(root, e, row.State); ok {
+			row.Section, row.StatePill, row.Reason, row.WaitingSince = SectionNeedsYou, n.Pill, n.Reason, n.Since
+			row.Actions = []CardAction{n.Action}
+		}
 	}
 	return row
 }

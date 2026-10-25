@@ -59,6 +59,7 @@ func startBlockedClaimed(t *testing.T, herdr bool, p *agentrunner.Pending) (*ser
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.RunnerFor = func(_, _ string) agentrunner.Runner { return runner }
 		c.BudgetPollInterval = time.Hour
+		c.WebAddr = "127.0.0.1:0"
 	})
 	wtPath, _ := leaveIteration(t, h, store, repo)
 	if _, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01", Cwd: wtPath}); err != nil {
