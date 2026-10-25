@@ -385,6 +385,10 @@ the block or typing into the session does, except for one gx raised itself, whic
 a newer Actionable or session exit replaces. Always carries a reason.
 _Avoid_: unread (a read session can still be actionable).
 
+**Auto-advance** — the server sends a Design session's Continue by itself after a countdown.
+
+**Chain** — a design run moving on to the next step or map ticket in the same session.
+
 **Action** — the prompts an agent attaches to an Actionable it raised, which gx can send into the
 session on the person's request (e.g. clear, then run the next design step).
 

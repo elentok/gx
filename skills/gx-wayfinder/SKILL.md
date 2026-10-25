@@ -102,7 +102,7 @@ Ruling something out of scope is a scoping act, not a step on the route. When a 
 
 ## Invocation
 
-Two modes. Either way, **never resolve more than one ticket per session**, with the exception of research tickets.
+Two modes. Either way, **resolve one ticket per session unless the calling skill allows more**, and always allow more for research tickets.
 
 ### Chart the map
 

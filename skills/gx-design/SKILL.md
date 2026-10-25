@@ -25,8 +25,8 @@ state machine. The map's `design_step` field is what Progress shows. This skill 
 - `resolve-tickets`, `spec`, `review`, `grill-findings` and `create-tickets` in steps 3 to 7.
 - `branch` when it creates the `<epic>-impl` branch (step 8).
 - `done` only when this run itself closes the map. Reporting the `<epic>-impl` slug (step 9) does not.
-- A move to an earlier step needs `--allow-backward`. Pass it only when a review sends tickets back
-  to the map (steps 5 and 6), never for any other move.
+- A move to an earlier step needs `--allow-backward`. Pass `--allow-backward` only for a review finding that becomes a map ticket
+  (steps 5 and 6), never for any other move.
 
 ## Calling other skills
 
@@ -54,6 +54,10 @@ marks the session as a design run. Outside a gx session it prints a note and doe
 
 Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the first match.
 
+At each detection, including after a chain, report the step it starts with
+`gx agent step <step> [--title "<ticket title>"]`. Use the step name from the list above; pass
+the ticket title during `resolve-tickets`.
+
 1. **No map epic** (`gx tickets epics --maps` doesn't list it) → follow gx-wayfinder's "Chart the map"
    for the epic, including its Destination grilling. Text after the epic address in
    `/gx-design <epic> <idea>` is the rough idea: pass it to that step as the loose idea instead of
@@ -63,12 +67,18 @@ Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the f
    the same session, unless the grilling changed the Destination enough that seeded tickets must
    change. Then rework them and stop.
 3. **Open tickets, or a non-empty `## Not yet specified`** → follow gx-wayfinder's "Work through the
-   map", resolving exactly **one** ticket. Never more per run: HITL tickets must stay interactive.
+   map", resolving one frontier ticket at a time. Skip claimed tickets.
    For a `grilling` ticket, load the skills named under "Asking questions" before the first
-   question. Given a ticket address, resolve that ticket instead of the first frontier ticket. If it is not
-   open, or its `blocked_by` are not all closed, say so and stop. A ticket address only ever runs
-   this step: when step 1 or 2 matches first, run that step instead and name the ticket in the
-   "Next:" line. Set `--design-step resolve-tickets` before resolving the ticket.
+   question. Each ticket keeps its own grilling round, Resolution and Decisions so far line.
+   Given a ticket address, resolve that ticket instead of the first frontier ticket. If it is not
+   open, or its `blocked_by` are not all closed, say so and stop. A ticket address picks only the first ticket;
+   after it closes, the run chains to the frontier. When step 1 or 2 matches first, run that step instead and
+   name the ticket in the "Next:" line. Set `--design-step resolve-tickets` before resolving the ticket.
+   - After a map ticket closes, chain to the next frontier ticket while the `--fits` check passes
+     with the map-ticket growth (see "After every run").
+   - Grilling, research and AFK task tickets chain. A chain never enters a prototype or HITL task ticket:
+     end with the run-end line just before it. A run that starts on one ends after it.
+   - The last map ticket closing chains into the spec step (step 4) when the budget allows.
 4. **No `docs/specs/<epic>.md`** → dispatch a subagent to read [gx-to-spec](../gx-to-spec/SKILL.md) and follow it. Seed it with
    the map body (Destination, Decisions so far) and each closed ticket's title and resolution gist,
    not full ticket bodies. The spec is where the map's gaps first show, so tell the subagent to sort
@@ -136,10 +146,14 @@ Review the spec against the map it came from and its own template, not in the ab
 Start a fresh session between runs (`/clear` in Claude, `/new` in Codex). The run that just ended
 is not the place for the next one, except where a step says to continue.
 
-Steps 4–8 can also chain. After step 4, 5 or 6 finishes, run `gx agent context-window`. If it
-reports under **50K** tokens used, go back to "Detecting the next step" in the same session instead
-of stopping. If it reports 50K or more, or the command errors, stop as usual. Never chain out of
-steps 1–3: map runs stay one per session.
+Every step chains by the same check. After a step finishes, run detection to find the next step,
+then run `gx agent context-window --fits <next step>`. On exit 0, chain: go back to "Detecting the
+next step" in the same session. On exit 1 or an error, end the run with the run-end line below;
+the server's auto-advance starts the next step in a fresh session. For a map ticket, use
+`resolve-tickets` as the next step.
+
+Set `--design-step` to the step the next run starts, with
+`gx tickets set <project:epic> --design-step <step>`, before printing the run-end line.
 
 End with one line:
 
