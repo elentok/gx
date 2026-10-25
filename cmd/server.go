@@ -168,8 +168,16 @@ func runServer(ctx context.Context) error {
 			return fmt.Errorf("GX_SERVER_LOG_LEVEL: %w", err)
 		}
 	}
+	// Test hook: gxfixture shortens the run-end countdown so flows do not wait it out.
+	var autoAdvanceDelay time.Duration
+	if v := os.Getenv("GX_AUTO_ADVANCE_DELAY"); v != "" {
+		if autoAdvanceDelay, err = time.ParseDuration(v); err != nil {
+			return fmt.Errorf("GX_AUTO_ADVANCE_DELAY: %w", err)
+		}
+	}
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
-		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel})
+		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
+		AutoAdvanceDelay: autoAdvanceDelay})
 	if err != nil {
 		return err
 	}

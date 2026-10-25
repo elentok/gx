@@ -7,6 +7,7 @@ import (
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets"
 )
 
 const project = "demo"
@@ -30,6 +31,9 @@ type scenario struct {
 	// designSteps makes each epic, by address, a map and sets its design step
 	// with the CLI verb, so no spec file is needed in trunk.
 	designSteps map[string]string
+	// design scripts the design agent's turns (agentfake.DesignTurn*), one per
+	// prompt in order; none means the fake's default.
+	design []string
 	// queue lists the epics put on the queue once the server is up.
 	queue []string
 }
@@ -91,18 +95,18 @@ var scenarios = map[string]scenario{
 	// design: a map epic at the Resolve tickets step, with open tickets. Its
 	// design session replays fakeclaude's scripted chat. Its implementation
 	// epic exists, so Progress links to it at Branch and Done.
-	"design": {
-		epics: []epic{
-			{project, "design-epic", []ticket{
-				{"01", "first", servertest.TicketOpts{}},
-				{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
-			}},
-			{project, "design-epic-impl", []ticket{
-				{"01", "build", servertest.TicketOpts{}},
-			}},
-		},
-		designSteps: map[string]string{project + ":design-epic": "resolve-tickets"},
-	},
+	"design": designBase,
+	// design-plain (V3): a round, then a plain-text turn after the answer.
+	"design-plain": designScript(tickets.StepResolveTickets,
+		agentfake.DesignTurnRound, agentfake.DesignTurnPlain),
+	// design-branch (V4): the map is at Branch and the agent ends the run.
+	"design-branch": designScript(tickets.StepBranch, agentfake.DesignTurnRunEnd),
+	// design-error (V13): a round, then an error turn before the run-end line.
+	"design-error": designScript(tickets.StepResolveTickets,
+		agentfake.DesignTurnRound, agentfake.DesignTurnError),
+	// design-guard (V14): six run-end turns in a row.
+	"design-guard": designScript(tickets.StepResolveTickets,
+		slices.Repeat([]string{agentfake.DesignTurnRunEnd}, 6)...),
 	// edge: a project with no epics, an epic with no tickets, and a ticket
 	// blocked by a dependency that is not merged.
 	"edge": {
@@ -115,6 +119,28 @@ var scenarios = map[string]scenario{
 			}},
 		},
 	},
+}
+
+var designBase = scenario{
+	epics: []epic{
+		{project, "design-epic", []ticket{
+			{"01", "first", servertest.TicketOpts{}},
+			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
+		}},
+		{project, "design-epic-impl", []ticket{
+			{"01", "build", servertest.TicketOpts{}},
+		}},
+	},
+	designSteps: map[string]string{project + ":design-epic": string(tickets.StepResolveTickets)},
+}
+
+// designScript is the design scenario with the map at step and the design
+// agent playing turns, one per prompt in order.
+func designScript(step tickets.DesignStep, turns ...string) scenario {
+	sc := designBase
+	sc.designSteps = map[string]string{project + ":design-epic": string(step)}
+	sc.design = turns
+	return sc
 }
 
 func scenarioNames() []string {

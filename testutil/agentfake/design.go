@@ -37,18 +37,69 @@ var designRounds = []string{
 		"❓ **Q9** - **Keep going?**: Ready for the next step?\n\n" + yesNoBlock,
 }
 
-// designTurn plays one turn: a /gx-design prompt gets the next scripted round,
-// and any other text (the person's answer) gets the run-end message. The
-// message lands in the transcript before the turn starts, and the turn ends
+// The turn kinds a WorkerConfig.Design script names, one per prompt in order.
+const (
+	// DesignTurnRound is the next scripted grilling round.
+	DesignTurnRound = "round"
+	// DesignTurnRunEnd is a message that closes the run.
+	DesignTurnRunEnd = "run-end"
+	// DesignTurnPlain is text with neither a question nor the run-end line.
+	DesignTurnPlain = "plain"
+	// DesignTurnError is error text, then the run-end line.
+	DesignTurnError = "error"
+	// DesignTurnDefaulted is a round whose questions are all defaulted: plain
+	// text under a heading, and one yes/no card to accept them.
+	DesignTurnDefaulted = "defaulted"
+)
+
+const defaultedRound = "Everything else has a clear answer.\n\n" +
+	"**Defaulted**\n\n- Q10: keep the current store.\n- Q11: migrate at startup.\n\n" +
+	"❓ **Q12** - **Accept these defaults?**: Say so, or object in the message box.\n\n" + yesNoBlock
+
+// designMessage is the assistant message for the turn-th prompt (from zero).
+// Without a script a /gx-design prompt gets the next round and any other text
+// the run-end message; a script that has run out falls back to the same.
+func (t *tui) designMessage(text string, script []string) string {
+	kind := ""
+	if t.design.turns < len(script) {
+		kind = script[t.design.turns]
+	} else if isDesignPrompt(text) {
+		kind = DesignTurnRound
+	}
+	t.design.turns++
+	switch kind {
+	case DesignTurnRound:
+		msg := designRounds[min(t.design.rounds, len(designRounds)-1)]
+		t.design.rounds++
+		return msg
+	case DesignTurnPlain:
+		return "Noted, I am thinking it over."
+	case DesignTurnError:
+		return "Error: the spec step failed, so I retried it.\n\n" + DesignRunEnd
+	case DesignTurnDefaulted:
+		return defaultedRound
+	}
+	return "Thanks, that settles it.\n\n" + DesignRunEnd
+}
+
+// designTurn plays one turn, picking its message with designMessage. The
+// message lands in the transcript while the turn is busy, and the turn ends
 // shortly after so the server sees the busy-to-idle change that raises the
 // Actionable.
 func (t *tui) designTurn(text string) error {
 	t.prompt = text
-	msg := "Thanks, that settles it.\n\n" + DesignRunEnd
+	var script []string
+	if cfg, err := LoadWorkerConfig(t.pid.Cwd); err == nil {
+		script = cfg.Design
+	}
 	if isDesignPrompt(text) {
 		t.design.active = true
-		msg = designRounds[min(t.design.rounds, len(designRounds)-1)]
-		t.design.rounds++
+	}
+	msg := t.designMessage(text, script)
+	// Busy comes first: a message that appears while the session still reads
+	// idle lets a test prompt it before the turn has started, and that prompt is lost.
+	if err := t.setStatus(StatusBusy, ""); err != nil {
+		return err
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -69,7 +120,7 @@ func (t *tui) designTurn(text string) error {
 		time.Sleep(designTurnTime)
 		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
 	}()
-	return t.setStatus(StatusBusy, "")
+	return nil
 }
 
 // designTurnTime is how long a scripted turn stays busy.

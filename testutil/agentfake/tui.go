@@ -306,6 +306,7 @@ type tui struct {
 type designState struct {
 	active bool
 	rounds int
+	turns  int
 }
 
 // tuiEvent is one key from the terminal, one control, or the end of input.

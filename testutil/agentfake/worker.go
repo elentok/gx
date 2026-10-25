@@ -33,6 +33,10 @@ type WorkerConfig struct {
 	// Behaviour maps a ticket address to what the worker does with it:
 	// BehaviourFinish (the default), BehaviourAsk, BehaviourFail or BehaviourPermission.
 	Behaviour map[string]string `json:"behaviour,omitempty"`
+	// Design scripts the design agent's turns, one DesignTurn* kind per prompt
+	// in order. Empty means today's behaviour: a round per /gx-design prompt,
+	// the run-end message for any other text.
+	Design []string `json:"design,omitempty"`
 }
 
 // What a worker does with a ticket.

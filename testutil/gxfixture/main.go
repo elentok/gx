@@ -3,7 +3,9 @@
 // removes everything it made. It never reads or writes the real HOME, config
 // or state: the server and every CLI verb run in a temp HOME and temp XDG dirs.
 //
-//	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] <scenario>
+//	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] [--auto-advance-delay <duration>] <scenario>
+//
+// --auto-advance-delay shortens the server's run-end countdown (default 10s).
 //
 // A binary left out is built with `go build`, which needs the module as the
 // working directory.
@@ -48,12 +50,18 @@ func main() {
 }
 
 func run(args []string) (err error) {
-	var gxBin, fakeBin, name string
+	var gxBin, fakeBin, name, autoAdvance string
 	var hold bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--hold":
 			hold = true
+		case "--auto-advance-delay":
+			if i+1 == len(args) {
+				return fmt.Errorf("%s needs a value", args[i])
+			}
+			autoAdvance = args[i+1]
+			i++
 		case "--gx", "--fakeclaude":
 			if i+1 == len(args) {
 				return fmt.Errorf("%s needs a value", args[i])
@@ -108,6 +116,12 @@ func run(args []string) (err error) {
 		stateD: filepath.Join(root, "state", "gx"),
 	}
 	f.env, f.cliEnv = isolatedEnv(root, binDir)
+	if autoAdvance != "" {
+		if _, err := time.ParseDuration(autoAdvance); err != nil {
+			return fmt.Errorf("--auto-advance-delay: %w", err)
+		}
+		f.env = append(f.env, "GX_AUTO_ADVANCE_DELAY="+autoAdvance)
+	}
 	if err := f.writeConfig(port); err != nil {
 		return err
 	}
@@ -212,7 +226,7 @@ func (f *fixture) seed(sc scenario) error {
 	if err := os.MkdirAll(repo, 0o755); err != nil {
 		return err
 	}
-	cfg, err := json.Marshal(agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: "30s", Behaviour: sc.behaviour})
+	cfg, err := json.Marshal(agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: "30s", Behaviour: sc.behaviour, Design: sc.design})
 	if err != nil {
 		return err
 	}

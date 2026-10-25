@@ -19,6 +19,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/transcript"
 )
 
 var gxBin, fixtureBin, fakeBin string
@@ -55,7 +56,14 @@ type running struct {
 
 func start(t *testing.T, scenario string) *running {
 	t.Helper()
-	cmd := exec.Command(fixtureBin, "--gx", gxBin, "--fakeclaude", fakeBin, scenario)
+	return startWith(t, scenario)
+}
+
+// startWith starts the scenario with extra gxfixture flags.
+func startWith(t *testing.T, scenario string, flags ...string) *running {
+	t.Helper()
+	args := append([]string{"--gx", gxBin, "--fakeclaude", fakeBin}, flags...)
+	cmd := exec.Command(fixtureBin, append(args, scenario)...)
 	cmd.Stderr = os.Stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -469,5 +477,91 @@ func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 	r.waitIdle(t, id)
 	r.web(t).post(t, "/v1/sessions/prompt", map[string]any{"id": id, "continue": true, "last_message": chat.Messages[len(chat.Messages)-1].ID})
 	r.waitChat(t, id, func(c server.SessionChatResponse) bool { return slices.Equal(roundLabels(c), []string{"9"}) })
+	r.stop(t)
+}
+
+// openDesign opens the design session of the scenario's map and returns its id.
+func (r *running) openDesign(t *testing.T) string {
+	t.Helper()
+	var res server.SessionResult
+	if err := json.Unmarshal([]byte(r.gx(t, "designs", "open", designAddr, "--json")), &res); err != nil || res.Session == nil {
+		t.Fatalf("designs open = %+v, %v", res, err)
+	}
+	return res.Session.ID
+}
+
+// promptWhenIdle types text until it shows in the chat. The status the server
+// reports lags the fake's turn, so a prompt sent right after a scripted message
+// can be refused, or typed into a busy session and lost.
+func (r *running) promptWhenIdle(t *testing.T, id, text string) {
+	t.Helper()
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		cmd := exec.Command(gxBin, "agents", "prompt", id, text)
+		cmd.Env = r.Env
+		if _, err := cmd.CombinedOutput(); err == nil {
+			for range 10 {
+				var chat server.SessionChatResponse
+				if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", id, "--json")), &chat); err != nil {
+					t.Fatal(err)
+				}
+				for _, m := range chat.Messages {
+					if m.Role == transcript.ChatRolePerson && m.Text == text {
+						return
+					}
+				}
+				time.Sleep(200 * time.Millisecond)
+			}
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatalf("session %s never took the prompt %q", id, text)
+}
+
+// agentTexts are the text of the session's assistant messages, oldest first.
+func agentTexts(chat server.SessionChatResponse) []string {
+	var texts []string
+	for _, m := range chat.Messages {
+		if m.Role == transcript.ChatRoleAgent && m.Kind == transcript.ChatKindText {
+			texts = append(texts, m.Text)
+		}
+	}
+	return texts
+}
+
+func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
+	const runEnd = "scripted run is over"
+	tests := []struct {
+		scenario string
+		// want is the text each assistant message must contain, in order; the
+		// test answers every message but the last.
+		want []string
+	}{
+		{"design-plain", []string{"Q8", "thinking it over"}},
+		{"design-branch", []string{runEnd}},
+		{"design-error", []string{"Q8", "Error: the spec step failed"}},
+		{"design-guard", slices.Repeat([]string{runEnd}, 6)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.scenario, func(t *testing.T) {
+			// A long countdown keeps the server from answering run-end lines itself.
+			r := startWith(t, tt.scenario, "--auto-advance-delay", "1h")
+			id := r.openDesign(t)
+			for i, want := range tt.want {
+				r.waitChat(t, id, func(c server.SessionChatResponse) bool {
+					texts := agentTexts(c)
+					return len(texts) == i+1 && strings.Contains(texts[i], want)
+				})
+				if i < len(tt.want)-1 {
+					r.promptWhenIdle(t, id, fmt.Sprintf("go on (%d)", i))
+				}
+			}
+			r.stop(t)
+		})
+	}
+}
+
+func TestStart_AutoAdvanceDelayFlagIsAccepted(t *testing.T) {
+	r := startWith(t, "design", "--auto-advance-delay", "50ms")
 	r.stop(t)
 }
