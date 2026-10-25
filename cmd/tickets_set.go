@@ -211,7 +211,6 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 		update.AllowBackward, _ = c.Flags().GetBool("allow-backward")
 		changed = append(changed, "design_step="+v)
 	}
-	var completedAt *time.Time
 	if handCompletable && c.Flags().Changed("completed-at") {
 		v, _ := c.Flags().GetString("completed-at")
 		at := time.Now().UTC()
@@ -221,7 +220,7 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 				return fmt.Errorf("%s: --completed-at %q: want an RFC3339 timestamp or now", ticketLabel(path), v)
 			}
 		}
-		completedAt = &at
+		update.CompletedAt = &at
 		changed = append(changed, "completed_at="+at.Format(time.RFC3339))
 	}
 	var notices []string
@@ -243,12 +242,6 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 	}
 	if err := tickets.UpdateEpicFields(path, update); err != nil {
 		return fmt.Errorf("%s: %w", ticketLabel(path), err)
-	}
-	if completedAt != nil {
-		// Stamping never overwrites, so a map completed earlier keeps its first value.
-		if err := tickets.StampMapCompletion(epicDir, *completedAt); err != nil {
-			return fmt.Errorf("%s: %w", ticketLabel(path), err)
-		}
 	}
 	printNotices(c.ErrOrStderr(), notices)
 

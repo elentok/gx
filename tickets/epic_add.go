@@ -161,21 +161,30 @@ func CreateEpic(projectDir, name string, fields EpicFields, body string) (string
 // conversation lacking totals, gets no tokens or cost. Stamping never
 // overwrites, so the first completion wins.
 func StampMapCompletion(mapPath string, at time.Time) error {
+	fields, err := mapCompletionFields(mapPath, at)
+	if err != nil {
+		return err
+	}
+	return StampEpicFields(mapPath, fields)
+}
+
+// mapCompletionFields are the frontmatter keys StampMapCompletion writes.
+func mapCompletionFields(mapPath string, at time.Time) (map[string]any, error) {
 	fields := map[string]any{"completed_at": at}
 	root, err := conversations.DefaultDir()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	label := ProjectName(filepath.Dir(mapPath)) + ":" + filepath.Base(mapPath)
 	sum, ok, err := conversations.SumEpicTotals(root, label, LoadEpicTicketMD(mapPath).CreatedAt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if ok {
 		fields["total_tokens"] = int64(sum.TotalTokens)
 		fields["actual_cost"] = sum.Cost
 	}
-	return StampEpicFields(mapPath, fields)
+	return fields, nil
 }
 
 // implEpicPath is where a map's <map>-impl epic lives.

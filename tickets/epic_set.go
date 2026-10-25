@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/fsutil"
 	"github.com/elentok/gx/tickets/schema"
@@ -40,6 +41,10 @@ type EpicUpdate struct {
 	AllowBackward bool
 	// BlockedBy is written as given; check it first with CheckEpicBlockedByWrite.
 	BlockedBy *[]string
+	// CompletedAt completes a map epic: it is stamped with the tokens and cost
+	// in the same write as every other field, and an existing stamp is kept, so
+	// the first completion wins.
+	CompletedAt *time.Time
 }
 
 // UpdateEpicFields applies u to the frontmatter of the epic ticket.md at
@@ -70,7 +75,25 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 			return fmt.Errorf("design_step is for a map epic; this epic is not kind: map")
 		}
 	}
+	var completion map[string]any
+	if u.CompletedAt != nil {
+		if !IsMapEpic(filepath.Dir(ticketPath)) {
+			return fmt.Errorf("completed_at is for a map epic; this epic is not kind: map")
+		}
+		var err error
+		if completion, err = mapCompletionFields(filepath.Dir(ticketPath), *u.CompletedAt); err != nil {
+			return err
+		}
+	}
 	return editEpicTicketMD(ticketPath, func(mapping *yaml.Node, _ *string) error {
+		for key, value := range completion {
+			if mappingKeyIndex(mapping, key) >= 0 {
+				continue
+			}
+			if err := setMappingValue(mapping, key, value); err != nil {
+				return err
+			}
+		}
 		if u.DesignStep != nil {
 			if err := checkDesignStepMove(mapping, *u.DesignStep, u.AllowBackward); err != nil {
 				return err
