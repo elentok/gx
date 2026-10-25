@@ -75,7 +75,12 @@ func printEpicRow(w io.Writer, address, kind, state string, done, total int, que
 
 func printEpicList(w io.Writer, l server.EpicList) error {
 	for _, e := range l.Epics {
-		if err := printEpicRow(w, e.Address, string(e.Kind), string(e.State), e.Done, e.Total, e.Queueable, string(e.Section)); err != nil {
+		// A joined card prints the active part's address, the first of Addresses.
+		address := e.Address
+		if len(e.Addresses) > 0 {
+			address = e.Addresses[0]
+		}
+		if err := printEpicRow(w, address, string(e.Kind), string(e.State), e.Done, e.Total, e.Queueable, string(e.Section)); err != nil {
 			return err
 		}
 	}

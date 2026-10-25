@@ -37,6 +37,19 @@ func TestPrintEpicList_OneLinePerEpic(t *testing.T) {
 	}
 }
 
+func TestPrintEpicList_JoinedCardPrintsTheActivePartsAddress(t *testing.T) {
+	var out bytes.Buffer
+	l := server.EpicList{Epics: []server.EpicListRow{
+		{Address: "proj:m", Addresses: []string{"proj:m-impl", "proj:m"}, Kind: server.EpicKindMap, State: server.EpicListRunning, Section: server.SectionInProgress},
+	}}
+	if err := printEpicList(&out, l); err != nil {
+		t.Fatal(err)
+	}
+	if want := "proj:m-impl\tmap\trunning\t0/0\tqueueable=false\tin-progress\n"; out.String() != want {
+		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+}
+
 func TestPrintEpicList_NeedsYouRowsKeepTheServersOldestWaitOrder(t *testing.T) {
 	var out bytes.Buffer
 	l := server.EpicList{Epics: []server.EpicListRow{

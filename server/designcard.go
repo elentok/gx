@@ -27,25 +27,67 @@ func designPercent(m tickets.Epic, step ProgressStep) int {
 	return min(100, (slices.Index(tickets.DesignSteps, step)+closed)*100/total)
 }
 
-// decorateDesignCard fills the card fields of a map row.
-func decorateDesignCard(row *EpicListRow, m tickets.Epic, byName map[string]tickets.Epic, act designActivity) {
+// reachedBranch reports whether a map's design is at Branch or later, which is
+// when a joined card shows the -impl epic.
+func reachedBranch(step ProgressStep) bool {
+	return slices.Index(tickets.DesignSteps, step) >= slices.Index(tickets.DesignSteps, ProgressBranch)
+}
+
+// decorateDesignCard fills the card fields of a map row. impl is the card row of
+// the map's -impl epic, or nil when the map has none. A joined card lists the
+// active part's address first.
+func decorateDesignCard(row *EpicListRow, m tickets.Epic, impl *EpicListRow, act designActivity) {
 	row.CardKind = CardKindDesign
 	row.Addresses = []string{row.Address}
-	impl, hasImpl := byName[m.Name+tickets.ImplEpicSuffix]
+	if impl != nil {
+		row.Addresses = append(row.Addresses, impl.Address)
+	}
 	switch {
-	case row.ProgressStep == ProgressDone && !hasImpl:
+	case impl != nil && reachedBranch(row.ProgressStep):
+		joinImplementation(row, impl, act)
+	case row.ProgressStep == ProgressDone:
 		row.Section = SectionFinished
 		row.StatusWords = "Designed"
 		row.RingProgress = 100
-	case row.ProgressStep == ProgressDone:
-		// The joined card with the -impl epic is built in the next ticket.
 	default:
 		row.RingProgress = designPercent(m, row.ProgressStep)
 		fallback := cmp.Or(lastActivity(m), m.CreatedAt)
 		placeDesign(row, act, mapNotStarted(m, row.ProgressStep), fallback)
-		if row.ProgressStep == ProgressCreateTickets && hasImpl && row.StatusWords == "Designing" {
-			row.StatusWords = fmt.Sprintf("Creating tickets (%d so far)...", len(impl.Tickets))
+		if row.ProgressStep == ProgressCreateTickets && impl != nil && row.StatusWords == "Designing" {
+			// The ring has no fraction to show yet; the client draws its placeholder.
+			row.RingProgress = 0
+			row.StatusWords = fmt.Sprintf("Creating tickets (%d so far)...", impl.Total)
 		}
+	}
+}
+
+// joinImplementation turns a map row into the Implementation card of the joined
+// pair: the -impl epic sets state, section and progress. A Design question still
+// waiting on an answer wins the card for Needs you.
+func joinImplementation(row *EpicListRow, impl *EpicListRow, act designActivity) {
+	row.CardKind = impl.CardKind
+	row.State, row.Done, row.Total = impl.State, impl.Done, impl.Total
+	row.Queued, row.Queueable = impl.Queued, impl.Queueable
+	row.MergedAt, row.BlockedByEpics = impl.MergedAt, impl.BlockedByEpics
+	row.MergeBlockKind, row.MergeBlockReason = impl.MergeBlockKind, impl.MergeBlockReason
+	row.Section, row.StatusWords, row.RingProgress = impl.Section, impl.StatusWords, impl.RingProgress
+	row.Reason, row.StatePill, row.WaitingSince = impl.Reason, impl.StatePill, impl.WaitingSince
+	row.Actions = make([]CardAction, len(impl.Actions))
+	for i, a := range impl.Actions {
+		a.Target = cmp.Or(a.Target, impl.Address)
+		row.Actions[i] = a
+	}
+	row.Addresses = []string{impl.Address, row.Address}
+	if impl.Section == SectionNeedsYou {
+		return
+	}
+	var design EpicListRow
+	design.Address = row.Address
+	placeDesign(&design, act, false, act.askedAt)
+	if design.StatePill == PillQuestion {
+		row.Section, row.StatePill, row.Reason = SectionNeedsYou, design.StatePill, design.Reason
+		row.WaitingSince, row.Actions = design.WaitingSince, design.Actions
+		row.Addresses = []string{row.Address, impl.Address}
 	}
 }
 

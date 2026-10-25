@@ -210,7 +210,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		}
 		now := time.Now()
 		for _, e := range epics {
-			if epicListed(e) {
+			if epicListed(e) && !joinedImpl(e, byName) {
 				row := s.epicListRow(project, e)
 				row.BlockedByEpics = unmergedBlockers(project, e, merged)
 				if e.IsMap {
@@ -227,16 +227,35 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		}
 	}
 	sortCards(list.Epics, func(r EpicListRow) int {
-		return s.rootQueuePosition(rootRef{Project: r.Project, Epic: r.Name})
+		// A joined card queues under its -impl epic, whichever part is active.
+		impl := r.Address
+		if r.ImplAddress != "" {
+			impl = r.ImplAddress
+		}
+		_, epic, _ := strings.Cut(impl, ":")
+		return s.rootQueuePosition(rootRef{Project: r.Project, Epic: epic})
 	})
 	writeJSON(w, list)
+}
+
+// joinedImpl reports whether e is the -impl epic of a listed map in byName. The
+// map's card shows it, so it gets no row of its own.
+func joinedImpl(e tickets.Epic, byName map[string]tickets.Epic) bool {
+	name, ok := strings.CutSuffix(e.Name, tickets.ImplEpicSuffix)
+	m, hasMap := byName[name]
+	return ok && hasMap && m.IsMap && epicListed(m)
 }
 
 // decorateMapRow adds the map-only fields to a listed map epic's row.
 func (s *Server) decorateMapRow(row *EpicListRow, project string, e tickets.Epic, byName map[string]tickets.Epic, design designActivity, now time.Time) {
 	row.ProgressStep = mapProgress(e)
 	row.PickerSection, row.PickerSortAt, row.ImplAddress = s.mapPicker(project, e, row.ProgressStep, byName, design, now)
-	decorateDesignCard(row, e, byName, design)
+	var impl *EpicListRow
+	if implEpic, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
+		r := s.epicListRow(project, implEpic)
+		impl = &r
+	}
+	decorateDesignCard(row, e, impl, design)
 }
 
 // openFollowUps counts the draft and open tickets of a follow-ups epic.
