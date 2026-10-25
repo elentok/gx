@@ -47,6 +47,10 @@ func ProgramSubmittedPath(conversationID string) string {
 	return filepath.Join(ProgramDir(), conversationID+".submitted")
 }
 
+// ProgramInterruptEntry is what a Ctrl+C logs to ProgramSubmittedPath, so a
+// test sees the key reach the program.
+const ProgramInterruptEntry = "<ctrl-c>"
+
 // promptMarker is colored like claude's, so even a plain draft has an SGR on
 // screen: a read with no styling at all cannot tell a draft from a placeholder.
 const promptMarker = "\x1b[35m❯\x1b[0m "

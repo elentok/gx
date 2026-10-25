@@ -459,6 +459,14 @@ func (c *Client) StopSession(ctx context.Context, id string) (server.SessionResu
 	return res, err
 }
 
+// InterruptSession ends a Working session's current turn and keeps the session.
+// A refusal is a result (Refused set), not an error.
+func (c *Client) InterruptSession(ctx context.Context, id string) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/interrupt", server.SessionRequest{ID: id}, &res)
+	return res, err
+}
+
 // RemoveSession deletes an Exited session's state dir. A refusal is a result
 // (Refused set), not an error.
 func (c *Client) RemoveSession(ctx context.Context, id string) (server.SessionResult, error) {

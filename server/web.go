@@ -118,9 +118,12 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/sessions/stop":   func(s *Server) http.HandlerFunc { return s.sessionWriteDesignWeb(s.stopSession) },
 	"POST /v1/sessions/resume": func(s *Server) http.HandlerFunc { return s.sessionWriteDesignWeb(s.resumeSession) },
 	"POST /v1/sessions/prompt": func(s *Server) http.HandlerFunc { return s.sessionPromptWeb() },
-	"POST /v1/designs/open":    func(s *Server) http.HandlerFunc { return s.designOpenWeb() },
-	"POST /v1/sessions/focus":  func(s *Server) http.HandlerFunc { return s.sessionFocusWriteWeb },
-	"POST /v1/afk":             func(s *Server) http.HandlerFunc { return s.afkWrite },
+	"POST /v1/sessions/interrupt": func(s *Server) http.HandlerFunc {
+		return s.sessionWriteDesignWeb(s.interruptSession)
+	},
+	"POST /v1/designs/open":   func(s *Server) http.HandlerFunc { return s.designOpenWeb() },
+	"POST /v1/sessions/focus": func(s *Server) http.HandlerFunc { return s.sessionFocusWriteWeb },
+	"POST /v1/afk":            func(s *Server) http.HandlerFunc { return s.afkWrite },
 }
 
 // checkWriteRequest returns why a non-GET request is refused, or "". It is the

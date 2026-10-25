@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import type { SessionInfo, SessionNext, SessionPromptRequest, SessionRoundCard } from "../generated/server";
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
+import { postInterruptSession, stateToken, type InterruptSession } from "./open";
 import { postPrompt, type PostPrompt } from "./prompt";
 import { isAnswered, nameOf, roundPrompt, unansweredOf, type Answers } from "./round";
 import { promptable } from "./view";
@@ -20,6 +21,7 @@ export function Composer({
   nextTitle,
   connected,
   post = postPrompt,
+  interrupt = postInterruptSession,
   onStale,
   round = [],
   answers = {},
@@ -37,6 +39,7 @@ export function Composer({
   nextTitle?: string;
   connected: boolean;
   post?: PostPrompt;
+  interrupt?: InterruptSession;
   /** The conversation moved under the person: refetch the chat, keep the draft. */
   onStale?: () => void;
   /** The open Grilling round: Send answers all of it in one prompt. */
@@ -75,6 +78,22 @@ export function Composer({
     }
   };
 
+  // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
+  const working = session.status.state === "working" && !promptable(session);
+  const onInterrupt = async () => {
+    if (!connected || pending) return;
+    setPending(true);
+    setError("");
+    try {
+      const res = await interrupt({ id: session.id, state: stateToken(session) });
+      if (res.refused) setError(res.message ?? "The interrupt was refused.");
+    } catch {
+      setError("Could not interrupt. Try again.");
+    } finally {
+      setPending(false);
+    }
+  };
+
   const inRound = round.length > 0;
   const sendRound = () => {
     setUnanswered([]);
@@ -91,7 +110,11 @@ export function Composer({
   };
 
   const canContinue = !!next && !NO_CONTINUE_STEPS.includes(step ?? "");
-  const sendButton = (
+  const sendButton = working ? (
+    <Button tone="deadlocked" disabled={!connected || pending} onClick={onInterrupt} height="auto">
+      Interrupt
+    </Button>
+  ) : (
     <Button disabled={!enabled || (!inRound && text.trim() === "")} onClick={onSend} height="auto">
       Send
     </Button>
@@ -190,7 +213,7 @@ export function Composer({
           </Button>
         )}
         {!open && focusButton}
-        {inRound && !open && sendButton}
+        {(inRound || working) && !open && sendButton}
       </Box>
     </Box>
   );

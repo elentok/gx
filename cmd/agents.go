@@ -22,6 +22,7 @@ func newAgentsCmd(d deps) *cobra.Command {
 		RunE: func(*cobra.Command, []string) error { return d.runTab(nav.TabAgents) }}
 	cmd.AddCommand(newAgentsCreateCmd(serverClient), newAgentsListCmd(), newAgentsChatCmd(), newAgentsScreenCmd(),
 		newAgentsSessionCmd("stop", "end a live session's agent (it stays, Exited)", (*apiclient.Client).StopSession),
+		newAgentsSessionCmd("interrupt", "end a Working session's current turn (the session stays)", (*apiclient.Client).InterruptSession),
 		newAgentsSessionCmd("remove", "delete an Exited session", (*apiclient.Client).RemoveSession),
 		newAgentsSessionCmd("mark-read", "clear a session's Unread", (*apiclient.Client).MarkSessionRead),
 		newAgentsSessionCmd("resume", "resume an Exited session's conversation", (*apiclient.Client).ResumeSession),

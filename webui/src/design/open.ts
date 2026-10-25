@@ -3,6 +3,7 @@ import type { DesignOpenRequest, SessionInfo, SessionRequest, SessionResult } fr
 export type OpenDesign = (body: DesignOpenRequest) => Promise<SessionResult>;
 export type StopSession = (body: SessionRequest) => Promise<SessionResult>;
 export type ResumeSession = (body: SessionRequest) => Promise<SessionResult>;
+export type InterruptSession = (body: SessionRequest) => Promise<SessionResult>;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 const postJson = (path: string) => async (body: unknown): Promise<SessionResult> => {
@@ -15,6 +16,7 @@ const postJson = (path: string) => async (body: unknown): Promise<SessionResult>
 export const postOpenDesign: OpenDesign = postJson("/v1/designs/open");
 export const postStopSession: StopSession = postJson("/v1/sessions/stop");
 export const postResumeSession: ResumeSession = postJson("/v1/sessions/resume");
+export const postInterruptSession: InterruptSession = postJson("/v1/sessions/interrupt");
 
 /** The server's SessionStateToken: id, state and the status time in Unix nanoseconds. */
 export function stateToken(s: SessionInfo): string {

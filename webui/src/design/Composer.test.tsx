@@ -116,6 +116,26 @@ test("the composer is disabled while the session is Working", async () => {
   expect((screen.getByRole("button", { name: /Continue/ }) as HTMLButtonElement).disabled).toBe(true);
 });
 
+test("a Working session offers Interrupt in place of Send, posting the state token", async () => {
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  render({ state: "working", chat: chatOf() });
+  const box = await openNote();
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  expect(box.disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Interrupt" }));
+  await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith("/v1/sessions/interrupt", expect.objectContaining({ method: "POST" })));
+  const body = JSON.parse(fetchSpy.mock.calls.find(([url]) => url === "/v1/sessions/interrupt")![1]!.body as string);
+  expect(body.id).toBe("s-a");
+  expect(body.state).toMatch(/^s-a:working:\d+$/);
+  fetchSpy.mockRestore();
+});
+
+test("an Idle session has no Interrupt", async () => {
+  render({ post: vi.fn<PostPrompt>(async () => ok) });
+  await openNote();
+  expect(screen.queryByRole("button", { name: "Interrupt" })).toBeNull();
+});
+
 test("a stale refusal keeps the draft and refetches the chat", async () => {
   const post = vi.fn<PostPrompt>(async () => ({ refused: true, reason: "stale", message: "the conversation moved; review it first" }));
   const fetchChat = vi.fn<FetchChat>(async () => ({ kind: "ok", detail: chatOf() }));

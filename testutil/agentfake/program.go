@@ -233,6 +233,9 @@ func (p *program) key(b byte) error {
 		if !p.ready {
 			return nil
 		}
+		if b == ctrlC {
+			return logSubmitted(p.convID, ProgramInterruptEntry)
+		}
 		text, submitted := p.box.key(b)
 		if !submitted {
 			return nil
