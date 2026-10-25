@@ -37,7 +37,7 @@ func TestUpdateEpicFields_CompletedAtWritesWithOtherFieldsAndKeepsFirst(t *testi
 }
 
 func TestUpdateEpicFields_DesignStepChecksTheKindTheCallLeavesBehind(t *testing.T) {
-	step := DesignSteps[0]
+	step := string(DesignSteps[0])
 	mapKind, loopKind := KindMap, "loop"
 
 	loop := writeEpic(t, t.TempDir(), "l", "kind: loop\nstatus: open\n", "# l\n")

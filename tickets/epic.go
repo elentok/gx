@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/tickets/schema"
@@ -10,6 +11,40 @@ import (
 // hand-driven: its tickets are decisions a person resolves, so the scheduler
 // never runs it and `tickets set` may claim and close its tickets directly.
 const KindMap = "map"
+
+// The epics a person files follow-ups into, live and archived. Neither is
+// schedulable work, so neither can be queued.
+const (
+	FollowUpsEpic         = "follow-ups"
+	ArchivedFollowUpsEpic = "follow-ups-archived"
+)
+
+// QueueRefusal is why an epic's name or status rules out queueing it; the
+// server and the TUI share it.
+type QueueRefusal string
+
+const (
+	QueueRefusalNone      QueueRefusal = ""
+	QueueRefusalFollowUps QueueRefusal = "follow-ups"
+	QueueRefusalNotOpen   QueueRefusal = "not-open"
+)
+
+// QueueRefusal returns why the epic's name or status rules out queueing it,
+// or QueueRefusalNone. It does not look at tickets, merge state or the queue.
+func (e Epic) QueueRefusal() QueueRefusal {
+	// In server mode the TUI's Name is a "project:epic" address.
+	name := e.Name
+	if i := strings.LastIndex(name, ":"); i >= 0 {
+		name = name[i+1:]
+	}
+	switch {
+	case name == FollowUpsEpic || name == ArchivedFollowUpsEpic:
+		return QueueRefusalFollowUps
+	case schema.Status(strings.ToLower(strings.TrimSpace(e.Status))) != schema.StatusOpen:
+		return QueueRefusalNotOpen
+	}
+	return QueueRefusalNone
+}
 
 // IsMapEpic reports whether the epic at epicPath is a wayfinder map, without
 // loading its tickets: its ticket.md says kind: map.

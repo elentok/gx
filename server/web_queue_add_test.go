@@ -25,6 +25,14 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "proj", "epic-drafting", "ticket.md"), []byte("---\nstatus: draft\n---\n# Drafting\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	for epic, status := range map[string]string{
+		"follow-ups": "open", "follow-ups-archived": "open", "epic-cancelled": "cancelled", "epic-closed": "done",
+	} {
+		servertest.WriteTicket(t, store, "proj", epic, "01", "first", "")
+		if err := os.WriteFile(filepath.Join(store, "proj", epic, "ticket.md"), []byte("---\nstatus: "+status+"\n---\n# E\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	servertest.WriteTicket(t, store, "proj", "map-epic", "01", "decide", "")
 	if err := os.WriteFile(filepath.Join(store, "proj", "map-epic", "ticket.md"), []byte("---\nkind: map\nstatus: open\n---\n# Map\n"), 0o644); err != nil {
 		t.Fatal(err)
@@ -55,6 +63,10 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 		{"already queued", "proj:epic-a", server.ReasonAlreadyQueued},
 		{"map epic", "proj:map-epic", server.ReasonMapEpic},
 		{"draft epic", "proj:epic-drafting", server.ReasonEpicDraft},
+		{"follow-ups", "proj:follow-ups", server.ReasonFollowUpsEpic},
+		{"follow-ups archived", "proj:follow-ups-archived", server.ReasonFollowUpsEpic},
+		{"cancelled epic", "proj:epic-cancelled", server.ReasonEpicNotOpen},
+		{"done epic", "proj:epic-closed", server.ReasonEpicNotOpen},
 		{"no open tickets", "proj:epic-done", server.ReasonNoOpenTickets},
 		{"draft only", "proj:epic-draft", server.ReasonNoOpenTickets},
 		{"claimed only", "proj:epic-claimed", server.ReasonNoOpenTickets},

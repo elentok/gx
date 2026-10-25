@@ -5,6 +5,27 @@ import (
 	"time"
 )
 
+func TestEpic_QueueRefusal(t *testing.T) {
+	for _, c := range []struct {
+		name, status string
+		want         QueueRefusal
+	}{
+		{"open", "open", QueueRefusalNone},
+		{"one-offs", "open", QueueRefusalNone},
+		{"follow-ups", "open", QueueRefusalFollowUps},
+		{"follow-ups-archived", "open", QueueRefusalFollowUps},
+		{"gx:follow-ups", "open", QueueRefusalFollowUps},
+		{"epic", "draft", QueueRefusalNotOpen},
+		{"epic", "done", QueueRefusalNotOpen},
+		{"epic", "cancelled", QueueRefusalNotOpen},
+		{"epic", "", QueueRefusalNotOpen},
+	} {
+		if got := (Epic{Name: c.name, Status: c.status}).QueueRefusal(); got != c.want {
+			t.Errorf("%s (%q) = %q, want %q", c.name, c.status, got, c.want)
+		}
+	}
+}
+
 func TestEpic_AllDone(t *testing.T) {
 	cases := []struct {
 		name    string

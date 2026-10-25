@@ -99,7 +99,7 @@ func TestEpicMenu_SnapshotNamesTheBranchAndDimsTheStatus(t *testing.T) {
 func queueEpicModel(t *testing.T, api fakeServerAPI) Model {
 	t.Helper()
 	st := applySnapshot(viewmodel.State{}.SetQueue([]server.QueueItem{{Address: "gx:alpha/06"}}), server.Snapshot{Tickets: []server.TicketInfo{
-		{Address: "gx:alpha/01", Title: "Done", Status: "done"},
+		{Address: "gx:alpha/01", Title: "Done", Status: "done", EpicStatus: "open"},
 		{Address: "gx:alpha/02", Title: "Draft", Status: "draft"},
 		{Address: "gx:alpha/03", Title: "Open", Status: "open"},
 		{Address: "gx:alpha/04", Title: "Claimed", Status: "claimed"},
@@ -150,17 +150,38 @@ func TestEpicMenu_AddEpicToQueueSendsTheEpicAddressOnce(t *testing.T) {
 }
 
 func TestEpicMenu_AddEpicToQueueDimReasons(t *testing.T) {
-	items := epicMenuItems(epicMenuInput{})
+	open := tickets.Epic{Name: "alpha", Status: "open"}
+	items := epicMenuItems(epicMenuInput{epic: open})
 	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != nothingToQueue {
 		t.Errorf("no queueable tickets: disabled = %q, want %q", got, nothingToQueue)
 	}
-	items = epicMenuItems(epicMenuInput{queueable: true, serverReason: serverNotRunning})
+	items = epicMenuItems(epicMenuInput{epic: open, queueable: true, serverReason: serverNotRunning})
 	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != serverNotRunning {
 		t.Errorf("no server: disabled = %q, want %q", got, serverNotRunning)
 	}
-	items = epicMenuItems(epicMenuInput{queueable: true})
+	items = epicMenuItems(epicMenuInput{epic: open, queueable: true})
 	if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != "" {
 		t.Errorf("queueable: disabled = %q, want enabled", got)
+	}
+}
+
+func TestEpicMenu_AddEpicToQueueRefusedEpics(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		epic tickets.Epic
+		want string
+	}{
+		{"follow-ups", tickets.Epic{Name: "follow-ups", Status: "open"}, followUpsNotQueueable},
+		{"follow-ups address", tickets.Epic{Name: "gx:follow-ups", Status: "open"}, followUpsNotQueueable},
+		{"follow-ups-archived", tickets.Epic{Name: "follow-ups-archived", Status: "open"}, followUpsNotQueueable},
+		{"draft", tickets.Epic{Name: "alpha", Status: "draft"}, "epic is draft, not open"},
+		{"done", tickets.Epic{Name: "alpha", Status: "done"}, "epic is done, not open"},
+		{"cancelled", tickets.Epic{Name: "alpha", Status: "cancelled"}, "epic is cancelled, not open"},
+	} {
+		items := epicMenuItems(epicMenuInput{epic: c.epic, queueable: true})
+		if got := itemByLabel(t, items, "Add epic to queue").Disabled; got != c.want {
+			t.Errorf("%s: disabled = %q, want %q", c.name, got, c.want)
+		}
 	}
 }
 

@@ -25,12 +25,13 @@ type epicMenuPickMsg struct {
 }
 
 const (
-	ticketsNotDone  = "tickets not done"
-	alreadyMerged   = "already merged"
-	nothingToQueue  = "nothing to queue"
-	actionQueueEpic = "queue-epic"
-	actionEditEpic  = "edit-epic"
-	actionYankEpic  = "yank-epic"
+	ticketsNotDone        = "tickets not done"
+	alreadyMerged         = "already merged"
+	nothingToQueue        = "nothing to queue"
+	followUpsNotQueueable = "follow-ups are not schedulable work"
+	actionQueueEpic       = "queue-epic"
+	actionEditEpic        = "edit-epic"
+	actionYankEpic        = "yank-epic"
 )
 
 var epicDirectStatuses = []schema.Status{schema.StatusDraft, schema.StatusOpen}
@@ -93,7 +94,7 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 
 	items = append(items,
 		pick("Add epic to queue", "", actionQueueEpic, contextmenu.Queue,
-			firstReason(in.serverReason, reasonIf(!in.queueable, nothingToQueue))),
+			firstReason(in.serverReason, queueWhy(epic, in.queueable))),
 		pick("Edit ticket.md", "e e", actionEditEpic, contextmenu.EditCopy, ""),
 		pick("Yank", "y y", actionYankEpic, contextmenu.EditCopy, ""))
 
@@ -158,11 +159,22 @@ func (m Model) handleEpicMenuPick(msg epicMenuPickMsg) (tea.Model, tea.Cmd) {
 	return m, dispatchMenuAction(m.serverAPI, m.worktreeRoot, m.settings, m.width, msg.target.result(msg.action))
 }
 
+// queueWhy is the reason Add epic to queue is dim, or "" when it applies.
+func queueWhy(epic tickets.Epic, queueable bool) string {
+	switch epic.QueueRefusal() {
+	case tickets.QueueRefusalFollowUps:
+		return followUpsNotQueueable
+	case tickets.QueueRefusalNotOpen:
+		return "epic is " + strings.TrimSpace(epic.Status) + ", not open"
+	}
+	return reasonIf(!queueable, nothingToQueue)
+}
+
 // epicQueueable reports whether epic has an open ticket and no queue entry
 // yet. It goes by the frontmatter status, not the rendered one, so blocked
 // tickets count and the server decides on them.
 func epicQueueable(epic tickets.Epic, queue []string) bool {
-	if slices.Contains(queue, epic.Path) {
+	if epic.QueueRefusal() != tickets.QueueRefusalNone || slices.Contains(queue, epic.Path) {
 		return false
 	}
 	return slices.ContainsFunc(epic.Tickets, func(t tickets.Ticket) bool {

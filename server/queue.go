@@ -36,6 +36,8 @@ const (
 	ReasonMapEpic          = "map-epic"
 	ReasonNoOpenTickets    = "no-open-tickets"
 	ReasonEpicDraft        = "epic-draft"
+	ReasonEpicNotOpen      = "epic-not-open"
+	ReasonFollowUpsEpic    = "follow-ups-epic"
 	ReasonAlreadyMerged    = "already-merged"
 	ReasonMergePending     = "merge-pending"
 	ReasonNotComplete      = "not-complete"
@@ -298,8 +300,12 @@ func (s *Server) refusal(t queueTarget) *QueueResult {
 		r = refusal(ReasonMapEpic, t.address+" is a map epic; its tickets are resolved by hand, not scheduled")
 	case !e.MergedAt.IsZero():
 		r = refusal(ReasonAlreadyMerged, t.address+" is already merged")
+	case e.QueueRefusal() == tickets.QueueRefusalFollowUps:
+		r = refusal(ReasonFollowUpsEpic, t.address+" is a follow-ups epic; a follow-up is not schedulable work")
 	case e.Status == string(schema.StatusDraft):
 		r = refusal(ReasonEpicDraft, t.address+" is a draft; its tickets are still being created")
+	case e.QueueRefusal() == tickets.QueueRefusalNotOpen:
+		r = refusal(ReasonEpicNotOpen, t.address+" is "+e.Status+", not open")
 	case !epicQueueable(e, false):
 		r = refusal(ReasonNoOpenTickets, t.address+" has no open ticket")
 	default:
