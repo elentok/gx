@@ -1,74 +1,39 @@
-import type { EpicListRow } from "../generated/server";
+import {
+  SectionFinished,
+  SectionInProgress,
+  SectionNeedsYou,
+  SectionReadyToDesign,
+  SectionReadyToQueue,
+  type EpicListRow,
+} from "../generated/server";
 import type { Tone } from "../ui/tone";
-import { ago } from "../view";
-
-export const FINISHED_CAP = 10;
 
 export interface Section {
-  key: "ready" | "designing" | "waiting" | "finished";
+  key: string;
   title: string;
   tone: Tone;
+  collapsedByDefault: boolean;
   rows: EpicListRow[];
 }
 
-// Missing timestamps sort last.
-const byTimeDesc = (time: (r: EpicListRow) => string | undefined) => (a: EpicListRow, b: EpicListRow) =>
-  (time(b) ?? "").localeCompare(time(a) ?? "");
-const byName = (a: EpicListRow, b: EpicListRow) => a.name.localeCompare(b.name);
+const SECTIONS: Omit<Section, "rows">[] = [
+  { key: SectionNeedsYou, title: "Needs you", tone: "waiting", collapsedByDefault: false },
+  { key: SectionInProgress, title: "In progress", tone: "running", collapsedByDefault: false },
+  { key: SectionReadyToQueue, title: "Ready to queue", tone: "running", collapsedByDefault: false },
+  { key: SectionReadyToDesign, title: "Ready to design", tone: "muted", collapsedByDefault: true },
+  { key: SectionFinished, title: "Finished", tone: "done", collapsedByDefault: true },
+];
 
-const finishedAt = (r: EpicListRow) => r.merged_at ?? r.completed_at;
-
-// The server computes each state, so grouping is a filter and a sort per section.
-export function sectionsOf(epics: EpicListRow[]): Section[] {
-  const inState = (state: string) => epics.filter((e) => e.state === state);
-  const sections: Section[] = [
-    { key: "ready", title: "Ready to queue", tone: "running", rows: inState("ready").sort(byTimeDesc((r) => r.created_at)) },
-    {
-      key: "designing",
-      title: "Designing",
-      tone: "muted",
-      rows: inState("designing").sort(byTimeDesc((r) => r.last_activity_at)),
-    },
-    { key: "waiting", title: "Waiting to design", tone: "muted", rows: inState("waiting-to-design").sort(byName) },
-    {
-      key: "finished",
-      title: "Recently finished",
-      tone: "done",
-      rows: inState("finished").sort(byTimeDesc(finishedAt)).slice(0, FINISHED_CAP),
-    },
-  ];
-  return sections.filter((s) => s.rows.length > 0);
-}
-
-export const searchEpics = (epics: EpicListRow[], query: string): EpicListRow[] => {
+/**
+ * Groups the cards by the section the server put them in, keeping the server's order. Without a
+ * filter, Finished shows only its first `finishedCap` cards; a filter searches all of them.
+ */
+export function sectionsOf(epics: EpicListRow[], query: string, finishedCap?: number): Section[] {
   const q = query.trim().toLowerCase();
-  return epics.filter((e) => e.name.toLowerCase().includes(q)).sort(byName);
-};
-
-const STATE_BADGES: Record<string, { label: string; tone: Tone }> = {
-  ready: { label: "Ready to queue", tone: "running" },
-  designing: { label: "Designing", tone: "muted" },
-  "waiting-to-design": { label: "Waiting to design", tone: "muted" },
-  finished: { label: "Finished", tone: "done" },
-  queued: { label: "Queued", tone: "running" },
-  running: { label: "Running", tone: "running" },
-  "awaiting-merge": { label: "Awaiting merge", tone: "waiting" },
-  "merge-blocked": { label: "Merge blocked", tone: "paused" },
-  merging: { label: "Merging", tone: "running" },
-  paused: { label: "Paused", tone: "paused" },
-  draft: { label: "Draft", tone: "muted" },
-  "no-open-tickets": { label: "No open tickets", tone: "muted" },
-};
-
-export const stateBadge = (state: string) => STATE_BADGES[state] ?? { label: state, tone: "muted" as Tone };
-
-// The time wording follows the section the row sits in; search rows follow the epic's state.
-export function timePart(row: EpicListRow, now: Date): string | undefined {
-  const [word, iso] =
-    row.state === "finished"
-      ? ["finished", finishedAt(row)]
-      : row.state === "designing"
-        ? ["active", row.last_activity_at]
-        : ["created", row.created_at];
-  return iso ? `${word} ${ago(iso, now)}` : undefined;
+  return SECTIONS.map((s) => {
+    let rows = epics.filter((e) => e.section === s.key);
+    if (q) rows = rows.filter((e) => e.name.toLowerCase().includes(q));
+    else if (s.key === SectionFinished && finishedCap !== undefined) rows = rows.slice(0, finishedCap);
+    return { ...s, rows };
+  });
 }

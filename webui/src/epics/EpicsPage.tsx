@@ -1,148 +1,137 @@
-import { Box, Input, Link, Text } from "@chakra-ui/react";
-import { Fragment, useState } from "react";
+import { Box, Input, Text } from "@chakra-ui/react";
+import { useState } from "react";
+import { useNavigate } from "react-router";
 import { useConnectionContext } from "../connection";
-import type { EpicListRow, FollowUpCount } from "../generated/server";
-import { epicHref } from "../hrefs";
-import { Arc } from "../ui/arc/Arc";
-import { Badge } from "../ui/badge/Badge";
-import { Button } from "../ui/button/Button";
+import type { OpenDesign } from "../design/open";
+import { NewDesignForm } from "../design/NewDesignForm";
+import { designHref } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
-import { SectionHeading } from "../page/SectionHeading";
+import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
+import { EpicCard } from "./EpicCard";
 import { useEpicList, type FetchEpicList } from "./list";
-import { QueueButton } from "./QueueButton";
-import { searchEpics, sectionsOf, stateBadge, timePart } from "./view";
+import { sectionsOf, type Section } from "./view";
 
-const Dim = ({ children }: { children: string }) => (
-  <Text as="span" color="text.muted">
-    {children}
-  </Text>
-);
-
-
-function EpicRow({
-  row,
-  now,
-  withBadge,
-  onQueued,
-}: {
-  row: EpicListRow;
-  now: Date;
-  withBadge?: boolean;
-  onQueued: () => void;
-}) {
-  const badge = stateBadge(row.state);
-  // Sections mark only a finished map; search rows mark every map.
-  const marked = row.kind === "map" && (withBadge || row.state === "finished");
-  const parts = [row.project, `${row.done}/${row.total}`, timePart(row, now), marked ? "map" : undefined].filter(
-    (p): p is string => p !== undefined,
-  );
-  // Only unmerged blockers reach the row; the server filters them.
-  const blockers = row.state === "ready" ? row.blocked_by_epics : [];
+function NewDesignDialog({ projects, open, onClose }: { projects: string[]; open?: OpenDesign; onClose: () => void }) {
+  const navigate = useNavigate();
   return (
-    <Box display="flex" alignItems="baseline" gap="2" py="1" fontFamily="condensed" fontSize="lg">
-      {withBadge && <Badge tone={badge.tone}>{badge.label}</Badge>}
-      {row.state === "running" && <Arc label="Running" />}
-      <Link href={epicHref(row.address)} color="inherit" fontWeight="600">
-        {row.name}
-      </Link>
-      <Dim>{parts.join(" · ")}</Dim>
-      {blockers.length > 0 && (
-        <Text as="span" color="text.muted">
-          after{" "}
-          {blockers.map((a, i) => (
-            <Fragment key={a}>
-              {i > 0 && ", "}
-              <Link href={epicHref(a)} color="inherit">
-                {a.slice(a.indexOf(":") + 1)}
-              </Link>
-            </Fragment>
-          ))}
-        </Text>
-      )}
-      {row.state === "merge-blocked" && row.land_block_reason && (
-        <Text as="span" color="text.muted">
-          {row.land_block_reason}
-        </Text>
-      )}
-      {row.queueable &&<QueueButton address={row.address} state={row.state} onQueued={onQueued} />}
+    <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4">
+      <Box
+        role="dialog"
+        aria-modal="true"
+        aria-label="New Design"
+        bg="surface"
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="md"
+        pt="4"
+        w="480px"
+        maxW="full"
+      >
+        <NewDesignForm
+          projects={projects}
+          open={open}
+          onStarted={(address) => navigate(designHref(address).slice(1))}
+          onCancel={onClose}
+        />
+      </Box>
     </Box>
   );
 }
 
-function FollowUps({ counts }: { counts: FollowUpCount[] }) {
-  if (counts.length === 0) return null;
-  const total = counts.reduce((sum, c) => sum + c.open, 0);
+function SectionBlock({ section, open, onToggle, onChanged }: { section: Section; open: boolean; onToggle: () => void; onChanged: () => void }) {
+  const id = `epics-${section.key}`;
   return (
-    <Text fontSize="sm" color="text.muted" ml="auto">
-      Follow-ups {total}
-      {counts.length > 1 &&
-        counts.map((c) => (
-          <Fragment key={c.project}>
-            {" · "}
-            <Link href={epicHref(`${c.project}:follow-ups`)} color="inherit">
-              {c.project}
-            </Link>{" "}
-            {c.open}
-          </Fragment>
-        ))}
-    </Text>
+    <Box role="region" aria-labelledby={id} mt="6">
+      <Box as="h2" id={id} m="0" mb="3">
+        <Box
+          as="button"
+          display="flex"
+          alignItems="center"
+          gap="2"
+          cursor="pointer"
+          fontFamily="condensed"
+          fontSize="24px"
+          fontWeight="600"
+          aria-expanded={open}
+          onClick={onToggle}
+        >
+          <Box aria-hidden>{open ? "▾" : "▸"}</Box>
+          <Box aria-hidden w="10px" h="10px" borderRadius="full" bg={`tone.${section.tone}.fg`} />
+          {section.title}
+          <Text as="span" color="text.muted">
+            {section.rows.length}
+          </Text>
+        </Box>
+      </Box>
+      {open && (
+        <Box display="grid" gap="20px" gridTemplateColumns="repeat(auto-fill, minmax(min(100%, 360px), 1fr))">
+          {section.rows.map((r) => (
+            <EpicCard key={r.address} row={r} onChanged={onChanged} />
+          ))}
+        </Box>
+      )}
+    </Box>
   );
 }
 
-export function EpicsPage({ fetchList }: { fetchList?: FetchEpicList }) {
+export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList; openDesign?: OpenDesign }) {
   const conn = useConnectionContext();
   const { list, failed, retry } = useEpicList(fetchList, conn);
   const [query, setQuery] = useState("");
-  const now = new Date();
+  const [toggled, setToggled] = useState<Set<string>>(new Set());
+  const [designing, setDesigning] = useState(false);
   const searching = query.trim() !== "";
-  const sections = list ? sectionsOf(list.epics) : [];
+  const sections = list ? sectionsOf(list.epics, query, list.recently_finished) : [];
+  const shown = searching ? sections.filter((s) => s.rows.length > 0) : sections;
+  const projects = [...new Set((list?.epics ?? []).map((e) => e.project))];
+  // A filter match opens a collapsed section; without one, the toggle flips the default.
+  const isOpen = (s: Section) => searching || s.collapsedByDefault === toggled.has(s.key);
+  const toggle = (key: string) =>
+    setToggled((t) => {
+      const next = new Set(t);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  const newDesign = (
+    <Button emphasis="main" onClick={() => setDesigning(true)}>
+      New Design
+    </Button>
+  );
 
   return (
     <DetailPage active="epics">
-        <Box display="flex" alignItems="center" gap="4" mt="4">
-          <Input
-            type="search"
-            aria-label="Search epics"
-            placeholder="Search epics"
-            maxW="240px"
-            size="sm"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          {list && <FollowUps counts={list.follow_ups} />}
+      <Box display="flex" alignItems="center" gap="4" mt="4">
+        <Input
+          type="search"
+          aria-label="Filter epics"
+          placeholder="Filter epics"
+          h="40px"
+          fontSize="16px"
+          maxW="320px"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        {list && list.epics.length > 0 && newDesign}
+      </Box>
+      {failed ? (
+        <Box mt="6" display="flex" alignItems="center" gap="3">
+          <Text color="text.muted">Could not load epics</Text>
+          <Button emphasis="ghost" onClick={retry}>
+            Retry
+          </Button>
         </Box>
-        {failed ? (
-          <Box mt="6" display="flex" alignItems="center" gap="3">
-            <Text color="text.muted">Could not load epics</Text>
-            <Button emphasis="ghost" onClick={retry}>
-              Retry
-            </Button>
-          </Box>
-        ) : !list ? (
-          <Spinner label="Loading epics" />
-        ) : searching ? (
-          <Box mt="4">
-            {searchEpics(list.epics, query).map((r) => (
-              <EpicRow key={r.address} row={r} now={now} withBadge onQueued={retry} />
-            ))}
-            {searchEpics(list.epics, query).length === 0 && <EmptyState title="No match" />}
-          </Box>
-        ) : sections.length === 0 ? (
-          <EmptyState title="No epics yet.">Run /gx-design to start one.</EmptyState>
-        ) : (
-          sections.map((s) => (
-            <Box key={s.key} mt="6" aria-labelledby={`epics-${s.key}`} role="region">
-              <SectionHeading id={`epics-${s.key}`} tone={s.tone}>
-                {s.title}
-              </SectionHeading>
-              {s.rows.map((r) => (
-                <EpicRow key={r.address} row={r} now={now} onQueued={retry} />
-              ))}
-            </Box>
-          ))
-        )}
+      ) : !list ? (
+        <Spinner label="Loading epics" />
+      ) : list.epics.length === 0 ? (
+        <EmptyState title="No epics yet.">{newDesign}</EmptyState>
+      ) : searching && shown.length === 0 ? (
+        <EmptyState title="No match" />
+      ) : (
+        shown.map((s) => <SectionBlock key={s.key} section={s} open={isOpen(s)} onToggle={() => toggle(s.key)} onChanged={retry} />)
+      )}
+      {designing && <NewDesignDialog projects={projects} open={openDesign} onClose={() => setDesigning(false)} />}
     </DetailPage>
   );
 }

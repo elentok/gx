@@ -69,7 +69,7 @@ export interface RouteFetchers {
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
   return [
     { path: "/q", element: <QueueRoute /> },
-    { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} /> },
+    { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} openDesign={fetchers.openDesign} /> },
     { path: "/designs", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
