@@ -85,6 +85,12 @@ tickets for others.
 ## 7. Close out
 
 - Stop the server and any other background shell.
+- Write a `### Summary` under this round's `## Round N` heading, before you report. Keep it short:
+  - what you ran: the flows, CLI and server checks, and any manual browser checks
+  - the result per story, as in step 4
+  - what you did about findings: fixed inline (with the commit), tickets opened (with their
+    addresses), or none
+  - anything you skipped, such as stories left unchecked at the token limit
 - Clean round (every story passes, no findings): append the lines from step 4, then
   `gx tickets set <addr> --iteration-status finished --commitless true`.
 - Inline fix: commit first. Report `finished` in a later tool call, with no `--commitless`.
