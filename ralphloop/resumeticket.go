@@ -199,7 +199,7 @@ func resumeMutation(now time.Time, base string) func(*schema.Ticket, *string) er
 		if base != "" {
 			t.Base = base
 		}
-		*body = schema.DemoteSection(*body, "## Needs Answer", now)
+		*body = schema.DemotePauseSections(*body, now)
 		return nil
 	}
 }
@@ -220,7 +220,7 @@ func UnmuteTicket(path string, now time.Time) error {
 			t.Status = schema.StatusOpen
 			t.PauseReason = ""
 		}
-		*body = schema.DemoteSection(*body, "## Needs Repair", now)
+		*body = schema.DemotePauseSections(*body, now)
 		*body = schema.AppendComment(*body, fmt.Sprintf("**%s** — unmuted", now.Format("2006-01-02")))
 	})
 }

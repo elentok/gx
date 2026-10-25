@@ -3,6 +3,7 @@ package schema
 import (
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/events"
 )
@@ -192,6 +193,15 @@ var legacyPauseHeadings = []string{"## Needs Answer", "## Needs Repair"}
 
 // PausedHeading is the body heading under which a pause explains itself.
 const PausedHeading = "## Paused"
+
+// DemotePauseSections retires every pause section (current and legacy
+// headings) from body into "## Comments", for any path that ends a pause.
+func DemotePauseSections(body string, now time.Time) string {
+	for _, heading := range append([]string{PausedHeading}, legacyPauseHeadings...) {
+		body = DemoteSection(body, heading, now)
+	}
+	return body
+}
 
 // ShimLegacyPause returns t with an old needs-answer / needs-repair status
 // read as paused, in memory. The reason comes from the old park_kind; with

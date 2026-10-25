@@ -43,7 +43,7 @@ func ClaimWithBase(path, resolvedBase string) error {
 		t.IterationFinishedAt = time.Time{}
 		t.PauseKind = ""
 		t.PauseReason = ""
-		*body = schema.DemoteSection(*body, "## Needs Repair", time.Now())
+		*body = schema.DemotePauseSections(*body, time.Now())
 	})
 }
 

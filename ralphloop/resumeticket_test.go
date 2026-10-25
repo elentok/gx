@@ -135,6 +135,29 @@ func TestResumeAnswered_LivePaneUnblocked_ReopensAndDemotesStub(t *testing.T) {
 	}
 }
 
+func TestResumeTicket_DemotesPausedSection(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: paused\npause_reason: zero-commit\ntype: implement\n---\n# A\n\n## Paused\n\nwaiting on a person\n",
+	})
+	path := ticketPath(scratchDir, "my-epic", "01-a.md")
+
+	if err := ResumeTicket(path, time.Now()); err != nil {
+		t.Fatalf("ResumeTicket: %v", err)
+	}
+
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(raw), "\n## Paused\n") {
+		t.Errorf("Paused section left behind:\n%s", raw)
+	}
+	if !strings.Contains(string(raw), "retired from `## Paused`") {
+		t.Errorf("Paused section not demoted into Comments:\n%s", raw)
+	}
+}
+
 // TestResumeAnswered_DeadPane_LeftForHuman covers test seam 3: a paused (answer)
 // ticket whose pane is already gone — an announce-and-stop pause, per
 // resumeAnswered's doc — is skipped and left paused (answer) for a person to
