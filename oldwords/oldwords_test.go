@@ -97,7 +97,6 @@ var allowed = map[string]allowance{
 	"ralphloop/notification_text.go":      allow("chat headlines \"needs answer\" and \"needs repair\"", "needsanswer", "needsrepair"),
 	"ralphloop/waitforfinish_recovery.go": allow("comment names the legacy Needs Answer heading", "needsanswer"),
 	"webui/src/generated/server.ts":       allow("generated from the wire fields above", "park", "needsanswer"),
-	"webui/src/epic/EpicPage.tsx":         allow("reads the needs_answer wire field", "needsanswer"),
 	"webui/src/epic/rows.ts":              allow("maps the legacy needs-answer and needs-repair statuses", "needsanswer", "needsrepair"),
 	"webui/src/view.ts":                   allow("reads the legacy needs-repair status and the parked wire field", "needsrepair", "park"),
 	// Tests of the read shim, the hidden aliases and the kept wire names.
@@ -124,6 +123,10 @@ var allowed = map[string]allowance{
 	"webui/src/ticket/header.ts":               allow("maps the legacy needs-answer and needs-repair wire statuses to Paused", "needsanswer", "needsrepair"),
 	"webui/src/ticket/ActionCard.test.tsx":     allow("builds tickets with the legacy wire statuses", "needsanswer", "needsrepair"),
 	"webui/src/ticket/TicketSections.test.tsx": allow("builds related tickets with the legacy wire statuses", "needsanswer", "needsrepair"),
+	"testutil/gxfixture/main_test.go":          allow("waits on and asserts the kept legacy needs-repair status", "needsrepair"),
+	"webui/e2e/CATALOG.md":                     allow("names the kept legacy needs-answer rendered status", "needsanswer"),
+	"webui/e2e/epics.e2e.ts":                   allow("asserts the kept legacy needs-answer rendered status", "needsanswer"),
+	"webui/e2e/pause.e2e.ts":                   allow("asserts the kept legacy needs-repair rendered status", "needsrepair"),
 	"cmd/server_restart_migrate_test.go":       allow("migration fixture uses the legacy needs-answer status", "needsanswer"),
 	"server/epicsummary_test.go":               allow("summary reads only the legacy Needs headings", "needsanswer", "needsrepair"),
 	"server/ticketwrites_test.go":              allow("unmute demotes only the legacy Needs Repair heading", "needsrepair"),
