@@ -73,7 +73,7 @@ var runEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next:.*$`)
 // the person: the grilling question wins over the run-end line.
 func designActionable(text, ticket string) (SessionActionable, bool) {
 	if hasGrillingMarker(text) {
-		return SessionActionable{Reason: grillingReason, Grilling: true}, true
+		return SessionActionable{Reason: grillingReason, Grilling: true, Derived: true}, true
 	}
 	return runEndNext(text, ticket)
 }
@@ -85,7 +85,7 @@ func runEndNext(text, ticket string) (SessionActionable, bool) {
 	if line == "" {
 		return SessionActionable{}, false
 	}
-	return SessionActionable{Reason: strings.TrimSpace(line), Action: designContinueAction(ticket)}, true
+	return SessionActionable{Reason: strings.TrimSpace(line), Action: designContinueAction(ticket), Derived: true}, true
 }
 
 // designContinueAction starts the next gx-design phase in a fresh conversation.
@@ -156,23 +156,31 @@ func (s *Server) lastAssistantText(id, conversationID string) (string, bool) {
 	return text, ok && err == nil
 }
 
-// detectDesignActionable raises the grilling or run-end Actionable when a
-// Design session's last assistant message holds its marker. Like an
-// agent-raised one, the person's next input clears it. A harness without a
-// claude transcript (codex) never matches.
+// detectDesignActionable recomputes the Actionable of a Design session from
+// its last assistant message: the newer turn supersedes an agent-raised one
+// and clears a derived one it no longer matches. A GxRaised one is never
+// touched. A harness without a claude transcript (codex) never matches.
 func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	text, ok := s.lastAssistantText(id, design.Conversation)
 	if !ok {
 		return
 	}
 	s.fileBadRoundBlocks(id, design, text)
-	a, ok := designActionable(text, design.Ticket)
-	if !ok {
-		return
-	}
+	a, matched := designActionable(text, design.Ticket)
 	raised := false
 	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
-		if !m.Status.Promptable() || m.Actionable.Reason != "" {
+		cur := m.Actionable
+		if !m.Status.Promptable() || cur.GxRaised {
+			return false
+		}
+		if !matched {
+			if !cur.Derived {
+				return false
+			}
+			m.Actionable = SessionActionable{}
+			return true
+		}
+		if cur.Derived && cur.Reason == a.Reason && cur.Grilling == a.Grilling {
 			return false
 		}
 		m.Actionable = a

@@ -67,6 +67,9 @@ type SessionActionable struct {
 	// Grilling marks the Actionable of a gx-design grilling round, so clients
 	// do not match its Reason text.
 	Grilling bool `json:"grilling,omitempty"`
+	// Derived marks an Actionable the server computed from the last assistant
+	// turn of a Design session. The next idle recomputes it.
+	Derived bool `json:"derived,omitempty"`
 }
 
 // SessionActionableQueue is the Kind of an Actionable whose Action is a queue

@@ -1155,6 +1155,11 @@ export interface SessionActionable {
    * do not match its Reason text.
    */
   grilling?: boolean;
+  /**
+   * Derived marks an Actionable the server computed from the last assistant
+   * turn of a Design session. The next idle recomputes it.
+   */
+  derived?: boolean;
 }
 /**
  * SessionActionableQueue is the Kind of an Actionable whose Action is a queue

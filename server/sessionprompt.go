@@ -120,8 +120,17 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		for _, a := range action {
 			ev.Bytes += len(a)
 		}
-	} else if err := typeSessionPrompt(dir, text); err != nil {
-		return SessionResult{}, err
+	} else {
+		if err := typeSessionPrompt(dir, text); err != nil {
+			return SessionResult{}, err
+		}
+		if !meta.Actionable.GxRaised && meta.Actionable.Reason != "" {
+			meta.Actionable = SessionActionable{}
+			if err := writeSessionMeta(dir, meta); err != nil {
+				return SessionResult{}, err
+			}
+			s.events.publish(EventSessionChanged, req.ID)
+		}
 	}
 	if err := ralphloop.AppendServerEvent(s.cfg.TicketStore, ev); err != nil {
 		s.log.Warn("logging session prompt", "session", req.ID, "err", err)
