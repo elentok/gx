@@ -332,10 +332,11 @@ func TestInstallDependencies_TwoDirectories_ShareOneBudget(t *testing.T) {
 		"web/package-lock.json": "{}",
 	}, nil)
 	binDir := t.TempDir()
-	writeScriptStub(t, binDir, "npm", "sleep 0.4")
+	marker := filepath.Join(t.TempDir(), "ran")
+	// The first install returns at once; the second hangs until the shared budget kills it.
+	writeScriptStub(t, binDir, "npm", "if [ -e '"+marker+"' ]; then sleep 30; fi; touch '"+marker+"'")
 
-	// Each install alone fits the budget; together they do not.
-	_, err := installDependenciesWithin(repo, binDir, "", 750*time.Millisecond)
+	_, err := installDependenciesWithin(repo, binDir, "", time.Second)
 	want := "installing dependencies in " + filepath.Join(repo, "web") + ": npm ci: timed out after 5m"
 	if err == nil || err.Error() != want {
 		t.Fatalf("error = %v, want %q", err, want)
