@@ -27,7 +27,7 @@ func startGrillingSession(t *testing.T, ticket string) (*servertest.Harness, con
 
 // startGrillingSessionIn is startGrillingSession on a store the caller has
 // already seeded.
-func startGrillingSessionIn(t *testing.T, ticket, store string) (*servertest.Harness, context.Context, <-chan server.Event, string, string, string) {
+func startGrillingSessionIn(t *testing.T, ticket, store string, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan server.Event, string, string, string) {
 	t.Helper()
 	cfg := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
@@ -39,7 +39,8 @@ func startGrillingSessionIn(t *testing.T, ticket, store string) (*servertest.Har
 			t.Fatal(err)
 		}
 	}
-	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), withAlerts(true, true))
+	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), withAlerts(true, true)}, opts...)
+	h := servertest.StartWithStore(t, store, opts...)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
 	evs, err := h.Client.Events(ctx, 0)

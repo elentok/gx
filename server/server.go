@@ -297,6 +297,10 @@ type Config struct {
 	// TranscriptMissTTL is how long a failed transcript lookup is remembered;
 	// zero means defaultTranscriptMissTTL and a negative value remembers none.
 	TranscriptMissTTL time.Duration
+	// AutoAdvanceDelay is the countdown before the server sends a run-end
+	// Continue; zero means DefaultAutoAdvanceDelay and a negative value turns
+	// auto-advance off.
+	AutoAdvanceDelay time.Duration
 }
 
 // Defaults for the session-prompting timings in Config. A zero Config field
@@ -333,6 +337,8 @@ type Server struct {
 	chats chatCache
 	// transcripts caches where each conversation's transcript is.
 	transcripts transcriptPaths
+	// autoAdvances holds the running auto-advance countdowns.
+	autoAdvances autoAdvances
 	// authFailures caches whether each transcript ends in an auth error.
 	authFailures authFailures
 	// filedRounds holds the round markers already in the follow-ups epic, so an

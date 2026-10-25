@@ -1133,6 +1133,11 @@ export interface SessionInfo {
    */
   auto_advance: boolean;
   /**
+   * AutoAdvanceAt is when the running countdown sends the Continue; unset
+   * with none running.
+   */
+  auto_advance_at?: string;
+  /**
    * Failure is set while the session is in one of the failure states.
    */
   failure?: SessionFailure;

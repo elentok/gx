@@ -31,6 +31,9 @@ type SessionInfo struct {
 	// AutoAdvance is the session's auto-advance switch; on unless the person
 	// turned it off.
 	AutoAdvance bool `json:"auto_advance"`
+	// AutoAdvanceAt is when the running countdown sends the Continue; unset
+	// with none running.
+	AutoAdvanceAt *time.Time `json:"auto_advance_at,omitempty"`
 	// Failure is set while the session is in one of the failure states.
 	Failure *SessionFailure `json:"failure,omitempty"`
 }

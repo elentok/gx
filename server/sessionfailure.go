@@ -55,9 +55,13 @@ func (m sessionMeta) statusFailure() *SessionFailure {
 	return nil
 }
 
-// sessionInfo is m.info() plus the failure that needs a transcript read.
+// sessionInfo is m.info() plus the failure that needs a transcript read and the
+// running countdown.
 func (s *Server) sessionInfo(m sessionMeta) SessionInfo {
 	info := m.info()
+	if at := s.autoAdvances.deadline(m.ID); !at.IsZero() {
+		info.AutoAdvanceAt = &at
+	}
 	info.Failure = m.statusFailure()
 	if info.Failure == nil {
 		info.Failure = s.transcriptFailure(m)

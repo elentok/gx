@@ -481,6 +481,9 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// Fake agents idle without a report and never leave idle after a nudge, so
 	// the stall nudge is off unless a test sets its delay.
 	h.cfg.StalledNudgeDelay = -1
+	// Fake agents idle on run-end lines in unrelated tests; auto-advance is off
+	// unless a test sets its countdown.
+	h.cfg.AutoAdvanceDelay = -1
 	// Tests write a transcript right after the server first looked for it, so
 	// a remembered miss would hide it. Negative turns the miss cache off.
 	h.cfg.TranscriptMissTTL = -1

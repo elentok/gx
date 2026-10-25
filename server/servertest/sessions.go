@@ -49,6 +49,11 @@ func WithStallThreshold(d time.Duration) func(*server.Config) {
 	return func(c *server.Config) { c.StallThreshold = d }
 }
 
+// WithAutoAdvanceDelay turns auto-advance on with a countdown of d.
+func WithAutoAdvanceDelay(d time.Duration) func(*server.Config) {
+	return func(c *server.Config) { c.AutoAdvanceDelay = d }
+}
+
 // RunSessionProcesses registers the fake harness and, when the test binary
 // was started as a session's holder or as the fake harness's program, runs
 // that and exits. Call it first in TestMain.

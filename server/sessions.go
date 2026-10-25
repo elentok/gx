@@ -519,6 +519,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 	defer first.stop()
 	chat := s.newChatPoll(dir, id)
 	defer chat.close()
+	seenBusy := false
 	for {
 		msg, err := stream.Next()
 		if err != nil {
@@ -532,6 +533,9 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 			st := sessionStatusOf(msg.Status)
 			var prompt, signal string
 			var design designRef
+			// An idle whose turn start this watch did not see is not Live.
+			live := seenBusy
+			seenBusy = st.State != SessionIdle
 			update(func(m *sessionMeta) bool {
 				// A stop records the exit itself, and a status the stream sent
 				// before it must not revive the session.
@@ -547,7 +551,7 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
 					if st.State == SessionIdle && prev.State != SessionIdle && m.Design {
-						design = designRef{m.ConversationID, m.Ticket}
+						design = designRef{m.ConversationID, m.Ticket, live}
 					}
 				}
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {

@@ -132,9 +132,11 @@ func epicAddress(addr string) string {
 }
 
 // designRef names the conversation and ticket of a Design session that just
-// went idle.
+// went idle. Live marks a turn that ended while this server watched it, the
+// only kind that auto-advances.
 type designRef struct {
 	Conversation, Ticket string
+	Live                 bool
 }
 
 // claudeTranscript finds the claude transcript of a session's conversation. A
@@ -190,7 +192,7 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	}
 	s.fileBadRoundBlocks(id, design, text)
 	a, matched := designActionable(text, design.Ticket, s.designFinal(design.Ticket))
-	raised := false
+	raised, advance := false, false
 	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
 		cur := m.Actionable
 		if !m.Status.Promptable() || cur.GxRaised {
@@ -208,8 +210,14 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 		}
 		m.Actionable = a
 		raised = true
+		advance = design.Live && len(a.Action) > 0 && !m.AutoAdvanceOff && m.Harness != string(harness.Codex)
 		return true
 	})
+	// A countdown that starts is silent: the person is told only if it does not send.
+	if advance && s.startAutoAdvance(id) {
+		s.events.publish(EventSessionChanged, id)
+		return
+	}
 	if raised {
 		s.triggerBanner(id, sound.Attention, a.Reason)
 	}
