@@ -128,6 +128,29 @@ func TestGrilling_DetectedOnIdleForDesignSessions(t *testing.T) {
 	}
 }
 
+// Claude reports idle before it writes the turn's last lines, so the idle
+// edge's own read sees the previous message.
+func TestGrilling_DetectedWhenTheTurnLandsAfterIdle(t *testing.T) {
+	h, ctx, evs, id, conv, path := startGrillingSession(t, "proj:map")
+	writeAssistantMessage(t, path, "Reading the code.")
+	report(t, conv, agentfake.Control{State: "working"})
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	line, err := json.Marshal(map[string]any{
+		"type":    "assistant",
+		"message": map[string]any{"content": []map[string]any{{"type": "text", "text": "❓ **Q1** Which store?"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	appendLines(t, path, string(line), turnDurationLine)
+	got := waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
+	if !got.Actionable.Grilling {
+		t.Fatalf("actionable = %+v, want the grilling round", got.Actionable)
+	}
+}
+
 func TestRunEnd_DetectedOnIdleForDesignSessions(t *testing.T) {
 	const grill = "❓ **Q1** Which store?\n"
 	for name, tc := range map[string]struct {

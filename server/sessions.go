@@ -521,6 +521,15 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 	defer first.stop()
 	chat := s.newChatPoll(dir, id)
 	defer chat.close()
+	// settle is closed to end the wait of the last idle edge's settleTurn.
+	var settle chan struct{}
+	endSettle := func() {
+		if settle != nil {
+			close(settle)
+			settle = nil
+		}
+	}
+	defer endSettle()
 	seenBusy, sawIdle := false, !reconnect
 	for {
 		msg, err := stream.Next()
@@ -535,10 +544,14 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 			st := sessionStatusOf(msg.Status)
 			var prompt, signal string
 			var design designRef
+			idleEdge := false
 			// An idle whose turn start this watch did not see (an idle-to-busy
 			// edge) is not Live, e.g. a turn already running at connect.
 			live := seenBusy
 			busy := st.State != SessionIdle
+			if busy {
+				endSettle()
+			}
 			seenBusy = busy && (seenBusy || sawIdle)
 			sawIdle = !busy
 			update(func(m *sessionMeta) bool {
@@ -558,8 +571,11 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 					if st.State == SessionIdle {
 						m.ReportedStep, m.ReportedTitle = "", ""
 					}
-					if st.State == SessionIdle && prev.State != SessionIdle && m.Design {
-						design = designRef{m.ConversationID, m.Ticket, live}
+					if st.State == SessionIdle && prev.State != SessionIdle {
+						idleEdge = true
+						if m.Design {
+							design = designRef{m.ConversationID, m.Ticket, live}
+						}
 					}
 				}
 				if msg.ConversationID != "" && msg.ConversationID != m.ConversationID {
@@ -583,8 +599,19 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 			first.noteState(st.State)
 			s.noteFailure(id)
 			chat.setActive(st.State == SessionStarting || st.State == SessionWorking)
+			// Marked before the Design check reads the transcript.
+			mark, marked := turnMark{}, false
+			if idleEdge {
+				mark, marked = s.markTurn(dir, id)
+			}
 			if design.Conversation != "" {
 				s.detectDesignActionable(dir, id, design)
+			}
+			if marked {
+				endSettle()
+				cancel := make(chan struct{})
+				settle = cancel
+				s.sessionWatches.start(func() { s.settleTurn(dir, id, mark, design, cancel) })
 			}
 			if prompt != "" {
 				first.start(signal, prompt)

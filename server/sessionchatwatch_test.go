@@ -95,3 +95,36 @@ func TestSessionChatChanged_IdleSessionPublishesNothing(t *testing.T) {
 		t.Fatal("session-chat-changed fired for an idle session")
 	}
 }
+
+const turnDurationLine = `{"type":"system","subtype":"turn_duration","durationMs":100}`
+
+// appendLines appends raw lines to the transcript at path.
+func appendLines(t *testing.T, path string, lines ...string) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	for _, l := range lines {
+		if _, err := f.WriteString(l + "\n"); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// Claude reports idle before it writes the turn's last lines, so the final
+// message lands after the poll stopped.
+func TestSessionChatChanged_TurnWrittenAfterIdlePublishes(t *testing.T) {
+	h, ctx, evs, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))
+	writeTranscript(t, path, chatLine)
+	report(t, conv, agentfake.Control{State: "working"})
+	waitSessionState(ctx, t, h, id, server.SessionWorking)
+	report(t, conv, agentfake.Control{State: "done"})
+	waitSessionState(ctx, t, h, id, server.SessionIdle)
+	time.Sleep(2 * chatPollTestInterval)
+	appendLines(t, path, chatLine, turnDurationLine)
+	if !chatEventWithin(evs, t, path, id, time.Second, false) {
+		t.Fatal("no session-chat-changed event for the turn written after idle")
+	}
+}

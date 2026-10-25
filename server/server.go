@@ -297,6 +297,9 @@ type Config struct {
 	// TranscriptMissTTL is how long a failed transcript lookup is remembered;
 	// zero means defaultTranscriptMissTTL and a negative value remembers none.
 	TranscriptMissTTL time.Duration
+	// TurnSettleTimeout caps how long an idle edge waits for claude to write
+	// the end of its turn; zero means defaultTurnSettleTimeout.
+	TurnSettleTimeout time.Duration
 	// AutoAdvanceDelay is the countdown before the server sends a run-end
 	// Continue; zero means DefaultAutoAdvanceDelay and a negative value turns
 	// auto-advance off.
@@ -423,6 +426,9 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.StallThreshold == 0 {
 		cfg.StallThreshold = defaultStallThreshold
+	}
+	if cfg.TurnSettleTimeout == 0 {
+		cfg.TurnSettleTimeout = defaultTurnSettleTimeout
 	}
 	if cfg.TranscriptMissTTL == 0 {
 		cfg.TranscriptMissTTL = defaultTranscriptMissTTL
