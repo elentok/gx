@@ -1,7 +1,26 @@
 # Changelog
 
-## Unreleased
+## v0.37.1 - 2026-10-25
 
+- Added a Screen button to the web ticket page. It shows the loop agent's live screen, or the saved screen once the agent has ended. If the live session goes away, the page falls back to the saved screen. The button is hidden for agents without a terminal.
+- Added an AFK toggle to the web UI header.
+- Added an Interrupt button on the Design page. It replaces Send while a design session is Working and sends Ctrl+C to it. Also added `gx agents interrupt` and `POST /v1/sessions/interrupt`.
+- Added a `notify-send` notifier for Linux. gx picks it when it is on `PATH`.
+- Changed the grilling round on the Design page: its notes, open question and scroll position now survive a reload, and the draft is cleared on Send.
+- Changed queueing: the server and the TUI now refuse to queue a follow-ups epic or an epic that is not open.
+- Changed `gx brief` to copy the tool's output into the log while the tool runs. `tsc` errors without a file are now reported as one `(global)` unit.
+- Changed `gx tickets migrate`: the totals backfill skips only tickets with unreadable transcripts and adds a note for each one. Any other error stops the backfill. The dry run now prints the same changes as the real run, pause steps included.
+- Changed the context-overrun flag to subtract a 50k-token session baseline first, so small estimates no longer trip it.
+- Changed the Design page to show Chart for an unknown design step.
+- Changed the server to cache transcript paths, auth failures and filed rounds, so snapshots no longer glob the disk.
+- Changed agent skills and prompts: agents use `rg -n` and then a ranged Read for files over 150 lines, quote `gx-question` labels in double quotes, and merge small code-review fixes in one area into one fix ticket. `gx-follow-up` now says that category is required and where it goes.
+- Changed `web/` from npm to pnpm.
+- Fixed resume, claim and start-over to retire the `## Paused` section as well as the old pause headings.
+- Fixed `guard-bash` treating `>` inside quoted text as a file redirect.
+- Fixed `gx tickets validate` on a single ticket printing the warning count for other tickets.
+- Fixed an epic's `completed_at` being written apart from its other fields. It is now written in the same update.
+- Fixed a race in the map-epic kind check. It now runs inside the epic edit lock.
+- Fixed a `RevParse` error being ignored when a merged epic is stamped.
 - Removed the deprecated `--provisional-destination` flag. Use `--destination-unconfirmed`. `gx tickets migrate` still renames the old `provisional_destination` field.
 
 ## v0.37.0 - 2026-10-25
