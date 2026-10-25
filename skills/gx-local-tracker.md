@@ -400,6 +400,8 @@ options:               # options only: 2 to 6 entries
 - `yes-no` has fixed labels "Yes" and "No". It takes optional one-line `yes:` and `no:` consequences.
 - `options` takes `id`, `label` and an optional `consequence` per entry. Ids are unique.
 - `recommended` names one value. The UI shows a "Recommended" badge and preselects nothing.
+- Wrap every `label`, `consequence`, `yes` and `no` value in double quotes. A bare value breaks the
+  YAML when it holds `: `, ` #`, a backtick or a leading quote (`label: "Write `done: true`"`).
 - Every type allows a free-text note from the person.
 - `ask` fails with the reason on bad YAML, an unknown type, duplicate ids, or a `recommended` outside
   the options.
