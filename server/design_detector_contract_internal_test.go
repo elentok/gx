@@ -118,6 +118,27 @@ func TestGxGrillingRoundTemplate_IsGrilling(t *testing.T) {
 	}
 }
 
+func TestAgentfakeDefaultedRounds_UseTheRealFormat(t *testing.T) {
+	for turn, wantCards := range map[string]int{
+		agentfake.DesignTurnDefaulted: 1,
+		agentfake.DesignTurnMixed:     1,
+	} {
+		text := agentfake.DesignRoundText(turn)
+		before, after, ok := strings.Cut(text, "\n---\n")
+		if !ok || !isDefaultsHeading(strings.TrimSpace(after)) {
+			t.Errorf("%s round has no defaults heading after a --- line: %q", turn, text)
+			continue
+		}
+		if !strings.Contains(before, "❓") {
+			t.Errorf("%s round = %q, want the card before the defaults", turn, text)
+		}
+		cards := roundCards(text)
+		if len(cards) != wantCards || strings.Contains(cards[0].Body, "Q10") {
+			t.Errorf("%s round cards = %+v, want %d card without the defaults", turn, cards, wantCards)
+		}
+	}
+}
+
 func TestGxGrillingAllDefaultedTemplate_IsGrilling(t *testing.T) {
 	var found string
 	for _, b := range fencedBlocks(skillText(t, "gx-grilling"), "````") {

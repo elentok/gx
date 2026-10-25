@@ -56,13 +56,27 @@ const (
 	DesignTurnSlow = "slow"
 )
 
+// defaultsSection is the gx-grilling format: after the asked questions, after
+// a `---` line, plain text under its own heading.
+const defaultsSection = "\n\n---\n\n**Decided unless you object**\n\n" +
+	"- Q10: keep the current store.\n- Q11: migrate at startup."
+
 const defaultedRound = "Everything else has a clear answer.\n\n" +
-	"**Defaulted**\n\n- Q10: keep the current store.\n- Q11: migrate at startup.\n\n" +
-	"❓ **Q12** - **Accept these defaults?**: Say so, or object in the message box.\n\n" + yesNoBlock
+	"❓ **Q12** - **Accept these defaults?**: Say so, or object in the message box.\n\n" + yesNoBlock +
+	defaultsSection
 
 const mixedRound = "One question needs you.\n\n" +
-	"**Defaulted**\n\n- Q10: keep the current store.\n- Q11: migrate at startup.\n\n" +
-	"❓ **Q12** - **Keep going?**: Ready for the next step?\n\n" + yesNoBlock
+	"❓ **Q12** - **Keep going?**: Ready for the next step?\n\n" + yesNoBlock +
+	defaultsSection
+
+// DesignRoundText is the scripted text of a DesignTurnDefaulted or
+// DesignTurnMixed turn, for tests that check it against the server's parser.
+func DesignRoundText(turn string) string {
+	if turn == DesignTurnMixed {
+		return mixedRound
+	}
+	return defaultedRound
+}
 
 // designMessage is the assistant message for the turn-th prompt (from zero).
 // Without a script a /gx-design prompt gets the next round and any other text

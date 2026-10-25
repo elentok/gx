@@ -170,6 +170,26 @@ func TestAutoAdvance_PageNoteStopsTheSendAndKeepsContinue(t *testing.T) {
 	wantStopped(t, f, c)
 }
 
+func TestAutoAdvance_ManualContinueStopsTheCountdown(t *testing.T) {
+	f, _ := startCountdown(t)
+	if res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Continue: true}); err != nil || res.Refused {
+		t.Fatalf("continue = %+v, %v", res, err)
+	}
+	if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
+		t.Errorf("countdown = %v after a manual Continue, want none", got.AutoAdvanceAt)
+	}
+}
+
+func TestAutoAdvance_RunActionStopsTheCountdown(t *testing.T) {
+	f, _ := startCountdown(t)
+	if res, err := f.h.Client.RunSessionAction(f.ctx, f.id); err != nil || res.Refused {
+		t.Fatalf("run action = %+v, %v", res, err)
+	}
+	if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil {
+		t.Errorf("countdown = %v after Run Action, want none", got.AutoAdvanceAt)
+	}
+}
+
 func TestAutoAdvance_SwitchOffDuringTheCountdownStopsTheSend(t *testing.T) {
 	f, c := startCountdown(t)
 	if res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, false); err != nil || res.Refused {

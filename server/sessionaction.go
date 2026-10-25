@@ -39,6 +39,7 @@ func (s *Server) sendSessionAction(req SessionRequest, auto bool) (SessionResult
 	if auto {
 		meta.AutoSends++
 	} else {
+		s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you ran the action")
 		meta.AutoSends = 0
 	}
 	if err := writeSessionMeta(dir, meta); err != nil {
