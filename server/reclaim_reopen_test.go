@@ -71,13 +71,11 @@ func TestReclaim_DeadEmptyClaimReopens(t *testing.T) {
 	runnerShapes(t, func(t *testing.T, headless bool) {
 		store, repo, wtPath, ticketPath := restartDead(t, headless, noWork)
 		waitStatus(t, ticketPath, schema.StatusOpen)
-		logged, _, err := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !slices.ContainsFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.ClaimReopened) }) {
-			t.Errorf("run log lacks claim-reopened: %v", logged)
-		}
+		// The reopen writes the ticket's status before its run-log event.
+		waitFor(t, func() bool {
+			logged, _, _ := ralphloop.ReadEvents(filepath.Join(store, "proj"), "epic-a")
+			return slices.ContainsFunc(logged, func(ev ralphloop.Event) bool { return ev.Type == string(events.ClaimReopened) })
+		})
 		if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
 			t.Errorf("worktree still there: %v", err)
 		}
