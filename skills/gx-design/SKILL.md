@@ -88,13 +88,25 @@ the ticket title during `resolve-tickets`.
    - **Design question** (behaviour, scope, parity, which runners or harnesses it covers): the
      subagent writes no spec and returns the questions instead.
 
-   If it returns any design question, file them as `grilling` map tickets (Map epics → Child
-   ticket) and stop, without chaining: the next run matches step 3 and resumes the map. Each ticket
-   costs a run, so by default file one ticket that lists every question with the subagent's
-   suggested answer. Give a question its own ticket only when it needs research or a prototype, or
-   is too big to settle in the same grilling round as the rest. Write the
-   spec only on a run that returns none. A spec never carries open design questions to the review.
-   Once the spec is written, set `--design-step spec`.
+   If it returns design questions with suggested answers, grill the person in this same session
+   (`gx-grilling`), then dispatch the subagent again with the answers. Continuing the same subagent
+   is fine where the harness allows it.
+   - **One round = one closed ticket.** Record each grilling round as one closed `grilling` map
+     ticket with the slug prefix `spec-round-` (Question is the questions, Resolution is the
+     answers) plus a Decisions so far line. The next dispatch gets them through the closed-ticket gists.
+   - **2-round cap.** Count the `spec-round-` tickets, so the count survives `/clear`,
+     auto-advance and detours. A detour never resets it. A question too big for one round becomes
+     the next round.
+   - **Before each redraft**, run `gx agent context-window --fits spec`. On a stop, end the run
+     with the run-end line.
+   - **From the third draft on**, the subagent decides new design questions itself and lists each
+     in a `## Self-decided design questions` section of the spec: the question, the choice and
+     the reason.
+   - **Research or prototype.** Only a question that needs research or a prototype becomes an open
+     `grilling` map ticket. File it after the rest of its batch is grilled and recorded, then stop
+     without a redraft: the next run matches step 3 and resumes the map.
+   - A spec never carries open design questions to the review.
+   - Set `--design-step spec` only after the draft is written.
 5. **No `## Review findings` section on the map** → dispatch a design-review subagent against the
    spec (rubric below). It writes the findings as a markdown checklist (`- [ ] …`) with
    `gx tickets section <project:epic> "Review findings" -`. Write `- [x] No findings` if there are none. Then set `--design-step review`.
@@ -141,6 +153,8 @@ Review the spec against the map it came from and its own template, not in the ab
 - What holes remain, or what question does the spec raise but not answer?
 - Does Further Notes hold an open design question? Each one is a finding: step 4 should have sent
   it back to the map.
+- Does `## Self-decided design questions` hold a choice you disagree with, or one that changes user
+  stories or scope? Each one is a finding. File none otherwise.
 
 ## After every run
 

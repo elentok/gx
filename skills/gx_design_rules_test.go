@@ -30,6 +30,33 @@ func TestGxDesignChainingRules(t *testing.T) {
 	}
 }
 
+func TestGxDesignSpecStepGrillsInPlace(t *testing.T) {
+	text := readFile(t, "gx-design/SKILL.md")
+	for _, want := range []string{
+		"grill the person in this same session",
+		"One round = one closed ticket",
+		"`spec-round-`",
+		"2-round cap",
+		"A detour never resets it",
+		"gx agent context-window --fits spec",
+		"From the third draft on",
+		"## Self-decided design questions",
+		"disagree with, or one that changes user\n  stories or scope",
+		"needs research or a prototype becomes an open",
+		"then stop\n     without a redraft",
+		"Set `--design-step spec` only after the draft is written",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("gx-design/SKILL.md lacks %q", want)
+		}
+	}
+	for _, banned := range []string{"and stop, without chaining", "file them as `grilling` map tickets"} {
+		if strings.Contains(text, banned) {
+			t.Errorf("gx-design/SKILL.md still has %q", banned)
+		}
+	}
+}
+
 func TestGxGrillingLowRiskDefaults(t *testing.T) {
 	text := readFile(t, "gx-grilling/SKILL.md")
 	for _, want := range []string{
