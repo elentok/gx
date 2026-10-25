@@ -201,6 +201,17 @@ func TestAgentLink(t *testing.T) {
 	}
 }
 
+func TestAgentStep_OutsideASessionIsANote(t *testing.T) {
+	noServer := func() (*apiclient.Client, error) {
+		t.Error("outside a session the server was called")
+		return nil, nil
+	}
+	var out bytes.Buffer
+	if err := runAgentStep(context.Background(), noServer, &out, false, server.ReportStepRequest{Step: "spec"}); err != nil || out.Len() == 0 {
+		t.Errorf("outside a session = %q, %v; want a note and success", out.String(), err)
+	}
+}
+
 func TestAgentsStopAndRemove_JSON(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()

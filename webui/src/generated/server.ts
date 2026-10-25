@@ -1138,6 +1138,13 @@ export interface SessionInfo {
    */
   auto_advance_at?: string;
   /**
+   * ReportedStep is the Design step the agent says it is running, and
+   * ReportedTitle the ticket it is on during Resolve tickets. Both clear when
+   * the session goes idle.
+   */
+  reported_step?: string;
+  reported_title?: string;
+  /**
    * Failure is set while the session is in one of the failure states.
    */
   failure?: SessionFailure;
@@ -1206,6 +1213,15 @@ export interface MarkActionableRequest {
 export interface LinkSessionRequest {
   id: string;
   ticket: string;
+}
+/**
+ * ReportStepRequest is the body of `gx agent step`: the caller's session, the
+ * Design step it is running and, during Resolve tickets, the ticket's title.
+ */
+export interface ReportStepRequest {
+  id: string;
+  step: string;
+  title?: string;
 }
 /**
  * CreateSessionRequest is the body of a session create. Cols and Rows are the

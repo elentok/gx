@@ -22,7 +22,7 @@ func newAgentCmd(d deps) *cobra.Command {
 		Use:   "agent",
 		Short: "agent-neutral inspection of the running coding-agent session",
 	}
-	cmd.AddCommand(newAgentContextWindowCmd(d), newAgentActionableCmd(), newAgentLinkCmd(), newAgentGuardBashCmd())
+	cmd.AddCommand(newAgentContextWindowCmd(d), newAgentActionableCmd(), newAgentLinkCmd(), newAgentStepCmd(), newAgentGuardBashCmd())
 	return cmd
 }
 

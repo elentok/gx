@@ -550,6 +550,9 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 					}
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
+					if st.State == SessionIdle {
+						m.ReportedStep, m.ReportedTitle = "", ""
+					}
 					if st.State == SessionIdle && prev.State != SessionIdle && m.Design {
 						design = designRef{m.ConversationID, m.Ticket, live}
 					}

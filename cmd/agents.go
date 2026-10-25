@@ -149,6 +149,37 @@ func runAgentLink(ctx context.Context, client func() (*apiclient.Client, error),
 	})
 }
 
+// newAgentStepCmd is `gx agent step`: the calling agent reports the Design
+// step it is running.
+func newAgentStepCmd() *cobra.Command {
+	var jsonOut bool
+	var title string
+	cmd := &cobra.Command{
+		Use:   "step <step> [--title <ticket title>]",
+		Short: "report the Design step this gx session is running; outside one, do nothing",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			req := server.ReportStepRequest{ID: os.Getenv(nativerunner.AgentSessionEnv), Step: args[0], Title: title}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runAgentStep(ctx, serverClient, c.OutOrStdout(), jsonOut, req)
+		},
+	}
+	cmd.Flags().StringVar(&title, "title", "", "the ticket's title, during Resolve tickets")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+// runAgentStep sends req, or, with no session id or no server, prints a note
+// and succeeds, so skills can call it unconditionally.
+func runAgentStep(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, req server.ReportStepRequest) error {
+	return runAgentSelfWrite(ctx, client, w, jsonOut, req.ID, "reported", func(cl *apiclient.Client) (server.SessionResult, error) {
+		return cl.ReportSessionStep(ctx, req)
+	})
+}
+
 // runAgentSelfWrite is a write an agent makes on its own session id; with no
 // id or no server it prints "nothing <done>" and succeeds.
 func runAgentSelfWrite(ctx context.Context, client func() (*apiclient.Client, error), w io.Writer, jsonOut bool, id, done string, write func(*apiclient.Client) (server.SessionResult, error)) error {

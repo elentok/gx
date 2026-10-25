@@ -34,6 +34,11 @@ type SessionInfo struct {
 	// AutoAdvanceAt is when the running countdown sends the Continue; unset
 	// with none running.
 	AutoAdvanceAt *time.Time `json:"auto_advance_at,omitempty"`
+	// ReportedStep is the Design step the agent says it is running, and
+	// ReportedTitle the ticket it is on during Resolve tickets. Both clear when
+	// the session goes idle.
+	ReportedStep  string `json:"reported_step,omitempty"`
+	ReportedTitle string `json:"reported_title,omitempty"`
 	// Failure is set while the session is in one of the failure states.
 	Failure *SessionFailure `json:"failure,omitempty"`
 }
@@ -101,6 +106,14 @@ type MarkActionableRequest struct {
 type LinkSessionRequest struct {
 	ID     string `json:"id"`
 	Ticket string `json:"ticket"`
+}
+
+// ReportStepRequest is the body of `gx agent step`: the caller's session, the
+// Design step it is running and, during Resolve tickets, the ticket's title.
+type ReportStepRequest struct {
+	ID    string `json:"id"`
+	Step  string `json:"step"`
+	Title string `json:"title,omitempty"`
 }
 
 // CreateSessionRequest is the body of a session create. Cols and Rows are the
@@ -182,6 +195,10 @@ type sessionMeta struct {
 	// AutoSends counts the auto-advance sends since the person last gave input.
 	// A restart keeps it: a restart never sends, so only the next run end reads it.
 	AutoSends int `json:"auto_sends,omitempty"`
+	// ReportedStep and ReportedTitle are the agent's own report of its Design
+	// step; the next idle clears them.
+	ReportedStep  string `json:"reported_step,omitempty"`
+	ReportedTitle string `json:"reported_title,omitempty"`
 	// RestoredAt is when the person last Restored the session; RestoreCrashed
 	// marks that run crashing within restoreCrashWindow.
 	RestoredAt     time.Time `json:"restored_at,omitzero"`
@@ -205,6 +222,8 @@ func (m sessionMeta) info() SessionInfo {
 		Unread:          m.Unread,
 		Actionable:      m.Actionable,
 		AutoAdvance:     !m.AutoAdvanceOff,
+		ReportedStep:    m.ReportedStep,
+		ReportedTitle:   m.ReportedTitle,
 	}
 	if st := m.Status; st.State == SessionBlocked {
 		info.Actionable = SessionActionable{Kind: st.Kind, Reason: cmp.Or(st.Message, st.Kind, SessionBlocked)}

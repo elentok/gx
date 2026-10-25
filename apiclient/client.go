@@ -547,6 +547,14 @@ func (c *Client) LinkSession(ctx context.Context, req server.LinkSessionRequest)
 	return res, err
 }
 
+// ReportSessionStep stores the Design step an agent is running on its session.
+// A refusal is a result (Refused set), not an error.
+func (c *Client) ReportSessionStep(ctx context.Context, req server.ReportStepRequest) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/step", req, &res)
+	return res, err
+}
+
 // ReportFocus sends a TUI's focus report. A refusal is a result (Refused
 // set), not an error.
 func (c *Client) ReportFocus(ctx context.Context, req server.FocusReport) (server.SessionResult, error) {
