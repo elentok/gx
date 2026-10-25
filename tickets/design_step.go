@@ -11,14 +11,46 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// DesignSteps are the values of a map epic's design_step, in order. They match
-// the Progress step wire values the server sends.
-var DesignSteps = []string{"chart", "resolve-tickets", "spec", "review", "grill-findings", "create-tickets", "branch", "done"}
+// DesignStep is a value of a map epic's design_step. The values are also the
+// Progress step wire values the server sends.
+type DesignStep string
+
+const (
+	StepChart          DesignStep = "chart"
+	StepResolveTickets DesignStep = "resolve-tickets"
+	StepSpec           DesignStep = "spec"
+	StepReview         DesignStep = "review"
+	StepGrillFindings  DesignStep = "grill-findings"
+	StepCreateTickets  DesignStep = "create-tickets"
+	StepBranch         DesignStep = "branch"
+	StepDone           DesignStep = "done"
+)
+
+// DesignSteps lists every DesignStep, in order.
+var DesignSteps = []DesignStep{
+	StepChart, StepResolveTickets, StepSpec, StepReview,
+	StepGrillFindings, StepCreateTickets, StepBranch, StepDone,
+}
+
+// ParseDesignStep returns the DesignStep named by s, or false when s is not one.
+func ParseDesignStep(s string) (DesignStep, bool) {
+	step := DesignStep(s)
+	return step, slices.Contains(DesignSteps, step)
+}
+
+// DesignStepNames is DesignSteps as strings, for messages and flag help.
+func DesignStepNames() []string {
+	names := make([]string, len(DesignSteps))
+	for i, s := range DesignSteps {
+		names[i] = string(s)
+	}
+	return names
+}
 
 // CheckDesignStep refuses a name that is not one of DesignSteps.
 func CheckDesignStep(step string) error {
-	if !slices.Contains(DesignSteps, step) {
-		return fmt.Errorf("design step %q; want one of %s", step, strings.Join(DesignSteps, ", "))
+	if _, ok := ParseDesignStep(step); !ok {
+		return fmt.Errorf("design step %q; want one of %s", step, strings.Join(DesignStepNames(), ", "))
 	}
 	return nil
 }
@@ -36,7 +68,7 @@ type DesignProbe struct {
 // and files. It checks from the last step back and stops at the first step that
 // is done, because the Branch step deletes the spec file from the trunk
 // checkout. Only MigrateDesignStep uses it: a stored design_step replaces it.
-func GuessDesignStep(m Epic, byName map[string]Epic, p DesignProbe) string {
+func GuessDesignStep(m Epic, byName map[string]Epic, p DesignProbe) DesignStep {
 	impl, hasImpl := byName[m.Name+ImplEpicSuffix]
 	findings := schema.Section(m.Body, "Review findings")
 	hasFindings := schema.HasSection(m.Body, "Review findings")
@@ -45,24 +77,24 @@ func GuessDesignStep(m Epic, byName map[string]Epic, p DesignProbe) string {
 	case m.Status == string(schema.StatusDone),
 		!m.CompletedAt.IsZero() && !hasImpl,
 		p.Repo != "" && p.BranchExists != nil && p.BranchExists(p.Repo, m.Name+ImplEpicSuffix):
-		return "done"
+		return StepDone
 	case hasImpl && impl.Status != string(schema.StatusDraft):
-		return "branch"
+		return StepBranch
 	case open && !m.DestinationUnconfirmed:
 		// A review that sent tickets back reopens the map's tickets.
-		return "resolve-tickets"
+		return StepResolveTickets
 	case hasFindings && findingsChecked(findings):
-		return "create-tickets"
+		return StepCreateTickets
 	case hasFindings:
-		return "grill-findings"
+		return StepGrillFindings
 	case p.TrunkDir != "" && fileExists(filepath.Join(p.TrunkDir, "docs", "specs", m.Name+".md")):
-		return "review"
+		return StepReview
 	case !open && schema.Section(m.Body, "Not yet specified") == "" && !m.DestinationUnconfirmed:
-		return "spec"
+		return StepSpec
 	case !m.DestinationUnconfirmed:
-		return "resolve-tickets"
+		return StepResolveTickets
 	}
-	return "chart"
+	return StepChart
 }
 
 // HasOpenTicket reports whether any of m's tickets is open or claimed.
@@ -113,14 +145,14 @@ func MigrateDesignStep(root string, probe DesignProbe) ([]MigrationChange, error
 			if mappingKeyIndex(mapping, "design_step") >= 0 {
 				return false, nil
 			}
-			return true, setMappingValue(mapping, "design_step", step)
+			return true, setMappingValue(mapping, "design_step", string(step))
 		})
 		if err != nil {
 			return changes, err
 		}
 		changes = append(changes, MigrationChange{
 			Path:  filepath.Join(e.Path, "ticket.md"),
-			Notes: []string{"design_step set to " + step},
+			Notes: []string{"design_step set to " + string(step)},
 		})
 	}
 	return changes, nil

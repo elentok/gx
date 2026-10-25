@@ -28,6 +28,7 @@ func TestEpicList_MapProgress(t *testing.T) {
 			writeEpicFiles(t, store, "m-"+string(s), stepMD(string(s)), open)
 		}
 		writeEpicFiles(t, store, "m-no-field", mapMD(""), done)
+		writeEpicFiles(t, store, "m-bad-step", stepMD("not-a-step"), open)
 		writeEpicFiles(t, store, "m-status-done", "---\nstatus: done\nkind: map\n---\n", done)
 		// Files and refs that the old guess read must change nothing.
 		writeEpicFiles(t, store, "m-ignored", stepMD("resolve-tickets"), open)
@@ -51,6 +52,7 @@ func TestEpicList_MapProgress(t *testing.T) {
 
 	want := map[string]server.ProgressStep{
 		"m-no-field":    server.ProgressChart,
+		"m-bad-step":    server.ProgressChart,
 		"m-status-done": server.ProgressDone,
 		"m-ignored":     server.ProgressResolveTickets,
 		"loop":          "",

@@ -35,18 +35,19 @@ const (
 	EpicListNoOpenTickets EpicListState = "no-open-tickets"
 )
 
-// ProgressStep is the step a map's design has reached; see mapProgress.
-type ProgressStep string
+// ProgressStep is the step a map's design has reached; see mapProgress. The
+// tickets package owns the list of steps.
+type ProgressStep = tickets.DesignStep
 
 const (
-	ProgressChart          ProgressStep = "chart"
-	ProgressResolveTickets ProgressStep = "resolve-tickets"
-	ProgressSpec           ProgressStep = "spec"
-	ProgressReview         ProgressStep = "review"
-	ProgressGrillFindings  ProgressStep = "grill-findings"
-	ProgressCreateTickets  ProgressStep = "create-tickets"
-	ProgressBranch         ProgressStep = "branch"
-	ProgressDone           ProgressStep = "done"
+	ProgressChart          = tickets.StepChart
+	ProgressResolveTickets = tickets.StepResolveTickets
+	ProgressSpec           = tickets.StepSpec
+	ProgressReview         = tickets.StepReview
+	ProgressGrillFindings  = tickets.StepGrillFindings
+	ProgressCreateTickets  = tickets.StepCreateTickets
+	ProgressBranch         = tickets.StepBranch
+	ProgressDone           = tickets.StepDone
 )
 
 // PickerSection is the Designs picker section a map row belongs to.

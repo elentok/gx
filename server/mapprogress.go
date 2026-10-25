@@ -9,50 +9,47 @@ import (
 )
 
 // mapProgress is a map's current Progress step. It comes from the epic's
-// design_step alone: status done always shows Done, and a missing field shows
-// Chart. It never looks at files or branch refs.
+// design_step alone: status done always shows Done, and a missing or unknown
+// field shows Chart. It never looks at files or branch refs.
 func mapProgress(m tickets.Epic) ProgressStep {
 	if m.Status == string(schema.StatusDone) {
 		return ProgressDone
 	}
-	if m.DesignStep == "" {
-		return ProgressChart
+	if step, ok := tickets.ParseDesignStep(m.DesignStep); ok {
+		return step
 	}
-	return ProgressStep(m.DesignStep)
+	return ProgressChart
 }
 
-// progressSteps lists the Progress steps in order.
-var progressSteps = []struct {
-	step  ProgressStep
-	label string
-}{
-	{ProgressChart, "Chart"},
-	{ProgressResolveTickets, "Resolve tickets"},
-	{ProgressSpec, "Spec"},
-	{ProgressReview, "Review"},
-	{ProgressGrillFindings, "Grill findings"},
-	{ProgressCreateTickets, "Create tickets"},
-	{ProgressBranch, "Branch"},
-	{ProgressDone, "Done"},
+// progressLabels is the label of each Progress step.
+var progressLabels = map[ProgressStep]string{
+	ProgressChart:          "Chart",
+	ProgressResolveTickets: "Resolve tickets",
+	ProgressSpec:           "Spec",
+	ProgressReview:         "Review",
+	ProgressGrillFindings:  "Grill findings",
+	ProgressCreateTickets:  "Create tickets",
+	ProgressBranch:         "Branch",
+	ProgressDone:           "Done",
 }
 
 // mapSteps lists all Progress steps with their state. The steps before the
 // current one are done, and all of them are once the map is Done.
 func mapSteps(m tickets.Epic, byName map[string]tickets.Epic) []MapStep {
 	current := mapProgress(m)
-	steps := make([]MapStep, 0, len(progressSteps))
+	steps := make([]MapStep, 0, len(tickets.DesignSteps))
 	state := MapStepDone
-	for _, s := range progressSteps {
-		label := s.label
+	for _, step := range tickets.DesignSteps {
+		label := progressLabels[step]
 		switch {
-		case s.step == current && current == ProgressDone:
-		case s.step == current:
+		case step == current && current == ProgressDone:
+		case step == current:
 			state = MapStepCurrent
 			label += currentStepNote(m, byName, current)
 		case state == MapStepCurrent:
 			state = MapStepTodo
 		}
-		steps = append(steps, MapStep{Step: s.step, Label: label, State: state})
+		steps = append(steps, MapStep{Step: step, Label: label, State: state})
 	}
 	return steps
 }

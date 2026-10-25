@@ -147,7 +147,7 @@ func checkDesignStepMove(mapping *yaml.Node, next string, allowBackward bool) er
 		return nil
 	}
 	cur := mapping.Content[i+1].Value
-	if slices.Index(DesignSteps, next) < slices.Index(DesignSteps, cur) {
+	if slices.Index(DesignSteps, DesignStep(next)) < slices.Index(DesignSteps, DesignStep(cur)) {
 		return fmt.Errorf("design_step %s is before the current %s; pass --allow-backward to move back", next, cur)
 	}
 	return nil

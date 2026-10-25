@@ -153,7 +153,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	// Epic address only (project:epic): the settable epic fields.
 	cmd.Flags().String("kind", "", "epic only: set kind (map or loop)")
 	cmd.Flags().String("destination-unconfirmed", "", "epic only: set destination_unconfirmed (true/false)")
-	cmd.Flags().String("design-step", "", "map epic only: set design_step ("+strings.Join(tickets.DesignSteps, ", ")+")")
+	cmd.Flags().String("design-step", "", "map epic only: set design_step ("+strings.Join(tickets.DesignStepNames(), ", ")+")")
 	cmd.Flags().Bool("allow-backward", false, "map epic only: allow --design-step to move to an earlier step")
 	for _, field := range tickets.EpicServerStamped {
 		flag := strings.ReplaceAll(field, "_", "-")
