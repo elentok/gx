@@ -359,3 +359,41 @@ test("sending the round drops its draft", async () => {
   const again = await screen.findByRole("group", { name: "Questions" });
   expect(within(again).queryByRole("button", { name: "Question 1, answered" })).toBeNull();
 });
+
+const defaultsText = "Intro\n\n**Decided unless you object**\n\n- Naming: use camelCase\n- Order: alphabetical";
+
+test("defaulted questions render as plain text beside one card, and Send asks nothing about them", async () => {
+  const post = vi.fn<PostPrompt>(async () => ({}));
+  const fetchChat = okChat(chatOf([msg({ text: defaultsText })], { round: [card({ label: "1", body: "First?" })] }));
+  renderChat([session()], fetchChat, post);
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  expect(screen.getByText("Decided unless you object")).toBeTruthy();
+  expect(screen.getByText("Naming: use camelCase")).toBeTruthy();
+  expect(screen.getByText("Order: alphabetical")).toBeTruthy();
+  expect(within(sheet).getAllByRole("button", { name: /^Question \d/ })).toHaveLength(1);
+
+  fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  const sent = JSON.stringify(post.mock.calls[0]);
+  expect(sent).toContain("Q1");
+  expect(sent).not.toContain("camelCase");
+  expect(sent).not.toContain("unanswered");
+});
+
+test("an all-defaulted round shows one Accept these defaults card", async () => {
+  const accept = card({
+    label: "1",
+    title: "Accept these defaults?",
+    body: "Do you accept the defaults below?",
+    kind: "yes-no",
+    options: undefined,
+  });
+  renderChat([session()], okChat(chatOf([msg({ text: defaultsText })], { round: [accept] })));
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  expect(within(sheet).getAllByRole("button", { name: /^Question \d/ })).toHaveLength(1);
+  expect(within(sheet).getByText("Q1 - Accept these defaults?")).toBeTruthy();
+  expect(within(sheet).getByRole("button", { name: "Yes" })).toBeTruthy();
+  expect(within(sheet).getByRole("button", { name: "No" })).toBeTruthy();
+  expect(screen.getByText("Naming: use camelCase")).toBeTruthy();
+});
