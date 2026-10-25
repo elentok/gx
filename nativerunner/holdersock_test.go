@@ -38,6 +38,17 @@ func startHolder(t *testing.T, child string) (dir string, c *nativerunner.Holder
 	return dir, c, errc
 }
 
+func TestRunHolder_LongSocketPathNamesTheCap(t *testing.T) {
+	dir := filepath.Join(shortTempDir(t), strings.Repeat("d", 120))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	err := nativerunner.RunHolder(dir, []string{"true"})
+	if err == nil || !strings.Contains(err.Error(), "unix socket path") {
+		t.Fatalf("err = %v, want one naming the unix socket path length cap", err)
+	}
+}
+
 func TestHolderSocket_CoreOps(t *testing.T) {
 	dir, c, done := startHolder(t, echoChild)
 

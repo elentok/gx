@@ -40,6 +40,9 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
 - Run web tests through `make web-test`. gx installs dependencies when it creates an iteration
   worktree, so web tests work in a fresh worktree. `make web-test` still installs first, at the cost
   of a slower run.
+- Unix socket paths are capped near 100 bytes, and `t.TempDir()` can exceed that. Holder-socket
+  tests (anything that binds `holder.sock`) need a short `TMPDIR` or a short state root; use
+  `shortTempDir` in `nativerunner` tests. The failure is `bind: invalid argument`.
 - Tests never read live machine state, such as sibling worktrees, real branches or the live
   server's state. Use `t.TempDir()` and `testutil.TempRepo`.
 - If a test run moves to the background, wait for its completion notice. Don't poll its output

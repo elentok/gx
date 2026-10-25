@@ -3,6 +3,7 @@ package nativerunner
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -115,9 +116,14 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		_ = tty.Close()
 		return err
 	}
-	ln, err := net.Listen("unix", filepath.Join(dir, HolderSocketFile))
+	sock := filepath.Join(dir, HolderSocketFile)
+	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		_ = tty.Close()
+		if errors.Is(err, syscall.EINVAL) {
+			// bind reports an over-long path as a bare EINVAL.
+			return fmt.Errorf("%w (unix socket path is %d bytes; the OS caps it near 100)", err, len(sock))
+		}
 		return err
 	}
 	// Closing the listener removes holder.sock, so no stale socket outlives
