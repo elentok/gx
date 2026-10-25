@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -180,15 +181,22 @@ type designRef struct {
 // claudeTranscript finds the claude transcript of a session's conversation. A
 // missing transcript (a codex session, or one not written yet) stays silent;
 // real errors and an ambiguous id are logged.
-func (s *Server) claudeTranscript(id, conversationID string) (string, bool) {
+func (s *Server) claudeTranscript(id string, meta sessionMeta) (string, bool) {
+	conversationID := meta.ConversationID
 	if conversationID == "" {
 		return "", false
 	}
-	return s.transcripts.resolve(conversationID, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
+	return s.transcripts.resolve(conversationID, meta.Status.State, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
 		projects, err := harness.ClaudeProjectsDir()
 		if err != nil {
 			s.log.Warn("claude projects dir", "session", id, "err", err)
 			return "", false
+		}
+		// One stat of the expected slug dir; the glob over every project dir
+		// is only for a session launched from a different cwd.
+		expected := filepath.Join(projects, transcript.Slugify(meta.Dir), conversationID+".jsonl")
+		if _, err := os.Stat(expected); err == nil {
+			return expected, true
 		}
 		paths, err := transcript.FindByIDIn(projects, conversationID)
 		if err != nil {
@@ -207,8 +215,8 @@ func (s *Server) claudeTranscript(id, conversationID string) (string, bool) {
 
 // lastAssistantText reads the session's last assistant message from its claude
 // transcript.
-func (s *Server) lastAssistantText(id, conversationID string) (string, bool) {
-	path, ok := s.claudeTranscript(id, conversationID)
+func (s *Server) lastAssistantText(id string, meta sessionMeta) (string, bool) {
+	path, ok := s.claudeTranscript(id, meta)
 	if !ok {
 		return "", false
 	}
@@ -224,7 +232,12 @@ func (s *Server) lastAssistantText(id, conversationID string) (string, bool) {
 // and clears a derived one it no longer matches. A GxRaised one is never
 // touched. A harness without a claude transcript (codex) never matches.
 func (s *Server) detectDesignActionable(dir, id string, design designRef) {
-	text, ok := s.lastAssistantText(id, design.Conversation)
+	meta, err := readSessionMeta(dir)
+	if err != nil {
+		meta = sessionMeta{}
+	}
+	meta.ConversationID = design.Conversation
+	text, ok := s.lastAssistantText(id, meta)
 	if !ok {
 		return
 	}

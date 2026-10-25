@@ -6,29 +6,47 @@ import (
 	"time"
 )
 
-// defaultTranscriptMissTTL is how long a failed transcript lookup stays
+// defaultTranscriptMissTTL is how long the first failed transcript lookup stays
 // remembered. A transcript not written yet shows up within a few seconds.
 const defaultTranscriptMissTTL = 3 * time.Second
 
+// missBackoff scales the miss TTL on each repeated miss: a transcript still
+// missing after a few tries is probably never coming (wrong harness, deleted),
+// and every lookup of it costs a glob over the whole projects dir.
+var missBackoff = []time.Duration{1, 10, 100}
+
+// transcriptMiss is one remembered failed lookup. A session status change
+// ends it early, since a new turn is when a transcript appears.
+type transcriptMiss struct {
+	at    time.Time
+	state string
+	tries int
+}
+
 // transcriptPaths remembers where each conversation's transcript is. A found
 // path never moves, so a lookup globs the projects dir at most once per
-// conversation, and once per transcriptMissTTL while it stays missing.
+// conversation, and while it stays missing at most once per backed-off TTL.
 type transcriptPaths struct {
 	mu     sync.Mutex
 	found  map[string]string
-	missed map[string]time.Time
+	missed map[string]transcriptMiss
 }
 
 // resolve returns the cached path of conversationID, or the result of find,
 // which runs under the lock so concurrent callers share one glob. A miss
-// stays cached for missTTL.
-func (c *transcriptPaths) resolve(conversationID string, now time.Time, missTTL time.Duration, find func() (string, bool)) (string, bool) {
+// stays cached for missTTL, then 10x and 100x that on repeated misses, and
+// is dropped when state differs from the one it was recorded in.
+func (c *transcriptPaths) resolve(conversationID, state string, now time.Time, missTTL time.Duration, find func() (string, bool)) (string, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if path, ok := c.found[conversationID]; ok {
 		return path, true
 	}
-	if at, ok := c.missed[conversationID]; ok && now.Sub(at) < missTTL {
+	miss, missed := c.missed[conversationID]
+	if missed && miss.state != state {
+		missed = false
+	}
+	if missed && now.Sub(miss.at) < missTTL*missBackoff[min(miss.tries-1, len(missBackoff)-1)] {
 		return "", false
 	}
 	path, ok := find()
@@ -41,9 +59,13 @@ func (c *transcriptPaths) resolve(conversationID string, now time.Time, missTTL 
 		return path, true
 	}
 	if c.missed == nil {
-		c.missed = map[string]time.Time{}
+		c.missed = map[string]transcriptMiss{}
 	}
-	c.missed[conversationID] = now
+	tries := 1
+	if missed {
+		tries = miss.tries + 1
+	}
+	c.missed[conversationID] = transcriptMiss{at: now, state: state, tries: tries}
 	return "", false
 }
 

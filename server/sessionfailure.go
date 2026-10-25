@@ -76,7 +76,7 @@ func (s *Server) transcriptFailure(m sessionMeta) *SessionFailure {
 	if state != SessionIdle && state != SessionWorking || m.Harness != s.settings.Load().chatHarness() {
 		return nil
 	}
-	path, ok := s.claudeTranscript(m.ID, m.ConversationID)
+	path, ok := s.claudeTranscript(m.ID, m)
 	if !ok {
 		return nil
 	}

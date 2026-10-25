@@ -96,6 +96,6 @@ func (p *chatPoll) transcript() string {
 	if err != nil || meta.Harness != p.s.settings.Load().chatHarness() {
 		return ""
 	}
-	path, _ := p.s.claudeTranscript(p.id, meta.ConversationID)
+	path, _ := p.s.claudeTranscript(p.id, meta)
 	return path
 }

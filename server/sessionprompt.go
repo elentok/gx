@@ -150,7 +150,7 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 // lastChatMessageID is the id of the newest visible message of the session's
 // chat, or "" with none.
 func (s *Server) lastChatMessageID(id string, meta sessionMeta) (string, error) {
-	path, ok := s.claudeTranscript(id, meta.ConversationID)
+	path, ok := s.claudeTranscript(id, meta)
 	if !ok {
 		return "", nil
 	}
