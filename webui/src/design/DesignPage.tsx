@@ -160,7 +160,7 @@ export function DesignPage({ address, fetchList, deps = {} }: { address?: string
       ) : !list ? (
         <Spinner label="Loading Designs" />
       ) : (
-        <Box display="grid" gridTemplateColumns={{ base: "1fr", lg: "260px minmax(0, 1fr) 300px" }} gap="4" minH="60vh">
+        <Box display="grid" gridTemplateColumns={{ base: "1fr", lg: "260px minmax(0, 1fr) 300px" }} gap="4" minH="60vh" alignContent={{ base: "start", lg: "normal" }}>
           {wide ? (
             <Picker groups={groups} projects={projects} current={address} onNew={onNew} />
           ) : (
