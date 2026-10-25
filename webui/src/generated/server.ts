@@ -363,8 +363,9 @@ export const SectionFinished: CardSection = "finished";
 /**
  * CardKind is the kind of an Epics page card.
  */
-export type CardKind = string;
-export const CardKindImplementation: CardKind = "implementation";
+export const CardKindImplementation = "implementation";
+export const CardKindDesign = "design";
+export type CardKind = typeof CardKindImplementation | typeof CardKindDesign;
 /**
  * CardActionKind names what a card button does.
  */
@@ -374,6 +375,13 @@ export const CardActionAnswer: CardActionKind = "answer";
 export const CardActionOpenTicket: CardActionKind = "open-ticket";
 export const CardActionOpenEpic: CardActionKind = "open-epic";
 export const CardActionMerge: CardActionKind = "merge";
+/**
+ * The Design actions target the Design's epic address. Design and Continue
+ * start a session first (POST open-design); Answer and Open only navigate.
+ */
+export const CardActionDesign: CardActionKind = "design";
+export const CardActionContinue: CardActionKind = "continue";
+export const CardActionOpen: CardActionKind = "open";
 /**
  * CardAction is one button of a card. Target is the address the button opens (a
  * ticket for Answer and Open ticket, an epic for Open epic) or acts on (Merge).
@@ -565,7 +573,8 @@ export const EpicListDraft: EpicListState = "draft";
  */
 export const EpicListNoOpenTickets: EpicListState = "no-open-tickets";
 /**
- * ProgressStep is the step a map's design has reached; see mapProgress.
+ * ProgressStep is the step a map's design has reached; see mapProgress. The
+ * tickets package owns the list of steps.
  */
 export type ProgressStep = string;
 export const ProgressChart: ProgressStep = "chart";
@@ -667,6 +676,16 @@ export interface EpicListRow {
    */
   state_pill?: string;
   waiting_since?: string;
+  /**
+   * CountdownEndsAt is the deadline of a Design's auto-advance countdown; the client
+   * builds "Next run starts in Ns" from it.
+   */
+  countdown_ends_at?: string;
+  /**
+   * MapPending marks a Design whose session runs before its map exists. It has no
+   * epic page: its title opens the Design page.
+   */
+  map_pending?: boolean;
 }
 /**
  * FollowUpCount is the number of draft and open tickets in one project's

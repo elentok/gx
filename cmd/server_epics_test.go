@@ -52,6 +52,19 @@ func TestPrintEpicList_NeedsYouRowsKeepTheServersOldestWaitOrder(t *testing.T) {
 	}
 }
 
+func TestPrintEpicList_MapPendingDesignPrintsProjectAndEpic(t *testing.T) {
+	var out bytes.Buffer
+	l := server.EpicList{Epics: []server.EpicListRow{
+		{Address: "proj:idea", Kind: server.EpicKindMap, State: server.EpicListDesigning, Section: server.SectionInProgress, MapPending: true},
+	}}
+	if err := printEpicList(&out, l); err != nil {
+		t.Fatal(err)
+	}
+	if want := "proj:idea\tmap\tdesigning\t0/0\tqueueable=false\tin-progress\n"; out.String() != want {
+		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+}
+
 func TestServerEpicsList_HasJSONFlag(t *testing.T) {
 	root := newRootCmd(deps{})
 	c, _, err := root.Find([]string{"server", "epics"})

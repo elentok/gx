@@ -40,7 +40,7 @@ func TestDesignsOpenNew_CreatesDesignSessionWithoutAnEpic(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, e := range list.Epics {
-		if strings.HasSuffix(e.Address, "fresh-idea") {
+		if strings.HasSuffix(e.Address, "fresh-idea") && !e.MapPending {
 			t.Errorf("epic %s was created", e.Address)
 		}
 	}

@@ -29,6 +29,7 @@ type CardKind string
 
 const (
 	CardKindImplementation CardKind = "implementation"
+	CardKindDesign         CardKind = "design"
 )
 
 // CardActionKind names what a card button does.
@@ -40,6 +41,11 @@ const (
 	CardActionOpenTicket CardActionKind = "open-ticket"
 	CardActionOpenEpic   CardActionKind = "open-epic"
 	CardActionMerge      CardActionKind = "merge"
+	// The Design actions target the Design's epic address. Design and Continue
+	// start a session first (POST open-design); Answer and Open only navigate.
+	CardActionDesign   CardActionKind = "design"
+	CardActionContinue CardActionKind = "continue"
+	CardActionOpen     CardActionKind = "open"
 )
 
 // CardAction is one button of a card. Target is the address the button opens (a

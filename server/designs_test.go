@@ -36,6 +36,12 @@ func startDesigns(t *testing.T) designsFixture {
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	return startDesignsIn(t, store)
+}
+
+// startDesignsIn is startDesigns on a store the caller has already seeded.
+func startDesignsIn(t *testing.T, store string) designsFixture {
+	t.Helper()
 	repo := testutil.TempRepo(t)
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)),

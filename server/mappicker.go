@@ -14,6 +14,14 @@ const pickerWindow = 7 * 24 * time.Hour
 // designActivity is what a map's design sessions say about it.
 type designActivity struct {
 	live, waiting bool
+	// The fields below read only the sessions that are neither Exited nor failed.
+	// running is set when one exists, asking when one waits on an answer (since
+	// askedAt), countdownAt is the deadline of its auto-advance. endedAt is when
+	// the newest Exited or failed session stopped.
+	running, asking bool
+	askedAt         time.Time
+	countdownAt     time.Time
+	endedAt         time.Time
 }
 
 // designActivities folds the sessions into one designActivity per map address.
@@ -27,13 +35,33 @@ func (s *Server) designActivities() map[string]designActivity {
 		return out
 	}
 	for _, info := range sessions {
-		if !info.Design || info.Status.State == SessionExited {
+		if !info.Design {
 			continue
 		}
 		addr := epicAddress(info.Ticket)
 		a := out[addr]
-		a.live = true
-		a.waiting = a.waiting || info.Actionable.Grilling
+		exited := info.Status.State == SessionExited
+		switch {
+		case exited || info.Failure != nil:
+			if info.StatusChangedAt.After(a.endedAt) {
+				a.endedAt = info.StatusChangedAt
+			}
+		default:
+			a.running = true
+			if info.Actionable.Grilling {
+				a.asking = true
+				if info.StatusChangedAt.After(a.askedAt) {
+					a.askedAt = info.StatusChangedAt
+				}
+			}
+			if info.AutoAdvanceAt != nil {
+				a.countdownAt = *info.AutoAdvanceAt
+			}
+		}
+		if !exited {
+			a.live = true
+			a.waiting = a.waiting || info.Actionable.Grilling
+		}
 		out[addr] = a
 	}
 	return out

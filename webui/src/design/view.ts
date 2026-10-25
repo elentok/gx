@@ -74,7 +74,7 @@ export const compareRows = (a: PickerRow, b: PickerRow) =>
 /** The non-empty sections of the Designs picker. */
 export function pickerGroups(epics: EpicListRow[], sessions: SessionInfo[]): PickerGroup[] {
   const maps = epics.filter((e) => e.kind === "map");
-  const known = new Set(epics.map((e) => e.address));
+  const known = new Set(epics.filter((e) => !e.map_pending).map((e) => e.address));
   return SECTIONS.map(({ key, title }) => ({
     key,
     title,

@@ -2,6 +2,7 @@ package server
 
 import (
 	"cmp"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -117,6 +118,12 @@ type EpicListRow struct {
 	// start of the wait the section sorts by.
 	StatePill    string    `json:"state_pill,omitempty"`
 	WaitingSince time.Time `json:"waiting_since,omitzero"`
+	// CountdownEndsAt is the deadline of a Design's auto-advance countdown; the client
+	// builds "Next run starts in Ns" from it.
+	CountdownEndsAt time.Time `json:"countdown_ends_at,omitzero"`
+	// MapPending marks a Design whose session runs before its map exists. It has no
+	// epic page: its title opens the Design page.
+	MapPending bool `json:"map_pending,omitempty"`
 }
 
 // FollowUpCount is the number of draft and open tickets in one project's
@@ -183,6 +190,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	list := EpicList{Epics: []EpicListRow{}, FollowUps: []FollowUpCount{}}
+	designs := s.designActivities()
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
 		epics, err := s.projectEpics(project)
@@ -191,20 +199,14 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		}
 		merged := map[string]bool{}
 		byName := map[string]tickets.Epic{}
-		hasMap := false
 		for _, e := range epics {
 			merged[e.Name] = !e.MergedAt.IsZero()
 			byName[e.Name] = e
-			hasMap = hasMap || (e.IsMap && epicListed(e))
 			if e.Name == followUpsEpicName {
 				if open := openFollowUps(e); open > 0 {
 					list.FollowUps = append(list.FollowUps, FollowUpCount{Project: project, Open: open})
 				}
 			}
-		}
-		var designs map[string]designActivity
-		if hasMap {
-			designs = s.designActivities()
 		}
 		now := time.Now()
 		for _, e := range epics {
@@ -215,6 +217,12 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 					s.decorateMapRow(&row, project, e, byName, designs[row.Address], now)
 				}
 				list.Epics = append(list.Epics, row)
+			}
+		}
+		for _, addr := range slices.Sorted(maps.Keys(designs)) {
+			p, epic, _ := strings.Cut(addr, ":")
+			if _, exists := byName[epic]; p == project && !exists && designs[addr].running {
+				list.Epics = append(list.Epics, mapPendingDesignRow(project, epic, designs[addr]))
 			}
 		}
 	}
@@ -228,6 +236,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) decorateMapRow(row *EpicListRow, project string, e tickets.Epic, byName map[string]tickets.Epic, design designActivity, now time.Time) {
 	row.ProgressStep = mapProgress(e)
 	row.PickerSection, row.PickerSortAt, row.ImplAddress = s.mapPicker(project, e, row.ProgressStep, byName, design, now)
+	decorateDesignCard(row, e, byName, design)
 }
 
 // openFollowUps counts the draft and open tickets of a follow-ups epic.
