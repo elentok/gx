@@ -1,6 +1,6 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
-import { Navigate, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { designHref } from "../hrefs";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
@@ -8,7 +8,6 @@ import { useEpicList, type FetchEpicList } from "../epics/list";
 import { readPageCache, writePageCache } from "../pageCache";
 import { DetailPage } from "../page/DetailPage";
 import { Button } from "../ui/button/Button";
-import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
 import { useFocusReport, type PostFocus } from "./focus";
@@ -21,7 +20,7 @@ import { ImplLink, Progress, showsImplLink } from "./Progress";
 import type { FetchScreen } from "./screen";
 import { SessionHeader, StartDesignButton } from "./SessionControls";
 import type { SessionInfo } from "../generated/server";
-import { designSession, liveSessions, IN_PROGRESS, pickerGroups } from "./view";
+import { designSession, liveSessions, pickerGroups } from "./view";
 
 /** The injected fetchers and actions the Design page talks to the server through. */
 export interface DesignDeps {
@@ -177,7 +176,6 @@ function DesignColumns({
   );
 }
 
-// `address` is the Design in the route; the bare route has none and opens the first In progress Design.
 const NEW_DESIGN_CACHE = "design.new";
 
 export function DesignPage({
@@ -185,7 +183,7 @@ export function DesignPage({
   fetchList,
   deps = {},
 }: {
-  address?: string;
+  address: string;
   fetchList?: FetchEpicList;
   deps?: DesignDeps;
 }) {
@@ -220,31 +218,23 @@ export function DesignPage({
     list?.epics.filter((e) => e.kind === "map").map((e) => e.project),
   ).size;
   // The form's project select starts on the Design on screen.
-  const currentProject = address?.split(":")[0];
-  const formProjects = currentProject
-    ? [currentProject, ...projectNames.filter((p) => p !== currentProject)]
-    : projectNames;
+  const currentProject = address.split(":")[0];
+  const formProjects = [
+    currentProject,
+    ...projectNames.filter((p) => p !== currentProject),
+  ];
   const chartRow = groups
     .flatMap((g) => g.rows)
     .find((r) => r.row.address === address)?.chart;
   const onNew = () => setDraft({});
-  const onNewSession = () => {
-    if (address)
-      setDraft({
-        slug: address.slice(address.indexOf(":") + 1),
-        project: currentProject,
-      });
-  };
-
-  const first =
-    list && !address
-      ? groups.find((g) => g.key === IN_PROGRESS)?.rows[0]
-      : undefined;
-  if (first)
-    return <Navigate to={designHref(first.row.address).slice(1)} replace />;
+  const onNewSession = () =>
+    setDraft({
+      slug: address.slice(address.indexOf(":") + 1),
+      project: currentProject,
+    });
 
   return (
-    <DetailPage active="designs">
+    <DetailPage active="epics">
       {draft && (
         <NewDesignForm
           key={`${draft.slug}|${draft.project}`}
@@ -289,26 +279,13 @@ export function DesignPage({
               onNew={onNew}
             />
           )}
-          {address ? (
-            <DesignColumns
-              address={address}
-              wide={wide}
-              deps={deps}
-              chart={chartRow}
-              onNewSession={onNewSession}
-            />
-          ) : (
-            <>
-              <Box aria-label="Chat" role="region">
-                <EmptyState title="No Design in progress.">
-                  <Button tone="running" onClick={onNew}>
-                    New Design
-                  </Button>
-                </EmptyState>
-              </Box>
-              <Box aria-label="Progress" role="region" />
-            </>
-          )}
+          <DesignColumns
+            address={address}
+            wide={wide}
+            deps={deps}
+            chart={chartRow}
+            onNewSession={onNewSession}
+          />
         </Box>
       )}
     </DetailPage>

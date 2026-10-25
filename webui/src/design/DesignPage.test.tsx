@@ -80,7 +80,7 @@ const detailOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   ...over,
 });
 
-function render(epics: EpicListRow[], sessions: SessionInfo[], path = "/designs", detail: EpicDetail = detailOf()) {
+function render(epics: EpicListRow[], sessions: SessionInfo[], path = "/d/gx:a", detail: EpicDetail = detailOf()) {
   const state = { snapshot: { sessions }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
   const list: EpicList = { epics, follow_ups: [] };
@@ -95,11 +95,6 @@ function render(epics: EpicListRow[], sessions: SessionInfo[], path = "/designs"
   );
   return router;
 }
-
-test("the top bar has a Designs tab", async () => {
-  render([map("a", "in-progress")], []);
-  expect((await screen.findByRole("link", { name: "Designs" })).getAttribute("href")).toBe("#/designs");
-});
 
 test("rows land in their four sections", async () => {
   render(
@@ -169,20 +164,6 @@ test("waiting and failed Designs sort first, then live ones, then newest first",
   expect(at("live")).toBeLessThan(at("new"));
   expect(at("new")).toBeLessThan(at("old"));
   expect(at("old")).toBeGreaterThanOrEqual(0);
-});
-
-test("the bare route opens the first In progress Design, never a Not started one", async () => {
-  const router = render([map("ns", "not-started", { picker_sort_at: hoursAgo(1) }), map("ip", "in-progress")], []);
-  await screen.findByRole("region", { name: "Chat" });
-  expect(router.state.location.pathname).toBe("/d/gx:ip");
-});
-
-test("the bare route shows the picker and an empty state when nothing is in progress", async () => {
-  const router = render([map("ns", "not-started")], []);
-  expect(await screen.findByText("No Design in progress.")).toBeTruthy();
-  expect(router.state.location.pathname).toBe("/designs");
-  fireEvent.click(screen.getByRole("button", { name: /Not started/ }));
-  expect(screen.getByRole("link", { name: /^ns/ })).toBeTruthy();
 });
 
 test("a Ready to queue row opens the implementation epic, any other row its Design", async () => {

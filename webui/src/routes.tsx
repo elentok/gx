@@ -1,5 +1,4 @@
-import { createHashRouter, redirect, useParams, type RouteObject } from "react-router";
-import { useConnectionContext, useConnectionState } from "./connection";
+import { createHashRouter, Navigate, redirect, useParams, type RouteObject } from "react-router";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
 import type { OpenDesign, ResumeSession, StopSession } from "./design/open";
@@ -10,16 +9,10 @@ import type { FetchEpicDetail } from "./epic/detail";
 import { EpicPage } from "./epic/EpicPage";
 import { EpicsPage } from "./epics/EpicsPage";
 import type { FetchEpicList } from "./epics/list";
-import { QueueScreen } from "./queue/QueueScreen";
 import type { FetchStats } from "./stats/stats";
 import { StatsPage } from "./stats/StatsPage";
 import type { FetchDetail } from "./ticket/detail";
 import { TicketPage } from "./ticket/TicketPage";
-
-function QueueRoute() {
-  const conn = useConnectionContext();
-  return <QueueScreen state={useConnectionState(conn)} onChanged={conn.refresh} />;
-}
 
 function TicketRoute({ fetchDetail, fetchScreen }: { fetchDetail?: FetchDetail; fetchScreen?: FetchScreen }) {
   // An address holds a slash (project:epic/NN), so it arrives as the splat.
@@ -32,10 +25,12 @@ function EpicRoute({ fetchDetail, openDesign }: { fetchDetail?: FetchEpicDetail;
 }
 
 function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
-  // A Design's address holds a colon (project:epic), so it arrives as the splat; the bare route has none.
+  // A Design's address holds a colon (project:epic), so it arrives as the splat.
+  const address = useParams()["*"];
+  if (!address) return <Navigate to="/epics" replace />;
   return (
     <DesignPage
-      address={useParams()["*"] || undefined}
+      address={address}
       fetchList={fetchers.epicList}
       deps={{
         fetchDetail: fetchers.epic,
@@ -68,15 +63,13 @@ export interface RouteFetchers {
 
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
   return [
-    { path: "/q", element: <QueueRoute /> },
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} openDesign={fetchers.openDesign} /> },
-    { path: "/designs", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },
     { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} openDesign={fetchers.openDesign} /> },
-    // "/" and an unknown hash go to the Queue.
-    { path: "*", loader: () => redirect("/q") },
+    // "/", the retired "/q" and "/designs", and an unknown hash go to the Epics page.
+    { path: "*", loader: () => redirect("/epics") },
   ];
 }
 

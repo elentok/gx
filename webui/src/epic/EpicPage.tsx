@@ -131,7 +131,7 @@ export function EpicPage({
       ) : detail ? (
         <>
           {/* The payload has no name field: the epic name is the address after the project. */}
-          <PageHeader backTo="/q" backLabel="← Queue" title={address.slice(address.indexOf(":") + 1)}>
+          <PageHeader backTo="/epics" backLabel="← Epics" title={address.slice(address.indexOf(":") + 1)}>
             {detail.state === "paused" && detail.land_block_reason && (
               <Text data-reason mt="2" fontSize="sm" color="text.muted">
                 {detail.land_block_reason}

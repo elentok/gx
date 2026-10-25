@@ -62,15 +62,10 @@ function renderAt(
 
 const currentTab = () => screen.getByRole("link", { current: "page" }).textContent;
 
-test.each(["/", "/q", "/nonsense/here"])("%s shows the Queue with the Queue tab marked and no h1", async (path) => {
+test.each(["/", "/q", "/designs", "/nonsense/here", "/epics"])("%s lands on the Epics page with the Epics tab marked and no h1", async (path) => {
   renderAt(path, okFor);
-  await waitFor(() => expect(currentTab()).toBe("Queue"));
-  expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
-});
-
-test("the Epics route marks the Epics tab", async () => {
-  renderAt("/epics", okFor);
   await waitFor(() => expect(currentTab()).toBe("Epics"));
+  expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
 });
 
 test("the epic and ticket pages mark no tab", async () => {
@@ -130,19 +125,19 @@ test("after a direct load the ticket back link falls back to its epic", async ()
   expect((await screen.findByRole("link", { name: "← e" })).getAttribute("href")).toBe("/e/gx:e");
 });
 
-test("after a direct load the epic back link falls back to the Queue", async () => {
+test("after a direct load the epic back link falls back to the Epics page", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch());
-  expect((await screen.findByRole("link", { name: "← Queue" })).getAttribute("href")).toBe("/q");
+  expect((await screen.findByRole("link", { name: "← Epics" })).getAttribute("href")).toBe("/epics");
 });
 
 test("a page reached inside the app keeps its labelled back link", async () => {
-  const router = createMemoryRouter(appRoutes({ ticket: okFor, epic: epicFetch() }), { initialEntries: ["/q", "/e/gx:e"], initialIndex: 1 });
+  const router = createMemoryRouter(appRoutes({ ticket: okFor, epic: epicFetch() }), { initialEntries: ["/epics", "/e/gx:e"], initialIndex: 1 });
   renderThemed(
     <ConnectionContext.Provider value={fakeConnection(true)}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   );
-  expect((await screen.findByRole("link", { name: "← Queue" })).getAttribute("href")).toBe("/q");
+  expect((await screen.findByRole("link", { name: "← Epics" })).getAttribute("href")).toBe("/epics");
 });
 
 const epicOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
@@ -198,9 +193,9 @@ test("an empty epic shows No tickets yet, and an empty summary renders nothing",
   expect(container.querySelectorAll("p")).toHaveLength(1);
 });
 
-test("the Queue, ticket and epic pages all render inside the shared container", async () => {
-  const q = renderAt("/q", okFor);
-  await screen.findByRole("link", { name: "Queue" });
+test("the Epics, ticket and epic pages all render inside the shared container", async () => {
+  const q = renderAt("/epics", okFor);
+  await screen.findByRole("link", { name: "Epics" });
   expect(q.container.querySelector("[data-page-container]")).toBeTruthy();
   cleanup();
   const t = renderAt("/t/gx:e/01", okFor);

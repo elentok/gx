@@ -41,7 +41,7 @@ it("shows the Button in every role, tone and size", () => {
 
 it("shows the TopBar in every state the spec lists", () => {
   const labels = galleryEntries.find((e) => e.name === "TopBar")?.cases.map((c) => c.label) ?? [];
-  for (const label of ["Queue active", "Epics active", "none active", "Paused","Offline", "no build string"]) {
+  for (const label of ["Epics active", "Stats active", "none active", "Paused", "Offline", "no build string"]) {
     expect(labels, label).toContain(label);
   }
 });

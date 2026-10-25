@@ -69,11 +69,7 @@ async function fill(slug: string, idea: string) {
   fireEvent.change(screen.getByLabelText("Rough idea"), { target: { value: idea } });
 }
 
-test("both buttons open the form", async () => {
-  render("/designs", [row("a", "gx", { picker_section: "not-started" })]);
-  fireEvent.click(await screen.findByRole("button", { name: "New Design" }));
-  expect(await screen.findByRole("form", { name: "New Design" })).toBeTruthy();
-  cleanup();
+test("the + New button opens the form", async () => {
   render("/d/gx:a", [row("a")]);
   fireEvent.click(await screen.findByRole("button", { name: "+ New" }));
   expect(await screen.findByRole("form", { name: "New Design" })).toBeTruthy();
@@ -117,13 +113,13 @@ test("a refusal shows the server's message and keeps the form", async () => {
 });
 
 test("a Design with only a session shows under In progress at Chart, and goes with its session", async () => {
-  render("/designs", [], [session()]);
+  render("/d/gx:idea", [], [session()]);
   const link = await screen.findByRole("link", { name: /idea/ });
   expect(link.getAttribute("href")).toBe("#/d/gx:idea");
   expect(link.textContent).toContain("Chart");
   cleanup();
-  render("/designs", [], []);
-  await screen.findByRole("button", { name: "New Design" });
+  render("/d/gx:idea", [], []);
+  await screen.findByRole("button", { name: "+ New" });
   expect(screen.queryByRole("link", { name: /idea/ })).toBeNull();
 });
 

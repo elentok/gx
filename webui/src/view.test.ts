@@ -1,102 +1,17 @@
 import { describe, expect, it } from "vitest";
-import canned from "./canned-snapshot.json";
-import type { QueueMode, Snapshot } from "./snapshot";
-import { REPAIR_HINT, epicView, snapshotView } from "./view";
+import { epicBadge } from "./view";
 
-const now = new Date("2026-10-19T12:00:00Z");
-const snap = canned as Snapshot;
-const view = (mode?: QueueMode) => snapshotView({ ...snap, mode }, now);
-const byName = (name: string, mode?: QueueMode) => view(mode).epics.find((e) => e.name === name)!;
-
-describe("snapshotView", () => {
-  it("orders epics by state and keeps server order within a state", () => {
-    expect(view().epics.map((e) => e.name)).toEqual(["dead", "pause", "run", "run2", "wait", "await"]);
-  });
-
-  it("maps state to tone and badge", () => {
-    expect(byName("pause")).toMatchObject({ tone: "paused", badge: "Paused", reason: "needs a person (+1 more)" });
-    expect(byName("dead")).toMatchObject({ tone: "paused", badge: "Paused", reason: "Dependency deadlock" });
-    expect(byName("run")).toMatchObject({ tone: "running", badge: "Running" });
-    expect(byName("wait")).toMatchObject({ tone: "waiting", badge: "Waiting for a slot" });
-    expect(byName("await")).toMatchObject({ tone: "muted", badge: "Awaiting merge" });
+describe("epicBadge", () => {
+  it("labels each state", () => {
+    expect(epicBadge("paused")).toBe("Paused");
+    expect(epicBadge("running")).toBe("Running");
+    expect(epicBadge("waiting")).toBe("Waiting for a slot");
+    expect(epicBadge("awaiting-merge")).toBe("Awaiting merge");
   });
 
   it("labels Waiting by queue mode and leaves Running unchanged", () => {
-    expect(byName("wait", "paused").badge).toBe("Waiting: queue paused");
-    expect(byName("wait", "running").badge).toBe("Waiting for a slot");
-    expect(byName("run", "paused").badge).toBe("Running");
-  });
-
-  it("keeps the merge action on a Paused epic whose merge failed", () => {
-    const blocked = { ...snap.epics[0]!, state: "paused" as const, reason: "Merge blocked", merge_blocked: true };
-    expect(epicView(blocked)).toMatchObject({ badge: "Paused", mergeBlocked: true });
-    expect(byName("dead").mergeBlocked).toBe(false);
-  });
-
-  it("lists active tickets before paused ones, and only Paused for Waiting", () => {
-    expect(byName("run").tickets.map((t) => [t.address, t.id, t.tone])).toEqual([
-      ["gx:run/03", "03", "muted"],
-      ["gx:run/04", "04", "paused"],
-    ]);
-    expect(byName("wait").tickets.map((t) => [t.address, t.tone])).toEqual([
-      ["gx:wait/03", "paused"],
-      ["gx:wait/04", "waiting"],
-    ]);
-  });
-
-  it("marks only a running epic and its working tickets as live", () => {
-    expect(byName("run").live).toBe(true);
-    expect(byName("wait").live).toBe(false);
-    expect(byName("run").tickets.map((t) => [t.address, t.live ?? false])).toEqual([
-      ["gx:run/03", true],
-      ["gx:run/04", false],
-    ]);
-  });
-
-  it("gives an answerable row its summary and a ticket route", () => {
-    expect(byName("wait").tickets[0]).toMatchObject({
-      detail: "Which option do you want?",
-      href: "#/t/gx:wait/03",
-    });
-  });
-
-  it("gives a repair row its reason and a hint, with no link", () => {
-    const row = byName("run").tickets[1];
-    expect(row).toMatchObject({ detail: "worktree has uncommitted changes", hint: REPAIR_HINT });
-    expect(row.href).toBeUndefined();
-  });
-
-  it("shows the server's reason label instead of the raw reason text", () => {
-    const epic = byName("run");
-    const labelled = {
-      ...snap.epics.find((e) => e.name === "run")!,
-      parked: epic.tickets.slice(1).map((t) => ({
-        ...snap.epics.find((e) => e.name === "run")!.parked[0]!,
-        address: t.address,
-        reason: "raw text",
-        reason_label: "Merge conflict",
-      })),
-    };
-    expect(epicView(labelled).tickets.at(-1)).toMatchObject({ detail: "Merge conflict" });
-  });
-
-  it("shows an answered row as amber with its queue position", () => {
-    expect(byName("wait").tickets[1]).toMatchObject({ tone: "waiting", state: "Answered · #2 in queue" });
-    expect(byName("wait").tickets[1].href).toBeUndefined();
-  });
-
-  it("formats recently finished rows", () => {
-    expect(view().recentlyFinished).toEqual([
-      { address: "gx:old", name: "old", project: "gx", done: 4, total: 4, oneOff: false, finished: "2h ago" },
-      {
-        address: "gx:one-offs/07",
-        name: "fix-flaky-test",
-        project: "gx",
-        done: 0,
-        total: 0,
-        oneOff: true,
-        finished: "1h ago",
-      },
-    ]);
+    expect(epicBadge("waiting", "paused")).toBe("Waiting: queue paused");
+    expect(epicBadge("waiting", "running")).toBe("Waiting for a slot");
+    expect(epicBadge("running", "paused")).toBe("Running");
   });
 });
