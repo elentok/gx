@@ -294,6 +294,9 @@ type Config struct {
 	// StallThreshold is how long a Working session's transcript may stay
 	// untouched before it counts as stalled; zero means defaultStallThreshold.
 	StallThreshold time.Duration
+	// TranscriptMissTTL is how long a failed transcript lookup is remembered;
+	// zero means defaultTranscriptMissTTL and a negative value remembers none.
+	TranscriptMissTTL time.Duration
 }
 
 // Defaults for the session-prompting timings in Config. A zero Config field
@@ -328,6 +331,13 @@ type Server struct {
 	cpuSpikes cpuSpikes
 	// chats caches parsed session chats by transcript file.
 	chats chatCache
+	// transcripts caches where each conversation's transcript is.
+	transcripts transcriptPaths
+	// authFailures caches whether each transcript ends in an auth error.
+	authFailures authFailures
+	// filedRounds holds the round markers already in the follow-ups epic, so an
+	// Idle detection never rescans its tickets.
+	filedRounds sync.Map
 	// storeCommits is nil until the store commit loop starts; guarded by
 	// reloadMu so a reload racing the start is never lost.
 	storeCommits *storecommit.Loop
@@ -407,6 +417,9 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.StallThreshold == 0 {
 		cfg.StallThreshold = defaultStallThreshold
+	}
+	if cfg.TranscriptMissTTL == 0 {
+		cfg.TranscriptMissTTL = defaultTranscriptMissTTL
 	}
 	if cfg.SessionsDir == "" {
 		data, err := config.DataDir()

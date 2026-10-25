@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/sound"
@@ -120,23 +121,25 @@ func (s *Server) claudeTranscript(id, conversationID string) (string, bool) {
 	if conversationID == "" {
 		return "", false
 	}
-	projects, err := harness.ClaudeProjectsDir()
-	if err != nil {
-		s.log.Warn("claude projects dir", "session", id, "err", err)
-		return "", false
-	}
-	paths, err := transcript.FindByIDIn(projects, conversationID)
-	if err != nil {
-		s.log.Warn("find transcript", "session", id, "err", err)
-		return "", false
-	}
-	if len(paths) > 1 {
-		s.log.Warn("several transcripts", "session", id, "conversation", conversationID, "count", len(paths))
-	}
-	if len(paths) != 1 {
-		return "", false
-	}
-	return paths[0], true
+	return s.transcripts.resolve(conversationID, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
+		projects, err := harness.ClaudeProjectsDir()
+		if err != nil {
+			s.log.Warn("claude projects dir", "session", id, "err", err)
+			return "", false
+		}
+		paths, err := transcript.FindByIDIn(projects, conversationID)
+		if err != nil {
+			s.log.Warn("find transcript", "session", id, "err", err)
+			return "", false
+		}
+		if len(paths) > 1 {
+			s.log.Warn("several transcripts", "session", id, "conversation", conversationID, "count", len(paths))
+		}
+		if len(paths) != 1 {
+			return "", false
+		}
+		return paths[0], true
+	})
 }
 
 // lastAssistantText reads the session's last assistant message from its claude

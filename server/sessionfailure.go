@@ -78,8 +78,11 @@ func (s *Server) transcriptFailure(m sessionMeta) *SessionFailure {
 	}
 	switch state {
 	case SessionIdle:
-		e, ok, err := transcript.LastAPIError(path)
-		if err == nil && ok && (e.Status == 401 || e.Error == "authentication_error") {
+		auth, err := s.authFailures.read(path, func(p string) (bool, error) {
+			e, ok, err := transcript.LastAPIError(p)
+			return ok && (e.Status == 401 || e.Error == "authentication_error"), err
+		})
+		if err == nil && auth {
 			return &SessionFailure{Kind: FailureKindAuth, Label: "Claude login needed", Text: "Run `claude /login` on this computer, then Retry."}
 		}
 	case SessionWorking:

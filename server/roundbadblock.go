@@ -70,7 +70,13 @@ func (s *Server) writeBadBlockFollowUp(id string, design designRef, round string
 	if err := ensureDraftEpic(epicPath); err != nil {
 		return "", err
 	}
+	if _, ok := s.filedRounds.Load(round); ok {
+		return "", nil
+	}
 	if filed, err := roundFiled(epicPath, round); filed || err != nil {
+		if filed {
+			s.filedRounds.Store(round, struct{}{})
+		}
 		return "", err
 	}
 	var ev strings.Builder
@@ -79,6 +85,9 @@ func (s *Server) writeBadBlockFollowUp(id string, design designRef, round string
 		fmt.Fprintf(&ev, "\nQ%s: %v\n\n```gx-question\n%s\n```\n", b.Label, b.Err, b.Raw)
 	}
 	if path, found, err := noteOccurrence(epicPath, badBlockKey, "Seen again: "+ev.String()); found || err != nil {
+		if err == nil {
+			s.filedRounds.Store(round, struct{}{})
+		}
 		return path, err
 	}
 	path, _, err := writeNewTicket(epicPath, "", badBlockSlug, func(tid string) (schema.Ticket, string) {
@@ -88,6 +97,9 @@ func (s *Server) writeBadBlockFollowUp(id string, design designRef, round string
 		)
 		return schema.Ticket{ID: schema.TicketID(tid), Status: schema.StatusDraft, Type: schema.TypeResearch, Category: schema.CategoryBug}, body
 	})
+	if err == nil {
+		s.filedRounds.Store(round, struct{}{})
+	}
 	return path, err
 }
 
