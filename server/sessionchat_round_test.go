@@ -115,6 +115,13 @@ func TestSessionChat_NextReadsTheRunEndLine(t *testing.T) {
 	}
 }
 
+func TestSessionChat_RoundWinsOverTheRunEndLine(t *testing.T) {
+	got := chatOf(t, assistantText("a1", "✅ Design: halfway. Next: design detector"), assistantText("a2", goodRound))
+	if len(got.Round) != 2 || got.Next != nil {
+		t.Errorf("round = %d cards, next = %+v, want the round and no Continue", len(got.Round), got.Next)
+	}
+}
+
 func TestSessionChat_BackgroundListsLiveTasksAndDropsAgedOutOnes(t *testing.T) {
 	now := time.Now().UTC()
 	ts := func(ago time.Duration) string { return now.Add(-ago).Format(time.RFC3339Nano) }

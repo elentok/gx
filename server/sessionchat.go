@@ -99,7 +99,11 @@ func chatLoader(ticket string) func(string) (chatSnapshot, error) {
 			return chatSnapshot{}, err
 		}
 		// Read before the cap and the fence strip: both cut what the parsers need.
-		snap := chatSnapshot{round: chatRound(loaded), next: chatNext(loaded, ticket)}
+		// An open round wins over the run-end line, as in designActionable.
+		snap := chatSnapshot{round: chatRound(loaded)}
+		if snap.round == nil {
+			snap.next = chatNext(loaded, ticket)
+		}
 		if len(loaded) > maxChatMessages {
 			loaded, snap.truncated = loaded[len(loaded)-maxChatMessages:], true
 		}
