@@ -192,7 +192,7 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 	}
 	s.fileBadRoundBlocks(id, design, text)
 	a, matched := designActionable(text, design.Ticket, s.designFinal(design.Ticket))
-	raised, advance := false, false
+	raised, advance, capped := false, false, false
 	s.updateSessionMetaOrWarn(dir, id, func(m *sessionMeta) bool {
 		cur := m.Actionable
 		if !m.Status.Promptable() || cur.GxRaised {
@@ -211,6 +211,9 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 		m.Actionable = a
 		raised = true
 		advance = design.Live && len(a.Action) > 0 && !m.AutoAdvanceOff && m.Harness != string(harness.Codex)
+		if capped = advance && m.AutoSends >= maxAutoSends; capped {
+			advance = false
+		}
 		return true
 	})
 	// A countdown that starts is silent: the person is told only if it does not send.
@@ -218,7 +221,10 @@ func (s *Server) detectDesignActionable(dir, id string, design designRef) {
 		s.events.publish(EventSessionChanged, id)
 		return
 	}
-	if raised {
+	switch {
+	case capped:
+		s.triggerBanner(id, sound.Attention, fmt.Sprintf("Auto-advance stopped after %d runs in a row: %s", maxAutoSends, a.Reason))
+	case raised:
 		s.triggerBanner(id, sound.Attention, a.Reason)
 	}
 }

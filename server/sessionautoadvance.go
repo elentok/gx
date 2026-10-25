@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/elentok/gx/harness"
 )
 
 // AutoAdvanceRequest is the body of POST /v1/sessions/auto-advance. State is
@@ -61,8 +63,13 @@ func (s *Server) setAutoAdvance(req AutoAdvanceRequest) (SessionResult, error) {
 		return sessionRefusal(ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	var info SessionInfo
+	start := false
 	if err := s.updateSessionMeta(dir, req.ID, func(m *sessionMeta) bool {
 		m.AutoAdvanceOff = req.Off
+		m.AutoSends = 0
+		a := m.Actionable
+		start = !req.Off && a.Derived && !a.Grilling && len(a.Action) > 0 && m.Status.Promptable() &&
+			m.Harness != string(harness.Codex) && s.autoAdvances.deadline(req.ID).IsZero()
 		info = m.info()
 		return true
 	}); err != nil {
@@ -70,6 +77,10 @@ func (s *Server) setAutoAdvance(req AutoAdvanceRequest) (SessionResult, error) {
 	}
 	if req.Off {
 		s.cancelAutoAdvance(req.ID, "Auto-advance switched off")
+	}
+	// Switching on over a raised Continue starts the countdown a run end would have.
+	if start && s.startAutoAdvance(req.ID) {
+		s.events.publish(EventSessionChanged, req.ID)
 	}
 	return SessionResult{Session: &info}, nil
 }

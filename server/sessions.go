@@ -585,16 +585,17 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time) {
 			first.personInput()
 			// Typing during a countdown stops only the countdown: the run-end
 			// Continue stays raised.
-			if !s.cancelAutoAdvance(id, "Auto-advance stopped: you typed") {
-				update(func(m *sessionMeta) bool {
-					if m.Actionable.GxRaised {
-						return false
-					}
-					changed := m.Actionable.Reason != ""
-					m.Actionable = SessionActionable{}
+			stopped := s.cancelAutoAdvance(id, "Auto-advance stopped: you typed")
+			update(func(m *sessionMeta) bool {
+				changed := m.AutoSends != 0
+				m.AutoSends = 0
+				if stopped || m.Actionable.GxRaised {
 					return changed
-				})
-			}
+				}
+				changed = changed || m.Actionable.Reason != ""
+				m.Actionable = SessionActionable{}
+				return changed
+			})
 		case nativerunner.StreamExit:
 			recordExit(sessionExitOf(msg.ExitCode))
 			return

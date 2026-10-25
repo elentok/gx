@@ -12,6 +12,10 @@ import (
 // server sends it.
 const DefaultAutoAdvanceDelay = 10 * time.Second
 
+// maxAutoSends is how many auto-sends in a row the server makes before it
+// leaves the Continue for the person.
+const maxAutoSends = 5
+
 // autoAdvances holds the running countdowns, one per session. They live in
 // memory only: a restart drops them and leaves the Continue raised.
 type autoAdvances struct {
@@ -133,7 +137,7 @@ func (s *Server) sendAutoAdvance(id string) {
 	if res.Refused || err != nil || meta.AutoAdvanceOff || !meta.Actionable.Derived || meta.Actionable.Grilling {
 		return
 	}
-	if res, err := s.runSessionAction(SessionRequest{ID: id}); err != nil || res.Refused {
+	if res, err := s.sendSessionAction(SessionRequest{ID: id}, true); err != nil || res.Refused {
 		s.log.Info("auto-advance not sent", "session", id, "err", err, "reason", res.Reason)
 	}
 }

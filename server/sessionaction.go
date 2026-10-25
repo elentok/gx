@@ -15,6 +15,13 @@ import (
 // runSessionAction clears an Idle session's Actionable and sends its Action
 // in the background, so the run outlives the client that asked for it.
 func (s *Server) runSessionAction(req SessionRequest) (SessionResult, error) {
+	return s.sendSessionAction(req, false)
+}
+
+// sendSessionAction is runSessionAction; auto marks a send the server made
+// itself, which the runaway guard counts. Any other send is the person's input
+// and resets that count.
+func (s *Server) sendSessionAction(req SessionRequest, auto bool) (SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
 	dir, meta, res, err := s.sessionDir(req.ID)
@@ -29,6 +36,11 @@ func (s *Server) runSessionAction(req SessionRequest) (SessionResult, error) {
 		return sessionRefusal(ReasonSessionNoAction, fmt.Sprintf("session %s has no action", req.ID)), nil
 	}
 	meta.Actionable = SessionActionable{}
+	if auto {
+		meta.AutoSends++
+	} else {
+		meta.AutoSends = 0
+	}
 	if err := writeSessionMeta(dir, meta); err != nil {
 		return SessionResult{}, err
 	}

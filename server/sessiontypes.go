@@ -179,6 +179,9 @@ type sessionMeta struct {
 	// AutoAdvanceOff is the inverse of the switch, so a meta written before the
 	// switch existed reads as on.
 	AutoAdvanceOff bool `json:"auto_advance_off,omitempty"`
+	// AutoSends counts the auto-advance sends since the person last gave input.
+	// A restart keeps it: a restart never sends, so only the next run end reads it.
+	AutoSends int `json:"auto_sends,omitempty"`
 	// RestoredAt is when the person last Restored the session; RestoreCrashed
 	// marks that run crashing within restoreCrashWindow.
 	RestoredAt     time.Time `json:"restored_at,omitzero"`

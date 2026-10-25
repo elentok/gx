@@ -109,6 +109,7 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		// to the page.
 		action := designContinueAction(meta.Ticket)
 		meta.Actionable = SessionActionable{}
+		meta.AutoSends = 0
 		if err := writeSessionMeta(dir, meta); err != nil {
 			return SessionResult{}, err
 		}
@@ -125,8 +126,13 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 			return SessionResult{}, err
 		}
 		stopped := s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you typed")
+		changed := meta.AutoSends != 0
+		meta.AutoSends = 0
 		if !stopped && !meta.Actionable.GxRaised && meta.Actionable.Reason != "" {
 			meta.Actionable = SessionActionable{}
+			changed = true
+		}
+		if changed {
 			if err := writeSessionMeta(dir, meta); err != nil {
 				return SessionResult{}, err
 			}
