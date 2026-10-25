@@ -241,3 +241,19 @@ func TestRunAction_RefusedWithNoAction(t *testing.T) {
 		t.Errorf("saved actionable = %v, want it kept", saved)
 	}
 }
+
+// A turn that leaves a background task running ends Working with Background,
+// which never turns Idle: the steps must not wait for Idle.
+func TestRunAction_RunsWhileABackgroundTaskRuns(t *testing.T) {
+	h, ctx, evs, id, conv := startInputSession(t, time.Minute)
+	report(t, conv, agentfake.Control{State: "background"})
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.Background })
+	if res, err := h.Client.MarkSessionActionable(ctx, server.MarkActionableRequest{ID: id, Reason: "ready", Action: []string{agentfake.ProgramClearCommand, "next-step"}}); err != nil || res.Refused {
+		t.Fatalf("mark actionable = %+v, %v", res, err)
+	}
+
+	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {
+		t.Fatalf("run action = %+v, %v", res, err)
+	}
+	waitForSubmitted(t, conv, "\"/clear\"\n\"next-step\"\n")
+}

@@ -56,13 +56,16 @@ func (s *Server) sendSessionAction(req SessionRequest, auto bool) (SessionResult
 // actionRun follows the session's status on its own watch, not the saved
 // meta, which can still lag behind the Idle a step just saw.
 type actionRun struct {
-	s       *Server
-	dir     string
-	holder  *nativerunner.HolderClient
-	msgs    <-chan nativerunner.WatchMessage
-	state   string
-	started time.Duration
-	settle  time.Duration
+	s      *Server
+	dir    string
+	holder *nativerunner.HolderClient
+	msgs   <-chan nativerunner.WatchMessage
+	state  string
+	// background marks a Working state whose turn is over, with a background
+	// task still running; Promptable treats it as Idle.
+	background bool
+	started    time.Duration
+	settle     time.Duration
 	// convID is the last conversation id seen; convChanged is set when a
 	// status carried a different one, and cleared at each step.
 	convID      string
@@ -118,7 +121,7 @@ func (s *Server) runAction(dir string, action []string) (int, error) {
 		if err := run.catchUp(); err != nil {
 			return i, err
 		}
-		if run.state != SessionIdle {
+		if !run.promptable() {
 			return i, fmt.Errorf("step %d: %w (%s)", i, errNotIdle, run.state)
 		}
 		if err := run.step(i, prompt); err != nil {
@@ -256,6 +259,9 @@ func (r *actionRun) nextStatus(timer <-chan time.Time) (expired bool, signal str
 	}
 }
 
+// The waits below read Idle as promptable: a finished turn that left a
+// background task running stays Working and never turns Idle.
+
 // waitForTurn waits for a real prompt to go Working then Idle. It stops the
 // rest if the session never goes Working within the start timeout.
 func (r *actionRun) waitForTurn() (string, error) {
@@ -270,9 +276,9 @@ func (r *actionRun) waitForTurn() (string, error) {
 		case expired && !working:
 			return signalStartTimeout, errors.New("prompt never went working")
 		case expired:
-		case r.state == SessionWorking:
+		case r.turnRunning():
 			working = true
-		case r.state == SessionIdle && working:
+		case r.promptable() && working:
 			return signalTurn, nil
 		}
 	}
@@ -291,21 +297,33 @@ func (r *actionRun) waitForSlash() (string, error) {
 			return signal, err
 		}
 		switch {
-		case expired && (working || r.state != SessionIdle):
+		case expired && (working || !r.promptable()):
 		case expired:
 			pressed, err := r.pressEnterIfStillTyped()
 			if pressed {
 				r.s.log.Debug("action step settle enter", "session", filepath.Base(r.dir))
 			}
 			return signalSettle, err
-		case r.state == SessionWorking:
+		case r.turnRunning():
 			working = true
-		case r.state == SessionIdle && working:
+		case r.promptable() && working:
 			return signalTurn, nil
-		case r.state == SessionIdle && r.convChanged:
+		case r.promptable() && r.convChanged:
 			return signalNewConv, nil
 		}
 	}
+}
+
+// promptable reports whether the session waits for the person, as
+// SessionStatus.Promptable does.
+func (r *actionRun) promptable() bool {
+	return SessionStatus{State: r.state, Background: r.background}.Promptable()
+}
+
+// turnRunning reports whether a turn is running: Working, but not a finished
+// turn that only left a background task.
+func (r *actionRun) turnRunning() bool {
+	return r.state == SessionWorking && !r.background
 }
 
 func (r *actionRun) apply(msg nativerunner.WatchMessage, ok bool) error {
@@ -313,7 +331,8 @@ func (r *actionRun) apply(msg nativerunner.WatchMessage, ok bool) error {
 		return errors.New("session ended")
 	}
 	if msg.Type == nativerunner.StreamStatus {
-		r.state = sessionStatusOf(msg.Status).State
+		st := sessionStatusOf(msg.Status)
+		r.state, r.background = st.State, st.Background
 		log := r.s.log.With("session", filepath.Base(r.dir))
 		if id := msg.ConversationID; id != "" && id != r.convID {
 			// The first id seen is the baseline, not a change.

@@ -138,6 +138,10 @@ func (w *programWatcher) Program(r harness.ProgramReport) {
 	case "done":
 		w.status = harness.Status{State: harness.Idle}
 		w.idleSeen = true
+	case "background":
+		// A turn that ended with a background task still running.
+		w.status = harness.Status{State: harness.Working, Background: true}
+		w.idleSeen = true
 	case "idle":
 		w.idleSeen = true
 		// idle without done is an Esc-cancel, but only of a turn or a dialog.
