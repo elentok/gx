@@ -23,6 +23,7 @@ const session = (state: string, failure?: SessionFailure, harness = "claude"): S
   run_started_at: new Date().toISOString(),
   unread: {},
   actionable: {},
+  auto_advance: true,
   failure,
 });
 

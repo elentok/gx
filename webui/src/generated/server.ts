@@ -975,6 +975,20 @@ export interface FocusReport {
 }
 
 //////////
+// source: sessionautoadvance.go
+
+/**
+ * AutoAdvanceRequest is the body of POST /v1/sessions/auto-advance. State is
+ * the web's session state token. Off, not On, so a body without it leaves the
+ * switch on.
+ */
+export interface AutoAdvanceRequest {
+  id: string;
+  state?: string;
+  off?: boolean;
+}
+
+//////////
 // source: sessionprompt.go
 
 export const ReasonPromptHarnessNotSupported = "harness-not-supported";
@@ -1113,6 +1127,11 @@ export interface SessionInfo {
   stopped?: boolean;
   unread: SessionUnread;
   actionable: SessionActionable;
+  /**
+   * AutoAdvance is the session's auto-advance switch; on unless the person
+   * turned it off.
+   */
+  auto_advance: boolean;
   /**
    * Failure is set while the session is in one of the failure states.
    */

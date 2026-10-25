@@ -641,6 +641,7 @@ var routeTable = []struct {
 	{"POST /v1/sessions/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.resumeSession)(w, r) }},
 	{"POST /v1/sessions/prompt", (*Server).sessionPromptWrite},
 	{"POST /v1/sessions/interrupt", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.interruptSession)(w, r) }},
+	{"POST /v1/sessions/auto-advance", (*Server).sessionAutoAdvanceWrite},
 	{"POST /v1/designs/open", (*Server).designOpenWrite},
 	{"POST /v1/afk", (*Server).afkWrite},
 }

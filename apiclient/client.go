@@ -467,6 +467,14 @@ func (c *Client) InterruptSession(ctx context.Context, id string) (server.Sessio
 	return res, err
 }
 
+// SetAutoAdvance turns a Design session's auto-advance switch on or off. A
+// refusal is a result (Refused set), not an error.
+func (c *Client) SetAutoAdvance(ctx context.Context, id string, on bool) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/auto-advance", server.AutoAdvanceRequest{ID: id, Off: !on}, &res)
+	return res, err
+}
+
 // RemoveSession deletes an Exited session's state dir. A refusal is a result
 // (Refused set), not an error.
 func (c *Client) RemoveSession(ctx context.Context, id string) (server.SessionResult, error) {

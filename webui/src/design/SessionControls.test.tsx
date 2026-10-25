@@ -35,6 +35,7 @@ const session = (id: string, over: Partial<SessionInfo> = {}): SessionInfo => ({
   run_started_at: "2026-10-23T10:00:00.123456789Z",
   unread: {},
   actionable: {},
+  auto_advance: true,
   ...over,
 });
 

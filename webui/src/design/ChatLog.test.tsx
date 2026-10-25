@@ -24,6 +24,7 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
   run_started_at: ago(1),
   unread: {},
   actionable: {},
+  auto_advance: true,
   ...over,
 });
 

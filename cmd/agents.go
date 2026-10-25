@@ -28,8 +28,35 @@ func newAgentsCmd(d deps) *cobra.Command {
 		newAgentsSessionCmd("resume", "resume an Exited session's conversation", (*apiclient.Client).ResumeSession),
 		newAgentsSessionCmd("run-action", "send an Idle session's Action prompts, one per turn", (*apiclient.Client).RunSessionAction),
 		newAgentsSessionCmd("focus", "show a session in the most recently focused TUI", (*apiclient.Client).FocusSession),
-		newAgentsReportFocusCmd(), newAgentsPromptCmd())
+		newAgentsReportFocusCmd(), newAgentsPromptCmd(), newAgentsAutoAdvanceCmd())
 	return cmd
+}
+
+func newAgentsAutoAdvanceCmd() *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:       "auto-advance <id> <on|off>",
+		Short:     "turn a design session's auto-advance on or off",
+		Args:      cobra.MatchAll(cobra.ExactArgs(2), cobra.OnlyValidArgs),
+		ValidArgs: []string{"on", "off"},
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			return runAgentsAutoAdvance(c.Context(), cl, c.OutOrStdout(), jsonOut, args[0], args[1] == "on")
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return cmd
+}
+
+func runAgentsAutoAdvance(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string, on bool) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	res, err := cl.SetAutoAdvance(ctx, id, on)
+	return printSessionResult(w, jsonOut, res, err)
 }
 
 // runAgentsPrompt never starts the server: a dead socket is a refusal.

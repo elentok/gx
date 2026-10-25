@@ -39,6 +39,7 @@ const session = (state = "idle", background = false): SessionInfo => ({
   run_started_at: new Date().toISOString(),
   unread: {},
   actionable: {},
+  auto_advance: true,
 });
 
 const chatOf = (

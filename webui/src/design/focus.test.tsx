@@ -21,6 +21,7 @@ const session = (id: string, changed: string): SessionInfo => ({
   run_started_at: changed,
   unread: {},
   actionable: {},
+  auto_advance: true,
 });
 
 function setVisibility(v: "visible" | "hidden") {

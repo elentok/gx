@@ -38,6 +38,7 @@ const session = (name: string, over: Partial<SessionInfo> = {}): SessionInfo => 
   run_started_at: hoursAgo(1),
   unread: {},
   actionable: {},
+  auto_advance: true,
   ...over,
 });
 

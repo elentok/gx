@@ -28,6 +28,9 @@ type SessionInfo struct {
 	Stopped    bool              `json:"stopped,omitempty"`
 	Unread     SessionUnread     `json:"unread"`
 	Actionable SessionActionable `json:"actionable"`
+	// AutoAdvance is the session's auto-advance switch; on unless the person
+	// turned it off.
+	AutoAdvance bool `json:"auto_advance"`
 	// Failure is set while the session is in one of the failure states.
 	Failure *SessionFailure `json:"failure,omitempty"`
 }
@@ -170,6 +173,9 @@ type sessionMeta struct {
 	// Actionable is the agent-raised one, which the person's next input clears,
 	// or a gx-raised one, which it spares. Exit clears either.
 	Actionable SessionActionable `json:"actionable,omitzero"`
+	// AutoAdvanceOff is the inverse of the switch, so a meta written before the
+	// switch existed reads as on.
+	AutoAdvanceOff bool `json:"auto_advance_off,omitempty"`
 	// RestoredAt is when the person last Restored the session; RestoreCrashed
 	// marks that run crashing within restoreCrashWindow.
 	RestoredAt     time.Time `json:"restored_at,omitzero"`
@@ -192,6 +198,7 @@ func (m sessionMeta) info() SessionInfo {
 		Stopped:         m.Stopped,
 		Unread:          m.Unread,
 		Actionable:      m.Actionable,
+		AutoAdvance:     !m.AutoAdvanceOff,
 	}
 	if st := m.Status; st.State == SessionBlocked {
 		info.Actionable = SessionActionable{Kind: st.Kind, Reason: cmp.Or(st.Message, st.Kind, SessionBlocked)}
