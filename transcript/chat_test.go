@@ -23,6 +23,8 @@ func TestReadChat_ShowsVisibleAndHidesTheRest(t *testing.T) {
 		`{"type":"system","uuid":"y1","timestamp":"2026-01-01T10:00:10Z","content":"note"}`,
 		`{"type":"attachment","uuid":"x1","timestamp":"2026-01-01T10:00:11Z"}`,
 		`not json`,
+		`{"type":"user","uuid":"n1","timestamp":"2026-01-01T10:00:11Z","origin":{"kind":"task-notification"},"message":{"content":"<task-notification>\n<task-id>a1</task-id>\n</task-notification>"}}`,
+		`{"type":"user","uuid":"n2","timestamp":"2026-01-01T10:00:11Z","message":{"content":"<task-notification>\n<task-id>a2</task-id>\n</task-notification>"}}`,
 		`{"type":"user","uuid":"u5","timestamp":"2026-01-01T10:00:12Z","message":{"content":"Which store?"}}`,
 	}
 	path := filepath.Join(t.TempDir(), "c.jsonl")

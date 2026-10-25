@@ -57,6 +57,10 @@ var (
 // around a built-in slash command; the person never typed them.
 const localCommandPrefix = "<local-command"
 
+// taskNotificationPrefix opens the line Claude Code writes when a background
+// task ends. It is not the person's reply, so a round it follows stays open.
+const taskNotificationPrefix = "<task-notification>"
+
 // ReadChat returns the transcript's visible messages in order: agent text,
 // the person's real prompts and slash commands. Thinking, system lines, meta
 // lines, attachments, compact summaries, sidechains and tool results stay
@@ -150,7 +154,7 @@ func (l chatLine) message() (ChatMessage, bool) {
 		return msg, true
 	}
 	msg.Role = ChatRolePerson
-	if strings.HasPrefix(text, localCommandPrefix) {
+	if strings.HasPrefix(text, localCommandPrefix) || strings.HasPrefix(text, taskNotificationPrefix) {
 		return ChatMessage{}, false
 	}
 	if name := commandNameRE.FindStringSubmatch(text); name != nil {
