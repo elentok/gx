@@ -80,6 +80,12 @@ There is no `internal/` directory. Top-level packages live at the repo root:
 
 Run `go list ./...` for the full list.
 
+## File size
+
+Keep a Go source file under about 1000 lines. When one grows past that, move a cohesive group of
+declarations into a new file in the same package (for example `server/sessionstate.go` out of
+`server/sessions.go`). Moves only: don't change behaviour in the same commit.
+
 ## Core principle: gx must be visually beautiful
 
 Beauty is a requirement, not polish. A feature that works but looks cluttered is not done.
