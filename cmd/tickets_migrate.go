@@ -83,12 +83,14 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 			return err
 		}
 		fmt.Fprintln(w, "dry run: pause, map-done and ticket-creation migration only, nothing written")
+		var changes []tickets.MigrationChange
 		for _, s := range steps {
-			fmt.Fprintf(w, "%s: %s\n", s.Path, s.Note())
+			changes = append(changes, tickets.MigrationChange{Path: s.Path, Notes: []string{s.Note()}})
 		}
-		changes := slices.Concat(mapsDone, created)
+		changes = mergeChanges(changes, mapsDone)
+		changes = mergeChanges(changes, created)
 		printChanges(w, changes)
-		fmt.Fprintf(w, "%d file(s) would change\n", len(steps)+len(changes))
+		fmt.Fprintf(w, "%d file(s) would change\n", len(changes))
 		return nil
 	}
 	result, err := tickets.Migrate(scratchRoot)

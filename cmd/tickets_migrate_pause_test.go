@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,6 +65,21 @@ func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(path("02-answer-none.md")); !strings.Contains(string(b), "needs-answer") {
 		t.Errorf("dry run wrote a file:\n%s", b)
+	}
+	lines := strings.Split(strings.TrimSpace(dry), "\n")
+	listed := 0
+	for _, l := range lines {
+		if strings.Contains(l, ".md: ") {
+			listed++
+		}
+	}
+	if last := lines[len(lines)-1]; last != fmt.Sprintf("%d file(s) would change", listed) {
+		t.Errorf("count line %q does not match %d listed files:\n%s", last, listed, dry)
+	}
+	for _, name := range []string{"01-answer-kind.md", "02-answer-none.md"} {
+		if n := strings.Count(dry, name+":"); n != 1 {
+			t.Errorf("dry run lists %s %d times, want once:\n%s", name, n, dry)
+		}
 	}
 
 	if err := os.Remove(path("08-broken.md")); err != nil {
