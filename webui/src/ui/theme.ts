@@ -22,6 +22,11 @@ export const themeConfig = defineConfig({
       color: "text",
       fontFamily: "text",
     },
+    // iOS Safari zooms into a focused field whose font is under 16px. Chakra's recipe layer sits
+    // above globalCss, hence !important; desktop keeps the small fields.
+    "input, textarea, select": {
+      "@media (pointer: coarse)": { fontSize: "16px !important" },
+    },
     // Registered so the live Card's border gradient can animate its angle. The cast is because
     // Chakra types globalCss values as style objects, which @property's descriptors are not.
     "@property --gx-orbit-angle": { syntax: "'<angle>'", inherits: "false", initialValue: "0deg" } as SystemStyleObject,
