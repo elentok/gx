@@ -1,5 +1,5 @@
 import { Box, Link, Text } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { EpicDetail } from "../epic/detail";
 import { idOf, isCancelled, isFolded } from "../epic/rows";
 import type { EpicDetailRow, MapStep } from "../generated/server";
@@ -118,6 +118,12 @@ function summaryLine(steps: MapStep[], rows: EpicDetailRow[]): string {
 function MobileProgress({ detail, steps }: { detail: EpicDetail; steps: MapStep[] }) {
   const [open, setOpen] = useState(false);
   const segments: Segment[] = steps.map((s) => ({ key: s.step, tone: markOf(s).tone, count: 1 }));
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
   return (
     <Box display="flex" flexDirection="column" gap="2">
       <SegmentedBar segments={segments} value={steps.filter((s) => s.state === "done").length} label="Design progress" />

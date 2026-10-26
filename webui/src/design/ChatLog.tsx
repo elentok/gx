@@ -1,5 +1,5 @@
 import { Box, Spinner as ChakraSpinner, Text } from "@chakra-ui/react";
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type {
   SessionBackgroundTask,
@@ -220,13 +220,19 @@ function ChatTail({
           answers={answers}
           initialText={draft.notes}
           onText={setNotes}
-          onRoundSent={clear}
+          onRoundSent={() => {
+            clear();
+            onFocusMode(false);
+          }}
           onReview={(index) => setFocus({ index })}
         />
       )}
     </Box>
   );
 }
+
+// Every dialog and popover (Send, jump menu, screen, steps) is one of these; Escape closes the top one first.
+const LAYERS = '[role="dialog"],[role="alertdialog"]';
 
 // The messages scroll alone. They open at the newest one and follow new ones until the reader scrolls up.
 function ChatScroller({
@@ -286,10 +292,23 @@ function ChatLog({
   const conn = useConnectionContext();
   const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
   const connected = useConnectionState(conn).connected;
-  if (!chat) return null;
-  const roundKey = (chat.round ?? [])
+  const roundKey = (chat?.round ?? [])
     .map((c) => `${c.label}:${c.title}`)
     .join("|");
+  // A new round starts docked, and a round that went away without our send (another tab, the session moved on)
+  // leaves nothing to focus on.
+  useEffect(() => onFocusMode(false), [roundKey]);
+  useEffect(() => {
+    if (!focusMode) return;
+    // Capture phase: judge the layers as they were before this same Escape closes one of them.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || document.querySelector(LAYERS)) return;
+      onFocusMode(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [focusMode, onFocusMode]);
+  if (!chat) return null;
   const busy =
     session.status.state === "working" && !session.status.background;
   return (

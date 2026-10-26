@@ -410,6 +410,83 @@ test("fold leaves focus mode; unfolding with the focus button enters it", async 
   expect(within(sheet).getByRole("button", { name: "Alpha" })).toBeTruthy();
 });
 
+const enterFocus = async () =>
+  fireEvent.click(within(await screen.findByRole("group", { name: "Questions" })).getByRole("button", { name: "Enter focus mode" }));
+const inFocus = () => screen.queryByText("earlier talk") === null;
+
+test("Escape leaves focus mode, also from the note field", async () => {
+  renderChat([session()], focusChat());
+  await enterFocus();
+  fireEvent.click(screen.getByRole("button", { name: "Note" }));
+  fireEvent.keyDown(screen.getByRole("textbox", { name: "Message" }), { key: "Escape" });
+  expect(await screen.findByText("earlier talk")).toBeTruthy();
+});
+
+test("Escape with the Send popover open closes only the popover", async () => {
+  renderChat([session()], focusChat());
+  await enterFocus();
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  const popover = await screen.findByRole("alertdialog", { name: "Unanswered questions" });
+  await act(async () => {});
+  fireEvent.keyDown(popover, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  expect(inFocus()).toBe(true);
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(await screen.findByText("earlier talk")).toBeTruthy();
+});
+
+test("Escape with the failure banner's screen modal open closes only the modal", async () => {
+  renderChat([session({ failure: { kind: "stalled", label: "Stalled" } as SessionInfo["failure"] })], focusChat());
+  await enterFocus();
+  fireEvent.click(await screen.findByRole("button", { name: "Screen" }));
+  await screen.findByRole("dialog", { name: "Screen" });
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Screen" })).toBeNull());
+  expect(inFocus()).toBe(true);
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(await screen.findByText("earlier talk")).toBeTruthy();
+});
+
+test("a successful send leaves focus mode; a refused send keeps it and shows the error", async () => {
+  const post = vi
+    .fn<PostPrompt>()
+    .mockResolvedValueOnce({ refused: true, reason: "text-too-long", message: "text is over the limit" })
+    .mockResolvedValue({});
+  renderChat([session()], focusChat(), post);
+  await enterFocus();
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
+  expect(await screen.findByText("text is over the limit")).toBeTruthy();
+  expect(inFocus()).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
+  expect(await screen.findByText("earlier talk")).toBeTruthy();
+});
+
+test("a new round starts docked, and a round that goes away ends focus mode", async () => {
+  let current = focusChat();
+  const { emit } = renderChat([session()], (...a) => current(...a));
+  await enterFocus();
+  expect(inFocus()).toBe(true);
+  current = okChat(chatOf([msg({ text: "earlier talk" })], { round: [card({ label: "1", title: "other", body: "Else?" })] }));
+  await emit("s-a");
+  expect(await screen.findByText("earlier talk")).toBeTruthy();
+  await enterFocus();
+  expect(inFocus()).toBe(true);
+  current = okChat(chatOf([msg({ text: "earlier talk" })]));
+  await emit("s-a");
+  expect(await screen.findByText("earlier talk")).toBeTruthy();
+});
+
+test("a fresh mount with a round draft opens docked", async () => {
+  renderChat([session()], focusChat());
+  fireEvent.click(within(await screen.findByRole("group", { name: "Questions" })).getByRole("button", { name: "Alpha" }));
+  cleanup();
+  renderChat([session()], focusChat());
+  await screen.findByRole("group", { name: "Questions" });
+  expect(inFocus()).toBe(false);
+});
+
 test("answers, the open question and the note survive switching modes; the text answer has five rows in focus", async () => {
   renderChat([session()], focusChat());
   const sheet = await screen.findByRole("group", { name: "Questions" });

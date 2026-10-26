@@ -28,6 +28,12 @@ export function ScreenModal({ target, fetcher = fetchScreen, onClose }: { target
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4" onClick={onClose}>
       <Box
