@@ -107,6 +107,9 @@ type Epic struct {
 	// loads as needs-rebase.
 	MergeBlockKind   string
 	MergeBlockReason string
+	// MergeBlockFiles is the full list of files a dirty-trunk pause names; the
+	// reason text caps it.
+	MergeBlockFiles []string
 	// MergeTarget is the branch the epic merges into. Only a server snapshot
 	// sets it; the loader leaves it empty.
 	MergeTarget string

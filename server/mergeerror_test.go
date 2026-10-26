@@ -178,6 +178,55 @@ func TestMergeError_PauseStoresKindAndReasonUntilALaterMergeClearsThem(t *testin
 	}
 }
 
+func TestMergeError_DirtyTrunkStoresTheFullFileListAndForksNoInvestigation(t *testing.T) {
+	files := []string{"a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt", "g.txt"}
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+		commitFiles(t, p, files...)
+		for _, n := range files {
+			testutil.WriteFile(t, f.repo, n, "local "+n)
+		}
+	})
+	f.pauseRoot(t)
+
+	md := f.epicMD(t)
+	for _, n := range files {
+		if !strings.Contains(md, "- "+n+"\n") {
+			t.Errorf("land_block_files lacks %s:\n%s", n, md)
+		}
+	}
+	for _, n := range files {
+		if got := readFile(t, filepath.Join(f.repo, n)); got != "local "+n {
+			t.Errorf("%s = %q, want the local content untouched", n, got)
+		}
+	}
+	entries, err := os.ReadDir(f.issues)
+	if err != nil || len(entries) != 1 {
+		t.Errorf("epic issues = %v, %v; want only ticket 01 (no investigation)", entries, err)
+	}
+}
+
+func TestMergeError_MergeAgainPausesWithAFreshListThenLandsOnceClean(t *testing.T) {
+	f, clean := dirtyTrunkFixture(t)
+	f.pauseRoot(t)
+
+	res, err := f.h.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
+	if err != nil || !res.Paused || res.PauseKind != string(events.DirtyTrunk) {
+		t.Fatalf("merge again = %+v, %v; want a dirty-trunk pause", res, err)
+	}
+	if md := f.epicMD(t); strings.Count(md, "land_block_kind") != 1 || !strings.Contains(md, "- a.txt\n") {
+		t.Errorf("pause not rewritten once:\n%s", md)
+	}
+
+	clean()
+	res, err = f.h.Client.EpicMerge(context.Background(), "proj:"+schedEpic)
+	if err != nil || !res.Merged {
+		t.Fatalf("merge after cleaning = %+v, %v", res, err)
+	}
+	if md := f.epicMD(t); strings.Contains(md, "land_block") {
+		t.Errorf("landing left the block on the epic:\n%s", md)
+	}
+}
+
 func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 	f, _ := dirtyTrunkFixture(t)
 	f.pauseRoot(t)

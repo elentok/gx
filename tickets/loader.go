@@ -298,8 +298,9 @@ type ticketMDYAML struct {
 	HadCodex     bool                    `yaml:"had_codex"`
 	Friction     *schema.FrictionSummary `yaml:"friction"`
 
-	MergeBlockKind   string `yaml:"land_block_kind"`
-	MergeBlockReason string `yaml:"land_block_reason"`
+	MergeBlockKind   string   `yaml:"land_block_kind"`
+	MergeBlockReason string   `yaml:"land_block_reason"`
+	MergeBlockFiles  []string `yaml:"land_block_files"`
 }
 
 // WriteEpicTicketMD writes a minimal ticket.md for the epic at epicPath, with
@@ -365,6 +366,7 @@ func loadEpicTicketMD(epic *Epic) {
 	epic.Friction = wire.Friction
 	epic.MergeBlockKind = wire.MergeBlockKind
 	epic.MergeBlockReason = wire.MergeBlockReason
+	epic.MergeBlockFiles = wire.MergeBlockFiles
 	// Roots paused before the kind was stored carry a reason and no kind.
 	if epic.MergeBlockKind == "" && epic.MergeBlockReason != "" {
 		epic.MergeBlockKind = "needs-rebase"

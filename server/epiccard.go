@@ -44,6 +44,8 @@ const (
 	CardActionOpenTicket CardActionKind = "open-ticket"
 	CardActionOpenEpic   CardActionKind = "open-epic"
 	CardActionMerge      CardActionKind = "merge"
+	// StashMerge targets the epic like Merge; its route is a later ticket's.
+	CardActionStashMerge CardActionKind = "stash-merge"
 	// The Design actions target the Design's epic address. Design and Continue
 	// start a session first (POST open-design); Answer and Open only navigate.
 	CardActionDesign   CardActionKind = "design"

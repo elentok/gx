@@ -407,6 +407,10 @@ export const CardActionOpenTicket: CardActionKind = "open-ticket";
 export const CardActionOpenEpic: CardActionKind = "open-epic";
 export const CardActionMerge: CardActionKind = "merge";
 /**
+ * StashMerge targets the epic like Merge; its route is a later ticket's.
+ */
+export const CardActionStashMerge: CardActionKind = "stash-merge";
+/**
  * The Design actions target the Design's epic address. Design and Continue
  * start a session first (POST open-design); Answer and Open only navigate.
  */
@@ -585,6 +589,15 @@ export interface EpicDetail {
    */
   land_block_kind?: string;
   land_block_reason?: string;
+  /**
+   * MergeBlockFiles is every file a dirty-trunk pause names; the reason caps its list.
+   */
+  land_block_files?: string[];
+  /**
+   * Actions are the verbs of a Merge blocked epic's pause, from the pause-to-verb
+   * table, in display order.
+   */
+  actions?: string[];
   /**
    * Steps is a map epic's Progress, and ImplAddress the address of its impl epic once it exists.
    */
@@ -860,6 +873,10 @@ export interface EpicSummary {
    * MergeBlockKind is the pause reason of a blocked merge.
    */
   merge_block_kind?: string;
+  /**
+   * Actions are the verbs of a blocked merge's pause, from the pause-to-verb table.
+   */
+  actions?: string[];
 }
 
 //////////

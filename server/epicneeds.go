@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // The state pill words of a Needs-you loop card.
@@ -26,6 +27,8 @@ type needsYou struct {
 	Reason string
 	Since  time.Time
 	Action CardAction
+	// More are the buttons after Action.
+	More []CardAction
 }
 
 // ticketWait is one paused or asking ticket of an epic.
@@ -48,10 +51,16 @@ func (s *Server) loopNeedsYou(root rootRef, e tickets.Epic, state EpicListState)
 	}
 	switch {
 	case state == EpicListMergeBlocked:
-		return needsYou{
+		n := needsYou{
 			Pill: PillMergeBlocked, Reason: e.MergeBlockReason, Since: fallback,
 			Action: CardAction{Kind: CardActionMerge, Label: "Merge", Target: root.String()},
-		}, true
+		}
+		if e.MergeBlockKind == string(schema.PauseDirtyTrunk) {
+			n.Reason = schema.PauseDirtyTrunk.Label()
+			n.Action = CardAction{Kind: CardActionStashMerge, Label: schema.VerbStashMerge.Label(), Target: root.String()}
+			n.More = []CardAction{{Kind: CardActionMerge, Label: schema.VerbMergeAgain.Label(), Target: root.String()}}
+		}
+		return n, true
 	case state == EpicListPaused && epicStateOf(e) == epicCycle:
 		return needsYou{
 			Pill: PillDeadlocked, Reason: cycleReason(root, e), Since: fallback,

@@ -78,6 +78,8 @@ type EpicSummary struct {
 	MergeBlocked bool `json:"merge_blocked,omitempty"`
 	// MergeBlockKind is the pause reason of a blocked merge.
 	MergeBlockKind string `json:"merge_block_kind,omitempty"`
+	// Actions are the verbs of a blocked merge's pause, from the pause-to-verb table.
+	Actions []string `json:"actions,omitempty"`
 }
 
 // epicSummaries summarizes every epic with a queue item, in queue order. A
@@ -189,6 +191,7 @@ func summarizeEpic(root rootRef, e tickets.Epic, claimedAt func(string) (time.Ti
 		case isMergeableEpic(root) && epicMergeBlocked(e):
 			sum.Reason, sum.Detail = EpicReasonMergeBlocked, e.MergeBlockReason
 			sum.MergeBlocked, sum.MergeBlockKind = true, e.MergeBlockKind
+			sum.Actions = mergeBlockActions(e.MergeBlockKind)
 		case epicStateOf(e) == epicCycle:
 			sum.Reason, sum.Detail = EpicReasonDeadlock, cycleReason(root, e)
 		}

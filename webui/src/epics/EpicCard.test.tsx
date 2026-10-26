@@ -50,6 +50,21 @@ test("the title is the only link and points at the epic page", () => {
   expect(links[0].getAttribute("href")).toBe("#/e/gx:blog");
 });
 
+test("a dirty-trunk row renders both buttons, and the not-yet-wired Stash kind does not crash", () => {
+  renderThemed(
+    <EpicCard
+      row={needsYou({
+        actions: [
+          { kind: "stash-merge", label: "Stash, merge and restore", target: "gx:blog" },
+          { kind: "merge", label: "Merge again", target: "gx:blog" },
+        ],
+      })}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "Stash, merge and restore" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Merge again" })).toBeTruthy();
+});
+
 test("title targets: one-off ticket, follow-ups epic, joined card's active part, pending Design", () => {
   const href = (r: EpicListRow) => {
     renderThemed(<EpicCard row={r} />);

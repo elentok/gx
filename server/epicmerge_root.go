@@ -153,19 +153,19 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 		first = true
 	case force || s.autoFFMerge(project) || hasManualMergeTicket(e):
 		trunkBefore, revErr := git.RevParse(repo, "refs/heads/"+target)
-		reason, kind := s.mergeRoot(project, epics, one, repo)
+		pause := s.mergeRoot(project, epics, one, repo)
 		// A non-ff below the cap is not an outcome: the merge ticket makes the
 		// epic not all-done, so the root stays queued and its finish merges again.
 		// The ticket is never manual, even under force: it counts against the cap.
-		if reason != "" && kind == events.NeedsRebase {
+		if pause.reason != "" && pause.kind == events.NeedsRebase {
 			if id := s.forkMergeTicket(root, e, target, false); id != "" {
 				return mergeDecision{result: QueueResult{MergeTicket: tickets.Address{Project: project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}
 			}
 		}
-		if reason != "" {
+		if pause.reason != "" {
 			s.stampEpic(root, e.Path, "completed_at")
-			s.storeMergeBlock(root, e.Path, kind, reason)
-			return pauseDecision(first, reason, kind)
+			s.storeMergeBlock(root, e.Path, pause)
+			return pauseDecision(first, pause.reason, pause.kind)
 		}
 		var added, removed int
 		countErr := revErr
@@ -332,18 +332,30 @@ func (s *Server) stampLines(root rootRef, epicPath string, added, removed int) {
 const (
 	mergeBlockKindKey   = "land_block_kind"
 	mergeBlockReasonKey = "land_block_reason"
+	mergeBlockFilesKey  = "land_block_files"
 )
 
+// mergePause is why a root's land paused. files is the full clashing list of a
+// dirty-trunk pause; the reason text caps it.
+type mergePause struct {
+	reason string
+	kind   events.Kind
+	files  []string
+}
+
 func (s *Server) clearMergeBlock(root rootRef, epicPath string) {
-	if err := tickets.ClearEpicFields(epicPath, mergeBlockKindKey, mergeBlockReasonKey); err != nil {
+	if err := tickets.ClearEpicFields(epicPath, mergeBlockKindKey, mergeBlockReasonKey, mergeBlockFilesKey); err != nil {
 		s.log.Warn("clear merge block", "root", root, "err", err)
 	}
 }
 
-// storeMergeBlock records a pause's kind and reason on the epic, so the epic's
-// state outlives the event and a server restart.
-func (s *Server) storeMergeBlock(root rootRef, epicPath string, kind events.Kind, reason string) {
-	fields := map[string]any{mergeBlockReasonKey: reason, mergeBlockKindKey: string(kind)}
+// storeMergeBlock records a pause's kind, reason and files on the epic, so the
+// epic's state outlives the event and a server restart.
+func (s *Server) storeMergeBlock(root rootRef, epicPath string, p mergePause) {
+	fields := map[string]any{mergeBlockReasonKey: p.reason, mergeBlockKindKey: string(p.kind)}
+	if len(p.files) > 0 {
+		fields[mergeBlockFilesKey] = p.files
+	}
 	if err := tickets.StampEpicFields(epicPath, fields); err != nil {
 		s.log.Warn("store merge block", "root", root, "err", err)
 	}
@@ -369,7 +381,7 @@ func (s *Server) nothingToMerge(project string, epics []tickets.Epic, one ralphl
 // merge core. A non-empty reason means the root must pause, not merge; kind
 // names the pause's cause. Every error pauses the
 // root: one left all-done in the queue looks stuck.
-func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, kind events.Kind) {
+func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) mergePause {
 	_, _, target, err := s.epicRefs(project, epics, one.Epic, repoDir)
 	if err != nil {
 		return s.refsFailed(project, one.Epic, err)
@@ -388,7 +400,7 @@ func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.O
 		// Trunk moved outside the server between git's ff check and the ff:
 		// that is a non-ff, not a failed merge.
 		if ancestor, aerr := git.IsAncestor(info.Repo.Root, "refs/heads/"+target, one.Epic); aerr == nil && !ancestor {
-			return needsRebase, events.NeedsRebase
+			return mergePause{reason: needsRebase, kind: events.NeedsRebase}
 		}
 		// No pre-check: git decides whether local changes block the merge, and
 		// only a refused merge looks at them.
@@ -399,33 +411,36 @@ func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.O
 					return mergeFailed(project, one.Epic, lerr)
 				}
 				if landed {
-					return "", ""
+					return mergePause{}
 				}
-				return fmt.Sprintf("uncommitted changes on %s (%s) clash with %s; commit or discard them, then merge again",
-					target, dir, listFiles(clashing)), events.DirtyTrunk
+				return mergePause{
+					reason: fmt.Sprintf("uncommitted changes on %s (%s) clash with %s; commit or discard them, then merge again",
+						target, dir, listFiles(clashing)),
+					kind:  events.DirtyTrunk,
+					files: clashing,
+				}
 			}
 		}
 		return mergeFailed(project, one.Epic, err)
 	}
 	if out.Merged {
-		return "", ""
+		return mergePause{}
 	}
-	return needsRebase, events.NeedsRebase
+	return mergePause{reason: needsRebase, kind: events.NeedsRebase}
 }
 
-// refsFailed is the pause reason and kind for an epic whose refs can't be
-// worked out.
-func (s *Server) refsFailed(project, epic string, err error) (string, events.Kind) {
+// refsFailed is the pause for an epic whose refs can't be worked out.
+func (s *Server) refsFailed(project, epic string, err error) mergePause {
 	if missing := (*tickets.ErrTrunkMissing)(nil); errors.As(err, &missing) {
 		// Nothing merges; the project stops claiming until a person fixes trunk.
 		s.enterTrunkMissing(project, err.Error())
-		return fmt.Sprintf("the trunk branch is missing: %v; fix the trunk, then merge again", err), events.TrunkMissing
+		return mergePause{reason: fmt.Sprintf("the trunk branch is missing: %v; fix the trunk, then merge again", err), kind: events.TrunkMissing}
 	}
 	return mergeFailed(project, epic, err)
 }
 
-func mergeFailed(project, epic string, err error) (string, events.Kind) {
-	return fmt.Sprintf("merge failed: %v; fix it, then merge again", err), events.MergeError
+func mergeFailed(project, epic string, err error) mergePause {
+	return mergePause{reason: fmt.Sprintf("merge failed: %v; fix it, then merge again", err), kind: events.MergeError}
 }
 
 // clashingFiles lists the uncommitted files in the target's checkout that the

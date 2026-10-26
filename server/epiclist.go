@@ -316,7 +316,7 @@ func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 		decorateLoopCard(&row, row.QueueSlot)
 		if n, ok := s.loopNeedsYou(root, e, row.State); ok {
 			row.Section, row.StatePill, row.Reason, row.WaitingSince = SectionNeedsYou, n.Pill, n.Reason, n.Since
-			row.Actions = []CardAction{n.Action}
+			row.Actions = append([]CardAction{n.Action}, n.More...)
 		}
 	}
 	return row

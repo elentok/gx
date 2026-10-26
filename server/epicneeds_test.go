@@ -24,6 +24,27 @@ func writeQuestionLog(t *testing.T, store, epic, file, ts, summary string) {
 	}
 }
 
+func TestEpicList_DirtyTrunkCardHasBothActions(t *testing.T) {
+	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "dirty", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: dirty-trunk\nland_block_reason: uncommitted changes on main clash with a.txt\n---\n", done)
+	})
+	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	var row server.EpicListRow
+	for _, r := range getEpicList(t, code, body).Epics {
+		if r.Address == "proj:dirty" {
+			row = r
+		}
+	}
+	want := []server.CardAction{
+		{Kind: server.CardActionStashMerge, Label: "Stash, merge and restore", Target: "proj:dirty"},
+		{Kind: server.CardActionMerge, Label: "Merge again", Target: "proj:dirty"},
+	}
+	if row.Reason != "Trunk has local changes" || !slices.Equal(row.Actions, want) {
+		t.Errorf("dirty row = reason %q actions %v, want both actions (%s)", row.Reason, row.Actions, body)
+	}
+}
+
 func TestEpicList_NeedsYouReasons(t *testing.T) {
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
 	asking := map[string]string{"01-a.md": issueMD("01", "paused", "pause_reason: self-reported\n", "A")}

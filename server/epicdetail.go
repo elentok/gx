@@ -118,6 +118,11 @@ type EpicDetail struct {
 	// merge paused.
 	MergeBlockKind   string `json:"land_block_kind,omitempty"`
 	MergeBlockReason string `json:"land_block_reason,omitempty"`
+	// MergeBlockFiles is every file a dirty-trunk pause names; the reason caps its list.
+	MergeBlockFiles []string `json:"land_block_files,omitempty"`
+	// Actions are the verbs of a Merge blocked epic's pause, from the pause-to-verb
+	// table, in display order.
+	Actions []string `json:"actions,omitempty"`
 	// Steps is a map epic's Progress, and ImplAddress the address of its impl epic once it exists.
 	Steps       []MapStep `json:"steps,omitempty"`
 	ImplAddress string    `json:"impl_address,omitempty"`
@@ -128,6 +133,17 @@ type EpicDetail struct {
 	// Deletable is set on an uncharted design, the rule the designs delete route guards.
 	Deletable bool      `json:"deletable,omitempty"`
 	Stats     EpicStats `json:"stats"`
+}
+
+// mergeBlockActions is the verbs the pause-to-verb table lists for a blocked
+// merge's kind.
+func mergeBlockActions(kind string) []string {
+	row, _ := schema.PauseReason(kind).Row()
+	actions := make([]string, len(row.Verbs))
+	for i, v := range row.Verbs {
+		actions[i] = v.Word()
+	}
+	return actions
 }
 
 // epicQueueable reports whether an epic can be queued: an unqueued, unmerged
@@ -228,7 +244,8 @@ func (s *Server) buildLoopDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 		Draft: e.Status == string(schema.StatusDraft),
 	}
 	if epicMergeBlocked(e) {
-		d.MergeBlockKind, d.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
+		d.MergeBlockKind, d.MergeBlockReason, d.MergeBlockFiles = e.MergeBlockKind, e.MergeBlockReason, e.MergeBlockFiles
+		d.Actions = mergeBlockActions(e.MergeBlockKind)
 	}
 	for _, t := range e.Tickets {
 		d.Rows = append(d.Rows, s.rowFor(root, e, t))

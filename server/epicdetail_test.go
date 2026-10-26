@@ -186,6 +186,38 @@ func TestEpicDetail_MergeBlockedCarriesKindAndReason(t *testing.T) {
 	}
 }
 
+func TestEpicDetail_MergeBlockedActionsFollowTheVerbTable(t *testing.T) {
+	want := map[string][]string{
+		"dirty-trunk":   {"stash-merge", "merge"},
+		"merge-error":   {"merge"},
+		"trunk-missing": {"merge"},
+		"needs-rebase":  {"merge"},
+	}
+	h, base := startEpicDetail(t, func(store string) {
+		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
+		for kind := range want {
+			files := ""
+			if kind == "dirty-trunk" {
+				files = "land_block_files:\n  - a.txt\n  - b.txt\n  - c.txt\n  - d.txt\n  - e.txt\n  - f.txt\n"
+			}
+			writeEpicFiles(t, store, kind, "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: "+kind+"\nland_block_reason: why\n"+files+"---\n", done)
+		}
+		writeEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
+	})
+	for kind, actions := range want {
+		_, d, body := getEpicDetail(t, h, base, "proj:"+kind)
+		if !slices.Equal(d.Actions, actions) {
+			t.Errorf("%s actions = %v, want %v (%s)", kind, d.Actions, actions, body)
+		}
+		if wantFiles := kind == "dirty-trunk"; (len(d.MergeBlockFiles) == 6) != wantFiles {
+			t.Errorf("%s files = %v (%s)", kind, d.MergeBlockFiles, body)
+		}
+	}
+	if _, d, body := getEpicDetail(t, h, base, "proj:unmerged"); len(d.Actions) != 0 {
+		t.Errorf("an unblocked epic carries actions: %s", body)
+	}
+}
+
 func TestEpicDetail_StoredReasonWithoutKindReadsAsNeedsRebase(t *testing.T) {
 	h, base := startEpicDetail(t, func(store string) {
 		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}

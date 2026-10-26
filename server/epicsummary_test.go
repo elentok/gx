@@ -169,6 +169,23 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 	}
 }
 
+func TestSummarizeEpic_MergeBlockActionsFollowTheVerbTable(t *testing.T) {
+	root := rootRef{Project: "proj", Epic: "epic"}
+	want := map[string][]string{
+		"dirty-trunk":   {"stash-merge", "merge"},
+		"merge-error":   {"merge"},
+		"trunk-missing": {"merge"},
+		"needs-rebase":  {"merge"},
+	}
+	for kind, actions := range want {
+		e := tickets.Epic{Name: "epic", CompletedAt: time.Unix(50, 0), MergeBlockKind: kind, MergeBlockReason: "why", Tickets: []tickets.Ticket{summaryTicket("01", "done")}}
+		got := summarizeEpic(root, e, func(string) (time.Time, bool) { return time.Time{}, false }, func(string) string { return "" }, func(tickets.Ticket) []tickets.LogEvent { return nil })
+		if !equalStrings(got.Actions, actions) {
+			t.Errorf("%s actions = %v, want %v", kind, got.Actions, actions)
+		}
+	}
+}
+
 func TestSummarizeEpic_PausedDetails(t *testing.T) {
 	root := rootRef{Project: "proj", Epic: "epic"}
 	repair := repairPausedTicket("03")
