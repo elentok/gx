@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, test } from "./fixture";
+import { realpath } from "node:fs/promises";
+import { card, expect, nav, test, type Fixture } from "./fixture";
 
 interface Row {
   name: string;
@@ -90,5 +91,68 @@ test.describe("3. Pause reasons and recovery", () => {
 
     await page.locator('a[href$="/t/demo:paused-epic/07"]').click();
     await expect(page.getByText("Run failed").first()).toBeVisible();
+  });
+});
+
+const fixDialog = (page: Page) => page.getByRole("dialog", { name: "Fix it with an agent" });
+const fixPrompt = "/gx-investigate demo:paused-epic/07 is needs-repair: Run failed";
+
+const openFixDialog = async (page: Page) => {
+  const row = page.locator('a[href$="/t/demo:paused-epic/07"]').locator("xpath=ancestor::*[.//button][1]");
+  // The running fix ticket's timer re-renders the page every second, so the button is never "stable".
+  await row.getByRole("button", { name: "Fix it with an agent" }).dispatchEvent("click");
+  await expect(fixDialog(page)).toBeVisible();
+};
+
+const sessions = async (fixture: Fixture) =>
+  JSON.parse(await fixture.cli("agents", "list", "--json")) as Array<{ dir: string; harness: string }>;
+
+// The fixture keeps the store at <root>/data/gx/tickets and the project's trunk checkout at <root>/repo.
+const trunkDir = async (fixture: Fixture) => {
+  const path = (await fixture.cli("tickets", "show", "demo:paused-epic/07")).match(/^path: (.+)$/m)![1];
+  return realpath(`${path.split("/data/gx/tickets")[0]}/repo`);
+};
+
+test.describe("55. Fix it with an agent", () => {
+  test("copy, start, and refuse a second agent", async ({ page, context, start }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const fixture = await start("paused");
+    await fixture.cli("server", "queue", "add", "demo:paused-epic");
+    const before = (await sessions(fixture)).length;
+
+    await page.getByRole("link", { name: "paused-epic" }).click();
+    await openFixDialog(page);
+    await expect(fixDialog(page).getByText(fixPrompt)).toBeVisible();
+    await fixDialog(page).getByRole("button", nav("Copy")).click();
+    await expect(fixDialog(page).getByRole("button", nav("Copied"))).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(fixPrompt);
+
+    await fixDialog(page).getByRole("button", nav("Start gx agent")).click();
+    await expect(fixDialog(page).getByText("Agent started. View it in the gx TUI Agents tab")).toBeVisible();
+    await expect(fixDialog(page).getByRole("button", nav("Start gx agent"))).toHaveCount(0);
+    await expect.poll(async () => (await sessions(fixture)).length).toBe(before + 1);
+    const started = (await sessions(fixture)).at(-1)!;
+    expect(started.harness).toBe("claude");
+    expect(await realpath(started.dir)).toBe(await trunkDir(fixture));
+
+    // A reload would fail the test, so the second visit is a fresh page on the same server.
+    const second = await context.newPage();
+    await second.goto(page.url());
+    await openFixDialog(second);
+    await fixDialog(second).getByRole("button", nav("Start gx agent")).click();
+    await expect(fixDialog(second).getByText("an agent is already fixing demo:paused-epic/07")).toBeVisible();
+    expect((await sessions(fixture)).length).toBe(before + 1);
+  });
+});
+
+test.describe("56. Fix it with an agent, remote control", () => {
+  test("names the Claude app", async ({ page, start }) => {
+    const fixture = await start("paused", { config: { "agents.fix-agent-remote-control": "true" } });
+    await fixture.cli("server", "queue", "add", "demo:paused-epic");
+
+    await page.getByRole("link", { name: "paused-epic" }).click();
+    await openFixDialog(page);
+    await fixDialog(page).getByRole("button", nav("Start gx agent")).click();
+    await expect(fixDialog(page).getByText("Agent started. View it in the gx TUI Agents tab or in the Claude app")).toBeVisible();
   });
 });

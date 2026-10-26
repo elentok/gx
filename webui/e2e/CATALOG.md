@@ -6,7 +6,7 @@ Retries are off. Locators use roles and visible text, plus `data-testid` `pill` 
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
-Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
+Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
 `newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40).
 
@@ -555,3 +555,21 @@ an exited session.
 - **Pass:**
   - The divider reads "5 done" and 3 done cards show, newest first (`merged-e`, `merged-d`, `merged-c`).
   - "Show 2 more" shows 5 cards and the button reads "Show fewer"; clicking goes back to 3.
+
+## 55. Fix it with an agent
+
+- **Scenario:** `paused`, with `paused-epic` queued. Browser clipboard permission granted.
+- **Steps:**
+  1. Open `paused-epic`; click "Fix it with an agent" on `07`; click Copy; click "Start gx agent".
+  2. In a second page on the same server, open the dialog on `07` again; click "Start gx agent".
+- **Pass:**
+  - The dialog shows `/gx-investigate demo:paused-epic/07 is needs-repair: Run failed`; Copy reads "Copied" and the clipboard holds the prompt.
+  - After the start the dialog reads "Agent started. View it in the gx TUI Agents tab" and has no "Start gx agent".
+  - `gx agents list` shows one more session, with harness `claude` and dir the trunk checkout of `demo`.
+  - The second dialog reads "an agent is already fixing demo:paused-epic/07" and `gx agents list` has no new session.
+
+## 56. Fix it with an agent, remote control
+
+- **Scenario:** `paused` with config `agents.fix-agent-remote-control=true`, `paused-epic` queued.
+- **Steps:** open `paused-epic`; click "Fix it with an agent" on `07`; click "Start gx agent".
+- **Pass:** the dialog reads "Agent started. View it in the gx TUI Agents tab or in the Claude app".
