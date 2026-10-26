@@ -461,9 +461,9 @@ func TestPausedScenario_OneTicketPerRecoveryPath(t *testing.T) {
 		id, reason, action string
 	}{
 		{"03", "self-reported", server.ActionAnswer},
-		{"04", "ambiguous-base", server.ActionResume},
-		{"05", "merge-conflict", server.ActionResume},
-		{"06", "zero-commit", server.ActionResume},
+		{"04", "ambiguous-base", server.ActionChooseBase},
+		{"05", "merge-conflict", server.ActionMerge},
+		{"06", "zero-commit", server.ActionRetry},
 	}
 	for _, c := range cases {
 		d := r.detail(t, pausedEpic+c.id)

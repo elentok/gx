@@ -43,7 +43,7 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 	}
 }
 
-func TestDetail_GxQuestionOffersResumeOnly(t *testing.T) {
+func TestDetail_ZeroCommitOffersRetryOnly(t *testing.T) {
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
@@ -55,8 +55,38 @@ func TestDetail_GxQuestionOffersResumeOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err := h.Client.Detail(context.Background(), answerAddr)
-	if want := []string{server.ActionResume}; err != nil || !slices.Equal(d.Actions, want) {
+	if want := []string{server.ActionRetry}; err != nil || !slices.Equal(d.Actions, want) {
 		t.Errorf("actions = %v, %v; want %v", d.Actions, err, want)
+	}
+}
+
+func TestDetail_ActionsFollowTheTable(t *testing.T) {
+	h, ticketPath, _ := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "paused"}); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		reason schema.PauseReason
+		want   []string
+	}{
+		{schema.PauseIterationError, []string{server.ActionRetry, server.ActionStartOver}},
+		{schema.PauseMergeConflict, []string{server.ActionMerge, server.ActionStartOver}},
+		{schema.PauseStrandedCommits, []string{server.ActionReopenAndRetry}},
+		{schema.PauseAmbiguousBase, []string{server.ActionChooseBase}},
+		{schema.PauseBlockedPane, []string{server.ActionRetry}},
+		{schema.PauseManual, []string{server.ActionResume, server.ActionStartOver}},
+	}
+	for _, c := range cases {
+		if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
+			tk.Status, tk.PauseReason = schema.StatusPaused, c.reason
+		}); err != nil {
+			t.Fatal(err)
+		}
+		d, err := h.Client.Detail(context.Background(), answerAddr)
+		if err != nil || !slices.Equal(d.Actions, c.want) {
+			t.Errorf("%s: actions = %v, %v; want %v", c.reason, d.Actions, err, c.want)
+		}
 	}
 }
 

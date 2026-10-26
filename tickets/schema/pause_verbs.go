@@ -57,6 +57,54 @@ func (v PauseVerb) Label() string { return pauseVerbs[v].Label }
 // Tooltip is v's help text, or "" for an unknown verb.
 func (v PauseVerb) Tooltip() string { return pauseVerbs[v].Tooltip }
 
+// verbWords spells the verbs whose detail action or CLI word differs from the
+// table's name.
+var verbWords = map[PauseVerb]string{
+	VerbMergeAgain:  "merge",
+	VerbAllowDeny:   "approve",
+	VerbReopenRetry: "reopen-and-retry",
+}
+
+// Word is the verb as the detail's actions and the refusals spell it.
+func (v PauseVerb) Word() string {
+	if w, ok := verbWords[v]; ok {
+		return w
+	}
+	return string(v)
+}
+
+// Describe is how a refusal names the ticket's status: "paused (repair:
+// iteration-error)" for a pause, else the stored status.
+func (t Ticket) Describe() string {
+	class := t.PausedClass()
+	if class == "" {
+		return string(t.Status)
+	}
+	return fmt.Sprintf("paused (%s: %s)", class, t.EffectiveReason())
+}
+
+// EffectiveReason is the stored reason, or the class default for a legacy
+// status that stores none.
+func (t Ticket) EffectiveReason() PauseReason {
+	if t.PauseReason == "" {
+		return t.PausedClass().DefaultReason()
+	}
+	return t.PauseReason
+}
+
+// RecoveryVerb is the first verb of t's table row, the one a refusal points at,
+// or "" when t is not paused or its kind has no row.
+func (t Ticket) RecoveryVerb() string {
+	if t.PausedClass() == "" {
+		return ""
+	}
+	row, ok := t.EffectiveReason().Row()
+	if !ok || len(row.Verbs) == 0 {
+		return ""
+	}
+	return row.Verbs[0].Word()
+}
+
 // PauseRow lists the verbs that recover one pause kind, in display order, and
 // for an answer-class kind who receives the reply.
 type PauseRow struct {

@@ -1,10 +1,11 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { ActionResume, type TicketDetail } from "../generated/server";
+import { ActionChooseBase, ActionReopenAndRetry, ActionResume, ActionRetry, type TicketDetail } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { ReasonStale } from "./answer";
 import { postResume, resumeWords, type PostResume } from "./resume";
 
+const STATUS_NEEDS_REPAIR = "needs-repair";
 const REASON_MANUAL = "manual";
 const REASON_SELF_REPORTED = "self-reported";
 
@@ -24,6 +25,14 @@ export function resumeLabel(reason: string | undefined): string {
     default:
       return "Retry";
   }
+}
+
+// Verbs the resume route serves. A repair pause lists retry too, but the route refuses it
+// until the repair verbs get their own routes.
+const RESUME_ROUTE_ACTIONS: string[] = [ActionResume, ActionChooseBase, ActionRetry, ActionReopenAndRetry];
+
+function servesResume(detail: TicketDetail): boolean {
+  return detail.status !== STATUS_NEEDS_REPAIR && detail.actions.some((a) => RESUME_ROUTE_ACTIONS.includes(a));
 }
 
 // The resume area. The server decides whether it shows (the detail's actions); an
@@ -53,7 +62,7 @@ export function ResumeForm({
     setBase("");
   }
 
-  if (!detail.actions.includes(ActionResume)) return null;
+  if (!servesResume(detail)) return null;
 
   const ready = bases.length === 0 || base !== "";
   const label = resumeLabel(detail.pause_reason);

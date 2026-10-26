@@ -11,9 +11,15 @@ import (
 
 // Actions the detail route offers. The server decides them; the UI renders them.
 const (
-	ActionAnswer  = "answer"
-	ActionApprove = "approve"
-	ActionResume  = "resume"
+	ActionAnswer         = "answer"
+	ActionApprove        = "approve"
+	ActionResume         = "resume"
+	ActionRetry          = "retry"
+	ActionStartOver      = "start-over"
+	ActionMerge          = "merge"
+	ActionChooseBase     = "choose-base"
+	ActionReopenAndRetry = "reopen-and-retry"
+	ActionStashMerge     = "stash-merge"
 )
 
 // Outcomes of a pause round.
@@ -283,12 +289,21 @@ func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone bool, 
 	if t.PausedClass() == "" {
 		return actions
 	}
-	selfReported := t.PauseReason == schema.PauseSelfReported
-	if selfReported && t.PausedClass() == schema.PauseClassAnswer && latest != nil && latest.End == nil {
-		actions = append(actions, ActionAnswer)
+	row, ok := t.EffectiveReason().Row()
+	if !ok {
+		return actions
 	}
-	if !selfReported || agentGone {
-		actions = append(actions, ActionResume)
+	approvable := len(actions) > 0
+	for _, v := range row.Verbs {
+		switch {
+		case v == schema.VerbAllowDeny:
+			// Approve is added above, from the live card.
+		case v == schema.VerbAnswer && (latest == nil || latest.End != nil):
+		case v == schema.VerbResume && t.PauseReason == schema.PauseSelfReported && !agentGone:
+		case v == schema.VerbRetry && t.PauseReason == schema.PauseBlockedPane && approvable:
+		default:
+			actions = append(actions, v.Word())
+		}
 	}
 	return actions
 }

@@ -103,10 +103,16 @@ export interface DesignDeleteRequest {
 export const ActionAnswer = "answer";
 export const ActionApprove = "approve";
 export const ActionResume = "resume";
+export const ActionRetry = "retry";
+export const ActionStartOver = "start-over";
+export const ActionMerge = "merge";
+export const ActionChooseBase = "choose-base";
+export const ActionReopenAndRetry = "reopen-and-retry";
+export const ActionStashMerge = "stash-merge";
 /**
  * Actions the detail route offers. The server decides them; the UI renders them.
  */
-export type Action = typeof ActionAnswer | typeof ActionApprove | typeof ActionResume;
+export type Action = typeof ActionAnswer | typeof ActionApprove | typeof ActionResume | typeof ActionRetry | typeof ActionStartOver | typeof ActionMerge | typeof ActionChooseBase | typeof ActionReopenAndRetry | typeof ActionStashMerge;
 export const RoundOpen = "open";
 export const RoundAnswered = "answered";
 export const RoundClosed = "closed";

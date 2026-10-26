@@ -70,16 +70,31 @@ test("a permission prompt on a running ticket shows the card", async () => {
 test("a Paused ticket shows its pause text in the card next to its action", async () => {
   const detail: TicketDetail = {
     ...plain,
-    status: "needs-repair",
-    pause_reason: "merge-conflict",
-    pause_text: "Conflict in main.go",
+    status: "needs-answer",
+    pause_reason: "zero-commit",
+    pause_text: "No commits",
     state: "tok-2",
-    actions: ["resume"],
+    actions: ["retry"],
   };
   renderTicket(() => detail);
   const c = await screen.findByRole("group", { name: "Action card" });
-  expect(c.textContent).toContain("Conflict in main.go");
-  expect(screen.getByRole("button", { name: "Resolve conflict" })).toBeTruthy();
+  expect(c.textContent).toContain("No commits");
+  expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+});
+
+test("a repair pause shows its text but no Retry the resume route would refuse", async () => {
+  const detail: TicketDetail = {
+    ...plain,
+    status: "needs-repair",
+    pause_reason: "iteration-error",
+    pause_text: "Agent crashed",
+    state: "tok-3",
+    actions: ["retry", "start-over"],
+  };
+  renderTicket(() => detail);
+  const c = await screen.findByRole("group", { name: "Action card" });
+  expect(c.textContent).toContain("Agent crashed");
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
 });
 
 test("an Answered ticket keeps the last question and the answer", async () => {

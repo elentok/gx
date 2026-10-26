@@ -8,6 +8,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // Stable machine-readable refusal codes shared by the repair verbs
@@ -40,6 +41,19 @@ type RefusalError struct {
 }
 
 func (e *RefusalError) Error() string { return e.Message }
+
+// statusRefusal words a refusal that names the ticket's status and, for a
+// pause, the table verb to use instead. rendered and tail are the fallback when
+// the ticket is not paused or its file does not parse.
+func statusRefusal(id, path, rendered, tail string) string {
+	if t, err := schema.ParseTicket(path); err == nil {
+		if verb := t.RecoveryVerb(); verb != "" {
+			return fmt.Sprintf("ticket %s is %s; use %s", id, t.Describe(), verb)
+		}
+		return fmt.Sprintf("ticket %s is %s%s", id, t.Describe(), tail)
+	}
+	return fmt.Sprintf("ticket %s is %s%s", id, rendered, tail)
+}
 
 // FindEpicTicket loads the epic at epicPath and returns it with ticket id.
 func FindEpicTicket(epicPath, id string) (tickets.Epic, tickets.Ticket, error) {

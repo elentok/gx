@@ -82,6 +82,24 @@ func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 	}
 }
 
+func TestRepair_ResumeAndUnparkRefusalsNameStatusAndVerb(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "14", "broken", servertest.TicketOpts{PauseReason: string(schema.PauseIterationError)})
+	servertest.WriteTicket(t, store, "proj", "epic-a", "15", "plain", "")
+	h := servertest.StartWithStore(t, store)
+	for _, verb := range []string{"resume", "unpark"} {
+		for _, c := range []struct{ id, want string }{
+			{"14", "ticket 14 is paused (repair: iteration-error); use retry"},
+			{"15", "ticket 15 is open, not asking"},
+		} {
+			res, err := h.Client.Repair(context.Background(), verb, server.RepairRequest{Address: "proj:epic-a/" + c.id})
+			if err != nil || !res.Refused || res.Message != c.want {
+				t.Errorf("%s %s: %+v, %v; want refusal %q", verb, c.id, res, err, c.want)
+			}
+		}
+	}
+}
+
 // pausedIteration leaves ticket 01 paused as kind with an iteration branch,
 // committed to when commit is set, and returns the ticket's path.
 func pausedIteration(t *testing.T, kind string, commit bool) (*servertest.Harness, string) {
