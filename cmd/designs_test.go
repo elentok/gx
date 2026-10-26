@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -95,6 +96,55 @@ func TestDesignsDelete_RefusalIsAnErrorAndSuccessDeletes(t *testing.T) {
 	}
 	if _, err := os.Stat(bare); !os.IsNotExist(err) {
 		t.Errorf("epic dir still there: %v", err)
+	}
+}
+
+func TestDesignsWorktree_JSON(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
+	mapTicket := filepath.Join(store, "proj", "map", "ticket.md")
+	if err := os.WriteFile(mapTicket, []byte("---\nkind: map\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	repo := testutil.TempRepo(t)
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
+
+	run := func() server.DesignWorktreeResult {
+		t.Helper()
+		var out bytes.Buffer
+		if err := runDesignsWorktree(context.Background(), h.Client, &out, true, server.DesignWorktreeRequest{Epic: "proj:map"}); err != nil {
+			t.Fatal(err)
+		}
+		var res server.DesignWorktreeResult
+		if err := json.Unmarshal(out.Bytes(), &res); err != nil {
+			t.Fatalf("output %q: %v", out.String(), err)
+		}
+		return res
+	}
+	first := run()
+	if first.Refused || first.Path == "" || first.Note != "" || first.AfterBranch {
+		t.Fatalf("first = %+v", first)
+	}
+	for dir, content := range map[string]string{first.Path: "design\n", repo: "trunk\n"} {
+		if err := os.WriteFile(filepath.Join(dir, "c.txt"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		for _, args := range [][]string{{"add", "c.txt"}, {"commit", "-m", "change"}} {
+			if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+				t.Fatalf("git %v: %v\n%s", args, err, out)
+			}
+		}
+	}
+	if res := run(); res.Path != first.Path || !strings.Contains(res.Note, "conflict") {
+		t.Errorf("after conflict = %+v", res)
+	}
+
+	if err := os.WriteFile(mapTicket, []byte("---\nkind: map\ndesign_step: branch\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if res := run(); !res.AfterBranch || res.Path != repo {
+		t.Errorf("after Branch = %+v, want trunk checkout %s", res, repo)
 	}
 }
 

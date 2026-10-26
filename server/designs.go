@@ -280,16 +280,9 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	if !ok || project == "" || epic == "" || (strings.Contains(req.Epic, "/") && !designTicketRe.MatchString(ticket)) {
 		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic or project:epic/NN)", req.Epic)), nil
 	}
-	dir, err := s.projectDir(project)
-	if err != nil {
-		return sessionRefusal(ReasonDesignUnknownEpic, err.Error()), nil
-	}
-	epicDir := filepath.Join(dir, epic)
-	if fi, err := os.Stat(epicDir); err != nil || !fi.IsDir() {
-		return sessionRefusal(ReasonDesignUnknownEpic, fmt.Sprintf("no epic %s", epicAddr)), nil
-	}
-	if !tickets.IsMapEpic(epicDir) {
-		return sessionRefusal(ReasonDesignNotMapEpic, fmt.Sprintf("%s is not a map epic", epicAddr)), nil
+	dir, reason, msg := s.mapEpicDir(project, epic)
+	if reason != "" {
+		return sessionRefusal(reason, msg), nil
 	}
 
 	mu, _ := s.designOpens.LoadOrStore(epicAddr, &sync.Mutex{})
@@ -345,6 +338,100 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		Harness:      s.settings.Load().chatHarness(),
 		rebaseNote:   note,
 	})
+}
+
+// mapEpicDir returns the project dir of a map epic, or the refusal reason and
+// message when the project or epic is unknown or the epic is not a map.
+func (s *Server) mapEpicDir(project, epic string) (dir, reason, msg string) {
+	dir, err := s.projectDir(project)
+	if err != nil {
+		return "", ReasonDesignUnknownEpic, err.Error()
+	}
+	epicDir := filepath.Join(dir, epic)
+	if fi, err := os.Stat(epicDir); err != nil || !fi.IsDir() {
+		return "", ReasonDesignUnknownEpic, fmt.Sprintf("no epic %s:%s", project, epic)
+	}
+	if !tickets.IsMapEpic(epicDir) {
+		return "", ReasonDesignNotMapEpic, fmt.Sprintf("%s:%s is not a map epic", project, epic)
+	}
+	return dir, "", ""
+}
+
+// DesignWorktreeRequest is the body of POST /v1/designs/worktree. Epic is a map
+// epic's address ("project:epic"). ExcludeSession is the caller's own gx
+// session, which does not count as another live design session in the rebase.
+type DesignWorktreeRequest struct {
+	Epic           string `json:"epic"`
+	ExcludeSession string `json:"exclude_session,omitempty"`
+}
+
+// DesignWorktreeResult answers designs worktree. Path is the Design's worktree,
+// or the trunk checkout once AfterBranch. Note says why the rebase was skipped;
+// it is empty when the rebase ran. A refusal is a result, as for designs open.
+type DesignWorktreeResult struct {
+	Path        string `json:"path,omitempty"`
+	Note        string `json:"note,omitempty"`
+	AfterBranch bool   `json:"after_branch"`
+	Refused     bool   `json:"refused,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	Message     string `json:"message,omitempty"`
+}
+
+func designWorktreeRefusal(reason, msg string) DesignWorktreeResult {
+	return DesignWorktreeResult{Refused: true, Reason: reason, Message: msg}
+}
+
+func (s *Server) designWorktreeWrite(w http.ResponseWriter, r *http.Request) {
+	var req DesignWorktreeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := s.designWorktree(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
+// designWorktree is designs open without the session: it ensures and rebases
+// the map's design worktree under the same rules, or after Branch returns the
+// trunk checkout and makes nothing.
+func (s *Server) designWorktree(req DesignWorktreeRequest) (DesignWorktreeResult, error) {
+	project, epic, ok := strings.Cut(req.Epic, ":")
+	if !ok || project == "" || epic == "" || strings.Contains(epic, "/") {
+		return designWorktreeRefusal(ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic)", req.Epic)), nil
+	}
+	dir, reason, msg := s.mapEpicDir(project, epic)
+	if reason != "" {
+		return designWorktreeRefusal(reason, msg), nil
+	}
+
+	mu, _ := s.designOpens.LoadOrStore(req.Epic, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	defer mu.(*sync.Mutex).Unlock()
+
+	if msg := designClash(dir, project, epic); msg != "" {
+		return designWorktreeRefusal(ReasonDesignBranchClash, msg), nil
+	}
+	past, err := s.afterBranch(project, epic)
+	if err != nil {
+		return DesignWorktreeResult{}, err
+	}
+	if past {
+		s.cleanupDesign(project, epic)
+		path := tickets.TrunkCheckout(s.cfg.TicketStore, project)
+		if path == "" {
+			return DesignWorktreeResult{}, fmt.Errorf("no trunk checkout for project %s", project)
+		}
+		return DesignWorktreeResult{Path: path, AfterBranch: true}, nil
+	}
+	path, err := s.ensureDesignWorktree(project, epic)
+	if err != nil {
+		return DesignWorktreeResult{}, err
+	}
+	return DesignWorktreeResult{Path: path, Note: s.rebaseDesign(project, epic, path, req.ExcludeSession)}, nil
 }
 
 // openNewDesign starts a design session for an idea with no map yet: Epic is

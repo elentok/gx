@@ -481,6 +481,15 @@ func (c *Client) DeleteDesign(ctx context.Context, req server.DesignDeleteReques
 	return res, err
 }
 
+// DesignWorktree returns a map's design worktree, made and rebased if needed,
+// or the trunk checkout after Branch. A refusal is a result (Refused set), not
+// an error.
+func (c *Client) DesignWorktree(ctx context.Context, req server.DesignWorktreeRequest) (server.DesignWorktreeResult, error) {
+	var res server.DesignWorktreeResult
+	err := c.post(ctx, "/v1/designs/worktree", req, &res)
+	return res, err
+}
+
 // FixAgent starts a fix agent for a needs-repair ticket. A refusal is a
 // result (Refused set), not an error.
 func (c *Client) FixAgent(ctx context.Context, req server.FixAgentRequest) (server.FixAgentResult, error) {

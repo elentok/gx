@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/spf13/cobra"
 )
@@ -14,7 +17,61 @@ import (
 // on a map epic.
 func newDesignsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "designs", Short: "map epics' design sessions owned by the server", Args: cobra.NoArgs}
-	cmd.AddCommand(newDesignsOpenCmd(), newDesignsDeleteCmd())
+	cmd.AddCommand(newDesignsOpenCmd(), newDesignsDeleteCmd(), newDesignsWorktreeCmd())
+	return cmd
+}
+
+// runDesignsWorktree never starts the server: a dead socket is a refusal. The
+// caller's own gx session, when set, is left out of the rebase's live check.
+func runDesignsWorktree(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.DesignWorktreeRequest) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	res, err := cl.DesignWorktree(ctx, req)
+	switch {
+	case apiclient.IsNotRunning(err):
+		res = server.DesignWorktreeResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+	case err != nil:
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	if jsonOut {
+		stamped, err := stampProvenance(res, viaServer, callerActor(os.Getwd))
+		if err != nil {
+			return err
+		}
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		return enc.Encode(stamped)
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	if _, err := fmt.Fprintln(w, res.Path); err != nil {
+		return err
+	}
+	if res.Note == "" {
+		return nil
+	}
+	_, err = fmt.Fprintln(w, res.Note)
+	return err
+}
+
+func newDesignsWorktreeCmd() *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "worktree <project:epic>",
+		Short: "print the map's design worktree, made and rebased onto trunk if needed (the trunk checkout after Branch)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			req := server.DesignWorktreeRequest{Epic: args[0], ExcludeSession: os.Getenv(nativerunner.AgentSessionEnv)}
+			return runDesignsWorktree(c.Context(), cl, c.OutOrStdout(), jsonOut, req)
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	return cmd
 }
 

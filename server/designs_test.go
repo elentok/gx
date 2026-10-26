@@ -312,6 +312,110 @@ func TestDesignsOpen_RefusesAnEpicNamedLikeTheDesignBranch(t *testing.T) {
 	}
 }
 
+func (f designsFixture) worktree(t *testing.T, epic, exclude string) server.DesignWorktreeResult {
+	t.Helper()
+	res, err := f.h.Client.DesignWorktree(f.ctx, server.DesignWorktreeRequest{Epic: epic, ExcludeSession: exclude})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+// commitOnTrunk commits file=content on the trunk checkout.
+func (f designsFixture) commitOnTrunk(t *testing.T, file, content string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(f.repo, file), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, f.repo, "add", file)
+	gitOut(t, f.repo, "commit", "-m", "trunk change")
+}
+
+func TestDesignsWorktree_ReturnsTheOpenPathAndRebasesOnAMovedTrunk(t *testing.T) {
+	f := startDesigns(t)
+	first := f.worktree(t, "proj:map", "")
+	if first.Refused || first.Note != "" || first.AfterBranch {
+		t.Fatalf("worktree = %+v", first)
+	}
+	if gitOut(t, first.Path, "rev-parse", "--abbrev-ref", "HEAD") != "map-design" {
+		t.Errorf("path %s is not the map-design worktree", first.Path)
+	}
+	f.commitOnTrunk(t, "t.txt", "trunk\n")
+	second := f.worktree(t, "proj:map", "")
+	if second.Path != first.Path || second.Note != "" {
+		t.Errorf("worktree = %+v, want path %s and no note", second, first.Path)
+	}
+	if gitOut(t, second.Path, "merge-base", "--is-ancestor", gitOut(t, f.repo, "rev-parse", "HEAD"), "HEAD") != "" {
+		t.Errorf("trunk is not an ancestor of map-design")
+	}
+	opened := f.open(t, "proj:map", false)
+	if dir, _ := readMeta(t, f.h, opened.Session.ID)["dir"].(string); dir != first.Path {
+		t.Errorf("open dir = %q, want %q", dir, first.Path)
+	}
+}
+
+func TestDesignsWorktree_ConflictReturnsTheNote(t *testing.T) {
+	f := startDesigns(t)
+	dir := f.worktree(t, "proj:map", "").Path
+	if err := os.WriteFile(filepath.Join(dir, "c.txt"), []byte("design\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, dir, "add", "c.txt")
+	gitOut(t, dir, "commit", "-m", "design change")
+	f.commitOnTrunk(t, "c.txt", "trunk\n")
+	res := f.worktree(t, "proj:map", "")
+	if res.Path != dir || !strings.Contains(res.Note, "not rebased") || !strings.Contains(res.Note, "conflict") {
+		t.Errorf("worktree = %+v", res)
+	}
+}
+
+func TestDesignsWorktree_AfterBranchReturnsTheTrunkCheckoutAndMakesNothing(t *testing.T) {
+	f := startDesignsAt(t, "branch")
+	res := f.worktree(t, "proj:map", "")
+	if res.Refused || res.Path != f.repo || !res.AfterBranch || res.Note != "" {
+		t.Errorf("worktree = %+v, want trunk checkout %s after Branch", res, f.repo)
+	}
+	if out := gitOut(t, f.repo, "branch", "--list", "map-design"); out != "" {
+		t.Errorf("map-design branch made: %q", out)
+	}
+}
+
+func TestDesignsWorktree_Refusals(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "map-design", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := startDesignsIn(t, store)
+	for _, tc := range []struct{ epic, reason string }{
+		{"proj:plain", server.ReasonDesignNotMapEpic},
+		{"proj:nope", server.ReasonDesignUnknownEpic},
+		{"proj:map", server.ReasonDesignBranchClash},
+		{"proj", server.ReasonSessionBadRequest},
+	} {
+		if res := f.worktree(t, tc.epic, ""); !res.Refused || res.Reason != tc.reason || res.Path != "" {
+			t.Errorf("worktree %s = %+v, want %s", tc.epic, res, tc.reason)
+		}
+	}
+	if gitOut(t, f.repo, "branch", "--list", "map-design") != "" {
+		t.Errorf("branch map-design was created")
+	}
+}
+
+func TestDesignsWorktree_LeavesOutTheCallersSessionFromTheLiveCheck(t *testing.T) {
+	f := startDesigns(t)
+	id := f.open(t, "proj:map", false).Session.ID
+	f.commitOnTrunk(t, "t.txt", "trunk\n")
+	if res := f.worktree(t, "proj:map", ""); !strings.Contains(res.Note, "live") {
+		t.Errorf("note = %q, want another-live-session note", res.Note)
+	}
+	if res := f.worktree(t, "proj:map", id); res.Note != "" {
+		t.Errorf("note = %q, want a clean rebase", res.Note)
+	}
+}
+
 func TestDesignsOpen_ReturnsTheNewestLiveSession(t *testing.T) {
 	f := startDesigns(t)
 	mk := func() string {
