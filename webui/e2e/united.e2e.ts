@@ -154,3 +154,34 @@ test("19. Follow-ups triage", async ({ page, start }) => {
   await first.getByRole("link", { name: "follow-ups", exact: true }).click();
   await expect(page).toHaveURL(/#\/e\/demo:follow-ups$/);
 });
+
+test("28. AFK toggle and Paused chip", async ({ page, start }) => {
+  const fixture = await start("ready");
+  const afk = page.getByRole("button", nav("AFK"));
+  await expect(afk).toBeVisible();
+  await expect(page.getByText("Paused", { exact: true })).toHaveCount(0);
+
+  await fixture.cli("server", "queue", "pause");
+  await expect(page.getByText("Paused", { exact: true })).toBeVisible();
+
+  await expect(afk).toHaveAttribute("aria-pressed", "false");
+  await afk.click();
+  await expect(afk).toHaveAttribute("aria-pressed", "true");
+  // `gx afk` with no argument flips the server state, so "afk off" shows the click had turned it on.
+  expect(await fixture.cli("afk")).toContain("afk off");
+});
+
+test("29. Grid columns at desktop width", async ({ page, start }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await start("united");
+  const first = await card(page, "paused-epic").boundingBox();
+  const second = await card(page, "question-epic").boundingBox();
+  expect(second!.y).toBe(first!.y);
+  expect(second!.x).toBeGreaterThan(first!.x);
+});
+
+test("30. Open epic on a deadlock card", async ({ page, start }) => {
+  await start("united");
+  await card(page, "deadlock-epic").getByRole("button", nav("Open epic")).click();
+  await expect(page).toHaveURL(/#\/e\/demo:deadlock-epic$/);
+});

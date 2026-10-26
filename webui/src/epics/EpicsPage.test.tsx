@@ -125,6 +125,16 @@ test("Finished shows the first recently-finished cards, the count follows", asyn
   expect(screen.queryByRole("link", { name: "done-b" })).toBeNull();
 });
 
+test("a few hundred finished epics load, show the cap, and filter past it", async () => {
+  const many = Array.from({ length: 300 }, (_, i) => row(`done-${i}`, { state: "finished", section: "finished" }));
+  await loaded(listOf(many, { recently_finished: 20 }));
+  fireEvent.click(toggle("Finished"));
+  expect(screen.getAllByRole("link", { name: /^done-/ })).toHaveLength(20);
+
+  fireEvent.change(await filterBox(), { target: { value: "done-29" } });
+  expect(screen.getAllByRole("link", { name: /^done-/ })).toHaveLength(11);
+});
+
 test("the filter opens a matching collapsed section, hides the others, and reaches past the cap", async () => {
   await loaded({ ...mixed(), recently_finished: 1 });
   fireEvent.change(await filterBox(), { target: { value: "DONE-B" } });

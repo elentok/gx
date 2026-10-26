@@ -288,3 +288,20 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Scenario:** `united`
 - **Steps:** open Ready to design; click Design on the `design-new` card.
 - **Pass:** the page is `#/d/demo:design-new` and `gx agents list` names `design-new`.
+
+## 28. AFK toggle and Paused chip
+
+- **Scenario:** `ready`
+- **Steps:** run `gx server queue pause`; click AFK in the top bar.
+- **Pass:** the "Paused" chip shows; AFK turns pressed and `gx afk` (a flip) reports `afk off`, so the server was on.
+
+## 29. Grid columns at desktop width
+
+- **Scenario:** `united`, viewport 1400 px wide.
+- **Pass:** two cards of Needs you sit on the same row, side by side.
+
+## 30. Open epic on a deadlock card
+
+- **Scenario:** `united`
+- **Steps:** click Open epic on the `deadlock-epic` card.
+- **Pass:** the page is `#/e/demo:deadlock-epic`.
