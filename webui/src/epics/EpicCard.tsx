@@ -9,6 +9,7 @@ import {
   CardActionOpenEpic,
   CardActionOpenTicket,
   CardActionQueue,
+  CardActionStashMerge,
   CardActionTriage,
   CardKindDesign,
   CardKindImplementation,
@@ -24,7 +25,7 @@ import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { EpicActionButton } from "./EpicActionButton";
 import { titleHref } from "./cardLinks";
 import { mergeToast } from "./MergeButton";
-import { postEpicMerge, postQueueAdd, type PostEpicWrite } from "./queue";
+import { postEpicMerge, postEpicStashMerge, postQueueAdd, type PostEpicWrite } from "./queue";
 import { RING_KIND, isCreatingTickets, isLive, needsYouTone, ringProgress, ringTone } from "./ring";
 import { TriageDialog } from "./TriageDialog";
 
@@ -52,6 +53,7 @@ function useCountdown(endsAt: string | undefined): number | undefined {
 export interface CardWrites {
   queue?: PostEpicWrite;
   merge?: PostEpicWrite;
+  stashMerge?: PostEpicWrite;
   openDesign?: OpenDesign;
   /** Goes to a hash route. */
   navigate?: (href: string) => void;
@@ -70,7 +72,7 @@ function ActionButtons({
   writes: CardWrites;
   onChanged: () => void;
 }) {
-  const { queue = postQueueAdd, merge = postEpicMerge, openDesign = postOpenDesign, navigate = goTo } = writes;
+  const { queue = postQueueAdd, merge = postEpicMerge, stashMerge = postEpicStashMerge, openDesign = postOpenDesign, navigate = goTo } = writes;
   const [triage, setTriage] = useState(false);
   const { run, pending } = useWrite();
 
@@ -79,17 +81,18 @@ function ActionButtons({
   function button(a: CardAction, i: number) {
     const target = a.target ?? row.address;
     const emphasis = i === 0 ? "main" : "secondary";
-    if (a.kind === CardActionQueue || a.kind === CardActionMerge) {
+    if (a.kind === CardActionQueue || a.kind === CardActionMerge || a.kind === CardActionStashMerge) {
       const isQueue = a.kind === CardActionQueue;
+      const isStash = a.kind === CardActionStashMerge;
       return (
         <EpicActionButton
           key={i}
           address={target}
           state={row.state}
-          post={isQueue ? queue : merge}
+          post={isQueue ? queue : isStash ? stashMerge : merge}
           label={a.label}
           pendingLabel={isQueue ? "Queueing…" : "Merging…"}
-          success={isQueue ? undefined : (res) => mergeToast(target, res)}
+          success={isQueue || isStash ? undefined : (res) => mergeToast(target, res)}
           onDone={onChanged}
         />
       );

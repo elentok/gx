@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { EpicDetail, EpicList, EpicListRow } from "../generated/server";
 import { appRoutes } from "../routes";
@@ -368,6 +368,43 @@ test("the land-block reason is a notice under the bar only while paused; Merge f
   await statsOf();
   expect(screen.queryByText("stale reason")).toBeNull();
   expect(screen.queryByRole("button", { name: "Merge" })).toBeNull();
+});
+
+test("a dirty-trunk pause lists every clashing file and offers both verbs with tooltips", async () => {
+  render("/e/gx:blog-impl", [], "loop", {
+    detail: {
+      state: "paused",
+      land_block_kind: "dirty-trunk",
+      land_block_reason: "Trunk has local changes",
+      land_block_files: ["a.go", "b/c.go", "d.go", "e.go"],
+      actions: ["stash-merge", "merge"],
+      action_info: {
+        "stash-merge": { label: "Stash, merge and restore", tooltip: "Set your changes aside." },
+        merge: { label: "Merge again", tooltip: "Merge the ticket's commits again." },
+      },
+    },
+  });
+  const files = await screen.findByTestId("land-block-files");
+  expect(Array.from(files.querySelectorAll("li")).map((li) => li.textContent)).toEqual(["a.go", "b/c.go", "d.go", "e.go"]);
+  expect(screen.getByRole("button", { name: "Stash, merge and restore" }).getAttribute("title")).toBe("Set your changes aside.");
+  expect(screen.getByRole("button", { name: "Merge again" }).getAttribute("title")).toBe("Merge the ticket's commits again.");
+});
+
+test("the stash button posts to its route with the state token", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ merged: true }), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    render("/e/gx:blog-impl", [], "loop", {
+      detail: { state: "paused", land_block_reason: "Trunk has local changes", actions: ["stash-merge", "merge"] },
+    });
+    fireEvent.click(await screen.findByRole("button", { name: "Stash, merge and restore" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [path, init] = fetchMock.mock.calls[0];
+    expect(path).toBe("/v1/epics/stash-merge");
+    expect(JSON.parse(init.body)).toEqual({ address: "gx:blog-impl", state: "paused" });
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 const ringOf = () => document.querySelector("[data-kind][data-tone]") as HTMLElement;

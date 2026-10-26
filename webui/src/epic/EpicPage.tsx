@@ -6,10 +6,10 @@ import type { OpenDesign } from "../design/open";
 import { StartDesignButton } from "../design/SessionControls";
 import { useWide } from "../design/useWide";
 import { hasDesignSession, liveSessions } from "../design/view";
-import type { EpicDetailRow, EpicListRow, SessionInfo } from "../generated/server";
+import { ActionMerge, ActionStashMerge, type EpicDetailRow, type EpicListRow, type SessionInfo } from "../generated/server";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { pageRing } from "./ring";
-import { MergeButton, isMergeable } from "../epics/MergeButton";
+import { MergeButton, StashMergeButton, isMergeable } from "../epics/MergeButton";
 import { designHref, epicHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
 import { useEpicList, type FetchEpicList } from "../epics/list";
@@ -162,7 +162,24 @@ function EpicBar({
           {detail.kind === "map" && <DesignSessionButton detail={detail} open={openDesign} />}
           {detail.queueable && <QueueButton address={address} state={detail.state ?? ""} onQueued={onChanged} />}
           {isMergeable(detail.state, !!detail.land_block_reason) && (
-            <MergeButton address={address} state={detail.state ?? ""} onMerged={onChanged} />
+            <>
+              {detail.actions?.includes(ActionStashMerge) && (
+                <StashMergeButton
+                  address={address}
+                  state={detail.state ?? ""}
+                  onMerged={onChanged}
+                  label={detail.action_info?.[ActionStashMerge]?.label}
+                  tooltip={detail.action_info?.[ActionStashMerge]?.tooltip}
+                />
+              )}
+              <MergeButton
+                address={address}
+                state={detail.state ?? ""}
+                onMerged={onChanged}
+                label={detail.action_info?.[ActionMerge]?.label}
+                tooltip={detail.action_info?.[ActionMerge]?.tooltip}
+              />
+            </>
           )}
         </Box>
       </Box>
@@ -170,6 +187,13 @@ function EpicBar({
         <Text data-reason mt="2" fontSize="sm" color="tone.paused.fg">
           {detail.land_block_reason}
         </Text>
+      )}
+      {detail.state === "paused" && (detail.land_block_files?.length ?? 0) > 0 && (
+        <Box as="ul" data-testid="land-block-files" mt="1" pl="5" fontSize="sm" fontFamily="mono" color="text.muted">
+          {detail.land_block_files?.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </Box>
       )}
     </Box>
   );

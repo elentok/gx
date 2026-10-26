@@ -12,16 +12,17 @@ interface Props {
   label: string;
   tone?: Tone;
   pendingLabel: string;
+  tooltip?: string;
   /** A toast for a success the page does not show by itself. */
   success?: (res: EpicWriteResult) => ToastSpec | undefined;
   onDone: () => void;
 }
 
 /** A POST button for an epic write: it sends the state the view shows; the outcome shows in a toast. */
-export function EpicActionButton({ address, state, post, label, tone = "running", pendingLabel, success, onDone }: Props) {
+export function EpicActionButton({ address, state, post, label, tone = "running", pendingLabel, tooltip, success, onDone }: Props) {
   const { run, pending } = useWrite();
   return (
-    <Button tone={tone} disabled={pending} onClick={() => run(() => post({ address, state }), { onDone, success })}>
+    <Button tone={tone} title={tooltip} disabled={pending} onClick={() => run(() => post({ address, state }), { onDone, success })}>
       {pending && <Spinner size="sm" />}
       {pending ? pendingLabel : label}
     </Button>

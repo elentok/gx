@@ -50,10 +50,11 @@ test("the title is the only link and points at the epic page", () => {
   expect(links[0].getAttribute("href")).toBe("#/e/gx:blog");
 });
 
-test("a dirty-trunk row renders both buttons, and the not-yet-wired Stash kind does not crash", () => {
+test("a dirty-trunk row renders both buttons and the reason, with no file list", () => {
   renderThemed(
     <EpicCard
       row={needsYou({
+        reason: "Trunk has local changes",
         actions: [
           { kind: "stash-merge", label: "Stash, merge and restore", target: "gx:blog" },
           { kind: "merge", label: "Merge again", target: "gx:blog" },
@@ -63,6 +64,18 @@ test("a dirty-trunk row renders both buttons, and the not-yet-wired Stash kind d
   );
   expect(screen.getByRole("button", { name: "Stash, merge and restore" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Merge again" })).toBeTruthy();
+  expect(text(screen.getByTestId("reason"))).toBe("Trunk has local changes");
+  expect(screen.queryByTestId("land-block-files")).toBeNull();
+});
+
+test("the stash button posts through the stash write with the state token", async () => {
+  const stashMerge = vi.fn().mockResolvedValue({});
+  const onChanged = vi.fn();
+  const r = needsYou({ actions: [{ kind: "stash-merge", label: "Stash, merge and restore", target: "gx:blog" }] });
+  renderThemed(<EpicCard row={r} writes={{ stashMerge }} onChanged={onChanged} />);
+  fireEvent.click(screen.getByRole("button", { name: "Stash, merge and restore" }));
+  await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  expect(stashMerge).toHaveBeenCalledWith({ address: "gx:blog", state: "paused" });
 });
 
 test("title targets: one-off ticket, follow-ups epic, joined card's active part, pending Design", () => {

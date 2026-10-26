@@ -123,6 +123,8 @@ type EpicDetail struct {
 	// Actions are the verbs of a Merge blocked epic's pause, from the pause-to-verb
 	// table, in display order.
 	Actions []string `json:"actions,omitempty"`
+	// ActionInfo gives each entry of Actions its button label and tooltip.
+	ActionInfo map[string]ActionInfo `json:"action_info,omitempty"`
 	// Steps is a map epic's Progress, and ImplAddress the address of its impl epic once it exists.
 	Steps       []MapStep `json:"steps,omitempty"`
 	ImplAddress string    `json:"impl_address,omitempty"`
@@ -246,6 +248,7 @@ func (s *Server) buildLoopDetail(root rootRef, e tickets.Epic, now time.Time) Ep
 	if epicMergeBlocked(e) {
 		d.MergeBlockKind, d.MergeBlockReason, d.MergeBlockFiles = e.MergeBlockKind, e.MergeBlockReason, e.MergeBlockFiles
 		d.Actions = mergeBlockActions(e.MergeBlockKind)
+		d.ActionInfo = actionInfo(d.Actions)
 	}
 	for _, t := range e.Tickets {
 		d.Rows = append(d.Rows, s.rowFor(root, e, t))

@@ -30,3 +30,5 @@ export const postQueueAdd: PostEpicWrite = (body) => postEpicWrite("/v1/queue/ad
 
 /** The merge route takes the same address and state token as a queue add. */
 export const postEpicMerge: PostEpicWrite = (body) => postEpicWrite("/v1/epics/merge", body);
+
+export const postEpicStashMerge: PostEpicWrite = (body) => postEpicWrite("/v1/epics/stash-merge", body);

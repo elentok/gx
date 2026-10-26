@@ -617,6 +617,10 @@ export interface EpicDetail {
    */
   actions?: string[];
   /**
+   * ActionInfo gives each entry of Actions its button label and tooltip.
+   */
+  action_info?: { [key: string]: ActionInfo};
+  /**
    * Steps is a map epic's Progress, and ImplAddress the address of its impl epic once it exists.
    */
   steps?: MapStep[];

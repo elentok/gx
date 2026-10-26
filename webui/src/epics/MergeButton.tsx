@@ -1,7 +1,7 @@
 import { epicHref, ticketHref } from "../hrefs";
 import type { ToastSpec } from "../ui/toaster";
 import { EpicActionButton } from "./EpicActionButton";
-import { postEpicMerge, type EpicWriteResult } from "./queue";
+import { postEpicMerge, postEpicStashMerge, type EpicWriteResult } from "./queue";
 
 /** The states a person can merge from: a done epic whose merge has not started, or whose merge paused. */
 export const isMergeable = (state: string | undefined, mergeBlocked: boolean) =>
@@ -27,16 +27,40 @@ export function mergeToast(address: string, res: EpicWriteResult): ToastSpec {
   return { type: "success", title: "Epic merged" };
 }
 
-export function MergeButton({ address, state, onMerged }: { address: string; state: string; onMerged: () => void }) {
+interface MergeButtonProps {
+  address: string;
+  state: string;
+  onMerged: () => void;
+  label?: string;
+  tooltip?: string;
+}
+
+export function MergeButton({ address, state, onMerged, label = "Merge", tooltip }: MergeButtonProps) {
   return (
     <EpicActionButton
       address={address}
       state={state}
       post={postEpicMerge}
-      label="Merge"
+      label={label}
       tone="done"
       pendingLabel="Merging…"
+      tooltip={tooltip}
       success={(res) => mergeToast(address, res)}
+      onDone={onMerged}
+    />
+  );
+}
+
+/** "Stash, merge and restore": its accepted outcomes show in place (the epic refetches), so only a refusal toasts. */
+export function StashMergeButton({ address, state, onMerged, label = "Stash, merge and restore", tooltip }: MergeButtonProps) {
+  return (
+    <EpicActionButton
+      address={address}
+      state={state}
+      post={postEpicStashMerge}
+      label={label}
+      pendingLabel="Merging…"
+      tooltip={tooltip}
       onDone={onMerged}
     />
   );
