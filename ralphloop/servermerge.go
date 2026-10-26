@@ -317,13 +317,21 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 	p := launchAndPromptParams{
 		Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink(),
 		ScratchDir: o.ScratchDir, EpicName: o.Epic, Ticket: o.Ticket.Identifier, TicketPath: o.Ticket.Path,
+		TicketData: o.Ticket,
 	}
+	vcap := newVerifyCap(p, defaultSmartZone)
 	elapsedMs := 0
 	nudged := false
 	for {
 		st, err := d.Runner.Wait(s, waitStates, smartZonePollMs*time.Millisecond)
 		if err != nil {
 			if errors.Is(err, agentrunner.ErrTimeout) {
+				if vcap != nil {
+					sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
+					if _, err := vcap.checkAndStop(d, p, sessionID); err != nil {
+						return err
+					}
+				}
 				continue
 			}
 			return err
