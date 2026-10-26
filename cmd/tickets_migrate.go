@@ -255,13 +255,23 @@ func mergeChanges(changes, extra []tickets.MigrationChange) []tickets.MigrationC
 // epicLandedUnder reports whether an epic of the tracker root's repo has
 // landed: its branch is gone, or is an ancestor of its target (its base,
 // else trunk). The repo is resolved on first use, so a root with nothing to
-// backfill never needs one.
+// backfill never needs one. A root outside any repo has nothing that could
+// have landed, so no epic counts as landed.
 func epicLandedUnder(root string) func(tickets.Epic) (bool, error) {
 	var repoRoot, trunk string
+	noRepo := false
 	return func(e tickets.Epic) (bool, error) {
+		if noRepo {
+			return false, nil
+		}
 		if repoRoot == "" {
 			var err error
-			if repoRoot, trunk, err = trackerRepo(root); err != nil {
+			repoRoot, trunk, err = trackerRepo(root)
+			if errors.Is(err, git.ErrNoRepo) {
+				noRepo = true
+				return false, nil
+			}
+			if err != nil {
 				return false, fmt.Errorf("backfilling merged_at: %w", err)
 			}
 		}

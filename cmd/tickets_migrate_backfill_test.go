@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,6 +36,25 @@ func TestExecute_TicketsMigrate_BackfillsMergedAtForLandedLoopEpics(t *testing.T
 		}
 		testutil.WriteFile(t, filepath.Join(root, name), "ticket.md", "---\nstatus: open\n"+fm+"---\n")
 	}
+	// Without completed_at, an epic whose tickets all finished takes the last done_at.
+	issue := func(status, doneAt string) string {
+		return "---\nid: \"01\"\nstatus: " + status + "\ntype: grilling\ncommitless: true\n" + doneAt + "---\n\n# x\n"
+	}
+	epics["finished"], epics["unfinished"] = "", ""
+	for name, issues := range map[string][]string{
+		"finished":   {issue("done", "done_at: 2026-03-01T00:00:00Z\n"), issue("done", "done_at: 2026-03-02T00:00:00Z\n")},
+		"unfinished": {issue("done", "done_at: 2026-03-01T00:00:00Z\n"), issue("open", "")},
+	} {
+		dir := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Join(dir, "issues"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		testutil.WriteFile(t, dir, "ticket.md", "---\nstatus: open\n---\n")
+		for i, body := range issues {
+			id := fmt.Sprintf("0%d", i+1)
+			testutil.WriteFile(t, filepath.Join(dir, "issues"), id+"-x.md", strings.Replace(body, `"01"`, `"`+id+`"`, 1))
+		}
+	}
 
 	var stdout bytes.Buffer
 	if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}}); err != nil {
@@ -43,9 +63,10 @@ func TestExecute_TicketsMigrate_BackfillsMergedAtForLandedLoopEpics(t *testing.T
 
 	completedAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	wantMerged := map[string]time.Time{
-		"landed":  completedAt,
-		"gone":    completedAt,
-		"already": time.Date(2026, 5, 6, 7, 8, 9, 0, time.UTC),
+		"landed":   completedAt,
+		"gone":     completedAt,
+		"already":  time.Date(2026, 5, 6, 7, 8, 9, 0, time.UTC),
+		"finished": time.Date(2026, 3, 2, 0, 0, 0, 0, time.UTC),
 	}
 	for name := range epics {
 		got := tickets.LoadEpicTicketMD(filepath.Join(root, name)).MergedAt

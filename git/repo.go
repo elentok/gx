@@ -20,6 +20,9 @@ type Repo struct {
 // ErrTrunkNotResolved is returned by helpers that need Repo.Trunk when it is empty.
 var ErrTrunkNotResolved = errors.New("trunk not resolved")
 
+// ErrNoRepo is returned by IdentifyDir and FindRepo when dir is not inside a git repo.
+var ErrNoRepo = errors.New("no git repo found")
+
 // LinkedWorktreeDir returns the directory where linked worktrees are created.
 // For normal bare repos this is the same as Root; for .bare repos it is the
 // parent directory that contains both .bare/ and the worktrees.
@@ -59,7 +62,7 @@ func FindRepo(dir string) (*Repo, error) {
 func IdentifyDir(dir string) (*DirInfo, error) {
 	gitDir := runAllowFail(dir, []string{"rev-parse", "--git-dir"})
 	if gitDir == "" {
-		return nil, fmt.Errorf("no git repo found at %q", dir)
+		return nil, fmt.Errorf("%w at %q", ErrNoRepo, dir)
 	}
 
 	isInsideWorktree := runAllowFail(dir, []string{"rev-parse", "--is-inside-work-tree"}) == "true"
