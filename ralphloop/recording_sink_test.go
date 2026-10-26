@@ -135,6 +135,7 @@ func (s *recordingSink) SmartZoneCompactStarted(identifier string) {
 }
 func (s *recordingSink) SmartZoneFinishingUp(identifier string) { s.record("SmartZoneFinishingUp") }
 func (s *recordingSink) SmartZoneRecovered(identifier string)   { s.record("SmartZoneRecovered") }
+func (s *recordingSink) VerifyCapStopped(identifier string)     { s.record("VerifyCapStopped") }
 
 func TestRun_EventSink_EmitsLifecycleSequenceForASingleTicket(t *testing.T) {
 	t.Parallel()

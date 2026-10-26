@@ -109,6 +109,10 @@ func (s *recordingEventSink) SmartZoneRecovered(identifier string) {
 	s.record(LiveEvent{Kind: LiveEventSmartZoneRecovered, Identifier: identifier})
 }
 
+func (s *recordingEventSink) VerifyCapStopped(identifier string) {
+	s.record(LiveEvent{Kind: LiveEventVerifyCapStopped, Identifier: identifier})
+}
+
 func (s *recordingEventSink) TicketCleanupFinished(identifier string) {
 	s.record(LiveEvent{Kind: LiveEventTicketCleanupFinished, Identifier: identifier})
 }

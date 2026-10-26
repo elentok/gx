@@ -8,6 +8,27 @@ import (
 
 var _ EventSink = (*ChannelEventSink)(nil)
 
+func TestChannelEventSink_VerifyCapStoppedEmitsOneLiveEvent(t *testing.T) {
+	t.Parallel()
+	s := NewChannelEventSink()
+
+	s.VerifyCapStopped("04a")
+
+	select {
+	case ev := <-s.Events():
+		if ev.Kind != LiveEventVerifyCapStopped || ev.Identifier != "04a" {
+			t.Errorf("event = %+v, want kind verify-cap-stopped identifier 04a", ev)
+		}
+	default:
+		t.Fatal("no event emitted")
+	}
+	select {
+	case ev := <-s.Events():
+		t.Errorf("extra event %+v", ev)
+	default:
+	}
+}
+
 func TestChannelEventSink_ForwardsCallsAsLiveEvents(t *testing.T) {
 	t.Parallel()
 	s := NewChannelEventSink()

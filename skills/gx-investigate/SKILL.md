@@ -43,7 +43,7 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
   gx-local-tracker.md for the field reference.
 - **`<root>/<epic-slug>/run-log.jsonl`** — the append-only scheduler/iteration event log
   (`ralphloop/eventlog.go`). One JSON line per event: `iteration-started`/`-finished`,
-  `cherry-picked`, `conflict-hit`/`-resolved`, `paused-smart-zone`, `paused-rate-limit`,
+  `cherry-picked`, `conflict-hit`/`-resolved`, `paused-smart-zone`, `verify-cap-stopped`, `paused-rate-limit`,
   `needs-answer`, `needs-repair`, `commitless`, `deps-installed`, and **`scheduler-scan`** — one
   entry per `claimNext` pass, listing every ticket's disposition that pass (`claimed`, `frontier`,
   `out-of-scope`, `blocked` + reason, `settled`, `unclaimed`). Query it with

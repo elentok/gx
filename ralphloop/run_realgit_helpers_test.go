@@ -158,6 +158,7 @@ func (s *compactRecoverySink) record(phase string) {
 func (s *compactRecoverySink) SmartZoneCompactStarted(string) { s.record("compact-started") }
 func (s *compactRecoverySink) SmartZoneFinishingUp(string)    { s.record("finishing-up") }
 func (s *compactRecoverySink) SmartZoneRecovered(string)      { s.record("recovered") }
+func (s *compactRecoverySink) VerifyCapStopped(string)        { s.record("verify-cap-stopped") }
 
 // codexRolloutTestEpoch anchors synthetic rollout JSONL timestamps for
 // TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve, mirroring

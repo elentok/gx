@@ -24,6 +24,7 @@ const (
 	ConflictResolved           Type = "conflict-resolved"
 	PausedSmartZone            Type = "paused-smart-zone"
 	SmartZoneRecoveryFailed    Type = "smart-zone-recovery-failed"
+	VerifyCapStopped           Type = "verify-cap-stopped"
 	SmartZoneWaitExpired       Type = "smart-zone-wait-expired"
 	SmartZoneGateReleased      Type = "smart-zone-gate-released"
 	BackgroundTaskGateHeld     Type = "background-task-gate-held"

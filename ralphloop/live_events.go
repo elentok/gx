@@ -32,6 +32,7 @@ const (
 	LiveEventSmartZoneCompactStarted
 	LiveEventSmartZoneFinishingUp
 	LiveEventSmartZoneRecovered
+	LiveEventVerifyCapStopped
 	LiveEventContextOccupancy
 	LiveEventNotificationFailed
 )
@@ -205,6 +206,10 @@ func (s *ChannelEventSink) SmartZoneFinishingUp(identifier string) {
 
 func (s *ChannelEventSink) SmartZoneRecovered(identifier string) {
 	s.emit(LiveEvent{Kind: LiveEventSmartZoneRecovered, Identifier: identifier})
+}
+
+func (s *ChannelEventSink) VerifyCapStopped(identifier string) {
+	s.emit(LiveEvent{Kind: LiveEventVerifyCapStopped, Identifier: identifier})
 }
 
 func (s *ChannelEventSink) ContextOccupancy(identifier string, tokens int) {

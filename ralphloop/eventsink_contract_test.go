@@ -47,6 +47,7 @@ var chatMembershipVerdicts = map[string]bool{
 	"SmartZoneCompactStarted":   false,
 	"SmartZoneFinishingUp":      false,
 	"SmartZoneRecovered":        false,
+	"VerifyCapStopped":          false,
 	"TicketCleanupFinished":     false,
 	"TicketRecovering":          false,
 	"TicketRecovered":           false,

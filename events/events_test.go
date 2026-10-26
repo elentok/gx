@@ -24,6 +24,9 @@ func TestValidate_KindOptionalOnOtherEvents(t *testing.T) {
 	if err := Validate(Submitted, ""); err != nil {
 		t.Errorf("Validate(submitted, \"\") = %v", err)
 	}
+	if err := Validate(VerifyCapStopped, ""); err != nil {
+		t.Errorf("Validate(verify-cap-stopped, \"\") = %v", err)
+	}
 }
 
 func TestValidate_UnknownKindRejected(t *testing.T) {

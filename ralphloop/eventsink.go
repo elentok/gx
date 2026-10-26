@@ -146,6 +146,9 @@ type EventSink interface {
 	// recoverSmartZoneBreach), so a renderer can drop the compacting/
 	// finishing-up phase suffix and go back to its normal running rendering.
 	SmartZoneRecovered(identifier string)
+	// VerifyCapStopped reports that identifier's verify iteration was stopped
+	// for exceeding the verify token cap.
+	VerifyCapStopped(identifier string)
 
 	// TicketCleanupFinished reports that a done ticket's commits had already
 	// merged, but a crash left its worktree/tab/branch behind between marking
@@ -229,6 +232,7 @@ func (noopEventSink) ConflictResolutionStarted(identifier string)               
 func (noopEventSink) SmartZoneCompactStarted(identifier string)                       {}
 func (noopEventSink) SmartZoneFinishingUp(identifier string)                          {}
 func (noopEventSink) SmartZoneRecovered(identifier string)                            {}
+func (noopEventSink) VerifyCapStopped(identifier string)                              {}
 func (noopEventSink) TicketCleanupFinished(identifier string)                         {}
 func (noopEventSink) TicketRecovering(identifier string)                              {}
 func (noopEventSink) TicketRecovered(identifier, epicName, branch, mergedSHA string)  {}
