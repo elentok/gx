@@ -166,6 +166,31 @@ func WorktreeStatusSummary(dir string) (staged, unstaged, untracked int, err err
 	return staged, unstaged, untracked, nil
 }
 
+// UncommittedPaths returns every path with uncommitted changes in the worktree:
+// each untracked file inside a new directory, and both paths of a rename or copy.
+func UncommittedPaths(worktreePath string) ([]string, error) {
+	out, _, err := runNoOptionalLocks(worktreePath, []string{"status", "--porcelain=v1", "--untracked-files=all", "-z"})
+	if err != nil {
+		return nil, err
+	}
+
+	var paths []string
+	parts := strings.Split(out, "\x00")
+	for i := 0; i < len(parts); i++ {
+		tok := parts[i]
+		if len(tok) < 4 || tok[2] != ' ' {
+			continue
+		}
+		paths = append(paths, tok[3:])
+		// In -z format a rename or copy is followed by its source path.
+		if strings.ContainsAny(tok[:2], "RC") && i+1 < len(parts) && parts[i+1] != "" {
+			i++
+			paths = append(paths, parts[i])
+		}
+	}
+	return paths, nil
+}
+
 // UncommittedChanges returns modified, added, deleted, and untracked files in
 // the worktree at the given path.
 func UncommittedChanges(worktreePath string) ([]Change, error) {

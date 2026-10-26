@@ -114,6 +114,32 @@ func TestMergeError_DirtyTrunkNamesOnlyTheClashingFiles(t *testing.T) {
 	}
 }
 
+func TestMergeError_DirtyTrunkListsNewDirectoryFilesAndBothRenamePaths(t *testing.T) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+		testutil.WriteFile(t, p.Cwd, "old.txt", "old")
+		testutil.CommitAll(t, p.Cwd, "add old")
+		for _, root := range []string{p.Cwd, f.repo} {
+			if err := os.Mkdir(filepath.Join(root, "newdir"), 0o755); err != nil && !os.IsExist(err) {
+				t.Fatal(err)
+			}
+		}
+		testutil.WriteFile(t, p.Cwd, "newdir/x.txt", "x")
+		testutil.MustGitExported(t, p.Cwd, "mv", "old.txt", "new.txt")
+		testutil.CommitAll(t, p.Cwd, "work")
+
+		// Main's checkout holds the same paths locally.
+		testutil.WriteFile(t, f.repo, "newdir/x.txt", "local")
+		testutil.WriteFile(t, f.repo, "new.txt", "local")
+	})
+
+	ev := f.pauseRoot(t)
+
+	want := fmt.Sprintf("uncommitted changes on main (%s) clash with new.txt, newdir/x.txt; commit or discard them, then merge again", f.repo)
+	if ev.Message != want {
+		t.Errorf("reason =\n%q\nwant\n%q", ev.Message, want)
+	}
+}
+
 // dirtyTrunkFixture pauses the epic on a dirty trunk; clean undoes the dirt.
 func dirtyTrunkFixture(t *testing.T) (f *schedFixture, clean func()) {
 	t.Helper()

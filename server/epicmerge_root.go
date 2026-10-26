@@ -429,8 +429,8 @@ func mergeFailed(project, epic string, err error) (string, events.Kind) {
 // merge would also change: files that differ between the target's tip and the
 // branch's. An unrelated local change doesn't block a merge, so it isn't listed.
 func clashingFiles(repoRoot, dir, target, branch string) []string {
-	changes, err := git.UncommittedChanges(dir)
-	if err != nil || len(changes) == 0 {
+	dirty, err := git.UncommittedPaths(dir)
+	if err != nil || len(dirty) == 0 {
 		return nil
 	}
 	merged, err := git.DiffNames(repoRoot, "refs/heads/"+target, "refs/heads/"+branch)
@@ -442,9 +442,9 @@ func clashingFiles(repoRoot, dir, target, branch string) []string {
 		touched[p] = true
 	}
 	var clashing []string
-	for _, c := range changes {
-		if touched[c.Path] {
-			clashing = append(clashing, c.Path)
+	for _, p := range dirty {
+		if touched[p] {
+			clashing = append(clashing, p)
 		}
 	}
 	return clashing

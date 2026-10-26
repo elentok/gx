@@ -1,6 +1,7 @@
 package git_test
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -108,6 +109,33 @@ func TestUncommittedChanges_modified(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected modified file.txt, got: %+v", changes)
+	}
+}
+
+func TestUncommittedPaths_listsNewDirectoryFilesAndBothRenamePaths(t *testing.T) {
+	t.Parallel()
+	repoDir := tempBareRepoWithWorktreesLight(t, "feature")
+	wtDir := filepath.Join(repoDir, "feature")
+
+	if err := os.Mkdir(filepath.Join(wtDir, "newdir"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, wtDir, "newdir/a.txt", "a")
+	testutil.WriteFile(t, wtDir, "newdir/b.txt", "b")
+	testutil.MustGitExported(t, wtDir, "mv", "file.txt", "renamed.txt")
+
+	paths, err := git.UncommittedPaths(wtDir)
+	if err != nil {
+		t.Fatalf("UncommittedPaths: %v", err)
+	}
+	got := map[string]bool{}
+	for _, p := range paths {
+		got[p] = true
+	}
+	for _, want := range []string{"newdir/a.txt", "newdir/b.txt", "file.txt", "renamed.txt"} {
+		if !got[want] {
+			t.Errorf("missing %q in %v", want, paths)
+		}
 	}
 }
 
