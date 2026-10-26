@@ -41,6 +41,8 @@ type OneIteration struct {
 	// LeafBase is the identifier of the unmerged sibling whose iteration branch
 	// the ticket starts from; "" starts it at the feature tip.
 	LeafBase string
+	// TargetTip is a merge ticket's merge target SHA at claim; "" for any other ticket.
+	TargetTip string
 	// Model and Effort are what the ticket's conflict-resolution agent starts
 	// under; empty leaves the agent's own default.
 	Model  string

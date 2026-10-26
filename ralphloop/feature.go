@@ -108,12 +108,33 @@ func MergeFinishFault(d Deps, o OneIteration, dir, target string) (events.Kind, 
 	if rebasing {
 		return events.IterationError, fmt.Sprintf("merge agent reported finished with a rebase still in progress in %s; finish or abort it", dir), nil
 	}
-	ok, err := d.IsAncestor(dir, target, o.Epic)
+	// The tip the target had at claim is enough: trunk may have moved since, and
+	// the land step forks a retry merge ticket for that.
+	required := target
+	if tip := claimTargetTip(o); tip != "" {
+		required = tip
+	}
+	ok, err := d.IsAncestor(dir, required, o.Epic)
 	if err != nil {
-		return "", "", fmt.Errorf("checking %s is an ancestor of %s: %w", target, o.Epic, err)
+		return "", "", fmt.Errorf("checking %s is an ancestor of %s: %w", required, o.Epic, err)
 	}
 	if !ok {
-		return events.IterationError, fmt.Sprintf("merge agent reported finished but %s is not an ancestor of %s; rebase it onto %s", target, o.Epic, target), nil
+		return events.IterationError, fmt.Sprintf("merge agent reported finished but %s is not an ancestor of %s; rebase it onto %s", required, o.Epic, target), nil
 	}
 	return "", "", nil
+}
+
+// claimTargetTip is the merge target SHA recorded when the ticket was last
+// claimed, "" when the run log has none (a ticket claimed before it was kept).
+func claimTargetTip(o OneIteration) string {
+	evs, _, err := ReadEvents(o.ScratchDir, o.Epic)
+	if err != nil {
+		return ""
+	}
+	for i := len(evs) - 1; i >= 0; i-- {
+		if ev := evs[i]; ev.Ticket == o.Ticket.Identifier && ev.Type == string(events.IterationStarted) && ev.TargetTip != "" {
+			return ev.TargetTip
+		}
+	}
+	return ""
 }

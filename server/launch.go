@@ -142,7 +142,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	}
 	s.logEvent(ticket, ralphloop.Event{
 		Type: string(events.IterationStarted), Agent: agent, Label: label, Cwd: cwd,
-		AgentSession: session.SessionID, Path: path,
+		AgentSession: session.SessionID, Path: path, TargetTip: one.TargetTip,
 	})
 	run := Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
 	return run, nil

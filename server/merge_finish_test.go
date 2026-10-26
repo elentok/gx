@@ -70,9 +70,27 @@ func TestMergeFinish_FixerCommitOnTheEpicStillFinishesDone(t *testing.T) {
 	}
 }
 
-func TestMergeFinish_TargetNotAnAncestorPausesStuck(t *testing.T) {
-	f, tk := runMergeTicket(t, func(f *schedFixture, _ string) string {
+// dropClaimTip resets the epic in cwd onto a parentless commit, so it no longer
+// holds the trunk tip the merge ticket was claimed at.
+func dropClaimTip(t *testing.T, cwd string) {
+	t.Helper()
+	orphan := gitOut(t, cwd, "commit-tree", "HEAD^{tree}", "-m", "orphan")
+	gitOut(t, cwd, "reset", "--hard", strings.TrimSpace(orphan))
+}
+
+func TestMergeFinish_TrunkMovedPastTheClaimTipStillFinishesDone(t *testing.T) {
+	_, tk := runMergeTicket(t, func(f *schedFixture, _ string) string {
 		advanceTrunk(t, f, "trunk.txt", "moved on")
+		return "finished"
+	})
+	if tk.Status != schema.StatusDone {
+		t.Errorf("status = %s, want done", tk.Status)
+	}
+}
+
+func TestMergeFinish_EpicLackingTheClaimTipPausesStuck(t *testing.T) {
+	f, tk := runMergeTicket(t, func(_ *schedFixture, cwd string) string {
+		dropClaimTip(t, cwd)
 		return "finished"
 	})
 	assertFixturePaused(t, f, tk, schema.StatusLegacyRepair, events.IterationError, "is not an ancestor of "+schedEpic)
@@ -153,9 +171,18 @@ func TestLateFinish_MergeUnreportedClosesDoneOnceChecksPass(t *testing.T) {
 	f.assertFeatureKept(t, "late finish")
 }
 
-func TestLateFinish_MergeUnreportedStaysPausedWhileChecksFail(t *testing.T) {
+func TestLateFinish_TrunkMovedPastTheClaimTipStillClosesDone(t *testing.T) {
 	f, _ := runMergeTicket(t, func(f *schedFixture, _ string) string {
 		advanceTrunk(t, f, "trunk.txt", "moved on")
+		return ""
+	})
+	reportMergeFinishedLate(t, f)
+	waitStatus(t, f.ticketFile(t, "01"), schema.StatusDone)
+}
+
+func TestLateFinish_MergeUnreportedStaysPausedWhileChecksFail(t *testing.T) {
+	f, _ := runMergeTicket(t, func(_ *schedFixture, cwd string) string {
+		dropClaimTip(t, cwd)
 		return ""
 	})
 	reportMergeFinishedLate(t, f)

@@ -467,6 +467,11 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 			return false, fmt.Errorf("base for %s: %w", ticketAddr, err)
 		}
 	}
+	if mode.feature {
+		if one.TargetTip, err = s.mergeTargetTip(ticket, repo); err != nil {
+			return false, fmt.Errorf("merge target for %s: %w", ticketAddr, err)
+		}
+	}
 	entry := trackedRun{
 		Run:  Run{Address: ticketAddr, Agent: string(agent), Runner: deps.Runner.Name(), Model: one.Model, Effort: one.Effort},
 		Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runLaunching,
@@ -608,6 +613,15 @@ func (s *Server) mergeTarget(addr tickets.Address) (string, error) {
 	}
 	_, _, target, err := s.epicRefs(addr.Project, epics, addr.Epic, repo)
 	return target, err
+}
+
+// mergeTargetTip is the SHA addr's merge target points at now.
+func (s *Server) mergeTargetTip(addr tickets.Address, repo string) (string, error) {
+	target, err := s.mergeTarget(addr)
+	if err != nil {
+		return "", err
+	}
+	return git.RevParse(repo, target)
 }
 
 // explicitBase reports whether t's base comes from a base: field (the

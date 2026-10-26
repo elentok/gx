@@ -143,6 +143,10 @@ type Event struct {
 	// ResolvedBase (iteration-started only) is the base (ref + SHA) the claim
 	// resolved; `gx tickets validate` compares it with the ticket's stamp.
 	ResolvedBase string `json:"resolved_base,omitempty"`
+	// TargetTip (iteration-started of a merge ticket only) is the SHA of the
+	// merge target when the ticket was claimed; a finish accepts an epic
+	// rebased onto it even after the target moves on.
+	TargetTip string `json:"target_tip,omitempty"`
 	// Path (iteration-started only, from the server's claim) is how the agent
 	// began: "resumed" on its earlier conversation, else "cold-start".
 	Path string `json:"path,omitempty"`
