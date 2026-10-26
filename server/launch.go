@@ -82,6 +82,15 @@ func (s *Server) runAgentConfig(project string, agent ralphloop.AgentKind, run R
 	return cmp.Or(run.Model, ac.Model), cmp.Or(run.Effort, ac.Effort)
 }
 
+// agentEnv is the tab env, plus the investigate ticket's address for an
+// investigate agent so its CLI calls identify it (see InvestigateEnv).
+func agentEnv(tabEnv []string, t tickets.Ticket, addr tickets.Address) []string {
+	if t.Type != string(schema.TypeInvestigate) {
+		return tabEnv
+	}
+	return append(slices.Clone(tabEnv), InvestigateEnv+"="+addr.String())
+}
+
 // launch starts one's agent in cwd. Its Codex sandbox gets one.ScratchDir, the
 // project dir where the epic's tickets live.
 func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphloop.OneIteration, cwd string) (Run, error) {
@@ -100,7 +109,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 			Cwd:             cwd,
 			Kind:            agentrunner.Kind(agent),
 			Args:            ralphloop.AgentArgs(agent, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
-			Env:             s.settings.Load().TabEnv,
+			Env:             agentEnv(s.settings.Load().TabEnv, t, ticket),
 			ResumeSessionID: resumeID,
 		}, launchPrompt(agent, launchSkill(t), investigatePrompt(t), ticket.String()), func(attempt int, decision string) {
 			s.logEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})

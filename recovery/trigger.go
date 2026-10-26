@@ -11,7 +11,10 @@ import (
 // Provenance the server stamps on every verb a rule remedy calls.
 const (
 	ActorRecovery = "recovery"
-	ViaServer     = "server"
+	// ActorInvestigate stamps a verb an investigate agent called: it recovers
+	// like a remedy and answers to the guard rail, unlike a person.
+	ActorInvestigate = "investigate"
+	ViaServer        = "server"
 )
 
 // Failure is one event that may start recovery.

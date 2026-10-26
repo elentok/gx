@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"syscall"
@@ -39,6 +40,9 @@ func (c *Client) AsTUI() *Client {
 func (c *Client) setOrigin(r *http.Request) {
 	if c.origin != "" {
 		r.Header.Set(server.OriginHeader, c.origin)
+	}
+	if addr := os.Getenv(server.InvestigateEnv); addr != "" {
+		r.Header.Set(server.InvestigateHeader, addr)
 	}
 }
 

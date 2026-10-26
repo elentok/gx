@@ -366,6 +366,44 @@ func (s *Server) recoverByInvestigating(plan recoveryPlan, f recovery.Failure) {
 	s.recordRecovery(plan.ref, events.RecoveryApplied, f, investigateEntry, child)
 }
 
+// investigateRetryEntry is the reason of the recovery-applied an investigate
+// agent's Retry logs; unlike investigateEntry it spends the pause kind's cap.
+const investigateRetryEntry = "investigate-retry"
+
+// investigateRetryFailure checks that req's investigator may Retry ref and
+// returns the failure the retry answers. Unattended, it may retry any repair
+// pause and a zero-commit one, within the guard rail; every other pause
+// (blocked-pane included) is for a person.
+func (s *Server) investigateRetryFailure(req QueueRequest, ref ticketRef) (recovery.Failure, QueueResult, bool) {
+	inv, ok, err := s.findTicket(req.investigator)
+	if err != nil || !ok || inv.ticket.Type != string(schema.TypeInvestigate) {
+		return recovery.Failure{}, refusal(ReasonInvestigateStop, req.investigator+" is not an investigate ticket"), false
+	}
+	t, err := schema.ParseTicket(ref.ticket.Path)
+	if err != nil {
+		return recovery.Failure{}, refusal(ReasonInvestigateStop, "cannot read "+ref.addr.String()+": "+err.Error()), false
+	}
+	reason := t.EffectiveReason()
+	row, hasRow := reason.Row()
+	if t.PausedClass() == "" || !hasRow || !slices.Contains(row.Verbs, schema.VerbRetry) ||
+		(t.PausedClass() != schema.PauseClassRepair && reason != schema.PauseZeroCommit) {
+		return recovery.Failure{}, refusal(ReasonInvestigateStop, ref.addr.String()+" is "+t.Describe()+"; only a person retries it"), false
+	}
+	f := recovery.Failure{Address: ref.addr.String(), Type: events.Paused, Kind: events.Kind(reason)}
+	// The fork is the investigation itself, not a remedy the agent's one retry
+	// of the kind could be spent on: it still counts toward the ticket's total.
+	log := s.ticketEvents(ref, f)
+	for i := range log {
+		if events.Type(log[i].Type) == events.RecoveryApplied && log[i].Reason == investigateEntry {
+			log[i].Kind = ""
+		}
+	}
+	if why := guardRailStop(log, f); why != "" {
+		return recovery.Failure{}, refusal(ReasonInvestigateStop, why), false
+	}
+	return f, QueueResult{}, true
+}
+
 // Guard-rail caps on automatic recovery, counted from the run log so a resume
 // or a server restart cannot clear them.
 const (

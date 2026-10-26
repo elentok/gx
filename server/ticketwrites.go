@@ -170,6 +170,15 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if ref.ticket.Status == string(schema.StatusDone) {
 			return refusal(ReasonTicketDone, ref.addr.String()+" is done"), nil
 		}
+		var applied *recovery.Failure
+		if req.investigator != "" {
+			f, res, ok := s.investigateRetryFailure(req, ref)
+			if !ok {
+				return res, nil
+			}
+			applied = &f
+			req.actor = recovery.ActorInvestigate
+		}
 		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
 			return QueueResult{}, nil
 		}
@@ -183,13 +192,13 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 			return res, err
 		}
 		source := req.Source
-		if req.actor == recovery.ActorRecovery {
+		if req.actor != "" {
 			source = tickets.SourceGx
 		}
 		if err := tickets.EndOpenRound(ref.ticket.Path, source, tickets.HowRelaunch, ralphloop.CloseRelaunch); err != nil {
 			return QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.addr, err)
 		}
-		if req.actor != recovery.ActorRecovery {
+		if req.actor == "" {
 			err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ralphloop.Event{
 				Time: time.Now(), Type: string(events.HumanRelaunch), Ticket: ref.addr.ID, Address: ref.addr.String(),
 			})
@@ -203,6 +212,12 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		}
 		if _, err := s.claimAndLaunch(ref.root(), ref.addr, ref.ticket, ref.repo, ticketAgent(ref.ticket, s.queuedAgent(ref.addr.String())), epics); err != nil {
 			return QueueResult{}, err
+		}
+		if applied != nil {
+			s.appendRecoveryEvent(ref, *applied, ralphloop.Event{
+				Type: string(events.RecoveryApplied), Ticket: ref.addr.ID, Kind: string(applied.Kind),
+				Reason: investigateRetryEntry, Outcome: "ok", Text: req.investigator,
+			})
 		}
 		return QueueResult{}, nil
 	})

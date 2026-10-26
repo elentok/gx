@@ -27,6 +27,7 @@ const (
 	// ReasonServerNotRunning is produced by the CLI, never the server.
 	ReasonServerNotRunning = "server-not-running"
 	ReasonUnknownTicket    = "unknown-ticket"
+	ReasonInvestigateStop  = "investigate-stop"
 	ReasonInvalidAddress   = "invalid-address"
 	ReasonInvalidAgent     = "invalid-agent"
 	ReasonAlreadyQueued    = "already-queued"
@@ -115,6 +116,9 @@ type QueueRequest struct {
 	// actor is set only by the server's own recovery calls, never decoded from a
 	// client: a pause made by recovery must not trigger recovery again.
 	actor string
+	// investigator is the claimed investigate ticket whose agent made the call,
+	// from InvestigateHeader. Verbs that honour it verify the ticket.
+	investigator string
 }
 
 // queueStore is the server-wide queue. It lives in a state-dir file, never in a
@@ -550,6 +554,9 @@ func queueWriteAs(web bool, do func(QueueRequest) (QueueResult, error)) http.Han
 			return
 		}
 		req.Source = requestOrigin(r, web)
+		if !web {
+			req.investigator = r.Header.Get(InvestigateHeader)
+		}
 		res, err := do(req)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
