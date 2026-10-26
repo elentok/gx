@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
@@ -26,7 +27,7 @@ func startPromptSession(t *testing.T) promptFixture {
 	t.Setenv(agentfake.ProgramInputEnv, "1")
 	cfg := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
-	f := startDesigns(t)
+	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = firstPromptGrace })
 	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
@@ -54,6 +55,22 @@ func TestSessionPrompt_TypesMultiLineTextAsOnePrompt(t *testing.T) {
 		t.Fatalf("prompt = %+v", res)
 	}
 	waitForSubmitted(t, f.conv, strconv.Quote("line one\nline two\n\nline four")+"\n")
+}
+
+func TestSessionPrompt_SwallowedEnterIsNudged(t *testing.T) {
+	f := startPromptSession(t)
+	if err := agentfake.SendProgramControl(f.conv, agentfake.Control{Action: agentfake.ActionSwallowEnter}); err != nil {
+		t.Fatal(err)
+	}
+	if res := f.prompt(t, "yes to both"); res.Refused {
+		t.Fatalf("prompt = %+v", res)
+	}
+	waitForSubmitted(t, f.conv, strconv.Quote("yes to both")+"\n")
+	report(t, f.conv, agentfake.Control{State: "working"})
+	time.Sleep(2 * firstPromptGrace)
+	if got := submitted(t, f.conv); got != strconv.Quote("yes to both")+"\n" {
+		t.Errorf("submitted = %q, want exactly one submission", got)
+	}
 }
 
 func TestSessionPrompt_Refusals(t *testing.T) {

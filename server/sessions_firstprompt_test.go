@@ -20,7 +20,7 @@ func startFirstPromptSession(t *testing.T, prompt string) (*servertest.Harness, 
 	t.Helper()
 	t.Setenv(agentfake.ProgramInputEnv, "1")
 	return startFakeSessionWith(t, server.CreateSessionRequest{Prompt: prompt}, func(c *server.Config) {
-		c.FirstPromptGrace = firstPromptGrace
+		c.PromptGrace = firstPromptGrace
 		c.ActionSlashSettle = 200 * time.Millisecond
 	})
 }

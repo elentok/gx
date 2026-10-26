@@ -21,7 +21,7 @@ func startFailingFirstPrompt(t *testing.T, prompt string) firstPromptFixture {
 	t.Helper()
 	t.Setenv(agentfake.ProgramInputEnv, "1")
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: prompt}, func(c *server.Config) {
-		c.FirstPromptGrace = firstPromptGrace
+		c.PromptGrace = firstPromptGrace
 		c.FirstPromptStartTimeout = firstPromptStartTimeout
 	}, withAlerts(true, true))
 	return firstPromptFixture{h: h, ctx: ctx, evs: evs, id: id, conv: conv}

@@ -165,7 +165,7 @@ func (f *firstPrompt) clearLeftover(prompt string) (cleared, cancelled bool) {
 		f.log.Warn("clear leftover first prompt", "err", err)
 		return false, false
 	}
-	p := &holderPrompter{c: c, f: f}
+	p := f.prompter(c, 0)
 	if err := claudeui.ClearInput(p, prompt); err != nil {
 		if errors.Is(err, errNudgeCancelled) {
 			return false, true
@@ -256,8 +256,8 @@ func (f *firstPrompt) deliver(prompt string) error {
 		return err
 	}
 	caps := claudeui.DefaultNudgeCaps
-	caps.Grace = cmp.Or(f.s.cfg.FirstPromptGrace, caps.Grace)
-	p := &holderPrompter{c: c, f: f, turn: turn}
+	caps.Grace = cmp.Or(f.s.cfg.PromptGrace, caps.Grace)
+	p := f.prompter(c, turn)
 	report := func(d claudeui.NudgeDecision) {
 		f.log.Debug("first prompt nudge", "decision", string(d))
 	}
@@ -299,17 +299,19 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 	}
 }
 
-// holderPrompter is claudeui.Prompter over a session's holder. A turn has
-// started once the holder's Turn passes the one seen before typing.
+// holderPrompter is the part of claudeui.Prompter every typed prompt shares:
+// the keys and screen reads over a session's holder. Each kind of prompt adds
+// its own WaitStart. Once cancel closes, no more keys go out; onTyped, when
+// set, runs once the text is typed.
 type holderPrompter struct {
-	c    *nativerunner.HolderClient
-	f    *firstPrompt
-	turn int
+	c       *nativerunner.HolderClient
+	cancel  <-chan struct{}
+	onTyped func()
 }
 
 func (p *holderPrompter) cancelled() error {
 	select {
-	case <-p.f.cancel:
+	case <-p.cancel:
 		return errNudgeCancelled
 	default:
 		return nil
@@ -323,7 +325,9 @@ func (p *holderPrompter) Submit(text string) error {
 	if err := p.c.TypeText(text); err != nil {
 		return err
 	}
-	p.f.markTyped()
+	if p.onTyped != nil {
+		p.onTyped()
+	}
 	return p.c.SendKeys("\r")
 }
 
@@ -341,7 +345,19 @@ func (p *holderPrompter) SendEnter() error {
 	return p.c.SendKeys("\r")
 }
 
-func (p *holderPrompter) WaitStart(timeout time.Duration) (bool, error) {
+// firstPrompter is the first prompt's Prompter. A turn has started once the
+// holder's Turn passes the one seen before typing.
+type firstPrompter struct {
+	holderPrompter
+	f    *firstPrompt
+	turn int
+}
+
+func (f *firstPrompt) prompter(c *nativerunner.HolderClient, turn int) *firstPrompter {
+	return &firstPrompter{holderPrompter: holderPrompter{c: c, cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
+}
+
+func (p *firstPrompter) WaitStart(timeout time.Duration) (bool, error) {
 	deadline := time.After(timeout)
 	for {
 		_, turn, err := p.c.Status()

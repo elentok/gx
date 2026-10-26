@@ -29,7 +29,7 @@ type designsFixture struct {
 
 // startDesigns starts a server with a map epic "map" and a plain epic "plain"
 // in project proj, whose repo is the trunk checkout, with the web mux up.
-func startDesigns(t *testing.T) designsFixture {
+func startDesigns(t *testing.T, opts ...func(*server.Config)) designsFixture {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
@@ -37,16 +37,17 @@ func startDesigns(t *testing.T) designsFixture {
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return startDesignsIn(t, store)
+	return startDesignsIn(t, store, opts...)
 }
 
 // startDesignsIn is startDesigns on a store the caller has already seeded.
-func startDesignsIn(t *testing.T, store string) designsFixture {
+func startDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) designsFixture {
 	t.Helper()
 	repo := testutil.TempRepo(t)
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)),
-		func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)),
+		func(c *server.Config) { c.WebAddr = "127.0.0.1:0" }}, opts...)
+	h := servertest.StartWithStore(t, store, opts...)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	t.Cleanup(cancel)
 	evs, err := h.Client.Events(ctx, 0)

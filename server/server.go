@@ -266,9 +266,9 @@ type Config struct {
 	// before a pending first prompt is handed to a person; zero means
 	// DefaultFirstPromptStartTimeout.
 	FirstPromptStartTimeout time.Duration
-	// FirstPromptGrace bounds each wait for a first prompt's turn to start
+	// PromptGrace bounds each wait for a typed prompt's turn to start
 	// before it is nudged; zero means claudeui.DefaultNudgeCaps.
-	FirstPromptGrace time.Duration
+	PromptGrace time.Duration
 
 	// CompactRewaitTimeout bounds recovery's R7 wait; zero means
 	// DefaultCompactRewaitTimeout.
@@ -315,7 +315,7 @@ type Config struct {
 }
 
 // Defaults for the session-prompting timings in Config. A zero Config field
-// means the default; FirstPromptGrace defaults to claudeui.DefaultNudgeCaps.
+// means the default; PromptGrace defaults to claudeui.DefaultNudgeCaps.
 const (
 	// DefaultActionStepStartTimeout is how long an Action step waits for its
 	// prompt to go Working before the rest of the Action is dropped.

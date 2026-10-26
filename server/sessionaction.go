@@ -70,6 +70,8 @@ type actionRun struct {
 	// status carried a different one, and cleared at each step.
 	convID      string
 	convChanged bool
+	// personTyped is set once a person's own key or paste reaches the session.
+	personTyped bool
 	actionRunOpts
 }
 
@@ -329,6 +331,9 @@ func (r *actionRun) turnRunning() bool {
 func (r *actionRun) apply(msg nativerunner.WatchMessage, ok bool) error {
 	if !ok || msg.Type == nativerunner.StreamExit {
 		return errors.New("session ended")
+	}
+	if msg.Type == nativerunner.StreamInput {
+		r.personTyped = true
 	}
 	if msg.Type == nativerunner.StreamStatus {
 		st := sessionStatusOf(msg.Status)

@@ -62,8 +62,9 @@ func (s *Server) sessionPromptHandler(source string) http.HandlerFunc {
 	}
 }
 
-// promptSession types a person's text into an Idle design session. It skips
-// the draft guard: gx.follow-ups/07 tracks that.
+// promptSession types a person's text into an Idle design session, in the
+// background so the nudges outlive the request. It skips the draft guard:
+// gx.follow-ups/07 tracks that.
 func (s *Server) promptSession(req SessionPromptRequest, source string) (SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
@@ -123,9 +124,7 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 			ev.Bytes += len(a)
 		}
 	} else {
-		if err := typeSessionPrompt(dir, text); err != nil {
-			return SessionResult{}, err
-		}
+		s.sessionWatches.start(func() { s.sendPrompt(dir, text) })
 		stopped := s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you typed")
 		changed := meta.AutoSends != 0
 		meta.AutoSends = 0
