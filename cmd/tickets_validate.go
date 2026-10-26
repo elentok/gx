@@ -47,7 +47,7 @@ func validateTicketLog(path string, ticket schema.Ticket, stderr io.Writer) erro
 	if err != nil {
 		return err
 	}
-	if ticket.PausedClass() == schema.PauseClassAnswer && tickets.OpenQuestion(events) == nil {
+	if ticket.PausedAsking() && tickets.OpenQuestion(events) == nil {
 		return fmt.Errorf("%s: ticket is paused for an answer but the log has no open question", ticketLabel(path))
 	}
 	for _, ev := range events {

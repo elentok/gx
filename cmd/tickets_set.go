@@ -594,7 +594,7 @@ func checkOpenQuestionGuard(c *cobra.Command, path string) error {
 		if err != nil {
 			return err
 		}
-		if current.PausedClass() == schema.PauseClassAnswer {
+		if current.PausedAsking() {
 			verb = "answer"
 		}
 	}

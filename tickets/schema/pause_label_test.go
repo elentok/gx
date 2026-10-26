@@ -12,7 +12,7 @@ func TestPauseReasonLabelGroups(t *testing.T) {
 		"background task": {PauseBackgroundTaskGate},
 		"merging": {
 			PauseMergeConflict, PauseAmbiguousMerge, PauseDirtyTrunk, PauseTrunkMissing,
-			PauseStrandedCommits, PauseMergeError,
+			PauseStrandedCommits, PauseMergeError, PauseNeedsRebase, PauseConflictMarkers,
 		},
 		"ticket graph":     {PauseBlockedCycle, PauseParentDefect},
 		"limits and other": {PauseBudgetKilled, PauseIterationError, PauseManual},

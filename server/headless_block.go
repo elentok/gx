@@ -47,7 +47,7 @@ func (s *Server) leaveBlocked(address string) error {
 	if err != nil {
 		return err
 	}
-	if !s.waitsOnHeadlessBlock(tk, address) || tk.PausedClass() != schema.PauseClassAnswer {
+	if !s.waitsOnHeadlessBlock(tk, address) || !tk.PausedAsking() {
 		return nil
 	}
 	if err := ralphloop.Claim(t.Path); err != nil {

@@ -69,7 +69,7 @@ func Merge(in MergeInput, d ralphloop.Deps) (MergeResult, string, error) {
 	if err != nil {
 		return MergeResult{}, "", err
 	}
-	if parsed.PausedClass() == schema.PauseClassAnswer {
+	if parsed.PausedAsking() {
 		if err := checkRecoverable(d, featurePath, epic, t.Identifier); err != nil {
 			return MergeResult{}, "", err
 		}
@@ -299,8 +299,8 @@ func featureWorktree(d ralphloop.Deps, cwd, epic string) (string, error) {
 // merges only as a zero-commit pause, a late commit that came with no finish.
 func checkLandable(id string, t schema.Ticket) error {
 	switch {
-	case t.Status == schema.StatusDone, t.Status == schema.StatusClaimed, t.PausedClass() == schema.PauseClassRepair:
-	case t.PausedClass() == schema.PauseClassAnswer && (t.PauseReason == "" || t.PauseReason == schema.PauseZeroCommit):
+	case t.Status == schema.StatusDone, t.Status == schema.StatusClaimed, t.PausedForRepair():
+	case t.PausedAsking() && (t.PauseReason == "" || t.PauseReason == schema.PauseZeroCommit):
 	default:
 		return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %s; merge accepts only done, claimed, paused for repair or a zero-commit asking pause", id, describeStatus(t))}
 	}

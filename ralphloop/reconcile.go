@@ -122,7 +122,7 @@ func reconcile(d Deps, rp reconcileParams, epic tickets.Epic) ([]tickets.Ticket,
 			// reattaching, reverting, or reporting on it here.
 			continue
 		}
-		if t.PausedClass() == schema.PauseClassRepair {
+		if t.PausedForRepair() {
 			if live[iterationKey(epic.Name, iterLabel(epic.Name, t.Identifier))] {
 				reattach(t)
 				reattached = append(reattached, t)

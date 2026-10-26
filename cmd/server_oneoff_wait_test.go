@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -113,6 +114,15 @@ func TestOneOffWait_ExitCodesByStatus(t *testing.T) {
 		if _, code := runWait(t, &fakeSource{statuses: []string{"open", status}}); code != want {
 			t.Errorf("%s: code = %d; want %d", status, code, want)
 		}
+	}
+}
+
+// A manual pause is answer class (gx receives the reply), so --wait stops on it
+// with 3 where it used to stop with 4.
+func TestWaitExitCode_ManualPauseStopsWithThree(t *testing.T) {
+	paused := tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseManual}
+	if code, stop := waitExitCode(server.TicketInfo{Status: paused.LegacyStatus()}); !stop || code != 3 {
+		t.Errorf("code, stop = %d, %v; want 3, true", code, stop)
 	}
 }
 

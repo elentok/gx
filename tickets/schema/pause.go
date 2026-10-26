@@ -38,6 +38,8 @@ const (
 	PauseBudgetKilled       PauseReason = "budget-killed"
 	PauseIterationError     PauseReason = "iteration-error"
 	PauseManual             PauseReason = "manual"
+	PauseNeedsRebase        PauseReason = "needs-rebase"
+	PauseConflictMarkers    PauseReason = "conflict-markers"
 )
 
 // PauseClass says what a person does about a pause: answer a question, or
@@ -58,6 +60,8 @@ var pauseClasses = map[PauseReason]PauseClass{
 	PauseBlockedPane:        PauseClassAnswer,
 	PauseBackgroundTaskGate: PauseClassAnswer,
 	PauseStrandedCommits:    PauseClassAnswer,
+	PauseManual:             PauseClassAnswer,
+	PauseDirtyTrunk:         PauseClassAnswer,
 
 	PauseMergeUnreported:    PauseClassRepair,
 	PauseSpinning:           PauseClassRepair,
@@ -69,14 +73,14 @@ var pauseClasses = map[PauseReason]PauseClass{
 	PauseAgentPromptStalled: PauseClassRepair,
 	PauseMergeConflict:      PauseClassRepair,
 	PauseAmbiguousMerge:     PauseClassRepair,
-	PauseDirtyTrunk:         PauseClassRepair,
 	PauseTrunkMissing:       PauseClassRepair,
+	PauseNeedsRebase:        PauseClassRepair,
+	PauseConflictMarkers:    PauseClassRepair,
 	PauseMergeError:         PauseClassRepair,
 	PauseBlockedCycle:       PauseClassRepair,
 	PauseParentDefect:       PauseClassRepair,
 	PauseBudgetKilled:       PauseClassRepair,
 	PauseIterationError:     PauseClassRepair,
-	PauseManual:             PauseClassRepair,
 }
 
 // pauseLabels is the one table of plain-words labels the TUI and the web show
@@ -105,6 +109,8 @@ var pauseLabels = map[PauseReason]string{
 	PauseTrunkMissing:    "Trunk not found",
 	PauseStrandedCommits: "Stranded commits",
 	PauseMergeError:      "Merge failed",
+	PauseNeedsRebase:     "Needs rebase",
+	PauseConflictMarkers: "Conflict markers left",
 	// Ticket graph.
 	PauseBlockedCycle: "Dependency loop",
 	PauseParentDefect: "Parent ticket missing or wrong",
@@ -187,6 +193,28 @@ func (t Ticket) PausedClass() PauseClass {
 	}
 	return ""
 }
+
+// AsksQuestion is true when a pause of r leaves a question in the ticket's
+// log. That is every answer-class reason except those gx receives (manual,
+// dirty-trunk), which are written as repair rounds with no question.
+func (r PauseReason) AsksQuestion() bool {
+	return r.Class() == PauseClassAnswer && events.Kind(r).AwaitsAnswer()
+}
+
+// PausedAsking is true when t is paused on a question in its log.
+func (t Ticket) PausedAsking() bool {
+	switch t.Status {
+	case StatusLegacyAnswer:
+		return true
+	case StatusPaused:
+		return t.PauseReason.AsksQuestion()
+	}
+	return false
+}
+
+// PausedForRepair is true when t is paused with no question in its log: a
+// fault, or a pause gx receives the reply to.
+func (t Ticket) PausedForRepair() bool { return t.PausedClass() != "" && !t.PausedAsking() }
 
 // Legacy body headings, accepted by the read shim only.
 var legacyPauseHeadings = []string{"## Needs Answer", "## Needs Repair"}

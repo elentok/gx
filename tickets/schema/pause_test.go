@@ -8,10 +8,18 @@ import (
 )
 
 func TestPauseClasses_MatchEventKinds(t *testing.T) {
+	// Answer class with gx as receiver, but still written as a repair round.
+	gxAnswers := map[PauseReason]bool{PauseManual: true, PauseDirtyTrunk: true}
 	for r, class := range pauseClasses {
 		k := events.Kind(r)
 		if !k.Valid() {
 			t.Errorf("reason %q is not an events kind", r)
+			continue
+		}
+		if gxAnswers[r] {
+			if class != PauseClassAnswer || k.AwaitsAnswer() {
+				t.Errorf("reason %q: class %q, AwaitsAnswer=%v", r, class, k.AwaitsAnswer())
+			}
 			continue
 		}
 		if k.AwaitsAnswer() != (class == PauseClassAnswer) {

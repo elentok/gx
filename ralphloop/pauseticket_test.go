@@ -257,7 +257,8 @@ func TestPause_DerivesTypeFromKindAndKeepsConversationOutOfMarkdown(t *testing.T
 		status   schema.Status
 		question bool // the log carries an open question afterwards
 	}{
-		{events.Manual, schema.StatusLegacyRepair, false},
+		// Answer class (gx receives the reply), but written as a repair round: no question.
+		{events.Manual, schema.StatusLegacyAnswer, false},
 		{events.AmbiguousBase, schema.StatusLegacyAnswer, true},
 		{events.BlockedPane, schema.StatusLegacyAnswer, true},
 		{events.StrandedCommits, schema.StatusLegacyAnswer, true},

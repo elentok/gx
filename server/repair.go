@@ -252,7 +252,7 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 		return repairOK(res)
 	}
 	tk, perr := schema.ParseTicket(t.Path)
-	paused := perr == nil && tk.PausedClass() == schema.PauseClassAnswer
+	paused := perr == nil && tk.PausedAsking()
 	zeroCommit := paused && tk.PauseReason == schema.PauseZeroCommit
 	// Every refusal runs before the first state change.
 	if paused && req.RequireState {
@@ -350,7 +350,7 @@ func resumeAnswered(ticketPath, id string, req RepairRequest) (repair.ResumeResu
 			return tickets.LogEvent{}, err
 		}
 		open := tickets.OpenQuestion(evs)
-		if t.PausedClass() != schema.PauseClassAnswer || open == nil || answerState(*open, t.PausedClass()) != req.State {
+		if !t.PausedAsking() || open == nil || answerState(*open, t.PausedClass()) != req.State {
 			return tickets.LogEvent{}, resumeRefused{staleResumeRefusal()}
 		}
 		if err := ralphloop.ResumeTicketWithBaseLocked(ticketPath, time.Now(), req.Base); err != nil {
@@ -446,7 +446,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (RepairResult, 
 		return RepairResult{}, false, nil
 	}
 	tk, err := schema.ParseTicket(t.Path)
-	if err != nil || tk.PausedClass() != schema.PauseClassAnswer {
+	if err != nil || !tk.PausedAsking() {
 		return RepairResult{}, false, nil
 	}
 	selfReported := tk.PauseReason == schema.PauseSelfReported

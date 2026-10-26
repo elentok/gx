@@ -108,6 +108,10 @@ func markRepairWithReason(path, reason string, pauseKind schema.PauseKind, state
 		t.Status = schema.StatusPaused
 		t.PauseKind = ""
 		t.PauseReason = schema.PausedReason(string(pauseKind), schema.PauseClassRepair)
+		if schema.ParsePauseReason(string(pauseKind)) == schema.PauseManual {
+			// Answer class, but still written through the repair path.
+			t.PauseReason = schema.PauseManual
+		}
 		*body += section
 	})
 }

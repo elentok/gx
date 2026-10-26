@@ -149,6 +149,11 @@ const (
 	// MergeUnreported is a merge agent that stopped without reporting finished
 	// or asking. Unlike the other merge faults, a late finish adopts it.
 	MergeUnreported Kind = "merge-unreported"
+	// NeedsRebase is an epic merge block that needs the branch rebased first.
+	NeedsRebase Kind = "needs-rebase"
+	// ConflictMarkers is a trunk-conflict ticket whose agent finished with
+	// conflict markers left in the files.
+	ConflictMarkers Kind = "conflict-markers"
 )
 
 // kindCauseHerdr lists the kinds a herdr outage can cause. It is an attribute
@@ -167,6 +172,7 @@ var kinds = map[Kind]bool{
 	DuplicateLive: true, IterationError: true, Manual: true, AmbiguousBase: true,
 	MergeConflict: true, ParentDefect: true, BackgroundTaskGate: true, StrandedCommits: true,
 	TrunkMissing: true, DirtyTrunk: true, MergeError: true, MergeUnreported: true,
+	NeedsRebase: true, ConflictMarkers: true,
 }
 
 // Kinds returns every kind in the enum, sorted so the CLI verb that publishes

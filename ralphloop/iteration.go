@@ -261,7 +261,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 		}
 		return fmt.Errorf("waiting for reattached agent %s to finish: %w", label, err)
 	}
-	if p.Ticket.PausedClass() == schema.PauseClassRepair {
+	if p.Ticket.PausedForRepair() {
 		if err := Claim(p.Ticket.Path); err != nil {
 			return fmt.Errorf("restoring ticket to claimed: %w", err)
 		}

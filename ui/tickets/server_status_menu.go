@@ -29,14 +29,15 @@ const (
 // statuses only the server's verbs change.
 var serverDirectStatuses = []schema.Status{schema.StatusOpen, schema.StatusDraft, schema.StatusDone}
 
-// isRepairPause is a ticket paused for a fault, the only pause that "enter"
-// resumes: an answer pause needs the Answer action's own confirmation.
+// isRepairPause is a ticket paused for a fault or by a person, the only pauses
+// that "enter" resumes: an answer pause needs the Answer action's own
+// confirmation.
 func isRepairPause(t tickets.Ticket) bool {
 	switch schema.Status(t.Status) {
 	case schema.StatusLegacyRepair:
 		return true
 	case schema.StatusPaused:
-		return t.PauseReason.Class() == schema.PauseClassRepair
+		return t.PauseReason.Class() == schema.PauseClassRepair || t.PauseReason == schema.PauseManual
 	}
 	return false
 }

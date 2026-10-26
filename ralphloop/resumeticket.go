@@ -216,7 +216,7 @@ func resumeMutation(now time.Time, base string) func(*schema.Ticket, *string) er
 func UnmuteTicket(path string, now time.Time) error {
 	return updateTicketWithBody(path, func(t *schema.Ticket, body *string) {
 		t.Mutes = nil
-		if t.PausedClass() == schema.PauseClassRepair {
+		if t.PausedForRepair() {
 			t.Status = schema.StatusOpen
 			t.PauseReason = ""
 		}

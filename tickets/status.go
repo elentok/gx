@@ -133,6 +133,12 @@ func (t Ticket) PausedClass() schema.PauseClass {
 	return ""
 }
 
+// PausedForRepair is true when t is paused with no question in its log: a
+// fault, or a pause gx receives the reply to.
+func (t Ticket) PausedForRepair() bool {
+	return t.PausedClass() != "" && !t.PauseReason.AsksQuestion()
+}
+
 // RawStatus is t's status as its file says it, with no Blocked by: or
 // waiting-for-children overlay.
 func (t Ticket) RawStatus() RenderedStatus { return t.baseStatus() }
