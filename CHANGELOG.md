@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.38.1 - 2026-10-26
+
+- Added a Delete design button to the Design page, for an uncharted design: a map with no Destination, no tickets and no live session. The button shows up without a reload once a session stops. Also added `gx designs delete <project:epic>` and `POST /v1/designs/delete`.
+- Added a project filter to the Epics page. It shows when there are two or more projects and applies to every card, follow-ups included. It works together with the text filter and is remembered across reloads. Finished is filtered by project before the cap.
+- Added a top-bar menu. The AFK toggle and the build info moved into it.
+- Changed New Design to open as a writing sheet over the page, with a bottom sheet on phones. The Design page no longer has an inline New Design form. The sheet picks its starting project from the draft or from the Epics project filter. The draft stays until Start or Discard, and closing the sheet keeps it.
+- Changed New Design to write the map epic before it starts the session. Map-pending design rows are gone. If the start fails after the map is written, the sheet clears the draft and opens the Design page, which shows the reason next to Start design session or New session. The response is a single result with `start_error`.
+- Changed `gx-design` and `gx-wayfinder` to chart into an existing map epic.
+- Changed every claude agent gx launches (Design, chat and History resume) to start in auto permission mode, unless the caller already passed a mode.
+- Changed the Epics page to list Ready to queue before In progress.
+- Fixed the `gx-to-tickets` create-tickets quiz not showing as a grilling round, so the Design session never became Actionable.
+- Fixed the pull and push modals redrawing 10 times a second while they wait for a keypress.
+
 ## v0.38.0 - 2026-10-26
 
 - Added auto-advance for Design sessions. When a step ends, the server sends Continue by itself after a countdown. Cancel, typing input, Continue, Run Action or turning the switch off stops one auto-send. A runaway guard stops it after 5 sends in a row. The switch and countdown are in the web Composer, the full-screen composer and the TUI Agents tab menu and info row. Also added `gx agents auto-advance <id> on|off` and `POST /v1/sessions/auto-advance`.
