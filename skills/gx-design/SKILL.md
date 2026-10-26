@@ -50,7 +50,34 @@ trailing call go unseen. Never pad the end with a tool call or a closing line.
 ## Detecting the next step
 
 First run `gx agent link <project:epic>` (the ticket address, when given one). The Agents tab then
-marks the session as a design run. Outside a gx session it prints a note and does nothing.
+marks the session as a design run. Outside a gx session it prints a note and does nothing; report
+that note to the person.
+
+Then settle where the run works, in this order. Edit nothing until it is settled.
+
+1. **After Branch.** The map is after Branch when its `design_step` is `branch` or `done`, or the
+   `<epic>-impl` branch exists (the server's rule). On `<epic>-design`, read `design_step` and
+   `git rev-parse --verify refs/heads/<epic>-impl`. Elsewhere, read `after_branch` from the
+   `gx designs worktree <project:epic> --json` output (step 3 below). If after Branch: go to step 9 when
+   the `<epic>-impl` epic exists, else stop with a message that the design is past Branch and
+   `<epic>-impl` is missing. Edit nothing either way.
+2. **No map yet.** For `/gx-design <epic> <idea>`, create the map first (step 1's "No map epic"
+   writes it to the tracker, not the repo), then continue here.
+3. **Branch check.** Check the run is on `<epic>-design` (`git branch --show-current`). If not (for
+   example a plain Claude session in the trunk checkout), run `gx designs worktree <project:epic> --json`.
+   It makes the design worktree if needed and rebases it onto trunk. Use its `path` as the
+   worktree. Report its `note` (why a rebase was skipped), if any.
+
+From here on, **never `cd` and never edit the trunk checkout**:
+
+- Every git command is `git -C <worktree> …`. Every file path is absolute under `<worktree>`.
+- Detection checks `docs/specs/<epic>.md` and the ADRs under `<worktree>`, not the trunk checkout.
+- Every subagent (gx-to-spec, the design reviews, gx-to-tickets) gets `<worktree>`'s absolute path
+  and this rule.
+- When the worktree is outside the start folder (bare repos), Claude may ask for permission on the
+  first edits. Tell the person to allow them.
+- The server does not see a plain session, so it can remove the worktree mid-run. Before the run-end
+  commit, run `gx designs worktree <project:epic> --json` again if `<worktree>` is gone. There is no lease.
 
 Read the map with `gx tickets show <project:epic>`. Evaluate in order; run the first match.
 
@@ -136,19 +163,21 @@ the ticket title during `resolve-tickets`.
    spec, publishing into `<epic>-impl`. Never publish into the map epic: its tickets are
    hand-resolved decisions, and implementation tickets belong to ralph-loop. Set
    `--design-step create-tickets` before publishing, then continue to step 8 in the same run.
-8. **No `<epic>-impl` branch** (`git rev-parse --verify refs/heads/<epic>-impl` fails) → commit the
-   design docs into the feature branch, so that implementation agents see them in their worktrees.
-   The server adopts a branch that already exists, so creating it here is safe.
-   - Start the branch from trunk (the repo's default branch). If `<epic>-impl` sets `base:` or is
-     blocked by another epic, stop and ask which branch to start from.
-   - Create it in a temporary worktree: `git worktree add -b <epic>-impl <tmp-dir> <trunk>`.
-   - Copy in `docs/specs/<epic>.md`, the ADRs this epic added under `docs/adr/`, and only this
-     epic's `GLOSSARY.md` hunks. If the checkout has other uncommitted edits in those files, leave
-     them out; ask when a hunk's owner is unclear.
-   - Commit as `<epic>: Add spec, ADRs and glossary terms`, then `git worktree remove <tmp-dir>`.
-   - Set `--design-step branch`.
-   - Remove the committed changes from the original checkout: delete the new files, and reverse
-     only the committed `GLOSSARY.md` hunks. Leave every other edit in place.
+8. **No `<epic>-impl` branch** (`git -C <worktree> rev-parse --verify refs/heads/<epic>-impl` fails) →
+   put the design branch into a new `<epic>-impl`, so that implementation agents see the design
+   docs in their worktrees. The server adopts a branch that already exists, so creating it here is safe.
+   - Commit pending edits in `<worktree>` on `<epic>-design` first.
+   - Start from trunk (the repo's default branch), or from the base the person names. If
+     `<epic>-impl` sets `base:` or is blocked by another epic, stop and ask which branch to start from.
+   - Create it in a temporary worktree: `git -C <worktree> worktree add -b <epic>-impl <tmp-dir> <base>`.
+   - With trunk as base, merge `<epic>-design` there: `git -C <tmp-dir> merge <epic>-design`.
+   - With another base, rebase a detached copy of the design tip and merge that copy. Never rewrite
+     `<epic>-design`: `git -C <worktree> rebase --onto <base> <trunk> <design-tip-sha>` (run it
+     detached, on the sha), then `git -C <tmp-dir> merge <the rebased sha>`.
+   - On a conflict, follow [gx-resolving-merge-conflicts](../gx-resolving-merge-conflicts/SKILL.md).
+   - Then `git -C <worktree> worktree remove <tmp-dir>` and set `--design-step branch`.
+   - Step 8 removes neither the design worktree nor the `<epic>-design` branch: the server does,
+     once it sees the Design is past Branch.
 9. **Otherwise** → report the `<epic>-impl` slug and stop. Launch it from the TUI Queue tab.
 
 ## Researching existing UI behavior
@@ -191,6 +220,10 @@ the server's auto-advance starts the next step in a fresh session. For a map tic
 
 Set `--design-step` to the step the next run starts, with
 `gx tickets set <project:epic> --design-step <step>`, before printing the run-end line.
+
+Before the run-end line, commit every edit in `<worktree>` on `<epic>-design`
+(`git -C <worktree> add -A`, then commit). The message starts with `<epic>:`. Skip it when the
+worktree has no changes, or when the run stopped before the branch check.
 
 End with one line:
 
