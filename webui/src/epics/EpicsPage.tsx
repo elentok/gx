@@ -95,7 +95,7 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
       return next;
     });
   const newDesign = (
-    <Button emphasis="main" onClick={() => setDesigning(true)}>
+    <Button emphasis="main" flexShrink="0" whiteSpace="nowrap" onClick={() => setDesigning(true)}>
       New Design
     </Button>
   );
@@ -110,6 +110,8 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
           h="40px"
           fontSize="16px"
           maxW="320px"
+          flex="1"
+          minW="0"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
