@@ -224,6 +224,9 @@ func (s *Server) ticketAnswer(req QueueRequest) (QueueResult, error) {
 		if err != nil {
 			return QueueResult{}, fmt.Errorf("answer %s: %w", ref.addr, err)
 		}
+		if err := s.cancelInvestigateChild(ref, req.Source); err != nil {
+			return QueueResult{}, err
+		}
 		if queued {
 			// Open again for gx to claim; the dead run has nothing to settle.
 			s.registry.delete(address)

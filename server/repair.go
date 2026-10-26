@@ -173,12 +173,18 @@ func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
 // iteration had settled. A direct merge has no queue.
 func (s *Server) mergeInQueue(req RepairRequest) (RepairResult, error) {
 	addr, err := tickets.ParseAddress(req.Address, tickets.AddressContext{})
-	if err != nil || !s.rootQueued(rootOf(addr)) {
+	if err != nil {
 		return s.repairMerge(req)
 	}
 	res, err := s.repairMerge(req)
 	if err != nil || res.Refused {
 		return res, err
+	}
+	if err := s.cancelInvestigateOf(req.Address, req.origin); err != nil {
+		return RepairResult{}, err
+	}
+	if !s.rootQueued(rootOf(addr)) {
+		return res, nil
 	}
 	if _, t, ok := s.freshTicket(addr); ok && s.merges.begin() {
 		defer s.merges.end()
@@ -208,6 +214,20 @@ func (s *Server) freshTicket(addr tickets.Address) (tickets.Epic, tickets.Ticket
 		}
 	}
 	return tickets.Epic{}, tickets.Ticket{}, false
+}
+
+// startOverInQueue is the server's start-over: a person's, so it also cancels
+// the ticket's open investigate child. A direct start-over has no server to
+// stop an agent.
+func (s *Server) startOverInQueue(req RepairRequest) (RepairResult, error) {
+	res, err := s.repairStartOver(req)
+	if err != nil || res.Refused {
+		return res, err
+	}
+	if err := s.cancelInvestigateOf(req.Address, req.origin); err != nil {
+		return RepairResult{}, err
+	}
+	return res, nil
 }
 
 func (s *Server) repairStartOver(req RepairRequest) (RepairResult, error) {

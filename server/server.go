@@ -628,7 +628,7 @@ var routeTable = []struct {
 	{"POST /v1/queue/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queueResume)(w, r) }},
 	{"POST /v1/queue/drain", func(s *Server, w http.ResponseWriter, r *http.Request) { s.modeWrite(s.queueFlush)(w, r) }},
 	{"POST /v1/tickets/merge", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.mergeInQueue)(w, r) }},
-	{"POST /v1/tickets/start-over", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairStartOver)(w, r) }},
+	{"POST /v1/tickets/start-over", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.startOverInQueue)(w, r) }},
 	{"POST /v1/tickets/resume", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
 	{"POST /v1/tickets/unpark", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairResume)(w, r) }},
 	{"POST /v1/tickets/verify", func(s *Server, w http.ResponseWriter, r *http.Request) { repairWrite(s.repairVerify)(w, r) }},

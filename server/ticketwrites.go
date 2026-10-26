@@ -208,6 +208,9 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 			return QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.addr, err)
 		}
 		if req.actor == "" {
+			if err := s.cancelInvestigateChild(ref, req.Source); err != nil {
+				return QueueResult{}, err
+			}
 			err := ralphloop.AppendEvent(ref.projectDir, ref.addr.Epic, ralphloop.Event{
 				Time: time.Now(), Type: string(events.HumanRelaunch), Ticket: ref.addr.ID, Address: ref.addr.String(),
 			})
@@ -277,20 +280,60 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 			return res, err
 		}
 		for _, t := range targets {
-			if err := tickets.EndOpenRound(t.Path, req.Source, tickets.HowCancel, "cancelled"); err != nil {
-				return QueueResult{}, fmt.Errorf("end pause round of %s: %w", ref.address(t), err)
+			if err := s.markCancelled(ref, t, req.Source); err != nil {
+				return QueueResult{}, err
 			}
-			if err := ralphloop.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {
-				return QueueResult{}, fmt.Errorf("cancel %s: %w", ref.address(t), err)
-			}
-			s.stampFinished(tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}, t.Path, true)
-			s.events.publish(EventTicketCancelled, ref.address(t))
 		}
 		if ref.addr.Epic == OneOffsEpic {
 			s.rescan()
 		}
 		return QueueResult{}, nil
 	})
+}
+
+// markCancelled closes t's pause round and settles it as cancelled. Its live
+// agent is the caller's to stop.
+func (s *Server) markCancelled(ref ticketRef, t tickets.Ticket, source string) error {
+	if err := tickets.EndOpenRound(t.Path, source, tickets.HowCancel, "cancelled"); err != nil {
+		return fmt.Errorf("end pause round of %s: %w", ref.address(t), err)
+	}
+	if err := ralphloop.SetStatus(t.Path, string(schema.StatusCancelled)); err != nil {
+		return fmt.Errorf("cancel %s: %w", ref.address(t), err)
+	}
+	s.stampFinished(tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}, t.Path, true)
+	s.events.publish(EventTicketCancelled, ref.address(t))
+	return nil
+}
+
+// cancelInvestigateChild is a person's recovery verb withdrawing ref's
+// unfinished investigate child, stopping its live agent, so an old investigation
+// does not act after the person. Investigate's own verbs never call it.
+func (s *Server) cancelInvestigateChild(ref ticketRef, source string) error {
+	forks := ref.epic.ForkParents()
+	for _, t := range ref.epic.Tickets {
+		parent, ok := forks.Of(t)
+		if !ok || parent.Identifier != ref.ticket.Identifier || t.Type != string(schema.TypeInvestigate) || isTerminal(t.Status) {
+			continue
+		}
+		addr := tickets.Address{Project: ref.addr.Project, Epic: ref.addr.Epic, ID: t.Identifier}
+		anyLive := func(agentrunner.Runner, agentrunner.Session) bool { return true }
+		if _, _, err := s.settleLive([]tickets.Address{addr}, true, ReasonTicketLive, anyLive); err != nil {
+			return err
+		}
+		if err := s.markCancelled(ref, t, source); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// cancelInvestigateOf is cancelInvestigateChild for a ticket named by address.
+func (s *Server) cancelInvestigateOf(address, source string) error {
+	ref, ok, err := s.findTicket(address)
+	if err != nil || !ok {
+		return err
+	}
+	return s.cancelInvestigateChild(ref, source)
 }
 
 // settleLive is relaunch's and cancel's one view of live agents: liveSession,
