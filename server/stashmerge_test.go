@@ -22,7 +22,11 @@ import (
 // dirty yet, so the pause does not name it.
 func stashMergeFixture(t *testing.T) *schedFixture {
 	t.Helper()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+		// The trunk-conflict ticket a stash-merge opens may be picked up too; it has nothing to commit.
+		if id != "01" {
+			return
+		}
 		testutil.WriteFile(t, p.Cwd, "same.txt", "branch")
 		testutil.WriteFile(t, p.Cwd, "late.txt", "branch")
 		testutil.CommitAll(t, p.Cwd, "work")
@@ -68,6 +72,18 @@ func TestStashMerge_WebRefusesAStaleTokenAndTouchesNothing(t *testing.T) {
 	}
 }
 
+// The Epics card sends the list state, which names a merge-blocked epic "merge-blocked"
+// where the Epic page's EpicState says paused.
+func TestStashMerge_AcceptsTheCardsMergeBlockedState(t *testing.T) {
+	f := stashMergeFixture(t)
+
+	code, body := f.webStashMerge(t, string(server.EpicListMergeBlocked))
+
+	if code != http.StatusOK || reasonOf(t, body) != "" {
+		t.Errorf("stash-merge from a card = %d %s, want it accepted", code, body)
+	}
+}
+
 func TestStashMerge_LeavesMarkersUncommittedAndBacksUpAFileThatClashesAtClickTime(t *testing.T) {
 	f := stashMergeFixture(t)
 	// Dirty only now: the pause did not list it.
@@ -103,7 +119,8 @@ func TestStashMerge_LeavesMarkersUncommittedAndBacksUpAFileThatClashesAtClickTim
 	// A top-level trunk-conflict ticket in the root epic names the ref and files.
 	ticket := f.ticketFile(t, "02")
 	md := readFile(t, ticket)
-	for _, want := range []string{"type: trunk-conflict", "status: open", refs[0], "same.txt", "late.txt"} {
+	// Not "status: open": the queue may have claimed the ticket by the time it is read.
+	for _, want := range []string{"type: trunk-conflict", refs[0], "same.txt", "late.txt"} {
 		if !strings.Contains(md, want) {
 			t.Errorf("trunk-conflict ticket lacks %q:\n%s", want, md)
 		}

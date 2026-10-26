@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -173,24 +174,26 @@ func (i *index) refresh(storePath string) error {
 	for _, addr := range changedAddresses(i.list, list) {
 		i.events.publish(EventTicketChanged, addr)
 	}
-	for _, addr := range changedEpicDesignSteps(i.loaded, loaded) {
+	for _, addr := range changedEpicMeta(i.loaded, loaded) {
 		i.events.publish(EventTicketChanged, addr)
 	}
 	i.list, i.loaded = list, loaded
 	return nil
 }
 
-// changedEpicDesignSteps lists, in address order, the epics whose design_step
-// differs between two scans. An epic's ticket.md edit changes no TicketInfo, so
-// without this a Progress view never learns the step moved.
-func changedEpicDesignSteps(old, next map[string][]tickets.Epic) []string {
+// changedEpicMeta lists, in address order, the epics whose design_step or
+// merge block differs between two scans. An epic's ticket.md edit changes no
+// TicketInfo, so without this a Progress view never learns the step moved and
+// an Epic page never learns a merge parked.
+func changedEpicMeta(old, next map[string][]tickets.Epic) []string {
 	steps := func(m map[string][]tickets.Epic) map[string]string {
 		out := map[string]string{}
 		for dir, epics := range m {
 			project := tickets.ProjectName(dir)
 			for _, e := range epics {
-				if e.DesignStep != "" {
-					out[project+":"+filepath.Base(e.Path)] = e.DesignStep
+				key := strings.Join(append([]string{e.DesignStep, e.MergeBlockKind, e.MergeBlockReason}, e.MergeBlockFiles...), "\x00")
+				if strings.Trim(key, "\x00") != "" {
+					out[project+":"+filepath.Base(e.Path)] = key
 				}
 			}
 		}

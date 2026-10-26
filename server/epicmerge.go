@@ -86,9 +86,15 @@ func (s *Server) loadMergeEpic(req QueueRequest) (m mergeEpicRef, refused *Queue
 	if !isMergeableEpic(root) {
 		return refuse(ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges")
 	}
-	// The web page sends the state it shows; the socket route sends none.
+	// The web page sends the state it shows; the socket route sends none. An
+	// Epics card shows the list state, which calls a merge-blocked epic
+	// "merge-blocked" where the Epic page says paused.
 	if shown := EpicState(req.State); shown != "" {
-		if now := epicStateFor(root, e, s.registry.startedAtOf); shown != now {
+		now := epicStateFor(root, e, s.registry.startedAtOf)
+		if shown == EpicState(EpicListMergeBlocked) && epicMergeBlocked(e) {
+			shown = EpicStatePaused
+		}
+		if shown != now {
 			return refuse(ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown))
 		}
 	}
