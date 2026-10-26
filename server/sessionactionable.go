@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/transcript"
@@ -55,26 +55,12 @@ func (s *Server) markSessionActionable(req MarkActionableRequest) (SessionResult
 	return SessionResult{Session: &info}, nil
 }
 
-// grillingMarker opens each question of a gx-design grilling round. It counts
-// only at the start of a line: a question may quote it inline, in backticks.
-const grillingMarker = "❓ **Q"
-
-var grillingMarkerRE = regexp.MustCompile(`(?m)^[ \t]*` + regexp.QuoteMeta(grillingMarker))
-
-// hasGrillingMarker reports whether text opens a grilling question.
-func hasGrillingMarker(text string) bool { return grillingMarkerRE.MatchString(text) }
-
 const grillingReason = "Grilling: waiting for your answers"
-
-// runEndLine matches the closing line of a gx-design run. It only marks that a
-// run ended: the text after "Next:" is the agent's own, and nothing reads a
-// phase from it.
-var runEndLine = regexp.MustCompile(`(?m)^.*✅ [^:\n]+:.*Next:.*$`)
 
 // designActionable is what a Design session's last assistant message asks of
 // the person: the grilling question wins over the run-end line.
 func designActionable(text, ticket, agent string, final bool) (SessionActionable, bool) {
-	if hasGrillingMarker(text) {
+	if grillround.HasMarker(text) {
 		return SessionActionable{Reason: grillingReason, Grilling: true, Derived: true}, true
 	}
 	return runEndNext(text, ticket, agent, final)
@@ -83,7 +69,7 @@ func designActionable(text, ticket, agent string, final bool) (SessionActionable
 // runEndNext is the Actionable a gx-design run-end line raises: Continue in a
 // fresh conversation, or just the line when the design is at its final step.
 func runEndNext(text, ticket, agent string, final bool) (SessionActionable, bool) {
-	line := runEndLine.FindString(text)
+	line := grillround.RunEndLine.FindString(text)
 	if line == "" {
 		return SessionActionable{}, false
 	}

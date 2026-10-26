@@ -297,6 +297,15 @@ Not the **Pause reason text**, which is the question's summary line.
 answers them together, in one prompt. Each question may carry a **Question block**. Not a **Pause
 round**, which is one question a Paused ticket asks.
 
+**Questions asked** — the number of question cards in a **Grilling round**. "Accept these defaults?"
+and "Shared understanding" count. Lines under "Decided unless you object" do not: they are not cards.
+A closing summary asks none.
+
+**Words read** — the words a person reads in a **Grilling round** or a closing summary: card text, the
+"Decided unless you object" list, and the option labels, consequences and yes/no labels of a **Question
+block**. YAML keys, ids and markdown markers do not count. Text before the first card counts only in a
+Shared understanding round, where it is the closing summary.
+
 **Answered** — a ticket that is `open` again after a person answered its pause (reason `self-reported`) and that
 gx has not yet claimed. It is derived, never written: the ticket's latest question has an answer. It
 ends when gx claims the ticket. Not a status value.

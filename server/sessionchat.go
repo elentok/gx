@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/transcript"
 )
@@ -114,7 +115,7 @@ func chatLoader(ticket string, final bool) func(string) (chatSnapshot, error) {
 		for _, m := range loaded {
 			text := m.Text
 			if m.Role == transcript.ChatRoleAgent {
-				text, _ = splitFences(text)
+				text, _ = grillround.SplitFences(text)
 			}
 			snap.msgs = append(snap.msgs, SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool})
 		}

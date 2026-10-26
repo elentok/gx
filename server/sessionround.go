@@ -6,12 +6,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
-
-const questionFence = "```gx-question"
 
 // roundBlockNote explains a free-text card whose gx-question block was missing
 // or bad.
@@ -56,74 +55,13 @@ var (
 	sentenceEndRE = regexp.MustCompile(`[.?!:](\s|$)`)
 )
 
-// splitFences removes every gx-question fence from text and returns the raw
-// blocks it held, in order. An unclosed fence runs to the end of the text.
-func splitFences(text string) (stripped string, blocks []string) {
-	var kept []string
-	inBlock := false
-	for line := range strings.SplitSeq(text, "\n") {
-		switch {
-		case inBlock && strings.TrimSpace(line) == "```":
-			inBlock = false
-		case inBlock:
-			blocks[len(blocks)-1] += line + "\n"
-		case strings.TrimSpace(line) == questionFence:
-			inBlock = true
-			blocks = append(blocks, "")
-		default:
-			kept = append(kept, line)
-		}
-	}
-	return strings.TrimSpace(strings.Join(kept, "\n")), blocks
-}
-
-// roundSegments splits an agent message holding a Grilling round into one
-// segment per question. A segment runs from one line-start marker to the next,
-// or to a `---` line.
-func roundSegments(text string) []string {
-	var segs []string
-	locs := grillingMarkerRE.FindAllStringIndex(text, -1)
-	for i, loc := range locs {
-		end := len(text)
-		if i+1 < len(locs) {
-			end = locs[i+1][0]
-		}
-		// The marker's trailing Q opens the header the number is read from.
-		segs = append(segs, untilRule("Q"+text[loc[1]:end]))
-	}
-	return segs
-}
-
 // roundCards splits an agent message holding a Grilling round into cards.
 func roundCards(text string) []SessionRoundCard {
 	var cards []SessionRoundCard
-	for i, seg := range roundSegments(text) {
+	for i, seg := range grillround.Segments(text) {
 		cards = append(cards, parseRoundSegment(i+1, seg).Card)
 	}
 	return cards
-}
-
-// defaultsHeading is the heading gx-grilling puts over the questions it
-// decided unless the person objects. They are not cards.
-const defaultsHeading = "decided unless you object"
-
-// isDefaultsHeading reports whether line opens the defaults section, however
-// the agent dresses the heading (`#`, `**`, a trailing colon).
-func isDefaultsHeading(line string) bool {
-	line = strings.TrimLeft(strings.TrimSpace(line), "#* ")
-	return strings.HasPrefix(strings.ToLower(line), defaultsHeading)
-}
-
-// untilRule cuts seg at its first `---` line or defaults heading.
-func untilRule(seg string) string {
-	var kept []string
-	for line := range strings.SplitSeq(seg, "\n") {
-		if strings.TrimSpace(line) == "---" || isDefaultsHeading(line) {
-			break
-		}
-		kept = append(kept, line)
-	}
-	return strings.Join(kept, "\n")
 }
 
 // parsedRound is one parsed round segment. Err is set only when the segment
@@ -139,7 +77,7 @@ type parsedRound struct {
 // single place that decides whether a block is readable, so the card shown and
 // the bad block filed cannot disagree.
 func parseRoundSegment(seq int, seg string) parsedRound {
-	body, blocks := splitFences(seg)
+	body, blocks := grillround.SplitFences(seg)
 	header, rest, _ := strings.Cut(body, "\n")
 	card := SessionRoundCard{Label: strconv.Itoa(seq), Title: roundTitle(header), Body: strings.TrimSpace(roundHeaderText(header) + "\n" + rest), Kind: tickets.QuestionText}
 	if m := roundNumberRE.FindStringSubmatch(header); m != nil {
@@ -223,7 +161,7 @@ func trailingAgentTexts(msgs []transcript.ChatMessage) []string {
 // chatRound is the round the agent's last turn ended with, or nil.
 func chatRound(msgs []transcript.ChatMessage) []SessionRoundCard {
 	for _, text := range trailingAgentTexts(msgs) {
-		if hasGrillingMarker(text) {
+		if grillround.HasMarker(text) {
 			return roundCards(text)
 		}
 	}

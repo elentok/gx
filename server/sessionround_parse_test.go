@@ -3,6 +3,8 @@ package server
 import (
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/grillround"
 )
 
 func TestParseRoundSegment_BadBlockAndCleanCardAreExclusive(t *testing.T) {
@@ -27,7 +29,7 @@ func TestParseRoundSegment_BadBlockAndCleanCardAreExclusive(t *testing.T) {
 			if (p.Card.Note != "") != c.wantNote {
 				t.Fatalf("card note = %q, want note %v", p.Card.Note, c.wantNote)
 			}
-			if got := len(badRoundBlocks(grillingMarker+strings.TrimPrefix(c.seg, "Q"))) == 1; got != c.wantBad {
+			if got := len(badRoundBlocks(grillround.Marker+strings.TrimPrefix(c.seg, "Q"))) == 1; got != c.wantBad {
 				t.Fatalf("badRoundBlocks found one = %v, want %v", got, c.wantBad)
 			}
 		})
@@ -69,7 +71,7 @@ func TestRoundCards_InlineMarkerStaysInItsQuestion(t *testing.T) {
 	if !strings.Contains(cards[0].Body, "b) Fixed reply.") {
 		t.Errorf("Q8 body = %q; want it to keep both options", cards[0].Body)
 	}
-	if hasGrillingMarker("Quote `❓ **Q1**` inline only.") {
+	if grillround.HasMarker("Quote `❓ **Q1**` inline only.") {
 		t.Error("an inline marker opened a round")
 	}
 }

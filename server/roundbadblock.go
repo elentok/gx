@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -31,7 +32,7 @@ type badRoundBlock struct {
 // question with no block is plain text, not a bad block.
 func badRoundBlocks(text string) []badRoundBlock {
 	var bad []badRoundBlock
-	for i, seg := range roundSegments(text) {
+	for i, seg := range grillround.Segments(text) {
 		if p := parseRoundSegment(i+1, seg); p.Err != nil {
 			bad = append(bad, badRoundBlock{p.Card.Label, p.Err, p.Raw})
 		}

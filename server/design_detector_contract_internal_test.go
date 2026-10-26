@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/testutil/agentfake"
 )
@@ -102,7 +103,7 @@ func TestAgentfakeDesignRunEnd_HasTemplateShape(t *testing.T) {
 	if !runEndShape.MatchString(agentfake.DesignRunEnd) {
 		t.Errorf("agentfake.DesignRunEnd %q does not have the template shape", agentfake.DesignRunEnd)
 	}
-	if !runEndLine.MatchString(agentfake.DesignRunEnd) {
+	if !grillround.RunEndLine.MatchString(agentfake.DesignRunEnd) {
 		t.Errorf("agentfake.DesignRunEnd %q does not match runEndLine", agentfake.DesignRunEnd)
 	}
 }
@@ -125,7 +126,7 @@ func TestAgentfakeDefaultedRounds_UseTheRealFormat(t *testing.T) {
 	} {
 		text := agentfake.DesignRoundText(turn)
 		before, after, ok := strings.Cut(text, "\n---\n")
-		if !ok || !isDefaultsHeading(strings.TrimSpace(after)) {
+		if !ok || !grillround.IsDefaultsHeading(strings.TrimSpace(after)) {
 			t.Errorf("%s round has no defaults heading after a --- line: %q", turn, text)
 			continue
 		}
