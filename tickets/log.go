@@ -340,6 +340,18 @@ func AllRounds(events []LogEvent) []PauseRound {
 	return rounds
 }
 
+// OpenRound is the opening event (pause.question or pause.repair) of the latest
+// round with neither an answer nor a close, or nil. Unlike OpenQuestion it also
+// sees repair rounds.
+func OpenRound(events []LogEvent) *LogEvent {
+	rounds := AllRounds(events)
+	if n := len(rounds); n > 0 && rounds[n-1].End == nil {
+		r := rounds[n-1].Question
+		return &r
+	}
+	return nil
+}
+
 // OpenQuestion is the latest pause.question with neither an answer nor a close,
 // or nil.
 func OpenQuestion(events []LogEvent) *LogEvent {

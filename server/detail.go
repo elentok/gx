@@ -190,6 +190,7 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 			return TicketDetail{}, err
 		}
 	}
+	d.State = detailState(evs, t)
 	rounds := tickets.Rounds(evs)
 	if len(rounds) == 0 {
 		d.Actions = detailActions(t, nil, false, d.Permission)
@@ -201,7 +202,6 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	}
 	latest := detailRound(last, true)
 	d.Latest = &latest
-	d.State = answerState(last.Question, t.PausedClass())
 	d.Answered = t.Status == schema.StatusOpen && latest.Outcome == RoundAnswered
 	d.Chat = roundChat(latest)
 	gone := false

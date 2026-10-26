@@ -154,6 +154,9 @@ func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
+	if res, refused, err := staleTicket(epicPath, id, req); refused || err != nil {
+		return res, err
+	}
 	res, _, err := repair.Merge(repair.MergeInput{
 		EpicPath: epicPath, ID: id, From: req.From, To: req.To,
 		IgnoreLiveTab: req.IgnoreLiveTab, Continue: req.Continue, Abort: req.Abort, Source: req.origin, Cwd: cwd,
@@ -211,9 +214,14 @@ func (s *Server) repairStartOver(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
+	if res, refused, err := staleTicket(epicPath, id, req); refused || err != nil {
+		return res, err
+	}
+	// The web never deletes the branch, whatever the body says.
+	deleteBranch := req.DeleteBranch && !req.RequireState
 	res, err := repair.StartOver(repair.StartOverInput{
 		EpicPath: epicPath, ID: id, Reason: req.Reason, Force: req.Force,
-		DeleteBranch: req.DeleteBranch, Source: req.origin, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
+		DeleteBranch: deleteBranch, Source: req.origin, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
 	}, s.startOverDeps(req.Address))
 	if err != nil {
 		return repairRefusal(err), nil
@@ -255,8 +263,8 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 	paused := perr == nil && tk.PausedAsking()
 	zeroCommit := paused && tk.PauseReason == schema.PauseZeroCommit
 	// Every refusal runs before the first state change.
-	if paused && req.RequireState {
-		res, refused, err := resumeStale(t.Path, tk, req.State)
+	if perr == nil && tk.PausedClass() != "" && req.RequireState {
+		res, refused, err := webStale(t.Path, req)
 		if err != nil {
 			return RepairResult{}, err
 		}
@@ -317,17 +325,30 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 	return repairOK(res)
 }
 
-// resumeStale refuses an resume whose token no longer names the ticket's open
-// question and status; a pause without an open question has no round to name.
-func resumeStale(ticketPath string, t schema.Ticket, state string) (RepairResult, bool, error) {
-	evs, err := tickets.ReadLog(ticketPath)
-	if err != nil {
-		return RepairResult{}, false, fmt.Errorf("read log of %s: %w", ticketPath, err)
-	}
-	if open := tickets.OpenQuestion(evs); open != nil && answerState(*open, t.PausedClass()) == state {
+// webStale refuses a web verb whose token no longer names the ticket's open
+// pause round and class; a pause without an open round has nothing to name.
+func webStale(ticketPath string, req RepairRequest) (RepairResult, bool, error) {
+	if !req.RequireState {
 		return RepairResult{}, false, nil
 	}
+	stale, err := ticketPauseStale(ticketPath, req.State)
+	if err != nil || !stale {
+		return RepairResult{}, false, err
+	}
 	return staleResumeRefusal(), true, nil
+}
+
+// staleTicket is webStale for the ticket id of the epic at epicPath. A ticket
+// that does not exist is left to the verb to refuse.
+func staleTicket(epicPath, id string, req RepairRequest) (RepairResult, bool, error) {
+	if !req.RequireState {
+		return RepairResult{}, false, nil
+	}
+	_, t, err := repair.FindEpicTicket(epicPath, id)
+	if err != nil {
+		return RepairResult{}, false, nil
+	}
+	return webStale(t.Path, req)
 }
 
 func staleResumeRefusal() RepairResult {

@@ -179,6 +179,15 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 			applied = &f
 			req.actor = recovery.ActorInvestigate
 		}
+		if req.State != "" {
+			stale, err := ticketPauseStale(ref.ticket.Path, req.State)
+			if err != nil {
+				return QueueResult{}, err
+			}
+			if stale {
+				return refusal(ReasonStale, "the pause changed; review the current one"), nil
+			}
+		}
 		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
 			return QueueResult{}, nil
 		}

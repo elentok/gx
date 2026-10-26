@@ -57,6 +57,38 @@ func answerState(q tickets.LogEvent, class schema.PauseClass) string {
 	return fmt.Sprintf("%d:%s", q.Seq, class)
 }
 
+// detailState is the token the detail page carries. A paused ticket's token
+// names its latest round of any kind, so repair and manual pauses have one.
+func detailState(evs []tickets.LogEvent, t schema.Ticket) string {
+	rounds := tickets.Rounds(evs)
+	if t.PausedClass() != "" {
+		rounds = tickets.AllRounds(evs)
+	}
+	if len(rounds) == 0 {
+		return ""
+	}
+	return answerState(rounds[len(rounds)-1].Question, t.PausedClass())
+}
+
+// pauseStale reports whether state no longer names t's open pause round.
+func pauseStale(evs []tickets.LogEvent, t schema.Ticket, state string) bool {
+	open := tickets.OpenRound(evs)
+	return t.PausedClass() == "" || open == nil || answerState(*open, t.PausedClass()) != state
+}
+
+// ticketPauseStale is pauseStale for the ticket stored at ticketPath.
+func ticketPauseStale(ticketPath, state string) (bool, error) {
+	t, err := schema.ParseTicket(ticketPath)
+	if err != nil {
+		return false, err
+	}
+	evs, err := tickets.ReadLog(ticketPath)
+	if err != nil {
+		return false, fmt.Errorf("read log of %s: %w", ticketPath, err)
+	}
+	return pauseStale(evs, t, state), nil
+}
+
 // normalizeAnswer turns every line ending into \n so a CR cannot submit the
 // prompt early.
 func normalizeAnswer(s string) string {
