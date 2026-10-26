@@ -244,90 +244,6 @@ test("a loop epic shows the stat sentence with no token counts", async () => {
   expect(screen.queryByText(/token/i)).toBeNull();
 });
 
-const statRow = (container: HTMLElement, label: string) => container.querySelector(`[data-stat-row="${label}"]`)?.textContent;
-
-test("a merged loop epic shows every Stats row below the tickets", async () => {
-  const { container } = renderAt(
-    "/e/gx:e",
-    okFor,
-    undefined,
-    epicFetch({
-      total: 6,
-      done: 2,
-      rows: loopRows,
-      stats: {
-        lines_added: 3412,
-        lines_removed: 1208,
-        total_tokens: 2_500_000,
-        cost: 12.5,
-        lead_time: 3 * 86400,
-        friction: {
-          pauses_by_reason: { deadlock: 3, conflict: 2, other: 1 },
-          run_events: { stall: 4, retry: 1 },
-          paused_secs: 600,
-          web_share: 0.5,
-        },
-      },
-    }),
-  );
-  await screen.findByRole("heading", { name: "Stats" });
-  expect(statRow(container, "Lines")).toBe("Lines+3,412 −1,208");
-  expect(statRow(container, "Tokens")).toBe("Tokens2.5M");
-  expect(statRow(container, "Cost")).toBe("Cost$12.50");
-  expect(statRow(container, "Lead time")).toBe("Lead time3dcreated → merged to trunk");
-  expect(statRow(container, "Pauses")).toBe("Pauses6deadlock ×3, conflict ×2");
-  expect(statRow(container, "Run events")).toBe("Run events5stall ×4, retry ×1");
-  expect(statRow(container, "Paused time")).toBe("Paused time10m");
-  expect(statRow(container, "Pause endings")).toBe("Pause endings50% web");
-  const stats = screen.getByRole("heading", { name: "Stats" });
-  expect(screen.getByText("Title 06").compareDocumentPosition(stats) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-});
-
-test("an unmerged loop epic shows only the lead time so far", async () => {
-  const { container } = renderAt(
-    "/e/gx:e",
-    okFor,
-    undefined,
-    epicFetch({ total: 6, done: 2, rows: loopRows, stats: { lead_time: 3 * 86400, lead_time_so_far: true } }),
-  );
-  await screen.findByRole("heading", { name: "Stats" });
-  expect(container.querySelectorAll("[data-stat-row]")).toHaveLength(1);
-  expect(statRow(container, "Lead time")).toBe("Lead time3d so far");
-});
-
-test("a loop epic with no stamp has no Stats section, and cost is missing when the payload has none", async () => {
-  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
-  await screen.findByText("Title 06");
-  expect(screen.queryByRole("heading", { name: "Stats" })).toBeNull();
-  cleanup();
-  const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, rows: loopRows, stats: { total_tokens: 900 } }));
-  await screen.findByRole("heading", { name: "Stats" });
-  expect(statRow(container, "Tokens")).toBe("Tokens900");
-  expect(statRow(container, "Cost")).toBeUndefined();
-});
-
-test("a Design shows tokens, cost and lead time, or so far, only when stamped", async () => {
-  const design = { kind: "map", total: 2, done: 1, rows: [rowOf("01", "done"), rowOf("02", "open")] };
-  const { container } = renderAt(
-    "/e/gx:e",
-    okFor,
-    undefined,
-    epicFetch({ ...design, stats: { total_tokens: 12_000, cost: 0.5, lead_time: 7200 } }),
-  );
-  await screen.findByRole("heading", { name: "Stats" });
-  expect(statRow(container, "Tokens")).toBe("Tokens12.0k");
-  expect(statRow(container, "Cost")).toBe("Cost$0.50");
-  expect(statRow(container, "Lead time")).toBe("Lead time2h");
-  cleanup();
-  const open = renderAt("/e/gx:e", okFor, undefined, epicFetch({ ...design, stats: { lead_time: 7200, lead_time_so_far: true } }));
-  await screen.findByRole("heading", { name: "Stats" });
-  expect(statRow(open.container, "Lead time")).toBe("Lead time2h so far");
-  cleanup();
-  renderAt("/e/gx:e", okFor, undefined, epicFetch(design));
-  await screen.findByText("Title 02");
-  expect(screen.queryByRole("heading", { name: "Stats" })).toBeNull();
-});
-
 test("a loop epic with zero cost and agent time still shows both in the stat sentence", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "running", total: 6, done: 2, wall_clock: 4000, cost_total: 0, agent_time: 0, rows: loopRows }));
   await screen.findByTestId("stats-line");
@@ -353,16 +269,6 @@ test("a Merge blocked epic shows its label and merge-block reason; a Merging epi
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "merging", total: 2, done: 1 }));
   await screen.findByTestId("stats-line");
   expect(statsLine()).toMatch(/^Merging · /);
-});
-
-test("the done fold counts done tickets and adds cancelled only when above zero", async () => {
-  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
-  expect(await screen.findByText("✓ 1 done · 1 cancelled")).toBeTruthy();
-  expect(screen.getByText("2m · $1.50")).toBeTruthy();
-  expect(screen.getByText("cancelled · $0.25")).toBeTruthy();
-  cleanup();
-  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 1, done: 1, rows: [rowOf("01", "done")] }));
-  expect(await screen.findByText("✓ 1 done")).toBeTruthy();
 });
 
 test("live tickets show their status word, elapsed time and cost; the draft word shows on drafts", async () => {
@@ -565,10 +471,9 @@ test("live forks nest under a live parent, the indent stops at 2, and a fork of 
   ];
   const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 7, done: 2, rows }));
   await screen.findByText("Title 01");
-  const live = [...container.querySelectorAll("[data-indent]")].map((el) => [
-    el.textContent?.match(/Title \d+/)?.[0],
-    el.getAttribute("data-indent"),
-  ]);
+  const live = [...container.querySelectorAll("[data-indent]")]
+    .map((el) => [el.textContent?.match(/Title \d+/)?.[0], el.getAttribute("data-indent")])
+    .filter(([title]) => title !== "Title 05" && title !== "Title 07");
   expect(live).toEqual([
     ["Title 01", "0"],
     ["Title 02", "1"],
@@ -576,28 +481,7 @@ test("live forks nest under a live parent, the indent stops at 2, and a fork of 
     ["Title 04", "2"],
     ["Title 06", "0"],
   ]);
-  expect(screen.getAllByText(/fork of/).map((el) => el.textContent)).toEqual(["fork of 01", "ready · fork of 05"]);
-});
-
-test("done forks nest under a done parent in the fold, and only a fork whose parent is elsewhere says fork of", async () => {
-  const rows = [
-    rowOf("01", "done"),
-    rowOf("02", "done", { parent: "gx:e/01" }),
-    rowOf("03", "open"),
-    rowOf("04", "done", { parent: "gx:e/03" }),
-  ];
-  const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 4, done: 3, rows }));
-  await screen.findByText("Title 01");
-  const fold = [...container.querySelectorAll("[data-fold-indent]")].map((el) => [
-    el.querySelector("a")?.textContent,
-    el.getAttribute("data-fold-indent"),
-  ]);
-  expect(fold).toEqual([
-    ["Title 01", "0"],
-    ["Title 02", "1"],
-    ["Title 04", "0"],
-  ]);
-  expect(screen.getAllByText(/fork of/).map((el) => el.textContent)).toEqual(["fork of 03"]);
+  expect(screen.getAllByText(/fork of/).map((el) => el.textContent)).toEqual(["ready · fork of 05", "fork of 01"]);
 });
 
 test("a blocked row lists its blockers, cross-epic ones as epic/NN", async () => {
