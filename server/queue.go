@@ -104,6 +104,8 @@ type QueueRequest struct {
 	Front bool `json:"front,omitempty"`
 	// Text is what a nudge types into the live pane.
 	Text string `json:"text,omitempty"`
+	// Verb is the action a recommend stores; Text carries its diagnosis.
+	Verb string `json:"verb,omitempty"`
 	// Decision is allow or deny, for answering a blocked permission request.
 	Decision string `json:"decision,omitempty"`
 	// RequestID names the permission request a decision answers; empty answers

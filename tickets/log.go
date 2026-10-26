@@ -25,6 +25,10 @@ const (
 	// EventPausePrompted records a prompt sent to the live agent of a pause. It
 	// names the round in Question and does not end it.
 	EventPausePrompted = "pause.prompted"
+	// EventPauseRecommend is an investigate agent's diagnosis (Text) and one verb
+	// (Choice) for the round it names in Question. It does not end the round, and
+	// a later round leaves it behind.
+	EventPauseRecommend = "pause.recommend"
 )
 
 // Round-end sources: who ended the round.
@@ -317,6 +321,40 @@ func PromptOpenRound(ticketPath, source string) error {
 		return nil
 	}
 	return err
+}
+
+// RecommendOpenRound writes pause.recommend{question, choice: verb, text:
+// diagnosis} for the latest round that has no end. It reports false, writing
+// nothing, when no round is open.
+func RecommendOpenRound(ticketPath, verb, diagnosis string) (bool, error) {
+	text, _ := ClipLogText(diagnosis)
+	_, err := appendLogWith(ticketPath, func(evs []LogEvent) (LogEvent, error) {
+		open := OpenRound(evs)
+		if open == nil {
+			return LogEvent{}, errNoOpenQuestion
+		}
+		return LogEvent{Type: EventPauseRecommend, Question: open.Seq, Choice: verb, Text: text, Source: SourceCLI}, nil
+	})
+	if errors.Is(err, errNoOpenQuestion) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// RecommendationOf is the latest pause.recommend naming the open round, or nil:
+// a round that ended, or a newer one, leaves older recommendations behind.
+func RecommendationOf(events []LogEvent) *LogEvent {
+	open := OpenRound(events)
+	if open == nil {
+		return nil
+	}
+	var rec *LogEvent
+	for i := range events {
+		if events[i].Type == EventPauseRecommend && events[i].Question == open.Seq {
+			rec = &events[i]
+		}
+	}
+	return rec
 }
 
 // LastPrompt is the time of the latest pause.prompted naming round question, or

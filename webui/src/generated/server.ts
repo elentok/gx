@@ -160,6 +160,12 @@ export interface DetailRound {
    * ClosedReason is the pause.closed reason of a round no answer ended.
    */
   closed_reason?: string;
+  /**
+   * PromptedAt is when a person last prompted the running agent of this open
+   * round, and Prompt is the line the web shows for it.
+   */
+  prompted_at?: string;
+  prompt?: string;
 }
 /**
  * DetailAnswer is a person's reply to a round.
@@ -169,6 +175,14 @@ export interface DetailAnswer {
   choice?: string;
   text?: string;
   note?: string;
+}
+/**
+ * DetailRecommendation is what an investigate agent left on a paused ticket: its
+ * diagnosis and the one verb of Actions it recommends.
+ */
+export interface DetailRecommendation {
+  verb: string;
+  diagnosis: string;
 }
 /**
  * PermissionCard is the pending permission prompt of a blocked agent.
@@ -257,6 +271,10 @@ export interface TicketDetail {
    */
   bases?: string[];
   actions: string[];
+  /**
+   * Recommendation is set while the open pause round carries one.
+   */
+  recommendation?: DetailRecommendation;
   /**
    * ActionInfo gives each entry of Actions its button label and tooltip, from
    * the pause-to-verb table, so the page holds no verb text of its own.

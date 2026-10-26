@@ -89,6 +89,13 @@ type DetailAnswer struct {
 	Note   string `json:"note,omitempty"`
 }
 
+// DetailRecommendation is what an investigate agent left on a paused ticket: its
+// diagnosis and the one verb of Actions it recommends.
+type DetailRecommendation struct {
+	Verb      string `json:"verb"`
+	Diagnosis string `json:"diagnosis"`
+}
+
 // PermissionCard is the pending permission prompt of a blocked agent.
 type PermissionCard struct {
 	RequestID   string `json:"request_id"`
@@ -148,6 +155,8 @@ type TicketDetail struct {
 	// the resume sends the chosen one back as its base.
 	Bases   []string `json:"bases,omitempty"`
 	Actions []string `json:"actions"`
+	// Recommendation is set while the open pause round carries one.
+	Recommendation *DetailRecommendation `json:"recommendation,omitempty"`
 	// ActionInfo gives each entry of Actions its button label and tooltip, from
 	// the pause-to-verb table, so the page holds no verb text of its own.
 	ActionInfo map[string]ActionInfo `json:"action_info,omitempty"`
@@ -216,6 +225,9 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		}
 	}
 	d.State = detailState(evs, t)
+	if rec := tickets.RecommendationOf(evs); rec != nil && t.PausedClass() != "" {
+		d.Recommendation = &DetailRecommendation{Verb: rec.Choice, Diagnosis: rec.Text}
+	}
 	rounds := tickets.Rounds(evs)
 	if len(rounds) == 0 {
 		d.Actions = detailActions(t, nil, false, d.Permission)

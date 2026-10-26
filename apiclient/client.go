@@ -365,6 +365,12 @@ func (c *Client) TicketAsk(ctx context.Context, address, body string) (server.Qu
 	return c.queueWriteTo(ctx, "/v1/tickets/ask", server.QueueRequest{Address: address, Text: body})
 }
 
+// TicketRecommend stores an investigate agent's diagnosis and recommended verb
+// on the paused ticket it investigates.
+func (c *Client) TicketRecommend(ctx context.Context, address, verb, diagnosis string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/recommend", server.QueueRequest{Address: address, Verb: verb, Text: diagnosis})
+}
+
 // TicketNudge types text into the live pane of a ticket's iteration.
 func (c *Client) TicketNudge(ctx context.Context, address, text string) (server.QueueResult, error) {
 	return c.queueWriteTo(ctx, "/v1/tickets/nudge", server.QueueRequest{Address: address, Text: text})

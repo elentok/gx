@@ -717,6 +717,31 @@ func newServerTicketsCmd() *cobra.Command {
 	}
 	nudge.Flags().BoolVar(&nudgeJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(nudge)
+
+	var recVerb string
+	var recJSON bool
+	recommend := &cobra.Command{
+		Use:   "recommend <project:epic/NN> --verb <verb> --diagnosis <text|->",
+		Short: "store an investigate agent's diagnosis and recommended verb on its paused ticket",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			diagnosis, _ := c.Flags().GetString("diagnosis")
+			if diagnosis == "-" {
+				b, err := io.ReadAll(c.InOrStdin())
+				if err != nil {
+					return fmt.Errorf("reading diagnosis: %w", err)
+				}
+				diagnosis = string(b)
+			}
+			return serverQueueWrite(c, recJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return cl.TicketRecommend(ctx, args[0], recVerb, diagnosis)
+			})
+		},
+	}
+	recommend.Flags().StringVar(&recVerb, "verb", "", "the recommended action (one of the ticket's detail actions)")
+	recommend.Flags().String("diagnosis", "", "the diagnosis, or - to read it from stdin")
+	recommend.Flags().BoolVar(&recJSON, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(recommend)
 	cmd.AddCommand(newTicketsAnswerCmd(deps{}, true))
 
 	var followJSON bool
