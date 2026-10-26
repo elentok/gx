@@ -37,6 +37,12 @@ func WithChatHarness(kind string) func(*server.Config) {
 	return func(c *server.Config) { c.ChatHarness = kind }
 }
 
+// WithRemoteControlHarness lets fix-agent sessions of kind take the
+// remote-control setting, as claude's do.
+func WithRemoteControlHarness(kind string) func(*server.Config) {
+	return func(c *server.Config) { c.RemoteControlHarness = kind }
+}
+
 // WithChatPollInterval shortens how often a working session's transcript size
 // is checked.
 func WithChatPollInterval(d time.Duration) func(*server.Config) {

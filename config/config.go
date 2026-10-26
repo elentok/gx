@@ -271,7 +271,8 @@ func Parse(data []byte) (Config, error) {
 				Done      *string `json:"done"`
 				Attention *string `json:"attention"`
 			} `json:"sounds"`
-			ClaudeArgs []string `json:"claude-args"`
+			ClaudeArgs            []string `json:"claude-args"`
+			FixAgentRemoteControl *bool    `json:"fix-agent-remote-control"`
 		} `json:"agents"`
 		Subscription *struct {
 			SuppressExtraUsageWarning *bool `json:"suppress-extra-usage-warning"`
@@ -445,6 +446,9 @@ func Parse(data []byte) (Config, error) {
 		}
 		if raw.Agents.ClaudeArgs != nil {
 			cfg.Agents.ClaudeArgs = raw.Agents.ClaudeArgs
+		}
+		if raw.Agents.FixAgentRemoteControl != nil {
+			cfg.Agents.FixAgentRemoteControl = *raw.Agents.FixAgentRemoteControl
 		}
 	}
 	if raw.Subscription != nil && raw.Subscription.SuppressExtraUsageWarning != nil {

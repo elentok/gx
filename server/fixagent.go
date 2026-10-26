@@ -1,11 +1,13 @@
 package server
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -109,16 +111,22 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 	if label := t.PauseReason.Label(); label != "" {
 		prompt += ": " + label
 	}
-	res, err := s.createSession(CreateSessionRequest{
+	settings := s.settings.Load()
+	cs := CreateSessionRequest{
 		Project:    ref.addr.Project,
 		Dir:        checkout,
 		Name:       fixAgentName(addr),
 		UniqueName: true,
 		Prompt:     prompt,
-		Harness:    s.settings.Load().chatHarness(),
-	})
+		Harness:    settings.chatHarness(),
+	}
+	remote := settings.AgentsFixAgentRemoteControl && cs.Harness == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
+	if remote {
+		cs.remoteControl = addr
+	}
+	res, err := s.createSession(cs)
 	if res.Refused && res.Reason == ReasonSessionNameTaken {
 		return fixAgentRefusal(ReasonSessionNameTaken, "an agent is already fixing "+addr), nil
 	}
-	return FixAgentResult{SessionResult: res}, err
+	return FixAgentResult{SessionResult: res, RemoteControl: remote && !res.Refused && err == nil}, err
 }

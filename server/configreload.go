@@ -143,7 +143,7 @@ func (s *Server) applyBudgetLimits(old, next Settings) {
 // reloadableSettings is next with the chat test seams, which are not config
 // keys, carried over from the live settings.
 func reloadableSettings(old, next Settings) Settings {
-	next.ChatHarness = old.ChatHarness
+	next.ChatHarness, next.RemoteControlHarness = old.ChatHarness, old.RemoteControlHarness
 	next.Chat.TelegramBaseURL, next.Chat.GateStatePath, next.Chat.FlushInterval = old.Chat.TelegramBaseURL, old.Chat.GateStatePath, old.Chat.FlushInterval
 	return next
 }
@@ -182,6 +182,7 @@ func changedKeys(old, next Settings) []string {
 		{"agents.banners.enabled", old.AgentsBanners, next.AgentsBanners},
 		{"agents.sounds", old.AgentsSounds, next.AgentsSounds},
 		{"agents.claude-args", old.AgentsClaudeArgs, next.AgentsClaudeArgs},
+		{"agents.fix-agent-remote-control", old.AgentsFixAgentRemoteControl, next.AgentsFixAgentRemoteControl},
 		{"agents.claude", old.AgentsClaude, next.AgentsClaude},
 		{"agents.codex", old.AgentsCodex, next.AgentsCodex},
 	}

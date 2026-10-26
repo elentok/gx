@@ -36,6 +36,9 @@ type AgentsConfig struct {
 	Banners         AgentsBannersConfig `json:"banners"`
 	Sounds          AgentsSoundsConfig  `json:"sounds"`
 	ClaudeArgs      []string            `json:"claude-args,omitempty"`
+	// FixAgentRemoteControl starts Claude fix-agent sessions with
+	// --remote-control.
+	FixAgentRemoteControl bool `json:"fix-agent-remote-control"`
 }
 
 // AgentsBannersConfig switches interactive-session OS banners.

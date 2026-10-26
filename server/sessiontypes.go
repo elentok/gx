@@ -140,6 +140,9 @@ type CreateSessionRequest struct {
 
 	// design marks the session Design although Ticket has no map epic yet.
 	design bool
+	// remoteControl is the --remote-control name, saved in the meta so resumes
+	// keep it whatever the setting says by then.
+	remoteControl string
 }
 
 // SessionResult is a session write's outcome: the session, or a refusal.
@@ -171,6 +174,9 @@ type sessionMeta struct {
 	AutoName bool   `json:"auto_name,omitempty"`
 	Ticket   string `json:"ticket,omitempty"`
 	Design   bool   `json:"design,omitempty"`
+	// RemoteControl is the name a Claude fix-agent session was started with
+	// --remote-control under; empty means the flag was never applied.
+	RemoteControl string `json:"remote_control,omitempty"`
 	// FirstPrompt waits for the ready report or the first Idle; it is cleared
 	// once typed or on exit.
 	FirstPrompt string `json:"first_prompt,omitempty"`

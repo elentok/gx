@@ -121,6 +121,8 @@ type Settings struct {
 	AgentsBanners       bool
 	AgentsSounds        config.AgentsSoundsConfig
 	AgentsClaudeArgs    []string
+	// AgentsFixAgentRemoteControl is read at each fix-agent start.
+	AgentsFixAgentRemoteControl bool
 
 	// CPUWatchdog is config cpu-watchdog: when a CPU spike files a ticket.
 	CPUWatchdog config.CPUWatchdogConfig
@@ -143,6 +145,11 @@ type Settings struct {
 	// empty means claude. Not a config key: servertest points it at the fake
 	// harness.
 	ChatHarness string
+
+	// RemoteControlHarness names the harness a fix-agent session may start
+	// with --remote-control; empty means claude. Not a config key: servertest
+	// points it at the fake harness, whose launch args stay unflagged.
+	RemoteControlHarness string
 }
 
 // SettingsFromConfig maps the user config to the server's reloadable
@@ -169,17 +176,18 @@ func SettingsFromConfig(cfg config.Config) Settings {
 			TelegramChatID:   cfg.Notifications.Telegram.ChatID,
 			SlackWebhookURL:  cfg.Notifications.Slack.WebhookURL,
 		},
-		SuppressExtraUsageWarning: cfg.Subscription.SuppressExtraUsageWarning,
-		WatchConfig:               cfg.Server.WatchConfig,
-		AgentsResumeOnStart:       cfg.Agents.ResumeOnStart,
-		AgentsBanners:             cfg.Agents.Banners.Enabled,
-		AgentsSounds:              cfg.Agents.Sounds,
-		AgentsClaudeArgs:          cfg.Agents.ClaudeArgs,
-		CPUWatchdog:               cfg.CPUWatchdog,
-		RecentlyFinished:          cfg.Server.RecentlyFinished,
-		AgentsClaude:              cfg.Agents.Claude,
-		AgentsCodex:               cfg.Agents.Codex,
-		WebAllowedHosts:           cfg.Server.Web.AllowedHosts,
+		SuppressExtraUsageWarning:   cfg.Subscription.SuppressExtraUsageWarning,
+		WatchConfig:                 cfg.Server.WatchConfig,
+		AgentsResumeOnStart:         cfg.Agents.ResumeOnStart,
+		AgentsBanners:               cfg.Agents.Banners.Enabled,
+		AgentsSounds:                cfg.Agents.Sounds,
+		AgentsClaudeArgs:            cfg.Agents.ClaudeArgs,
+		AgentsFixAgentRemoteControl: cfg.Agents.FixAgentRemoteControl,
+		CPUWatchdog:                 cfg.CPUWatchdog,
+		RecentlyFinished:            cfg.Server.RecentlyFinished,
+		AgentsClaude:                cfg.Agents.Claude,
+		AgentsCodex:                 cfg.Agents.Codex,
+		WebAllowedHosts:             cfg.Server.Web.AllowedHosts,
 	}
 }
 

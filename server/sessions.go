@@ -162,6 +162,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		Ticket:         req.Ticket,
 		Design:         req.design || (req.Ticket != "" && s.onMapEpic(req.Ticket)),
 		FirstPrompt:    req.Prompt,
+		RemoteControl:  req.remoteControl,
 		ConversationID: conv,
 		CreatedAt:      time.Now(),
 	}
@@ -332,11 +333,10 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 	if err != nil {
 		return err
 	}
-	var extra []string
-	if meta.Harness == string(harness.Claude) {
-		extra = s.settings.Load().AgentsClaudeArgs
+	opts := harness.LaunchOptions{
+		SessionID: meta.ConversationID,
+		Args:      launchArgs(meta, s.settings.Load().AgentsClaudeArgs),
 	}
-	opts := harness.LaunchOptions{SessionID: meta.ConversationID, Args: extra}
 	launch := h.Launch(opts)
 	if resume {
 		var ok bool
@@ -372,6 +372,18 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 	// Reap the holder; it outlives the server otherwise.
 	go func() { _ = cmd.Wait() }()
 	return nil
+}
+
+// launchArgs is the extra harness args of a launch or resume. Only Claude gets
+// any; the remote-control name comes from the meta, never the settings.
+func launchArgs(meta *sessionMeta, claudeArgs []string) []string {
+	if meta.Harness != string(harness.Claude) {
+		return nil
+	}
+	if meta.RemoteControl == "" {
+		return claudeArgs
+	}
+	return append(slices.Clone(claudeArgs), "--remote-control", meta.RemoteControl)
 }
 
 // endFailedStart saves a session whose holder did not start as Exited

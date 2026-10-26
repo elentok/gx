@@ -532,6 +532,11 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "Extra arguments passed to claude in interactive sessions. Default: none."
+        },
+        "fix-agent-remote-control": {
+          "type": "boolean",
+          "description": "Start Claude fix-agent sessions with --remote-control <ticket address>, so they can be driven from the Claude app. Other harnesses and session kinds ignore it. Default: false.",
+          "default": false
         }
       },
       "default": {
