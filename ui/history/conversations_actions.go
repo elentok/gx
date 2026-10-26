@@ -125,9 +125,10 @@ func (m Model) handleEditorFinished(msg editorFinishedMsg, notifyCmd tea.Cmd) (t
 	return m, notifyCmd
 }
 
-// resumeCommandArgs builds the argv `claude --resume <sessionID>` split-launches.
+// resumeCommandArgs builds the argv `claude --resume <sessionID>
+// --permission-mode auto` split-launches.
 func resumeCommandArgs(sessionID string) (program string, args []string) {
-	return "claude", []string{"--resume", sessionID}
+	return "claude", []string{"--resume", sessionID, "--permission-mode", "auto"}
 }
 
 // cmdResumeConversation opens `claude --resume <session-id>` for the selected

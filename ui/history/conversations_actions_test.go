@@ -3,6 +3,7 @@ package history
 import (
 	"errors"
 	"os"
+	"slices"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -141,8 +142,8 @@ func TestResumeCommandArgs(t *testing.T) {
 	if program != "claude" {
 		t.Fatalf("program = %q, want claude", program)
 	}
-	want := []string{"--resume", "sess-101"}
-	if len(args) != len(want) || args[0] != want[0] || args[1] != want[1] {
+	want := []string{"--resume", "sess-101", "--permission-mode", "auto"}
+	if !slices.Equal(args, want) {
 		t.Fatalf("args = %#v, want %#v", args, want)
 	}
 }

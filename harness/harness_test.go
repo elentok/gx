@@ -41,7 +41,7 @@ func TestLookup_FindsARegisteredHarness(t *testing.T) {
 func TestClaudeLaunch(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
 	cmd := claude(t).Launch(harness.LaunchOptions{SessionID: "s1", Args: []string{"--x"}, Env: []string{"FOO=bar"}})
-	if cmd.Name != "claude" || !slices.Equal(cmd.Args, []string{"--session-id", "s1", "--x"}) {
+	if cmd.Name != "claude" || !slices.Equal(cmd.Args, []string{"--session-id", "s1", "--permission-mode", "auto", "--x"}) {
 		t.Fatalf("Launch = %s %q", cmd.Name, cmd.Args)
 	}
 	assertClaudeEnv(t, cmd.Env)
@@ -50,10 +50,17 @@ func TestClaudeLaunch(t *testing.T) {
 func TestClaudeResume(t *testing.T) {
 	t.Setenv("CLAUDECODE", "1")
 	cmd, ok := claude(t).Resume("conv-1", harness.LaunchOptions{Args: []string{"--x"}, Env: []string{"FOO=bar"}})
-	if !ok || cmd.Name != "claude" || !slices.Equal(cmd.Args, []string{"--resume", "conv-1", "--x"}) {
+	if !ok || cmd.Name != "claude" || !slices.Equal(cmd.Args, []string{"--resume", "conv-1", "--permission-mode", "auto", "--x"}) {
 		t.Fatalf("Resume = %s %q, ok=%v", cmd.Name, cmd.Args, ok)
 	}
 	assertClaudeEnv(t, cmd.Env)
+}
+
+func TestClaudeLaunchKeepsCallerPermissionMode(t *testing.T) {
+	cmd := claude(t).Launch(harness.LaunchOptions{SessionID: "s1", Args: []string{"--permission-mode", "auto", "--x"}})
+	if !slices.Equal(cmd.Args, []string{"--session-id", "s1", "--permission-mode", "auto", "--x"}) {
+		t.Fatalf("Launch = %q", cmd.Args)
+	}
 }
 
 func assertClaudeEnv(t *testing.T, env []string) {
