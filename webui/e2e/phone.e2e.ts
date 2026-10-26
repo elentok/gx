@@ -22,6 +22,31 @@ test("23. Phone, Epics page", async ({ page, start }) => {
   expect(line!.height).toBeLessThanOrEqual(lineHeight * 1.5);
 });
 
+test.describe("53. Phone, epic page", () => {
+  test("buttons sit below the stats line", async ({ page, start }) => {
+    await start("united");
+    await page.evaluate(() => (location.hash = "#/e/demo:awaiting-epic"));
+    const merge = page.getByRole("button", nav("Merge"));
+    await expect(merge).toBeVisible();
+    const stats = (await page.getByTestId("stats-line").boundingBox())!;
+    for (const button of await merge.locator("xpath=..").getByRole("button").all()) {
+      const box = (await button.boundingBox())!;
+      expect(box.y).toBeGreaterThanOrEqual(stats.y + stats.height);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test("a card's meta sits below its title", async ({ page, start }) => {
+    await start("mixed");
+    await page.evaluate(() => (location.hash = "#/e/demo:mixed-epic"));
+    const link = page.getByRole("link", { name: "02 open ready" });
+    await expect(link).toBeVisible();
+    const title = (await link.getByText("open", nav("open")).boundingBox())!;
+    const meta = (await link.getByText("ready", nav("ready")).boundingBox())!;
+    expect(meta.y).toBeGreaterThanOrEqual(title.y + title.height);
+  });
+});
+
 test("41. Phone, New Design sheet", async ({ page, start }) => {
   await start("ready");
   await page.getByRole("button", nav("New Design")).click();

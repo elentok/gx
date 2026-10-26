@@ -6,8 +6,8 @@ Retries are off. Locators use roles and visible text, plus `data-testid` `pill` 
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
-Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46),
-`united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41),
+Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
+`united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
 `newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40).
 
 ## 1. Queue an epic
@@ -513,3 +513,45 @@ an exited session.
   - SQLite, `Q8b` as the current dot and the composer note survive entering and leaving.
   - ▾ folds and leaves; ⤢ on the folded sheet unfolds and enters.
   - Sending leaves with the sent round shown; Continue opens the `Q9` round docked. No "Questions, full screen" dialog appears.
+
+## 50. Design epic page
+
+- **Scenario:** `design`
+- **Steps:**
+  1. Write a long Destination section on `design-epic` with `gx tickets section`; open `#/e/demo:design-epic`.
+  2. Click Start design session; open the epic page again.
+- **Pass:**
+  - Before the session the ring reads a percentage with `data-tone="muted"`. The summary shows in full under the title.
+  - The stats line starts with "Resolve tickets", shows a time ("2m") and has no "$".
+  - The open tickets read `01 first implement · ready` and `02 second implement · after 01`. The done ticket `03 timed` shows "2m" and no "$".
+  - After the start the ring is `running` and the comet shows.
+
+## 51. Merge from the epic page
+
+- **Scenario:** `united`
+- **Steps:** open `#/e/demo:awaiting-epic`, then `#/e/demo:blocked-merge-epic`.
+- **Pass:**
+  - `awaiting-epic` has a Merge button with `data-tone="done"`, last in the button group.
+  - `blocked-merge-epic` shows "needs a rebase" under the bar. Merge is still there, as the retry.
+
+## 52. Draft impl epic
+
+- **Scenario:** `united`
+- **Steps:** open `#/e/demo:publishing-epic-impl`.
+- **Pass:** the stats line starts with "Publishing tickets". Queue is disabled and its wrapper has the title "Queue unlocks once all tickets are published".
+
+## 53. Phone, epic page
+
+- **Scenario:** `united` at 375 px wide; the second test uses `mixed`.
+- **Steps:** open `#/e/demo:awaiting-epic`; open `#/e/demo:mixed-epic`.
+- **Pass:**
+  - Every button of the bar sits below the stats line and is at least 44 px tall.
+  - On a card the meta text ("ready") sits below the title ("open").
+
+## 54. Done list
+
+- **Scenario:** `many-done`
+- **Steps:** open `#/e/demo:many-done-epic`; click "Show 2 more"; click "Show fewer".
+- **Pass:**
+  - The divider reads "5 done" and 3 done cards show, newest first (`merged-e`, `merged-d`, `merged-c`).
+  - "Show 2 more" shows 5 cards and the button reads "Show fewer"; clicking goes back to 3.

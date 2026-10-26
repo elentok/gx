@@ -535,6 +535,39 @@ test.describe("45. Delete design", () => {
   });
 });
 
+test("50. Design epic page", async ({ page, start }) => {
+  const fixture = await start("design");
+  const summary = "Reach the sea by building a canal, a lock and a long harbour wall before the autumn storms.";
+  await fixture.cli("tickets", "section", "demo:design-epic", "Destination", summary);
+  // The server reads the new section a moment after the CLI wrote it, so the page is opened until it shows.
+  await expect(async () => {
+    await page.evaluate(() => (location.hash = "#/epics"));
+    await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
+    await expect(page.getByText(summary, nav(summary))).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  const ring = page.locator("[data-kind]").first();
+
+  // Before a session the ring is muted and the stats line names the step, with a time and no cost.
+  await expect(ring).toHaveAttribute("data-tone", "muted");
+  await expect(ring).toHaveText(/%$/);
+  await expect(page.getByText(summary, nav(summary))).toBeVisible();
+  const stats = page.getByTestId("stats-line");
+  await expect(stats).toHaveText(/^Resolve tickets/);
+  await expect(stats).not.toContainText("$");
+  await expect(stats).toContainText("2m");
+  await expect(page.getByRole("link", { name: /^01 first .*implement.* ready$/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^02 second .*implement.* after 01$/ })).toBeVisible();
+  const timed = page.getByRole("link", { name: /03 timed/ });
+  await expect(timed).toContainText("2m");
+  await expect(timed).not.toContainText("$");
+
+  await page.getByRole("button", nav("Start design session")).click();
+  await expect(page.getByText("Two questions before the spec.")).toBeVisible();
+  await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
+  await expect(ring).toHaveAttribute("data-tone", "running");
+  await expect(page.getByTestId("comet")).toBeVisible();
+});
+
 test.describe("46. gx designs delete", () => {
   test("removes an uncharted design", async ({ start }) => {
     const fixture = await start("ready");

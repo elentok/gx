@@ -99,6 +99,24 @@ test("8. Edge states", async ({ page, start }) => {
   await expect(page.getByRole("link", { name: "01 unmerged ready" })).toBeVisible();
 });
 
+test("54. Done list", async ({ page, start }) => {
+  await start("many-done");
+  await page.evaluate(() => (location.hash = "#/e/demo:many-done-epic"));
+  const done = page.locator('[data-done-divider] ~ [data-tone="done"]');
+  await expect(page.getByText("5 done")).toBeVisible();
+  await expect(done).toHaveCount(3);
+  // Newest first.
+  await expect(done.nth(0)).toContainText("merged-e");
+  await expect(done.nth(2)).toContainText("merged-c");
+
+  await page.getByRole("button", nav("Show 2 more")).click();
+  await expect(done).toHaveCount(5);
+  await expect(done.nth(4)).toContainText("merged-a");
+  await page.getByRole("button", nav("Show fewer")).click();
+  await expect(done).toHaveCount(3);
+  await expect(page.getByRole("button", nav("Show 2 more"))).toBeVisible();
+});
+
 test("6. Outside changes show up", async ({ page, start }) => {
   const fixture = await start("ready");
   const ready = await section(page, "Ready to queue");

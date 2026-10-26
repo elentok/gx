@@ -267,3 +267,29 @@ test("30. Open epic on a deadlock card", async ({ page, start }) => {
   await card(page, "deadlock-epic").getByRole("button", nav("Open epic")).click();
   await expect(page).toHaveURL(/#\/e\/demo:deadlock-epic$/);
 });
+
+test("51. Merge from the epic page", async ({ page, start }) => {
+  await start("united");
+
+  // An awaiting-merge epic: Merge is the last button of the group, in the done tone.
+  await page.evaluate(() => (location.hash = "#/e/demo:awaiting-epic"));
+  const merge = page.getByRole("button", nav("Merge"));
+  await expect(merge).toBeVisible();
+  await expect(merge).toHaveAttribute("data-tone", "done");
+  await expect(merge.locator("xpath=..").getByRole("button").last()).toHaveText("Merge");
+
+  // A land-blocked epic shows the reason under the bar. Merge stays, as the retry: isMergeable allows a
+  // paused epic with a land-block reason.
+  await page.evaluate(() => (location.hash = "#/e/demo:blocked-merge-epic"));
+  await expect(page.getByText("needs a rebase")).toBeVisible();
+  await expect(page.getByRole("button", nav("Merge"))).toBeVisible();
+});
+
+test("52. Draft impl epic", async ({ page, start }) => {
+  await start("united");
+  await page.evaluate(() => (location.hash = "#/e/demo:publishing-epic-impl"));
+  await expect(page.getByTestId("stats-line")).toHaveText(/^Publishing tickets/);
+  const queue = page.getByRole("button", nav("Queue"));
+  await expect(queue).toBeDisabled();
+  await expect(page.getByTitle("Queue unlocks once all tickets are published")).toBeVisible();
+});
