@@ -98,7 +98,6 @@ var allowed = map[string]allowance{
 	"ralphloop/waitforfinish_recovery.go": allow("comment names the legacy Needs Answer heading", "needsanswer"),
 	"webui/src/generated/server.ts":       allow("generated from the wire fields above", "park", "needsanswer"),
 	"webui/src/epic/rows.ts":              allow("maps the legacy needs-answer and needs-repair statuses", "needsanswer", "needsrepair"),
-	"webui/src/view.ts":                   allow("reads the legacy needs-repair status and the parked wire field", "needsrepair", "park"),
 	// Tests of the read shim, the hidden aliases and the kept wire names.
 	"cmd/server_parity_test.go":                allow("lists the hidden drain, park and unpark routes", "drain", "park"),
 	"cmd/tickets_alias_test.go":                allow("tests the retired land, reset, unpark and drain aliases", "park", "land", "reset", "drain"),
@@ -117,8 +116,6 @@ var allowed = map[string]allowance{
 	"tickets/schema/pause_write_test.go":       allow("asserts the old words are never written", "park", "needsanswer", "needsrepair", "land"),
 	"webui/src/canned-snapshot.json":           allow("fixture of the kept parked wire field and legacy rendered statuses", "park", "needsanswer", "needsrepair"),
 	"webui/src/canned-snapshot.test.ts":        allow("reads the kept parked wire field and legacy statuses", "park", "needsanswer", "needsrepair"),
-	"webui/src/queue/QueueScreen.test.tsx":     allow("builds the kept parked wire field", "park"),
-	"webui/src/view.test.ts":                   allow("builds the kept parked wire field", "park"),
 	"webui/src/routes.test.tsx":                allow("uses the kept legacy rendered statuses and needs_answer field", "needsanswer", "needsrepair"),
 	"webui/src/ticket/header.ts":               allow("maps the legacy needs-answer and needs-repair wire statuses to Paused", "needsanswer", "needsrepair"),
 	"webui/src/ticket/ActionCard.test.tsx":     allow("builds tickets with the legacy wire statuses", "needsanswer", "needsrepair"),

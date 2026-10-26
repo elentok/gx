@@ -112,7 +112,7 @@ it and use it for every later `set`, `section` and `--blocked-by`, never the pre
 **Code review** — once all moves and chains are done, so it comes last, run `gx tickets ensure-code-review
 <project>:follow-ups-<date>` for the ready epic. Fill the stub's "What to review" with "all follow-up
 fixes in this epic" (`gx tickets section <review-addr> "What to review" -`). Map epics get none: they
-land no code.
+merge no code.
 
 `gx tickets validate` one ticket of each new epic.
 
