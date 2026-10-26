@@ -1,11 +1,13 @@
 import { Box } from "@chakra-ui/react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import canned from "../canned-snapshot.json";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { WideContext } from "../design/useWide";
+import { EpicPage } from "../epic/EpicPage";
 import { EpicCard } from "../epics/EpicCard";
-import type { EpicListRow } from "../generated/server";
+import type { EpicDetail, EpicDetailRow, EpicListRow, FixAgentResult } from "../generated/server";
 import { JumpRow } from "../nav/JumpMenu";
 import { Arc } from "../ui/arc/Arc";
 import { StatusIcon, STATUS_LABELS, type StatusKind } from "../ui/status-icon/StatusIcon";
@@ -79,6 +81,93 @@ const OpenMenu = ({ children }: { children: ReactNode }) => {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => root.current?.querySelector<HTMLElement>("button[aria-label=Menu]")?.click(), []);
   return <div ref={root}>{children}</div>;
+};
+
+const epicSteps = (current: string, done: string[] = []): EpicDetail["steps"] =>
+  ["chart", "spec", "create-tickets", "done"].map((step) => ({
+    step,
+    label: step,
+    state: done.includes(step) ? "done" : step === current ? "current" : "todo",
+  }));
+
+const epicRow = (id: string, over: Partial<EpicDetailRow> = {}): EpicDetailRow =>
+  ({ address: `demo:blog-impl/${id}`, title: `Ticket ${id}`, rendered_status: "open", ...over }) as EpicDetailRow;
+
+const epicDetail = (over: Partial<EpicDetail> = {}): EpicDetail => ({
+  address: "demo:blog-impl",
+  kind: "loop",
+  summary: "Move the blog to the new layout.",
+  done: 0,
+  total: 0,
+  agent_time: 300,
+  cost_total: 1.5,
+  wall_clock: 125,
+  stats: {},
+  rows: [],
+  queueable: false,
+  queued: false,
+  ...over,
+});
+
+const withRows = (over: Partial<EpicDetail>, rows: EpicDetailRow[]) =>
+  epicDetail({ ...over, rows, total: rows.length, done: rows.filter((r) => r.rendered_status === "done").length });
+
+const claimed = new Date().toISOString();
+const doneRows = [epicRow("01", { rendered_status: "done", elapsed: 120 }), epicRow("02", { rendered_status: "done", elapsed: 300 })];
+
+// getState must return the same object each call, or useSyncExternalStore loops.
+const idleEpicState = { snapshot: { sessions: [] }, connected: true, loadedOnce: true, tick: 0 };
+const idleEpicConnection = {
+  getState: () => idleEpicState,
+  subscribe: () => () => {},
+  onEvent: () => () => {},
+  refresh: () => {},
+} as unknown as Connection;
+
+// The page needs a router and a connection; the transform keeps the fix dialog's fixed overlay inside the frame.
+const EpicPageFrame = ({ detail, fixing }: { detail: EpicDetail; fixing?: boolean }) => {
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = root.current;
+    if (!fixing || !el) return;
+    // The detail loads after mount, so click the button once it shows up.
+    const click = () => {
+      const fix = [...el.querySelectorAll("button")].find((b) => b.textContent === "Fix it with an agent");
+      fix?.click();
+      return !!fix;
+    };
+    if (click()) return;
+    const watch = new MutationObserver(() => click() && watch.disconnect());
+    watch.observe(el, { childList: true, subtree: true });
+    return () => watch.disconnect();
+  }, [fixing]);
+  const router = useMemo(
+    () =>
+      createMemoryRouter(
+        [
+          {
+            path: "*",
+            element: (
+              <EpicPage
+                address={detail.address}
+                fetchDetail={async () => ({ kind: "ok", detail })}
+                fetchList={async () => ({ epics: [], follow_ups: [] })}
+                fixAgent={async () => ({}) as FixAgentResult}
+              />
+            ),
+          },
+        ],
+        { initialEntries: [`/e/${detail.address}`] },
+      ),
+    [detail],
+  );
+  return (
+    <ConnectionContext.Provider value={idleEpicConnection}>
+      <Box ref={root} position="relative" w="800px" minH="500px" transform="translateZ(0)" overflow="hidden" borderWidth="1px" borderColor="border">
+        <RouterProvider router={router} />
+      </Box>
+    </ConnectionContext.Provider>
+  );
 };
 
 const chartDays =["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -447,6 +536,57 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "current", node: <JumpRow row={cardRow()} current /> },
       { label: "cursor", node: <JumpRow row={cardRow()} active /> },
       { label: "finished", node: <JumpRow row={cardRow({ state: "finished", section: "finished", status_words: "Merged", ring_progress: 100 })} /> },
+    ],
+  },
+  {
+    name: "EpicPage",
+    cases: [
+      {
+        label: "running",
+        node: (
+          <EpicPageFrame
+            detail={withRows({ state: "running" }, [...doneRows, epicRow("03", { rendered_status: "claimed", claimed_at: claimed }), epicRow("04")])}
+          />
+        ),
+      },
+      { label: "finished", node: <EpicPageFrame detail={withRows({ state: "finished" }, doneRows)} /> },
+      {
+        label: "Design",
+        node: (
+          <EpicPageFrame
+            detail={withRows({ address: "demo:blog", kind: "map", steps: epicSteps("spec", ["chart"]), stats: { cost: 2.5 } }, [
+              epicRow("01", { rendered_status: "done", elapsed: 120 }),
+            ])}
+          />
+        ),
+      },
+      { label: "draft -impl", node: <EpicPageFrame detail={withRows({ state: "waiting", draft: true }, [epicRow("01"), epicRow("02")])} /> },
+      {
+        label: "merge-blocked",
+        node: (
+          <EpicPageFrame
+            detail={withRows({ state: "paused", land_block_reason: "Conflicts with main in server/land.go" }, doneRows)}
+          />
+        ),
+      },
+      { label: "empty", node: <EpicPageFrame detail={epicDetail({ state: "waiting" })} /> },
+      {
+        label: "needs-repair",
+        node: (
+          <EpicPageFrame
+            detail={withRows({ state: "paused" }, [...doneRows, epicRow("03", { rendered_status: "needs-repair", reason: "dirty tree" })])}
+          />
+        ),
+      },
+      {
+        label: "needs-repair dialog",
+        node: (
+          <EpicPageFrame
+            fixing
+            detail={withRows({ state: "paused" }, [...doneRows, epicRow("03", { rendered_status: "needs-repair", reason: "dirty tree" })])}
+          />
+        ),
+      },
     ],
   },
   {

@@ -67,6 +67,13 @@ it("shows the EpicCard in every state the spec lists", () => {
   }
 });
 
+it("shows the epic page in every state the spec lists", () => {
+  const labels = galleryEntries.find((e) => e.name === "EpicPage")?.cases.map((c) => c.label) ?? [];
+  for (const label of ["running", "finished", "Design", "draft -impl", "merge-blocked", "empty", "needs-repair", "needs-repair dialog"]) {
+    expect(labels, label).toContain(label);
+  }
+});
+
 it("shows the jump menu rows in every case the spec lists", () => {
   const labels = galleryEntries.find((e) => e.name === "JumpRow")?.cases.map((c) => c.label) ?? [];
   for (const label of ["design", "implementation", "one-off", "follow-ups", "Needs you", "current", "cursor", "finished"]) {
