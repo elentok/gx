@@ -68,8 +68,8 @@ export function NewDesignForm({
   /** The Epics page's project filter, when it is on one project. */
   filterProject?: string;
   open?: OpenDesign;
-  /** Runs with the new Design's address once the server started it. */
-  onStarted: (address: string) => void;
+  /** Runs with the new Design's address once its map exists; `startFailure` is why the session did not start. */
+  onStarted: (address: string, startFailure?: string) => void;
   /** Closing keeps the draft. */
   onClose: () => void;
   /** Forces the phone bottom sheet (or the centered modal) regardless of the viewport width. */
@@ -101,11 +101,18 @@ export function NewDesignForm({
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const slug = draft.slug.trim();
+    let startFailure: string | undefined;
     run(
-      () => open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project }),
+      async () => {
+        const res = await open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project });
+        // The map exists though no session started, so the Design page takes over and offers the retry.
+        if (!res.epic_created) return res;
+        startFailure = res.message ?? "The design session did not start.";
+        return { ...res, refused: false };
+      },
       () => {
         writeDraft(undefined);
-        onStarted(`${draft.project}:${slug}`);
+        onStarted(`${draft.project}:${slug}`, startFailure);
       },
     );
   };

@@ -14,7 +14,7 @@ import type { OpenDesign, ResumeSession, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress, showsImplLink } from "./Progress";
 import type { FetchScreen } from "./screen";
-import { SessionHeader, StartDesignButton } from "./SessionControls";
+import { Failure, SessionHeader, StartDesignButton } from "./SessionControls";
 import type { SessionInfo } from "../generated/server";
 import { useWide } from "./useWide";
 import { designSession, liveSessions } from "./view";
@@ -37,6 +37,7 @@ interface SessionStripProps {
   live: SessionInfo[];
   deps: DesignDeps;
   onSelect: (id: string) => void;
+  startFailure?: string;
 }
 
 // The header above the chat: switch/stop controls, a way to start again, or the first Start button.
@@ -46,19 +47,26 @@ function SessionStrip({
   live,
   deps,
   onSelect,
+  startFailure,
 }: SessionStripProps) {
-  if (!session) {
-    return <StartDesignButton address={address} open={deps.open} />;
-  }
+  // The reason is for the failed start only: a live session means a retry worked.
+  const reason = !session || session.status.state === "exited" ? startFailure : undefined;
   return (
-    <SessionHeader
-      address={address}
-      shown={session}
-      live={live}
-      onSelect={onSelect}
-      open={deps.open}
-      stop={deps.stop}
-    />
+    <Box display="flex" flexDirection="column" alignItems="flex-end" gap="1">
+      <Failure>{reason ?? ""}</Failure>
+      {session ? (
+        <SessionHeader
+          address={address}
+          shown={session}
+          live={live}
+          onSelect={onSelect}
+          open={deps.open}
+          stop={deps.stop}
+        />
+      ) : (
+        <StartDesignButton address={address} open={deps.open} />
+      )}
+    </Box>
   );
 }
 
@@ -68,11 +76,13 @@ function DesignBody({
   wide,
   deps,
   fetchList,
+  startFailure,
 }: {
   address: string;
   wide: boolean;
   deps: DesignDeps;
   fetchList?: FetchEpicList;
+  startFailure?: string;
 }) {
   const conn = useConnectionContext();
   const { detail } = useEpicDetail(address, conn, deps.fetchDetail);
@@ -126,6 +136,7 @@ function DesignBody({
           live={live}
           deps={deps}
           onSelect={setSelected}
+          startFailure={startFailure}
         />
       </Box>
       <Box
@@ -185,10 +196,13 @@ export function DesignPage({
   address,
   fetchList,
   deps = {},
+  startFailure,
 }: {
   address: string;
   fetchList?: FetchEpicList;
   deps?: DesignDeps;
+  /** Why the session did not start, when the New Design modal created the map but the start failed. */
+  startFailure?: string;
 }) {
   const conn = useConnectionContext();
   const { list, failed } = useEpicList(fetchList, conn);
@@ -207,6 +221,7 @@ export function DesignPage({
           wide={wide}
           deps={deps}
           fetchList={fetchList}
+          startFailure={startFailure}
         />
       )}
     </DetailPage>

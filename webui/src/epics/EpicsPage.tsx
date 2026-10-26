@@ -155,7 +155,7 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
           projects={projects}
           filterProject={filterProject}
           open={openDesign}
-          onStarted={(address) => navigate(designHref(address).slice(1))}
+          onStarted={(address, startFailure) => navigate(designHref(address).slice(1), { state: { startFailure } })}
           onClose={() => setDesigning(false)}
         />
       )}

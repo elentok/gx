@@ -122,7 +122,16 @@ test("Start design posts, clears the draft and reports the address", async () =>
   type("Rough idea", "an idea");
   await act(async () => click("Start design"));
   expect(open).toHaveBeenCalledWith({ epic: "fresh", new_design: true, idea: "an idea", project: "gx" });
-  expect(onStarted).toHaveBeenCalledWith("gx:fresh");
+  expect(onStarted).toHaveBeenCalledWith("gx:fresh", undefined);
+  expect(saved()).toBeNull();
+});
+
+test("the map-created marker clears the draft and hands the reason to the page", async () => {
+  const { onStarted } = mount({ open: async () => ({ refused: true, epic_created: true, message: "agent binary missing" }) as never });
+  type("Epic name", "fresh");
+  type("Rough idea", "an idea");
+  await act(async () => click("Start design"));
+  expect(onStarted).toHaveBeenCalledWith("gx:fresh", "agent binary missing");
   expect(saved()).toBeNull();
 });
 

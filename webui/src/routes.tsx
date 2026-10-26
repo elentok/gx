@@ -1,4 +1,4 @@
-import { createHashRouter, Navigate, redirect, useParams, type RouteObject } from "react-router";
+import { createHashRouter, Navigate, redirect, useLocation, useParams, type RouteObject } from "react-router";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
 import type { OpenDesign, ResumeSession, StopSession } from "./design/open";
@@ -35,10 +35,12 @@ function EpicRoute({
 function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
   // A Design's address holds a colon (project:epic), so it arrives as the splat.
   const address = useParams()["*"];
+  const startFailure = (useLocation().state as { startFailure?: string } | null)?.startFailure;
   if (!address) return <Navigate to="/epics" replace />;
   return (
     <DesignPage
       address={address}
+      startFailure={startFailure}
       fetchList={fetchers.epicList}
       deps={{
         fetchDetail: fetchers.epic,

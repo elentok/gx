@@ -78,7 +78,7 @@ const detailOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   ...over,
 });
 
-function render(epics: EpicListRow[], sessions: SessionInfo[], path = "/d/gx:a", detail: EpicDetail = detailOf()) {
+function render(epics: EpicListRow[], sessions: SessionInfo[], path: string | { pathname: string; state: unknown } = "/d/gx:a", detail: EpicDetail = detailOf()) {
   const state = { snapshot: { sessions }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
   const list: EpicList = { epics, follow_ups: [] };
@@ -110,6 +110,24 @@ test("the title row holds a back link, the Design name and the Sessions control,
 test("without a session the title row offers to start one", async () => {
   render([map("a")], []);
   expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy();
+});
+
+const failedStart = { pathname: "/d/gx:a", state: { startFailure: "agent binary missing" } };
+
+test("a failed start's reason shows above Start design session when the map has no session", async () => {
+  render([map("a")], [], failedStart);
+  const button = await screen.findByRole("button", { name: "Start design session" });
+  const alert = screen.getByRole("alert");
+  expect(alert.textContent).toBe("agent binary missing");
+  expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("a failed start's reason shows above New session when an exited session exists", async () => {
+  render([map("a")], [session("a", { status: { state: "exited" } })], failedStart);
+  const button = await screen.findByRole("button", { name: "New session" });
+  const alert = screen.getByRole("alert");
+  expect(alert.textContent).toBe("agent binary missing");
+  expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
 test("a chart-step map with an exited session shows the session header, never the New Design form", async () => {
