@@ -146,7 +146,7 @@ If the ticket has a `## Mock check` section, run it before you report finished. 
 heading. It lists the mock file, the states with their widths, the parts and the fixture scenario.
 
 - The map's mock directory is `$(gx tickets root)/<map>/mocks/`, where `<map>` is the ticket's epic
-  name minus `-impl`. No frontmatter link.
+  name minus `-impl`.
 - Run the steps in [gx-ui-check/MOCK-CHECK.md](../gx-ui-check/MOCK-CHECK.md) for each listed state and
   width, part by part, by the part selector. Do not copy the steps here.
 - Check only the parts the ticket built.
