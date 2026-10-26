@@ -116,6 +116,56 @@ func TestGxGrillingLowRiskDefaults(t *testing.T) {
 	}
 }
 
+// grillingSkipRuleGaps returns the phrases of the skip-the-question rule that
+// text lacks.
+func grillingSkipRuleGaps(text string) []string {
+	var gaps []string
+	for _, want := range []string{
+		"skip the question",
+		"3 or more rounds",
+		"is not counted",
+		"non-recommended answer changed a user story, the scope or the map's Destination",
+		"raised a new question, which then needed a later round",
+		"a clarifying note, an objected low-risk default, and a second round that only confirms the first",
+		"When you cannot tell, ask",
+		`"Chart the map" (gx-design step 1)`,
+		"unconfirmed-Destination grilling (gx-design step 2)",
+		"A map ticket",
+		"A `spec-round-` ticket",
+		"`## Review findings` or `## Re-review findings`",
+		"`(stories/scope changed)` marker",
+		"print the summary once, as the last text before the next round or the run-end line",
+		"no `❓ **Q` marker and no `gx-question` block",
+		"`✅ ... Next:` line",
+		"defines no reply to it",
+		"`## Decisions so far`",
+		"Do not reopen the grilling",
+	} {
+		if !strings.Contains(text, want) {
+			gaps = append(gaps, want)
+		}
+	}
+	return gaps
+}
+
+func TestGxGrillingSkipsSharedUnderstandingAfterStraightforwardGrilling(t *testing.T) {
+	text := readFile(t, "gx-grilling/SKILL.md")
+	for _, gap := range grillingSkipRuleGaps(text) {
+		t.Errorf("gx-grilling/SKILL.md lacks %q", gap)
+	}
+	if strings.Contains(text, "Do not act on it until the user confirms") {
+		t.Error("gx-grilling/SKILL.md still gates on the user confirming a shared understanding")
+	}
+}
+
+func TestGxGrillingSkipRule_FailsWithoutDestinationException(t *testing.T) {
+	text := readFile(t, "gx-grilling/SKILL.md")
+	broken := strings.ReplaceAll(text, "unconfirmed-Destination grilling (gx-design step 2)", "")
+	if len(grillingSkipRuleGaps(broken)) == 0 {
+		t.Error("skip rule check passes without the Destination exception")
+	}
+}
+
 func TestGxWayfinderLetsCallerAllowMoreTickets(t *testing.T) {
 	text := readFile(t, "gx-wayfinder/SKILL.md")
 	if !strings.Contains(text, "unless the calling skill allows more") {

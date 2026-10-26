@@ -103,9 +103,31 @@ Each round the user answers reshapes the tree: settled decisions push the fronti
 
 Finding _facts_ is your job, never the user's. When a frontier question needs a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to find it; don't ask the user for anything you could look up yourself. Don't block on it: a running exploration is an unsettled prerequisite, so only the questions downstream of it wait for the sub-agent to report; ask the rest of the frontier now. The _decisions_ are the user's: put each to them and wait.
 
-The session is done when the frontier is empty: every branch of the design tree visited, nothing left silently assumed. Do not act on it until the user confirms you have reached a shared understanding.
+The session is done when the frontier is empty: every branch of the design tree visited, nothing left silently assumed.
 
-Ask for that confirmation as a one-question round, so the web shows it as a question. Write the summary first, then the question:
+## Closing: ask, or skip and summarize
+
+Close a grilling with a one-question "Shared understanding" round only when the grilling was not straightforward. After a straightforward grilling, skip the question: record, close and chain as usual, then print a short summary of what you recorded.
+
+The unit the rule looks at:
+
+- A map ticket, across all its rounds.
+- A `spec-round-` ticket.
+- A whole findings section (`## Review findings` or `## Re-review findings`). Ask the question, when asked, once after the last finding.
+
+Ask the question when any of these happened in the grilling you are closing:
+
+- 3 or more rounds. The "Shared understanding" round itself is not counted.
+- A non-recommended answer changed a user story, the scope or the map's Destination. For findings, this means a finding with the `(stories/scope changed)` marker whose answer was not the recommendation. The marker alone is not a trigger.
+- A note from the person raised a new question, which then needed a later round.
+
+These still allow the skip: a clarifying note, an objected low-risk default, and a second round that only confirms the first.
+
+When you cannot tell, ask.
+
+Always ask for the Destination grilling: gx-wayfinder's "Chart the map" (gx-design step 1) and the unconfirmed-Destination grilling (gx-design step 2).
+
+To ask, send a one-question round, so the web shows it as a question. Write the summary first, then the question:
 
 ````
 ❓ **Qn** - **Shared understanding**: Is this a shared understanding I can record and close?
@@ -117,3 +139,10 @@ type: yes-no
 recommended: yes
 ```
 ````
+
+On a skip, print the summary once, as the last text before the next round or the run-end line.
+
+- Name what you closed: the ticket address and title, the spec-round ticket, or the findings section.
+- Give it no `❓ **Q` marker and no `gx-question` block, and do not write it as a `✅ ... Next:` line.
+- It is a record only. This skill defines no reply to it.
+- A correction that arrives in a later reply goes into the map's `## Decisions so far` (or the current grilling's Resolution). Do not reopen the grilling. Once the spec exists, fix a wrong record by editing the spec.
