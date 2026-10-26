@@ -176,10 +176,12 @@ The server sends every card fact in `/v1/epics`, one row per card, so the page r
   live tickets in the `-impl` epic. From Branch on, progress is the `-impl` epic's n/m. The card does
   not wait for the map's done status.
 - Status words (prototype `united-epics-page/05`, round 6):
-  - Design: "Designing", "Creating tickets (N so far)...", "Not started".
+  - Design: "Designing", "Creating tickets (N so far)...", "Not started",
+    "Designed" (done Design with no `-impl` epic; the card sits in Finished).
   - Implementation: "Implementing...", "Merging...", "Implemented" (awaiting merge), "Queued #N",
     "Not started", "Merged" for Finished.
-  - Other: "One-off", "Draft", "No open tickets", the follow-ups counts ("5 bugs, 2 ideas").
+  - Other: "One-off", "Draft", "No open tickets", the follow-ups counts ("5 bugs, 2 ideas";
+    follow-ups with no category count as "N other").
 - State pill words (Needs you only): Question (a Design or a ticket waiting on an answer),
   Permission, Paused, Deadlocked, Merge blocked, Awaiting merge.
 - Reason text: the implementer picks the words. Examples from the prototype: "3 questions on the
