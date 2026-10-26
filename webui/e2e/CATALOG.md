@@ -281,13 +281,13 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Scenario:** `design`, at 375 px wide
 - **Steps:**
   1. Open `#/d/demo:design-epic` and start the session.
-  2. Click the Progress summary, then Close in the modal.
+  2. Click the Progress summary, then Close in the modal. Open it again and press Escape.
   3. Tap the title; click Close on the sheet.
   4. Press Send with nothing answered, then Escape. Press ⤢, then ⤡.
 - **Pass:**
   - The composer has no Focus button. The Send popover is at most 343 px wide, inside the viewport and overlaps the sheet.
   - Focus mode keeps the Progress summary above the sheet and hides the messages; ⤡ leaves.
-  - The summary opens the "Design progress steps" modal with Resolve tickets current.
+  - The summary opens the "Design progress steps" modal with Resolve tickets current. Close and Escape both close it.
   - Note reads only its icon; the Auto-advance switch has no text.
   - The title opens a "Jump to epic" sheet that fills the screen; Close closes it.
 

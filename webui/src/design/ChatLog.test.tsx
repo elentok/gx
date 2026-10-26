@@ -435,6 +435,23 @@ test("Escape with the Send popover open closes only the popover", async () => {
   expect(await screen.findByText("earlier talk")).toBeTruthy();
 });
 
+test("Escape with the phone steps modal open closes only the modal", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    renderChat([session()], focusChat(), undefined, implDetail);
+    await enterFocus();
+    fireEvent.click(await screen.findByRole("button", { name: /^Branch/ }));
+    await screen.findByRole("dialog", { name: "Design progress steps" });
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Design progress steps" })).toBeNull());
+    expect(inFocus()).toBe(true);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(await screen.findByText("earlier talk")).toBeTruthy();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("Escape with the failure banner's screen modal open closes only the modal", async () => {
   renderChat([session({ failure: { kind: "stalled", label: "Stalled" } as SessionInfo["failure"] })], focusChat());
   await enterFocus();

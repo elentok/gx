@@ -60,6 +60,10 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await expect(steps.locator('li[data-step="resolve-tickets"][data-state="current"]')).toBeVisible();
   await steps.getByRole("button", nav("Close")).click();
   await expect(steps).toHaveCount(0);
+  await progress.getByRole("button", { name: /Resolve tickets/ }).click();
+  await expect(steps).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(steps).toHaveCount(0);
 
   // The composer has no Focus button; the sheet's own button is the way in.
   await expect(page.locator('[aria-label="Composer"]').getByRole("button", { name: /focus/i })).toHaveCount(0);

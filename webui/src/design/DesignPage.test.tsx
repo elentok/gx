@@ -235,6 +235,20 @@ test("on a phone Progress is a segment bar and a line that expands on tap", asyn
   }
 });
 
+test("Escape closes the phone steps modal", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(1) }));
+    const p = await progress();
+    fireEvent.click(await p.findByRole("button", { name: /^Resolve tickets/ }));
+    expect(screen.getByRole("dialog", { name: "Design progress steps" })).toBeTruthy();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Design progress steps" })).toBeNull();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 const deletable = detailOf({ deletable: true });
 
 test("Delete design shows only for a deletable Design with no live session, following the sessions live", async () => {
