@@ -20,25 +20,6 @@ func pauseReasonLabel(reason schema.PauseReason) string {
 	return strings.ToUpper(words[:1]) + words[1:]
 }
 
-// pauseActionLabel is the name of the action that clears a pause, by reason.
-// Resume is only for a pause the person chose; every other fault is a Retry.
-func pauseActionLabel(reason schema.PauseReason) string {
-	switch reason {
-	case schema.PauseSelfReported:
-		return "Answer"
-	case schema.PauseAmbiguousBase:
-		return "Choose base"
-	case schema.PauseMergeConflict:
-		return "Resolve conflict"
-	case schema.PauseStrandedCommits:
-		return "Merge commits"
-	case schema.PauseManual, "":
-		// No reason means the ticket is not paused, so the item is dim anyway.
-		return resumeLabel
-	}
-	return "Retry"
-}
-
 // isPausedTicket reports whether t is Paused, including a ticket still stored
 // under an old needs-answer / needs-repair status.
 func isPausedTicket(t tickets.Ticket) bool {

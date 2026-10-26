@@ -11,8 +11,8 @@ import (
 
 func TestTicketMenuItems_SuggestableItemsBuiltOnce(t *testing.T) {
 	t.Parallel()
-	type want struct{ resume, investigate, unmute contextmenu.Group }
-	home := want{contextmenu.Server, contextmenu.Agent, contextmenu.Server}
+	type want struct{ investigate, unmute contextmenu.Group }
+	home := want{contextmenu.Agent, contextmenu.Server}
 	for _, tt := range []struct {
 		name string
 		in   ticketMenuInput
@@ -21,16 +21,16 @@ func TestTicketMenuItems_SuggestableItemsBuiltOnce(t *testing.T) {
 		{"open", ticketMenuInput{rendered: tickets.StatusOpen}, home},
 		{"claimed", ticketMenuInput{rendered: tickets.StatusClaimed}, home},
 		{"paused (answer)", ticketMenuInput{rendered: tickets.StatusPausedAnswer, ticket: tickets.Ticket{Status: string(schema.StatusPaused)}},
-			want{contextmenu.Suggested, contextmenu.Suggested, contextmenu.Server}},
+			want{contextmenu.Suggested, contextmenu.Server}},
 		{"paused (repair)", ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseManual}},
-			want{contextmenu.Server, contextmenu.Suggested, contextmenu.Server}},
-		{"error", ticketMenuInput{rendered: tickets.StatusError}, want{contextmenu.Server, contextmenu.Suggested, contextmenu.Server}},
+			want{contextmenu.Suggested, contextmenu.Server}},
+		{"error", ticketMenuInput{rendered: tickets.StatusError}, want{contextmenu.Suggested, contextmenu.Server}},
 		{"muted open", ticketMenuInput{rendered: tickets.StatusOpen, ticket: tickets.Ticket{Mutes: muted}},
-			want{contextmenu.Server, contextmenu.Agent, contextmenu.Suggested}},
+			want{contextmenu.Agent, contextmenu.Suggested}},
 	} {
 		items := ticketMenuItems(tt.in)
 		for label, group := range map[string]contextmenu.Group{
-			resumeLabel: tt.want.resume, "Investigate": tt.want.investigate, "Unmute & Reopen": tt.want.unmute,
+			"Investigate": tt.want.investigate, "Unmute & Reopen": tt.want.unmute,
 		} {
 			var groups []contextmenu.Group
 			for _, it := range items {
@@ -60,7 +60,8 @@ func TestTicketHasSuggestedActions_AgreesWithMenu(t *testing.T) {
 		{"done", ticketMenuInput{rendered: tickets.StatusDone}, false},
 		{"blocked", ticketMenuInput{rendered: tickets.StatusBlocked}, false},
 		{"paused (answer)", ticketMenuInput{rendered: tickets.StatusPausedAnswer}, true},
-		{"paused (answer) herdr down", ticketMenuInput{rendered: tickets.StatusPausedAnswer, herdrDown: true}, true},
+		// The row has no detail; the menu opens with the answer verbs Suggested.
+		{"paused (answer) herdr down", ticketMenuInput{rendered: tickets.StatusPausedAnswer, herdrDown: true, detail: &answerDetail}, true},
 		{"paused (repair)", ticketMenuInput{rendered: tickets.StatusPausedRepair}, true},
 		{"paused (repair) herdr down", ticketMenuInput{rendered: tickets.StatusPausedRepair, herdrDown: true}, false},
 		{"error herdr down", ticketMenuInput{rendered: tickets.StatusError, herdrDown: true}, false},

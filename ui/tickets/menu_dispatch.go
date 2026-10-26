@@ -14,8 +14,11 @@ const serverNotRunning = "server not running"
 // the row's address (result.Path). Orchestration writes go only through the
 // server.
 func dispatchMenuAction(api ServerAPI, worktreeRoot string, settings ui.Settings, width int, result actionsMenuResult) tea.Cmd {
+	if word, ok := recoveryWord(result.Action); ok {
+		return cmdServerWrite(api, word, result.Path)
+	}
 	switch result.Action {
-	case actionResume, actionUnmuteReopen, serverVerbPause, serverVerbCancel, serverVerbRelaunch:
+	case actionResume, actionUnmuteReopen, serverVerbPause, serverVerbCancel:
 		return cmdServerWrite(api, result.Action, result.Path)
 	case actionMerge:
 		if api == nil {

@@ -74,10 +74,13 @@ func groupsOf(items []contextmenu.Item[ticketTarget]) []contextmenu.Group {
 
 func TestQueueTicketMenu_SameGroupsAsTicketsTabAndResumeByAddress(t *testing.T) {
 	var calls []string
-	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls}), schema.PauseManual, nil)
+	d := detailWith(server.ActionResume, server.ActionStartOver)
+	m := queueWithTicket(t, newMaintenanceQueue(t, fakeServerAPI{calls: &calls, detail: d}), schema.PauseManual, nil)
 	m, ready := requestQueueMenu(t, m)
 
-	tabs := ticketMenuItems(newTicketMenuInput(m.epics[0], m.epics[0].Tickets[0], false, ""))
+	in := newTicketMenuInput(m.epics[0], m.epics[0].Tickets[0], false, "")
+	in.detail = &d
+	tabs := ticketMenuItems(in)
 	want := slices.Insert(groupsOf(tabs), slices.Index(groupsOf(tabs), contextmenu.EditCopy), contextmenu.Queue)
 	if got := groupsOf(ready.items); !slices.Equal(got, want) {
 		t.Errorf("groups = %v, want %v", got, want)

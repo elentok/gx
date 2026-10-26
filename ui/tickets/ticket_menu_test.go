@@ -76,7 +76,7 @@ func itemLabels(items []contextmenu.Item[ticketTarget]) []string {
 }
 
 func orchestrationLabels() []string {
-	return []string{resumeLabel, "Unmute & Reopen", "Pause", "Cancel", "Relaunch"}
+	return []string{"Unmute & Reopen", "Pause", "Cancel"}
 }
 
 func withMutes(info server.TicketInfo, mutes []schema.MuteRecord) server.TicketInfo {
@@ -86,7 +86,7 @@ func withMutes(info server.TicketInfo, mutes []schema.MuteRecord) server.TicketI
 
 func TestTicketMenu_GroupsAndPauseByAddress(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(server.ActionAnswer, server.ActionResume)})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		pausedAnswerInfo("gx:alpha/01", "First"),
 	}})
@@ -208,7 +208,7 @@ func TestTicketMenu_NoServer_OrchestrationIsDim(t *testing.T) {
 			}
 
 			before, _ := os.ReadFile(file)
-			for _, label := range []string{"Pause", "Cancel", "Relaunch", "Unmute"} {
+			for _, label := range []string{"Pause", "Cancel", "Unmute"} {
 				next, cmd := chooseTicketMenuItem(t, m, label)
 				if cmd != nil {
 					t.Errorf("%s issued a cmd", label)
@@ -261,8 +261,9 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 		t.Errorf("set draft on a draft = %q", got)
 	}
 
-	done := ticketMenuInput{rendered: tickets.StatusDone, ticket: tickets.Ticket{Status: "done"}, isMap: true}
-	for _, label := range []string{"Pause", "Cancel", "Relaunch", resumeLabel, "Unmute & Reopen"} {
+	resumeDetail := detailWith(server.ActionResume)
+	done := ticketMenuInput{rendered: tickets.StatusDone, ticket: tickets.Ticket{Status: "done"}, isMap: true, detail: &resumeDetail}
+	for _, label := range []string{"Pause", "Cancel", resumeLabel, "Unmute & Reopen"} {
 		if got := disabled(done, label); got != ticketFinished {
 			t.Errorf("%s on a done ticket = %q, want %q", label, got, ticketFinished)
 		}
@@ -276,14 +277,8 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 	if got := disabled(open, "Unmute & Reopen"); got != notMuted {
 		t.Errorf("unmute = %q, want %q", got, notMuted)
 	}
-	if got := disabled(open, resumeLabel); got != notPaused {
-		t.Errorf("resume = %q, want %q", got, notPaused)
-	}
-	if got := itemByLabel(t, ticketMenuItems(open), resumeLabel).Key; got != "enter" {
-		t.Errorf("resume key = %q, want enter", got)
-	}
 
-	paused := ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseManual}, herdrDown: true}
+	paused := ticketMenuInput{rendered: tickets.StatusPausedRepair, ticket: tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseManual}, herdrDown: true, detail: &resumeDetail}
 	if got := disabled(paused, "Pause"); got != alreadyPaused {
 		t.Errorf("pause on a paused ticket = %q", got)
 	}
@@ -423,9 +418,11 @@ func TestTicketMenuItems_ResumeEnterHintOnlyWhenEnterResumes(t *testing.T) {
 		{"paused (answer)", "", tickets.StatusPausedAnswer, ""},
 		{"paused (repair)", schema.PauseManual, tickets.StatusPausedRepair, "enter"},
 	} {
+		d := detailWith(server.ActionResume)
 		items := ticketMenuItems(ticketMenuInput{
 			rendered: tt.rendered,
 			ticket:   tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: tt.reason},
+			detail:   &d,
 		})
 		if got := itemByLabel(t, items, resumeLabel).Key; got != tt.wantKey {
 			t.Errorf("%s: Resume key = %q, want %q", tt.name, got, tt.wantKey)

@@ -43,6 +43,7 @@ type Item[T any] struct {
 	Key      string // direct-key hint, e.g. "e e"; display only
 	Group    Group
 	Disabled string // non-empty = dim; shown under the list while selected
+	Help     string // one line shown under the list while an enabled item is selected
 	Run      func(T) tea.Cmd
 }
 
@@ -283,9 +284,13 @@ func (m Menu[T]) View() string {
 	// The reason line is always there, blank on enabled items, so the frame
 	// keeps its height as the cursor moves.
 	reason := ""
-	if m.cursor < len(visible) && visible[m.cursor].Disabled != "" {
-		it := visible[m.cursor]
-		reason = ui.StyleMuted.Render(ansi.Truncate(it.Label+": "+it.Disabled, inner, "…"))
+	if m.cursor < len(visible) {
+		switch it := visible[m.cursor]; {
+		case it.Disabled != "":
+			reason = ui.StyleMuted.Render(ansi.Truncate(it.Label+": "+it.Disabled, inner, "…"))
+		case it.Help != "":
+			reason = ui.StyleMuted.Render(ansi.Truncate(it.Help, inner, "…"))
+		}
 	}
 	return ui.RenderModalFrame(ui.ModalFrameOptions{
 		Title:         ansi.Truncate(title+" · "+m.prompt, inner-2, "…"),

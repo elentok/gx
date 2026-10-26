@@ -12,15 +12,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-// actionResume is the server's resume, under the one "Resume" label every
-// menu shares. The "m" menu offers it for the pause kind the server
-// can't safely auto-clear — an announce-and-stop (zero-commit) pause's
-// live-but-idle pane looks identical to an answered gate pause, so a person
-// confirms it explicitly here instead.
-const (
-	actionResume = serverVerbResume
-	resumeLabel  = "Resume"
-)
+// actionResume is the server's resume.
+const actionResume = serverVerbResume
 
 // actionInvestigate opens a new herdr tab and launches a fresh
 // gx-investigate session for the ticket (see cmdLaunchInvestigate), for any
@@ -59,6 +52,11 @@ func unmuteSuggested(ticket tickets.Ticket) bool {
 // (ui.IconSet.SuggestedAction): its Context menu has an enabled Suggested
 // item.
 func ticketHasSuggestedActions(in ticketMenuInput) bool {
+	// The row has no detail yet, so an answer pause's recovery items (suggested
+	// once the menu opens) are counted here.
+	if resumeSuggested(in.rendered) && in.serverReason == "" && !in.archived {
+		return true
+	}
 	return slices.ContainsFunc(ticketMenuItems(in), func(it contextmenu.Item[ticketTarget]) bool {
 		return it.Group == contextmenu.Suggested && it.Disabled == ""
 	})

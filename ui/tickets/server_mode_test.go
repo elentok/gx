@@ -30,6 +30,8 @@ type fakeServerAPI struct {
 	replaceRes server.QueueResult
 	removeRes  server.QueueResult
 	mergeRes   server.QueueResult
+	// detail is what Detail returns for any address.
+	detail     server.TicketDetail
 	budget     server.BudgetStatus
 	iterations []server.IterationInfo
 	// snap and queue are what Snapshot and QueueItems return.
@@ -110,6 +112,15 @@ func (f fakeServerAPI) TicketApprove(_ context.Context, address string) (server.
 func (f fakeServerAPI) EpicMerge(_ context.Context, address string) (server.QueueResult, error) {
 	f.record("merge " + address)
 	return f.mergeRes, nil
+}
+
+func (f fakeServerAPI) EpicStashMerge(_ context.Context, address string) (server.QueueResult, error) {
+	f.record("stash-merge " + address)
+	return server.QueueResult{}, nil
+}
+
+func (f fakeServerAPI) Detail(context.Context, string) (server.TicketDetail, error) {
+	return f.detail, nil
 }
 
 func (f fakeServerAPI) Repair(_ context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {
@@ -289,10 +300,10 @@ func TestServerMode_PendingRowRendersVerdictSubtext(t *testing.T) {
 	}
 }
 
-// Seam D: "enter" on a paused row issues resume.
+// Seam D: "enter" on a paused row issues the detail's first verb (resume here).
 func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 	var calls []string
-	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls})
+	m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(server.ActionResume)})
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		// The wire carries no pause reason, so only the retired repair status
 		// tells the client this pause is a repair.
@@ -375,6 +386,9 @@ func (f fakeServerAPI) TicketChanged(_ context.Context, address string) error {
 
 func openAnswerMenu(t *testing.T, api fakeServerAPI) Model {
 	t.Helper()
+	if len(api.detail.Actions) == 0 {
+		api.detail = detailWith(server.ActionAnswer, server.ActionResume)
+	}
 	m := newServerModel(t).WithServer(api)
 	m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
 		pausedAnswerInfo("gx:alpha/01", "First"),

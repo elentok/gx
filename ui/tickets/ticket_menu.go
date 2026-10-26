@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -42,6 +43,9 @@ type ticketMenuInput struct {
 	onQueue, hasProposal bool
 	// session is the design session Go to design session… opens; "" offers none.
 	session string
+	// detail is the ticket's server detail, read off the Update goroutine; nil
+	// (no server, or the read failed) offers no recovery items.
+	detail *server.TicketDetail
 }
 
 const (
@@ -92,6 +96,17 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 	}
 	paused := isRepairPause(in.ticket)
 	answer := resumeSuggested(in.rendered)
+	// The first recovery item is what "enter" runs on a repair pause; an answer
+	// pause's verbs need their own confirmation, so they get no hint.
+	var recovery []contextmenu.Item[ticketTarget]
+	for i, a := range recoveryActions(in.detail) {
+		it := server(a.label, reasonIf(paused && i == 0, "enter"), recoverPrefix+a.word, "")
+		it.Help = a.help
+		if a.recommended {
+			it.Label += recommendedMark
+		}
+		recovery = append(recovery, suggest(answer || a.recommended, it))
+	}
 
 	var items []contextmenu.Item[ticketTarget]
 	if in.isMap && in.session != "" {
@@ -113,15 +128,11 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		items = append(items, item("Set "+string(status), "", contextmenu.Status, why, ticketMenuPickMsg{status: status}))
 	}
 
-	// An answer pause's action clears an announce-and-stop pause, which "enter"
-	// does not (see isRepairPause), so it gets no hint.
-	resumeKey := reasonIf(paused || !answer, "enter")
 	unmute := unmuteSuggested(in.ticket)
+	items = append(items, server("Pause", "", serverVerbPause, reasonIf(paused, alreadyPaused)))
+	items = append(items, recovery...)
 	items = append(items,
-		server("Pause", "", serverVerbPause, reasonIf(paused, alreadyPaused)),
-		suggest(answer, server(pauseActionLabel(in.ticket.PauseReason), resumeKey, actionResume, reasonIf(!paused && !answer, notPaused))),
 		server("Cancel", "", serverVerbCancel, ""),
-		server("Relaunch", "", serverVerbRelaunch, ""),
 		// A mute outlives the status (see actionUnmuteReopen), so a finished
 		// ticket keeps its Unmute.
 		suggest(unmute, pick("Unmute & Reopen", "", actionUnmuteReopen, contextmenu.Server,
@@ -248,6 +259,7 @@ func cmdTicketMenu(api ServerAPI, in ticketMenuInput) tea.Cmd {
 		it, live := serverIteration(api, address)
 		in.paneLive = live && it.Tab != ""
 		in.watchReason = watchReason(api, agentAddress(address, target.ticketID))
+		in.detail = ticketDetail(api, address)
 		return ticketMenuReadyMsg{target: target, prompt: prompt, items: ticketMenuItems(in)}
 	}
 }
