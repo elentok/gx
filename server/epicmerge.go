@@ -130,15 +130,21 @@ func (s *Server) fillEpicMergeTargets(list []TicketInfo) {
 // not done, already merged): every snapshot runs this per epic, and only a
 // mergeable epic is worth its git calls.
 func (s *Server) epicMergeTarget(a tickets.Address) string {
-	dir, repo, err := s.projectOf(a.Project)
-	if err != nil {
+	// The cheap epic checks come from the index and run before projectOf, which
+	// reads project.json: most epics are not mergeable.
+	dir, epics, ok := s.idx.projectEpics(a.Project)
+	if !ok {
 		return ""
 	}
-	epics, _ := s.idx.epicsOf(dir)
 	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return filepath.Base(e.Path) == a.Epic })
 	if i < 0 || epics[i].IsMap || !epics[i].AllDone() || !epics[i].MergedAt.IsZero() {
 		return ""
 	}
+	pf, err := config.ReadProjectFile(dir)
+	if err != nil || pf.Repo == nil {
+		return ""
+	}
+	repo := *pf.Repo
 	// The target is a function of the loaded epics (a new scan is a new slice),
 	// project.json and the repo's refs, so those make the cache stamp.
 	stamp, cacheable := tickets.RefsStamp(repo, filepath.Join(dir, config.ProjectFileName))

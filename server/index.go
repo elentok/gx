@@ -220,6 +220,19 @@ func (i *index) epicsOf(dir string) ([]tickets.Epic, bool) {
 	return epics, ok
 }
 
+// projectEpics is the named project's directory and epics as of the last scan,
+// with no store read. ok is false for a project the scan has not seen.
+func (i *index) projectEpics(project string) (dir string, epics []tickets.Epic, ok bool) {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	for d, es := range i.loaded {
+		if tickets.ProjectName(d) == project {
+			return d, es, true
+		}
+	}
+	return "", nil, false
+}
+
 // changedAddresses lists, in address order, tickets added, removed or edited
 // between two address-sorted lists.
 func changedAddresses(old, next []TicketInfo) []string {
