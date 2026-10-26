@@ -441,7 +441,7 @@ func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.O
 		}
 		// No pre-check: git decides whether local changes block the merge, and
 		// only a refused merge looks at them.
-		if dir := git.CheckoutDirForBranch(info.Repo, worktrees, target); dir != "" {
+		if _, dir, derr := checkoutDirFor(repoDir, target); derr == nil {
 			if clashing := clashingFiles(info.Repo.Root, dir, target, one.Epic); len(clashing) > 0 {
 				landed, lerr := s.landOverDirtyTrunk(project, info.Repo, dir, one.Epic, target, clashing)
 				if lerr != nil {

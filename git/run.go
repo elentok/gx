@@ -25,9 +25,14 @@ func (e *RunError) Error() string {
 // run executes a git command in the given directory and returns trimmed stdout
 // and stderr. Returns a *RunError if the command exits non-zero.
 func run(dir string, args []string) (stdout, stderr string, err error) {
+	return runEnv(dir, NonInteractiveEnv(), args)
+}
+
+// runEnv is run with an explicit environment.
+func runEnv(dir string, env, args []string) (stdout, stderr string, err error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
-	cmd.Env = NonInteractiveEnv()
+	cmd.Env = env
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf

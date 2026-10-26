@@ -1,11 +1,8 @@
 package git
 
 import (
-	"bytes"
 	"errors"
-	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -36,42 +33,21 @@ func SnapshotPaths(dir string, paths []string) (string, error) {
 		append([]string{"update-index", "--add", "--remove", "--"}, paths...),
 	}
 	for _, args := range steps {
-		if _, err := runWithEnv(dir, env, args); err != nil {
+		if _, _, err := runEnv(dir, env, args); err != nil {
 			return "", err
 		}
 	}
-	tree, err := runWithEnv(dir, env, []string{"write-tree"})
+	tree, _, err := runEnv(dir, env, []string{"write-tree"})
 	if err != nil {
 		return "", err
 	}
-	return runWithEnv(dir, env, []string{"commit-tree", tree, "-p", "HEAD", "-m", "gx backup of uncommitted files"})
+	commit, _, err := runEnv(dir, env, []string{"commit-tree", tree, "-p", "HEAD", "-m", "gx backup of uncommitted files"})
+	return commit, err
 }
 
-func runWithEnv(dir string, env []string, args []string) (string, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = env
-	var out, errOut bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errOut
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(errOut.String()))
-	}
-	return strings.TrimSpace(out.String()), nil
-}
-
-// MergeSnapshotOnto replays the changes snapshot made to HEAD onto branch
-// without touching any file. clean is false when they would conflict; tree is
-// then empty, and otherwise the merged tree.
-func MergeSnapshotOnto(dir, snapshot, branch string) (tree string, clean bool, err error) {
-	tree, clean, err = MergeSnapshotMarked(dir, snapshot, branch)
-	if !clean {
-		return "", false, err
-	}
-	return tree, true, nil
-}
-
-// MergeSnapshotMarked is MergeSnapshotOnto that also returns the tree of a
-// conflicting merge, where each conflicting file holds its conflict markers.
+// MergeSnapshotMarked replays the changes snapshot made to HEAD onto branch
+// without touching any file. tree is the merged tree; when clean is false the
+// merge conflicts and each conflicting file in tree holds its conflict markers.
 func MergeSnapshotMarked(dir, snapshot, branch string) (tree string, clean bool, err error) {
 	out, _, err := run(dir, []string{"merge-tree", "--write-tree", "--merge-base=HEAD", snapshot, branch})
 	var runErr *RunError

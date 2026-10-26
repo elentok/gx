@@ -23,31 +23,14 @@ func (s *Server) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, ta
 	if err != nil {
 		return false, err
 	}
-	restored, clean, err := git.MergeSnapshotOnto(dir, snapshot, "refs/heads/"+epic)
+	restored, clean, err := git.MergeSnapshotMarked(dir, snapshot, "refs/heads/"+epic)
 	if err != nil || !clean {
 		return false, err
 	}
-	// The backup comes first: whatever happens to the files, they stay in git.
-	ref, now, err := s.backupSnapshot(repo.Root, epic, snapshot)
+	ref, now, landed, err := s.landWithRestore(repo.Root, dir, epic, target, snapshot, restored, clashing,
+		"restore after failed land", "landed")
 	if err != nil {
-		return false, err
-	}
-	if err := git.SetAside(dir, clashing); err != nil {
-		return false, fmt.Errorf("set aside %s: %w (backup %s)", listFiles(clashing), err, ref)
-	}
-	ok, err := git.MergeFastForward(dir, epic)
-	if err != nil || !ok {
-		// Not landed: put the files back as they were.
-		if rerr := git.RestoreFromTree(dir, snapshot, clashing); rerr != nil {
-			s.log.Warn("restore after failed land", "epic", epic, "backup", ref, "err", rerr)
-		}
-		if err == nil {
-			err = fmt.Errorf("%s is no longer a fast-forward of %s", epic, target)
-		}
-		return false, err
-	}
-	if err := git.RestoreFromTree(dir, restored, clashing); err != nil {
-		return true, fmt.Errorf("landed, but restoring %s failed: %w (backup %s)", listFiles(clashing), err, ref)
+		return landed, err
 	}
 	if pdir, err := s.projectDir(project); err == nil {
 		_ = ralphloop.AppendEvent(pdir, epic, ralphloop.Event{
@@ -55,6 +38,36 @@ func (s *Server) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, ta
 		})
 	}
 	return true, nil
+}
+
+// landWithRestore fast-forwards target's checkout dir to epic over files, whose
+// uncommitted content snapshot holds, and puts merged back in their place. The
+// backup ref comes first: whatever happens to the files, they stay in git. When
+// the fast-forward fails the files go back as they were and landed is false;
+// landed is true when only the final restore failed. failLog and doneWord are
+// the Warn message and the error wording of the two callers.
+func (s *Server) landWithRestore(repoRoot, dir, epic, target, snapshot, merged string, files []string, failLog, doneWord string) (ref string, now time.Time, landed bool, err error) {
+	ref, now, err = s.backupSnapshot(repoRoot, epic, snapshot)
+	if err != nil {
+		return "", now, false, err
+	}
+	if err := git.SetAside(dir, files); err != nil {
+		return ref, now, false, fmt.Errorf("set aside %s: %w (backup %s)", listFiles(files), err, ref)
+	}
+	ok, err := git.MergeFastForward(dir, epic)
+	if err != nil || !ok {
+		if rerr := git.RestoreFromTree(dir, snapshot, files); rerr != nil {
+			s.log.Warn(failLog, "epic", epic, "backup", ref, "err", rerr)
+		}
+		if err == nil {
+			err = fmt.Errorf("%s is no longer a fast-forward of %s", epic, target)
+		}
+		return ref, now, false, err
+	}
+	if err := git.RestoreFromTree(dir, merged, files); err != nil {
+		return ref, now, true, fmt.Errorf("%s, but restoring %s failed: %w (backup %s)", doneWord, listFiles(files), err, ref)
+	}
+	return ref, now, true, nil
 }
 
 // backupSnapshot names the snapshot commit with a new backup ref and prunes the

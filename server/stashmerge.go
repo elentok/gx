@@ -51,17 +51,9 @@ func (s *Server) stashMergeLocked(m mergeEpicRef, one ralphloop.OneIteration, ta
 	if r := epicMergeRefusal(root, e, m.repo); r != nil {
 		return *r, nil, nil
 	}
-	info, err := git.IdentifyDir(m.repo)
+	repo, dir, err := checkoutDirFor(m.repo, target)
 	if err != nil {
 		return QueueResult{}, nil, err
-	}
-	worktrees, err := git.ListWorktrees(info.Repo)
-	if err != nil {
-		return QueueResult{}, nil, err
-	}
-	dir := git.CheckoutDirForBranch(info.Repo, worktrees, target)
-	if dir == "" {
-		return QueueResult{}, nil, fmt.Errorf("no checkout of %s", target)
 	}
 	if ff, err := git.IsAncestor(m.repo, target, "refs/heads/"+epic); err != nil {
 		return QueueResult{}, nil, err
@@ -69,7 +61,7 @@ func (s *Server) stashMergeLocked(m mergeEpicRef, one ralphloop.OneIteration, ta
 		return refusal(ReasonNeedsRebase, fmt.Sprintf("%s is not a fast-forward of %s; merge again to rebase it", epic, target)), nil, nil
 	}
 	// Recomputed now: the files may have changed since the pause.
-	clashing := clashingFiles(info.Repo.Root, dir, target, epic)
+	clashing := clashingFiles(repo.Root, dir, target, epic)
 	if len(clashing) == 0 {
 		return refusal(ReasonNotDirtyTrunk, "no uncommitted file on "+target+" clashes any more; merge again"), nil, nil
 	}
@@ -85,25 +77,10 @@ func (s *Server) stashMergeLocked(m mergeEpicRef, one ralphloop.OneIteration, ta
 		d, err := s.epicMergeLocked(root, one, m.repo, m.epics, e, target)
 		return QueueResult{}, &d, err
 	}
-	ref, now, err := s.backupSnapshot(info.Repo.Root, epic, snapshot)
+	ref, now, _, err := s.landWithRestore(repo.Root, dir, epic, target, snapshot, tree, clashing,
+		"restore after failed stash-merge", "fast-forwarded")
 	if err != nil {
 		return QueueResult{}, nil, err
-	}
-	if err := git.SetAside(dir, clashing); err != nil {
-		return QueueResult{}, nil, fmt.Errorf("set aside %s: %w (backup %s)", listFiles(clashing), err, ref)
-	}
-	ok, err := git.MergeFastForward(dir, epic)
-	if err != nil || !ok {
-		if rerr := git.RestoreFromTree(dir, snapshot, clashing); rerr != nil {
-			s.log.Warn("restore after failed stash-merge", "epic", epic, "backup", ref, "err", rerr)
-		}
-		if err == nil {
-			err = fmt.Errorf("%s is no longer a fast-forward of %s", epic, target)
-		}
-		return QueueResult{}, nil, err
-	}
-	if err := git.RestoreFromTree(dir, tree, clashing); err != nil {
-		return QueueResult{}, nil, fmt.Errorf("fast-forwarded, but restoring %s failed: %w (backup %s)", listFiles(clashing), err, ref)
 	}
 	return s.recordTrunkConflict(m, one, target, ref, clashing, now)
 }

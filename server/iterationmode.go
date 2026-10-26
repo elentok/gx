@@ -71,19 +71,26 @@ func (s *Server) targetCheckout(addr tickets.Address) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	info, err := git.IdentifyDir(repo)
+	_, dir, err := checkoutDirFor(repo, target)
+	return dir, err
+}
+
+// checkoutDirFor is the repo and the working tree that has target checked out;
+// an error when none has.
+func checkoutDirFor(repoDir, target string) (git.Repo, string, error) {
+	info, err := git.IdentifyDir(repoDir)
 	if err != nil {
-		return "", err
+		return git.Repo{}, "", err
 	}
 	worktrees, err := git.ListWorktrees(info.Repo)
 	if err != nil {
-		return "", err
+		return git.Repo{}, "", err
 	}
 	dir := git.CheckoutDirForBranch(info.Repo, worktrees, target)
 	if dir == "" {
-		return "", fmt.Errorf("no checkout of %s", target)
+		return git.Repo{}, "", fmt.Errorf("no checkout of %s", target)
 	}
-	return dir, nil
+	return info.Repo, dir, nil
 }
 
 // projectHasNoVCS: a commitless ticket in a vcs: none project has no repository
