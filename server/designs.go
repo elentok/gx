@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -38,24 +39,78 @@ func designClash(projectDir, project, epic string) string {
 	return fmt.Sprintf("%s has an epic %s, which would share the branch of the %s Design", project, designBranch(epic), epic)
 }
 
+// designCtx is what every design git helper needs about one map: its project
+// dir, repo, and the Design's branch and worktree path.
+type designCtx struct {
+	projectDir string
+	repo       *git.Repo
+	epic       string
+	branch     string
+	path       string
+}
+
+func (s *Server) designCtxOf(project, epic string) (designCtx, error) {
+	projectDir, repoDir, err := s.projectOf(project)
+	if err != nil {
+		return designCtx{}, err
+	}
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return designCtx{}, err
+	}
+	branch := designBranch(epic)
+	return designCtx{projectDir, repo, epic, branch, filepath.Join(repo.LinkedWorktreeDir(), branch)}, nil
+}
+
+// pastBranchStep reports whether design_step is branch or done.
+func pastBranchStep(step tickets.DesignStep) bool {
+	return step == tickets.StepBranch || step == tickets.StepDone
+}
+
 // afterBranch reports whether the map's Design is past the Branch step: its
 // design_step is branch or done, or the <map>-impl branch exists. The impl epic
 // alone does not count, as step 7 makes it before step 8 needs the worktree.
 // A deleted impl branch with design_step branch still counts.
-func (s *Server) afterBranch(project, epic string) (bool, error) {
-	projectDir, repoDir, err := s.projectOf(project)
+func (c designCtx) afterBranch() bool {
+	step := tickets.DesignStep(tickets.LoadEpicTicketMD(filepath.Join(c.projectDir, c.epic)).DesignStep)
+	return pastBranchStep(step) || tickets.BranchExists(c.repo.Root, c.epic+tickets.ImplEpicSuffix)
+}
+
+// designDir is where a map's Design session runs: the trunk checkout once past
+// Branch (Past), else the design worktree with Note saying why its rebase was
+// skipped. Clash is the refusal message when an epic shares the branch name.
+type designDir struct {
+	Path  string
+	Note  string
+	Past  bool
+	Clash string
+}
+
+// resolveDesignDir checks the branch clash, then after Branch cleans up the
+// design worktree and returns the trunk checkout; before it ensures the
+// worktree and rebases it. excludeID is a session that does not count as
+// another live one in the rebase.
+func (s *Server) resolveDesignDir(project, epic, excludeID string) (designDir, error) {
+	c, err := s.designCtxOf(project, epic)
 	if err != nil {
-		return false, err
+		return designDir{}, err
 	}
-	repo, err := git.FindRepo(repoDir)
+	if msg := designClash(c.projectDir, project, epic); msg != "" {
+		return designDir{Clash: msg}, nil
+	}
+	if c.afterBranch() {
+		s.cleanupDesign(project, epic)
+		path := tickets.TrunkCheckout(s.cfg.TicketStore, project)
+		if path == "" {
+			return designDir{}, fmt.Errorf("no trunk checkout for project %s", project)
+		}
+		return designDir{Path: path, Past: true}, nil
+	}
+	path, err := s.ensureDesignWorktree(c)
 	if err != nil {
-		return false, err
+		return designDir{}, err
 	}
-	step := tickets.DesignStep(tickets.LoadEpicTicketMD(filepath.Join(projectDir, epic)).DesignStep)
-	if step == tickets.StepBranch || step == tickets.StepDone {
-		return true, nil
-	}
-	return tickets.BranchExists(repo.Root, epic+tickets.ImplEpicSuffix), nil
+	return designDir{Path: path, Note: s.rebaseDesign(project, epic, path, excludeID)}, nil
 }
 
 // cleanupDesign removes the map's design worktree and branch once the Design is
@@ -69,31 +124,20 @@ func (s *Server) cleanupDesign(project, epic string) {
 }
 
 func (s *Server) tryCleanupDesign(project, epic string) error {
-	past, err := s.afterBranch(project, epic)
-	if err != nil || !past {
+	c, err := s.designCtxOf(project, epic)
+	if err != nil || !c.afterBranch() {
 		return err
 	}
 	live, err := s.liveDesignSession(project + ":" + epic)
 	if err != nil || live != nil {
 		return err
 	}
-	_, repoDir, err := s.projectOf(project)
-	if err != nil {
-		return err
-	}
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		return err
-	}
-	branch := designBranch(epic)
-	path := filepath.Join(repo.LinkedWorktreeDir(), branch)
-	_, statErr := os.Stat(path)
-	hasWorktree := statErr == nil
-	if !hasWorktree && !tickets.BranchExists(repo.Root, branch) {
+	_, statErr := os.Stat(c.path)
+	if statErr != nil && !tickets.BranchExists(c.repo.Root, c.branch) {
 		return nil
 	}
-	if hasWorktree {
-		changes, err := git.UncommittedChanges(path)
+	if statErr == nil {
+		changes, err := git.UncommittedChanges(c.path)
 		if err != nil {
 			return err
 		}
@@ -101,19 +145,28 @@ func (s *Server) tryCleanupDesign(project, epic string) error {
 			return fmt.Errorf("the worktree has uncommitted edits")
 		}
 	}
-	missing, err := git.UnappliedPatches(repo.Root, epic+tickets.ImplEpicSuffix, branch)
+	missing, err := git.UnappliedPatches(c.repo.Root, epic+tickets.ImplEpicSuffix, c.branch)
 	if err != nil {
 		return err
 	}
 	if len(missing) > 0 {
 		return fmt.Errorf("%d design commit(s) are not in %s", len(missing), epic+tickets.ImplEpicSuffix)
 	}
-	if hasWorktree {
-		if err := git.RemoveWorktree(*repo, path, false); err != nil {
+	return c.removeWorktreeAndBranch(false)
+}
+
+// removeWorktreeAndBranch drops the Design's worktree and branch, each only if
+// it exists. force removes the worktree whatever it holds.
+func (c designCtx) removeWorktreeAndBranch(force bool) error {
+	if _, err := os.Stat(c.path); err == nil {
+		if err := git.RemoveWorktree(*c.repo, c.path, force); err != nil {
 			return err
 		}
 	}
-	return git.DeleteLocalBranch(*repo, branch, true)
+	if !tickets.BranchExists(c.repo.Root, c.branch) {
+		return nil
+	}
+	return git.DeleteLocalBranch(*c.repo, c.branch, true)
 }
 
 // scanDesignCleanups runs the design cleanup for every map whose design_step
@@ -136,7 +189,7 @@ func (s *Server) scanDesignCleanups() {
 			step := tickets.DesignStep(tickets.LoadEpicTicketMD(e.Path).DesignStep)
 			project, epic := tickets.ProjectName(dir), filepath.Base(e.Path)
 			prev, _ := s.designSteps.Swap(project+":"+epic, step)
-			if prev == step || (step != tickets.StepBranch && step != tickets.StepDone) {
+			if prev == step || !pastBranchStep(step) {
 				continue
 			}
 			s.goSettle(func() { s.cleanupDesign(project, epic) })
@@ -146,28 +199,18 @@ func (s *Server) scanDesignCleanups() {
 
 // ensureDesignWorktree makes sure the map's design worktree exists and returns
 // its path: on a new branch from trunk, or re-added on the existing branch.
-func (s *Server) ensureDesignWorktree(project, epic string) (string, error) {
-	projectDir, repoDir, err := s.projectOf(project)
+func (s *Server) ensureDesignWorktree(c designCtx) (string, error) {
+	if _, err := os.Stat(c.path); err == nil {
+		return c.path, nil
+	}
+	if tickets.BranchExists(c.repo.Root, c.branch) {
+		return c.path, git.AddWorktreeOnBranch(*c.repo, c.branch, c.path)
+	}
+	trunk, err := tickets.Trunk(c.projectDir, c.repo.Root)
 	if err != nil {
 		return "", err
 	}
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		return "", err
-	}
-	branch := designBranch(epic)
-	path := filepath.Join(repo.LinkedWorktreeDir(), branch)
-	if _, err := os.Stat(path); err == nil {
-		return path, nil
-	}
-	if tickets.BranchExists(repo.Root, branch) {
-		return path, git.AddWorktreeOnBranch(*repo, branch, path)
-	}
-	trunk, err := tickets.Trunk(projectDir, repo.Root)
-	if err != nil {
-		return "", err
-	}
-	return path, git.AddWorktree(*repo, branch, path, trunk)
+	return c.path, git.AddWorktree(*c.repo, c.branch, c.path, trunk)
 }
 
 // rebaseDesign rebases the design worktree's branch onto trunk, so the agent
@@ -175,43 +218,46 @@ func (s *Server) ensureDesignWorktree(project, epic string) (string, error) {
 // rebase, leaves the branch at its old tip and returns a note saying why.
 // excludeID is a session that does not count as another live one.
 func (s *Server) rebaseDesign(project, epic, worktree, excludeID string) string {
-	live, err := s.liveDesignSessionExcept(project+":"+epic, excludeID)
-	if err != nil {
+	if err := s.tryRebase(project, epic, worktree, excludeID); err != nil {
 		return "the design branch was not rebased onto trunk: " + err.Error()
 	}
+	return ""
+}
+
+func (s *Server) tryRebase(project, epic, worktree, excludeID string) error {
+	live, err := s.liveDesignSessionExcept(project+":"+epic, excludeID)
+	if err != nil {
+		return err
+	}
 	if live != nil {
-		return "the design branch was not rebased onto trunk: another design session of this map is live"
+		return errors.New("another design session of this map is live")
 	}
 	changes, err := git.UncommittedChanges(worktree)
 	if err != nil {
-		return "the design branch was not rebased onto trunk: " + err.Error()
+		return err
 	}
 	if len(changes) > 0 {
-		return "the design branch was not rebased onto trunk: the worktree has uncommitted edits"
+		return errors.New("the worktree has uncommitted edits")
 	}
-	projectDir, repoDir, err := s.projectOf(project)
+	c, err := s.designCtxOf(project, epic)
 	if err != nil {
-		return "the design branch was not rebased onto trunk: " + err.Error()
+		return err
 	}
-	repo, err := git.FindRepo(repoDir)
+	trunk, err := tickets.Trunk(c.projectDir, c.repo.Root)
 	if err != nil {
-		return "the design branch was not rebased onto trunk: " + err.Error()
-	}
-	trunk, err := tickets.Trunk(projectDir, repo.Root)
-	if err != nil {
-		return "the design branch was not rebased onto trunk: " + err.Error()
+		return err
 	}
 	out, err := git.Rebase(worktree, trunk)
 	if err == nil {
-		return ""
+		return nil
 	}
 	if inProgress, _ := git.RebaseInProgress(worktree); inProgress {
 		if abortErr := git.AbortRebase(worktree); abortErr != nil {
-			return "the design branch was not rebased onto trunk: the rebase conflicted and could not be aborted: " + abortErr.Error()
+			return fmt.Errorf("the rebase conflicted and could not be aborted: %w", abortErr)
 		}
-		return "the design branch was not rebased onto trunk: the rebase conflicted and was aborted"
+		return errors.New("the rebase conflicted and was aborted")
 	}
-	return "the design branch was not rebased onto trunk: " + strings.TrimSpace(out+" "+err.Error())
+	return errors.New(strings.TrimSpace(out + " " + err.Error()))
 }
 
 // DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
@@ -284,10 +330,10 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	if live != nil && !req.New {
 		return SessionResult{Session: live}, nil
 	}
-	if msg := designClash(dir, project, epic); msg != "" {
-		return sessionRefusal(ReasonDesignBranchClash, msg), nil
-	}
 	if live != nil {
+		if msg := designClash(dir, project, epic); msg != "" {
+			return sessionRefusal(ReasonDesignBranchClash, msg), nil
+		}
 		if web && req.State != SessionStateToken(*live) {
 			return sessionRefusal(ReasonStale, "the session changed; review its current state"), nil
 		}
@@ -296,21 +342,12 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		}
 	}
 
-	past, err := s.afterBranch(project, epic)
+	d, err := s.resolveDesignDir(project, epic, "")
 	if err != nil {
 		return SessionResult{}, err
 	}
-	var worktree, note string
-	if past {
-		s.cleanupDesign(project, epic)
-		if worktree = tickets.TrunkCheckout(s.cfg.TicketStore, project); worktree == "" {
-			return SessionResult{}, fmt.Errorf("no trunk checkout for project %s", project)
-		}
-	} else {
-		if worktree, err = s.ensureDesignWorktree(project, epic); err != nil {
-			return SessionResult{}, err
-		}
-		note = s.rebaseDesign(project, epic, worktree, "")
+	if d.Clash != "" {
+		return sessionRefusal(ReasonDesignBranchClash, d.Clash), nil
 	}
 	prompt := "/gx-design " + epicAddr
 	if ticket != "" {
@@ -318,13 +355,13 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	}
 	return s.createSession(CreateSessionRequest{
 		Project:      project,
-		Dir:          worktree,
-		MadeWorktree: !past,
+		Dir:          d.Path,
+		MadeWorktree: !d.Past,
 		Name:         epic,
 		Ticket:       epicAddr,
 		Prompt:       prompt,
 		Harness:      s.settings.Load().chatHarness(),
-		RebaseNote:   note,
+		RebaseNote:   d.Note,
 	})
 }
 
@@ -391,7 +428,7 @@ func (s *Server) designWorktree(req DesignWorktreeRequest) (DesignWorktreeResult
 	if !ok || project == "" || epic == "" || strings.Contains(epic, "/") {
 		return designWorktreeRefusal(ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic)", req.Epic)), nil
 	}
-	dir, reason, msg := s.mapEpicDir(project, epic)
+	_, reason, msg := s.mapEpicDir(project, epic)
 	if reason != "" {
 		return designWorktreeRefusal(reason, msg), nil
 	}
@@ -400,26 +437,14 @@ func (s *Server) designWorktree(req DesignWorktreeRequest) (DesignWorktreeResult
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
 
-	if msg := designClash(dir, project, epic); msg != "" {
-		return designWorktreeRefusal(ReasonDesignBranchClash, msg), nil
-	}
-	past, err := s.afterBranch(project, epic)
+	d, err := s.resolveDesignDir(project, epic, req.ExcludeSession)
 	if err != nil {
 		return DesignWorktreeResult{}, err
 	}
-	if past {
-		s.cleanupDesign(project, epic)
-		path := tickets.TrunkCheckout(s.cfg.TicketStore, project)
-		if path == "" {
-			return DesignWorktreeResult{}, fmt.Errorf("no trunk checkout for project %s", project)
-		}
-		return DesignWorktreeResult{Path: path, AfterBranch: true}, nil
+	if d.Clash != "" {
+		return designWorktreeRefusal(ReasonDesignBranchClash, d.Clash), nil
 	}
-	path, err := s.ensureDesignWorktree(project, epic)
-	if err != nil {
-		return DesignWorktreeResult{}, err
-	}
-	return DesignWorktreeResult{Path: path, Note: s.rebaseDesign(project, epic, path, req.ExcludeSession)}, nil
+	return DesignWorktreeResult{Path: d.Path, Note: d.Note, AfterBranch: d.Past}, nil
 }
 
 // openNewDesign starts a design session for an idea with no map yet: Epic is
@@ -456,11 +481,11 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 	if err := createMap(dir, slug, idea); err != nil {
 		return SessionResult{}, err
 	}
-	worktree, err := s.ensureDesignWorktree(req.Project, slug)
+	d, err := s.resolveDesignDir(req.Project, slug, "")
 	if err != nil {
 		return SessionResult{EpicCreated: true, StartError: err.Error()}, nil
 	}
-	return s.startSession(req.Project, slug, worktree, s.rebaseDesign(req.Project, slug, worktree, "")), nil
+	return s.startSession(req.Project, slug, d.Path, d.Note), nil
 }
 
 // createMap writes the uncharted map epic for a New Design, at the Chart step.
@@ -580,25 +605,11 @@ func (s *Server) deleteDesign(req DesignDeleteRequest) (SessionResult, error) {
 // hold: deleting the Design discards its edits and commits. A map that never
 // had either is a no-op.
 func (s *Server) forceRemoveDesign(project, epic string) error {
-	_, repoDir, err := s.projectOf(project)
+	c, err := s.designCtxOf(project, epic)
 	if err != nil {
 		return err
 	}
-	repo, err := git.FindRepo(repoDir)
-	if err != nil {
-		return err
-	}
-	branch := designBranch(epic)
-	path := filepath.Join(repo.LinkedWorktreeDir(), branch)
-	if _, err := os.Stat(path); err == nil {
-		if err := git.RemoveWorktree(*repo, path, true); err != nil {
-			return err
-		}
-	}
-	if !tickets.BranchExists(repo.Root, branch) {
-		return nil
-	}
-	return git.DeleteLocalBranch(*repo, branch, true)
+	return c.removeWorktreeAndBranch(true)
 }
 
 // liveDesignSession is the session of the Design at epicAddr that has not

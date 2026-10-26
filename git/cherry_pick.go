@@ -204,22 +204,14 @@ func AbortRebase(dir string) error {
 // commits ahead of base) reports false — there's nothing to compare, so
 // callers must treat that as "unverified", not "confirmed landed".
 func PatchesApplied(dir, upstream, base, branch string) (bool, error) {
-	out, _, err := run(dir, []string{"cherry", upstream, branch, base})
+	total, missing, err := cherry(dir, upstream, branch, base)
 	if err != nil {
 		return false, err
 	}
-	found := false
-	for line := range strings.SplitSeq(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		found = true
-		if !strings.HasPrefix(line, "-") {
-			return false, nil
-		}
+	if len(missing) > 0 {
+		return false, nil
 	}
-	if found {
+	if total > 0 {
 		return true, nil
 	}
 	ahead, err := CommitsAhead(dir, base, branch)
@@ -356,15 +348,26 @@ func RebaseInProgress(dir string) (bool, error) {
 // (git cherry), oldest first. It compares patches, so a rebased upstream still
 // counts its commits as applied.
 func UnappliedPatches(dir, upstream, head string) ([]string, error) {
-	out, _, err := run(dir, []string{"cherry", upstream, head})
+	_, missing, err := cherry(dir, upstream, head)
+	return missing, err
+}
+
+// cherry runs git cherry with args (upstream, head and an optional limit) and
+// returns how many commits it listed and the shas whose patch is not upstream.
+func cherry(dir string, args ...string) (total int, missing []string, err error) {
+	out, _, err := run(dir, append([]string{"cherry"}, args...))
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
-	var missing []string
-	for _, line := range strings.Split(out, "\n") {
-		if sha, ok := strings.CutPrefix(strings.TrimSpace(line), "+ "); ok {
+	for line := range strings.SplitSeq(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		total++
+		if sha, ok := strings.CutPrefix(line, "+ "); ok {
 			missing = append(missing, sha)
 		}
 	}
-	return missing, nil
+	return total, missing, nil
 }
