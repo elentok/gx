@@ -29,8 +29,8 @@ lone**, so the `ensure-verify` stub and older verify tickets are lone tickets.
 - **Lone**: checks like a part and decides like a collect ticket. One-part epics and the stub are
   lone.
 
-Follow the steps below for your role. Collect and the lone cap stop are not written yet; see
-"Not yet written" at the end.
+Follow the steps below for your role. A part follows steps 1 to 4. A collect ticket follows step 1
+and steps 5 to 7. A lone ticket follows steps 1 to 4, then steps 5 to 7.
 
 ## The verify part body
 
@@ -64,6 +64,16 @@ Do not read the spec. Open it, at the path in the ticket, only for these cases:
   [gx-follow-up](../gx-follow-up/SKILL.md), unattended, each time.
 - A story is added from a fix diff (next round, below). That read files no follow-up.
 
+**Collect.** Read only:
+
+- its own ticket: it holds `## Out of Scope` and, when it has one, a starting table (step 5),
+- `## Results` from every verify ticket in its `blocked_by`, with `gx tickets show <addr> --section
+  Results`, and
+- the epic's deviations, as a part does.
+
+Do not read the spec. A collect ticket checks nothing itself, except the rerun of one inline fix
+(step 6).
+
 **Next-round part.** Before you check anything, read the diff of the fix tickets in its
 `blocked_by`. Add any other passed story whose code the diff changed: copy its text and Verification
 entry from the spec into your ticket's story list, in the format above.
@@ -78,6 +88,8 @@ the epic's other tickets stand in for the spec.
 - If the spec has no Verification section, derive one: for each user story, pick the catalog flows
   from step 3 and the CLI or server checks it implies.
 - If the epic has no web, CLI or server change, close the ticket now (step 7, clean round).
+- Note the spec's `## Out of Scope` section. A lone ticket without one in its own ticket copies it
+  from the spec when it opens a collect ticket (step 6).
 
 ## 2. Start the server
 
@@ -87,7 +99,7 @@ its own server; never share one. The fixture is isolated: it uses temp state dir
 real gx state. Keep it in a background shell. Stop it before you finish.
 
 If the fixture does not start, that is a finding. A part records it under its results. A lone ticket
-fixes it if small, else opens a ticket (step 5 and 6).
+decides it like any finding (steps 5 and 6).
 
 ## 3. Map the diff to the flow catalog
 
@@ -121,8 +133,7 @@ with Write, then `gx tickets section <addr> "Results" - < <file>` (rewrite the w
 time, lines so far plus the new one; never a heredoc, never edit the ticket file by path). A part
 never fixes, never commits, never judges scope and never opens tickets.
 
-**Lone.** Write one line per user story into the ticket body, under a `## Round N` heading, with the
-same section command. Findings go below the lines.
+**Lone.** Write the lines and findings the same way, under `## Results` in your own ticket.
 
 ### Part cap stop
 
@@ -138,59 +149,97 @@ When the session shows a finish-up prompt, stop checking:
 When every story has a line, stop the fixture server and any other background shell, then report
 `gx tickets set <addr> --iteration-status finished --commitless true`. A part commits nothing.
 
-The rest of this skill (steps 5 to 7) is for a lone ticket.
+### Lone and collect cap stops
 
-## 5. Fix one small finding inline
+A lone or collect ticket stops at the same finish-up prompt. Do the first steps of its list, then
+stop every background shell you started (the fixture, for a lone ticket) before you report finished.
 
-This ticket commits only the small fixes and flows in this step. A clean round closes it commitless.
+- **Lone.** Mark every unchecked story `unchecked`, reason `cap stop`, and write the results (step 4).
+  Open extra parts for the unchecked stories plus a collect ticket, all with the same `Round: N`
+  (step 6). Write your results into that collect ticket as its starting table (step 5). Do not name
+  this ticket in its `blocked_by`: the collect ticket is its child, and a blocker waits on its whole
+  fork subtree. Report `gx tickets set <addr> --iteration-status finished --commitless true` (drop
+  `--commitless` if you committed an inline fix).
+- **Collect.** Write the current table with the decisions made so far into a second collect ticket
+  for the same round, same `Round: N`, as its starting table. Open it as a child. Report finished.
 
-If the round has exactly one finding and the fix is about 30 changed lines or fewer in at most 2
-files, fix it here. Re-run the check that failed. Run `gofmt -l` on the changed Go files, then commit
-with the subject `<epic>/<ticket id>: <what changed>`.
+The rest of this skill (steps 5 to 7) is for a collect or lone ticket.
 
-A small missing flow or scenario follows the same size rule. Write it, run it and commit it to the
-suite.
+## 5. Merge the results into one table
 
-Anything larger, or any second finding, goes to step 6. Do not fix some findings inline and open
-tickets for others.
+A lone ticket uses its own results from step 4 as the part results.
 
-## 6. Open tickets for several findings or a larger fix
+Write one table for all stories into your ticket, under `## Table`, with
+`gx tickets section <addr> "Table" - < <file>`. Use the spec's story numbers. Columns:
 
-- One ticket per independent finding, or per group of findings that name the same fix. Use
-  `gx tickets add <epic> --parent <this ticket id> --slug <slug> --body -`. The child names this
-  ticket as its `parent`. Nothing about it is recorded on this ticket.
-- Then open the next-round verify ticket the same way, with `--type verify --blocked-by <the child
-  ids>`, a body that starts with `Round: N+1`, and a line pointing at this ticket's address. It
-  waits for the children, then rechecks all stories.
-- If this is round 3, do not open a next round. Run `gx tickets ask` instead (see step 7).
+| story | verdict | covering check | round last checked | finding, with fix ticket, follow-up or inline-fix commit |
+| ----- | ------- | -------------- | ------------------ | -------------------------------------------------------- |
+
+- Carry the previous collect ticket's table forward: start from the table in your own ticket and
+  update only the rows the parts re-checked.
+- Take each verdict and covering check from the parts' `## Results` lines. Keep `unchecked` for
+  every story a cap stop left unchecked, and note the cap stop in its row. It stays `unchecked`
+  until its extra part runs.
+- Do not recheck a part's `pass`.
+
+## 6. Decide and open the work
+
+**Cap-stop leftovers.** For the unchecked stories, open extra parts plus a second collect ticket
+that names them in `blocked_by`, all with the same `Round: N`.
+
+- A story left unchecked for the second time in a round gets a solo extra part (one story).
+- If that solo part also stops at the cap, mark the story `fail`, "too large for one session",
+  record every other decision, open all other work first, then run `gx tickets ask` for it last (see
+  step 7).
+
+**Findings.**
+
+- Exactly one small finding (30 changed lines or fewer, at most 2 files): fix it inline. Rerun the
+  check that failed. Run `gofmt -l` on the changed Go files, then commit with the subject
+  `<epic>/<ticket id>: <what changed>`. Name the commit in the table row. A small missing flow or
+  scenario follows the same size rule.
+- Otherwise, one child fix ticket per finding, or per group of findings that name the same fix. Do not
+  fix some findings inline and open tickets for others.
+- A finding outside the `## Out of Scope` section in your own ticket goes to gx-follow-up
+  ([gx-follow-up](../gx-follow-up/SKILL.md), unattended), not to a fix ticket. The table names each
+  follow-up.
+
+**Next round.** Open `Round: N+1` when there are fix tickets, or when the inline fix's rerun failed
+or touched code of other passed stories. Only a fix round raises N.
+
+- Open next-round parts in the format of [The verify part body](#the-verify-part-body), covering the
+  failed and unchecked stories plus every passed story you expect a fix to touch, judged from the
+  finding. Each story carries its finding and fix ticket. Each part names its fix tickets in
+  `blocked_by`.
+- Also open a new collect ticket, `Round: N+1`, that names the new parts in `blocked_by`.
+
+**Opening tickets.** Use `gx tickets add <epic> --parent <this ticket id> --slug <slug>
+[--type verify] [--blocked-by <ids>] --expected-context-window <K> --body -`.
+
+- Every ticket you open is your child. Nothing about it is recorded on this ticket.
+- Each gets `expected_context_window`: the sum of its per-story estimates plus the base (parts), or
+  the collect estimate (collect tickets).
+- Every collect ticket you open gets a copy of `## Out of Scope`: from your own ticket, or for a
+  lone ticket without one, from the spec. A collect ticket opened for a cap stop also gets its
+  starting table (steps 5 and cap stops).
 
 ## 7. Close out
 
 - Stop the server and any other background shell.
-- Write a `### Summary` under this round's `## Round N` heading, before you report. Keep it short:
-  - what you ran: the flows, CLI and server checks, and any manual browser checks
-  - the result per story, as in step 4
-  - what you did about findings: fixed inline (with the commit), tickets opened (with their
-    addresses), or none
-  - anything you skipped
-- Clean round (every story passes, none `unchecked`, no findings): append the lines from step 4, then
-  `gx tickets set <addr> --iteration-status finished --commitless true`.
-- Inline fix: commit first. Report `finished` in a later tool call, with no `--commitless`.
-- Tickets opened: write the story lines and the findings into the body, then
-  `gx tickets set <addr> --iteration-status finished --commitless true`, unless step 5 committed
-  something in this round. Then drop `--commitless`.
-- Round 3 that still has problems: commit anything green, write the body, then run
-  `gx tickets ask` following [gx-local-tracker.md](../gx-local-tracker.md)'s announce-and-stop
-  rule. The question names the failing stories. End your turn. Do not report `finished`.
+- Write a `### Summary` under `## Table` before you report. Keep it short: what you ran (lone), the
+  result per story, what you did about findings (inline commit, tickets and
+  follow-ups opened, or none), and anything you skipped.
+- **Round 3** (`Round: 3`) with stories still failing: open no next round. Commit anything green,
+  write the body, then run `gx tickets ask` following
+  [gx-local-tracker.md](../gx-local-tracker.md)'s announce-and-stop rule. The question names the
+  failing stories. End your turn. Do not report `finished`.
+- **Cap-stop solo failure** (step 6): open all other work first, then run `gx tickets ask` last, as
+  above.
+- **Clean round**: every story passes and every finding was fixed inline with a passing rerun that
+  touched no other passed story's code, or sent to gx-follow-up. Report
+  `gx tickets set <addr> --iteration-status finished --commitless true`, unless this ticket made the
+  inline fix.
+- **Inline fix or tickets opened**: commit first if you fixed inline. Report `finished` in a later
+  tool call, without `--commitless` only if you committed.
 
 `--status done` is never yours to set. gx decides it after you report `finished`.
-
-## Not yet written
-
-The next ticket in this epic adds, here and in the role steps above:
-
-- the collect step (merge the parts' results, decide, open work),
-- the lone role's split into parts plus a collect ticket,
-- the lone and collect cap stops.
-
-Until then a collect ticket has no steps: stop and ask with `gx tickets ask`.
