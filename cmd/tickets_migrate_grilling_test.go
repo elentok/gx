@@ -49,9 +49,15 @@ func (e grillingEnv) writeGrillingTranscript(t *testing.T, cwd, id, epic string,
 	}
 	var lines [][]byte
 	add := func(typ, text string) {
+		message := map[string]any{"content": []map[string]any{{"type": "text", "text": text}}}
+		if typ == "assistant" {
+			// Non-zero usage, so a backfilled record that joins the sums shows.
+			message["model"] = "claude-sonnet-4-5"
+			message["usage"] = map[string]any{"input_tokens": 1000, "output_tokens": 500}
+		}
 		line, _ := json.Marshal(map[string]any{
 			"type": typ, "uuid": id + typ, "timestamp": at.Format(time.RFC3339),
-			"message": map[string]any{"content": []map[string]any{{"type": "text", "text": text}}},
+			"message": message,
 		})
 		lines = append(lines, line, []byte("\n"))
 	}

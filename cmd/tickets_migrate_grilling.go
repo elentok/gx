@@ -10,7 +10,6 @@ import (
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
@@ -122,15 +121,13 @@ func designEpic(path string) (string, error) {
 	return "", err
 }
 
-// saveBackfilledDesign writes the record of an old Design transcript with its
-// own totals, read from the same transcript, and counts it. RecordedAt is the
-// transcript's start, so a rerun writes the same bytes.
+// saveBackfilledDesign writes the record of an old Design transcript and counts
+// it. RecordedAt is the transcript's start, so a rerun writes the same bytes.
+// Its totals are zero, not the transcript's: the transcript predates the
+// started marker, so its spend must stay out of the token and cost sums of
+// epics created after the marker. Nil totals would make those sums unknown.
 func saveBackfilledDesign(dir, home, cwd, id, ticket string, at time.Time) error {
-	rec := conversations.Record{ID: id, Dir: cwd, Harness: string(harness.Claude), Ticket: ticket, Design: true, RecordedAt: at}
-	tokens, cost, err := ralphloop.SessionsTotals([]ralphloop.SessionRef{{Agent: ralphloop.AgentClaude, Cwd: cwd, SessionID: id}})
-	if err == nil {
-		rec.Totals = &conversations.Totals{TotalTokens: int(tokens), Cost: cost}
-	}
+	rec := conversations.Record{ID: id, Dir: cwd, Harness: string(harness.Claude), Ticket: ticket, Design: true, RecordedAt: at, Totals: &conversations.Totals{}}
 	if err := conversations.Save(dir, rec); err != nil {
 		return err
 	}
