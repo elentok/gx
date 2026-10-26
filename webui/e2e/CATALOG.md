@@ -575,3 +575,15 @@ an exited session.
 - **Scenario:** `paused` with config `agents.fix-agent-remote-control=true`, `paused-epic` queued.
 - **Steps:** open `paused-epic`; click "Fix it with an agent" on `07`; click "Start gx agent".
 - **Pass:** the dialog reads "Agent started. View it in the gx TUI Agents tab or in the Claude app".
+
+## 57. Stats, Grilling section
+
+- **Scenario:** `grilling-stats`; the phone test runs at 375 px wide.
+- **Steps:** open `#/stats`; pick range 7d, then 30d; pick project `demo`.
+- **Pass:**
+  - The "Grilling" section follows "Cost and effort" and precedes "Friction", with cards "Words read" and "Questions asked".
+  - At 30d the headlines are 550 and 12, and the small text is total over the 26 non-hatched days (21/day, 0/day).
+  - The 4 days before the earliest count are hatched; the empty day after it is a zero bar (no bar, not hatched).
+  - At 7d the headlines are 260 and 6, with no hatched days.
+  - Project `demo` shows 310 and 7; the 4 hatched days stay the same.
+  - At phone width the cards stack in one column with no horizontal scroll.
