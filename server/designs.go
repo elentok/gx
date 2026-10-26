@@ -331,12 +331,12 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	return s.createSession(CreateSessionRequest{
 		Project:      project,
 		Dir:          worktree,
-		madeWorktree: !past,
+		MadeWorktree: !past,
 		Name:         epic,
 		Ticket:       epicAddr,
 		Prompt:       prompt,
 		Harness:      s.settings.Load().chatHarness(),
-		rebaseNote:   note,
+		RebaseNote:   note,
 	})
 }
 
@@ -493,12 +493,12 @@ func (s *Server) startSession(project, slug, worktree, rebaseNote string) Sessio
 	res, err := s.createSession(CreateSessionRequest{
 		Project:      project,
 		Dir:          worktree,
-		madeWorktree: true,
+		MadeWorktree: true,
 		Name:         slug,
 		Ticket:       addr,
 		Prompt:       "/gx-design " + addr,
 		Harness:      s.settings.Load().chatHarness(),
-		rebaseNote:   rebaseNote,
+		RebaseNote:   rebaseNote,
 	})
 	switch {
 	case err != nil:

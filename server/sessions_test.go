@@ -486,6 +486,14 @@ func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
 	}
 }
 
+func TestCreateSession_RequestCarriesMadeWorktreeAndRebaseNote(t *testing.T) {
+	h, _, _, id, _ := startFakeSessionWith(t, server.CreateSessionRequest{MadeWorktree: true, RebaseNote: "not rebased: dirty"})
+	meta := readMeta(t, h, id)
+	if meta["made_worktree"] != true || meta["rebase_note"] != "not rebased: dirty" {
+		t.Errorf("meta made_worktree, rebase_note = %v, %v; want true, the note", meta["made_worktree"], meta["rebase_note"])
+	}
+}
+
 func TestCreateSession_ExistingDirLeavesTrustDialog(t *testing.T) {
 	t.Setenv(agentfake.ProgramTrustEnv, "1")
 	h, ctx, evs, id, _ := startFakeSession(t)

@@ -143,10 +143,10 @@ type CreateSessionRequest struct {
 
 	// design marks the session Design although Ticket has no map epic yet.
 	design bool
-	// madeWorktree marks Dir as a worktree gx made, as Worktree does.
-	madeWorktree bool
-	// rebaseNote is saved in the meta as RebaseNote.
-	rebaseNote string
+	// MadeWorktree marks Dir as a worktree gx made, as Worktree does.
+	MadeWorktree bool `json:"made_worktree,omitempty"`
+	// RebaseNote is saved in the meta as RebaseNote.
+	RebaseNote string `json:"rebase_note,omitempty"`
 	// remoteControl is the --remote-control name, saved in the meta so resumes
 	// keep it whatever the setting says by then.
 	remoteControl string

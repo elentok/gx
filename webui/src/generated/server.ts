@@ -91,6 +91,28 @@ export interface DesignOpenRequest {
   project?: string;
 }
 /**
+ * DesignWorktreeRequest is the body of POST /v1/designs/worktree. Epic is a map
+ * epic's address ("project:epic"). ExcludeSession is the caller's own gx
+ * session, which does not count as another live design session in the rebase.
+ */
+export interface DesignWorktreeRequest {
+  epic: string;
+  exclude_session?: string;
+}
+/**
+ * DesignWorktreeResult answers designs worktree. Path is the Design's worktree,
+ * or the trunk checkout once AfterBranch. Note says why the rebase was skipped;
+ * it is empty when the rebase ran. A refusal is a result, as for designs open.
+ */
+export interface DesignWorktreeResult {
+  path?: string;
+  note?: string;
+  after_branch: boolean;
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+/**
  * Refusal reason of the designs delete route, beside the unknown and not-map ones.
  */
 export const ReasonDesignNotUncharted = "not-uncharted";
@@ -1511,6 +1533,14 @@ export interface CreateSessionRequest {
   harness?: string;
   cols?: number /* int */;
   rows?: number /* int */;
+  /**
+   * MadeWorktree marks Dir as a worktree gx made, as Worktree does.
+   */
+  made_worktree?: boolean;
+  /**
+   * RebaseNote is saved in the meta as RebaseNote.
+   */
+  rebase_note?: string;
 }
 /**
  * SessionResult is a session write's outcome: the session, or a refusal.

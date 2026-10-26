@@ -1,9 +1,11 @@
 package tickets
 
 import (
+	"errors"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -138,6 +140,45 @@ func TestStartSession_FillsDirWithTheDesignWorktree(t *testing.T) {
 	}
 	if msg.Dir != "/wt/design-map" {
 		t.Errorf("Dir = %q, want the design worktree", msg.Dir)
+	}
+}
+
+func TestStartSession_CarriesTheRebaseNoteAndTrustFlag(t *testing.T) {
+	api := fakeServerAPI{designWorktree: server.DesignWorktreeResult{Path: "/wt/design-map", Note: "not rebased: dirty"}}
+	m := startSessionModel(t).WithServer(api)
+	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
+	msg, ok := cmd().(StartSessionMsg)
+	if !ok {
+		t.Fatalf("not a StartSessionMsg: %T", cmd())
+	}
+	if msg.RebaseNote != "not rebased: dirty" || !msg.MadeWorktree {
+		t.Errorf("RebaseNote, MadeWorktree = %q, %v; want the note, true", msg.RebaseNote, msg.MadeWorktree)
+	}
+}
+
+func TestStartSession_ServerErrorIsShownAndOpensNoForm(t *testing.T) {
+	api := fakeServerAPI{designWorktreeErr: errors.New("500 boom")}
+	m := startSessionModel(t).WithServer(api)
+	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
+	got := cmd()
+	if _, form := got.(StartSessionMsg); form {
+		t.Fatal("a server error opened the create form")
+	}
+	if _, ok := got.(notify.NotifyMsg); !ok {
+		t.Errorf("msg = %T, want a notification", got)
+	}
+}
+
+func TestStartSession_NotRunningFallsBackToTrunk(t *testing.T) {
+	api := fakeServerAPI{designWorktreeErr: syscall.ECONNREFUSED}
+	m := startSessionModel(t).WithServer(api)
+	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
+	msg, ok := cmd().(StartSessionMsg)
+	if !ok {
+		t.Fatalf("not a StartSessionMsg: %T", cmd())
+	}
+	if msg.MadeWorktree || msg.RebaseNote != "" {
+		t.Errorf("trunk fallback = %+v, want no note and no trust flag", msg)
 	}
 }
 

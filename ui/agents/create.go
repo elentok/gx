@@ -67,6 +67,9 @@ func (e formEntry) newWorktree() bool { return e.dir == "" }
 // CreatePrefill pre-fills the create form; every field stays editable.
 type CreatePrefill struct {
 	Project, Dir, Name, Prompt, Ticket string
+	// RebaseNote and MadeWorktree ride along to the created session.
+	RebaseNote   string
+	MadeWorktree bool
 }
 
 type createField int
@@ -443,6 +446,10 @@ func (m Model) submitCreate() (tea.Model, tea.Cmd) {
 		}
 	} else {
 		req.Dir = e.dir
+		// The note and trust flag belong to the prefilled worktree only.
+		if f.prefill.Dir != "" && e.dir == f.prefill.Dir {
+			req.MadeWorktree, req.RebaseNote = f.prefill.MadeWorktree, f.prefill.RebaseNote
+		}
 	}
 	// The new session has no info lines yet, so it gets the whole panel.
 	req.Cols, req.Rows = max(m.mainWidth()-2, 1), max(m.height-1, 1)

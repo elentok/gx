@@ -409,7 +409,7 @@ func (m Model) startSession(req ticketsui.StartSessionMsg) (Model, tea.Cmd) {
 	if !ok {
 		return m, cmd
 	}
-	agents, open := agents.OpenCreateForm(agentsui.CreatePrefill{Project: req.Project, Dir: req.Dir, Name: req.Name, Prompt: req.Prompt, Ticket: req.Ticket})
+	agents, open := agents.OpenCreateForm(agentsui.CreatePrefill{Project: req.Project, Dir: req.Dir, Name: req.Name, Prompt: req.Prompt, Ticket: req.Ticket, RebaseNote: req.RebaseNote, MadeWorktree: req.MadeWorktree})
 	current.model = agents
 	m.setActivePage(current)
 	return m, tea.Batch(cmd, open)
