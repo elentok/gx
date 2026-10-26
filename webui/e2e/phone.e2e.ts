@@ -13,6 +13,30 @@ test("23. Phone, Epics page", async ({ page, start }) => {
   expect(second!.y).toBeGreaterThan(first!.y);
 });
 
+test("41. Phone, New Design sheet", async ({ page, start }) => {
+  await start("ready");
+  await page.getByRole("button", nav("New Design")).click();
+  const dialog = page.getByRole("dialog", nav("New Design"));
+  await expect(dialog).toBeVisible();
+
+  // A bottom sheet about 88% of the viewport high, with a grab handle.
+  const box = await dialog.boundingBox();
+  expect(box!.width).toBe(375);
+  expect(box!.y + box!.height).toBe(812);
+  expect(box!.height / 812).toBeGreaterThan(0.85);
+  expect(box!.height / 812).toBeLessThan(0.91);
+  await expect(dialog.getByTestId("grab-handle")).toBeVisible();
+
+  // Start design is about twice as wide as Discard; Close sits in the header, above the idea box.
+  const start_ = await dialog.getByRole("button", nav("Start design")).boundingBox();
+  const discard = await dialog.getByRole("button", nav("Discard")).boundingBox();
+  expect(start_!.width / discard!.width).toBeGreaterThan(1.7);
+  expect(start_!.width / discard!.width).toBeLessThan(2.3);
+  const close = await dialog.getByRole("button", nav("Close")).boundingBox();
+  const idea = await dialog.getByRole("textbox", nav("Rough idea")).boundingBox();
+  expect(close!.y + close!.height).toBeLessThanOrEqual(idea!.y);
+});
+
 test("24. Phone, Design page", async ({ page, start }) => {
   await start("design");
 

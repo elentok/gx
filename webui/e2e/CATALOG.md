@@ -7,8 +7,8 @@ Epics page cards. The helpers `section` and `card` in `fixture.ts` find a sectio
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14),
-`united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24),
-`newdesign.e2e.ts` (flows 25, 26, 27).
+`united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41),
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40).
 
 ## 1. Queue an epic
 
@@ -257,6 +257,15 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Scenario:** `united`, at 375 px wide (`test.use({ viewport })`)
 - **Pass:** two cards of Needs you share a left edge and the second sits below the first.
 
+## 41. Phone, New Design sheet
+
+- **Scenario:** `ready`, at 375 px wide
+- **Steps:** click New Design.
+- **Pass:**
+  - The dialog is a bottom sheet: 375 px wide, anchored to the bottom, 85% to 91% of the viewport high, with a grab handle (`data-testid="grab-handle"`).
+  - Start design is 1.7 to 2.3 times as wide as Discard.
+  - Close sits in the header, above the idea box.
+
 ## 24. Phone, Design page
 
 - **Scenario:** `design`, at 375 px wide
@@ -279,16 +288,73 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Scenario:** `ready`
 - **Steps:**
   1. Click New Design (right of the filter); fill the name `fresh-design` and an idea; Start design.
-  2. Click "← Epics" and the new card's title.
+  2. Click "← Epics", open New Design again, press Escape, then click the new card's title.
 - **Pass:**
-  - The form is a "New Design" dialog. Start opens `#/d/demo:fresh-design` and `gx server epics` lists it.
-  - The card of the running session opens the same page.
+  - The form is a "New Design" dialog with a header row (no project pill in `ready`, which has one
+    project) and an idea box taller than half the dialog. The placeholders read `epic-name` and
+    "What is the problem? Who hits it? What does done look like?".
+  - Start opens `#/d/demo:fresh-design` and `gx server epics` lists it. `gx tickets show
+    demo:fresh-design` shows `kind: map`, `design_step: chart` and `## Initial prompt`, and no
+    Destination.
+  - A reopened modal is empty.
+  - The card of the Designing epic opens its epic page, `#/e/demo:fresh-design` (not the Design page).
 
 ## 27. Design a not-started Design
 
 - **Scenario:** `united`
 - **Steps:** open Ready to design; click Design on the `design-new` card.
 - **Pass:** the page is `#/d/demo:design-new` and `gx agents list` names `design-new`.
+
+## 34. New Design text size
+
+- **Scenario:** `ready`
+- **Steps:** open New Design.
+- **Pass:** the Epic name and Rough idea fields have a computed font size of 16px.
+
+## 35. New Design project select
+
+- **Scenario:** `united` (projects `demo` and `auto`)
+- **Steps:** open New Design with the Epics filter on All projects; press Escape; pick `auto` in the
+  Epics "Project" filter; open New Design again.
+- **Pass:** the dialog's Project select lists `demo` and `auto`. With All projects and an empty
+  draft it shows `demo` (the first); with the filter on `auto` it shows `auto`.
+
+## 36. New Design draft keeps its project
+
+- **Scenario:** `united`
+- **Steps:** set the Epics filter to `demo`; open New Design, pick `auto`, type a name; press Escape; open it again.
+- **Pass:** the Project select shows `auto`, not the filter's `demo`.
+
+## 37. New Design draft is shared, closing keeps it
+
+- **Scenario:** `ready`
+- **Steps:**
+  1. Type a name and an idea. Open a second page of the same browser context on `#/epics`.
+  2. In the first page close the dialog with ×, reopen, close with Escape, reopen, close with a click on the backdrop, reopen.
+- **Pass:**
+  - The second page does not open the modal by itself. Its New Design shows the same name and idea.
+  - After each way of closing, the reopened dialog still holds the name and idea.
+
+## 38. New Design Discard
+
+- **Scenario:** `ready`
+- **Steps:** click Discard with empty fields. Reopen, type a name and an idea, click Discard, click Keep, click Discard twice.
+- **Pass:**
+  - With empty fields Discard closes the dialog at once.
+  - With text it shows "Discard this draft?" with Keep and Discard. Keep returns to the text.
+  - The confirming Discard closes the dialog; the next one is empty.
+
+## 39. New Design refused
+
+- **Scenario:** `ready`
+- **Steps:** open New Design; name it `ready-epic`; type an idea; Start design.
+- **Pass:** an alert in the dialog reads "already has an epic". The name and idea stay and the URL stays `#/epics`.
+
+## 40. gx designs open
+
+- **Scenario:** `ready`
+- **Steps:** run `gx designs open cli-design --idea x --project demo --json` twice.
+- **Pass:** the first run succeeds and `gx tickets show demo:cli-design` shows `kind: map`. The second returns `epic-exists`.
 
 ## 28. Menu: AFK, build text, Paused chip
 
