@@ -488,3 +488,23 @@ func TestEpicDetail_UnknownAddress(t *testing.T) {
 		}
 	}
 }
+
+func TestEpicDetail_NeedsRepairRowCarriesTheStateToken(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		servertest.WriteTicketWith(t, store, "proj", "work", "01", "broken", servertest.TicketOpts{PauseReason: "merge-conflict"})
+		servertest.WriteTicketWith(t, store, "proj", "work", "02", "fine", servertest.TicketOpts{})
+	})
+	_, d, body := getEpicDetail(t, h, base, "proj:work")
+	if len(d.Rows) != 2 {
+		t.Fatalf("rows = %s", body)
+	}
+	for _, r := range d.Rows {
+		want := ""
+		if strings.HasSuffix(r.Address, "/01") {
+			want = repairToken
+		}
+		if r.State != want {
+			t.Errorf("%s state = %q, want %q", r.Address, r.State, want)
+		}
+	}
+}

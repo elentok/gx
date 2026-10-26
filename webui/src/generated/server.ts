@@ -459,6 +459,10 @@ export interface EpicDetailRow {
    */
   reason?: string;
   /**
+   * State is the token the fix-agent route needs; set on a needs-repair row.
+   */
+  state?: string;
+  /**
    * Current and Blocked are set on a map epic's rows: Current is the claimed
    * ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.
    */
@@ -834,6 +838,31 @@ export interface EpicSummary {
    * MergeBlockKind is the pause reason of a blocked merge; empty for a needs-rebase block.
    */
   merge_block_kind?: string;
+}
+
+//////////
+// source: fixagent.go
+
+export const ReasonFixUnknownTicket = "unknown-ticket";
+export const ReasonFixNotRepair = "not-needs-repair";
+export const ReasonFixInvestigating = "investigating";
+/**
+ * Refusal reasons of the fix-agent route, beside the session ones.
+ */
+export type ReasonFix = typeof ReasonFixUnknownTicket | typeof ReasonFixNotRepair | typeof ReasonFixInvestigating;
+/**
+ * FixAgentRequest is the body of POST /v1/tickets/fix-agent. State is the
+ * token of the needs-repair row the web saw, required on the web mux.
+ */
+export interface FixAgentRequest {
+  address: string;
+  state?: string;
+}
+/**
+ * FixAgentResult is the session result plus whether remote control was applied.
+ */
+export interface FixAgentResult extends SessionResult {
+  remote_control: boolean;
 }
 
 //////////

@@ -12,6 +12,7 @@ packages:
       - epicdetail.go
       - epiclist.go
       - epicsummary.go
+      - fixagent.go
       - index.go
       - pause.go
       - recentlyfinished.go

@@ -39,6 +39,8 @@ type EpicDetailRow struct {
 	Question string `json:"question,omitempty"`
 	// Reason is the plain-words pause reason of a paused loop-epic ticket.
 	Reason string `json:"reason,omitempty"`
+	// State is the token the fix-agent route needs; set on a needs-repair row.
+	State string `json:"state,omitempty"`
 	// Current and Blocked are set on a map epic's rows: Current is the claimed
 	// ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.
 	Current bool `json:"current,omitempty"`
@@ -301,8 +303,12 @@ func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) EpicDeta
 	if at, ok := s.registry.startedAtOf(row.Address); ok && status == tickets.StatusClaimed {
 		row.ClaimedAt = at
 	}
-	if open := tickets.OpenQuestion(readLogLenient(t)); open != nil && status == tickets.StatusPausedAnswer {
+	evs := readLogLenient(t)
+	if open := tickets.OpenQuestion(evs); open != nil && status == tickets.StatusPausedAnswer {
 		row.Asking, row.Question = true, open.Summary
+	}
+	if status == tickets.StatusPausedRepair {
+		row.State = repairState(evs, t.PausedClass())
 	}
 	if t.PausedClass() != "" {
 		row.Reason = t.PauseReason.Label()

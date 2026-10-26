@@ -658,6 +658,7 @@ var routeTable = []struct {
 	{"POST /v1/sessions/auto-advance/cancel", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.cancelAutoAdvanceRoute)(w, r) }},
 	{"POST /v1/designs/open", (*Server).designOpenWrite},
 	{"POST /v1/designs/delete", (*Server).designDeleteWrite},
+	{"POST /v1/tickets/fix-agent", (*Server).fixAgentWrite},
 	{"POST /v1/afk", (*Server).afkWrite},
 }
 

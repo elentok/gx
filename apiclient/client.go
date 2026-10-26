@@ -459,6 +459,14 @@ func (c *Client) DeleteDesign(ctx context.Context, req server.DesignDeleteReques
 	return res, err
 }
 
+// FixAgent starts a fix agent for a needs-repair ticket. A refusal is a
+// result (Refused set), not an error.
+func (c *Client) FixAgent(ctx context.Context, req server.FixAgentRequest) (server.FixAgentResult, error) {
+	var res server.FixAgentResult
+	err := c.post(ctx, "/v1/tickets/fix-agent", req, &res)
+	return res, err
+}
+
 // StopSession ends a live session's holder. A refusal is a result (Refused
 // set), not an error.
 func (c *Client) StopSession(ctx context.Context, id string) (server.SessionResult, error) {
