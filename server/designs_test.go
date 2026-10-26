@@ -165,6 +165,21 @@ func TestDesignsOpen_ConflictSkipsTheRebaseAndSetsANote(t *testing.T) {
 	}
 }
 
+func TestLinkSession_CarriesTheRebaseNote(t *testing.T) {
+	f := startDesigns(t)
+	res, _ := f.reopenAfterTrunkCommit(t, "c.txt", "trunk\n", func(dir string) {
+		if err := os.WriteFile(filepath.Join(dir, "c.txt"), []byte("design\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		gitOut(t, dir, "add", "c.txt")
+		gitOut(t, dir, "commit", "-m", "design change")
+	})
+	linked, err := f.h.Client.LinkSession(f.ctx, server.LinkSessionRequest{ID: res.Session.ID, Ticket: "proj:map"})
+	if err != nil || linked.Session == nil || linked.Session.RebaseNote != res.Session.RebaseNote || linked.Session.RebaseNote == "" {
+		t.Errorf("link = %+v, %v; want the open's note %q", linked.Session, err, res.Session.RebaseNote)
+	}
+}
+
 func TestDesignsOpen_UncommittedEditsSkipTheRebaseAndSetANote(t *testing.T) {
 	f := startDesigns(t)
 	var before string

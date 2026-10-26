@@ -334,7 +334,13 @@ func printSessionResult(w io.Writer, jsonOut bool, res server.SessionResult, err
 	if res.Session == nil {
 		return nil
 	}
-	_, err = fmt.Fprintln(w, res.Session.ID)
+	if _, err = fmt.Fprintln(w, res.Session.ID); err != nil {
+		return err
+	}
+	if res.Session.RebaseNote == "" {
+		return nil
+	}
+	_, err = fmt.Fprintln(w, res.Session.RebaseNote)
 	return err
 }
 

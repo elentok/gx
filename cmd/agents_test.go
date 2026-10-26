@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
@@ -198,6 +199,25 @@ func TestAgentLink(t *testing.T) {
 	}
 	if err := runAgentLink(ctx, noServer, &out, false, server.LinkSessionRequest{Ticket: "x"}); err != nil || out.Len() == 0 {
 		t.Errorf("outside a session = %q, %v; want a note and success", out.String(), err)
+	}
+}
+
+func TestPrintSessionResult_PrintsTheRebaseNoteOnlyWhenSet(t *testing.T) {
+	var out bytes.Buffer
+	res := server.SessionResult{Session: &server.SessionInfo{ID: "s1"}}
+	if err := printSessionResult(&out, false, res, nil); err != nil || out.String() != "s1\n" {
+		t.Errorf("no note = %q, %v; want just the id", out.String(), err)
+	}
+
+	out.Reset()
+	res.Session.RebaseNote = "design branch not rebased: conflict"
+	if err := printSessionResult(&out, false, res, nil); err != nil || out.String() != "s1\ndesign branch not rebased: conflict\n" {
+		t.Errorf("with note = %q, %v; want the id then the note", out.String(), err)
+	}
+
+	out.Reset()
+	if err := printSessionResult(&out, true, res, nil); err != nil || !strings.Contains(out.String(), `"rebase_note"`) {
+		t.Errorf("json = %q, %v; want rebase_note", out.String(), err)
 	}
 }
 
