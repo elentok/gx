@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, section, test, toasts } from "./fixture";
+import { card, expect, holdRoute, nav, section, test, toasts } from "./fixture";
 
 const NEEDS_YOU = [
   "paused-epic",
@@ -114,7 +114,10 @@ test("17. Merge from the card", async ({ page, start }) => {
   await card(page, "awaiting-epic").getByRole("button", nav("Merge")).click();
   await expect(toasts(page).filter({ hasText: /^no branch awaiting-epic in / })).toBeVisible();
 
+  const release = await holdRoute(page, "**/v1/epics/merge");
   await card(page, "blocked-merge-epic").getByRole("button", nav("Merge")).click();
+  await expect(card(page, "blocked-merge-epic").getByRole("button")).toBeDisabled();
+  release();
   await expect(toasts(page).last()).toBeVisible();
   await expect(toasts(page)).toHaveCount(2);
   await expect(page).toHaveURL(/#\/epics$/);

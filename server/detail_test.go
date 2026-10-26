@@ -90,6 +90,9 @@ func TestDetail_ActionsFollowTheTable(t *testing.T) {
 		if err != nil || !slices.Equal(d.Actions, c.want) {
 			t.Errorf("%s: actions = %v, %v; want %v", c.reason, d.Actions, err, c.want)
 		}
+		if c.reason == schema.PauseStrandedCommits && d.ActionInfo[server.ActionReopenAndRetry].Label != "Reopen and retry" {
+			t.Errorf("stranded-commits label = %q", d.ActionInfo[server.ActionReopenAndRetry].Label)
+		}
 	}
 }
 
