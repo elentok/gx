@@ -163,6 +163,20 @@ test("Start over asks for a reason first and never sends branch deletion", async
   expect(body).not.toHaveProperty("delete_branch");
 });
 
+test("Start over's Confirm is disabled until a reason is typed", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })));
+  vi.stubGlobal("fetch", fetchMock);
+  renderTicket(() => repair(["retry", "start-over"]));
+  fireEvent.click(await screen.findByRole("button", { name: "Start over" }));
+  const dialog = screen.getByRole("dialog", { name: "Start over" });
+  const confirm = within(dialog).getByRole("button", { name: "Start over" }) as HTMLButtonElement;
+  expect(confirm.disabled).toBe(true);
+  fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "   " } });
+  expect(confirm.disabled).toBe(true);
+  fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "wrong approach" } });
+  expect(confirm.disabled).toBe(false);
+});
+
 test("a Retry refused because the agent is working offers Stop agent and retry, which sends stop", async () => {
   const fetchMock = vi
     .fn()

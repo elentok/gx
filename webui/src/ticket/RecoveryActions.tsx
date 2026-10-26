@@ -129,7 +129,7 @@ export function RecoveryActions({
           label={detail.action_info?.[ActionStartOver]?.label ?? "Start over"}
           tooltip={detail.action_info?.[ActionStartOver]?.tooltip}
           pending={pending}
-          onConfirm={(reason) => send(ActionStartOver, reason ? { reason } : {})}
+          onConfirm={(reason) => send(ActionStartOver, { reason })}
           onClose={() => setConfirming(false)}
         />
       )}
@@ -173,7 +173,7 @@ function StartOverDialog({
         {tooltip && <Text>{tooltip}</Text>}
         <Textarea
           aria-label="Reason"
-          placeholder="Why start over? (optional)"
+          placeholder="Why start over?"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           rows={3}
@@ -182,7 +182,7 @@ function StartOverDialog({
           <Button emphasis="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button tone="deadlocked" disabled={pending} onClick={() => onConfirm(reason.trim())}>
+          <Button tone="deadlocked" disabled={pending || !reason.trim()} onClick={() => onConfirm(reason.trim())}>
             {pending && <Spinner size="sm" />}
             {label}
           </Button>

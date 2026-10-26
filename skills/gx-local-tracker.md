@@ -227,7 +227,7 @@ Exception: in a **map epic** the server schedules nothing, so `claimed` and `don
 hand there — see "Map epics".
 
 Orchestration changes a person may need go through server verbs, each with a `--json` result or a
-`{"refused":true,"reason":…}` refusal: `gx server tickets pause | cancel | relaunch`,
+`{"refused":true,"reason":…}` refusal: `gx server tickets pause | cancel | retry`,
 `gx server queue add | remove | replace | move`, and read verbs such as
 `gx server tickets explain <addr>` ("why isn't this running") and `history <addr>`. The repair verbs
 are `gx server tickets merge | start-over | resume | verify`. If the server is down, only these four run

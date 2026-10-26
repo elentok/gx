@@ -92,6 +92,13 @@ func (s *Server) ResumeAsWeb(req RepairRequest) (RepairResult, error) {
 	return s.repairResume(req)
 }
 
+// StartOverAsWeb is the start-over the web mux serves.
+func (s *Server) StartOverAsWeb(req RepairRequest) (RepairResult, error) {
+	req.RequireState = true
+	req.origin = OriginWeb
+	return s.repairStartOver(req)
+}
+
 // ResumeAs is the resume a client of the given origin sends over the socket.
 func (s *Server) ResumeAs(req RepairRequest, origin string) (RepairResult, error) {
 	req.origin = origin

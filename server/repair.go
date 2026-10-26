@@ -48,6 +48,9 @@ type RepairRequest struct {
 	RequireState bool `json:"-"`
 	// origin is web, tui or cli, set by repairWriteAs from the request.
 	origin string
+	// investigator is the investigate ticket whose agent made the call, from
+	// InvestigateHeader. Its merge or start-over must not cancel its own ticket.
+	investigator string
 }
 
 // ReasonBadBase refuses an resume whose base is not one of the competing blockers.
@@ -191,7 +194,7 @@ func (s *Server) mergeInQueue(req RepairRequest) (RepairResult, error) {
 	if err != nil || res.Refused {
 		return res, err
 	}
-	if err := s.cancelInvestigateOf(req.Address, req.origin); err != nil {
+	if err := s.cancelInvestigateUnlessSelf(req); err != nil {
 		return RepairResult{}, err
 	}
 	if !s.rootQueued(rootOf(addr)) {
@@ -235,13 +238,26 @@ func (s *Server) startOverInQueue(req RepairRequest) (RepairResult, error) {
 	if err != nil || res.Refused {
 		return res, err
 	}
-	if err := s.cancelInvestigateOf(req.Address, req.origin); err != nil {
+	if err := s.cancelInvestigateUnlessSelf(req); err != nil {
 		return RepairResult{}, err
 	}
 	return res, nil
 }
 
+// cancelInvestigateUnlessSelf cancels the ticket's investigate child, except
+// when that investigate agent is the caller.
+func (s *Server) cancelInvestigateUnlessSelf(req RepairRequest) error {
+	if req.investigator != "" {
+		return nil
+	}
+	return s.cancelInvestigateOf(req.Address, req.origin)
+}
+
 func (s *Server) repairStartOver(req RepairRequest) (RepairResult, error) {
+	// The web has no --reason flag to name; the CLI refusal text stays in repair.
+	if req.RequireState && strings.TrimSpace(req.Reason) == "" {
+		return repairRefusal(&repair.RefusalError{Reason: repair.ReasonReasonRequired, Message: "a reason is required to start over"}), nil
+	}
 	epicPath, id, cwd, err := s.epicTarget(req, true, false)
 	if err != nil {
 		return repairRefusal(err), nil
@@ -583,6 +599,9 @@ func repairWriteAs(web bool, do func(RepairRequest) (RepairResult, error)) http.
 		}
 		req.RequireState = web
 		req.origin = requestOrigin(r, web)
+		if !web {
+			req.investigator = r.Header.Get(InvestigateHeader)
+		}
 		if web && req.State == "" {
 			writeJSON(w, repairRefusal(&repair.RefusalError{Reason: ReasonStale, Message: "a state token is required; review the current pause"}))
 			return

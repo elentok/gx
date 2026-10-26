@@ -3,9 +3,11 @@ package server_test
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
@@ -48,6 +50,39 @@ func TestPersonVerb_StartOverCancelsTheOpenInvestigateChild(t *testing.T) {
 		t.Fatalf("start-over = %+v, %v; want started over", res, err)
 	}
 	wantChildStatus(t, child, schema.StatusCancelled)
+}
+
+func TestInvestigateVerb_MergeLeavesItsOwnTicket(t *testing.T) {
+	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
+	child := writeInvestigateChild(t, ticketPath, "open")
+	t.Setenv(server.InvestigateEnv, "proj:epic-a/01a")
+	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	if err != nil || res.Refused {
+		t.Fatalf("merge = %+v, %v; want merged", res, err)
+	}
+	wantChildStatus(t, child, schema.StatusOpen)
+}
+
+func TestInvestigateVerb_StartOverLeavesItsOwnTicket(t *testing.T) {
+	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
+	child := writeInvestigateChild(t, ticketPath, "open")
+	t.Setenv(server.InvestigateEnv, "proj:epic-a/01a")
+	res, err := h.Client.Repair(context.Background(), "start-over", server.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
+	if err != nil || res.Refused {
+		t.Fatalf("start-over = %+v, %v; want started over", res, err)
+	}
+	wantChildStatus(t, child, schema.StatusOpen)
+}
+
+func TestWebStartOver_EmptyReasonRefusalNamesNoCLIFlag(t *testing.T) {
+	h, _ := pausedIteration(t, string(events.ZeroCommit), true)
+	res, err := h.Server.StartOverAsWeb(server.RepairRequest{Address: "proj:epic-a/01", State: "tok"})
+	if err != nil || !res.Refused || res.Reason != repair.ReasonReasonRequired {
+		t.Fatalf("start-over = %+v, %v; want %s refusal", res, err, repair.ReasonReasonRequired)
+	}
+	if strings.Contains(res.Message, "--reason") {
+		t.Errorf("message = %q, must not mention a CLI flag", res.Message)
+	}
 }
 
 func TestPersonVerb_RefusedMergeLeavesTheInvestigateChild(t *testing.T) {

@@ -184,7 +184,7 @@ session. Everything above (background, state, diagnosis) applies unchanged; only
 - allowed: exactly the verbs the matched entry lists in its `verbs` (as named in the prompt),
   whatever they are — e.g. R3's entry grants its `merge`. A matched entry keeps its granted verbs.
   Plus, with no catalog entry needed: Retry alone, on any repair pause and on `zero-commit`, within
-  1 per kind and 3 per ticket (read the counts from `detail`), and only if Retry is in
+  1 per kind and 3 per ticket (the server refuses a retry past the cap), and only if Retry is in
   `detail.actions`. Filing a tooling bug via the `gx-follow-up` skill (target `gx`, `unattended`)
   is always allowed. The prompt's entry is the authority, not your own judgment of what would help.
 - recommend only: Merge again and Start over (without a grant from a matched entry); Retry when it
