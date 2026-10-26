@@ -131,6 +131,9 @@ func (s *Server) PauseTicket(project, epic, id string, kind events.Kind, reason 
 	return s.pauseTicket(dir, tickets.Address{Project: project, Epic: epic, ID: id}, path, kind, reason, Run{})
 }
 
+// PruneBackups runs the backup-ref prune as of now.
+func (s *Server) PruneBackups(repoRoot string, now time.Time) { s.pruneBackups(repoRoot, now) }
+
 // PutRunFrom is PutRun with the base the iteration branched from.
 func (s *Server) PutRunFrom(root string, r Run, base string) {
 	s.registry.put(trackedRun{Run: r, Root: root, Base: base})

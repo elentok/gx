@@ -28,6 +28,7 @@ func TestTrunkConflict_TheAgentRunsInTheTargetCheckoutAndTheEpicLands(t *testing
 	var f *schedFixture
 	f = stashMergeFixtureWith(t, func(_ *schedFixture, p servertest.Prompt) {
 		cwds <- p.Cwd
+		testutil.WriteFile(t, p.Cwd, "same.txt", "resolved")
 		reportIteration(t, f.ticketFile(t, "02"), "finished")
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

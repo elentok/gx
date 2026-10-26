@@ -69,10 +69,6 @@ func (s *Server) backupSnapshot(repoRoot, epic, snapshot string) (ref string, no
 	return ref, now, nil
 }
 
-// backupInUse is the seam for refs an open trunk-conflict ticket still needs;
-// the prune keeps them whatever their age.
-func (s *Server) backupInUse(ref string) bool { return false }
-
 // pruneBackups drops the gx backup refs older than backupMaxAge. A failure is
 // logged, never fatal: it must not stop a land.
 func (s *Server) pruneBackups(repoRoot string, now time.Time) {
