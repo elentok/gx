@@ -197,10 +197,32 @@ test("the composer is disabled while the session is Working", async () => {
   });
   const box = await openNote();
   expect(box.disabled).toBe(true);
-  expect(
-    (screen.getByRole("button", { name: /Continue/ }) as HTMLButtonElement)
-      .disabled,
-  ).toBe(true);
+  expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
+});
+
+test("one line: the switch on the left; Note, Focus and Send on the right; the note box above the bar", async () => {
+  render({ post: vi.fn<PostPrompt>(async () => ok) });
+  const sw = await screen.findByRole("switch", { name: /Auto-advance/ });
+  const note = screen.getByRole("button", { name: "Note" });
+  const send = screen.getByRole("button", { name: "Send" });
+  const follows = (a: Node, b: Node) =>
+    !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(follows(sw, note)).toBe(true);
+  expect(follows(note, send)).toBe(true);
+  const box = await openNote();
+  expect(follows(box, sw)).toBe(true);
+  fireEvent.click(sw);
+  expect(sw.getAttribute("aria-checked")).toBe("true");
+});
+
+test("Interrupt replaces Send while working, Continue replaces it after a run-end line", async () => {
+  render({ state: "working" });
+  await screen.findByRole("button", { name: "Interrupt" });
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  cleanup();
+  render({ chat: chatOf({ next: runEnd }), steps: stepsAt("spec") });
+  await screen.findByRole("button", { name: /Continue/ });
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
 });
 
 test("a Working session offers Interrupt in place of Send, posting the state token", async () => {

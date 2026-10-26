@@ -53,6 +53,7 @@ export function AutoAdvanceBar({
         tone="muted"
         role="switch"
         aria-checked={session.auto_advance}
+        aria-label={`Auto-advance ${session.auto_advance ? "on" : "off"}`}
         disabled={disabled}
         onClick={() =>
           run(
@@ -66,7 +67,28 @@ export function AutoAdvanceBar({
           )
         }
       >
-        Auto-advance {session.auto_advance ? "on" : "off"}
+        <Box
+          aria-hidden
+          w="28px"
+          h="16px"
+          borderRadius="full"
+          bg={session.auto_advance ? "tone.waiting.fg" : "text.dim"}
+          position="relative"
+          flexShrink={0}
+        >
+          <Box
+            position="absolute"
+            top="2px"
+            left={session.auto_advance ? "14px" : "2px"}
+            w="12px"
+            h="12px"
+            borderRadius="full"
+            bg="surface"
+          />
+        </Box>
+        <Text as="span" display={{ base: "none", md: "inline" }}>
+          Auto-advance
+        </Text>
       </Button>
       {secondsLeft !== undefined && (
         <>

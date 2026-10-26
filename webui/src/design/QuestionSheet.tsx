@@ -3,9 +3,25 @@ import { useEffect, useRef, useState } from "react";
 import type { SessionRoundCard } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { Button } from "../ui/button/Button";
-import { choicesOf, isAnswered, nameOf, type Answer, type Answers } from "./round";
+import {
+  choicesOf,
+  isAnswered,
+  nameOf,
+  type Answer,
+  type Answers,
+} from "./round";
 
-function Choice({ label, on, recommended, onClick }: { label: string; on: boolean; recommended: boolean; onClick: () => void }) {
+function Choice({
+  label,
+  on,
+  recommended,
+  onClick,
+}: {
+  label: string;
+  on: boolean;
+  recommended: boolean;
+  onClick: () => void;
+}) {
   return (
     <chakra.button
       type="button"
@@ -16,7 +32,7 @@ function Choice({ label, on, recommended, onClick }: { label: string; on: boolea
       textAlign="start"
       px="4"
       minH="44px"
-      borderRadius="md"
+      borderRadius="12px"
       borderWidth="1px"
       borderColor={on ? "tone.done.fg" : "transparent"}
       bg={on ? "tone.done.fg" : "tone.muted.bg"}
@@ -55,7 +71,11 @@ export function Question({
   const text = card.kind === "text" || choicesOf(card).length === 0;
   return (
     <Box display="flex" flexDirection="column" gap={big ? "3" : "2"}>
-      <Markdown inline fontSize={big ? "xl" : "md"} fontWeight="600">{`${nameOf(card)} - ${card.title}`}</Markdown>
+      <Markdown
+        inline
+        fontSize={big ? "xl" : "md"}
+        fontWeight="600"
+      >{`${nameOf(card)} - ${card.title}`}</Markdown>
       {card.body && <Markdown fontSize="md">{card.body}</Markdown>}
       {text ? (
         <>
@@ -66,6 +86,7 @@ export function Question({
           )}
           <Textarea
             size="sm"
+            borderRadius="12px"
             rows={big ? 5 : 2}
             aria-label={`Answer to question ${card.label}`}
             placeholder="Your answer"
@@ -106,6 +127,7 @@ export function Question({
       {noteOpen && (
         <Textarea
           size="sm"
+          borderRadius="12px"
           rows={2}
           aria-label={`Note text for question ${card.label}`}
           placeholder="Note on this question"
@@ -147,8 +169,12 @@ export function QuestionDots({
             fontSize={c.label.length > 2 ? "2xs" : "xs"}
             fontWeight="600"
             cursor="pointer"
-            borderColor={answered ? "tone.done.fg" : on ? "tone.waiting.fg" : "border"}
-            bg={answered ? "tone.done.fg" : on ? "tone.waiting.fg" : "transparent"}
+            borderColor={
+              answered ? "tone.done.fg" : on ? "tone.waiting.fg" : "border"
+            }
+            bg={
+              answered ? "tone.done.fg" : on ? "tone.waiting.fg" : "transparent"
+            }
             color={answered || on ? "surface" : "text.muted"}
             onClick={() => onPick(k)}
           >
@@ -180,7 +206,9 @@ export function QuestionSheet({
   onIndex?: (index: number) => void;
 }) {
   const [open, setOpen] = useState(true);
-  const [index, setIndex] = useState(() => Math.min(initialIndex, round.length - 1));
+  const [index, setIndex] = useState(() =>
+    Math.min(initialIndex, round.length - 1),
+  );
   useEffect(() => onIndex?.(index), [index, onIndex]);
   const row = useRef<HTMLDivElement>(null);
   // Set while a smooth scroll we started is still moving, so its in-between frames don't set the question.
@@ -195,9 +223,17 @@ export function QuestionSheet({
   // Keep the scroll position on the current question; scrolling by hand sets the question.
   useEffect(() => {
     const el = row.current;
-    if (el && typeof el.scrollTo === "function" && el.clientWidth > 0 && Math.round(el.scrollLeft / el.clientWidth) !== index) {
+    if (
+      el &&
+      typeof el.scrollTo === "function" &&
+      el.clientWidth > 0 &&
+      Math.round(el.scrollLeft / el.clientWidth) !== index
+    ) {
       window.clearTimeout(scrolling.current);
-      scrolling.current = window.setTimeout(() => (scrolling.current = undefined), 600);
+      scrolling.current = window.setTimeout(
+        () => (scrolling.current = undefined),
+        600,
+      );
       el.scrollTo({ left: index * el.clientWidth, behavior: "smooth" });
     }
   }, [index, open]);
@@ -205,7 +241,12 @@ export function QuestionSheet({
   const onScroll = () => {
     const el = row.current;
     if (!el || el.clientWidth === 0 || scrolling.current !== undefined) return;
-    setIndex(Math.min(round.length - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth))));
+    setIndex(
+      Math.min(
+        round.length - 1,
+        Math.max(0, Math.round(el.scrollLeft / el.clientWidth)),
+      ),
+    );
   };
 
   const done = round.filter((c) => isAnswered(answers[c.label])).length;
@@ -215,15 +256,45 @@ export function QuestionSheet({
   };
 
   return (
-    <Box role="group" aria-label="Questions" borderWidth="1px" borderColor="tone.waiting.fg" borderRadius="md" bg="surface.raised" overflow="hidden" display="flex" flexDirection="column" minH="0">
-      <Box px="3" pt="2" pb="2" display="flex" alignItems="center" gap="2" flex="none">
+    <Box
+      role="group"
+      aria-label="Questions"
+      borderWidth="1px"
+      borderColor="tone.waiting.fg"
+      borderRadius="12px"
+      bg="surface.raised"
+      overflow="hidden"
+      display="flex"
+      flexDirection="column"
+      minH="0"
+    >
+      <Box
+        px="3"
+        pt="2"
+        pb="2"
+        display="flex"
+        alignItems="center"
+        gap="2"
+        flex="none"
+      >
         <Box flex="1">
-          <QuestionDots round={round} answers={answers} current={open ? index : undefined} onPick={goto} />
+          <QuestionDots
+            round={round}
+            answers={answers}
+            current={open ? index : undefined}
+            onPick={goto}
+          />
         </Box>
         <Text fontSize="xs" color="text.dim">
           {done} of {round.length} answered
         </Text>
-        <Button emphasis="ghost" size="sm" aria-expanded={open} aria-label={open ? "Fold questions" : "Open questions"} onClick={() => setOpen((o) => !o)}>
+        <Button
+          emphasis="ghost"
+          size="sm"
+          aria-expanded={open}
+          aria-label={open ? "Fold questions" : "Open questions"}
+          onClick={() => setOpen((o) => !o)}
+        >
           {open ? "▾" : "▴"}
         </Button>
       </Box>
@@ -260,10 +331,18 @@ export function QuestionSheet({
           ))}
         </Box>
         <Box display="flex" justifyContent="space-between" mt="2">
-          <Button emphasis="ghost" disabled={index === 0} onClick={() => setIndex(index - 1)}>
+          <Button
+            emphasis="ghost"
+            disabled={index === 0}
+            onClick={() => setIndex(index - 1)}
+          >
             ← Prev
           </Button>
-          <Button emphasis="ghost" disabled={index === round.length - 1} onClick={() => setIndex(index + 1)}>
+          <Button
+            emphasis="ghost"
+            disabled={index === round.length - 1}
+            onClick={() => setIndex(index + 1)}
+          >
             Next →
           </Button>
         </Box>

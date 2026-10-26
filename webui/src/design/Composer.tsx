@@ -29,7 +29,7 @@ import {
 } from "./round";
 import { promptable } from "./view";
 
-// Under the chat: the notes box behind a note icon, and Continue after a run-end line. Nothing sends unless the session is Idle.
+// Under the chat, one line: the auto-advance switch, then Note, Focus and the main action. Nothing sends unless the session is Idle.
 export function Composer({
   session,
   lastMessage,
@@ -155,27 +155,41 @@ export function Composer({
   };
 
   const canContinue = !!next?.action.action?.length;
-  const sendButton = working ? (
+  // Interrupt while the agent works; Continue after a run-end line unless a note or round is waiting to go.
+  const mainButton = working ? (
     <Button
       tone="deadlocked"
       disabled={!connected || pending}
       onClick={onInterrupt}
-      height="auto"
     >
       Interrupt
+    </Button>
+  ) : canContinue && !inRound && text.trim() === "" ? (
+    <Button
+      aria-label={nextTitle ? `Continue ${nextTitle}` : "Continue"}
+      disabled={!enabled}
+      onClick={() => send({ continue: true })}
+    >
+      Continue
     </Button>
   ) : (
     <Button
       disabled={!enabled || (!inRound && text.trim() === "")}
       onClick={onSend}
-      height="auto"
     >
       Send
     </Button>
   );
   const focusButton = inRound && onFullScreen && (
-    <Button emphasis="secondary" onClick={() => onFullScreen(true)} height="auto">
-      ⤢ Focus
+    <Button
+      emphasis="secondary"
+      aria-label="⤢ Focus"
+      onClick={() => onFullScreen(true)}
+    >
+      ⤢{" "}
+      <Text as="span" display={{ base: "none", md: "inline" }}>
+        Focus
+      </Text>
     </Button>
   );
   const notices = (
@@ -250,6 +264,7 @@ export function Composer({
             aria-label="Message"
             flex="1"
             rows={2}
+            borderRadius="12px"
             placeholder="Note for the whole round (optional)"
             value={text}
             disabled={!enabled}
@@ -294,55 +309,38 @@ export function Composer({
       aria-label="Composer"
     >
       {open && (
-        // The note is one unit: its box, then Close and Send right under it.
-        <Box display="flex" flexDirection="column" gap="2">
-          <Textarea
-            aria-label="Message"
-            value={text}
-            disabled={!enabled}
-            onChange={(e) => setText(e.target.value)}
-            autoFocus
-          />
-          <Box display="flex" gap="2" justifyContent="flex-end">
-            <Button emphasis="ghost" tone="muted" onClick={() => setOpen(false)}>
-              Close
-            </Button>
-            {focusButton}
-            {sendButton}
-          </Box>
-        </Box>
+        <Textarea
+          aria-label="Message"
+          borderRadius="12px"
+          value={text}
+          disabled={!enabled}
+          onChange={(e) => setText(e.target.value)}
+          autoFocus
+        />
       )}
       {notices}
-      {autoAdvanceBar}
-      {/* Under the note: its toggle and Continue; a round with no note open sends from here. */}
-      <Box display="flex" gap="2" alignItems="stretch">
-        {!open && (
-          <Button
-            emphasis="secondary"
-            aria-label="Note"
-            onClick={() => setOpen(true)}
-            height="auto"
-          >
-            ✎ Note
-          </Button>
+      {/* One line: the switch on the left, the main action on the right. */}
+      <Box display="flex" gap="2" alignItems="center">
+        {autoAdvanceBar}
+        <Box flex="1" />
+        {canContinue && !working && (
+          <Text as="span" fontSize="xs" color="text.dim" truncate minW="0">
+            {nextTitle}
+          </Text>
         )}
-        {canContinue && (
-          <Button
-            disabled={!enabled}
-            onClick={() => send({ continue: true })}
-            flex="1"
-            flexDirection="column"
-            height="auto"
-            py="2"
-          >
-            <Text as="span">Continue</Text>
-            <Text as="span" fontSize="xs" fontWeight="normal">
-              {nextTitle}
-            </Text>
-          </Button>
-        )}
-        {!open && focusButton}
-        {(inRound || working) && !open && sendButton}
+        <Button
+          emphasis="secondary"
+          aria-label="Note"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          ✎{" "}
+          <Text as="span" display={{ base: "none", md: "inline" }}>
+            Note
+          </Text>
+        </Button>
+        {focusButton}
+        {mainButton}
       </Box>
     </Box>
   );
