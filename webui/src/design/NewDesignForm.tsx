@@ -70,7 +70,7 @@ export function NewDesignForm({
   onClose: () => void;
 }) {
   const sheetMode = !useWide();
-  const sheetHeight = useVisualViewportHeight();
+  const viewport = useVisualViewportHeight();
   const [draft, setDraft] = useState(() => {
     const saved = readDraft();
     return { slug: saved.slug ?? "", idea: saved.idea ?? "", project: startingProject(saved, projects, filterProject) };
@@ -117,7 +117,7 @@ export function NewDesignForm({
   return (
     <Box
       position="fixed"
-      inset="0"
+      {...(sheetMode ? viewport.overlay : { inset: "0" })}
       zIndex="modal"
       bg="overlay"
       display="flex"
@@ -141,7 +141,7 @@ export function NewDesignForm({
         borderTopRadius={sheetMode ? "xl" : "lg"}
         borderBottomRadius={sheetMode ? "0" : "lg"}
         w={sheetMode ? "full" : "720px"}
-        h={sheetMode ? sheetHeight : "520px"}
+        h={sheetMode ? viewport.sheetHeight : "520px"}
         maxW="full"
         maxH="full"
         display="flex"

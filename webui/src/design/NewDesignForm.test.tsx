@@ -156,11 +156,13 @@ test("Tab wraps inside the dialog", () => {
 
 function stubPhone() {
   const listeners = new Set<() => void>();
-  const vv = { height: 700, addEventListener: (_: string, f: () => void) => listeners.add(f), removeEventListener: (_: string, f: () => void) => listeners.delete(f) };
+  const vv = { height: 700, offsetTop: 0, addEventListener: (_: string, f: () => void) => listeners.add(f), removeEventListener: (_: string, f: () => void) => listeners.delete(f) };
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   vi.stubGlobal("visualViewport", vv);
   vi.stubGlobal("innerHeight", 800);
-  return { resize: (height: number) => act(() => ((vv.height = height), listeners.forEach((f) => f()))) };
+  return {
+    resize: (height: number, offsetTop = 0) => act(() => ((vv.height = height), (vv.offsetTop = offsetTop), listeners.forEach((f) => f()))),
+  };
 }
 
 test("a narrow viewport renders the bottom sheet with a grab handle, Close, and a 1:2 footer", () => {
@@ -182,6 +184,16 @@ test("the sheet is 88% high and follows the visual viewport while the keyboard i
   expect(getComputedStyle(dialog).height).toBe("704px");
   resize(400);
   expect(getComputedStyle(dialog).height).toBe("392px");
+  vi.unstubAllGlobals();
+});
+
+test("the overlay covers the visual viewport, so the keyboard does not hide the sheet", () => {
+  const { resize } = stubPhone();
+  mount();
+  const overlay = screen.getByRole("dialog").parentElement!;
+  resize(400, 120);
+  expect(getComputedStyle(overlay).top).toBe("120px");
+  expect(getComputedStyle(overlay).height).toBe("400px");
   vi.unstubAllGlobals();
 });
 
