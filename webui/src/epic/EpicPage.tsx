@@ -21,6 +21,7 @@ import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail";
+import type { FixAgent } from "./fixAgent";
 import { MoreStats } from "./MoreStats";
 import { TicketCard } from "./TicketCard";
 import {
@@ -63,13 +64,13 @@ function DoneGroup({ rows, ctx }: { rows: EpicDetailRow[]; ctx: RowContext }) {
   );
 }
 
-function EpicBody({ detail, now, designLive }: { detail: EpicDetail; now: number; designLive: boolean }) {
+function EpicBody({ detail, now, designLive, fixAgent }: { detail: EpicDetail; now: number; designLive: boolean; fixAgent?: FixAgent }) {
   const ctx = rowContext(detail, now, designLive);
   return (
     <>
       <Box mt="4" display="flex" flexDirection="column" gap="3">
         {nestLive(detail.rows).map(({ row: r, indent }) => (
-          <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} />
+          <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} fixAgent={fixAgent} />
         ))}
       </Box>
       <DoneGroup rows={detail.rows.filter(isFolded)} ctx={ctx} />
@@ -194,11 +195,13 @@ export function EpicPage({
   fetchDetail,
   openDesign,
   fetchList,
+  fixAgent,
 }: {
   address: string;
   fetchDetail?: FetchEpicDetail;
   openDesign?: OpenDesign;
   fetchList?: FetchEpicList;
+  fixAgent?: FixAgent;
 }) {
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps the running clocks counting.
@@ -251,7 +254,7 @@ export function EpicPage({
               No tickets yet
             </Text>
           ) : (
-            <EpicBody detail={detail} now={Date.now()} designLive={liveSessions(address, sessions).length > 0} />
+            <EpicBody detail={detail} now={Date.now()} designLive={liveSessions(address, sessions).length > 0} fixAgent={fixAgent} />
           )}
           <MoreStats detail={detail} />
         </>

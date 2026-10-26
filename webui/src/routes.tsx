@@ -7,6 +7,7 @@ import type { PostPrompt } from "./design/prompt";
 import type { FetchScreen } from "./design/screen";
 import type { FetchEpicDetail } from "./epic/detail";
 import { EpicPage } from "./epic/EpicPage";
+import type { FixAgent } from "./epic/fixAgent";
 import { EpicsPage } from "./epics/EpicsPage";
 import type { FetchEpicList } from "./epics/list";
 import type { FetchStats } from "./stats/stats";
@@ -24,12 +25,22 @@ function EpicRoute({
   fetchDetail,
   fetchList,
   openDesign,
+  fixAgent,
 }: {
   fetchDetail?: FetchEpicDetail;
   fetchList?: FetchEpicList;
   openDesign?: OpenDesign;
+  fixAgent?: FixAgent;
 }) {
-  return <EpicPage address={useParams()["*"] ?? ""} fetchDetail={fetchDetail} fetchList={fetchList} openDesign={openDesign} />;
+  return (
+    <EpicPage
+      address={useParams()["*"] ?? ""}
+      fetchDetail={fetchDetail}
+      fetchList={fetchList}
+      openDesign={openDesign}
+      fixAgent={fixAgent}
+    />
+  );
 }
 
 function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
@@ -71,6 +82,7 @@ export interface RouteFetchers {
   chat?: FetchChat;
   prompt?: PostPrompt;
   focus?: PostFocus;
+  fixAgent?: FixAgent;
 }
 
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
@@ -79,7 +91,10 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },
-    { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} fetchList={fetchers.epicList} openDesign={fetchers.openDesign} /> },
+    {
+      path: "/e/*",
+      element: <EpicRoute fetchDetail={fetchers.epic} fetchList={fetchers.epicList} openDesign={fetchers.openDesign} fixAgent={fetchers.fixAgent} />,
+    },
     // "/", the retired "/q" and "/designs", and an unknown hash go to the Epics page.
     { path: "*", loader: () => redirect("/epics") },
   ];

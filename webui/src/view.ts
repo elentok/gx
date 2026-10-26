@@ -18,5 +18,3 @@ export function epicBadge(state: EpicState, mode?: QueueMode): string {
   }
   return STATE_LABELS[state];
 }
-
-export const REPAIR_HINT = "Fix it in the TUI";

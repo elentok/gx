@@ -4,6 +4,7 @@ import { afterEach, expect, test } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { EpicDetail, EpicList, EpicListRow } from "../generated/server";
 import { appRoutes } from "../routes";
+import type { FixAgent } from "./fixAgent";
 import { renderThemed } from "../ui/render";
 
 afterEach(cleanup);
@@ -43,7 +44,7 @@ function render(
   path: string,
   epics: EpicListRow[],
   kind: EpicDetail["kind"] = "loop",
-  extra: { sessions?: unknown[]; detail?: Partial<EpicDetail>; hang?: boolean; notFound?: boolean } = {},
+  extra: { sessions?: unknown[]; detail?: Partial<EpicDetail>; hang?: boolean; notFound?: boolean; fixAgent?: FixAgent } = {},
 ) {
   const state = {
     snapshot: { sessions: extra.sessions ?? [] },
@@ -51,10 +52,11 @@ function render(
     loadedOnce: true,
     tick: 0,
   } as unknown as ConnectionState;
-  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {}, refresh: () => {} } as unknown as Connection;
   const list: EpicList = { epics, follow_ups: [] };
   const router = createMemoryRouter(
     appRoutes({
+      fixAgent: extra.fixAgent,
       epicList: async () => list,
       epic: extra.hang
         ? () => new Promise(() => {})
@@ -162,8 +164,8 @@ test("a claimed row adds its time so far only while the Design has a live sessio
   expect(await statsOf()).toBe("spec");
 });
 
-const live = (rows: object[], kind: EpicDetail["kind"] = "loop") =>
-  render("/e/gx:blog-impl", [], kind, { detail: { total: rows.length, rows: rows as EpicDetail["rows"] } });
+const live = (rows: object[], kind: EpicDetail["kind"] = "loop", fixAgent?: FixAgent) =>
+  render("/e/gx:blog-impl", [], kind, { fixAgent, detail: { total: rows.length, rows: rows as EpicDetail["rows"] } });
 const cardOf = async (id: string) => (await screen.findByText(id)).closest("[data-indent]") as HTMLElement;
 const tk = (id: string, over: object = {}) => ({ address: `gx:blog/${id}`, title: `title ${id}`, rendered_status: "open", ...over });
 
@@ -198,11 +200,53 @@ test("a needs-repair card is expanded with its status and reason; an error card 
   live([tk("01", { rendered_status: "needs-repair", reason: "dirty tree" }), tk("02", { rendered_status: "error" })]);
   const repair = await cardOf("01");
   expect(repair.textContent).toContain("needs-repair · dirty tree");
-  expect(within(repair).getByText("Fix it in the TUI")).toBeTruthy();
+  expect(within(repair).getByRole("button", { name: "Fix it with an agent" })).toBeTruthy();
+  expect(document.body.textContent).not.toContain("Fix it in the TUI");
   const error = await cardOf("02");
   expect(error.getAttribute("data-tone")).toBe("deadlocked");
   expect(error.textContent).toContain("error");
   expect(within(error).getAllByRole("link")).toHaveLength(1);
+});
+
+const repairRow = (over: object = {}) => tk("01", { rendered_status: "needs-repair", state: "tok-1", ...over });
+const openFixDialog = async () => {
+  fireEvent.click(within(await cardOf("01")).getByRole("button", { name: "Fix it with an agent" }));
+  return within(await screen.findByRole("dialog"));
+};
+
+test("the fix dialog shows the prompt with the reason, or without one", async () => {
+  live([repairRow({ reason: "dirty tree" })]);
+  const dialog = await openFixDialog();
+  expect(dialog.getByText("/gx-investigate gx:blog/01 is needs-repair: dirty tree")).toBeTruthy();
+  expect(dialog.getByRole("button", { name: "Copy" })).toBeTruthy();
+  cleanup();
+  live([repairRow()]);
+  expect((await openFixDialog()).getByText("/gx-investigate gx:blog/01 is needs-repair")).toBeTruthy();
+});
+
+test.each([
+  [false, "Agent started. View it in the gx TUI Agents tab"],
+  [true, "Agent started. View it in the gx TUI Agents tab or in the Claude app"],
+])("starting the fix agent (remote control %s) says it started and drops Start", async (remote, text) => {
+  const calls: unknown[] = [];
+  live([repairRow()], "loop", async (body) => {
+    calls.push(body);
+    return { remote_control: remote };
+  });
+  const dialog = await openFixDialog();
+  fireEvent.click(dialog.getByRole("button", { name: "Start gx agent" }));
+  expect(await dialog.findByText(text)).toBeTruthy();
+  expect(dialog.queryByRole("button", { name: "Start gx agent" })).toBeNull();
+  expect(calls).toEqual([{ address: "gx:blog/01", state: "tok-1" }]);
+});
+
+test("a refused fix agent shows the message and keeps Copy and Start", async () => {
+  live([repairRow()], "loop", async () => ({ remote_control: false, refused: true, message: "Already investigating" }));
+  const dialog = await openFixDialog();
+  fireEvent.click(dialog.getByRole("button", { name: "Start gx agent" }));
+  expect(await dialog.findByText("Already investigating")).toBeTruthy();
+  expect(dialog.getByRole("button", { name: "Copy" })).toBeTruthy();
+  expect(dialog.getByRole("button", { name: "Start gx agent" })).toBeTruthy();
 });
 
 const doneTk = (id: string, minute: number, over: object = {}) =>

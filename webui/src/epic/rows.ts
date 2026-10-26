@@ -1,7 +1,7 @@
 import type { EpicDetail, EpicDetailRow } from "./detail";
 import type { Tone } from "../ui/tone";
 import { ticketHref } from "../hrefs";
-import { REPAIR_HINT, epicBadge } from "../view";
+import { epicBadge } from "../view";
 
 type Bucket = "done" | "running" | "asking" | "waiting" | "children" | "attention";
 
@@ -149,10 +149,10 @@ function elapsedAndCost(row: EpicDetailRow, elapsed: number | undefined, ctx: Ro
 // An asking or needs-repair card stays expanded: a second row under the line holds its question or hint.
 export const isExpanded = (row: EpicDetailRow) => !!row.needs_answer || row.rendered_status === "needs-repair";
 
-// What an expanded card holds in its second row. Needs-repair keeps the TUI hint until the fix-agent button lands.
-export function cardNote(row: EpicDetailRow): { text?: string; answerHref?: string } {
+// What an expanded card holds in its second row: the question and an Answer link, or a needs-repair fix button.
+export function cardNote(row: EpicDetailRow): { text?: string; answerHref?: string; fix?: boolean } {
   if (row.needs_answer) return { text: row.question, answerHref: ticketHref(row.address) };
-  if (row.rendered_status === "needs-repair") return { text: REPAIR_HINT };
+  if (row.rendered_status === "needs-repair") return { fix: true };
   return {};
 }
 

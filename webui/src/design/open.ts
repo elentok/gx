@@ -16,7 +16,7 @@ export type ResumeSession = (body: SessionRequest) => Promise<SessionResult>;
 export type InterruptSession = (body: SessionRequest) => Promise<SessionResult>;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
-const postJson =
+export const postJson =
   (path: string) =>
   async (body: unknown): Promise<SessionResult> => {
     const res = await fetch(path, {

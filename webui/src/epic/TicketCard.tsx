@@ -1,10 +1,13 @@
 import { Box, Link, Text } from "@chakra-ui/react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ticketHref } from "../hrefs";
 import { Arc } from "../ui/arc/Arc";
 import { Button } from "../ui/button/Button";
 import { StatusIcon } from "../ui/status-icon/StatusIcon";
 import { type EpicDetailRow } from "./detail";
+import { FixAgentDialog } from "./FixAgentDialog";
+import type { FixAgent } from "./fixAgent";
 import { cardNote, idOf, isExpanded, isRunning, toneOf } from "./rows";
 
 function Dot({ row }: { row: EpicDetailRow }) {
@@ -57,8 +60,19 @@ function Line({ row, meta, titleLink }: { row: EpicDetailRow; meta: string; titl
 
 // A live ticket as one anchor to its page; a needs-you or needs-repair ticket stays expanded, with the title as the
 // link and its question or hint in a second row.
-export function TicketCard({ row, meta, indent }: { row: EpicDetailRow; meta: string; indent: number }) {
+export function TicketCard({
+  row,
+  meta,
+  indent,
+  fixAgent,
+}: {
+  row: EpicDetailRow;
+  meta: string;
+  indent: number;
+  fixAgent?: FixAgent;
+}) {
   const navigate = useNavigate();
+  const [fixing, setFixing] = useState(false);
   const note = isExpanded(row) ? cardNote(row) : undefined;
   return (
     <Box data-indent={indent} data-tone={toneOf(row)} ml={indent * 6}>
@@ -76,7 +90,13 @@ export function TicketCard({ row, meta, indent }: { row: EpicDetailRow; meta: st
                 Answer
               </Button>
             )}
+            {note.fix && (
+              <Button tone="paused" size="sm" onClick={() => setFixing(true)}>
+                Fix it with an agent
+              </Button>
+            )}
           </Box>
+          {fixing && <FixAgentDialog row={row} fixAgent={fixAgent} onClose={() => setFixing(false)} />}
         </>
       ) : (
         <Link href={ticketHref(row.address)} display="block" color="inherit" _hover={{ textDecoration: "none" }}>

@@ -620,7 +620,7 @@ test("an asking row shows its question and an Answer button; other rows have non
   expect(screen.getAllByRole("button", { name: "Answer" })).toHaveLength(1);
 });
 
-test("a paused row shows its reason with no Open link; a repair-class row says Fix it in the TUI", async () => {
+test("a paused row shows its reason with no Open link; a repair-class row offers Fix it with an agent", async () => {
   const rows = [
     rowOf("02", "needs-repair", { reason: "Needs repair" }),
     rowOf("03", "needs-repair", { reason: "Agent stalled" }),
@@ -628,7 +628,7 @@ test("a paused row shows its reason with no Open link; a repair-class row says F
   rows[1].rendered_status = "paused";
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 2, rows }));
   expect(await screen.findByText("needs-repair · Needs repair")).toBeTruthy();
-  expect(screen.getAllByText("Fix it in the TUI")).toHaveLength(1);
+  expect(screen.getAllByRole("button", { name: "Fix it with an agent" })).toHaveLength(1);
   expect(screen.getByText("paused · Agent stalled")).toBeTruthy();
   expect(screen.queryByText("Open →")).toBeNull();
 });
