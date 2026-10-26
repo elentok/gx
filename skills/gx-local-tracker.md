@@ -119,10 +119,10 @@ opened) don't count. Fix tickets it opens (if any) name it as their `parent`.
 
 ### The `verify` type
 
-A ticket with `type: verify` checks the finished epic in a running gx. Like `code-review` it carries
-no `blocked_by`: it becomes eligible once the epic's `code-review` ticket is `done`, and it never
-waits on other `verify` tickets or on children it opened (those name it as their `parent`). It is
-commitless by design. `gx tickets ensure-verify <epic>` stamps out the epic's verify ticket, and is a
+A ticket with `type: verify` checks the finished epic in a running gx. It may carry `blocked_by`: it
+becomes eligible once the epic's `code-review` ticket is `done` and every same-epic ticket in its
+`blocked_by` is done. Verify tickets without `blocked_by` never wait on other `verify` tickets, and no
+verify ticket waits on children it opened (those name it as their `parent`). It is commitless by design. `gx tickets ensure-verify <epic>` stamps out the epic's verify ticket, and is a
 no-op when one exists.
 
 The body of the file (everything after the closing `---`) is free-form markdown: title, "What to

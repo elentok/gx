@@ -599,6 +599,97 @@ func TestEpic_RenderedStatus_VerifyTicketsDontBlockEachOtherOrWaitOnChildren(t *
 	}
 }
 
+func TestEpic_RenderedStatus_VerifyRound1PartsOpenTogetherAfterCodeReview(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 8, Identifier: "08", Type: typeCodeReview, Status: "open"},
+		{Number: 9, Identifier: "09", Type: "verify", Status: "open"},
+		{Number: 10, Identifier: "10", Type: "verify", Status: "open"},
+	}}
+	for _, i := range []int{1, 2} {
+		if got := epic.RenderedStatus(epic.Tickets[i]); got != StatusBlocked {
+			t.Errorf("RenderedStatus(%s) = %v, want StatusBlocked while code review is open", epic.Tickets[i].Identifier, got)
+		}
+	}
+	epic.Tickets[0].Status = "done"
+	for _, i := range []int{1, 2} {
+		if got := epic.RenderedStatus(epic.Tickets[i]); got != StatusOpen {
+			t.Errorf("RenderedStatus(%s) = %v, want StatusOpen once code review is done", epic.Tickets[i].Identifier, got)
+		}
+	}
+}
+
+func TestEpic_RenderedStatus_VerifyCollectWaitsOnItsParts(t *testing.T) {
+	epic := Epic{Tickets: []Ticket{
+		{Number: 8, Identifier: "08", Type: typeCodeReview, Status: "done"},
+		{Number: 9, Identifier: "09", Type: "verify", Status: "done"},
+		{Number: 10, Identifier: "10", Type: "verify", Status: "open"},
+		{Number: 11, Identifier: "11", Type: "verify", Status: "open", BlockedBy: []string{"09", "10"}},
+	}}
+	collect := epic.Tickets[3]
+	if got := epic.RenderedStatus(collect); got != StatusBlocked {
+		t.Errorf("RenderedStatus(collect) = %v, want StatusBlocked while a part is open", got)
+	}
+	epic.Tickets[2].Status = "done"
+	if got := epic.RenderedStatus(collect); got != StatusOpen {
+		t.Errorf("RenderedStatus(collect) = %v, want StatusOpen once all parts are done", got)
+	}
+}
+
+func TestEpic_RenderedStatus_VerifyNextRoundPartWaitsOnCollectAndFixes(t *testing.T) {
+	collectID := "11"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 8, Identifier: "08", Type: typeCodeReview, Status: "done"},
+		{Number: 11, Identifier: "11", Type: "verify", Status: "open"},
+		{Number: 12, Identifier: "12", Status: "open"},
+		{Number: 13, Identifier: "13", Type: "verify", Status: "open", Parent: &collectID, BlockedBy: []string{"12"}},
+	}}
+	part := epic.Tickets[3]
+	if got := epic.RenderedStatus(part); got != StatusBlocked {
+		t.Errorf("RenderedStatus(part) = %v, want StatusBlocked while the collect ticket is open", got)
+	}
+	epic.Tickets[1].Status = "done"
+	if got := epic.RenderedStatus(part); got != StatusBlocked {
+		t.Errorf("RenderedStatus(part) = %v, want StatusBlocked while a fix ticket is open", got)
+	}
+	epic.Tickets[2].Status = "done"
+	if got := epic.RenderedStatus(part); got != StatusOpen {
+		t.Errorf("RenderedStatus(part) = %v, want StatusOpen once collect and fixes are done", got)
+	}
+}
+
+func TestEpic_RenderedStatus_VerifyCollectAfterLoneTicketWaitsOnExtraParts(t *testing.T) {
+	loneID := "09"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 8, Identifier: "08", Type: typeCodeReview, Status: "done"},
+		{Number: 9, Identifier: "09", Type: "verify", Status: "done"},
+		{Number: 10, Identifier: "10", Type: "verify", Status: "open", Parent: &loneID},
+		{Number: 11, Identifier: "11", Type: "verify", Status: "open", Parent: &loneID, BlockedBy: []string{"10"}},
+	}}
+	if got := epic.RenderedStatus(epic.Tickets[3]); got != StatusBlocked {
+		t.Errorf("RenderedStatus(collect) = %v, want StatusBlocked while an extra part is open", got)
+	}
+	epic.Tickets[2].Status = "done"
+	if got := epic.RenderedStatus(epic.Tickets[3]); got != StatusOpen {
+		t.Errorf("RenderedStatus(collect) = %v, want StatusOpen once extra parts are done", got)
+	}
+}
+
+func TestEpic_RenderedStatus_VerifyChildrenOfPausedCollectStayBlocked(t *testing.T) {
+	collectID := "11"
+	epic := Epic{Tickets: []Ticket{
+		{Number: 8, Identifier: "08", Type: typeCodeReview, Status: "done"},
+		{Number: 11, Identifier: "11", Type: "verify", Status: "paused"},
+		{Number: 13, Identifier: "13", Type: "verify", Status: "open", Parent: &collectID},
+	}}
+	if got := epic.RenderedStatus(epic.Tickets[2]); got != StatusBlocked {
+		t.Errorf("RenderedStatus(child) = %v, want StatusBlocked under a paused collect ticket", got)
+	}
+	epic.Tickets[1].Status = "done"
+	if got := epic.RenderedStatus(epic.Tickets[2]); got != StatusOpen {
+		t.Errorf("RenderedStatus(child) = %v, want StatusOpen once the collect ticket is done", got)
+	}
+}
+
 func TestEpic_RenderedStatus_CodeReviewTicketsDontBlockEachOther(t *testing.T) {
 	epic := Epic{Tickets: []Ticket{
 		{Number: 9, Identifier: "09", Type: typeCodeReview, Status: "open"},

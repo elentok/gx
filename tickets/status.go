@@ -283,11 +283,12 @@ func (e Epic) effectiveBlockedBy(t Ticket) []string {
 	return tokens
 }
 
-// verifyBlockers is a verify ticket's synthesized Blocked by: tokens: the
-// epic's code-review tickets and nothing else, so verify tickets never wait on
-// each other or on tickets they opened.
+// verifyBlockers is a verify ticket's Blocked by: tokens: the epic's
+// code-review tickets plus its own literal same-epic Blocked by:. A verify
+// ticket with no literal Blocked by: never waits on other verify tickets or on
+// tickets it opened.
 func (e Epic) verifyBlockers(t Ticket) []string {
-	var tokens []string
+	tokens := slices.DeleteFunc(slices.Clone(t.BlockedBy), crossEpicRef)
 	for _, other := range e.Tickets {
 		if other.Type != typeCodeReview || e.descendsFrom(other, t) {
 			continue

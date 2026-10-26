@@ -40,6 +40,18 @@ func TestFrontier_VerifyEntersOnlyAfterCodeReviewDone(t *testing.T) {
 	}
 }
 
+func TestFrontier_VerifyRound1PartsEnterTogetherAfterCodeReview(t *testing.T) {
+	t.Parallel()
+	epic := tickets.Epic{Tickets: []tickets.Ticket{
+		{Number: 2, Identifier: "02", Type: "code-review", Status: "open"},
+		{Number: 3, Identifier: "03", Type: "verify", Status: "open"},
+		{Number: 4, Identifier: "04", Type: "verify", Status: "open"},
+	}}
+	assertNumbers(t, Frontier(epic), []int{2})
+	epic.Tickets[0].Status = "done"
+	assertNumbers(t, Frontier(epic), []int{3, 4})
+}
+
 func TestFrontier_MapEpicHasNone(t *testing.T) {
 	t.Parallel()
 	epic := tickets.Epic{IsMap: true, Tickets: []tickets.Ticket{{Number: 1, Status: "open"}}}
