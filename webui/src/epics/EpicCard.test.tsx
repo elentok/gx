@@ -113,6 +113,17 @@ test("Queue posts in place, then reports the change", async () => {
   expect(queue).toHaveBeenCalledWith({ address: "gx:blog", state: "ready" });
 });
 
+test("a refused Queue shows its reason next to the button", async () => {
+  const queue = vi.fn().mockResolvedValue({ refused: true, reason: "epic-draft", message: "gx:blog is a draft" });
+  const onChanged = vi.fn();
+  const r = row({ state: "ready", section: "ready-to-queue", actions: [{ kind: "queue", label: "Queue" }] });
+  renderThemed(<EpicCard row={r} writes={{ queue }} onChanged={onChanged} />);
+  fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+  const alert = await within(screen.getByTestId("footer")).findByRole("alert");
+  expect(text(alert)).toContain("gx:blog is a draft");
+  expect(onChanged).not.toHaveBeenCalled();
+});
+
 test("a refused Merge shows its reason next to the button", async () => {
   const merge = vi.fn().mockResolvedValue({ refused: true, reason: "x", message: "Conflicts with main" });
   const r = row({ state: "merge-blocked", section: "needs-you", state_pill: "Merge blocked", actions: [{ kind: "merge", label: "Merge" }] });
