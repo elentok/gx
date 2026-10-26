@@ -44,6 +44,8 @@ const (
 	ReasonNotComplete      = "not-complete"
 	ReasonBranchMissing    = "branch-missing"
 	ReasonOneOffsEpic      = "one-offs-epic"
+	ReasonNotDirtyTrunk    = "not-dirty-trunk"
+	ReasonNeedsRebase      = "needs-rebase"
 )
 
 // QueueItem is one queued ticket and the agent it will run under.
@@ -66,8 +68,11 @@ type QueueResult struct {
 	// with PauseKind and Message.
 	Merged      bool   `json:"merged,omitempty"`
 	MergeTicket string `json:"merge_ticket,omitempty"`
-	Paused      bool   `json:"parked,omitempty"`
-	PauseKind   string `json:"park_kind,omitempty"`
+	// TrunkConflict is the address of the trunk-conflict ticket "Stash, merge and
+	// restore" added.
+	TrunkConflict string `json:"trunk_conflict,omitempty"`
+	Paused        bool   `json:"parked,omitempty"`
+	PauseKind     string `json:"park_kind,omitempty"`
 	// Outcome is an answer's result: delivered or adopted. A stale refusal
 	// carries the current Question and its State token.
 	Outcome  string            `json:"outcome,omitempty"`

@@ -63,6 +63,10 @@ const (
 	// checkout: set aside, fast-forwarded and restored with no pause. Reason
 	// lists the files; the event names the backup ref that held them.
 	DirtyTrunkLanded Type = "dirty-trunk-landed"
+	// TrunkConflictOpened is "Stash, merge and restore": the target was
+	// fast-forwarded and restoring the uncommitted files left conflict markers.
+	// Reason lists the files; the event names the backup ref that held them.
+	TrunkConflictOpened Type = "trunk-conflict-opened"
 )
 
 // Event types added by the orchestrator-daemon stages. Fixed now so S0 ships

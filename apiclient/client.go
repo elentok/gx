@@ -352,6 +352,13 @@ func (c *Client) EpicMerge(ctx context.Context, address string) (server.QueueRes
 	return c.queueWriteTo(ctx, "/v1/epics/merge", server.QueueRequest{Address: address})
 }
 
+// EpicStashMerge is "Stash, merge and restore" for an epic paused on a dirty
+// trunk: the target is fast-forwarded and the uncommitted files come back with
+// conflict markers, behind a trunk-conflict ticket (TrunkConflict).
+func (c *Client) EpicStashMerge(ctx context.Context, address string) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/epics/stash-merge", server.QueueRequest{Address: address})
+}
+
 // TicketAsk records an agent's question (a "## Question" + "## Handoff" body)
 // on a ticket and pauses it asking.
 func (c *Client) TicketAsk(ctx context.Context, address, body string) (server.QueueResult, error) {

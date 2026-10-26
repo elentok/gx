@@ -123,6 +123,10 @@ const (
 	// TypeVerify checks the finished epic in a running gx. It is commitless and
 	// waits only on the epic's code-review ticket.
 	TypeVerify TicketType = "verify"
+	// TypeTrunkConflict is system-generated only: "Stash, merge and restore"
+	// adds one to the root epic when restoring a person's uncommitted files left
+	// conflict markers in the target's checkout. It is commitless and top-level.
+	TypeTrunkConflict TicketType = "trunk-conflict"
 )
 
 var validTypes = map[TicketType]bool{
@@ -138,6 +142,7 @@ var validTypes = map[TicketType]bool{
 	TypeMerge:              true,
 	TypeDiagnose:           true,
 	TypeVerify:             true,
+	TypeTrunkConflict:      true,
 }
 
 // Valid reports whether t is one of the canonical type values.
@@ -365,7 +370,7 @@ type MuteRecord struct {
 // a real spike/scaffold commit as its actual output, so it stays on the
 // crash-recovery path like TypeImplement unless explicitly flagged.
 func (t Ticket) IsCommitless() bool {
-	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve || t.Type == TypeMerge || t.Type == TypeDiagnose || t.Type == TypeVerify
+	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve || t.Type == TypeMerge || t.Type == TypeDiagnose || t.Type == TypeVerify || t.Type == TypeTrunkConflict
 }
 
 // Validate checks a populated Ticket for well-formedness: a valid id, a
@@ -425,6 +430,9 @@ func Validate(t Ticket) error {
 	}
 	if t.Type == TypeDiagnose && t.Parent != nil {
 		errs = append(errs, fmt.Errorf("parent: a diagnose ticket is top-level only, got parent %q", *t.Parent))
+	}
+	if t.Type == TypeTrunkConflict && t.Parent != nil {
+		errs = append(errs, fmt.Errorf("parent: a trunk-conflict ticket is top-level only, got parent %q", *t.Parent))
 	}
 	if t.Base != "" && t.IsCommitless() {
 		errs = append(errs, fmt.Errorf("base: not allowed on a commitless ticket (it has no branch to base)"))

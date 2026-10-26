@@ -110,6 +110,13 @@ type Epic struct {
 	// MergeBlockFiles is the full list of files a dirty-trunk pause names; the
 	// reason text caps it.
 	MergeBlockFiles []string
+	// TrunkFastForwardedAt is when "Stash, merge and restore" fast-forwarded the
+	// target. It is not MergedAt: the epic merges for good once its trunk-conflict
+	// ticket is done. TrunkConflictBackup and TrunkConflictFiles name the backup
+	// ref and the files that ticket resolves.
+	TrunkFastForwardedAt time.Time
+	TrunkConflictBackup  string
+	TrunkConflictFiles   []string
 	// MergeTarget is the branch the epic merges into. Only a server snapshot
 	// sets it; the loader leaves it empty.
 	MergeTarget string

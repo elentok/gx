@@ -117,6 +117,7 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/tickets/start-over": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.startOverInQueue) },
 	"POST /v1/queue/add":          func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.queueAdd) },
 	"POST /v1/epics/merge":        func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.epicMerge) },
+	"POST /v1/epics/stash-merge":  func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.epicStashMerge) },
 	"POST /v1/agents/answer":      func(s *Server) http.HandlerFunc { return s.queueWrite(s.agentAnswerWeb) },
 	"POST /v1/sessions/stop":      func(s *Server) http.HandlerFunc { return s.sessionWriteDesignWeb(s.stopSession) },
 	"POST /v1/sessions/resume":    func(s *Server) http.HandlerFunc { return s.sessionWriteDesignWeb(s.resumeSession) },

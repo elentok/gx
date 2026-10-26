@@ -28,12 +28,10 @@ func (s *Server) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, ta
 		return false, err
 	}
 	// The backup comes first: whatever happens to the files, they stay in git.
-	now := time.Now()
-	ref := fmt.Sprintf("%s%s-%d", git.BackupRefPrefix, epic, now.UnixNano())
-	if err := git.UpdateRef(repo.Root, ref, snapshot); err != nil {
+	ref, now, err := s.backupSnapshot(repo.Root, epic, snapshot)
+	if err != nil {
 		return false, err
 	}
-	s.pruneBackups(repo.Root, now)
 	if err := git.SetAside(dir, clashing); err != nil {
 		return false, fmt.Errorf("set aside %s: %w (backup %s)", listFiles(clashing), err, ref)
 	}
@@ -57,6 +55,18 @@ func (s *Server) landOverDirtyTrunk(project string, repo git.Repo, dir, epic, ta
 		})
 	}
 	return true, nil
+}
+
+// backupSnapshot names the snapshot commit with a new backup ref and prunes the
+// old ones.
+func (s *Server) backupSnapshot(repoRoot, epic, snapshot string) (ref string, now time.Time, err error) {
+	now = time.Now()
+	ref = fmt.Sprintf("%s%s-%d", git.BackupRefPrefix, epic, now.UnixNano())
+	if err := git.UpdateRef(repoRoot, ref, snapshot); err != nil {
+		return "", now, err
+	}
+	s.pruneBackups(repoRoot, now)
+	return ref, now, nil
 }
 
 // backupInUse is the seam for refs an open trunk-conflict ticket still needs;

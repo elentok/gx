@@ -301,6 +301,10 @@ type ticketMDYAML struct {
 	MergeBlockKind   string   `yaml:"land_block_kind"`
 	MergeBlockReason string   `yaml:"land_block_reason"`
 	MergeBlockFiles  []string `yaml:"land_block_files"`
+
+	TrunkFastForwardedAt *time.Time `yaml:"trunk_fast_forwarded_at"`
+	TrunkConflictBackup  string     `yaml:"trunk_conflict_backup"`
+	TrunkConflictFiles   []string   `yaml:"trunk_conflict_files"`
 }
 
 // WriteEpicTicketMD writes a minimal ticket.md for the epic at epicPath, with
@@ -367,6 +371,11 @@ func loadEpicTicketMD(epic *Epic) {
 	epic.MergeBlockKind = wire.MergeBlockKind
 	epic.MergeBlockReason = wire.MergeBlockReason
 	epic.MergeBlockFiles = wire.MergeBlockFiles
+	if wire.TrunkFastForwardedAt != nil {
+		epic.TrunkFastForwardedAt = *wire.TrunkFastForwardedAt
+	}
+	epic.TrunkConflictBackup = wire.TrunkConflictBackup
+	epic.TrunkConflictFiles = wire.TrunkConflictFiles
 	// Roots paused before the kind was stored carry a reason and no kind.
 	if epic.MergeBlockKind == "" && epic.MergeBlockReason != "" {
 		epic.MergeBlockKind = "needs-rebase"

@@ -63,10 +63,21 @@ func runWithEnv(dir string, env []string, args []string) (string, error) {
 // without touching any file. clean is false when they would conflict; tree is
 // then empty, and otherwise the merged tree.
 func MergeSnapshotOnto(dir, snapshot, branch string) (tree string, clean bool, err error) {
+	tree, clean, err = MergeSnapshotMarked(dir, snapshot, branch)
+	if !clean {
+		return "", false, err
+	}
+	return tree, true, nil
+}
+
+// MergeSnapshotMarked is MergeSnapshotOnto that also returns the tree of a
+// conflicting merge, where each conflicting file holds its conflict markers.
+func MergeSnapshotMarked(dir, snapshot, branch string) (tree string, clean bool, err error) {
 	out, _, err := run(dir, []string{"merge-tree", "--write-tree", "--merge-base=HEAD", snapshot, branch})
 	var runErr *RunError
 	if errors.As(err, &runErr) && runErr.Code == 1 {
-		return "", false, nil
+		tree, _, _ = strings.Cut(runErr.Stdout, "\n")
+		return tree, false, nil
 	}
 	if err != nil {
 		return "", false, err

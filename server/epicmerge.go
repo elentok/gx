@@ -21,50 +21,78 @@ import (
 // otherwise. A manual ticket resets the merge-ticket cap and merges the epic
 // whatever auto-ff-merge says.
 func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
-	project, epic, ok := tickets.ParseEpicAddress(req.Address)
-	if !ok {
-		return refusal(ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)"), nil
+	m, refused, err := s.loadMergeEpic(req)
+	if refused != nil || err != nil {
+		return refusedOr(refused), err
 	}
-	a := tickets.Address{Project: project, Epic: epic}
-	root := rootRef{Project: a.Project, Epic: a.Epic}
-	unknown := refusal(ReasonUnknownTicket, "no epic "+root.String())
-	dir, repo, err := s.projectOf(a.Project)
-	if err != nil {
-		return unknown, nil
-	}
-	epics, err := tickets.LoadResolved(a.Project, dir)
+	first, _, target, err := s.epicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
 	if err != nil {
 		return QueueResult{}, err
 	}
-	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return filepath.Base(e.Path) == a.Epic })
-	if i < 0 || len(epics[i].Tickets) == 0 {
-		return unknown, nil
-	}
-	e := epics[i]
-	if e.IsMap {
-		return refusal(ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand"), nil
-	}
-	if !isMergeableEpic(root) {
-		return refusal(ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges"), nil
-	}
-	// The web page sends the state it shows; the socket route sends none.
-	if shown := EpicState(req.State); shown != "" {
-		if now := epicStateFor(root, e, s.registry.startedAtOf); shown != now {
-			return refusal(ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown)), nil
-		}
-	}
-	first, _, target, err := s.epicRefs(a.Project, epics, a.Epic, repo)
-	if err != nil {
-		return QueueResult{}, err
-	}
-	one := ralphloop.OneIteration{Epic: a.Epic, Ticket: first}
-	unlock := s.trunkLocks.lock(repo, target)
-	d, err := s.epicMergeLocked(root, one, repo, epics, e, target)
+	one := ralphloop.OneIteration{Epic: m.root.Epic, Ticket: first}
+	unlock := s.trunkLocks.lock(m.repo, target)
+	d, err := s.epicMergeLocked(m.root, one, m.repo, m.epics, m.epic, target)
 	unlock()
 	if err != nil {
 		return QueueResult{}, err
 	}
-	return s.actOnMerge(root, one, dir, e, d), nil
+	return s.actOnMerge(m.root, one, m.dir, m.epic, d), nil
+}
+
+// mergeEpicRef is the epic a manual merge verb acts on, loaded and checked.
+type mergeEpicRef struct {
+	root      rootRef
+	dir, repo string
+	epics     []tickets.Epic
+	epic      tickets.Epic
+}
+
+func refusedOr(r *QueueResult) QueueResult {
+	if r == nil {
+		return QueueResult{}
+	}
+	return *r
+}
+
+// loadMergeEpic resolves req's epic address for a manual merge verb. A non-nil
+// refusal means the verb stops there; req's state token, when it has one, must
+// match the epic's current state.
+func (s *Server) loadMergeEpic(req QueueRequest) (m mergeEpicRef, refused *QueueResult, err error) {
+	refuse := func(reason, msg string) (mergeEpicRef, *QueueResult, error) {
+		r := refusal(reason, msg)
+		return mergeEpicRef{}, &r, nil
+	}
+	project, epic, ok := tickets.ParseEpicAddress(req.Address)
+	if !ok {
+		return refuse(ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)")
+	}
+	root := rootRef{Project: project, Epic: epic}
+	dir, repo, err := s.projectOf(project)
+	if err != nil {
+		return refuse(ReasonUnknownTicket, "no epic "+root.String())
+	}
+	epics, err := tickets.LoadResolved(project, dir)
+	if err != nil {
+		return mergeEpicRef{}, nil, err
+	}
+	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return filepath.Base(e.Path) == epic })
+	if i < 0 || len(epics[i].Tickets) == 0 {
+		return refuse(ReasonUnknownTicket, "no epic "+root.String())
+	}
+	e := epics[i]
+	if e.IsMap {
+		return refuse(ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand")
+	}
+	if !isMergeableEpic(root) {
+		return refuse(ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges")
+	}
+	// The web page sends the state it shows; the socket route sends none.
+	if shown := EpicState(req.State); shown != "" {
+		if now := epicStateFor(root, e, s.registry.startedAtOf); shown != now {
+			return refuse(ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown))
+		}
+	}
+	return mergeEpicRef{root: root, dir: dir, repo: repo, epics: epics, epic: e}, nil, nil
 }
 
 // epicMergeLocked is epicMerge's work under the trunk lock; the caller acts on
