@@ -123,6 +123,12 @@ to every page:
   (`webui/src/pageCache.ts`).
 - A page without data yet shows the centered `Spinner`, never skeleton placeholders.
 
+Web checks:
+
+- Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.
+- The web UI does not use prettier. Never run it: it reformats unrelated lines.
+- Run e2e with `make web-e2e`. It rebuilds the web bundle first. `pnpm e2e` does not rebuild.
+
 ## UI
 
 - See ./design-system.md for UI work
