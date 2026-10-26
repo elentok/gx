@@ -43,6 +43,8 @@ const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
   ...over,
 });
 
+const exited = (over: Partial<SessionInfo> = {}) => session({ status: { state: "exited" }, ...over });
+
 function render(path: string, epics: EpicListRow[], sessions: SessionInfo[] = [], over: Partial<RouteFetchers> = {}) {
   const state = { snapshot: { sessions }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {}, refresh: () => {} } as unknown as Connection;
@@ -69,16 +71,23 @@ async function fill(slug: string, idea: string) {
   fireEvent.change(screen.getByLabelText("Rough idea"), { target: { value: idea } });
 }
 
-test("the + New button opens the form", async () => {
-  render("/d/gx:a", [row("a")]);
-  fireEvent.click(await screen.findByRole("button", { name: "+ New" }));
+// The form opens from "New session" on a Design that has no map yet and whose session has exited.
+async function openForm() {
+  fireEvent.click(await screen.findByRole("button", { name: "New session" }));
+  await screen.findByLabelText("Epic name");
+}
+
+test("New session on an Exited session-only Design opens the form with its name", async () => {
+  render("/d/gx:idea", [], [exited()]);
+  fireEvent.click(await screen.findByRole("button", { name: "New session" }));
   expect(await screen.findByRole("form", { name: "New Design" })).toBeTruthy();
+  expect((screen.getByLabelText("Epic name") as HTMLInputElement).value).toBe("idea");
 });
 
 test("submit sends the exact request and shows the new Design", async () => {
   const openDesign = vi.fn(async () => started);
-  const router = render("/d/gx:a", [row("a")], [], { openDesign });
-  fireEvent.click(await screen.findByRole("button", { name: "+ New" }));
+  const router = render("/d/gx:old", [], [exited({ ticket: "gx:old" })], { openDesign });
+  await openForm();
   await fill("idea", "make it fast");
   fireEvent.click(screen.getByRole("button", { name: "Start design" }));
   await waitFor(() => expect(router.state.location.pathname).toBe("/d/gx:idea"));
@@ -87,59 +96,41 @@ test("submit sends the exact request and shows the new Design", async () => {
 
 test("the project select shows only with several projects and starts on the current Design's project", async () => {
   const openDesign = vi.fn(async () => started);
-  render("/d/other:b", [row("a"), row("b", "other")], [], { openDesign });
-  fireEvent.click(await screen.findByRole("button", { name: "+ New" }));
+  render("/d/other:idea", [row("a")], [exited({ project: "other", ticket: "other:idea" })], { openDesign });
+  await openForm();
   const select = (await screen.findByLabelText("Project")) as HTMLSelectElement;
   expect(select.value).toBe("other");
   await fill("idea", "x");
   fireEvent.click(screen.getByRole("button", { name: "Start design" }));
   await waitFor(() => expect(openDesign).toHaveBeenCalledWith(expect.objectContaining({ project: "other" })));
   cleanup();
-  render("/d/gx:a", [row("a")]);
-  fireEvent.click(await screen.findByRole("button", { name: "+ New" }));
-  await screen.findByLabelText("Epic name");
+  render("/d/gx:idea", [row("a")], [exited()]);
+  await openForm();
   expect(screen.queryByLabelText("Project")).toBeNull();
 });
 
 test("a refusal shows the server's message and keeps the form", async () => {
   const openDesign = vi.fn(async () => ({ refused: true, reason: "epic-exists", message: "gx already has an epic idea" }) as SessionResult);
-  const router = render("/d/gx:a", [row("a")], [], { openDesign });
-  fireEvent.click(await screen.findByRole("button", { name: "+ New" }));
+  const router = render("/d/gx:old", [], [exited({ ticket: "gx:old" })], { openDesign });
+  await openForm();
   await fill("idea", "x");
   fireEvent.click(screen.getByRole("button", { name: "Start design" }));
   expect((await screen.findByRole("alert")).textContent).toBe("gx already has an epic idea");
   expect((screen.getByLabelText("Epic name") as HTMLInputElement).value).toBe("idea");
-  expect(router.state.location.pathname).toBe("/d/gx:a");
-});
-
-test("a Design with only a session shows under In progress at Chart, and goes with its session", async () => {
-  render("/d/gx:idea", [], [session()]);
-  const link = await screen.findByRole("link", { name: /idea/ });
-  expect(link.getAttribute("href")).toBe("#/d/gx:idea");
-  expect(link.textContent).toContain("Chart");
-  cleanup();
-  render("/d/gx:idea", [], []);
-  await screen.findByRole("button", { name: "+ New" });
-  expect(screen.queryByRole("link", { name: /idea/ })).toBeNull();
-});
-
-test("an Exited session-only Design offers New session, which opens the form with its name", async () => {
-  render("/d/gx:idea", [], [session({ status: { state: "exited" } })]);
-  fireEvent.click(await screen.findByRole("button", { name: "New session" }));
-  expect(((await screen.findByLabelText("Epic name")) as HTMLInputElement).value).toBe("idea");
+  expect(router.state.location.pathname).toBe("/d/gx:old");
 });
 
 test("the open form and its text survive a reload, and Cancel drops them", async () => {
-  render("/d/gx:a", [row("a")]);
-  fireEvent.click(await screen.findByRole("button", { name: "+ New" }));
+  render("/d/gx:idea", [], [exited()]);
+  await openForm();
   await fill("idea", "make it fast");
   cleanup();
-  render("/d/gx:a", [row("a")]);
+  render("/d/gx:idea", [], [exited()]);
   expect(((await screen.findByLabelText("Epic name")) as HTMLInputElement).value).toBe("idea");
   expect((screen.getByLabelText("Rough idea") as HTMLTextAreaElement).value).toBe("make it fast");
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   cleanup();
-  render("/d/gx:a", [row("a")]);
-  await screen.findByRole("button", { name: "+ New" });
+  render("/d/gx:idea", [], [exited()]);
+  await screen.findByRole("button", { name: "New session" });
   expect(screen.queryByRole("form", { name: "New Design" })).toBeNull();
 });

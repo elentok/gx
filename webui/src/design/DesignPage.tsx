@@ -1,10 +1,11 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Heading, Text } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { designHref } from "../hrefs";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { useEpicList, type FetchEpicList } from "../epics/list";
+import { BackLink } from "../nav/BackLink";
 import { readPageCache, writePageCache } from "../pageCache";
 import { DetailPage } from "../page/DetailPage";
 import { Button } from "../ui/button/Button";
@@ -14,13 +15,13 @@ import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
 import { NewDesignForm, type NewDesignDraft } from "./NewDesignForm";
 import type { OpenDesign, ResumeSession, StopSession } from "./open";
-import { MobilePicker, Picker, useWide } from "./Picker";
 import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress, showsImplLink } from "./Progress";
 import type { FetchScreen } from "./screen";
 import { SessionHeader, StartDesignButton } from "./SessionControls";
 import type { SessionInfo } from "../generated/server";
-import { designSession, liveSessions, pickerGroups } from "./view";
+import { useWide } from "./useWide";
+import { designSession, liveSessions } from "./view";
 
 /** The injected fetchers and actions the Design page talks to the server through. */
 export interface DesignDeps {
@@ -55,11 +56,7 @@ function SessionStrip({
   onNewSession,
 }: SessionStripProps) {
   if (!session) {
-    return (
-      <Box display="flex" justifyContent="center" py="4">
-        <StartDesignButton address={address} open={deps.open} />
-      </Box>
-    );
+    return <StartDesignButton address={address} open={deps.open} />;
   }
   if (!chart)
     return (
@@ -82,8 +79,8 @@ function SessionStrip({
   );
 }
 
-// The Chat and Progress columns of one Design. Progress reads the Design's epic detail.
-function DesignColumns({
+// The title row and the Chat and Progress columns of one Design. Progress reads the Design's epic detail.
+function DesignBody({
   address,
   wide,
   deps,
@@ -131,16 +128,20 @@ function DesignColumns({
   return (
     <>
       <Box
-        aria-label="Chat"
-        role="region"
-        minW="0"
+        mt="4"
+        mb="3"
         display="flex"
-        flexDirection="column"
-        gap="3"
+        alignItems="flex-end"
+        justifyContent="space-between"
+        gap="4"
+        flex="none"
       >
-        {wide && detail && showsImplLink(detail) && (
-          <ImplLink address={detail.impl_address!} />
-        )}
+        <Box minW="0">
+          <BackLink to="/epics" label="← Epics" />
+          <Heading as="h1" fontFamily="condensed" fontSize="2xl">
+            {address.slice(address.indexOf(":") + 1)}
+          </Heading>
+        </Box>
         <SessionStrip
           address={address}
           session={session}
@@ -150,27 +151,54 @@ function DesignColumns({
           onSelect={setSelected}
           onNewSession={onNewSession}
         />
-        <DesignChat
-          session={session}
-          fetchChat={deps.fetchChat}
-          post={deps.post}
-          done={done}
-          nextTitle={nextTitle}
-          working={working}
-          actions={{
-            onNewSession,
-            resume: deps.resume,
-            fetchScreen: deps.fetchScreen,
-          }}
-        />
       </Box>
-      {/* On a phone Progress sits right under the picker, above the chat. */}
       <Box
-        aria-label="Progress"
-        role="region"
-        gridRow={{ base: 2, lg: "auto" }}
+        display="grid"
+        gridTemplateColumns={{ base: "1fr", lg: "minmax(0, 1fr) 300px" }}
+        gridTemplateRows={{ base: "auto minmax(0, 1fr)", lg: "minmax(0, 1fr)" }}
+        gap="4"
+        flex="1"
+        minH="0"
       >
-        {detail && <Progress detail={detail} wide={wide} />}
+        <Box
+          aria-label="Chat"
+          role="region"
+          minW="0"
+          minH="0"
+          display="flex"
+          flexDirection="column"
+          gap="3"
+          gridRow={{ base: 2, lg: 1 }}
+          gridColumn={1}
+        >
+          {wide && detail && showsImplLink(detail) && (
+            <ImplLink address={detail.impl_address!} />
+          )}
+          <DesignChat
+            session={session}
+            fetchChat={deps.fetchChat}
+            post={deps.post}
+            done={done}
+            nextTitle={nextTitle}
+            working={working}
+            actions={{
+              onNewSession,
+              resume: deps.resume,
+              fetchScreen: deps.fetchScreen,
+            }}
+          />
+        </Box>
+        {/* On a phone Progress sits above the chat. */}
+        <Box
+          aria-label="Progress"
+          role="region"
+          gridRow={1}
+          gridColumn={{ base: 1, lg: 2 }}
+          minH="0"
+          overflowY="auto"
+        >
+          {detail && <Progress detail={detail} wide={wide} />}
+        </Box>
       </Box>
     </>
   );
@@ -188,7 +216,6 @@ export function DesignPage({
   deps?: DesignDeps;
 }) {
   const conn = useConnectionContext();
-  const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   const { list, failed } = useEpicList(fetchList, conn);
 
   const navigate = useNavigate();
@@ -207,26 +234,17 @@ export function DesignPage({
   );
 
   const wide = useWide();
-  const groups = list ? pickerGroups(list.epics, sessions) : [];
-  const projectNames = [
-    ...new Set([
-      ...(list?.epics ?? []).map((e) => e.project),
-      ...groups.flatMap((g) => g.rows.map((r) => r.row.project)),
-    ]),
-  ];
-  const projects = new Set(
-    list?.epics.filter((e) => e.kind === "map").map((e) => e.project),
-  ).size;
+  const projectNames = [...new Set((list?.epics ?? []).map((e) => e.project))];
   // The form's project select starts on the Design on screen.
   const currentProject = address.split(":")[0];
   const formProjects = [
     currentProject,
     ...projectNames.filter((p) => p !== currentProject),
   ];
-  const chartRow = groups
-    .flatMap((g) => g.rows)
-    .find((r) => r.row.address === address)?.chart;
-  const onNew = () => setDraft({});
+  // No map yet: Chart has not made the Design's epic.
+  const chart = !list?.epics.some(
+    (e) => e.address === address && !e.map_pending,
+  );
   const onNewSession = () =>
     setDraft({
       slug: address.slice(address.indexOf(":") + 1),
@@ -234,7 +252,7 @@ export function DesignPage({
     });
 
   return (
-    <DetailPage active="epics">
+    <DetailPage active="epics" fill>
       {draft && (
         <NewDesignForm
           key={`${draft.slug}|${draft.project}`}
@@ -254,39 +272,13 @@ export function DesignPage({
       ) : !list ? (
         <Spinner label="Loading Designs" />
       ) : (
-        <Box
-          display="grid"
-          gridTemplateColumns={{
-            base: "1fr",
-            lg: "260px minmax(0, 1fr) 300px",
-          }}
-          gap="4"
-          minH="60vh"
-          alignContent={{ base: "start", lg: "normal" }}
-        >
-          {wide ? (
-            <Picker
-              groups={groups}
-              projects={projects}
-              current={address}
-              onNew={onNew}
-            />
-          ) : (
-            <MobilePicker
-              groups={groups}
-              projects={projects}
-              current={address}
-              onNew={onNew}
-            />
-          )}
-          <DesignColumns
-            address={address}
-            wide={wide}
-            deps={deps}
-            chart={chartRow}
-            onNewSession={onNewSession}
-          />
-        </Box>
+        <DesignBody
+          address={address}
+          wide={wide}
+          deps={deps}
+          chart={chart}
+          onNewSession={onNewSession}
+        />
       )}
     </DetailPage>
   );

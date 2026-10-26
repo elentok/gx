@@ -215,8 +215,8 @@ export function QuestionSheet({
   };
 
   return (
-    <Box role="group" aria-label="Questions" borderWidth="1px" borderColor="tone.waiting.fg" borderRadius="md" bg="surface.raised" overflow="hidden">
-      <Box px="3" pt="2" pb="2" display="flex" alignItems="center" gap="2">
+    <Box role="group" aria-label="Questions" borderWidth="1px" borderColor="tone.waiting.fg" borderRadius="md" bg="surface.raised" overflow="hidden" display="flex" flexDirection="column" minH="0">
+      <Box px="3" pt="2" pb="2" display="flex" alignItems="center" gap="2" flex="none">
         <Box flex="1">
           <QuestionDots round={round} answers={answers} current={open ? index : undefined} onPick={goto} />
         </Box>
@@ -227,7 +227,7 @@ export function QuestionSheet({
           {open ? "▾" : "▴"}
         </Button>
       </Box>
-      <Box hidden={!open} px="3" pb="3" maxH="50dvh" overflowY="auto">
+      <Box hidden={!open} px="3" pb="3" minH="0" overflowY="auto">
         <Box
           ref={row}
           onScroll={onScroll}

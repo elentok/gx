@@ -96,150 +96,21 @@ function render(epics: EpicListRow[], sessions: SessionInfo[], path = "/d/gx:a",
   return router;
 }
 
-test("rows land in their four sections", async () => {
-  render(
-    [map("a", "in-progress"), map("b", "not-started"), map("c", "ready-to-queue"), map("d", "recently-finished"), map("old", "none")],
-    [],
-    "/d/gx:a",
-  );
-  await screen.findByText("Ready to queue");
-  for (const [title, name] of [["In progress", "a"], ["Not started", "b"], ["Ready to queue", "c"], ["Recently finished", "d"]]) {
-    expect(screen.getByText(title)).toBeTruthy();
-    if (title === "Not started" || title === "Recently finished") fireEvent.click(screen.getByRole("button", { name: new RegExp(title) }));
-    expect(screen.getAllByRole("link", { name: new RegExp(`^${name}`) })).toHaveLength(1);
-  }
-  expect(screen.queryByRole("link", { name: /^old/ })).toBeNull();
+test("the title row holds a back link, the Design name and the Sessions control, with no picker or state label", async () => {
+  render([map("a", "in-progress"), map("b", "in-progress")], [session("a", { status: { state: "working" } })]);
+  expect((await screen.findByRole("heading", { level: 1, name: "a" })).textContent).toBe("a");
+  expect(screen.getByRole("link", { name: "← Epics" }).getAttribute("href")).toBe("/epics");
+  expect(screen.getByRole("button", { name: "New session" })).toBeTruthy();
+  expect(screen.queryByLabelText("Filter Designs")).toBeNull();
+  expect(screen.queryByRole("link", { name: /^b/ })).toBeNull();
+  expect(screen.queryByText(/designing|working/i)).toBeNull();
+  expect(screen.getByRole("region", { name: "Chat" })).toBeTruthy();
+  expect(screen.getByRole("region", { name: "Progress" })).toBeTruthy();
 });
 
-test("each mark shows", async () => {
-  render(
-    [
-      map("live", "in-progress"),
-      map("ask", "in-progress"),
-      map("bad", "in-progress"),
-      map("limited", "in-progress"),
-      map("rdy", "ready-to-queue"),
-      map("fin", "recently-finished"),
-    ],
-    [
-      session("live", { status: { state: "working" } }),
-      session("ask", { actionable: { reason: "Grilling: waiting for your answers", grilling: true } }),
-      session("bad", { failure: { kind: "crashed", label: "Crashed" } }),
-      session("limited", { failure: { kind: "rate-limit", label: "Rate limited" } }),
-    ],
-    "/d/gx:live",
-  );
-  const link = async (n: string) => (await screen.findByRole("link", { name: new RegExp(`^${n}`) })) as HTMLElement;
-  expect(within(await link("live")).getByLabelText("Live")).toBeTruthy();
-  expect(within(await link("ask")).getByLabelText("Waiting for your answer")).toBeTruthy();
-  expect(within(await link("bad")).getByLabelText("Needs attention")).toBeTruthy();
-  expect(within(await link("limited")).queryByLabelText("Needs attention")).toBeNull();
-  expect(within(await link("rdy")).getByText("▶")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: /Recently finished/ }));
-  expect(within(await link("fin")).getByText("✓")).toBeTruthy();
-});
-
-test("waiting and failed Designs sort first, then live ones, then newest first", async () => {
-  render(
-    [
-      map("old", "in-progress", { picker_sort_at: hoursAgo(9) }),
-      map("new", "in-progress", { picker_sort_at: hoursAgo(1) }),
-      map("live", "in-progress", { picker_sort_at: hoursAgo(20) }),
-      map("bad", "in-progress", { picker_sort_at: hoursAgo(30) }),
-      map("ask", "in-progress", { picker_sort_at: hoursAgo(40) }),
-    ],
-    [
-      session("live", { status: { state: "working" } }),
-      session("bad", { failure: { kind: "crashed", label: "Crashed" } }),
-      session("ask", { actionable: { reason: "Grilling: waiting for your answers", grilling: true } }),
-    ],
-    "/d/gx:new",
-  );
-  await screen.findByText("In progress");
-  const order = screen.getAllByRole("link").map((l) => l.textContent ?? "");
-  const at = (n: string) => order.findIndex((t) => t.startsWith(n));
-  // Waiting and failed first (newest first among them), then live, then the rest.
-  expect(at("bad")).toBeLessThan(at("ask"));
-  expect(at("ask")).toBeLessThan(at("live"));
-  expect(at("live")).toBeLessThan(at("new"));
-  expect(at("new")).toBeLessThan(at("old"));
-  expect(at("old")).toBeGreaterThanOrEqual(0);
-});
-
-test("a Ready to queue row opens the implementation epic, any other row its Design", async () => {
-  render(
-    [map("rdy", "ready-to-queue", { impl_address: "gx:rdy-impl" }), map("ip", "in-progress"), map("ns", "not-started")],
-    [],
-    "/d/gx:ip",
-  );
-  fireEvent.click(await screen.findByRole("button", { name: /Not started/ }));
-  const href = async (n: string) => (await screen.findByRole("link", { name: new RegExp(`^${n}`) })).getAttribute("href");
-  expect(await href("rdy")).toBe("#/e/gx:rdy-impl");
-  expect(await href("ip")).toBe("#/d/gx:ip");
-  expect(await href("ns")).toBe("#/d/gx:ns");
-});
-
-test("Recently finished starts collapsed unless it holds the open Design", async () => {
-  render([map("ip", "in-progress"), map("fin", "recently-finished")], [], "/d/gx:ip");
-  await screen.findByRole("button", { name: /Recently finished/ });
-  expect(screen.queryByRole("link", { name: /^fin/ })).toBeNull();
-  cleanup();
-  render([map("ip", "in-progress"), map("fin", "recently-finished")], [], "/d/gx:fin");
-  expect(await screen.findByRole("link", { name: /^fin/ })).toBeTruthy();
-});
-
-const filterBox = async () => (await screen.findByLabelText("Filter Designs")) as HTMLInputElement;
-
-test("Not started is collapsed with its count, opens on a filter match and closes when cleared", async () => {
-  render([map("ip", "in-progress"), map("alpha", "not-started"), map("beta", "not-started"), map("gamma", "not-started")], [], "/d/gx:ip");
-  await screen.findByText(/^Not started/);
-  expect(screen.getByRole("button", { name: /Not started.*3/ })).toBeTruthy();
-  expect(screen.queryByRole("link", { name: /^alpha/ })).toBeNull();
-
-  fireEvent.change(await filterBox(), { target: { value: "alp" } });
-  expect(screen.getByRole("button", { name: /Not started.*1/ })).toBeTruthy();
-  expect(screen.getByRole("link", { name: /^alpha/ })).toBeTruthy();
-  expect(screen.queryByRole("link", { name: /^beta/ })).toBeNull();
-  expect(screen.queryByRole("link", { name: /^ip/ })).toBeNull();
-
-  fireEvent.change(await filterBox(), { target: { value: "" } });
-  expect(screen.queryByRole("link", { name: /^alpha/ })).toBeNull();
-  expect(screen.getByRole("button", { name: /Not started.*3/ })).toBeTruthy();
-});
-
-test("the filter matches the epic slug", async () => {
-  render([map("Pretty title", "in-progress", { address: "gx:the-slug" }), map("other", "in-progress")], [], "/d/gx:other");
-  fireEvent.change(await filterBox(), { target: { value: "the-slug" } });
-  expect(screen.getByRole("link", { name: /^Pretty title/ })).toBeTruthy();
-  expect(screen.queryByRole("link", { name: /^other/ })).toBeNull();
-});
-
-test("rows show their project only with several projects", async () => {
-  render([map("a", "in-progress"), map("b", "in-progress", { project: "other", address: "other:b" })], [], "/d/gx:a");
-  expect(within(await screen.findByRole("link", { name: /^a/ })).getByText("gx")).toBeTruthy();
-  expect(within(screen.getByRole("link", { name: /^b/ })).getByText("other")).toBeTruthy();
-  cleanup();
-  render([map("a", "in-progress")], [], "/d/gx:a");
-  expect(within(await screen.findByRole("link", { name: /^a/ })).queryByText("gx")).toBeNull();
-});
-
-test("on a phone the picker is a dropdown with a count of other Designs that need you", async () => {
-  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
-  try {
-    render(
-      [map("cur", "in-progress"), map("ask", "in-progress"), map("bad", "in-progress"), map("calm", "in-progress")],
-      [session("ask", { actionable: { reason: "Grilling: waiting for your answers", grilling: true } }), session("bad", { failure: { kind: "crashed", label: "Crashed" } })],
-      "/d/gx:cur",
-    );
-    const button = await screen.findByRole("button", { name: /^cur/ });
-    expect(screen.getByText("? 2 more")).toBeTruthy();
-    expect(screen.queryByLabelText("Filter Designs")).toBeNull();
-    fireEvent.click(button);
-    expect(screen.getByLabelText("Filter Designs")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /^calm/ })).toBeTruthy();
-  } finally {
-    vi.unstubAllGlobals();
-  }
+test("without a session the title row offers to start one", async () => {
+  render([map("a", "in-progress")], []);
+  expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy();
 });
 
 const progress = async () => within(await screen.findByRole("region", { name: "Progress" }));

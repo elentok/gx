@@ -1,5 +1,11 @@
 import { Box, Spinner as ChakraSpinner, Text } from "@chakra-ui/react";
-import { useCallback, useState } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type {
   SessionBackgroundTask,
@@ -183,9 +189,22 @@ function ChatTail({
   const failure = visibleFailure(session.failure, done);
   const round = chat.round ?? [];
   return (
-    <>
+    // The bottom area: at most half the screen, so only the question body scrolls past that.
+    <Box
+      flex="none"
+      maxH="50dvh"
+      display="flex"
+      flexDirection="column"
+      minH="0"
+      gap="3"
+    >
       {round.length > 0 && (
-        <Box hidden={full}>
+        <Box
+          hidden={full}
+          display={full ? "none" : "flex"}
+          flexDirection="column"
+          minH="0"
+        >
           <QuestionSheet
             round={round}
             answers={answers}
@@ -240,7 +259,40 @@ function ChatTail({
           onFullScreen={setFull}
         />
       )}
-    </>
+    </Box>
+  );
+}
+
+// The messages scroll alone. They open at the newest one and follow new ones until the reader scrolls up.
+function ChatScroller({
+  children,
+  signal,
+}: {
+  children: ReactNode;
+  /** Changes whenever the content grows. */
+  signal: unknown;
+}) {
+  const el = useRef<HTMLDivElement>(null);
+  const stuck = useRef(true);
+  useLayoutEffect(() => {
+    if (el.current && stuck.current) el.current.scrollTop = el.current.scrollHeight;
+  }, [signal]);
+  return (
+    <Box
+      ref={el}
+      flex="1"
+      minH="0"
+      overflowY="auto"
+      display="flex"
+      flexDirection="column"
+      gap="3"
+      onScroll={(e) => {
+        const t = e.currentTarget;
+        stuck.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80;
+      }}
+    >
+      {children}
+    </Box>
   );
 }
 
@@ -272,23 +324,27 @@ function ChatLog({
   const busy =
     session.status.state === "working" && !session.status.background;
   return (
-    <Box display="flex" flexDirection="column" gap="3">
-      {chat.truncated && (
-        <Text fontSize="xs" color="text.dim" textAlign="center">
-          Earlier messages hidden
-        </Text>
-      )}
-      {chat.messages.map((m, i) => (
-        <Entry
-          key={m.id || i}
-          m={m}
-          tool={busy && i === chat.messages.length - 1}
-        />
-      ))}
-      {chat.background.length > 0 && (
-        <BackgroundStrip tasks={chat.background} />
-      )}
-      {busy && step && <WorkingRow {...step} />}
+    <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
+      <ChatScroller
+        signal={`${chat.messages.length}|${chat.background.length}|${busy}`}
+      >
+        {chat.truncated && (
+          <Text fontSize="xs" color="text.dim" textAlign="center">
+            Earlier messages hidden
+          </Text>
+        )}
+        {chat.messages.map((m, i) => (
+          <Entry
+            key={m.id || i}
+            m={m}
+            tool={busy && i === chat.messages.length - 1}
+          />
+        ))}
+        {chat.background.length > 0 && (
+          <BackgroundStrip tasks={chat.background} />
+        )}
+        {busy && step && <WorkingRow {...step} />}
+      </ChatScroller>
       <ChatTail
         key={roundKey}
         session={session}
