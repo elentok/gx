@@ -85,22 +85,52 @@ func TestDeadlock_ErrorTicketPausesTheEpic(t *testing.T) {
 	}
 }
 
-// A blocked ticket listed before a paused one still makes the epic Paused, not
-// a blocked cycle: the result must not depend on ticket order.
-func TestDeadlock_BlockedTicketBeforePausedOneIsAllPaused(t *testing.T) {
-	store := t.TempDir()
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "02")
-	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "second", servertest.TicketOpts{Status: "bogus"})
-	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
-	h := servertest.StartWithStore(t, store)
-	if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", ""); err != nil {
-		t.Fatal(err)
+// A blocked (or waiting) ticket next to a paused one makes the epic Paused, not
+// a blocked cycle, whichever of the two is listed first.
+func TestDeadlock_BlockedOrWaitingNextToPausedIsAllPaused(t *testing.T) {
+	type tk struct {
+		id   string
+		opts servertest.TicketOpts
 	}
-	h.Server.ClaimNext()
-	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
-	got := runLogOf(t, h, events.Deadlocked)
-	if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
-		t.Errorf("deadlocked events = %+v, want one all-paused", got)
+	pauses := map[string]servertest.TicketOpts{
+		"paused-answer": {PauseReason: "question"},
+		"error":         {Status: "error"},
+		"draft":         {Status: "draft"},
+	}
+	done := servertest.TicketOpts{Status: "done"}
+	cases := map[string][]tk{}
+	for name, p := range pauses {
+		cases["blocked first, "+name] = []tk{{"01", servertest.TicketOpts{BlockedBy: []string{"02"}}}, {"02", p}}
+		cases["paused first, "+name] = []tk{{"01", p}, {"02", servertest.TicketOpts{BlockedBy: []string{"01"}}}}
+		// A done ticket whose fork child is paused renders as waiting for children.
+		child1, child2 := p, p
+		child1.Parent, child2.Parent = "01", "02"
+		cases["waiting first, "+name] = []tk{{"01", done}, {"01a", child1}}
+		cases["paused first, waiting, "+name] = []tk{{"01", p}, {"02", done}, {"02a", child2}}
+	}
+	for name, tickets := range cases {
+		t.Run(name, func(t *testing.T) {
+			store := t.TempDir()
+			for _, tk := range tickets {
+				servertest.WriteTicketWith(t, store, "proj", "epic-a", tk.id, "ticket-"+tk.id, tk.opts)
+			}
+			servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+			h := servertest.StartWithStore(t, store)
+			for _, tk := range tickets {
+				if tk.opts.Status != "done" {
+					if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/"+tk.id, ""); err != nil {
+						t.Fatal(err)
+					}
+					break
+				}
+			}
+			h.Server.ClaimNext()
+			waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
+			got := runLogOf(t, h, events.Deadlocked)
+			if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
+				t.Errorf("deadlocked events = %+v, want one all-paused", got)
+			}
+		})
 	}
 }
 
