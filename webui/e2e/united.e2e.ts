@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { card, expect, nav, section, test } from "./fixture";
 
 const NEEDS_YOU = [
@@ -30,8 +31,8 @@ test("16. Needs you", async ({ page, start }) => {
   const titles = await page.getByRole("heading", { level: 2 }).allTextContents();
   expect(titles.map((t) => t.replace(/[▾▸\d]/g, "").trim())).toEqual([
     "Needs you",
-    "In progress",
     "Ready to queue",
+    "In progress",
     "Ready to design",
     "Finished",
   ]);
@@ -157,20 +158,99 @@ test("19. Follow-ups triage", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/e\/demo:follow-ups$/);
 });
 
-test("28. AFK toggle and Paused chip", async ({ page, start }) => {
-  const fixture = await start("ready");
-  const afk = page.getByRole("button", nav("AFK"));
-  await expect(afk).toBeVisible();
-  await expect(page.getByText("Paused", { exact: true })).toHaveCount(0);
+const menuButton = (page: Page) => page.getByRole("button", nav("Menu"));
+const menu = (page: Page) => page.getByRole("menu", nav("Menu"));
+const afkItem = (page: Page) => menu(page).getByRole("menuitemcheckbox", nav("AFK"));
+
+test("28. Menu: AFK, build text, Paused chip", async ({ page, start }) => {
+  const fixture = await start("united");
+  const bar = page.getByRole("navigation");
+  const paused = bar.getByText("Paused", { exact: true });
+  await expect(paused).toHaveCount(0);
+
+  // The hamburger sits right of the Live dot.
+  const live = await page.getByRole("status", nav("Live")).boundingBox();
+  const button = await menuButton(page).boundingBox();
+  expect(button!.x).toBeGreaterThan(live!.x);
+
+  await menuButton(page).click();
+  await expect(afkItem(page)).toHaveAttribute("aria-checked", "false");
+  await afkItem(page).click();
+  await expect(afkItem(page)).toHaveAttribute("aria-checked", "true");
+  await expect(menu(page)).toBeVisible();
+  // `gx afk` with no argument flips the server state, so "afk off" shows the click turned it on.
+  expect(await fixture.cli("afk")).toContain("afk off");
+  await expect(afkItem(page)).toHaveAttribute("aria-checked", "false");
+
+  // The build text shows and does nothing.
+  const build = menu(page).getByText(/^v\d/);
+  await expect(build).toBeVisible();
+  await build.click();
+  await expect(menu(page)).toBeVisible();
+  await expect(page).toHaveURL(/#\/epics$/);
+
+  // With AFK on and the menu closed, the bar has no AFK.
+  await afkItem(page).click();
+  await expect(afkItem(page)).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("Escape");
+  await expect(menu(page)).toHaveCount(0);
+  await expect(bar.getByText("AFK")).toHaveCount(0);
 
   await fixture.cli("server", "queue", "pause");
-  await expect(page.getByText("Paused", { exact: true })).toBeVisible();
+  await expect(paused).toBeVisible();
+});
 
-  await expect(afk).toHaveAttribute("aria-pressed", "false");
-  await afk.click();
-  await expect(afk).toHaveAttribute("aria-pressed", "true");
-  // `gx afk` with no argument flips the server state, so "afk off" shows the click had turned it on.
+test("31. Menu keyboard", async ({ page, start }) => {
+  const fixture = await start("united");
+  await menuButton(page).focus();
+  await page.keyboard.press("Enter");
+  await expect(menu(page)).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(afkItem(page)).toHaveAttribute("data-highlighted", "");
+  await page.keyboard.press("Enter");
+  await expect(afkItem(page)).toHaveAttribute("aria-checked", "true");
+  await expect(menu(page)).toBeVisible();
   expect(await fixture.cli("afk")).toContain("afk off");
+  await page.keyboard.press("Escape");
+  await expect(menu(page)).toHaveCount(0);
+});
+
+test("32. Epics project filter", async ({ page, start }) => {
+  await start("united");
+  const select = page.getByRole("combobox", { name: "Project" });
+  await expect(select.locator("option")).toHaveText(["All projects", "demo", "auto"]);
+  const search = page.getByRole("searchbox", { name: "Filter epics" });
+  const first = await search.boundingBox();
+  const picker = await select.boundingBox();
+  expect(picker!.x).toBeGreaterThan(first!.x);
+
+  await select.selectOption({ label: "demo" });
+  // Open every collapsed section, so the follow-ups card and the Finished cards count too.
+  await section(page, "Ready to design");
+  await section(page, "Finished");
+  const cards = page.locator("[data-section]");
+  const shown = await cards.count();
+  expect(shown).toBeGreaterThan(0);
+  await expect(cards.getByText("demo", { exact: true })).toHaveCount(shown);
+  await expect(cards.getByText("auto", { exact: true })).toHaveCount(0);
+  await expect(card(page, "follow-ups")).toBeVisible();
+
+  // A name from the other project matches nothing.
+  await search.fill("awaiting-auto-epic");
+  await expect(page.getByText("No match")).toBeVisible();
+  await search.fill("");
+
+  // A second page in the same context reads the stored choice.
+  const other = await page.context().newPage();
+  await other.goto(new URL(page.url()).origin + "/#/epics");
+  await expect(other.getByRole("combobox", { name: "Project" })).toHaveValue("demo");
+  await other.close();
+});
+
+test("33. No project filter with one project", async ({ page, start }) => {
+  await start("ready");
+  await expect(page.getByRole("searchbox", { name: "Filter epics" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Project" })).toHaveCount(0);
 });
 
 test("29. Grid columns at desktop width", async ({ page, start }) => {

@@ -7,7 +7,7 @@ Epics page cards. The helpers `section` and `card` in `fixture.ts` find a sectio
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14),
-`united.e2e.ts` (flows 15, 16, 17, 18, 19), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24),
+`united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24),
 `newdesign.e2e.ts` (flows 25, 26, 27).
 
 ## 1. Queue an epic
@@ -179,7 +179,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Scenario:** `united` (two projects, one card per section and per Needs-you reason, workers held)
 - **Steps:** open the Epics page; open and close Ready to design; click around a card; filter.
 - **Pass:**
-  - Sections read Needs you, In progress, Ready to queue, Ready to design, Finished. Ready to design
+  - Sections read Needs you, Ready to queue, In progress, Ready to design, Finished. Ready to design
     and Finished start collapsed, and the header toggles Ready to design.
   - Each title shows its card count: eight in Needs you (paused, question, permission, deadlock,
     merge-blocked, awaiting-merge, Design question, paused one-off), and Finished counts the cards
@@ -249,8 +249,8 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Scenario:** `united`
 - **Steps:** open `#/e/demo:paused-epic`, then `#/e/demo:running-epic`; click "← Epics". Open
   `#/d/demo:design-live`; click "← Epics".
-- **Pass:** the title count of other Needs-you cards reads 8 on `paused-epic` (itself in Needs you) and
-  9 on the other two pages. "← Epics" opens `#/epics` from the epic page and the Design page.
+- **Pass:** the title count of other Needs-you cards reads 7 on `paused-epic` (itself in Needs you) and
+  8 on the other two pages. A stopped Design is not in Needs you. "← Epics" opens `#/epics` from the epic page and the Design page.
 
 ## 23. Phone, Epics page
 
@@ -290,11 +290,45 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Steps:** open Ready to design; click Design on the `design-new` card.
 - **Pass:** the page is `#/d/demo:design-new` and `gx agents list` names `design-new`.
 
-## 28. AFK toggle and Paused chip
+## 28. Menu: AFK, build text, Paused chip
+
+- **Scenario:** `united` (the flow lives in `united.e2e.ts`)
+- **Steps:**
+  1. Open the Menu (hamburger, right of the Live dot); click the AFK item.
+  2. Run `gx afk` (a flip).
+  3. Click the build text; click AFK again; press Esc.
+  4. Run `gx server queue pause`.
+- **Pass:**
+  - The AFK item reads unchecked, then checked after the click, and the menu stays open. `gx afk`
+    reports `afk off`, so the server was on, and the item reads unchecked again.
+  - The build text (`v...`) shows and does nothing: the menu stays open and the URL does not change.
+  - With AFK on and the menu closed, the bar has no AFK.
+  - The "Paused" chip shows in the bar.
+
+## 31. Menu keyboard
+
+- **Scenario:** `united`
+- **Steps:** focus the Menu button, press Enter, ArrowDown, Enter, then Esc.
+- **Pass:** the menu opens; ArrowDown highlights AFK; Enter checks it and the menu stays open (`gx afk`
+  reports `afk off`); Esc closes the menu.
+
+## 32. Epics project filter
+
+- **Scenario:** `united` (projects `demo` and `auto`)
+- **Steps:**
+  1. Read the "Project" select, right of "Filter epics". Pick `demo`; open Ready to design and Finished.
+  2. Filter for `awaiting-auto-epic`, an `auto` epic.
+  3. Open a second page in the same browser context on `#/epics`.
+- **Pass:**
+  - The options are All projects, `demo`, `auto`.
+  - Every card, the `follow-ups` card included, reads `demo`; none reads `auto`.
+  - The `auto` epic gives "No match".
+  - The second page reads `demo` in the select.
+
+## 33. No project filter with one project
 
 - **Scenario:** `ready`
-- **Steps:** run `gx server queue pause`; click AFK in the top bar.
-- **Pass:** the "Paused" chip shows; AFK turns pressed and `gx afk` (a flip) reports `afk off`, so the server was on.
+- **Pass:** the Epics page has "Filter epics" and no "Project" select.
 
 ## 29. Grid columns at desktop width
 

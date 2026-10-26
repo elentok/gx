@@ -70,16 +70,16 @@ test("22. Jump menu count and back link", async ({ page, start }) => {
   await start("united");
   const waiting = page.getByTestId("waiting-count");
 
-  // Eight other cards need you from a Needs-you epic, nine from one that does not.
+  // Seven other cards need you from a Needs-you epic, eight from one that does not.
   await goto(page, "#/e/demo:paused-epic");
-  await expect(waiting).toHaveText("8");
+  await expect(waiting).toHaveText("7");
   await goto(page, "#/e/demo:running-epic");
-  await expect(waiting).toHaveText("9");
+  await expect(waiting).toHaveText("8");
 
   await page.getByRole("link", nav("← Epics")).click();
   await expect(page).toHaveURL(/#\/epics$/);
   await goto(page, "#/d/demo:design-live");
-  await expect(waiting).toHaveText("9");
+  await expect(waiting).toHaveText("8");
   await page.getByRole("link", nav("← Epics")).click();
   await expect(page).toHaveURL(/#\/epics$/);
 });
