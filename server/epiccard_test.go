@@ -74,6 +74,37 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 	}
 }
 
+func TestEpicList_QueuedOneOffSortsBySlotAndReadsQueuedN(t *testing.T) {
+	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
+	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "q-first", loop, open)
+		writeEpicFiles(t, store, "q-last", loop, open)
+		writeEpicFiles(t, store, "one-offs", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": issueMD("01", "open", "", "Queued one"),
+			"02-b.md": issueMD("02", "open", "", "Idle one"),
+		})
+	})
+	for _, addr := range []string{"proj:q-first", "proj:one-offs/01", "proj:q-last"} {
+		if res, err := h.Client.QueueAdd(t.Context(), addr, ""); err != nil || res.Refused {
+			t.Fatalf("queue add %s = %+v, %v", addr, res, err)
+		}
+	}
+	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	var names, words []string
+	for _, r := range getEpicList(t, code, body).Epics {
+		if r.Section == server.SectionInProgress {
+			names, words = append(names, r.Name), append(words, r.StatusWords)
+		}
+	}
+	if want := []string{"q-first", "Queued one", "q-last"}; !slices.Equal(names, want) {
+		t.Errorf("In progress = %v, want %v", names, want)
+	}
+	if want := []string{"Queued #1", "Queued #2", "Queued #3"}; !slices.Equal(words, want) {
+		t.Errorf("status words = %v, want %v", words, want)
+	}
+}
+
 func TestEpicList_SectionSortOrders(t *testing.T) {
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	loop := func(created string) string {

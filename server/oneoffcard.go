@@ -36,8 +36,9 @@ func (s *Server) oneOffCards(project string, e tickets.Epic) []EpicListRow {
 			row.WaitingSince = cmp.Or(n.Since, t.ClaimedAt, lastActivity(e))
 		} else if e.RenderedStatus(t) == tickets.StatusClaimed {
 			row.State, row.Section = EpicListRunning, SectionInProgress
-		} else if s.ticketQueued(addr) {
+		} else if slot := s.queueSlot(addr.String()); slot > 0 {
 			row.State, row.Section = EpicListQueued, SectionInProgress
+			row.QueueSlot, row.StatusWords = slot, fmt.Sprintf("Queued #%d", slot)
 		} else {
 			continue
 		}
@@ -52,14 +53,6 @@ func oneOffRow(address, title, project string) EpicListRow {
 		Addresses: []string{address}, CardKind: CardKindOneOff,
 		StatusWords: "One-off", Actions: []CardAction{},
 	}
-}
-
-// ticketQueued reports whether the queue holds the ticket itself, not just its epic.
-func (s *Server) ticketQueued(addr tickets.Address) bool {
-	return slices.ContainsFunc(s.queued.list(), func(it QueueItem) bool {
-		a, err := parseQueuedAddress(it.Address)
-		return err == nil && a == addr
-	})
 }
 
 // capFinishedOneOffs drops the Finished one-off cards that are not among the

@@ -116,25 +116,32 @@ func decorateLoopCard(row *EpicListRow, position int) {
 	}
 }
 
-// rootQueuePosition is the 1-based slot of root among the queued epics, in queue
-// order, or 0 when the queue holds none of its tickets.
-func (s *Server) rootQueuePosition(root rootRef) int {
-	var seen []rootRef
+// queueSlot is the 1-based slot of key among the queue's slots, or 0 when the
+// queue holds none. An epic's tickets share one slot; each one-off ticket has its own.
+func (s *Server) queueSlot(key string) int {
+	var seen []string
 	for _, it := range s.queued.list() {
 		a, err := parseQueuedAddress(it.Address)
 		if err != nil {
 			continue
 		}
-		r := rootOf(a)
-		if !slices.Contains(seen, r) {
-			seen = append(seen, r)
+		k := rootOf(a).String()
+		if isOneOffsEpicName(a.Epic) {
+			k = a.String()
 		}
-		if r == root {
+		if !slices.Contains(seen, k) {
+			seen = append(seen, k)
+		}
+		if k == key {
 			return len(seen)
 		}
 	}
 	return 0
 }
+
+// rootQueuePosition is the 1-based slot of root among the queued epics, in queue
+// order, or 0 when the queue holds none of its tickets.
+func (s *Server) rootQueuePosition(root rootRef) int { return s.queueSlot(root.String()) }
 
 // inProgressRank orders In progress: running, then queued, then the rest.
 func inProgressRank(r EpicListRow) int {
@@ -180,6 +187,9 @@ func sortCards(rows []EpicListRow, queuePosition func(EpicListRow) int) {
 			}
 			if a.State == EpicListQueued {
 				return cmp.Compare(queuePosition(a), queuePosition(b))
+			}
+			if inProgressRank(a) == 2 {
+				return b.LastActivityAt.Compare(a.LastActivityAt)
 			}
 		case SectionReadyToQueue:
 			return b.CreatedAt.Compare(a.CreatedAt)
