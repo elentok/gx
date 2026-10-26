@@ -63,6 +63,13 @@ test("8. Edge states", async ({ page, start }) => {
   const progress = await section(page, "In progress");
   await expect(progress.getByRole("link", { name: "empty-epic" })).toBeVisible();
   await expect(card(page, "empty-epic").getByText("Implemented")).toBeVisible();
+
+  // Filtering to the empty epic hides every other card.
+  await page.getByRole("searchbox", nav("Filter epics")).fill("empty");
+  await expect(card(page, "empty-epic")).toBeVisible();
+  await expect(page.getByRole("link", { name: "blocked-epic" })).toHaveCount(0);
+  await page.getByRole("searchbox", nav("Filter epics")).fill("");
+
   await progress.getByRole("link", { name: "empty-epic" }).click();
   await expect(page.getByText("No tickets yet")).toBeVisible();
 

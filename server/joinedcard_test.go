@@ -144,6 +144,30 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	}
 }
 
+func TestEpicList_DoneJoinedCardWithQueuedImplSitsInProgress(t *testing.T) {
+	tix := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "m", joinedMapMD("done"), tix)
+		writeEpicFiles(t, store, "m-impl", "---\nstatus: open\n---\n", tix)
+	})
+	if res, err := h.Client.QueueAdd(t.Context(), "proj:m-impl", ""); err != nil || res.Refused {
+		t.Fatalf("queue add = %+v, %v", res, err)
+	}
+	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	var row *server.EpicListRow
+	for _, r := range getEpicList(t, code, body).Epics {
+		if r.Name == "m" {
+			row = &r
+		}
+	}
+	if row == nil {
+		t.Fatal("no row for the joined card")
+	}
+	if row.Section != server.SectionInProgress || row.QueueSlot != 1 {
+		t.Errorf("section = %q, slot = %d, want in-progress and slot 1", row.Section, row.QueueSlot)
+	}
+}
+
 func TestEpicList_JoinedCardCarriesImplQueueSlot(t *testing.T) {
 	tix := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	h, base := startEpicDetail(t, func(store string) {
