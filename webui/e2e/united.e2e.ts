@@ -76,7 +76,7 @@ test("16. Needs you", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/epics$/);
   await card(page, "paused-epic").getByRole("link", { name: "paused-epic", exact: true }).click();
   await expect(page).toHaveURL(/#\/e\/demo:paused-epic$/);
-  await page.getByRole("link", nav("← Epics")).click();
+  await page.getByRole("link", { name: /^← Epics/ }).click();
 
   // Only merge-blocked and awaiting-merge cards offer Merge.
   for (const name of ["blocked-merge-epic", "awaiting-epic"]) {

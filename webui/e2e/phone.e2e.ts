@@ -11,6 +11,15 @@ test("23. Phone, Epics page", async ({ page, start }) => {
   const second = await card(page, "question-epic").boundingBox();
   expect(second!.x).toBe(first!.x);
   expect(second!.y).toBeGreaterThan(first!.y);
+
+  // The back link stays on one line with the short or the full count.
+  await page.evaluate(() => (location.hash = "#/d/demo:design-live"));
+  const back = page.getByRole("link", { name: /^← Epics · 8 more/ });
+  await expect(back).toBeVisible();
+  await expect(back).toContainText(/· 8 more( need you)?$/);
+  const line = await back.boundingBox();
+  const lineHeight = await back.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+  expect(line!.height).toBeLessThanOrEqual(lineHeight * 1.5);
 });
 
 test("41. Phone, New Design sheet", async ({ page, start }) => {

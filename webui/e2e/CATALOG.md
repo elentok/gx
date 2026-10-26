@@ -66,7 +66,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   1. Open the Epics page, then the Design page by its route (`#/d/demo:design-epic`); it shows
      "Start design session". No link reaches a Design page before its session starts.
   2. Click Start design session.
-- **Pass:** Progress shows Resolve tickets as the current step, and the chat shows the first scripted
+- **Pass:** The back link reads "← Epics" with no count. Progress shows Resolve tickets as the current step, and the chat shows the first scripted
   message ("Two questions before the spec.") in place of the start button.
 
 ## 5. Answer a round
@@ -227,6 +227,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   2. Press Esc; press Ctrl+K.
   3. Type `draft-epic`, then `finished-a`; press Esc.
 - **Pass:**
+  - The menu shows no count.
   - The title click and Ctrl+K both open the "Jump to epic" dialog with the filter focused; Esc closes it.
   - With no text, Needs you rows show (`paused-epic`) and Ready to design (`draft-epic`) and Finished
     (`finished-a`) rows do not. Typing a name shows its row.
@@ -241,21 +242,30 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   - Down selects the second row and Enter opens its epic page; the menu closes.
   - `design-live` opens `#/d/demo:design-live`, `running-epic` opens `#/e/demo:running-epic`, and the
     one-off opens `#/t/demo:one-offs/02`.
+  - On the one-off's ticket page the back link reads "← one-offs" with no count.
 - **Not covered:** the `design-epic` Design of the spec text. `united` has no joined card, so the Design
   pick uses `design-live`.
 
-## 22. Jump menu count and back link
+## 22. Back link count
 
 - **Scenario:** `united`
-- **Steps:** open `#/e/demo:paused-epic`, then `#/e/demo:running-epic`; click "← Epics". Open
-  `#/d/demo:design-live`; click "← Epics".
-- **Pass:** the title count of other Needs-you cards reads 7 on `paused-epic` (itself in Needs you) and
-  8 on the other two pages. A stopped Design is not in Needs you. "← Epics" opens `#/epics` from the epic page and the Design page.
+- **Steps:**
+  1. Open `#/e/demo:paused-epic`, `#/d/demo:design-live`, then `#/e/demo:running-epic`.
+  2. Click the count text of the back link.
+  3. Open `#/e/demo:running-epic`; run `gx tickets set demo:paused-epic/01 --status open`.
+- **Pass:**
+  - The back link reads "← Epics · 7 more need you" on `paused-epic` (itself in Needs you) and
+    "· 8 more need you" on the other two pages. A stopped Design is not in Needs you.
+  - The title button has no number and no `waiting-count` element exists.
+  - Clicking the count text opens `#/epics`.
+  - The count drops from 8 to 7 with no reload.
 
 ## 23. Phone, Epics page
 
 - **Scenario:** `united`, at 375 px wide (`test.use({ viewport })`)
-- **Pass:** two cards of Needs you share a left edge and the second sits below the first.
+- **Pass:**
+  - Two cards of Needs you share a left edge and the second sits below the first.
+  - On `#/d/demo:design-live` the back link reads "← Epics · 8 more" (or the full text) on one line.
 
 ## 41. Phone, New Design sheet
 

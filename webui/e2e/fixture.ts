@@ -1,5 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { expect, test as base, type Page } from "@playwright/test";
 
@@ -57,11 +58,11 @@ async function startFixture(
   const env = { ...process.env, ...Object.fromEntries(out.env.map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)])) };
   const fixture: Fixture = {
     async cli(...args) {
-      const { stdout } = await run(out.gx, args, { env });
+      const { stdout } = await run(out.gx, args, { env, cwd: tmpdir() });
       return stdout;
     },
     async cliEnv(extra, ...args) {
-      const { stdout } = await run(out.gx, args, { env: { ...env, ...extra } });
+      const { stdout } = await run(out.gx, args, { env: { ...env, ...extra }, cwd: tmpdir() });
       return stdout;
     },
     async release() {

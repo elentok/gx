@@ -20,6 +20,7 @@ test("20. Jump menu opens and closes", async ({ page, start }) => {
 
   await page.keyboard.press("Control+k");
   await expect(filter(page)).toBeFocused();
+  await expect(menu(page)).not.toContainText(/more need/);
 
   // Ready to design and Finished rows show only once the filter has text.
   await expect(row(page, "draft-epic")).toHaveCount(0);
@@ -64,22 +65,34 @@ test("21. Jump menu keyboard and picks", async ({ page, start }) => {
     // The shortcut works once the new page has mounted its menu.
     if (pick !== "queued") await expect(title).toContainText(pick);
   }
+
+  // A one-off's ticket page has no count on its back link.
+  await expect(page.getByRole("link", { name: /^← one-offs/ }).first()).toHaveAccessibleName("← one-offs");
 });
 
-test("22. Jump menu count and back link", async ({ page, start }) => {
-  await start("united");
+test("22. Back link count", async ({ page, start }) => {
+  const fx = await start("united");
   const back = (n: number) => page.getByRole("link", nav(`← Epics · ${n} more need you`));
 
   // Seven other cards need you from a Needs-you epic, eight from one that does not.
   await goto(page, "#/e/demo:paused-epic");
   await expect(back(7)).toBeVisible();
+  await goto(page, "#/d/demo:design-live");
+  await expect(back(8)).toBeVisible();
   await goto(page, "#/e/demo:running-epic");
   await expect(back(8)).toBeVisible();
 
-  await back(8).click();
+  // The title button carries no number and nothing is called waiting-count.
+  await expect(page.getByRole("heading", { level: 1 }).getByRole("button")).not.toContainText(/\d/);
+  await expect(page.getByTestId("waiting-count")).toHaveCount(0);
+
+  // Clicking the count text itself opens the Epics page.
+  await back(8).getByText("· 8 more need you").click();
   await expect(page).toHaveURL(/#\/epics$/);
-  await goto(page, "#/d/demo:design-live");
+
+  // The count follows the server with no reload.
+  await goto(page, "#/e/demo:running-epic");
   await expect(back(8)).toBeVisible();
-  await back(8).click();
-  await expect(page).toHaveURL(/#\/epics$/);
+  await fx.cli("tickets", "set", "demo:paused-epic/01", "--status", "open");
+  await expect(back(7)).toBeVisible();
 });

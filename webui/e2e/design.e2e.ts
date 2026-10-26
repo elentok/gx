@@ -16,6 +16,7 @@ test.describe("4. Start a design session", () => {
     await start("design");
     await openDesign(page);
     await expect(step(page, "resolve-tickets", "current")).toBeVisible();
+    await expect(page.getByRole("link", { name: /^← Epics/ })).toHaveAccessibleName("← Epics");
 
     await page.getByRole("button", nav("Start design session")).click();
 
