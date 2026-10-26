@@ -53,6 +53,38 @@ func TestDesignsDelete_DeletesAnUnchartedDesign(t *testing.T) {
 	}
 }
 
+func TestDesignsDelete_RemovesTheDesignWorktreeAndBranch(t *testing.T) {
+	f := startDeletable(t)
+	res := f.open(t, "proj:bare", false)
+	if res.Refused || res.Session == nil {
+		t.Fatalf("open = %+v", res)
+	}
+	dir, _ := readMeta(t, f.h, res.Session.ID)["dir"].(string)
+	if err := os.WriteFile(filepath.Join(dir, "design.md"), []byte("design\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, dir, "add", "design.md")
+	gitOut(t, dir, "commit", "-m", "design work")
+	if err := os.WriteFile(filepath.Join(dir, "uncommitted.md"), []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.stop(t, res.Session.ID)
+	waitFor(t, func() bool { return len(f.live(t)) == 0 })
+
+	if r := f.del(t, "proj:bare"); r.Refused {
+		t.Fatalf("delete = %+v", r)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("worktree still there: %v", err)
+	}
+	if out := gitOut(t, f.repo, "branch", "--list", "bare-design"); out != "" {
+		t.Errorf("branch still there: %q", out)
+	}
+	if _, err := os.Stat(filepath.Join(f.h.TicketStore, "proj", "bare")); !os.IsNotExist(err) {
+		t.Errorf("epic dir still there: %v", err)
+	}
+}
+
 func TestDesignsDelete_Refusals(t *testing.T) {
 	f := startDeletable(t)
 	if res := f.open(t, "proj:live", false); res.Session == nil {

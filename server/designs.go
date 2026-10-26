@@ -491,11 +491,39 @@ func (s *Server) deleteDesign(req DesignDeleteRequest) (SessionResult, error) {
 	if !uncharted {
 		return sessionRefusal(ReasonDesignNotUncharted, fmt.Sprintf("%s is charted or has a live session", req.Epic)), nil
 	}
+	if err := s.forceRemoveDesign(project, epic); err != nil {
+		return SessionResult{}, err
+	}
 	if err := os.RemoveAll(epics[i].Path); err != nil {
 		return SessionResult{}, err
 	}
 	s.events.publish(EventTicketChanged, req.Epic)
 	return SessionResult{}, nil
+}
+
+// forceRemoveDesign drops the map's design worktree and branch whatever they
+// hold: deleting the Design discards its edits and commits. A map that never
+// had either is a no-op.
+func (s *Server) forceRemoveDesign(project, epic string) error {
+	_, repoDir, err := s.projectOf(project)
+	if err != nil {
+		return err
+	}
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return err
+	}
+	branch := designBranch(epic)
+	path := filepath.Join(repo.LinkedWorktreeDir(), branch)
+	if _, err := os.Stat(path); err == nil {
+		if err := git.RemoveWorktree(*repo, path, true); err != nil {
+			return err
+		}
+	}
+	if !tickets.BranchExists(repo.Root, branch) {
+		return nil
+	}
+	return git.DeleteLocalBranch(*repo, branch, true)
 }
 
 // liveDesignSession is the session of the Design at epicAddr that has not
