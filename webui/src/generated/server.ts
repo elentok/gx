@@ -1535,6 +1535,20 @@ export interface Stats {
   throughput: StatsThroughput;
   cost: StatsCost;
   friction: StatsFriction;
+  grilling: StatsGrilling;
+}
+
+//////////
+// source: statsgrilling.go
+
+/**
+ * StatsGrilling is the Grilling section: words and questions per day of the
+ * counted Design conversations. Days before the first counted item are
+ * no_data.
+ */
+export interface StatsGrilling {
+  words: StatsAmount[];
+  questions: StatsAmount[];
 }
 
 //////////

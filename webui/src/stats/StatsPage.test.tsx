@@ -50,6 +50,7 @@ const statsOf = (over: Partial<Stats["throughput"]> = {}, extra: Partial<Stats> 
   },
   cost: { tokens_design: [], tokens_implementation: [], spend_design: [], spend_implementation: [] },
   friction: { pause_reasons: [], pauses_by_reason: [], run_events: [], pause_endings: [] },
+  grilling: { words: [], questions: [] },
   ...extra,
 });
 
@@ -125,6 +126,31 @@ test("Cost cards with data on every day are not partial", async () => {
   const full = [amount(1), amount(1), amount(1)];
   renderStats(async () => statsOf({}, { cost: { tokens_design: full, tokens_implementation: full, spend_design: full, spend_implementation: full } }));
   expect(await cardText("Tokens")).not.toContain("partial");
+});
+
+test("the Grilling section sits between Cost and effort and Friction", async () => {
+  renderStats(async () => statsOf());
+  await screen.findByText("Words read");
+  const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-labelledby"));
+  expect(names).toEqual(["stats-throughput", "stats-cost", "stats-grilling", "stats-friction"]);
+  expect(screen.getByText("Questions asked")).toBeTruthy();
+});
+
+test("the Grilling cards skip no-data days in the total and average and hatch them", async () => {
+  const grilling = {
+    words: [amount(1000), amount(0, true), amount(2500)],
+    questions: [amount(4), amount(0, true), amount(6)],
+  };
+  renderStats(async () => statsOf({}, { grilling }));
+  const words = await cardText("Words read");
+  expect(words).toContain("3,500");
+  expect(words).toContain("1,750/day");
+  expect(words).toContain("partial");
+  expect((await cardEl("Words read")).querySelectorAll("[data-nodata]")).toHaveLength(1);
+  const questions = await cardText("Questions asked");
+  expect(questions).toContain("10");
+  expect(questions).toContain("5/day");
+  expect((await cardEl("Questions asked")).querySelectorAll("[data-nodata]")).toHaveLength(1);
 });
 
 test("the Pauses tooltip lists a reason folded into other", async () => {

@@ -27,6 +27,7 @@ packages:
       - sessions.go
       - sessiontypes.go
       - stats.go
+      - statsgrilling.go
       - verdicts.go
     type_mappings:
       time.Time: "string"

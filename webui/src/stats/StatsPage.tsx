@@ -88,8 +88,34 @@ function Cost({ stats }: { stats: Stats }) {
   };
   return (
     <Section id="stats-cost" title="Cost and effort" tone="waiting">
-      {card("Tokens", c.tokens_design, c.tokens_implementation, (n) => Math.round(n).toLocaleString("en-US"))}
+      {card("Tokens", c.tokens_design, c.tokens_implementation, thousands)}
       {card("Spend", c.spend_design, c.spend_implementation, (n) => `$${n.toFixed(2)}`)}
+    </Section>
+  );
+}
+
+const thousands = (n: number) => Math.round(n).toLocaleString("en-US");
+
+function Grilling({ stats }: { stats: Stats }) {
+  const { days, grilling: g } = stats;
+  const card = (title: string, label: string, data: StatsAmount[]) => {
+    const values = amounts(data);
+    const total = sumNullable(values);
+    const dataDays = values.filter((v) => v !== null).length;
+    return (
+      <StatCard
+        title={title}
+        days={days}
+        series={[{ key: "count", label, tone: "done", values }]}
+        headline={thousands(total)}
+        small={`${thousands(dataDays === 0 ? 0 : total / dataDays)}/day`}
+      />
+    );
+  };
+  return (
+    <Section id="stats-grilling" title="Grilling" tone="done">
+      {card("Words read", "Words", g.words)}
+      {card("Questions asked", "Questions", g.questions)}
     </Section>
   );
 }
@@ -189,6 +215,7 @@ export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats;
         <>
           <Throughput stats={stats} />
           <Cost stats={stats} />
+          <Grilling stats={stats} />
           <Friction stats={stats} />
         </>
       )}
