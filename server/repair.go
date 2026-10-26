@@ -58,6 +58,17 @@ const ReasonBadBase = "bad-base"
 const zeroCommitPrompt = "A person reviewed your finish with no commits and wants you to continue. " +
 	"Finish the work, or report `--iteration-status finished --commitless true`."
 
+// retryPrompts is what a live agent receives when a person retries one of the
+// pauses whose agent is still running. The retry route prompts instead of
+// relaunching for exactly these kinds.
+var retryPrompts = map[schema.PauseReason]string{
+	schema.PauseZeroCommit: zeroCommitPrompt,
+	schema.PauseBlockedPane: "A person reviewed your blocked prompt and wants you to continue. " +
+		"Carry on with the work.",
+	schema.PauseBackgroundTaskGate: "A person reviewed the background task you were waiting on and wants you to continue. " +
+		"Finish the work.",
+}
+
 // RepairResult is what every repair verb returns: the verb's own result in
 // Data, or a refusal carrying the repair package's stable reason code.
 type RepairResult struct {
@@ -313,8 +324,8 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 	if res, refused, err := s.resumeSelfReported(epicPath, id, req.origin); refused || err != nil {
 		return res, err
 	}
-	if zeroCommit {
-		prompted, err := s.promptLiveAgent(dir, addr, zeroCommitPrompt)
+	if prompt, ok := retryPrompts[tk.PauseReason]; paused && ok {
+		prompted, err := s.promptLiveAgent(dir, addr, prompt)
 		if err != nil {
 			return repairRefusal(err), nil
 		}
@@ -322,7 +333,7 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 			if err := tickets.PromptOpenRound(t.Path, req.origin); err != nil {
 				return RepairResult{}, fmt.Errorf("log prompt of %s: %w", addr, err)
 			}
-			ev := ralphloop.Event{Type: string(events.PausePrompted), Ticket: id, Address: addr.String(), Text: zeroCommitPrompt}
+			ev := ralphloop.Event{Type: string(events.PausePrompted), Ticket: id, Address: addr.String(), Text: prompt}
 			if err := ralphloop.AppendEvent(dir, addr.Epic, ev); err != nil {
 				s.log.Warn("logging pause prompt", "ticket", addr.String(), "err", err)
 			}
@@ -455,23 +466,7 @@ func (s *Server) ambiguousBlockers(addr tickets.Address) []string {
 // promptLiveAgent sends text to the iteration's agent when it is still
 // running, and reports whether it did. A direct run has no runner and finds none.
 func (s *Server) promptLiveAgent(dir string, addr tickets.Address, text string) (bool, error) {
-	if s.registry == nil {
-		return false, nil
-	}
-	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.worktreeDir(addr.Project))
-	runner := s.runnerFor(addr.Project)
-	if pause, ok := ralphloop.LatestPauseEvent(dir, addr.Epic, addr.ID); ok {
-		if pause.Label != "" {
-			label = pause.Label
-		}
-		if r := s.runnerForRun(Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
-			runner = r
-		}
-	}
-	if runner == nil {
-		return false, nil
-	}
-	sess, ok, err := runner.Find(label)
+	runner, sess, ok, err := s.iterationSession(dir, addr)
 	if err != nil || !ok {
 		return false, err
 	}
@@ -484,6 +479,28 @@ func (s *Server) promptLiveAgent(dir string, addr tickets.Address, text string) 
 		return false, fmt.Errorf("prompt %s: %w", addr, err)
 	}
 	return true, nil
+}
+
+// iterationSession finds the iteration's agent session, if it is still running.
+func (s *Server) iterationSession(dir string, addr tickets.Address) (agentrunner.Runner, agentrunner.Session, bool, error) {
+	if s.registry == nil {
+		return nil, agentrunner.Session{}, false, nil
+	}
+	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, s.worktreeDir(addr.Project))
+	runner := s.runnerFor(addr.Project)
+	if pause, ok := ralphloop.LatestPauseEvent(dir, addr.Epic, addr.ID); ok {
+		if pause.Label != "" {
+			label = pause.Label
+		}
+		if r := s.runnerForRun(Run{Address: addr.String(), Runner: pause.Runner}); pause.Runner != "" && r != nil {
+			runner = r
+		}
+	}
+	if runner == nil {
+		return nil, agentrunner.Session{}, false, nil
+	}
+	sess, ok, err := runner.Find(label)
+	return runner, sess, ok, err
 }
 
 // resumeSelfReported applies the rule for a self-reported pause: a live waiting

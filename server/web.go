@@ -112,7 +112,7 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/tickets/answer":     func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.ticketAnswer) },
 	"POST /v1/tickets/resume":     func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
 	"POST /v1/tickets/unpark":     func(s *Server) http.HandlerFunc { return repairWriteWeb(s.repairResume) },
-	"POST /v1/tickets/retry":      func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.ticketRelaunch) },
+	"POST /v1/tickets/retry":      func(s *Server) http.HandlerFunc { return s.retryWrite(true) },
 	"POST /v1/tickets/merge":      func(s *Server) http.HandlerFunc { return repairWriteWeb(s.mergeInQueue) },
 	"POST /v1/tickets/start-over": func(s *Server) http.HandlerFunc { return repairWriteWeb(s.startOverInQueue) },
 	"POST /v1/queue/add":          func(s *Server) http.HandlerFunc { return s.queueWriteWeb(s.queueAdd) },

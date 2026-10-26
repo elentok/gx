@@ -1,8 +1,12 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/elentok/gx/events"
+	"io"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
@@ -158,6 +162,57 @@ func (s *Server) ticketUnmute(req QueueRequest) (QueueResult, error) {
 		s.rescan()
 		return QueueResult{}, nil
 	})
+}
+
+// retryWrite serves the retry route. Retry on an answer-class pause whose
+// agent is still running prompts that agent through the resume dispatch (status
+// prompted); every other retry relaunches. An investigator's retry always
+// relaunches.
+func (s *Server) retryWrite(web bool) http.HandlerFunc {
+	relaunch := queueWriteAs(web, s.ticketRelaunch)
+	resume := repairWriteAs(web, s.repairResume)
+	return func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		var req struct {
+			Address string `json:"address"`
+		}
+		if json.Unmarshal(body, &req) == nil && (web || r.Header.Get(InvestigateHeader) == "") && s.promptsOnRetry(req.Address) {
+			resume(w, r)
+			return
+		}
+		relaunch(w, r)
+	}
+}
+
+// promptsOnRetry reports whether a retry of address prompts its live agent
+// instead of relaunching.
+func (s *Server) promptsOnRetry(address string) bool {
+	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
+	if err != nil {
+		return false
+	}
+	_, t, ok := s.freshTicket(addr)
+	if !ok {
+		return false
+	}
+	tk, err := schema.ParseTicket(t.Path)
+	if err != nil || !tk.PausedAsking() {
+		return false
+	}
+	if _, ok := retryPrompts[tk.PauseReason]; !ok {
+		return false
+	}
+	dir, err := s.projectDir(addr.Project)
+	if err != nil {
+		return false
+	}
+	_, _, live, err := s.iterationSession(dir, addr)
+	return err == nil && live
 }
 
 // ticketRelaunch starts a fresh iteration of a ticket outside the queue order,

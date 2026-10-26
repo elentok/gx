@@ -262,6 +262,16 @@ test("a round the agent was prompted on shows the Prompt sent line", async () =>
   expect(await screen.findByText(prompt)).toBeTruthy();
 });
 
+test("a prompted Retry on a zero-commit card shows that the ticket stays paused", async () => {
+  const body = { data: { ticket: "12", status: "prompted", message: "the agent is still running and was asked to continue" } };
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify(body)));
+  vi.stubGlobal("fetch", fetchMock);
+  renderTicket(() => repair(["retry"], { pause_reason: "zero-commit" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+  expect(await screen.findByText("Sent to the running agent. The ticket stays paused until it finishes.")).toBeTruthy();
+  expect(fetchMock).toHaveBeenCalledWith("/v1/tickets/retry", expect.anything());
+});
+
 test("a prompted Resume shows that the ticket stays paused", async () => {
   const body = { data: { ticket: "12", status: "prompted", message: "the agent is still running and was asked to continue" } };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body))));
