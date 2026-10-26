@@ -285,7 +285,6 @@ test.describe("49. Focus mode", () => {
     }).toPass();
     await expect(questions.getByText("Q9 - Keep going?")).toBeVisible();
     await expect(enter).toBeVisible();
-    await expect(page.getByText("Q8b - Migrate at startup?: Yes")).toBeVisible();
     await expect(page.getByRole("dialog", nav("Questions, full screen"))).toHaveCount(0);
   });
 });

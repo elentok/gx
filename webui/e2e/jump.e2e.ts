@@ -82,6 +82,14 @@ test("22. Back link count", async ({ page, start }) => {
   await goto(page, "#/e/demo:running-epic");
   await expect(back(8)).toBeVisible();
 
+  // The count is smaller than "← Epics", not the link's colour, and has no pill background.
+  const style = await back(8).getByText("· 8 more need you").evaluate((el) => {
+    const cs = getComputedStyle(el);
+    const link = getComputedStyle(el.closest("a")!);
+    return { smaller: parseFloat(cs.fontSize) < parseFloat(link.fontSize), recolored: cs.color !== link.color, bg: cs.backgroundColor };
+  });
+  expect(style).toEqual({ smaller: true, recolored: true, bg: "rgba(0, 0, 0, 0)" });
+
   // The title button carries no number and nothing is called waiting-count.
   await expect(page.getByRole("heading", { level: 1 }).getByRole("button")).not.toContainText(/\d/);
   await expect(page.getByTestId("waiting-count")).toHaveCount(0);
