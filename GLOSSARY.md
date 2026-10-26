@@ -381,12 +381,19 @@ joined card from Branch on), **One-off** (one ticket of the `one-offs` epic) and
 per project with open follow-ups). _Avoid_: tile, row (a row is the data behind a card).
 
 **Design session** — an interactive session with a **Session ticket**: where gx-design runs on a
-map. It runs in the project's trunk checkout. A map epic or map ticket can have more than one at a
-time. _Avoid_: planning session.
+map. It runs in the map's **Design worktree**, and in the trunk checkout only after Branch. A map
+epic or map ticket can have more than one at a time. _Avoid_: planning session.
+
+**Design branch** — the branch `<map>-design` that holds a map's design work. It is rebased onto
+trunk at each Design session open, merged into `<map>-impl` at Branch, and removed by the server
+after Branch. _Avoid_: map branch.
+
+**Design worktree** — the server-made worktree on the Design branch, where every Design session of
+that map runs. _Avoid_: design checkout.
 
 **Progress** — the list of gx-design steps for a Design (Chart, Resolve tickets, Spec, Review, Grill
-findings, Create tickets, Branch, Done), derived by the server from the tracker, the trunk checkout
-and the repo's refs. It shows current state only and has no round counter. A "step" is one of these;
+findings, Create tickets, Branch, Done), read from the stored `design_step` only. It shows current
+state only and has no round counter. A "step" is one of these;
 a run is one gx-design invocation, and many runs can stay in one step. _Avoid_: "next step" for the
 run-end Continue action.
 

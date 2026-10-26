@@ -181,7 +181,8 @@ conversation history.
   `gx tickets set` accept an epic address (`project:epic`, no ticket id) and validate it against the
   epic schema: `set` writes `kind`, `status` and `destination_unconfirmed`, and on a map epic
   `design_step` (`--design-step <step>`: chart, resolve-tickets, spec, review, grill-findings,
-  create-tickets, branch, done; a move to an earlier step needs `--allow-backward`); `completed_at`,
+  create-tickets, branch, done; `branch` means the map's design branch was merged into a new
+  `<epic>-impl` branch, step 8 of gx-design; a move to an earlier step needs `--allow-backward`); `completed_at`,
   `evolved_at`, `evolve_skipped` and `evolve_ticket` are server-stamped and read-only. Never
   hand-edit an epic's `ticket.md`.
 
