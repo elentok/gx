@@ -241,6 +241,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	validateCmd.Flags().BoolVar(&validateAll, "all", false, "validate every project in the ticket store")
 	cmd.AddCommand(validateCmd)
 	var showJSON bool
+	var showSection string
 	showCmd := &cobra.Command{
 		Use:   "show <addr>",
 		Short: "print a ticket (project:epic/06, epic/06 or 06) or an epic and its tickets (project:epic or epic)",
@@ -250,10 +251,11 @@ func newTicketsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsShow(cwd, args[0], showJSON, c.OutOrStdout())
+			return runTicketsShow(cwd, args[0], showJSON, showSection, c.OutOrStdout())
 		},
 	}
 	showCmd.Flags().BoolVar(&showJSON, "json", false, "emit structured JSON instead of text")
+	showCmd.Flags().StringVar(&showSection, "section", "", "print only this ## section, from the ticket or from every ticket of an epic that has it")
 	cmd.AddCommand(showCmd)
 	cmd.AddCommand(newTicketsLogCmd(d))
 	cmd.AddCommand(newTicketsSetCmd(d))

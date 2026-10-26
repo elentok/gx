@@ -128,6 +128,35 @@ func TestExecute_TicketsShow_EpicAddressPrintsEntryAndTickets(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsShow_SectionPrintsOnlyMatchingSections(t *testing.T) {
+	repo, project := setupShowProject(t)
+	issues := filepath.Join(project, "epic", "issues")
+	testutil.WriteFile(t, issues, "07-second.md",
+		"---\nid: \"07\"\nstatus: done\ntype: implement\n---\n\n# 07 — Second\n\n## What to build\n\nSecret.\n\n## Spec deviations\n\n- narrowed X\n")
+
+	want := "mine:epic/07  Second\n- narrowed X\n\n"
+	for _, args := range [][]string{
+		{"tickets", "show", "epic", "--section", "Spec deviations"},
+		{"tickets", "show", "mine:epic/07", "--section", "Spec deviations"},
+	} {
+		out, err := runIn(t, repo, args...)
+		if err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		if out != want {
+			t.Errorf("%v printed\n%q\nwant\n%q", args, out, want)
+		}
+	}
+
+	out, err := runIn(t, repo, "tickets", "show", "mine:epic/06", "--section", "Spec deviations")
+	if err != nil || out != "" {
+		t.Errorf("ticket without the section printed %q, err %v", out, err)
+	}
+	if _, err := runIn(t, repo, "tickets", "show", "mine:epic/07", "--section", "Spec deviations", "--json"); err == nil {
+		t.Error("--section with --json should refuse")
+	}
+}
+
 func TestExecute_TicketsShow_RefusesWithStableCode(t *testing.T) {
 	repo, project := setupShowProject(t)
 

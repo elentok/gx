@@ -9,6 +9,7 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // ticketShowJSON is the --json shape of `gx tickets show`.
@@ -38,7 +39,13 @@ func currentEpic(cwd string) string {
 // and prints the ticket. Short forms are expanded before anything is
 // printed; an address that names nothing is refused with an
 // tickets.AddressError carrying a stable code.
-func runTicketsShow(cwd, addr string, jsonOut bool, w io.Writer) error {
+//
+// With a non-empty section it prints only that "## section" of the ticket, or
+// of every ticket of an epic that has it, each under a line naming the ticket.
+func runTicketsShow(cwd, addr string, jsonOut bool, section string, w io.Writer) error {
+	if section != "" && jsonOut {
+		return errors.New("--section is not supported with --json")
+	}
 	a, t, err := findTicket(cwd, addr)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) && addrErr.Code == tickets.CodeMalformedAddress {
@@ -46,13 +53,66 @@ func runTicketsShow(cwd, addr string, jsonOut bool, w io.Writer) error {
 			if jsonOut {
 				return &tickets.AddressError{Code: tickets.CodeEpicJSON, Msg: "--json is not supported for an epic address"}
 			}
+			if section != "" {
+				return showEpicSection(cwd, project, epic, section, w)
+			}
 			return showEpic(cwd, project, epic, w)
 		}
 	}
 	if err != nil {
 		return err
 	}
+	if section != "" {
+		return printTicketSection(a, t, section, w)
+	}
 	return printTicket(a, t, jsonOut, w)
+}
+
+// printTicketSection prints the ticket's address and title, then the named
+// section; a ticket without the section prints nothing.
+func printTicketSection(a tickets.Address, t tickets.Ticket, section string, w io.Writer) error {
+	if t.ReadErr != "" {
+		return fmt.Errorf("%s: %s", a, t.ReadErr)
+	}
+	if !schema.HasSection(t.Body, section) {
+		return nil
+	}
+	_, err := fmt.Fprintf(w, "%s  %s\n%s\n\n", a, t.Title, schema.Section(t.Body, section))
+	return err
+}
+
+// showEpicSection prints the named section of each of the epic's tickets.
+func showEpicSection(cwd, project, name, section string, w io.Writer) error {
+	var root string
+	var err error
+	if project == "" {
+		root, err = ticketRoot(cwd)
+		project = tickets.ProjectName(root)
+	} else {
+		root, err = projectRoot(cwd, project)
+	}
+	if err != nil {
+		return err
+	}
+	if _, err := tickets.EpicTicketMDPath(root, project, name); err != nil {
+		return err
+	}
+	epics, err := tickets.Load(root)
+	if err != nil {
+		return err
+	}
+	for _, epic := range epics {
+		if epic.Name != name {
+			continue
+		}
+		for _, t := range epic.Tickets {
+			a := tickets.Address{Project: project, Epic: name, ID: t.Identifier}
+			if err := printTicketSection(a, t, section, w); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // parseEpicArg accepts "project:epic", or a bare epic slug, which leaves
