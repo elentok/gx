@@ -238,6 +238,10 @@ func (s *Server) repairStartOver(req RepairRequest) (RepairResult, error) {
 	if res, refused, err := staleTicket(epicPath, id, req); refused || err != nil {
 		return res, err
 	}
+	if _, t, ferr := repair.FindEpicTicket(epicPath, id); ferr == nil && t.Type == string(schema.TypeTrunkConflict) {
+		addr := tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
+		return s.startOverTrunkConflict(req, addr, t)
+	}
 	// The web never deletes the branch, whatever the body says.
 	deleteBranch := req.DeleteBranch && !req.RequireState
 	res, err := repair.StartOver(repair.StartOverInput{

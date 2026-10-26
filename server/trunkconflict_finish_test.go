@@ -66,6 +66,40 @@ func TestTrunkConflict_NoMarkersLeftMakesTheTicketDoneDeletesTheBackupAndLandsTh
 	}
 }
 
+func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *testing.T) {
+	// The agent reports nothing, so the ticket stays open on its pause.
+	f := stashMergeFixtureWith(t, func(*schedFixture, servertest.Prompt) {})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	evs := f.subscribe(ctx, t)
+	if res, err := f.h.Client.EpicStashMerge(ctx, "proj:"+schedEpic); err != nil || res.Refused {
+		t.Fatalf("stash-merge = %+v, %v", res, err)
+	}
+	servertest.WaitForEvent(ctx, t, evs, server.EventIterationPaused, "proj:"+schedEpic+"/02")
+	if got := f.read(t, "same.txt"); !strings.Contains(got, "<<<<<<<") {
+		t.Fatalf("same.txt = %q, want conflict markers", got)
+	}
+
+	res, err := f.h.Client.Repair(ctx, "start-over", server.RepairRequest{Address: "proj:" + schedEpic + "/02", Reason: "give up"})
+	if err != nil || res.Refused {
+		t.Fatalf("start-over = %+v, %v", res, err)
+	}
+	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
+
+	if got := f.read(t, "same.txt"); got != "local" {
+		t.Errorf("same.txt = %q, want the backed-up local edit", got)
+	}
+	if md := readFile(t, f.ticketFile(t, "02")); !strings.Contains(md, "status: done") {
+		t.Errorf("ticket not done:\n%s", md)
+	}
+	if refs := f.backupRefs(t); len(refs) != 0 {
+		t.Errorf("backup refs = %v, want the ref deleted", refs)
+	}
+	if merged := tickets.LoadEpicTicketMD(filepath.Join(f.store, "proj", schedEpic)).MergedAt; merged.IsZero() {
+		t.Error("root has no merged_at")
+	}
+}
+
 func TestTrunkConflict_PruneKeepsAnOldRefOfAnOpenTicket(t *testing.T) {
 	// The agent reports nothing, so the ticket stays open.
 	f := stashMergeFixtureWith(t, func(*schedFixture, servertest.Prompt) {})
