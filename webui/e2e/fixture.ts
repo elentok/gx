@@ -100,4 +100,19 @@ export const test = base.extend<{
   },
 });
 
+/** Matches a role's accessible name exactly. */
+export const nav = (name: string) => ({ name, exact: true });
+
+/** A section of the Epics page, expanded if it starts collapsed. */
+export async function section(page: Page, title: string) {
+  const region = page.getByRole("region", { name: new RegExp(`^${title}`) });
+  const header = region.getByRole("button", { name: new RegExp(`^${title}`) });
+  if ((await header.getAttribute("aria-expanded")) === "false") await header.click();
+  return region;
+}
+
+/** The Epics page card whose title link is `epic`. */
+export const card = (page: Page, epic: string) =>
+  page.locator("[data-kind]").filter({ has: page.getByRole("link", { name: epic, exact: true }) });
+
 export { expect };

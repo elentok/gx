@@ -1,24 +1,23 @@
-import { expect, test } from "./fixture";
-
-const nav = (name: string) => ({ name, exact: true });
+import { card, expect, nav, section, test } from "./fixture";
 
 test("1. Queue an epic", async ({ page, start }) => {
   await start("ready");
-  await page.getByRole("link", nav("Epics")).click();
-  await expect(page.getByRole("link", { name: "ready-epic" })).toBeVisible();
+  const ready = await section(page, "Ready to queue");
+  await expect(ready.getByRole("link", { name: "ready-epic" })).toBeVisible();
 
-  await page.getByRole("button", nav("Queue")).click();
+  await card(page, "ready-epic").getByRole("button", nav("Queue")).click();
 
-  await page.getByRole("link", nav("Queue")).click();
-  await expect(page.getByRole("link", { name: "ready-epic" })).toBeVisible();
-  await expect(page.getByText("All quiet")).toHaveCount(0);
+  await expect(ready.getByRole("link", { name: "ready-epic" })).toHaveCount(0);
+  const progress = await section(page, "In progress");
+  await expect(progress.getByRole("link", { name: "ready-epic" })).toBeVisible();
 });
 
 test("2. Epic looks right", async ({ page, start }) => {
   await start("mixed");
-  await page.getByRole("link", nav("Epics")).click();
-  await expect(page.getByText("demo · 2/7")).toBeVisible();
-  await page.getByRole("link", { name: "mixed-epic" }).click();
+  const mixed = card(page, "mixed-epic");
+  await expect(mixed.getByText("2/7")).toBeVisible();
+  await expect(mixed.getByText("demo", { exact: true })).toBeVisible();
+  await mixed.getByRole("link", { name: "mixed-epic" }).click();
 
   await expect(page.getByText("Not queued · 2 of 7 done")).toBeVisible();
   await expect(page.getByText("✓ 1 done · 1 cancelled")).toBeVisible();
@@ -34,43 +33,40 @@ test("2. Epic looks right", async ({ page, start }) => {
   await expect(page.getByText("asks · needs-answer · Waiting for your answer")).toBeVisible();
   await expect(page.getByText("Which option should the fake worker take?")).toBeVisible();
 
-  await page.getByRole("link", nav("Queue")).click();
-  const card = page.getByRole("link", { name: "mixed-epic" });
-  await expect(card).toBeVisible();
-  await expect(page.getByText("4/7")).toBeVisible();
-  await expect(page.getByText("drafted", { exact: true })).toBeVisible();
-  await expect(page.getByText("asks", { exact: true })).toBeVisible();
-  await expect(page.getByText("Which option should the fake worker take?")).toBeVisible();
+  await page.getByRole("link", nav("← Epics")).click();
+  await expect(mixed.getByText("4/7")).toBeVisible();
+  await expect(mixed.getByTestId("pill")).toBeVisible();
+  await expect(mixed.getByTestId("reason")).toBeVisible();
 });
 
 test("7. Epic completion", async ({ page, start }) => {
   const fixture = await start("finishing", { hold: true });
-  await page.getByRole("link", nav("Queue")).click();
-  await expect(page.getByRole("link", { name: "finishing-epic" })).toBeVisible();
-  await expect(page.getByText("1/2")).toBeVisible();
+  const progress = await section(page, "In progress");
+  await expect(progress.getByRole("link", { name: "finishing-epic" })).toBeVisible();
+  await expect(card(page, "finishing-epic").getByText("1/2")).toBeVisible();
 
   await fixture.release();
 
-  // The last ticket merges; the epic leaves the active queue for Recently finished.
-  await expect(page.getByText("All quiet")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Recently finished" })).toBeVisible();
-  await expect(page.getByText(/demo · 2\/2/)).toBeVisible();
-  await page.getByRole("link", { name: "finishing-epic" }).click();
+  // The last ticket merges; the epic leaves In progress for Finished.
+  await expect(progress.getByRole("link", { name: "finishing-epic" })).toHaveCount(0);
+  const finished = await section(page, "Finished");
+  await expect(finished.getByRole("link", { name: "finishing-epic" })).toBeVisible();
+  await expect(card(page, "finishing-epic").getByText("2/2")).toBeVisible();
+  await card(page, "finishing-epic").getByRole("link", { name: "finishing-epic" }).click();
   await expect(page.getByText(/2 of 2 done/)).toBeVisible();
 });
 
 test("8. Edge states", async ({ page, start }) => {
   await start("edge");
-  await page.getByRole("link", nav("Queue")).click();
-  await expect(page.getByText("All quiet")).toBeVisible();
 
-  // The Epics page lists no empty epic, so it is opened by its route.
-  await page.getByRole("link", nav("Epics")).click();
-  await expect(page.getByRole("link", { name: "empty-epic" })).toHaveCount(0);
-  await page.evaluate(() => (location.hash = "#/e/demo:empty-epic"));
+  // An empty epic counts as implemented, so the server files it under In progress.
+  const progress = await section(page, "In progress");
+  await expect(progress.getByRole("link", { name: "empty-epic" })).toBeVisible();
+  await expect(card(page, "empty-epic").getByText("Implemented")).toBeVisible();
+  await progress.getByRole("link", { name: "empty-epic" }).click();
   await expect(page.getByText("No tickets yet")).toBeVisible();
 
-  await page.getByRole("link", nav("Epics")).click();
+  await page.getByRole("link", nav("← Epics")).click();
   await page.getByRole("link", { name: "blocked-epic" }).click();
   await expect(page.getByText("waiting · blocked · after 01")).toBeVisible();
   await expect(page.getByText("unmerged · open")).toBeVisible();
@@ -78,11 +74,12 @@ test("8. Edge states", async ({ page, start }) => {
 
 test("6. Outside changes show up", async ({ page, start }) => {
   const fixture = await start("ready");
-  await page.getByRole("link", nav("Queue")).click();
-  await expect(page.getByText("All quiet")).toBeVisible();
+  const ready = await section(page, "Ready to queue");
+  await expect(ready.getByRole("link", { name: "ready-epic" })).toBeVisible();
 
   await fixture.cli("server", "queue", "add", "demo:ready-epic");
 
-  await expect(page.getByRole("link", { name: "ready-epic" })).toBeVisible();
-  await expect(page.getByText("All quiet")).toHaveCount(0);
+  const progress = await section(page, "In progress");
+  await expect(progress.getByRole("link", { name: "ready-epic" })).toBeVisible();
+  await expect(ready.getByRole("link", { name: "ready-epic" })).toHaveCount(0);
 });

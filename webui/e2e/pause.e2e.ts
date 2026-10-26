@@ -1,13 +1,11 @@
 import type { Page } from "@playwright/test";
-import { expect, test } from "./fixture";
-
-const nav = (name: string) => ({ name, exact: true });
+import { card, expect, nav, test } from "./fixture";
 
 interface Row {
   name: string;
   epic: string;
   id: string;
-  /** What the queue card shows for the ticket. */
+  /** What the Epics page card shows. It names the epic's first pause only. */
   onQueue: string;
   /** What the epic page row and the ticket page show. */
   reason: string;
@@ -31,7 +29,7 @@ const rows: Row[] = [
     name: "Choose base",
     epic: "paused-epic",
     id: "04",
-    onQueue: "Seeded pause: ambiguous-base",
+    onQueue: "Seeded pause: self-reported",
     reason: "Ambiguous base",
     recover: async (page) => {
       await page.getByRole("button", nav("01")).click();
@@ -42,7 +40,7 @@ const rows: Row[] = [
     name: "Retry",
     epic: "paused-epic",
     id: "06",
-    onQueue: "Seeded pause: zero-commit",
+    onQueue: "Seeded pause: self-reported",
     reason: "Agent stopped without a result",
     recover: async (page) => {
       await page.getByRole("button", nav("Retry")).click();
@@ -52,7 +50,7 @@ const rows: Row[] = [
     name: "Approve",
     epic: "approve-epic",
     id: "01",
-    onQueue: "needs approval",
+    onQueue: "wants to run: rg fixture",
     reason: "Needs approval",
     recover: async (page) => {
       await page.getByRole("button", nav("Allow once")).click();
@@ -66,8 +64,7 @@ test.describe("3. Pause reasons and recovery", () => {
       const fixture = await start("paused");
       await fixture.cli("server", "queue", "add", "demo:paused-epic");
 
-      await page.getByRole("link", nav("Queue")).click();
-      await expect(page.getByText(row.onQueue)).toBeVisible();
+      await expect(card(page, row.epic).getByText(row.onQueue)).toBeVisible();
 
       await page.getByRole("link", { name: row.epic }).click();
       if (row.epic === "paused-epic") await expect(page.getByText(row.reason)).toBeVisible();
@@ -84,9 +81,7 @@ test.describe("3. Pause reasons and recovery", () => {
     const fixture = await start("paused");
     await fixture.cli("server", "queue", "add", "demo:paused-epic");
 
-    await page.getByRole("link", nav("Queue")).click();
-    await expect(page.getByText("Run failed")).toBeVisible();
-    await expect(page.getByText("Fix it in the TUI")).toHaveCount(2);
+    await expect(card(page, "paused-epic").getByText(/\+4 more/)).toBeVisible();
 
     await page.getByRole("link", { name: "paused-epic" }).click();
     await expect(page.getByText("repair · needs-repair · Run failed")).toBeVisible();

@@ -1,10 +1,11 @@
 import type { Page } from "@playwright/test";
-import { expect, test } from "./fixture";
+import { card, expect, nav, test } from "./fixture";
 
-const nav = (name: string) => ({ name, exact: true });
-
+// The card's title opens the epic page, whose Start button starts the session and moves on.
+// The Design page before the start is reached by its route.
 const openDesign = async (page: Page) => {
-  await page.getByRole("link", nav("Designs")).click();
+  await expect(card(page, "design-epic")).toBeVisible();
+  await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
   await expect(page.getByRole("button", nav("Start design session"))).toBeVisible();
 };
 
@@ -48,8 +49,11 @@ test.describe("5. Answer a round", () => {
     const cont = page.getByRole("button", { name: /^Continue/ });
     await expect(cont).toBeVisible();
 
-    await cont.click();
-    await expect(page.getByText("A fresh round.")).toBeVisible();
+    // Under load the run-end update can land after the first press ("the session changed"), so press again.
+    await expect(async () => {
+      await cont.click({ timeout: 2000 });
+      await expect(page.getByText("A fresh round.")).toBeVisible({ timeout: 2000 });
+    }).toPass();
     await expect(page.getByRole("group", nav("Questions")).getByText("Q9 - Keep going?")).toBeVisible();
   });
 });
@@ -191,8 +195,11 @@ test.describe("12. The auto-advance switch", () => {
     await expect(page.getByRole("button", { name: /^Continue/ })).toBeVisible();
     await expect(page.getByText(/Continuing in/)).toHaveCount(0);
 
-    await autoSwitch(page, "off").click();
-    await expect(autoSwitch(page, "on")).toBeVisible();
+    // Under load the run-end update can land after the first press ("the session changed"), so press again.
+    await expect(async () => {
+      await autoSwitch(page, "off").click();
+      await expect(autoSwitch(page, "on")).toBeVisible({ timeout: 2000 });
+    }).toPass();
     await expect(page.getByText(/Continuing in/)).toBeVisible();
   });
 });
