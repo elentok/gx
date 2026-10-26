@@ -41,6 +41,8 @@ This is the one definition of a part's body format. gx-to-tickets and the collec
 - The fixture scenario to start.
 - Per story: its spec number, its text and its Verification entry, both word for word, and its token
   estimate.
+- Per Mock states line of the spec's Verification section: the line word for word (mock path, state,
+  width, scenario, parts), and its 8K estimate.
 - A next-round part also adds, per story, the finding and the fix ticket it rechecks.
 
 Section names are free. The part writes its results under `## Results` (step 4).
@@ -87,6 +89,8 @@ the epic's other tickets stand in for the spec.
   `## Spec deviations` bullets are deliberate, so do not report them as findings.
 - If the spec has no Verification section, derive one: for each user story, pick the catalog flows
   from step 3 and the CLI or server checks it implies.
+- The Mock states list is part of the Verification section. Read it with the stories, and check its
+  lines like a part does (step 4).
 - If the epic has no web, CLI or server change, close the ticket now (step 7, clean round).
 - Note the spec's `## Out of Scope` section. A lone ticket without one in its own ticket copies it
   from the spec when it opens a collect ticket (step 6).
@@ -116,7 +120,8 @@ catalog:
 ## 4. Run and record
 
 - Run each selected flow and each CLI or server verb check from the Verification entry.
-- Drive the browser by hand only for a gap no flow covers. Use text snapshots, not screenshots.
+- Drive the browser by hand only for a gap no flow covers. Use text snapshots, not screenshots. The
+  one exception is a Mock states line (below).
 - A harness failure (the fixture crashes, a flow fails for a reason unrelated to the epic, a
   selector is stale) is a finding, like any other.
 - Before you write a story's line, quote its text, and name the test or check that covers it. Read
@@ -125,6 +130,18 @@ catalog:
 - The line format is `- Story <n>: pass, <covering test or check>`, `- Story <n>: fail, <what
   failed>` or `- Story <n>: unchecked, <why>`. Use `unchecked` when you named no covering test or
   check, or did not run it. Never write `pass` for a story you did not read or verify.
+
+**Mock states lines.** These steps apply only when the part (or lone ticket) has Mock states lines.
+With none, skip this block: the epic verifies as before.
+
+- Check each line like a story. Start the line's fixture scenario, screenshot the whole state section
+  of the mock and the built page at the line's width, and compare them by eye. Follow the steps in
+  [gx-ui-check/MOCK-CHECK.md](../gx-ui-check/MOCK-CHECK.md); do not copy them here.
+- Screenshots are allowed here, at device scale factor 1, cropped to the state selector.
+- Write one result line per Mock states line, with the same verdicts as a story line (`pass`, `fail`,
+  `unchecked`), in the format `- Mock <mock path> <state> <width>: pass, <what you compared>`.
+- A difference listed in the epic's `## Spec deviations` is not a finding.
+- Any other look difference is a finding. Step 6 decides it like any finding, so it gets a fix ticket.
 
 **Part.** Write each story's line under `## Results` in your own ticket only, right after you check
 that story, using the spec's story numbers. Do not wait to write them all at the end. Findings go
@@ -173,7 +190,8 @@ The rest of this skill (steps 5 to 7) is for a collect or lone ticket.
 A lone ticket uses its own results from step 4 as the part results.
 
 Write one table for all stories into your ticket, under `## Table`, with
-`gx tickets section <addr> "Table" - < <file>`. Use the spec's story numbers. Columns:
+`gx tickets section <addr> "Table" - < <file>`. Use the spec's story numbers. Each Mock states line gets a row too, labelled `Mock <state> <width>`.
+Columns:
 
 | story | verdict | covering check | round last checked | finding, with fix ticket, follow-up or inline-fix commit |
 | ----- | ------- | -------------- | ------------------ | -------------------------------------------------------- |
