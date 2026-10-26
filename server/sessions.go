@@ -404,6 +404,9 @@ func launchArgs(meta *sessionMeta, claudeArgs []string) []string {
 	if meta.Harness != string(harness.Claude) {
 		return nil
 	}
+	if meta.Design {
+		claudeArgs = agentrunner.WithDesignDisallowedTools(claudeArgs)
+	}
 	if meta.RemoteControl == "" {
 		return claudeArgs
 	}

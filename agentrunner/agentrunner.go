@@ -101,6 +101,19 @@ func WithLoopDisallowedTools(args []string) []string {
 	return append(args, "--disallowedTools", LoopDisallowedTools)
 }
 
+// DesignDisallowedTools are the tools no design agent may use. Design agents
+// ask in gx-grilling rounds, which the web page renders.
+const DesignDisallowedTools = "AskUserQuestion"
+
+// WithDesignDisallowedTools appends the claude ban on DesignDisallowedTools to
+// args unless args already carry a ban of their own.
+func WithDesignDisallowedTools(args []string) []string {
+	if slices.Contains(args, "--disallowedTools") {
+		return args
+	}
+	return append(slices.Clone(args), "--disallowedTools", DesignDisallowedTools)
+}
+
 // Waiting is an agent that is not working: idle, or done.
 func (s Status) Waiting() bool {
 	return s.State == StateIdle || s.State == StateDone

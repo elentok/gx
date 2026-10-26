@@ -14,6 +14,7 @@ func TestLaunchArgs(t *testing.T) {
 	}{
 		{"claude with a remote-control name", sessionMeta{Harness: "claude", RemoteControl: "proj:loop/01"}, []string{"--verbose", "--remote-control", "proj:loop/01"}},
 		{"claude without a name", sessionMeta{Harness: "claude"}, []string{"--verbose"}},
+		{"claude design bans AskUserQuestion", sessionMeta{Harness: "claude", Design: true}, []string{"--verbose", "--disallowedTools", "AskUserQuestion"}},
 		{"codex never gets it", sessionMeta{Harness: "codex", RemoteControl: "proj:loop/01"}, nil},
 	} {
 		if got := launchArgs(&tc.meta, claudeArgs); !slices.Equal(got, tc.want) {
