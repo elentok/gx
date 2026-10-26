@@ -58,6 +58,64 @@ func (s *Server) afterBranch(project, epic string) (bool, error) {
 	return tickets.BranchExists(repo.Root, epic+tickets.ImplEpicSuffix), nil
 }
 
+// cleanupDesign removes the map's design worktree and branch once the Design is
+// past Branch, no design session of the map is live, the worktree has no
+// uncommitted edits and every design patch is in <map>-impl. Anything else
+// keeps both and logs a warning; the next trigger checks again.
+func (s *Server) cleanupDesign(project, epic string) {
+	if err := s.tryCleanupDesign(project, epic); err != nil {
+		s.log.Warn("design cleanup kept the worktree and branch", "map", project+":"+epic, "err", err)
+	}
+}
+
+func (s *Server) tryCleanupDesign(project, epic string) error {
+	past, err := s.afterBranch(project, epic)
+	if err != nil || !past {
+		return err
+	}
+	live, err := s.liveDesignSession(project + ":" + epic)
+	if err != nil || live != nil {
+		return err
+	}
+	_, repoDir, err := s.projectOf(project)
+	if err != nil {
+		return err
+	}
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return err
+	}
+	branch := designBranch(epic)
+	path := filepath.Join(repo.LinkedWorktreeDir(), branch)
+	_, statErr := os.Stat(path)
+	hasWorktree := statErr == nil
+	if !hasWorktree && !tickets.BranchExists(repo.Root, branch) {
+		return nil
+	}
+	if hasWorktree {
+		changes, err := git.UncommittedChanges(path)
+		if err != nil {
+			return err
+		}
+		if len(changes) > 0 {
+			return fmt.Errorf("the worktree has uncommitted edits")
+		}
+	}
+	missing, err := git.UnappliedPatches(repo.Root, epic+tickets.ImplEpicSuffix, branch)
+	if err != nil {
+		return err
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("%d design commit(s) are not in %s", len(missing), epic+tickets.ImplEpicSuffix)
+	}
+	if hasWorktree {
+		if err := git.RemoveWorktree(*repo, path, false); err != nil {
+			return err
+		}
+	}
+	return git.DeleteLocalBranch(*repo, branch, true)
+}
+
 // ensureDesignWorktree makes sure the map's design worktree exists and returns
 // its path: on a new branch from trunk, or re-added on the existing branch.
 func (s *Server) ensureDesignWorktree(project, epic string) (string, error) {
@@ -223,6 +281,7 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	}
 	var worktree, note string
 	if past {
+		s.cleanupDesign(project, epic)
 		if worktree = tickets.TrunkCheckout(s.cfg.TicketStore, project); worktree == "" {
 			return SessionResult{}, fmt.Errorf("no trunk checkout for project %s", project)
 		}

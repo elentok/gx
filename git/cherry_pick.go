@@ -351,3 +351,20 @@ func RebaseInProgress(dir string) (bool, error) {
 	}
 	return false, nil
 }
+
+// UnappliedPatches returns the commits of head whose patch is not in upstream
+// (git cherry), oldest first. It compares patches, so a rebased upstream still
+// counts its commits as applied.
+func UnappliedPatches(dir, upstream, head string) ([]string, error) {
+	out, _, err := run(dir, []string{"cherry", upstream, head})
+	if err != nil {
+		return nil, err
+	}
+	var missing []string
+	for _, line := range strings.Split(out, "\n") {
+		if sha, ok := strings.CutPrefix(strings.TrimSpace(line), "+ "); ok {
+			missing = append(missing, sha)
+		}
+	}
+	return missing, nil
+}

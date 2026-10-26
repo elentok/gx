@@ -934,21 +934,34 @@ func (s *Server) removeSession(req SessionRequest) (SessionResult, error) {
 
 // updateSessionMeta applies change to the session's saved meta and, when it
 // reports a change, saves it and publishes it.
+// A Design session this change moved to Exited triggers the design cleanup once
+// the lock is released.
 func (s *Server) updateSessionMeta(dir, id string, change func(*sessionMeta) bool) error {
+	meta, exitedDesign, err := s.saveSessionMetaUpdate(dir, id, change)
+	if exitedDesign {
+		if project, epic, ok := strings.Cut(epicAddress(meta.Ticket), ":"); ok {
+			s.cleanupDesign(project, epic)
+		}
+	}
+	return err
+}
+
+func (s *Server) saveSessionMetaUpdate(dir, id string, change func(*sessionMeta) bool) (meta sessionMeta, exitedDesign bool, err error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
-	meta, err := readSessionMeta(dir)
+	meta, err = readSessionMeta(dir)
 	if err != nil {
-		return fmt.Errorf("read session %s meta: %w", id, err)
+		return meta, false, fmt.Errorf("read session %s meta: %w", id, err)
 	}
+	wasExited := meta.Status.State == SessionExited
 	if !change(&meta) {
-		return nil
+		return meta, false, nil
 	}
 	if err := writeSessionMeta(dir, meta); err != nil {
-		return fmt.Errorf("save session %s meta: %w", id, err)
+		return meta, false, fmt.Errorf("save session %s meta: %w", id, err)
 	}
 	s.events.publish(EventSessionChanged, id)
-	return nil
+	return meta, meta.Design && !wasExited && meta.Status.State == SessionExited, nil
 }
 
 // updateSessionMetaOrWarn is updateSessionMeta for background callers, which
