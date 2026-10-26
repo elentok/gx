@@ -116,6 +116,46 @@ func (s *Server) tryCleanupDesign(project, epic string) error {
 	return git.DeleteLocalBranch(*repo, branch, true)
 }
 
+// scanDesignCleanups runs the design cleanup for every map whose design_step
+// is past Branch. A plain Claude session at step 8 reports no exit, and `gx
+// tickets set --design-step` writes the file without telling the server, so
+// the rescan is what notices. A map that keeps its worktree is checked again
+// on every rescan, so a warning is logged only when its reason changes.
+func (s *Server) scanDesignCleanups() {
+	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
+	if err != nil {
+		return
+	}
+	for _, dir := range dirs {
+		epics, _ := s.idx.epicsOf(dir)
+		for _, e := range epics {
+			if !e.IsMap {
+				continue
+			}
+			step := tickets.DesignStep(tickets.LoadEpicTicketMD(e.Path).DesignStep)
+			if step != tickets.StepBranch && step != tickets.StepDone {
+				continue
+			}
+			project, epic := tickets.ProjectName(dir), filepath.Base(e.Path)
+			key := project + ":" + epic
+			if !s.designScans.start(key) {
+				continue
+			}
+			s.goSettle(func() {
+				defer s.designScans.end(key)
+				err := s.tryCleanupDesign(project, epic)
+				text := ""
+				if err != nil {
+					text = err.Error()
+				}
+				if prev, _ := s.designWarned.Swap(key, text); text != "" && prev != text {
+					s.log.Warn("design cleanup kept the worktree and branch", "map", key, "err", err)
+				}
+			})
+		}
+	}
+}
+
 // ensureDesignWorktree makes sure the map's design worktree exists and returns
 // its path: on a new branch from trunk, or re-added on the existing branch.
 func (s *Server) ensureDesignWorktree(project, epic string) (string, error) {

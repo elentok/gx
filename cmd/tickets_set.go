@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
@@ -133,7 +134,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsSet(c, path, c.OutOrStdout(), c.ErrOrStderr(), d.getwd)
+			return runTicketsSet(c, path, c.OutOrStdout(), c.ErrOrStderr(), d.getwd, d.dial())
 		},
 	}
 
@@ -169,7 +170,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 // runEpicSet is runTicketsSet for an epic's ticket.md, validated against the
 // epic schema rather than the ticket one. A server-stamped field refuses with
 // tickets.CodeServerStamped before anything is written.
-func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string, error)) error {
+func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
 	epicDir := filepath.Dir(path)
 	// Nothing completes a map by itself unless a -impl epic appears, so a person may.
 	handCompletable := tickets.IsMapEpic(epicDir)
@@ -243,6 +244,7 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 	if err := tickets.UpdateEpicFields(path, update); err != nil {
 		return fmt.Errorf("%s: %w", ticketLabel(path), err)
 	}
+	pingLabels(dial, ticketLabel(path))
 	printNotices(c.ErrOrStderr(), notices)
 
 	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
@@ -357,9 +359,9 @@ func mapDoneStamp(c *cobra.Command, path string) (*conversations.Totals, error) 
 // runTicketsSet applies every flag actually passed on c to path's ticket via
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
-func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error)) error {
+func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
 	if isEpicTicketMD(path) {
-		return runEpicSet(c, path, w, getwd)
+		return runEpicSet(c, path, w, getwd, dial)
 	}
 	if c.Flags().Changed("exported-at") {
 		return fmt.Errorf("%s: exported_at is gx-managed and not settable via `tickets set`", path)
@@ -459,7 +461,7 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 	}
 	printNotices(stderr, notices)
 
-	pingServer(path)
+	pingLabels(dial, ticketLabel(path))
 	if jsonOut, _ := c.Flags().GetBool("json"); jsonOut {
 		return writeStamped(w, struct {
 			Address string   `json:"address"`

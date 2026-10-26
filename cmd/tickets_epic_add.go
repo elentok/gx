@@ -104,7 +104,7 @@ func newTicketsEpicSetCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runEpicSet(c, path, c.OutOrStdout(), d.getwd)
+			return runEpicSet(c, path, c.OutOrStdout(), d.getwd, d.dial())
 		},
 	}
 	cmd.Flags().String("kind", "", "set kind (map or loop)")

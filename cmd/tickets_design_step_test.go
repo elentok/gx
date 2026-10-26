@@ -25,6 +25,18 @@ func TestTicketsSet_DesignStep(t *testing.T) {
 		}
 	})
 
+	t.Run("pings the server with the epic address", func(t *testing.T) {
+		d, _ := setMap(t)
+		cl, pings := fakeMoveServer(t, nil, nil)
+		d.serverClient = cl
+		if err := execute([]string{"tickets", "set", "mine:e", "--design-step=review"}, d); err != nil {
+			t.Fatalf("set: %v", err)
+		}
+		if len(*pings) != 1 || (*pings)[0] != "mine:e" {
+			t.Errorf("pings = %v, want [mine:e]", *pings)
+		}
+	})
+
 	t.Run("refuses an unknown step and writes nothing", func(t *testing.T) {
 		d, ticketMD := setMap(t)
 		before, _ := os.ReadFile(ticketMD)

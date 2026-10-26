@@ -143,6 +143,41 @@ func TestDesignCleanup_DesignOpenAfterBranchRunsTheCheck(t *testing.T) {
 	waitFor(t, func() bool { return f.designGone(t, dir) })
 }
 
+func (f designsFixture) setDesignStepBranch(t *testing.T) {
+	t.Helper()
+	ticketMD := filepath.Join(f.h.TicketStore, "proj", "map", "ticket.md")
+	if err := os.WriteFile(ticketMD, []byte("---\nkind: map\ndesign_step: branch\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDesignCleanup_StepMovingToBranchRemovesWithoutSessionExit(t *testing.T) {
+	f := startDesignsAt(t, "create-tickets")
+	dir, id := f.openDesignWorktree(t, true)
+	f.stop(t, id)
+	gitOut(t, f.repo, "branch", "map-impl", "map-design")
+	if !f.designKept(t, dir) {
+		t.Fatalf("design worktree or branch removed before the step moved")
+	}
+	f.setDesignStepBranch(t)
+	waitFor(t, func() bool { return f.designGone(t, dir) })
+}
+
+func TestDesignCleanup_StepMovingToBranchWithDirtyWorktreeKeepsBothAndWarns(t *testing.T) {
+	f := startDesignsAt(t, "create-tickets")
+	dir, id := f.openDesignWorktree(t, true)
+	f.stop(t, id)
+	gitOut(t, f.repo, "branch", "map-impl", "map-design")
+	if err := os.WriteFile(filepath.Join(dir, "wip.md"), []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.setDesignStepBranch(t)
+	f.waitForCleanupWarning(t)
+	if !f.designKept(t, dir) {
+		t.Errorf("design worktree or branch removed")
+	}
+}
+
 func TestDesignCleanup_LiveSessionKeepsTheWorktree(t *testing.T) {
 	f := startDesignsAt(t, "create-tickets")
 	dir, _ := f.openDesignWorktree(t, true)
