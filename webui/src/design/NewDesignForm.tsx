@@ -138,7 +138,8 @@ export function NewDesignForm({
         bg="surface.raised"
         borderWidth="1px"
         borderColor="border"
-        borderRadius={sheetMode ? "xl xl 0 0" : "lg"}
+        borderTopRadius={sheetMode ? "xl" : "lg"}
+        borderBottomRadius={sheetMode ? "0" : "lg"}
         w={sheetMode ? "full" : "720px"}
         h={sheetMode ? sheetHeight : "520px"}
         maxW="full"

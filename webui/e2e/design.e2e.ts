@@ -305,7 +305,7 @@ test.describe("45. Delete design", () => {
 });
 
 test.describe("46. gx designs delete", () => {
-  test("removes an uncharted design and refuses a charted epic", async ({ start }) => {
+  test("removes an uncharted design", async ({ start }) => {
     const fixture = await start("ready");
     await fixture.cli("designs", "open", "cli-del", "--idea", "x", "--project", "demo", "--json");
     await stopSession(fixture, "cli-del");
@@ -313,10 +313,14 @@ test.describe("46. gx designs delete", () => {
     await fixture.cli("designs", "delete", "demo:cli-del");
     await expect(fixture.cli("tickets", "show", "demo:cli-del")).rejects.toBeTruthy();
 
+  });
+
+  test("refuses a charted design with the not-uncharted reason", async ({ start }) => {
+    const fixture = await start("design");
     const refused = await fixture
-      .cli("designs", "delete", "demo:ready-epic")
+      .cli("designs", "delete", "demo:design-epic")
       .then(() => undefined, (err: { stdout?: string; stderr?: string }) => `${err.stdout}${err.stderr}`);
-    expect(refused).toBeTruthy();
-    await fixture.cli("tickets", "show", "demo:ready-epic");
+    expect(refused).toContain("not-uncharted");
+    await fixture.cli("tickets", "show", "demo:design-epic");
   });
 });

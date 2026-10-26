@@ -173,7 +173,11 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []EpicDetailRow{},
 		Queueable: epicQueueable(e, queued), Queued: queued,
 	}
-	d.Deletable, _ = s.designUncharted(root.String(), e)
+	if deletable, err := s.designUncharted(root.String(), e); err != nil {
+		s.log.Warn("design deletable check", "epic", root.String(), "err", err)
+	} else {
+		d.Deletable = deletable
+	}
 	d.Steps = mapSteps(e, byName)
 	d.Stats = epicStats(e, e.CompletedAt, now)
 	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {

@@ -87,7 +87,7 @@ export function DeleteDesignButton({
           <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => setConfirming(false)}>
             Keep
           </Button>
-          <Button size="sm" tone="deadlocked" disabled={pending} onClick={() => run(() => remove({ epic: address }), onDeleted)}>
+          <Button size="sm" tone="paused" disabled={pending} onClick={() => run(() => remove({ epic: address }), onDeleted)}>
             Delete
           </Button>
         </>

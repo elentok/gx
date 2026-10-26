@@ -245,6 +245,17 @@ test("Delete design shows only for a deletable Design with no live session, foll
   expect(screen.queryByRole("button", { name: "Delete design" })).toBeNull();
 });
 
+test("the detail is fetched once on mount and once more when a session starts or exits", async () => {
+  const epic = vi.fn(async () => ({ kind: "ok" as const, detail: deletable }));
+  const router = render([map("a")], [], "/d/gx:a", deletable, { epic });
+  await screen.findByRole("button", { name: "Delete design" });
+  expect(epic).toHaveBeenCalledTimes(1);
+  router.setSessions([session("a")]);
+  await waitFor(() => expect(epic).toHaveBeenCalledTimes(2));
+  router.setSessions([session("a", { status: { state: "exited" } })]);
+  await waitFor(() => expect(epic).toHaveBeenCalledTimes(3));
+});
+
 test("Keep restores the Delete design button", async () => {
   render([map("a")], [], "/d/gx:a", deletable);
   fireEvent.click(await screen.findByRole("button", { name: "Delete design" }));

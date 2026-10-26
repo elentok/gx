@@ -3,6 +3,7 @@ package server_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server"
@@ -84,6 +85,31 @@ func TestDesignsDelete_EpicDetailDeletableMatchesTheRule(t *testing.T) {
 		if d.Deletable != want {
 			t.Errorf("%s deletable = %v, want %v", epic, d.Deletable, want)
 		}
+	}
+}
+
+func TestDesignsDelete_EpicDetailLogsADeletableCheckError(t *testing.T) {
+	f := startDeletable(t)
+	// A file where the sessions dir should be makes listing sessions fail.
+	if err := os.RemoveAll(f.h.SessionsDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(f.h.SessionsDir, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	d, err := f.h.Client.EpicDetail(f.ctx, "proj:bare")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Deletable {
+		t.Error("deletable = true after the check failed")
+	}
+	log, err := os.ReadFile(server.LogPath(f.h.StateDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(log), "design deletable check") {
+		t.Errorf("error not logged:\n%s", log)
 	}
 }
 

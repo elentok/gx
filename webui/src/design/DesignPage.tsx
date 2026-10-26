@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
@@ -126,7 +126,12 @@ function DesignBody({
   useFocusReport(conn, session?.id, connState.streams, deps.focus);
   // `deletable` depends on the live sessions, and a session stop is no ticket event.
   const liveKey = live.map((s) => s.id).join(",");
-  useEffect(() => refetch(), [liveKey, refetch]);
+  const seenLiveKey = useRef(liveKey);
+  useEffect(() => {
+    if (seenLiveKey.current === liveKey) return;
+    seenLiveKey.current = liveKey;
+    refetch();
+  }, [liveKey, refetch]);
   return (
     <>
       <Box
