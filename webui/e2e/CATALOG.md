@@ -283,7 +283,10 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   1. Open `#/d/demo:design-epic` and start the session.
   2. Click the Progress summary, then Close in the modal.
   3. Tap the title; click Close on the sheet.
+  4. Press Send with nothing answered, then Escape. Press ⤢, then ⤡.
 - **Pass:**
+  - The composer has no Focus button. The Send popover is at most 343 px wide, inside the viewport and overlaps the sheet.
+  - Focus mode keeps the Progress summary above the sheet and hides the messages; ⤡ leaves.
   - The summary opens the "Design progress steps" modal with Resolve tickets current.
   - Note reads only its icon; the Auto-advance switch has no text.
   - The title opens a "Jump to epic" sheet that fills the screen; Close closes it.
@@ -485,4 +488,21 @@ an exited session.
   - The note's `rows` is 3.
   - The dots, "0 of 2 answered" and the Prev/Next row keep their positions and stay visible.
   - The body's scroll position changes and the sheet's top edge does not.
-  - Docked only: the Focus mode flow adds the focus mode half.
+  - The same checks hold in focus mode (enter with ⤢ first).
+
+## 49. Focus mode
+
+- **Scenario:** `design`
+- **Steps:**
+  1. Start the session. Press ⤢ (left of ▾), then ⤡.
+  2. Enter, open the `Q8` note, focus its field, press Escape.
+  3. Enter, press Send with gaps, Escape twice. Repeat with Ctrl+K and the jump menu.
+  4. Pick SQLite, type a composer note, enter, leave.
+  5. Enter, press ▾; press ⤢ on the folded sheet.
+  6. Answer `Q8b`, press Send, then Continue.
+- **Pass:**
+  - ⤢ sits left of ▾. Entering hides "Two questions before the spec."; the sheet is taller than half the viewport; the title, Progress region and composer stay; the question title is larger than docked; the button reads ⤡.
+  - Escape from the note field leaves. With a layer open, the first Escape closes only the Send popover or the jump menu, the second leaves.
+  - SQLite, `Q8b` as the current dot and the composer note survive entering and leaving.
+  - ▾ folds and leaves; ⤢ on the folded sheet unfolds and enters.
+  - Sending leaves with the sent round shown; Continue opens the `Q9` round docked. No "Questions, full screen" dialog appears.

@@ -61,6 +61,32 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await steps.getByRole("button", nav("Close")).click();
   await expect(steps).toHaveCount(0);
 
+  // The composer has no Focus button; the sheet's own button is the way in.
+  await expect(page.locator('[aria-label="Composer"]').getByRole("button", { name: /focus/i })).toHaveCount(0);
+
+  // Send with gaps: the popover fits the screen and overlaps the sheet.
+  const questions = page.getByRole("group", nav("Questions"));
+  await page.getByRole("button", nav("Send")).click();
+  const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
+  await expect(popover).toBeVisible();
+  const pop = (await popover.boundingBox())!;
+  const sheetBox = (await questions.boundingBox())!;
+  expect(pop.width).toBeLessThanOrEqual(343);
+  expect(pop.x).toBeGreaterThanOrEqual(0);
+  expect(pop.x + pop.width).toBeLessThanOrEqual(375);
+  expect(pop.y).toBeLessThan(sheetBox.y + sheetBox.height);
+  expect(pop.y + pop.height).toBeGreaterThan(sheetBox.y);
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+
+  // Focus mode keeps the Progress summary above the sheet and hides the messages.
+  await questions.getByRole("button", nav("Enter focus mode")).click();
+  await expect(page.getByText("Two questions before the spec.")).toHaveCount(0);
+  const summary = (await progress.getByRole("button", { name: /Resolve tickets/ }).boundingBox())!;
+  expect(summary.y + summary.height).toBeLessThanOrEqual((await questions.boundingBox())!.y);
+  await questions.getByRole("button", nav("Leave focus mode")).click();
+  await expect(page.getByText("Two questions before the spec.")).toBeVisible();
+
   // Note loses its text, and the switch loses its label.
   await expect(page.getByRole("button", nav("Note"))).toHaveText("✎");
   await expect(page.getByRole("switch")).not.toContainText("Auto-advance");

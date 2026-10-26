@@ -141,13 +141,15 @@ test.describe("47. Send popover", () => {
 test.describe("48. Fixed sheet rows", () => {
   test.use({ viewport: { width: 1280, height: 600 } });
 
-  test("the header and Prev/Next stay put while the body scrolls", async ({ page, start }) => {
+  for (const mode of ["docked", "focus mode"]) {
+  test(`the header and Prev/Next stay put while the body scrolls, ${mode}`, async ({ page, start }) => {
     await start("design", { autoAdvanceDelay: "1h" });
     await openDesign(page);
     await page.getByRole("button", nav("Start design session")).click();
 
     const questions = page.getByRole("group", nav("Questions"));
     await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
+    if (mode === "focus mode") await questions.getByRole("button", nav("Enter focus mode")).click();
     await questions.getByRole("button", nav("Note on question 8")).click();
     const note = questions.getByRole("textbox", nav("Note text for question 8"));
     await expect(note).toBeVisible();
@@ -180,6 +182,111 @@ test.describe("48. Fixed sheet rows", () => {
     expect(scrollAfter).toBeGreaterThan(scrollBefore);
     expect(await where()).toEqual(before);
     for (const el of [dot, count, prev, next]) await expect(el).toBeInViewport();
+  });
+  }
+});
+
+test.describe("49. Focus mode", () => {
+  test("hides the messages, keeps the round, and every way out leaves", async ({ page, start }) => {
+    await start("design", { autoAdvanceDelay: "1h" });
+    await openDesign(page);
+    await page.getByRole("button", nav("Start design session")).click();
+
+    const questions = page.getByRole("group", nav("Questions"));
+    const send = page.getByRole("button", nav("Send"));
+    const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
+    const jump = page.getByRole("dialog", nav("Jump to epic"));
+    const enter = questions.getByRole("button", nav("Enter focus mode"));
+    const leave = questions.getByRole("button", nav("Leave focus mode"));
+    const chat = page.getByText("Two questions before the spec.");
+    const q8 = questions.getByText("Q8 - Which store?");
+    const viewport = page.viewportSize()!;
+    await expect(q8).toBeVisible();
+    await expect(enter).toHaveText("⤢");
+
+    // The button sits left of ▾.
+    const fold = (await questions.getByRole("button", nav("Fold questions")).boundingBox())!;
+    const focusBox = (await enter.boundingBox())!;
+    expect(focusBox.x + focusBox.width).toBeLessThanOrEqual(fold.x);
+
+    const dockedSize = await q8.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    await enter.click();
+    await expect(chat).toHaveCount(0);
+    expect((await questions.boundingBox())!.height).toBeGreaterThan(viewport.height / 2);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("region", nav("Progress"))).toBeVisible();
+    await expect(page.locator('[aria-label="Composer"]')).toBeVisible();
+    expect(await q8.evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThan(dockedSize);
+    await expect(leave).toHaveText("⤡");
+    await leave.click();
+    await expect(chat).toBeVisible();
+    await expect(enter).toBeVisible();
+
+    // Escape from the note field leaves.
+    await enter.click();
+    await expect(chat).toHaveCount(0);
+    await questions.getByRole("button", nav("Note on question 8")).click();
+    await questions.getByRole("textbox", nav("Note text for question 8")).focus();
+    await page.keyboard.press("Escape");
+    await expect(chat).toBeVisible();
+
+    // Escape closes the layer on top first, a second one leaves.
+    const layers = [
+      { layer: popover, open: () => send.click() },
+      { layer: jump, open: () => page.keyboard.press("Control+k") },
+    ];
+    for (const { layer, open } of layers) {
+      await enter.click();
+      await expect(chat).toHaveCount(0);
+      await open();
+      await expect(layer).toBeVisible();
+      // Escape goes to the layer once focus is inside it.
+      await expect(layer.locator(":focus")).toHaveCount(1);
+      await page.keyboard.press("Escape");
+      await expect(layer).toHaveCount(0);
+      await expect(leave).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(chat).toBeVisible();
+    }
+
+    // The round survives entering and leaving: an answer, the current question and the composer note.
+    await questions.getByRole("button", { name: /SQLite/ }).click();
+    await expect(questions.getByText("Q8b - Migrate at startup?")).toBeVisible();
+    await page.getByRole("button", nav("Note")).click();
+    await page.getByRole("textbox", nav("Message")).fill("keep this");
+    await enter.click();
+    await expect(chat).toHaveCount(0);
+    await expect(questions.getByRole("button", nav("Question 8b"))).toHaveAttribute("aria-current", "step");
+    await expect(page.getByRole("textbox", nav("Message"))).toHaveValue("keep this");
+    await leave.click();
+    await expect(questions.getByRole("button", nav("Question 8b"))).toHaveAttribute("aria-current", "step");
+    await expect(questions.getByText("1 of 2 answered")).toBeVisible();
+    await expect(page.getByRole("textbox", nav("Message"))).toHaveValue("keep this");
+
+    // Folding leaves, and ⤢ on the folded sheet unfolds and enters.
+    await enter.click();
+    await questions.getByRole("button", nav("Fold questions")).click();
+    await expect(chat).toBeVisible();
+    await expect(questions.getByRole("button", nav("Open questions"))).toBeVisible();
+    await enter.click();
+    await expect(chat).toHaveCount(0);
+    await expect(questions.getByRole("button", nav("Fold questions"))).toBeVisible();
+    await expect(leave).toBeVisible();
+
+    // Answering both and sending leaves with the sent round shown; Continue opens the next one docked.
+    await questions.getByRole("button", { name: /Yes/ }).click();
+    await send.click();
+    await expect(page.getByText("Q8b - Migrate at startup?: Yes")).toBeVisible();
+    await expect(enter).toHaveCount(0);
+    const cont = page.getByRole("button", { name: /^Continue/ });
+    await expect(async () => {
+      await cont.click({ timeout: 2000 });
+      await expect(page.getByText("A fresh round.")).toBeVisible({ timeout: 2000 });
+    }).toPass();
+    await expect(questions.getByText("Q9 - Keep going?")).toBeVisible();
+    await expect(enter).toBeVisible();
+    await expect(page.getByText("Q8b - Migrate at startup?: Yes")).toBeVisible();
+    await expect(page.getByRole("dialog", nav("Questions, full screen"))).toHaveCount(0);
   });
 });
 
