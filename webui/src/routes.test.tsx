@@ -190,7 +190,8 @@ test("an unknown epic shows Epic not found", async () => {
 test("an empty epic shows No tickets yet, and an empty summary renders nothing", async () => {
   const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch());
   expect(await screen.findByText("No tickets yet")).toBeTruthy();
-  expect(container.querySelectorAll("p")).toHaveLength(1);
+  // The stats line and the "No tickets yet" text; an empty summary adds none.
+  expect(container.querySelectorAll("p")).toHaveLength(2);
 });
 
 test("the Epics, ticket and epic pages all render inside the shared container", async () => {
@@ -223,16 +224,13 @@ const loopRows = [
   rowOf("06", "blocked", { cost: 0.1 }),
 ];
 
-test("an epic page draws the segmented bar without empty segments, cancelled counted as done", async () => {
-  const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
-  await screen.findByRole("progressbar", { name: "Epic progress" });
-  const segments = [...container.querySelectorAll("[data-segment]")].map((s) => [
-    s.getAttribute("data-segment"),
-    (s as HTMLElement).style.width,
-  ]);
-  expect(segments.map(([k]) => k)).toEqual(["done", "running", "waiting", "attention"]);
-  expect(segments[0][1]).toBe(`${(2 / 6) * 100}%`);
+test("an epic page draws no segmented bar", async () => {
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
+  await screen.findByText("Title 03");
+  expect(screen.queryByRole("progressbar", { name: "Epic progress" })).toBeNull();
 });
+
+const statsLine = () => screen.getByTestId("stats-line").textContent;
 
 test("a loop epic shows the stat sentence with no token counts", async () => {
   renderAt(
@@ -241,7 +239,8 @@ test("a loop epic shows the stat sentence with no token counts", async () => {
     undefined,
     epicFetch({ state: "running", total: 6, done: 2, wall_clock: 4000, cost_total: 1.75, agent_time: 125, rows: loopRows }),
   );
-  expect(await screen.findByText("Running · 2 of 6 done · took 1h 6m · $1.75 · 2m of agent time")).toBeTruthy();
+  await screen.findByTestId("stats-line");
+  expect(statsLine()).toBe("Running · 1h 6m · $1.75 · 2m agent time");
   expect(screen.queryByText(/token/i)).toBeNull();
 });
 
@@ -331,24 +330,29 @@ test("a Design shows tokens, cost and lead time, or so far, only when stamped", 
 
 test("a loop epic with zero cost and agent time still shows both in the stat sentence", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "running", total: 6, done: 2, wall_clock: 4000, cost_total: 0, agent_time: 0, rows: loopRows }));
-  expect(await screen.findByText("Running · 2 of 6 done · took 1h 6m · $0.00 · 0s of agent time")).toBeTruthy();
+  await screen.findByTestId("stats-line");
+  expect(statsLine()).toBe("Running · 1h 6m · $0.00 · 0s agent time");
 });
 
 test("a waiting epic says Not queued until it holds a queue item", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "waiting", total: 1, queueable: true }));
-  expect(await screen.findByText("Not queued · 0 of 1 done · $0.00 · 0s of agent time")).toBeTruthy();
+  await screen.findByTestId("stats-line");
+  expect(statsLine()).toBe("Not queued · $0.00 · 0s agent time");
   cleanup();
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "waiting", total: 1, queued: true }));
-  expect(await screen.findByText("Waiting for a slot · 0 of 1 done · $0.00 · 0s of agent time")).toBeTruthy();
+  await screen.findByTestId("stats-line");
+  expect(statsLine()).toBe("Waiting for a slot · $0.00 · 0s agent time");
 });
 
 test("a Merge blocked epic shows its label and merge-block reason; a Merging epic its label", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "paused", total: 1, done: 1, land_block_reason: "rebase clash in a.go" }));
-  expect(await screen.findByText(/^Paused · 1 of 1 done/)).toBeTruthy();
+  await screen.findByTestId("stats-line");
+  expect(statsLine()).toMatch(/^Paused · /);
   expect(screen.getByText("rebase clash in a.go")).toBeTruthy();
   cleanup();
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "merging", total: 2, done: 1 }));
-  expect(await screen.findByText(/^Merging · 1 of 2 done/)).toBeTruthy();
+  await screen.findByTestId("stats-line");
+  expect(statsLine()).toMatch(/^Merging · /);
 });
 
 test("the done fold counts done tickets and adds cancelled only when above zero", async () => {
@@ -377,15 +381,15 @@ test("only a claimed ticket on the epic page spins", async () => {
   expect(arcs[0].parentElement?.closest("[data-tone]")?.textContent).toContain("Title 03");
 });
 
-test("a map epic shows only N of M done and rows with title and status", async () => {
+test("a map epic shows rows with title and status", async () => {
   renderAt(
     "/e/gx:m",
     okFor,
     undefined,
     epicFetch({ kind: "map", total: 2, done: 1, rows: [rowOf("01", "done"), rowOf("02", "open", { elapsed: 60 })] }),
   );
-  expect(await screen.findByText("1 of 2 done")).toBeTruthy();
-  expect(screen.getByText("open")).toBeTruthy();
+  expect(await screen.findByText("open")).toBeTruthy();
+  expect(screen.queryByText("1 of 2 done")).toBeNull();
 });
 
 test("every live, fold, Error and map row links to its ticket page", async () => {
@@ -400,7 +404,7 @@ test("every live, fold, Error and map row links to its ticket page", async () =>
     undefined,
     epicFetch({ kind: "map", total: 2, done: 1, rows: [rowOf("01", "done"), rowOf("02", "open")] }),
   );
-  await screen.findByText("1 of 2 done");
+  await screen.findByText("Title 02");
   expect(hrefOf("Title 01")).toBe("#/t/gx:e/01");
   expect(hrefOf("Title 02")).toBe("#/t/gx:e/02");
 });
@@ -640,12 +644,12 @@ test("a running row's elapsed time and a running epic's wall clock tick", async 
     const rows = [rowOf("01", "claimed", { claimed_at: "2026-01-01T09:58:00Z" })];
     renderAt("/e/gx:e", okFor, conn, epicFetch({ state: "running", total: 1, wall_clock: 600, rows }));
     expect(await screen.findByText("claimed · 2m")).toBeTruthy();
-    expect(screen.getByText("Running · 0 of 1 done · took 10m · $0.00 · 0s of agent time")).toBeTruthy();
+    expect(statsLine()).toBe("Running · 10m · $0.00 · 0s agent time");
     await act(async () => {
       await vi.advanceTimersByTimeAsync(TICK_MS * 2);
     });
     expect(screen.getByText("claimed · 4m")).toBeTruthy();
-    expect(screen.getByText("Running · 0 of 1 done · took 12m · $0.00 · 0s of agent time")).toBeTruthy();
+    expect(statsLine()).toBe("Running · 12m · $0.00 · 0s agent time");
     conn.stop();
   } finally {
     vi.useRealTimers();
@@ -692,21 +696,20 @@ test("the epic page shows Queue only for a queueable epic", async () => {
   expect(await screen.findByRole("button", { name: "Queue" })).toBeTruthy();
 });
 
-test("a draft impl epic's Queue button is off and says tickets are still publishing", async () => {
+test("a draft impl epic's Queue button is off", async () => {
   renderAt("/e/gx:foo-impl", okFor, undefined, epicFetch({ draft: true, queueable: false }));
   const queue = (await screen.findByRole("button", { name: "Queue" })) as HTMLButtonElement;
   expect(queue.disabled).toBe(true);
-  expect(screen.getByText("Still publishing tickets")).toBeTruthy();
 });
 
-test("a draft non-impl epic and an open impl epic do not show the publishing block", async () => {
+test("a draft non-impl epic and an open impl epic show no Queue button", async () => {
   renderAt("/e/gx:follow-ups", okFor, undefined, epicFetch({ draft: true, queueable: false }));
   await screen.findByRole("heading", { name: "follow-ups" });
-  expect(screen.queryByText("Still publishing tickets")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Queue" })).toBeNull();
   cleanup();
   renderAt("/e/gx:foo-impl", okFor, undefined, epicFetch({ draft: false, queueable: false }));
   await screen.findByRole("heading", { name: "foo-impl" });
-  expect(screen.queryByText("Still publishing tickets")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Queue" })).toBeNull();
 });
 
 // The epic page also GETs the epic list for its jump menu; keep that out of the recorded POSTs.

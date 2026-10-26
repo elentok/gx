@@ -1,11 +1,11 @@
-import { Box, Link, Text } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { Box, Text } from "@chakra-ui/react";
+import { Fragment, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { OpenDesign } from "../design/open";
 import { StartDesignButton } from "../design/SessionControls";
 import { useWide } from "../design/useWide";
-import { hasDesignSession } from "../design/view";
+import { hasDesignSession, liveSessions } from "../design/view";
 import type { EpicListRow, SessionInfo } from "../generated/server";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { pageRing } from "./ring";
@@ -17,17 +17,17 @@ import { JumpMenu, waitingCount } from "../nav/JumpMenu";
 import { Markdown } from "../markdown/Markdown";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
-import { StatLine } from "../page/StatLine";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
-import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail";
 import { StatsSection } from "./StatsSection";
 import {
+  designStatParts,
   detailLine,
   foldedTail,
+  loopStatParts,
   iconOf,
   idOf,
   isCancelled,
@@ -37,8 +37,6 @@ import {
   nestLive,
   pauseAction,
   rowContext,
-  segmentsOf,
-  statValues,
   toneOf,
 } from "./rows";
 
@@ -46,18 +44,8 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
   const folded = detail.rows.filter(isFolded);
   const cancelled = folded.filter(isCancelled).length;
   const ctx = rowContext(detail, now);
-  // The server's wall clock is as of the fetch, so a running epic adds the time since then.
-  const fetchedAt = useMemo(() => Date.now(), [detail]);
-  const wallClock =
-    detail.state === "running" && detail.wall_clock !== undefined
-      ? detail.wall_clock + Math.max(0, (now - fetchedAt) / 1000)
-      : detail.wall_clock;
   return (
     <>
-      <Box mt="4">
-        <SegmentedBar segments={segmentsOf(detail.rows)} value={detail.done} label="Epic progress" />
-      </Box>
-      <StatLine values={statValues({ ...detail, wall_clock: wallClock })} />
       {folded.length > 0 && (
         <Box as="details" mt="4">
           <Box as="summary" color="tone.done.fg">
@@ -113,6 +101,88 @@ function DesignSessionButton({ detail, open }: { detail: EpicDetail; open?: Open
     </Button>
   ) : (
     <StartDesignButton address={detail.address} open={open} onStarted={goToDesign} />
+  );
+}
+
+const QUEUE_LOCKED = "Queue unlocks once all tickets are published";
+
+// One bar under a hairline: the stats line on the left, the buttons on the right. On phones the buttons wrap to
+// their own row at a touch-friendly height. A paused epic's land-block reason sits under the bar.
+function EpicBar({
+  address,
+  detail,
+  now,
+  wide,
+  sessions,
+  partner,
+  openDesign,
+  onChanged,
+}: {
+  address: string;
+  detail: EpicDetail;
+  now: number;
+  wide: boolean;
+  sessions: SessionInfo[];
+  partner?: string;
+  openDesign?: OpenDesign;
+  onChanged: () => void;
+}) {
+  const navigate = useNavigate();
+  const isImpl = address.endsWith("-impl");
+  // The server's wall clock is as of the fetch, so a running epic adds the time since then.
+  const fetchedAt = useMemo(() => Date.now(), [detail]);
+  const wallClock =
+    detail.state === "running" && detail.wall_clock !== undefined
+      ? detail.wall_clock + Math.max(0, (now - fetchedAt) / 1000)
+      : detail.wall_clock;
+  const parts =
+    detail.kind === "map"
+      ? designStatParts(detail, liveSessions(address, sessions).length > 0, now)
+      : loopStatParts({ ...detail, wall_clock: wallClock });
+  return (
+    <Box mt="4" borderTopWidth="1px" borderColor="border" pt="3">
+      <Box display="flex" flexWrap="wrap" alignItems="center" justifyContent="space-between" gap="3">
+        <Text data-testid="stats-line" fontSize="sm" color="text.muted">
+          {parts.map((p, i) => (
+            <Fragment key={i}>
+              {i > 0 && " · "}
+              {p.tone ? <Text as="span" color={`tone.${p.tone}.fg`}>{p.text}</Text> : p.text}
+            </Fragment>
+          ))}
+        </Text>
+        <Box
+          display="flex"
+          flexWrap="wrap"
+          alignItems="center"
+          gap="2"
+          w={wide ? undefined : "full"}
+          css={wide ? undefined : { "& button": { height: "44px" } }}
+        >
+          {partner && (
+            <Button tone="muted" emphasis="secondary" onClick={() => navigate(epicHref(partner).slice(1))}>
+              {isImpl ? "Open design" : "Open implementation epic"}
+            </Button>
+          )}
+          {detail.draft && isImpl && (
+            <Box as="span" title={QUEUE_LOCKED}>
+              <Button tone="running" disabled>
+                Queue
+              </Button>
+            </Box>
+          )}
+          {detail.kind === "map" && <DesignSessionButton detail={detail} open={openDesign} />}
+          {detail.queueable && <QueueButton address={address} state={detail.state ?? ""} onQueued={onChanged} />}
+          {isMergeable(detail.state, !!detail.land_block_reason) && (
+            <MergeButton address={address} state={detail.state ?? ""} onMerged={onChanged} />
+          )}
+        </Box>
+      </Box>
+      {detail.state === "paused" && detail.land_block_reason && (
+        <Text data-reason mt="2" fontSize="sm" color="tone.paused.fg">
+          {detail.land_block_reason}
+        </Text>
+      )}
+    </Box>
   );
 }
 
@@ -177,42 +247,17 @@ export function EpicPage({
             }
           >
             {!wide && summary}
-            {partner && (
-              <Link href={epicHref(partner)} display="block" mt="2" fontSize="sm" color="tone.running.fg">
-                {address.endsWith("-impl") ? "Open design →" : "Open implementation epic →"}
-              </Link>
-            )}
-            {detail.state === "paused" && detail.land_block_reason && (
-              <Text data-reason mt="2" fontSize="sm" color="text.muted">
-                {detail.land_block_reason}
-              </Text>
-            )}
-            {detail.draft && address.endsWith("-impl") && (
-              <Box mt="2" display="flex" alignItems="center" gap="2">
-                <Button tone="running" disabled>
-                  Queue
-                </Button>
-                <Text as="span" color="text.muted">
-                  Still publishing tickets
-                </Text>
-              </Box>
-            )}
-            {detail.kind === "map" && (
-              <Box mt="2">
-                <DesignSessionButton detail={detail} open={openDesign} />
-              </Box>
-            )}
-            {detail.queueable && (
-              <Box mt="2" display="flex" alignItems="center" gap="2">
-                <QueueButton address={address} state={detail.state ?? ""} onQueued={refetch} />
-              </Box>
-            )}
-            {isMergeable(detail.state, !!detail.land_block_reason) && (
-              <Box mt="2" display="flex" alignItems="center" gap="2">
-                <MergeButton address={address} state={detail.state ?? ""} onMerged={refetch} />
-              </Box>
-            )}
           </PageHeader>
+          <EpicBar
+            address={address}
+            detail={detail}
+            now={Date.now()}
+            wide={wide}
+            sessions={sessions}
+            partner={partner}
+            openDesign={openDesign}
+            onChanged={refetch}
+          />
           {detail.total === 0 ? (
             <Text mt="4" color="text.muted">
               No tickets yet

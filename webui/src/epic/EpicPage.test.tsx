@@ -90,22 +90,102 @@ test("the back link counts the other Needs-you cards from the loaded list", asyn
   expect(await screen.findByRole("link", { name: "← Epics · 2 more need you" })).toBeTruthy();
 });
 
-test("a Design's epic page links to its -impl page", async () => {
+test("a Design's epic page has an Open implementation epic button that goes to the -impl page", async () => {
   render("/e/gx:blog", [joined], "map");
-  const link = await screen.findByRole("link", { name: "Open implementation epic →" });
-  expect(link.getAttribute("href")).toBe("#/e/gx:blog-impl");
+  fireEvent.click(await screen.findByRole("button", { name: "Open implementation epic" }));
+  expect(await screen.findByRole("heading", { level: 1, name: /blog-impl/ })).toBeTruthy();
 });
 
-test("an -impl epic page links back to the Design", async () => {
+test("an -impl epic page has an Open design button that goes back to the Design", async () => {
   render("/e/gx:blog-impl", [joined]);
-  const link = await screen.findByRole("link", { name: "Open design →" });
-  expect(link.getAttribute("href")).toBe("#/e/gx:blog");
+  fireEvent.click(await screen.findByRole("button", { name: "Open design" }));
+  expect(await screen.findByRole("heading", { level: 1, name: /^blog$/ })).toBeTruthy();
 });
 
-test("an -impl epic with no Design shows no link", async () => {
+test("an -impl epic with no Design shows no partner button", async () => {
   render("/e/gx:solo-impl", [row("solo-impl")]);
   await screen.findByRole("heading", { level: 1 });
-  expect(screen.queryByRole("link", { name: /Open (design|implementation epic)/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Open (design|implementation epic)/ })).toBeNull();
+});
+
+const statsOf = async () => (await screen.findByTestId("stats-line")).textContent;
+const loop = (over: Partial<EpicDetail>) => ({ detail: { total: 3, wall_clock: 125, cost_total: 1.5, agent_time: 300, ...over } });
+
+test.each([
+  ["a waiting epic with no queue item", { state: "waiting" }, "Not queued · took 2m · $1.50 · 5m agent time"],
+  ["a waiting queued epic", { state: "waiting", queued: true }, "Waiting for a slot · took 2m · $1.50 · 5m agent time"],
+  ["a running epic", { state: "running" }, "Running · 2m · $1.50 · 5m agent time"],
+  ["a finished epic", { state: "finished" }, "Finished · took 2m · $1.50 · 5m agent time"],
+  ["a draft -impl epic", { state: "waiting", draft: true }, "Publishing tickets · took 2m · $1.50 · 5m agent time"],
+  ["an epic that never started", { state: "waiting", queued: true, wall_clock: undefined }, "Waiting for a slot · $1.50 · 5m agent time"],
+] as [string, Partial<EpicDetail>, string][])("the stats line of %s", async (_n, over, text) => {
+  render("/e/gx:blog-impl", [], "loop", loop(over));
+  expect(await statsOf()).toBe(text);
+});
+
+test("the stats line has no segmented bar or done count", async () => {
+  render("/e/gx:blog-impl", [], "loop", loop({ state: "running", done: 1 }));
+  await statsOf();
+  expect(screen.queryByText(/of \d+ done/)).toBeNull();
+  expect(screen.queryByLabelText("Epic progress")).toBeNull();
+});
+
+const closedRow = (elapsed: number) => ({ address: "gx:blog/01", title: "t", rendered_status: "done", elapsed });
+const claimedRow = (secondsAgo: number) => ({
+  address: "gx:blog/02",
+  title: "t",
+  rendered_status: "claimed",
+  claimed_at: new Date(Date.now() - secondsAgo * 1000).toISOString(),
+});
+
+test("a Design's stats line shows the step label, the design time and the cost", async () => {
+  render("/e/gx:blog", [designCard], "map", {
+    detail: { steps: steps("spec"), rows: [closedRow(120)], stats: { cost: 2.5 } },
+  });
+  expect(await statsOf()).toBe("spec · 2m · $2.50");
+});
+
+test("a Design's stats line leaves out the time and cost when unknown, and shows the Done label when done", async () => {
+  render("/e/gx:blog", [designCard], "map", { detail: { steps: steps("done", ["done"]) } });
+  expect(await statsOf()).toBe("done");
+});
+
+test("a claimed row adds its time so far only while the Design has a live session", async () => {
+  const detail = { steps: steps("spec"), rows: [closedRow(60), claimedRow(600)] };
+  render("/e/gx:blog", [designCard], "map", { detail, sessions: [session("working")] });
+  expect(await statsOf()).toBe("spec · 11m");
+  cleanup();
+  render("/e/gx:blog", [designCard], "map", { detail, sessions: [session("exited")] });
+  expect(await statsOf()).toBe("spec · 1m");
+  cleanup();
+  render("/e/gx:blog", [designCard], "map", { detail: { steps: steps("spec"), rows: [claimedRow(600)] } });
+  expect(await statsOf()).toBe("spec");
+});
+
+test("the buttons run partner first and the action last, Merge in the done tone", async () => {
+  render("/e/gx:blog-impl", [joined], "loop", { detail: { state: "awaiting-merge" } });
+  const buttons = await screen.findAllByRole("button", { name: /^(Open design|Merge)$/ });
+  expect(buttons.map((b) => b.textContent)).toEqual(["Open design", "Merge"]);
+  expect(buttons[1].getAttribute("data-tone")).toBe("done");
+});
+
+test("a draft -impl epic has a disabled Queue with its tooltip", async () => {
+  render("/e/gx:blog-impl", [], "loop", { detail: { draft: true } });
+  const queue = (await screen.findByRole("button", { name: "Queue" })) as HTMLButtonElement;
+  expect(queue.disabled).toBe(true);
+  expect(queue.parentElement?.getAttribute("title")).toBe("Queue unlocks once all tickets are published");
+  expect(screen.queryByText("Still publishing tickets")).toBeNull();
+});
+
+test("the land-block reason is a notice under the bar only while paused; Merge follows isMergeable", async () => {
+  render("/e/gx:blog-impl", [], "loop", { detail: { state: "paused", land_block_reason: "rebase conflict" } });
+  expect((await screen.findByText("rebase conflict")).hasAttribute("data-reason")).toBe(true);
+  expect(screen.getByRole("button", { name: "Merge" })).toBeTruthy();
+  cleanup();
+  render("/e/gx:blog-impl", [], "loop", { detail: { state: "running", land_block_reason: "stale reason" } });
+  await statsOf();
+  expect(screen.queryByText("stale reason")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Merge" })).toBeNull();
 });
 
 const ringOf = () => document.querySelector("[data-kind][data-tone]") as HTMLElement;

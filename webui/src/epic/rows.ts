@@ -1,5 +1,4 @@
 import type { EpicDetail, EpicDetailRow } from "./detail";
-import type { Segment } from "../ui/progress-bar/SegmentedBar";
 import type { StatusKind } from "../ui/status-icon/StatusIcon";
 import type { Tone } from "../ui/tone";
 import { ticketHref } from "../hrefs";
@@ -46,14 +45,6 @@ export const isRunning = (row: EpicDetailRow) => bucketOf(row) === "running";
 export const toneOfStatus = (status: string): Tone => BUCKET_TONES[bucketOfStatus(status)];
 export const toneOf = (row: EpicDetailRow): Tone => toneOfStatus(row.rendered_status);
 
-export function segmentsOf(rows: EpicDetailRow[]): Segment[] {
-  return (Object.keys(BUCKET_TONES) as Bucket[]).map((key) => ({
-    key,
-    tone: BUCKET_TONES[key],
-    count: rows.filter((r) => bucketOf(r) === key).length,
-  }));
-}
-
 export function formatDuration(seconds: number): string {
   const s = Math.round(seconds);
   if (s < 60) return `${s}s`;
@@ -65,19 +56,59 @@ export function formatDuration(seconds: number): string {
 
 export const formatCost = (dollars: number) => `$${dollars.toFixed(2)}`;
 
-// A Waiting epic that holds no queue item is not waiting for a slot.
-const stateLabel = (d: EpicDetail) => (d.state === "waiting" && !d.queued ? "Not queued" : d.state && epicBadge(d.state));
+export interface StatPart {
+  text: string;
+  tone?: Tone;
+}
 
-export function statValues(d: EpicDetail): string[] {
-  const done = `${d.done} of ${d.total} done`;
-  if (d.kind === "map") return [done];
+const STATE_TONES: Record<NonNullable<EpicDetail["state"]>, Tone> = {
+  running: "running",
+  merging: "running",
+  finished: "done",
+  paused: "paused",
+  waiting: "waiting",
+  "awaiting-merge": "waiting",
+};
+
+// A draft -impl epic is still being published into; a Waiting epic that holds no queue item is not waiting for a slot.
+function statePart(d: EpicDetail): StatPart | undefined {
+  if (d.draft && d.address.endsWith("-impl")) return { text: "Publishing tickets", tone: "muted" };
+  if (!d.state) return undefined;
+  return { text: d.state === "waiting" && !d.queued ? "Not queued" : epicBadge(d.state), tone: STATE_TONES[d.state] };
+}
+
+// A running epic's clock counts up, so it reads plain; every other one reads "took".
+export function loopStatParts(d: EpicDetail): StatPart[] {
+  const wall =
+    d.wall_clock === undefined ? undefined : `${d.state === "running" ? "" : "took "}${formatDuration(d.wall_clock)}`;
   return [
-    stateLabel(d),
-    done,
-    d.wall_clock === undefined ? undefined : `took ${formatDuration(d.wall_clock)}`,
-    formatCost(d.cost_total),
-    `${formatDuration(d.agent_time)} of agent time`,
-  ].filter((v): v is string => v !== undefined && v !== "");
+    statePart(d),
+    wall && { text: wall },
+    { text: formatCost(d.cost_total) },
+    { text: `${formatDuration(d.agent_time)} agent time` },
+  ].filter((p): p is StatPart => !!p && p.text !== "");
+}
+
+// The Design's time: the rows' claim-to-close seconds, plus the claimed row's time so far only while a session
+// is live. Undefined when no row has a time.
+export function designTime(d: EpicDetail, live: boolean, now: number): number | undefined {
+  const times = d.rows.map((r) =>
+    isRunning(r) ? (live && r.claimed_at ? Math.max(0, (now - Date.parse(r.claimed_at)) / 1000) : undefined) : r.elapsed,
+  );
+  const known = times.filter((t): t is number => t !== undefined);
+  return known.length ? known.reduce((a, b) => a + b, 0) : undefined;
+}
+
+export function designStatParts(d: EpicDetail, live: boolean, now: number): StatPart[] {
+  const steps = d.steps ?? [];
+  const finished = steps.find((s) => s.step === "done")?.state === "done";
+  const label = (finished ? steps.find((s) => s.step === "done") : steps.find((s) => s.state === "current"))?.label;
+  const time = designTime(d, live, now);
+  return [
+    label ? { text: label } : undefined,
+    time === undefined ? undefined : { text: formatDuration(time) },
+    d.stats.cost === undefined ? undefined : { text: formatCost(d.stats.cost) },
+  ].filter((p): p is StatPart => !!p);
 }
 
 export const idOf = (address: string) => address.slice(address.lastIndexOf("/") + 1);
