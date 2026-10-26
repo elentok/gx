@@ -159,9 +159,18 @@ result, or exit 1 with `{"refused": true, "reason": "<code>", "message": "..."}`
 (the merge-lock refusal, `iteration_branch_missing`, `live_agent_on_tab`, `fork_children`, `status_refused`,
 `commitless`, `merge_conflict_pending`, …), never on `message`.
 
+**Verb list.** The verbs you may recommend or run are the paused ticket's `detail.actions`
+(`gx server tickets detail <project:epic/NN> --json`). Read it first. Recommend or run only verbs it
+lists; a verb it omits is not available now, whatever the reasons table below suggests.
+
+**Done.** A recovery is done once the verb was not refused and the ticket left `paused`. One
+exception: Retry on a `zero-commit` pause whose agent is still live only sends a prompt to that agent.
+"Prompt sent" counts as done; do not wait for the ticket to leave `paused`.
+
 **Go-ahead.** Every write (`merge`, `start-over`, `resume`, `merge --continue/--abort`) needs the
 human's explicit go-ahead in this session. `verify` is read-only and always free. In attended mode
-this is the only rule; unattended mode is below.
+(`m` → Investigate) ask the go-ahead as a `gx-question` round (see the `gx-grilling` skill), not as
+free text. Unattended mode is below.
 
 ## Unattended mode
 
@@ -173,20 +182,28 @@ session. Everything above (background, state, diagnosis) applies unchanged; only
 <unattended-verbs>
 
 - allowed: exactly the verbs the matched entry lists in its `verbs` (as named in the prompt),
-  whatever they are — e.g. R3's entry grants its `merge`. The entry's verbs are the whole grant,
-  with one exception: filing a tooling bug via the `gx-follow-up` skill (target `gx`, `unattended`)
+  whatever they are — e.g. R3's entry grants its `merge`. A matched entry keeps its granted verbs.
+  Plus, with no catalog entry needed: Retry alone, on any repair pause and on `zero-commit`, within
+  1 per kind and 3 per ticket (read the counts from `detail`), and only if Retry is in
+  `detail.actions`. Filing a tooling bug via the `gx-follow-up` skill (target `gx`, `unattended`)
   is always allowed. The prompt's entry is the authority, not your own judgment of what would help.
-- never: a pane nudge or any other verb the matched entry does not list (an unlisted `merge`,
-  `start-over`, `resume` or `merge --continue/--abort` included), or editing product code. The one
-  exception is filing via the `gx-follow-up` skill, above.
+- recommend only: Merge again and Start over (without a grant from a matched entry); Retry when it
+  is used up or would fail the same way; every verb on a `blocked-pane` pause (no Retry there).
+- never: a pane nudge or any other verb the matched entry does not list and the allowed bullet does
+  not grant (an ungranted `merge`, `start-over`, `resume` or `merge --continue/--abort` included),
+  or editing product code. The one exception is filing via the `gx-follow-up` skill, above.
 
 </unattended-verbs>
 
 - **Entry matched** → diagnose, then apply only the entry's verbs against the failed ticket (the
   investigate ticket's `parent`). Report at the action, as above.
-- **`No catalog entry matched`** → write the diagnosis to `## Findings` on your own ticket, report
-  it, and pause the failed ticket. Do nothing else;
-  propose any other command in the report for a human to run.
+- **No entry, Retry allowed** → diagnose, then Retry once. Done by the rule above.
+- **Recommend only** (the cases above, and `No catalog entry matched` with nothing allowed) → leave
+  the diagnosis and exactly one recommended verb on the failed ticket:
+  `gx server tickets recommend <project:epic/NN> --verb <verb> --diagnosis -` (diagnosis on stdin;
+  the verb must be in `detail.actions`). Also write the diagnosis to `## Findings` on your own
+  ticket. Do nothing else: no agent waits on this, a person picks the verb from the ticket's detail.
+  Propose any other command in the report for a human to run.
 - Never wait for a go-ahead, and never ask: an unattended session has no one to answer. Never end
   with an offer ("say go and I'll…", "want me to file this?"). Do the allowed action, or name the
   command for a human in the report.
@@ -204,8 +221,11 @@ repair verbs at all, only filing via the `gx-follow-up` skill. It is about gx it
 paused ticket, so there is no ticket to pause. It ends the same way: after filing, report
 `gx tickets set <your-addr> --iteration-status finished --commitless true`.
 
-Attended mode (`m` → Investigate opens an interactive tab, not a ticket) keeps the human go-ahead
-exactly as before.
+Attended mode (`m` → Investigate opens an interactive tab, not a ticket) keeps the human go-ahead,
+asked as a `gx-question` round.
+
+An epic-level investigation (a deadlock: every ticket paused or blocked) ends with findings only:
+write `## Findings`, report, and run no recovery verb.
 
 **Completeness is your job, not `merge`'s.** `merge` always leaves the ticket `done`, so judge first:
 
