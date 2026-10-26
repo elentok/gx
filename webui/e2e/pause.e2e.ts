@@ -100,8 +100,11 @@ const fixPrompt = "/gx-investigate demo:paused-epic/07 is needs-repair: Run fail
 const openFixDialog = async (page: Page) => {
   const row = page.locator('a[href$="/t/demo:paused-epic/07"]').locator("xpath=ancestor::*[.//button][1]");
   // The running fix ticket's timer re-renders the page every second, so the button is never "stable".
-  await row.getByRole("button", { name: "Fix it with an agent" }).dispatchEvent("click");
-  await expect(fixDialog(page)).toBeVisible();
+  // A fresh page can show the button before React attaches its handler, which drops the first click.
+  await expect(async () => {
+    await row.getByRole("button", { name: "Fix it with an agent" }).dispatchEvent("click");
+    await expect(fixDialog(page)).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
 };
 
 const sessions = async (fixture: Fixture) =>
