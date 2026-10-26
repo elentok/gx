@@ -85,6 +85,25 @@ func TestDeadlock_ErrorTicketPausesTheEpic(t *testing.T) {
 	}
 }
 
+// A blocked ticket listed before a paused one still makes the epic Paused, not
+// a blocked cycle: the result must not depend on ticket order.
+func TestDeadlock_BlockedTicketBeforePausedOneIsAllPaused(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "02")
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "second", servertest.TicketOpts{Status: "bogus"})
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store)
+	if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", ""); err != nil {
+		t.Fatal(err)
+	}
+	h.Server.ClaimNext()
+	waitFor(t, func() bool { return len(runLogOf(t, h, events.Deadlocked)) > 0 })
+	got := runLogOf(t, h, events.Deadlocked)
+	if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
+		t.Errorf("deadlocked events = %+v, want one all-paused", got)
+	}
+}
+
 // A map epic holds notes, not work, so it is never Deadlocked.
 func TestDeadlock_MapEpicIsNeverDeadlocked(t *testing.T) {
 	store := t.TempDir()

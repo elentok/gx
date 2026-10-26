@@ -69,7 +69,7 @@ func epicStateOf(e tickets.Epic) epicState {
 	state := epicDone
 	for _, t := range e.Tickets {
 		if isPaused(e, t) {
-			state = max(state, epicPaused)
+			state = epicPaused
 			continue
 		}
 		switch e.RenderedStatus(t) {
