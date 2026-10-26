@@ -18,6 +18,8 @@ type typedTicketSpec struct {
 	ticketType schema.TicketType
 	name       string
 	bodyFormat string
+
+	contextWindow int
 }
 
 // ensureTypedTicket is a no-op when epicPath already has a ticket of
@@ -49,7 +51,7 @@ func ensureTypedTicket(epicPath string, w io.Writer, spec typedTicketSpec) error
 		ID:                    schema.TicketID(id),
 		Status:                schema.StatusOpen,
 		Type:                  spec.ticketType,
-		ExpectedContextWindow: 30000,
+		ExpectedContextWindow: spec.contextWindow,
 	}
 	address, ok := tickets.AddressOfPath(stubPath, id)
 	if !ok {

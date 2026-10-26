@@ -64,6 +64,8 @@ func runTicketsEnsureCodeReview(epicPath string, w io.Writer) error {
 	return ensureTypedTicket(epicPath, w, typedTicketSpec{
 		ticketType: schema.TypeCodeReview,
 		name:       "code-review",
-		bodyFormat: "\n# %s — Code review: %s\n\n## What to review\n\n\n## Test seams\n\nnone — review ticket, opens fix tickets as children (`parent:` pointing back here) if it finds anything.\n\n## Acceptance criteria\n\n- [ ] Full epic reviewed for correctness and cross-ticket consistency\n- [ ] Any findings opened as child fix tickets\n",
+
+		contextWindow: 30000,
+		bodyFormat:    "\n# %s — Code review: %s\n\n## What to review\n\n\n## Test seams\n\nnone — review ticket, opens fix tickets as children (`parent:` pointing back here) if it finds anything.\n\n## Acceptance criteria\n\n- [ ] Full epic reviewed for correctness and cross-ticket consistency\n- [ ] Any findings opened as child fix tickets\n",
 	})
 }

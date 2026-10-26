@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -202,6 +203,94 @@ func TestRunTicketsEnsureVerify_CreatesOneValidStubThenNoops(t *testing.T) {
 	if !strings.Contains(stdout.String(), "already has a verify ticket") {
 		t.Errorf("stdout = %q, want it to mention the existing verify ticket", stdout.String())
 	}
+}
+
+func TestRunTicketsEnsureVerify_StubGetsSeventyKBudgetAndCodeReviewKeepsThirtyK(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		run    func(string, io.Writer) error
+		file   string
+		budget int
+	}{
+		{runTicketsEnsureVerify, "02-verify.md", 70000},
+		{runTicketsEnsureCodeReview, "02-code-review.md", 30000},
+	} {
+		epicPath := filepath.Join(t.TempDir(), "widget-epic")
+		writeDoneImplTicket(t, epicPath)
+
+		if err := tc.run(epicPath, io.Discard); err != nil {
+			t.Fatalf("%s: %v", tc.file, err)
+		}
+		ticket, err := schema.ParseTicket(filepath.Join(epicPath, "issues", tc.file))
+		if err != nil {
+			t.Fatalf("parse %s: %v", tc.file, err)
+		}
+		if ticket.ExpectedContextWindow != tc.budget {
+			t.Errorf("%s expected_context_window = %d, want %d", tc.file, ticket.ExpectedContextWindow, tc.budget)
+		}
+	}
+}
+
+func TestExecute_TicketsEnsureVerify_BodyNamesRepoSpecWithOrWithoutImplSuffix(t *testing.T) {
+	store := isolateTicketStore(t)
+	repoDir := testutil.TempRepo(t)
+	project := addProject(t, store, "mine", repoDir)
+	if err := os.MkdirAll(filepath.Join(repoDir, "docs", "specs"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "docs", "specs", "widget.md"), []byte("# spec\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, epic := range []string{"widget-impl", "widget", "other-impl"} {
+		writeDoneImplTicket(t, filepath.Join(project, epic))
+	}
+
+	for epic, wantSpec := range map[string]bool{"widget-impl": true, "widget": true, "other-impl": false} {
+		if _, err := runIn(t, repoDir, "tickets", "ensure-verify", epic); err != nil {
+			t.Fatalf("ensure-verify %s: %v", epic, err)
+		}
+		body, err := os.ReadFile(filepath.Join(project, epic, "issues", "02-verify.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Contains(string(body), "docs/specs/widget.md"); got != wantSpec {
+			t.Errorf("%s: body names repo spec = %v, want %v\n%s", epic, got, wantSpec, body)
+		}
+		if !wantSpec && strings.Contains(string(body), "Spec:") {
+			t.Errorf("%s: body names a spec but none exists\n%s", epic, body)
+		}
+	}
+}
+
+func TestRunTicketsEnsureVerify_BodyNamesEpicOwnSpecMd(t *testing.T) {
+	t.Parallel()
+	epicPath := filepath.Join(t.TempDir(), "widget-epic")
+	writeDoneImplTicket(t, epicPath)
+	if err := os.WriteFile(filepath.Join(epicPath, "spec.md"), []byte("# spec\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runTicketsEnsureVerify(epicPath, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+
+	body, err := os.ReadFile(filepath.Join(epicPath, "issues", "02-verify.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), filepath.Join(epicPath, "spec.md")) {
+		t.Errorf("body does not name the epic's spec.md\n%s", body)
+	}
+}
+
+// writeDoneImplTicket gives epicPath one done implement ticket, creating its
+// issues dir.
+func writeDoneImplTicket(t *testing.T, epicPath string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeTicket(t, filepath.Join(epicPath, "issues", "01-do-thing.md"), "01", "done", "implement")
 }
 
 // writeTicket writes a minimal valid ticket fixture with the given id,
