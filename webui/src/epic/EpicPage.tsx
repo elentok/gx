@@ -102,7 +102,7 @@ function EpicBar({
   detail,
   now,
   wide,
-  sessions,
+  designLive,
   partner,
   openDesign,
   onChanged,
@@ -111,7 +111,7 @@ function EpicBar({
   detail: EpicDetail;
   now: number;
   wide: boolean;
-  sessions: SessionInfo[];
+  designLive: boolean;
   partner?: string;
   openDesign?: OpenDesign;
   onChanged: () => void;
@@ -126,7 +126,7 @@ function EpicBar({
       : detail.wall_clock;
   const parts =
     detail.kind === "map"
-      ? designStatParts(detail, liveSessions(address, sessions).length > 0, now)
+      ? designStatParts(detail, designLive, now)
       : loopStatParts({ ...detail, wall_clock: wallClock });
   return (
     <Box mt="4" borderTopWidth="1px" borderColor="border" pt="3">
@@ -207,6 +207,8 @@ export function EpicPage({
   // Subscribing re-renders the page every tick, which keeps the running clocks counting.
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
   const wide = useWide();
+  const now = Date.now();
+  const designLive = liveSessions(address, sessions).length > 0;
   const { detail, notFound, refetch } = useEpicDetail(address, conn, fetchDetail);
   const { list } = useEpicList(fetchList, conn);
   // The payload has no name field: the epic name is the address after the project.
@@ -242,9 +244,9 @@ export function EpicPage({
           <EpicBar
             address={address}
             detail={detail}
-            now={Date.now()}
+            now={now}
             wide={wide}
-            sessions={sessions}
+            designLive={designLive}
             partner={partner}
             openDesign={openDesign}
             onChanged={refetch}
@@ -254,7 +256,7 @@ export function EpicPage({
               No tickets yet
             </Text>
           ) : (
-            <EpicBody detail={detail} now={Date.now()} designLive={liveSessions(address, sessions).length > 0} fixAgent={fixAgent} />
+            <EpicBody detail={detail} now={now} designLive={designLive} fixAgent={fixAgent} />
           )}
           <MoreStats detail={detail} />
         </>

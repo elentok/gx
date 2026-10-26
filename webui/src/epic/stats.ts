@@ -27,27 +27,38 @@ const topCounts = (counts: Record<string, number> = {}, limit = Infinity) =>
 
 // The collapsed card's dim preview: lines (loop only), tokens and lead time, whichever are stamped.
 export function statPreview(d: EpicDetail): string {
-  const byLabel = new Map(statRows(d).map((r) => [r.label, r.value]));
-  const lines = d.kind === "map" ? undefined : byLabel.get("Lines");
-  const tokens = byLabel.get("Tokens");
-  const lead = byLabel.get("Lead time");
-  return [lines && `${lines} lines`, tokens && `${tokens} tokens`, lead && `lead time ${lead}`].filter(Boolean).join(" · ");
+  const { lines, tokens, lead } = headlineValues(d);
+  return [
+    d.kind !== "map" && lines && `${lines} lines`,
+    tokens && `${tokens} tokens`,
+    lead && `lead time ${lead}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+// The formatted values of the three headline rows, undefined when not stamped.
+function headlineValues({ stats: s }: EpicDetail) {
+  return {
+    lines: s.lines_added === undefined ? undefined : `+${s.lines_added.toLocaleString("en-US")} −${(s.lines_removed ?? 0).toLocaleString("en-US")}`,
+    tokens: s.total_tokens === undefined ? undefined : formatTokens(s.total_tokens),
+    lead: s.lead_time === undefined ? undefined : s.lead_time_so_far ? `${formatLead(s.lead_time)} so far` : formatLead(s.lead_time),
+  };
 }
 
 // A row with no stamped value is left out.
 export function statRows(d: EpicDetail): StatRow[] {
   const { stats: s } = d;
   const f = s.friction;
+  const { lines, tokens, lead } = headlineValues(d);
   const rows: StatRow[] = [];
-  if (s.lines_added !== undefined) {
-    rows.push({ label: "Lines", value: `+${s.lines_added.toLocaleString("en-US")} −${(s.lines_removed ?? 0).toLocaleString("en-US")}` });
-  }
-  if (s.total_tokens !== undefined) rows.push({ label: "Tokens", value: formatTokens(s.total_tokens) });
+  if (lines) rows.push({ label: "Lines", value: lines });
+  if (tokens) rows.push({ label: "Tokens", value: tokens });
   if (s.cost !== undefined) rows.push({ label: "Cost", value: formatCost(s.cost) });
-  if (s.lead_time !== undefined) {
+  if (lead) {
     rows.push({
       label: "Lead time",
-      value: s.lead_time_so_far ? `${formatLead(s.lead_time)} so far` : formatLead(s.lead_time),
+      value: lead,
       note: d.kind === "map" || s.lead_time_so_far ? undefined : "created → merged to trunk",
     });
   }

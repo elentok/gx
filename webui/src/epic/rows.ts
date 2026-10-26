@@ -1,3 +1,4 @@
+import { MapStepCurrent, MapStepDone, ProgressDone } from "../generated/server";
 import type { EpicDetail, EpicDetailRow } from "./detail";
 import type { Tone } from "../ui/tone";
 import { ticketHref } from "../hrefs";
@@ -90,8 +91,8 @@ export function designTime(d: EpicDetail, live: boolean, now: number): number | 
 
 export function designStatParts(d: EpicDetail, live: boolean, now: number): StatPart[] {
   const steps = d.steps ?? [];
-  const finished = steps.find((s) => s.step === "done")?.state === "done";
-  const label = (finished ? steps.find((s) => s.step === "done") : steps.find((s) => s.state === "current"))?.label;
+  const doneStep = steps.find((s) => s.step === ProgressDone);
+  const label = (doneStep?.state === MapStepDone ? doneStep : steps.find((s) => s.state === MapStepCurrent))?.label;
   const time = designTime(d, live, now);
   return [
     label ? { text: label } : undefined,
