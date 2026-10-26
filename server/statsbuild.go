@@ -81,6 +81,7 @@ func newStats(n int) Stats {
 			PauseReasons:   []string{},
 			PausesByReason: emptyCounts(n), RunEvents: emptyCounts(n), PauseEndings: emptyCounts(n),
 		},
+		Grilling: newStatsGrilling(n),
 	}
 }
 

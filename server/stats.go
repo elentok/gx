@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -69,6 +70,7 @@ type Stats struct {
 	Throughput StatsThroughput `json:"throughput"`
 	Cost       StatsCost       `json:"cost"`
 	Friction   StatsFriction   `json:"friction"`
+	Grilling   StatsGrilling   `json:"grilling"`
 }
 
 func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
@@ -86,5 +88,13 @@ func (s *Server) stats(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, buildStats(all, n, project, time.Now().In(time.Local)))
+	recs, err := conversations.List(s.cfg.ConversationsDir)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	now := time.Now().In(time.Local)
+	out := buildStats(all, n, project, now)
+	out.Grilling = buildGrilling(recs, s.onMapEpic, newStatsWindow(n, now), project)
+	writeJSON(w, out)
 }

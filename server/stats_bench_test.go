@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -15,6 +16,7 @@ const (
 	benchTicketsPerEpic  = 100
 	statsBuildBudget     = time.Second
 	benchStampDaysSpread = 90
+	benchRecords         = 2000
 )
 
 func writeBenchStore(b *testing.B, store string) {
@@ -60,6 +62,36 @@ func statsBuildOnce(b *testing.B, store string) time.Duration {
 	}
 	buildStats(all, 90, "", time.Now())
 	return time.Since(start)
+}
+
+// BenchmarkStats_Grilling reads and sums 2,000 conversation records, the
+// Grilling work of one /v1/stats request.
+func BenchmarkStats_Grilling(b *testing.B) {
+	root := b.TempDir()
+	now := time.Now()
+	for i := range benchRecords {
+		items := make([]conversations.GrillingItem, 5)
+		for j := range items {
+			at := now.AddDate(0, 0, -(i+j)%benchStampDaysSpread)
+			items[j] = conversations.GrillingItem{MessageID: fmt.Sprintf("m-%d-%d", i, j), At: at, Questions: 3, Words: 120}
+		}
+		rec := conversations.Record{ID: fmt.Sprintf("c-%04d", i), Ticket: "proj:design/01", Design: true, RecordedAt: now, Grilling: items}
+		if err := conversations.Save(root, rec); err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.ResetTimer()
+	for range b.N {
+		start := time.Now()
+		recs, err := conversations.List(root)
+		if err != nil {
+			b.Fatal(err)
+		}
+		buildGrilling(recs, func(string) bool { return true }, newStatsWindow(90, now), "")
+		if took := time.Since(start); took > statsBuildBudget {
+			b.Errorf("grilling build took %v, budget %v", took, statsBuildBudget)
+		}
+	}
 }
 
 // BenchmarkStats_Build loads and aggregates a store of about 26,000 tickets,
