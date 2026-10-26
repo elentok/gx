@@ -7,7 +7,8 @@ Epics page cards. The helpers `section` and `card` in `fixture.ts` find a sectio
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14),
-`united.e2e.ts` (flows 15, 16, 17, 18, 19).
+`united.e2e.ts` (flows 15, 16, 17, 18, 19), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24),
+`newdesign.e2e.ts` (flows 25, 26, 27).
 
 ## 1. Queue an epic
 
@@ -216,3 +217,74 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Steps:** open Ready to design; click Triage on the first card; close the dialog; click the title.
 - **Pass:** the `follow-ups` card is first and reads "1 bug, 1 idea". The dialog shows
   `/gx-triage-follow-ups --project demo` and a Copy button. The title opens `#/e/demo:follow-ups`.
+
+## 20. Jump menu opens and closes
+
+- **Scenario:** `united`
+- **Steps:**
+  1. Open `#/e/demo:running-epic`; click the title.
+  2. Press Esc; press Ctrl+K.
+  3. Type `draft-epic`, then `finished-a`; press Esc.
+- **Pass:**
+  - The title click and Ctrl+K both open the "Jump to epic" dialog with the filter focused; Esc closes it.
+  - With no text, Needs you rows show (`paused-epic`) and Ready to design (`draft-epic`) and Finished
+    (`finished-a`) rows do not. Typing a name shows its row.
+
+## 21. Jump menu keyboard and picks
+
+- **Scenario:** `united`
+- **Steps:**
+  1. Open `#/e/demo:running-epic`, open the menu and type `finished`; press Down, then Enter.
+  2. Open the menu again and pick `design-live`, then `running-epic`, then the one-off `queued`.
+- **Pass:**
+  - Down selects the second row and Enter opens its epic page; the menu closes.
+  - `design-live` opens `#/d/demo:design-live`, `running-epic` opens `#/e/demo:running-epic`, and the
+    one-off opens `#/t/demo:one-offs/02`.
+- **Not covered:** the `design-epic` Design of the spec text. `united` has no joined card, so the Design
+  pick uses `design-live`.
+
+## 22. Jump menu count and back link
+
+- **Scenario:** `united`
+- **Steps:** open `#/e/demo:paused-epic`, then `#/e/demo:running-epic`; click "← Epics". Open
+  `#/d/demo:design-live`; click "← Epics".
+- **Pass:** the title count of other Needs-you cards reads 8 on `paused-epic` (itself in Needs you) and
+  9 on the other two pages. "← Epics" opens `#/epics` from the epic page and the Design page.
+
+## 23. Phone, Epics page
+
+- **Scenario:** `united`, at 375 px wide (`test.use({ viewport })`)
+- **Pass:** two cards of Needs you share a left edge and the second sits below the first.
+
+## 24. Phone, Design page
+
+- **Scenario:** `design`, at 375 px wide
+- **Steps:**
+  1. Open `#/d/demo:design-epic` and start the session.
+  2. Click the Progress summary, then Close in the modal.
+  3. Tap the title; click Close on the sheet.
+- **Pass:**
+  - The summary opens the "Design progress steps" modal with Resolve tickets current.
+  - Note and Focus read only their icons; the Auto-advance switch has no text.
+  - The title opens a "Jump to epic" sheet that fills the screen; Close closes it.
+
+## 25. New Design from an empty page
+
+- **Scenario:** `empty` (one project, no epics)
+- **Pass:** the page reads "No epics yet." and offers New Design.
+
+## 26. New Design form
+
+- **Scenario:** `ready`
+- **Steps:**
+  1. Click New Design (right of the filter); fill the name `fresh-design` and an idea; Start design.
+  2. Click "← Epics" and the new card's title.
+- **Pass:**
+  - The form is a "New Design" dialog. Start opens `#/d/demo:fresh-design` and `gx server epics` lists it.
+  - The card of the running session opens the same page.
+
+## 27. Design a not-started Design
+
+- **Scenario:** `united`
+- **Steps:** open Ready to design; click Design on the `design-new` card.
+- **Pass:** the page is `#/d/demo:design-new` and `gx agents list` names `design-new`.

@@ -54,6 +54,8 @@ type scenario struct {
 }
 
 var scenarios = map[string]scenario{
+	// empty: a project with no epics, so the Epics page has no cards.
+	"empty": {projects: []string{project}},
 	// ready: an epic that is not queued yet.
 	"ready": {
 		epics: []epic{{project, "ready-epic", []ticket{
