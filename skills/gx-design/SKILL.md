@@ -85,7 +85,8 @@ the ticket title during `resolve-tickets`.
    - The last map ticket closing chains into the spec step (step 4) when the budget allows.
 4. **No `docs/specs/<epic>.md`** → dispatch a subagent to read [gx-to-spec](../gx-to-spec/SKILL.md) and follow it. Seed it with
    the map body (Destination, Decisions so far) and each closed ticket's title and resolution gist,
-   not full ticket bodies. The spec is where the map's gaps first show, so tell the subagent to sort
+   not full ticket bodies. Also seed it with the list of stored mocks under `<root>/<map>/mocks/`.
+   The spec is where the map's gaps first show, so tell the subagent to sort
    every fact the map never decided:
    - **Implementer's choice** (a name, a config key, an internal marker): the spec says the
      implementer picks it, and moves on.
@@ -164,6 +165,8 @@ Review the spec against the map it came from and its own template, not in the ab
 - Is each user story testable?
 - Does every user story have an entry in the spec's `## Verification` section? A story with no
   entry is a finding. An epic with no user-visible behavior may say so in one line instead.
+- Does each state of each stored mock have a Mock states line in `## Verification`? A missing line
+  is a finding, like a story with no entry.
 - Does anything creep past the map's `## Out of scope` or the Destination's boundary?
 - What did the spec silently assume that the map never decided?
 - What holes remain, or what question does the spec raise but not answer?

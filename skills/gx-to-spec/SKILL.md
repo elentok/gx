@@ -76,6 +76,19 @@ the epic is built. Each entry lists:
 
 If the epic has no user-visible behavior (no web, CLI or server change), write one line saying so.
 
+If the map has a stored mock (`$(gx tickets root)/<map>/mocks/*.html`), end `## Verification` with a
+**Mock states** list: one line per approved state in each stored mock. Each line names:
+
+- the mock path, in full: `$(gx tickets root)/<map>/mocks/<NN>-<slug>.html`
+- the state name
+- the width
+- the fixture scenario
+- the part names in that state
+
+Story entries refer to a Mock states line by its state name. They do not repeat the look check. If a
+line's fixture scenario does not exist yet, also list it under the new flows or scenarios to write.
+With no stored mock, write no Mock states list.
+
 ## Out of Scope
 
 A description of the things that are out of scope for this spec.
