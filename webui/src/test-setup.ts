@@ -10,5 +10,8 @@ globalThis.Request = class extends NodeRequest {
   }
 };
 
-// A page cache entry must never leak into the next test.
-afterEach(() => globalThis.sessionStorage?.clear());
+// A page cache entry or a stored filter must never leak into the next test.
+afterEach(() => {
+  globalThis.sessionStorage?.clear();
+  globalThis.localStorage?.clear();
+});

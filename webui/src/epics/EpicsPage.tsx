@@ -1,4 +1,4 @@
-import { Box, Input, Text } from "@chakra-ui/react";
+import { Box, chakra, Input, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext } from "../connection";
@@ -12,6 +12,16 @@ import { Spinner } from "../ui/spinner/Spinner";
 import { EpicCard } from "./EpicCard";
 import { useEpicList, type FetchEpicList } from "./list";
 import { sectionsOf, type Section } from "./view";
+
+const PROJECT_KEY = "gx.epics.project";
+
+function readStoredProject(): string {
+  try {
+    return localStorage.getItem(PROJECT_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
 
 function NewDesignDialog({ projects, open, onClose }: { projects: string[]; open?: OpenDesign; onClose: () => void }) {
   const navigate = useNavigate();
@@ -82,10 +92,21 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
   const [query, setQuery] = useState("");
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [designing, setDesigning] = useState(false);
+  const [storedProject, setStoredProject] = useState(readStoredProject);
   const searching = query.trim() !== "";
-  const sections = list ? sectionsOf(list.epics, query, list.recently_finished) : [];
-  const shown = searching ? sections.filter((s) => s.rows.length > 0) : sections;
   const projects = [...new Set((list?.epics ?? []).map((e) => e.project))];
+  // A stored project that is gone, or a single project, acts as "All projects" without rewriting it.
+  const filterProject = projects.length > 1 && projects.includes(storedProject) ? storedProject : undefined;
+  const sections = list ? sectionsOf(list.epics, query, list.recently_finished, filterProject) : [];
+  const shown = searching ? sections.filter((s) => s.rows.length > 0) : sections;
+  const chooseProject = (project: string) => {
+    setStoredProject(project);
+    try {
+      localStorage.setItem(PROJECT_KEY, project);
+    } catch {
+      // Storage is a convenience; the choice still holds for this page.
+    }
+  };
   // A filter match opens a collapsed section; without one, the toggle flips the default.
   const isOpen = (s: Section) => searching || s.collapsedByDefault === toggled.has(s.key);
   const toggle = (key: string) =>
@@ -115,6 +136,28 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        {projects.length > 1 && (
+          <chakra.select
+            aria-label="Project"
+            value={filterProject ?? ""}
+            onChange={(e) => chooseProject(e.target.value)}
+            bg="surface"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="sm"
+            px="2"
+            h="40px"
+            fontSize="16px"
+            flexShrink="0"
+          >
+            <option value="">All projects</option>
+            {projects.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </chakra.select>
+        )}
         {list && list.epics.length > 0 && newDesign}
       </Box>
       {failed ? (
