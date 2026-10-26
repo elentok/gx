@@ -53,6 +53,26 @@ words."
 A loud or hand-built command seen in more than one session is a finding: its suggested fix is a
 `gx brief` helper that prints only what the agent was looking for (category `idea`).
 
+### Verify parts
+
+A verify part is a ticket with `expected_context_window`, so the table's `context-overrun` flag
+already covers it: actual tokens minus the 50K session baseline pass twice the budget. That flag is
+the only automatic check; don't add another. Compare every verify part yourself, flagged or not,
+using only the table and the ticket body (`gx tickets show`), never its session:
+
+- Its actual tokens (minus the baseline) against its budget.
+- Its budget against the sum of the per-story estimates in its body, plus the 15K base. They should
+  match; if not, the part was written wrong.
+
+A cap stop is a `verify-cap-stopped` event in the run log. A part that has one had a budget that was
+too low, whatever the numbers say: treat it as off even if the actual tokens look fine.
+
+When a part is off, make one finding per symptom, not per part (step 4): the estimate rule in
+[gx-to-tickets](../gx-to-tickets/SKILL.md) needs adjusting. Evidence: the part's ticket id, budget,
+actual, story estimates and any cap stop. Target `gx:follow-ups`, category `idea`. It goes through
+the usual triage (step 5) and [gx-follow-up](../gx-follow-up/SKILL.md) (step 6). Parts within budget
+produce no finding.
+
 ## 4. Join by symptom
 
 Group the subagent reports by symptom across tickets: one cause seen in five tickets is one finding
