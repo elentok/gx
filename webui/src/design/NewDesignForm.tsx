@@ -101,18 +101,12 @@ export function NewDesignForm({
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const slug = draft.slug.trim();
-    let startFailure: string | undefined;
     run(
-      async () => {
-        const res = await open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project });
-        // The map exists though no session started, so the Design page takes over and offers the retry.
-        if (!res.epic_created) return res;
-        startFailure = res.message ?? "The design session did not start.";
-        return { ...res, refused: false };
-      },
-      () => {
+      () => open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project }),
+      (res) => {
         writeDraft(undefined);
-        onStarted(`${draft.project}:${slug}`, startFailure);
+        // With start_error the map exists though no session started; the Design page offers the retry.
+        onStarted(`${draft.project}:${slug}`, res.start_error);
       },
     );
   };

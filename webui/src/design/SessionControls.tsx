@@ -18,7 +18,7 @@ export function useWrite() {
   const conn = useConnectionContext();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
-  const run = async (call: () => Promise<{ refused?: boolean; message?: string }>, onDone?: () => void) => {
+  const run = async <R extends { refused?: boolean; message?: string }>(call: () => Promise<R>, onDone?: (res: R) => void) => {
     if (pending) return;
     setPending(true);
     setError("");
@@ -27,7 +27,7 @@ export function useWrite() {
       if (res.refused) setError(res.message ?? "The request was refused.");
       else {
         conn.refresh();
-        onDone?.();
+        onDone?.(res);
       }
     } catch {
       setError("Could not reach gx. Try again.");

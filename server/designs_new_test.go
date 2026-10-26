@@ -53,7 +53,7 @@ func TestDesignsOpenNew_WritesTheMapThenStartsTheSession(t *testing.T) {
 	}
 }
 
-func TestDesignsOpenNew_StartFailureReturnsJSONWithTheMarker(t *testing.T) {
+func TestDesignsOpenNew_StartFailureIsOneResultWithStartError(t *testing.T) {
 	store := t.TempDir()
 	repo := testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
@@ -63,8 +63,8 @@ func TestDesignsOpenNew_StartFailureReturnsJSONWithTheMarker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !res.Refused || !res.EpicCreated || res.Session != nil {
-		t.Fatalf("open = %+v, want refusal with epic_created", res)
+	if res.Refused || !res.EpicCreated || res.StartError == "" || res.Session != nil {
+		t.Fatalf("open = %+v, want epic_created with start_error and no refusal", res)
 	}
 	if _, err := os.Stat(filepath.Join(store, "proj", "fresh-idea", "ticket.md")); err != nil {
 		t.Errorf("map missing: %v", err)
