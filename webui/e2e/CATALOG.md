@@ -6,7 +6,8 @@ Retries are off. Locators use roles and visible text, plus `data-testid` `pill` 
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
-Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14).
+Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14),
+`united.e2e.ts` (flows 15, 16, 17, 18, 19).
 
 ## 1. Queue an epic
 
@@ -165,3 +166,53 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   2. Run `gx agent step spec` with the session id in `GX_AGENT_SESSION`.
 - **Pass:** the chat shows the spinner row "Working: Resolve tickets · first" (the current ticket's
   title), then "Working: Spec" after the report.
+
+## 15. Redirects
+
+- **Scenario:** `ready`
+- **Steps:** set the hash to `#/`, `#/q`, `#/designs` and an unknown path in turn.
+- **Pass:** each lands on `#/epics`; the nav has links Epics and Stats, and none named Queue or Designs.
+
+## 16. Needs you
+
+- **Scenario:** `united` (two projects, one card per section and per Needs-you reason, workers held)
+- **Steps:** open the Epics page; open and close Ready to design; click around a card; filter.
+- **Pass:**
+  - Sections read Needs you, In progress, Ready to queue, Ready to design, Finished. Ready to design
+    and Finished start collapsed, and the header toggles Ready to design.
+  - Each title shows its card count: nine in Needs you (paused, question, permission, deadlock,
+    merge-blocked, awaiting-merge, Design question, stopped Design, paused one-off), and Finished
+    counts the cards on screen.
+  - Every Needs-you card has a pill; no other section has one.
+  - A click on a card's project text stays on `#/epics`; its title opens `#/e/demo:paused-epic`.
+  - Merge is the only button on the merge-blocked and awaiting-merge cards. Queued, running,
+    finished and draft cards have no buttons.
+  - A filter shows only the matching card, and "No match" when nothing matches.
+- **Not covered:** a Ready to queue card with a blocker (the scenario has none, so its reason is
+  unchecked).
+
+## 17. Merge from the card
+
+- **Scenario:** `united`
+- **Steps:** click Merge on `awaiting-epic`, then on `blocked-merge-epic`.
+- **Pass:** each card shows the server's refusal, and the page stays on `#/epics`. The fixture's
+  epics have no git branch, so a successful merge is not covered.
+
+## 18. Joined card
+
+- **Scenario:** `design`, started with `--hold`
+- **Steps:** run `gx tickets set demo:design-epic --design-step create-tickets`, then `branch`, then
+  `gx server queue add demo:design-epic-impl`.
+- **Pass:**
+  - One card, `design-epic`, with no `design-epic-impl` card. Its title opens `#/e/demo:design-epic`.
+  - The status reads "Designing" with a percentage in the ring, then "Creating tickets (N so far)..."
+    with "…", then "Not started" with `n/m` at Branch, then "Implementing..." once queued. The title
+    opens `#/e/demo:design-epic-impl` from Branch on.
+  - The impl epic page links "Open design →" and the design epic page links "Open implementation epic →".
+
+## 19. Follow-ups triage
+
+- **Scenario:** `united`
+- **Steps:** open Ready to design; click Triage on the first card; close the dialog; click the title.
+- **Pass:** the `follow-ups` card is first and reads "1 bug, 1 idea". The dialog shows
+  `/gx-triage-follow-ups --project demo` and a Copy button. The title opens `#/e/demo:follow-ups`.
