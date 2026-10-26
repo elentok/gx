@@ -33,6 +33,29 @@ func cmdEpicMerge(api ServerAPI, epic string) tea.Cmd {
 	}
 }
 
+// actionStashMerge is the server's "Stash, merge and restore" on an epic paused
+// on a dirty trunk. Its menu result carries the epic address as EpicName.
+const actionStashMerge = "stash-merge-epic"
+
+// cmdEpicStashMerge asks the server to stash, merge epic ("project:epic") and
+// restore the stash, and toasts the outcome.
+func cmdEpicStashMerge(api ServerAPI, epic string) tea.Cmd {
+	return func() tea.Msg {
+		res, err := api.EpicStashMerge(context.Background(), epic)
+		switch {
+		case err != nil:
+			return notify.Error("stash-merge " + epic + ": " + err.Error())()
+		case res.Refused:
+			return notify.Error("stash-merge refused: " + res.Message)()
+		case res.Paused:
+			return notify.Error("stash-merge paused: " + res.Message)()
+		case res.TrunkConflict != "":
+			return notify.Warning("merged; conflicts left in " + res.TrunkConflict)()
+		}
+		return notify.Success(epic + " merged")()
+	}
+}
+
 // isPausedRoot is a queued epic whose tickets are all done: its merge paused,
 // so the server kept the root in the queue.
 func isPausedRoot(epic tickets.Epic, queued map[string]bool) bool {

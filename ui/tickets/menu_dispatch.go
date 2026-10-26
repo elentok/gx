@@ -25,6 +25,11 @@ func dispatchMenuAction(api ServerAPI, worktreeRoot string, settings ui.Settings
 			return notify.Warning(serverNotRunning)
 		}
 		return cmdEpicMerge(api, result.EpicName)
+	case actionStashMerge:
+		if api == nil {
+			return notify.Warning(serverNotRunning)
+		}
+		return cmdEpicStashMerge(api, result.EpicName)
 	case actionStartSession:
 		return startSessionCmd(settings.TicketStore, result.Path)
 	case actionInvestigate:

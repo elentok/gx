@@ -17,6 +17,7 @@ func (m QueueModel) handleQueueTicketMenuKey() (tea.Model, tea.Cmd) {
 			branch:       epic.MergeTarget,
 			queueable:    epicQueueable(epic, m.checkedPaths()),
 			serverReason: serverReason(m.serverAPI, m.link),
+			actions:      m.summaries[epic.Name].Actions,
 		})
 		return m, nil
 	}

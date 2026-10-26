@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -47,6 +48,9 @@ type epicMenuInput struct {
 	archived     bool
 	// session is the design session Go to design session… opens; "" offers none.
 	session string
+	// actions are the verbs of the epic's blocked merge, from its server
+	// summary; empty when the merge is not blocked.
+	actions []string
 }
 
 // epicMenuItems lists every action for an epic, in the shape of
@@ -84,7 +88,32 @@ func epicMenuItems(in epicMenuInput) []contextmenu.Item[ticketTarget] {
 	if in.branch != "" {
 		mergeLabel += " into " + in.branch
 	}
-	items = append(items, pick(mergeLabel, "", actionMerge, mergeGroup, firstReason(in.serverReason, mergeWhy)))
+	mergeItem := pick(mergeLabel, "", actionMerge, mergeGroup, firstReason(in.serverReason, mergeWhy))
+	if len(in.actions) == 0 {
+		items = append(items, mergeItem)
+	}
+	// A blocked merge offers the verbs of its pause in place of plain Merge. The
+	// server only sends them for a finished epic, so unfinished tickets in the
+	// row (it may lag) don't dim them.
+	blockedWhy := firstReason(in.serverReason, reasonIf(!epic.MergedAt.IsZero(), alreadyMerged))
+	if len(in.actions) > 0 {
+		mergeItem.Disabled, mergeItem.Group = blockedWhy, contextmenu.Suggested
+	}
+	for _, word := range in.actions {
+		v, ok := schema.VerbOfWord(word)
+		switch word {
+		case server.ActionStashMerge:
+			it := pick(v.Label(), "", actionStashMerge, contextmenu.Suggested, blockedWhy)
+			it.Help = v.Tooltip()
+			items = append(items, it)
+		case server.ActionMerge:
+			if ok {
+				mergeItem.Label = v.Label()
+				mergeItem.Help = v.Tooltip()
+			}
+			items = append(items, mergeItem)
+		}
+	}
 
 	current := schema.Status(strings.ToLower(strings.TrimSpace(epic.Status)))
 	for _, status := range epicDirectStatuses {
@@ -118,8 +147,20 @@ func (m Model) openEpicMenu(epic tickets.Epic, archived bool) Model {
 		serverReason: serverReason(m.serverAPI, m.link),
 		archived:     archived,
 		session:      epicSession(m.vm.Sessions, epic.Path),
+		actions:      epicSummaryActions(m.vm.Epics, epic.Name),
 	})
 	return m
+}
+
+// epicSummaryActions is the Actions of the summary for address, nil when the
+// server sent none.
+func epicSummaryActions(sums []server.EpicSummary, address string) []string {
+	for _, s := range sums {
+		if s.Address == address {
+			return s.Actions
+		}
+	}
+	return nil
 }
 
 func openEpicContextMenu(menu contextmenu.Menu[ticketTarget], in epicMenuInput) contextmenu.Menu[ticketTarget] {

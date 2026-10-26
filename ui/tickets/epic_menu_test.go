@@ -185,6 +185,42 @@ func TestEpicMenu_AddEpicToQueueRefusedEpics(t *testing.T) {
 	}
 }
 
+func TestEpicMenu_MergeBlockVerbsComeFromActions(t *testing.T) {
+	done := tickets.Epic{Name: "gx:alpha", Status: "open", Tickets: []tickets.Ticket{{Status: "done"}}}
+	labels := func(actions []string) []string {
+		var out []string
+		for _, it := range epicMenuItems(epicMenuInput{epic: done, actions: actions}) {
+			if strings.HasPrefix(it.Label, "Merge") || strings.HasPrefix(it.Label, "Stash") {
+				out = append(out, it.Label)
+			}
+		}
+		return out
+	}
+	if got, want := labels([]string{"stash-merge", "merge"}), []string{"Stash, merge and restore", "Merge again"}; !slices.Equal(got, want) {
+		t.Errorf("dirty-trunk labels = %v, want %v", got, want)
+	}
+	if got, want := labels([]string{"merge"}), []string{"Merge again"}; !slices.Equal(got, want) {
+		t.Errorf("needs-rebase labels = %v, want %v", got, want)
+	}
+	if got, want := labels(nil), []string{"Merge"}; !slices.Equal(got, want) {
+		t.Errorf("no actions labels = %v, want %v", got, want)
+	}
+}
+
+func TestEpicMenu_StashMergeRunsOnTheEpic(t *testing.T) {
+	var calls []string
+	m, _ := epicMenuModel(t, fakeServerAPI{calls: &calls})
+	m.vm.Epics = []server.EpicSummary{{Address: "gx:alpha", Actions: []string{"stash-merge", "merge"}}}
+	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:alpha"), "Stash, merge and restore")
+	if cmd == nil {
+		t.Fatal("Stash, merge and restore issued nothing")
+	}
+	cmd()
+	if !slices.Equal(calls, []string{"stash-merge gx:alpha"}) {
+		t.Errorf("calls = %v, want stash-merge gx:alpha", calls)
+	}
+}
+
 func TestEpicMenu_CurrentStatusIsDim(t *testing.T) {
 	items := epicMenuItems(epicMenuInput{epic: tickets.Epic{Status: "open"}})
 	if got := itemByLabel(t, items, "Set open").Disabled; got != "already open" {
