@@ -689,20 +689,24 @@ func newServerTicketsCmd() *cobra.Command {
 	approve.Flags().BoolVar(&approveJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(approve)
 
-	var relaunchJSON, relaunchStop bool
-	relaunch := &cobra.Command{
-		Use:   "relaunch <project:epic/NN>",
-		Short: "start a fresh iteration of a ticket",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(c, relaunchJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
-				return cl.TicketRelaunch(ctx, args[0], relaunchStop)
-			})
-		},
+	// relaunch is the old name of retry, kept hidden for one release.
+	for _, name := range []string{"retry", "relaunch"} {
+		var retryJSON, retryStop bool
+		retry := &cobra.Command{
+			Use:    name + " <project:epic/NN>",
+			Short:  "start a fresh agent on a ticket's branch, keeping its commits",
+			Args:   cobra.ExactArgs(1),
+			Hidden: name == "relaunch",
+			RunE: func(c *cobra.Command, args []string) error {
+				return serverQueueWrite(c, retryJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+					return cl.TicketRetry(ctx, args[0], retryStop)
+				})
+			},
+		}
+		retry.Flags().BoolVar(&retryStop, "stop", false, "stop a working leftover pane of the ticket first")
+		retry.Flags().BoolVar(&retryJSON, "json", false, "emit the structured result (or refusal) as JSON")
+		cmd.AddCommand(retry)
 	}
-	relaunch.Flags().BoolVar(&relaunchStop, "stop", false, "stop a working leftover pane of the ticket first")
-	relaunch.Flags().BoolVar(&relaunchJSON, "json", false, "emit the structured result (or refusal) as JSON")
-	cmd.AddCommand(relaunch)
 
 	var nudgeJSON bool
 	nudge := &cobra.Command{

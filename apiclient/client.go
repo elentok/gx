@@ -331,10 +331,15 @@ func (c *Client) TicketApprove(ctx context.Context, address string) (server.Queu
 	return c.queueWriteTo(ctx, "/v1/tickets/approve", server.QueueRequest{Address: address})
 }
 
-// TicketRelaunch starts a fresh iteration of a ticket; stop lets it stop a
-// working leftover pane first.
+// TicketRetry starts a fresh agent on a ticket's branch, keeping its commits;
+// stop lets it stop a working leftover pane first.
+func (c *Client) TicketRetry(ctx context.Context, address string, stop bool) (server.QueueResult, error) {
+	return c.queueWriteTo(ctx, "/v1/tickets/retry", server.QueueRequest{Address: address, Stop: stop})
+}
+
+// TicketRelaunch is the old name of TicketRetry.
 func (c *Client) TicketRelaunch(ctx context.Context, address string, stop bool) (server.QueueResult, error) {
-	return c.queueWriteTo(ctx, "/v1/tickets/relaunch", server.QueueRequest{Address: address, Stop: stop})
+	return c.TicketRetry(ctx, address, stop)
 }
 
 // EpicMerge triggers a manual merge of an epic address: a direct land

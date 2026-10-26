@@ -22,6 +22,9 @@ const (
 	ReasonIterationRunning = "iteration-running"
 	ReasonTicketDone       = "ticket-done"
 	ReasonHerdrUnavailable = "herdr-unavailable"
+	// ReasonAgentWorking refuses a retry while the ticket's agent is still
+	// working; the web maps it to "Stop agent and retry".
+	ReasonAgentWorking = "agent-working"
 	// ReasonBudgetLimit refuses a relaunch or nudge past the daily soft
 	// limit (the hard limit implies it), as claims are held back.
 	ReasonBudgetLimit = "budget-limit"
@@ -176,7 +179,7 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if res, refused := s.budgetRefusal(); refused {
 			return res, nil
 		}
-		if res, refused, err := s.settleLive([]tickets.Address{ref.addr}, req.Stop, isWorking); refused || err != nil {
+		if res, refused, err := s.settleLive([]tickets.Address{ref.addr}, req.Stop, ReasonAgentWorking, isWorking); refused || err != nil {
 			return res, err
 		}
 		source := req.Source
@@ -246,7 +249,7 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 		anyLive := func(agentrunner.Runner, agentrunner.Session) bool { return true }
 		// A one-off is archived on cancel, so its run can't be left alive behind it.
 		stop := req.Stop || ref.addr.Epic == OneOffsEpic
-		if res, refused, err := s.settleLive(addrs, stop, anyLive); refused || err != nil {
+		if res, refused, err := s.settleLive(addrs, stop, ReasonTicketLive, anyLive); refused || err != nil {
 			return res, err
 		}
 		for _, t := range targets {
@@ -270,7 +273,7 @@ func (s *Server) ticketCancel(req QueueRequest) (QueueResult, error) {
 // so a leftover pane outside the registry counts too. A live session that
 // blocks refuses ticket-live unless stop, which stops every blocking session
 // through its runner first.
-func (s *Server) settleLive(addrs []tickets.Address, stop bool, blocks func(agentrunner.Runner, agentrunner.Session) bool) (QueueResult, bool, error) {
+func (s *Server) settleLive(addrs []tickets.Address, stop bool, reason string, blocks func(agentrunner.Runner, agentrunner.Session) bool) (QueueResult, bool, error) {
 	type live struct {
 		addr   tickets.Address
 		runner agentrunner.Runner
@@ -287,7 +290,7 @@ func (s *Server) settleLive(addrs []tickets.Address, stop bool, blocks func(agen
 		}
 	}
 	if len(found) > 0 && !stop {
-		return refusal(ReasonTicketLive, found[0].addr.String()+" has a live pane; use --stop"), true, nil
+		return refusal(reason, found[0].addr.String()+" has a live pane; use --stop"), true, nil
 	}
 	for _, l := range found {
 		if err := l.runner.Stop(l.sess); err != nil {

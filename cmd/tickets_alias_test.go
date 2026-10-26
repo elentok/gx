@@ -52,6 +52,35 @@ func TestServerTicketsPauseAndResumeKeepHiddenAliases(t *testing.T) {
 	}
 }
 
+func TestServerTicketsRetryHasHiddenRelaunchAlias(t *testing.T) {
+	root := newRootCmd(deps{})
+	for verb, hidden := range map[string]bool{"retry": false, "relaunch": true} {
+		c, _, err := root.Find([]string{"server", "tickets", verb})
+		if err != nil || c.Name() != verb {
+			t.Errorf("gx server tickets %s: %v (found %v)", verb, err, c.Name())
+			continue
+		}
+		if c.Hidden != hidden {
+			t.Errorf("gx server tickets %s: hidden = %v, want %v", verb, c.Hidden, hidden)
+		}
+		if c.Flags().Lookup("stop") == nil {
+			t.Errorf("gx server tickets %s has no --stop flag", verb)
+		}
+	}
+	tickets, _, _ := root.Find([]string{"server", "tickets"})
+	var help bytes.Buffer
+	tickets.SetOut(&help)
+	if err := tickets.Help(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(help.String(), "relaunch") {
+		t.Errorf("tickets help lists relaunch:\n%s", help.String())
+	}
+	if !strings.Contains(help.String(), "retry") {
+		t.Errorf("tickets help is missing retry:\n%s", help.String())
+	}
+}
+
 func TestServerQueueDrainIsHiddenButDispatches(t *testing.T) {
 	root := newRootCmd(deps{})
 	c, _, err := root.Find([]string{"server", "queue", "drain"})

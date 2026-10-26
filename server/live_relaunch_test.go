@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -39,14 +40,14 @@ func startWithLeftover(t *testing.T, state agentrunner.State) (*servertest.Harne
 	return h, fake, leftover, path
 }
 
-func TestRelaunchAndCancel_WorkingLeftoverRefusesTicketLive(t *testing.T) {
+func TestRetryAndCancel_WorkingLeftoverRefuses(t *testing.T) {
 	h, fake, _, path := startWithLeftover(t, agentrunner.StateWorking)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false)
-	if err != nil || !res.Refused || res.Reason != server.ReasonTicketLive {
-		t.Errorf("relaunch = %+v, %v; want %s refusal", res, err, server.ReasonTicketLive)
+	res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", false)
+	if err != nil || !res.Refused || res.Reason != server.ReasonAgentWorking {
+		t.Errorf("retry = %+v, %v; want %s refusal", res, err, server.ReasonAgentWorking)
 	}
 	res, err = h.Client.TicketCancel(ctx, "proj:epic-a/01", false)
 	if err != nil || !res.Refused || res.Reason != server.ReasonTicketLive {
@@ -76,16 +77,55 @@ func TestCancel_StopClosesALeftoverThroughTheRunner(t *testing.T) {
 	}
 }
 
-func TestRelaunch_StopClosesAWorkingLeftover(t *testing.T) {
+func TestRetry_StopClosesAWorkingLeftover(t *testing.T) {
 	h, fake, leftover, _ := startWithLeftover(t, agentrunner.StateWorking)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if res, err := h.Client.TicketRelaunch(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
-		t.Fatalf("relaunch --stop = %+v, %v", res, err)
+	if res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
+		t.Fatalf("retry --stop = %+v, %v", res, err)
 	}
 	if sess, ok, _ := fake.Find(holderLabel); ok && sess.ID == leftover.ID {
 		t.Error("the working leftover is still live")
+	}
+}
+
+// Retry on a repair pause reopens the ticket on the same branch: the head and
+// its commits survive.
+func TestRetry_RepairPauseKeepsTheBranchHead(t *testing.T) {
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	git := func(args ...string) string {
+		t.Helper()
+		out, err := exec.Command("git", append([]string{"-C", repo}, args...)...).CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	const branch = "ralph-loop/epic-a-item-01"
+	git("branch", branch)
+	wt := filepath.Join(t.TempDir(), "wt")
+	git("worktree", "add", wt, branch)
+	testutil.WriteFile(t, wt, "work.txt", "work")
+	testutil.CommitAll(t, wt, "agent work")
+	git("worktree", "remove", "--force", wt)
+	head := git("rev-parse", branch)
+
+	h := servertest.StartWithStore(t, store, func(*server.Config) {})
+	registerLaunch(h)
+	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "boom"); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", false); err != nil || res.Refused {
+		t.Fatalf("retry = %+v, %v", res, err)
+	}
+	if got := git("rev-parse", branch); got != head {
+		t.Errorf("branch head = %s, want %s kept", got, head)
 	}
 }
 
