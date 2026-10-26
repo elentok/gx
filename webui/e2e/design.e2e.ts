@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, test } from "./fixture";
+import { card, expect, nav, section, test, type Fixture } from "./fixture";
 
 // The card's title opens the epic page, whose Start button starts the session and moves on.
 // The Design page before the start is reached by its route.
@@ -201,5 +201,122 @@ test.describe("12. The auto-advance switch", () => {
       await expect(autoSwitch(page, "on")).toBeVisible({ timeout: 2000 });
     }).toPass();
     await expect(page.getByText(/Continuing in/)).toBeVisible();
+  });
+});
+
+// Starts a Design through the New Design dialog, which lands on its Design page.
+const startDesign = async (page: Page, slug: string) => {
+  await page.getByRole("button", nav("New Design")).click();
+  const dialog = page.getByRole("dialog", nav("New Design"));
+  await dialog.getByRole("textbox", nav("Epic name")).fill(slug);
+  await dialog.getByRole("textbox", nav("Rough idea")).fill("An idea.");
+  await dialog.getByRole("button", nav("Start design")).click();
+  await expect(page).toHaveURL(new RegExp(`#/d/demo:${slug}$`));
+};
+
+const sessionRows = async (fixture: Fixture, slug: string) =>
+  (await fixture.cli("agents", "list")).split("\n").filter((l) => l.includes(slug));
+
+// Stops the session of `slug` through the CLI; its row is found by slug in `gx agents list`.
+const stopSession = async (fixture: Fixture, slug: string) => {
+  await expect.poll(async () => (await sessionRows(fixture, slug)).length).toBeGreaterThan(0);
+  await fixture.cli("agents", "stop", (await sessionRows(fixture, slug))[0].split("\t")[0].trim());
+};
+
+const newSession = (page: Page) => page.getByRole("button", nav("New session"));
+
+test.describe("42. Stopped session card", () => {
+  test("the card moves to Ready to design as Not started with a Design button", async ({ page, start }) => {
+    const fixture = await start("ready");
+    await startDesign(page, "stopped-design");
+    await page.getByRole("link", nav("← Epics")).click();
+
+    await stopSession(fixture, "stopped-design");
+    const ready = await section(page, "Ready to design");
+    const stopped = ready.locator("[data-kind]").filter({ has: page.getByRole("link", nav("stopped-design")) });
+    await expect(stopped).toContainText("Not started");
+    await expect(stopped.getByRole("button", nav("Design"))).toBeVisible();
+  });
+});
+
+test.describe("43. New session on a stopped Design", () => {
+  test("the header starts a new session and no form opens", async ({ page, start }) => {
+    const fixture = await start("ready");
+    await startDesign(page, "retry-design");
+    await stopSession(fixture, "retry-design");
+
+    // The banner and the header each have a "New session"; the header one is first in the page.
+    await expect(newSession(page).first()).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("textbox", nav("Epic name"))).toHaveCount(0);
+
+    await newSession(page).first().click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect.poll(async () => (await sessionRows(fixture, "retry-design")).length).toBe(2);
+    await expect(page).toHaveURL(/#\/d\/demo:retry-design$/);
+  });
+});
+
+test.describe("44. Failure banner New session", () => {
+  test("a session that ends without a run-end starts a new one with no form", async ({ page, start }) => {
+    const fixture = await start("ready");
+    await startDesign(page, "ended-design");
+    await stopSession(fixture, "ended-design");
+
+    const failure = page.getByRole("region", nav("Session failure"));
+    await expect(failure).toContainText("Session ended");
+    await failure.getByRole("button", nav("New session")).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("textbox", nav("Epic name"))).toHaveCount(0);
+    await expect.poll(async () => (await sessionRows(fixture, "ended-design")).length).toBe(2);
+  });
+});
+
+test.describe("45. Delete design", () => {
+  test("appears when the session stops with the page open, and Delete removes the design", async ({ page, start }) => {
+    const fixture = await start("ready");
+    await startDesign(page, "delete-me");
+    const del = page.getByRole("button", nav("Delete design"));
+    await expect(del).toHaveCount(0);
+
+    await stopSession(fixture, "delete-me");
+    await expect(del).toBeVisible();
+
+    await del.click();
+    await expect(page.getByText("Delete this design?")).toBeVisible();
+    await page.getByRole("button", nav("Keep")).click();
+    await expect(page.getByText("Delete this design?")).toHaveCount(0);
+    await expect(del).toBeVisible();
+
+    await del.click();
+    await page.getByRole("button", nav("Delete")).click();
+    await expect(page).toHaveURL(/#\/epics$/);
+    await expect(card(page, "delete-me")).toHaveCount(0);
+    await expect(fixture.cli("tickets", "show", "demo:delete-me")).rejects.toBeTruthy();
+
+    await startDesign(page, "delete-me");
+  });
+
+  test("a charted design has no Delete design", async ({ page, start }) => {
+    await start("design");
+    await openDesign(page);
+    await expect(page.getByRole("button", nav("Delete design"))).toHaveCount(0);
+  });
+});
+
+test.describe("46. gx designs delete", () => {
+  test("removes an uncharted design and refuses a charted epic", async ({ start }) => {
+    const fixture = await start("ready");
+    await fixture.cli("designs", "open", "cli-del", "--idea", "x", "--project", "demo", "--json");
+    await stopSession(fixture, "cli-del");
+
+    await fixture.cli("designs", "delete", "demo:cli-del");
+    await expect(fixture.cli("tickets", "show", "demo:cli-del")).rejects.toBeTruthy();
+
+    const refused = await fixture
+      .cli("designs", "delete", "demo:ready-epic")
+      .then(() => undefined, (err: { stdout?: string; stderr?: string }) => `${err.stdout}${err.stderr}`);
+    expect(refused).toBeTruthy();
+    await fixture.cli("tickets", "show", "demo:ready-epic");
   });
 });

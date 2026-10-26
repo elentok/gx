@@ -6,7 +6,7 @@ Retries are off. Locators use roles and visible text, plus `data-testid` `pill` 
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.
 
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
-Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14),
+Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41),
 `newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40).
 
@@ -406,3 +406,45 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Scenario:** `united`
 - **Steps:** click Open epic on the `deadlock-epic` card.
 - **Pass:** the page is `#/e/demo:deadlock-epic`.
+
+The Design page flows below build their Design in the flow (New Design, then `gx agents stop <id>`,
+the id being the first column of `gx agents list`), so no scenario has to hold a chart-step map with
+an exited session.
+
+## 42. Stopped session card
+
+- **Scenario:** `ready`
+- **Steps:** start a Design `stopped-design` from the dialog; go back to the Epics page; stop its session through the CLI.
+- **Pass:** the card is in Ready to design, reads "Not started" and has a Design button.
+
+## 43. New session on a stopped Design
+
+- **Scenario:** `ready`
+- **Steps:** start `retry-design`, stop its session, stay on `#/d/demo:retry-design`; click the header "New session".
+- **Pass:** no dialog and no Epic name field appear, and `gx agents list` shows a second session for it.
+
+## 44. Failure banner New session
+
+- **Scenario:** `ready`
+- **Steps:** start `ended-design`, stop its session (it ends with no run-end); click "New session" in the `Session failure` region.
+- **Pass:** the banner says "Session ended". No dialog appears; `gx agents list` shows a second session.
+
+## 45. Delete design
+
+- **Scenario:** `ready`; the second test uses `design`.
+- **Steps:**
+  1. Start `delete-me`; "Delete design" is absent. Stop its session with the page open.
+  2. Click "Delete design", then Keep, then "Delete design" and Delete.
+  3. Start `delete-me` again.
+  4. On `design`, open `#/d/demo:design-epic`.
+- **Pass:**
+  - "Delete design" appears with no reload. Keep returns to the page with the button still there.
+  - Delete goes to `#/epics`, the card is gone and `gx tickets show demo:delete-me` fails.
+  - The second New Design with `delete-me` succeeds.
+  - `design-epic` (charted) shows no "Delete design".
+
+## 46. gx designs delete
+
+- **Scenario:** `ready`
+- **Steps:** `gx designs open cli-del`, stop its session, run `gx designs delete demo:cli-del`; run the same verb on `demo:ready-epic`.
+- **Pass:** `gx tickets show demo:cli-del` fails. The verb on `ready-epic` exits non-zero and the epic stays.
