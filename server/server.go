@@ -857,6 +857,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(gatesDone); s.keepGatesWatched(freshCtx) }()
 	cpuDone := make(chan struct{})
 	go func() { defer close(cpuDone); s.keepCPUWatched(freshCtx) }()
+	sweepDone := make(chan struct{})
+	go func() { defer close(sweepDone); s.sweepDesignCounts() }()
 	var err error
 	select {
 	case <-ctx.Done():
@@ -882,6 +884,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	<-budgetDone
 	<-gatesDone
 	<-cpuDone
+	<-sweepDone
 	// A watcher reload still in flight can start a countdown, so stop it after.
 	s.configWatch.running.Wait()
 	s.stopHardGrace()
