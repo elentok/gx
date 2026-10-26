@@ -364,6 +364,97 @@ const (
 	approveAddr = "demo:approve-epic/01"
 )
 
+// issueFiles is the ticket files of an epic on disk, by file name.
+func (r *running) issueFiles(t *testing.T, project, epic string) map[string]string {
+	t.Helper()
+	root := filepath.Dir(filepath.Dir(r.StateDir))
+	dir := filepath.Join(root, "data", "gx", "tickets", project, epic, "issues")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{}
+	for _, e := range entries {
+		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[e.Name()] = string(data)
+	}
+	return files
+}
+
+func TestManyDoneScenario_FiveMergedWithDistinctCloseTimesAndOneOpen(t *testing.T) {
+	r := start(t, "many-done")
+	closed := map[string]bool{}
+	open := 0
+	for name, data := range r.issueFiles(t, "demo", "many-done-epic") {
+		switch {
+		case strings.Contains(data, "status: done\n"):
+			_, after, ok := strings.Cut(data, "done_at: ")
+			if !ok || !strings.Contains(data, "claimed_at: ") {
+				t.Fatalf("%s is done without stamps:\n%s", name, data)
+			}
+			closed[strings.SplitN(after, "\n", 2)[0]] = true
+		case strings.Contains(data, "status: open\n"):
+			open++
+		}
+	}
+	if len(closed) != 5 || open != 1 {
+		t.Errorf("close times %v, open %d; want 5 distinct close times and 1 open", closed, open)
+	}
+	r.stop(t)
+}
+
+func TestDesignScenario_HasATimedDoneTicket(t *testing.T) {
+	r := start(t, "design")
+	data := r.issueFiles(t, "demo", "design-epic")["03-timed.md"]
+	for _, want := range []string{"status: done\n", "claimed_at: 2026-01-01T10:00:00Z\n", "done_at: 2026-01-01T10:02:30Z\n"} {
+		if !strings.Contains(data, want) {
+			t.Errorf("timed ticket lacks %q:\n%s", want, data)
+		}
+	}
+	r.stop(t)
+}
+
+func TestUnitedScenario_HasADraftImplEpic(t *testing.T) {
+	r := start(t, "united")
+	root := filepath.Dir(filepath.Dir(r.StateDir))
+	meta, err := os.ReadFile(filepath.Join(root, "data", "gx", "tickets", "demo", "publishing-epic-impl", "ticket.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(meta), "status: draft\n") {
+		t.Errorf("publishing-epic-impl ticket.md:\n%s", meta)
+	}
+	r.stop(t)
+}
+
+func TestConfigFlag_WritesTheKeyIntoTheFixtureConfig(t *testing.T) {
+	r := startWith(t, "empty", "--config", "server.remote-control=true", "--config", "extra.name=hello")
+	root := filepath.Dir(filepath.Dir(r.StateDir))
+	raw, err := os.ReadFile(filepath.Join(root, "home", ".config", "gx", "config.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cfg struct {
+		Server struct {
+			RemoteControl bool `json:"remote-control"`
+			WatchConfig   bool `json:"watch-config"`
+		} `json:"server"`
+		Extra struct {
+			Name string `json:"name"`
+		} `json:"extra"`
+	}
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.Server.RemoteControl || cfg.Extra.Name != "hello" {
+		t.Errorf("config = %s, want server.remote-control true and extra.name hello", raw)
+	}
+	r.stop(t)
+}
+
 func TestPausedScenario_OneTicketPerRecoveryPath(t *testing.T) {
 	r := start(t, "paused")
 	cases := []struct {

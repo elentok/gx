@@ -31,6 +31,7 @@ async function startFixture(
   page: Page,
   hold: boolean,
   autoAdvanceDelay?: string,
+  config: Record<string, string> = {},
 ): Promise<{ fixture: Fixture; stop: () => Promise<void> }> {
   const proc = spawn(
     process.env.GX_E2E_GXFIXTURE!,
@@ -41,6 +42,7 @@ async function startFixture(
       process.env.GX_E2E_FAKECLAUDE!,
       ...(hold ? ["--hold"] : []),
       ...(autoAdvanceDelay ? ["--auto-advance-delay", autoAdvanceDelay] : []),
+      ...Object.entries(config).flatMap(([key, value]) => ["--config", `${key}=${value}`]),
       scenario,
     ],
     { stdio: ["ignore", "pipe", "inherit"] },
@@ -86,12 +88,15 @@ async function startFixture(
  * gets its own server, stopped when the test ends.
  */
 export const test = base.extend<{
-  start: (scenario: string, opts?: { hold?: boolean; autoAdvanceDelay?: string }) => Promise<Fixture>;
+  start: (
+    scenario: string,
+    opts?: { hold?: boolean; autoAdvanceDelay?: string; config?: Record<string, string> },
+  ) => Promise<Fixture>;
 }>({
   start: async ({ page }, use) => {
     const stops: Array<() => Promise<void>> = [];
     await use(async (scenario, opts) => {
-      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay);
+      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config);
       stops.push(stop);
       return fixture;
     });

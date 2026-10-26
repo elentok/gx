@@ -4,6 +4,7 @@ import (
 	"maps"
 	"net"
 	"slices"
+	"time"
 
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -160,6 +161,18 @@ var scenarios = map[string]scenario{
 		},
 		openDesigns: []string{project + ":design-question", project + ":design-live"},
 	},
+	// many-done: an epic with five merged tickets closed at different times, and
+	// one open ticket.
+	"many-done": {
+		epics: []epic{{project, "many-done-epic", []ticket{
+			{"01", "merged-a", doneAt("2026-01-01T10:00:00Z")},
+			{"02", "merged-b", doneAt("2026-01-02T10:00:00Z")},
+			{"03", "merged-c", doneAt("2026-01-03T10:00:00Z")},
+			{"04", "merged-d", doneAt("2026-01-04T10:00:00Z")},
+			{"05", "merged-e", doneAt("2026-01-05T10:00:00Z")},
+			{"06", "open", servertest.TicketOpts{}},
+		}}},
+	},
 	// edge: a project with no epics, an epic with no tickets, and a ticket
 	// blocked by a dependency that is not merged.
 	"edge": {
@@ -179,12 +192,19 @@ var designBase = scenario{
 		{project, "design-epic", []ticket{
 			{"01", "first", servertest.TicketOpts{}},
 			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
+			{"03", "timed", servertest.TicketOpts{Status: "done", ClaimedAt: "2026-01-01T10:00:00Z", DoneAt: "2026-01-01T10:02:30Z"}},
 		}},
 		{project, "design-epic-impl", []ticket{
 			{"01", "build", servertest.TicketOpts{}},
 		}},
 	},
 	designSteps: map[string]string{project + ":design-epic": string(tickets.StepResolveTickets)},
+}
+
+// doneAt is a merged ticket claimed an hour before it closed at stamp.
+func doneAt(stamp string) servertest.TicketOpts {
+	closed, _ := time.Parse(time.RFC3339, stamp)
+	return servertest.TicketOpts{Status: "done", ClaimedAt: closed.Add(-time.Hour).Format(time.RFC3339), DoneAt: stamp}
 }
 
 // designScript is the design scenario with the map at step and the design
@@ -226,6 +246,8 @@ func unitedEpics() []epic {
 		}},
 		{project, "design-new", nil},
 		{project, "draft-epic", open},
+		// A draft -impl epic: its tickets are still being published.
+		{project, "publishing-epic-impl", open},
 		{project, "idle-epic", []ticket{{"01", "stuck", servertest.TicketOpts{Status: "claimed"}}}},
 		// Finished: more than recentlyFinished, one-offs included.
 		{project, "finished-a", done},
@@ -248,13 +270,14 @@ func unitedMeta() map[string]string {
 		return "status: open\ncompleted_at: 2026-01-" + day + "T10:00:00Z\nmerged_at: 2026-01-" + day + "T11:00:00Z\n"
 	}
 	return map[string]string{
-		project + ":blocked-merge-epic": "status: open\nland_block_reason: needs a rebase\n",
-		project + ":deadlock-epic":      "status: open\nblocked_by: [\"ready-epic\"]\n",
-		project + ":draft-epic":         "status: draft\n",
-		project + ":finished-a":         merged("01"),
-		project + ":finished-b":         merged("02"),
-		"auto:finished-c":               merged("03"),
-		project + ":one-offs":           "status: draft\n",
+		project + ":blocked-merge-epic":   "status: open\nland_block_reason: needs a rebase\n",
+		project + ":deadlock-epic":        "status: open\nblocked_by: [\"ready-epic\"]\n",
+		project + ":draft-epic":           "status: draft\n",
+		project + ":publishing-epic-impl": "status: draft\n",
+		project + ":finished-a":           merged("01"),
+		project + ":finished-b":           merged("02"),
+		"auto:finished-c":                 merged("03"),
+		project + ":one-offs":             "status: draft\n",
 	}
 }
 

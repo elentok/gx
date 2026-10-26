@@ -183,6 +183,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	fs.String("append-system-prompt-file", "", "")
 	fs.String("model", "", "")
 	fs.String("effort", "", "")
+	fs.String("remote-control", "", "")
 	if err := fs.Parse(args); err != nil {
 		return tuiOptions{}, err
 	}
@@ -555,6 +556,10 @@ func (t *tui) classify(text string) (promptKind, string, WorkerConfig) {
 func (t *tui) workerPrompt(text string) (string, WorkerConfig, bool) {
 	fields := strings.Fields(text)
 	if len(fields) < 2 || !strings.HasPrefix(fields[0], "/") {
+		return "", WorkerConfig{}, false
+	}
+	// A fix agent's prompt ends in free text, not a ticket address.
+	if fields[0] == "/gx-investigate" {
 		return "", WorkerConfig{}, false
 	}
 	cfg, err := LoadWorkerConfig(t.pid.Cwd)

@@ -6,6 +6,7 @@
 //	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] [--auto-advance-delay <duration>] <scenario>
 //
 // --auto-advance-delay shortens the server's run-end countdown (default 10s).
+// --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 //
 // A binary left out is built with `go build`, which needs the module as the
 // working directory.
@@ -52,6 +53,7 @@ func main() {
 
 func run(args []string) (err error) {
 	var gxBin, fakeBin, name, autoAdvance string
+	var configs []string
 	var hold bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -62,6 +64,12 @@ func run(args []string) (err error) {
 				return fmt.Errorf("%s needs a value", args[i])
 			}
 			autoAdvance = args[i+1]
+			i++
+		case "--config":
+			if i+1 == len(args) {
+				return fmt.Errorf("%s needs a value", args[i])
+			}
+			configs = append(configs, args[i+1])
 			i++
 		case "--gx", "--fakeclaude":
 			if i+1 == len(args) {
@@ -123,7 +131,7 @@ func run(args []string) (err error) {
 		}
 		f.env = append(f.env, "GX_AUTO_ADVANCE_DELAY="+autoAdvance)
 	}
-	if err := f.writeConfig(port, sc.recentlyFinished); err != nil {
+	if err := f.writeConfig(port, sc.recentlyFinished, configs); err != nil {
 		return err
 	}
 	if err := f.seed(sc); err != nil {
@@ -216,17 +224,44 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 	return env, cliEnv
 }
 
-func (f *fixture) writeConfig(port, recentlyFinished int) error {
+// writeConfig writes the fixture's config. overrides are `dotted.key=<json>`
+// entries (a value that is not JSON is a string) set over the defaults.
+func (f *fixture) writeConfig(port, recentlyFinished int, overrides []string) error {
 	dir := filepath.Join(f.root, "home", ".config", "gx")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	finished := ""
+	server := map[string]any{"watch-config": false, "web": map[string]any{"listen": fmt.Sprintf("127.0.0.1:%d", port)}}
 	if recentlyFinished > 0 {
-		finished = fmt.Sprintf(`"recently-finished":%d,`, recentlyFinished)
+		server["recently-finished"] = recentlyFinished
 	}
-	cfg := fmt.Sprintf(`{"agent-runner":"pty","runner-wait":"100ms","server":{%s"watch-config":false,"web":{"listen":"127.0.0.1:%d"}}}`, finished, port)
-	return os.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0o644)
+	cfg := map[string]any{"agent-runner": "pty", "runner-wait": "100ms", "server": server}
+	for _, kv := range overrides {
+		key, raw, ok := strings.Cut(kv, "=")
+		if !ok || key == "" {
+			return fmt.Errorf("--config %q: want key=value", kv)
+		}
+		var val any
+		if json.Unmarshal([]byte(raw), &val) != nil {
+			val = raw
+		}
+		node := cfg
+		parts := strings.Split(key, ".")
+		for _, p := range parts[:len(parts)-1] {
+			next, ok := node[p].(map[string]any)
+			if !ok {
+				next = map[string]any{}
+				node[p] = next
+			}
+			node = next
+		}
+		node[parts[len(parts)-1]] = val
+	}
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(dir, "config.json"), data, 0o644)
 }
 
 // seed writes the scenario's project repo (carrying the fake worker's config,

@@ -290,6 +290,29 @@ func TestTUIClaude_NoPidFile(t *testing.T) {
 	}
 }
 
+func TestParseTUIArgs_AcceptsRemoteControl(t *testing.T) {
+	args := append([]string{"--remote-control", "fix-agent"}, tuiLaunchArgs...)
+	if _, err := parseTUIArgs(args); err != nil {
+		t.Fatalf("parseTUIArgs: %v", err)
+	}
+}
+
+func TestClassify_InvestigatePromptIsASlashPrompt(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, WorkerConfigFile), []byte(`{}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tu := &tui{pid: PidFile{Cwd: dir}}
+	kind, _, _ := tu.classify("/gx-investigate demo:paused-epic/07 is needs-repair: Run failed")
+	if kind != promptSlash {
+		t.Fatalf("kind = %v, want promptSlash", kind)
+	}
+	kind, _, _ = tu.classify("/gx-implement demo:paused-epic/07")
+	if kind != promptWorker {
+		t.Fatalf("control: kind = %v, want promptWorker", kind)
+	}
+}
+
 func TestTUIClaude_RejectsUnknownFlag(t *testing.T) {
 	f := startTUIFake(t, append([]string{"--bogus"}, tuiLaunchArgs...))
 	if code := f.waitExit(); code != 1 {

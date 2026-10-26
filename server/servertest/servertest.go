@@ -109,6 +109,8 @@ type TicketOpts struct {
 	PauseReason string
 	// Category is the ticket's category: frontmatter field ("bug", "idea"), omitted when empty.
 	Category string
+	// ClaimedAt, DoneAt and CancelledAt are RFC 3339 stamps, omitted when empty.
+	ClaimedAt, DoneAt, CancelledAt string
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -177,6 +179,11 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 	}
 	if opts.Category != "" {
 		fm += "category: " + opts.Category + "\n"
+	}
+	for _, stamp := range [][2]string{{"claimed_at", opts.ClaimedAt}, {"done_at", opts.DoneAt}, {"cancelled_at", opts.CancelledAt}} {
+		if stamp[1] != "" {
+			fm += stamp[0] + ": " + stamp[1] + "\n"
+		}
 	}
 	fm += "---\n\n# " + slug + "\n"
 	return os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644)
