@@ -87,9 +87,18 @@ test("Close, Escape and a backdrop click close and keep the draft", () => {
   type("Epic slug", "fresh");
   click("Close");
   fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-  fireEvent.click(screen.getByRole("dialog").parentElement!);
+  const backdrop = screen.getByRole("dialog").parentElement!;
+  fireEvent.mouseDown(backdrop);
+  fireEvent.click(backdrop);
   expect(onClose).toHaveBeenCalledTimes(3);
   expect(saved().slug).toBe("fresh");
+});
+
+test("a press in the sheet released on the backdrop keeps it open", () => {
+  const { onClose } = mount();
+  fireEvent.mouseDown(screen.getByRole("textbox", { name: "Rough idea" }));
+  fireEvent.click(screen.getByRole("dialog").parentElement!);
+  expect(onClose).not.toHaveBeenCalled();
 });
 
 test("Discard with an empty draft closes at once", () => {

@@ -78,6 +78,8 @@ export function NewDesignForm({
   const [confirming, setConfirming] = useState(false);
   const { run, pending, error } = useWrite();
   const sheet = useRef<HTMLDivElement>(null);
+  // A drag that starts in the sheet and ends on the backdrop fires a click there; only a press on the backdrop closes.
+  const pressedBackdrop = useRef(false);
 
   const patch = (p: Partial<typeof draft>) => {
     const next = { ...draft, ...p };
@@ -124,7 +126,8 @@ export function NewDesignForm({
       alignItems={sheetMode ? "flex-end" : "center"}
       justifyContent="center"
       p={sheetMode ? "0" : "4"}
-      onClick={onClose}
+      onMouseDown={(e) => (pressedBackdrop.current = e.target === e.currentTarget)}
+      onClick={(e) => pressedBackdrop.current && e.target === e.currentTarget && onClose()}
     >
       <Box
         ref={sheet}
