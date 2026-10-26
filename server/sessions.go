@@ -43,7 +43,12 @@ const (
 	ReasonSessionDirGone        = "dir-gone"
 	ReasonSessionNoResume       = "no-resume"
 	ReasonSessionNotDesign      = "not-design-session"
+	ReasonSessionNameTaken      = "name-taken"
 )
+
+// errSessionNameTaken is saveNewSession's refusal of a unique name that a live
+// session already has.
+var errSessionNameTaken = errors.New("a live session already has this name")
 
 // sessionMetaFile holds a session's meta in its state dir.
 const sessionMetaFile = "meta.json"
@@ -160,7 +165,10 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		ConversationID: conv,
 		CreatedAt:      time.Now(),
 	}
-	dir, err := s.saveNewSession(&meta)
+	dir, err := s.saveNewSession(&meta, req.UniqueName)
+	if errors.Is(err, errSessionNameTaken) {
+		return sessionRefusal(ReasonSessionNameTaken, fmt.Sprintf("a live session is already named %q", meta.Name)), nil
+	}
 	if err != nil {
 		return SessionResult{}, err
 	}
@@ -245,16 +253,23 @@ func (s *Server) addSessionWorktree(project, name string) (string, string) {
 
 // saveNewSession gives meta its id and, when it has no name, the lowest free
 // `<project>-<n>`, then saves it. Holding metaMu keeps two creates from
-// taking the same name.
-func (s *Server) saveNewSession(meta *sessionMeta) (string, error) {
+// taking the same name. With unique, a live session that already has the name
+// refuses the save with errSessionNameTaken; an Exited one does not.
+func (s *Server) saveNewSession(meta *sessionMeta, unique bool) (string, error) {
 	s.sessionWatches.metaMu.Lock()
 	defer s.sessionWatches.metaMu.Unlock()
-	if meta.Name == "" {
+	if meta.Name == "" || unique {
 		list, err := s.listSessions()
 		if err != nil {
 			return "", err
 		}
-		meta.Name, meta.AutoName = freeSessionName(meta.Project, list), true
+		if meta.Name == "" {
+			meta.Name, meta.AutoName = freeSessionName(meta.Project, list), true
+		} else if slices.ContainsFunc(list, func(si SessionInfo) bool {
+			return si.Name == meta.Name && si.Status.State != SessionExited
+		}) {
+			return "", errSessionNameTaken
+		}
 	}
 	id, dir, err := s.makeSessionDir()
 	if err != nil {

@@ -127,8 +127,10 @@ type CreateSessionRequest struct {
 	Worktree string `json:"worktree,omitempty"`
 	// Name falls back to Worktree, then the harness's Display name, then
 	// `<project>-<n>`.
-	Name   string `json:"name,omitempty"`
-	Ticket string `json:"ticket,omitempty"`
+	Name string `json:"name,omitempty"`
+	// UniqueName refuses the create when a live session already has Name.
+	UniqueName bool   `json:"unique_name,omitempty"`
+	Ticket     string `json:"ticket,omitempty"`
 	// Prompt is typed at the session's first Idle; empty starts it Idle.
 	Prompt string `json:"prompt,omitempty"`
 	// Harness defaults to claude.

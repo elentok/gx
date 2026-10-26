@@ -1195,10 +1195,11 @@ export const ReasonSessionNoAction = "no-action";
 export const ReasonSessionDirGone = "dir-gone";
 export const ReasonSessionNoResume = "no-resume";
 export const ReasonSessionNotDesign = "not-design-session";
+export const ReasonSessionNameTaken = "name-taken";
 /**
  * Refusal reasons of the interactive-session writes.
  */
-export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign;
+export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken;
 export const SessionStarting = "starting";
 export const SessionWorking = "working";
 export const SessionIdle = "idle";
@@ -1395,6 +1396,10 @@ export interface CreateSessionRequest {
    * `<project>-<n>`.
    */
   name?: string;
+  /**
+   * UniqueName refuses the create when a live session already has Name.
+   */
+  unique_name?: boolean;
   ticket?: string;
   /**
    * Prompt is typed at the session's first Idle; empty starts it Idle.

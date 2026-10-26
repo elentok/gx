@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -92,6 +93,71 @@ func TestCreateSession_StartsHolderAndListsSession(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(h.StateDir, "agents")); !os.IsNotExist(err) {
 		t.Errorf("loop agents root exists (%v); a session must not use it", err)
+	}
+}
+
+func uniqueNameReq(name string, t *testing.T) server.CreateSessionRequest {
+	return server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: name, UniqueName: true, Harness: string(agentfake.HarnessKind)}
+}
+
+func TestCreateSession_ConcurrentUniqueNamesMakeOneSession(t *testing.T) {
+	h, ctx, _, _, _ := startFakeSession(t)
+	results := make([]server.SessionResult, 4)
+	var wg sync.WaitGroup
+	for i := range results {
+		req := uniqueNameReq("fixer", t)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			res, err := h.Client.CreateSession(ctx, req)
+			if err != nil {
+				t.Error(err)
+			}
+			results[i] = res
+		}()
+	}
+	wg.Wait()
+	made, refused := 0, 0
+	for _, res := range results {
+		switch {
+		case res.Session != nil:
+			made++
+		case res.Refused && res.Reason == server.ReasonSessionNameTaken:
+			refused++
+		}
+	}
+	if made != 1 || refused != len(results)-1 {
+		t.Errorf("made %d, refused %d of %+v; want 1 made, rest %s", made, refused, results, server.ReasonSessionNameTaken)
+	}
+}
+
+func TestCreateSession_UniqueNameIgnoresAnExitedSession(t *testing.T) {
+	h, ctx, evs, _, _ := startFakeSession(t)
+	first, err := h.Client.CreateSession(ctx, uniqueNameReq("fixer", t))
+	if err != nil || first.Session == nil {
+		t.Fatalf("create first = %+v, %v", first, err)
+	}
+	id := first.Session.ID
+	waitForHolder(t, filepath.Join(h.SessionsDir, id))
+	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
+		t.Fatalf("stop = %+v, %v", res, err)
+	}
+	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+
+	second, err := h.Client.CreateSession(ctx, uniqueNameReq("fixer", t))
+	if err != nil || second.Session == nil {
+		t.Errorf("create next to the exited one = %+v, %v; want a session", second, err)
+	}
+}
+
+func TestCreateSession_TypedNameStaysNonUniqueWithoutTheOption(t *testing.T) {
+	h, ctx, _, _, _ := startFakeSession(t)
+	for range 2 {
+		req := uniqueNameReq("twin", t)
+		req.UniqueName = false
+		if res, err := h.Client.CreateSession(ctx, req); err != nil || res.Session == nil {
+			t.Fatalf("create = %+v, %v; want a session", res, err)
+		}
 	}
 }
 
