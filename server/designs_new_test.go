@@ -1,13 +1,15 @@
 package server_test
 
 import (
+	"context"
+	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
 )
 
 func (f designsFixture) openNew(t *testing.T, slug, idea string) server.SessionResult {
@@ -19,30 +21,53 @@ func (f designsFixture) openNew(t *testing.T, slug, idea string) server.SessionR
 	return res
 }
 
-func TestDesignsOpenNew_CreatesDesignSessionWithoutAnEpic(t *testing.T) {
+func (f designsFixture) mapPath(slug string) string {
+	return filepath.Join(f.h.TicketStore, "proj", slug, "ticket.md")
+}
+
+func TestDesignsOpenNew_WritesTheMapThenStartsTheSession(t *testing.T) {
 	f := startDesigns(t)
 	res := f.openNew(t, "fresh-idea", "a thing\nwith lines")
-	if res.Refused || res.Session == nil {
+	if res.Refused || res.Session == nil || res.EpicCreated {
 		t.Fatalf("open = %+v", res)
 	}
 	meta := readMeta(t, f.h, res.Session.ID)
-	want := map[string]any{"dir": f.repo, "name": "fresh-idea", "ticket": "proj:fresh-idea", "design": true, "first_prompt": "/gx-design fresh-idea a thing\nwith lines"}
+	want := map[string]any{"dir": f.repo, "name": "fresh-idea", "ticket": "proj:fresh-idea", "design": true, "first_prompt": "/gx-design proj:fresh-idea"}
 	for k, v := range want {
 		if meta[k] != v {
 			t.Errorf("meta[%s] = %v, want %v", k, meta[k], v)
 		}
 	}
-	if !res.Session.Design {
-		t.Errorf("session = %+v, want Design", res.Session)
-	}
-	list, err := f.h.Client.Epics(f.ctx)
+	raw, err := os.ReadFile(f.mapPath("fresh-idea"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, e := range list.Epics {
-		if strings.HasSuffix(e.Address, "fresh-idea") && !e.MapPending {
-			t.Errorf("epic %s was created", e.Address)
+	got := string(raw)
+	for _, w := range []string{"kind: map", "status: open", "design_step: chart", "## Initial prompt\n\na thing\nwith lines"} {
+		if !strings.Contains(got, w) {
+			t.Errorf("map lacks %q:\n%s", w, got)
 		}
+	}
+	if strings.Contains(got, "Destination") || strings.Count(got, "\n## ") != 1 {
+		t.Errorf("map has more than Initial prompt:\n%s", got)
+	}
+}
+
+func TestDesignsOpenNew_StartFailureReturnsJSONWithTheMarker(t *testing.T) {
+	store := t.TempDir()
+	repo := testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness("no-such-harness"))
+	res, err := h.Client.OpenDesign(context.Background(), server.DesignOpenRequest{Epic: "fresh-idea", NewDesign: true, Idea: "idea", Project: "proj"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !res.Refused || !res.EpicCreated || res.Session != nil {
+		t.Fatalf("open = %+v, want refusal with epic_created", res)
+	}
+	if _, err := os.Stat(filepath.Join(store, "proj", "fresh-idea", "ticket.md")); err != nil {
+		t.Errorf("map missing: %v", err)
 	}
 }
 
@@ -55,18 +80,14 @@ func TestDesignsOpenNew_LinkingToItsOwnAddressKeepsDesign(t *testing.T) {
 	}
 }
 
-func TestDesignsOpenNew_SecondCallReturnsTheFirstSession(t *testing.T) {
+func TestDesignsOpenNew_SecondCallIsRefusedAsEpicExists(t *testing.T) {
 	f := startDesigns(t)
-	first := f.openNew(t, "fresh-idea", "one")
-	second := f.openNew(t, "fresh-idea", "two")
-	if first.Session == nil || second.Session == nil || second.Session.ID != first.Session.ID {
-		t.Fatalf("second = %+v, want session of %+v", second, first)
+	f.openNew(t, "fresh-idea", "one")
+	if second := f.openNew(t, "fresh-idea", "two"); !second.Refused || second.Reason != server.ReasonDesignEpicExists || second.EpicCreated {
+		t.Fatalf("second = %+v, want epic-exists with no marker", second)
 	}
 	if got := len(f.live(t)); got != 1 {
 		t.Errorf("live sessions = %d, want 1", got)
-	}
-	if fp, _ := readMeta(t, f.h, first.Session.ID)["first_prompt"].(string); fp != "/gx-design fresh-idea one" {
-		t.Errorf("first_prompt = %q", fp)
 	}
 }
 
@@ -80,36 +101,14 @@ func TestDesignsOpenNew_Refusals(t *testing.T) {
 		"empty idea":   {"fresh-idea", " \n", server.ReasonEmptyPrompt},
 		"idea too big": {"fresh-idea", strings.Repeat("a", 32*1024+1), server.ReasonPromptTextTooLong},
 	} {
-		if res := f.openNew(t, tc.slug, tc.idea); !res.Refused || res.Reason != tc.want {
-			t.Errorf("%s: open = %+v, want reason %q", name, res, tc.want)
+		if res := f.openNew(t, tc.slug, tc.idea); !res.Refused || res.Reason != tc.want || res.EpicCreated {
+			t.Errorf("%s: open = %+v, want reason %q with no marker", name, res, tc.want)
 		}
 	}
 	if got := len(f.live(t)); got != 0 {
 		t.Errorf("live sessions = %d, want 0", got)
 	}
-}
-
-func TestDesignsOpenNew_AcceptsPromptsBeforeTheMapExists(t *testing.T) {
-	t.Setenv(agentfake.ProgramInputEnv, "1")
-	cfg := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
-	f := startDesigns(t)
-	res := f.openNew(t, "fresh-idea", "idea")
-	if res.Refused || res.Session == nil {
-		t.Fatalf("open = %+v", res)
+	if _, err := os.Stat(f.mapPath("fresh-idea")); err == nil {
+		t.Error("a refusal wrote the map")
 	}
-	id := res.Session.ID
-	conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
-	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
-	report(t, conv, agentfake.Control{State: "idle"})
-	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
-
-	first := strconv.Quote("/gx-design fresh-idea idea") + "\n"
-	waitForSubmitted(t, conv, first)
-
-	got, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: id, Text: "more detail"})
-	if err != nil || got.Refused {
-		t.Fatalf("prompt = %+v, %v", got, err)
-	}
-	waitForSubmitted(t, conv, first+strconv.Quote("more detail")+"\n")
 }

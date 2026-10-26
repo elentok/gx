@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // Refusal reasons of the designs open route, beside the session ones.
@@ -18,6 +19,9 @@ const (
 	ReasonDesignNotMapEpic  = "not-map-epic"
 	ReasonDesignUnknownEpic = "unknown-epic"
 	ReasonDesignEpicExists  = "epic-exists"
+	// ReasonDesignStartFailed: a New Design wrote its map but could not start
+	// the session.
+	ReasonDesignStartFailed = "design-start-failed"
 )
 
 // DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
@@ -148,13 +152,6 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 	mu.(*sync.Mutex).Lock()
 	defer mu.(*sync.Mutex).Unlock()
 
-	live, err := s.liveDesignSession(addr)
-	if err != nil {
-		return SessionResult{}, err
-	}
-	if live != nil {
-		return SessionResult{Session: live}, nil
-	}
 	if _, err := os.Stat(filepath.Join(dir, slug)); err == nil {
 		return sessionRefusal(ReasonDesignEpicExists, fmt.Sprintf("%s already has an epic %s", req.Project, slug)), nil
 	}
@@ -162,15 +159,36 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 	if checkout == "" {
 		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", req.Project)), nil
 	}
-	return s.createSession(CreateSessionRequest{
+
+	// From here the map exists, so every failure carries EpicCreated.
+	createdFailure := func(res SessionResult, err error) (SessionResult, error) {
+		if err != nil {
+			res = sessionRefusal(ReasonDesignStartFailed, err.Error())
+		}
+		if res.Refused {
+			res.EpicCreated = true
+		}
+		return res, nil
+	}
+	epicPath, err := tickets.CreateEpic(dir, slug, tickets.EpicFields{Kind: tickets.KindMap, Status: string(schema.StatusOpen)}, "## Initial prompt\n\n"+idea+"\n")
+	if err != nil {
+		if epicPath == "" {
+			return SessionResult{}, err
+		}
+		return createdFailure(SessionResult{}, err)
+	}
+	step := string(tickets.StepChart)
+	if err := tickets.UpdateEpicFields(filepath.Join(epicPath, "ticket.md"), tickets.EpicUpdate{DesignStep: &step}); err != nil {
+		return createdFailure(SessionResult{}, err)
+	}
+	return createdFailure(s.createSession(CreateSessionRequest{
 		Project: req.Project,
 		Dir:     checkout,
 		Name:    slug,
 		Ticket:  addr,
-		Prompt:  "/gx-design " + slug + " " + idea,
+		Prompt:  "/gx-design " + addr,
 		Harness: s.settings.Load().chatHarness(),
-		design:  true,
-	})
+	}))
 }
 
 // liveDesignSession is the session of the Design at epicAddr that has not

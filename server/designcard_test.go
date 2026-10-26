@@ -159,7 +159,7 @@ func TestEpicList_MapPendingDesignLifecycle(t *testing.T) {
 	}
 }
 
-func TestEpicList_MapPendingDesignGoesAwayWhenItsSessionEnds(t *testing.T) {
+func TestEpicList_NewDesignKeepsItsCardWhenItsSessionEnds(t *testing.T) {
 	f := startDesigns(t)
 	res := f.openNew(t, "fresh-idea", "an idea")
 	if res.Refused || res.Session == nil {
@@ -172,7 +172,8 @@ func TestEpicList_MapPendingDesignGoesAwayWhenItsSessionEnds(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitForSession(f.ctx, t, f.h, f.evs, res.Session.ID, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
-	if r, ok := epicRows(t, f.h, f)["fresh-idea"]; ok {
-		t.Errorf("row after the session ended = %+v, want none", r)
+	// The map is on disk before the session starts, so its card outlives the session.
+	if r, ok := epicRows(t, f.h, f)["fresh-idea"]; !ok || r.MapPending {
+		t.Errorf("row after the session ended = %+v (found %v), want the map's own card", r, ok)
 	}
 }

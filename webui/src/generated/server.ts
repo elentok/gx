@@ -64,9 +64,14 @@ export const ReasonDesignNotMapEpic = "not-map-epic";
 export const ReasonDesignUnknownEpic = "unknown-epic";
 export const ReasonDesignEpicExists = "epic-exists";
 /**
+ * ReasonDesignStartFailed: a New Design wrote its map but could not start
+ * the session.
+ */
+export const ReasonDesignStartFailed = "design-start-failed";
+/**
  * Refusal reasons of the designs open route, beside the session ones.
  */
-export type ReasonDesign = typeof ReasonDesignNotMapEpic | typeof ReasonDesignUnknownEpic | typeof ReasonDesignEpicExists;
+export type ReasonDesign = typeof ReasonDesignNotMapEpic | typeof ReasonDesignUnknownEpic | typeof ReasonDesignEpicExists | typeof ReasonDesignStartFailed;
 /**
  * DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
  * epic's address ("project:epic") or one of its tickets ("project:epic/NN").
@@ -1400,6 +1405,11 @@ export interface SessionResult {
    * Client is the TUI a focus request went to; empty with no TUI connected.
    */
   client?: string;
+  /**
+   * EpicCreated marks a failed New Design open that had already written the
+   * map epic: the Design exists even though no session started.
+   */
+  epic_created?: boolean;
 }
 
 //////////

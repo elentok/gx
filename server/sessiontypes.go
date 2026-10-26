@@ -148,6 +148,9 @@ type SessionResult struct {
 	Message string       `json:"message,omitempty"`
 	// Client is the TUI a focus request went to; empty with no TUI connected.
 	Client string `json:"client,omitempty"`
+	// EpicCreated marks a failed New Design open that had already written the
+	// map epic: the Design exists even though no session started.
+	EpicCreated bool `json:"epic_created,omitempty"`
 }
 
 // sessionMeta is what a session's state dir records about it.
