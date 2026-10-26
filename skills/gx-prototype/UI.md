@@ -95,9 +95,23 @@ Put the switcher in a single shared component so both sub-shapes can reuse it. L
 
 Surface the URL (and the `?variant=` keys). The user will flip through whenever they get to it. The interesting feedback is usually **"I want the header from B with the sidebar from C"**, which is the actual design they want.
 
+### 5a. Store the approved mock
+
+Applies to a UI prototype that resolves a map ticket. The session that resolves the ticket runs this step just before it records the Resolution. LOGIC.md and TUI mocks have no such step.
+
+- Store the mock at `<root>/<map>/mocks/<NN>-<slug>.html`. `<root>` is `gx tickets root`; `<NN>-<slug>` is the prototype ticket. Never store it in the repo or the `-impl` branch.
+- Keep only the approved rows and states. No rejected variants.
+- From a claude.ai artifact: copy the approved rows and states from its HTML into a new standalone file, unchanged in look. The artifact stays as it is.
+- From an in-repo `?variant=` route: open the approved variant in playwright-cli at each approved state and width, and save one self-contained HTML file. The save inlines every CSS rule from `document.styleSheets` and drops all scripts. You choose how the save script is written.
+- Wrap each approved state in a `<section>` with `data-mock-state="<name>"` and `data-mock-width="<px>"`, drawn inside a box of that width. A mock state is one section: one name at one width. State names are unique within the file.
+- Mark each part with `data-mock-part="<kebab-name>"`, unique within its state section. The same part keeps the same name in every state.
+- The Resolution links both the stored file and the artifact.
+- The stored file is the approved mock even if someone edits the artifact later, until a map ticket approves the change.
+- A ticket that replaces an earlier approved look says so in its Resolution and deletes the old file.
+
 ### 6. Capture the answer and clean up
 
-Once a variant has won, capture the answer (which variant and why), then capture the prototype the way the [SKILL](SKILL.md) describes. Fold the winner into the real code and move the rest onto the throwaway branch, not into main:
+Once a variant has won, capture the answer (which variant and why), then capture the prototype the way the [SKILL](SKILL.md) describes. Fold the winner into the real code and move the rest onto the throwaway branch, not into main. One exception: a variant route made for a design map never folds into main. It stays on the throwaway branch; the stored mock and that branch are the outputs.
 
 - **Sub-shape A**: fold the winner into the existing page; drop the losing variants and the switcher from main.
 - **Sub-shape B**: promote the winning variant to a real route; drop the throwaway route and the switcher from main.
