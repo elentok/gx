@@ -74,6 +74,61 @@ func TestRecoveryItems_MatchDetailActions(t *testing.T) {
 	}
 }
 
+// The TUI has no input for a reply or a base, and the server has no repair verb
+// for reopen-and-retry, so these verbs must never reach the server as a resume.
+func TestServerWrite_WebOnlyVerbsNeverResume(t *testing.T) {
+	for _, verb := range []string{server.ActionAnswer, server.ActionChooseBase, server.ActionReopenAndRetry, "no-such-verb"} {
+		t.Run(verb, func(t *testing.T) {
+			var calls []string
+			cmd := cmdServerWrite(fakeServerAPI{calls: &calls}, verb, "gx:alpha/02")
+			if cmd == nil {
+				t.Fatal("no toast for a web-only verb")
+			}
+			cmd()
+			if len(calls) != 0 {
+				t.Fatalf("calls = %v, want none", calls)
+			}
+		})
+	}
+}
+
+func TestServerWrite_ResumeStillResumes(t *testing.T) {
+	var calls []string
+	cmdServerWrite(fakeServerAPI{calls: &calls}, server.ActionResume, "gx:alpha/02")()
+	if want := []string{"resume gx:alpha/02"}; !slices.Equal(calls, want) {
+		t.Fatalf("calls = %v, want %v", calls, want)
+	}
+}
+
+func TestServerMode_EnterSkipsWebOnlyActions(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		actions []string
+		want    []string
+	}{
+		{"only web verbs", []string{server.ActionAnswer, server.ActionChooseBase}, nil},
+		{"web verb first", []string{server.ActionAnswer, server.ActionResume}, []string{"resume gx:alpha/02"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []string
+			m := newServerModel(t).WithServer(fakeServerAPI{calls: &calls, detail: detailWith(tc.actions...)})
+			m = withState(m, server.Snapshot{Tickets: []server.TicketInfo{
+				{Address: "gx:alpha/02", Title: "Second", Status: string(schema.StatusLegacyRepair), RenderedStatus: tickets.StatusPausedRepair.Word()},
+			}})
+			updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+			m = selectTicketRow(t, updated.(Model))
+
+			_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+			if cmd != nil {
+				cmd()
+			}
+			if !slices.Equal(calls, tc.want) {
+				t.Fatalf("calls = %v, want %v", calls, tc.want)
+			}
+		})
+	}
+}
+
 func TestRecoveryItems_NoDetailOffersNone(t *testing.T) {
 	ticket := tickets.Ticket{Status: string(schema.StatusPaused), PauseReason: schema.PauseIterationError}
 	items := ticketMenuItems(ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket})

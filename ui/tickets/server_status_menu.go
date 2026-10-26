@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"context"
+	"slices"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -42,6 +43,17 @@ func isRepairPause(t tickets.Ticket) bool {
 	return false
 }
 
+// isWebOnlyVerb is a detail.actions verb the TUI cannot run: it needs a reply or
+// a base the TUI has no input for, or the server has no repair verb for it. The
+// menu still lists them; picking one points the person to the web.
+func isWebOnlyVerb(verb string) bool {
+	switch verb {
+	case server.ActionAnswer, server.ActionChooseBase, server.ActionReopenAndRetry:
+		return true
+	}
+	return false
+}
+
 // serverWriteMsg reports a finished server verb: the refusal or error, if any.
 type serverWriteMsg struct {
 	verb    string
@@ -53,6 +65,9 @@ type serverWriteMsg struct {
 func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
 	if api == nil {
 		return notify.Warning(serverNotRunning)
+	}
+	if isWebOnlyVerb(verb) {
+		return notify.Warning(verb + " needs the web UI")
 	}
 	return func() tea.Msg {
 		ctx := context.Background()
@@ -83,9 +98,10 @@ func cmdServerWrite(api ServerAPI, verb, address string) tea.Cmd {
 			repair(verb, server.RepairRequest{Address: address})
 		case server.ActionStartOver:
 			repair(verb, server.RepairRequest{Address: address, Reason: serverStartOverReason})
-		default:
-			// resume, and the verbs that lift a pause through it.
+		case server.ActionResume:
 			repair(serverVerbResume, server.RepairRequest{Address: address})
+		default:
+			return notify.Warning("unknown action " + verb)()
 		}
 		switch {
 		case err != nil:
@@ -127,9 +143,10 @@ func cmdRunFirstAction(api ServerAPI, address string) tea.Cmd {
 		if err != nil {
 			return notify.Error("detail: " + err.Error())()
 		}
-		if len(d.Actions) == 0 {
+		i := slices.IndexFunc(d.Actions, func(a string) bool { return !isWebOnlyVerb(a) })
+		if i < 0 {
 			return nil
 		}
-		return cmdServerWrite(api, d.Actions[0], address)()
+		return cmdServerWrite(api, d.Actions[i], address)()
 	}
 }
