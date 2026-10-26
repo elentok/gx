@@ -128,18 +128,20 @@ test("each entry kind renders", async () => {
   expect((await screen.findByText("bold")).tagName).toBe("STRONG");
   expect(screen.getByText("do the thing")).toBeTruthy();
   expect(screen.getByText("/gx-design")).toBeTruthy();
-  expect(screen.getByText("· 12 tool calls")).toBeTruthy();
+  expect(screen.queryByText(/tool call/)).toBeNull();
   expect(screen.getByText("Context compacted")).toBeTruthy();
   expect(screen.getByText("Earlier messages hidden")).toBeTruthy();
 });
 
-test("the tools line names the latest tool only while Working", async () => {
-  const chat = okChat(chatOf([msg({ kind: "tools", tool_count: 3, last_tool: "Grep" })]));
+test("tool messages render nothing, busy or idle", async () => {
+  const chat = okChat(chatOf([msg({ text: "hi" }), msg({ kind: "tools", tool_count: 3, last_tool: "Grep" })]));
   renderChat([session({ status: { state: "working" } })], chat);
-  expect(await screen.findByText("· 3 tool calls, Grep")).toBeTruthy();
+  await screen.findByText("hi");
+  expect(screen.queryByText(/tool call|Grep/)).toBeNull();
   cleanup();
   renderChat([session({ status: { state: "idle" } })], chat);
-  expect(await screen.findByText("· 3 tool calls")).toBeTruthy();
+  await screen.findByText("hi");
+  expect(screen.queryByText(/tool call|Grep/)).toBeNull();
 });
 
 const steps = [

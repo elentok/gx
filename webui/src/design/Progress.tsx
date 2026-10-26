@@ -24,7 +24,7 @@ const ticketsOf = (steps: MapStep[], rows: EpicDetailRow[]) =>
   steps.some((s) => s.step === RESOLVE_TICKETS && s.state === "current") ? rows : [];
 
 // The mark column is one fixed width, so every label in the tree starts at the same x.
-const MARK_W = "1.25em";
+const MARK_W = "16px";
 const GAP = "2";
 
 function Row({ glyph, tone, children }: { glyph: string; tone: Tone; children: ReactNode }) {

@@ -35,13 +35,7 @@ const KIND_NAMES: Record<string, string> = {
   agent: "subagent",
 };
 
-function toolsLine(m: SessionChatMessage, latest: boolean) {
-  const n = m.tool_count ?? 0;
-  const line = `· ${n} tool ${n === 1 ? "call" : "calls"}`;
-  return latest && m.last_tool ? `${line}, ${m.last_tool}` : line;
-}
-
-function Entry({ m, tool }: { m: SessionChatMessage; tool: boolean }) {
+function Entry({ m }: { m: SessionChatMessage }) {
   if (m.kind === "compacted") {
     return (
       <Text
@@ -57,13 +51,7 @@ function Entry({ m, tool }: { m: SessionChatMessage; tool: boolean }) {
       </Text>
     );
   }
-  if (m.kind === "tools") {
-    return (
-      <Text fontSize="xs" color="text.dim">
-        {toolsLine(m, tool)}
-      </Text>
-    );
-  }
+  if (m.kind === "tools") return null;
   if (m.kind === "prompt") {
     return (
       <Box
@@ -334,11 +322,7 @@ function ChatLog({
           </Text>
         )}
         {chat.messages.map((m, i) => (
-          <Entry
-            key={m.id || i}
-            m={m}
-            tool={busy && i === chat.messages.length - 1}
-          />
+          <Entry key={m.id || i} m={m} />
         ))}
         {chat.background.length > 0 && (
           <BackgroundStrip tasks={chat.background} />
