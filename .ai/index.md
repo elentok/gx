@@ -74,6 +74,12 @@ instead of hand-written helpers. A web test that needs a project repo also needs
 stall nudge, say) makes every fake agent hang until the test times out. Give it an off switch that
 is off by default in `servertest`.
 
+## Pauses
+
+Pause only when gx cannot recover on its own. Every pause needs a web button that ends it, never
+a gx CLI step. A new pause kind needs a row in the pause-to-verb table. See
+[ADR 0042](../docs/adr/0042-few-pauses-all-recoverable-from-the-web.md).
+
 ## Package map
 
 There is no `internal/` directory. Top-level packages live at the repo root:

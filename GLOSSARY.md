@@ -544,8 +544,9 @@ Set per project; detected from the repo when unset. A top-level ticket's **Targe
 _Avoid_: target branch, main branch, master.
 
 **Dirty trunk** — a **Trunk** checked out in a worktree whose local changes make git refuse a merge.
-Changes the merge doesn't touch don't count. gx never discards them: the epic is **Merge blocked**
-until a person commits or discards them and merges again.
+Changes the merge doesn't touch don't count. gx never discards them. It sets the clashing files
+aside and restores them when the merge is clean; when that isn't clean, the epic is **Merge
+blocked** and asks the person to commit or discard them, then merge again.
 _Avoid_: unclean trunk, trunk conflict (a conflict is between branches, not with a checkout).
 
 **Missing trunk** — a project whose **Trunk** names no local branch, whether set or detected. gx
@@ -764,8 +765,10 @@ since it has no branch.
 _Avoid_: closed epic, finished epic.
 
 **Merge blocked** — an epic state: a **Complete epic** whose merge failed and waits for a person. It
-is shown as "Paused: merge blocked" with its existing merge action. It carries the reason (a **Dirty trunk**, a git error, a branch that still needs a rebase after the
-merge-ticket cap) and the fix. A person fixes the cause and merges again.
+is shown as "Paused: merge blocked" with its existing merge action. It carries the reason (a **Dirty
+trunk**, a git error, a branch that still needs a rebase after the merge-ticket cap) and the fix. For
+a **Dirty trunk** the person chooses: set the clashing files aside and restore them, or commit or
+discard them first (`dirty-trunk`). A person fixes the cause and merges again.
 _Avoid_: merge failed, root paused (the server's internal name for the same event).
 
 **Merging** — an epic state: every ticket is done or cancelled except an open or claimed **Merge

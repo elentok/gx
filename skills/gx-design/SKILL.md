@@ -174,6 +174,9 @@ Review the spec against the map it came from and its own template, not in the ab
   it back to the map.
 - Does `## Self-decided design questions` hold a choice you disagree with, or one that changes user
   stories or scope? Each one is a finding. File none otherwise.
+- Does the spec add a pause kind, or a new way into an existing one? Each one is a finding unless
+  the spec says why gx cannot recover on its own and which web button ends the pause (see
+  [ADR 0042](../../docs/adr/0042-few-pauses-all-recoverable-from-the-web.md)).
 
 ## After every run
 
