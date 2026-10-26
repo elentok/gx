@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.38.0 - 2026-10-26
+
+- Added auto-advance for Design sessions. When a step ends, the server sends Continue by itself after a countdown. Cancel, typing input, Continue, Run Action or turning the switch off stops one auto-send. A runaway guard stops it after 5 sends in a row. The switch and countdown are in the web Composer, the full-screen composer and the TUI Agents tab menu and info row. Also added `gx agents auto-advance <id> on|off` and `POST /v1/sessions/auto-advance`.
+- Added `gx agent context-window --fits <step>`. It reports whether the next Design step fits under the context ceiling, and reports stop when auto-advance is off. `gx-design` uses it to decide when to chain steps, map runs included.
+- Added `gx agent step`, which reports the Design step a session is running. Going idle clears it.
+- Added the united Epics page. It replaces the Queue and Designs pages. Cards sit in five server-decided sections with collapse and counts. Needs you shows a reason and an action (Answer, Open ticket, Open epic, Merge), oldest wait first. A Design and its implementation epic share one card. One-off epics and the follow-ups epic get their own cards, and Finished is capped. A filter reaches past the cap, and a New Design dialog is included. In progress is sorted by queue slot, and one-off epics show "Queued #N". `/`, `/q` and `/designs` now redirect to `/epics`. The nav shows only Epics and Stats. `gx server epics` prints the section column.
+- Added Jump menus to the Design and Epic pages, with links between a Design and its implementation epic.
+- Changed the Design page: it fills the window, with a title row, the chat and a Progress column. The chat scrolls on its own and opens at the newest message. The composer is one line, tool lines are hidden, and a "Working: <step>" row shows on every busy turn. It also has a phone layout. The Designs picker is gone.
+- Changed buttons in the web UI to use roles, tones and sizes (`emphasis`) in place of variants. Added kind colors and a progress ring to cards.
+- Changed stopped Designs to sit in In progress with Continue, not in Needs you.
+- Changed the New Design form to keep its draft across a reload.
+- Changed Continue to be hidden after the Branch and Done steps, in every UI.
+- Changed `gx-grilling` to mark low-risk questions as decided unless you object. `gx-design` step 4 now grills its design questions in the same session, and runs a second review at most once after a story or scope change.
+- Changed skills to tell agents to Write a ticket body to a file and pipe it in, not use a heredoc. `gx-verify-epic` quotes each story from a full read and adds an unchecked story state.
+- Changed the `gx-resolve-follow-ups` skill's name to `gx-triage-follow-ups`. It now adds a code-review ticket to the ready epic.
+- Changed auto-Continue to read Codex rollouts and to reset Codex sessions with `/new`.
+- Fixed the Design check missing a final grilling question because Claude reports idle before it flushes the transcript. The server now waits up to 2s for the turn to finish writing and re-reads the chat.
+- Fixed an Action hanging when a background task was still running. `/gx-design` was never typed after `/clear`.
+- Fixed transcript lookup across project folders. A transcript missed before its file existed no longer hides the agent's first message. Misses now back off 3s, 30s, then 5min.
+- Fixed long `gx-question` rounds not parsing, because the last assistant text was capped.
+- Fixed a new design session leaving the Design page when it was linked.
+- Fixed Resume that prompts a live agent leaving the pause round open.
+- Fixed a turn first seen mid-flight after a watch reconnect showing as Live.
+- Fixed a blocked ticket before a paused one being reported as a blocked cycle.
+- Fixed finished epics without `completed_at` staying "Implemented" after merge. `gx tickets migrate` now backfills `merged_at`, and skips that backfill for a tracker root outside git.
+- Fixed the Triage Copy button doing nothing on plain HTTP. It now falls back to `execCommand` and shows "Copy failed" when that fails too.
+- Fixed `guard-bash` quote handling. It now fails closed on unbalanced quotes.
+- Fixed the holder bind error to name the unix socket path length limit.
+- Fixed the New Design button wrapping on mobile.
+
 ## v0.37.2 - 2026-10-25
 
 - Changed the `gx-investigate` skill to note that Retry only prompts a live agent.
