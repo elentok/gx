@@ -215,6 +215,18 @@ test("one line: the switch on the left; Note, Focus and Send on the right; the n
   expect(sw.getAttribute("aria-checked")).toBe("true");
 });
 
+test("on a phone Note is icon-only and Auto-advance shows no word, the switch stays", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    render({});
+    const sw = await screen.findByRole("switch", { name: /Auto-advance/ });
+    expect(sw.textContent).toBe("");
+    expect(screen.getByRole("button", { name: "Note" }).textContent).toBe("✎");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("Interrupt replaces Send while working, Continue replaces it after a run-end line", async () => {
   render({ state: "working" });
   await screen.findByRole("button", { name: "Interrupt" });
@@ -612,7 +624,7 @@ test("a question card shows its number and title above the body", async () => {
 });
 
 const focusDialog = async () => {
-  fireEvent.click(await screen.findByRole("button", { name: "⤢ Focus" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Focus" }));
   return screen.findByRole("dialog", { name: "Questions, full screen" });
 };
 

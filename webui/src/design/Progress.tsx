@@ -124,7 +124,32 @@ function MobileProgress({ detail, steps }: { detail: EpicDetail; steps: MapStep[
       <Button emphasis="ghost" tone="muted" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         {summaryLine(steps, detail.rows)} {open ? "▴" : "▾"}
       </Button>
-      {open && <Steps steps={steps} rows={detail.rows} />}
+      {open && (
+        <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4" onClick={() => setOpen(false)}>
+          <Box
+            role="dialog"
+            aria-modal="true"
+            aria-label="Design progress steps"
+            bg="surface"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="md"
+            p="3"
+            maxW="full"
+            maxH="full"
+            overflow="auto"
+            display="flex"
+            flexDirection="column"
+            gap="2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Steps steps={steps} rows={detail.rows} />
+            <Button emphasis="ghost" onClick={() => setOpen(false)}>
+              Close
+            </Button>
+          </Box>
+        </Box>
+      )}
       {showsImplLink(detail) && <ImplLink address={detail.impl_address!} />}
     </Box>
   );

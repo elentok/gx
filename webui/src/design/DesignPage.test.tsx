@@ -173,7 +173,9 @@ test("on a phone Progress is a segment bar and a line that expands on tap", asyn
     expect(p.queryByText("Grill findings")).toBeNull();
     expect(p.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
     fireEvent.click(line);
-    expect(p.getByText("Grill findings")).toBeTruthy();
+    const modal = within(screen.getByRole("dialog", { name: "Design progress steps" }));
+    expect(modal.getByText("Grill findings")).toBeTruthy();
+    expect(modal.getByText("Chat content")).toBeTruthy();
   } finally {
     vi.unstubAllGlobals();
   }

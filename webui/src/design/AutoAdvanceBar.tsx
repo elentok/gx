@@ -7,6 +7,7 @@ import {
   type CancelAutoAdvance,
   type SetAutoAdvance,
 } from "./open";
+import { useWide } from "./useWide";
 
 export type RunCall = (
   call: () => Promise<{ refused?: boolean; message?: string }>,
@@ -44,6 +45,7 @@ export function AutoAdvanceBar({
   setAutoAdvance: SetAutoAdvance;
   cancelAutoAdvance: CancelAutoAdvance;
 }) {
+  const wide = useWide();
   const secondsLeft = useAutoAdvanceCountdown(session);
   const state = stateToken(session);
   return (
@@ -86,9 +88,7 @@ export function AutoAdvanceBar({
             bg="surface"
           />
         </Box>
-        <Text as="span" display={{ base: "none", md: "inline" }}>
-          Auto-advance
-        </Text>
+        {wide && <Text as="span">Auto-advance</Text>}
       </Button>
       {secondsLeft !== undefined && (
         <>

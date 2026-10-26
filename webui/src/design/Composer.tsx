@@ -27,6 +27,7 @@ import {
   unansweredOf,
   type Answers,
 } from "./round";
+import { useWide } from "./useWide";
 import { promptable } from "./view";
 
 // Under the chat, one line: the auto-advance switch, then Note, Focus and the main action. Nothing sends unless the session is Idle.
@@ -78,6 +79,7 @@ export function Composer({
   /** Opens or closes the full-screen round; a sent round closes it. */
   onFullScreen?: (on: boolean) => void;
 }) {
+  const wide = useWide();
   const [open, setOpen] = useState(false);
   const [unanswered, setUnanswered] = useState<SessionRoundCard[]>([]);
   const [text, setTextState] = useState(initialText);
@@ -183,13 +185,10 @@ export function Composer({
   const focusButton = inRound && onFullScreen && (
     <Button
       emphasis="secondary"
-      aria-label="⤢ Focus"
+      aria-label="Focus"
       onClick={() => onFullScreen(true)}
     >
-      ⤢{" "}
-      <Text as="span" display={{ base: "none", md: "inline" }}>
-        Focus
-      </Text>
+      ⤢{wide && " Focus"}
     </Button>
   );
   const notices = (
@@ -334,10 +333,7 @@ export function Composer({
           aria-expanded={open}
           onClick={() => setOpen(!open)}
         >
-          ✎{" "}
-          <Text as="span" display={{ base: "none", md: "inline" }}>
-            Note
-          </Text>
+          ✎{wide && " Note"}
         </Button>
         {focusButton}
         {mainButton}
