@@ -323,9 +323,14 @@ stories' estimates) stay at or under 70K.
 - The 70K budget wins: a scenario group that passes 70K is split across parts.
 - A single story over 70K gets a part of its own, with a note in the body that it is over budget.
 
-**One part.** If every story fits in one part, publish one lone verify ticket: `Round: 1`, no
-`Role:` line, the spec path, the stories and the spec's `## Out of Scope` section, and no collect
-ticket.
+**One part.** If every story fits in one part, publish one lone verify ticket, and no collect ticket:
+
+```sh
+gx tickets add <epic-slug> --slug verify --type verify --expected-context-window <base+stories> --body -
+```
+
+The body has `Round: 1`, no `Role:` line, the spec path, the fixture scenario, per story its number,
+its text and its Verification entry word for word, and the spec's `## Out of Scope` section.
 
 **Several parts.** Publish each part as a top-level ticket (no `parent`, no `blocked_by`):
 

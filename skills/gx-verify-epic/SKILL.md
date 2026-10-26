@@ -156,12 +156,15 @@ stop every background shell you started (the fixture, for a lone ticket) before 
 
 - **Lone.** Mark every unchecked story `unchecked`, reason `cap stop`, and write the results (step 4).
   Open extra parts for the unchecked stories plus a collect ticket, all with the same `Round: N`
-  (step 6). Write your results into that collect ticket as its starting table (step 5). Do not name
+  (step 6). Write your results into that collect ticket as its starting table (step 5), and copy
+  `## Out of Scope` into it. Do not name
   this ticket in its `blocked_by`: the collect ticket is its child, and a blocker waits on its whole
   fork subtree. Report `gx tickets set <addr> --iteration-status finished --commitless true` (drop
   `--commitless` if you committed an inline fix).
-- **Collect.** Write the current table with the decisions made so far into a second collect ticket
-  for the same round, same `Round: N`, as its starting table. Open it as a child. Report finished.
+- **Collect.** Write the current table with the decisions made so far into your own ticket, and into
+  a new collect ticket for the same round, same `Round: N`, as its starting table. Open it as a
+  child; step 6 covers copying `## Out of Scope` and setting `expected_context_window` and
+  `blocked_by`. Report finished.
 
 The rest of this skill (steps 5 to 7) is for a collect or lone ticket.
 
@@ -184,8 +187,8 @@ Write one table for all stories into your ticket, under `## Table`, with
 
 ## 6. Decide and open the work
 
-**Cap-stop leftovers.** For the unchecked stories, open extra parts plus a second collect ticket
-that names them in `blocked_by`, all with the same `Round: N`.
+**Cap-stop leftovers.** For the unchecked stories, open extra parts plus a collect ticket
+(the first one when you are a lone ticket) that names them in `blocked_by`, all with the same `Round: N`.
 
 - A story left unchecked for the second time in a round gets a solo extra part (one story).
 - If that solo part also stops at the cap, mark the story `fail`, "too large for one session",
@@ -211,7 +214,8 @@ or touched code of other passed stories. Only a fix round raises N.
   failed and unchecked stories plus every passed story you expect a fix to touch, judged from the
   finding. Each story carries its finding and fix ticket. Each part names its fix tickets in
   `blocked_by`.
-- Also open a new collect ticket, `Round: N+1`, that names the new parts in `blocked_by`.
+- Also open a new collect ticket, `Round: N+1`, that names the new parts in `blocked_by`. Write the
+  current table into it as its starting table (step 5).
 
 **Opening tickets.** Use `gx tickets add <epic> --parent <this ticket id> --slug <slug>
 [--type verify] [--blocked-by <ids>] --expected-context-window <K> --body -`.
@@ -220,8 +224,8 @@ or touched code of other passed stories. Only a fix round raises N.
 - Each gets `expected_context_window`: the sum of its per-story estimates plus the base (parts), or
   the collect estimate (collect tickets).
 - Every collect ticket you open gets a copy of `## Out of Scope`: from your own ticket, or for a
-  lone ticket without one, from the spec. A collect ticket opened for a cap stop also gets its
-  starting table (steps 5 and cap stops).
+  lone ticket without one, from the spec. It also gets the current table as its starting table
+  (step 5 and the cap stops).
 
 ## 7. Close out
 
