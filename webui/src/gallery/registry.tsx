@@ -446,6 +446,7 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [
       { label: "several projects", node: <ModalFrame><NewDesignForm projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
       { label: "one project", node: <ModalFrame><NewDesignForm projects={["gx"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
+      { label: "phone bottom sheet", node: <ModalFrame><NewDesignForm phone projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
     ],
   },
 ];

@@ -144,3 +144,39 @@ test("Tab wraps inside the dialog", () => {
   fireEvent.keyDown(document.activeElement!, { key: "Tab", shiftKey: true });
   expect(document.activeElement).toBe(start);
 });
+
+function stubPhone() {
+  const listeners = new Set<() => void>();
+  const vv = { height: 700, addEventListener: (_: string, f: () => void) => listeners.add(f), removeEventListener: (_: string, f: () => void) => listeners.delete(f) };
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  vi.stubGlobal("visualViewport", vv);
+  vi.stubGlobal("innerHeight", 800);
+  return { resize: (height: number) => act(() => ((vv.height = height), listeners.forEach((f) => f()))) };
+}
+
+test("a narrow viewport renders the bottom sheet with a grab handle, Close, and a 1:2 footer", () => {
+  stubPhone();
+  mount();
+  expect(screen.getByTestId("grab-handle")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
+  expect(getComputedStyle(screen.getByRole("button", { name: "Discard" })).flexGrow).toBe("1");
+  expect(getComputedStyle(screen.getByRole("button", { name: "Start design" })).flexGrow).toBe("2");
+  vi.unstubAllGlobals();
+});
+
+test("the sheet is 88% high and follows the visual viewport while the keyboard is open", () => {
+  const { resize } = stubPhone();
+  mount();
+  const dialog = screen.getByRole("dialog");
+  expect(dialog.style.height || getComputedStyle(dialog).height).toBe("692px");
+  resize(800);
+  expect(getComputedStyle(dialog).height).toBe("704px");
+  resize(400);
+  expect(getComputedStyle(dialog).height).toBe("392px");
+  vi.unstubAllGlobals();
+});
+
+test("a wide viewport has no grab handle", () => {
+  mount();
+  expect(screen.queryByTestId("grab-handle")).toBeNull();
+});

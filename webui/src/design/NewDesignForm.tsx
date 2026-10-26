@@ -3,6 +3,11 @@ import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { postOpenDesign, type OpenDesign } from "./open";
 import { Failure, useWrite } from "./SessionControls";
+import { useVisualViewportHeight } from "./useVisualViewportHeight";
+import { useWide } from "./useWide";
+
+const SHEET_HEIGHT = 0.88;
+const SHEET_TOP_GAP = 8;
 
 export interface NewDesignDraft {
   slug?: string;
@@ -57,6 +62,7 @@ export function NewDesignForm({
   open = postOpenDesign,
   onStarted,
   onClose,
+  phone,
 }: {
   projects: string[];
   /** The Epics page's project filter, when it is on one project. */
@@ -66,7 +72,14 @@ export function NewDesignForm({
   onStarted: (address: string) => void;
   /** Closing keeps the draft. */
   onClose: () => void;
+  /** Forces the phone bottom sheet (or the centered modal) regardless of the viewport width. */
+  phone?: boolean;
 }) {
+  const wide = useWide();
+  const sheetMode = phone ?? !wide;
+  const viewportHeight = useVisualViewportHeight();
+  // The keyboard shrinks the visual viewport, so the sheet follows it to keep the footer visible.
+  const sheetHeight = viewportHeight ? `${Math.round(Math.min(SHEET_HEIGHT * window.innerHeight, viewportHeight - SHEET_TOP_GAP))}px` : "88%";
   const [draft, setDraft] = useState(() => {
     const saved = readDraft();
     return { slug: saved.slug ?? "", idea: saved.idea ?? "", project: startingProject(saved, projects, filterProject) };
@@ -110,7 +123,17 @@ export function NewDesignForm({
   };
 
   return (
-    <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4" onClick={onClose}>
+    <Box
+      position="fixed"
+      inset="0"
+      zIndex="modal"
+      bg="overlay"
+      display="flex"
+      alignItems={sheetMode ? "flex-end" : "center"}
+      justifyContent="center"
+      p={sheetMode ? "0" : "4"}
+      onClick={onClose}
+    >
       <Box
         ref={sheet}
         as="form"
@@ -123,15 +146,16 @@ export function NewDesignForm({
         bg="surface.raised"
         borderWidth="1px"
         borderColor="border"
-        borderRadius="lg"
-        w="720px"
-        h="520px"
+        borderRadius={sheetMode ? "xl xl 0 0" : "lg"}
+        w={sheetMode ? "full" : "720px"}
+        h={sheetMode ? sheetHeight : "520px"}
         maxW="full"
         maxH="full"
         display="flex"
         flexDirection="column"
         overflow="hidden"
       >
+        {sheetMode && <Box aria-hidden data-testid="grab-handle" alignSelf="center" w="36px" h="4px" mt="2" borderRadius="full" bg="border" flexShrink="0" />}
         <Box display="flex" alignItems="center" gap="2" p="3" borderBottomWidth="1px" borderColor="border" flexShrink="0">
           {projects.length > 1 && (
             <>
@@ -218,11 +242,11 @@ export function NewDesignForm({
             </>
           ) : (
             <>
-              <Button type="button" emphasis="ghost" tone="muted" onClick={() => (hasText(draft) ? setConfirming(true) : discard())}>
+              <Button type="button" emphasis="ghost" tone="muted" flex={sheetMode ? "1" : undefined} onClick={() => (hasText(draft) ? setConfirming(true) : discard())}>
                 Discard
               </Button>
-              <Box flex="1" />
-              <Button type="submit" tone="running" disabled={pending}>
+              {!sheetMode && <Box flex="1" />}
+              <Button type="submit" tone="running" flex={sheetMode ? "2" : undefined} disabled={pending}>
                 Start design
               </Button>
             </>
