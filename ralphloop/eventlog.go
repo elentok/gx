@@ -186,6 +186,9 @@ type Event struct {
 	// AtticRef (manual-merge/ticket-started-over only) is the ref that preserves the
 	// commits the command set aside.
 	AtticRef string `json:"attic_ref,omitempty"`
+	// BackupRef (dirty-trunk-landed only) is the gx ref holding the files the
+	// land set aside.
+	BackupRef string `json:"backup_ref,omitempty"`
 	// TaskID (background-task gate events only) is the gated task, so readers
 	// never parse it out of Reason.
 	TaskID string `json:"task_id,omitempty"`

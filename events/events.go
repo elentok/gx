@@ -56,6 +56,10 @@ const (
 	// SessionPrompted is a person's text typed into a design session; the
 	// server log records its size, never the text.
 	SessionPrompted Type = "session-prompted"
+	// DirtyTrunkLanded is an epic landed over uncommitted files in the target's
+	// checkout: set aside, fast-forwarded and restored with no pause. Reason
+	// lists the files; the event names the backup ref that held them.
+	DirtyTrunkLanded Type = "dirty-trunk-landed"
 )
 
 // Event types added by the orchestrator-daemon stages. Fixed now so S0 ships

@@ -141,6 +141,9 @@ From the person's view:
     "+N more", so that the reason stays readable.
 30. As a project owner, I want no auto-retry after a dirty-trunk park, so that gx never touches my
     local changes.
+    _Superseded in part: when putting the clashing files back after the fast-forward would be
+    clean, the server now backs them up, sets them aside, lands and restores them without a pause
+    (`recover-merge-error`, "Dirty trunk at land"). Only a restore that would conflict still parks._
 31. As a project owner, I want a dirty trunk hit after a merge ticket to leave the merge ticket
     `done` and not use up the retry cap, so that the cap only counts real rebases.
 32. As a project owner, I want any other land error to park the root with "land failed: `<git
