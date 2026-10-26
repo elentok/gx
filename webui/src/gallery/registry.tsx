@@ -1,8 +1,9 @@
 import { Box } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import canned from "../canned-snapshot.json";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
+import { WideContext } from "../design/useWide";
 import { EpicCard } from "../epics/EpicCard";
 import type { EpicListRow } from "../generated/server";
 import { JumpRow } from "../nav/JumpMenu";
@@ -72,6 +73,13 @@ const ModalFrame = ({ children }: { children: ReactNode }) => (
     </Box>
   </ConnectionContext.Provider>
 );
+
+// Opens a menu the way a user does, by clicking its trigger once mounted.
+const OpenMenu = ({ children }: { children: ReactNode }) => {
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => root.current?.querySelector<HTMLElement>("button[aria-label=Menu]")?.click(), []);
+  return <div ref={root}>{children}</div>;
+};
 
 const chartDays =["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -203,8 +211,8 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "Paused", node: <TopBar active="epics" build="v1.2.3" mode="paused" connected /> },
       { label: "Offline", node: <TopBar active="epics" build="v1.2.3" connected={false} /> },
       { label: "menu closed", node: <TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} /> },
-      { label: "menu open, AFK off", node: <TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} menuOpen /> },
-      { label: "menu open, AFK on", node: <TopBar active="epics" build="v1.2.3" connected afk onToggleAfk={() => {}} menuOpen /> },
+      { label: "menu open, AFK off", node: <OpenMenu><TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} /></OpenMenu> },
+      { label: "menu open, AFK on", node: <OpenMenu><TopBar active="epics" build="v1.2.3" connected afk onToggleAfk={() => {}} /></OpenMenu> },
       { label: "no build string", node: <TopBar active="epics" connected /> },
     ],
   },
@@ -446,7 +454,7 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [
       { label: "several projects", node: <ModalFrame><NewDesignForm projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
       { label: "one project", node: <ModalFrame><NewDesignForm projects={["gx"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
-      { label: "phone bottom sheet", node: <ModalFrame><NewDesignForm phone projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
+      { label: "phone bottom sheet", node: <WideContext.Provider value={false}><ModalFrame><NewDesignForm projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame></WideContext.Provider> },
     ],
   },
 ];

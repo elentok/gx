@@ -6,9 +6,6 @@ import { Failure, useWrite } from "./SessionControls";
 import { useVisualViewportHeight } from "./useVisualViewportHeight";
 import { useWide } from "./useWide";
 
-const SHEET_HEIGHT = 0.88;
-const SHEET_TOP_GAP = 8;
-
 export interface NewDesignDraft {
   slug?: string;
   idea?: string;
@@ -62,7 +59,6 @@ export function NewDesignForm({
   open = postOpenDesign,
   onStarted,
   onClose,
-  phone,
 }: {
   projects: string[];
   /** The Epics page's project filter, when it is on one project. */
@@ -72,14 +68,9 @@ export function NewDesignForm({
   onStarted: (address: string, startFailure?: string) => void;
   /** Closing keeps the draft. */
   onClose: () => void;
-  /** Forces the phone bottom sheet (or the centered modal) regardless of the viewport width. */
-  phone?: boolean;
 }) {
-  const wide = useWide();
-  const sheetMode = phone ?? !wide;
-  const viewportHeight = useVisualViewportHeight();
-  // The keyboard shrinks the visual viewport, so the sheet follows it to keep the footer visible.
-  const sheetHeight = viewportHeight ? `${Math.round(Math.min(SHEET_HEIGHT * window.innerHeight, viewportHeight - SHEET_TOP_GAP))}px` : "88%";
+  const sheetMode = !useWide();
+  const sheetHeight = useVisualViewportHeight();
   const [draft, setDraft] = useState(() => {
     const saved = readDraft();
     return { slug: saved.slug ?? "", idea: saved.idea ?? "", project: startingProject(saved, projects, filterProject) };

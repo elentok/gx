@@ -22,12 +22,10 @@ interface Props {
   afk?: boolean;
   // The toggle shows only when the page can switch AFK mode.
   onToggleAfk?: () => void;
-  // Starts the menu open; the gallery uses it to show the open state.
-  menuOpen?: boolean;
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected, afk = false, onToggleAfk, menuOpen }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, afk = false, onToggleAfk }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
   return (
     <Box as="nav" display="flex" alignItems="center" justifyContent="space-between" mb="4">
@@ -53,7 +51,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, afk =
         {queueChip && <Chip tone="waiting">{queueChip}</Chip>}
         <LiveDot tone={connected ? "running" : "muted"} label={connected ? "Live" : "Offline"} />
         {(onToggleAfk || build) && (
-          <Menu.Root closeOnSelect={false} lazyMount unmountOnExit defaultOpen={menuOpen} positioning={{ placement: "bottom-end" }}>
+          <Menu.Root closeOnSelect={false} lazyMount unmountOnExit positioning={{ placement: "bottom-end" }}>
             <Menu.Trigger asChild>
               <chakra.button type="button" aria-label="Menu" cursor="pointer" color="text.muted" display="flex" p="1">
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
