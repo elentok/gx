@@ -19,19 +19,30 @@ test("2. Epic looks right", async ({ page, start }) => {
   await expect(mixed.getByText("demo", { exact: true })).toBeVisible();
   await mixed.getByRole("link", { name: "mixed-epic" }).click();
 
-  await expect(page.getByText("Not queued · 2 of 7 done")).toBeVisible();
-  await expect(page.getByText("✓ 1 done · 1 cancelled")).toBeVisible();
-  await expect(page.getByText("open · open")).toBeVisible();
-  await expect(page.getByText("blocked · blocked · after 02")).toBeVisible();
-  await expect(page.getByText("drafted · draft")).toBeVisible();
-  await expect(page.getByText("asks · open")).toBeVisible();
-  await expect(page.getByText("fails · open")).toBeVisible();
+  await expect(page.getByText("2/7")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Implementation" })).toBeVisible();
+  await expect(page.getByTestId("comet")).toHaveCount(0);
+  await expect(page.getByTestId("stats-line")).toHaveText("Not queued · $0.00 · 0s agent time");
+  await expect(page.getByText("1 done, 1 cancelled")).toBeVisible();
+  await expect(page.getByRole("link", { name: "02 open ready" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "03 blocked after 02" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "04 drafted draft" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "06 asks ready" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "07 fails ready" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "05 dropped cancelled" })).toBeVisible();
+  // The epic has no stats until work merges, so there is no More stats card yet.
+  await expect(page.getByRole("button", { name: /^More stats/ })).toHaveCount(0);
 
   // The worker settles with 02 and 03 merged, 06 asking and 07 failing.
   await page.getByRole("button", nav("Queue")).click();
-  await expect(page.getByText(/Running · 4 of 7 done/)).toBeVisible();
-  await expect(page.getByText("asks · needs-answer · Waiting for your answer")).toBeVisible();
+  await expect(page.getByText("2/7")).toBeVisible();
+  await expect(page.getByTestId("stats-line")).toHaveText(/^Running · /);
+  await expect(page.getByTestId("comet")).toBeVisible();
+  await expect(page.getByText("4/7")).toBeVisible();
+  await expect(page.getByText("needs-answer · Waiting for your answer")).toBeVisible();
   await expect(page.getByText("Which option should the fake worker take?")).toBeVisible();
+  await expect(page.getByRole("button", nav("Answer"))).toBeVisible();
+  await expect(page.getByRole("link", { name: "07 fails" })).toBeVisible();
 
   await page.getByRole("link", nav("← Epics")).click();
   await expect(mixed.getByText("4/7")).toBeVisible();
@@ -53,7 +64,14 @@ test("7. Epic completion", async ({ page, start }) => {
   await expect(finished.getByRole("link", { name: "finishing-epic" })).toBeVisible();
   await expect(card(page, "finishing-epic").getByText("2/2")).toBeVisible();
   await card(page, "finishing-epic").getByRole("link", { name: "finishing-epic" }).click();
-  await expect(page.getByText(/2 of 2 done/)).toBeVisible();
+  await expect(page.getByText("Finished · $0.00 · 0s agent time")).toBeVisible();
+  await expect(page.getByText("2 done")).toBeVisible();
+  await expect(page.getByText("2/2")).toBeVisible();
+  await expect(page.getByTestId("comet")).toHaveCount(0);
+  const more = page.getByRole("button", { name: /^More stats/ });
+  await expect(more).toHaveAttribute("aria-expanded", "false");
+  await more.click();
+  await expect(more).toHaveAttribute("aria-expanded", "true");
 });
 
 test("8. Edge states", async ({ page, start }) => {
@@ -72,11 +90,13 @@ test("8. Edge states", async ({ page, start }) => {
 
   await progress.getByRole("link", { name: "empty-epic" }).click();
   await expect(page.getByText("No tickets yet")).toBeVisible();
+  await expect(page.getByText("0/0")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^More stats/ })).toHaveCount(0);
 
   await page.getByRole("link", nav("← Epics")).click();
   await page.getByRole("link", { name: "blocked-epic" }).click();
-  await expect(page.getByText("waiting · blocked · after 01")).toBeVisible();
-  await expect(page.getByText("unmerged · open")).toBeVisible();
+  await expect(page.getByRole("link", { name: "02 waiting after 01" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "01 unmerged ready" })).toBeVisible();
 });
 
 test("6. Outside changes show up", async ({ page, start }) => {

@@ -133,9 +133,9 @@ test("18. Joined card", async ({ page, start }) => {
   // The two epic pages link to each other.
   await joined.getByRole("link", { name: "design-epic", exact: true }).click();
   await expect(page).toHaveURL(/#\/e\/demo:design-epic-impl$/);
-  await page.getByRole("link", nav("Open design →")).click();
+  await page.getByRole("button", { name: "Open design", exact: true }).click();
   await expect(page).toHaveURL(/#\/e\/demo:design-epic$/);
-  await page.getByRole("link", nav("Open implementation epic →")).click();
+  await page.getByRole("button", { name: "Open implementation epic", exact: true }).click();
   await expect(page).toHaveURL(/#\/e\/demo:design-epic-impl$/);
 });
 

@@ -27,10 +27,14 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   3. Click Queue on the epic page.
   4. Click "← Epics".
 - **Pass:**
-  - Before queueing, the epic page reads "Not queued · 2 of 7 done", folds "1 done · 1 cancelled",
-    and shows ticket lines `open`, `blocked · after 02`, `drafted · draft`, `asks`, `fails`.
-  - After queueing, the fake worker settles: the epic page reads "Running · 4 of 7 done", ticket 06
-    shows "needs-answer" with its question, and the Epics page card shows `4/7`, a pill and a reason.
+  - Before queueing, the epic page shows the ring `2/7` with the Implementation badge and no comet, the
+    stats line "Not queued · $0.00 · 0s agent time", the divider "1 done, 1 cancelled", and one card link
+    per live ticket: `02 open ready`, `03 blocked after 02`, `04 drafted draft`, `06 asks ready`,
+    `07 fails ready`, then the cancelled `05 dropped cancelled`. There is no More stats card yet.
+  - After queueing, the stats line starts with "Running" and the comet shows. The fake worker settles:
+    the ring reads `4/7`, ticket 06 is expanded with "needs-answer · Waiting for your answer", its
+    question and an Answer button, and ticket 07 stays a card. The Epics page card shows `4/7`, a pill and
+    a reason.
 
 ## 3. Pause reasons and recovery
 
@@ -44,7 +48,8 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Pass:**
   - The card names the epic's first pause only (`paused-epic`: "Seeded pause: self-reported" and
     "+4 more"; `approve-epic`: "wants to run: rg fixture"). The reason shows on the epic page row
-    and on the ticket page.
+    and on the ticket page. Opening a ticket from its card lands on `#/t/<address>`. The Repair row's
+    card reads "needs-repair · Run failed".
   - The action clears the reason from the ticket page without a reload.
 - **Rows:**
 
@@ -54,7 +59,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   | Choose base | `paused-epic/04` | Ambiguous base | pick `01`, Choose base |
   | Retry | `paused-epic/06` | Agent stopped without a result | Retry |
   | Approve | `approve-epic/01` | Needs approval | Allow once |
-  | Repair | `paused-epic/07` | Run failed | none: the card shows "+4 more", the epic page shows "Fix it in the TUI" twice |
+  | Repair | `paused-epic/07` | Run failed | none: the card shows "+4 more", the epic page shows two "Fix it with an agent" buttons and no "Fix it in the TUI" |
 
 - **Not covered yet:** Resolve conflict (`paused-epic/05`, `merge-conflict`). The server offers the
   button but refuses the resume ("ticket 05 is …, not asking").
@@ -98,7 +103,8 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   1. Open the Epics page; the `finishing-epic` card is in In progress and shows `1/2`.
   2. Release the hold; the last ticket finishes and merges.
 - **Pass:** the card is in the Finished section (collapsed until opened) as `2/2`; its epic page
-  reads "2 of 2 done".
+  reads "Finished · $0.00 · 0s agent time" with the ring `2/2`, no comet, the divider "2 done", and a
+  More stats card that is `aria-expanded` false, then true after a click.
 
 ## 8. Edge states
 
@@ -109,8 +115,8 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   2. Open `empty-epic`.
   3. Click "← Epics" and open `blocked-epic`.
 - **Pass:**
-  - `empty-epic` reads "No tickets yet".
-  - `blocked-epic` shows `waiting · blocked · after 01` and `unmerged · open`.
+  - `empty-epic` reads "No tickets yet" with ring `0/0` and no More stats card.
+  - `blocked-epic` shows the cards `02 waiting after 01` and `01 unmerged ready`.
 - **Not covered:** the "No epics yet" state of the Epics page. `edge` has epics, so it never shows.
 
 ## 9. Design progress to the end
@@ -210,7 +216,8 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   - The status reads "Designing" with a percentage in the ring, then "Creating tickets (N so far)..."
     with "…", then "Not started" with `n/m` at Branch, then "Implementing..." once queued. The title
     opens `#/e/demo:design-epic-impl` from Branch on.
-  - The impl epic page links "Open design →" and the design epic page links "Open implementation epic →".
+  - The impl epic page has an "Open design" button and the design epic page an "Open implementation
+    epic" button (no arrows); each opens the other's page.
 
 ## 19. Follow-ups triage
 

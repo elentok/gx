@@ -84,8 +84,9 @@ test.describe("3. Pause reasons and recovery", () => {
     await expect(card(page, "paused-epic").getByText(/\+4 more/)).toBeVisible();
 
     await page.getByRole("link", { name: "paused-epic" }).click();
-    await expect(page.getByText("repair · needs-repair · Run failed")).toBeVisible();
-    await expect(page.getByText("Fix it in the TUI")).toHaveCount(2);
+    await expect(page.getByText("needs-repair · Run failed")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Fix it with an agent" })).toHaveCount(2);
+    await expect(page.getByText("Fix it in the TUI")).toHaveCount(0);
 
     await page.locator('a[href$="/t/demo:paused-epic/07"]').click();
     await expect(page.getByText("Run failed").first()).toBeVisible();
