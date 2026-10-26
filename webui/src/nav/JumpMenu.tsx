@@ -5,7 +5,8 @@ import { useConnectionContext } from "../connection";
 import { CardActionAnswer, CardKindDesign,SectionNeedsYou, SectionReadyToDesign, SectionFinished, type EpicListRow } from "../generated/server";
 import { designHref } from "../hrefs";
 import { useWide } from "../design/useWide";
-import { isLive, RING_KIND, ringProgress, ringTone, titleHref } from "../epics/EpicCard";
+import { titleHref } from "../epics/cardLinks";
+import { isLive, RING_KIND, ringProgress, ringTone } from "../epics/ring";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { sectionsOf, type Section } from "../epics/view";
 import { Button } from "../ui/button/Button";
@@ -256,7 +257,7 @@ export function JumpMenu({ name, current, fetchList }: { name: string; current: 
             </Text>
           )}
           {!phone && (
-            <Text as="span" aria-hidden fontSize="13px" color="text.dim" fontFamily="text"fontWeight="400">
+            <Text as="span" aria-hidden fontSize="13px" color="text.dim" fontFamily="text" fontWeight="400">
               ⌘K
             </Text>
           )}

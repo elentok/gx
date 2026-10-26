@@ -60,7 +60,7 @@ const cardRow = (over: Partial<EpicListRow> = {}): EpicListRow => ({
   ...over,
 });
 
-const chartDays =["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const chartDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const perTone =(render: (tone: Tone) => ReactNode): GalleryCase[] =>
   TONES.map((tone) => ({ label: tone, node: render(tone) }));

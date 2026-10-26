@@ -11,12 +11,7 @@ import {
   CardActionQueue,
   CardActionTriage,
   CardKindDesign,
-  CardKindFollowUps,
   CardKindImplementation,
-  CardKindOneOff,
-  EpicListFinished,
-  EpicListMerging,
-  EpicListRunning,
   SectionNeedsYou,
   type CardAction,
   type EpicListRow,
@@ -25,56 +20,17 @@ import { designHref, epicHref, ticketHref } from "../hrefs";
 import { postOpenDesign, type OpenDesign } from "../design/open";
 import { Button } from "../ui/button/Button";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
-import type { Kind, Tone } from "../ui/tone";
 import { EpicActionButton } from "./EpicActionButton";
+import { titleHref } from "./cardLinks";
 import { postEpicMerge, postQueueAdd, type PostEpicWrite } from "./queue";
+import { RING_KIND, isCreatingTickets, isLive, needsYouTone, ringProgress, ringTone } from "./ring";
 import { TriageDialog } from "./TriageDialog";
-
-export const RING_KIND: Record<EpicListRow["card_kind"] & string, Kind> = {
-  [CardKindDesign]: "design",
-  [CardKindImplementation]: "implementation",
-  [CardKindOneOff]: "oneoff",
-  [CardKindFollowUps]: "followups",
-};
-
-const PILL_TONE: Record<string, Tone> = {
-  Question: "waiting",
-  Permission: "waiting",
-  Stopped: "paused",
-  Paused: "paused",
-  Deadlocked: "deadlocked",
-  "Merge blocked": "deadlocked",
-  "Awaiting merge": "done",
-};
-
-const needsYouTone = (row: EpicListRow): Tone => PILL_TONE[row.state_pill ?? ""] ?? "waiting";
-
-export function ringTone(row: EpicListRow): Tone {
-  if (row.section === SectionNeedsYou) return needsYouTone(row);
-  if (row.state === EpicListFinished) return "done";
-  return isLive(row) ? "running" : "muted";
-}
-
-const isCreatingTickets = (row: EpicListRow) => row.status_words?.startsWith("Creating tickets") ?? false;
-
-export const isLive = (row: EpicListRow) =>
-  row.state === EpicListRunning || row.state === EpicListMerging || isCreatingTickets(row);
-
-export const ringProgress = (row: EpicListRow) =>
-  (row.ring_progress ?? (row.total ? (row.done / row.total) * 100 : 0)) / 100;
 
 function ringLabel(row: EpicListRow): string {
   if (isCreatingTickets(row)) return "…";
   if (row.card_kind === CardKindDesign) return `${row.ring_progress ?? 0}%`;
   if (row.card_kind === CardKindImplementation) return `${row.done}/${row.total}`;
   return "";
-}
-
-/** The one link of the card; see "Card actions" in docs/specs/united-epics-page.md. */
-export function titleHref(row: EpicListRow): string {
-  if (row.map_pending) return designHref(row.address);
-  if (row.card_kind === CardKindOneOff) return ticketHref(row.address);
-  return epicHref(row.addresses?.[0] ?? row.address);
 }
 
 function useCountdown(endsAt: string | undefined): number | undefined {
