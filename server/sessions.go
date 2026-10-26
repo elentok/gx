@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
@@ -198,7 +199,7 @@ func (s *Server) recordConversation(m sessionMeta) {
 		return
 	}
 	err := conversations.Save(s.cfg.ConversationsDir, conversations.Record{
-		ID: m.ConversationID, Dir: m.Dir, Harness: m.Harness, Ticket: m.Ticket, RecordedAt: time.Now(),
+		ID: m.ConversationID, Dir: m.Dir, Harness: m.Harness, Ticket: m.Ticket, Design: m.Design, RecordedAt: time.Now(),
 	})
 	if err != nil {
 		s.log.Warn("record conversation", "session", m.ID, "err", err)
@@ -223,6 +224,22 @@ func (s *Server) saveConversationTotals(m sessionMeta, conversation string) {
 	}
 	if err := conversations.SaveTotals(s.cfg.ConversationsDir, conversation, conversations.Totals{TotalTokens: int(tokens), Cost: cost}); err != nil {
 		s.log.Warn("save conversation totals", "session", m.ID, "conversation", conversation, "err", err)
+	}
+	if m.Design && agent == ralphloop.AgentClaude {
+		s.saveConversationGrilling(m, conversation)
+	}
+}
+
+// saveConversationGrilling counts the Grilling rounds of the ended Design
+// conversation onto its record. Any non-Codex harness reads as Claude here, as
+// for totals.
+func (s *Server) saveConversationGrilling(m sessionMeta, conversation string) {
+	home, err := os.UserHomeDir()
+	if err == nil {
+		err = grillround.Recount(s.cfg.ConversationsDir, home, conversations.Record{ID: conversation, Dir: m.Dir, Harness: string(harness.Claude)})
+	}
+	if err != nil {
+		s.log.Warn("count conversation grilling", "session", m.ID, "conversation", conversation, "err", err)
 	}
 }
 
