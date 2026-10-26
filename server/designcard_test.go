@@ -23,6 +23,21 @@ func epicRows(t *testing.T, h *servertest.Harness, f designsFixture) map[string]
 	return got
 }
 
+// waitForEpicRow polls for the row of name: the epic index follows the store
+// through a file watcher, so a map written just now shows up a moment later.
+func waitForEpicRow(t *testing.T, f designsFixture, name string, ok func(server.EpicListRow) bool) server.EpicListRow {
+	t.Helper()
+	var r server.EpicListRow
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		var found bool
+		if r, found = epicRows(t, f.h, f)[name]; found && ok(r) {
+			return r
+		}
+	}
+	t.Fatalf("row %q = %+v, never matched", name, r)
+	return r
+}
+
 func actionKinds(r server.EpicListRow) []server.CardActionKind {
 	var out []server.CardActionKind
 	for _, a := range r.Actions {
@@ -121,7 +136,7 @@ func TestEpicList_DesignCountdownCarriesItsDeadline(t *testing.T) {
 	t.Error("map row is missing")
 }
 
-func TestEpicList_MapPendingDesignLifecycle(t *testing.T) {
+func TestEpicList_NewDesignLifecycle(t *testing.T) {
 	cfg := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
 	f := startDesigns(t)
@@ -131,9 +146,9 @@ func TestEpicList_MapPendingDesignLifecycle(t *testing.T) {
 	}
 	id := res.Session.ID
 
-	r, ok := epicRows(t, f.h, f)["fresh-idea"]
-	if !ok || !r.MapPending || r.Address != "proj:fresh-idea" || r.Section != server.SectionInProgress || r.StatusWords != "Designing" {
-		t.Fatalf("running row = %+v (found %v), want a map-pending In progress card", r, ok)
+	r := waitForEpicRow(t, f, "fresh-idea", func(r server.EpicListRow) bool { return r.Section == server.SectionInProgress })
+	if r.Address != "proj:fresh-idea" || r.StatusWords != "Designing" {
+		t.Fatalf("running row = %+v, want an In progress Designing card", r)
 	}
 
 	conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
@@ -146,34 +161,19 @@ func TestEpicList_MapPendingDesignLifecycle(t *testing.T) {
 		t.Errorf("waiting row = section %q pill %q, want Needs you / Question", r.Section, r.StatePill)
 	}
 
-	writeEpicFiles(t, f.h.TicketStore, "fresh-idea", "---\nstatus: open\nkind: map\ndesign_step: chart\ndestination_unconfirmed: true\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
-	// The epic index follows the store through a file watcher, so poll for it.
-	var mapped server.EpicListRow
-	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
-		if mapped = epicRows(t, f.h, f)["fresh-idea"]; !mapped.MapPending {
-			break
-		}
-	}
-	if mapped.MapPending || mapped.ProgressStep != server.ProgressChart {
-		t.Errorf("row once the map exists = %+v, want the normal Design card", mapped)
-	}
 }
 
-func TestEpicList_NewDesignKeepsItsCardWhenItsSessionEnds(t *testing.T) {
+func TestEpicList_NewDesignGoesToReadyToDesignWhenItsSessionEndsUncharted(t *testing.T) {
 	f := startDesigns(t)
 	res := f.openNew(t, "fresh-idea", "an idea")
 	if res.Refused || res.Session == nil {
 		t.Fatalf("open = %+v", res)
 	}
-	if _, ok := epicRows(t, f.h, f)["fresh-idea"]; !ok {
-		t.Fatal("running Design has no card")
-	}
 	if _, err := f.h.Client.StopSession(f.ctx, res.Session.ID); err != nil {
 		t.Fatal(err)
 	}
 	waitForSession(f.ctx, t, f.h, f.evs, res.Session.ID, func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
-	// The map is on disk before the session starts, so its card outlives the session.
-	if r, ok := epicRows(t, f.h, f)["fresh-idea"]; !ok || r.MapPending {
-		t.Errorf("row after the session ended = %+v (found %v), want the map's own card", r, ok)
+	if r := waitForEpicRow(t, f, "fresh-idea", func(r server.EpicListRow) bool { return r.Section == server.SectionReadyToDesign }); r.StatusWords != "Not started" {
+		t.Errorf("row after the session ended = %+v, want Ready to design / Not started", r)
 	}
 }

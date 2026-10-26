@@ -243,9 +243,7 @@ export function DesignPage({
     ...projectNames.filter((p) => p !== currentProject),
   ];
   // No map yet: Chart has not made the Design's epic.
-  const chart = !list?.epics.some(
-    (e) => e.address === address && !e.map_pending,
-  );
+  const chart = !list?.epics.some((e) => e.address === address);
   const onNewSession = () =>
     setDraft({
       slug: address.slice(address.indexOf(":") + 1),

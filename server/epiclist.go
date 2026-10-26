@@ -2,7 +2,6 @@ package server
 
 import (
 	"cmp"
-	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -110,9 +109,6 @@ type EpicListRow struct {
 	// CountdownEndsAt is the deadline of a Design's auto-advance countdown; the client
 	// builds "Next run starts in Ns" from it.
 	CountdownEndsAt time.Time `json:"countdown_ends_at,omitzero"`
-	// MapPending marks a Design whose session runs before its map exists. It has no
-	// epic page: its title opens the Design page.
-	MapPending bool `json:"map_pending,omitempty"`
 }
 
 // FollowUpCount is the number of draft and open tickets in one project's
@@ -252,12 +248,6 @@ func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[
 			decorateDesignCard(&row, e, impl, designs[row.Address])
 		}
 		rows = append(rows, row)
-	}
-	for _, addr := range slices.Sorted(maps.Keys(designs)) {
-		p, epic, _ := strings.Cut(addr, ":")
-		if _, exists := byName[epic]; p == project && !exists && designs[addr].running {
-			rows = append(rows, mapPendingDesignRow(project, epic, designs[addr]))
-		}
 	}
 	return rows
 }

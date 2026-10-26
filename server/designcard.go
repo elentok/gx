@@ -86,19 +86,6 @@ func joinImplementation(row *EpicListRow, impl *EpicListRow, act designActivity)
 	}
 }
 
-// mapPendingDesignRow is the card of a Design session that runs before its map
-// exists, keyed and titled by the session's epic name.
-func mapPendingDesignRow(project, epic string, act designActivity) EpicListRow {
-	row := EpicListRow{
-		Address: rootRef{Project: project, Epic: epic}.String(), Project: project, Name: epic,
-		Kind: EpicKindMap, State: EpicListDesigning, MapPending: true,
-		CardKind: CardKindDesign, BlockedByEpics: []string{},
-	}
-	row.Addresses = []string{row.Address}
-	placeDesign(row.Address, act, false, act.endedAt).applyTo(&row)
-	return row
-}
-
 func (p designPlacement) applyTo(row *EpicListRow) {
 	row.Section, row.StatusWords, row.StatePill, row.Reason = p.section, p.statusWords, p.pill, p.reason
 	row.WaitingSince, row.CountdownEndsAt, row.Actions = p.waitingSince, p.countdownEndsAt, p.actions

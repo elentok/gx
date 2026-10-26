@@ -32,7 +32,7 @@ const ROWS = [
   row("other-question", { section: "needs-you", state_pill: "Question" }),
   row("current", { section: "in-progress" }),
   row("loop-epic", { section: "in-progress" }),
-  row("blog", { card_kind: "design", section: "in-progress", map_pending: false }),
+  row("blog", { card_kind: "design", section: "in-progress" }),
   row("fix-it", { card_kind: "one-off", section: "in-progress", address: "demo:one/01", addresses: ["demo:one/01"] }),
   row("unstarted", { card_kind: "design", section: "ready-to-design", status_words: "Not started" }),
   row("old-epic", { section: "finished", state: "finished", status_words: "Merged" }),

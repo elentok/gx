@@ -58,7 +58,6 @@ test("title targets: one-off ticket, follow-ups epic, joined card's active part,
   expect(href(row({ address: "gx:one-offs/03", card_kind: "one-off", addresses: ["gx:one-offs/03"] }))).toBe("#/t/gx:one-offs/03");
   expect(href(row({ address: "gx:follow-ups", card_kind: "follow-ups", addresses: ["gx:follow-ups"] }))).toBe("#/e/gx:follow-ups");
   expect(href(row({ address: "gx:blog", addresses: ["gx:blog-impl", "gx:blog"] }))).toBe("#/e/gx:blog-impl");
-  expect(href(row({ address: "gx:new", card_kind: "design", map_pending: true }))).toBe("#/d/gx:new");
 });
 
 test("the pill and reason show on a Needs-you card; a quiet card shows neither", () => {

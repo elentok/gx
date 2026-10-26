@@ -688,11 +688,6 @@ export interface EpicListRow {
    * builds "Next run starts in Ns" from it.
    */
   countdown_ends_at?: string;
-  /**
-   * MapPending marks a Design whose session runs before its map exists. It has no
-   * epic page: its title opens the Design page.
-   */
-  map_pending?: boolean;
 }
 /**
  * FollowUpCount is the number of draft and open tickets in one project's
