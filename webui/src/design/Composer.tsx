@@ -1,5 +1,5 @@
 import { Box, Text, Textarea } from "@chakra-ui/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type {
   SessionInfo,
@@ -20,13 +20,8 @@ import {
   type SetAutoAdvance,
 } from "./open";
 import { postPrompt, type PostPrompt } from "./prompt";
-import {
-  isAnswered,
-  nameOf,
-  roundPrompt,
-  unansweredOf,
-  type Answers,
-} from "./round";
+import { isAnswered, roundPrompt, unansweredOf, type Answers } from "./round";
+import { SendPopover } from "./SendPopover";
 import { useWide } from "./useWide";
 import { promptable } from "./view";
 
@@ -72,7 +67,7 @@ export function Composer({
   onText?: (text: string) => void;
   /** The round went out. */
   onRoundSent?: () => void;
-  /** "Answer them" in the unanswered confirm: open the sheet at that question. */
+  /** A row of the unanswered popover: open the sheet at that question. */
   onReview?: (index: number) => void;
   /** The round is full screen: the composer renders into this element, its note always open. */
   fullScreen?: HTMLElement | null;
@@ -151,6 +146,7 @@ export function Composer({
   };
   const onSend = () => {
     if (!inRound) return send({ text }, () => setText(""));
+    if (unanswered.length > 0) return setUnanswered([]);
     const missing = unansweredOf(round, answers);
     if (missing.length > 0) setUnanswered(missing);
     else sendRound();
@@ -175,12 +171,14 @@ export function Composer({
       Continue
     </Button>
   ) : (
-    <Button
-      disabled={!enabled || (!inRound && text.trim() === "")}
-      onClick={onSend}
-    >
-      Send
-    </Button>
+    withPopover(
+      <Button
+        disabled={!enabled || (!inRound && text.trim() === "")}
+        onClick={onSend}
+      >
+        Send
+      </Button>,
+    )
   );
   const focusButton = inRound && onFullScreen && (
     <Button
@@ -191,42 +189,24 @@ export function Composer({
       ⤢{wide && " Focus"}
     </Button>
   );
-  const notices = (
-    <>
-      {error && <Text role="alert">{error}</Text>}
-      {unanswered.length > 0 && (
-        <Box
-          role="alertdialog"
-          aria-label="Unanswered questions"
-          display="flex"
-          flexDirection="column"
-          gap="2"
-        >
-          <Text>
-            {unanswered.length}{" "}
-            {unanswered.length === 1 ? "question is" : "questions are"}{" "}
-            unanswered ({unanswered.map(nameOf).join(", ")}). Send anyway?
-          </Text>
-          <Box display="flex" gap="2">
-            <Button
-              emphasis="secondary"
-              onClick={() => {
-                onReview?.(
-                  round.findIndex((c) => c.label === unanswered[0].label),
-                );
-                setUnanswered([]);
-              }}
-            >
-              Answer them
-            </Button>
-            <Button disabled={!enabled} onClick={sendRound}>
-              Send anyway
-            </Button>
-          </Box>
-        </Box>
-      )}
-    </>
-  );
+  const notices = <>{error && <Text role="alert">{error}</Text>}</>;
+  // With gaps, Send's click opens the popover instead of sending; a click while it is open closes it.
+  function withPopover(send: ReactNode) {
+    return (
+      <SendPopover
+        unanswered={unanswered}
+        total={round.length}
+        sendDisabled={!enabled}
+        onSendAnyway={sendRound}
+        onAnswer={(c) =>
+          onReview?.(round.findIndex((r) => r.label === c.label))
+        }
+        onClose={() => setUnanswered([])}
+      >
+        {send}
+      </SendPopover>
+    );
+  }
 
   const autoAdvanceBar = (
     <AutoAdvanceBar
@@ -278,15 +258,17 @@ export function Composer({
             <Text fontSize="xs" color="text.dim" textAlign="center">
               {done} of {round.length} answered
             </Text>
-            <Button
-              disabled={!enabled}
-              onClick={onSend}
-              size="md"
-              justifyContent="center"
-              px="6"
-            >
-              Send
-            </Button>
+            {withPopover(
+              <Button
+                disabled={!enabled}
+                onClick={onSend}
+                size="md"
+                justifyContent="center"
+                px="6"
+              >
+                Send
+              </Button>,
+            )}
           </Box>
         </Box>
       </Box>,

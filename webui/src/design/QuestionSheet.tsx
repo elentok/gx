@@ -214,11 +214,20 @@ export function QuestionSheet({
   // Set while a smooth scroll we started is still moving, so its in-between frames don't set the question.
   const scrolling = useRef<number | undefined>(undefined);
 
+  // Focus waits a render, so a folded sheet is shown (and the question visible) by the time it lands.
+  const [toFocus, setToFocus] = useState<{ index: number }>();
   useEffect(() => {
     if (!focus) return;
     setIndex(focus.index);
     setOpen(true);
+    setToFocus(focus);
   }, [focus]);
+  useEffect(() => {
+    if (!toFocus) return;
+    row.current?.children[toFocus.index]
+      ?.querySelector<HTMLElement>("button[aria-pressed], textarea")
+      ?.focus({ preventScroll: true });
+  }, [toFocus]);
 
   // Keep the scroll position on the current question; scrolling by hand sets the question.
   useEffect(() => {

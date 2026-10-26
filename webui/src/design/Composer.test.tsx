@@ -215,7 +215,11 @@ test("one line: the switch on the left; Note, Focus and Send on the right; the n
 });
 
 test("on a phone Note is icon-only and Auto-advance shows no word, the switch stays", async () => {
-  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener() {},
+    removeEventListener() {},
+  }));
   try {
     render({});
     const sw = await screen.findByRole("switch", { name: /Auto-advance/ });
@@ -526,30 +530,137 @@ test("Send answers the whole round in one prompt", async () => {
   });
 });
 
-test("unanswered questions ask before sending; Answer them opens the first one", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
+// Q1 answered, Q2 and Q3 not; Send is clicked and the popover is open.
+const sendWithGaps = async (post: PostPrompt) => {
   render({ post, chat: chatOf({ round: round() }) });
   const s = within(await sheet());
   fireEvent.click(s.getByRole("button", { name: "Beta" }));
   fireEvent.click(s.getByRole("button", { name: "Question 3" }));
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect(
-    screen.getByText(/2 questions are unanswered \(Q2, Q3\)\. Send anyway\?/),
-  ).toBeTruthy();
+  const popover = await screen.findByRole("alertdialog");
+  // The popover settles a tick after it opens: focus lands, then it hears Escape and outside presses.
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      within(popover).getByRole("button", { name: "Send anyway" }),
+    ),
+  );
+  return { s, popover };
+};
+
+test("Send with gaps opens a popover listing the unanswered questions; Send anyway has focus and sends", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  const { popover } = await sendWithGaps(post);
+  const p = within(popover);
+  expect(popover.getAttribute("aria-label")).toBe("Unanswered questions");
+  expect(p.getByText("2 questions are unanswered")).toBeTruthy();
+  expect(p.getByText("1 of 3 answered")).toBeTruthy();
+  expect(p.getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+    "Q2T2›",
+    "Q3T3›",
+  ]);
+  expect(p.queryByRole("button", { name: "Answer them" })).toBeNull();
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      p.getByRole("button", { name: "Send anyway" }),
+    ),
+  );
   expect(post).not.toHaveBeenCalled();
 
-  fireEvent.click(screen.getByRole("button", { name: "Answer them" }));
-  expect(screen.queryByRole("alertdialog")).toBeNull();
-  expect(
-    s.getByRole("button", { name: "Question 2" }).getAttribute("aria-current"),
-  ).toBe("step");
-
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  fireEvent.click(screen.getByRole("button", { name: "Send anyway" }));
+  fireEvent.click(p.getByRole("button", { name: "Send anyway" }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   expect(post.mock.calls[0][0].text).toBe(
     "Q1 - T1: Beta\nQ2 - T2: (unanswered)\nQ3 - T3: (unanswered)",
   );
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+});
+
+test("one gap says 'question is unanswered'", async () => {
+  const { s } = await sendWithGaps(vi.fn<PostPrompt>(async () => ok));
+  fireEvent.click(s.getByRole("button", { name: "Question 2" }));
+  fireEvent.click(s.getByRole("button", { name: "Sure" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  expect(
+    within(await screen.findByRole("alertdialog")).getByText(
+      "1 question is unanswered",
+    ),
+  ).toBeTruthy();
+});
+
+test("Escape closes the popover and focuses Send", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  const { popover } = await sendWithGaps(post);
+  fireEvent.keyDown(popover, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Send" }),
+    ),
+  );
+  expect(post).not.toHaveBeenCalled();
+});
+
+test("an outside click closes the popover and focuses Send", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  await sendWithGaps(post);
+  // The popover listens for outside presses a tick after it opens, so press until it hears one.
+  await waitFor(() => {
+    fireEvent.pointerDown(document.body);
+    fireEvent.pointerUp(document.body);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Send" }),
+    ),
+  );
+  expect(post).not.toHaveBeenCalled();
+});
+
+test("a second Send click closes the popover and sends nothing", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  await sendWithGaps(post);
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  expect(post).not.toHaveBeenCalled();
+});
+
+test("a popover row opens the sheet at that question and focuses its first control, even folded", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  const { s, popover } = await sendWithGaps(post);
+  fireEvent.click(s.getByRole("button", { name: "Fold questions" }));
+  fireEvent.click(within(popover).getByRole("button", { name: /Q3/ }));
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      s.getByRole("textbox", { name: "Answer to question 3" }),
+    ),
+  );
+  expect(
+    s.getByRole("button", { name: "Question 3" }).getAttribute("aria-current"),
+  ).toBe("step");
+
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(
+    within(await screen.findByRole("alertdialog")).getByRole("button", {
+      name: /Q2/,
+    }),
+  );
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      s.getByRole("button", { name: "Sure" }),
+    ),
+  );
+  expect(post).not.toHaveBeenCalled();
+});
+
+test("Send with every question answered posts at once", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ round: [askCard(1)] }) });
+  fireEvent.click(within(await sheet()).getByRole("button", { name: "Alpha" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(screen.queryByRole("alertdialog")).toBeNull();
 });
 
 test("a stale refusal keeps every answer and note of the round", async () => {
@@ -569,7 +680,7 @@ test("a stale refusal keeps every answer and note of the round", async () => {
   fireEvent.change(box, { target: { value: "keep" } });
   const before = fetchChat.mock.calls.length;
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  fireEvent.click(screen.getByRole("button", { name: "Send anyway" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
   expect(await screen.findByRole("alert")).toBeTruthy();
   await waitFor(() =>
     expect(fetchChat.mock.calls.length).toBeGreaterThan(before),
@@ -688,19 +799,4 @@ test("full screen keeps the note draft and the answers, and Escape collapses bac
     (screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement)
       .value,
   ).toBe("draft");
-});
-
-test("Answer them in full screen moves to the first unanswered question", async () => {
-  render({
-    post: vi.fn<PostPrompt>(async () => ok),
-    chat: chatOf({ round: round() }),
-  });
-  const d = within(await focusDialog());
-  fireEvent.click(d.getByRole("button", { name: "Alpha" }));
-  fireEvent.click(d.getByRole("button", { name: "Question 1, answered" }));
-  fireEvent.click(d.getByRole("button", { name: "Send" }));
-  fireEvent.click(d.getByRole("button", { name: "Answer them" }));
-  expect(
-    d.getByRole("button", { name: "Question 2" }).getAttribute("aria-current"),
-  ).toBe("step");
 });
