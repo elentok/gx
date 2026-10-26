@@ -187,41 +187,14 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		if err != nil {
 			continue
 		}
-		merged := map[string]bool{}
-		byName := map[string]tickets.Epic{}
 		for _, e := range epics {
-			merged[e.Name] = !e.MergedAt.IsZero()
-			byName[e.Name] = e
 			if e.Name == followUpsEpicName {
 				if open := openFollowUps(e); open > 0 {
 					list.FollowUps = append(list.FollowUps, FollowUpCount{Project: project, Open: open})
 				}
 			}
 		}
-		if fu, ok := byName[followUpsEpicName]; ok {
-			if row, ok := followUpsCard(project, fu); ok {
-				list.Epics = append(list.Epics, row)
-			}
-		}
-		for _, e := range epics {
-			list.Epics = append(list.Epics, s.oneOffCards(project, e)...)
-		}
-		for _, e := range epics {
-			if epicListed(e) && !joinedImpl(e, byName) {
-				row := s.epicListRow(project, e)
-				row.BlockedByEpics = unmergedBlockers(project, e, merged)
-				if e.IsMap {
-					s.decorateMapRow(&row, project, e, byName, designs[row.Address])
-				}
-				list.Epics = append(list.Epics, row)
-			}
-		}
-		for _, addr := range slices.Sorted(maps.Keys(designs)) {
-			p, epic, _ := strings.Cut(addr, ":")
-			if _, exists := byName[epic]; p == project && !exists && designs[addr].running {
-				list.Epics = append(list.Epics, mapPendingDesignRow(project, epic, designs[addr]))
-			}
-		}
+		list.Epics = append(list.Epics, s.projectCards(project, epics, designs)...)
 	}
 	list.RecentlyFinished = s.settings.Load().RecentlyFinished
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
@@ -229,23 +202,62 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, list)
 }
 
-// joinedImpl reports whether e is the -impl epic of a listed map in byName. The
-// map's card shows it, so it gets no row of its own.
-func joinedImpl(e tickets.Epic, byName map[string]tickets.Epic) bool {
-	name, ok := strings.CutSuffix(e.Name, tickets.ImplEpicSuffix)
-	m, hasMap := byName[name]
-	return ok && hasMap && m.IsMap && epicListed(m)
-}
-
-// decorateMapRow adds the map-only fields to a listed map epic's row.
-func (s *Server) decorateMapRow(row *EpicListRow, project string, e tickets.Epic, byName map[string]tickets.Epic, design designActivity) {
-	row.ProgressStep = mapProgress(e)
-	var impl *EpicListRow
-	if implEpic, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
-		r := s.epicListRow(project, implEpic)
-		impl = &r
+// projectCards builds one project's cards: follow-ups, one-offs, loop and map
+// epics, then pending Design cards. A listed map's card shows its -impl epic,
+// so that epic gets no row of its own.
+func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity) []EpicListRow {
+	merged := map[string]bool{}
+	byName := map[string]tickets.Epic{}
+	for _, e := range epics {
+		merged[e.Name] = !e.MergedAt.IsZero()
+		byName[e.Name] = e
 	}
-	decorateDesignCard(row, e, impl, design)
+	// joined maps a listed map's name to its -impl epic.
+	joined := map[string]tickets.Epic{}
+	for _, e := range epics {
+		if impl, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok && e.IsMap && epicListed(e) {
+			joined[e.Name] = impl
+		}
+	}
+	isJoinedImpl := func(e tickets.Epic) bool {
+		name, ok := strings.CutSuffix(e.Name, tickets.ImplEpicSuffix)
+		_, has := joined[name]
+		return ok && has
+	}
+
+	var rows []EpicListRow
+	if fu, ok := byName[followUpsEpicName]; ok {
+		if row, ok := followUpsCard(project, fu); ok {
+			rows = append(rows, row)
+		}
+	}
+	for _, e := range epics {
+		rows = append(rows, s.oneOffCards(project, e)...)
+	}
+	for _, e := range epics {
+		if !epicListed(e) || isJoinedImpl(e) {
+			continue
+		}
+		row := s.epicListRow(project, e)
+		row.BlockedByEpics = unmergedBlockers(project, e, merged)
+		if e.IsMap {
+			row.ProgressStep = mapProgress(e)
+			var impl *EpicListRow
+			if implEpic, ok := joined[e.Name]; ok {
+				r := s.epicListRow(project, implEpic)
+				impl = &r
+			}
+			decorateDesignCard(&row, e, impl, designs[row.Address])
+		}
+		rows = append(rows, row)
+	}
+	for _, addr := range slices.Sorted(maps.Keys(designs)) {
+		p, epic, _ := strings.Cut(addr, ":")
+		if _, exists := byName[epic]; p == project && !exists && designs[addr].running {
+			rows = append(rows, mapPendingDesignRow(project, epic, designs[addr]))
+		}
+	}
+	return rows
 }
 
 // openFollowUps counts the draft and open tickets of a follow-ups epic.
