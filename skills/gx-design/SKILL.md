@@ -38,7 +38,7 @@ or "follow gx-to-spec's…", that means [gx-wayfinder](../gx-wayfinder/SKILL.md)
 ## Asking questions
 
 Whenever you grill the person (gx-wayfinder's Destination and frontier grilling, a HITL ticket, the
-provisional Destination, the review), read [gx-grilling](../gx-grilling/SKILL.md),
+provisional Destination, the review, the create-tickets quiz of step 7), read [gx-grilling](../gx-grilling/SKILL.md),
 [gx-domain-modeling](../gx-domain-modeling/SKILL.md) and [gx-unslop](../gx-unslop/SKILL.md) first,
 and print each round in the format `gx-grilling` defines. gx marks the session
 Actionable itself when it sees a round, so call nothing to raise it.

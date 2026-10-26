@@ -214,6 +214,12 @@ Ask the user:
 - Are the declared seams the right ones to test against?
 - Should any tickets be merged or split further?
 
+Ask them as one round in the format [gx-grilling](../gx-grilling/SKILL.md) defines: a `❓ **Qn**`
+line, a `➡️` recommendation and a `gx-question` block per question. Only a line that starts with
+`❓ **Q` makes the web UI show the round and mark the session as waiting for you; a plain numbered
+list goes unseen. Keep the Summary and the breakdown above the round, and make the round the last
+thing in the turn: no tool call, and no text, after it.
+
 Iterate until the user approves the breakdown. Skip this step when running unattended (e.g. inside
 ralph-loop) — publish the breakdown as drafted and let the tickets themselves carry the record of
 what was decided.
