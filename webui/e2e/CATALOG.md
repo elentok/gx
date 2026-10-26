@@ -33,8 +33,10 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
     `07 fails ready`, then the cancelled `05 dropped cancelled`. There is no More stats card yet.
   - After queueing, the stats line starts with "Running" and the comet shows. The fake worker settles:
     the ring reads `4/7`, ticket 06 is expanded with "needs-answer · Waiting for your answer", its
-    question and an Answer button, and ticket 07 stays a card. The Epics page card shows `4/7`, a pill and
-    a reason.
+    question and an Answer button. Ticket 07 is expanded in the deadlocked tone with "needs-repair · Run
+    failed" in its meta and a Fix it with an agent button. The flow turns recovery off, so 07 stays a
+    needs-repair card instead of becoming a waiting parent of an investigate ticket. The Epics page card
+    shows `4/7`, a pill and a reason.
 
 ## 3. Pause reasons and recovery
 

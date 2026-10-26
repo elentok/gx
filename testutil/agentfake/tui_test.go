@@ -258,6 +258,19 @@ func TestTUIClaude_ExitControlExitsWithCode(t *testing.T) {
 	}
 }
 
+func TestTUIClaude_FailingWorkerExitsNonZero(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	cfg := `{"behaviour":{"p:e/01":"` + BehaviourFail + `"}}`
+	if err := os.WriteFile(filepath.Join(f.cmd.Dir, WorkerConfigFile), []byte(cfg), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.typeLine("/gx-implement p:e/01")
+	if code := f.waitExit(); code != 1 {
+		t.Fatalf("exit code = %d, want 1; screen: %q", code, f.screen.String())
+	}
+}
+
 func TestTUIClaude_TrustDialogBeforePidFile(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs, TUITrustEnv+"=1")
 	f.waitFor("the trust dialog", func() bool {

@@ -575,6 +575,10 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 	if err := WorkTicket(cfg, address); err != nil {
 		fmt.Fprintln(os.Stderr, "fakeclaude worker:", err)
 	}
+	if cfg.Behaviour[address] == BehaviourFail {
+		_ = SendControl(t.ctlPath, Control{Action: ActionExit, Code: 1})
+		return
+	}
 	_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
 }
 

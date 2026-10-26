@@ -48,8 +48,8 @@ const (
 	BehaviourFinish = "finish"
 	// BehaviourAsk pauses the ticket with a question and commits nothing.
 	BehaviourAsk = "ask"
-	// BehaviourFail goes idle without a commit or a report, which the server
-	// reads as a stalled agent.
+	// BehaviourFail commits and reports nothing. The TUI fake then exits non-zero,
+	// which the server reads as a failed run.
 	BehaviourFail = "fail"
 	// BehaviourPermission blocks the TUI fake on a Bash permission prompt, which
 	// only the pty runner can approve. WorkTicket itself does nothing for it.

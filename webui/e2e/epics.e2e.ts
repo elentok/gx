@@ -13,7 +13,8 @@ test("1. Queue an epic", async ({ page, start }) => {
 });
 
 test("2. Epic looks right", async ({ page, start }) => {
-  await start("mixed");
+  // Recovery would fork an investigation off the failed ticket and turn it into a waiting parent.
+  await start("mixed", { config: { "recovery.enabled": "false" } });
   const mixed = card(page, "mixed-epic");
   await expect(mixed.getByText("2/7")).toBeVisible();
   await expect(mixed.getByText("demo", { exact: true })).toBeVisible();
@@ -42,7 +43,8 @@ test("2. Epic looks right", async ({ page, start }) => {
   await expect(page.getByText("needs-answer · Waiting for your answer")).toBeVisible();
   await expect(page.getByText("Which option should the fake worker take?")).toBeVisible();
   await expect(page.getByRole("button", nav("Answer"))).toBeVisible();
-  await expect(page.getByRole("link", { name: "07 fails" })).toBeVisible();
+  const failed = page.locator('[data-tone="deadlocked"]').filter({ has: page.getByRole("link", { name: "fails" }) });
+  await expect(failed.getByText("needs-repair · Run failed")).toBeVisible();
 
   await page.getByRole("link", nav("← Epics")).click();
   await expect(mixed.getByText("4/7")).toBeVisible();
