@@ -1,13 +1,11 @@
 import { Box, chakra, Heading, Input, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { useConnectionContext } from "../connection";
 import { CardActionAnswer, CardKindDesign,SectionNeedsYou, SectionReadyToDesign, SectionFinished, type EpicListRow } from "../generated/server";
 import { designHref } from "../hrefs";
 import { useWide } from "../design/useWide";
 import { titleHref } from "../epics/cardLinks";
 import { isLive, RING_KIND, ringProgress, ringTone } from "../epics/ring";
-import { useEpicList, type FetchEpicList } from "../epics/list";
 import { sectionsOf, type Section } from "../epics/view";
 import { Button } from "../ui/button/Button";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
@@ -22,6 +20,10 @@ export const jumpHref = (row: EpicListRow): string =>
     : (row.actions?.find((a) => a.kind === CardActionAnswer)?.link ?? titleHref(row));
 
 const isCurrent = (row: EpicListRow, current: string) => row.address === current || (row.addresses?.includes(current) ?? false);
+
+/** The Needs-you cards other than the epic on screen. */
+export const waitingCount = (epics: EpicListRow[], current: string): number =>
+  epics.filter((e) => e.section === SectionNeedsYou && !isCurrent(e, current)).length;
 
 /** Ready to design and Finished show only while the filter has text. */
 function visibleSections(epics: EpicListRow[], query: string): Section[] {
@@ -193,16 +195,12 @@ function Menu({
 
 /**
  * The page title as a button that opens a list of epics to switch to. `current` is the address
- * of the epic on screen; the count on the title is the other Needs-you cards.
+ * of the epic on screen; `epics` is the list the page already loaded.
  */
-export function JumpMenu({ name, current, fetchList }: { name: string; current: string; fetchList?: FetchEpicList }) {
-  const conn = useConnectionContext();
-  const { list } = useEpicList(fetchList, conn);
+export function JumpMenu({ name, current, epics }: { name: string; current: string; epics: EpicListRow[] }) {
   const phone = !useWide();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const epics = list?.epics ?? [];
-  const waiting = epics.filter((e) => e.section === SectionNeedsYou && !isCurrent(e, current)).length;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -242,20 +240,6 @@ export function JumpMenu({ name, current, fetchList }: { name: string; current: 
           <Text as="span" aria-hidden fontSize="16px" color="text.dim">
             ▾
           </Text>
-          {waiting > 0 && (
-            <Text
-              as="span"
-              data-testid="waiting-count"
-              aria-label={`${waiting} more need you`}
-              fontSize="14px"
-              px="2"
-              borderRadius="full"
-              color="tone.waiting.fg"
-              bg="tone.waiting.bg"
-            >
-              {waiting}
-            </Text>
-          )}
           {!phone && (
             <Text as="span" aria-hidden fontSize="13px" color="text.dim" fontFamily="text" fontWeight="400">
               ⌘K

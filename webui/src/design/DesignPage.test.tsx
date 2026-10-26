@@ -113,6 +113,11 @@ function render(
   return Object.assign(router, { setSessions });
 }
 
+test("the back link counts the other Needs-you cards from the loaded list", async () => {
+  render([map("a", { section: "needs-you" }), map("b", { section: "needs-you" })], []);
+  expect(await screen.findByRole("link", { name: "← Epics · 1 more needs you" })).toBeTruthy();
+});
+
 test("the title row holds a back link, the Design name and the Sessions control, with no picker or state label", async () => {
   render([map("a"), map("b")], [session("a", { status: { state: "working" } })]);
   const title = await screen.findByRole("heading", { level: 1 });

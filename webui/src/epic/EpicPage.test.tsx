@@ -67,6 +67,15 @@ test("the epic page has a back link to /epics and a title that opens the jump me
   expect(await screen.findByRole("dialog")).toBeTruthy();
 });
 
+test("the back link counts the other Needs-you cards from the loaded list", async () => {
+  render("/e/gx:blog-impl", [
+    { ...joined, section: "needs-you" },
+    row("q1", { section: "needs-you" }),
+    row("q2", { section: "needs-you" }),
+  ]);
+  expect(await screen.findByRole("link", { name: "← Epics · 2 more need you" })).toBeTruthy();
+});
+
 test("a Design's epic page links to its -impl page", async () => {
   render("/e/gx:blog", [joined], "map");
   const link = await screen.findByRole("link", { name: "Open implementation epic →" });

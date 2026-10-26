@@ -5,7 +5,7 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { BackLink } from "../nav/BackLink";
-import { JumpMenu } from "../nav/JumpMenu";
+import { JumpMenu, waitingCount } from "../nav/JumpMenu";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
@@ -16,7 +16,7 @@ import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress, showsImplLink } from "./Progress";
 import type { FetchScreen } from "./screen";
 import { DeleteDesignButton, Failure, SessionHeader, StartDesignButton } from "./SessionControls";
-import type { SessionInfo } from "../generated/server";
+import type { EpicListRow, SessionInfo } from "../generated/server";
 import { useWide } from "./useWide";
 import { designSession, liveSessions } from "./view";
 
@@ -84,13 +84,13 @@ function DesignBody({
   address,
   wide,
   deps,
-  fetchList,
+  epics,
   startFailure,
 }: {
   address: string;
   wide: boolean;
   deps: DesignDeps;
-  fetchList?: FetchEpicList;
+  epics: EpicListRow[];
   startFailure?: string;
 }) {
   const conn = useConnectionContext();
@@ -144,8 +144,8 @@ function DesignBody({
         flex="none"
       >
         <Box minW="0">
-          <BackLink to="/epics" label="← Epics" />
-          <JumpMenu name={address.slice(address.indexOf(":") + 1)} current={address} fetchList={fetchList} />
+          <BackLink to="/epics" label="← Epics" waiting={waitingCount(epics, address)} />
+          <JumpMenu name={address.slice(address.indexOf(":") + 1)} current={address} epics={epics} />
         </Box>
         <SessionStrip
           address={address}
@@ -238,7 +238,7 @@ export function DesignPage({
           address={address}
           wide={wide}
           deps={deps}
-          fetchList={fetchList}
+          epics={list.epics ?? []}
           startFailure={startFailure}
         />
       )}

@@ -9,7 +9,7 @@ import { MergeButton, isMergeable } from "../epics/MergeButton";
 import { designHref, epicHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
 import { useEpicList, type FetchEpicList } from "../epics/list";
-import { JumpMenu } from "../nav/JumpMenu";
+import { JumpMenu, waitingCount } from "../nav/JumpMenu";
 import { Markdown } from "../markdown/Markdown";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
@@ -144,8 +144,9 @@ export function EpicPage({
           <PageHeader
             backTo="/epics"
             backLabel="← Epics"
+            waiting={waitingCount(list?.epics ?? [], address)}
             title={name}
-            heading={<JumpMenu name={name} current={address} fetchList={fetchList} />}
+            heading={<JumpMenu name={name} current={address} epics={list?.epics ?? []} />}
           >
             {partner && (
               <Link href={epicHref(partner)} display="block" mt="2" fontSize="sm" color="tone.running.fg">

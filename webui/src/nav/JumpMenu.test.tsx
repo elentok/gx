@@ -2,9 +2,9 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicList, EpicListRow } from "../generated/server";
+import type { EpicListRow } from "../generated/server";
 import { renderThemed } from "../ui/render";
-import { JumpMenu, jumpHref } from "./JumpMenu";
+import { JumpMenu, jumpHref, waitingCount } from "./JumpMenu";
 
 afterEach(cleanup);
 
@@ -43,14 +43,12 @@ function Where() {
 }
 
 function setup(epics: EpicListRow[] = ROWS) {
-  const list: EpicList = { epics, follow_ups: [] };
-  const fetchList = vi.fn(async () => list);
   const router = createMemoryRouter([
     {
       path: "*",
       element: (
         <>
-          <JumpMenu name="current" current="demo:current" fetchList={fetchList} />
+          <JumpMenu name="current" current="demo:current" epics={epics} />
           <Where />
         </>
       ),
@@ -63,7 +61,6 @@ function setup(epics: EpicListRow[] = ROWS) {
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   );
-  return fetchList;
 }
 
 const titleButton = () => screen.findByRole("button", { name: /^current/ });
@@ -86,10 +83,17 @@ test("Ctrl+K and ⌘K open the menu", async () => {
   expect(await screen.findByRole("dialog")).toBeTruthy();
 });
 
-test("the title counts the other Needs-you cards", async () => {
-  setup([...ROWS, row("current-too", { section: "needs-you", address: "demo:current", addresses: ["demo:current"] })]);
-  expect((await titleButton()).textContent).toContain("2");
-  expect(screen.getByLabelText("2 more need you")).toBeTruthy();
+test("the title shows no count", async () => {
+  setup();
+  expect((await titleButton()).textContent).toBe("current▾⌘K");
+  expect(screen.queryByTestId("waiting-count")).toBeNull();
+});
+
+test("waitingCount leaves out the epic on screen", () => {
+  const rows = [...ROWS, row("current-too", { section: "needs-you", address: "demo:current", addresses: ["demo:current"] })];
+  expect(waitingCount(rows, "demo:current")).toBe(2);
+  expect(waitingCount(rows, "demo:loop-epic")).toBe(3);
+  expect(waitingCount([], "demo:current")).toBe(0);
 });
 
 test("Ready to design and Finished show only while typing, and typing searches finished epics", async () => {

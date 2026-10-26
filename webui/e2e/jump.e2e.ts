@@ -68,18 +68,18 @@ test("21. Jump menu keyboard and picks", async ({ page, start }) => {
 
 test("22. Jump menu count and back link", async ({ page, start }) => {
   await start("united");
-  const waiting = page.getByTestId("waiting-count");
+  const back = (n: number) => page.getByRole("link", nav(`← Epics · ${n} more need you`));
 
   // Seven other cards need you from a Needs-you epic, eight from one that does not.
   await goto(page, "#/e/demo:paused-epic");
-  await expect(waiting).toHaveText("7");
+  await expect(back(7)).toBeVisible();
   await goto(page, "#/e/demo:running-epic");
-  await expect(waiting).toHaveText("8");
+  await expect(back(8)).toBeVisible();
 
-  await page.getByRole("link", nav("← Epics")).click();
+  await back(8).click();
   await expect(page).toHaveURL(/#\/epics$/);
   await goto(page, "#/d/demo:design-live");
-  await expect(waiting).toHaveText("8");
-  await page.getByRole("link", nav("← Epics")).click();
+  await expect(back(8)).toBeVisible();
+  await back(8).click();
   await expect(page).toHaveURL(/#\/epics$/);
 });
