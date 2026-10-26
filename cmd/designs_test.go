@@ -72,6 +72,32 @@ func TestDesignsOpen_NewDesignJSON(t *testing.T) {
 	}
 }
 
+func TestDesignsDelete_RefusalIsAnErrorAndSuccessDeletes(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
+	bare := filepath.Join(store, "proj", "bare")
+	if err := os.MkdirAll(bare, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bare, "ticket.md"), []byte("---\nkind: map\n---\n\n## Initial prompt\n\nidea\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)))
+
+	var out bytes.Buffer
+	err := runDesignsDelete(context.Background(), h.Client, &out, false, "proj:plain")
+	if err == nil || !strings.Contains(err.Error(), server.ReasonDesignNotMapEpic) {
+		t.Errorf("delete of a loop epic: err = %v, want a refusal", err)
+	}
+	if err := runDesignsDelete(context.Background(), h.Client, &out, false, "proj:bare"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if _, err := os.Stat(bare); !os.IsNotExist(err) {
+		t.Errorf("epic dir still there: %v", err)
+	}
+}
+
 func TestDesignsOpen_JSON(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")

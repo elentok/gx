@@ -14,7 +14,34 @@ import (
 // on a map epic.
 func newDesignsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "designs", Short: "map epics' design sessions owned by the server", Args: cobra.NoArgs}
-	cmd.AddCommand(newDesignsOpenCmd())
+	cmd.AddCommand(newDesignsOpenCmd(), newDesignsDeleteCmd())
+	return cmd
+}
+
+// runDesignsDelete never starts the server: a dead socket is a refusal.
+func runDesignsDelete(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, epic string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	res, err := cl.DeleteDesign(ctx, server.DesignDeleteRequest{Epic: epic})
+	return printSessionResult(w, jsonOut, res, err)
+}
+
+func newDesignsDeleteCmd() *cobra.Command {
+	var jsonOut bool
+	cmd := &cobra.Command{
+		Use:   "delete <project:epic>",
+		Short: "delete an uncharted design: a map with no Destination, no tickets and no live session",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			return runDesignsDelete(c.Context(), cl, c.OutOrStdout(), jsonOut, args[0])
+		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	return cmd
 }
 

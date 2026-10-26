@@ -115,8 +115,10 @@ type EpicDetail struct {
 	Steps       []MapStep `json:"steps,omitempty"`
 	ImplAddress string    `json:"impl_address,omitempty"`
 	// Draft is set on a loop epic that is still being published into.
-	Draft bool      `json:"draft,omitempty"`
-	Stats EpicStats `json:"stats"`
+	Draft bool `json:"draft,omitempty"`
+	// Deletable is set on an uncharted design, the rule the designs delete route guards.
+	Deletable bool      `json:"deletable,omitempty"`
+	Stats     EpicStats `json:"stats"`
 }
 
 // epicQueueable reports whether an epic can be queued: an unqueued, unmerged
@@ -171,6 +173,7 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 		Done: e.DoneCount(), Total: e.TotalCount(), Rows: []EpicDetailRow{},
 		Queueable: epicQueueable(e, queued), Queued: queued,
 	}
+	d.Deletable, _ = s.designUncharted(root.String(), e)
 	d.Steps = mapSteps(e, byName)
 	d.Stats = epicStats(e, e.CompletedAt, now)
 	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {

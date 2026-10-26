@@ -90,6 +90,17 @@ export interface DesignOpenRequest {
   idea?: string;
   project?: string;
 }
+/**
+ * Refusal reason of the designs delete route, beside the unknown and not-map ones.
+ */
+export const ReasonDesignNotUncharted = "not-uncharted";
+/**
+ * DesignDeleteRequest is the body of POST /v1/designs/delete. Epic is the map
+ * epic's address ("project:epic").
+ */
+export interface DesignDeleteRequest {
+  epic: string;
+}
 
 //////////
 // source: detail.go
@@ -557,6 +568,10 @@ export interface EpicDetail {
    * Draft is set on a loop epic that is still being published into.
    */
   draft?: boolean;
+  /**
+   * Deletable is set on an uncharted design, the rule the designs delete route guards.
+   */
+  deletable?: boolean;
   stats: EpicStats;
 }
 

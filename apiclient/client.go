@@ -451,6 +451,14 @@ func (c *Client) OpenDesign(ctx context.Context, req server.DesignOpenRequest) (
 	return res, err
 }
 
+// DeleteDesign deletes an uncharted design's epic. A refusal is a result
+// (Refused set), not an error.
+func (c *Client) DeleteDesign(ctx context.Context, req server.DesignDeleteRequest) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/designs/delete", req, &res)
+	return res, err
+}
+
 // StopSession ends a live session's holder. A refusal is a result (Refused
 // set), not an error.
 func (c *Client) StopSession(ctx context.Context, id string) (server.SessionResult, error) {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
@@ -189,6 +190,82 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 		Prompt:  "/gx-design " + addr,
 		Harness: s.settings.Load().chatHarness(),
 	}))
+}
+
+// Refusal reason of the designs delete route, beside the unknown and not-map ones.
+const ReasonDesignNotUncharted = "not-uncharted"
+
+// DesignDeleteRequest is the body of POST /v1/designs/delete. Epic is the map
+// epic's address ("project:epic").
+type DesignDeleteRequest struct {
+	Epic string `json:"epic"`
+}
+
+// designUncharted is the one rule behind EpicDetail.Deletable and the delete
+// route: a map with no Destination, no tickets of any status and no live
+// design session.
+func (s *Server) designUncharted(epicAddr string, e tickets.Epic) (bool, error) {
+	if !e.IsMap || schema.Section(e.Body, "Destination") != "" || len(e.Tickets) > 0 {
+		return false, nil
+	}
+	live, err := s.liveDesignSession(epicAddr)
+	return live == nil, err
+}
+
+func (s *Server) designDeleteWrite(w http.ResponseWriter, r *http.Request) {
+	var req DesignDeleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	res, err := s.deleteDesign(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
+}
+
+// deleteDesign removes an uncharted design's epic directory. It re-checks the
+// rule from disk under the lock designs open takes, so a session or a chart
+// that lands first wins. Exited session records stay.
+func (s *Server) deleteDesign(req DesignDeleteRequest) (SessionResult, error) {
+	project, epic, ok := strings.Cut(req.Epic, ":")
+	if !ok || project == "" || epic == "" || strings.Contains(epic, "/") {
+		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("%q is not an epic address (want project:epic)", req.Epic)), nil
+	}
+	dir, err := s.projectDir(project)
+	if err != nil {
+		return sessionRefusal(ReasonDesignUnknownEpic, err.Error()), nil
+	}
+
+	mu, _ := s.designOpens.LoadOrStore(req.Epic, &sync.Mutex{})
+	mu.(*sync.Mutex).Lock()
+	defer mu.(*sync.Mutex).Unlock()
+
+	epics, err := tickets.LoadResolved(project, dir)
+	if err != nil {
+		return SessionResult{}, err
+	}
+	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return e.Name == epic })
+	if i < 0 {
+		return sessionRefusal(ReasonDesignUnknownEpic, fmt.Sprintf("no epic %s", req.Epic)), nil
+	}
+	if !epics[i].IsMap {
+		return sessionRefusal(ReasonDesignNotMapEpic, fmt.Sprintf("%s is not a map epic", req.Epic)), nil
+	}
+	uncharted, err := s.designUncharted(req.Epic, epics[i])
+	if err != nil {
+		return SessionResult{}, err
+	}
+	if !uncharted {
+		return sessionRefusal(ReasonDesignNotUncharted, fmt.Sprintf("%s is charted or has a live session", req.Epic)), nil
+	}
+	if err := os.RemoveAll(epics[i].Path); err != nil {
+		return SessionResult{}, err
+	}
+	s.events.publish(EventTicketChanged, req.Epic)
+	return SessionResult{}, nil
 }
 
 // liveDesignSession is the session of the Design at epicAddr that has not

@@ -78,6 +78,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/sessions/auto-advance":        "agents auto-advance",
 	"POST /v1/sessions/auto-advance/cancel": "agents auto-advance-cancel",
 	"POST /v1/designs/open":                 "designs open",
+	"POST /v1/designs/delete":               "designs delete",
 	"GET /v1/epics":                         "server epics",
 	"GET /v1/epics/detail":                  "server epics detail",
 	"GET /v1/stats":                         "server stats",
