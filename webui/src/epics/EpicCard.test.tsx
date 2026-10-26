@@ -153,9 +153,10 @@ test.each([
   expect(navigate).toHaveBeenCalledWith(href);
 });
 
-test("Answer on a Design opens the Design page", () => {
+test("Answer opens the link the server sent, even on a joined implementation card", () => {
   const navigate = vi.fn();
-  renderThemed(<EpicCard row={needsYou({ card_kind: "design", actions: [{ kind: "answer", label: "Answer", target: "gx:blog" }] })} writes={{ navigate }} />);
+  const answer = { kind: "answer", label: "Answer", target: "gx:blog", link: "#/d/gx:blog" };
+  renderThemed(<EpicCard row={needsYou({ card_kind: "implementation", actions: [answer] })} writes={{ navigate }} />);
   fireEvent.click(screen.getByRole("button", { name: "Answer" }));
   expect(navigate).toHaveBeenCalledWith("#/d/gx:blog");
 });

@@ -396,6 +396,11 @@ export interface CardAction {
   kind: CardActionKind;
   label: string;
   target?: string;
+  /**
+   * Link is the hash route the button opens, when the server decides it. Answer
+   * sets it for a Design question; the client falls back to the ticket page.
+   */
+  link?: string;
 }
 
 //////////

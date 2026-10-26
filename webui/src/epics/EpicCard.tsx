@@ -153,7 +153,7 @@ function ActionButtons({
       [CardActionDesign]: () => startDesign(target),
       [CardActionContinue]: () => startDesign(target),
       [CardActionOpen]: () => navigate(designHref(target)),
-      [CardActionAnswer]: () => navigate(row.card_kind === CardKindDesign ? designHref(target) : ticketHref(target)),
+      [CardActionAnswer]: () => navigate(a.link ?? ticketHref(target)),
       [CardActionOpenTicket]: () => navigate(ticketHref(target)),
       [CardActionOpenEpic]: () => navigate(epicHref(target)),
       [CardActionTriage]: () => setTriage(true),

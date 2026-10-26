@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { EpicList, EpicListRow } from "../generated/server";
 import { renderThemed } from "../ui/render";
-import { JumpMenu } from "./JumpMenu";
+import { JumpMenu, jumpHref } from "./JumpMenu";
 
 afterEach(cleanup);
 
@@ -135,6 +135,16 @@ test("a Design opens on its Design page, a loop epic on its epic page, a one-off
   await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/e/demo:loop-epic"));
   await pick("fix-it");
   await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/t/demo:one/01"));
+});
+
+test("a joined card with a Design question opens the Design page", () => {
+  const joined = row("blog", {
+    address: "demo:blog",
+    addresses: ["demo:blog", "demo:blog-impl"],
+    actions: [{ kind: "answer", label: "Answer", target: "demo:blog", link: "#/d/demo:blog" }],
+  });
+  expect(jumpHref(joined)).toBe("#/d/demo:blog");
+  expect(jumpHref(row("loop-epic"))).toBe("#/e/demo:loop-epic");
 });
 
 test("Esc and a click outside close the menu", async () => {

@@ -59,6 +59,9 @@ type CardAction struct {
 	Kind   CardActionKind `json:"kind"`
 	Label  string         `json:"label"`
 	Target string         `json:"target,omitempty"`
+	// Link is the hash route the button opens, when the server decides it. Answer
+	// sets it for a Design question; the client falls back to the ticket page.
+	Link string `json:"link,omitempty"`
 }
 
 // loopCardSection is the section of a loop epic row.

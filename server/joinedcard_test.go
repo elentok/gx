@@ -135,4 +135,11 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	if want := []string{"proj:m", "proj:m-impl"}; !slices.Equal(r.Addresses, want) {
 		t.Errorf("addresses = %v, want %v", r.Addresses, want)
 	}
+	if r.CardKind != server.CardKindImplementation {
+		t.Errorf("card kind = %q, want implementation", r.CardKind)
+	}
+	want := []server.CardAction{{Kind: server.CardActionAnswer, Label: "Answer", Target: "proj:m", Link: "#/d/proj:m"}}
+	if !slices.Equal(r.Actions, want) {
+		t.Errorf("actions = %+v, want %+v", r.Actions, want)
+	}
 }

@@ -52,7 +52,7 @@ func decorateDesignCard(row *EpicListRow, m tickets.Epic, impl *EpicListRow, act
 	default:
 		row.RingProgress = designPercent(m, row.ProgressStep)
 		fallback := cmp.Or(lastActivity(m), m.CreatedAt)
-		placeDesign(row, act, mapNotStarted(m, row.ProgressStep), fallback)
+		placeDesign(row.Address, act, mapNotStarted(m, row.ProgressStep), fallback).applyTo(row)
 		if row.ProgressStep == ProgressCreateTickets && impl != nil && row.StatusWords == "Designing" {
 			// The ring has no fraction to show yet; the client draws its placeholder.
 			row.RingProgress = 0
@@ -65,29 +65,25 @@ func decorateDesignCard(row *EpicListRow, m tickets.Epic, impl *EpicListRow, act
 // pair: the -impl epic sets state, section and progress. A Design question still
 // waiting on an answer wins the card for Needs you.
 func joinImplementation(row *EpicListRow, impl *EpicListRow, act designActivity) {
-	row.CardKind = impl.CardKind
-	row.State, row.Done, row.Total = impl.State, impl.Done, impl.Total
-	row.Queued, row.Queueable = impl.Queued, impl.Queueable
-	row.MergedAt, row.BlockedByEpics = impl.MergedAt, impl.BlockedByEpics
-	row.MergeBlockKind, row.MergeBlockReason = impl.MergeBlockKind, impl.MergeBlockReason
-	row.Section, row.StatusWords, row.RingProgress = impl.Section, impl.StatusWords, impl.RingProgress
-	row.Reason, row.StatePill, row.WaitingSince = impl.Reason, impl.StatePill, impl.WaitingSince
+	m := *row
+	*row = *impl
+	row.Address, row.Name, row.Kind, row.ProgressStep = m.Address, m.Name, m.Kind, m.ProgressStep
+	// The map keeps its own timestamps and picker placement.
+	row.CreatedAt, row.CompletedAt, row.QueuedAt, row.LastActivityAt = m.CreatedAt, m.CompletedAt, m.QueuedAt, m.LastActivityAt
+	row.PickerSection, row.PickerSortAt, row.ImplAddress = m.PickerSection, m.PickerSortAt, m.ImplAddress
 	row.Actions = make([]CardAction, len(impl.Actions))
 	for i, a := range impl.Actions {
 		a.Target = cmp.Or(a.Target, impl.Address)
 		row.Actions[i] = a
 	}
-	row.Addresses = []string{impl.Address, row.Address}
+	row.Addresses = []string{impl.Address, m.Address}
 	if impl.Section == SectionNeedsYou {
 		return
 	}
-	var design EpicListRow
-	design.Address = row.Address
-	placeDesign(&design, act, false, act.askedAt)
-	if design.StatePill == PillQuestion {
-		row.Section, row.StatePill, row.Reason = SectionNeedsYou, design.StatePill, design.Reason
-		row.WaitingSince, row.Actions = design.WaitingSince, design.Actions
-		row.Addresses = []string{row.Address, impl.Address}
+	if p := placeDesign(m.Address, act, false, act.askedAt); p.pill == PillQuestion {
+		row.Section, row.StatePill, row.Reason = SectionNeedsYou, p.pill, p.reason
+		row.WaitingSince, row.Actions = p.waitingSince, p.actions
+		row.Addresses = []string{m.Address, impl.Address}
 	}
 }
 
@@ -100,37 +96,53 @@ func mapPendingDesignRow(project, epic string, act designActivity) EpicListRow {
 		CardKind: CardKindDesign, BlockedByEpics: []string{},
 	}
 	row.Addresses = []string{row.Address}
-	placeDesign(&row, act, false, act.endedAt)
+	placeDesign(row.Address, act, false, act.endedAt).applyTo(&row)
 	return row
 }
 
-// placeDesign sets the section, status, pill, reason and button of a Design card
-// from its sessions. fallback starts a Stopped wait when no session ended.
-func placeDesign(row *EpicListRow, act designActivity, notStarted bool, fallback time.Time) {
-	target := row.Address
-	row.StatusWords = "Designing"
+func (p designPlacement) applyTo(row *EpicListRow) {
+	row.Section, row.StatusWords, row.StatePill, row.Reason = p.section, p.statusWords, p.pill, p.reason
+	row.WaitingSince, row.CountdownEndsAt, row.Actions = p.waitingSince, p.countdownEndsAt, p.actions
+}
+
+// designPlacement is where a Design card sits and what it shows.
+type designPlacement struct {
+	section         CardSection
+	statusWords     string
+	pill            string
+	reason          string
+	waitingSince    time.Time
+	countdownEndsAt time.Time
+	actions         []CardAction
+}
+
+// placeDesign places the Design card of the map at address from its sessions.
+// fallback starts a Stopped wait when no session ended.
+func placeDesign(address string, act designActivity, notStarted bool, fallback time.Time) designPlacement {
+	p := designPlacement{statusWords: "Designing"}
 	switch {
 	case !act.running && notStarted:
-		row.Section = SectionReadyToDesign
-		row.StatusWords = "Not started"
-		row.Actions = []CardAction{{Kind: CardActionDesign, Label: "Design", Target: target}}
+		p.section = SectionReadyToDesign
+		p.statusWords = "Not started"
+		p.actions = []CardAction{{Kind: CardActionDesign, Label: "Design", Target: address}}
 	case !act.running:
-		row.Section = SectionNeedsYou
-		row.StatePill = "Stopped"
-		row.Reason = "No design session is running"
-		row.WaitingSince = cmp.Or(act.endedAt, fallback)
-		row.Actions = []CardAction{{Kind: CardActionContinue, Label: "Continue", Target: target}}
+		p.section = SectionNeedsYou
+		p.pill = "Stopped"
+		p.reason = "No design session is running"
+		p.waitingSince = cmp.Or(act.endedAt, fallback)
+		p.actions = []CardAction{{Kind: CardActionContinue, Label: "Continue", Target: address}}
 	case !act.countdownAt.IsZero():
-		row.Section = SectionInProgress
-		row.CountdownEndsAt = act.countdownAt
+		p.section = SectionInProgress
+		p.countdownEndsAt = act.countdownAt
 	case act.asking:
-		row.Section = SectionNeedsYou
-		row.StatePill = PillQuestion
-		row.Reason = "The design session waits on your answer"
-		row.WaitingSince = cmp.Or(act.askedAt, fallback)
-		row.Actions = []CardAction{{Kind: CardActionAnswer, Label: "Answer", Target: target}}
+		p.section = SectionNeedsYou
+		p.pill = PillQuestion
+		p.reason = "The design session waits on your answer"
+		p.waitingSince = cmp.Or(act.askedAt, fallback)
+		p.actions = []CardAction{{Kind: CardActionAnswer, Label: "Answer", Target: address, Link: "#/d/" + address}}
 	default:
-		row.Section = SectionInProgress
-		row.Actions = []CardAction{{Kind: CardActionOpen, Label: "Open", Target: target}}
+		p.section = SectionInProgress
+		p.actions = []CardAction{{Kind: CardActionOpen, Label: "Open", Target: address}}
 	}
+	return p
 }

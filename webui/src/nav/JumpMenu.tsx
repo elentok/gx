@@ -2,7 +2,7 @@ import { Box, chakra, Heading, Input, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext } from "../connection";
-import { CardKindDesign, SectionNeedsYou, SectionReadyToDesign, SectionFinished, type EpicListRow } from "../generated/server";
+import { CardActionAnswer, CardKindDesign,SectionNeedsYou, SectionReadyToDesign, SectionFinished, type EpicListRow } from "../generated/server";
 import { designHref } from "../hrefs";
 import { useWide } from "../design/useWide";
 import { isLive, RING_KIND, ringProgress, ringTone, titleHref } from "../epics/EpicCard";
@@ -11,9 +11,14 @@ import { sectionsOf, type Section } from "../epics/view";
 import { Button } from "../ui/button/Button";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 
-/** A Design opens on its Design page, any other card where its title points. */
+/**
+ * A Design opens on its Design page, a card whose Answer link the server set
+ * opens there, any other card where its title points.
+ */
 export const jumpHref = (row: EpicListRow): string =>
-  row.card_kind === CardKindDesign ? designHref(row.address) : titleHref(row);
+  row.card_kind === CardKindDesign
+    ? designHref(row.address)
+    : (row.actions?.find((a) => a.kind === CardActionAnswer)?.link ?? titleHref(row));
 
 const isCurrent = (row: EpicListRow, current: string) => row.address === current || (row.addresses?.includes(current) ?? false);
 
