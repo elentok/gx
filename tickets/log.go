@@ -22,6 +22,9 @@ const (
 	EventPauseClosed     = "pause.closed"
 	// EventPauseRepair opens a round that has no question (a repair pause).
 	EventPauseRepair = "pause.repair"
+	// EventPausePrompted records a prompt sent to the live agent of a pause. It
+	// names the round in Question and does not end it.
+	EventPausePrompted = "pause.prompted"
 )
 
 // Round-end sources: who ended the round.
@@ -297,6 +300,35 @@ func EndOpenRound(ticketPath, source, how, reason string) error {
 		return nil
 	}
 	return err
+}
+
+// PromptOpenRound writes pause.prompted{question, source} for the latest round
+// that has no end, leaving the round open. A ticket with no open round gets no
+// write and no error.
+func PromptOpenRound(ticketPath, source string) error {
+	_, err := appendLogWith(ticketPath, func(evs []LogEvent) (LogEvent, error) {
+		open := OpenRound(evs)
+		if open == nil {
+			return LogEvent{}, errNoOpenQuestion
+		}
+		return LogEvent{Type: EventPausePrompted, Question: open.Seq, Source: source}, nil
+	})
+	if errors.Is(err, errNoOpenQuestion) {
+		return nil
+	}
+	return err
+}
+
+// LastPrompt is the time of the latest pause.prompted naming round question, or
+// the zero time with none.
+func LastPrompt(events []LogEvent, question int) time.Time {
+	var at time.Time
+	for _, ev := range events {
+		if ev.Type == EventPausePrompted && ev.Question == question {
+			at = ev.TS
+		}
+	}
+	return at
 }
 
 // PauseRound is the event that opened a round and the event that ended it, if any.

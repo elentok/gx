@@ -74,6 +74,11 @@ type DetailRound struct {
 	Answer *DetailAnswer `json:"answer,omitempty"`
 	// ClosedReason is the pause.closed reason of a round no answer ended.
 	ClosedReason string `json:"closed_reason,omitempty"`
+
+	// PromptedAt is when a person last prompted the running agent of this open
+	// round, and Prompt is the line the web shows for it.
+	PromptedAt *time.Time `json:"prompted_at,omitempty"`
+	Prompt     string     `json:"prompt,omitempty"`
 }
 
 // DetailAnswer is a person's reply to a round.
@@ -222,6 +227,10 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		d.Rounds = append(d.Rounds, detailRound(r, false))
 	}
 	latest := detailRound(last, true)
+	if at := tickets.LastPrompt(evs, last.Question.Seq); !at.IsZero() && last.End == nil {
+		latest.PromptedAt = &at
+		latest.Prompt = "Prompt sent to the running agent at " + at.Local().Format("15:04")
+	}
 	d.Latest = &latest
 	d.Answered = t.Status == schema.StatusOpen && latest.Outcome == RoundAnswered
 	d.Chat = roundChat(latest)

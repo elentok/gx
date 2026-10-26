@@ -42,7 +42,7 @@ func TestResume_ZeroCommitEndsTheRoundWithTheClientsSource(t *testing.T) {
 	}
 }
 
-func TestResume_ZeroCommitPromptedLiveAgentEndsTheRound(t *testing.T) {
+func TestResume_ZeroCommitPromptedLiveAgentKeepsTheRoundOpen(t *testing.T) {
 	e := startAnswerEnv(t, nil)
 	pauseEnvZeroCommit(t, e)
 
@@ -54,8 +54,8 @@ func TestResume_ZeroCommitPromptedLiveAgentEndsTheRound(t *testing.T) {
 		t.Fatalf("result = %+v; want the live agent prompted", out)
 	}
 	rounds := endedRounds(t, e.ticket)
-	if len(rounds) != 1 || rounds[0].End == nil || rounds[0].End.How != tickets.HowResume {
-		t.Errorf("rounds = %+v; want the round ended by resume so the next ask is accepted", rounds)
+	if len(rounds) != 1 || rounds[0].End != nil {
+		t.Errorf("rounds = %+v; want the round still open after the prompt", rounds)
 	}
 }
 

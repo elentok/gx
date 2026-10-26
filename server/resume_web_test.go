@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/events"
@@ -161,6 +163,57 @@ func TestWebResume_ZeroCommitWithALiveAgentPromptsAndKeepsThePause(t *testing.T)
 	}
 	if tk, err := schema.ParseTicket(e.ticket); err != nil || tk.PausedClass() != schema.PauseClassAnswer {
 		t.Errorf("ticket = %+v, %v; want still asking", tk, err)
+	}
+}
+
+func TestWebResume_ZeroCommitPromptKeepsTheRoundOpenAndIsLogged(t *testing.T) {
+	e := startAnswerEnv(t, nil, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+	state := pauseEnvZeroCommit(t, e)
+	hs, err := e.h.Client.Handshake(t.Context())
+	if err != nil || hs.WebURL == "" {
+		t.Fatalf("handshake = %+v, %v", hs, err)
+	}
+
+	resumeResult(t, webResume(t, e.h, server.RepairRequest{State: state}))
+
+	evs, err := tickets.ReadLog(e.ticket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var prompts []tickets.LogEvent
+	for _, ev := range evs {
+		if ev.Type == tickets.EventPausePrompted {
+			prompts = append(prompts, ev)
+		}
+	}
+	open := tickets.OpenRound(evs)
+	if len(prompts) != 1 || open == nil || prompts[0].Question != open.Seq || prompts[0].Source != tickets.SourceWeb {
+		t.Fatalf("prompts = %+v, open = %+v; want one web pause.prompted on the open round", prompts, open)
+	}
+	if got := stateOf(t, e.ticket); got != state {
+		t.Errorf("state = %q, want unchanged %q", got, state)
+	}
+
+	code, body := webDo(t, e.h, http.MethodGet, hs.WebURL+"/v1/tickets/detail?address="+answerAddr)
+	if code != http.StatusOK {
+		t.Fatalf("detail = %d %s", code, body)
+	}
+	var d server.TicketDetail
+	if err := json.Unmarshal([]byte(body), &d); err != nil {
+		t.Fatal(err)
+	}
+	want := "Prompt sent to the running agent at " + prompts[0].TS.Local().Format("15:04")
+	if d.Latest == nil || d.Latest.Outcome != server.RoundOpen || d.Latest.Prompt != want {
+		t.Errorf("latest = %+v; want an open round with prompt %q", d.Latest, want)
+	}
+
+	runLog, err := os.ReadFile(filepath.Join(e.h.TicketStore, "proj", "epic-a", "run-log.jsonl"))
+	if err != nil || !strings.Contains(string(runLog), `"type":"`+string(events.PausePrompted)+`"`) {
+		t.Errorf("run log = %q, %v; want a pause-prompted event", runLog, err)
+	}
+	srvLog, err := os.ReadFile(server.LogPath(e.h.StateDir))
+	if err != nil || !strings.Contains(string(srvLog), "prompted the live agent") {
+		t.Errorf("server.log = %q, %v; want the prompt INFO line", srvLog, err)
 	}
 }
 

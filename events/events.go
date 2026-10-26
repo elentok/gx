@@ -53,6 +53,9 @@ const (
 	// PromptNudged is one step a runner took on a launch prompt the agent
 	// didn't pick up; its reason is a claudeui.NudgeDecision.
 	PromptNudged Type = "prompt-nudged"
+	// PausePrompted is a person's Retry that prompted the live agent of a
+	// paused ticket; the pause stays open.
+	PausePrompted Type = "pause-prompted"
 	// SessionPrompted is a person's text typed into a design session; the
 	// server log records its size, never the text.
 	SessionPrompted Type = "session-prompted"

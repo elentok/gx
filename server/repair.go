@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
@@ -294,9 +295,14 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 			return repairRefusal(err), nil
 		}
 		if prompted {
-			if err := tickets.EndOpenRound(t.Path, req.origin, tickets.HowResume, ralphloop.CloseResumed); err != nil {
-				return RepairResult{}, fmt.Errorf("end pause round of %s: %w", addr, err)
+			if err := tickets.PromptOpenRound(t.Path, req.origin); err != nil {
+				return RepairResult{}, fmt.Errorf("log prompt of %s: %w", addr, err)
 			}
+			ev := ralphloop.Event{Type: string(events.PausePrompted), Ticket: id, Address: addr.String(), Text: zeroCommitPrompt}
+			if err := ralphloop.AppendEvent(dir, addr.Epic, ev); err != nil {
+				s.log.Warn("logging pause prompt", "ticket", addr.String(), "err", err)
+			}
+			s.log.Info("prompted the live agent of a paused ticket", "ticket", addr.String(), "origin", req.origin)
 			return repairOK(repair.ResumeResult{Ticket: id, Status: repair.ResumePrompted, Message: repair.MessagePrompted})
 		}
 	}

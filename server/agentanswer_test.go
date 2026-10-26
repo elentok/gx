@@ -27,7 +27,7 @@ type answerEnv struct {
 	ticket string
 }
 
-func startAnswerEnv(t *testing.T, wrap func(*runnerfake.Runner) agentrunner.Runner) answerEnv {
+func startAnswerEnv(t *testing.T, wrap func(*runnerfake.Runner) agentrunner.Runner, opts ...func(*server.Config)) answerEnv {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -37,7 +37,7 @@ func startAnswerEnv(t *testing.T, wrap func(*runnerfake.Runner) agentrunner.Runn
 	if wrap != nil {
 		runner = wrap(fake)
 	}
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Runner = runner })
+	h := servertest.StartWithStore(t, store, append([]func(*server.Config){func(c *server.Config) { c.Runner = runner }}, opts...)...)
 	if _, err := fake.Start(agentrunner.StartOptions{Label: answerLabel, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
 		t.Fatal(err)
 	}
