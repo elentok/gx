@@ -14,6 +14,12 @@ interface Row {
   recover?: (page: Page) => Promise<void>;
 }
 
+const recovery = (page: Page) => page.getByRole("form", { name: "Recovery actions" });
+
+// A hash change keeps the page, since the fixture fails a test whose page reloaded.
+const openTicket = (page: Page, id: string) =>
+  page.evaluate((hash) => (location.hash = hash), `#/t/demo:paused-epic/${id}`);
+
 const rows: Row[] = [
   {
     name: "Answer",
@@ -40,11 +46,59 @@ const rows: Row[] = [
   {
     name: "Retry",
     epic: "paused-epic",
-    id: "06",
+    id: "07",
     onQueue: "Seeded pause: self-reported",
-    reason: "Agent stopped without a result",
+    reason: "Run failed",
     recover: async (page) => {
-      await page.getByRole("button", nav("Retry")).click();
+      await recovery(page).getByRole("button", nav("Retry")).click();
+    },
+  },
+  {
+    name: "Merge again",
+    epic: "paused-epic",
+    id: "05",
+    onQueue: "Seeded pause: self-reported",
+    reason: "Merge conflict",
+    recover: async (page) => {
+      await recovery(page).getByRole("button", nav("Merge again")).click();
+    },
+  },
+  {
+    name: "Start over",
+    epic: "paused-epic",
+    id: "08",
+    onQueue: "Seeded pause: self-reported",
+    reason: "Paused by you",
+    recover: async (page) => {
+      await recovery(page).getByRole("button", nav("Start over")).click();
+      const dialog = page.getByRole("dialog", { name: "Start over" });
+      await dialog.getByRole("textbox", { name: "Reason" }).fill("wrong base");
+      await dialog.getByRole("button", nav("Start over")).click();
+    },
+  },
+  {
+    name: "Resume",
+    epic: "paused-epic",
+    id: "08",
+    onQueue: "Seeded pause: self-reported",
+    reason: "Paused by you",
+    recover: async (page) => {
+      await expect(recovery(page).getByRole("button")).toHaveText([/^Resume$/, /^Start over$/]);
+      await recovery(page).getByRole("button", nav("Resume")).click();
+    },
+  },
+  {
+    name: "Recommended",
+    epic: "paused-epic",
+    id: "09",
+    onQueue: "Seeded pause: self-reported",
+    reason: "Run failed",
+    recover: async (page) => {
+      await expect(page.getByText("The run hit a transient error; retrying should work.")).toBeVisible();
+      const buttons = recovery(page).getByRole("button");
+      await expect(buttons.filter({ hasText: "Recommended" })).toHaveCount(1);
+      await expect(recovery(page).getByRole("button", nav("Start over"))).not.toContainText("Recommended");
+      await buttons.filter({ hasText: "Recommended" }).click();
     },
   },
   {
@@ -68,7 +122,7 @@ test.describe("3. Pause reasons and recovery", () => {
       await expect(card(page, row.epic).getByText(row.onQueue)).toBeVisible();
 
       await page.getByRole("link", { name: row.epic }).click();
-      if (row.epic === "paused-epic") await expect(page.getByText(row.reason)).toBeVisible();
+      if (row.epic === "paused-epic") await expect(page.getByText(row.reason).first()).toBeVisible();
       // The row's action link ("Answer →", "Review →") goes to the same page.
       await page.locator(`a[href$="/t/demo:${row.epic}/${row.id}"]`).filter({ hasNotText: "→" }).click();
 
@@ -82,15 +136,46 @@ test.describe("3. Pause reasons and recovery", () => {
     const fixture = await start("paused");
     await fixture.cli("server", "queue", "add", "demo:paused-epic");
 
-    await expect(card(page, "paused-epic").getByText(/\+4 more/)).toBeVisible();
+    await expect(card(page, "paused-epic").getByText(/\+6 more/)).toBeVisible();
 
     await page.getByRole("link", { name: "paused-epic" }).click();
-    await expect(page.getByText("needs-repair · Run failed")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Fix it with an agent" })).toHaveCount(2);
-    await expect(page.getByText("Fix it in the TUI")).toHaveCount(0);
+    await expect(page.getByText("needs-repair · Run failed").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Fix it with an agent" })).toHaveCount(3);
 
-    await page.locator('a[href$="/t/demo:paused-epic/07"]').click();
+    await page.locator('a[href$="/t/demo:paused-epic/07"]').filter({ hasNotText: "→" }).click();
     await expect(page.getByText("Run failed").first()).toBeVisible();
+  });
+
+  const tooltips = [
+    ["05", "Merge again", "Merge the ticket's commits onto its target again."],
+    ["08", "Resume", "Lift the pause. The ticket waits its turn in the queue."],
+    ["09", /^Retry\s*Recommended$/, "Start a fresh agent now. Keeps the branch and its commits."],
+    ["08", "Start over", "Throw away the work and run again from the base. A backup branch is kept."],
+  ] as const;
+
+  for (const [id, button, title] of tooltips) {
+    test(`Tooltip: ${button} on ${id}`, async ({ page, start }) => {
+      await start("paused");
+      await openTicket(page, id);
+      const target = recovery(page).getByRole("button", typeof button === "string" ? nav(button) : { name: button });
+      await expect(target).toHaveAttribute("title", title);
+    });
+  }
+
+  test("Retry is disabled while the call runs", async ({ page, start }) => {
+    await start("paused");
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/v1/tickets/retry", async (route) => {
+      await gate;
+      await route.continue();
+    });
+    await openTicket(page, "07");
+    const retry = recovery(page).getByRole("button", nav("Retry"));
+    await retry.click();
+    await expect(retry).toBeDisabled();
+    release();
+    await expect(page.getByText("Run failed")).toHaveCount(0);
   });
 });
 

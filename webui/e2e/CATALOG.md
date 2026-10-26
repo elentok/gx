@@ -59,12 +59,17 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
   | --- | --- | --- | --- |
   | Answer | `paused-epic/03` | Waiting for your answer | type an answer, Send answer |
   | Choose base | `paused-epic/04` | Ambiguous base | pick `01`, Choose base |
-  | Retry | `paused-epic/06` | Agent stopped without a result | Retry |
+  | Retry | `paused-epic/07` | Run failed | Retry in the Recovery actions form |
+  | Merge again | `paused-epic/05` | Merge conflict | Merge again; the ticket turns Done |
+  | Start over | `paused-epic/08` | Paused by you | Start over, type a Reason in the dialog, confirm |
+  | Resume | `paused-epic/08` | Paused by you | the card shows Resume and Start over; Resume |
+  | Recommended | `paused-epic/09` | Run failed | the diagnosis shows and only the first button reads "Recommended"; click it |
   | Approve | `approve-epic/01` | Needs approval | Allow once |
-  | Repair | `paused-epic/07` | Run failed | none: the card shows "+4 more", the epic page shows two "Fix it with an agent" buttons and no "Fix it in the TUI" |
+  | Repair | `paused-epic/07` | Run failed | none: the card shows "+6 more", the epic page shows three "Fix it with an agent" buttons |
 
-- **Not covered yet:** Resolve conflict (`paused-epic/05`, `merge-conflict`). The server offers the
-  button but refuses the resume ("ticket 05 is …, not asking").
+- **Tooltips:** each recovery button carries its tooltip as a `title`: Merge again (05), Resume (08),
+  Retry Recommended (09) and Start over (08).
+- **Pending:** a held `/v1/tickets/retry` call leaves the Retry button disabled until it answers.
 
 ## 4. Start a design session
 
