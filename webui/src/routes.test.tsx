@@ -601,7 +601,7 @@ function stubPosts(post: (url: string, init: RequestInit) => Promise<Response>) 
   );
 }
 
-test("the epic page Queue posts, then refetches; a refusal shows inline", async () => {
+test("the epic page Queue posts, then refetches; a refusal shows in a toast", async () => {
   const post = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ queue: [] })));
   stubPosts(post);
   let fetched = 0;
@@ -620,7 +620,7 @@ test("the epic page Queue posts, then refetches; a refusal shows inline", async 
   );
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ queueable: true, state: "waiting" }));
   fireEvent.click(await screen.findByRole("button", { name: "Queue" }));
-  expect((await screen.findByRole("alert")).textContent).toBe("already in the queue");
+  expect(await screen.findByText("already in the queue")).toBeTruthy();
   vi.unstubAllGlobals();
 });
 
@@ -658,7 +658,7 @@ test("the epic page Merge posts the shown state, is disabled while pending, then
   vi.unstubAllGlobals();
 });
 
-test("the epic page Merge shows a refusal and an HTTP error inline", async () => {
+test("the epic page Merge shows a refusal and an HTTP error in toasts", async () => {
   const post = vi.fn(
     async () =>
       new Response(JSON.stringify({ refused: true, reason: "stale-state", message: "the epic changed" })),
@@ -666,9 +666,9 @@ test("the epic page Merge shows a refusal and an HTTP error inline", async () =>
   stubPosts(post);
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "paused", land_block_reason: "rebase clash" }));
   fireEvent.click(await screen.findByRole("button", { name: "Merge" }));
-  expect((await screen.findByRole("alert")).textContent).toBe("the epic changed");
-  post.mockImplementation(async () => new Response("boom", { status: 500 }));
+  expect(await screen.findByText("the epic changed")).toBeTruthy();
+  post.mockImplementation(async () => new Response("boom: disk full", { status: 500 }));
   fireEvent.click(screen.getByRole("button", { name: "Merge" }));
-  await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Merge failed: HTTP 500"));
+  expect(await screen.findByText("boom: disk full")).toBeTruthy();
   vi.unstubAllGlobals();
 });

@@ -1,10 +1,15 @@
+import { WriteError } from "../useWrite";
+
 export interface EpicWriteBody {
   address: string;
   /** The web mux refuses a queue write without a state token; the epic's list state is enough. */
   state: string;
 }
 
-export type EpicWriteResult = { refused?: false } | { refused: true; reason: string; message: string };
+/** An epic merge's outcome: the root paused (`parked`, with `message`), or a merge ticket was forked. */
+export type EpicWriteResult =
+  | { refused?: false; merged?: boolean; parked?: boolean; park_kind?: string; message?: string; merge_ticket?: string }
+  | { refused: true; reason: string; message: string };
 
 export type PostEpicWrite = (body: EpicWriteBody) => Promise<EpicWriteResult>;
 
@@ -15,9 +20,10 @@ async function postEpicWrite(path: string, body: EpicWriteBody): Promise<EpicWri
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (!res.ok) throw new WriteError((await res.text().catch(() => "")).trim() || `HTTP ${res.status}`);
   const result = await res.json().catch(() => null);
-  if (res.ok && result) return result;
-  throw new Error(`HTTP ${res.status}`);
+  if (result) return result;
+  throw new WriteError(`HTTP ${res.status}`);
 }
 
 export const postQueueAdd: PostEpicWrite = (body) => postEpicWrite("/v1/queue/add", body);

@@ -22,6 +22,7 @@ import { Button } from "../ui/button/Button";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { EpicActionButton } from "./EpicActionButton";
 import { titleHref } from "./cardLinks";
+import { mergeToast } from "./MergeButton";
 import { postEpicMerge, postQueueAdd, type PostEpicWrite } from "./queue";
 import { RING_KIND, isCreatingTickets, isLive, needsYouTone, ringProgress, ringTone } from "./ring";
 import { TriageDialog } from "./TriageDialog";
@@ -100,7 +101,7 @@ function ActionButtons({
           post={isQueue ? queue : merge}
           label={a.label}
           pendingLabel={isQueue ? "Queueing…" : "Merging…"}
-          failure={isQueue ? "Could not queue the epic" : "Merge failed"}
+          success={isQueue ? undefined : (res) => mergeToast(target, res)}
           onDone={onChanged}
         />
       );

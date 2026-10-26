@@ -2,10 +2,12 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { EpicListRow } from "../generated/server";
 import { renderThemed } from "../ui/render";
+import { toaster } from "../ui/toaster";
 import { EpicCard } from "./EpicCard";
 
 afterEach(() => {
   cleanup();
+  toaster.remove();
   vi.useRealTimers();
 });
 
@@ -112,24 +114,50 @@ test("Queue posts in place, then reports the change", async () => {
   expect(queue).toHaveBeenCalledWith({ address: "gx:blog", state: "ready" });
 });
 
-test("a refused Queue shows its reason next to the button", async () => {
+test("a refused Queue shows its reason in a toast", async () => {
   const queue = vi.fn().mockResolvedValue({ refused: true, reason: "epic-draft", message: "gx:blog is a draft" });
   const onChanged = vi.fn();
   const r = row({ state: "ready", section: "ready-to-queue", actions: [{ kind: "queue", label: "Queue" }] });
   renderThemed(<EpicCard row={r} writes={{ queue }} onChanged={onChanged} />);
   fireEvent.click(screen.getByRole("button", { name: "Queue" }));
-  const alert = await within(screen.getByTestId("footer")).findByRole("alert");
-  expect(text(alert)).toContain("gx:blog is a draft");
+  expect(await screen.findByText("gx:blog is a draft")).toBeTruthy();
   expect(onChanged).not.toHaveBeenCalled();
 });
 
-test("a refused Merge shows its reason next to the button", async () => {
+test("a refused Merge shows its reason in a toast", async () => {
   const merge = vi.fn().mockResolvedValue({ refused: true, reason: "x", message: "Conflicts with main" });
   const r = row({ state: "merge-blocked", section: "needs-you", state_pill: "Merge blocked", actions: [{ kind: "merge", label: "Merge" }] });
   renderThemed(<EpicCard row={r} writes={{ merge }} />);
   fireEvent.click(screen.getByRole("button", { name: "Merge" }));
-  const alert = await within(screen.getByTestId("footer")).findByRole("alert");
-  expect(text(alert)).toContain("Conflicts with main");
+  expect(await screen.findByText("Conflicts with main")).toBeTruthy();
+});
+
+test("a parked Merge shows a warning toast with the message and a link to the epic", async () => {
+  const merge = vi.fn().mockResolvedValue({ parked: true, message: "Rebase onto main failed" });
+  const r = row({ state: "awaiting-merge", section: "needs-you", actions: [{ kind: "merge", label: "Merge" }] });
+  renderThemed(<EpicCard row={r} writes={{ merge }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+  expect(await screen.findByText("Rebase onto main failed")).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Open the paused epic" }).getAttribute("href")).toBe("#/e/gx:blog");
+});
+
+test("a forked Merge shows 'Merge ticket <name> created' with a link", async () => {
+  const merge = vi.fn().mockResolvedValue({ merge_ticket: "gx:blog/09" });
+  const r = row({ state: "awaiting-merge", section: "needs-you", actions: [{ kind: "merge", label: "Merge" }] });
+  renderThemed(<EpicCard row={r} writes={{ merge }} />);
+  fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+  expect(await screen.findByText("Merge ticket gx:blog/09 created")).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Open the merge ticket" }).getAttribute("href")).toBe("#/t/gx:blog/09");
+});
+
+test("a Queue shows no success toast", async () => {
+  const queue = vi.fn().mockResolvedValue({ queue: [] });
+  const onChanged = vi.fn();
+  const r = row({ state: "ready", section: "ready-to-queue", actions: [{ kind: "queue", label: "Queue" }] });
+  renderThemed(<EpicCard row={r} writes={{ queue }} onChanged={onChanged} />);
+  fireEvent.click(screen.getByRole("button", { name: "Queue" }));
+  await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  expect(document.querySelector("[data-scope='toast'][data-part='root']")).toBeNull();
 });
 
 test("Design posts open-design, then navigates to the Design page", async () => {

@@ -1,8 +1,9 @@
-import { Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { Spinner } from "@chakra-ui/react";
 import { Button } from "../ui/button/Button";
 import type { Tone } from "../ui/tone";
-import type { PostEpicWrite } from "./queue";
+import type { ToastSpec } from "../ui/toaster";
+import { useWrite } from "../useWrite";
+import type { EpicWriteResult, PostEpicWrite } from "./queue";
 
 interface Props {
   address: string;
@@ -11,40 +12,18 @@ interface Props {
   label: string;
   tone?: Tone;
   pendingLabel: string;
-  /** The inline text for a request that failed before the server answered; the error message is appended. */
-  failure: string;
+  /** A toast for a success the page does not show by itself. */
+  success?: (res: EpicWriteResult) => ToastSpec | undefined;
   onDone: () => void;
 }
 
-/** A POST button for an epic write: it sends the state the view shows, and a refusal shows inline. */
-export function EpicActionButton({ address, state, post, label, tone = "running", pendingLabel, failure, onDone }: Props) {
-  const [pending, setPending] = useState(false);
-  const [refusal, setRefusal] = useState<string>();
-
-  async function run() {
-    setPending(true);
-    setRefusal(undefined);
-    try {
-      const res = await post({ address, state });
-      if (res.refused) setRefusal(res.message || res.reason);
-      else onDone();
-    } catch (err) {
-      setRefusal(`${failure}: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setPending(false);
-    }
-  }
-
+/** A POST button for an epic write: it sends the state the view shows; the outcome shows in a toast. */
+export function EpicActionButton({ address, state, post, label, tone = "running", pendingLabel, success, onDone }: Props) {
+  const { run, pending } = useWrite();
   return (
-    <>
-      <Button tone={tone} disabled={pending} onClick={run}>
-        {pending ? pendingLabel : label}
-      </Button>
-      {refusal && (
-        <Text as="span" role="alert" color="text.muted">
-          {refusal}
-        </Text>
-      )}
-    </>
+    <Button tone={tone} disabled={pending} onClick={() => run(() => post({ address, state }), { onDone, success })}>
+      {pending && <Spinner size="sm" />}
+      {pending ? pendingLabel : label}
+    </Button>
   );
 }

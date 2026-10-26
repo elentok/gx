@@ -99,13 +99,13 @@ test("16. Needs you", async ({ page, start }) => {
 });
 
 // The fixture's epics have no git branch, so the server refuses the merge. A refusal on the card
-// shows the click reached the server from the card, with no navigation.
+// toast shows the click reached the server from the card, with no navigation.
 test("17. Merge from the card", async ({ page, start }) => {
   await start("united");
   await section(page, "Needs you");
   for (const name of ["awaiting-epic", "blocked-merge-epic"]) {
     await card(page, name).getByRole("button", nav("Merge")).click();
-    await expect(card(page, name).getByRole("alert")).toBeVisible();
+    await expect(page.locator("[data-scope='toast'][data-part='root']").last()).toBeVisible();
   }
   await expect(page).toHaveURL(/#\/epics$/);
 });

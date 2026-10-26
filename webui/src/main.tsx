@@ -5,11 +5,13 @@ import { App } from "./App";
 import { sessionSnapshotCache } from "./snapshotCache";
 import "./ui/fonts.css";
 import { system } from "./ui/theme";
+import { AppToaster } from "./ui/toaster";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ChakraProvider value={system}>
       <App deps={{ cache: sessionSnapshotCache }} />
+      <AppToaster />
     </ChakraProvider>
   </StrictMode>,
 );

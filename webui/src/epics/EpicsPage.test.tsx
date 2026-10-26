@@ -87,7 +87,9 @@ const mixed = () =>
     row("done-b", { state: "finished", section: "finished" }),
   ]);
 
-const regionNames = () => screen.getAllByRole("region").map((r) => r.getAttribute("aria-labelledby"));
+// The toaster's own container is a region too; only the sections name themselves.
+const sectionRegions = () => screen.queryAllByRole("region").filter((r) => r.hasAttribute("aria-labelledby"));
+const regionNames = () => sectionRegions().map((r) => r.getAttribute("aria-labelledby"));
 const toggle = (title: string) => screen.getByRole("button", { name: new RegExp(`^.?\\s*${title}`) });
 
 test("five sections show in order with counts, Ready to design and Finished start collapsed", async () => {
@@ -194,7 +196,7 @@ test("a filter with no match says No match", async () => {
   await loaded(mixed());
   fireEvent.change(await filterBox(), { target: { value: "zzz" } });
   expect(screen.getByText("No match")).toBeTruthy();
-  expect(screen.queryByRole("region")).toBeNull();
+  expect(sectionRegions()).toHaveLength(0);
 });
 
 test("no epics shows the empty state with a New Design button", async () => {
@@ -243,7 +245,7 @@ test("the first load shows a spinner under the filter", async () => {
   renderEpics(() => new Promise(() => {}));
   expect(await screen.findByRole("status", { name: "Loading epics" })).toBeTruthy();
   expect(await filterBox()).toBeTruthy();
-  expect(screen.queryByRole("region")).toBeNull();
+  expect(sectionRegions()).toHaveLength(0);
 });
 
 test("a failed first fetch shows Could not load epics, and Retry fetches again", async () => {

@@ -5,6 +5,7 @@ import canned from "../canned-detail.json";
 import type { DetailRound, TicketDetail } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { system } from "../ui/theme";
+import { AppToaster } from "../ui/toaster";
 import type { AnswerBody, PostAnswer } from "./answer";
 import { AnswerForm } from "./AnswerForm";
 
@@ -116,6 +117,7 @@ test("a new question swaps in with the note kept and the pick cleared", async ()
   rerender(
     <ChakraProvider value={system}>
       <AnswerForm detail={{ ...withLatest({ kind: "yes-no", summary: "New question" }), state: "tok-2" }} post={post} />
+      <AppToaster />
     </ChakraProvider>,
   );
   expect(screen.getByRole("button", { name: "Yes" }).getAttribute("aria-pressed")).toBe("false");
