@@ -89,7 +89,7 @@ The server sends every card fact in `/v1/epics`, one row per card, so the page r
 
 37. As a person, I want **Design** on a Design that has not started (its map is at Chart, no map ticket is done, and no session is live), which starts a session and opens the Design page, so that I start designing in one click.
 38. As a person, I want **Answer** on a Design that waits on an answer and **Open** on a Design whose session runs, both opening the Design page, so that I reach the chat.
-39. As a person, I want a stopped Design (any Design that is not started, not done, and has no live session) to sit in Needs you with **Continue**, which starts a session and opens the Design page, so that a stopped Design does not stall unseen.
+39. As a person, I want a stopped Design (any Design that is not started, not done, and has no live session) to sit at the end of In progress with "No design session is running" and **Continue**, which starts a session and opens the Design page, so that a stopped Design does not stall unseen. It is not in Needs you: no agent waits on me, the work is only paused.
 40. As a person, I want a Design in the auto-advance countdown to stay in In progress with "Next run starts in Ns" as its reason, so that I do not act on something that resumes by itself.
 41. As a person, I want **Answer** for a ticket question or permission, **Open ticket** for a paused ticket and **Open epic** for a deadlocked epic, so that I reach the page where I act.
 42. As a person, I want **Queue** on a ready card and **Merge** on merge-blocked and awaiting-merge cards to act in place, so that I do not leave the page.
@@ -149,14 +149,15 @@ The server sends every card fact in `/v1/epics`, one row per card, so the page r
   then an Implementation.
 - Section rules (ticket 02 and 04):
   - Needs you: paused, deadlocked, merge-blocked; awaiting merge with auto-merge off; a loop epic or
-    one-off with a ticket question or permission waiting; a Design whose session waits on an answer;
-    a stopped Design. Sort by the oldest wait first. The wait starts when the ticket paused or asked,
-    when the merge failed, when the epic reached awaiting merge, or when the Design session ended or
-    posted its question. With no such time, use the last activity.
+    one-off with a ticket question or permission waiting; a Design whose session waits on an answer.
+    Sort by the oldest wait first. The wait starts when the ticket paused or asked,
+    when the merge failed, when the epic reached awaiting merge, or when the Design session posted its
+    question. With no such time, use the last activity.
   - In progress: running, queued (not started), merging, awaiting merge with auto-merge on, Designs
     with a live session (including the auto-advance countdown and a Design with no map yet), joined
-    cards in Creating tickets.
-    Running first, then queued in queue order, then Designs by last activity.
+    cards in Creating tickets, stopped Designs.
+    Running first, then queued in queue order, then live Designs by last activity, then stopped
+    Designs by last activity.
   - Ready to queue: ready epics, newest first.
   - Ready to design: follow-ups cards first (one per project with open follow-ups), then Designs not
     started, draft epics and epics with no open tickets, by name.
@@ -180,7 +181,7 @@ The server sends every card fact in `/v1/epics`, one row per card, so the page r
     "Not started", "Merged" for Finished.
   - Other: "One-off", "Draft", "No open tickets", the follow-ups counts ("5 bugs, 2 ideas").
 - State pill words (Needs you only): Question (a Design or a ticket waiting on an answer),
-  Permission, Stopped, Paused, Deadlocked, Merge blocked, Awaiting merge.
+  Permission, Paused, Deadlocked, Merge blocked, Awaiting merge.
 - Reason text: the implementer picks the words. Examples from the prototype: "3 questions on the
   Destination", "Auto-advance is off", "06 Retry the launch: zero commits after the iteration",
   "05 and 07 each wait on the other", "Conflicts with main in server/land.go", "Auto-merge is off for
@@ -203,7 +204,7 @@ The server sends every card fact in `/v1/epics`, one row per card, so the page r
 | Design, not started | Ready to design | Design | POST open-design, then open `/d/<epic>` |
 | Design, session waits on an answer | Needs you | Answer | open `/d/<epic>` |
 | Design, session runs | In progress | Open | open `/d/<epic>` |
-| Design, no session, not done | Needs you | Continue | POST open-design, then open `/d/<epic>` |
+| Design, no session, not done | In progress | Continue | POST open-design, then open `/d/<epic>` |
 | Design, auto-advance countdown | In progress | none | |
 | Loop epic or one-off, ticket question or permission | Needs you | Answer | open the ticket page |
 | Loop epic or one-off, paused ticket | Needs you | Open ticket | open the ticket page |
@@ -399,7 +400,7 @@ fixture scenario with one card per section and per Needs-you reason. Catalog flo
 36. Story 36: new flow "Joined card": the `design-epic` epic page links to `design-epic-impl`, and back.
 37. Story 37: new flow "New Design": open Ready to design, click Design on a not-started Design; it opens `#/d/<epic>` and `gx agents list` shows a design session.
 38. Story 38: ported flow 4 (Start a design session) starts from the Epics page; with the session running the card shows Open; with a round waiting it shows Answer; each opens the Design page.
-39. Story 39: server table tests: a Design at Chart with no done map ticket and no live session is Not started in Ready to design; a Design at Spec with no live session is Stopped in Needs you. New scenario Design with no session at Spec: the card is in Needs you with "Stopped" and Continue; Continue opens the Design page and `gx agents list` shows a session.
+39. Story 39: server table tests: a Design at Chart with no done map ticket and no live session is Not started in Ready to design; a Design at Spec with no live session is Stopped in In progress (originally Needs you). New scenario Design with no session at Spec: the card is in In progress with Continue; Continue opens the Design page and `gx agents list` shows a session.
 40. Story 40: flow 10 (Auto-advance) plus a look at the Epics page during the countdown: the card is in In progress with "Next run starts in Ns".
 41. Story 41: ported flow 3 (Pause reasons): each paused card on the Epics page shows Answer or Open ticket and opens the ticket page; the new scenario's deadlocked epic shows Open epic.
 42. Story 42: ported flow 1 (Queue in place); new flow "Needs you" clicks Merge on the merge-blocked and awaiting-merge cards; `gx server epics` shows the change; both cards show only Merge.

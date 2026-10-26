@@ -116,7 +116,7 @@ type designPlacement struct {
 }
 
 // placeDesign places the Design card of the map at address from its sessions.
-// fallback starts a Stopped wait when no session ended.
+// fallback starts a question's wait when the session holds no time for it.
 func placeDesign(address string, act designActivity, notStarted bool, fallback time.Time) designPlacement {
 	p := designPlacement{statusWords: "Designing"}
 	switch {
@@ -125,10 +125,9 @@ func placeDesign(address string, act designActivity, notStarted bool, fallback t
 		p.statusWords = "Not started"
 		p.actions = []CardAction{{Kind: CardActionDesign, Label: "Design", Target: address}}
 	case !act.running:
-		p.section = SectionNeedsYou
-		p.pill = "Stopped"
+		// Nothing waits on the person: the Design is only paused until they continue it.
+		p.section = SectionInProgress
 		p.reason = "No design session is running"
-		p.waitingSince = cmp.Or(act.endedAt, fallback)
 		p.actions = []CardAction{{Kind: CardActionContinue, Label: "Continue", Target: address}}
 	case !act.countdownAt.IsZero():
 		p.section = SectionInProgress

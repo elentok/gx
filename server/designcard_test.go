@@ -78,7 +78,7 @@ func TestEpicList_DesignCards(t *testing.T) {
 		{"d-idle", server.SectionReadyToDesign, "Not started", "", []server.CardActionKind{server.CardActionDesign}},
 		{"d-live", server.SectionInProgress, "Designing", "", []server.CardActionKind{server.CardActionOpen}},
 		{"d-wait", server.SectionNeedsYou, "Designing", server.PillQuestion, []server.CardActionKind{server.CardActionAnswer}},
-		{"d-stopped", server.SectionNeedsYou, "Designing", "Stopped", []server.CardActionKind{server.CardActionContinue}},
+		{"d-stopped", server.SectionInProgress, "Designing", "", []server.CardActionKind{server.CardActionContinue}},
 		{"d-done", server.SectionFinished, "Designed", "", nil},
 	} {
 		r := got[w.name]
@@ -94,9 +94,6 @@ func TestEpicList_DesignCards(t *testing.T) {
 	}
 	if r := got["d-wait"]; r.WaitingSince.IsZero() || r.WaitingSince.Before(time.Now().Add(-time.Minute)) {
 		t.Errorf("d-wait waiting since = %v, want the question time", r.WaitingSince)
-	}
-	if r := got["d-stopped"]; !r.WaitingSince.Equal(time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC)) {
-		t.Errorf("d-stopped waiting since = %v, want its created_at", r.WaitingSince)
 	}
 	if r := got["d-pct"]; r.RingProgress != 30 {
 		t.Errorf("d-pct ring = %d, want 30 (3 of 10)", r.RingProgress)

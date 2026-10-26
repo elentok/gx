@@ -65,7 +65,7 @@ func TestUnitedScenarioHasACardPerSectionAndReason(t *testing.T) {
 		"deadlock-epic|needs-you|Deadlocked",
 		"awaiting-epic|needs-you|Awaiting merge",
 		"blocked-merge-epic|needs-you|Merge blocked",
-		"design-stopped|needs-you|Stopped",
+		"design-stopped|in-progress|",
 		"paused-epic|needs-you|Paused",
 		"question-epic|needs-you|Question",
 		"perm-epic|needs-you|Permission",

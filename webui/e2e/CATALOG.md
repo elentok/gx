@@ -181,10 +181,11 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 - **Pass:**
   - Sections read Needs you, In progress, Ready to queue, Ready to design, Finished. Ready to design
     and Finished start collapsed, and the header toggles Ready to design.
-  - Each title shows its card count: nine in Needs you (paused, question, permission, deadlock,
-    merge-blocked, awaiting-merge, Design question, stopped Design, paused one-off), and Finished
-    counts the cards on screen.
-  - Every Needs-you card has a pill; no other section has one.
+  - Each title shows its card count: eight in Needs you (paused, question, permission, deadlock,
+    merge-blocked, awaiting-merge, Design question, paused one-off), and Finished counts the cards
+    on screen.
+  - Every Needs-you card has a pill; no other section has one. The stopped Design sits in In
+    progress with Continue.
   - A click on a card's project text stays on `#/epics`; its title opens `#/e/demo:paused-epic`.
   - Merge is the only button on the merge-blocked and awaiting-merge cards. Queued, running,
     finished and draft cards have no buttons.

@@ -143,16 +143,21 @@ func (s *Server) queueSlot(key string) int {
 // order, or 0 when the queue holds none of its tickets.
 func (s *Server) rootQueuePosition(root rootRef) int { return s.queueSlot(root.String()) }
 
-// inProgressRank orders In progress: running, then queued, then the rest.
+// inProgressRank orders In progress: running, then queued, then the rest, then
+// stopped Designs.
 func inProgressRank(r EpicListRow) int {
-	switch r.State {
-	case EpicListRunning:
+	switch {
+	case r.State == EpicListRunning:
 		return 0
-	case EpicListQueued:
+	case r.State == EpicListQueued:
 		return 1
+	case r.CardKind == CardKindDesign && slices.ContainsFunc(r.Actions, isContinue):
+		return 3
 	}
 	return 2
 }
+
+func isContinue(a CardAction) bool { return a.Kind == CardActionContinue }
 
 func followUpsRank(r EpicListRow) int {
 	if r.CardKind == CardKindFollowUps {
@@ -188,7 +193,7 @@ func sortCards(rows []EpicListRow, queuePosition func(EpicListRow) int) {
 			if a.State == EpicListQueued {
 				return cmp.Compare(queuePosition(a), queuePosition(b))
 			}
-			if inProgressRank(a) == 2 {
+			if inProgressRank(a) >= 2 {
 				return b.LastActivityAt.Compare(a.LastActivityAt)
 			}
 		case SectionReadyToQueue:

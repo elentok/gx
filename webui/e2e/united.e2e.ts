@@ -8,7 +8,6 @@ const NEEDS_YOU = [
   "blocked-merge-epic",
   "awaiting-epic",
   "design-question",
-  "design-stopped",
   "paused", // the one-off ticket
 ];
 
@@ -58,6 +57,7 @@ test("16. Needs you", async ({ page, start }) => {
   await expect(fin.getByRole("button", { name: new RegExp(`${shown}$`) })).toBeVisible();
 
   // Every Needs-you reason sits in Needs you; pills and reasons show only there.
+  // A stopped Design waits on no one, so it sits in In progress with Continue.
   for (const name of NEEDS_YOU) {
     await expect(needs.getByRole("link", { name, exact: true })).toBeVisible();
     await expect(card(page, name).getByTestId("pill")).toBeVisible();
@@ -65,6 +65,8 @@ test("16. Needs you", async ({ page, start }) => {
   await expect(page.getByTestId("pill")).toHaveCount(NEEDS_YOU.length);
   const progress = await section(page, "In progress");
   await expect(progress.getByTestId("pill")).toHaveCount(0);
+  await expect(progress.getByRole("link", { name: "design-stopped", exact: true })).toBeVisible();
+  await expect(card(page, "design-stopped").getByRole("button")).toHaveText(["Continue"]);
   const queue = await section(page, "Ready to queue");
   await expect(queue.getByTestId("pill")).toHaveCount(0);
 

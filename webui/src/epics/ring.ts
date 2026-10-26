@@ -21,7 +21,6 @@ export const RING_KIND: Record<EpicListRow["card_kind"] & string, Kind> = {
 const PILL_TONE: Record<string, Tone> = {
   Question: "waiting",
   Permission: "waiting",
-  Stopped: "paused",
   Paused: "paused",
   Deadlocked: "deadlocked",
   "Merge blocked": "deadlocked",
