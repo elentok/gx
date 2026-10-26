@@ -10,6 +10,13 @@ globalThis.Request = class extends NodeRequest {
   }
 };
 
+// jsdom has no ResizeObserver; Chakra's popper (Menu) observes its anchor with one.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 // A page cache entry or a stored filter must never leak into the next test.
 afterEach(() => {
   globalThis.sessionStorage?.clear();

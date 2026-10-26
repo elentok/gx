@@ -1,4 +1,4 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
+import { Box, chakra, Menu, Text } from "@chakra-ui/react";
 import { STATS_HREF } from "../../hrefs";
 import type { QueueMode } from "../../snapshot";
 import { Chip } from "../chip/Chip";
@@ -22,10 +22,12 @@ interface Props {
   afk?: boolean;
   // The toggle shows only when the page can switch AFK mode.
   onToggleAfk?: () => void;
+  // Starts the menu open; the gallery uses it to show the open state.
+  menuOpen?: boolean;
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected, afk = false, onToggleAfk }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, afk = false, onToggleAfk, menuOpen }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
   return (
     <Box as="nav" display="flex" alignItems="center" justifyContent="space-between" mb="4">
@@ -48,29 +50,34 @@ export function TopBar({ active, tone = "running", build, mode, connected, afk =
         ))}
       </Box>
       <Box display="flex" alignItems="center" gap="2">
-        {build && (
-          <Text fontSize="xs" color="text.muted" data-testid="server-build">
-            {build}
-          </Text>
-        )}
         {queueChip && <Chip tone="waiting">{queueChip}</Chip>}
-        {onToggleAfk && (
-          <chakra.button
-            type="button"
-            aria-pressed={afk}
-            onClick={onToggleAfk}
-            fontFamily="condensed"
-            fontSize="sm"
-            fontWeight="600"
-            textTransform="uppercase"
-            letterSpacing="wide"
-            cursor="pointer"
-            color={afk ? `tone.${tone}.fg` : "text.muted"}
-          >
-            AFK
-          </chakra.button>
-        )}
         <LiveDot tone={connected ? "running" : "muted"} label={connected ? "Live" : "Offline"} />
+        {(onToggleAfk || build) && (
+          <Menu.Root closeOnSelect={false} lazyMount unmountOnExit defaultOpen={menuOpen} positioning={{ placement: "bottom-end" }}>
+            <Menu.Trigger asChild>
+              <chakra.button type="button" aria-label="Menu" cursor="pointer" color="text.muted" display="flex" p="1">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M3 5h12M3 9h12M3 13h12" />
+                </svg>
+              </chakra.button>
+            </Menu.Trigger>
+            <Menu.Positioner>
+              <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40">
+                {onToggleAfk && (
+                  <Menu.CheckboxItem value="afk" checked={afk} onCheckedChange={onToggleAfk} cursor="pointer">
+                    <Menu.ItemIndicator color={`tone.${tone}.fg`} />
+                    AFK
+                  </Menu.CheckboxItem>
+                )}
+                {build && (
+                  <Text px="3" py="1.5" fontSize="xs" color="text.muted" data-testid="server-build">
+                    {build}
+                  </Text>
+                )}
+              </Menu.Content>
+            </Menu.Positioner>
+          </Menu.Root>
+        )}
       </Box>
     </Box>
   );
