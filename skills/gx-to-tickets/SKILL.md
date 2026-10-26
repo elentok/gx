@@ -312,9 +312,16 @@ changes no web, CLI or server behavior (a docs-only, skills-only or refactor epi
 | CLI check (one `gx` command and its output)        | 3K     |
 | Go test run (one package)                          | 4K     |
 | Skill-text quote (one `rg`/`Read` of a skill line) | 2K     |
+| Mock state check (one mock state at one width: screenshot the mock and the built page, list the differences) | 8K |
 
 A part's fixed base is 15K (fixture start and the ticket read). A collect ticket's fixed estimate is
 30K. Keep these numbers in one place so gx-evolve can compare them with the actual token counts.
+
+Implement tickets use the same table: add 10K to `expected_context_window` per mock state in the
+ticket's `## Mock check`, and allow at most 4 mock states per implement ticket. Both the 10K and the
+cap count mock states: one state section of the mock file, one name at one width. Over the cap,
+split the ticket. The first ticket builds the parts and checks the first 4 states. A follow-on
+implement ticket, blocked by the first, checks the remaining states and fixes what differs.
 
 **Pack the parts.** Fill parts greedily in story order. A part's expected tokens (base plus its
 stories' estimates) stay at or under 70K.
@@ -322,6 +329,8 @@ stories' estimates) stay at or under 70K.
 - Stories that share a fixture scenario stay in one part.
 - The 70K budget wins: a scenario group that passes 70K is split across parts.
 - A single story over 70K gets a part of its own, with a note in the body that it is over budget.
+- A story's Mock states line packs like the story's other Verification items: only these three rules
+  apply. There is no per-part state cap and no per-mock-file rule.
 
 **One part.** If every story fits in one part, publish one lone verify ticket, and no collect ticket:
 
@@ -330,7 +339,8 @@ gx tickets add <epic-slug> --slug verify --type verify --expected-context-window
 ```
 
 The body has `Round: 1`, no `Role:` line, the spec path, the fixture scenario, per story its number,
-its text and its Verification entry word for word, and the spec's `## Out of Scope` section.
+its text and its Verification entry word for word (a Mock states line is copied word for word too),
+and the spec's `## Out of Scope` section.
 
 **Several parts.** Publish each part as a top-level ticket (no `parent`, no `blocked_by`):
 
@@ -340,7 +350,8 @@ gx tickets add <epic-slug> --slug verify-part-<n> --type verify --expected-conte
 
 The body follows the part format in [gx-verify-epic](../gx-verify-epic/SKILL.md) ("The verify part
 body"): `Round: 1`, `Role: part`, the spec path, the fixture scenario, and per story its number, its
-text and its Verification entry word for word, plus its estimate. Do not restate the format here.
+text and its Verification entry word for word, plus its estimate. Copy each Mock states line word
+for word into the part body. Do not restate the format here.
 
 Then publish one round-1 collect ticket after all parts:
 
@@ -387,6 +398,16 @@ implementation list.
 
 (Or: `none — <rationale>`.)
 
+## Mock check
+
+- Mock file: `<full path>`
+- States: `<state name>` at `<width>`, ...
+- Parts this ticket builds: ...
+- Fixture scenario: `<gxfixture scenario>`
+
+(Only on an implement ticket that builds part of a stored mock. A UI ticket that builds no mock
+part has no `## Mock check`.)
+
 ## Acceptance criteria
 
 - [ ] Acceptance criterion 1
@@ -394,6 +415,10 @@ implementation list.
 ```
 
 </ticket-template>
+
+**Mock check rules.** Name the gxfixture scenario for every mock state in `## Mock check`. If no
+scenario exists for a state, add an implement ticket that creates it, and make it block every ticket
+that checks that state.
 
 ### Frontmatter fields
 
