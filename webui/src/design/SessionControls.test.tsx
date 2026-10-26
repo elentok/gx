@@ -15,6 +15,7 @@ import type {
 } from "../generated/server";
 import { appRoutes, type RouteFetchers } from "../routes";
 import { renderThemed } from "../ui/render";
+import { WriteError } from "../useWrite";
 import { stateToken } from "./open";
 
 afterEach(() => {
@@ -146,8 +147,21 @@ test("a refused Start shows the message", async () => {
   fireEvent.click(
     await screen.findByRole("button", { name: "Start design session" }),
   );
-  expect((await screen.findByRole("alert")).textContent).toBe(
-    "no trunk checkout",
+  expect(await screen.findByText("no trunk checkout")).toBeTruthy();
+});
+
+test("Start is disabled while the write is pending, then a server error shows its text in a toast", async () => {
+  let fail: (e: Error) => void = () => {};
+  const openDesign = vi.fn(() => new Promise<SessionResult>((_, reject) => (fail = reject)));
+  render("/d/gx:a", [], { openDesign });
+  fireEvent.click(await screen.findByRole("button", { name: "Start design session" }));
+  await waitFor(() =>
+    expect((screen.getByRole("button", { name: "Start design session" }) as HTMLButtonElement).disabled).toBe(true),
+  );
+  fail(new WriteError("trunk is dirty, commit first"));
+  expect(await screen.findByText("trunk is dirty, commit first")).toBeTruthy();
+  await waitFor(() =>
+    expect((screen.getByRole("button", { name: "Start design session" }) as HTMLButtonElement).disabled).toBe(false),
   );
 });
 

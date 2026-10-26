@@ -165,7 +165,7 @@ test("39. New Design refused for an existing epic", async ({ page, start }) => {
   await fields(dialog).idea.fill("Same name.");
   await dialog.getByRole("button", nav("Start design")).click();
 
-  await expect(dialog.getByRole("alert")).toContainText("already has an epic");
+  await expect(page.locator("[data-scope='toast'][data-part='root']").last()).toContainText("already has an epic");
   await expect(fields(dialog).slug).toHaveValue("ready-epic");
   await expect(fields(dialog).idea).toHaveValue("Same name.");
   await expect(page).toHaveURL(/#\/epics$/);

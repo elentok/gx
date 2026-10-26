@@ -297,6 +297,6 @@ test("a refused delete shows the reason and keeps the page", async () => {
   const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign });
   fireEvent.click(await screen.findByRole("button", { name: "Delete design" }));
   fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-  expect((await screen.findByRole("alert")).textContent).toBe("a session is running");
+  expect(await screen.findByText("a session is running")).toBeTruthy();
   expect(router.state.location.pathname).toBe("/d/gx:a");
 });

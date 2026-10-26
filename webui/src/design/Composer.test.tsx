@@ -22,6 +22,7 @@ import type {
 } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
+import { WriteError } from "../useWrite";
 import type { FetchChat } from "./chat";
 import type { PostPrompt } from "./prompt";
 
@@ -353,11 +354,24 @@ test("a stale refusal keeps the draft and refetches the chat", async () => {
   const before = fetchChat.mock.calls.length;
   fireEvent.change(box, { target: { value: "keep me" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect(await screen.findByRole("alert")).toBeTruthy();
+  expect(await screen.findByText("the conversation moved; review it first")).toBeTruthy();
   expect(box.value).toBe("keep me");
   await waitFor(() =>
     expect(fetchChat.mock.calls.length).toBeGreaterThan(before),
   );
+});
+
+test("Send is disabled while the prompt is pending, and a server error shows its text in a toast", async () => {
+  let fail: (e: Error) => void = () => {};
+  const post = vi.fn<PostPrompt>(() => new Promise((_, reject) => (fail = reject)));
+  render({ post });
+  const box = await openNote();
+  fireEvent.change(box, { target: { value: "hello" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true));
+  fail(new WriteError("session is gone"));
+  expect(await screen.findByText("session is gone")).toBeTruthy();
+  expect(box.value).toBe("hello");
 });
 
 test("another refusal shows its message and keeps the draft", async () => {
@@ -370,9 +384,7 @@ test("another refusal shows its message and keeps the draft", async () => {
   const box = await openNote();
   fireEvent.change(box, { target: { value: "long" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect((await screen.findByRole("alert")).textContent).toBe(
-    "text is over 32768 bytes",
-  );
+  expect(await screen.findByText("text is over 32768 bytes")).toBeTruthy();
   expect(box.value).toBe("long");
 });
 
@@ -681,7 +693,7 @@ test("a stale refusal keeps every answer and note of the round", async () => {
   const before = fetchChat.mock.calls.length;
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
-  expect(await screen.findByRole("alert")).toBeTruthy();
+  expect(await screen.findByText("the conversation moved")).toBeTruthy();
   await waitFor(() =>
     expect(fetchChat.mock.calls.length).toBeGreaterThan(before),
   );

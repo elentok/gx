@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection } from "../connection";
 import { renderThemed } from "../ui/render";
+import { WriteError } from "../useWrite";
 import type { OpenDesign } from "./open";
 import { NewDesignForm } from "./NewDesignForm";
 
@@ -148,9 +149,20 @@ test("a refusal shows in the dialog and keeps the draft", async () => {
   const { onStarted } = mount({ open: async () => ({ refused: true, message: "name taken" }) as never });
   type("Epic slug", "fresh");
   await act(async () => click("Start design"));
-  expect(screen.getByText("name taken")).toBeTruthy();
+  expect(await screen.findByText("name taken")).toBeTruthy();
   expect(onStarted).not.toHaveBeenCalled();
   expect(saved().slug).toBe("fresh");
+});
+
+test("Start design is disabled while pending, and a server error shows its text in a toast", async () => {
+  let fail: (e: Error) => void = () => {};
+  const { onStarted } = mount({ open: () => new Promise((_, reject) => (fail = reject)) as never });
+  type("Epic slug", "fresh");
+  await act(async () => click("Start design"));
+  expect((screen.getByRole("button", { name: "Start design" }) as HTMLButtonElement).disabled).toBe(true);
+  await act(async () => fail(new WriteError("slug already exists")));
+  expect(await screen.findByText("slug already exists")).toBeTruthy();
+  expect(onStarted).not.toHaveBeenCalled();
 });
 
 test("Tab wraps inside the dialog", () => {

@@ -6,6 +6,7 @@ import type {
   SessionRequest,
   SessionResult,
 } from "../generated/server";
+import { WriteError } from "../useWrite";
 
 export type OpenDesign = (body: DesignOpenRequest) => Promise<SessionResult>;
 export type DeleteDesign = (
@@ -24,10 +25,21 @@ export const postJson =
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const result = await res.json().catch(() => null);
-    if (result && (res.ok || result.refused)) return result;
-    throw new Error(`${path}: HTTP ${res.status}`);
+    return readWrite<R>(res);
   };
+
+/** A JSON answer, or a refusal; any other answer throws the server's plain-text body for the toast. */
+export async function readWrite<R extends SessionResult>(res: Response): Promise<R> {
+  const text = await res.text().catch(() => "");
+  let result: R | null = null;
+  try {
+    result = JSON.parse(text);
+  } catch {
+    // Not JSON: an error body, handled below.
+  }
+  if (result && (res.ok || result.refused)) return result;
+  throw new WriteError(text.trim() || `HTTP ${res.status}`);
+}
 
 export const postOpenDesign: OpenDesign = postJson("/v1/designs/open");
 export const postDeleteDesign: DeleteDesign = postJson("/v1/designs/delete");

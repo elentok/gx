@@ -176,7 +176,7 @@ test("a refused Design stays on the page and says why", async () => {
   const r = row({ card_kind: "design", actions: [{ kind: "continue", label: "Continue", target: "gx:blog" }] });
   renderThemed(<EpicCard row={r} writes={{ openDesign, navigate }} />);
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-  expect(text(await screen.findByRole("alert"))).toContain("Already running");
+  expect(await screen.findByText(/Already running/)).toBeTruthy();
   expect(navigate).not.toHaveBeenCalled();
 });
 

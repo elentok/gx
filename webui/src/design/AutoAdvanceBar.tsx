@@ -2,6 +2,7 @@ import { Box, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import type { SessionInfo } from "../generated/server";
 import { Button } from "../ui/button/Button";
+import type { Refusable } from "../useWrite";
 import {
   stateToken,
   type CancelAutoAdvance,
@@ -9,10 +10,7 @@ import {
 } from "./open";
 import { useWide } from "./useWide";
 
-export type RunCall = (
-  call: () => Promise<{ refused?: boolean; message?: string }>,
-  failure: string,
-) => Promise<void>;
+export type RunCall = (call: () => Promise<Refusable>) => Promise<void>;
 
 // Counts down to the server's deadline; undefined with no countdown running.
 export function useAutoAdvanceCountdown(session: SessionInfo) {
@@ -58,14 +56,12 @@ export function AutoAdvanceBar({
         aria-label={`Auto-advance ${session.auto_advance ? "on" : "off"}`}
         disabled={disabled}
         onClick={() =>
-          run(
-            () =>
-              setAutoAdvance({
-                id: session.id,
-                state,
-                off: session.auto_advance,
-              }),
-            "Could not switch auto-advance. Try again.",
+          run(() =>
+            setAutoAdvance({
+              id: session.id,
+              state,
+              off: session.auto_advance,
+            }),
           )
         }
       >
@@ -97,10 +93,7 @@ export function AutoAdvanceBar({
             emphasis="secondary"
             disabled={disabled}
             onClick={() =>
-              run(
-                () => cancelAutoAdvance({ id: session.id, state }),
-                "Could not cancel. Try again.",
-              )
+              run(() => cancelAutoAdvance({ id: session.id, state }))
             }
           >
             Cancel

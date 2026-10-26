@@ -1,4 +1,5 @@
 import type { SessionPromptRequest, SessionResult } from "../generated/server";
+import { readWrite } from "./open";
 
 export type PostPrompt = (body: SessionPromptRequest) => Promise<SessionResult>;
 
@@ -9,7 +10,5 @@ export const postPrompt: PostPrompt = async (body) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const result = await res.json().catch(() => null);
-  if (result && (res.ok || result.refused)) return result;
-  throw new Error(`prompt: HTTP ${res.status}`);
+  return readWrite(res);
 };

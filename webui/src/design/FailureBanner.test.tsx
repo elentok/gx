@@ -194,7 +194,7 @@ test("another refusal keeps Restore and shows its message", async () => {
   const resume = vi.fn<ResumeSession>(async () => refusal("session-live"));
   render(crashed(), { resume });
   fireEvent.click(await screen.findByRole("button", { name: "Restore" }));
-  expect((await screen.findByRole("alert")).textContent).toBe("refused session-live");
+  expect(await screen.findByText("refused session-live")).toBeTruthy();
   expect(buttonsOf(await banner())).toEqual(["Restore", "New session"]);
 });
 

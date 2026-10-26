@@ -1,4 +1,4 @@
-import { Box, Link, Text } from "@chakra-ui/react";
+import { Box, Link, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import {
   CardActionAnswer,
@@ -19,6 +19,7 @@ import {
 import { designHref, epicHref, ticketHref } from "../hrefs";
 import { postOpenDesign, type OpenDesign } from "../design/open";
 import { Button } from "../ui/button/Button";
+import { useWrite } from "../useWrite";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { EpicActionButton } from "./EpicActionButton";
 import { titleHref } from "./cardLinks";
@@ -71,22 +72,9 @@ function ActionButtons({
 }) {
   const { queue = postQueueAdd, merge = postEpicMerge, openDesign = postOpenDesign, navigate = goTo } = writes;
   const [triage, setTriage] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [refusal, setRefusal] = useState<string>();
+  const { run, pending } = useWrite();
 
-  async function startDesign(epic: string) {
-    setPending(true);
-    setRefusal(undefined);
-    try {
-      const res = await openDesign({ epic });
-      if (res.refused) setRefusal(res.message || "The request was refused.");
-      else navigate(designHref(epic));
-    } catch {
-      setRefusal("Could not reach gx. Try again.");
-    } finally {
-      setPending(false);
-    }
-  }
+  const startDesign = (epic: string) => run(() => openDesign({ epic }), { onDone: () => navigate(designHref(epic)) });
 
   function button(a: CardAction, i: number) {
     const target = a.target ?? row.address;
@@ -117,6 +105,7 @@ function ActionButtons({
     }[a.kind];
     return (
       <Button key={i} tone="running" emphasis={emphasis} disabled={pending} onClick={onClick}>
+        {pending && (a.kind === CardActionDesign || a.kind === CardActionContinue) && <Spinner size="sm" />}
         {a.label}
       </Button>
     );
@@ -125,11 +114,6 @@ function ActionButtons({
   return (
     <>
       {row.actions?.map(button)}
-      {refusal && (
-        <Text as="span" role="alert" color="text.muted">
-          {refusal}
-        </Text>
-      )}
       {triage && <TriageDialog project={row.project} onClose={() => setTriage(false)} />}
     </>
   );

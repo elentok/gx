@@ -1,8 +1,9 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext } from "../connection";
 import type { DesignOpenRequest, SessionInfo } from "../generated/server";
 import { Button } from "../ui/button/Button";
+import { useWrite } from "../useWrite";
 import {
   postDeleteDesign,
   postOpenDesign,
@@ -13,29 +14,19 @@ import {
   type StopSession,
 } from "./open";
 
-/** Runs one write at a time: a second click while one is in flight does nothing. */
-export function useWrite() {
+/** The shared write hook, with a connection refresh after every accepted write. */
+export function useDesignWrite() {
   const conn = useConnectionContext();
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
-  const run = async <R extends { refused?: boolean; message?: string }>(call: () => Promise<R>, onDone?: (res: R) => void) => {
-    if (pending) return;
-    setPending(true);
-    setError("");
-    try {
-      const res = await call();
-      if (res.refused) setError(res.message ?? "The request was refused.");
-      else {
+  const { run, pending } = useWrite();
+  const runThenRefresh: typeof run = (call, opts) =>
+    run(call, {
+      ...opts,
+      onDone: (res) => {
         conn.refresh();
-        onDone?.(res);
-      }
-    } catch {
-      setError("Could not reach gx. Try again.");
-    } finally {
-      setPending(false);
-    }
-  };
-  return { run, pending, error };
+        opts?.onDone?.(res);
+      },
+    });
+  return { run: runThenRefresh, pending };
 }
 
 export const Failure = ({ children }: { children: string }) =>
@@ -55,13 +46,13 @@ export function StartDesignButton({
   open?: OpenDesign;
   onStarted?: () => void;
 }) {
-  const { run, pending, error } = useWrite();
+  const { run, pending } = useDesignWrite();
   return (
     <Box display="flex" alignItems="center" gap="2">
-      <Button tone="running" disabled={pending} onClick={() => run(() => open({ epic: address }), onStarted)}>
+      <Button tone="running" disabled={pending} onClick={() => run(() => open({ epic: address }), { onDone: onStarted })}>
+        {pending && <Spinner size="sm" />}
         Start design session
       </Button>
-      <Failure>{error}</Failure>
     </Box>
   );
 }
@@ -76,18 +67,18 @@ export function DeleteDesignButton({
   remove?: DeleteDesign;
   onDeleted: () => void;
 }) {
-  const { run, pending, error } = useWrite();
+  const { run, pending } = useDesignWrite();
   const [confirming, setConfirming] = useState(false);
   return (
     <Box display="flex" alignItems="center" gap="2">
-      <Failure>{error}</Failure>
       {confirming ? (
         <>
           <Text fontSize="sm">Delete this design?</Text>
           <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => setConfirming(false)}>
             Keep
           </Button>
-          <Button size="sm" tone="paused" disabled={pending} onClick={() => run(() => remove({ epic: address }), onDeleted)}>
+          <Button size="sm" tone="paused" disabled={pending} onClick={() => run(() => remove({ epic: address }), { onDone: onDeleted })}>
+            {pending && <Spinner size="sm" />}
             Delete
           </Button>
         </>
@@ -102,14 +93,14 @@ export function DeleteDesignButton({
 
 /** Opens a new session for the Design; asks first, and sends the state token, when the shown one is live. */
 export function useStartNew(address: string, shown: SessionInfo, open: OpenDesign = postOpenDesign) {
-  const write = useWrite();
+  const write = useDesignWrite();
   const isLive = shown.status.state !== "exited";
   const startNew = () => {
     if (isLive && !window.confirm("Stop the current session and start a new one?")) return;
     const body: DesignOpenRequest = { epic: address, new: true, ...(isLive ? { state: stateToken(shown) } : {}) };
     write.run(() => open(body));
   };
-  return { startNew, pending: write.pending, error: write.error };
+  return { startNew, pending: write.pending };
 }
 
 /** The chat header: the live-session menu, and New session. */
@@ -129,7 +120,7 @@ export function SessionHeader({
   open?: OpenDesign;
   stop?: StopSession;
 }) {
-  const { run, pending, error } = useWrite();
+  const { run, pending } = useDesignWrite();
   const [menu, setMenu] = useState(false);
   const startNew = useStartNew(address, shown, open);
 
@@ -142,6 +133,7 @@ export function SessionHeader({
           </Button>
         )}
         <Button size="sm" emphasis="secondary" disabled={pending || startNew.pending} onClick={startNew.startNew}>
+          {startNew.pending && <Spinner size="sm" />}
           New session
         </Button>
       </Box>
@@ -163,6 +155,7 @@ export function SessionHeader({
               </Button>
               {s.id !== shown.id && (
                 <Button size="sm" tone="deadlocked" disabled={pending} onClick={() => run(() => stop({ id: s.id, state: stateToken(s) }))}>
+                  {pending && <Spinner size="sm" />}
                   Stop {s.name || s.id}
                 </Button>
               )}
@@ -170,7 +163,6 @@ export function SessionHeader({
           ))}
         </Box>
       )}
-      <Failure>{error || startNew.error}</Failure>
     </Box>
   );
 }

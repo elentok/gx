@@ -1,7 +1,7 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useRef, useState } from "react";
 import { copyText } from "../clipboard";
-import { Failure, useWrite } from "../design/SessionControls";
+import { useDesignWrite } from "../design/SessionControls";
 import { Button } from "../ui/button/Button";
 import { postFixAgent, type FixAgent } from "./fixAgent";
 import type { EpicDetailRow } from "./detail";
@@ -18,7 +18,7 @@ export function FixAgentDialog({
 }) {
   const [copy, setCopy] = useState<"idle" | "copied" | "failed">("idle");
   const [started, setStarted] = useState<{ remote: boolean }>();
-  const { run, pending, error } = useWrite();
+  const { run, pending } = useDesignWrite();
   const promptRef = useRef<HTMLElement>(null);
   const prompt = row.fix_prompt ?? "";
 
@@ -45,7 +45,6 @@ export function FixAgentDialog({
         {started && (
           <Text>{`Agent started. View it in the gx TUI Agents tab${started.remote ? " or in the Claude app" : ""}`}</Text>
         )}
-        <Failure>{error}</Failure>
         <Box display="flex" gap="2" justifyContent="flex-end">
           <Button
             emphasis="secondary"
@@ -57,8 +56,9 @@ export function FixAgentDialog({
             <Button
               tone="running"
               disabled={pending}
-              onClick={() => run(() => fixAgent({ address: row.address, state: row.state }), (res) => setStarted({ remote: res.remote_control }))}
+              onClick={() => run(() => fixAgent({ address: row.address, state: row.state }), { onDone: (res) => setStarted({ remote: res.remote_control }) })}
             >
+              {pending && <Spinner size="sm" />}
               Start gx agent
             </Button>
           )}

@@ -1,4 +1,4 @@
-import { Box, Text, Textarea } from "@chakra-ui/react";
+import { Box, Spinner, Text, Textarea } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
 import type {
   SessionInfo,
@@ -8,6 +8,7 @@ import type {
 } from "../generated/server";
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
+import { useWrite } from "../useWrite";
 import { AutoAdvanceBar, type RunCall } from "./AutoAdvanceBar";
 import {
   postAutoAdvance,
@@ -75,58 +76,31 @@ export function Composer({
     setTextState(t);
     onText?.(t);
   };
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const { run: write, pending } = useWrite();
   const enabled = connected && promptable(session) && !pending;
 
-  const send = async (
-    body: Partial<SessionPromptRequest>,
-    onSent?: () => void,
-  ) => {
+  const send = (body: Partial<SessionPromptRequest>, onSent?: () => void) => {
     if (!enabled) return;
-    setPending(true);
-    setError("");
-    try {
-      const res = await post({
-        id: session.id,
-        text: "",
-        last_message: lastMessage,
-        ...body,
-      });
-      if (res.refused) {
-        setError(res.message ?? "The message was refused.");
-        if (res.reason === ReasonStale) onStale?.();
-      } else {
-        onSent?.();
-      }
-    } catch {
-      setError("Could not send. Try again.");
-    } finally {
-      setPending(false);
-    }
+    return write(
+      async () => {
+        const res = await post({
+          id: session.id,
+          text: "",
+          last_message: lastMessage,
+          ...body,
+        });
+        if (res.refused && res.reason === ReasonStale) onStale?.();
+        return res;
+      },
+      { onDone: onSent },
+    );
   };
 
   // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
   const working = session.status.state === "working" && !promptable(session);
-  // The calls that are not a prompt: one pending flag, one error line; a refusal shows its message, a throw shows `failure`.
-  const run: RunCall = async (call, failure) => {
-    if (!connected || pending) return;
-    setPending(true);
-    setError("");
-    try {
-      const res = await call();
-      if (res.refused) setError(res.message ?? failure);
-    } catch {
-      setError(failure);
-    } finally {
-      setPending(false);
-    }
-  };
+  const run: RunCall = (call) => (connected ? write(call) : Promise.resolve());
   const onInterrupt = () =>
-    run(
-      () => interrupt({ id: session.id, state: stateToken(session) }),
-      "Could not interrupt. Try again.",
-    );
+    run(() => interrupt({ id: session.id, state: stateToken(session) }));
 
   const inRound = round.length > 0;
   const sendRound = () => {
@@ -152,6 +126,7 @@ export function Composer({
       disabled={!connected || pending}
       onClick={onInterrupt}
     >
+      {pending && <Spinner size="sm" />}
       Interrupt
     </Button>
   ) : canContinue && !inRound && text.trim() === "" ? (
@@ -160,6 +135,7 @@ export function Composer({
       disabled={!enabled}
       onClick={() => send({ continue: true })}
     >
+      {pending && <Spinner size="sm" />}
       Continue
     </Button>
   ) : (
@@ -168,11 +144,11 @@ export function Composer({
         disabled={!enabled || (!inRound && text.trim() === "")}
         onClick={onSend}
       >
+        {pending && <Spinner size="sm" />}
         Send
       </Button>,
     )
   );
-  const notices = <>{error && <Text role="alert">{error}</Text>}</>;
   // With gaps, Send's click opens the popover instead of sending; a click while it is open closes it.
   function withPopover(send: ReactNode) {
     return (
@@ -224,7 +200,6 @@ export function Composer({
           autoFocus
         />
       )}
-      {notices}
       {/* One line: the switch on the left, the main action on the right. */}
       <Box display="flex" gap="2" alignItems="center">
         {autoAdvanceBar}

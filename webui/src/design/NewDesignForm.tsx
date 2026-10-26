@@ -1,8 +1,8 @@
-import { Box, chakra, Text } from "@chakra-ui/react";
+import { Box, chakra, Spinner, Text } from "@chakra-ui/react";
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { postOpenDesign, type OpenDesign } from "./open";
-import { Failure, useWrite } from "./SessionControls";
+import { useDesignWrite } from "./SessionControls";
 import { useVisualViewportHeight } from "./useVisualViewportHeight";
 import { useWide } from "./useWide";
 
@@ -76,7 +76,7 @@ export function NewDesignForm({
     return { slug: saved.slug ?? "", idea: saved.idea ?? "", project: startingProject(saved, projects, filterProject) };
   });
   const [confirming, setConfirming] = useState(false);
-  const { run, pending, error } = useWrite();
+  const { run, pending } = useDesignWrite();
   const sheet = useRef<HTMLDivElement>(null);
   // A drag that starts in the sheet and ends on the backdrop fires a click there; only a press on the backdrop closes.
   const pressedBackdrop = useRef(false);
@@ -96,10 +96,12 @@ export function NewDesignForm({
     const slug = draft.slug.trim();
     run(
       () => open({ epic: slug, new_design: true, idea: draft.idea, project: draft.project }),
-      (res) => {
-        writeDraft(undefined);
-        // With start_error the map exists though no session started; the Design page offers the retry.
-        onStarted(`${draft.project}:${slug}`, res.start_error);
+      {
+        onDone: (res) => {
+          writeDraft(undefined);
+          // With start_error the map exists though no session started; the Design page offers the retry.
+          onStarted(`${draft.project}:${slug}`, res.start_error);
+        },
       },
     );
   };
@@ -226,7 +228,6 @@ export function NewDesignForm({
           value={draft.idea}
           onChange={(e) => patch({ idea: e.target.value })}
         />
-        <Failure>{error}</Failure>
         <Box display="flex" alignItems="center" gap="2" p="3" borderTopWidth="1px" borderColor="border" bg="surface" flexShrink="0">
           {confirming ? (
             <>
@@ -247,6 +248,7 @@ export function NewDesignForm({
               </Button>
               {!sheetMode && <Box flex="1" />}
               <Button type="submit" tone="running" flex={sheetMode ? "2" : undefined} disabled={pending}>
+                {pending && <Spinner size="sm" />}
                 Start design
               </Button>
             </>

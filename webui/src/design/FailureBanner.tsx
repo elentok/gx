@@ -1,6 +1,5 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { useConnectionContext } from "../connection";
 import type { SessionFailure, SessionInfo } from "../generated/server";
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
@@ -8,7 +7,7 @@ import { postResumeSession, stateToken, type OpenDesign, type ResumeSession } fr
 import { postPrompt, type PostPrompt } from "./prompt";
 import type { FetchScreen } from "./screen";
 import { ScreenModal } from "./ScreenModal";
-import { useStartNew } from "./SessionControls";
+import { useDesignWrite, useStartNew } from "./SessionControls";
 
 // The generated file is imported for types only: its tygo constants are not runtime values.
 const CRASHED = "crashed";
@@ -65,9 +64,8 @@ export function FailureBanner({
   post?: PostPrompt;
   onStale?: () => void;
 } & FailureActions) {
-  const conn = useConnectionContext();
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState("");
+  const { run, pending } = useDesignWrite();
+  const [clicked, setClicked] = useState<ButtonName>();
   const [screen, setScreen] = useState(false);
   // A refusal that no retry can fix: the page stops offering Restore, as it does after a quick re-crash.
   const [cannotRestore, setCannotRestore] = useState(false);
@@ -75,42 +73,25 @@ export function FailureBanner({
   const restoreHidden = failure.recrashed || cannotRestore;
   const startNew = useStartNew(address, session, open);
 
-  const restore = async () => {
-    setPending(true);
-    setError("");
-    try {
+  const restore = () =>
+    run(async () => {
       const res = await resume({ id: sessionId, state: stateToken(session) });
-      if (!res.refused) conn.refresh();
-      else if (res.reason === ReasonSessionDirGone || res.reason === ReasonSessionNoResume) setCannotRestore(true);
-      else setError(res.message ?? "The session could not be restored.");
-    } catch {
-      setError("Could not reach gx. Try again.");
-    } finally {
-      setPending(false);
-    }
-  };
+      if (res.refused && (res.reason === ReasonSessionDirGone || res.reason === ReasonSessionNoResume)) setCannotRestore(true);
+      return res;
+    });
 
-  const retry = async () => {
-    setPending(true);
-    setError("");
-    try {
+  const retry = () =>
+    run(async () => {
       const res = await post({ id: sessionId, text: "continue", last_message: lastMessage });
-      if (res.refused) {
-        setError(res.message ?? "The message was refused.");
-        if (res.reason === ReasonStale) onStale?.();
-      }
-    } catch {
-      setError("Could not send. Try again.");
-    } finally {
-      setPending(false);
-    }
-  };
+      if (res.refused && res.reason === ReasonStale) onStale?.();
+      return res;
+    });
 
   const onClick: Record<ButtonName, () => void> = {
-    Restore: restore,
-    "New session": startNew.startNew,
+    Restore: () => (setClicked("Restore"), restore()),
+    "New session": () => (setClicked("New session"), startNew.startNew()),
     Screen: () => setScreen(true),
-    Retry: retry,
+    Retry: () => (setClicked("Retry"), retry()),
   };
   const buttons = (BUTTONS[failure.kind] ?? []).filter((name) => !(name === "Restore" && restoreHidden));
 
@@ -136,7 +117,6 @@ export function FailureBanner({
           Open it in gx, Agents tab.
         </Text>
       )}
-      {(error || startNew.error) && <Text role="alert">{error || startNew.error}</Text>}
       {buttons.length > 0 && (
         <Box display="flex" gap="2">
           {buttons.map((name) => (
@@ -147,6 +127,7 @@ export function FailureBanner({
               disabled={pending || startNew.pending}
               onClick={onClick[name]}
             >
+              {(pending || startNew.pending) && clicked === name && <Spinner size="sm" />}
               {name}
             </Button>
           ))}

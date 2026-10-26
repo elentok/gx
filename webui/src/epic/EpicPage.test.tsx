@@ -251,7 +251,7 @@ test("a refused fix agent shows the message and keeps Copy and Start", async () 
   live([repairRow()], "loop", async () => ({ remote_control: false, refused: true, message: "Already investigating" }));
   const dialog = await openFixDialog();
   fireEvent.click(dialog.getByRole("button", { name: "Start gx agent" }));
-  expect(await dialog.findByText("Already investigating")).toBeTruthy();
+  expect(await screen.findByText("Already investigating")).toBeTruthy();
   expect(dialog.getByRole("button", { name: "Copy" })).toBeTruthy();
   expect(dialog.getByRole("button", { name: "Start gx agent" })).toBeTruthy();
 });
