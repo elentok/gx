@@ -214,13 +214,13 @@ const openFixDialog = async () => {
   return within(await screen.findByRole("dialog"));
 };
 
-test("the fix dialog shows the prompt with the reason, or without one", async () => {
-  live([repairRow({ reason: "dirty tree" })]);
+test("the fix dialog shows the row's fix_prompt, with or without a reason", async () => {
+  live([repairRow({ reason: "dirty tree", fix_prompt: "/gx-investigate gx:blog/01 is needs-repair: from the server" })]);
   const dialog = await openFixDialog();
-  expect(dialog.getByText("/gx-investigate gx:blog/01 is needs-repair: dirty tree")).toBeTruthy();
+  expect(dialog.getByText("/gx-investigate gx:blog/01 is needs-repair: from the server")).toBeTruthy();
   expect(dialog.getByRole("button", { name: "Copy" })).toBeTruthy();
   cleanup();
-  live([repairRow()]);
+  live([repairRow({ fix_prompt: "/gx-investigate gx:blog/01 is needs-repair" })]);
   expect((await openFixDialog()).getByText("/gx-investigate gx:blog/01 is needs-repair")).toBeTruthy();
 });
 

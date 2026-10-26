@@ -506,5 +506,12 @@ func TestEpicDetail_NeedsRepairRowCarriesTheStateToken(t *testing.T) {
 		if r.State != want {
 			t.Errorf("%s state = %q, want %q", r.Address, r.State, want)
 		}
+		wantPrompt := ""
+		if want != "" {
+			wantPrompt = "/gx-investigate " + r.Address + " is needs-repair: Merge conflict"
+		}
+		if r.FixPrompt != wantPrompt {
+			t.Errorf("%s fix_prompt = %q, want %q", r.Address, r.FixPrompt, wantPrompt)
+		}
 	}
 }

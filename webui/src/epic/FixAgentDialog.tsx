@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { copyText } from "../clipboard";
 import { Failure, useWrite } from "../design/SessionControls";
 import { Button } from "../ui/button/Button";
-import { fixPrompt, postFixAgent, type FixAgent } from "./fixAgent";
+import { postFixAgent, type FixAgent } from "./fixAgent";
 import type { EpicDetailRow } from "./detail";
 
 /** Shows the investigate prompt to copy, or starts a gx agent on it. */
@@ -20,7 +20,7 @@ export function FixAgentDialog({
   const [started, setStarted] = useState<{ remote: boolean }>();
   const { run, pending, error } = useWrite();
   const promptRef = useRef<HTMLElement>(null);
-  const prompt = fixPrompt(row.address, row.reason);
+  const prompt = row.fix_prompt ?? "";
 
   return (
     <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4" onClick={onClose}>

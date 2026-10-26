@@ -574,7 +574,7 @@ export const galleryEntries: GalleryEntry[] = [
         label: "needs-repair",
         node: (
           <EpicPageFrame
-            detail={withRows({ state: "paused" }, [...doneRows, epicRow("03", { rendered_status: "needs-repair", reason: "dirty tree" })])}
+            detail={withRows({ state: "paused" }, [...doneRows, epicRow("03", { rendered_status: "needs-repair", reason: "dirty tree", fix_prompt: "/gx-investigate demo:blog/03 is needs-repair: dirty tree" })])}
           />
         ),
       },
@@ -583,7 +583,7 @@ export const galleryEntries: GalleryEntry[] = [
         node: (
           <EpicPageFrame
             fixing
-            detail={withRows({ state: "paused" }, [...doneRows, epicRow("03", { rendered_status: "needs-repair", reason: "dirty tree" })])}
+            detail={withRows({ state: "paused" }, [...doneRows, epicRow("03", { rendered_status: "needs-repair", reason: "dirty tree", fix_prompt: "/gx-investigate demo:blog/03 is needs-repair: dirty tree" })])}
           />
         ),
       },

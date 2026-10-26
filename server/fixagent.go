@@ -70,9 +70,21 @@ func (s *Server) fixAgentHandler(web bool) http.HandlerFunc {
 }
 
 // fixAgentName is the session name of the agent fixing addr. Creating with a
-// unique name makes it the one-agent-per-ticket guard.
+// unique name makes it the one-agent-per-ticket guard, so the mapping must be
+// injective: "_" starts every escape, and is itself escaped, so two addresses
+// never share a name even when their parts contain hyphens.
 func fixAgentName(addr string) string {
-	return "fix-" + strings.NewReplacer(":", "-", "/", "-").Replace(addr)
+	return "fix-" + strings.NewReplacer("_", "__", ":", "_c", "/", "_s").Replace(addr)
+}
+
+// fixAgentPrompt is the prompt the fix agent starts from; a pause label
+// follows the colon, none leaves the sentence at "needs-repair".
+func fixAgentPrompt(addr string, t tickets.Ticket) string {
+	prompt := "/gx-investigate " + addr + " is needs-repair"
+	if label := t.PauseReason.Label(); label != "" {
+		prompt += ": " + label
+	}
+	return prompt
 }
 
 // startFixAgent starts a /gx-investigate session in the project's trunk
@@ -107,17 +119,13 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 	if checkout == "" {
 		return fixAgentRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", ref.addr.Project)), nil
 	}
-	prompt := "/gx-investigate " + addr + " is needs-repair"
-	if label := t.PauseReason.Label(); label != "" {
-		prompt += ": " + label
-	}
 	settings := s.settings.Load()
 	cs := CreateSessionRequest{
 		Project:    ref.addr.Project,
 		Dir:        checkout,
 		Name:       fixAgentName(addr),
 		UniqueName: true,
-		Prompt:     prompt,
+		Prompt:     fixAgentPrompt(addr, t),
 		Harness:    settings.chatHarness(),
 	}
 	remote := settings.AgentsFixAgentRemoteControl && cs.Harness == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))

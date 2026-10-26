@@ -463,6 +463,10 @@ export interface EpicDetailRow {
    */
   state?: string;
   /**
+   * FixPrompt is the prompt the fix agent starts from; set on a needs-repair row.
+   */
+  fix_prompt?: string;
+  /**
    * Current and Blocked are set on a map epic's rows: Current is the claimed
    * ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.
    */

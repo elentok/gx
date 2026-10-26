@@ -46,7 +46,7 @@ func TestFixAgent_StartsInTheTrunkCheckout(t *testing.T) {
 		t.Error("remote_control is set before remote control exists")
 	}
 	meta := readMeta(t, f.h, res.Session.ID)
-	want := map[string]any{"dir": f.repo, "name": "fix-proj-loop-01", "harness": string(agentfake.HarnessKind),
+	want := map[string]any{"dir": f.repo, "name": "fix-proj_cloop_s01", "harness": string(agentfake.HarnessKind),
 		"first_prompt": "/gx-investigate proj:loop/01 is needs-repair: Merge conflict"}
 	for k, v := range want {
 		if meta[k] != v {

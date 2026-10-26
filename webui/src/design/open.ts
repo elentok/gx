@@ -17,8 +17,8 @@ export type InterruptSession = (body: SessionRequest) => Promise<SessionResult>;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export const postJson =
-  (path: string) =>
-  async (body: unknown): Promise<SessionResult> => {
+  <R extends SessionResult = SessionResult>(path: string) =>
+  async (body: unknown): Promise<R> => {
     const res = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

@@ -41,6 +41,8 @@ type EpicDetailRow struct {
 	Reason string `json:"reason,omitempty"`
 	// State is the token the fix-agent route needs; set on a needs-repair row.
 	State string `json:"state,omitempty"`
+	// FixPrompt is the prompt the fix agent starts from; set on a needs-repair row.
+	FixPrompt string `json:"fix_prompt,omitempty"`
 	// Current and Blocked are set on a map epic's rows: Current is the claimed
 	// ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.
 	Current bool `json:"current,omitempty"`
@@ -309,6 +311,7 @@ func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) EpicDeta
 	}
 	if status == tickets.StatusPausedRepair {
 		row.State = repairState(evs, t.PausedClass())
+		row.FixPrompt = fixAgentPrompt(row.Address, t)
 	}
 	if t.PausedClass() != "" {
 		row.Reason = t.PauseReason.Label()
