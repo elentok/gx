@@ -295,6 +295,29 @@ func TestDesignsOpen_ReAddsARemovedWorktreeOnTheSameBranch(t *testing.T) {
 	}
 }
 
+func TestDesignsOpen_ClashRefusalKeepsTheLiveSession(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := startDesignsIn(t, store)
+	first := f.open(t, "proj:map", false)
+	if first.Refused || first.Session == nil {
+		t.Fatalf("open = %+v", first)
+	}
+	servertest.WriteTicket(t, store, "proj", "map-design", "01", "first", "")
+
+	res := f.open(t, "proj:map", true)
+	if !res.Refused || res.Reason != server.ReasonDesignBranchClash {
+		t.Fatalf("open = %+v, want design-branch-clash", res)
+	}
+	live := f.live(t)
+	if len(live) != 1 || live[0].ID != first.Session.ID {
+		t.Errorf("live sessions = %+v, want only %s", live, first.Session.ID)
+	}
+}
+
 func TestDesignsOpen_RefusesAnEpicNamedLikeTheDesignBranch(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")

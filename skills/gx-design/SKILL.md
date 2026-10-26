@@ -61,8 +61,10 @@ Then settle where the run works, in this order. Edit nothing until it is settled
    `gx designs worktree <project:epic> --json` output (step 3 below). If after Branch: go to step 9 when
    the `<epic>-impl` epic exists, else stop with a message that the design is past Branch and
    `<epic>-impl` is missing. Edit nothing either way.
-2. **No map yet.** For `/gx-design <epic> <idea>`, create the map first (step 1's "No map epic"
-   writes it to the tracker, not the repo), then continue here.
+2. **No map yet.** For `/gx-design <epic> <idea>`, first check that no `<epic>-design` epic exists
+   (`gx tickets epics`). If one does, stop with a message that it clashes with the design branch
+   name, and create nothing. Otherwise create the map (step 1's "No map epic" writes it to the
+   tracker, not the repo), then continue here.
 3. **Branch check.** Check the run is on `<epic>-design` (`git branch --show-current`). If not (for
    example a plain Claude session in the trunk checkout), run `gx designs worktree <project:epic> --json`.
    It makes the design worktree if needed and rebases it onto trunk. Use its `path` as the
@@ -172,8 +174,9 @@ the ticket title during `resolve-tickets`.
    - Create it in a temporary worktree: `git -C <worktree> worktree add -b <epic>-impl <tmp-dir> <base>`.
    - With trunk as base, merge `<epic>-design` there: `git -C <tmp-dir> merge <epic>-design`.
    - With another base, rebase a detached copy of the design tip and merge that copy. Never rewrite
-     `<epic>-design`: `git -C <worktree> rebase --onto <base> <trunk> <design-tip-sha>` (run it
-     detached, on the sha), then `git -C <tmp-dir> merge <the rebased sha>`.
+     `<epic>-design`, and never detach the design worktree. Run the rebase in the temporary worktree:
+     `git -C <tmp-dir> rebase --onto <base> <trunk> <design-tip-sha>` (this detaches `<tmp-dir>` only),
+     then `git -C <tmp-dir> merge <the rebased sha>`.
    - On a conflict, follow [gx-resolving-merge-conflicts](../gx-resolving-merge-conflicts/SKILL.md).
    - Then `git -C <worktree> worktree remove <tmp-dir>` and set `--design-step branch`.
    - Step 8 removes neither the design worktree nor the `<epic>-design` branch: the server does,

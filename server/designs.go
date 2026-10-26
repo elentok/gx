@@ -296,6 +296,9 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	if live != nil && !req.New {
 		return SessionResult{Session: live}, nil
 	}
+	if msg := designClash(dir, project, epic); msg != "" {
+		return sessionRefusal(ReasonDesignBranchClash, msg), nil
+	}
 	if live != nil {
 		if web && req.State != SessionStateToken(*live) {
 			return sessionRefusal(ReasonStale, "the session changed; review its current state"), nil
@@ -305,9 +308,6 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		}
 	}
 
-	if msg := designClash(dir, project, epic); msg != "" {
-		return sessionRefusal(ReasonDesignBranchClash, msg), nil
-	}
 	past, err := s.afterBranch(project, epic)
 	if err != nil {
 		return SessionResult{}, err
