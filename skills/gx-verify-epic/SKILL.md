@@ -203,9 +203,9 @@ Write one table for all stories into your ticket, under `## Table`, with
   scenario follows the same size rule.
 - Otherwise, one child fix ticket per finding, or per group of findings that name the same fix. Do not
   fix some findings inline and open tickets for others.
-- A finding outside the `## Out of Scope` section in your own ticket goes to gx-follow-up
-  ([gx-follow-up](../gx-follow-up/SKILL.md), unattended), not to a fix ticket. The table names each
-  follow-up.
+- A finding outside the epic's scope goes to gx-follow-up ([gx-follow-up](../gx-follow-up/SKILL.md),
+  unattended), not to a fix ticket. Judge it against the `## Out of Scope` section in your own
+  ticket: a finding that section covers is out of scope. The table names each follow-up.
 
 **Next round.** Open `Round: N+1` when there are fix tickets, or when the inline fix's rerun failed
 or touched code of other passed stories. Only a fix round raises N.
