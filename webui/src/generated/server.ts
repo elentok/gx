@@ -424,8 +424,8 @@ export const EpicKindMap = "map";
  */
 export type EpicKind = typeof EpicKindLoop | typeof EpicKindMap;
 /**
- * EpicDetailRow is one ticket of an EpicDetail. A map epic's rows fill only
- * Address, Title and RenderedStatus.
+ * EpicDetailRow is one ticket of an EpicDetail. A map epic's rows leave Parent,
+ * Cost, Asking, Question and Reason empty.
  */
 export interface EpicDetailRow {
   address: string;
@@ -435,11 +435,16 @@ export interface EpicDetailRow {
   parent?: string;
   /**
    * Elapsed is in seconds and set once the ticket merges; a running row ticks
-   * on the client from ClaimedAt.
+   * on the client from ClaimedAt. On a map row it is the done time minus the
+   * claim time, absent when either is unset.
    */
   elapsed?: number /* int */;
   cost?: number /* float64 */;
   claimed_at?: string;
+  /**
+   * ClosedAt is when the ticket was done, else cancelled; the page sorts the done group by it.
+   */
+  closed_at?: string;
   /**
    * Blockers are the unresolved ones: own-epic bare ("04"), cross-epic as "epic/NN".
    */
@@ -559,6 +564,10 @@ export interface EpicDetail {
    */
   steps?: MapStep[];
   impl_address?: string;
+  /**
+   * RingProgress is a map epic's Design progress in percent, as on the Design card.
+   */
+  ring_progress?: number /* int */;
   /**
    * Draft is set on a loop epic that is still being published into.
    */

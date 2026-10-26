@@ -242,14 +242,98 @@ func TestEpicDetail_MapEpic(t *testing.T) {
 	if d.WallClock != 0 || d.AgentTime != 0 || d.CostTotal != 0 {
 		t.Errorf("totals = %d/%d/%v, want empty", d.WallClock, d.AgentTime, d.CostTotal)
 	}
-	if r := rowOf(t, d, "proj:atlas/01"); r.Title != "A" || r.RenderedStatus != "done" || r.Type != "" || r.Elapsed != 0 || r.Cost != 0 {
-		t.Errorf("row 01 = %+v, want title and status only", r)
+	if r := rowOf(t, d, "proj:atlas/01"); r.Title != "A" || r.RenderedStatus != "done" || r.Type != "implement" || r.Elapsed != 0 || r.Cost != 0 {
+		t.Errorf("row 01 = %+v, want title, status and type only", r)
 	}
 	if r := rowOf(t, d, "proj:atlas/02"); r.Blockers != nil || r.Asking {
-		t.Errorf("row 02 = %+v, want no blockers and no answer flag", r)
+		t.Errorf("row 02 = %+v, want no blockers (01 is done) and no answer flag", r)
 	}
 	if r := rowOf(t, d, "proj:atlas/03"); r.Reason != "" {
 		t.Errorf("row 03 reason = %q, want none on a map epic row", r.Reason)
+	}
+}
+
+func TestEpicDetail_MapRowsCarryRedesignFields(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\n---\n\n## Destination\n\nReach the sea.\n",
+			map[string]string{
+				"01-a.md": issueMD("01", "done", "claimed_at: 2026-01-01T10:00:00Z\ndone_at: 2026-01-01T10:05:00Z\n", "A"),
+				"02-b.md": issueMD("02", "done", "done_at: 2026-01-01T11:00:00Z\n", "B"),
+				"03-c.md": issueMD("03", "claimed", "claimed_at: 2026-01-01T12:00:00Z\n", "C"),
+				"04-d.md": issueMD("04", "open", "blocked_by: [\"03\"]\n", "D"),
+				"05-e.md": issueMD("05", "cancelled", "cancelled_at: 2026-01-01T13:00:00Z\n", "E"),
+			})
+	})
+	_, d, body := getEpicDetail(t, h, base, "proj:atlas")
+	r1 := rowOf(t, d, "proj:atlas/01")
+	if r1.Elapsed != 300 || r1.ClosedAt.Format("15:04") != "10:05" {
+		t.Errorf("row 01 elapsed/closed = %d/%v, want 300 and 10:05: %s", r1.Elapsed, r1.ClosedAt, body)
+	}
+	if r2 := rowOf(t, d, "proj:atlas/02"); r2.Elapsed != 0 || r2.ClosedAt.IsZero() {
+		t.Errorf("row 02 elapsed/closed = %d/%v, want no elapsed and a close time", r2.Elapsed, r2.ClosedAt)
+	}
+	r3 := rowOf(t, d, "proj:atlas/03")
+	if r3.ClaimedAt.IsZero() || !r3.ClosedAt.IsZero() {
+		t.Errorf("row 03 = %+v, want claimed_at and no close time", r3)
+	}
+	if r4 := rowOf(t, d, "proj:atlas/04"); !slices.Equal(r4.Blockers, []string{"03"}) || !r4.ClaimedAt.IsZero() {
+		t.Errorf("row 04 = %+v, want blocker 03 and no claimed_at", r4)
+	}
+	if r5 := rowOf(t, d, "proj:atlas/05"); r5.ClosedAt.Format("15:04") != "13:00" {
+		t.Errorf("row 05 closed = %v, want 13:00", r5.ClosedAt)
+	}
+}
+
+func TestEpicDetail_LoopRowsCarryCloseTime(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-a.md": issueMD("01", "done", "done_at: 2026-01-01T10:05:00Z\n", "A"),
+			"02-b.md": issueMD("02", "cancelled", "cancelled_at: 2026-01-01T13:00:00Z\n", "B"),
+			"03-c.md": issueMD("03", "open", "", "C"),
+		})
+	})
+	_, d, _ := getEpicDetail(t, h, base, "proj:work")
+	if got := rowOf(t, d, "proj:work/01").ClosedAt.Format("15:04"); got != "10:05" {
+		t.Errorf("done closed = %s, want 10:05", got)
+	}
+	if got := rowOf(t, d, "proj:work/02").ClosedAt.Format("15:04"); got != "13:00" {
+		t.Errorf("cancelled closed = %s, want 13:00", got)
+	}
+	if !rowOf(t, d, "proj:work/03").ClosedAt.IsZero() {
+		t.Error("open row has a close time")
+	}
+}
+
+func TestEpicDetail_MapRingProgress(t *testing.T) {
+	cases := []struct {
+		name, epic string
+		check      func(t *testing.T, ring int)
+	}{
+		{"mid-way", "---\nstatus: open\nkind: map\n---\n", func(t *testing.T, ring int) {
+			if ring <= 0 || ring >= 100 {
+				t.Errorf("ring = %d, want strictly between 0 and 100", ring)
+			}
+		}},
+		{"done", "---\nstatus: done\nkind: map\ncompleted_at: 2026-01-01T00:00:00Z\n---\n", func(t *testing.T, ring int) {
+			if ring != 100 {
+				t.Errorf("ring = %d, want 100", ring)
+			}
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			h, base := startEpicDetail(t, func(store string) {
+				writeEpicFiles(t, store, "atlas", c.epic, map[string]string{
+					"01-a.md": issueMD("01", "done", "", "A"),
+					"02-b.md": issueMD("02", "open", "", "B"),
+				})
+			})
+			_, d, body := getEpicDetail(t, h, base, "proj:atlas")
+			c.check(t, d.RingProgress)
+			if !strings.Contains(body, `"ring_progress"`) {
+				t.Errorf("body has no ring_progress: %s", body)
+			}
+		})
 	}
 }
 

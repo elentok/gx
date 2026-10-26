@@ -16,8 +16,8 @@ const (
 	EpicKindMap  = "map"
 )
 
-// EpicDetailRow is one ticket of an EpicDetail. A map epic's rows fill only
-// Address, Title and RenderedStatus.
+// EpicDetailRow is one ticket of an EpicDetail. A map epic's rows leave Parent,
+// Cost, Asking, Question and Reason empty.
 type EpicDetailRow struct {
 	Address        string `json:"address"`
 	Title          string `json:"title"`
@@ -25,10 +25,13 @@ type EpicDetailRow struct {
 	Type           string `json:"type,omitempty"`
 	Parent         string `json:"parent,omitempty"`
 	// Elapsed is in seconds and set once the ticket merges; a running row ticks
-	// on the client from ClaimedAt.
+	// on the client from ClaimedAt. On a map row it is the done time minus the
+	// claim time, absent when either is unset.
 	Elapsed   int       `json:"elapsed,omitempty"`
 	Cost      float64   `json:"cost,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
+	// ClosedAt is when the ticket was done, else cancelled; the page sorts the done group by it.
+	ClosedAt time.Time `json:"closed_at,omitzero"`
 	// Blockers are the unresolved ones: own-epic bare ("04"), cross-epic as "epic/NN".
 	Blockers []string `json:"blockers,omitempty"`
 	// Asking is set on a paused ticket with an open question; Question is its summary line.
@@ -114,6 +117,8 @@ type EpicDetail struct {
 	// Steps is a map epic's Progress, and ImplAddress the address of its impl epic once it exists.
 	Steps       []MapStep `json:"steps,omitempty"`
 	ImplAddress string    `json:"impl_address,omitempty"`
+	// RingProgress is a map epic's Design progress in percent, as on the Design card.
+	RingProgress int `json:"ring_progress,omitempty"`
 	// Draft is set on a loop epic that is still being published into.
 	Draft bool `json:"draft,omitempty"`
 	// Deletable is set on an uncharted design, the rule the designs delete route guards.
@@ -179,18 +184,32 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 		d.Deletable = deletable
 	}
 	d.Steps = mapSteps(e, byName)
+	if step := mapProgress(e); step == ProgressDone {
+		d.RingProgress = 100
+	} else {
+		d.RingProgress = designPercent(e, step)
+	}
 	d.Stats = epicStats(e, e.CompletedAt, now)
 	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
 		d.ImplAddress = rootRef{Project: root.Project, Epic: e.Name + tickets.ImplEpicSuffix}.String()
 	}
 	current, blocked := mapTicketFlags(e)
 	for _, t := range e.Tickets {
-		d.Rows = append(d.Rows, EpicDetailRow{
+		status := e.RenderedStatus(t)
+		row := EpicDetailRow{
 			Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title,
-			RenderedStatus: e.RenderedStatus(t).Word(),
-			Current:        current.DisplayNumber() != "" && t.DisplayNumber() == current.DisplayNumber(),
-			Blocked:        blocked[t.DisplayNumber()],
-		})
+			RenderedStatus: status.Word(), Type: t.Type, Blockers: e.UnresolvedBlockers(t),
+			ClosedAt: t.FinishedAt(),
+			Current:  current.DisplayNumber() != "" && t.DisplayNumber() == current.DisplayNumber(),
+			Blocked:  blocked[t.DisplayNumber()],
+		}
+		if status == tickets.StatusClaimed {
+			row.ClaimedAt = t.ClaimedAt
+		}
+		if !t.ClaimedAt.IsZero() && !t.DoneAt.IsZero() {
+			row.Elapsed = int(t.DoneAt.Sub(t.ClaimedAt).Seconds())
+		}
+		d.Rows = append(d.Rows, row)
 	}
 	return d
 }
@@ -274,6 +293,7 @@ func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) EpicDeta
 	row := EpicDetailRow{
 		Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title, RenderedStatus: status.Word(),
 		Type: t.Type, Elapsed: t.ElapsedTime, Cost: t.ActualCost, Blockers: e.UnresolvedBlockers(t),
+		ClosedAt: t.FinishedAt(),
 	}
 	if t.Parent != nil {
 		row.Parent = ticketAddress(root, *t.Parent)
