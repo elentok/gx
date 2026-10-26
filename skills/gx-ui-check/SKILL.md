@@ -26,10 +26,11 @@ $TMPDIR/gx-ui/gxfixture --gx $TMPDIR/gx-ui/gx --fakeclaude $TMPDIR/gx-ui/claude 
 ```
 
 - Run it with `run_in_background`. It prints one JSON line, then keeps running until SIGTERM.
-- The scenario names are in the catalog (`ready`, `mixed`, `finishing`, `paused`, `design`, `edge`).
-  An unknown name makes the command list the known ones.
-- Pass `--hold` only for a flow that says so (flow 7). It freezes the workers until you delete the
-  file named by `hold_file`.
+- The scenario names are in the catalog (`empty`, `ready`, `mixed`, `finishing`, `paused`, `united`,
+  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`). An unknown name makes the command list
+  the known ones.
+- Pass `--hold` only for a flow that says so (flow 7, and the Stash flow on `dirty-trunk`). It
+  freezes the workers until you delete the file named by `hold_file`.
 - Each run is its own isolated server and state. Start one per flow.
 
 The JSON line has these fields:

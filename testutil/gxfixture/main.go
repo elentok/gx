@@ -31,6 +31,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // Output is the JSON gxfixture prints once the server answers.
@@ -289,10 +290,13 @@ func (f *fixture) seed(sc scenario) error {
 		return err
 	}
 	for _, args := range [][]string{{"init", "-b", "main"}, {"add", "."}, {"commit", "-m", "fixture"}} {
-		cmd := exec.Command("git", args...)
-		cmd.Dir, cmd.Env = repo, f.env
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
+		if err := f.git(repo, args...); err != nil {
+			return err
+		}
+	}
+	if sc.gitSetup != nil {
+		if err := sc.gitSetup(f, repo); err != nil {
+			return err
 		}
 	}
 	if sc.conversations != nil {
@@ -336,7 +340,7 @@ func (f *fixture) seed(sc scenario) error {
 			}
 			if tk.opts.PauseReason != "" {
 				ticketPath := filepath.Join(f.store, e.project, e.name, "issues", tk.id+"-"+tk.slug+".md")
-				if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "Seeded pause: " + tk.opts.PauseReason}); err != nil {
+				if err := seedPauseRound(ticketPath, tk.opts.PauseReason, sc.recommend[addr+"/"+tk.id]); err != nil {
 					return err
 				}
 			}
@@ -353,6 +357,35 @@ func (f *fixture) seed(sc scenario) error {
 				return fmt.Errorf("set design step of %s: %w\n%s", addr, err, out)
 			}
 		}
+	}
+	return nil
+}
+
+// seedPauseRound opens the round a real pause of reason opens: a question only
+// where the reply goes to the agent, else a repair round. A recommendation is
+// stored on it as an investigate agent would.
+func seedPauseRound(ticketPath, reason string, rec recommendation) error {
+	summary := "Seeded pause: " + reason
+	ev := tickets.LogEvent{Type: tickets.EventPauseRepair, By: "gx", PauseKind: reason, Reason: summary}
+	if schema.PauseReason(reason).AsksQuestion() {
+		ev = tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: summary}
+	}
+	if _, err := tickets.AppendLog(ticketPath, ev); err != nil {
+		return err
+	}
+	if rec.verb == "" {
+		return nil
+	}
+	_, err := tickets.RecommendOpenRound(ticketPath, rec.verb, rec.diagnosis)
+	return err
+}
+
+// git runs a git command in dir with the fixture's identity.
+func (f *fixture) git(dir string, args ...string) error {
+	cmd := exec.Command("git", args...)
+	cmd.Dir, cmd.Env = dir, f.env
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
 	}
 	return nil
 }

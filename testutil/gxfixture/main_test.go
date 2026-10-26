@@ -19,6 +19,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -65,6 +66,7 @@ func TestUnitedScenarioHasACardPerSectionAndReason(t *testing.T) {
 		"deadlock-epic|needs-you|Deadlocked",
 		"awaiting-epic|needs-you|Awaiting merge",
 		"blocked-merge-epic|needs-you|Merge blocked",
+		"dirty-trunk-epic|needs-you|Merge blocked",
 		"design-stopped|in-progress|",
 		"paused-epic|needs-you|Paused",
 		"question-epic|needs-you|Question",
@@ -490,26 +492,105 @@ func TestPausedScenario_OneTicketPerRecoveryPath(t *testing.T) {
 	r.stop(t)
 }
 
+// roundTypes is the event type of each pause round in the ticket's log.
+func (r *running) roundTypes(t *testing.T, project, epic, id string) []string {
+	t.Helper()
+	root := filepath.Dir(filepath.Dir(r.StateDir))
+	paths, _ := filepath.Glob(filepath.Join(root, "data", "gx", "tickets", project, epic, "issues", id+"-*.md"))
+	if len(paths) != 1 {
+		t.Fatalf("ticket files for %s = %v", id, paths)
+	}
+	evs, err := tickets.ReadLog(paths[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var types []string
+	for _, round := range tickets.AllRounds(evs) {
+		types = append(types, round.Question.Type)
+	}
+	return types
+}
+
+func TestPausedScenario_EachPauseHasTheRoundOfItsKind(t *testing.T) {
+	r := start(t, "paused")
+	// A question only where the reply goes to the agent.
+	for id, want := range map[string]string{
+		"03": tickets.EventPauseQuestion,
+		"04": tickets.EventPauseQuestion,
+		"05": tickets.EventPauseRepair,
+		"06": tickets.EventPauseQuestion,
+		"07": tickets.EventPauseRepair,
+		"08": tickets.EventPauseRepair,
+		"09": tickets.EventPauseRepair,
+	} {
+		if got := r.roundTypes(t, "demo", "paused-epic", id); !slices.Equal(got, []string{want}) {
+			t.Errorf("%s rounds = %v, want [%s]", id, got, want)
+		}
+	}
+	if d := r.detail(t, pausedEpic+"09"); d.Recommendation == nil || d.Recommendation.Verb != server.ActionRetry {
+		t.Errorf("09 recommendation = %+v, want retry", d.Recommendation)
+	}
+	repo := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "repo")
+	if out, err := exec.Command("git", "-C", repo, "rev-parse", "--verify", "ralph-loop/paused-epic-item-05").CombinedOutput(); err != nil {
+		t.Errorf("05 has no iteration branch: %v\n%s", err, out)
+	}
+	r.stop(t)
+}
+
+func TestDirtyTrunkScenario_RootPausedOnADirtyCheckout(t *testing.T) {
+	r := start(t, "dirty-trunk")
+	repo := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "repo")
+	status, err := exec.Command("git", "-C", repo, "status", "--porcelain").Output()
+	if err != nil || !strings.Contains(string(status), "same.txt") {
+		t.Errorf("trunk status = %q, %v; want a dirty same.txt", status, err)
+	}
+	var found bool
+	for _, c := range r.cardsOf(t) {
+		if c.Name == "dirty-epic" {
+			found = true
+			if c.MergeBlockKind != "dirty-trunk" || c.Section != server.SectionNeedsYou {
+				t.Errorf("dirty-epic card = %+v, want a needs-you card blocked on dirty-trunk", c)
+			}
+		}
+	}
+	if !found {
+		t.Error("no dirty-epic card")
+	}
+	r.stop(t)
+}
+
 func TestPausedScenario_WebRecoveryClearsEachPause(t *testing.T) {
 	r := start(t, "paused")
 	w := r.web(t)
 
-	d := r.detail(t, pausedEpic+"03")
-	w.post(t, "/v1/tickets/answer", map[string]any{"address": d.Address, "text": "go ahead", "state": d.State})
-
-	// 05 (merge conflict) is left out: repair.Resume refuses a repair-class pause,
-	// so the web's "Resolve conflict" cannot clear it. See the ticket's Spec deviations.
-	for _, c := range []struct{ id, base string }{{"04", "01"}, {"06", ""}} {
-		d := r.detail(t, pausedEpic+c.id)
-		body := map[string]any{"address": d.Address, "state": d.State}
-		if c.base != "" {
-			body["base"] = c.base
-		}
-		w.post(t, "/v1/tickets/resume", body)
+	// The route each verb's button posts to, as webui/src/ticket/recover.ts has it.
+	routes := map[string]string{
+		server.ActionAnswer:     "/v1/tickets/answer",
+		server.ActionResume:     "/v1/tickets/resume",
+		server.ActionChooseBase: "/v1/tickets/resume",
+		server.ActionRetry:      "/v1/tickets/retry",
+		server.ActionMerge:      "/v1/tickets/merge",
 	}
-	for _, id := range []string{"03", "04", "06"} {
-		if d := r.detail(t, pausedEpic+id); d.Status != "open" {
-			t.Errorf("%s is %q (reason %q) after its recovery, want open", id, d.Status, d.PauseReason)
+	ids := []string{"03", "04", "05", "06", "07", "08", "09"}
+	for _, id := range ids {
+		d := r.detail(t, pausedEpic+id)
+		if len(d.Actions) == 0 {
+			t.Fatalf("%s has no actions: %+v", id, d)
+		}
+		verb := d.Actions[0]
+		body := map[string]any{"address": d.Address, "state": d.State}
+		switch verb {
+		case server.ActionAnswer:
+			body["text"] = "go ahead"
+		case server.ActionChooseBase:
+			body["base"] = "01"
+		}
+		w.post(t, routes[verb], body)
+	}
+	for _, id := range ids {
+		// A merge lands the ticket and a retry relaunches it, so only the pause is checked.
+		if d := r.detail(t, pausedEpic+id); d.Status == "needs-answer" || d.Status == "needs-repair" {
+			t.Errorf("%s is still %q (reason %q) after its recovery", id, d.Status, d.PauseReason)
 		}
 	}
 

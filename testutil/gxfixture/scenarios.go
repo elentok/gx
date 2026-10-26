@@ -1,9 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"maps"
 	"net"
+	"os"
+	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/conversations"
@@ -57,7 +62,14 @@ type scenario struct {
 	// (the "started" marker). It is called with the time of seeding, so the days
 	// it picks stay inside the stats range.
 	conversations func(now time.Time) (started time.Time, recs []conversations.Record)
+	// recommend stores an investigate recommendation on the open round of a
+	// paused ticket, by ticket address.
+	recommend map[string]recommendation
+	// gitSetup shapes the project repo (branches, a dirty checkout) after its first commit.
+	gitSetup func(f *fixture, repo string) error
 }
+
+type recommendation struct{ verb, diagnosis string }
 
 var scenarios = map[string]scenario{
 	// empty: a project with no epics, so the Epics page has no cards.
@@ -107,6 +119,8 @@ var scenarios = map[string]scenario{
 				{"05", "resolve-conflict", servertest.TicketOpts{PauseReason: "merge-conflict"}},
 				{"06", "retry", servertest.TicketOpts{PauseReason: "zero-commit"}},
 				{"07", "repair", servertest.TicketOpts{PauseReason: "iteration-error"}},
+				{"08", "manual", servertest.TicketOpts{PauseReason: "manual"}},
+				{"09", "recommended", servertest.TicketOpts{PauseReason: "iteration-error"}},
 			}},
 			{project, "approve-epic", []ticket{
 				{"01", "approve", servertest.TicketOpts{}},
@@ -114,6 +128,17 @@ var scenarios = map[string]scenario{
 		},
 		behaviour: map[string]string{project + ":approve-epic/01": agentfake.BehaviourPermission},
 		queue:     []string{project + ":approve-epic"},
+		recommend: map[string]recommendation{
+			project + ":paused-epic/09": {"retry", "The run hit a transient error; retrying should work."},
+		},
+		// A merge-conflict pause keeps its iteration branch and the epic's feature
+		// worktree, so Merge again has something to merge into.
+		gitSetup: func(f *fixture, repo string) error {
+			if err := f.git(repo, "worktree", "add", "-b", "paused-epic", filepath.Join(repo, ".worktrees", "paused-epic")); err != nil {
+				return err
+			}
+			return f.commitOnBranch(repo, "ralph-loop/paused-epic-item-05", "conflict.txt", "branch")
+		},
 	},
 	// design: a map epic at the Resolve tickets step, with open tickets. Its
 	// design session replays fakeclaude's scripted chat. Its implementation
@@ -180,6 +205,21 @@ var scenarios = map[string]scenario{
 			project + ":one-offs/02",
 		},
 		openDesigns: []string{project + ":design-question", project + ":design-live"},
+	},
+	// dirty-trunk: a complete epic whose merge is paused because trunk's checkout
+	// holds an uncommitted same.txt that the epic's branch also adds, so
+	// restoring the stash after the merge conflicts.
+	"dirty-trunk": {
+		epics: []epic{{project, "dirty-epic", []ticket{
+			{"01", "built", servertest.TicketOpts{Status: "done"}},
+		}}},
+		epicMeta: map[string]string{project + ":dirty-epic": dirtyTrunkMeta("same.txt")},
+		gitSetup: func(f *fixture, repo string) error {
+			if err := f.commitOnBranch(repo, "dirty-epic", "same.txt", "branch"); err != nil {
+				return err
+			}
+			return os.WriteFile(filepath.Join(repo, "same.txt"), []byte("local"), 0o644)
+		},
 	},
 	// many-done: an epic with five merged tickets closed at different times, and
 	// one open ticket.
@@ -276,6 +316,7 @@ func unitedEpics() []epic {
 		{project, "deadlock-epic", open},
 		{project, "blocked-merge-epic", done},
 		{project, "awaiting-epic", done},
+		{project, "dirty-trunk-epic", done},
 		{project, "design-question", nil},
 		{project, "design-stopped", nil},
 		// In progress.
@@ -317,6 +358,7 @@ func unitedMeta() map[string]string {
 	}
 	return map[string]string{
 		project + ":blocked-merge-epic":   "status: open\nland_block_reason: needs a rebase\n",
+		project + ":dirty-trunk-epic":     dirtyTrunkMeta("a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt", "g.txt"),
 		project + ":deadlock-epic":        "status: open\nblocked_by: [\"ready-epic\"]\n",
 		project + ":draft-epic":           "status: draft\n",
 		project + ":publishing-epic-impl": "status: draft\n",
@@ -325,6 +367,33 @@ func unitedMeta() map[string]string {
 		"auto:finished-c":                 merged("03"),
 		project + ":one-offs":             "status: draft\n",
 	}
+}
+
+// dirtyTrunkMeta is the epic frontmatter of a merge paused on a dirty trunk,
+// with the full clashing file list stored as the server stores it.
+func dirtyTrunkMeta(files ...string) string {
+	reason := fmt.Sprintf("uncommitted changes on main clash with %s; commit or discard them, then merge again", strings.Join(files[:min(len(files), 5)], ", "))
+	if extra := len(files) - 5; extra > 0 {
+		reason += fmt.Sprintf(" (+%d more)", extra)
+	}
+	return "status: open\nland_block_kind: dirty-trunk\nland_block_reason: " + strconv.Quote(reason) +
+		"\nland_block_files: [" + strings.Join(files, ", ") + "]\n"
+}
+
+// commitOnBranch creates branch off main with one committed file and returns to main.
+func (f *fixture) commitOnBranch(repo, branch, file, content string) error {
+	if err := f.git(repo, "checkout", "-b", branch); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(repo, file), []byte(content), 0o644); err != nil {
+		return err
+	}
+	for _, args := range [][]string{{"add", file}, {"commit", "-m", branch}, {"checkout", "main"}} {
+		if err := f.git(repo, args...); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func scenarioNames() []string {
