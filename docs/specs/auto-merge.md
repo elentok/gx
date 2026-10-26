@@ -85,6 +85,9 @@ From the person's view:
 
 ### Retry cap
 
+> Stories 10 and 11 and the retry-cap rule are changed by `docs/specs/recover-merge-error.md`: the
+> cap is three merge tickets, and the cap pause has kind `needs-rebase`.
+
 10. As a project owner, I want a second merge ticket if trunk moved again during the first, so that
     one unlucky race does not need me.
 11. As a project owner, I want the root to park ("needs rebase … then merge again") once the epic has

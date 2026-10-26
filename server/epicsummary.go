@@ -76,7 +76,7 @@ type EpicSummary struct {
 	// MergeBlocked is set on a Paused epic whose last merge failed, so clients
 	// keep offering the merge action.
 	MergeBlocked bool `json:"merge_blocked,omitempty"`
-	// MergeBlockKind is the pause reason of a blocked merge; empty for a needs-rebase block.
+	// MergeBlockKind is the pause reason of a blocked merge.
 	MergeBlockKind string `json:"merge_block_kind,omitempty"`
 }
 

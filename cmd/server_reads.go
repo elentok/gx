@@ -501,11 +501,7 @@ func runServerQueueWrite(ctx context.Context, cl *apiclient.Client, w io.Writer,
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
 	}
 	if res.Paused {
-		kind := res.PauseKind
-		if kind == "" {
-			kind = "needs-rebase"
-		}
-		return fmt.Errorf("paused (%s): %s", kind, res.Message)
+		return fmt.Errorf("paused (%s): %s", res.PauseKind, res.Message)
 	}
 	if res.Merged {
 		_, err := fmt.Fprintln(w, "merged")

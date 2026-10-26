@@ -109,7 +109,7 @@ func (d mergeDecision) sendNotice() bool {
 	case outcomeCompleted:
 		return d.first
 	case outcomePaused:
-		return d.result.PauseKind != "" || d.first
+		return d.result.PauseKind != string(events.NeedsRebase) || d.first
 	}
 	return false
 }
@@ -157,7 +157,7 @@ func (s *Server) mergeEpic(root rootRef, one ralphloop.OneIteration, repo string
 		// A non-ff below the cap is not an outcome: the merge ticket makes the
 		// epic not all-done, so the root stays queued and its finish merges again.
 		// The ticket is never manual, even under force: it counts against the cap.
-		if reason != "" && kind == "" {
+		if reason != "" && kind == events.NeedsRebase {
 			if id := s.forkMergeTicket(root, e, target, false); id != "" {
 				return mergeDecision{result: QueueResult{MergeTicket: tickets.Address{Project: project, Epic: root.Epic, ID: id}.String()}, outcome: outcomeMergeTicket}
 			}
@@ -214,8 +214,7 @@ func (s *Server) actOnMerge(root rootRef, one ralphloop.OneIteration, dir string
 	return d.result
 }
 
-// pauseRoot reports the pause of e's all-done root; an empty kind is a
-// needs-rebase pause.
+// pauseRoot reports the pause of e's all-done root.
 func (s *Server) pauseRoot(root rootRef, one ralphloop.OneIteration, dir string, e tickets.Epic, d mergeDecision) {
 	project := root.Project
 	reason, kind := d.result.Message, d.result.PauseKind
@@ -227,9 +226,9 @@ func (s *Server) pauseRoot(root rootRef, one ralphloop.OneIteration, dir string,
 	if s.chat.Enabled() {
 		s.chat.Pause(project, s.chatOverride(project), one.Epic, one.Ticket.Path, one.Ticket.Identifier, string(schema.StatusLegacyAnswer), events.Kind(kind), reason, ralphloop.CountsOf(e))
 	}
-	// Only a needs-rebase pause, the one without a kind, is the
-	// epic's outcome; any other pause waits on a person's fix and then merges.
-	if kind == "" {
+	// Only a needs-rebase pause is the epic's outcome; any other pause waits on
+	// a person's fix and then merges.
+	if kind == string(events.NeedsRebase) {
 		s.notifyEpicOutcome(project, dir, one, e, false)
 	}
 }
@@ -342,12 +341,9 @@ func (s *Server) clearMergeBlock(root rootRef, epicPath string) {
 }
 
 // storeMergeBlock records a pause's kind and reason on the epic, so the epic's
-// state outlives the event and a server restart. A needs-rebase pause has no kind.
+// state outlives the event and a server restart.
 func (s *Server) storeMergeBlock(root rootRef, epicPath string, kind events.Kind, reason string) {
-	fields := map[string]any{mergeBlockReasonKey: reason}
-	if kind != "" {
-		fields[mergeBlockKindKey] = string(kind)
-	}
+	fields := map[string]any{mergeBlockReasonKey: reason, mergeBlockKindKey: string(kind)}
 	if err := tickets.StampEpicFields(epicPath, fields); err != nil {
 		s.log.Warn("store merge block", "root", root, "err", err)
 	}
@@ -371,7 +367,7 @@ func (s *Server) nothingToMerge(project string, epics []tickets.Epic, one ralphl
 
 // mergeRoot fast-forwards the root's target to its feature branch through the
 // merge core. A non-empty reason means the root must pause, not merge; kind
-// names the pause's cause, empty for a needs-rebase one. Every error pauses the
+// names the pause's cause. Every error pauses the
 // root: one left all-done in the queue looks stuck.
 func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.OneIteration, repoDir string) (reason string, kind events.Kind) {
 	_, _, target, err := s.epicRefs(project, epics, one.Epic, repoDir)
@@ -392,7 +388,7 @@ func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.O
 		// Trunk moved outside the server between git's ff check and the ff:
 		// that is a non-ff, not a failed merge.
 		if ancestor, aerr := git.IsAncestor(info.Repo.Root, "refs/heads/"+target, one.Epic); aerr == nil && !ancestor {
-			return needsRebase, ""
+			return needsRebase, events.NeedsRebase
 		}
 		// No pre-check: git decides whether local changes block the merge, and
 		// only a refused merge looks at them.
@@ -407,7 +403,7 @@ func (s *Server) mergeRoot(project string, epics []tickets.Epic, one ralphloop.O
 	if out.Merged {
 		return "", ""
 	}
-	return needsRebase, ""
+	return needsRebase, events.NeedsRebase
 }
 
 // refsFailed is the pause reason and kind for an epic whose refs can't be

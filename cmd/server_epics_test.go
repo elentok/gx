@@ -128,7 +128,7 @@ func TestServerEpicsMerge_PrintsEachOutcome(t *testing.T) {
 		"forked": {res: server.QueueResult{MergeTicket: "proj:epic/07"}, out: "proj:epic/07\n"},
 		"paused": {res: server.QueueResult{Paused: true, PauseKind: "conflict", Message: "merge conflict in a.go"},
 			errPart: "paused (conflict): merge conflict in a.go"},
-		"paused needs-rebase": {res: server.QueueResult{Paused: true, Message: "branch is behind trunk"},
+		"paused needs-rebase": {res: server.QueueResult{Paused: true, PauseKind: "needs-rebase", Message: "branch is behind trunk"},
 			errPart: "paused (needs-rebase): branch is behind trunk"},
 	}
 	for _, code := range []string{

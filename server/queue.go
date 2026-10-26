@@ -62,7 +62,7 @@ type QueueResult struct {
 	ExtraUsage bool `json:"extra_usage,omitempty"`
 	// Merged, MergeTicket and Paused are an epic merge's outcome: a direct
 	// merge, the address of the merge ticket it forked, or a pause of the root
-	// with PauseKind (empty for a needs-rebase pause) and Message.
+	// with PauseKind and Message.
 	Merged      bool   `json:"merged,omitempty"`
 	MergeTicket string `json:"merge_ticket,omitempty"`
 	Paused      bool   `json:"parked,omitempty"`

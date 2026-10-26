@@ -10,7 +10,7 @@ import (
 )
 
 // maxMergeTickets is how many merge tickets one run gets before the root pauses.
-const maxMergeTickets = 2
+const maxMergeTickets = 3
 
 // mergeTicketsThisRun counts e's merge tickets from the latest manual one
 // onward, that one included; all of them when none is manual. The store is the

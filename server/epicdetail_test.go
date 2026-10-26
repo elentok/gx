@@ -186,6 +186,17 @@ func TestEpicDetail_MergeBlockedCarriesKindAndReason(t *testing.T) {
 	}
 }
 
+func TestEpicDetail_StoredReasonWithoutKindReadsAsNeedsRebase(t *testing.T) {
+	h, base := startEpicDetail(t, func(store string) {
+		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
+		writeEpicFiles(t, store, "legacy", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_reason: needs rebase of legacy onto main\n---\n", done)
+	})
+	_, d, body := getEpicDetail(t, h, base, "proj:legacy")
+	if d.MergeBlockKind != "needs-rebase" {
+		t.Errorf("kind = %q, want needs-rebase (%s)", d.MergeBlockKind, body)
+	}
+}
+
 func TestEpicDetail_Queueable(t *testing.T) {
 	h, base := startEpicDetail(t, func(store string) {
 		open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}

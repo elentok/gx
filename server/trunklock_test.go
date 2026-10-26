@@ -66,7 +66,7 @@ func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *t
 	if len(completed) != 1 || len(paused) != 1 {
 		t.Fatalf("completed %+v, paused %+v, want one each", completed, paused)
 	}
-	if p := paused[0]; p.Kind != "" || !strings.HasPrefix(p.Message, "needs rebase: ") {
+	if p := paused[0]; p.Kind != "needs-rebase" || !strings.HasPrefix(p.Message, "needs rebase: ") {
 		t.Errorf("pause = kind %q, reason %q, want a needs-rebase pause", p.Kind, p.Message)
 	}
 	merged := strings.TrimPrefix(completed[0].Address, "proj:")
@@ -121,7 +121,7 @@ func TestTrunkLock_TrunkMovedBeforeTheFFPausesNeedsRebaseNotMergeFailed(t *testi
 
 	ev := f.pauseRoot(t)
 
-	if ev.Kind != "" || ev.Message != "needs rebase: "+schedEpic+" onto main; rebase it, then merge again" {
+	if ev.Kind != "needs-rebase" || ev.Message != "needs rebase: "+schedEpic+" onto main; rebase it, then merge again" {
 		t.Errorf("pause = kind %q, reason %q, want a needs-rebase pause", ev.Kind, ev.Message)
 	}
 	f.assertRootQueued(t)

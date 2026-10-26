@@ -18,11 +18,12 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-// atMergeCap adds two done merge tickets to an epic's tickets: its run has
-// used both, so its next non-ff pauses the root instead of forking.
+// atMergeCap adds three done merge tickets to an epic's tickets: its run has
+// used them all, so its next non-ff pauses the root instead of forking.
 func atMergeCap(opts map[string]servertest.TicketOpts) map[string]servertest.TicketOpts {
 	opts["02"] = servertest.TicketOpts{Type: "merge", Status: "done"}
 	opts["03"] = servertest.TicketOpts{Type: "merge", Status: "done"}
+	opts["04"] = servertest.TicketOpts{Type: "merge", Status: "done"}
 	return opts
 }
 
@@ -155,7 +156,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 	waitUntil(t, "the dependent to launch", func() bool { return f.others.Load() > 0 })
 }
 
-func TestMergeFork_TrunkMovingAgainForksASecondThenPausesAtTheCap(t *testing.T) {
+func TestMergeFork_TrunkMovingTwiceForksAThirdThenPausesAtTheCap(t *testing.T) {
 	f := newForkFixture(t, nil)
 	// Trunk moves between each merge ticket's finish and its merge: moving it
 	// inside the agent's turn would fail the finish check instead.
@@ -169,15 +170,15 @@ func TestMergeFork_TrunkMovingAgainForksASecondThenPausesAtTheCap(t *testing.T) 
 
 	ev := f.pauseRoot(t)
 
-	if want := "needs rebase: " + schedEpic + " onto main; rebase it, then merge again"; ev.Kind != "" || ev.Message != want {
-		t.Errorf("pause = kind %q, reason %q, want reason %q", ev.Kind, ev.Message, want)
+	if want := "needs rebase: " + schedEpic + " onto main; rebase it, then merge again"; ev.Kind != string(events.NeedsRebase) || ev.Message != want {
+		t.Errorf("pause = kind %q, reason %q, want kind %q, reason %q", ev.Kind, ev.Message, events.NeedsRebase, want)
 	}
-	if got := f.merges.Load(); got != 2 {
-		t.Errorf("merge turns = %d, want 2", got)
+	if got := f.merges.Load(); got != 3 {
+		t.Errorf("merge turns = %d, want 3", got)
 	}
 	files := f.mergeTicketFiles(t)
-	if len(files) != 2 {
-		t.Fatalf("merge tickets = %v, want two", files)
+	if len(files) != 3 {
+		t.Fatalf("merge tickets = %v, want three", files)
 	}
 	for _, path := range files {
 		if body := readFile(t, path); !strings.Contains(body, "status: done") {

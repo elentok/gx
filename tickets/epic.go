@@ -103,8 +103,8 @@ type Epic struct {
 	HadCodex     bool
 	Friction     *schema.FrictionSummary
 	// MergeBlockKind and MergeBlockReason are why the last merge paused the epic;
-	// the merge step clears both before it decides. The kind is empty for a
-	// needs-rebase pause.
+	// the merge step clears both before it decides. A stored reason with no kind
+	// loads as needs-rebase.
 	MergeBlockKind   string
 	MergeBlockReason string
 	// MergeTarget is the branch the epic merges into. Only a server snapshot

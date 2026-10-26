@@ -382,7 +382,7 @@ func TestEpicMerge_TrunkMovingDuringTheMergeAtTheCapPauses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertMergePaused(t, res, "")
+	assertMergePaused(t, res, events.NeedsRebase)
 	if files := f.mergeTicketFiles(t); len(files) != 0 {
 		t.Errorf("forked merge tickets = %v, want none past the cap", files)
 	}
@@ -485,7 +485,7 @@ func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testi
 func TestEpicMerge_ManualTicketResetsTheCapAndResumesTheRoot(t *testing.T) {
 	f := newForkFixtureWith(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), nil)
 	ev := f.pauseRoot(t)
-	if ev.Kind != "" {
+	if ev.Kind != string(events.NeedsRebase) {
 		t.Fatalf("pause kind = %q (%s), want a needs-rebase pause", ev.Kind, ev.Message)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -496,7 +496,7 @@ func TestEpicMerge_ManualTicketResetsTheCapAndResumesTheRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.assertManualTicket(t, res, "04")
+	f.assertManualTicket(t, res, "05")
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "proj:"+schedEpic)
 
 	if got := f.merges.Load(); got != 1 {

@@ -115,7 +115,7 @@ type EpicDetail struct {
 	// queued is not waiting for a slot.
 	Queued bool `json:"queued"`
 	// MergeBlockKind and MergeBlockReason describe why a Merge blocked epic's last
-	// merge paused; the kind is empty for a needs-rebase pause.
+	// merge paused.
 	MergeBlockKind   string `json:"land_block_kind,omitempty"`
 	MergeBlockReason string `json:"land_block_reason,omitempty"`
 	// Steps is a map epic's Progress, and ImplAddress the address of its impl epic once it exists.

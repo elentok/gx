@@ -365,6 +365,10 @@ func loadEpicTicketMD(epic *Epic) {
 	epic.Friction = wire.Friction
 	epic.MergeBlockKind = wire.MergeBlockKind
 	epic.MergeBlockReason = wire.MergeBlockReason
+	// Roots paused before the kind was stored carry a reason and no kind.
+	if epic.MergeBlockKind == "" && epic.MergeBlockReason != "" {
+		epic.MergeBlockKind = "needs-rebase"
+	}
 	loadEpicEvolveFields(epic, fm)
 }
 
