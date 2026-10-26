@@ -22,7 +22,6 @@ const row = (name: string, project = "gx", over: Partial<EpicListRow> = {}): Epi
   queued: false,
   queueable: false,
   blocked_by_epics: [],
-  picker_section: "in-progress",
   ...over,
 });
 

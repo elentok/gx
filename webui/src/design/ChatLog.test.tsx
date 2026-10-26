@@ -73,7 +73,6 @@ function renderChat(sessions: SessionInfo[], fetchChat: FetchChat, prompt?: Post
             queued: false,
             queueable: false,
             blocked_by_epics: [],
-            picker_section: "in-progress",
           },
         ],
         follow_ups: [],

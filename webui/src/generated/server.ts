@@ -601,18 +601,6 @@ export const ProgressCreateTickets: ProgressStep = "create-tickets";
 export const ProgressBranch: ProgressStep = "branch";
 export const ProgressDone: ProgressStep = "done";
 /**
- * PickerSection is the Designs picker section a map row belongs to.
- */
-export type PickerSection = string;
-export const PickerInProgress: PickerSection = "in-progress";
-export const PickerNotStarted: PickerSection = "not-started";
-export const PickerReadyToQueue: PickerSection = "ready-to-queue";
-export const PickerRecentlyFinished: PickerSection = "recently-finished";
-/**
- * PickerNone: finished more than 7 days ago; the row stays on the Epics page.
- */
-export const PickerNone: PickerSection = "none";
-/**
  * EpicListRow is one epic of the /v1/epics payload.
  */
 export interface EpicListRow {
@@ -658,13 +646,10 @@ export interface EpicListRow {
    */
   progress_step?: ProgressStep;
   /**
-   * PickerSection, PickerSortAt and ImplAddress are set only on a map row.
-   * PickerSortAt is the time the section sorts by; ImplAddress is the
-   * implementation epic's address when it exists.
+   * QueueSlot is the 1-based slot of the row's loop epic in the queue, 0 when it
+   * is not queued. A joined card carries its -impl epic's slot.
    */
-  picker_section?: PickerSection;
-  picker_sort_at?: string;
-  impl_address?: string;
+  queue_slot?: number /* int */;
   /**
    * The card fields below are set on loop epic rows. A joined card carries both
    * of its epics' addresses in Addresses, the active part first.

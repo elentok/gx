@@ -10,7 +10,7 @@ afterEach(cleanup);
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
-const map = (name: string, picker_section: EpicListRow["picker_section"], over: Partial<EpicListRow> = {}): EpicListRow => ({
+const map = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   address: `gx:${name}`,
   project: "gx",
   name,
@@ -21,8 +21,6 @@ const map = (name: string, picker_section: EpicListRow["picker_section"], over: 
   queued: false,
   queueable: false,
   blocked_by_epics: [],
-  picker_section,
-  picker_sort_at: hoursAgo(5),
   ...over,
 });
 
@@ -97,7 +95,7 @@ function render(epics: EpicListRow[], sessions: SessionInfo[], path = "/d/gx:a",
 }
 
 test("the title row holds a back link, the Design name and the Sessions control, with no picker or state label", async () => {
-  render([map("a", "in-progress"), map("b", "in-progress")], [session("a", { status: { state: "working" } })]);
+  render([map("a"), map("b")], [session("a", { status: { state: "working" } })]);
   const title = await screen.findByRole("heading", { level: 1 });
   expect(within(title).getByRole("button", { name: /^a/ })).toBeTruthy();
   expect(screen.getByRole("link", { name: "← Epics" }).getAttribute("href")).toBe("/epics");
@@ -110,14 +108,14 @@ test("the title row holds a back link, the Design name and the Sessions control,
 });
 
 test("without a session the title row offers to start one", async () => {
-  render([map("a", "in-progress")], []);
+  render([map("a")], []);
   expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy();
 });
 
 const progress = async () => within(await screen.findByRole("region", { name: "Progress" }));
 
 test("Progress shows the eight steps with their marks and the server's labels", async () => {
-  render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ steps: stepsAt(2) }));
+  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(2) }));
   const p = await progress();
   await p.findByText("Spec");
   const steps = p.getAllByRole("listitem").filter((li) => li.hasAttribute("data-step"));
@@ -131,7 +129,7 @@ test("while Resolve tickets is current its tickets show: closed folded, current 
     ticketRow("03", "Chat content", { current: true }),
     ticketRow("04", "Later one", { blocked: true }),
   ];
-  render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ rows, total: 4, done: 2 }));
+  render([map("a")], [], "/d/gx:a", detailOf({ rows, total: 4, done: 2 }));
   const p = await progress();
   expect(await p.findByText("2 closed · 1 cancelled")).toBeTruthy();
   expect(p.queryByText("Chart it")).toBeNull();
@@ -142,22 +140,22 @@ test("while Resolve tickets is current its tickets show: closed folded, current 
 });
 
 test("the tickets show only while Resolve tickets is current", async () => {
-  render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ steps: stepsAt(2), rows: [ticketRow("03", "Chat content", { current: true })] }));
+  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(2), rows: [ticketRow("03", "Chat content", { current: true })] }));
   const p = await progress();
   await p.findByText("Spec");
   expect(p.queryByText("Chat content")).toBeNull();
 });
 
 test("the implementation epic link shows only at Branch and Done, once the epic exists", async () => {
-  render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ steps: stepsAt(6) }));
+  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(6) }));
   await progress();
   expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
   cleanup();
-  render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ steps: stepsAt(5), impl_address: "gx:a-impl" }));
+  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(5), impl_address: "gx:a-impl" }));
   await progress();
   expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
   cleanup();
-  render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ steps: stepsAt(6), impl_address: "gx:a-impl" }));
+  render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(6), impl_address: "gx:a-impl" }));
   const link = await screen.findByRole("link", { name: /Open implementation epic/ });
   expect(link.getAttribute("href")).toBe("#/e/gx:a-impl");
   expect(within(screen.getByRole("region", { name: "Chat" })).getByRole("link", { name: /Open implementation epic/ })).toBeTruthy();
@@ -167,7 +165,7 @@ test("on a phone Progress is a segment bar and a line that expands on tap", asyn
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   try {
     const rows = [ticketRow("02", "Done one", { rendered_status: "done" }), ticketRow("03", "Chat content", { current: true }), ticketRow("04", "Last")];
-    render([map("a", "in-progress")], [], "/d/gx:a", detailOf({ rows, impl_address: "gx:a-impl" }));
+    render([map("a")], [], "/d/gx:a", detailOf({ rows, impl_address: "gx:a-impl" }));
     const p = await progress();
     expect(await p.findByRole("progressbar", { name: "Design progress" })).toBeTruthy();
     const line = p.getByRole("button", { name: /^Resolve tickets · 03 Chat content \(2 of 3\)/ });

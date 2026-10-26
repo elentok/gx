@@ -68,9 +68,8 @@ func joinImplementation(row *EpicListRow, impl *EpicListRow, act designActivity)
 	m := *row
 	*row = *impl
 	row.Address, row.Name, row.Kind, row.ProgressStep = m.Address, m.Name, m.Kind, m.ProgressStep
-	// The map keeps its own timestamps and picker placement.
+	// The map keeps its own timestamps; the queue slot stays the impl epic's.
 	row.CreatedAt, row.CompletedAt, row.QueuedAt, row.LastActivityAt = m.CreatedAt, m.CompletedAt, m.QueuedAt, m.LastActivityAt
-	row.PickerSection, row.PickerSortAt, row.ImplAddress = m.PickerSection, m.PickerSortAt, m.ImplAddress
 	row.Actions = make([]CardAction, len(impl.Actions))
 	for i, a := range impl.Actions {
 		a.Target = cmp.Or(a.Target, impl.Address)

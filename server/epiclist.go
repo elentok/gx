@@ -53,18 +53,6 @@ const (
 	ProgressDone           = tickets.StepDone
 )
 
-// PickerSection is the Designs picker section a map row belongs to.
-type PickerSection string
-
-const (
-	PickerInProgress       PickerSection = "in-progress"
-	PickerNotStarted       PickerSection = "not-started"
-	PickerReadyToQueue     PickerSection = "ready-to-queue"
-	PickerRecentlyFinished PickerSection = "recently-finished"
-	// PickerNone: finished more than 7 days ago; the row stays on the Epics page.
-	PickerNone PickerSection = "none"
-)
-
 // followUpsEpicName is every project's contributor outbox epic.
 const followUpsEpicName = "follow-ups"
 
@@ -97,12 +85,9 @@ type EpicListRow struct {
 	MergeBlockReason string `json:"land_block_reason,omitempty"`
 	// ProgressStep is set only on a map row.
 	ProgressStep ProgressStep `json:"progress_step,omitempty"`
-	// PickerSection, PickerSortAt and ImplAddress are set only on a map row.
-	// PickerSortAt is the time the section sorts by; ImplAddress is the
-	// implementation epic's address when it exists.
-	PickerSection PickerSection `json:"picker_section,omitempty"`
-	PickerSortAt  time.Time     `json:"picker_sort_at,omitzero"`
-	ImplAddress   string        `json:"impl_address,omitempty"`
+	// QueueSlot is the 1-based slot of the row's loop epic in the queue, 0 when it
+	// is not queued. A joined card carries its -impl epic's slot.
+	QueueSlot int `json:"queue_slot,omitempty"`
 
 	// The card fields below are set on loop epic rows. A joined card carries both
 	// of its epics' addresses in Addresses, the active part first.
@@ -221,13 +206,12 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 		for _, e := range epics {
 			list.Epics = append(list.Epics, s.oneOffCards(project, e)...)
 		}
-		now := time.Now()
 		for _, e := range epics {
 			if epicListed(e) && !joinedImpl(e, byName) {
 				row := s.epicListRow(project, e)
 				row.BlockedByEpics = unmergedBlockers(project, e, merged)
 				if e.IsMap {
-					s.decorateMapRow(&row, project, e, byName, designs[row.Address], now)
+					s.decorateMapRow(&row, project, e, byName, designs[row.Address])
 				}
 				list.Epics = append(list.Epics, row)
 			}
@@ -241,15 +225,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 	}
 	list.RecentlyFinished = s.settings.Load().RecentlyFinished
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
-	sortCards(list.Epics, func(r EpicListRow) int {
-		// A joined card queues under its -impl epic, whichever part is active.
-		impl := r.Address
-		if r.ImplAddress != "" {
-			impl = r.ImplAddress
-		}
-		_, epic, _ := strings.Cut(impl, ":")
-		return s.rootQueuePosition(rootRef{Project: r.Project, Epic: epic})
-	})
+	sortCards(list.Epics, func(r EpicListRow) int { return r.QueueSlot })
 	writeJSON(w, list)
 }
 
@@ -262,9 +238,8 @@ func joinedImpl(e tickets.Epic, byName map[string]tickets.Epic) bool {
 }
 
 // decorateMapRow adds the map-only fields to a listed map epic's row.
-func (s *Server) decorateMapRow(row *EpicListRow, project string, e tickets.Epic, byName map[string]tickets.Epic, design designActivity, now time.Time) {
+func (s *Server) decorateMapRow(row *EpicListRow, project string, e tickets.Epic, byName map[string]tickets.Epic, design designActivity) {
 	row.ProgressStep = mapProgress(e)
-	row.PickerSection, row.PickerSortAt, row.ImplAddress = s.mapPicker(project, e, row.ProgressStep, byName, design, now)
 	var impl *EpicListRow
 	if implEpic, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
 		r := s.epicListRow(project, implEpic)
@@ -333,7 +308,8 @@ func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}
 	if !e.IsMap {
-		decorateLoopCard(&row, s.rootQueuePosition(root))
+		row.QueueSlot = s.rootQueuePosition(root)
+		decorateLoopCard(&row, row.QueueSlot)
 		if n, ok := s.loopNeedsYou(root, e, row.State); ok {
 			row.Section, row.StatePill, row.Reason, row.WaitingSince = SectionNeedsYou, n.Pill, n.Reason, n.Since
 			row.Actions = []CardAction{n.Action}

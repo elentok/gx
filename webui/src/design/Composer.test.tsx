@@ -132,7 +132,6 @@ function render(opts: {
             queued: false,
             queueable: false,
             blocked_by_epics: [],
-            picker_section: "in-progress",
           },
         ],
         follow_ups: [],

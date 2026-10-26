@@ -52,7 +52,7 @@ function render(focus: PostFocus) {
     appRoutes({
       epicList: async () => ({
         epics: [
-          { address: "gx:a", project: "gx", name: "a", kind: "map", state: "designing", done: 0, total: 0, queued: false, queueable: false, blocked_by_epics: [], picker_section: "in-progress" },
+          { address: "gx:a", project: "gx", name: "a", kind: "map", state: "designing", done: 0, total: 0, queued: false, queueable: false, blocked_by_epics: [] },
         ],
         follow_ups: [],
       }),

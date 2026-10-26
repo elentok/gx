@@ -143,3 +143,30 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 		t.Errorf("actions = %+v, want %+v", r.Actions, want)
 	}
 }
+
+func TestEpicList_JoinedCardCarriesImplQueueSlot(t *testing.T) {
+	tix := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "other", "---\nstatus: open\n---\n", tix)
+		writeEpicFiles(t, store, "queued", joinedMapMD("done"), tix)
+		writeEpicFiles(t, store, "queued-impl", "---\nstatus: open\n---\n", tix)
+		writeEpicFiles(t, store, "idle", joinedMapMD("done"), tix)
+		writeEpicFiles(t, store, "idle-impl", "---\nstatus: open\n---\n", tix)
+	})
+	for _, name := range []string{"other", "queued-impl"} {
+		if res, err := h.Client.QueueAdd(t.Context(), "proj:"+name, ""); err != nil || res.Refused {
+			t.Fatalf("queue add %s = %+v, %v", name, res, err)
+		}
+	}
+	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
+	got := map[string]server.EpicListRow{}
+	for _, r := range getEpicList(t, code, body).Epics {
+		got[r.Name] = r
+	}
+	if s := got["queued"].QueueSlot; s != 2 {
+		t.Errorf("queued card slot = %d, want its -impl epic's slot 2", s)
+	}
+	if s := got["idle"].QueueSlot; s != 0 {
+		t.Errorf("card with no queued impl slot = %d, want 0", s)
+	}
+}
