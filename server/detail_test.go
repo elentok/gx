@@ -58,6 +58,9 @@ func TestDetail_ZeroCommitOffersRetryOnly(t *testing.T) {
 	if want := []string{server.ActionRetry}; err != nil || !slices.Equal(d.Actions, want) {
 		t.Errorf("actions = %v, %v; want %v", d.Actions, err, want)
 	}
+	if got, want := d.ActionInfo[server.ActionRetry], (server.ActionInfo{Label: schema.VerbRetry.Label(), Tooltip: schema.VerbRetry.Tooltip()}); got != want {
+		t.Errorf("retry info = %+v, want %+v", got, want)
+	}
 }
 
 func TestDetail_ActionsFollowTheTable(t *testing.T) {

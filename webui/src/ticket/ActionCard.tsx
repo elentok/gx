@@ -1,16 +1,17 @@
 import { Box, Text } from "@chakra-ui/react";
-import { ActionAnswer, ActionResume, type TicketDetail } from "../generated/server";
+import { ActionAnswer, type TicketDetail } from "../generated/server";
 import type { Sent } from "./answer";
 import { AnswerForm } from "./AnswerForm";
 import { AnswerResult } from "./AnswerResult";
 import { PermissionCard } from "./PermissionCard";
-import { ResumeForm } from "./ResumeForm";
+import { isRecoverAction } from "./recover";
+import { RecoveryActions } from "./RecoveryActions";
 import { TicketReading } from "./TicketReading";
 
 const hasOpenQuestion = (detail: TicketDetail) => detail.latest?.outcome === "open";
 
 /** Whether anything on the page asks a person to act, or shows what they just did. */
-export function needsActionCard(detail: TicketDetail, sent: Sent | null, resumed: string): boolean {
+export function needsActionCard(detail: TicketDetail, sent: Sent | null): boolean {
   return (
     !!detail.error_reason ||
     hasOpenQuestion(detail) ||
@@ -18,9 +19,8 @@ export function needsActionCard(detail: TicketDetail, sent: Sent | null, resumed
     !!detail.permission ||
     !!detail.pause_text ||
     detail.actions.includes(ActionAnswer) ||
-    detail.actions.includes(ActionResume) ||
-    !!sent ||
-    resumed !== ""
+    detail.actions.some(isRecoverAction) ||
+    !!sent
   );
 }
 
@@ -40,19 +40,15 @@ const cardProps = {
 export function ActionCard({
   detail,
   sent,
-  resumed,
   onSent,
-  onResumed,
   refetch,
 }: {
   detail: TicketDetail;
   sent: Sent | null;
-  resumed: string;
   onSent: (sent: Sent) => void;
-  onResumed: (words: string) => void;
   refetch: () => void;
 }) {
-  if (!needsActionCard(detail, sent, resumed)) return null;
+  if (!needsActionCard(detail, sent)) return null;
 
   // A broken ticket has nothing to answer or resume, and the parser error is the only file text shown.
   if (detail.error_reason) {
@@ -94,19 +90,7 @@ export function ActionCard({
         }}
         onStale={refetch}
       />
-      {resumed && (
-        <Text role="status" aria-label="Resume result" mt="4">
-          Resumed ·{resumed}
-        </Text>
-      )}
-      <ResumeForm
-        detail={detail}
-        onDone={(words) => {
-          onResumed(words);
-          refetch();
-        }}
-        onStale={refetch}
-      />
+      <RecoveryActions detail={detail} onDone={refetch} onStale={refetch} />
     </Box>
   );
 }

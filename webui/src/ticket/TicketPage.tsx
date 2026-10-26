@@ -29,7 +29,6 @@ export function TicketPage({
   useConnectionState(conn);
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
   const [sent, setSent] = useState<Sent | null>(null);
-  const [resumed, setResumed] = useState("");
   const [showScreen, setShowScreen] = useState(false);
   const epicAddress = epicOfTicket(address);
   const backTo = `/e/${epicAddress}`;
@@ -58,15 +57,13 @@ export function TicketPage({
             <ActionCard
               detail={detail}
               sent={sent}
-              resumed={resumed}
               onSent={setSent}
-              onResumed={setResumed}
               refetch={refetch}
             />
             {!detail.parse_error && (
               <>
                 <TicketSections detail={detail} now={Date.now()} />
-                {!hasSections(detail) && !needsActionCard(detail, sent, resumed) && <NothingHere />}
+                {!hasSections(detail) && !needsActionCard(detail, sent) && <NothingHere />}
               </>
             )}
           </>

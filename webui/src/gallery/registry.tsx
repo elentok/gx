@@ -243,7 +243,7 @@ export const galleryEntries: GalleryEntry[] = [
       },
       {
         label: "attention",
-        node: <TicketLine id={ticket.address} title={ticket.title} tone="paused" reason="Worktree is dirty" hint="Fix it in the TUI" />,
+        node: <TicketLine id={ticket.address} title={ticket.title} tone="paused" reason="Worktree is dirty" hint="Open the ticket to fix it" />,
       },
       {
         label: "answered",

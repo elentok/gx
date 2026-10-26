@@ -121,6 +121,13 @@ export const RoundClosed = "closed";
  */
 export type Round = typeof RoundOpen | typeof RoundAnswered | typeof RoundClosed;
 /**
+ * ActionInfo is the text of one action's button.
+ */
+export interface ActionInfo {
+  label: string;
+  tooltip: string;
+}
+/**
  * DetailOption is one choice of an options question.
  */
 export interface DetailOption {
@@ -250,6 +257,11 @@ export interface TicketDetail {
    */
   bases?: string[];
   actions: string[];
+  /**
+   * ActionInfo gives each entry of Actions its button label and tooltip, from
+   * the pause-to-verb table, so the page holds no verb text of its own.
+   */
+  action_info?: { [key: string]: ActionInfo};
   /**
    * ErrorReason, ParseError and Path are set for an Error ticket. ParseError is
    * set only when the file fails to parse, and then the payload carries no body
@@ -569,7 +581,7 @@ export interface EpicDetail {
   queued: boolean;
   /**
    * MergeBlockKind and MergeBlockReason describe why a Merge blocked epic's last
-   * merge paused; the kind is empty for a needs-rebase pause.
+   * merge paused.
    */
   land_block_kind?: string;
   land_block_reason?: string;
@@ -845,7 +857,7 @@ export interface EpicSummary {
    */
   merge_blocked?: boolean;
   /**
-   * MergeBlockKind is the pause reason of a blocked merge; empty for a needs-rebase block.
+   * MergeBlockKind is the pause reason of a blocked merge.
    */
   merge_block_kind?: string;
 }

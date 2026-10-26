@@ -29,6 +29,23 @@ const (
 	RoundClosed   = "closed"
 )
 
+// ActionInfo is the text of one action's button.
+type ActionInfo struct {
+	Label   string `json:"label"`
+	Tooltip string `json:"tooltip"`
+}
+
+// actionInfo looks up each action's label and tooltip.
+func actionInfo(actions []string) map[string]ActionInfo {
+	out := make(map[string]ActionInfo, len(actions))
+	for _, a := range actions {
+		if v, ok := schema.VerbOfWord(a); ok {
+			out[a] = ActionInfo{Label: v.Label(), Tooltip: v.Tooltip()}
+		}
+	}
+	return out
+}
+
 // DetailOption is one choice of an options question.
 type DetailOption struct {
 	ID          string `json:"id"`
@@ -126,6 +143,9 @@ type TicketDetail struct {
 	// the resume sends the chosen one back as its base.
 	Bases   []string `json:"bases,omitempty"`
 	Actions []string `json:"actions"`
+	// ActionInfo gives each entry of Actions its button label and tooltip, from
+	// the pause-to-verb table, so the page holds no verb text of its own.
+	ActionInfo map[string]ActionInfo `json:"action_info,omitempty"`
 	// ErrorReason, ParseError and Path are set for an Error ticket. ParseError is
 	// set only when the file fails to parse, and then the payload carries no body
 	// or stats.
@@ -194,6 +214,7 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	rounds := tickets.Rounds(evs)
 	if len(rounds) == 0 {
 		d.Actions = detailActions(t, nil, false, d.Permission)
+		d.ActionInfo = actionInfo(d.Actions)
 		return d, nil
 	}
 	last := rounds[len(rounds)-1]
@@ -211,6 +232,7 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		}
 	}
 	d.Actions = detailActions(t, &last, gone, d.Permission)
+	d.ActionInfo = actionInfo(d.Actions)
 	if t.PausedClass() == schema.PauseClassAnswer && t.PauseReason == schema.PauseAmbiguousBase {
 		d.Bases = s.ambiguousBlockers(ref.addr)
 	}

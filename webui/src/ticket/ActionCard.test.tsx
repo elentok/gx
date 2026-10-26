@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import canned from "../canned-detail.json";
@@ -75,6 +75,7 @@ test("a Paused ticket shows its pause text in the card next to its action", asyn
     pause_text: "No commits",
     state: "tok-2",
     actions: ["retry"],
+    action_info: { retry: { label: "Retry", tooltip: "Start a fresh agent now." } },
   };
   renderTicket(() => detail);
   const c = await screen.findByRole("group", { name: "Action card" });
@@ -82,19 +83,115 @@ test("a Paused ticket shows its pause text in the card next to its action", asyn
   expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
 });
 
-test("a repair pause shows its text but no Retry the resume route would refuse", async () => {
-  const detail: TicketDetail = {
-    ...plain,
-    status: "needs-repair",
-    pause_reason: "iteration-error",
-    pause_text: "Agent crashed",
-    state: "tok-3",
-    actions: ["retry", "start-over"],
-  };
-  renderTicket(() => detail);
+const info = {
+  retry: { label: "Retry", tooltip: "Start a fresh agent now." },
+  "start-over": { label: "Start over", tooltip: "Throw away the work and run again." },
+  merge: { label: "Merge again", tooltip: "Merge the commits again." },
+  resume: { label: "Resume", tooltip: "Lift the pause." },
+  "reopen-and-retry": { label: "Reopen and retry", tooltip: "Reopen the ticket." },
+};
+const repair = (actions: (keyof typeof info)[], extra: Partial<TicketDetail> = {}): TicketDetail => ({
+  ...plain,
+  status: "needs-repair",
+  pause_reason: "iteration-error",
+  pause_text: "Agent crashed",
+  state: "tok-3",
+  actions,
+  action_info: info,
+  ...extra,
+});
+const posted = (fetchMock: ReturnType<typeof vi.fn>) =>
+  fetchMock.mock.calls.map(([url, init]) => [url, JSON.parse((init as RequestInit).body as string)]);
+
+test("a repair pause shows one button per action with its label and tooltip", async () => {
+  renderTicket(() => repair(["retry", "start-over"]));
   const c = await screen.findByRole("group", { name: "Action card" });
   expect(c.textContent).toContain("Agent crashed");
-  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Retry" }).getAttribute("title")).toBe("Start a fresh agent now.");
+  expect(screen.getByRole("button", { name: "Start over" }).getAttribute("title")).toBe(
+    "Throw away the work and run again.",
+  );
+  expect(screen.queryByRole("button", { name: "Merge again" })).toBeNull();
+});
+
+test("stranded-commits reads Reopen and retry", async () => {
+  renderTicket(() => repair(["reopen-and-retry"], { pause_reason: "stranded-commits" }));
+  expect(await screen.findByRole("button", { name: "Reopen and retry" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Merge commits" })).toBeNull();
+});
+
+test("Retry posts the state token and shows a success toast", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({})));
+  vi.stubGlobal("fetch", fetchMock);
+  renderTicket(() => repair(["retry", "start-over"]));
+  fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+  expect(await screen.findByText("Retry started")).toBeTruthy();
+  expect(posted(fetchMock)).toEqual([["/v1/tickets/retry", { address: "gx:demo/12", state: "tok-3" }]]);
+});
+
+test("Resume posts to the resume route and shows a success toast", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: { ticket: "12", status: "open" } })));
+  vi.stubGlobal("fetch", fetchMock);
+  renderTicket(() => repair(["resume", "start-over"], { pause_reason: "manual" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+  expect(await screen.findByText("Resumed")).toBeTruthy();
+  expect(posted(fetchMock)[0]).toEqual(["/v1/tickets/resume", { address: "gx:demo/12", state: "tok-3" }]);
+});
+
+test("Merge again posts to the merge route", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })));
+  vi.stubGlobal("fetch", fetchMock);
+  renderTicket(() => repair(["merge", "start-over"], { pause_reason: "merge-conflict" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Merge again" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+  expect(posted(fetchMock)[0]).toEqual(["/v1/tickets/merge", { address: "gx:demo/12", state: "tok-3" }]);
+});
+
+test("Start over asks for a reason first and never sends branch deletion", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })));
+  vi.stubGlobal("fetch", fetchMock);
+  renderTicket(() => repair(["retry", "start-over"]));
+  fireEvent.click(await screen.findByRole("button", { name: "Start over" }));
+  const dialog = screen.getByRole("dialog", { name: "Start over" });
+  expect(fetchMock).not.toHaveBeenCalled();
+  fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "wrong approach" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Start over" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+  const [url, body] = posted(fetchMock)[0]!;
+  expect(url).toBe("/v1/tickets/start-over");
+  expect(body).toEqual({ address: "gx:demo/12", state: "tok-3", reason: "wrong approach" });
+  expect(body).not.toHaveProperty("delete_branch");
+});
+
+test("a Retry refused because the agent is working offers Stop agent and retry, which sends stop", async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response(JSON.stringify({ refused: true, reason: "agent-working", message: "agent is still working" })),
+    )
+    .mockResolvedValueOnce(new Response(JSON.stringify({})));
+  vi.stubGlobal("fetch", fetchMock);
+  renderTicket(() => repair(["retry", "start-over"]));
+  fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Stop agent and retry" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  expect(posted(fetchMock)[1]).toEqual(["/v1/tickets/retry", { address: "gx:demo/12", state: "tok-3", stop: true }]);
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Stop agent and retry" })).toBeNull());
+});
+
+test("a stale refusal refetches the detail", async () => {
+  let fetched = 0;
+  const fetchMock = vi.fn(
+    async () => new Response(JSON.stringify({ refused: true, reason: "stale", message: "The pause changed." })),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  renderTicket(() => {
+    fetched++;
+    return repair(["retry", "start-over"]);
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+  const before = fetched;
+  await waitFor(() => expect(fetched).toBeGreaterThan(before));
 });
 
 test("an Answered ticket keeps the last question and the answer", async () => {
@@ -135,29 +232,6 @@ test("a sent answer keeps its result on screen after the refetch", async () => {
   await waitFor(() => expect(screen.queryByLabelText("Your answer")).toBeNull());
   expect(screen.getByRole("status", { name: "Answer result" })).toBeTruthy();
   expect(card()).toBeTruthy();
-});
-
-test("a sent action keeps its result on screen after the refetch", async () => {
-  let detail: TicketDetail = {
-    ...plain,
-    status: "needs-answer",
-    pause_reason: "manual",
-    state: "tok-3",
-    actions: ["resume"],
-  };
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () => {
-      detail = { ...plain, status: "open", actions: [] };
-      return new Response(JSON.stringify({ data: { ticket: "gx:demo/12", status: "reopened" } }));
-    }),
-  );
-  renderTicket(() => detail);
-  fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
-  const result = await screen.findByRole("status", { name: "Resume result" });
-  expect(result.textContent).toContain("reopened");
-  await waitFor(() => expect(screen.queryByRole("button", { name: "Resume" })).toBeNull());
-  expect(screen.getByRole("status", { name: "Resume result" })).toBeTruthy();
 });
 
 test("a done ticket and a plain open ticket show no card and no earlier rounds", async () => {

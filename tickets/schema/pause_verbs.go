@@ -73,6 +73,16 @@ func (v PauseVerb) Word() string {
 	return string(v)
 }
 
+// VerbOfWord is the verb that Word spells as w.
+func VerbOfWord(w string) (PauseVerb, bool) {
+	for v := range pauseVerbs {
+		if v.Word() == w {
+			return v, true
+		}
+	}
+	return "", false
+}
+
 // Describe is how a refusal names the ticket's status: "paused (repair:
 // iteration-error)" for a pause, else the stored status.
 func (t Ticket) Describe() string {
