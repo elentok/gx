@@ -54,6 +54,14 @@ The JSON line has these fields:
 Send SIGTERM to the fixture process (stop the background task). It shuts down the server and its
 agents and removes its state. Stop it even when the flow failed.
 
+## Porting e2e flows
+
+- Run one flow at a time with `make web-e2e` and Playwright's `-g <flow>`. A whole-file run makes
+  every wrong locator wait the full 60s timeout.
+- When you write an explore ticket for UI or e2e work, run the suite and check each locator and
+  card placement against the running UI. Reading the code is not enough. Record which flows fail
+  now.
+
 ## Reporting
 
 Say which flows you ran, which Pass lines held, and which did not, with what the page showed

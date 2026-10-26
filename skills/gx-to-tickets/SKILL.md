@@ -133,6 +133,11 @@ instead of one, blocked in sequence:
 This keeps each ticket within budget and avoids one session paying for both wide exploration and
 implementation.
 
+A UI or e2e explore ticket must run the suite and check locators and section placement against the
+running UI, not by reading code. Its findings must say which flows fail now. Write that into the
+explore ticket's acceptance criteria. The implement ticket then runs one flow at a time with
+`-g <flow>` (see `gx-ui-check`).
+
 An explore ticket stays `type: implement`. **Never publish a `type: research` ticket into an epic this
 skill produces.** A loop-driven epic contains work ralph-loop claims and closes; `research` is a
 diagnosis or a decision handed to a *person* to plan, which is why `gx-investigate` files one as
