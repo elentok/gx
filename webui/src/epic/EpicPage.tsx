@@ -1,12 +1,12 @@
 import { Box, Text } from "@chakra-ui/react";
-import { Fragment, useMemo } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { OpenDesign } from "../design/open";
 import { StartDesignButton } from "../design/SessionControls";
 import { useWide } from "../design/useWide";
 import { hasDesignSession, liveSessions } from "../design/view";
-import type { EpicListRow, SessionInfo } from "../generated/server";
+import type { EpicDetailRow, EpicListRow, SessionInfo } from "../generated/server";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { pageRing } from "./ring";
 import { MergeButton, isMergeable } from "../epics/MergeButton";
@@ -20,54 +20,59 @@ import { PageHeader } from "../page/PageHeader";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
-import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail";
-import { StatsSection } from "./StatsSection";
+import { MoreStats } from "./MoreStats";
 import { TicketCard } from "./TicketCard";
 import {
   cardMeta,
   designStatParts,
-  foldedTail,
-  loopStatParts,
-  idOf,
-  isCancelled,
+  doneHeading,
+  doneMeta,
+  doneRows,
   isFolded,
-  nestFolded,
+  loopStatParts,
   nestLive,
   rowContext,
+  type RowContext,
 } from "./rows";
 
+const DONE_SHOWN = 3;
+
+// The done cards under their divider: the newest few, then the rest on request (not remembered).
+function DoneGroup({ rows, ctx }: { rows: EpicDetailRow[]; ctx: RowContext }) {
+  const [all, setAll] = useState(false);
+  if (rows.length === 0) return null;
+  const done = doneRows(rows);
+  const shown = all ? done : done.slice(0, DONE_SHOWN);
+  return (
+    <Box mt="4" display="flex" flexDirection="column" gap="3">
+      <Box data-done-divider display="flex" alignItems="center" gap="3" color="text.muted" fontSize="sm">
+        <Box flex="1" borderTopWidth="1px" borderColor="border" />
+        {doneHeading(done)}
+        <Box flex="1" borderTopWidth="1px" borderColor="border" />
+      </Box>
+      {shown.map((r) => (
+        <TicketCard key={r.address} row={r} meta={doneMeta(r, ctx)} indent={0} />
+      ))}
+      {done.length > DONE_SHOWN && (
+        <Button tone="muted" emphasis="secondary" size="sm" onClick={() => setAll(!all)}>
+          {all ? "Show fewer" : `Show ${done.length - DONE_SHOWN} more`}
+        </Button>
+      )}
+    </Box>
+  );
+}
+
 function EpicBody({ detail, now, designLive }: { detail: EpicDetail; now: number; designLive: boolean }) {
-  const folded = detail.rows.filter(isFolded);
-  const cancelled = folded.filter(isCancelled).length;
   const ctx = rowContext(detail, now, designLive);
   return (
     <>
-      {folded.length > 0 && (
-        <Box as="details" mt="4">
-          <Box as="summary" color="tone.done.fg">
-            ✓ {folded.length - cancelled} done{cancelled > 0 && ` · ${cancelled} cancelled`}
-          </Box>
-          {nestFolded(detail.rows).map(({ row: r, indent }) => (
-            <Box key={r.address} data-fold-indent={indent} ml={indent * 6}>
-              <TicketLine
-                id={idOf(r.address)}
-                title={r.title}
-                address={r.address}
-                reason={foldedTail(r, ctx)}
-                tone={isCancelled(r) ? "muted" : "done"}
-                unclipped
-                inlineReason
-              />
-            </Box>
-          ))}
-        </Box>
-      )}
       <Box mt="4" display="flex" flexDirection="column" gap="3">
         {nestLive(detail.rows).map(({ row: r, indent }) => (
           <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} />
         ))}
       </Box>
+      <DoneGroup rows={detail.rows.filter(isFolded)} ctx={ctx} />
     </>
   );
 }
@@ -248,7 +253,7 @@ export function EpicPage({
           ) : (
             <EpicBody detail={detail} now={Date.now()} designLive={liveSessions(address, sessions).length > 0} />
           )}
-          <StatsSection detail={detail} />
+          <MoreStats detail={detail} />
         </>
       ) : (
         <Spinner label="Loading epic" />

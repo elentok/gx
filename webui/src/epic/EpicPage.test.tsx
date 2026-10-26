@@ -205,6 +205,88 @@ test("a needs-repair card is expanded with its status and reason; an error card 
   expect(within(error).getAllByRole("link")).toHaveLength(1);
 });
 
+const doneTk = (id: string, minute: number, over: object = {}) =>
+  tk(id, { rendered_status: "done", elapsed: 300, cost: 1.5, closed_at: `2026-01-01T10:${String(minute).padStart(2, "0")}:00Z`, ...over });
+const doneIds = () => [...document.querySelectorAll("[data-indent]")].map((c) => c.textContent);
+
+test("the done divider counts done and cancelled; it is the first item with no live rows", async () => {
+  live([doneTk("01", 1), doneTk("02", 2, { rendered_status: "cancelled" })]);
+  const divider = await screen.findByText("1 done, 1 cancelled");
+  expect(document.querySelector("[data-done-divider]")).toBe(divider);
+  expect(divider.parentElement?.firstElementChild).toBe(divider);
+  expect(divider.parentElement?.previousElementSibling?.querySelector("[data-indent]")).toBeNull();
+});
+
+test("the divider follows the live cards", async () => {
+  live([doneTk("01", 1), tk("02")]);
+  const divider = await screen.findByText("1 done");
+  expect(screen.getByText("title 02").compareDocumentPosition(divider) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+test("the done group shows the 3 newest, Show N more reveals the rest and Show fewer hides them", async () => {
+  live([doneTk("01", 1), doneTk("02", 4), doneTk("03", 2), doneTk("04", 3), doneTk("05", 0)]);
+  await screen.findByText("5 done");
+  expect(doneIds().map((t) => t?.slice(0, 2))).toEqual(["02", "04", "03"]);
+  fireEvent.click(screen.getByRole("button", { name: "Show 2 more" }));
+  expect(doneIds()).toHaveLength(5);
+  fireEvent.click(screen.getByRole("button", { name: "Show fewer" }));
+  expect(doneIds()).toHaveLength(3);
+});
+
+test("a done loop card shows time and cost; a cancelled one reads cancelled; a done fork says what it forks", async () => {
+  live([doneTk("01", 1, { parent: "gx:blog/09" }), doneTk("02", 2, { rendered_status: "cancelled" })]);
+  expect((await cardOf("01")).textContent).toContain("5m · $1.50 · fork of 09");
+  const cancelled = await cardOf("02");
+  expect(cancelled.textContent).toContain("cancelled");
+  expect(cancelled.getAttribute("data-tone")).toBe("muted");
+});
+
+test("a done Design card shows its time only from a minute up", async () => {
+  live([doneTk("01", 1, { elapsed: 59 }), doneTk("02", 2, { elapsed: 120 })], "map");
+  expect((await cardOf("01")).textContent).not.toMatch(/\d+[smh]/);
+  expect((await cardOf("02")).textContent).toContain("2m");
+});
+
+const withStats = (detail: Partial<EpicDetail>, kind: EpicDetail["kind"] = "loop") =>
+  render("/e/gx:blog-impl", [], kind, { detail });
+const loopStats = {
+  lines_added: 1200,
+  lines_removed: 300,
+  total_tokens: 2_500_000,
+  cost: 4.5,
+  lead_time: 7200,
+  friction: { pauses_by_reason: { question: 2, error: 1 }, run_events: { retry: 3 }, paused_secs: 600, web_share: 0.5 },
+};
+
+test("More stats is collapsed by default with the loop preview, and opens to every stat row", async () => {
+  withStats({ stats: loopStats });
+  const card = await screen.findByRole("button", { name: /^More stats/ });
+  expect(card.getAttribute("aria-expanded")).toBe("false");
+  expect(card.textContent).toContain("+1,200 −300 lines · 2.5M tokens · lead time 2h");
+  expect(document.querySelector("[data-stat-row]")).toBeNull();
+  fireEvent.click(card);
+  expect(card.getAttribute("aria-expanded")).toBe("true");
+  const labels = [...document.querySelectorAll("[data-stat-row]")].map((r) => r.getAttribute("data-stat-row"));
+  expect(labels).toEqual(["Lines", "Tokens", "Cost", "Lead time", "Pauses", "Run events", "Paused time", "Pause endings"]);
+  expect(document.querySelector("[data-stat-row='Lead time']")?.textContent).toContain("created → merged to trunk");
+  expect(document.querySelector("[data-stat-row='Pauses']")?.textContent).toContain("question ×2, error ×1");
+  expect(document.querySelector("[data-stat-row='Pause endings']")?.textContent).toContain("50% web");
+  fireEvent.click(card);
+  expect(card.getAttribute("aria-expanded")).toBe("false");
+});
+
+test("a Design's More stats preview leaves out lines", async () => {
+  render("/e/gx:blog", [designCard], "map", { detail: { steps: steps("spec"), stats: loopStats } });
+  expect((await screen.findByRole("button", { name: /^More stats/ })).textContent).toContain("2.5M tokens · lead time 2h");
+  expect(screen.queryByText(/lines/)).toBeNull();
+});
+
+test("there is no More stats card without stats", async () => {
+  withStats({ stats: {} });
+  await statsOf();
+  expect(screen.queryByRole("button", { name: /More stats/ })).toBeNull();
+});
+
 test("a Design's cards show the ticket type then the state", async () => {
   live([tk("01", { type: "prototype" }), tk("02", { type: "grilling", rendered_status: "blocked", blockers: ["04"] })], "map");
   expect((await cardOf("01")).textContent).toContain("prototype · ready");

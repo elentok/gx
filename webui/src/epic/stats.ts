@@ -25,6 +25,15 @@ const topCounts = (counts: Record<string, number> = {}, limit = Infinity) =>
     .map(([name, n]) => `${name} ×${n}`)
     .join(", ");
 
+// The collapsed card's dim preview: lines (loop only), tokens and lead time, whichever are stamped.
+export function statPreview(d: EpicDetail): string {
+  const byLabel = new Map(statRows(d).map((r) => [r.label, r.value]));
+  const lines = d.kind === "map" ? undefined : byLabel.get("Lines");
+  const tokens = byLabel.get("Tokens");
+  const lead = byLabel.get("Lead time");
+  return [lines && `${lines} lines`, tokens && `${tokens} tokens`, lead && `lead time ${lead}`].filter(Boolean).join(" · ");
+}
+
 // A row with no stamped value is left out.
 export function statRows(d: EpicDetail): StatRow[] {
   const { stats: s } = d;

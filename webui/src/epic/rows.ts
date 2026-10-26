@@ -32,7 +32,7 @@ export const isCancelled = (row: EpicDetailRow) => row.rendered_status === "canc
 export const isFolded = (row: EpicDetailRow) => bucketOf(row) === "done";
 export const isRunning = (row: EpicDetailRow) => bucketOf(row) === "running";
 export const toneOfStatus = (status: string): Tone => BUCKET_TONES[bucketOfStatus(status)];
-export const toneOf = (row: EpicDetailRow): Tone => toneOfStatus(row.rendered_status);
+export const toneOf = (row: EpicDetailRow): Tone => (isCancelled(row) ? "muted" : toneOfStatus(row.rendered_status));
 
 export function formatDuration(seconds: number): string {
   const s = Math.round(seconds);
@@ -117,11 +117,11 @@ function blockerNote(blockers: string[]): string {
 }
 
 // A fork says what it forks from when that parent is not drawn above it: the parent sits in the other group,
-// or is not in the epic. A fork nested under its parent in the same group needs no note.
+// or is not in the epic. Only live forks nest under their parent; the done group is flat, so its forks always say.
 function forkNote(row: EpicDetailRow, byAddress: Map<string, EpicDetailRow>): string | undefined {
   if (!row.parent) return undefined;
   const parent = byAddress.get(row.parent);
-  return !parent || isFolded(parent) !== isFolded(row) ? `fork of ${idOf(row.parent)}` : undefined;
+  return !parent || isFolded(parent) || isFolded(row) ? `fork of ${idOf(row.parent)}` : undefined;
 }
 
 export interface RowContext {
@@ -186,10 +186,27 @@ export function cardMeta(row: EpicDetailRow, ctx: RowContext): string {
   );
 }
 
-// A folded row's dim tail: elapsed time (or a muted "cancelled" word), then cost, then the fork note.
-export function foldedTail(row: EpicDetailRow, ctx: RowContext): string {
+// A done Design row shows its claim-to-close time only, and nothing under a minute.
+const designDoneTime = (row: EpicDetailRow) =>
+  row.elapsed !== undefined && row.elapsed >= 60 ? formatDuration(row.elapsed) : undefined;
+
+// A done row's dim meta: elapsed time (or "cancelled"), then cost for a loop row, then the fork note.
+export function doneMeta(row: EpicDetailRow, ctx: RowContext): string {
   const [elapsed, cost] = elapsedAndCost(row, row.elapsed, ctx);
-  return joinDot(isCancelled(row) ? "cancelled" : elapsed, cost, forkNote(row, ctx.byAddress));
+  const time = ctx.detail.kind === "map" ? designDoneTime(row) : elapsed;
+  return joinDot(isCancelled(row) ? "cancelled" : time, isCancelled(row) ? undefined : cost, forkNote(row, ctx.byAddress));
+}
+
+// Done rows newest-closed first, flat; a row with no close time goes last.
+export const doneRows = (rows: EpicDetailRow[]) => {
+  const closed = (r: EpicDetailRow) => (r.closed_at ? Date.parse(r.closed_at) : -Infinity);
+  return rows.filter(isFolded).sort((a, b) => closed(b) - closed(a));
+};
+
+// The divider text over the done cards: cancelled rows are counted apart from the done ones.
+export function doneHeading(rows: EpicDetailRow[]): string {
+  const cancelled = rows.filter(isCancelled).length;
+  return `${rows.length - cancelled} done${cancelled > 0 ? `, ${cancelled} cancelled` : ""}`;
 }
 
 export const MAX_INDENT = 2;
@@ -215,4 +232,3 @@ function nestGroup(rows: EpicDetailRow[], inGroup: (r: EpicDetailRow) => boolean
 }
 
 export const nestLive = (rows: EpicDetailRow[]) => nestGroup(rows, (r) => !isFolded(r));
-export const nestFolded = (rows: EpicDetailRow[]) => nestGroup(rows, isFolded);
