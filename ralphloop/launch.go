@@ -195,6 +195,10 @@ type launchAndPromptParams struct {
 	// rendering a chat message has the ticket's own fields (title, etc.)
 	// without re-reading TicketPath itself.
 	TicketData tickets.Ticket
+	// noVerifyCap exempts this pane from the verify token cap even when
+	// TicketData is a verify ticket: the conflict-resolution pane shares the
+	// ticket's params but is not the verify session.
+	noVerifyCap bool
 	// StartEvent/FinishEvent are the run-log event types logged when the
 	// agent starts/finishes; "" skips logging that transition.
 	StartEvent  string

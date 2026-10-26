@@ -980,6 +980,7 @@ func reattachLiveConflictResolver(d Deps, p iterationParams, live agentrunner.Se
 
 	launchParams := p.launchAndPromptParams(label, live.ID, "", p.FeatureWorktree, "", "")
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
+	launchParams.noVerifyCap = true
 	if !alreadyFinished(string(agent.State)) {
 		if err := waitForFinish(d, launchParams, sessionID); err != nil {
 			return "", fmt.Errorf("waiting for reattached conflict-resolution agent %s to finish: %w", label, err)
@@ -1056,6 +1057,7 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 	launchParams := p.launchAndPromptParams(label, l.ID, prompt, p.FeatureWorktree, "", "")
 	launchParams.Session = l.Session
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
+	launchParams.noVerifyCap = true
 	switch {
 	case err != nil:
 		err = fmt.Errorf("sending initial prompt: %w", err)

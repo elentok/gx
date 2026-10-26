@@ -53,6 +53,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	// the blocked-pane / rate-limit / gated-give-up branches below — see its
 	// own doc comment.
 	recovery := newSmartZoneRecovery(smartZone)
+	vcap := newVerifyCap(p, smartZone)
 	for {
 		pollMs := smartZonePollMs
 		if p.FinishTimeoutMs > 0 {
@@ -220,6 +221,16 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		// corroborated) is a failed recovery, not a failed iteration: the agent
 		// is still alive and may well compact on its own, so keep polling and
 		// let the next breach try again. Every other error still aborts.
+		// The cap stop goes first and takes the whole tick: if occupancy is
+		// also past the smart zone, the next poll runs its recovery.
+		stopped, err := vcap.checkAndStop(d, p, sessionID)
+		if err != nil {
+			return err
+		}
+		if stopped {
+			elapsedMs = 0
+			continue
+		}
 		breached, err := recovery.checkAndRecover(d, p, sessionID)
 		if err != nil {
 			return err
