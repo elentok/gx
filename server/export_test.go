@@ -20,6 +20,21 @@ var (
 	TicketAgent    = ticketAgent
 )
 
+// LiveDesignSessionID is the ID of epicAddr's newest live design session
+// leaving out excludeID, or "".
+func (s *Server) LiveDesignSessionID(epicAddr, excludeID string) string {
+	live, err := s.liveDesignSessionExcept(epicAddr, excludeID)
+	if err != nil || live == nil {
+		return ""
+	}
+	return live.ID
+}
+
+// RebaseDesign is rebaseDesign: the skip note, or "" when it rebased.
+func (s *Server) RebaseDesign(project, epic, worktree, excludeID string) string {
+	return s.rebaseDesign(project, epic, worktree, excludeID)
+}
+
 // LaunchingRuns counts runs whose agent has no session yet, which a budget
 // stop skips.
 func (s *Server) LaunchingRuns() int {

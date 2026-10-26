@@ -186,6 +186,13 @@ func AbortCherryPick(dir string) error {
 	return err
 }
 
+// AbortRebase abandons the rebase currently in progress in dir and puts the
+// branch back at its pre-rebase tip.
+func AbortRebase(dir string) error {
+	_, _, err := run(dir, []string{"rebase", "--abort"})
+	return err
+}
+
 // PatchesApplied reports whether every commit in base..branch already has a
 // patch-equivalent commit reachable from upstream (git cherry, which
 // compares patch-id rather than commit hash). Unlike IsAncestor, this stays

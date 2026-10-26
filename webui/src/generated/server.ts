@@ -1396,6 +1396,11 @@ export interface SessionInfo {
    * Failure is set while the session is in one of the failure states.
    */
   failure?: SessionFailure;
+  /**
+   * RebaseNote says why a Design open did not rebase the design branch onto
+   * trunk; empty when it did.
+   */
+  rebase_note?: string;
 }
 /**
  * SessionStatus is a Session status.

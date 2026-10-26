@@ -106,6 +106,102 @@ func TestDesignsOpen_CreatesWithTheTuiPrefill(t *testing.T) {
 	}
 }
 
+// reopenAfterTrunkCommit opens the map, stops it, lets edit change the design
+// worktree, commits file=content on trunk, and opens again.
+func (f designsFixture) reopenAfterTrunkCommit(t *testing.T, file, content string, edit func(dir string)) (server.SessionResult, string) {
+	t.Helper()
+	first := f.open(t, "proj:map", false)
+	dir, _ := readMeta(t, f.h, first.Session.ID)["dir"].(string)
+	if _, err := f.h.Client.StopSession(f.ctx, first.Session.ID); err != nil {
+		t.Fatal(err)
+	}
+	edit(dir)
+	if err := os.WriteFile(filepath.Join(f.repo, file), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, f.repo, "add", file)
+	gitOut(t, f.repo, "commit", "-m", "trunk change")
+	res := f.open(t, "proj:map", false)
+	if res.Refused || res.Session == nil {
+		t.Fatalf("reopen = %+v", res)
+	}
+	return res, dir
+}
+
+func TestDesignsOpen_RebasesTheDesignBranchOntoTrunk(t *testing.T) {
+	f := startDesigns(t)
+	res, dir := f.reopenAfterTrunkCommit(t, "t.txt", "trunk\n", func(string) {})
+	trunk := gitOut(t, f.repo, "rev-parse", "HEAD")
+	if gitOut(t, dir, "merge-base", "--is-ancestor", trunk, "HEAD") != "" {
+		t.Errorf("trunk is not an ancestor of map-design")
+	}
+	if res.Session.RebaseNote != "" {
+		t.Errorf("note = %q, want none", res.Session.RebaseNote)
+	}
+}
+
+func TestDesignsOpen_ConflictSkipsTheRebaseAndSetsANote(t *testing.T) {
+	f := startDesigns(t)
+	var tip string
+	res, dir := f.reopenAfterTrunkCommit(t, "c.txt", "trunk\n", func(dir string) {
+		if err := os.WriteFile(filepath.Join(dir, "c.txt"), []byte("design\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		gitOut(t, dir, "add", "c.txt")
+		gitOut(t, dir, "commit", "-m", "design change")
+		tip = gitOut(t, dir, "rev-parse", "HEAD")
+	})
+	if got := gitOut(t, dir, "rev-parse", "HEAD"); got != tip {
+		t.Errorf("tip = %s, want unchanged %s", got, tip)
+	}
+	if out := gitOut(t, dir, "status", "--porcelain"); out != "" {
+		t.Errorf("worktree not clean after abort: %s", out)
+	}
+	if !strings.Contains(res.Session.RebaseNote, "not rebased") || !strings.Contains(res.Session.RebaseNote, "conflict") {
+		t.Errorf("note = %q", res.Session.RebaseNote)
+	}
+	if note, _ := readMeta(t, f.h, res.Session.ID)["rebase_note"].(string); note != res.Session.RebaseNote {
+		t.Errorf("meta note = %q", note)
+	}
+}
+
+func TestDesignsOpen_UncommittedEditsSkipTheRebaseAndSetANote(t *testing.T) {
+	f := startDesigns(t)
+	var before string
+	res, dir := f.reopenAfterTrunkCommit(t, "t.txt", "trunk\n", func(dir string) {
+		before = gitOut(t, dir, "rev-parse", "HEAD")
+		if err := os.WriteFile(filepath.Join(dir, "wip.txt"), []byte("wip\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if got := gitOut(t, dir, "rev-parse", "HEAD"); got != before {
+		t.Errorf("tip moved to %s from %s", got, before)
+	}
+	if !strings.Contains(res.Session.RebaseNote, "uncommitted") {
+		t.Errorf("note = %q", res.Session.RebaseNote)
+	}
+}
+
+func TestDesignLiveCheck_LeavesOutTheCallerAndRebaseSkipsForAnother(t *testing.T) {
+	f := startDesigns(t)
+	first := f.open(t, "proj:map", false)
+	id := first.Session.ID
+	dir, _ := readMeta(t, f.h, id)["dir"].(string)
+	s := f.h.Server
+	if got := s.LiveDesignSessionID("proj:map", ""); got != id {
+		t.Fatalf("live = %q, want %q", got, id)
+	}
+	if got := s.LiveDesignSessionID("proj:map", id); got != "" {
+		t.Errorf("live leaving out the caller = %q, want none", got)
+	}
+	if note := s.RebaseDesign("proj", "map", dir, ""); !strings.Contains(note, "live") {
+		t.Errorf("note = %q, want another-live-session note", note)
+	}
+	if note := s.RebaseDesign("proj", "map", dir, id); note != "" {
+		t.Errorf("note = %q, want a clean rebase", note)
+	}
+}
+
 func TestDesignsOpen_ReAddsARemovedWorktreeOnTheSameBranch(t *testing.T) {
 	f := startDesigns(t)
 	first := f.open(t, "proj:map", false)

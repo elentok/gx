@@ -164,6 +164,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		Design:         req.design || (req.Ticket != "" && s.onMapEpic(req.Ticket)),
 		FirstPrompt:    req.Prompt,
 		RemoteControl:  req.remoteControl,
+		RebaseNote:     req.rebaseNote,
 		ConversationID: conv,
 		CreatedAt:      time.Now(),
 	}

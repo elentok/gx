@@ -64,6 +64,50 @@ func (s *Server) ensureDesignWorktree(project, epic string) (string, error) {
 	return path, git.AddWorktree(*repo, branch, path, trunk)
 }
 
+// rebaseDesign rebases the design worktree's branch onto trunk, so the agent
+// reads current code and docs. A problem never blocks the open: it skips the
+// rebase, leaves the branch at its old tip and returns a note saying why.
+// excludeID is a session that does not count as another live one.
+func (s *Server) rebaseDesign(project, epic, worktree, excludeID string) string {
+	live, err := s.liveDesignSessionExcept(project+":"+epic, excludeID)
+	if err != nil {
+		return "the design branch was not rebased onto trunk: " + err.Error()
+	}
+	if live != nil {
+		return "the design branch was not rebased onto trunk: another design session of this map is live"
+	}
+	changes, err := git.UncommittedChanges(worktree)
+	if err != nil {
+		return "the design branch was not rebased onto trunk: " + err.Error()
+	}
+	if len(changes) > 0 {
+		return "the design branch was not rebased onto trunk: the worktree has uncommitted edits"
+	}
+	projectDir, repoDir, err := s.projectOf(project)
+	if err != nil {
+		return "the design branch was not rebased onto trunk: " + err.Error()
+	}
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return "the design branch was not rebased onto trunk: " + err.Error()
+	}
+	trunk, err := tickets.Trunk(projectDir, repo.Root)
+	if err != nil {
+		return "the design branch was not rebased onto trunk: " + err.Error()
+	}
+	out, err := git.Rebase(worktree, trunk)
+	if err == nil {
+		return ""
+	}
+	if inProgress, _ := git.RebaseInProgress(worktree); inProgress {
+		if abortErr := git.AbortRebase(worktree); abortErr != nil {
+			return "the design branch was not rebased onto trunk: the rebase conflicted and could not be aborted: " + abortErr.Error()
+		}
+		return "the design branch was not rebased onto trunk: the rebase conflicted and was aborted"
+	}
+	return "the design branch was not rebased onto trunk: " + strings.TrimSpace(out+" "+err.Error())
+}
+
 // DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
 // epic's address ("project:epic") or one of its tickets ("project:epic/NN").
 // New stops the Design's live session and starts a fresh one; State is the
@@ -157,6 +201,7 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	if err != nil {
 		return SessionResult{}, err
 	}
+	note := s.rebaseDesign(project, epic, worktree, "")
 	prompt := "/gx-design " + epicAddr
 	if ticket != "" {
 		prompt += "/" + ticket
@@ -169,6 +214,7 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		Ticket:       epicAddr,
 		Prompt:       prompt,
 		Harness:      s.settings.Load().chatHarness(),
+		rebaseNote:   note,
 	})
 }
 
@@ -210,7 +256,7 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 	if err != nil {
 		return SessionResult{EpicCreated: true, StartError: err.Error()}, nil
 	}
-	return s.startSession(req.Project, slug, worktree), nil
+	return s.startSession(req.Project, slug, worktree, s.rebaseDesign(req.Project, slug, worktree, "")), nil
 }
 
 // createMap writes the uncharted map epic for a New Design, at the Chart step.
@@ -226,7 +272,7 @@ func createMap(dir, slug, idea string) error {
 // startSession starts the design session for a map that now exists. A failure
 // is a result, not a refusal: the map is there, so the caller reports it as
 // created with the reason in StartError.
-func (s *Server) startSession(project, slug, worktree string) SessionResult {
+func (s *Server) startSession(project, slug, worktree, rebaseNote string) SessionResult {
 	addr := project + ":" + slug
 	res, err := s.createSession(CreateSessionRequest{
 		Project:      project,
@@ -236,6 +282,7 @@ func (s *Server) startSession(project, slug, worktree string) SessionResult {
 		Ticket:       addr,
 		Prompt:       "/gx-design " + addr,
 		Harness:      s.settings.Load().chatHarness(),
+		rebaseNote:   rebaseNote,
 	})
 	switch {
 	case err != nil:
@@ -326,6 +373,12 @@ func (s *Server) deleteDesign(req DesignDeleteRequest) (SessionResult, error) {
 // exited and has the latest RunStartedAt, or nil. The Design page picks by the
 // same key (webui/src/design/view.ts).
 func (s *Server) liveDesignSession(epicAddr string) (*SessionInfo, error) {
+	return s.liveDesignSessionExcept(epicAddr, "")
+}
+
+// liveDesignSessionExcept is liveDesignSession leaving out the session
+// excludeID, so a caller never counts itself. Empty excludes none.
+func (s *Server) liveDesignSessionExcept(epicAddr, excludeID string) (*SessionInfo, error) {
 	list, err := s.listSessions()
 	if err != nil {
 		return nil, err
@@ -333,7 +386,7 @@ func (s *Server) liveDesignSession(epicAddr string) (*SessionInfo, error) {
 	var live *SessionInfo
 	for i := range list {
 		in := &list[i]
-		if in.Design && in.Status.State != SessionExited && epicAddress(in.Ticket) == epicAddr &&
+		if in.ID != excludeID && in.Design && in.Status.State != SessionExited && epicAddress(in.Ticket) == epicAddr &&
 			(live == nil || !in.RunStartedAt.Before(live.RunStartedAt)) {
 			live = in
 		}

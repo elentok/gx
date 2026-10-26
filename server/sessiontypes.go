@@ -41,6 +41,9 @@ type SessionInfo struct {
 	ReportedTitle string `json:"reported_title,omitempty"`
 	// Failure is set while the session is in one of the failure states.
 	Failure *SessionFailure `json:"failure,omitempty"`
+	// RebaseNote says why a Design open did not rebase the design branch onto
+	// trunk; empty when it did.
+	RebaseNote string `json:"rebase_note,omitempty"`
 }
 
 // SessionStatus is a Session status.
@@ -142,6 +145,8 @@ type CreateSessionRequest struct {
 	design bool
 	// madeWorktree marks Dir as a worktree gx made, as Worktree does.
 	madeWorktree bool
+	// rebaseNote is saved in the meta as RebaseNote.
+	rebaseNote string
 	// remoteControl is the --remote-control name, saved in the meta so resumes
 	// keep it whatever the setting says by then.
 	remoteControl string
@@ -217,6 +222,8 @@ type sessionMeta struct {
 	// marks that run crashing within restoreCrashWindow.
 	RestoredAt     time.Time `json:"restored_at,omitzero"`
 	RestoreCrashed bool      `json:"restore_crashed,omitempty"`
+	// RebaseNote is why the design branch was not rebased at open, if it wasn't.
+	RebaseNote string `json:"rebase_note,omitempty"`
 }
 
 func (m sessionMeta) info() SessionInfo {
@@ -238,6 +245,7 @@ func (m sessionMeta) info() SessionInfo {
 		AutoAdvance:     !m.AutoAdvanceOff,
 		ReportedStep:    m.ReportedStep,
 		ReportedTitle:   m.ReportedTitle,
+		RebaseNote:      m.RebaseNote,
 	}
 	if st := m.Status; st.State == SessionBlocked {
 		info.Actionable = SessionActionable{Kind: st.Kind, Reason: cmp.Or(st.Message, st.Kind, SessionBlocked)}

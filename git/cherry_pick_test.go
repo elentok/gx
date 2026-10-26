@@ -161,6 +161,43 @@ func TestAbortCherryPick_ClearsConflictAndRestoresHead(t *testing.T) {
 	}
 }
 
+func TestAbortRebase_ClearsConflictAndRestoresHead(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepoWithConflictSetup(t)
+
+	base, err := git.RevParse(dir, "HEAD~1")
+	if err != nil {
+		t.Fatalf("RevParse base: %v", err)
+	}
+	trunk, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse trunk: %v", err)
+	}
+	testutil.MustGitExported(t, dir, "checkout", "-b", "feature", base)
+	testutil.WriteFile(t, dir, "a.txt", "line from feature\n")
+	testutil.CommitAll(t, dir, "feature change")
+	featureHead, err := git.RevParse(dir, "HEAD")
+	if err != nil {
+		t.Fatalf("RevParse feature: %v", err)
+	}
+
+	if _, err := git.Rebase(dir, trunk); err == nil {
+		t.Fatal("Rebase() error = nil, want conflict error")
+	}
+	if inProgress, _ := git.RebaseInProgress(dir); !inProgress {
+		t.Fatal("RebaseInProgress() = false, want true mid-conflict")
+	}
+	if err := git.AbortRebase(dir); err != nil {
+		t.Fatalf("AbortRebase: %v", err)
+	}
+	if inProgress, _ := git.RebaseInProgress(dir); inProgress {
+		t.Error("RebaseInProgress() = true after abort")
+	}
+	if gotHead, _ := git.RevParse(dir, "HEAD"); gotHead != featureHead {
+		t.Errorf("HEAD after abort = %s, want %s", gotHead, featureHead)
+	}
+}
+
 func TestCommitsAhead_CountsCommitsInRange(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
