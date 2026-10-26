@@ -128,7 +128,7 @@ export function Question({
         <Textarea
           size="sm"
           borderRadius="12px"
-          rows={2}
+          rows={3}
           aria-label={`Note text for question ${card.label}`}
           placeholder="Note on this question"
           value={answer.note ?? ""}
@@ -298,39 +298,55 @@ export function QuestionSheet({
           {open ? "▾" : "▴"}
         </Button>
       </Box>
-      <Box hidden={!open} px="3" pb="3" minH="0" overflowY="auto">
-        <Box
-          ref={row}
-          onScroll={onScroll}
-          display="flex"
-          overflowX="auto"
-          css={{
-            scrollSnapType: "x mandatory",
-            overscrollBehaviorX: "contain",
-            scrollbarWidth: "none",
-            "&::-webkit-scrollbar": { display: "none" },
-          }}
-        >
-          {round.map((c, k) => (
-            <Box
-              key={c.label}
-              flex="0 0 100%"
-              minW="0"
-              css={{ scrollSnapAlign: "start" }}
-              role="group"
-              aria-label={`Question ${c.label} of ${round.length}`}
-              aria-hidden={k !== index}
-            >
-              <Question
-                card={c}
-                answer={answers[c.label] ?? {}}
-                onChange={(a) => onAnswers((all) => ({ ...all, [c.label]: a }))}
-                onPicked={() => setIndex(Math.min(k + 1, round.length - 1))}
-              />
-            </Box>
-          ))}
+      <Box
+        display={open ? "flex" : "none"}
+        flexDirection="column"
+        flex="1"
+        minH="0"
+      >
+        <Box px="3" minH="0" flex="1" overflowY="auto">
+          <Box
+            ref={row}
+            onScroll={onScroll}
+            display="flex"
+            overflowX="auto"
+            css={{
+              scrollSnapType: "x mandatory",
+              overscrollBehaviorX: "contain",
+              scrollbarWidth: "none",
+              "&::-webkit-scrollbar": { display: "none" },
+            }}
+          >
+            {round.map((c, k) => (
+              <Box
+                key={c.label}
+                flex="0 0 100%"
+                minW="0"
+                css={{ scrollSnapAlign: "start" }}
+                role="group"
+                aria-label={`Question ${c.label} of ${round.length}`}
+                aria-hidden={k !== index}
+              >
+                <Question
+                  card={c}
+                  answer={answers[c.label] ?? {}}
+                  onChange={(a) =>
+                    onAnswers((all) => ({ ...all, [c.label]: a }))
+                  }
+                  onPicked={() => setIndex(Math.min(k + 1, round.length - 1))}
+                />
+              </Box>
+            ))}
+          </Box>
         </Box>
-        <Box display="flex" justifyContent="space-between" mt="2">
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          flex="none"
+          px="3"
+          pt="2"
+          pb="3"
+        >
           <Button
             emphasis="ghost"
             disabled={index === 0}
