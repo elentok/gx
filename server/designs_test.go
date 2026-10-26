@@ -106,6 +106,63 @@ func TestDesignsOpen_CreatesWithTheTuiPrefill(t *testing.T) {
 	}
 }
 
+// startDesignsAt is startDesigns with the map's design_step set (none when empty).
+func startDesignsAt(t *testing.T, step string) designsFixture {
+	t.Helper()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "map-impl", "01", "first", "")
+	fm := "---\nkind: map\n"
+	if step != "" {
+		fm += "design_step: " + step + "\n"
+	}
+	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte(fm+"---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return startDesignsIn(t, store)
+}
+
+func TestDesignsOpen_AfterBranchStartsInTheTrunkCheckout(t *testing.T) {
+	for _, tc := range []struct{ name, step, implBranch string }{
+		{"step branch", "branch", ""},
+		{"step done", "done", ""},
+		{"impl branch only", "create-tickets", "map-impl"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := startDesignsAt(t, tc.step)
+			if tc.implBranch != "" {
+				gitOut(t, f.repo, "branch", tc.implBranch)
+			}
+			res := f.open(t, "proj:map", false)
+			if res.Refused || res.Session == nil {
+				t.Fatalf("open = %+v", res)
+			}
+			meta := readMeta(t, f.h, res.Session.ID)
+			if dir, _ := meta["dir"].(string); dir != f.repo {
+				t.Errorf("dir = %q, want trunk checkout %q", dir, f.repo)
+			}
+			if meta["made_worktree"] == true {
+				t.Errorf("made_worktree = true, want false")
+			}
+			if out := gitOut(t, f.repo, "branch", "--list", "map-design"); out != "" {
+				t.Errorf("map-design branch made: %q", out)
+			}
+		})
+	}
+}
+
+func TestDesignsOpen_ImplEpicWithoutBranchStillUsesTheDesignWorktree(t *testing.T) {
+	f := startDesignsAt(t, "create-tickets")
+	res := f.open(t, "proj:map", false)
+	if res.Refused || res.Session == nil {
+		t.Fatalf("open = %+v", res)
+	}
+	dir, _ := readMeta(t, f.h, res.Session.ID)["dir"].(string)
+	if gitOut(t, dir, "rev-parse", "--abbrev-ref", "HEAD") != "map-design" {
+		t.Errorf("dir %s is not the map-design worktree", dir)
+	}
+}
+
 // reopenAfterTrunkCommit opens the map, stops it, lets edit change the design
 // worktree, commits file=content on trunk, and opens again.
 func (f designsFixture) reopenAfterTrunkCommit(t *testing.T, file, content string, edit func(dir string)) (server.SessionResult, string) {

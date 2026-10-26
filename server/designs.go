@@ -38,6 +38,26 @@ func designClash(projectDir, project, epic string) string {
 	return fmt.Sprintf("%s has an epic %s, which would share the branch of the %s Design", project, designBranch(epic), epic)
 }
 
+// afterBranch reports whether the map's Design is past the Branch step: its
+// design_step is branch or done, or the <map>-impl branch exists. The impl epic
+// alone does not count, as step 7 makes it before step 8 needs the worktree.
+// A deleted impl branch with design_step branch still counts.
+func (s *Server) afterBranch(project, epic string) (bool, error) {
+	projectDir, repoDir, err := s.projectOf(project)
+	if err != nil {
+		return false, err
+	}
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return false, err
+	}
+	step := tickets.DesignStep(tickets.LoadEpicTicketMD(filepath.Join(projectDir, epic)).DesignStep)
+	if step == tickets.StepBranch || step == tickets.StepDone {
+		return true, nil
+	}
+	return tickets.BranchExists(repo.Root, epic+tickets.ImplEpicSuffix), nil
+}
+
 // ensureDesignWorktree makes sure the map's design worktree exists and returns
 // its path: on a new branch from trunk, or re-added on the existing branch.
 func (s *Server) ensureDesignWorktree(project, epic string) (string, error) {
@@ -197,11 +217,21 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	if msg := designClash(dir, project, epic); msg != "" {
 		return sessionRefusal(ReasonDesignBranchClash, msg), nil
 	}
-	worktree, err := s.ensureDesignWorktree(project, epic)
+	past, err := s.afterBranch(project, epic)
 	if err != nil {
 		return SessionResult{}, err
 	}
-	note := s.rebaseDesign(project, epic, worktree, "")
+	var worktree, note string
+	if past {
+		if worktree = tickets.TrunkCheckout(s.cfg.TicketStore, project); worktree == "" {
+			return SessionResult{}, fmt.Errorf("no trunk checkout for project %s", project)
+		}
+	} else {
+		if worktree, err = s.ensureDesignWorktree(project, epic); err != nil {
+			return SessionResult{}, err
+		}
+		note = s.rebaseDesign(project, epic, worktree, "")
+	}
 	prompt := "/gx-design " + epicAddr
 	if ticket != "" {
 		prompt += "/" + ticket
@@ -209,7 +239,7 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	return s.createSession(CreateSessionRequest{
 		Project:      project,
 		Dir:          worktree,
-		madeWorktree: true,
+		madeWorktree: !past,
 		Name:         epic,
 		Ticket:       epicAddr,
 		Prompt:       prompt,
