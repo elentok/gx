@@ -87,6 +87,7 @@ var requiredFiles = []string{
 	"gx-verify/SKILL.md",
 	"gx-verify-epic/SKILL.md",
 	"gx-ui-check/SKILL.md",
+	"gx-ui-check/MOCK-CHECK.md",
 }
 
 func TestBundleRequiredFilesPresent(t *testing.T) {
