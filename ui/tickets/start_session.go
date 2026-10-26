@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"context"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -8,6 +9,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/notify"
 )
 
 // actionStartSession hands a map epic or one of its open tickets to the
@@ -70,14 +72,30 @@ func goToSessionItem(id string) contextmenu.Item[ticketTarget] {
 }
 
 // startSessionCmd builds the request for address ("project:epic" or
-// "project:epic/NN"); the session is named after the short address and runs in
-// the project's trunk checkout, resolved from storePath off the UI thread.
-func startSessionCmd(storePath, address string) tea.Cmd {
+// "project:epic/NN"); the session is named after the short address. It runs in
+// the map's design worktree when the server hands one out, else in the
+// project's trunk checkout, resolved from storePath off the UI thread. A
+// refusal opens no form.
+func startSessionCmd(api ServerAPI, storePath, address string) tea.Cmd {
 	project, short, _ := strings.Cut(address, ":")
+	epic, _, _ := strings.Cut(address, "/")
 	return func() tea.Msg {
+		dir := ""
+		if api != nil {
+			// A transport error reads as no server: fall back to the trunk checkout.
+			if res, err := api.DesignWorktree(context.Background(), server.DesignWorktreeRequest{Epic: epic}); err == nil {
+				if res.Refused {
+					return notify.Error("start session refused: " + res.Message)()
+				}
+				dir = res.Path
+			}
+		}
+		if dir == "" {
+			dir = tickets.TrunkCheckout(storePath, project)
+		}
 		return StartSessionMsg{
 			Project: project,
-			Dir:     tickets.TrunkCheckout(storePath, project),
+			Dir:     dir,
 			Name:    short,
 			Prompt:  "/gx-design " + address,
 			Ticket:  address,

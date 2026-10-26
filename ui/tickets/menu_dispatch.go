@@ -31,7 +31,7 @@ func dispatchMenuAction(api ServerAPI, worktreeRoot string, settings ui.Settings
 		}
 		return cmdEpicStashMerge(api, result.EpicName)
 	case actionStartSession:
-		return startSessionCmd(settings.TicketStore, result.Path)
+		return startSessionCmd(api, settings.TicketStore, result.Path)
 	case actionInvestigate:
 		return cmdLaunchInvestigate(worktreeRoot, result.EpicName, result.TicketID)
 	case actionTranscript:

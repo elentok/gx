@@ -38,6 +38,7 @@ type ServerAPI interface {
 	EpicStashMerge(ctx context.Context, address string) (server.QueueResult, error)
 	Detail(ctx context.Context, address string) (server.TicketDetail, error)
 	Repair(ctx context.Context, verb string, req server.RepairRequest) (server.RepairResult, error)
+	DesignWorktree(ctx context.Context, req server.DesignWorktreeRequest) (server.DesignWorktreeResult, error)
 	Iterations(ctx context.Context) ([]server.IterationInfo, error)
 	TicketChanged(ctx context.Context, address string) error
 }

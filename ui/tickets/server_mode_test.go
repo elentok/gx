@@ -34,6 +34,8 @@ type fakeServerAPI struct {
 	detail     server.TicketDetail
 	budget     server.BudgetStatus
 	iterations []server.IterationInfo
+	// designWorktree is what DesignWorktree returns.
+	designWorktree server.DesignWorktreeResult
 	// snap and queue are what Snapshot and QueueItems return.
 	snap  server.Snapshot
 	queue []server.QueueItem
@@ -126,6 +128,11 @@ func (f fakeServerAPI) Detail(context.Context, string) (server.TicketDetail, err
 func (f fakeServerAPI) Repair(_ context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {
 	f.record(verb + " " + req.Address)
 	return server.RepairResult{}, nil
+}
+
+func (f fakeServerAPI) DesignWorktree(_ context.Context, req server.DesignWorktreeRequest) (server.DesignWorktreeResult, error) {
+	f.record("design-worktree " + req.Epic)
+	return f.designWorktree, nil
 }
 
 func (f fakeServerAPI) record(call string) {

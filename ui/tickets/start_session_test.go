@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/notify"
 )
 
 func menuHasStartSession(m Model) bool {
@@ -121,9 +122,36 @@ func TestStartSession_ChoosingItRequestsThePrefilledForm(t *testing.T) {
 		if got := cmd(); got != tc.want {
 			t.Errorf("%s: msg = %+v, want %+v", tc.address, got, tc.want)
 		}
-		if len(calls) != 0 {
-			t.Errorf("%s: server calls = %v, want none (no ticket status written)", tc.address, calls)
+		if want := []string{"design-worktree gx:map"}; !slices.Equal(calls, want) {
+			t.Errorf("%s: server calls = %v, want %v (no ticket status written)", tc.address, calls, want)
 		}
+	}
+}
+
+func TestStartSession_FillsDirWithTheDesignWorktree(t *testing.T) {
+	api := fakeServerAPI{designWorktree: server.DesignWorktreeResult{Path: "/wt/design-map"}}
+	m := startSessionModel(t).WithServer(api)
+	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
+	msg, ok := cmd().(StartSessionMsg)
+	if !ok {
+		t.Fatalf("not a StartSessionMsg: %T", cmd())
+	}
+	if msg.Dir != "/wt/design-map" {
+		t.Errorf("Dir = %q, want the design worktree", msg.Dir)
+	}
+}
+
+func TestStartSession_RefusalShowsMessageAndOpensNoForm(t *testing.T) {
+	api := fakeServerAPI{designWorktree: server.DesignWorktreeResult{Refused: true, Message: "another session is live"}}
+	m := startSessionModel(t).WithServer(api)
+	_, cmd := chooseTicketMenuItem(t, openEpicMenuOn(t, m, "gx:map"), "Start session")
+	got := cmd()
+	if _, form := got.(StartSessionMsg); form {
+		t.Fatal("a refusal opened the create form")
+	}
+	n, ok := got.(notify.NotifyMsg)
+	if !ok || !strings.Contains(n.Message, "another session is live") {
+		t.Errorf("msg = %+v, want a notification carrying the refusal", got)
 	}
 }
 
@@ -147,7 +175,7 @@ func TestStartSession_CarriesTheTrunkCheckout(t *testing.T) {
 		if tc.name == "bare repo without one" {
 			testutil.MustGitExported(t, bare, "worktree", "remove", "--force", trunkWt)
 		}
-		msg, ok := startSessionCmd(store, "gx:map")().(StartSessionMsg)
+		msg, ok := startSessionCmd(nil, store, "gx:map")().(StartSessionMsg)
 		if !ok {
 			t.Fatalf("%s: not a StartSessionMsg", tc.name)
 		}
