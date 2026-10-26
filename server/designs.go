@@ -117,10 +117,11 @@ func (s *Server) tryCleanupDesign(project, epic string) error {
 }
 
 // scanDesignCleanups runs the design cleanup for every map whose design_step
-// is past Branch. A plain Claude session at step 8 reports no exit, and `gx
-// tickets set --design-step` writes the file without telling the server, so
-// the rescan is what notices. A map that keeps its worktree is checked again
-// on every rescan, so a warning is logged only when its reason changes.
+// moved to Branch or Done since the last rescan. A plain Claude session at step
+// 8 reports no exit, and `gx tickets set --design-step` writes the file without
+// telling the server, so the rescan is what notices. Only the transition
+// triggers the check, so an idle server does no git work for old maps; session
+// exit and design open cover a map that keeps its worktree.
 func (s *Server) scanDesignCleanups() {
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
@@ -133,25 +134,12 @@ func (s *Server) scanDesignCleanups() {
 				continue
 			}
 			step := tickets.DesignStep(tickets.LoadEpicTicketMD(e.Path).DesignStep)
-			if step != tickets.StepBranch && step != tickets.StepDone {
-				continue
-			}
 			project, epic := tickets.ProjectName(dir), filepath.Base(e.Path)
-			key := project + ":" + epic
-			if !s.designScans.start(key) {
+			prev, _ := s.designSteps.Swap(project+":"+epic, step)
+			if prev == step || (step != tickets.StepBranch && step != tickets.StepDone) {
 				continue
 			}
-			s.goSettle(func() {
-				defer s.designScans.end(key)
-				err := s.tryCleanupDesign(project, epic)
-				text := ""
-				if err != nil {
-					text = err.Error()
-				}
-				if prev, _ := s.designWarned.Swap(key, text); text != "" && prev != text {
-					s.log.Warn("design cleanup kept the worktree and branch", "map", key, "err", err)
-				}
-			})
+			s.goSettle(func() { s.cleanupDesign(project, epic) })
 		}
 	}
 }

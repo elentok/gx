@@ -387,8 +387,7 @@ type Server struct {
 	pauseHold    recoveryHold
 	defectScan   sync.Mutex
 	lateFinishes inFlight
-	designScans  inFlight
-	designWarned sync.Map // map address -> last cleanup warning text
+	designSteps  sync.Map // map address -> design step at the last rescan
 	deadlocks    deadlocks
 	gatesRaised  map[gateHold]bool      // touched only by the gate watchdog
 	rewatch      atomic.Pointer[func()] // set by keepFresh when the watch is active; read by every rescan caller

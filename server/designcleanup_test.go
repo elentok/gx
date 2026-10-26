@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server"
 )
@@ -175,6 +176,27 @@ func TestDesignCleanup_StepMovingToBranchWithDirtyWorktreeKeepsBothAndWarns(t *t
 	f.waitForCleanupWarning(t)
 	if !f.designKept(t, dir) {
 		t.Errorf("design worktree or branch removed")
+	}
+}
+
+func TestDesignCleanup_RescanWithoutStepChangeDoesNotCheckAgain(t *testing.T) {
+	f := startDesignsAt(t, "create-tickets")
+	dir, id := f.openDesignWorktree(t, true)
+	f.stop(t, id)
+	gitOut(t, f.repo, "branch", "map-impl", "map-design")
+	wip := filepath.Join(dir, "wip.md")
+	if err := os.WriteFile(wip, []byte("wip\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f.setDesignStepBranch(t)
+	f.waitForCleanupWarning(t)
+	if err := os.Remove(wip); err != nil {
+		t.Fatal(err)
+	}
+	f.setDesignStepBranch(t) // rescans with the step unchanged
+	time.Sleep(500 * time.Millisecond)
+	if !f.designKept(t, dir) {
+		t.Errorf("an unchanged step ran the cleanup check again")
 	}
 }
 
