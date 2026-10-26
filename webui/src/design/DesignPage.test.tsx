@@ -153,7 +153,7 @@ test("a chart-step map with an exited session shows the session header, never th
   render([map("a")], [session("a", { status: { state: "exited" } })], "/d/gx:a", detailOf({ steps: stepsAt(0) }));
   fireEvent.click(await screen.findByRole("button", { name: "New session" }));
   expect(screen.queryByRole("form", { name: "New Design" })).toBeNull();
-  expect(screen.queryByLabelText("Epic name")).toBeNull();
+  expect(screen.queryByLabelText("Epic slug")).toBeNull();
 });
 
 test("a Design with no map yet and no session still offers Start design session", async () => {

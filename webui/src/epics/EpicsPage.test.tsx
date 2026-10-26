@@ -213,7 +213,7 @@ test("New Design opens the form in a dialog, Close closes it", async () => {
   expect(screen.queryByRole("dialog")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "New Design" }));
   const dialog = screen.getByRole("dialog", { name: "New Design" });
-  expect(within(dialog).getByRole("textbox", { name: "Epic name" })).toBeTruthy();
+  expect(within(dialog).getByRole("textbox", { name: "Epic slug" })).toBeTruthy();
   fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
   expect(screen.queryByRole("dialog")).toBeNull();
 });
@@ -232,7 +232,7 @@ test("Start posts new_design and opens the new Design page", async () => {
   await filterBox();
   fireEvent.click(await screen.findByRole("button", { name: "New Design" }));
   const dialog = screen.getByRole("dialog", { name: "New Design" });
-  fireEvent.change(within(dialog).getByRole("textbox", { name: "Epic name" }), { target: { value: "fresh" } });
+  fireEvent.change(within(dialog).getByRole("textbox", { name: "Epic slug" }), { target: { value: "fresh" } });
   fireEvent.change(within(dialog).getByRole("textbox", { name: "Rough idea" }), { target: { value: "an idea" } });
   await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Start design" })));
   expect(open).toHaveBeenCalledWith({ epic: "fresh", new_design: true, idea: "an idea", project: "gx" });

@@ -176,7 +176,11 @@ export function NewDesignForm({
             </>
           )}
           <chakra.input
-            aria-label="Epic name"
+            aria-label="Epic slug"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             autoFocus
             {...field}
             flex="1"
@@ -184,7 +188,7 @@ export function NewDesignForm({
             h="40px"
             px="3"
             fontWeight="600"
-            placeholder="epic-name"
+            placeholder="my-epic"
             value={draft.slug}
             onChange={(e) => patch({ slug: e.target.value })}
           />

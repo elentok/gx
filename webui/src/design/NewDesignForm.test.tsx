@@ -29,7 +29,7 @@ test("fields are named and inputs are 16px", () => {
   mount();
   const dialog = screen.getByRole("dialog", { name: "New Design" });
   expect(dialog.getAttribute("aria-modal")).toBe("true");
-  for (const name of ["Epic name", "Rough idea"]) expect(getComputedStyle(screen.getByRole("textbox", { name })).fontSize).toBe("16px");
+  for (const name of ["Epic slug", "Rough idea"]) expect(getComputedStyle(screen.getByRole("textbox", { name })).fontSize).toBe("16px");
   expect(getComputedStyle(screen.getByRole("combobox", { name: "Project" })).fontSize).toBe("16px");
   for (const name of ["Start design", "Discard", "Close"]) expect(screen.getByRole("button", { name })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
@@ -71,20 +71,20 @@ test("starting project skips a project that is gone", () => {
 
 test("every change saves the draft, and a new mount restores it", () => {
   mount();
-  type("Epic name", "fresh");
+  type("Epic slug", "fresh");
   type("Rough idea", "an idea");
   type("Project", "blog");
   expect(saved()).toEqual({ slug: "fresh", idea: "an idea", project: "blog" });
   cleanup();
   mount();
-  expect((screen.getByRole("textbox", { name: "Epic name" }) as HTMLInputElement).value).toBe("fresh");
+  expect((screen.getByRole("textbox", { name: "Epic slug" }) as HTMLInputElement).value).toBe("fresh");
   expect((screen.getByRole("textbox", { name: "Rough idea" }) as HTMLTextAreaElement).value).toBe("an idea");
   expect(project()).toBe("blog");
 });
 
 test("Close, Escape and a backdrop click close and keep the draft", () => {
   const { onClose } = mount();
-  type("Epic name", "fresh");
+  type("Epic slug", "fresh");
   click("Close");
   fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   fireEvent.click(screen.getByRole("dialog").parentElement!);
@@ -118,7 +118,7 @@ test("Discard with text asks first; Keep returns, Discard clears", () => {
 test("Start design posts, clears the draft and reports the address", async () => {
   const open = vi.fn(ok);
   const { onStarted } = mount({ open });
-  type("Epic name", " fresh ");
+  type("Epic slug", " fresh ");
   type("Rough idea", "an idea");
   await act(async () => click("Start design"));
   expect(open).toHaveBeenCalledWith({ epic: "fresh", new_design: true, idea: "an idea", project: "gx" });
@@ -128,7 +128,7 @@ test("Start design posts, clears the draft and reports the address", async () =>
 
 test("a start_error clears the draft and hands the reason to the page", async () => {
   const { onStarted } = mount({ open: async () => ({ epic_created: true, start_error: "agent binary missing" }) as never });
-  type("Epic name", "fresh");
+  type("Epic slug", "fresh");
   type("Rough idea", "an idea");
   await act(async () => click("Start design"));
   expect(onStarted).toHaveBeenCalledWith("gx:fresh", "agent binary missing");
@@ -137,7 +137,7 @@ test("a start_error clears the draft and hands the reason to the page", async ()
 
 test("a refusal shows in the dialog and keeps the draft", async () => {
   const { onStarted } = mount({ open: async () => ({ refused: true, message: "name taken" }) as never });
-  type("Epic name", "fresh");
+  type("Epic slug", "fresh");
   await act(async () => click("Start design"));
   expect(screen.getByText("name taken")).toBeTruthy();
   expect(onStarted).not.toHaveBeenCalled();

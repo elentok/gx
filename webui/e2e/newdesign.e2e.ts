@@ -15,7 +15,7 @@ const openDialog = async (page: Page) => {
 };
 
 const fields = (dialog: Locator) => ({
-  slug: dialog.getByRole("textbox", nav("Epic name")),
+  slug: dialog.getByRole("textbox", nav("Epic slug")),
   idea: dialog.getByRole("textbox", nav("Rough idea")),
   project: dialog.getByRole("combobox", nav("Project")),
 });
@@ -39,7 +39,7 @@ test("26. New Design form", async ({ page, start }) => {
 
   // One project: no pill. The idea box fills more than half the dialog.
   await expect(project).toHaveCount(0);
-  await expect(slug).toHaveAttribute("placeholder", "epic-name");
+  await expect(slug).toHaveAttribute("placeholder", "my-epic");
   await expect(idea).toHaveAttribute("placeholder", "What is the problem? Who hits it? What does done look like?");
   const [box, sheet] = [await idea.boundingBox(), await dialog.boundingBox()];
   expect(box!.height).toBeGreaterThan(sheet!.height / 2);

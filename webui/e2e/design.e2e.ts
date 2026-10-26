@@ -208,7 +208,7 @@ test.describe("12. The auto-advance switch", () => {
 const startDesign = async (page: Page, slug: string) => {
   await page.getByRole("button", nav("New Design")).click();
   const dialog = page.getByRole("dialog", nav("New Design"));
-  await dialog.getByRole("textbox", nav("Epic name")).fill(slug);
+  await dialog.getByRole("textbox", nav("Epic slug")).fill(slug);
   await dialog.getByRole("textbox", nav("Rough idea")).fill("An idea.");
   await dialog.getByRole("button", nav("Start design")).click();
   await expect(page).toHaveURL(new RegExp(`#/d/demo:${slug}$`));
@@ -248,7 +248,7 @@ test.describe("43. New session on a stopped Design", () => {
     // The banner and the header each have a "New session"; the header one is first in the page.
     await expect(newSession(page).first()).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(page.getByRole("textbox", nav("Epic name"))).toHaveCount(0);
+    await expect(page.getByRole("textbox", nav("Epic slug"))).toHaveCount(0);
 
     await newSession(page).first().click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -267,7 +267,7 @@ test.describe("44. Failure banner New session", () => {
     await expect(failure).toContainText("Session ended");
     await failure.getByRole("button", nav("New session")).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(page.getByRole("textbox", nav("Epic name"))).toHaveCount(0);
+    await expect(page.getByRole("textbox", nav("Epic slug"))).toHaveCount(0);
     await expect.poll(async () => (await sessionRows(fixture, "ended-design")).length).toBe(2);
   });
 });

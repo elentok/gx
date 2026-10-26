@@ -291,7 +291,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   2. Click "← Epics", open New Design again, press Escape, then click the new card's title.
 - **Pass:**
   - The form is a "New Design" dialog with a header row (no project pill in `ready`, which has one
-    project) and an idea box taller than half the dialog. The placeholders read `epic-name` and
+    project) and an idea box taller than half the dialog. The placeholders read `my-epic` and
     "What is the problem? Who hits it? What does done look like?".
   - Start opens `#/d/demo:fresh-design` and `gx server epics` lists it. `gx tickets show
     demo:fresh-design` shows `kind: map`, `design_step: chart` and `## Initial prompt`, and no
@@ -309,7 +309,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
 
 - **Scenario:** `ready`
 - **Steps:** open New Design.
-- **Pass:** the Epic name and Rough idea fields have a computed font size of 16px.
+- **Pass:** the Epic slug and Rough idea fields have a computed font size of 16px.
 
 ## 35. New Design project select
 
@@ -421,7 +421,7 @@ an exited session.
 
 - **Scenario:** `ready`
 - **Steps:** start `retry-design`, stop its session, stay on `#/d/demo:retry-design`; click the header "New session".
-- **Pass:** no dialog and no Epic name field appear, and `gx agents list` shows a second session for it.
+- **Pass:** no dialog and no Epic slug field appear, and `gx agents list` shows a second session for it.
 
 ## 44. Failure banner New session
 
