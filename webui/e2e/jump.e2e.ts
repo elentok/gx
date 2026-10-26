@@ -74,16 +74,16 @@ test("22. Back link count", async ({ page, start }) => {
   const fx = await start("united");
   const back = (n: number) => page.getByRole("link", nav(`← Epics · ${n} more need you`));
 
-  // Seven other cards need you from a Needs-you epic, eight from one that does not.
+  // Eight other cards need you from a Needs-you epic, nine from one that does not.
   await goto(page, "#/e/demo:paused-epic");
-  await expect(back(7)).toBeVisible();
+  await expect(back(8)).toBeVisible();
   await goto(page, "#/d/demo:design-live");
-  await expect(back(8)).toBeVisible();
+  await expect(back(9)).toBeVisible();
   await goto(page, "#/e/demo:running-epic");
-  await expect(back(8)).toBeVisible();
+  await expect(back(9)).toBeVisible();
 
   // The count is smaller than "← Epics", not the link's colour, and has no pill background.
-  const style = await back(8).getByText("· 8 more need you").evaluate((el) => {
+  const style = await back(9).getByText("· 9 more need you").evaluate((el) => {
     const cs = getComputedStyle(el);
     const link = getComputedStyle(el.closest("a")!);
     return { smaller: parseFloat(cs.fontSize) < parseFloat(link.fontSize), recolored: cs.color !== link.color, bg: cs.backgroundColor };
@@ -95,12 +95,12 @@ test("22. Back link count", async ({ page, start }) => {
   await expect(page.getByTestId("waiting-count")).toHaveCount(0);
 
   // Clicking the count text itself opens the Epics page.
-  await back(8).getByText("· 8 more need you").click();
+  await back(9).getByText("· 9 more need you").click();
   await expect(page).toHaveURL(/#\/epics$/);
 
   // The count follows the server with no reload.
   await goto(page, "#/e/demo:running-epic");
-  await expect(back(8)).toBeVisible();
+  await expect(back(9)).toBeVisible();
   await fx.cli("tickets", "set", "demo:paused-epic/01", "--status", "open");
-  await expect(back(7)).toBeVisible();
+  await expect(back(8)).toBeVisible();
 });

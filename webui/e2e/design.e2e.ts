@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, section, test, type Fixture } from "./fixture";
+import { card, expect, holdRoute, nav, section, test, type Fixture } from "./fixture";
 
 // The card's title opens the epic page, whose Start button starts the session and moves on.
 // The Design page before the start is reached by its route.
@@ -42,7 +42,10 @@ test.describe("5. Answer a round", () => {
     await expect(questions.getByText("Q8b - Migrate at startup?")).toBeVisible();
     await questions.getByRole("button", { name: /Yes/ }).click();
     await expect(questions.getByText("2 of 2 answered")).toBeVisible();
+    const release = await holdRoute(page, "**/v1/sessions/prompt");
     await page.getByRole("button", nav("Send")).click();
+    await expect(page.getByRole("button", nav("Send"))).toBeDisabled();
+    release();
 
     // The agent got the answers: the chat shows them as the person's message.
     await expect(page.getByText("Q8 - Which store?: SQLite")).toBeVisible();
@@ -520,7 +523,11 @@ test.describe("45. Delete design", () => {
     await expect(del).toBeVisible();
 
     await del.click();
-    await page.getByRole("button", nav("Delete")).click();
+    const release = await holdRoute(page, "**/v1/designs/delete");
+    const confirm = page.getByRole("button", nav("Delete"));
+    await confirm.click();
+    await expect(confirm).toBeDisabled();
+    release();
     await expect(page).toHaveURL(/#\/epics$/);
     await expect(card(page, "delete-me")).toHaveCount(0);
     await expect(fixture.cli("tickets", "show", "demo:delete-me")).rejects.toBeTruthy();

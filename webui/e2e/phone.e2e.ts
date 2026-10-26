@@ -14,9 +14,9 @@ test("23. Phone, Epics page", async ({ page, start }) => {
 
   // The back link stays on one line with the short or the full count.
   await page.evaluate(() => (location.hash = "#/d/demo:design-live"));
-  const back = page.getByRole("link", { name: /^← Epics · 8 more/ });
+  const back = page.getByRole("link", { name: /^← Epics · 9 more/ });
   await expect(back).toBeVisible();
-  await expect(back).toContainText(/· 8 more( need you)?$/);
+  await expect(back).toContainText(/· 9 more( need you)?$/);
   const line = await back.boundingBox();
   const lineHeight = await back.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
   expect(line!.height).toBeLessThanOrEqual(lineHeight * 1.5);

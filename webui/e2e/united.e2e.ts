@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, section, test } from "./fixture";
+import { card, expect, nav, section, test, toasts } from "./fixture";
 
 const NEEDS_YOU = [
   "paused-epic",
@@ -7,6 +7,7 @@ const NEEDS_YOU = [
   "perm-epic",
   "deadlock-epic",
   "blocked-merge-epic",
+  "dirty-trunk-epic",
   "awaiting-epic",
   "design-question",
   "paused", // the one-off ticket
@@ -82,6 +83,12 @@ test("16. Needs you", async ({ page, start }) => {
   for (const name of ["blocked-merge-epic", "awaiting-epic"]) {
     await expect(card(page, name).getByRole("button")).toHaveText(["Merge"]);
   }
+  // A dirty trunk offers both ways out and names the cause, but lists no files on the card.
+  const dirty = card(page, "dirty-trunk-epic");
+  await expect(dirty.getByRole("button")).toHaveText(["Stash, merge and restore", "Merge again"]);
+  await expect(dirty.getByTestId("pill")).toHaveText("Merge blocked");
+  await expect(dirty.getByTestId("reason")).toHaveText("Trunk has local changes");
+  await expect(dirty.getByTestId("land-block-files")).toHaveCount(0);
   for (const name of ["running-epic", "queued-epic"]) {
     await expect(card(page, name).getByRole("button")).toHaveCount(0);
   }
@@ -98,15 +105,18 @@ test("16. Needs you", async ({ page, start }) => {
   await expect(page.getByText("No match")).toBeVisible();
 });
 
-// The fixture's epics have no git branch, so the server refuses the merge. A refusal on the card
-// toast shows the click reached the server from the card, with no navigation.
+// The fixture's epics have no git branch, so the server refuses the merge on awaiting-epic. Every
+// outcome is a toast on the card, with no navigation.
 test("17. Merge from the card", async ({ page, start }) => {
   await start("united");
   await section(page, "Needs you");
-  for (const name of ["awaiting-epic", "blocked-merge-epic"]) {
-    await card(page, name).getByRole("button", nav("Merge")).click();
-    await expect(page.locator("[data-scope='toast'][data-part='root']").last()).toBeVisible();
-  }
+
+  await card(page, "awaiting-epic").getByRole("button", nav("Merge")).click();
+  await expect(toasts(page).filter({ hasText: /^no branch awaiting-epic in / })).toBeVisible();
+
+  await card(page, "blocked-merge-epic").getByRole("button", nav("Merge")).click();
+  await expect(toasts(page).last()).toBeVisible();
+  await expect(toasts(page)).toHaveCount(2);
   await expect(page).toHaveURL(/#\/epics$/);
 });
 
@@ -282,7 +292,7 @@ test("51. Merge from the epic page", async ({ page, start }) => {
   // paused epic with a land-block reason.
   await page.evaluate(() => (location.hash = "#/e/demo:blocked-merge-epic"));
   await expect(page.getByText("needs a rebase")).toBeVisible();
-  await expect(page.getByRole("button", nav("Merge"))).toBeVisible();
+  await expect(page.getByRole("button", nav("Merge again"))).toBeVisible();
 });
 
 test("52. Draft impl epic", async ({ page, start }) => {

@@ -121,4 +121,18 @@ export async function section(page: Page, title: string) {
 export const card = (page: Page, epic: string) =>
   page.locator("[data-kind]").filter({ has: page.getByRole("link", { name: epic, exact: true }) });
 
+/** Holds every request to `url` until the returned release runs, so a test can see a button while its write is pending. */
+export async function holdRoute(page: Page, url: string): Promise<() => void> {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route(url, async (route) => {
+    await gate;
+    await route.continue();
+  });
+  return release;
+}
+
+/** The toasts on screen. */
+export const toasts = (page: Page) => page.getByRole("region", { name: /^Notifications/ }).getByRole("status");
+
 export { expect };

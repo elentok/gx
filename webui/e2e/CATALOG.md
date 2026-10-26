@@ -8,15 +8,16 @@ Epics page cards. The helpers `section` and `card` in `fixture.ts` find a sectio
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40).
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59).
 
 ## 1. Queue an epic
 
 - **Scenario:** `ready` (one epic, `ready-epic`, not queued)
 - **Steps:**
   1. Open the Epics page; `ready-epic` is in Ready to queue.
-  2. Click the card's Queue button.
-- **Pass:** the card leaves Ready to queue and shows in In progress, with no navigation.
+  2. Click the card's Queue button, with the `/v1/queue/add` call held.
+- **Pass:** the card's button is disabled while the call runs. After it, the card leaves Ready to
+  queue and shows in In progress, with no navigation and no toast.
 
 ## 2. Epic looks right
 
@@ -86,10 +87,11 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Scenario:** `design`
 - **Steps:**
   1. Start the session. Round one has `Q8` (options) and `Q8b` (yes/no).
-  2. Pick SQLite and Yes, then Send.
+  2. Pick SQLite and Yes, then Send, with the `/v1/sessions/prompt` call held.
   3. Click Continue.
 - **Pass:**
   - The question dots and titles read `Q8` and `Q8b`.
+  - Send is disabled while the call runs.
   - The chat shows the answers as the person's message, so the agent received them.
   - Continue shows after the agent's run-end line.
   - Continue brings a fresh round with `Q9`.
@@ -194,13 +196,15 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Pass:**
   - Sections read Needs you, Ready to queue, In progress, Ready to design, Finished. Ready to design
     and Finished start collapsed, and the header toggles Ready to design.
-  - Each title shows its card count: eight in Needs you (paused, question, permission, deadlock,
-    merge-blocked, awaiting-merge, Design question, paused one-off), and Finished counts the cards
+  - Each title shows its card count: nine in Needs you (paused, question, permission, deadlock,
+    merge-blocked, dirty-trunk, awaiting-merge, Design question, paused one-off), and Finished counts the cards
     on screen.
   - Every Needs-you card has a pill; no other section has one. The stopped Design sits in In
     progress with Continue.
   - A click on a card's project text stays on `#/epics`; its title opens `#/e/demo:paused-epic`.
-  - Merge is the only button on the merge-blocked and awaiting-merge cards. Queued, running,
+  - Merge is the only button on the merge-blocked and awaiting-merge cards. The dirty-trunk card
+    shows "Stash, merge and restore" and "Merge again", the pill "Merge blocked" and the reason
+    "Trunk has local changes", with no file list. Queued, running,
     finished and draft cards have no buttons.
   - A filter shows only the matching card, and "No match" when nothing matches.
 - **Not covered:** a Ready to queue card with a blocker (the scenario has none, so its reason is
@@ -210,8 +214,9 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 
 - **Scenario:** `united`
 - **Steps:** click Merge on `awaiting-epic`, then on `blocked-merge-epic`.
-- **Pass:** each card shows the server's refusal, and the page stays on `#/epics`. The fixture's
-  epics have no git branch, so a successful merge is not covered.
+- **Pass:** `awaiting-epic` shows the toast "no branch awaiting-epic in ..." (the fixture's epics
+  have no git branch). `blocked-merge-epic` shows its result as a second toast. The page stays on
+  `#/epics`. A successful merge is not covered.
 
 ## 18. Joined card
 
@@ -268,18 +273,18 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
   2. Click the count text of the back link.
   3. Open `#/e/demo:running-epic`; run `gx tickets set demo:paused-epic/01 --status open`.
 - **Pass:**
-  - The back link reads "← Epics · 7 more need you" on `paused-epic` (itself in Needs you) and
-    "· 8 more need you" on the other two pages. A stopped Design is not in Needs you.
+  - The back link reads "← Epics · 8 more need you" on `paused-epic` (itself in Needs you) and
+    "· 9 more need you" on the other two pages. A stopped Design is not in Needs you.
   - The title button has no number and no `waiting-count` element exists.
   - Clicking the count text opens `#/epics`.
-  - The count drops from 8 to 7 with no reload.
+  - The count drops from 9 to 8 with no reload.
 
 ## 23. Phone, Epics page
 
 - **Scenario:** `united`, at 375 px wide (`test.use({ viewport })`)
 - **Pass:**
   - Two cards of Needs you share a left edge and the second sits below the first.
-  - On `#/d/demo:design-live` the back link reads "← Epics · 8 more" (or the full text) on one line.
+  - On `#/d/demo:design-live` the back link reads "← Epics · 9 more" (or the full text) on one line.
 
 ## 41. Phone, New Design sheet
 
@@ -461,11 +466,12 @@ an exited session.
 - **Scenario:** `ready`; the second test uses `design`.
 - **Steps:**
   1. Start `delete-me`; "Delete design" is absent. Stop its session with the page open.
-  2. Click "Delete design", then Keep, then "Delete design" and Delete.
+  2. Click "Delete design", then Keep, then "Delete design" and Delete (with `/v1/designs/delete` held).
   3. Start `delete-me` again.
   4. On `design`, open `#/d/demo:design-epic`.
 - **Pass:**
   - "Delete design" appears with no reload. Keep returns to the page with the button still there.
+  - The confirm Delete is disabled while the call runs.
   - Delete goes to `#/epics`, the card is gone and `gx tickets show demo:delete-me` fails.
   - The second New Design with `delete-me` succeeds.
   - `design-epic` (charted) shows no "Delete design".
@@ -539,7 +545,7 @@ an exited session.
 - **Steps:** open `#/e/demo:awaiting-epic`, then `#/e/demo:blocked-merge-epic`.
 - **Pass:**
   - `awaiting-epic` has a Merge button with `data-tone="done"`, last in the button group.
-  - `blocked-merge-epic` shows "needs a rebase" under the bar. Merge is still there, as the retry.
+  - `blocked-merge-epic` shows "needs a rebase" under the bar. The button reads "Merge again".
 
 ## 52. Draft impl epic
 
@@ -592,3 +598,30 @@ an exited session.
   - At 7d the headlines are 260 and 6, with no hatched days.
   - Project `demo` shows 310 and 7; the 4 hatched days stay the same.
   - At phone width the cards stack in one column with no horizontal scroll.
+
+## 58. Dirty trunk on the Epic page
+
+- **Scenario:** `dirty-trunk` (epic `dirty-epic`; the trunk has an untracked `same.txt` that the
+  epic's branch also adds)
+- **Steps:** open `#/e/demo:dirty-epic`.
+- **Pass:**
+  - The stats line reads "Paused · ...", and the reason says the changes clash with `same.txt`.
+  - The file list (`land-block-files`) holds one item, `same.txt`.
+  - "Stash, merge and restore" (with its tooltip) and "Merge again" are there.
+
+## 59. Stash, merge and restore
+
+- **Scenario:** `dirty-trunk`, started with `--hold`
+- **Steps:** open `#/e/demo:dirty-epic`; click "Stash, merge and restore".
+- **Pass:** a ticket "Resolve the conflicts on main" appears in the epic, the stats line reads
+  "Running · ...", the stash button is gone, and the epic never shows "Awaiting merge" or
+  "Finished" (the held worker keeps the epic unfinished).
+
+## 60. Merge again on a dirty trunk
+
+- **Scenario:** `dirty-trunk`
+- **Steps:** open `#/e/demo:dirty-epic`; click "Merge again" while the trunk is still dirty.
+- **Pass:**
+  - A warning toast says the changes clash with `same.txt`, with an "Open the paused epic" link to
+    the epic.
+  - The Epic page stays on "Paused" and shows the fresh file list (`same.txt`).

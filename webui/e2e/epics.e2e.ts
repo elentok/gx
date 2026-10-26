@@ -1,15 +1,20 @@
-import { card, expect, nav, section, test } from "./fixture";
+import { card, expect, holdRoute, nav, section, test, toasts } from "./fixture";
 
 test("1. Queue an epic", async ({ page, start }) => {
   await start("ready");
   const ready = await section(page, "Ready to queue");
   await expect(ready.getByRole("link", { name: "ready-epic" })).toBeVisible();
 
+  const release = await holdRoute(page, "**/v1/queue/add");
   await card(page, "ready-epic").getByRole("button", nav("Queue")).click();
+  await expect(card(page, "ready-epic").getByRole("button")).toBeDisabled();
+  release();
 
   await expect(ready.getByRole("link", { name: "ready-epic" })).toHaveCount(0);
   const progress = await section(page, "In progress");
   await expect(progress.getByRole("link", { name: "ready-epic" })).toBeVisible();
+  // The card moving is the feedback: no success toast.
+  await expect(toasts(page)).toHaveCount(0);
 });
 
 test("2. Epic looks right", async ({ page, start }) => {
