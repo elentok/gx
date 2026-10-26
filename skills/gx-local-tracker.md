@@ -260,9 +260,16 @@ How the `gx-wayfinder` skill's map and tickets map onto this tracker. This is th
 operations a map needs — chart, claim, close and frontier; a gap belongs here, not in the skill
 that drives it.
 
-- **Chart**: `gx tickets epic add <project:epic> --kind map --status open --body -`, body = the map
-  (a frontmatter block at the top may set `destination_unconfirmed: true`). Then run
-  `gx tickets validate` on any ticket of the epic. Later edits to the map body (Decisions so far,
+- **Chart**: two cases.
+  - The map exists already (New Design wrote it): one `gx tickets section <project:epic> <heading> -`
+    call per section (Destination, Notes, Decisions so far, Not yet specified). `epic add` refuses an
+    existing epic. Keep `## Initial prompt`.
+  - Direct route, no map yet: `gx tickets epic add <project:epic> --kind map --status open --body -`
+    with a body holding only `## Initial prompt`, then
+    `gx tickets set <project:epic> --design-step chart`. Fill in the sections as in the first case.
+    (A frontmatter block at the top of the body may set `destination_unconfirmed: true`.)
+
+  Then run `gx tickets validate` on any ticket of the epic. Later edits to the map body (Decisions so far,
   Not yet specified, Out of scope) go through `gx tickets section <project:epic> <heading> -`.
 - **Child ticket**: `gx tickets add <epic> --slug <slug> --type <type> [--blocked-by <ids>] --body
   -`, with the question under `## Question`.

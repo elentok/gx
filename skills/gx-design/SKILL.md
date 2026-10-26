@@ -58,10 +58,14 @@ At each detection, including after a chain, report the step it starts with
 `gx agent step <step> [--title "<ticket title>"]`. Use the step name from the list above; pass
 the ticket title during `resolve-tickets`.
 
-1. **No map epic** (`gx tickets epics --maps` doesn't list it) → follow gx-wayfinder's "Chart the map"
-   for the epic, including its Destination grilling. Text after the epic address in
-   `/gx-design <epic> <idea>` is the rough idea: pass it to that step as the loose idea instead of
-   asking for it. Once the map is charted, set `--design-step chart`.
+1. **The map has no `## Destination`** → report the step as `chart`. Read `## Initial prompt` as the
+   loose idea and follow gx-wayfinder's "Chart the map" into the existing map, including its
+   Destination grilling.
+   - **No map epic** (`gx tickets epics --maps` doesn't list it): a direct invocation. Text after the
+     epic address in `/gx-design <epic> <idea>` is the idea; without it, ask for the idea first.
+     Write the map as the tracker's "Chart" operation says (`kind: map`, `design_step: chart`, body
+     holding only `## Initial prompt` with the idea text). That map has no Destination, so go on
+     with the chart step above.
 2. **`destination_unconfirmed: true`** → follow `gx-grilling` on the Destination alone, then clear the
    flag with `gx tickets set <project:epic> --destination-unconfirmed false`. Continue to step 3 in
    the same session, unless the grilling changed the Destination enough that seeded tickets must
