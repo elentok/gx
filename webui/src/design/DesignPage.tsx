@@ -1,20 +1,15 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useCallback, useState } from "react";
-import { useNavigate } from "react-router";
+import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
-import { designHref } from "../hrefs";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { BackLink } from "../nav/BackLink";
 import { JumpMenu } from "../nav/JumpMenu";
-import { readPageCache, writePageCache } from "../pageCache";
 import { DetailPage } from "../page/DetailPage";
-import { Button } from "../ui/button/Button";
 import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
 import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
-import { NewDesignForm, type NewDesignDraft } from "./NewDesignForm";
 import type { OpenDesign, ResumeSession, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress, showsImplLink } from "./Progress";
@@ -40,10 +35,8 @@ interface SessionStripProps {
   address: string;
   session?: SessionInfo;
   live: SessionInfo[];
-  chart?: boolean;
   deps: DesignDeps;
   onSelect: (id: string) => void;
-  onNewSession: () => void;
 }
 
 // The header above the chat: switch/stop controls, a way to start again, or the first Start button.
@@ -51,32 +44,21 @@ function SessionStrip({
   address,
   session,
   live,
-  chart,
   deps,
   onSelect,
-  onNewSession,
 }: SessionStripProps) {
   if (!session) {
     return <StartDesignButton address={address} open={deps.open} />;
   }
-  if (!chart)
-    return (
-      <SessionHeader
-        address={address}
-        shown={session}
-        live={live}
-        onSelect={onSelect}
-        open={deps.open}
-        stop={deps.stop}
-      />
-    );
-  if (session.status.state !== "exited") return null;
   return (
-    <Box display="flex" justifyContent="flex-end">
-      <Button size="sm" emphasis="secondary" onClick={onNewSession}>
-        New session
-      </Button>
-    </Box>
+    <SessionHeader
+      address={address}
+      shown={session}
+      live={live}
+      onSelect={onSelect}
+      open={deps.open}
+      stop={deps.stop}
+    />
   );
 }
 
@@ -85,17 +67,12 @@ function DesignBody({
   address,
   wide,
   deps,
-  chart,
   fetchList,
-  onNewSession,
 }: {
   address: string;
   wide: boolean;
   deps: DesignDeps;
   fetchList?: FetchEpicList;
-  /** The Design has no map yet, so only its session can be started again, from the New Design form. */
-  chart?: boolean;
-  onNewSession: () => void;
 }) {
   const conn = useConnectionContext();
   const { detail } = useEpicDetail(address, conn, deps.fetchDetail);
@@ -147,10 +124,8 @@ function DesignBody({
           address={address}
           session={session}
           live={live}
-          chart={chart}
           deps={deps}
           onSelect={setSelected}
-          onNewSession={onNewSession}
         />
       </Box>
       <Box
@@ -183,7 +158,8 @@ function DesignBody({
             nextTitle={nextTitle}
             working={working}
             actions={{
-              onNewSession,
+              address,
+              open: deps.open,
               resume: deps.resume,
               fetchScreen: deps.fetchScreen,
             }}
@@ -205,8 +181,6 @@ function DesignBody({
   );
 }
 
-const NEW_DESIGN_CACHE = "design.new";
-
 export function DesignPage({
   address,
   fetchList,
@@ -219,53 +193,10 @@ export function DesignPage({
   const conn = useConnectionContext();
   const { list, failed } = useEpicList(fetchList, conn);
 
-  const navigate = useNavigate();
-  // The open form and its text survive a reload, like a half-answered round (see useRoundDraft).
-  const [draft, setDraftState] = useState<NewDesignDraft | undefined>(
-    () => readPageCache<NewDesignDraft>(NEW_DESIGN_CACHE) ?? undefined,
-  );
-  const setDraft = (d: NewDesignDraft | undefined) => {
-    writePageCache(NEW_DESIGN_CACHE, d ?? null);
-    setDraftState(d);
-  };
-  // Saves without touching state: the form's key comes from the draft, so a state change would remount it.
-  const saveDraft = useCallback(
-    (d: NewDesignDraft) => writePageCache(NEW_DESIGN_CACHE, d),
-    [],
-  );
-
   const wide = useWide();
-  const projectNames = [...new Set((list?.epics ?? []).map((e) => e.project))];
-  // The form's project select starts on the Design on screen.
-  const currentProject = address.split(":")[0];
-  const formProjects = [
-    currentProject,
-    ...projectNames.filter((p) => p !== currentProject),
-  ];
-  // No map yet: Chart has not made the Design's epic.
-  const chart = !list?.epics.some((e) => e.address === address);
-  const onNewSession = () =>
-    setDraft({
-      slug: address.slice(address.indexOf(":") + 1),
-      project: currentProject,
-    });
 
   return (
     <DetailPage active="epics" fill>
-      {draft && (
-        <NewDesignForm
-          key={`${draft.slug}|${draft.project}`}
-          projects={formProjects}
-          initial={draft}
-          open={deps.open}
-          onStarted={(started) => {
-            setDraft(undefined);
-            navigate(designHref(started).slice(1));
-          }}
-          onCancel={() => setDraft(undefined)}
-          onChange={saveDraft}
-        />
-      )}
       {failed ? (
         <Text color="text.muted">Could not load Designs</Text>
       ) : !list ? (
@@ -275,9 +206,7 @@ export function DesignPage({
           address={address}
           wide={wide}
           deps={deps}
-          chart={chart}
           fetchList={fetchList}
-          onNewSession={onNewSession}
         />
       )}
     </DetailPage>

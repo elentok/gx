@@ -58,6 +58,18 @@ export function StartDesignButton({
   );
 }
 
+/** Opens a new session for the Design; asks first, and sends the state token, when the shown one is live. */
+export function useStartNew(address: string, shown: SessionInfo, open: OpenDesign = postOpenDesign) {
+  const write = useWrite();
+  const isLive = shown.status.state !== "exited";
+  const startNew = () => {
+    if (isLive && !window.confirm("Stop the current session and start a new one?")) return;
+    const body: DesignOpenRequest = { epic: address, new: true, ...(isLive ? { state: stateToken(shown) } : {}) };
+    write.run(() => open(body));
+  };
+  return { startNew, pending: write.pending, error: write.error };
+}
+
 /** The chat header: the live-session menu, and New session. */
 export function SessionHeader({
   address,
@@ -77,13 +89,7 @@ export function SessionHeader({
 }) {
   const { run, pending, error } = useWrite();
   const [menu, setMenu] = useState(false);
-  const isLive = shown.status.state !== "exited";
-
-  const startNew = () => {
-    if (isLive && !window.confirm("Stop the current session and start a new one?")) return;
-    const body: DesignOpenRequest = { epic: address, new: true, ...(isLive ? { state: stateToken(shown) } : {}) };
-    run(() => open(body));
-  };
+  const startNew = useStartNew(address, shown, open);
 
   return (
     <Box display="flex" flexDirection="column" gap="1">
@@ -93,7 +99,7 @@ export function SessionHeader({
             {live.length} live {menu ? "▴" : "▾"}
           </Button>
         )}
-        <Button size="sm" emphasis="secondary" disabled={pending} onClick={startNew}>
+        <Button size="sm" emphasis="secondary" disabled={pending || startNew.pending} onClick={startNew.startNew}>
           New session
         </Button>
       </Box>
@@ -122,7 +128,7 @@ export function SessionHeader({
           ))}
         </Box>
       )}
-      <Failure>{error}</Failure>
+      <Failure>{error || startNew.error}</Failure>
     </Box>
   );
 }

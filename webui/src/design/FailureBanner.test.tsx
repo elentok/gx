@@ -5,7 +5,7 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import type { MapStep, SessionChatResponse, SessionFailure, SessionInfo, SessionResult } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
-import type { ResumeSession } from "./open";
+import type { OpenDesign, ResumeSession } from "./open";
 import type { PostPrompt } from "./prompt";
 import type { FetchScreen } from "./screen";
 
@@ -43,7 +43,7 @@ const steps = (done: boolean): MapStep[] => [
 
 function render(
   s: SessionInfo,
-  opts: { done?: boolean; post?: PostPrompt; resume?: ResumeSession; screen?: FetchScreen; chat?: SessionChatResponse } = {},
+  opts: { done?: boolean; post?: PostPrompt; resume?: ResumeSession; openDesign?: OpenDesign; screen?: FetchScreen; chat?: SessionChatResponse } = {},
 ) {
   const state = { snapshot: { sessions: [s] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
   const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
@@ -62,6 +62,7 @@ function render(
       chat: async () => ({ kind: "ok", detail: opts.chat ?? chat }),
       prompt: opts.post,
       resume: opts.resume,
+      openDesign: opts.openDesign,
       screen: opts.screen,
     }),
     { initialEntries: ["/d/gx:a"] },
@@ -153,6 +154,26 @@ test("Restore sends the state token and keeps a half-answered round's draft", as
   expect(body.id).toBe("s-a");
   expect(body.state).toMatch(/^s-a:exited:\d+$/);
   expect(((await screen.findByLabelText("Answer to question 1")) as HTMLTextAreaElement).value).toBe("half an answer");
+});
+
+test("an ended session's New session opens a new one without a state token", async () => {
+  const openDesign = vi.fn<OpenDesign>(async () => ok);
+  render(crashed(), { openDesign });
+  fireEvent.click(within(await banner()).getByRole("button", { name: "New session" }));
+  await waitFor(() => expect(openDesign).toHaveBeenCalledWith({ epic: "gx:a", new: true }));
+});
+
+test("a stalled live session's New session confirms, then sends the state token", async () => {
+  const openDesign = vi.fn<OpenDesign>(async () => ok);
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  render(session("working", { kind: "stalled", label: "Stalled" }), { openDesign });
+  fireEvent.click(within(await banner()).getByRole("button", { name: "New session" }));
+  await waitFor(() => expect(openDesign).toHaveBeenCalledTimes(1));
+  expect(confirm).toHaveBeenCalled();
+  const body = openDesign.mock.calls[0][0];
+  expect(body.new).toBe(true);
+  expect(body.state).toMatch(/^s-a:working:\d+$/);
+  confirm.mockRestore();
 });
 
 test("a quick re-crash hides Restore and makes New session primary", async () => {

@@ -112,6 +112,19 @@ test("without a session the title row offers to start one", async () => {
   expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy();
 });
 
+test("a chart-step map with an exited session shows the session header, never the New Design form", async () => {
+  render([map("a")], [session("a", { status: { state: "exited" } })], "/d/gx:a", detailOf({ steps: stepsAt(0) }));
+  fireEvent.click(await screen.findByRole("button", { name: "New session" }));
+  expect(screen.queryByRole("form", { name: "New Design" })).toBeNull();
+  expect(screen.queryByLabelText("Epic name")).toBeNull();
+});
+
+test("a Design with no map yet and no session still offers Start design session", async () => {
+  render([], []);
+  expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy();
+  expect(screen.queryByRole("form", { name: "New Design" })).toBeNull();
+});
+
 const progress = async () => within(await screen.findByRole("region", { name: "Progress" }));
 
 test("Progress shows the eight steps with their marks and the server's labels", async () => {

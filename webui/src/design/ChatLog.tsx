@@ -353,7 +353,7 @@ export function DesignChat({
   done,
   nextTitle,
   working,
-  actions = {},
+  actions,
 }: {
   session?: SessionInfo;
   fetchChat?: FetchChat;
@@ -364,7 +364,7 @@ export function DesignChat({
   nextTitle?: string;
   /** The step the busy row names, and the ticket during Resolve tickets. */
   working?: WorkingStep;
-  actions?: FailureActions;
+  actions: FailureActions;
 }) {
   if (!session) return null;
   if (session.harness !== "claude") {

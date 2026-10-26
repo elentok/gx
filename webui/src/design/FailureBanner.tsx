@@ -4,10 +4,11 @@ import { useConnectionContext } from "../connection";
 import type { SessionFailure, SessionInfo } from "../generated/server";
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
-import { postResumeSession, stateToken, type ResumeSession } from "./open";
+import { postResumeSession, stateToken, type OpenDesign, type ResumeSession } from "./open";
 import { postPrompt, type PostPrompt } from "./prompt";
 import type { FetchScreen } from "./screen";
 import { ScreenModal } from "./ScreenModal";
+import { useStartNew } from "./SessionControls";
 
 // The generated file is imported for types only: its tygo constants are not runtime values.
 const CRASHED = "crashed";
@@ -38,7 +39,9 @@ const BUTTONS: Record<string, ButtonName[]> = {
 };
 
 export interface FailureActions {
-  onNewSession?: () => void;
+  /** The Design's epic address, for New session. */
+  address: string;
+  open?: OpenDesign;
   resume?: ResumeSession;
   fetchScreen?: FetchScreen;
 }
@@ -52,7 +55,8 @@ export function FailureBanner({
   onStale,
   resume = postResumeSession,
   fetchScreen,
-  onNewSession,
+  address,
+  open,
 }: {
   failure: SessionFailure;
   session: SessionInfo;
@@ -69,6 +73,7 @@ export function FailureBanner({
   const [cannotRestore, setCannotRestore] = useState(false);
   const sessionId = session.id;
   const restoreHidden = failure.recrashed || cannotRestore;
+  const startNew = useStartNew(address, session, open);
 
   const restore = async () => {
     setPending(true);
@@ -103,7 +108,7 @@ export function FailureBanner({
 
   const onClick: Record<ButtonName, () => void> = {
     Restore: restore,
-    "New session": () => onNewSession?.(),
+    "New session": startNew.startNew,
     Screen: () => setScreen(true),
     Retry: retry,
   };
@@ -131,7 +136,7 @@ export function FailureBanner({
           Open it in gx, Agents tab.
         </Text>
       )}
-      {error && <Text role="alert">{error}</Text>}
+      {(error || startNew.error) && <Text role="alert">{error || startNew.error}</Text>}
       {buttons.length > 0 && (
         <Box display="flex" gap="2">
           {buttons.map((name) => (
@@ -139,7 +144,7 @@ export function FailureBanner({
               key={name}
               emphasis={name === "New session" && restoreHidden ? "main" : "secondary"}
               tone={name === "New session" && restoreHidden ? "running" : undefined}
-              disabled={pending}
+              disabled={pending || startNew.pending}
               onClick={onClick[name]}
             >
               {name}
