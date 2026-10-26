@@ -42,6 +42,7 @@ func (c *verifyCap) checkAndStop(d Deps, p launchAndPromptParams, sessionID stri
 	if retry, err := interruptOrRetry(d, p, "verify cap"); retry || err != nil {
 		return false, err
 	}
+	// Set before the prompt is sent on purpose: a failed send is logged, not retried.
 	c.fired = true
 
 	reason := fmt.Sprintf("context occupancy %d exceeds the verify cap %d", occupancy, c.limit)
@@ -54,7 +55,7 @@ func (c *verifyCap) checkAndStop(d Deps, p launchAndPromptParams, sessionID stri
 		c.limit, verifySkill,
 	)
 	if err := d.Runner.Prompt(p.session(), prompt); err != nil {
-		p.logAgentEvent(string(events.SmartZoneRecoveryFailed), sessionID, fmt.Sprintf("sending the verify cap prompt to %s: %v", p.Label, err))
+		p.logAgentEvent(string(events.VerifyCapStopped), sessionID, fmt.Sprintf("sending the verify cap prompt to %s: %v", p.Label, err))
 	}
 	return true, nil
 }

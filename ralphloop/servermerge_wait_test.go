@@ -162,6 +162,8 @@ type blipRunner struct {
 	finishPollsOnly bool
 	// interruptErr, when set, fails every Interrupt.
 	interruptErr error
+	// promptErr, when set, fails every Prompt without recording it.
+	promptErr error
 	// contextExhausted, when set, is the evidence of the next RateLimit call
 	// alone failing with ErrContextExhausted; later calls see the fake's state.
 	contextExhausted string
@@ -184,6 +186,13 @@ func (r *blipRunner) Interrupt(s agentrunner.Session) error {
 		return r.interruptErr
 	}
 	return r.Runner.Interrupt(s)
+}
+
+func (r *blipRunner) Prompt(s agentrunner.Session, text string) error {
+	if r.promptErr != nil {
+		return r.promptErr
+	}
+	return r.Runner.Prompt(s, text)
 }
 
 func (r *blipRunner) Wait(s agentrunner.Session, states []agentrunner.State, timeout time.Duration) (agentrunner.Status, error) {

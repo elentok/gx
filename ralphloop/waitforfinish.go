@@ -217,10 +217,6 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		// A gated give-up (the pane claimed completion the transcript never
-		// corroborated) is a failed recovery, not a failed iteration: the agent
-		// is still alive and may well compact on its own, so keep polling and
-		// let the next breach try again. Every other error still aborts.
 		// The cap stop goes first and takes the whole tick: if occupancy is
 		// also past the smart zone, the next poll runs its recovery.
 		stopped, err := vcap.checkAndStop(d, p, sessionID)
@@ -231,6 +227,10 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			elapsedMs = 0
 			continue
 		}
+		// A gated give-up (the pane claimed completion the transcript never
+		// corroborated) is a failed recovery, not a failed iteration: the agent
+		// is still alive and may well compact on its own, so keep polling and
+		// let the next breach try again. Every other error still aborts.
 		breached, err := recovery.checkAndRecover(d, p, sessionID)
 		if err != nil {
 			return err

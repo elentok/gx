@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"slices"
 	"strings"
 	"testing"
@@ -20,9 +21,12 @@ type verifyCapFixture struct {
 	err        error
 }
 
-func runVerifyCapWait(t *testing.T, ticketType string, agent AgentKind, smartZone, polls int, occupancy func(prompts []string) int) verifyCapFixture {
+func runVerifyCapWait(t *testing.T, ticketType string, agent AgentKind, smartZone, polls int, occupancy func(prompts []string) int, tweak ...func(*blipRunner)) verifyCapFixture {
 	t.Helper()
 	r := boundGiveUpRunner(func(wait int) bool { return wait <= polls })
+	for _, f := range tweak {
+		f(r)
+	}
 	scratchDir := epicScratchDir(t, "epic")
 	read := func(string, string) (int, bool, error) { return occupancy(r.Prompts("iter-19")), true, nil }
 	d := Deps{
@@ -83,6 +87,34 @@ func TestWaitForFinish_VerifyCap_StopsVerifyButNotImplement(t *testing.T) {
 	}
 	if i.r.interrupts != 0 || len(i.r.Prompts("iter-19")) != 0 {
 		t.Errorf("implement got interrupts=%d prompts=%q, want neither", i.r.interrupts, i.r.Prompts("iter-19"))
+	}
+}
+
+func TestWaitForFinish_VerifyCap_FailedPromptSendLogsCapStop(t *testing.T) {
+	t.Parallel()
+	got := runVerifyCapWait(t, "verify", AgentClaude, verifyCapTestZone, 3, constOccupancy(verifyCapTestZone),
+		func(r *blipRunner) { r.promptErr = errors.New("send failed") })
+	if got.err != nil {
+		t.Fatal(got.err)
+	}
+	evs, _, err := ReadEvents(got.scratchDir, "epic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var capStops, recoveryFailed int
+	for _, ev := range evs {
+		switch ev.Type {
+		case string(events.VerifyCapStopped):
+			capStops++
+		case string(events.SmartZoneRecoveryFailed):
+			recoveryFailed++
+		}
+	}
+	if recoveryFailed != 0 {
+		t.Errorf("smart-zone-recovery-failed events = %d, want 0", recoveryFailed)
+	}
+	if capStops != 2 {
+		t.Errorf("verify-cap-stopped events = %d, want the stop plus the failed send, with no retry", capStops)
 	}
 }
 

@@ -24,7 +24,6 @@ const (
 	ConflictResolved           Type = "conflict-resolved"
 	PausedSmartZone            Type = "paused-smart-zone"
 	SmartZoneRecoveryFailed    Type = "smart-zone-recovery-failed"
-	VerifyCapStopped           Type = "verify-cap-stopped"
 	SmartZoneWaitExpired       Type = "smart-zone-wait-expired"
 	SmartZoneGateReleased      Type = "smart-zone-gate-released"
 	BackgroundTaskGateHeld     Type = "background-task-gate-held"
@@ -32,6 +31,7 @@ const (
 	BackgroundTaskGateExpired  Type = "background-task-gate-expired"
 	PausedRateLimit            Type = "paused-rate-limit"
 	Resumed                    Type = "resumed"
+	VerifyCapStopped           Type = "verify-cap-stopped"
 	// Paused is a ticket paused for a person; the kind is the pause reason and
 	// its class says whether the person answers or repairs.
 	Paused                  Type = "paused"
