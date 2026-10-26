@@ -24,7 +24,7 @@ func launchSkill(t tickets.Ticket) string {
 		return codeReviewSkill
 	case t.IsVerify():
 		return verifySkill
-	case t.Type == string(schema.TypePrompt):
+	case t.Type == string(schema.TypePrompt), t.Type == string(schema.TypeTrunkConflict):
 		return oneOffSkill
 	case t.Type == string(schema.TypeEvolve):
 		return evolveSkill
@@ -34,6 +34,21 @@ func launchSkill(t tickets.Ticket) string {
 		return mergeSkill
 	}
 	return implementSkill
+}
+
+// trunkConflictNote tells a trunk-conflict agent what the one-off skill does
+// not: it works in the target's own checkout, where a commit would be the
+// person's to make.
+const trunkConflictNote = "This is a trunk-conflict ticket. You are in the checkout of the merge target. " +
+	"Resolve the conflict markers in the files the ticket lists, keeping both sides' intent. " +
+	"Leave the files uncommitted: do not commit, stash, reset or switch branches."
+
+// launchNote is what the agent is told on top of the skill command.
+func launchNote(t tickets.Ticket) string {
+	if t.Type == string(schema.TypeTrunkConflict) {
+		return trunkConflictNote
+	}
+	return investigatePrompt(t)
 }
 
 func launchPrompt(agent ralphloop.AgentKind, skill, note, address string) string {
@@ -111,7 +126,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 			Args:            ralphloop.AgentArgs(agent, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
 			Env:             agentEnv(s.settings.Load().TabEnv, t, ticket),
 			ResumeSessionID: resumeID,
-		}, launchPrompt(agent, launchSkill(t), investigatePrompt(t), ticket.String()), func(attempt int, decision string) {
+		}, launchPrompt(agent, launchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
 			s.logEvent(ticket, ralphloop.Event{Type: string(events.PromptNudged), Label: label, Attempt: attempt, Reason: decision})
 		})
 	}

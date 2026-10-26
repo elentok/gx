@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -21,8 +22,13 @@ type iterationMode struct {
 	// target is where a feature-mode epic merges, resolved at finish so the check
 	// sees the trunk current then.
 	target func() (string, error)
-	// scratchDir is set only for scratch-project tickets.
+	// scratchDir is a kept directory the agent runs in directly, with no worktree:
+	// the scratch dir of a scratch-project ticket, or the target checkout of a
+	// trunk-conflict ticket.
 	scratchDir string
+	// err is why a trunk-conflict ticket's checkout could not be found; prepare
+	// and resume fail with it instead of running the agent somewhere else.
+	err error
 	// ref is the detached worktree's start for a commitless ticket in a real
 	// project; launch-only, so resume never needs it.
 	ref string
@@ -33,11 +39,42 @@ func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterat
 	if typ == schema.TypeMerge {
 		return iterationMode{feature: true, target: func() (string, error) { return s.mergeTarget(addr) }}
 	}
+	if typ == schema.TypeTrunkConflict {
+		dir, err := s.targetCheckout(addr)
+		return iterationMode{commitless: true, scratchDir: dir, err: err}
+	}
 	m := iterationMode{commitless: addr.Project == ScratchProject || addr.Epic == OneOffsEpic || typ == schema.TypePrompt || typ == schema.TypeInvestigate || typ == schema.TypeEvolve || typ == schema.TypeDiagnose}
 	if m.commitless && (addr.Project == ScratchProject || s.projectHasNoVCS(addr.Project)) {
 		m.scratchDir = scratchSubdir(s.cfg.TicketStore, addr.Epic)
 	}
 	return m
+}
+
+// targetCheckout is the directory where addr's root epic merges: the checkout
+// of its target branch, where the uncommitted files a trunk-conflict ticket
+// resolves live.
+func (s *Server) targetCheckout(addr tickets.Address) (string, error) {
+	target, err := s.mergeTarget(addr)
+	if err != nil {
+		return "", err
+	}
+	_, repo, err := s.projectOf(addr.Project)
+	if err != nil {
+		return "", err
+	}
+	info, err := git.IdentifyDir(repo)
+	if err != nil {
+		return "", err
+	}
+	worktrees, err := git.ListWorktrees(info.Repo)
+	if err != nil {
+		return "", err
+	}
+	dir := git.CheckoutDirForBranch(info.Repo, worktrees, target)
+	if dir == "" {
+		return "", fmt.Errorf("no checkout of %s", target)
+	}
+	return dir, nil
 }
 
 // projectHasNoVCS: a commitless ticket in a vcs: none project has no repository
@@ -53,6 +90,8 @@ func (s *Server) projectHasNoVCS(project string) bool {
 
 func (m iterationMode) prepare(d ralphloop.Deps, o ralphloop.OneIteration) (ralphloop.IterationWorktree, error) {
 	switch {
+	case m.err != nil:
+		return ralphloop.IterationWorktree{}, m.err
 	case m.feature:
 		return ralphloop.PrepareFeature(d, o)
 	case m.commitless:
@@ -85,6 +124,8 @@ func (m iterationMode) finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralp
 // resume rebuilds the worktree; base is the persisted base of a feature-branch run.
 func (m iterationMode) resume(d ralphloop.Deps, o ralphloop.OneIteration, base string) (ralphloop.IterationWorktree, error) {
 	switch {
+	case m.err != nil:
+		return ralphloop.IterationWorktree{}, m.err
 	case m.feature:
 		return ralphloop.ResumeFeature(d, o)
 	case m.commitless:

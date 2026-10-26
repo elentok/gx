@@ -348,6 +348,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 		s.checkDeadlock(root, projectDir, e)
 		frontier := ralphloop.Frontier(e)
 		if len(frontier) == 0 {
+			s.retryHeldLand(root, e, loaded, repo)
 			return false, nil
 		}
 		t := frontier[0]

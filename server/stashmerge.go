@@ -139,6 +139,9 @@ func (s *Server) recordTrunkConflict(m mergeEpicRef, one ralphloop.OneIteration,
 	if err != nil {
 		return QueueResult{}, nil, fmt.Errorf("add trunk-conflict ticket to %s: %w", root, err)
 	}
+	// The poller must not read the old index: it still shows the epic completed
+	// and, with main now at its tip, merged by hand.
+	s.rescan()
 	if err := s.ensureRootQueued(root, one.Ticket); err != nil {
 		s.log.Warn("queue root after stash-merge", "root", root, "err", err)
 	}

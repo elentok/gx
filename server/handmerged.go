@@ -74,7 +74,9 @@ func (s *Server) stampIfMerged(root rootRef, epics []tickets.Epic, e tickets.Epi
 // stampMerged is stampIfMerged under the trunk lock. It reports whether it
 // dequeued the root, the one case that sends a notice.
 func (s *Server) stampMerged(root rootRef, e tickets.Epic, repo, target string) (removed bool) {
-	if !tickets.LoadEpicTicketMD(e.Path).MergedAt.IsZero() {
+	// Read fresh: a stash-merge may have cleared completed_at since the poll's
+	// snapshot, and its epic is not merged until the trunk-conflict ticket is done.
+	if fresh := tickets.LoadEpicTicketMD(e.Path); !fresh.MergedAt.IsZero() || fresh.CompletedAt.IsZero() {
 		return false
 	}
 	if merged, err := s.mergedProbe(repo, "refs/heads/"+e.Name, target); err != nil || !merged {

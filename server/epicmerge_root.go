@@ -59,11 +59,48 @@ func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, rep
 	lockKey := target
 	if err != nil {
 		lockKey = "epic:" + root.String()
+	} else if holder := s.trunkConflictHolder(root.Project, epics, repo, target, one.Epic); holder != "" {
+		// Not a pause: the root stays queued and claimRoot retries once the ticket is done.
+		s.heldLands.set(root.String(), true)
+		s.log.Info("land waits for a trunk-conflict ticket", "root", root, "holder", holder, "target", target)
+		return
 	}
 	unlock := s.trunkLocks.lock(repo, lockKey)
 	d := s.mergeEpic(root, one, repo, epics, e, target, false)
 	unlock()
 	s.actOnMerge(root, one, dir, e, d)
+}
+
+// trunkConflictHolder is the epic, other than self, whose open trunk-conflict
+// ticket has an agent editing target's checkout; "" when there is none. A land
+// into target would change files under that agent, so it waits.
+func (s *Server) trunkConflictHolder(project string, epics []tickets.Epic, repo, target, self string) string {
+	for _, e := range epics {
+		if e.Name == self || !slices.ContainsFunc(e.Tickets, func(t tickets.Ticket) bool {
+			return t.Type == string(schema.TypeTrunkConflict) && !e.RenderedStatus(t).Terminal()
+		}) {
+			continue
+		}
+		if _, _, held, err := s.epicRefs(project, epics, e.Name, repo); err == nil && held == target {
+			return e.Name
+		}
+	}
+	return ""
+}
+
+// retryHeldLand lands root again once the trunk-conflict ticket that held its
+// land is gone. The hold lives in memory only: a server restart forgets it.
+func (s *Server) retryHeldLand(root rootRef, e tickets.Epic, epics []tickets.Epic, repo string) {
+	if !s.heldLands.has(root.String()) {
+		return
+	}
+	_, _, target, err := s.epicRefs(root.Project, epics, root.Epic, repo)
+	if err == nil && s.trunkConflictHolder(root.Project, epics, repo, target, root.Epic) != "" {
+		return
+	}
+	s.heldLands.set(root.String(), false)
+	one := ralphloop.OneIteration{Epic: root.Epic, Ticket: lowestTicket(e)}
+	s.goSettle(func() { s.completeRootIfDone(root, one) })
 }
 
 // mergeOutcome is how a merge ended; the zero value is a refusal with nothing

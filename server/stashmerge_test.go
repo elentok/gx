@@ -22,9 +22,18 @@ import (
 // dirty yet, so the pause does not name it.
 func stashMergeFixture(t *testing.T) *schedFixture {
 	t.Helper()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
-		// The trunk-conflict ticket a stash-merge opens may be picked up too; it has nothing to commit.
-		if id != "01" {
+	return stashMergeFixtureWith(t, func(*schedFixture, servertest.Prompt) {})
+}
+
+// stashMergeFixtureWith is stashMergeFixture whose agent also runs conflictTurn
+// for every prompt except the epic's first ticket, such as the trunk-conflict
+// ticket a stash-merge opens.
+func stashMergeFixtureWith(t *testing.T, conflictTurn func(f *schedFixture, p servertest.Prompt)) *schedFixture {
+	t.Helper()
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+		if p.Address != "proj:"+schedEpic+"/01" {
+			// The trunk-conflict ticket a stash-merge opens may be picked up too; it has nothing to commit by default.
+			conflictTurn(f, p)
 			return
 		}
 		testutil.WriteFile(t, p.Cwd, "same.txt", "branch")
