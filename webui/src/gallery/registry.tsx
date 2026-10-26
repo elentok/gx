@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import canned from "../canned-snapshot.json";
 import { EpicCard } from "../epics/EpicCard";
 import type { EpicListRow } from "../generated/server";
+import { JumpRow } from "../nav/JumpMenu";
 import { Arc } from "../ui/arc/Arc";
 import { StatusIcon, STATUS_LABELS, type StatusKind } from "../ui/status-icon/StatusIcon";
 import { Badge } from "../ui/badge/Badge";
@@ -411,6 +412,19 @@ export const galleryEntries: GalleryEntry[] = [
           </Box>
         ),
       },
+    ],
+  },
+  {
+    name: "JumpRow",
+    cases: [
+      { label: "design", node: <JumpRow row={cardRow({ card_kind: "design", name: "blog", status_words: "Designing", ring_progress: 30 })} /> },
+      { label: "implementation", node: <JumpRow row={cardRow()} /> },
+      { label: "one-off", node: <JumpRow row={cardRow({ card_kind: "one-off", name: "fix-it", state: "queued", status_words: "One-off", ring_progress: 0 })} /> },
+      { label: "follow-ups", node: <JumpRow row={cardRow({ card_kind: "follow-ups", name: "follow-ups", section: "ready-to-design", status_words: "5 bugs, 2 ideas", ring_progress: 0 })} /> },
+      { label: "Needs you", node: <JumpRow row={cardRow({ section: "needs-you", state_pill: "Question" })} /> },
+      { label: "current", node: <JumpRow row={cardRow()} current /> },
+      { label: "cursor", node: <JumpRow row={cardRow()} active /> },
+      { label: "finished", node: <JumpRow row={cardRow({ state: "finished", section: "finished", status_words: "Merged", ring_progress: 100 })} /> },
     ],
   },
 ];

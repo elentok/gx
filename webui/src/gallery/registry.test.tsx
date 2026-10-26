@@ -67,6 +67,13 @@ it("shows the EpicCard in every state the spec lists", () => {
   }
 });
 
+it("shows the jump menu rows in every case the spec lists", () => {
+  const labels = galleryEntries.find((e) => e.name === "JumpRow")?.cases.map((c) => c.label) ?? [];
+  for (const label of ["design", "implementation", "one-off", "follow-ups", "Needs you", "current", "cursor", "finished"]) {
+    expect(labels, label).toContain(label);
+  }
+});
+
 it("keeps gallery.html out of the production build input", () => {
   expect(existsSync(join(__dirname, "../../gallery.html"))).toBe(true);
   expect(config.build?.rollupOptions?.input).toBe("index.html");

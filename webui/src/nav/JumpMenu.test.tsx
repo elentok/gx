@@ -1,0 +1,164 @@
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { createMemoryRouter, RouterProvider, useLocation } from "react-router";
+import { afterEach, expect, test, vi } from "vitest";
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
+import type { EpicList, EpicListRow } from "../generated/server";
+import { renderThemed } from "../ui/render";
+import { JumpMenu } from "./JumpMenu";
+
+afterEach(cleanup);
+
+const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
+  address: `demo:${name}`,
+  project: "demo",
+  name,
+  kind: "loop",
+  state: "running",
+  done: 1,
+  total: 4,
+  queued: false,
+  queueable: false,
+  blocked_by_epics: [],
+  addresses: [`demo:${name}`],
+  card_kind: "implementation",
+  section: "in-progress",
+  status_words: "Implementing...",
+  ring_progress: 25,
+  ...over,
+});
+
+const ROWS = [
+  row("question", { section: "needs-you", state_pill: "Question", status_words: "Waiting" }),
+  row("other-question", { section: "needs-you", state_pill: "Question" }),
+  row("current", { section: "in-progress" }),
+  row("loop-epic", { section: "in-progress" }),
+  row("blog", { card_kind: "design", section: "in-progress", map_pending: false }),
+  row("fix-it", { card_kind: "one-off", section: "in-progress", address: "demo:one/01", addresses: ["demo:one/01"] }),
+  row("unstarted", { card_kind: "design", section: "ready-to-design", status_words: "Not started" }),
+  row("old-epic", { section: "finished", state: "finished", status_words: "Merged" }),
+];
+
+function Where() {
+  return <div data-testid="where">{useLocation().pathname}</div>;
+}
+
+function setup(epics: EpicListRow[] = ROWS) {
+  const list: EpicList = { epics, follow_ups: [] };
+  const fetchList = vi.fn(async () => list);
+  const router = createMemoryRouter([
+    {
+      path: "*",
+      element: (
+        <>
+          <JumpMenu name="current" current="demo:current" fetchList={fetchList} />
+          <Where />
+        </>
+      ),
+    },
+  ]);
+  const state = { snapshot: { sessions: [] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+  renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <RouterProvider router={router} />
+    </ConnectionContext.Provider>,
+  );
+  return fetchList;
+}
+
+const titleButton = () => screen.findByRole("button", { name: /^current/ });
+const names = () => screen.queryAllByRole("option").map((o) => within(o).getAllByText(/./)[0].textContent);
+
+test("a click opens the menu with the filter focused", async () => {
+  setup();
+  fireEvent.click(await titleButton());
+  expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Jump to epic" }));
+});
+
+test("Ctrl+K and ⌘K open the menu", async () => {
+  setup();
+  await titleButton();
+  fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+  expect(await screen.findByRole("dialog", { name: "Jump to epic" })).toBeTruthy();
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.keyDown(window, { key: "k", metaKey: true });
+  expect(await screen.findByRole("dialog")).toBeTruthy();
+});
+
+test("the title counts the other Needs-you cards", async () => {
+  setup([...ROWS, row("current-too", { section: "needs-you", address: "demo:current", addresses: ["demo:current"] })]);
+  expect((await titleButton()).textContent).toContain("2");
+  expect(screen.getByLabelText("2 more need you")).toBeTruthy();
+});
+
+test("Ready to design and Finished show only while typing, and typing searches finished epics", async () => {
+  setup();
+  fireEvent.click(await titleButton());
+  expect(screen.queryByText("unstarted")).toBeNull();
+  expect(screen.queryByText("old-epic")).toBeNull();
+  const input = screen.getByRole("combobox");
+  fireEvent.change(input, { target: { value: "old" } });
+  expect(screen.getByText("old-epic")).toBeTruthy();
+  fireEvent.change(input, { target: { value: "unst" } });
+  expect(screen.getByText("unstarted")).toBeTruthy();
+});
+
+test("the current epic is marked, and a Needs-you row reads its pill", async () => {
+  setup();
+  fireEvent.click(await titleButton());
+  const options = screen.getAllByRole("option");
+  expect(options.find((o) => o.hasAttribute("aria-current"))?.textContent).toContain("current");
+  expect(within(options[0]).getByText("demo · Question")).toBeTruthy();
+});
+
+test("Down and Enter open the next row", async () => {
+  setup();
+  fireEvent.click(await titleButton());
+  const input = screen.getByRole("combobox");
+  expect(names()[0]).toBe("question");
+  fireEvent.keyDown(input, { key: "ArrowDown" });
+  fireEvent.keyDown(input, { key: "Enter" });
+  await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/e/demo:other-question"));
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("a Design opens on its Design page, a loop epic on its epic page, a one-off on its ticket", async () => {
+  setup();
+  const pick = async (name: string) => {
+    fireEvent.click(await titleButton());
+    fireEvent.click(screen.getByText(name));
+  };
+  await pick("blog");
+  await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/d/demo:blog"));
+  await pick("loop-epic");
+  await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/e/demo:loop-epic"));
+  await pick("fix-it");
+  await waitFor(() => expect(screen.getByTestId("where").textContent).toBe("/t/demo:one/01"));
+});
+
+test("Esc and a click outside close the menu", async () => {
+  setup();
+  fireEvent.click(await titleButton());
+  fireEvent.keyDown(screen.getByRole("combobox"), { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.click(await titleButton());
+  fireEvent.mouseDown(document.body);
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("on a phone the menu is a sheet with a close button and no ⌘K hint", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    setup();
+    const title = await titleButton();
+    expect(title.textContent).not.toContain("⌘K");
+    fireEvent.click(title);
+    fireEvent.mouseDown(document.body);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

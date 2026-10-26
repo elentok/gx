@@ -98,7 +98,8 @@ function render(epics: EpicListRow[], sessions: SessionInfo[], path = "/d/gx:a",
 
 test("the title row holds a back link, the Design name and the Sessions control, with no picker or state label", async () => {
   render([map("a", "in-progress"), map("b", "in-progress")], [session("a", { status: { state: "working" } })]);
-  expect((await screen.findByRole("heading", { level: 1, name: "a" })).textContent).toBe("a");
+  const title = await screen.findByRole("heading", { level: 1 });
+  expect(within(title).getByRole("button", { name: /^a/ })).toBeTruthy();
   expect(screen.getByRole("link", { name: "← Epics" }).getAttribute("href")).toBe("/epics");
   expect(screen.getByRole("button", { name: "New session" })).toBeTruthy();
   expect(screen.queryByLabelText("Filter Designs")).toBeNull();

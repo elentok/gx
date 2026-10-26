@@ -1,4 +1,4 @@
-import { Box, Heading, Text } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -6,6 +6,7 @@ import { designHref } from "../hrefs";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { useEpicList, type FetchEpicList } from "../epics/list";
 import { BackLink } from "../nav/BackLink";
+import { JumpMenu } from "../nav/JumpMenu";
 import { readPageCache, writePageCache } from "../pageCache";
 import { DetailPage } from "../page/DetailPage";
 import { Button } from "../ui/button/Button";
@@ -85,11 +86,13 @@ function DesignBody({
   wide,
   deps,
   chart,
+  fetchList,
   onNewSession,
 }: {
   address: string;
   wide: boolean;
   deps: DesignDeps;
+  fetchList?: FetchEpicList;
   /** The Design has no map yet, so only its session can be started again, from the New Design form. */
   chart?: boolean;
   onNewSession: () => void;
@@ -138,9 +141,7 @@ function DesignBody({
       >
         <Box minW="0">
           <BackLink to="/epics" label="← Epics" />
-          <Heading as="h1" fontFamily="condensed" fontSize="2xl">
-            {address.slice(address.indexOf(":") + 1)}
-          </Heading>
+          <JumpMenu name={address.slice(address.indexOf(":") + 1)} current={address} fetchList={fetchList} />
         </Box>
         <SessionStrip
           address={address}
@@ -277,6 +278,7 @@ export function DesignPage({
           wide={wide}
           deps={deps}
           chart={chart}
+          fetchList={fetchList}
           onNewSession={onNewSession}
         />
       )}

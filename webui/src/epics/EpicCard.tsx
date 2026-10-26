@@ -30,7 +30,7 @@ import { EpicActionButton } from "./EpicActionButton";
 import { postEpicMerge, postQueueAdd, type PostEpicWrite } from "./queue";
 import { TriageDialog } from "./TriageDialog";
 
-const RING_KIND: Record<EpicListRow["card_kind"] & string, Kind> = {
+export const RING_KIND: Record<EpicListRow["card_kind"] & string, Kind> = {
   [CardKindDesign]: "design",
   [CardKindImplementation]: "implementation",
   [CardKindOneOff]: "oneoff",
@@ -49,7 +49,7 @@ const PILL_TONE: Record<string, Tone> = {
 
 const needsYouTone = (row: EpicListRow): Tone => PILL_TONE[row.state_pill ?? ""] ?? "waiting";
 
-function ringTone(row: EpicListRow): Tone {
+export function ringTone(row: EpicListRow): Tone {
   if (row.section === SectionNeedsYou) return needsYouTone(row);
   if (row.state === EpicListFinished) return "done";
   return isLive(row) ? "running" : "muted";
@@ -57,8 +57,11 @@ function ringTone(row: EpicListRow): Tone {
 
 const isCreatingTickets = (row: EpicListRow) => row.status_words?.startsWith("Creating tickets") ?? false;
 
-const isLive = (row: EpicListRow) =>
+export const isLive = (row: EpicListRow) =>
   row.state === EpicListRunning || row.state === EpicListMerging || isCreatingTickets(row);
+
+export const ringProgress = (row: EpicListRow) =>
+  (row.ring_progress ?? (row.total ? (row.done / row.total) * 100 : 0)) / 100;
 
 function ringLabel(row: EpicListRow): string {
   if (isCreatingTickets(row)) return "…";
@@ -203,7 +206,7 @@ export function EpicCard({ row, writes = {}, onChanged = () => {} }: { row: Epic
     >
       <Box display="flex" alignItems="center" gap="4">
         <ProgressRing
-          progress={(row.ring_progress ?? (row.total ? (row.done / row.total) * 100 : 0)) / 100}
+          progress={ringProgress(row)}
           tone={ringTone(row)}
           kind={kind}
           label={ringLabel(row)}
