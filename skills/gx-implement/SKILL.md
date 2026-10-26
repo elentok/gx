@@ -140,6 +140,22 @@ interactive prompt. Commit whatever is green first, then run `gx tickets ask` (w
 are in the tracker) and end your turn. This is not a fork — the same ticket resumes once a person
 answers.
 
+## Mock check
+
+If the ticket has a `## Mock check` section, run it before you report finished. Find it by that
+heading. It lists the mock file, the states with their widths, the parts and the fixture scenario.
+
+- The map's mock directory is `$(gx tickets root)/<map>/mocks/`, where `<map>` is the ticket's epic
+  name minus `-impl`. No frontmatter link.
+- Run the steps in [gx-ui-check/MOCK-CHECK.md](../gx-ui-check/MOCK-CHECK.md) for each listed state and
+  width, part by part, by the part selector. Do not copy the steps here.
+- Check only the parts the ticket built.
+- Fix each look difference. A difference kept on purpose goes under `## Spec deviations` (below),
+  with the reason.
+- A named mock file that is missing is a check that cannot run. Follow "When only a person can
+  answer": commit what is green, run `gx tickets ask` naming the missing file, end your turn. Never
+  report a check that did not run.
+
 ## Record deliberate spec deviations
 
 If you deliberately narrow, skip or change something the spec or ticket asked for, record it in a
