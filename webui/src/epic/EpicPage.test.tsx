@@ -162,6 +162,55 @@ test("a claimed row adds its time so far only while the Design has a live sessio
   expect(await statsOf()).toBe("spec");
 });
 
+const live = (rows: object[], kind: EpicDetail["kind"] = "loop") =>
+  render("/e/gx:blog-impl", [], kind, { detail: { total: rows.length, rows: rows as EpicDetail["rows"] } });
+const cardOf = async (id: string) => (await screen.findByText(id)).closest("[data-indent]") as HTMLElement;
+const tk = (id: string, over: object = {}) => ({ address: `gx:blog/${id}`, title: `title ${id}`, rendered_status: "open", ...over });
+
+test("a live ticket is one link to its page with id, title and meta; paused rows have no Open link", async () => {
+  live([tk("01"), tk("02", { rendered_status: "blocked", blockers: ["01"] }), tk("03", { rendered_status: "paused", reason: "needs a person" })]);
+  const card = await cardOf("01");
+  const links = within(card).getAllByRole("link");
+  expect(links).toHaveLength(1);
+  expect(links[0].getAttribute("href")).toBe("#/t/gx:blog/01");
+  expect(links[0].textContent).toContain("title 01");
+  expect(links[0].textContent).toContain("ready");
+  expect((await cardOf("02")).textContent).toContain("after 01");
+  expect((await cardOf("03")).textContent).toContain("paused · needs a person");
+  expect(screen.queryByText("Open →")).toBeNull();
+});
+
+test("a fork's card is indented and the running card has the spinning dot", async () => {
+  live([tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }), tk("02", { parent: "gx:blog/01" })]);
+  expect((await cardOf("02")).getAttribute("data-indent")).toBe("1");
+  expect(within(await cardOf("01")).getByRole("img", { name: "Running" })).toBeTruthy();
+});
+
+test("a needs-you card shows its question and an Answer button to the ticket page", async () => {
+  live([tk("01", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?" })]);
+  const card = await cardOf("01");
+  expect(within(card).getByText("Which db?")).toBeTruthy();
+  fireEvent.click(within(card).getByRole("button", { name: "Answer" }));
+  expect(await screen.findByLabelText("Loading ticket")).toBeTruthy();
+});
+
+test("a needs-repair card is expanded with its status and reason; an error card is one line", async () => {
+  live([tk("01", { rendered_status: "needs-repair", reason: "dirty tree" }), tk("02", { rendered_status: "error" })]);
+  const repair = await cardOf("01");
+  expect(repair.textContent).toContain("needs-repair · dirty tree");
+  expect(within(repair).getByText("Fix it in the TUI")).toBeTruthy();
+  const error = await cardOf("02");
+  expect(error.getAttribute("data-tone")).toBe("deadlocked");
+  expect(error.textContent).toContain("error");
+  expect(within(error).getAllByRole("link")).toHaveLength(1);
+});
+
+test("a Design's cards show the ticket type then the state", async () => {
+  live([tk("01", { type: "prototype" }), tk("02", { type: "grilling", rendered_status: "blocked", blockers: ["04"] })], "map");
+  expect((await cardOf("01")).textContent).toContain("prototype · ready");
+  expect((await cardOf("02")).textContent).toContain("grilling · after 04");
+});
+
 test("the buttons run partner first and the action last, Merge in the done tone", async () => {
   render("/e/gx:blog-impl", [joined], "loop", { detail: { state: "awaiting-merge" } });
   const buttons = await screen.findAllByRole("button", { name: /^(Open design|Merge)$/ });

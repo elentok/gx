@@ -388,12 +388,12 @@ test("a map epic shows rows with title and status", async () => {
     undefined,
     epicFetch({ kind: "map", total: 2, done: 1, rows: [rowOf("01", "done"), rowOf("02", "open", { elapsed: 60 })] }),
   );
-  expect(await screen.findByText("open")).toBeTruthy();
+  expect(await screen.findByText("ready")).toBeTruthy();
   expect(screen.queryByText("1 of 2 done")).toBeNull();
 });
 
 test("every live, fold, Error and map row links to its ticket page", async () => {
-  const hrefOf = (title: string) => screen.getByRole("link", { name: title }).getAttribute("href");
+  const hrefOf = (title: string) => screen.getByRole("link", { name: new RegExp(title) }).getAttribute("href");
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
   await screen.findByText("claimed · 1h 1m");
   for (const n of ["01", "02", "03", "04", "05", "06"]) expect(hrefOf(`Title ${n}`)).toBe(`#/t/gx:e/${n}`);
@@ -566,7 +566,7 @@ test("live forks nest under a live parent, the indent stops at 2, and a fork of 
   const { container } = renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 7, done: 2, rows }));
   await screen.findByText("Title 01");
   const live = [...container.querySelectorAll("[data-indent]")].map((el) => [
-    el.querySelector("a")?.textContent,
+    el.textContent?.match(/Title \d+/)?.[0],
     el.getAttribute("data-indent"),
   ]);
   expect(live).toEqual([
@@ -576,7 +576,7 @@ test("live forks nest under a live parent, the indent stops at 2, and a fork of 
     ["Title 04", "2"],
     ["Title 06", "0"],
   ]);
-  expect(screen.getAllByText(/fork of/).map((el) => el.textContent)).toEqual(["fork of 01", "open · fork of 05"]);
+  expect(screen.getAllByText(/fork of/).map((el) => el.textContent)).toEqual(["fork of 01", "ready · fork of 05"]);
 });
 
 test("done forks nest under a done parent in the fold, and only a fork whose parent is elsewhere says fork of", async () => {
@@ -606,22 +606,21 @@ test("a blocked row lists its blockers, cross-epic ones as epic/NN", async () =>
     rowOf("03", "blocked", { blockers: ["04"] }),
   ];
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 2, rows }));
-  expect(await screen.findByText("blocked · after 04 and other-epic/06")).toBeTruthy();
-  expect(screen.getByText("blocked · after 04")).toBeTruthy();
+  expect(await screen.findByText("after 04 and other-epic/06")).toBeTruthy();
+  expect(screen.getByText("after 04")).toBeTruthy();
 });
 
-test("an asking row shows its question and an Answer link to the ticket page; other rows have no link", async () => {
+test("an asking row shows its question and an Answer button; other rows have none", async () => {
   const rows = [
     rowOf("02", "needs-answer", { needs_answer: true, question: "Which database?" }),
     rowOf("03", "needs-repair"),
   ];
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 2, rows }));
   expect(await screen.findByText("Which database?")).toBeTruthy();
-  const links = screen.getAllByRole("link", { name: "Answer →" });
-  expect(links.map((l) => l.getAttribute("href"))).toEqual(["#/t/gx:e/02"]);
+  expect(screen.getAllByRole("button", { name: "Answer" })).toHaveLength(1);
 });
 
-test("a paused row shows its reason and links to the ticket page; a repair-class row says Fix it in the TUI and has no link", async () => {
+test("a paused row shows its reason with no Open link; a repair-class row says Fix it in the TUI", async () => {
   const rows = [
     rowOf("02", "needs-repair", { reason: "Needs repair" }),
     rowOf("03", "needs-repair", { reason: "Agent stalled" }),
@@ -631,8 +630,7 @@ test("a paused row shows its reason and links to the ticket page; a repair-class
   expect(await screen.findByText("needs-repair · Needs repair")).toBeTruthy();
   expect(screen.getAllByText("Fix it in the TUI")).toHaveLength(1);
   expect(screen.getByText("paused · Agent stalled")).toBeTruthy();
-  const links = screen.getAllByRole("link", { name: "Open →" });
-  expect(links.map((l) => l.getAttribute("href"))).toEqual(["#/t/gx:e/03"]);
+  expect(screen.queryByText("Open →")).toBeNull();
 });
 
 test("a running row's elapsed time and a running epic's wall clock tick", async () => {

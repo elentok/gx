@@ -1,5 +1,4 @@
 import type { EpicDetail, EpicDetailRow } from "./detail";
-import type { StatusKind } from "../ui/status-icon/StatusIcon";
 import type { Tone } from "../ui/tone";
 import { ticketHref } from "../hrefs";
 import { REPAIR_HINT, epicBadge } from "../view";
@@ -29,16 +28,6 @@ const BUCKET_TONES: Record<Bucket, Tone> = {
   attention: "deadlocked",
 };
 
-const BUCKET_ICONS: Record<Bucket, StatusKind | undefined> = {
-  done: "done",
-  running: undefined,
-  asking: "asking",
-  waiting: "waiting",
-  children: "children",
-  attention: "attention",
-};
-
-export const iconOf = (row: EpicDetailRow) => BUCKET_ICONS[bucketOf(row)];
 export const isCancelled = (row: EpicDetailRow) => row.rendered_status === "cancelled";
 export const isFolded = (row: EpicDetailRow) => bucketOf(row) === "done";
 export const isRunning = (row: EpicDetailRow) => bucketOf(row) === "running";
@@ -139,11 +128,13 @@ export interface RowContext {
   detail: EpicDetail;
   now: number;
   byAddress: Map<string, EpicDetailRow>;
+  designLive: boolean;
 }
 
-export const rowContext = (detail: EpicDetail, now: number): RowContext => ({
+export const rowContext = (detail: EpicDetail, now: number, designLive = false): RowContext => ({
   detail,
   now,
+  designLive,
   byAddress: new Map(detail.rows.map((r) => [r.address, r])),
 });
 
@@ -155,22 +146,42 @@ function elapsedAndCost(row: EpicDetailRow, elapsed: number | undefined, ctx: Ro
   return [elapsed === undefined ? undefined : formatDuration(elapsed), row.cost === undefined ? undefined : formatCost(row.cost)];
 }
 
-// What a paused row offers under its line: an asking row its question and an Answer link, a repair-class
-// row the TUI hint and no link, any other paused row a link to the ticket page where recovery lives.
-export function pauseAction(row: EpicDetailRow): { hint?: string; href?: string; linkLabel?: string } {
-  if (row.needs_answer) return { hint: row.question, href: ticketHref(row.address) };
-  if (!row.reason) return {};
-  if (row.rendered_status === "needs-repair") return { hint: REPAIR_HINT };
-  return { href: ticketHref(row.address), linkLabel: "Open →" };
+// An asking or needs-repair card stays expanded: a second row under the line holds its question or hint.
+export const isExpanded = (row: EpicDetailRow) => !!row.needs_answer || row.rendered_status === "needs-repair";
+
+// What an expanded card holds in its second row. Needs-repair keeps the TUI hint until the fix-agent button lands.
+export function cardNote(row: EpicDetailRow): { text?: string; answerHref?: string } {
+  if (row.needs_answer) return { text: row.question, answerHref: ticketHref(row.address) };
+  if (row.rendered_status === "needs-repair") return { text: REPAIR_HINT };
+  return {};
 }
 
-// The dim detail line under a row: status word, pause reason, elapsed time, cost, then the blockers and fork note.
-export function detailLine(row: EpicDetailRow, ctx: RowContext): string {
+// A blocked row reads "after NN" with no status word; an open row with no blockers is "ready".
+function stateOf(row: EpicDetailRow): { word?: string; after?: string } {
+  const after = row.blockers?.length ? blockerNote(row.blockers) : undefined;
+  const status = row.rendered_status;
+  if (status === "open" && !after) return { word: "ready" };
+  if (status === "blocked" && after) return { after };
+  return { word: status, after };
+}
+
+// A Design row counts up only while a design session runs; its other rows carry no time or cost.
+function designMeta(row: EpicDetailRow, ctx: RowContext): string {
+  const { word, after } = stateOf(row);
+  const open = row.rendered_status === "open" || row.rendered_status === "blocked";
+  const time = isRunning(row) && ctx.designLive ? elapsedOf(row, ctx.now) : undefined;
+  return joinDot(row.type, open ? (after ?? word) : word, time === undefined ? undefined : formatDuration(time));
+}
+
+// The dim meta text of a live card: state word, pause reason, elapsed time, cost, then the blockers and fork note.
+export function cardMeta(row: EpicDetailRow, ctx: RowContext): string {
+  if (ctx.detail.kind === "map") return designMeta(row, ctx);
+  const { word, after } = stateOf(row);
   return joinDot(
-    row.rendered_status,
+    word,
     row.reason,
     ...elapsedAndCost(row, elapsedOf(row, ctx.now), ctx),
-    row.blockers?.length ? blockerNote(row.blockers) : undefined,
+    after,
     forkNote(row, ctx.byAddress),
   );
 }

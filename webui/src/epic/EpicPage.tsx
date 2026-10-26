@@ -23,27 +23,24 @@ import { Spinner } from "../ui/spinner/Spinner";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { useEpicDetail, type EpicDetail, type FetchEpicDetail } from "./detail";
 import { StatsSection } from "./StatsSection";
+import { TicketCard } from "./TicketCard";
 import {
+  cardMeta,
   designStatParts,
-  detailLine,
   foldedTail,
   loopStatParts,
-  iconOf,
   idOf,
   isCancelled,
   isFolded,
-  isRunning,
   nestFolded,
   nestLive,
-  pauseAction,
   rowContext,
-  toneOf,
 } from "./rows";
 
-function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
+function EpicBody({ detail, now, designLive }: { detail: EpicDetail; now: number; designLive: boolean }) {
   const folded = detail.rows.filter(isFolded);
   const cancelled = folded.filter(isCancelled).length;
-  const ctx = rowContext(detail, now);
+  const ctx = rowContext(detail, now, designLive);
   return (
     <>
       {folded.length > 0 && (
@@ -68,21 +65,7 @@ function EpicBody({ detail, now }: { detail: EpicDetail; now: number }) {
       )}
       <Box mt="4" display="flex" flexDirection="column" gap="3">
         {nestLive(detail.rows).map(({ row: r, indent }) => (
-          <Box key={r.address} data-indent={indent} ml={indent * 6}>
-            <TicketLine
-              id={idOf(r.address)}
-              title={r.title}
-              address={r.address}
-              reason={detailLine(r, ctx)}
-              tone={toneOf(r)}
-              unclipped
-              inlineReason
-              {...pauseAction(r)}
-              live={isRunning(r)}
-              icon={iconOf(r)}
-              toneTitle
-            />
-          </Box>
+          <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} />
         ))}
       </Box>
     </>
@@ -263,7 +246,7 @@ export function EpicPage({
               No tickets yet
             </Text>
           ) : (
-            <EpicBody detail={detail} now={Date.now()} />
+            <EpicBody detail={detail} now={Date.now()} designLive={liveSessions(address, sessions).length > 0} />
           )}
           <StatsSection detail={detail} />
         </>
