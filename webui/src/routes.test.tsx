@@ -709,9 +709,16 @@ test("a draft non-impl epic and an open impl epic do not show the publishing blo
   expect(screen.queryByText("Still publishing tickets")).toBeNull();
 });
 
+// The epic page also GETs the epic list for its jump menu; keep that out of the recorded POSTs.
+function stubPosts(post: (url: string, init: RequestInit) => Promise<Response>) {
+  vi.stubGlobal("fetch", (url: string, init: RequestInit) =>
+    url === "/v1/epics" ? Promise.resolve(new Response(JSON.stringify({ epics: [], follow_ups: [] }))) : post(url, init),
+  );
+}
+
 test("the epic page Queue posts, then refetches; a refusal shows inline", async () => {
   const post = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ queue: [] })));
-  vi.stubGlobal("fetch", post);
+  stubPosts(post);
   let fetched = 0;
   renderAt("/e/gx:e", okFor, undefined, async () => {
     fetched++;
@@ -749,7 +756,7 @@ test("the epic page shows Merge only for Awaiting merge and Merge blocked", asyn
 test("the epic page Merge posts the shown state, is disabled while pending, then refetches", async () => {
   let answer!: (r: Response) => void;
   const post = vi.fn(async (_url: string, _init: RequestInit) => new Promise<Response>((r) => (answer = r)));
-  vi.stubGlobal("fetch", post);
+  stubPosts(post);
   let fetched = 0;
   renderAt("/e/gx:e", okFor, undefined, async () => {
     fetched++;
@@ -771,7 +778,7 @@ test("the epic page Merge shows a refusal and an HTTP error inline", async () =>
     async () =>
       new Response(JSON.stringify({ refused: true, reason: "stale-state", message: "the epic changed" })),
   );
-  vi.stubGlobal("fetch", post);
+  stubPosts(post);
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "paused", land_block_reason: "rebase clash" }));
   fireEvent.click(await screen.findByRole("button", { name: "Merge" }));
   expect((await screen.findByRole("alert")).textContent).toBe("the epic changed");

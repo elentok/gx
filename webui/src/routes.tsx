@@ -20,8 +20,16 @@ function TicketRoute({ fetchDetail, fetchScreen }: { fetchDetail?: FetchDetail; 
   return <TicketPage address={address} fetchDetail={fetchDetail} fetchScreen={fetchScreen} />;
 }
 
-function EpicRoute({ fetchDetail, openDesign }: { fetchDetail?: FetchEpicDetail; openDesign?: OpenDesign }) {
-  return <EpicPage address={useParams()["*"] ?? ""} fetchDetail={fetchDetail} openDesign={openDesign} />;
+function EpicRoute({
+  fetchDetail,
+  fetchList,
+  openDesign,
+}: {
+  fetchDetail?: FetchEpicDetail;
+  fetchList?: FetchEpicList;
+  openDesign?: OpenDesign;
+}) {
+  return <EpicPage address={useParams()["*"] ?? ""} fetchDetail={fetchDetail} fetchList={fetchList} openDesign={openDesign} />;
 }
 
 function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
@@ -67,7 +75,7 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },
-    { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} openDesign={fetchers.openDesign} /> },
+    { path: "/e/*", element: <EpicRoute fetchDetail={fetchers.epic} fetchList={fetchers.epicList} openDesign={fetchers.openDesign} /> },
     // "/", the retired "/q" and "/designs", and an unknown hash go to the Epics page.
     { path: "*", loader: () => redirect("/epics") },
   ];

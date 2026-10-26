@@ -7,20 +7,25 @@ export function PageHeader({
   backTo,
   backLabel,
   title,
+  heading,
   children,
 }: {
   backTo: string;
   backLabel: string;
   title: string;
+  /** Replaces the plain h1, for a title that is a control. It must render the h1 itself. */
+  heading?: ReactNode;
   children?: ReactNode;
 }) {
   return (
     <>
       <BackLink to={backTo} label={backLabel} />
       <Box mt="4">
-        <Heading as="h1" fontFamily="condensed" fontSize="2xl">
-          {title}
-        </Heading>
+        {heading ?? (
+          <Heading as="h1" fontFamily="condensed" fontSize="2xl">
+            {title}
+          </Heading>
+        )}
         {children}
       </Box>
     </>

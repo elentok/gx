@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Link, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -6,8 +6,10 @@ import type { OpenDesign } from "../design/open";
 import { StartDesignButton } from "../design/SessionControls";
 import { hasDesignSession } from "../design/view";
 import { MergeButton, isMergeable } from "../epics/MergeButton";
-import { designHref } from "../hrefs";
+import { designHref, epicHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
+import { useEpicList, type FetchEpicList } from "../epics/list";
+import { JumpMenu } from "../nav/JumpMenu";
 import { Markdown } from "../markdown/Markdown";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
@@ -114,15 +116,24 @@ export function EpicPage({
   address,
   fetchDetail,
   openDesign,
+  fetchList,
 }: {
   address: string;
   fetchDetail?: FetchEpicDetail;
   openDesign?: OpenDesign;
+  fetchList?: FetchEpicList;
 }) {
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps the running clocks counting.
   useConnectionState(conn);
   const { detail, notFound, refetch } = useEpicDetail(address, conn, fetchDetail);
+  const { list } = useEpicList(fetchList, conn);
+  // The payload has no name field: the epic name is the address after the project.
+  const name = address.slice(address.indexOf(":") + 1);
+  // A joined card lists both of its epics; the other one is the Design or its -impl epic.
+  const partner = list?.epics
+    ?.find((e) => e.addresses?.includes(address))
+    ?.addresses?.find((a) => a !== address);
 
   return (
     <DetailPage>
@@ -130,8 +141,17 @@ export function EpicPage({
         <EmptyState title="Epic not found">{address} does not exist.</EmptyState>
       ) : detail ? (
         <>
-          {/* The payload has no name field: the epic name is the address after the project. */}
-          <PageHeader backTo="/epics" backLabel="← Epics" title={address.slice(address.indexOf(":") + 1)}>
+          <PageHeader
+            backTo="/epics"
+            backLabel="← Epics"
+            title={name}
+            heading={<JumpMenu name={name} current={address} fetchList={fetchList} />}
+          >
+            {partner && (
+              <Link href={epicHref(partner)} display="block" mt="2" fontSize="sm" color="tone.running.fg">
+                {address.endsWith("-impl") ? "Open design →" : "Open implementation epic →"}
+              </Link>
+            )}
             {detail.state === "paused" && detail.land_block_reason && (
               <Text data-reason mt="2" fontSize="sm" color="text.muted">
                 {detail.land_block_reason}
