@@ -240,6 +240,8 @@ func grillingStats() scenario {
 			rec("conv-b", "other:plan-epic/01", item("m3", 10, 1, 40), item("m4", 3, 4, 200)),
 			rec("conv-c", "demo:design-epic/01", item("m5", 3, 2, 60)),
 			rec("conv-uncounted", "demo:design-epic/01"),
+			// A plain session: not Design, so its record has no counts.
+			{ID: "conv-plain", Dir: "/tmp/conv-plain", Harness: "claude", Ticket: "demo:design-epic/01"},
 		}
 	}
 	return sc

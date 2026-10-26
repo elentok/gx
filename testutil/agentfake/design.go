@@ -2,6 +2,7 @@ package agentfake
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -172,9 +173,12 @@ const (
 
 // appendMessage appends a transcript line of the given role to the file at path.
 func appendMessage(path, role string, content any) error {
+	now := time.Now().UTC()
 	line, err := json.Marshal(map[string]any{
-		"type":      role,
-		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
+		"type": role,
+		// Grilling counts dedupe on the line's uuid, so each line needs its own.
+		"uuid":      fmt.Sprintf("fake-%d", now.UnixNano()),
+		"timestamp": now.Format(time.RFC3339Nano),
 		"message":   map[string]any{"role": role, "content": content},
 	})
 	if err != nil {

@@ -98,6 +98,11 @@ func run(args []string) (err error) {
 		return err
 	}
 	defer os.RemoveAll(root)
+	// /tmp is a symlink on macOS: claude slugs transcripts by the real path, so
+	// record dirs must use it too.
+	if root, err = filepath.EvalSymlinks(root); err != nil {
+		return err
+	}
 	if gxBin, err = binary(gxBin, filepath.Join(root, "gx"), "github.com/elentok/gx"); err != nil {
 		return err
 	}
