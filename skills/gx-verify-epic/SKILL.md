@@ -42,7 +42,7 @@ This is the one definition of a part's body format. gx-to-tickets and the collec
 - Per story: its spec number, its text and its Verification entry, both word for word, and its token
   estimate.
 - Per Mock states line of the spec's Verification section: the line word for word (mock path, state,
-  width, scenario, parts), and its 8K estimate.
+  width, scenario, parts), and its estimate from the gx-to-tickets estimate table.
 - A next-round part also adds, per story, the finding and the fix ticket it rechecks.
 
 Section names are free. The part writes its results under `## Results` (step 4).
@@ -120,8 +120,8 @@ catalog:
 ## 4. Run and record
 
 - Run each selected flow and each CLI or server verb check from the Verification entry.
-- Drive the browser by hand only for a gap no flow covers. Use text snapshots, not screenshots. The
-  one exception is a Mock states line (below).
+- Drive the browser by hand only for a gap no flow covers. Use text snapshots, not screenshots. For
+  Mock states lines, follow `MOCK-CHECK.md` (below); its screenshots are allowed.
 - A harness failure (the fixture crashes, a flow fails for a reason unrelated to the epic, a
   selector is stale) is a finding, like any other.
 - Before you write a story's line, quote its text, and name the test or check that covers it. Read
@@ -137,7 +137,8 @@ With none, skip this block: the epic verifies as before.
 - Check each line like a story. Start the line's fixture scenario, screenshot the whole state section
   of the mock and the built page at the line's width, and compare them by eye. Follow the steps in
   [gx-ui-check/MOCK-CHECK.md](../gx-ui-check/MOCK-CHECK.md); do not copy them here.
-- Screenshots are allowed here, at device scale factor 1, cropped to the state selector.
+- A missing mock file named by a Mock states line is an `unchecked` line plus a finding, never a
+  silent skip.
 - Write one result line per Mock states line, with the same verdicts as a story line (`pass`, `fail`,
   `unchecked`), in the format `- Mock <mock path> <state> <width>: pass, <what you compared>`.
 - A difference listed in the epic's `## Spec deviations` is not a finding.
@@ -190,8 +191,8 @@ The rest of this skill (steps 5 to 7) is for a collect or lone ticket.
 A lone ticket uses its own results from step 4 as the part results.
 
 Write one table for all stories into your ticket, under `## Table`, with
-`gx tickets section <addr> "Table" - < <file>`. Use the spec's story numbers. Each Mock states line gets a row too, labelled `Mock <state> <width>`.
-Columns:
+`gx tickets section <addr> "Table" - < <file>`. Use the spec's story numbers. Each Mock states line
+gets a row too, labelled `Mock <state> <width>`. Columns:
 
 | story | verdict | covering check | round last checked | finding, with fix ticket, follow-up or inline-fix commit |
 | ----- | ------- | -------------- | ------------------ | -------------------------------------------------------- |

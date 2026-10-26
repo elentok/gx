@@ -11,9 +11,11 @@ steps. The browser commands come from the `playwright-cli` skill.
 3. Pick the state and the part you compare. The mock marks them:
    - Part selector: `[data-mock-state=<s>] [data-mock-part=<p>]`
    - State selector: `[data-mock-state=<s>]`
+
+   gx-implement compares by the part selector, gx-verify-epic by the state selector.
 4. Locate the same part on the built page. You choose how: roles, visible text or a CSS selector.
-5. Screenshot the mock and the built page at the state's width, at device scale factor 1, cropped to
-   the selector. Never take a full page at retina scale.
+5. Resize the viewport to the state's width before each state. Screenshot the mock and the built
+   page at that width, at device scale factor 1, cropped to the selector. Never take a full page at retina scale.
 6. Compare the two screenshots side by side by eye. List each difference.
 
 ## What wins

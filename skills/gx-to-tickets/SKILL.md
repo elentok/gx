@@ -312,7 +312,9 @@ changes no web, CLI or server behavior (a docs-only, skills-only or refactor epi
 | CLI check (one `gx` command and its output)        | 3K     |
 | Go test run (one package)                          | 4K     |
 | Skill-text quote (one `rg`/`Read` of a skill line) | 2K     |
-| Mock state check (one mock state at one width: screenshot the mock and the built page, list the differences) | 8K |
+| Mock state check (one state, one width)            | 8K     |
+
+Each Mock states line counts its 8K once, even when two stories share a state.
 
 A part's fixed base is 15K (fixture start and the ticket read). A collect ticket's fixed estimate is
 30K. Keep these numbers in one place so gx-evolve can compare them with the actual token counts.
@@ -416,9 +418,9 @@ part has no `## Mock check`.)
 
 </ticket-template>
 
-**Mock check rules.** Name the gxfixture scenario for every mock state in `## Mock check`. If no
-scenario exists for a state, add an implement ticket that creates it, and make it block every ticket
-that checks that state.
+**Mock check rules** (for the `## Mock check` section above). Name the gxfixture scenario for every
+mock state in `## Mock check`. If no scenario exists for a state, add an implement ticket that
+creates it, and make it block every ticket that checks that state.
 
 ### Frontmatter fields
 

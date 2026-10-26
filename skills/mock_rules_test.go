@@ -71,8 +71,9 @@ func TestMockRulesAnchors(t *testing.T) {
 		{"verify-epic", "gx-verify-epic/SKILL.md", []string{
 			"**Mock states lines.**",
 			"[gx-ui-check/MOCK-CHECK.md](../gx-ui-check/MOCK-CHECK.md)",
-			"8K estimate",
+			"estimate from the gx-to-tickets estimate table",
 			"`pass`, `fail`, `unchecked`",
+			"A missing mock file named by a Mock states line is an `unchecked` line plus a finding",
 		}},
 	}
 	for _, tc := range cases {
