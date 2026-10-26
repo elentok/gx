@@ -1,6 +1,8 @@
 import { Box } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import canned from "../canned-snapshot.json";
+import { ConnectionContext, type Connection } from "../connection";
+import { NewDesignForm } from "../design/NewDesignForm";
 import { EpicCard } from "../epics/EpicCard";
 import type { EpicListRow } from "../generated/server";
 import { JumpRow } from "../nav/JumpMenu";
@@ -60,7 +62,18 @@ const cardRow = (over: Partial<EpicListRow> = {}): EpicListRow => ({
   ...over,
 });
 
-const chartDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const idleConnection = { refresh: () => {} } as Connection;
+
+// A transform makes the modal's fixed overlay fill this frame instead of the page.
+const ModalFrame = ({ children }: { children: ReactNode }) => (
+  <ConnectionContext.Provider value={idleConnection}>
+    <Box position="relative" h="600px" w="800px" transform="translateZ(0)" overflow="hidden" borderWidth="1px" borderColor="border">
+      {children}
+    </Box>
+  </ConnectionContext.Provider>
+);
+
+const chartDays =["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const perTone =(render: (tone: Tone) => ReactNode): GalleryCase[] =>
   TONES.map((tone) => ({ label: tone, node: render(tone) }));
@@ -426,6 +439,13 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "current", node: <JumpRow row={cardRow()} current /> },
       { label: "cursor", node: <JumpRow row={cardRow()} active /> },
       { label: "finished", node: <JumpRow row={cardRow({ state: "finished", section: "finished", status_words: "Merged", ring_progress: 100 })} /> },
+    ],
+  },
+  {
+    name: "NewDesignForm",
+    cases: [
+      { label: "several projects", node: <ModalFrame><NewDesignForm projects={["gx", "dotfiles", "blog"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
+      { label: "one project", node: <ModalFrame><NewDesignForm projects={["gx"]} onStarted={() => {}} onClose={() => {}} /></ModalFrame> },
     ],
   },
 ];

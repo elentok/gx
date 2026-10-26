@@ -208,13 +208,22 @@ test("the follow-ups counts line is gone", async () => {
   expect(screen.queryByText(/Follow-ups/)).toBeNull();
 });
 
-test("New Design opens the form in a dialog, Cancel closes it", async () => {
+test("New Design opens the form in a dialog, Close closes it", async () => {
   await loaded(mixed());
+  expect(screen.queryByRole("dialog")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "New Design" }));
   const dialog = screen.getByRole("dialog", { name: "New Design" });
   expect(within(dialog).getByRole("textbox", { name: "Epic name" })).toBeTruthy();
-  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
   expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("the New Design project starts on the page's filtered project", async () => {
+  localStorage.setItem("gx.epics.project", "blog");
+  await loaded(listOf([row("a"), row("b", { project: "blog", address: "blog:b" })]));
+  fireEvent.click(screen.getByRole("button", { name: "New Design" }));
+  const dialog = screen.getByRole("dialog", { name: "New Design" });
+  expect((within(dialog).getByRole("combobox", { name: "Project" }) as HTMLSelectElement).value).toBe("blog");
 });
 
 test("Start posts new_design and opens the new Design page", async () => {

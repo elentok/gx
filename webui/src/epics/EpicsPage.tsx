@@ -23,33 +23,6 @@ function readStoredProject(): string {
   }
 }
 
-function NewDesignDialog({ projects, open, onClose }: { projects: string[]; open?: OpenDesign; onClose: () => void }) {
-  const navigate = useNavigate();
-  return (
-    <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4">
-      <Box
-        role="dialog"
-        aria-modal="true"
-        aria-label="New Design"
-        bg="surface"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="md"
-        pt="4"
-        w="480px"
-        maxW="full"
-      >
-        <NewDesignForm
-          projects={projects}
-          open={open}
-          onStarted={(address) => navigate(designHref(address).slice(1))}
-          onCancel={onClose}
-        />
-      </Box>
-    </Box>
-  );
-}
-
 function SectionBlock({ section, open, onToggle, onChanged }: { section: Section; open: boolean; onToggle: () => void; onChanged: () => void }) {
   const id = `epics-${section.key}`;
   return (
@@ -88,6 +61,7 @@ function SectionBlock({ section, open, onToggle, onChanged }: { section: Section
 
 export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList; openDesign?: OpenDesign }) {
   const conn = useConnectionContext();
+  const navigate = useNavigate();
   const { list, failed, retry } = useEpicList(fetchList, conn);
   const [query, setQuery] = useState("");
   const [toggled, setToggled] = useState<Set<string>>(new Set());
@@ -176,7 +150,15 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
       ) : (
         shown.map((s) => <SectionBlock key={s.key} section={s} open={isOpen(s)} onToggle={() => toggle(s.key)} onChanged={retry} />)
       )}
-      {designing && <NewDesignDialog projects={projects} open={openDesign} onClose={() => setDesigning(false)} />}
+      {designing && (
+        <NewDesignForm
+          projects={projects}
+          filterProject={filterProject}
+          open={openDesign}
+          onStarted={(address) => navigate(designHref(address).slice(1))}
+          onClose={() => setDesigning(false)}
+        />
+      )}
     </DetailPage>
   );
 }
