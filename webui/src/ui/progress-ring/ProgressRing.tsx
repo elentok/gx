@@ -15,7 +15,11 @@ const KIND_ICONS: Record<Kind, string> = {
   followups: "M2 9l2-5.5h8L14 9v3.5H2V9zM2 9h3.5l.8 1.5h3.4L10.5 9H14",
 };
 
-const SIZES = { md: { px: 64, stroke: 5 }, compact: { px: 26, stroke: 3 } } as const;
+const SIZES = {
+  md: { px: 64, stroke: 5, font: "15px", badge: true },
+  sm: { px: 52, stroke: 4, font: "13px", badge: true },
+  compact: { px: 26, stroke: 3, font: "9px", badge: false },
+} as const;
 
 // Both drawn on a 100-unit path so the comet's 16% share does not depend on the radius.
 const COMET_SEGMENTS = 10;
@@ -35,7 +39,7 @@ interface Props {
 }
 
 export function ProgressRing({ progress, tone = "running", kind, label = "", size = "md", live = false }: Props) {
-  const { px, stroke } = SIZES[size];
+  const { px, stroke, font, badge } = SIZES[size];
   const r = (px - stroke) / 2;
   const c = px / 2;
   const clamped = Math.min(1, Math.max(0, progress));
@@ -95,14 +99,14 @@ export function ProgressRing({ progress, tone = "running", kind, label = "", siz
           alignItems="center"
           justifyContent="center"
           fontFamily="condensed"
-          fontSize={size === "md" ? "15px" : "9px"}
+          fontSize={font}
           fontVariantNumeric="tabular-nums"
           lineHeight="1"
         >
           {label}
         </Box>
       )}
-      {size === "md" && (
+      {badge && (
         <Box
           role="img"
           aria-label={KIND_LABELS[kind]}

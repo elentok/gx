@@ -9,6 +9,7 @@ export function PageHeader({
   waiting,
   title,
   heading,
+  lead,
   children,
 }: {
   backTo: string;
@@ -18,16 +19,28 @@ export function PageHeader({
   title: string;
   /** Replaces the plain h1, for a title that is a control. It must render the h1 itself. */
   heading?: ReactNode;
+  /** Sits left of the title, such as a ProgressRing. */
+  lead?: ReactNode;
   children?: ReactNode;
 }) {
+  const h1 = heading ?? (
+    <Heading as="h1" fontFamily="condensed" fontSize="2xl">
+      {title}
+    </Heading>
+  );
   return (
     <>
       <BackLink to={backTo} label={backLabel} waiting={waiting} />
       <Box mt="4">
-        {heading ?? (
-          <Heading as="h1" fontFamily="condensed" fontSize="2xl">
-            {title}
-          </Heading>
+        {lead ? (
+          <Box display="flex" alignItems="flex-start" gap="4">
+            {lead}
+            <Box minW="0" flex="1">
+              {h1}
+            </Box>
+          </Box>
+        ) : (
+          h1
         )}
         {children}
       </Box>

@@ -4,7 +4,11 @@ import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { OpenDesign } from "../design/open";
 import { StartDesignButton } from "../design/SessionControls";
+import { useWide } from "../design/useWide";
 import { hasDesignSession } from "../design/view";
+import type { EpicListRow, SessionInfo } from "../generated/server";
+import { ProgressRing } from "../ui/progress-ring/ProgressRing";
+import { pageRing } from "./ring";
 import { MergeButton, isMergeable } from "../epics/MergeButton";
 import { designHref, epicHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
@@ -112,6 +116,21 @@ function DesignSessionButton({ detail, open }: { detail: EpicDetail; open?: Open
   );
 }
 
+function EpicRing({
+  detail,
+  card,
+  sessions,
+  size,
+}: {
+  detail: EpicDetail;
+  card?: EpicListRow;
+  sessions: SessionInfo[];
+  size: "md" | "sm";
+}) {
+  const r = pageRing(detail, card, sessions);
+  return <ProgressRing progress={r.progress} tone={r.tone} kind={r.kind} label={r.label} size={size} live={r.live} />;
+}
+
 export function EpicPage({
   address,
   fetchDetail,
@@ -125,15 +144,18 @@ export function EpicPage({
 }) {
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps the running clocks counting.
-  useConnectionState(conn);
+  const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
+  const wide = useWide();
   const { detail, notFound, refetch } = useEpicDetail(address, conn, fetchDetail);
   const { list } = useEpicList(fetchList, conn);
   // The payload has no name field: the epic name is the address after the project.
   const name = address.slice(address.indexOf(":") + 1);
   // A joined card lists both of its epics; the other one is the Design or its -impl epic.
-  const partner = list?.epics
-    ?.find((e) => e.addresses?.includes(address))
-    ?.addresses?.find((a) => a !== address);
+  const joinedCard = list?.epics?.find((e) => e.addresses?.includes(address));
+  const partner = joinedCard?.addresses?.find((a) => a !== address);
+  // The card speaks for this page only while its active (first) address is this epic.
+  const card = joinedCard?.addresses?.[0] === address ? joinedCard : undefined;
+  const summary = detail?.summary && <Markdown mt="2">{detail.summary}</Markdown>;
 
   return (
     <DetailPage>
@@ -146,8 +168,15 @@ export function EpicPage({
             backLabel="← Epics"
             waiting={waitingCount(list?.epics ?? [], address)}
             title={name}
-            heading={<JumpMenu name={name} current={address} epics={list?.epics ?? []} />}
+            lead={<EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "md" : "sm"} />}
+            heading={
+              <>
+                <JumpMenu name={name} current={address} epics={list?.epics ?? []} />
+                {wide && summary}
+              </>
+            }
           >
+            {!wide && summary}
             {partner && (
               <Link href={epicHref(partner)} display="block" mt="2" fontSize="sm" color="tone.running.fg">
                 {address.endsWith("-impl") ? "Open design →" : "Open implementation epic →"}
@@ -183,7 +212,6 @@ export function EpicPage({
                 <MergeButton address={address} state={detail.state ?? ""} onMerged={refetch} />
               </Box>
             )}
-            {detail.summary && <Markdown mt="2">{detail.summary}</Markdown>}
           </PageHeader>
           {detail.total === 0 ? (
             <Text mt="4" color="text.muted">

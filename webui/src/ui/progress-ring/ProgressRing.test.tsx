@@ -26,6 +26,16 @@ describe("ProgressRing", () => {
     expect(live.getByTestId("comet").querySelectorAll("circle")).toHaveLength(10);
   });
 
+  it("renders the 52px size with its label and badge", () => {
+    const { getByText, getByRole, container } = renderThemed(
+      <ProgressRing progress={0.5} kind="design" label="50%" size="sm" />,
+    );
+    expect(getByText("50%")).toBeTruthy();
+    expect(getByRole("img", { name: KIND_LABELS.design })).toBeTruthy();
+    expect((container.firstElementChild as HTMLElement).getAttribute("data-kind")).toBe("design");
+    expect(container.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 52 52");
+  });
+
   it("drops the icon badge in the compact size", () => {
     const { queryByRole } = renderThemed(<ProgressRing progress={0.5} kind="design" size="compact" />);
     expect(queryByRole("img")).toBeNull();
