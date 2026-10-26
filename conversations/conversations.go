@@ -31,6 +31,21 @@ type Record struct {
 	// Totals is set once the conversation ends; nil while it runs or when its
 	// transcript could not be read.
 	Totals *Totals `json:"totals,omitempty"`
+	// Design notes that the session was a Design session. Records written
+	// before the flag existed lack it; callers derive it from the ticket.
+	Design bool `json:"design,omitempty"`
+	// Grilling holds the counted Grilling rounds and summaries. nil means not
+	// counted; an empty list means counted, no rounds. No omitempty: it would
+	// turn the empty list back into absent.
+	Grilling []GrillingItem `json:"grilling"`
+}
+
+// GrillingItem is one counted Grilling round or closing summary.
+type GrillingItem struct {
+	MessageID string    `json:"message_id"`
+	At        time.Time `json:"at"`
+	Questions int       `json:"questions"`
+	Words     int       `json:"words"`
 }
 
 // Totals are a finished conversation's tokens and cost, subagents included.
@@ -97,8 +112,43 @@ func Save(root string, r Record) error {
 		if r.Totals == nil {
 			r.Totals = prev.Totals
 		}
+		if r.Grilling == nil {
+			r.Grilling = prev.Grilling
+		}
+		r.Design = r.Design || prev.Design
 	}
 	return write(path, r)
+}
+
+// SaveGrilling replaces the counted Grilling items of conversation id, keeping
+// its Totals. A conversation with no record is skipped. A nil items counts as
+// an empty list.
+func SaveGrilling(root, id string, items []GrillingItem) error {
+	path, err := recordPath(root, id)
+	if err != nil {
+		return err
+	}
+	r, err := read(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if items == nil {
+		items = []GrillingItem{}
+	}
+	r.Grilling = items
+	return write(path, r)
+}
+
+// Read returns the saved record of conversation id; fs.ErrNotExist when none.
+func Read(root, id string) (Record, error) {
+	path, err := recordPath(root, id)
+	if err != nil {
+		return Record{}, err
+	}
+	return read(path)
 }
 
 // SaveTotals adds totals to the saved record of conversation id. A
