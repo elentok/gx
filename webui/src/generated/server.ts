@@ -589,7 +589,9 @@ export const EpicListNoOpenTickets: EpicListState = "no-open-tickets";
 export const EpicListFollowUps: EpicListState = "follow-ups";
 /**
  * ProgressStep is the step a map's design has reached; see mapProgress. The
- * tickets package owns the list of steps.
+ * tickets package owns the list of steps. The constants below are literals,
+ * not tickets.Step*, because tygo cannot resolve another package's constant;
+ * TestProgressStepsMatchTickets keeps them in sync.
  */
 export type ProgressStep = string;
 export const ProgressChart: ProgressStep = "chart";

@@ -39,18 +39,20 @@ const (
 )
 
 // ProgressStep is the step a map's design has reached; see mapProgress. The
-// tickets package owns the list of steps.
+// tickets package owns the list of steps. The constants below are literals,
+// not tickets.Step*, because tygo cannot resolve another package's constant;
+// TestProgressStepsMatchTickets keeps them in sync.
 type ProgressStep = tickets.DesignStep
 
 const (
-	ProgressChart          = tickets.StepChart
-	ProgressResolveTickets = tickets.StepResolveTickets
-	ProgressSpec           = tickets.StepSpec
-	ProgressReview         = tickets.StepReview
-	ProgressGrillFindings  = tickets.StepGrillFindings
-	ProgressCreateTickets  = tickets.StepCreateTickets
-	ProgressBranch         = tickets.StepBranch
-	ProgressDone           = tickets.StepDone
+	ProgressChart          ProgressStep = "chart"
+	ProgressResolveTickets ProgressStep = "resolve-tickets"
+	ProgressSpec           ProgressStep = "spec"
+	ProgressReview         ProgressStep = "review"
+	ProgressGrillFindings  ProgressStep = "grill-findings"
+	ProgressCreateTickets  ProgressStep = "create-tickets"
+	ProgressBranch         ProgressStep = "branch"
+	ProgressDone           ProgressStep = "done"
 )
 
 // followUpsEpicName is every project's contributor outbox epic.

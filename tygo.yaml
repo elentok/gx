@@ -29,4 +29,5 @@ packages:
       - verdicts.go
     type_mappings:
       time.Time: "string"
+      tickets.DesignStep: "string"
     enum_style: "union"

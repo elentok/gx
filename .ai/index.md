@@ -127,6 +127,9 @@ Web checks:
 
 - Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.
 - The web UI does not use prettier. Never run it: it reformats unrelated lines.
+- Regenerate `webui/src/generated/server.ts` with `make web-types`. tygo cannot resolve a constant
+  or alias from another package (it emits `any`), so give wire types in `server/` literal values
+  and map cross-package types in `tygo.yaml` `type_mappings`. Check `git diff` for `any`.
 - Run e2e with `make web-e2e`. It rebuilds the web bundle first. `pnpm e2e` does not rebuild.
 
 ## UI

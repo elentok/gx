@@ -4,12 +4,24 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/tickets"
 )
+
+func TestProgressStepsMatchTickets(t *testing.T) {
+	got := []server.ProgressStep{
+		server.ProgressChart, server.ProgressResolveTickets, server.ProgressSpec, server.ProgressReview,
+		server.ProgressGrillFindings, server.ProgressCreateTickets, server.ProgressBranch, server.ProgressDone,
+	}
+	if !slices.Equal(got, tickets.DesignSteps) {
+		t.Fatalf("server.Progress* = %v, want tickets.DesignSteps = %v", got, tickets.DesignSteps)
+	}
+}
 
 func TestEpicList_MapProgress(t *testing.T) {
 	repo := testutil.TempRepo(t)
