@@ -156,7 +156,8 @@ func clearIteration(in StartOverInput, d ralphloop.Deps, wtDir, epic, id, branch
 // are checked first: no flag overrides them.
 func checkStartOverable(in StartOverInput, epic tickets.Epic, t tickets.Ticket) error {
 	for _, other := range epic.Tickets {
-		if other.Parent != nil && *other.Parent == t.Identifier {
+		if other.Parent != nil && *other.Parent == t.Identifier &&
+			other.Status != string(schema.StatusDone) && other.Type != string(schema.TypeInvestigate) {
 			return &RefusalError{Reason: ReasonForkChildren, Message: fmt.Sprintf("ticket %s has fork child %s; start over %s instead", in.ID, other.Identifier, other.Identifier)}
 		}
 	}

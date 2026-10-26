@@ -101,6 +101,17 @@ func pausedIteration(t *testing.T, kind string, commit bool) (*servertest.Harnes
 	return h, ticketPath
 }
 
+func TestRepair_StartOverIgnoresAnOpenInvestigateChild(t *testing.T) {
+	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
+	epicIssues := filepath.Dir(ticketPath)
+	testutil.WriteFile(t, epicIssues, "01a-investigate.md", "---\nid: \"01a\"\nparent: \"01\"\nstatus: open\ntype: investigate\n---\n\n# 01a\n")
+
+	res, err := h.Client.Repair(context.Background(), "start-over", server.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
+	if err != nil || res.Refused {
+		t.Fatalf("start-over = %+v, %v; want started over", res, err)
+	}
+}
+
 func TestRepair_MergeAcceptsAZeroCommitPauseWithCommits(t *testing.T) {
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 

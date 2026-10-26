@@ -82,6 +82,37 @@ func TestStartOver_EndsTheOpenRoundWithTheRequestsSource(t *testing.T) {
 	}
 }
 
+func TestStartOver_ForkChildren(t *testing.T) {
+	cases := []struct {
+		name, status, typ string
+		refused           bool
+	}{
+		{"done child is ignored", "done", "implement", false},
+		{"open investigate child is ignored", "open", "investigate", false},
+		{"open implement child refuses", "open", "implement", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			in, d, _, _ := startOverFixture(t, agentrunner.StateIdle)
+			child := "---\nid: \"01a\"\nparent: \"01\"\nstatus: " + c.status + "\ntype: " + c.typ + "\n---\n\n# 01a — child\n"
+			if err := os.WriteFile(filepath.Join(in.EpicPath, "issues", "01a-child.md"), []byte(child), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, err := repair.StartOver(in, d)
+			var r *repair.RefusalError
+			if c.refused {
+				if !errors.As(err, &r) || r.Reason != repair.ReasonForkChildren {
+					t.Fatalf("err = %v, want a %s refusal", err, repair.ReasonForkChildren)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("StartOver: %v", err)
+			}
+		})
+	}
+}
+
 func TestStartOver_RefusesAWorkingAgent(t *testing.T) {
 	for _, state := range []agentrunner.State{agentrunner.StateWorking, agentrunner.StateBlocked} {
 		t.Run(string(state), func(t *testing.T) {
