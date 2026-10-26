@@ -48,7 +48,8 @@ export function TicketReading({ detail }: { detail: TicketDetail }) {
               ))}
             </Box>
           )}
-          {latest.closed_reason && <Text>Closed: {latest.closed_reason}</Text>}
+          {latest.prompt && <Text>{latest.prompt}</Text>}
+          {latest.closed_reason &&<Text>Closed: {latest.closed_reason}</Text>}
         </>
       )}
       {detail.rounds.length > 0 && (

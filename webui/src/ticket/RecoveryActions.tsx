@@ -2,11 +2,14 @@ import { Box, Spinner, Text, Textarea } from "@chakra-ui/react";
 import { useState } from "react";
 import { ActionChooseBase, ActionResume, ActionRetry, ActionStartOver, type TicketDetail } from "../generated/server";
 import { Button } from "../ui/button/Button";
-import { useWrite } from "../useWrite";
+import { useWrite, type Refusable } from "../useWrite";
 import { ReasonStale } from "./answer";
 import { isRecoverAction, postRecover, ReasonAgentWorking, type PostRecover, type RecoverBody } from "./recover";
 
 const SUCCESS_TOASTS: Record<string, string> = { [ActionRetry]: "Retry started", [ActionResume]: "Resumed" };
+
+// A resume of a zero-commit pause with a live agent prompts it and leaves the pause in place.
+const PROMPTED_TOAST = "Sent to the running agent. The ticket stays paused until it finishes.";
 
 // The buttons for the recovery verbs the detail lists. The server decides which show and what they say;
 // this holds no verb logic beyond where each one posts.
@@ -46,7 +49,10 @@ export function RecoveryActions({
         return res;
       },
       {
-        success: () => (SUCCESS_TOASTS[action] ? { type: "success", title: SUCCESS_TOASTS[action]! } : undefined),
+        success: (res) => {
+          if ((res as Refusable & { data?: { status?: string } }).data?.status === "prompted") return { type: "success", title: PROMPTED_TOAST };
+          return SUCCESS_TOASTS[action] ? { type: "success", title: SUCCESS_TOASTS[action]! } : undefined;
+        },
         onDone: () => {
           setConfirming(false);
           onDone?.();
@@ -69,6 +75,7 @@ export function RecoveryActions({
       aria-label="Recovery actions"
       role="form"
     >
+      {detail.recommendation && <Text whiteSpace="pre-wrap">{detail.recommendation.diagnosis}</Text>}
       {bases.length > 0 && actions.includes(ActionChooseBase) && (
         <>
           <Text>Choose the base branch:</Text>
@@ -108,6 +115,11 @@ export function RecoveryActions({
             >
               {pending && <Spinner size="sm" />}
               {info?.label ?? action}
+              {action === detail.recommendation?.verb && (
+                <Text as="span" fontSize="xs" fontWeight="600" textTransform="uppercase">
+                  Recommended
+                </Text>
+              )}
             </Button>
           );
         })}

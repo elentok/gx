@@ -245,3 +245,27 @@ test("a done ticket and a plain open ticket show no card and no earlier rounds",
   expect(card()).toBeNull();
   expect(screen.queryByText(/Earlier rounds/)).toBeNull();
 });
+
+test("a recommendation shows its diagnosis and marks one button Recommended", async () => {
+  renderTicket(() =>
+    repair(["retry", "start-over"], { recommendation: { verb: "start-over", diagnosis: "The branch is unrecoverable." } }),
+  );
+  const c = await screen.findByRole("group", { name: "Action card" });
+  expect(c.textContent).toContain("The branch is unrecoverable.");
+  expect(screen.getAllByText("Recommended")).toHaveLength(1);
+  expect(within(screen.getByRole("button", { name: /Start over/ })).getByText("Recommended")).toBeTruthy();
+});
+
+test("a round the agent was prompted on shows the Prompt sent line", async () => {
+  const prompt = "Prompt sent to the running agent at 14:05";
+  renderTicket(() => ({ ...base, latest: { ...base.latest!, prompt, prompted_at: "2026-10-26T14:05:00Z" } }));
+  expect(await screen.findByText(prompt)).toBeTruthy();
+});
+
+test("a prompted Resume shows that the ticket stays paused", async () => {
+  const body = { data: { ticket: "12", status: "prompted", message: "the agent is still running and was asked to continue" } };
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body))));
+  renderTicket(() => repair(["resume"], { pause_reason: "zero-commit" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+  expect(await screen.findByText("Sent to the running agent. The ticket stays paused until it finishes.")).toBeTruthy();
+});
