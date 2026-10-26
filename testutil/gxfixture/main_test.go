@@ -720,6 +720,51 @@ func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
 	}
 }
 
+func TestGrillingStatsScenario_StatsReturnTheSeededTotals(t *testing.T) {
+	r := start(t, "grilling-stats")
+	tests := []struct {
+		args             []string
+		words, questions float64
+	}{
+		{[]string{"--range", "30"}, 550, 12},
+		{[]string{"--range", "30", "--project", "demo"}, 310, 7},
+		{[]string{"--range", "30", "--project", "other"}, 240, 5},
+		{[]string{"--range", "7"}, 260, 6},
+		{[]string{"--range", "7", "--project", "demo"}, 60, 2},
+		{[]string{"--range", "7", "--project", "other"}, 200, 4},
+	}
+	for _, tt := range tests {
+		var st server.Stats
+		if err := json.Unmarshal([]byte(r.gx(t, append([]string{"server", "stats", "--json"}, tt.args...)...)), &st); err != nil {
+			t.Fatal(err)
+		}
+		var words, questions float64
+		for i := range st.Grilling.Words {
+			words += st.Grilling.Words[i].Value
+			questions += st.Grilling.Questions[i].Value
+		}
+		if words != tt.words || questions != tt.questions {
+			t.Errorf("%v: words %v questions %v, want %v and %v", tt.args, words, questions, tt.words, tt.questions)
+		}
+	}
+
+	// 30 days: index 0 is 29 days ago. Days 29..26 ago precede the earliest count.
+	var st server.Stats
+	if err := json.Unmarshal([]byte(r.gx(t, "server", "stats", "--json", "--range", "30")), &st); err != nil {
+		t.Fatal(err)
+	}
+	for i, w := range st.Grilling.Words {
+		daysAgo := 29 - i
+		if want := daysAgo > 25; w.NoData != want {
+			t.Errorf("%d days ago: no_data = %v, want %v", daysAgo, w.NoData, want)
+		}
+	}
+	if w := st.Grilling.Words[29-24]; w.Value != 0 || w.NoData {
+		t.Errorf("24 days ago = %+v, want a zero bar", w)
+	}
+	r.stop(t)
+}
+
 func TestStart_AutoAdvanceDelayFlagIsAccepted(t *testing.T) {
 	r := startWith(t, "design", "--auto-advance-delay", "50ms")
 	r.stop(t)

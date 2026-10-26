@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -287,6 +288,18 @@ func (f *fixture) seed(sc scenario) error {
 		cmd.Dir, cmd.Env = repo, f.env
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+	if sc.conversations != nil {
+		dir := filepath.Join(f.root, "data", "gx", "conversations")
+		started, recs := sc.conversations(time.Now())
+		if err := conversations.MarkStarted(dir, started); err != nil {
+			return err
+		}
+		for _, r := range recs {
+			if err := conversations.Save(dir, r); err != nil {
+				return err
+			}
 		}
 	}
 	for _, p := range sc.projects {

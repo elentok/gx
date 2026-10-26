@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
@@ -52,6 +53,10 @@ type scenario struct {
 	recentlyFinished int
 	// openDesigns lists the maps whose design session is opened once the server is up.
 	openDesigns []string
+	// conversations seeds the conversation records, and the time recording began
+	// (the "started" marker). It is called with the time of seeding, so the days
+	// it picks stay inside the stats range.
+	conversations func(now time.Time) (started time.Time, recs []conversations.Record)
 }
 
 var scenarios = map[string]scenario{
@@ -114,6 +119,21 @@ var scenarios = map[string]scenario{
 	// design session replays fakeclaude's scripted chat. Its implementation
 	// epic exists, so Progress links to it at Branch and Done.
 	"design": designBase,
+	// grilling-stats: design plus seeded Grilling counts. The totals below are
+	// per `gx server stats` range, days counted back from today; "all" is both
+	// projects:
+	//
+	//	         30 days          7 days
+	//	         words questions  words questions
+	//	demo       310     7        60     2
+	//	other      240     5       200     4
+	//	all        550    12       260     6
+	//
+	// Counted days are 25, 10 and 3 days ago. The 4 days before the 25th have
+	// no_data (hatched); day 24 has no rounds, so it is a zero bar. The "started"
+	// marker is 12 days ago, so a transcript older than that sits before it.
+	// One Design record has no counts, so it is not counted.
+	"grilling-stats": grillingStats(),
 	// design-plain (V3): a round, then a plain-text turn after the answer.
 	"design-plain": designScript(tickets.StepResolveTickets,
 		agentfake.DesignTurnRound, agentfake.DesignTurnPlain),
@@ -199,6 +219,30 @@ var designBase = scenario{
 		}},
 	},
 	designSteps: map[string]string{project + ":design-epic": string(tickets.StepResolveTickets)},
+}
+
+// grillingStats is the design scenario with conversation records that carry
+// fixed Grilling items; see the scenario map for the totals they sum to.
+func grillingStats() scenario {
+	sc := designBase
+	sc.conversations = func(now time.Time) (time.Time, []conversations.Record) {
+		noon := func(daysAgo int) time.Time {
+			return time.Date(now.Year(), now.Month(), now.Day()-daysAgo, 12, 0, 0, 0, time.Local)
+		}
+		rec := func(id, ticket string, items ...conversations.GrillingItem) conversations.Record {
+			return conversations.Record{ID: id, Dir: "/tmp/" + id, Harness: "claude", Ticket: ticket, Design: true, Grilling: items}
+		}
+		item := func(id string, daysAgo, questions, words int) conversations.GrillingItem {
+			return conversations.GrillingItem{MessageID: id, At: noon(daysAgo), Questions: questions, Words: words}
+		}
+		return noon(12), []conversations.Record{
+			rec("conv-a", "demo:design-epic/01", item("m1", 25, 2, 100), item("m2", 10, 3, 150)),
+			rec("conv-b", "other:plan-epic/01", item("m3", 10, 1, 40), item("m4", 3, 4, 200)),
+			rec("conv-c", "demo:design-epic/01", item("m5", 3, 2, 60)),
+			rec("conv-uncounted", "demo:design-epic/01"),
+		}
+	}
+	return sc
 }
 
 // doneAt is a merged ticket claimed an hour before it closed at stamp.
