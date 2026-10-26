@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { EpicListRow } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { EpicCard } from "./EpicCard";
@@ -183,6 +183,36 @@ test("Triage opens a dialog with the command and a copy button", async () => {
   expect(text(dialog)).toContain("/gx-triage-follow-ups --project gx");
   fireEvent.click(within(dialog).getByRole("button", { name: "Copy" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith("/gx-triage-follow-ups --project gx"));
+});
+
+function openTriage() {
+  const r = row({ card_kind: "follow-ups", actions: [{ kind: "triage", label: "Triage", target: "gx" }] });
+  renderThemed(<EpicCard row={r} />);
+  fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+  return screen.getByRole("dialog");
+}
+
+describe("Triage copy without navigator.clipboard", () => {
+  beforeEach(() => {
+    Object.assign(navigator, { clipboard: undefined });
+  });
+
+  test("falls back to execCommand and shows Copied", async () => {
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.assign(document, { execCommand });
+    const dialog = openTriage();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Copied" })).toBeTruthy());
+    expect(execCommand).toHaveBeenCalledWith("copy");
+  });
+
+  test("shows Copy failed and selects the command when execCommand fails", async () => {
+    Object.assign(document, { execCommand: vi.fn().mockReturnValue(false) });
+    const dialog = openTriage();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Copy" }));
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Copy failed" })).toBeTruthy());
+    expect(window.getSelection()?.toString()).toBe("/gx-triage-follow-ups --project gx");
+  });
 });
 
 test("a countdown reason ticks from the deadline", () => {
