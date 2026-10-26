@@ -458,3 +458,31 @@ an exited session.
 - **Scenario:** `ready`
 - **Steps:** `gx designs open cli-del`, stop its session, run `gx designs delete demo:cli-del`; run the same verb on `demo:ready-epic`.
 - **Pass:** `gx tickets show demo:cli-del` fails. The verb on `ready-epic` exits non-zero and the epic stays.
+
+## 47. Send popover
+
+- **Scenario:** `design`
+- **Steps:**
+  1. Start the session and press Send with nothing answered.
+  2. Click the `Q8b` row. Fold the sheet with ▾, press Send, click the `Q8` row.
+  3. Pick SQLite on `Q8`, press Send.
+  4. Press Escape. Press Send and click the chat. Press Send twice.
+  5. Press Send, then Enter on the focused "Send anyway".
+- **Pass:**
+  - A popover named "Unanswered questions" shows above Send, ends within 2 px of Send's right edge, and the composer keeps its height.
+  - It reads "2 questions are unanswered" and "0 of 2 answered", with `Q8` and `Q8b` rows; after the answer, "1 question is unanswered" and "1 of 2 answered".
+  - The `Q8b` row closes it, makes `Q8b` the current dot and focuses its first choice. On a folded sheet the `Q8` row opens the sheet at `Q8`.
+  - "Send anyway" is focused on open. Escape and a click on the chat close it and focus Send. The second Send press closes it and posts nothing.
+  - Enter sends the round with `Q8b` as "(unanswered)", with no second dialog and no "Answer them" button.
+
+## 48. Fixed sheet rows
+
+- **Scenario:** `design`, at 1280x600.
+- **Steps:**
+  1. Start the session, click "📝 Note" on `Q8`.
+  2. Scroll the question body to its end.
+- **Pass:**
+  - The note's `rows` is 3.
+  - The dots, "0 of 2 answered" and the Prev/Next row keep their positions and stay visible.
+  - The body's scroll position changes and the sheet's top edge does not.
+  - Docked only: the Focus mode flow adds the focus mode half.

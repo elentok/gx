@@ -59,6 +59,130 @@ test.describe("5. Answer a round", () => {
   });
 });
 
+test.describe("47. Send popover", () => {
+  test("lists the gaps above Send, jumps to a question, sends anyway", async ({ page, start }) => {
+    await start("design", { autoAdvanceDelay: "1h" });
+    await openDesign(page);
+    await page.getByRole("button", nav("Start design session")).click();
+
+    const questions = page.getByRole("group", nav("Questions"));
+    const send = page.getByRole("button", nav("Send"));
+    const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
+    const composer = page.locator('[aria-label="Composer"]');
+    await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
+
+    const heightBefore = (await composer.boundingBox())!.height;
+    await send.click();
+    await expect(popover).toBeVisible();
+    expect((await composer.boundingBox())!.height).toBe(heightBefore);
+    await expect(popover.getByText("2 questions are unanswered")).toBeVisible();
+    await expect(popover.getByText("0 of 2 answered")).toBeVisible();
+    const rowQ8 = popover.getByRole("button", { name: /^Q8 Which store\? ›$/ });
+    const rowQ8b = popover.getByRole("button", { name: /^Q8b Migrate at startup\? ›$/ });
+    await expect(rowQ8).toBeVisible();
+    await expect(rowQ8b).toBeVisible();
+    await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
+
+    // The popover sits above Send and ends at its right edge.
+    const pop = (await popover.boundingBox())!;
+    const btn = (await send.boundingBox())!;
+    expect(pop.y + pop.height).toBeLessThan(btn.y);
+    expect(Math.abs(pop.x + pop.width - (btn.x + btn.width))).toBeLessThanOrEqual(2);
+
+    // A row closes the popover, makes its question current and focuses its first choice.
+    await rowQ8b.click();
+    await expect(popover).toHaveCount(0);
+    await expect(questions.getByRole("button", nav("Question 8b"))).toHaveAttribute("aria-current", "step");
+    await expect(questions.getByRole("group", nav("Question 8b of 2")).getByRole("button").first()).toBeFocused();
+
+    // A folded sheet opens at the question of the row.
+    await questions.getByRole("button", nav("Fold questions")).click();
+    await expect(questions.getByRole("button", nav("Open questions"))).toBeVisible();
+    await send.click();
+    await popover.getByRole("button", { name: /^Q8 Which store\? ›$/ }).click();
+    await expect(questions.getByRole("button", nav("Fold questions"))).toBeVisible();
+    await expect(questions.getByRole("button", nav("Question 8"))).toHaveAttribute("aria-current", "step");
+
+    // One gap left.
+    await questions.getByRole("button", { name: /SQLite/ }).click();
+    await send.click();
+    await expect(popover.getByText("1 question is unanswered")).toBeVisible();
+    await expect(popover.getByText("1 of 2 answered")).toBeVisible();
+
+    // Escape and a click on the chat close it and give focus back to Send.
+    await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(popover).toHaveCount(0);
+    await expect(send).toBeFocused();
+    await send.click();
+    await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
+    await page.getByText("Two questions before the spec.").click();
+    await expect(popover).toHaveCount(0);
+    await expect(send).toBeFocused();
+
+    // A second press closes what the first opened, and sends nothing.
+    await send.click();
+    await expect(popover).toBeVisible();
+    await send.click();
+    await expect(popover).toHaveCount(0);
+    await expect(page.getByText("Q8b - Migrate at startup?: (unanswered)")).toHaveCount(0);
+
+    // Enter on the focused Send anyway sends, with no second dialog.
+    await send.click();
+    await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(page.getByText("Q8b - Migrate at startup?: (unanswered)")).toBeVisible();
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("button", nav("Answer them"))).toHaveCount(0);
+  });
+});
+
+test.describe("48. Fixed sheet rows", () => {
+  test.use({ viewport: { width: 1280, height: 600 } });
+
+  test("the header and Prev/Next stay put while the body scrolls", async ({ page, start }) => {
+    await start("design", { autoAdvanceDelay: "1h" });
+    await openDesign(page);
+    await page.getByRole("button", nav("Start design session")).click();
+
+    const questions = page.getByRole("group", nav("Questions"));
+    await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
+    await questions.getByRole("button", nav("Note on question 8")).click();
+    const note = questions.getByRole("textbox", nav("Note text for question 8"));
+    await expect(note).toBeVisible();
+    await expect(note).toHaveAttribute("rows", "3");
+
+    const dot = questions.getByRole("button", nav("Question 8"));
+    const count = questions.getByText("0 of 2 answered");
+    const prev = questions.getByRole("button", nav("← Prev"));
+    const next = questions.getByRole("button", nav("Next →"));
+    const scroller = await note.evaluateHandle((el) => {
+      for (let p = el.parentElement; p; p = p.parentElement) {
+        if (getComputedStyle(p).overflowY === "auto" && p.scrollHeight > p.clientHeight) return p;
+      }
+      return null;
+    });
+    expect(await scroller.evaluate((el) => el !== null), "the body must overflow at this height").toBe(true);
+
+    const where = async () => ({
+      dot: await dot.boundingBox(),
+      count: await count.boundingBox(),
+      prev: await prev.boundingBox(),
+      next: await next.boundingBox(),
+      top: (await questions.boundingBox())!.y,
+    });
+    const before = await where();
+    const scrollBefore = await scroller.evaluate((el) => (el as HTMLElement).scrollTop);
+    await scroller.evaluate((el) => ((el as HTMLElement).scrollTop = (el as HTMLElement).scrollHeight));
+    const scrollAfter = await scroller.evaluate((el) => (el as HTMLElement).scrollTop);
+
+    expect(scrollAfter).toBeGreaterThan(scrollBefore);
+    expect(await where()).toEqual(before);
+    for (const el of [dot, count, prev, next]) await expect(el).toBeInViewport();
+  });
+});
+
 test.describe("9. Design progress to the end", () => {
   test("walks every step to Done", async ({ page, start }) => {
     const fixture = await start("design");
