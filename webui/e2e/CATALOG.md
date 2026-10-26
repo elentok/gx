@@ -285,7 +285,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8), `pause.e2e.ts` (flow 3), `design.e2e
   3. Tap the title; click Close on the sheet.
 - **Pass:**
   - The summary opens the "Design progress steps" modal with Resolve tickets current.
-  - Note and Focus read only their icons; the Auto-advance switch has no text.
+  - Note reads only its icon; the Auto-advance switch has no text.
   - The title opens a "Jump to epic" sheet that fills the screen; Close closes it.
 
 ## 25. New Design from an empty page

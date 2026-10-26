@@ -98,6 +98,8 @@ function DesignBody({
   const connState = useConnectionState(conn);
   const sessions = connState.snapshot?.sessions ?? [];
   const [selected, setSelected] = useState<string>();
+  // Not stored: the message list and the impl link both read it, so it lives here.
+  const [focusMode, setFocusMode] = useState(false);
   const done = detail?.steps?.some(
     (s) => s.step === "done" && s.state === "done",
   );
@@ -176,7 +178,7 @@ function DesignBody({
           gridRow={{ base: 2, lg: 1 }}
           gridColumn={1}
         >
-          {wide && detail && showsImplLink(detail) && (
+          {wide && !focusMode && detail && showsImplLink(detail) && (
             <ImplLink address={detail.impl_address!} />
           )}
           <DesignChat
@@ -186,6 +188,8 @@ function DesignBody({
             done={done}
             nextTitle={nextTitle}
             working={working}
+            focusMode={focusMode}
+            onFocusMode={setFocusMode}
             actions={{
               address,
               open: deps.open,

@@ -366,7 +366,71 @@ test("sending the round drops its draft", async () => {
   expect(within(again).queryByRole("button", { name: "Question 1, answered" })).toBeNull();
 });
 
-const defaultsText = "Intro\n\n**Decided unless you object**\n\n- Naming: use camelCase\n- Order: alphabetical";
+const implDetail = { impl_address: "gx:a-impl", steps: [{ step: "branch", label: "Branch", state: "current" }] };
+
+const focusChat = () =>
+  okChat(
+    chatOf([msg({ text: "earlier talk" })], {
+      round: [card({ label: "1", body: "First?" }), card({ label: "3", body: "Third?", kind: "text", options: undefined })],
+    }),
+  );
+
+test("focus mode hides the messages and the impl link; banner, notice and composer stay", async () => {
+  renderChat([session({ failure: { kind: "stalled", label: "Stalled" } as SessionInfo["failure"] })], focusChat(), undefined, implDetail);
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  expect(screen.getByText("earlier talk")).toBeTruthy();
+  expect(screen.getByRole("link", { name: /Open implementation epic/ })).toBeTruthy();
+  fireEvent.click(within(sheet).getByRole("button", { name: "Enter focus mode" }));
+  expect(screen.queryByText("earlier talk")).toBeNull();
+  expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
+  expect(screen.getByRole("group", { name: "Questions" })).toBeTruthy();
+  expect(screen.getByLabelText("Session failure")).toBeTruthy();
+  expect(screen.getByRole("form", { name: "Composer" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Leave focus mode" }));
+  expect(await screen.findByText("earlier talk")).toBeTruthy();
+  expect(screen.getByRole("link", { name: /Open implementation epic/ })).toBeTruthy();
+});
+
+test("focus mode keeps the gx stopped notice", async () => {
+  renderChat([session({ actionable: { reason: "boom", gx_raised: true } })], focusChat());
+  fireEvent.click(within(await screen.findByRole("group", { name: "Questions" })).getByRole("button", { name: "Enter focus mode" }));
+  expect(screen.getByRole("region", { name: "gx stopped" })).toBeTruthy();
+});
+
+test("fold leaves focus mode; unfolding with the focus button enters it", async () => {
+  renderChat([session()], focusChat());
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  fireEvent.click(within(sheet).getByRole("button", { name: "Enter focus mode" }));
+  expect(screen.queryByText("earlier talk")).toBeNull();
+  fireEvent.click(within(sheet).getByRole("button", { name: "Fold questions" }));
+  expect(await screen.findByText("earlier talk")).toBeTruthy();
+  expect(within(sheet).queryByRole("button", { name: "Alpha" })).toBeNull();
+  fireEvent.click(within(sheet).getByRole("button", { name: "Enter focus mode" }));
+  expect(screen.queryByText("earlier talk")).toBeNull();
+  expect(within(sheet).getByRole("button", { name: "Alpha" })).toBeTruthy();
+});
+
+test("answers, the open question and the note survive switching modes; the text answer has five rows in focus", async () => {
+  renderChat([session()], focusChat());
+  const sheet = await screen.findByRole("group", { name: "Questions" });
+  fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
+  fireEvent.click(within(sheet).getByRole("button", { name: "Question 3" }));
+  fireEvent.click(screen.getByRole("button", { name: "Note" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "for all" } });
+  const answer = () => within(sheet).getByRole("textbox", { name: "Answer to question 3" }) as HTMLTextAreaElement;
+  expect(answer().rows).toBe(2);
+  fireEvent.click(within(sheet).getByRole("button", { name: "Enter focus mode" }));
+  expect(answer().rows).toBe(5);
+  fireEvent.change(answer(), { target: { value: "typed" } });
+  fireEvent.click(within(sheet).getByRole("button", { name: "Leave focus mode" }));
+  expect(answer().rows).toBe(2);
+  expect(answer().value).toBe("typed");
+  expect(within(sheet).getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
+  expect(within(sheet).getByRole("button", { name: "Question 3, answered" }).getAttribute("aria-current")).toBe("step");
+  expect((screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value).toBe("for all");
+});
+
+const defaultsText ="Intro\n\n**Decided unless you object**\n\n- Naming: use camelCase\n- Order: alphabetical";
 
 test("defaulted questions render as plain text beside one card, and Send asks nothing about them", async () => {
   const post = vi.fn<PostPrompt>(async () => ({}));

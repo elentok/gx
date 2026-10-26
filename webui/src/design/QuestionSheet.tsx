@@ -53,7 +53,7 @@ function Choice({
   );
 }
 
-// One question of a round. `big` is the full-screen size.
+// One question of a round. `big` is the focus-mode size.
 export function Question({
   card,
   answer,
@@ -195,6 +195,8 @@ export function QuestionSheet({
   focus,
   initialIndex = 0,
   onIndex,
+  focusMode = false,
+  onFocusMode,
 }: {
   round: SessionRoundCard[];
   answers: Answers;
@@ -204,6 +206,9 @@ export function QuestionSheet({
   /** The question the sheet opens at, and a listener for every move, so the caller can keep a draft. */
   initialIndex?: number;
   onIndex?: (index: number) => void;
+  /** Focus mode: the sheet fills its column and its questions render big. The page owns it. */
+  focusMode?: boolean;
+  onFocusMode?: (on: boolean) => void;
 }) {
   const [open, setOpen] = useState(true);
   const [index, setIndex] = useState(() =>
@@ -276,6 +281,7 @@ export function QuestionSheet({
       display="flex"
       flexDirection="column"
       minH="0"
+      flex={focusMode ? "1" : undefined}
     >
       <Box
         px="3"
@@ -297,12 +303,28 @@ export function QuestionSheet({
         <Text fontSize="xs" color="text.dim">
           {done} of {round.length} answered
         </Text>
+        {onFocusMode && (
+          <Button
+            emphasis="ghost"
+            size="sm"
+            aria-label={focusMode ? "Leave focus mode" : "Enter focus mode"}
+            onClick={() => {
+              setOpen(true);
+              onFocusMode(!focusMode);
+            }}
+          >
+            {focusMode ? "⤡" : "⤢"}
+          </Button>
+        )}
         <Button
           emphasis="ghost"
           size="sm"
           aria-expanded={open}
           aria-label={open ? "Fold questions" : "Open questions"}
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => {
+            setOpen((o) => !o);
+            if (open) onFocusMode?.(false);
+          }}
         >
           {open ? "▾" : "▴"}
         </Button>
@@ -337,6 +359,7 @@ export function QuestionSheet({
                 aria-hidden={k !== index}
               >
                 <Question
+                  big={focusMode}
                   card={c}
                   answer={answers[c.label] ?? {}}
                   onChange={(a) =>

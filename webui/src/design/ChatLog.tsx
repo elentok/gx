@@ -1,11 +1,5 @@
 import { Box, Spinner as ChakraSpinner, Text } from "@chakra-ui/react";
-import {
-  useCallback,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type {
   SessionBackgroundTask,
@@ -26,7 +20,6 @@ import {
 } from "./FailureBanner";
 import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
-import { RoundFocus } from "./RoundFocus";
 import { useRoundDraft } from "./roundDraft";
 
 const KIND_NAMES: Record<string, string> = {
@@ -153,6 +146,8 @@ function ChatTail({
   done,
   nextTitle,
   actions,
+  focusMode,
+  onFocusMode,
 }: {
   session: SessionInfo;
   roundKey: string;
@@ -163,6 +158,8 @@ function ChatTail({
   done?: boolean;
   nextTitle?: string;
   actions: FailureActions;
+  focusMode: boolean;
+  onFocusMode: (on: boolean) => void;
 }) {
   const { draft, setAnswers, setNotes, setIndex, clear } = useRoundDraft(
     session.id,
@@ -170,47 +167,29 @@ function ChatTail({
   );
   const { answers } = draft;
   const [focus, setFocus] = useState<{ index: number }>();
-  // Full screen, the composer renders into the overlay's footer; the docked sheet stays mounted, hidden, so it keeps its place.
-  const [full, setFull] = useState(false);
-  const [footer, setFooter] = useState<HTMLDivElement | null>(null);
-  const close = useCallback(() => setFull(false), []);
   const failure = visibleFailure(session.failure, done);
   const round = chat.round ?? [];
   return (
     // The bottom area: at most half the screen, so only the question body scrolls past that.
+    // In focus mode the cap is gone and the sheet takes the rest of the column.
     <Box
-      flex="none"
-      maxH="50dvh"
+      flex={focusMode ? "1" : "none"}
+      maxH={focusMode ? undefined : "50dvh"}
       display="flex"
       flexDirection="column"
       minH="0"
       gap="3"
     >
       {round.length > 0 && (
-        <Box
-          hidden={full}
-          display={full ? "none" : "flex"}
-          flexDirection="column"
-          minH="0"
-        >
-          <QuestionSheet
-            round={round}
-            answers={answers}
-            onAnswers={setAnswers}
-            focus={focus}
-            initialIndex={draft.index}
-            onIndex={setIndex}
-          />
-        </Box>
-      )}
-      {full && round.length > 0 && (
-        <RoundFocus
+        <QuestionSheet
           round={round}
           answers={answers}
           onAnswers={setAnswers}
           focus={focus}
-          onClose={close}
-          footer={setFooter}
+          initialIndex={draft.index}
+          onIndex={setIndex}
+          focusMode={focusMode}
+          onFocusMode={onFocusMode}
         />
       )}
       {failure && (
@@ -243,8 +222,6 @@ function ChatTail({
           onText={setNotes}
           onRoundSent={clear}
           onReview={(index) => setFocus({ index })}
-          fullScreen={full ? footer : undefined}
-          onFullScreen={setFull}
         />
       )}
     </Box>
@@ -293,6 +270,8 @@ function ChatLog({
   nextTitle,
   working: step,
   actions,
+  focusMode,
+  onFocusMode,
 }: {
   session: SessionInfo;
   fetchChat?: FetchChat;
@@ -301,6 +280,8 @@ function ChatLog({
   nextTitle?: string;
   working?: WorkingStep;
   actions: FailureActions;
+  focusMode: boolean;
+  onFocusMode: (on: boolean) => void;
 }) {
   const conn = useConnectionContext();
   const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
@@ -313,22 +294,24 @@ function ChatLog({
     session.status.state === "working" && !session.status.background;
   return (
     <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
-      <ChatScroller
-        signal={`${chat.messages.length}|${chat.background.length}|${busy}`}
-      >
-        {chat.truncated && (
-          <Text fontSize="xs" color="text.dim" textAlign="center">
-            Earlier messages hidden
-          </Text>
-        )}
-        {chat.messages.map((m, i) => (
-          <Entry key={m.id || i} m={m} />
-        ))}
-        {chat.background.length > 0 && (
-          <BackgroundStrip tasks={chat.background} />
-        )}
-        {busy && step && <WorkingRow {...step} />}
-      </ChatScroller>
+      {!focusMode && (
+        <ChatScroller
+          signal={`${chat.messages.length}|${chat.background.length}|${busy}`}
+        >
+          {chat.truncated && (
+            <Text fontSize="xs" color="text.dim" textAlign="center">
+              Earlier messages hidden
+            </Text>
+          )}
+          {chat.messages.map((m, i) => (
+            <Entry key={m.id || i} m={m} />
+          ))}
+          {chat.background.length > 0 && (
+            <BackgroundStrip tasks={chat.background} />
+          )}
+          {busy && step && <WorkingRow {...step} />}
+        </ChatScroller>
+      )}
       <ChatTail
         key={roundKey}
         session={session}
@@ -340,6 +323,8 @@ function ChatLog({
         done={done}
         nextTitle={nextTitle}
         actions={actions}
+        focusMode={focusMode}
+        onFocusMode={onFocusMode}
       />
     </Box>
   );
@@ -354,6 +339,8 @@ export function DesignChat({
   nextTitle,
   working,
   actions,
+  focusMode = false,
+  onFocusMode = () => {},
 }: {
   session?: SessionInfo;
   fetchChat?: FetchChat;
@@ -365,6 +352,9 @@ export function DesignChat({
   /** The step the busy row names, and the ticket during Resolve tickets. */
   working?: WorkingStep;
   actions: FailureActions;
+  /** Focus mode: only the questions sheet, the failure notices and the composer. The page owns it. */
+  focusMode?: boolean;
+  onFocusMode?: (on: boolean) => void;
 }) {
   if (!session) return null;
   if (session.harness !== "claude") {
@@ -390,6 +380,8 @@ export function DesignChat({
       nextTitle={nextTitle}
       working={working}
       actions={actions}
+      focusMode={focusMode}
+      onFocusMode={onFocusMode}
     />
   );
 }

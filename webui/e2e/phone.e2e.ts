@@ -61,9 +61,8 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await steps.getByRole("button", nav("Close")).click();
   await expect(steps).toHaveCount(0);
 
-  // Note and Focus lose their text, and the switch loses its label.
+  // Note loses its text, and the switch loses its label.
   await expect(page.getByRole("button", nav("Note"))).toHaveText("✎");
-  await expect(page.getByRole("button", nav("Focus"))).toHaveText("⤢");
   await expect(page.getByRole("switch")).not.toContainText("Auto-advance");
 
   // A tap on the title opens a full-screen sheet; its close button closes it.

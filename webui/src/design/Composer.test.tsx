@@ -199,7 +199,7 @@ test("the composer is disabled while the session is Working", async () => {
   expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
 });
 
-test("one line: the switch on the left; Note, Focus and Send on the right; the note box above the bar", async () => {
+test("one line: the switch on the left; Note and Send on the right; the note box above the bar", async () => {
   render({ post: vi.fn<PostPrompt>(async () => ok) });
   const sw = await screen.findByRole("switch", { name: /Auto-advance/ });
   const note = screen.getByRole("button", { name: "Note" });
@@ -733,70 +733,8 @@ test("a question card shows its number and title above the body", async () => {
   expect(s.getByText("Body 1?")).toBeTruthy();
 });
 
-const focusDialog = async () => {
-  fireEvent.click(await screen.findByRole("button", { name: "Focus" }));
-  return screen.findByRole("dialog", { name: "Questions, full screen" });
-};
-
-test("Focus opens the round full screen; Send there answers it and collapses back", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  render({ post, chat: chatOf({ round: [askCard(1), askCard(2)] }) });
-  const d = within(await focusDialog());
-  expect(screen.queryByRole("group", { name: "Questions" })).toBeNull();
-  fireEvent.click(d.getByRole("button", { name: "Alpha" }));
-  fireEvent.click(d.getByRole("button", { name: "Beta" }));
-  expect(d.getByText("2 of 2 answered")).toBeTruthy();
-  fireEvent.change(d.getByRole("textbox", { name: "Message" }), {
-    target: { value: "overall" },
-  });
-  fireEvent.click(d.getByRole("button", { name: "Send" }));
-  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-  expect(post.mock.calls[0][0].text).toBe(
-    "Q1 - T1: Alpha\nQ2 - T2: Beta\n\nNote:\noverall",
-  );
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  expect(await sheet()).toBeTruthy();
-});
-
-test("full screen shows the auto-advance switch and the countdown with Cancel", async () => {
-  const fetchSpy = vi
-    .spyOn(globalThis, "fetch")
-    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
-  render({
-    chat: chatOf({ round: [askCard(1)] }),
-    auto: { auto_advance_at: new Date(Date.now() + 9500).toISOString() },
-  });
-  const d = within(await focusDialog());
-  expect(d.getByRole("switch", { name: /Auto-advance on/ })).toBeTruthy();
-  expect(d.getByText(/Continuing in 10s/)).toBeTruthy();
-  fireEvent.click(d.getByRole("button", { name: "Cancel" }));
-  await waitFor(() =>
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "/v1/sessions/auto-advance/cancel",
-      expect.objectContaining({ method: "POST" }),
-    ),
-  );
-  fetchSpy.mockRestore();
-});
-
-test("full screen keeps the note draft and the answers, and Escape collapses back", async () => {
-  render({
-    post: vi.fn<PostPrompt>(async () => ok),
-    chat: chatOf({ round: round() }),
-  });
-  fireEvent.change(await openNote(), { target: { value: "draft" } });
-  const d = within(await focusDialog());
-  expect(
-    (d.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value,
-  ).toBe("draft");
-  fireEvent.click(d.getByRole("button", { name: "Alpha" }));
-  fireEvent.keyDown(window, { key: "Escape" });
-  expect(screen.queryByRole("dialog")).toBeNull();
-  expect(
-    within(await sheet()).getByRole("button", { name: "Question 1, answered" }),
-  ).toBeTruthy();
-  expect(
-    (screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement)
-      .value,
-  ).toBe("draft");
+test("a round's composer has no Focus button", async () => {
+  render({ chat: chatOf({ round: [askCard(1)] }) });
+  await sheet();
+  expect(screen.queryByRole("button", { name: "Focus" })).toBeNull();
 });

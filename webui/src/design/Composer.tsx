@@ -1,6 +1,5 @@
 import { Box, Text, Textarea } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import type {
   SessionInfo,
   SessionNext,
@@ -20,12 +19,12 @@ import {
   type SetAutoAdvance,
 } from "./open";
 import { postPrompt, type PostPrompt } from "./prompt";
-import { isAnswered, roundPrompt, unansweredOf, type Answers } from "./round";
+import { roundPrompt, unansweredOf, type Answers } from "./round";
 import { SendPopover } from "./SendPopover";
 import { useWide } from "./useWide";
 import { promptable } from "./view";
 
-// Under the chat, one line: the auto-advance switch, then Note, Focus and the main action. Nothing sends unless the session is Idle.
+// Under the chat, one line: the auto-advance switch, then Note and the main action. Nothing sends unless the session is Idle.
 export function Composer({
   session,
   lastMessage,
@@ -43,8 +42,6 @@ export function Composer({
   onText,
   onRoundSent,
   onReview,
-  fullScreen,
-  onFullScreen,
 }: {
   session: SessionInfo;
   /** The id of the last chat message the page saw. */
@@ -69,10 +66,6 @@ export function Composer({
   onRoundSent?: () => void;
   /** A row of the unanswered popover: open the sheet at that question. */
   onReview?: (index: number) => void;
-  /** The round is full screen: the composer renders into this element, its note always open. */
-  fullScreen?: HTMLElement | null;
-  /** Opens or closes the full-screen round; a sent round closes it. */
-  onFullScreen?: (on: boolean) => void;
 }) {
   const wide = useWide();
   const [open, setOpen] = useState(false);
@@ -141,7 +134,6 @@ export function Composer({
     return send({ text: roundPrompt(round, answers, text) }, () => {
       setText("");
       onRoundSent?.();
-      onFullScreen?.(false);
     });
   };
   const onSend = () => {
@@ -180,15 +172,6 @@ export function Composer({
       </Button>,
     )
   );
-  const focusButton = inRound && onFullScreen && (
-    <Button
-      emphasis="secondary"
-      aria-label="Focus"
-      onClick={() => onFullScreen(true)}
-    >
-      ⤢{wide && " Focus"}
-    </Button>
-  );
   const notices = <>{error && <Text role="alert">{error}</Text>}</>;
   // With gaps, Send's click opens the popover instead of sending; a click while it is open closes it.
   function withPopover(send: ReactNode) {
@@ -217,64 +200,6 @@ export function Composer({
       cancelAutoAdvance={cancelAutoAdvance}
     />
   );
-
-  if (fullScreen) {
-    const done = round.filter((c) => isAnswered(answers[c.label])).length;
-    return createPortal(
-      <Box
-        borderTopWidth="1px"
-        bg="surface"
-        px="4"
-        py="3"
-        display="flex"
-        flexDirection="column"
-        gap="2"
-        role="form"
-        aria-label="Composer"
-      >
-        {notices}
-        {autoAdvanceBar}
-        <Box
-          display="flex"
-          gap="3"
-          flexDirection={{ base: "column", md: "row" }}
-        >
-          <Textarea
-            aria-label="Message"
-            flex="1"
-            rows={2}
-            borderRadius="12px"
-            placeholder="Note for the whole round (optional)"
-            value={text}
-            disabled={!enabled}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <Box
-            display="flex"
-            flexDirection="column"
-            gap="1"
-            justifyContent="flex-end"
-          >
-            <Text fontSize="xs" color="text.dim" textAlign="center">
-              {done} of {round.length} answered
-            </Text>
-            {withPopover(
-              <Button
-                disabled={!enabled}
-                onClick={onSend}
-                size="md"
-                justifyContent="center"
-                px="6"
-              >
-                Send
-              </Button>,
-            )}
-          </Box>
-        </Box>
-      </Box>,
-      fullScreen,
-    );
-  }
 
   return (
     <Box
@@ -317,7 +242,6 @@ export function Composer({
         >
           ✎{wide && " Note"}
         </Button>
-        {focusButton}
         {mainButton}
       </Box>
     </Box>
