@@ -1,5 +1,6 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { useEpicList, type FetchEpicList } from "../epics/list";
@@ -10,11 +11,11 @@ import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
 import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
-import type { OpenDesign, ResumeSession, StopSession } from "./open";
+import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress, showsImplLink } from "./Progress";
 import type { FetchScreen } from "./screen";
-import { Failure, SessionHeader, StartDesignButton } from "./SessionControls";
+import { DeleteDesignButton, Failure, SessionHeader, StartDesignButton } from "./SessionControls";
 import type { SessionInfo } from "../generated/server";
 import { useWide } from "./useWide";
 import { designSession, liveSessions } from "./view";
@@ -25,6 +26,7 @@ export interface DesignDeps {
   fetchChat?: FetchChat;
   post?: PostPrompt;
   open?: OpenDesign;
+  remove?: DeleteDesign;
   stop?: StopSession;
   resume?: ResumeSession;
   fetchScreen?: FetchScreen;
@@ -38,6 +40,8 @@ interface SessionStripProps {
   deps: DesignDeps;
   onSelect: (id: string) => void;
   startFailure?: string;
+  /** The map has no Destination and no tickets yet, so it can still be deleted. */
+  deletable?: boolean;
 }
 
 // The header above the chat: switch/stop controls, a way to start again, or the first Start button.
@@ -48,7 +52,9 @@ function SessionStrip({
   deps,
   onSelect,
   startFailure,
+  deletable,
 }: SessionStripProps) {
+  const navigate = useNavigate();
   // The reason is for the failed start only: a live session means a retry worked.
   const reason = !session || session.status.state === "exited" ? startFailure : undefined;
   return (
@@ -65,6 +71,9 @@ function SessionStrip({
         />
       ) : (
         <StartDesignButton address={address} open={deps.open} />
+      )}
+      {deletable && live.length === 0 && (
+        <DeleteDesignButton address={address} remove={deps.remove} onDeleted={() => navigate("/epics")} />
       )}
     </Box>
   );
@@ -137,6 +146,7 @@ function DesignBody({
           deps={deps}
           onSelect={setSelected}
           startFailure={startFailure}
+          deletable={detail?.deletable}
         />
       </Box>
       <Box

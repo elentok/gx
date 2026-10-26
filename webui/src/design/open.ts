@@ -1,7 +1,8 @@
-import type { AutoAdvanceRequest, DesignOpenRequest, SessionInfo, SessionRequest, SessionResult } from "../generated/server";
+import type { AutoAdvanceRequest, DesignDeleteRequest, DesignOpenRequest, SessionInfo, SessionRequest, SessionResult } from "../generated/server";
 
 export type OpenDesign = (body: DesignOpenRequest) => Promise<SessionResult>;
-export type StopSession = (body: SessionRequest) => Promise<SessionResult>;
+export type DeleteDesign = (body: DesignDeleteRequest) => Promise<SessionResult>;
+export type StopSession =(body: SessionRequest) => Promise<SessionResult>;
 export type ResumeSession = (body: SessionRequest) => Promise<SessionResult>;
 export type InterruptSession = (body: SessionRequest) => Promise<SessionResult>;
 
@@ -14,7 +15,8 @@ const postJson = (path: string) => async (body: unknown): Promise<SessionResult>
 };
 
 export const postOpenDesign: OpenDesign = postJson("/v1/designs/open");
-export const postStopSession: StopSession = postJson("/v1/sessions/stop");
+export const postDeleteDesign: DeleteDesign = postJson("/v1/designs/delete");
+export const postStopSession:StopSession = postJson("/v1/sessions/stop");
 export const postResumeSession: ResumeSession = postJson("/v1/sessions/resume");
 export const postInterruptSession: InterruptSession = postJson("/v1/sessions/interrupt");
 export type SetAutoAdvance = (body: AutoAdvanceRequest) => Promise<SessionResult>;

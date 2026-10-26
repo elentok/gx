@@ -3,7 +3,15 @@ import { useState } from "react";
 import { useConnectionContext } from "../connection";
 import type { DesignOpenRequest, SessionInfo } from "../generated/server";
 import { Button } from "../ui/button/Button";
-import { postOpenDesign, postStopSession, stateToken, type OpenDesign, type StopSession } from "./open";
+import {
+  postDeleteDesign,
+  postOpenDesign,
+  postStopSession,
+  stateToken,
+  type DeleteDesign,
+  type OpenDesign,
+  type StopSession,
+} from "./open";
 
 /** Runs one write at a time: a second click while one is in flight does nothing. */
 export function useWrite() {
@@ -54,6 +62,40 @@ export function StartDesignButton({
         Start design session
       </Button>
       <Failure>{error}</Failure>
+    </Box>
+  );
+}
+
+/** Deletes an uncharted Design after an inline confirm; success leaves for the Epics page. */
+export function DeleteDesignButton({
+  address,
+  remove = postDeleteDesign,
+  onDeleted,
+}: {
+  address: string;
+  remove?: DeleteDesign;
+  onDeleted: () => void;
+}) {
+  const { run, pending, error } = useWrite();
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <Box display="flex" alignItems="center" gap="2">
+      <Failure>{error}</Failure>
+      {confirming ? (
+        <>
+          <Text fontSize="sm">Delete this design?</Text>
+          <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => setConfirming(false)}>
+            Keep
+          </Button>
+          <Button size="sm" tone="deadlocked" disabled={pending} onClick={() => run(() => remove({ epic: address }), onDeleted)}>
+            Delete
+          </Button>
+        </>
+      ) : (
+        <Button size="sm" emphasis="ghost" tone="paused" onClick={() => setConfirming(true)}>
+          Delete design
+        </Button>
+      )}
     </Box>
   );
 }

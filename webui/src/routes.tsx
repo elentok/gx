@@ -1,7 +1,7 @@
 import { createHashRouter, Navigate, redirect, useLocation, useParams, type RouteObject } from "react-router";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
-import type { OpenDesign, ResumeSession, StopSession } from "./design/open";
+import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./design/open";
 import type { PostFocus } from "./design/focus";
 import type { PostPrompt } from "./design/prompt";
 import type { FetchScreen } from "./design/screen";
@@ -47,6 +47,7 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
         fetchChat: fetchers.chat,
         post: fetchers.prompt,
         open: fetchers.openDesign,
+        remove: fetchers.deleteDesign,
         stop: fetchers.stop,
         resume: fetchers.resume,
         fetchScreen: fetchers.screen,
@@ -58,6 +59,7 @@ function DesignRoute({ fetchers }: { fetchers: RouteFetchers }) {
 
 export interface RouteFetchers {
   openDesign?: OpenDesign;
+  deleteDesign?: DeleteDesign;
   stop?: StopSession;
   resume?: ResumeSession;
   screen?: FetchScreen;

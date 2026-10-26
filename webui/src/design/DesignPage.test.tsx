@@ -1,9 +1,9 @@
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { EpicDetail, EpicDetailRow, EpicList, EpicListRow, MapStep, SessionInfo } from "../generated/server";
-import { appRoutes } from "../routes";
+import { appRoutes, type RouteFetchers } from "../routes";
 import { renderThemed } from "../ui/render";
 
 afterEach(cleanup);
@@ -78,12 +78,27 @@ const detailOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   ...over,
 });
 
-function render(epics: EpicListRow[], sessions: SessionInfo[], path: string | { pathname: string; state: unknown } = "/d/gx:a", detail: EpicDetail = detailOf()) {
-  const state = { snapshot: { sessions }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
-  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+function render(
+  epics: EpicListRow[],
+  sessions: SessionInfo[],
+  path: string | { pathname: string; state: unknown } = "/d/gx:a",
+  detail: EpicDetail = detailOf(),
+  fetchers: RouteFetchers = {},
+) {
+  let state = { snapshot: { sessions }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const listeners = new Set<() => void>();
+  const conn = {
+    getState: () => state,
+    subscribe: (fn: () => void) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    onEvent: () => () => {},
+    refresh: () => {},
+  } as unknown as Connection;
   const list: EpicList = { epics, follow_ups: [] };
   const router = createMemoryRouter(
-    appRoutes({ epicList: async () => list, epic: async () => ({ kind: "ok", detail }) }),
+    appRoutes({ epicList: async () => list, epic: async () => ({ kind: "ok", detail }), ...fetchers }),
     { initialEntries: [path] },
   );
   renderThemed(
@@ -91,7 +106,11 @@ function render(epics: EpicListRow[], sessions: SessionInfo[], path: string | { 
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   );
-  return router;
+  const setSessions = (next: SessionInfo[]) => {
+    state = { ...state, snapshot: { sessions: next } } as unknown as ConnectionState;
+    act(() => listeners.forEach((fn) => fn()));
+  };
+  return Object.assign(router, { setSessions });
 }
 
 test("the title row holds a back link, the Design name and the Sessions control, with no picker or state label", async () => {
@@ -209,4 +228,45 @@ test("on a phone Progress is a segment bar and a line that expands on tap", asyn
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+const deletable = detailOf({ deletable: true });
+
+test("Delete design shows only for a deletable Design with no live session, following the sessions live", async () => {
+  const router = render([map("a")], [], "/d/gx:a", deletable);
+  expect(await screen.findByRole("button", { name: "Delete design" })).toBeTruthy();
+  router.setSessions([session("a")]);
+  expect(screen.queryByRole("button", { name: "Delete design" })).toBeNull();
+  router.setSessions([session("a", { status: { state: "exited" } })]);
+  expect(screen.getByRole("button", { name: "Delete design" })).toBeTruthy();
+  cleanup();
+  render([map("a")], [], "/d/gx:a", detailOf());
+  await screen.findByRole("button", { name: "Start design session" });
+  expect(screen.queryByRole("button", { name: "Delete design" })).toBeNull();
+});
+
+test("Keep restores the Delete design button", async () => {
+  render([map("a")], [], "/d/gx:a", deletable);
+  fireEvent.click(await screen.findByRole("button", { name: "Delete design" }));
+  expect(screen.getByText("Delete this design?")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Keep" }));
+  expect(screen.getByRole("button", { name: "Delete design" })).toBeTruthy();
+});
+
+test("confirming Delete calls the route and goes to the Epics page", async () => {
+  const deleteDesign = vi.fn(async () => ({}));
+  const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign });
+  fireEvent.click(await screen.findByRole("button", { name: "Delete design" }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  await waitFor(() => expect(router.state.location.pathname).toBe("/epics"));
+  expect(deleteDesign).toHaveBeenCalledWith({ epic: "gx:a" });
+});
+
+test("a refused delete shows the reason and keeps the page", async () => {
+  const deleteDesign = vi.fn(async () => ({ refused: true, message: "a session is running" }));
+  const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign });
+  fireEvent.click(await screen.findByRole("button", { name: "Delete design" }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("a session is running");
+  expect(router.state.location.pathname).toBe("/d/gx:a");
 });
