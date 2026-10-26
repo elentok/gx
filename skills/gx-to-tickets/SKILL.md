@@ -203,6 +203,10 @@ Present the proposed breakdown as a numbered list. For each ticket, show:
   not just when a ticket is borderline, so the user can judge granularity against the same number
   that drove the split
 
+After the implement tickets, show the proposed verify parts (see "Verify tickets" in step 6): per
+part its stories, fixture scenario and expected token budget, plus the collect ticket's budget, or
+the single lone ticket when everything fits in one part.
+
 Before the list, show the draft epic Summary (written as step 6 describes) so the user can correct
 it with the rest of the breakdown.
 
@@ -289,13 +293,65 @@ If the breakdown appends a trailing `type: code-review` ticket, run
 epic already has a code-review ticket among its published issues, else it stamps out the stub. Skip
 running it only if the user has explicitly asked for a second code-review ticket.
 
-Then run `gx tickets ensure-verify <epic-slug>` to stamp out the epic's `type: verify` ticket. Skip
-it when the epic has no user-visible behavior, meaning the spec changes no web, CLI or server
-behavior (a docs-only, skills-only or refactor epic).
-
 If the spec has a `## Verification` section that lists new flows or scenarios to write, turn each
 one into an implementation ticket in the breakdown, like any other piece of work. The verify ticket
 runs those flows; it only writes one itself when it is small (see gx-verify-epic).
+
+#### Verify tickets
+
+After the implement and code-review tickets, split the spec's user stories into budgeted verify
+tickets. Skip this and `ensure-verify` when the epic has no user-visible behavior, meaning the spec
+changes no web, CLI or server behavior (a docs-only, skills-only or refactor epic). The spec for epic
+`<name>-impl` is `docs/specs/<name>.md`; this is the resolved spec path.
+
+**Estimate each story.** Add up the cost of what its `## Verification` entry asks for:
+
+| Item in the entry                                  | Tokens |
+| -------------------------------------------------- | ------ |
+| Web flow run (one flow from the catalog)           | 6K     |
+| CLI check (one `gx` command and its output)        | 3K     |
+| Go test run (one package)                          | 4K     |
+| Skill-text quote (one `rg`/`Read` of a skill line) | 2K     |
+
+A part's fixed base is 15K (fixture start and the ticket read). A collect ticket's fixed estimate is
+30K. Keep these numbers in one place so gx-evolve can compare them with the actual token counts.
+
+**Pack the parts.** Fill parts greedily in story order. A part's expected tokens (base plus its
+stories' estimates) stay at or under 70K.
+
+- Stories that share a fixture scenario stay in one part.
+- The 70K budget wins: a scenario group that passes 70K is split across parts.
+- A single story over 70K gets a part of its own, with a note in the body that it is over budget.
+
+**One part.** If every story fits in one part, publish one lone verify ticket: `Round: 1`, no
+`Role:` line, the spec path, the stories and the spec's `## Out of Scope` section, and no collect
+ticket.
+
+**Several parts.** Publish each part as a top-level ticket (no `parent`, no `blocked_by`):
+
+```sh
+gx tickets add <epic-slug> --slug verify-part-<n> --type verify --expected-context-window <base+stories> --body -
+```
+
+The body follows the part format in [gx-verify-epic](../gx-verify-epic/SKILL.md) ("The verify part
+body"): `Round: 1`, `Role: part`, the spec path, the fixture scenario, and per story its number, its
+text and its Verification entry word for word, plus its estimate. Do not restate the format here.
+
+Then publish one round-1 collect ticket after all parts:
+
+```sh
+gx tickets add <epic-slug> --slug verify-collect --type verify --expected-context-window 30000 \
+  --blocked-by <every part id> --body -
+```
+
+Its body has `Round: 1`, `Role: collect`, the spec path and a copy of the spec's `## Out of Scope`
+section. Never make a part a child (`parent`) of the collect ticket: a child waits for its parent,
+which would deadlock.
+
+Every verify ticket you write sets `expected_context_window`.
+
+Last, run `gx tickets ensure-verify <epic-slug>`. It is a no-op when the epic already has a verify
+ticket.
 
 Last, once every ticket is written and validated, the Summary is written and `ensure-code-review`
 (and `ensure-verify`, when it ran) have run, open the epic you created as a draft: `gx tickets set <project:epic>-impl --status open`.
