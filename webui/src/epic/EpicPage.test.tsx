@@ -152,6 +152,13 @@ test("a Design's stats line leaves out the time and cost when unknown, and shows
   expect(await statsOf()).toBe("done");
 });
 
+test("a sub-minute done row counts in the design time sum", async () => {
+  render("/e/gx:blog", [designCard], "map", {
+    detail: { steps: steps("spec"), rows: [closedRow(30), { ...closedRow(30), address: "gx:blog/03" }] },
+  });
+  expect(await statsOf()).toBe("spec · 1m");
+});
+
 test("a claimed row adds its time so far only while the Design has a live session", async () => {
   const detail = { steps: steps("spec"), rows: [closedRow(60), claimedRow(600)] };
   render("/e/gx:blog", [designCard], "map", { detail, sessions: [session("working")] });
