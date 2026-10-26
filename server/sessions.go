@@ -158,7 +158,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		Harness:        req.Harness,
 		Project:        req.Project,
 		Dir:            req.Dir,
-		MadeWorktree:   req.Worktree != "",
+		MadeWorktree:   req.Worktree != "" || req.madeWorktree,
 		Name:           req.Name,
 		Ticket:         req.Ticket,
 		Design:         req.design || (req.Ticket != "" && s.onMapEpic(req.Ticket)),

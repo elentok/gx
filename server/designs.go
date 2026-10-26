@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -20,7 +21,48 @@ const (
 	ReasonDesignNotMapEpic  = "not-map-epic"
 	ReasonDesignUnknownEpic = "unknown-epic"
 	ReasonDesignEpicExists  = "epic-exists"
+	// ReasonDesignBranchClash: an epic named <map>-design would share the
+	// Design's branch name.
+	ReasonDesignBranchClash = "design-branch-clash"
 )
+
+// designBranch is the branch and worktree name of a map's Design.
+func designBranch(epic string) string { return epic + "-design" }
+
+// designClash is the refusal message when the project has an epic named like
+// the Design's branch, or "".
+func designClash(projectDir, project, epic string) string {
+	if _, err := os.Stat(filepath.Join(projectDir, designBranch(epic))); err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%s has an epic %s, which would share the branch of the %s Design", project, designBranch(epic), epic)
+}
+
+// ensureDesignWorktree makes sure the map's design worktree exists and returns
+// its path: on a new branch from trunk, or re-added on the existing branch.
+func (s *Server) ensureDesignWorktree(project, epic string) (string, error) {
+	projectDir, repoDir, err := s.projectOf(project)
+	if err != nil {
+		return "", err
+	}
+	repo, err := git.FindRepo(repoDir)
+	if err != nil {
+		return "", err
+	}
+	branch := designBranch(epic)
+	path := filepath.Join(repo.LinkedWorktreeDir(), branch)
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
+	}
+	if tickets.BranchExists(repo.Root, branch) {
+		return path, git.AddWorktreeOnBranch(*repo, branch, path)
+	}
+	trunk, err := tickets.Trunk(projectDir, repo.Root)
+	if err != nil {
+		return "", err
+	}
+	return path, git.AddWorktree(*repo, branch, path, trunk)
+}
 
 // DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
 // epic's address ("project:epic") or one of its tickets ("project:epic/NN").
@@ -108,21 +150,25 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		}
 	}
 
-	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, project)
-	if checkout == "" {
-		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", project)), nil
+	if msg := designClash(dir, project, epic); msg != "" {
+		return sessionRefusal(ReasonDesignBranchClash, msg), nil
+	}
+	worktree, err := s.ensureDesignWorktree(project, epic)
+	if err != nil {
+		return SessionResult{}, err
 	}
 	prompt := "/gx-design " + epicAddr
 	if ticket != "" {
 		prompt += "/" + ticket
 	}
 	return s.createSession(CreateSessionRequest{
-		Project: project,
-		Dir:     checkout,
-		Name:    epic,
-		Ticket:  epicAddr,
-		Prompt:  prompt,
-		Harness: s.settings.Load().chatHarness(),
+		Project:      project,
+		Dir:          worktree,
+		madeWorktree: true,
+		Name:         epic,
+		Ticket:       epicAddr,
+		Prompt:       prompt,
+		Harness:      s.settings.Load().chatHarness(),
 	})
 }
 
@@ -153,15 +199,18 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 	if _, err := os.Stat(filepath.Join(dir, slug)); err == nil {
 		return sessionRefusal(ReasonDesignEpicExists, fmt.Sprintf("%s already has an epic %s", req.Project, slug)), nil
 	}
-	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, req.Project)
-	if checkout == "" {
-		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", req.Project)), nil
+	if msg := designClash(dir, req.Project, slug); msg != "" {
+		return sessionRefusal(ReasonDesignBranchClash, msg), nil
 	}
 
 	if err := createMap(dir, slug, idea); err != nil {
 		return SessionResult{}, err
 	}
-	return s.startSession(req.Project, slug, checkout), nil
+	worktree, err := s.ensureDesignWorktree(req.Project, slug)
+	if err != nil {
+		return SessionResult{EpicCreated: true, StartError: err.Error()}, nil
+	}
+	return s.startSession(req.Project, slug, worktree), nil
 }
 
 // createMap writes the uncharted map epic for a New Design, at the Chart step.
@@ -177,15 +226,16 @@ func createMap(dir, slug, idea string) error {
 // startSession starts the design session for a map that now exists. A failure
 // is a result, not a refusal: the map is there, so the caller reports it as
 // created with the reason in StartError.
-func (s *Server) startSession(project, slug, checkout string) SessionResult {
+func (s *Server) startSession(project, slug, worktree string) SessionResult {
 	addr := project + ":" + slug
 	res, err := s.createSession(CreateSessionRequest{
-		Project: project,
-		Dir:     checkout,
-		Name:    slug,
-		Ticket:  addr,
-		Prompt:  "/gx-design " + addr,
-		Harness: s.settings.Load().chatHarness(),
+		Project:      project,
+		Dir:          worktree,
+		madeWorktree: true,
+		Name:         slug,
+		Ticket:       addr,
+		Prompt:       "/gx-design " + addr,
+		Harness:      s.settings.Load().chatHarness(),
 	})
 	switch {
 	case err != nil:

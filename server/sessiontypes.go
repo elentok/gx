@@ -140,6 +140,8 @@ type CreateSessionRequest struct {
 
 	// design marks the session Design although Ticket has no map epic yet.
 	design bool
+	// madeWorktree marks Dir as a worktree gx made, as Worktree does.
+	madeWorktree bool
 	// remoteControl is the --remote-control name, saved in the meta so resumes
 	// keep it whatever the setting says by then.
 	remoteControl string

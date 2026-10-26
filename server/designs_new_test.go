@@ -32,11 +32,15 @@ func TestDesignsOpenNew_WritesTheMapThenStartsTheSession(t *testing.T) {
 		t.Fatalf("open = %+v", res)
 	}
 	meta := readMeta(t, f.h, res.Session.ID)
-	want := map[string]any{"dir": f.repo, "name": "fresh-idea", "ticket": "proj:fresh-idea", "design": true, "first_prompt": "/gx-design proj:fresh-idea"}
+	dir, _ := meta["dir"].(string)
+	want := map[string]any{"dir": dir, "name": "fresh-idea", "ticket": "proj:fresh-idea", "design": true, "first_prompt": "/gx-design proj:fresh-idea", "made_worktree": true}
 	for k, v := range want {
 		if meta[k] != v {
 			t.Errorf("meta[%s] = %v, want %v", k, meta[k], v)
 		}
+	}
+	if dir == f.repo || gitOut(t, dir, "rev-parse", "--abbrev-ref", "HEAD") != "fresh-idea-design" {
+		t.Errorf("dir %s is not a fresh-idea-design worktree", dir)
 	}
 	raw, err := os.ReadFile(f.mapPath("fresh-idea"))
 	if err != nil {
@@ -88,6 +92,22 @@ func TestDesignsOpenNew_SecondCallIsRefusedAsEpicExists(t *testing.T) {
 	}
 	if got := len(f.live(t)); got != 1 {
 		t.Errorf("live sessions = %d, want 1", got)
+	}
+}
+
+func TestDesignsOpenNew_BranchClashLeavesNothingBehind(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "fresh-idea-design", "01", "first", "")
+	f := startDesignsIn(t, store)
+	res := f.openNew(t, "fresh-idea", "idea")
+	if !res.Refused || res.Reason != server.ReasonDesignBranchClash || !strings.Contains(res.Message, "fresh-idea-design") {
+		t.Fatalf("open = %+v, want design-branch-clash naming fresh-idea-design", res)
+	}
+	if _, err := os.Stat(filepath.Join(store, "proj", "fresh-idea")); err == nil {
+		t.Errorf("map was written")
+	}
+	if gitOut(t, f.repo, "branch", "--list", "fresh-idea-design") != "" {
+		t.Errorf("branch was created")
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -90,11 +91,56 @@ func TestDesignsOpen_CreatesWithTheTuiPrefill(t *testing.T) {
 		t.Fatalf("open = %+v", res)
 	}
 	meta := readMeta(t, f.h, res.Session.ID)
-	want := map[string]any{"dir": f.repo, "name": "map", "ticket": "proj:map", "harness": string(agentfake.HarnessKind), "first_prompt": "/gx-design proj:map", "design": true}
+	dir, _ := meta["dir"].(string)
+	want := map[string]any{"dir": dir, "name": "map", "ticket": "proj:map", "harness": string(agentfake.HarnessKind), "first_prompt": "/gx-design proj:map", "design": true, "made_worktree": true}
 	for k, v := range want {
 		if meta[k] != v {
 			t.Errorf("meta[%s] = %v, want %v", k, meta[k], v)
 		}
+	}
+	if dir == f.repo || gitOut(t, dir, "rev-parse", "--abbrev-ref", "HEAD") != "map-design" {
+		t.Errorf("dir %s is not a map-design worktree", dir)
+	}
+	if gitOut(t, dir, "rev-parse", "HEAD") != gitOut(t, f.repo, "rev-parse", "HEAD") {
+		t.Errorf("map-design does not start at trunk")
+	}
+}
+
+func TestDesignsOpen_ReAddsARemovedWorktreeOnTheSameBranch(t *testing.T) {
+	f := startDesigns(t)
+	first := f.open(t, "proj:map", false)
+	dir, _ := readMeta(t, f.h, first.Session.ID)["dir"].(string)
+	if _, err := f.h.Client.StopSession(f.ctx, first.Session.ID); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, dir, "commit", "--allow-empty", "-m", "design work")
+	tip := gitOut(t, dir, "rev-parse", "HEAD")
+	gitOut(t, f.repo, "worktree", "remove", "--force", dir)
+
+	second := f.open(t, "proj:map", false)
+	if second.Refused || second.Session == nil {
+		t.Fatalf("open = %+v", second)
+	}
+	got, _ := readMeta(t, f.h, second.Session.ID)["dir"].(string)
+	if got != dir || gitOut(t, got, "rev-parse", "--abbrev-ref", "HEAD") != "map-design" || gitOut(t, got, "rev-parse", "HEAD") != tip {
+		t.Errorf("worktree %s not back on map-design at %s", got, tip)
+	}
+}
+
+func TestDesignsOpen_RefusesAnEpicNamedLikeTheDesignBranch(t *testing.T) {
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "map-design", "01", "first", "")
+	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	f := startDesignsIn(t, store)
+	res := f.open(t, "proj:map", false)
+	if !res.Refused || res.Reason != server.ReasonDesignBranchClash || !strings.Contains(res.Message, "map-design") {
+		t.Fatalf("open = %+v, want design-branch-clash naming map-design", res)
+	}
+	if gitOut(t, f.repo, "branch", "--list", "map-design") != "" {
+		t.Errorf("branch map-design was created")
 	}
 }
 

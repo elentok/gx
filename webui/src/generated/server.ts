@@ -64,9 +64,14 @@ export const ReasonDesignNotMapEpic = "not-map-epic";
 export const ReasonDesignUnknownEpic = "unknown-epic";
 export const ReasonDesignEpicExists = "epic-exists";
 /**
+ * ReasonDesignBranchClash: an epic named <map>-design would share the
+ * Design's branch name.
+ */
+export const ReasonDesignBranchClash = "design-branch-clash";
+/**
  * Refusal reasons of the designs open route, beside the session ones.
  */
-export type ReasonDesign = typeof ReasonDesignNotMapEpic | typeof ReasonDesignUnknownEpic | typeof ReasonDesignEpicExists;
+export type ReasonDesign = typeof ReasonDesignNotMapEpic | typeof ReasonDesignUnknownEpic | typeof ReasonDesignEpicExists | typeof ReasonDesignBranchClash;
 /**
  * DesignOpenRequest is the body of POST /v1/designs/open. Epic is a map
  * epic's address ("project:epic") or one of its tickets ("project:epic/NN").
