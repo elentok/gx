@@ -82,13 +82,18 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(w, "dry run: pause, map-done and ticket-creation migration only, nothing written")
+		grilling, err := backfillGrilling(scratchRoot, true)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintln(w, "dry run: pause, map-done, ticket-creation and grilling migration only, nothing written")
 		var changes []tickets.MigrationChange
 		for _, s := range steps {
 			changes = append(changes, tickets.MigrationChange{Path: s.Path, Notes: []string{s.Note()}})
 		}
 		changes = mergeChanges(changes, mapsDone)
 		changes = mergeChanges(changes, created)
+		changes = mergeChanges(changes, grilling)
 		printChanges(w, changes)
 		fmt.Fprintf(w, "%d file(s) would change\n", len(changes))
 		return nil
@@ -138,6 +143,11 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		var created []tickets.MigrationChange
 		created, err = backfillTicketCreation(scratchRoot, false)
 		changes = mergeChanges(changes, created)
+	}
+	if err == nil {
+		var grilling []tickets.MigrationChange
+		grilling, err = backfillGrilling(scratchRoot, false)
+		changes = mergeChanges(changes, grilling)
 	}
 	if err == nil {
 		var moved []tickets.MigrationChange
