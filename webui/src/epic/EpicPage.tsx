@@ -6,9 +6,8 @@ import type { OpenDesign } from "../design/open";
 import { StartDesignButton } from "../design/SessionControls";
 import { useWide } from "../useWide";
 import { hasDesignSession, liveSessions } from "../design/view";
-import { ActionMerge, ActionStashMerge, type EpicDetailRow, type EpicListRow, type SessionInfo } from "../generated/server";
-import { ProgressRing } from "../ui/progress-ring/ProgressRing";
-import { pageRing } from "./ring";
+import { ActionMerge, ActionStashMerge, type EpicDetailRow } from "../generated/server";
+import { EpicRing } from "./EpicRing";
 import { MergeButton, StashMergeButton } from "../epics/MergeButton";
 import { designHref, epicHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
@@ -245,21 +244,6 @@ function MergeBlockNotice({
       </Box>
     </Box>
   );
-}
-
-function EpicRing({
-  detail,
-  card,
-  sessions,
-  size,
-}: {
-  detail: EpicDetail;
-  card?: EpicListRow;
-  sessions: SessionInfo[];
-  size: "md" | "sm";
-}) {
-  const r = pageRing(detail, card, sessions);
-  return <ProgressRing progress={r.progress} tone={r.tone} kind={r.kind} label={r.label} size={size} live={r.live} />;
 }
 
 type EpicPageProps = {

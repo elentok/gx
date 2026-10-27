@@ -131,6 +131,42 @@ test("the title row holds the Design name and the Sessions control, with no pick
   expect(screen.getByRole("region", { name: "Progress" })).toBeTruthy();
 });
 
+const ringOf = () => document.querySelector("[data-kind][data-tone]") as HTMLElement;
+
+test.each([
+  ["done", { steps: stepsAt(8) }, [], "done", false],
+  ["a live session with an Actionable", {}, [session("a", { actionable: { reason: "question" } })], "waiting", false],
+  ["a working session", {}, [session("a", { status: { state: "working" } })], "running", true],
+  ["a starting session", {}, [session("a", { status: { state: "starting" } })], "running", true],
+  ["creating tickets", { steps: stepsAt(5), impl_address: "gx:a-impl" }, [], "running", true],
+  ["an idle live session", {}, [session("a")], "running", false],
+  ["only an Exited session", {}, [session("a", { status: { state: "exited" } })], "muted", false],
+  ["no session", {}, [], "muted", false],
+])("a Design page with %s", async (_n, over, sessions, tone, comet) => {
+  render([map("a")], sessions, "/d/gx:a", detailOf({ ...over, ring_progress: 40 }));
+  expect(await screen.findByText("40%")).toBeTruthy();
+  expect(ringOf().getAttribute("data-kind")).toBe("design");
+  expect(ringOf().getAttribute("data-tone")).toBe(tone);
+  expect(!!screen.queryByTestId("comet")).toBe(comet);
+});
+
+test("the ring leads the header at 64px, and at 52px on a phone", async () => {
+  render([map("a")], []);
+  await screen.findByText("0%");
+  const title = screen.getByRole("heading", { level: 1 });
+  expect(ringOf().compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 64 64");
+  cleanup();
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    render([map("a")], []);
+    await screen.findByText("0%");
+    expect(ringOf().querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 52 52");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("without a session the title row offers to start one", async () => {
   render([map("a")], []);
   expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy();

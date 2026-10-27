@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
+import { EpicRing } from "../epic/EpicRing";
+import { PageHeader } from "../page/PageHeader";
 import { useEpicList, waitingCount, type EpicList, type FetchEpicList } from "../epics/list";
 import { JumpMenu } from "../nav/JumpMenu";
 import { DetailPage } from "../page/DetailPage";
@@ -108,6 +110,9 @@ function DesignBody({
     (current?.step === "resolve-tickets" &&
       detail?.rows.find((r) => r.current)?.title) ||
     current?.label;
+  const name = address.slice(address.indexOf(":") + 1);
+  // The card speaks for this page only while its active (first) address is this Design.
+  const card = epics.find((e) => e.addresses?.[0] === address);
   const live = liveSessions(address, sessions);
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session =
@@ -145,7 +150,11 @@ function DesignBody({
         flex="none"
       >
         <Box minW="0">
-          <JumpMenu name={address.slice(address.indexOf(":") + 1)} current={address} epics={epics} />
+          <PageHeader
+            title={name}
+            lead={detail && <EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "md" : "sm"} />}
+            heading={<JumpMenu name={name} current={address} epics={epics} />}
+          />
         </Box>
         <SessionStrip
           address={address}
