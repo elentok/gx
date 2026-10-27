@@ -991,6 +991,10 @@ suits a copy gx has largely rewritten.
 on the changed files or as a full run. It comes from the gx defaults or from the project's check
 config. _Avoid_: suite, task, test target.
 
+**Flake** — a test that fails and then passes on a rerun with no code change. A flake counts as a
+failure: a pass on retry is not a pass. A known flake is an open follow-up, not an entry on a list.
+_Avoid_: intermittent failure, known failure.
+
 **gx defaults** — the checks gx picks by itself for a project, from the tools it finds. A project
 with no check config uses only these.
 
