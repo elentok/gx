@@ -164,6 +164,9 @@ If you deliberately narrow, skip or change something the spec or ticket asked fo
 [gx-code-review](../gx-code-review/SKILL.md) collects these so its reviewers don't report a known
 narrowing as a bug. Only deliberate decisions belong here — not bugs or unfinished work.
 
+A changed test form counts: if the ticket's Decisions or seams name a form (table test,
+server-level test, ...) and you write another, record it here.
+
 ## Comments: fewer, and no numbers in them
 
 A comment quoting a measured value duplicates it, and duplicates drift - stale figures ship.
@@ -179,6 +182,11 @@ A comment quoting a measured value duplicates it, and duplicates drift - stale f
 Use [gx-tdd](../gx-tdd/SKILL.md) where possible, at pre-agreed seams. Every declared seam needs a
 real assertion; if one cannot be observed, pause the ticket with `gx tickets ask`, naming the seam, instead of finishing
 (see "When only a person can answer").
+
+**Bug fixes: confirm red on the old code first (mutation check).** Write the regression test, run
+it against the unfixed code, and see it fail for the bug's reason (not a harness error or timeout).
+Only then apply the fix and see it go green. A test that passes before the fix proves nothing:
+rework it until it fails. If you cannot make it fail, pause with `gx tickets ask`.
 
 Run typechecking regularly and single test files regularly. At the end, test only the packages you
 touched plus their direct importers (see `.ai/index.md` "Testing") — not the full suite.

@@ -164,6 +164,11 @@ or test name. If no automated seam is appropriate for a ticket (pure documentati
 split, exploratory research), write an explicit `none` entry with the rationale — never leave the
 section silent.
 
+For a **bug-fix ticket**, the regression seam must also say "the test must fail on the old code" and
+name the test form the Decisions chose (table test, server-level test, ...). A test that passes on
+the old code proves nothing. When a seam names `ClaimNext`, name the queue step that feeds it too
+(e.g. `h.Client.QueueAdd(...)`), or the test never reaches the branch under test.
+
 ### 4b. Write each implement ticket's "Where to look" map
 
 Every `type: implement` ticket must carry a `## Where to look` section. You already have this from
