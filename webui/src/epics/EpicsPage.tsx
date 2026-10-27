@@ -96,7 +96,7 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
   );
 
   return (
-    <DetailPage active="epics">
+    <DetailPage active="epics" mode="wide">
       <Box display="flex" alignItems="center" gap="4" mt="4">
         <Input
           type="search"

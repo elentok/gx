@@ -92,6 +92,22 @@ test("a ticket route shows a spinner, then the ticket whose address is in the ha
   expect(screen.queryByRole("status", { name: "Loading ticket" })).toBeNull();
 });
 
+test("the ticket page renders under the narrow page mode", async () => {
+  const queries: string[] = [];
+  vi.stubGlobal("matchMedia", (q: string) => {
+    queries.push(q);
+    return { matches: true, addEventListener: () => {}, removeEventListener: () => {} };
+  });
+  try {
+    renderAt("/t/gx:e/01", okFor);
+    await screen.findByRole("heading", { name: "Title of gx:e/01" });
+    expect(queries).toContain("(min-width: 40em)");
+    expect(queries).not.toContain("(min-width: 62em)");
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("a 404 shows Ticket not found", async () => {
   renderAt("/t/gx:e/99", async () => ({ kind: "not-found" }));
   expect(await screen.findByText("Ticket not found")).toBeTruthy();

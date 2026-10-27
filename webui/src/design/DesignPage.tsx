@@ -214,25 +214,31 @@ function DesignBody({
   );
 }
 
-export function DesignPage({
-  address,
-  fetchList,
-  deps = {},
-  startFailure,
-}: {
+type DesignPageProps = {
   address: string;
   fetchList?: FetchEpicList;
   deps?: DesignDeps;
   /** Why the session did not start, when the New Design modal created the map but the start failed. */
   startFailure?: string;
-}) {
+};
+
+// The body reads `useWide`, so it renders inside DetailPage's page mode.
+export function DesignPage(props: DesignPageProps) {
+  return (
+    <DetailPage active="epics" fill mode="wide">
+      <DesignPageBody {...props} />
+    </DetailPage>
+  );
+}
+
+function DesignPageBody({ address, fetchList, deps = {}, startFailure }: DesignPageProps) {
   const conn = useConnectionContext();
   const { list, failed } = useEpicList(fetchList, conn);
 
   const wide = useWide();
 
   return (
-    <DetailPage active="epics" fill>
+    <>
       {failed ? (
         <Text color="text.muted">Could not load Designs</Text>
       ) : !list ? (
@@ -246,6 +252,6 @@ export function DesignPage({
           startFailure={startFailure}
         />
       )}
-    </DetailPage>
+    </>
   );
 }

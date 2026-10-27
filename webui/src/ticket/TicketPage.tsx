@@ -35,7 +35,7 @@ export function TicketPage({
   const backLabel = `← ${epicAddress.slice(epicAddress.indexOf(":") + 1)}`;
 
   return (
-    <DetailPage>
+    <DetailPage mode="narrow">
         {notFound ? (
           <>
             <BackLink to={backTo} label={backLabel} />

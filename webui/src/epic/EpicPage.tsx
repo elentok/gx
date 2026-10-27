@@ -214,19 +214,24 @@ function EpicRing({
   return <ProgressRing progress={r.progress} tone={r.tone} kind={r.kind} label={r.label} size={size} live={r.live} />;
 }
 
-export function EpicPage({
-  address,
-  fetchDetail,
-  openDesign,
-  fetchList,
-  fixAgent,
-}: {
+type EpicPageProps = {
   address: string;
   fetchDetail?: FetchEpicDetail;
   openDesign?: OpenDesign;
   fetchList?: FetchEpicList;
   fixAgent?: FixAgent;
-}) {
+};
+
+// The body reads `useWide`, so it renders inside DetailPage's page mode.
+export function EpicPage(props: EpicPageProps) {
+  return (
+    <DetailPage mode="narrow">
+      <EpicPageBody {...props} />
+    </DetailPage>
+  );
+}
+
+function EpicPageBody({ address, fetchDetail, openDesign, fetchList, fixAgent }: EpicPageProps) {
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps the running clocks counting.
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -245,7 +250,7 @@ export function EpicPage({
   const summary = detail?.summary && <Markdown mt="2">{detail.summary}</Markdown>;
 
   return (
-    <DetailPage>
+    <>
       {notFound ? (
         <EmptyState title="Epic not found">{address} does not exist.</EmptyState>
       ) : detail ? (
@@ -287,6 +292,6 @@ export function EpicPage({
       ) : (
         <Spinner label="Loading epic" />
       )}
-    </DetailPage>
+    </>
   );
 }
