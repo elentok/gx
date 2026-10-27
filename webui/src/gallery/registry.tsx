@@ -569,6 +569,40 @@ export const galleryEntries: GalleryEntry[] = [
           />
         ),
       },
+      {
+        label: "dirty-trunk",
+        node: (
+          <EpicPageFrame
+            detail={withRows(
+              {
+                state: "paused",
+                land_block_kind: "dirty-trunk",
+                land_block_reason: "Trunk has local changes: a.go, b/c.go and 1 more",
+                land_block_files: ["a.go", "b/c.go", "d.go"],
+                actions: ["stash-merge", "merge"],
+                action_info: {
+                  "stash-merge": { label: "Stash, merge and restore", tooltip: "Set your changes aside." },
+                  merge: { label: "Merge again", tooltip: "Merge the ticket's commits again." },
+                },
+              },
+              doneRows,
+            )}
+          />
+        ),
+      },
+      { label: "cancelled card", node: <EpicPageFrame detail={withRows({ state: "running" }, [...doneRows, epicRow("03", { rendered_status: "cancelled" }), epicRow("04")])} /> },
+      {
+        label: "running fork",
+        node: (
+          <EpicPageFrame
+            detail={withRows({ state: "running" }, [
+              ...doneRows,
+              epicRow("03", { rendered_status: "claimed", claimed_at: claimed }),
+              epicRow("04", { rendered_status: "claimed", claimed_at: claimed, parent: "demo:blog-impl/03" }),
+            ])}
+          />
+        ),
+      },
       { label: "empty", node: <EpicPageFrame detail={epicDetail({ state: "waiting" })} /> },
       {
         label: "needs-repair",
