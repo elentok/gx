@@ -81,6 +81,12 @@ type InputsTable struct {
 	// DigestDir holds the text-only transcript digests the rows point at.
 	DigestDir string      `json:"digest_dir"`
 	Rows      []InputsRow `json:"rows"`
+	// Slower and Flakes come from the check record and the brief index.
+	// SlowerBaselineRuns is how many earlier full runs the baseline had; under
+	// 5 there is no Slower row.
+	Slower             []SlowerRow `json:"slower"`
+	SlowerBaselineRuns int         `json:"slower_baseline_runs"`
+	Flakes             []FlakeRow  `json:"flakes"`
 }
 
 // buildInputsTable derives every row from frontmatter, the run log and the
@@ -282,6 +288,11 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 	if err != nil {
 		return err
 	}
+	checks, err := buildEpicChecks(env, t)
+	if err != nil {
+		return err
+	}
+	table.Slower, table.SlowerBaselineRuns, table.Flakes = checks.slower, checks.baselineRuns, checks.flakes
 	if table.DigestDir, err = os.MkdirTemp(env.tempDir, "gx-evolve-digests-"); err != nil {
 		return err
 	}
@@ -293,6 +304,9 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 		return writeJSON(w, table)
 	}
 	if err := printInputsTable(w, table); err != nil {
+		return err
+	}
+	if err := printEpicChecks(w, table); err != nil {
 		return err
 	}
 	if _, err := fmt.Fprintf(w, "digests: %s\n", table.DigestDir); err != nil {

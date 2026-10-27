@@ -30,6 +30,9 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"investigate", "gx-investigate/SKILL.md", []string{"`gx check`"}},
 		{"to-tickets", "gx-to-tickets/SKILL.md", []string{"iteration hint", "`gx brief`"}},
 		{"follow-up", "gx-follow-up/SKILL.md", []string{"search the candidates for that test name first"}},
+		{"evolve", "gx-evolve/SKILL.md", []string{
+			"### Check rows", "`slower:`", "`flake:`", "](../gx-follow-up/SKILL.md)", "Category `bug`", "Category `idea`",
+		}},
 		{"index", "../.ai/index.md", []string{"Verify with `gx check` in the foreground, unpiped"}},
 	}
 	for _, c := range cases {

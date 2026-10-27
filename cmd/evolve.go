@@ -44,6 +44,8 @@ type evolveEnv struct {
 	// (rollouts) are where `evolve inputs` finds sessions; "" skips that source.
 	// tempDir is where its digest dir goes ("" = the OS temp dir).
 	homeDir, stateDir, codexHome, tempDir string
+	// dataDir holds the check record and brief index; "" skips the check rows.
+	dataDir string
 }
 
 // evolveTarget is an epic an evolve verb acts on.
@@ -366,6 +368,7 @@ func defaultEvolveEnv(d deps) (evolveEnv, error) {
 	// Missing dirs only cost digests, which then report "missing".
 	env.homeDir, _ = d.userHomeDir()
 	env.stateDir, _ = config.StateDir()
+	env.dataDir, _ = config.DataDir()
 	env.codexHome = sessionlookup.DefaultRoots().CodexHome
 	if cwd, err := os.Getwd(); err == nil {
 		if root, err := ticketRoot(cwd); err == nil {

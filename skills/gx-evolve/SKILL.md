@@ -73,6 +73,20 @@ actual, story estimates and any cap stop. Target `gx:follow-ups`, category `idea
 the usual triage (step 5) and [gx-follow-up](../gx-follow-up/SKILL.md) (step 6). Parts within budget
 produce no finding.
 
+### Check rows
+
+After the ticket table, `gx evolve inputs` can print `slower:` and `flake:` rows (`slower` and
+`flakes` in the JSON). Each row is a finding; don't deep-read a session for it.
+
+- **Slower**: a check kind whose latest full verify run is at least 20% and 30 s above the median of
+  the last 5 full runs before the epic's first claim. Name the check kind in the finding. Category
+  `idea`.
+- **Flake**: a test that failed and then passed on the same tree. Name the test in the finding, with
+  the failing run id, the passing run and the tree id. Category `bug`.
+
+Both go through triage (step 5) and are filed through [gx-follow-up](../gx-follow-up/SKILL.md) (step
+6). Its test-name dedupe finds a follow-up that the failing-tests rule already filed for the flake.
+
 ## 4. Join by symptom
 
 Group the subagent reports by symptom across tickets: one cause seen in five tickets is one finding
