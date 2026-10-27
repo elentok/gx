@@ -247,7 +247,11 @@ function EpicPageBody({ address, fetchDetail, openDesign, fetchList, fixAgent }:
   const partner = joinedCard?.addresses?.find((a) => a !== address);
   // The card speaks for this page only while its active (first) address is this epic.
   const card = joinedCard?.addresses?.[0] === address ? joinedCard : undefined;
-  const summary = detail?.summary && <Markdown mt="2">{detail.summary}</Markdown>;
+  const summary = detail?.summary && (
+    <Markdown mt={wide ? "1" : "12px"} fontSize="15px" lineHeight="1.5" color="text.muted">
+      {detail.summary}
+    </Markdown>
+  );
 
   return (
     <>

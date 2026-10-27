@@ -9,6 +9,7 @@ import { isCurrent } from "../epics/list";
 import { isLive, RING_KIND, ringProgress, ringTone } from "../epics/ring";
 import { sectionsOf, type Section } from "../epics/view";
 import { Button } from "../ui/button/Button";
+import { titleSize } from "./titleSize";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 
 /**
@@ -217,7 +218,7 @@ export function JumpMenu({ name, current, epics }: { name: string; current: stri
 
   return (
     <Box ref={root} position="relative" minW="0">
-      <Heading as="h1" fontFamily="condensed" fontSize="2xl">
+      <Heading as="h1" fontFamily="condensed" {...titleSize(!phone)}>
         <chakra.button
           type="button"
           aria-haspopup="dialog"

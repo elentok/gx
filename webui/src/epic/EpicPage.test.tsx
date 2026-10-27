@@ -496,6 +496,23 @@ test("the summary renders in full", async () => {
   expect(await screen.findByText(summary)).toBeTruthy();
 });
 
+test("the summary sits beside the title wide and under the ring row on a phone", async () => {
+  const summary = "A short summary";
+  render("/e/gx:blog-impl", [], "loop", { detail: { summary } });
+  // The h1 sits in the jump menu; the title column is the menu's parent.
+  const titleColumn = (await screen.findByRole("heading", { level: 1 })).parentElement?.parentElement;
+  expect(titleColumn?.contains(await screen.findByText(summary))).toBe(true);
+  cleanup();
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    render("/e/gx:blog-impl", [], "loop", { detail: { summary } });
+    const title = await screen.findByRole("heading", { level: 1 });
+    expect(title.parentElement?.parentElement?.contains(await screen.findByText(summary))).toBe(false);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("the spinner shows before data and an unknown address says not found", async () => {
   render("/e/gx:blog-impl", [], "loop", { hang: true });
   expect(screen.getByLabelText("Loading epic")).toBeTruthy();
