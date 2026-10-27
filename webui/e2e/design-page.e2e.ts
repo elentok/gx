@@ -271,8 +271,13 @@ test.describe("68. Text size", () => {
     await questions.getByRole("button", { name: /Yes/ }).click();
     await page.getByRole("button", nav("Send answers")).click();
 
-    // Chat view: the message, the prompt and the docked title (the next round, Q9).
-    // Continue starts the next round; under load the first press can land before the run ends, so press again.
+    // Chat view: the message and the prompt. Continue starts a fresh session, whose chat holds only the
+    // new round, so read them before pressing it. Send already shows the chat.
+    await expect(page.getByText("Two questions before the spec.")).toBeVisible();
+    expect(await fontSize(page.getByText("Two questions before the spec."))).toBe("16px");
+    expect(await fontSize(page.getByText("prompt size probe"))).toBe("16px");
+
+    // The docked title (the next round, Q9). Under load the first Continue press can land before the run ends, so press again.
     const cont = page.getByRole("button", { name: /^Continue/ });
     await expect(async () => {
       await cont.click({ timeout: 2000 });
@@ -281,10 +286,8 @@ test.describe("68. Text size", () => {
     // The new round can reopen the Questions view just after Q9 shows, so press Chat until it sticks.
     await expect(async () => {
       await showChat(page);
-      await expect(page.getByText("Two questions before the spec.")).toBeVisible({ timeout: 2000 });
+      await expect(page.getByText("A fresh round.")).toBeVisible({ timeout: 2000 });
     }).toPass();
-    expect(await fontSize(page.getByText("Two questions before the spec."))).toBe("16px");
-    expect(await fontSize(page.getByText("prompt size probe"))).toBe("16px");
     expect(await fontSize(questions.getByText("Q9 - Keep going?"))).toBe("18px");
   });
 });

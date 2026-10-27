@@ -757,7 +757,8 @@ an exited session.
 - **Scenario:** `design` (auto-advance held)
 - **Steps:**
   1. Click Start design session. In the Questions view read the computed font size of the `Q8` title, its body ("SQLite or files?"), the first child of the SQLite choice and "0 of 2 answered".
-  2. Open the composer "Note", type "prompt size probe", answer both questions and click Send. Click Continue until `Q9` shows, then click Chat.
-  3. Read the font size of the chat message "Two questions before the spec.", the sent prompt and the docked `Q9` title.
+  2. Open the composer "Note", type "prompt size probe", answer both questions and click Send; the chat shows.
+  3. Read the font size of the chat message "Two questions before the spec." and the sent prompt. Continue starts a fresh session whose chat holds only the new round, so read them before Continue.
+  4. Click Continue until `Q9` shows, click Chat and read the font size of the docked `Q9` title.
 - **Pass:** the title is 24px, the body 17px, "n of m answered" 13px (the `xs` token), the choice 16px, the chat message and the prompt 16px, the docked title 18px.
 - **Note:** "Earlier messages hidden" is not checked: no scenario shows it (the chat is never truncated), and it uses the same `xs` size as "n of m answered".
