@@ -234,7 +234,7 @@ function ChatTail({
 }
 
 // Every dialog and popover (Send, jump menu, screen, steps) is one of these; Escape closes the top one first.
-const LAYERS = '[role="dialog"],[role="alertdialog"]';
+const LAYERS = '[role="dialog"],[role="alertdialog"],[role="menu"]';
 
 // The messages scroll alone. They open at the newest one and follow new ones until the reader scrolls up.
 function ChatScroller({

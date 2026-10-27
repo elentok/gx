@@ -443,6 +443,19 @@ test("Escape with the Send popover open closes only the popover", async () => {
   expect(await screen.findByText("earlier talk")).toBeTruthy();
 });
 
+test("Escape with the ⋯ menu open closes only the menu", async () => {
+  renderChat([session()], focusChat());
+  await screen.findByRole("group", { name: "Questions" });
+  fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
+  const menu = await screen.findByRole("menu");
+  await act(async () => {});
+  fireEvent.keyDown(menu, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  expect(inQuestions()).toBe(true);
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(await screen.findByText("earlier talk")).toBeTruthy();
+});
+
 test("Escape with the phone steps modal open closes only the modal", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   try {

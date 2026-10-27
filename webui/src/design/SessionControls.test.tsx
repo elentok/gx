@@ -200,35 +200,64 @@ test("a Done Design has no session button on its epic page", async () => {
   expect(screen.queryByRole("button", { name: /design session/ })).toBeNull();
 });
 
+const openMenu = async () => fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
+const newSession = () => screen.findByRole("menuitem", { name: /New session/ });
+
 test("New session confirms, then opens new with the state token", async () => {
   const s = session("s1");
   const openDesign = vi.fn(async () => ok);
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   render("/d/gx:a", [s], { openDesign });
-  fireEvent.click(await screen.findByRole("button", { name: "New session" }));
+  await openMenu();
+  const item = await newSession();
+  expect(item.textContent).toContain("Stop this session and start a fresh one");
+  fireEvent.click(item);
+  await waitFor(() =>
+    expect(openDesign).toHaveBeenCalledWith({
+      epic: "gx:a",
+      new: true,
+      state: stateToken(s),
+    }),
+  );
   expect(confirm).toHaveBeenCalledWith(
     "Stop the current session and start a new one?",
   );
-  expect(openDesign).toHaveBeenCalledWith({
-    epic: "gx:a",
-    new: true,
-    state: stateToken(s),
-  });
 });
 
 test("declining the confirm sends nothing", async () => {
   const openDesign = vi.fn(async () => ok);
-  vi.spyOn(window, "confirm").mockReturnValue(false);
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
   render("/d/gx:a", [session("s1")], { openDesign });
-  fireEvent.click(await screen.findByRole("button", { name: "New session" }));
+  await openMenu();
+  fireEvent.click(await newSession());
+  await waitFor(() => expect(confirm).toHaveBeenCalled());
   expect(openDesign).not.toHaveBeenCalled();
+});
+
+test("New session on an exited session asks nothing and sends no state token", async () => {
+  const openDesign = vi.fn(async () => ok);
+  const confirm = vi.spyOn(window, "confirm");
+  render("/d/gx:a", [session("s1", { status: { state: "exited" } })], { openDesign });
+  await openMenu();
+  const item = await newSession();
+  expect(item.textContent).toContain("Start a fresh session");
+  fireEvent.click(item);
+  await waitFor(() => expect(openDesign).toHaveBeenCalledWith({ epic: "gx:a", new: true }));
+  expect(confirm).not.toHaveBeenCalled();
 });
 
 test("the state token has the server's shape", () => {
   expect(stateToken(session("s1"))).toBe("s1:idle:1792749600123456789");
 });
 
-test("the N live menu switches the page and stops another session with a token", async () => {
+test("the menu lists Live sessions only with 2 or more, and has none with one", async () => {
+  render("/d/gx:a", [session("only")]);
+  await openMenu();
+  await newSession();
+  expect(screen.queryByText(/Live sessions/)).toBeNull();
+});
+
+test("the Live sessions list switches the page and stops another session with a token", async () => {
   // The older run flipped state last; the newer run start still wins.
   const older = session("old", {
     run_started_at: "2026-10-23T09:00:00Z",
@@ -242,12 +271,15 @@ test("the N live menu switches the page and stops another session with a token",
   const chatFor = vi.fn(async () => ({ kind: "ok" as const, detail: chat }));
   render("/d/gx:a", [older, newer], { stop, chat: chatFor });
   await waitFor(() => expect(chatFor).toHaveBeenCalledWith("new"));
-  fireEvent.click(await screen.findByRole("button", { name: /2 live/ }));
+  await openMenu();
+  expect(await screen.findByText("Live sessions · 2")).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: "new" }).getAttribute("aria-current")).toBe("true");
+  expect(screen.queryByRole("button", { name: "Stop new" })).toBeNull();
   fireEvent.click(screen.getByRole("menuitem", { name: "old" }));
   await waitFor(() => expect(chatFor).toHaveBeenCalledWith("old"));
-  fireEvent.click(screen.getByRole("button", { name: /2 live/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Stop new" }));
-  expect(stop).toHaveBeenCalledWith({ id: "new", state: stateToken(newer) });
+  await openMenu();
+  fireEvent.click(await screen.findByRole("button", { name: "Stop new" }));
+  await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "new", state: stateToken(newer) }));
 });
 
 test("a send goes to the session on screen", async () => {
@@ -271,8 +303,8 @@ test("a send goes to the session on screen", async () => {
     prompt,
     chat: async () => ({ kind: "ok", detail: withContinue }),
   });
-  fireEvent.click(await screen.findByRole("button", { name: /2 live/ }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "old" }));
+  await openMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: "old" }));
   fireEvent.click(await screen.findByRole("button", { name: /Continue/ }));
   await waitFor(() => expect(prompt).toHaveBeenCalled());
   expect(prompt.mock.calls[0][0]).toMatchObject({ id: "old", continue: true });

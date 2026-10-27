@@ -16,7 +16,7 @@ import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./ope
 import type { PostPrompt } from "./prompt";
 import { ImplLink, Progress, StepLine, StepsSheet, showsImplLink } from "./Progress";
 import type { FetchScreen } from "./screen";
-import { DeleteDesignButton, Failure, SessionHeader, StartDesignButton } from "./SessionControls";
+import { DesignActionsMenu, Failure, StartDesignButton } from "./SessionControls";
 import type { EpicListRow, SessionInfo } from "../generated/server";
 import { useWide } from "../useWide";
 import { designSession, liveSessions } from "./view";
@@ -61,21 +61,18 @@ function SessionStrip({
   return (
     <Box display="flex" flexDirection="column" alignItems="flex-end" gap="1">
       <Failure>{reason ?? ""}</Failure>
-      {session ? (
-        <SessionHeader
-          address={address}
-          shown={session}
-          live={live}
-          onSelect={onSelect}
-          open={deps.open}
-          stop={deps.stop}
-        />
-      ) : (
-        <StartDesignButton address={address} open={deps.open} />
-      )}
-      {deletable && live.length === 0 && (
-        <DeleteDesignButton address={address} remove={deps.remove} onDeleted={() => navigate("/epics")} />
-      )}
+      {!session && <StartDesignButton address={address} open={deps.open} />}
+      <DesignActionsMenu
+        address={address}
+        shown={session}
+        live={live}
+        deletable={deletable}
+        onSelect={onSelect}
+        onDeleted={() => navigate("/epics")}
+        open={deps.open}
+        stop={deps.stop}
+        remove={deps.remove}
+      />
     </Box>
   );
 }

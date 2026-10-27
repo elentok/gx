@@ -118,12 +118,14 @@ test("the Epics tab counts the other Needs-you cards from the loaded list", asyn
   expect(await screen.findByRole("link", { name: "Epics · 1 needs you" })).toBeTruthy();
 });
 
-test("the title row holds the Design name and the Sessions control, with no picker or state label", async () => {
+test("the title row holds the Design name and More actions, with no picker or state label", async () => {
   render([map("a"), map("b")], [session("a", { status: { state: "working" } })]);
   const title = await screen.findByRole("heading", { level: 1 });
   expect(within(title).getByRole("button", { name: /^a/ })).toBeTruthy();
   expect(screen.queryByRole("link", { name: /^←/ })).toBeNull();
-  expect(screen.getByRole("button", { name: "New session" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "More actions" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "New session" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /live/ })).toBeNull();
   expect(screen.queryByLabelText("Filter Designs")).toBeNull();
   expect(screen.queryByRole("link", { name: /^b/ })).toBeNull();
   expect(screen.queryByText(/designing|working/i)).toBeNull();
@@ -182,9 +184,9 @@ test("a failed start's reason shows above Start design session when the map has 
   expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
-test("a failed start's reason shows above New session when an exited session exists", async () => {
+test("a failed start's reason stays under the header when an exited session exists", async () => {
   render([map("a")], [session("a", { status: { state: "exited" } })], failedStart);
-  const button = await screen.findByRole("button", { name: "New session" });
+  const button = await screen.findByRole("button", { name: "More actions" });
   const alert = screen.getByRole("alert");
   expect(alert.textContent).toBe("agent binary missing");
   expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -192,7 +194,8 @@ test("a failed start's reason shows above New session when an exited session exi
 
 test("a chart-step map with an exited session shows the session header, never the New Design form", async () => {
   render([map("a")], [session("a", { status: { state: "exited" } })], "/d/gx:a", detailOf({ steps: stepsAt(0) }));
-  fireEvent.click(await screen.findByRole("button", { name: "New session" }));
+  await openMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /New session/ }));
   expect(screen.queryByRole("form", { name: "New Design" })).toBeNull();
   expect(screen.queryByLabelText("Epic slug")).toBeNull();
 });
@@ -315,23 +318,27 @@ test("on a phone the implementation epic link sits in the Chat region at Branch"
 
 const deletable = detailOf({ deletable: true });
 
+const openMenu = async () => fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
+const deleteItem = () => screen.queryByRole("menuitem", { name: "Delete design" });
+
 test("Delete design shows only for a deletable Design with no live session, following the sessions live", async () => {
   const router = render([map("a")], [], "/d/gx:a", deletable);
-  expect(await screen.findByRole("button", { name: "Delete design" })).toBeTruthy();
+  await openMenu();
+  expect(await screen.findByRole("menuitem", { name: "Delete design" })).toBeTruthy();
   router.setSessions([session("a")]);
-  expect(screen.queryByRole("button", { name: "Delete design" })).toBeNull();
+  await waitFor(() => expect(deleteItem()).toBeNull());
   router.setSessions([session("a", { status: { state: "exited" } })]);
-  expect(screen.getByRole("button", { name: "Delete design" })).toBeTruthy();
+  await waitFor(() => expect(deleteItem()).toBeTruthy());
   cleanup();
   render([map("a")], [], "/d/gx:a", detailOf());
   await screen.findByRole("button", { name: "Start design session" });
-  expect(screen.queryByRole("button", { name: "Delete design" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
 });
 
 test("the detail is fetched once on mount and once more when a session starts or exits", async () => {
   const epic = vi.fn(async () => ({ kind: "ok" as const, detail: deletable }));
   const router = render([map("a")], [], "/d/gx:a", deletable, { epic });
-  await screen.findByRole("button", { name: "Delete design" });
+  await screen.findByRole("button", { name: "More actions" });
   expect(epic).toHaveBeenCalledTimes(1);
   router.setSessions([session("a")]);
   await waitFor(() => expect(epic).toHaveBeenCalledTimes(2));
@@ -339,19 +346,21 @@ test("the detail is fetched once on mount and once more when a session starts or
   await waitFor(() => expect(epic).toHaveBeenCalledTimes(3));
 });
 
-test("Keep restores the Delete design button", async () => {
+test("Keep returns with Delete design still listed", async () => {
   render([map("a")], [], "/d/gx:a", deletable);
-  fireEvent.click(await screen.findByRole("button", { name: "Delete design" }));
-  expect(screen.getByText("Delete this design?")).toBeTruthy();
+  await openMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }));
+  expect(await screen.findByText("Delete this design?")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Keep" }));
-  expect(screen.getByRole("button", { name: "Delete design" })).toBeTruthy();
+  expect(await screen.findByRole("menuitem", { name: "Delete design" })).toBeTruthy();
 });
 
 test("confirming Delete calls the route and goes to the Epics page", async () => {
   const deleteDesign = vi.fn(async () => ({}));
   const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign });
-  fireEvent.click(await screen.findByRole("button", { name: "Delete design" }));
-  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  await openMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
   await waitFor(() => expect(router.state.location.pathname).toBe("/epics"));
   expect(deleteDesign).toHaveBeenCalledWith({ epic: "gx:a" });
 });
@@ -359,8 +368,9 @@ test("confirming Delete calls the route and goes to the Epics page", async () =>
 test("a refused delete shows the reason and keeps the page", async () => {
   const deleteDesign = vi.fn(async () => ({ refused: true, message: "a session is running" }));
   const router = render([map("a")], [], "/d/gx:a", deletable, { deleteDesign });
-  fireEvent.click(await screen.findByRole("button", { name: "Delete design" }));
-  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  await openMenu();
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete design" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
   expect(await screen.findByText("a session is running")).toBeTruthy();
   expect(router.state.location.pathname).toBe("/d/gx:a");
 });

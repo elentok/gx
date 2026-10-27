@@ -1,4 +1,4 @@
-import { Box, Spinner, Text } from "@chakra-ui/react";
+import { Box, chakra, Menu, Spinner, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext } from "../connection";
 import type { DesignOpenRequest, SessionInfo } from "../generated/server";
@@ -57,40 +57,6 @@ export function StartDesignButton({
   );
 }
 
-/** Deletes an uncharted Design after an inline confirm; success leaves for the Epics page. */
-export function DeleteDesignButton({
-  address,
-  remove = postDeleteDesign,
-  onDeleted,
-}: {
-  address: string;
-  remove?: DeleteDesign;
-  onDeleted: () => void;
-}) {
-  const { run, pending } = useDesignWrite();
-  const [confirming, setConfirming] = useState(false);
-  return (
-    <Box display="flex" alignItems="center" gap="2">
-      {confirming ? (
-        <>
-          <Text fontSize="sm">Delete this design?</Text>
-          <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => setConfirming(false)}>
-            Keep
-          </Button>
-          <Button size="sm" tone="paused" disabled={pending} onClick={() => run(() => remove({ epic: address }), { onDone: onDeleted })}>
-            {pending && <Spinner size="sm" />}
-            Delete
-          </Button>
-        </>
-      ) : (
-        <Button size="sm" emphasis="ghost" tone="paused" onClick={() => setConfirming(true)}>
-          Delete design
-        </Button>
-      )}
-    </Box>
-  );
-}
-
 /** Opens a new session for the Design; asks first, and sends the state token, when the shown one is live. */
 export function startNew(
   run: ReturnType<typeof useDesignWrite>["run"],
@@ -104,65 +70,122 @@ export function startNew(
   run(() => open(body));
 }
 
-/** The chat header: the live-session menu, and New session. */
-export function SessionHeader({
+/**
+ * The header's "⋯" menu: New session, the live sessions (with 2 or more), and Delete design while it
+ * can run. Renders nothing when none of them applies.
+ */
+export function DesignActionsMenu({
   address,
   shown,
   live,
+  deletable,
   onSelect,
+  onDeleted,
   open = postOpenDesign,
   stop = postStopSession,
+  remove = postDeleteDesign,
 }: {
   address: string;
-  shown: SessionInfo;
+  shown?: SessionInfo;
   /** Live design sessions, newest first. */
   live: SessionInfo[];
+  /** The map has no Destination and no tickets yet, so it can still be deleted. */
+  deletable?: boolean;
   onSelect: (id: string) => void;
+  onDeleted: () => void;
   open?: OpenDesign;
   stop?: StopSession;
+  remove?: DeleteDesign;
 }) {
   const { run, pending } = useDesignWrite();
-  const [menu, setMenu] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const canDelete = deletable && live.length === 0;
+  if (!shown && !canDelete) return null;
 
+  const item = { cursor: "pointer", color: "text", ps: "3", _highlighted: { bg: "surface" } } as const;
   return (
-    <Box display="flex" flexDirection="column" gap="1">
-      <Box display="flex" alignItems="center" gap="2" justifyContent="flex-end">
-        {live.length > 1 && (
-          <Button size="sm" emphasis="secondary" aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
-            {live.length} live {menu ? "▴" : "▾"}
-          </Button>
-        )}
-        <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => startNew(run, address, shown, open)}>
-          {pending && <Spinner size="sm" />}
-          New session
-        </Button>
-      </Box>
-      {menu && (
-        <Box role="menu" aria-label="Live sessions" display="flex" flexDirection="column" gap="1" fontSize="sm">
-          {live.map((s) => (
-            <Box key={s.id} display="flex" alignItems="center" gap="2" justifyContent="space-between">
-              <Button
-                role="menuitem"
-                emphasis="ghost"
-                aria-current={s.id === shown.id}
-                onClick={() => {
-                  onSelect(s.id);
-                  setMenu(false);
-                }}
-              >
-                {s.name || s.id}
-                {s.id === shown.id && " ✓"}
-              </Button>
-              {s.id !== shown.id && (
-                <Button size="sm" tone="deadlocked" disabled={pending} onClick={() => run(() => stop({ id: s.id, state: stateToken(s) }))}>
-                  {pending && <Spinner size="sm" />}
-                  Stop {s.name || s.id}
+    <Menu.Root
+      lazyMount
+      unmountOnExit
+      positioning={{ placement: "bottom-end" }}
+      onOpenChange={(e) => !e.open && setConfirming(false)}
+    >
+      <Menu.Trigger asChild>
+        <chakra.button type="button" aria-label="More actions" cursor="pointer" color="text.muted" fontSize="xl" lineHeight="1" px="2">
+          ⋯
+        </chakra.button>
+      </Menu.Trigger>
+      <Menu.Positioner>
+        <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="64">
+          {shown && (
+            <Menu.Item
+              value="new-session"
+              disabled={pending}
+              onClick={() => startNew(run, address, shown, open)}
+              flexDirection="column"
+              alignItems="flex-start"
+              {...item}
+            >
+              New session
+              <Text fontSize="xs" color="text.muted">
+                {shown.status.state === "exited" ? "Start a fresh session" : "Stop this session and start a fresh one"}
+              </Text>
+            </Menu.Item>
+          )}
+          {shown && live.length > 1 && (
+            <>
+              <Text px="3" pt="2" mt="1" borderTopWidth="1px" borderColor="border" fontSize="xs" letterSpacing="wider" textTransform="uppercase" color="text.muted">
+                Live sessions · {live.length}
+              </Text>
+              {live.map((s) => (
+                <Box key={s.id} display="flex" alignItems="center" justifyContent="space-between" gap="2" pe="2">
+                  <Menu.Item
+                    value={`session-${s.id}`}
+                    aria-current={s.id === shown.id}
+                    onClick={() => onSelect(s.id)}
+                    flex="1"
+                    justifyContent="space-between"
+                    {...item}
+                  >
+                    {s.name || s.id}
+                    {s.id === shown.id && <Text as="span" aria-hidden color="tone.running.fg">✓</Text>}
+                  </Menu.Item>
+                  {s.id !== shown.id && (
+                    <Button
+                      size="sm"
+                      emphasis="secondary"
+                      tone="deadlocked"
+                      aria-label={`Stop ${s.name || s.id}`}
+                      disabled={pending}
+                      onClick={() => run(() => stop({ id: s.id, state: stateToken(s) }))}
+                    >
+                      {pending && <Spinner size="sm" />}
+                      Stop
+                    </Button>
+                  )}
+                </Box>
+              ))}
+            </>
+          )}
+          {canDelete &&
+            (confirming ? (
+              <Box display="flex" alignItems="center" gap="2" px="3" py="1.5">
+                <Text fontSize="sm">Delete this design?</Text>
+                <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => setConfirming(false)}>
+                  Keep
                 </Button>
-              )}
-            </Box>
-          ))}
-        </Box>
-      )}
-    </Box>
+                <Button size="sm" tone="paused" disabled={pending} onClick={() => run(() => remove({ epic: address }), { onDone: onDeleted })}>
+                  {pending && <Spinner size="sm" />}
+                  Delete
+                </Button>
+              </Box>
+            ) : (
+              <Menu.Item value="delete-design" closeOnSelect={false} onClick={() => setConfirming(true)} {...item} color="tone.paused.fg">
+                Delete design
+              </Menu.Item>
+            ))}
+        </Menu.Content>
+      </Menu.Positioner>
+    </Menu.Root>
   );
 }
