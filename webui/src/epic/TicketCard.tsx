@@ -87,11 +87,13 @@ function Line({
   meta,
   wide,
   titleLink,
+  bold,
 }: {
   row: EpicDetailRow;
   meta: string;
   wide: boolean;
   titleLink?: boolean;
+  bold?: boolean;
 }) {
   const title = titleLink ? (
     <Link href={ticketHref(row.address)} color="inherit" display="inline">
@@ -142,6 +144,7 @@ function Line({
         <Text
           as="span"
           color="white"
+          fontWeight={bold ? 500 : undefined}
           minW="0"
           flex="1 1 0"
           overflow="hidden"
@@ -155,6 +158,9 @@ function Line({
     </Box>
   );
 }
+
+// On phones the card's buttons span the row at touch height.
+const phoneButton = (wide: boolean) => (wide ? {} : { w: "100%", h: "44px" });
 
 function CardFrame({
   row,
@@ -202,27 +208,66 @@ function NoteCard({
   const [fixing, setFixing] = useState(false);
   const { answerPath } = note;
   return (
-    <>
-      <Line row={row} meta={meta} wide={wide} titleLink />
-      <Box display="flex" flexWrap="wrap" alignItems="center" gap="3" pl="6" mt="1">
+    <Box
+      bg="rgba(255,112,102,0.07)"
+      borderWidth="1px"
+      borderColor="rgba(255,112,102,0.35)"
+      borderRadius="12px"
+      px="16px"
+      py="12px"
+      display="flex"
+      flexDirection="column"
+      gap="10px"
+    >
+      <Line row={row} meta={meta} wide={wide} titleLink bold />
+      <Box
+        data-note-row
+        display="flex"
+        flexDirection={wide ? "row" : "column"}
+        alignItems={wide ? "center" : "stretch"}
+        gap={wide ? "12px" : "10px"}
+        pl={wide ? "60px" : "54px"}
+      >
         {note.text && (
-          <Text data-hint fontSize="sm" color="text.muted">
+          <Text
+            data-hint
+            fontSize="14px"
+            color="text.muted"
+            flex={wide ? "1 1 0" : undefined}
+            minW="0"
+          >
             {note.text}
           </Text>
         )}
         {answerPath && (
-          <Button tone="paused" size="sm" onClick={() => navigate(answerPath)}>
+          <Button
+            tone="paused"
+            size="sm"
+            onClick={() => navigate(answerPath)}
+            {...phoneButton(wide)}
+          >
             Answer
           </Button>
         )}
         {note.fix && (
-          <Button tone="paused" size="sm" onClick={() => setFixing(true)}>
+          <Button
+            tone="paused"
+            size="sm"
+            onClick={() => setFixing(true)}
+            {...phoneButton(wide)}
+          >
             Fix it with an agent
           </Button>
         )}
       </Box>
-      {fixing && <FixAgentDialog row={row} fixAgent={fixAgent} onClose={() => setFixing(false)} />}
-    </>
+      {fixing && (
+        <FixAgentDialog
+          row={row}
+          fixAgent={fixAgent}
+          onClose={() => setFixing(false)}
+        />
+      )}
+    </Box>
   );
 }
 

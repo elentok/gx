@@ -215,6 +215,20 @@ test("a needs-you card shows its question and an Answer button to the ticket pag
   expect(await screen.findByLabelText("Loading ticket")).toBeTruthy();
 });
 
+test("a needs-answer card's second row holds the question, then the Answer button", async () => {
+  live([tk("01", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?" })]);
+  const row = (await cardOf("01")).querySelector("[data-note-row]")!;
+  const items = Array.from(row.children);
+  expect(items.map((el) => el.textContent)).toEqual(["Which db?", "Answer"]);
+  expect(items[1].tagName).toBe("BUTTON");
+});
+
+test("a needs-repair card's second row ends with the fix button", async () => {
+  live([tk("01", { rendered_status: "needs-repair", reason: "dirty tree" })]);
+  const row = (await cardOf("01")).querySelector("[data-note-row]")!;
+  expect(row.lastElementChild?.textContent).toBe("Fix it with an agent");
+});
+
 test("a needs-repair card is expanded with its status and reason; an error card is one line", async () => {
   live([tk("01", { rendered_status: "needs-repair", reason: "dirty tree" }), tk("02", { rendered_status: "error" })]);
   const repair = await cardOf("01");
