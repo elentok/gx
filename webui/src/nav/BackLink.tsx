@@ -1,6 +1,6 @@
 import { Text } from "@chakra-ui/react";
 import { Link } from "react-router";
-import { useWide } from "../design/useWide";
+import { useWide } from "../useWide";
 
 /** `waiting` is the number of other epics in Needs you; it reads inside the link and is left out at zero. */
 export function BackLink({ to, label, waiting = 0 }: { to: string; label: string; waiting?: number }) {

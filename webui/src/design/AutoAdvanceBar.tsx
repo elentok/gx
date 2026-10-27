@@ -8,7 +8,7 @@ import {
   type CancelAutoAdvance,
   type SetAutoAdvance,
 } from "./open";
-import { useWide } from "./useWide";
+import { useWide } from "../useWide";
 
 export type RunCall = (call: () => Promise<Refusable>) => Promise<void>;
 

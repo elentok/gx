@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { EpicListRow } from "../generated/server";
 import { renderThemed } from "../ui/render";
-import { JumpMenu, jumpHref, waitingCount } from "./JumpMenu";
+import { JumpMenu, jumpHref } from "./JumpMenu";
 
 afterEach(cleanup);
 
@@ -87,13 +87,6 @@ test("the title shows no count", async () => {
   setup();
   expect((await titleButton()).textContent).toBe("current▾⌘K");
   expect(screen.queryByTestId("waiting-count")).toBeNull();
-});
-
-test("waitingCount leaves out the epic on screen", () => {
-  const rows = [...ROWS, row("current-too", { section: "needs-you", address: "demo:current", addresses: ["demo:current"] })];
-  expect(waitingCount(rows, "demo:current")).toBe(2);
-  expect(waitingCount(rows, "demo:loop-epic")).toBe(3);
-  expect(waitingCount([], "demo:current")).toBe(0);
 });
 
 test("Ready to design and Finished show only while typing, and typing searches finished epics", async () => {

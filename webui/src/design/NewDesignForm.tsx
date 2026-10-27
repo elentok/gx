@@ -4,7 +4,7 @@ import { Button } from "../ui/button/Button";
 import { postOpenDesign, type OpenDesign } from "./open";
 import { useDesignWrite } from "./SessionControls";
 import { useVisualViewportHeight } from "./useVisualViewportHeight";
-import { useWide } from "./useWide";
+import { useWide } from "../useWide";
 
 export interface NewDesignDraft {
   slug?: string;

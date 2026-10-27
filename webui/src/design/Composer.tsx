@@ -22,7 +22,7 @@ import {
 import { postPrompt, type PostPrompt } from "./prompt";
 import { roundPrompt, unansweredOf, type Answers } from "./round";
 import { SendPopover } from "./SendPopover";
-import { useWide } from "./useWide";
+import { useWide } from "../useWide";
 import { promptable } from "./view";
 
 // Under the chat, one line: the auto-advance switch, then Note and the main action. Nothing sends unless the session is Idle.

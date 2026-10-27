@@ -4,7 +4,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import canned from "../canned-snapshot.json";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
-import { WideContext } from "../design/useWide";
+import { WideContext } from "../useWide";
 import { EpicPage } from "../epic/EpicPage";
 import { EpicCard } from "../epics/EpicCard";
 import type { EpicDetail, EpicDetailRow, EpicListRow, FixAgentResult } from "../generated/server";

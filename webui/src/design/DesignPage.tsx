@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
-import { useEpicList, type FetchEpicList } from "../epics/list";
+import { useEpicList, waitingCount, type FetchEpicList } from "../epics/list";
 import { BackLink } from "../nav/BackLink";
-import { JumpMenu, waitingCount } from "../nav/JumpMenu";
+import { JumpMenu } from "../nav/JumpMenu";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
 import type { FetchChat } from "./chat";
@@ -17,7 +17,7 @@ import { ImplLink, Progress, showsImplLink } from "./Progress";
 import type { FetchScreen } from "./screen";
 import { DeleteDesignButton, Failure, SessionHeader, StartDesignButton } from "./SessionControls";
 import type { EpicListRow, SessionInfo } from "../generated/server";
-import { useWide } from "./useWide";
+import { useWide } from "../useWide";
 import { designSession, liveSessions } from "./view";
 
 /** The injected fetchers and actions the Design page talks to the server through. */
