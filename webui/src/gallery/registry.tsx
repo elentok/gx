@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import canned from "../canned-snapshot.json";
@@ -19,6 +19,7 @@ import { DayChart } from "../ui/day-chart/DayChart";
 import { LineChart } from "../ui/day-chart/LineChart";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { LiveDot } from "../ui/live-dot/LiveDot";
+import { Modal } from "../ui/modal/Modal";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { SegmentedBar } from "../ui/progress-bar/SegmentedBar";
@@ -68,9 +69,9 @@ const cardRow = (over: Partial<EpicListRow> = {}): EpicListRow => ({
 const idleConnection = { refresh: () => {} } as Connection;
 
 // A transform makes the modal's fixed overlay fill this frame instead of the page.
-const ModalFrame = ({ children }: { children: ReactNode }) => (
+const ModalFrame = ({ children, h = "600px", w = "800px" }: { children: ReactNode; h?: string; w?: string }) => (
   <ConnectionContext.Provider value={idleConnection}>
-    <Box position="relative" h="600px" w="800px" transform="translateZ(0)" overflow="hidden" borderWidth="1px" borderColor="border">
+    <Box position="relative" h={h} w={w} transform="translateZ(0)" overflow="hidden" borderWidth="1px" borderColor="border">
       {children}
     </Box>
   </ConnectionContext.Provider>
@@ -397,6 +398,34 @@ export const galleryEntries: GalleryEntry[] = [
   { name: "Chip", cases: perTone((tone) => <Chip tone={tone}>{tone}</Chip>) },
   { name: "LiveDot", cases: perTone((tone) => <LiveDot tone={tone} label={tone} />) },
   { name: "Strip", cases: perTone((tone) => <Strip tone={tone}>{tone}</Strip>) },
+  {
+    name: "Modal",
+    // The Modal has no tone of its own; the tone cases show it holding a button in that tone.
+    cases: [
+      ...perTone((tone) => (
+        <ModalFrame h="200px" w="400px">
+          <Modal label={tone} onClose={() => {}}>
+            <Text>{ticket.title}</Text>
+            <Box display="flex" justifyContent="flex-end">
+              <Button emphasis="main" tone={tone}>
+                {tone}
+              </Button>
+            </Box>
+          </Modal>
+        </ModalFrame>
+      )),
+      {
+        label: "bottom sheet",
+        node: (
+          <ModalFrame h="200px" w="400px">
+            <Modal label="bottom sheet" onClose={() => {}} backdrop={{ alignItems: "flex-end", p: "0" }} w="full" borderTopRadius="xl" borderBottomRadius="0">
+              <Text>{ticket.title}</Text>
+            </Modal>
+          </ModalFrame>
+        ),
+      },
+    ],
+  },
   {
     name: "EmptyState",
     cases: [
