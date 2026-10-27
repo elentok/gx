@@ -110,6 +110,13 @@ func TestEpicList_DesignCards(t *testing.T) {
 	if r := got["d-wait"]; r.WaitingSince.IsZero() || r.WaitingSince.Before(time.Now().Add(-time.Minute)) {
 		t.Errorf("d-wait waiting since = %v, want the question time", r.WaitingSince)
 	}
+	if r := got["d-wait"]; r.TimeKind != server.CardTimeWaiting || !r.TimeStart.Equal(r.WaitingSince) {
+		t.Errorf("d-wait time = %q %v, want waiting since %v", r.TimeKind, r.TimeStart, r.WaitingSince)
+	}
+	// The stamp reaches the epic index through the file watcher, a moment after the session starts.
+	waitForEpicRow(t, f, "d-live", func(r server.EpicListRow) bool {
+		return r.TimeKind == server.CardTimeElapsed && !r.TimeStart.IsZero()
+	})
 	if r := got["d-pct"]; r.RingProgress != 30 {
 		t.Errorf("d-pct ring = %d, want 30 (3 of 10)", r.RingProgress)
 	}

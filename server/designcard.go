@@ -63,10 +63,19 @@ func decorateDesignCard(row *EpicListRow, m tickets.Epic, impl *EpicListRow, act
 		row.Section = SectionFinished
 		row.StatusWords = "Designed"
 		row.RingProgress = designPercent(m, row.ProgressStep)
+		row.setTime(CardTimeFinished, row.CompletedAt)
 	default:
 		row.RingProgress = designPercent(m, row.ProgressStep)
 		fallback := cmp.Or(lastActivity(m), m.CreatedAt)
 		placeDesign(row.Address, act, mapNotStarted(m, row.ProgressStep), fallback).applyTo(row)
+		switch row.Section {
+		case SectionReadyToDesign:
+			row.setTime(CardTimeCreated, m.CreatedAt)
+		case SectionNeedsYou:
+			row.setTime(CardTimeWaiting, row.WaitingSince)
+		default:
+			row.setTime(CardTimeElapsed, m.DesignStartedAt)
+		}
 		if row.ProgressStep == ProgressCreateTickets && impl != nil && row.StatusWords == "Designing" {
 			// The ring has no fraction to show yet; the client draws its placeholder.
 			row.RingProgress = 0
@@ -96,6 +105,7 @@ func joinImplementation(row *EpicListRow, impl *EpicListRow, act designActivity)
 	if p := placeDesign(m.Address, act, false, act.askedAt); p.pill == PillQuestion {
 		row.Section, row.StatePill, row.Reason = SectionNeedsYou, p.pill, p.reason
 		row.WaitingSince, row.Actions = p.waitingSince, p.actions
+		row.setTime(CardTimeWaiting, row.WaitingSince)
 		row.Addresses = []string{m.Address, impl.Address}
 	}
 }

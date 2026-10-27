@@ -145,6 +145,9 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	if r.CardKind != server.CardKindImplementation {
 		t.Errorf("card kind = %q, want implementation", r.CardKind)
 	}
+	if r.TimeKind != server.CardTimeWaiting || !r.TimeStart.Equal(r.WaitingSince) {
+		t.Errorf("time = %q %v, want waiting since %v", r.TimeKind, r.TimeStart, r.WaitingSince)
+	}
 	if got := designSection(); got != server.SectionNeedsYou {
 		t.Errorf("design_section = %q, want needs-you", got)
 	}
