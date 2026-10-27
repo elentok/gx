@@ -34,11 +34,11 @@ func newServerStatsCmd() *cobra.Command {
 }
 
 func printStats(w io.Writer, s server.Stats) error {
-	if _, err := fmt.Fprintln(w, "date\ttickets_merged\tepics_merged"); err != nil {
+	if _, err := fmt.Fprintln(w, "date\ttickets_merged\tepics_merged\tdesigns_completed"); err != nil {
 		return err
 	}
 	for i, day := range s.Days {
-		if _, err := fmt.Fprintf(w, "%s\t%d\t%d\n", day, s.Throughput.TicketsMerged[i], s.Throughput.EpicsMerged[i]); err != nil {
+		if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\n", day, s.Throughput.TicketsMerged[i], s.Throughput.EpicsMerged[i], s.Throughput.DesignsCompleted[i]); err != nil {
 			return err
 		}
 	}

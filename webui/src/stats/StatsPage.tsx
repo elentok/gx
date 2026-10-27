@@ -34,7 +34,8 @@ function Throughput({ stats }: { stats: Stats }) {
   return (
     <Section id="stats-throughput" title="Throughput" tone="running">
         <StatCard title="Tickets merged" days={days} series={[{ key: "tickets", label: "Tickets", tone: "running", values: t.tickets_merged }]} />
-        <StatCard title="Epics merged to trunk" days={days} series={[{ key: "epics", label: "Epics", tone: "done", values: t.epics_merged }]} />
+        <StatCard title="Epics merged" days={days} series={[{ key: "epics", label: "Epics", tone: "done", values: t.epics_merged }]} />
+        <StatCard title="Designs completed" days={days} series={[{ key: "designs", label: "Designs", tone: "waiting", values: t.designs_completed }]} />
         <StatCard
           title="Lines of code"
           days={days}

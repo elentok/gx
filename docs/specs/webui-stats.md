@@ -20,8 +20,8 @@ The Stats page shows per-day charts for the last 7, 30 or 90 days (30 by default
 projects or one project. Both filters live in the URL (`#/stats?range=30&project=gx`). The charts
 sit in three sections of chart cards:
 
-- **Throughput**: tickets merged, epics merged to trunk, lines of code, follow-ups, and maps waiting
-  for design.
+- **Throughput**: tickets merged, epics merged, designs completed, lines of code, follow-ups, and
+  maps waiting for design.
 - **Cost and effort**: tokens and spend, each split into Design and Implementation.
 - **Friction**: pauses by reason, run events, and pause endings by where they ended.
 
@@ -81,8 +81,9 @@ Throughput
     decisions do not count as merged work.
 20. As the person running gx, I want commitless done tickets (one-offs, investigations) in "Tickets
     merged", so that work with no commits still counts.
-21. As the person running gx, I want an "Epics merged to trunk" bar chart by `merged_at`, so that I
-    see when whole features reached trunk.
+21. As the person running gx, I want an "Epics merged" bar chart by `merged_at`, and a separate
+    "Designs completed" bar chart by a map's `completed_at`, so that I see when whole features
+    reached trunk and when designs finished, without counting a feature twice.
 22. As the person running gx, I want a "Lines of code" chart with lines added above the baseline and
     lines removed below it, on the day each epic merged, so that I see how much code changed.
 23. As the person running gx, I want the "Lines of code" headline to show the two sums ("+N −M")
@@ -256,7 +257,7 @@ never merged)
   with a title, a headline and a legend. Two columns on desktop, one on a phone. The page uses the
   shared page container.
 - Chart types:
-  - Tickets merged, epics merged: bars.
+  - Tickets merged, epics merged, designs completed: bars.
   - Lines of code: added above the baseline, removed below it.
   - Follow-ups: "created" and "finished" bars side by side.
   - Waiting for design: a line.
@@ -281,7 +282,9 @@ never merged)
 - Tickets merged: tickets with `status: done` outside map epics, counted on `done_at`. Commitless
   tickets count. Epic `ticket.md` files are not tickets here. A done ticket with no `done_at` is left
   out.
-- Epics merged to trunk: epics counted on `merged_at`.
+- Epics merged: non-map epics counted on `merged_at`. A map is left out: it carries the `merged_at`
+  copied from its `-impl` epic, so counting it would count the feature twice.
+- Designs completed: map epics counted on `completed_at`.
 - Lines of code: `lines_added` and `lines_removed` from the epic `ticket.md`, counted on `merged_at`.
 - Follow-ups: a ticket is a follow-up when its original address (see below) is in a `follow-ups`
   epic, wherever it lives now. `category` is not used. "created" counts on `created_at`. "finished"

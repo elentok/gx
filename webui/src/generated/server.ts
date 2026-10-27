@@ -1620,6 +1620,7 @@ export interface StatsAmount {
 export interface StatsThroughput {
   tickets_merged: number /* int */[];
   epics_merged: number /* int */[];
+  designs_completed: number /* int */[];
   lines_added: number /* int */[];
   lines_removed: number /* int */[];
   follow_ups_created: number /* int */[];

@@ -68,7 +68,7 @@ func newStats(n int) Stats {
 	return Stats{
 		Range: n,
 		Throughput: StatsThroughput{
-			TicketsMerged: ints(), EpicsMerged: ints(),
+			TicketsMerged: ints(), EpicsMerged: ints(), DesignsCompleted: ints(),
 			LinesAdded: ints(), LinesRemoved: ints(),
 			FollowUpsCreated: ints(), FollowUpsFinished: ints(),
 			WaitingForDesign: ints(),
@@ -123,8 +123,12 @@ func (b *statsBuilder) addEpic(e tickets.Epic) {
 		cost = b.design
 		cost.addMapRemainder(b.win, e)
 		b.addWaiting(e)
-	}
-	if i := b.win.bucket(e.MergedAt); i >= 0 {
+		// A map's merged_at is copied from its impl epic, so a map counts once,
+		// as a completed design, and not again as a merged epic.
+		if i := b.win.bucket(e.CompletedAt); i >= 0 {
+			b.tp.DesignsCompleted[i]++
+		}
+	} else if i := b.win.bucket(e.MergedAt); i >= 0 {
 		b.tp.EpicsMerged[i]++
 		if e.LinesAdded != nil {
 			b.tp.LinesAdded[i] += *e.LinesAdded

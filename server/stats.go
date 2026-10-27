@@ -32,6 +32,7 @@ type StatsAmount struct {
 type StatsThroughput struct {
 	TicketsMerged     []int `json:"tickets_merged"`
 	EpicsMerged       []int `json:"epics_merged"`
+	DesignsCompleted  []int `json:"designs_completed"`
 	LinesAdded        []int `json:"lines_added"`
 	LinesRemoved      []int `json:"lines_removed"`
 	FollowUpsCreated  []int `json:"follow_ups_created"`

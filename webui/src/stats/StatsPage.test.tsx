@@ -41,6 +41,7 @@ const statsOf = (over: Partial<Stats["throughput"]> = {}, extra: Partial<Stats> 
   throughput: {
     tickets_merged: [1, 2, 3],
     epics_merged: [0, 1, 0],
+    designs_completed: [2, 0, 1],
     lines_added: [10, 20, 30],
     lines_removed: [1, 2, 3],
     follow_ups_created: [1, 0, 1],
@@ -83,7 +84,8 @@ test("the Throughput cards follow their headline rules", async () => {
   renderStats(async () => statsOf());
   expect(await cardText("Tickets merged")).toContain("6");
   expect(await cardText("Tickets merged")).toContain("2.0/day");
-  expect(await cardText("Epics merged to trunk")).toContain("1");
+  expect(await cardText("Epics merged")).toContain("1");
+  expect(await cardText("Designs completed")).toContain("3");
   const loc = await cardText("Lines of code");
   expect(loc).toContain("+60 −6");
   expect(loc).not.toContain("/day");

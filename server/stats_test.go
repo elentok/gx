@@ -115,6 +115,30 @@ func TestStats_EpicsMergedIncludeArchives(t *testing.T) {
 	}
 }
 
+func TestStats_MapsCountAsDesignsCompletedNotEpicsMerged(t *testing.T) {
+	s := statsStore(t, func(store string) {
+		// A done map carries the merged_at copied from its impl epic.
+		writeProjectEpic(t, store, "proj", "feat", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(3)+"\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
+		writeProjectEpic(t, store, "proj", "feat-impl", "---\nstatus: done\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
+		writeProjectEpic(t, store, "proj", "open-map", "---\nkind: map\nstatus: open\n---\n", nil)
+	})("")
+	for _, c := range []struct {
+		name   string
+		series []int
+		day    int
+		want   int
+	}{
+		{"epics merged: impl only", s.Throughput.EpicsMerged, 1, 1},
+		{"epics merged: map completion is not a merge", s.Throughput.EpicsMerged, 3, 0},
+		{"designs completed: on completed_at", s.Throughput.DesignsCompleted, 3, 1},
+		{"designs completed: not on merged_at", s.Throughput.DesignsCompleted, 1, 0},
+	} {
+		if got := statsAt(t, s, c.series, c.day); got != c.want {
+			t.Errorf("%s: day %d = %d, want %d", c.name, c.day, got, c.want)
+		}
+	}
+}
+
 func TestStats_ProjectFilter(t *testing.T) {
 	get := statsFixture(t)
 	s := get("?project=other")
