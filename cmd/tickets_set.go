@@ -49,7 +49,10 @@ Agent-only settable fields:
     agent's own self-report for the current claim, distinct from status. This report
     can only start a merge, never conclude one — gx's own commit count and
     cherry-pick decide whether the ticket is actually merged. Never pair finished with
-    --status=done: the merge status is gx's alone to write.
+    --status=done: the merge status is gx's alone to write. A finished report for a ticket
+    whose iteration branch has commits is refused unless ` + "`gx check`" + ` recorded a passing
+    run of the worktree's current tree. When the only failures are flakes or pre-existing
+    failures, file a follow-up per failing test and pass --check-failures <addr,addr>.
 
 Read-only fields (gx-managed, not settable via ` + "`set`" + `):
   id — ticket identity, fixed at creation
@@ -145,6 +148,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().StringVar(&expectedContextWindow, "expected-context-window", "", "set expected_context_window")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
 	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, asking, finished)")
+	cmd.Flags().String("check-failures", "", "with --iteration-status finished: follow-up addresses (comma-separated), one per failing test of the last `gx check` run")
 
 	// Declared only so a write attempt is refused with a clear message rather
 	// than cobra's generic unknown-flag error.
@@ -385,6 +389,9 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 
 	if c.Flags().Changed("iteration-status") {
 		if err := checkIterationStatusFinishedGuard(c, path); err != nil {
+			return err
+		}
+		if err := checkFinishedGuard(c, path, getwd); err != nil {
 			return err
 		}
 	}

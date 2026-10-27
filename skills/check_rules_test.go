@@ -13,7 +13,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 	}{
 		{"failing tests", "gx-failing-tests.md", []string{
 			"3 times", "git merge-base", "flake", "pre-existing failure", "branch fault",
-			"30 changed lines or fewer in at most 2 files", "](gx-follow-up/SKILL.md)",
+			"30 changed lines or fewer in at most 2 files", "](gx-follow-up/SKILL.md)", "--check-failures",
 		}},
 		{"implement", "gx-implement/SKILL.md", []string{
 			"](../gx-failing-tests.md)", "-count=20", "`gx check`",

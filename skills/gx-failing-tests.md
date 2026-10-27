@@ -12,7 +12,8 @@ Use this for every failing test you did not expect. Sort it before you fix anyth
 ## What to do
 
 - **Flake or pre-existing failure:** file it with [gx-follow-up](gx-follow-up/SKILL.md), with the
-  test name in the title. Then carry on with your ticket.
+  test name in the title. Then carry on with your ticket, and finish with
+  `--check-failures <addrs>` (one ticket per failing test).
 - **Small fix:** a fix of 30 changed lines or fewer in at most 2 files may go inside your ticket.
   Record it under `## Spec deviations` in the ticket body, and file the follow-up as fixed.
 - **Branch fault:** fix it, or report it as the branch's problem. Do not file it as a follow-up.
