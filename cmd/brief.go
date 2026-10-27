@@ -15,6 +15,8 @@ var briefTools = map[string]brief.Tool{
 	"go-test": brief.GoTest{},
 	"vitest":  brief.Vitest{},
 	"tsc":     brief.Tsc{},
+
+	"playwright": brief.Playwright{},
 }
 
 func newBriefCmd(d deps) *cobra.Command {
@@ -24,8 +26,10 @@ func newBriefCmd(d deps) *cobra.Command {
 		Long: `Run a dev tool and print one result line and the log path (always the last
 line). Exit 0 means pass, 1 fail, 2 brief could not run the tool.
 
-Tools: go-test, vitest, tsc (vitest and tsc run from the node_modules/.bin found
-walking up to the git root)
+Tools: go-test, vitest, tsc, playwright (the node tools run from the
+node_modules/.bin found walking up to the git root). playwright needs -C webui:
+it adds -c e2e/playwright.config.ts, uses the line reporter and runs
+make web-build only when webui/dist/index.html is missing.
 
 conflicts lists the unmerged files of an in-progress merge or rebase with the
 line numbers of their conflict markers (exit 1 while any remain, 0 when none).
