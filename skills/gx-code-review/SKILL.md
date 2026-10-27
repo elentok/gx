@@ -76,6 +76,9 @@ read/git access to the worktree, so it runs the diff itself.
 
 - The `SKILL.md` path resolved in step 2, with the instruction to Read it and follow it against that
   diff.
+- The spec path (or ticket address list) resolved in step 1, and the known spec deviations list,
+  with the rule: "Don't propose changes that undo an explicit requirement of the spec or tickets.
+  Flag the tension instead."
 - The brief: "Report findings as a list — file, line/hunk, summary, severity, suggested fix. Under
   500 words."
 
