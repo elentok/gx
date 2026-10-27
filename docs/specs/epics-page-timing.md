@@ -109,7 +109,7 @@ reads `project · status` as it does today.
 - **Queue item enqueue time.** Each server-queue item gains an enqueue time, stored in the queue
   state file. The server sets it to now on add, on the merge ticket's auto-enqueue, and for each new
   address in a replace. A replace keeps the time of an address that was already queued. A move keeps
-  it. The server ignores any enqueue time a client sends. Items from an older queue file load with no
+  it. The `QueueItem` JSON (`gx server queue items --json`) carries the enqueue time. The server ignores any enqueue time a client sends. Items from an older queue file load with no
   time. There is no backfill.
 - **Design-start stamp.** A map epic gains a server-stamped frontmatter field: when its first design
   session opened. The server writes it when it creates a session whose Session ticket is the map or
@@ -160,8 +160,17 @@ reads `project · status` as it does today.
 
 Run against a temporary gx server built from the epic. New flow to write: **61. Card times**
 (scenario `united`, in `united.e2e.ts`). Its steps open the Epics page and expand every section. The
-`united` scenario must give `design-live` and `design-stopped` a design-start stamp in
-`unitedMeta`, and `running-epic` a `started_at`. That scenario change is an implementation ticket.
+`united` scenario must give:
+
+- every epic a `created_at`, with a recent one (minutes old) for `ready-epic`;
+- `design-live` and `design-stopped` a design-start stamp in `unitedMeta`;
+- `running-epic` and `awaiting-auto-epic` a `started_at`;
+- `awaiting-epic`, `blocked-merge-epic` and `dirty-trunk-epic` (the done Needs-you epics) a
+  `completed_at`, and `deadlock-epic/01` a `claimed_at`, so each Needs-you row has a
+  `waiting_since`.
+
+The `design` scenario must give `demo:design-epic` a design-start stamp in `designBase`, for flow 18.
+These fixture changes are one implementation ticket.
 
 1. Flow 61: every card except `follow-ups` has a `time` element. Flow 16 still passes.
 2. Flow 61: the card line text matches `^demo · .+ · .+$` (or `auto · ...`) and the time sits between
@@ -170,10 +179,10 @@ Run against a temporary gx server built from the epic. New flow to write: **61. 
 4. `gx server epics --json`: the Needs-you rows' start equals their `waiting_since`.
 5. Flow 61: `running-epic` matches a bare duration. `gx server epics --json`: its start equals its
    `started_at`.
-6. `gx server epics --json`: `awaiting-auto-epic` (In progress, "Implemented") has kind elapsed when
-   it has a `started_at`, and no time when it has none.
+6. `gx server epics --json`: `awaiting-auto-epic` (In progress, "Implemented") has kind elapsed, and
+   its start equals its `started_at`.
 7. Flow 61: `queued-epic` shows a bare duration. Then run `gx server queue remove demo:queued-epic/01`
-   and `gx server queue add demo:queued-epic/01`. `gx server queue list --json` shows a newer enqueue time, and the card
+   and `gx server queue add demo:queued-epic/01`. `gx server queue items --json` shows a newer enqueue time, and the card
    reads `<1m`.
 8. Flow 61: the queued one-off `demo:one-offs/02` shows a bare duration.
 9. Server test only (old queue file). No browser check.
@@ -256,6 +265,8 @@ Run against a temporary gx server built from the epic. New flow to write: **61. 
 
 ## Further Notes
 
-- ADR 0041 (stats read stamps, not logs) applies: every start comes from a frontmatter stamp or the
-  queue state file, never from logs.
+- ADR 0041 (stats read stamps, not logs) applies to the new starts: the enqueue time and the
+  design-start stamp come from the queue state file and a frontmatter stamp, never from logs. Needs
+  you reuses `waiting_since` as it is, which already reads permission events from the ticket log and
+  Design question rounds.
 - The `united` fixture's Finished epics merged in January 2026, so their labels read in weeks.
