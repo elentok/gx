@@ -812,3 +812,25 @@ an exited session.
 - **Pass:**
   - The banner is gone and the epic cards stay.
   - No request went to `/v1/checks/save`.
+
+## 67. Set up checks, save to repo
+
+- **Scenario:** `checks-missing`, project filter `demo`
+- **Steps:** click "Set up checks", open "Show the file", click "Save".
+- **Pass:**
+  - The dialog "Set up checks · demo" presets Test as "Use command" with `make test`, a
+    "Recommended" chip and "Found in Makefile · test". Format, lint and typecheck are on "gx default"
+    with "Nothing found" and an empty disabled field. No row suggests the `build` script.
+  - "Save to" defaults to committing `.gx/checks.json` on main. The preview shows
+    `// .gx/checks.json (committed on main)` and `{"test": {"full": "make test"}}`.
+  - After Save the toast reads "Committed .gx/checks.json on main", the dialog and the banner are
+    gone, and `gx server checks` reports `demo` as not missing.
+
+## 68. Set up checks, save to project.json and keep gx defaults
+
+- **Scenario:** `checks-missing`, project filter `demo`
+- **Steps:** pick "Keep it in gx's project.json" and Save. In a second run, click "Keep gx defaults".
+- **Pass:**
+  - Each run closes the dialog and removes the banner, and `gx server checks` reports `demo` as
+    not missing.
+  - "Keep gx defaults" saves `{}`.

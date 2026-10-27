@@ -2,6 +2,8 @@ import { Box, chakra, Input, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { MissingBanner } from "../checks/MissingBanner";
+import { SetupDialog } from "../checks/SetupDialog";
+import { postSaveChecks, type SaveChecks } from "../checks/setup";
 import { fetchChecksStatus, type FetchChecksStatus } from "../checks/status";
 import { useConnectionContext } from "../connection";
 import type { OpenDesign } from "../design/open";
@@ -92,20 +94,20 @@ export function EpicsPage({
   fetchList,
   fetchChecks = fetchChecksStatus,
   openDesign,
-  onSetUp = () => {},
+  saveChecks = postSaveChecks,
 }: {
   fetchList?: FetchEpicList;
   fetchChecks?: FetchChecksStatus;
   openDesign?: OpenDesign;
-  /** Opens the check setup dialog for a project. */
-  onSetUp?: (project: string) => void;
+  saveChecks?: SaveChecks;
 }) {
   const conn = useConnectionContext();
   const navigate = useNavigate();
   const { list, failed, retry } = useEpicList(fetchList, conn);
   // A failed read shows no banner: it is not worth an error state.
-  const checks = useFetched("checks", fetchChecks, conn).data;
+  const { data: checks, retry: rereadChecks } = useFetched("checks", fetchChecks, conn);
   const [bannerHidden, setBannerHidden] = useState(false);
+  const [settingUp, setSettingUp] = useState<string>();
   const [query, setQuery] = useState("");
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [designing, setDesigning] = useState(false);
@@ -116,6 +118,7 @@ export function EpicsPage({
   // A stored project that is gone, or a single project, acts as "All projects" without rewriting it.
   const filterProject = projects.length > 1 && projects.includes(storedProject) ? storedProject : undefined;
   const missing = (checks?.projects ?? []).filter((p) => p.missing && (filterProject === undefined || p.project === filterProject));
+  const setupProject = checks?.projects.find((p) => p.project === settingUp);
   const sections = list ? sectionsOf(list.epics, query, list.recently_finished, filterProject) : [];
   const shown = sections.filter((s) => s.rows.length > 0);
   const chooseProject = (project: string) => {
@@ -179,7 +182,7 @@ export function EpicsPage({
         )}
         {list && list.epics.length > 0 && newDesign}
       </Box>
-      {!bannerHidden && <MissingBanner missing={missing} onSetUp={onSetUp} onDismiss={() => setBannerHidden(true)} />}
+      {!bannerHidden && <MissingBanner missing={missing} onSetUp={setSettingUp} onDismiss={() => setBannerHidden(true)} />}
       {failed ? (
         <Box mt="6" display="flex" alignItems="center" gap="3">
           <Text color="text.muted">Could not load epics</Text>
@@ -196,6 +199,7 @@ export function EpicsPage({
       ) : (
         shown.map((s) => <SectionBlock key={s.key} section={s} now={now} open={isOpen(s)} onToggle={() => toggle(s.key)} onChanged={retry} />)
       )}
+      {setupProject && <SetupDialog project={setupProject} save={saveChecks} onSaved={rereadChecks} onClose={() => setSettingUp(undefined)} />}
       {designing && (
         <NewDesignForm
           projects={projects}

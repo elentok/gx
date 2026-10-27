@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import type { SaveChecks } from "../checks/setup";
 import type { ChecksStatus, ProjectChecks } from "../checks/status";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { EpicList, EpicListRow } from "../generated/server";
@@ -59,9 +60,9 @@ const project = (name: string, over: Partial<ProjectChecks> = {}, recommended = 
   ...over,
 });
 
-function renderPage(checks: () => Promise<ChecksStatus>, onSetUp = vi.fn()) {
+function renderPage(checks: () => Promise<ChecksStatus>, saveChecks: SaveChecks = vi.fn(async () => ({}))) {
   const list: EpicList = { epics: [epic("demo"), epic("auto")], follow_ups: [] };
-  const router = createMemoryRouter(appRoutes({ epicList: async () => list, checksStatus: checks, onSetUpChecks: onSetUp }), {
+  const router = createMemoryRouter(appRoutes({ epicList: async () => list, checksStatus: checks, saveChecks }), {
     initialEntries: ["/epics"],
   });
   renderThemed(
@@ -69,8 +70,10 @@ function renderPage(checks: () => Promise<ChecksStatus>, onSetUp = vi.fn()) {
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   );
-  return onSetUp;
+  return saveChecks;
 }
+
+const setupDialog = (project: string) => screen.findByRole("dialog", { name: `Set up checks · ${project}` });
 
 const both = async (): Promise<ChecksStatus> => ({ projects: [project("demo", {}, 1), project("auto")] });
 const banner = () => screen.findByRole("region", { name: "Missing check config" });
@@ -81,7 +84,7 @@ const noBanner = async () => {
 
 test("one filtered project gets its own sentence, the suggestion count and two buttons", async () => {
   localStorage.setItem("gx.epics.project", "demo");
-  const onSetUp = renderPage(both);
+  renderPage(both);
   const b = await banner();
   expect(b.textContent).toContain("demo has no check config.");
   expect(b.textContent).toContain("Agents run gx's built-in checks until you set it up.");
@@ -89,16 +92,35 @@ test("one filtered project gets its own sentence, the suggestion count and two b
   expect(within(b).queryByText(/auto/)).toBeNull();
   expect(within(b).getByRole("button", { name: "Not now" })).toBeTruthy();
   fireEvent.click(within(b).getByRole("button", { name: "Set up checks" }));
-  expect(onSetUp).toHaveBeenCalledWith("demo");
+  await setupDialog("demo");
 });
 
 test("All projects shows one banner with a Set up checks button per missing project", async () => {
-  const onSetUp = renderPage(both);
+  renderPage(both);
   const b = await banner();
   expect(b.textContent).toContain("2 projects have no check config.");
   expect(within(b).getAllByRole("listitem").map((li) => li.textContent?.replace("Set up checks", ""))).toEqual(["demo", "auto"]);
   fireEvent.click(within(b).getByRole("button", { name: "Set up checks for auto" }));
-  expect(onSetUp).toHaveBeenCalledWith("auto");
+  await setupDialog("auto");
+});
+
+test("a successful save closes the dialog, toasts, and the banner drops that project after the status is read again", async () => {
+  let saved = false;
+  const checks = async (): Promise<ChecksStatus> => ({ projects: [project("demo", { missing: !saved }, 1), project("auto")] });
+  const save = vi.fn<SaveChecks>(async () => {
+    saved = true;
+    return {};
+  });
+  renderPage(checks, save);
+  const b = await banner();
+  fireEvent.click(within(b).getByRole("button", { name: "Set up checks for demo" }));
+  const d = await setupDialog("demo");
+  fireEvent.click(within(d).getByRole("button", { name: "Keep gx defaults" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(save).toHaveBeenCalledWith({ project: "demo", target: "repo", checks: {} });
+  await waitFor(() => expect(within(screen.getByRole("region", { name: "Missing check config" })).queryByText(/demo/)).toBeNull());
+  expect(screen.getByRole("region", { name: "Missing check config" }).textContent).toContain("auto has no check config.");
+  expect((await screen.findAllByText("Committed .gx/checks.json on main")).length).toBeGreaterThan(0);
 });
 
 test("no banner when nothing is missing", async () => {

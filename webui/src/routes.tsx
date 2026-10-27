@@ -8,6 +8,7 @@ import type { FetchScreen } from "./design/screen";
 import type { FetchEpicDetail } from "./epic/detail";
 import { EpicPage } from "./epic/EpicPage";
 import type { FixAgent } from "./epic/fixAgent";
+import type { SaveChecks } from "./checks/setup";
 import type { FetchChecksStatus } from "./checks/status";
 import { EpicsPage } from "./epics/EpicsPage";
 import type { FetchEpicList } from "./epics/list";
@@ -80,8 +81,7 @@ export interface RouteFetchers {
   epic?: FetchEpicDetail;
   epicList?: FetchEpicList;
   checksStatus?: FetchChecksStatus;
-  /** Opens the check setup dialog; nothing wires it until the dialog exists. */
-  onSetUpChecks?: (project: string) => void;
+  saveChecks?: SaveChecks;
   stats?: FetchStats;
   chat?: FetchChat;
   prompt?: PostPrompt;
@@ -91,7 +91,7 @@ export interface RouteFetchers {
 
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
   return [
-    { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} fetchChecks={fetchers.checksStatus} openDesign={fetchers.openDesign} onSetUp={fetchers.onSetUpChecks} /> },
+    { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} fetchChecks={fetchers.checksStatus} openDesign={fetchers.openDesign} saveChecks={fetchers.saveChecks} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },
