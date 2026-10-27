@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Text, chakra } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -14,7 +14,7 @@ import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
 import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./open";
 import type { PostPrompt } from "./prompt";
-import { ImplLink, Progress, showsImplLink } from "./Progress";
+import { ImplLink, Progress, StepLine, StepsSheet, showsImplLink } from "./Progress";
 import type { FetchScreen } from "./screen";
 import { DeleteDesignButton, Failure, SessionHeader, StartDesignButton } from "./SessionControls";
 import type { EpicListRow, SessionInfo } from "../generated/server";
@@ -101,6 +101,7 @@ function DesignBody({
   const [selected, setSelected] = useState<string>();
   // Not stored: the message list and the impl link both read it, so it lives here.
   const [questions, setQuestions] = useState(false);
+  const [stepsOpen, setStepsOpen] = useState(false);
   const done = detail?.steps?.some(
     (s) => s.step === "done" && s.state === "done",
   );
@@ -138,8 +139,10 @@ function DesignBody({
     seenLiveKey.current = liveKey;
     refetch();
   }, [liveKey, refetch]);
+  const ring = (size: "md" | "sm" | "compact") => <EpicRing detail={detail!} card={card} sessions={sessions} size={size} />;
   return (
     <>
+      {stepsOpen && detail && <StepsSheet detail={detail} ring={ring("compact")} onClose={() => setStepsOpen(false)} />}
       <Box
         mt="4"
         mb="3"
@@ -152,8 +155,22 @@ function DesignBody({
         <Box minW="0">
           <PageHeader
             title={name}
-            lead={detail && <EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "md" : "sm"} />}
-            heading={<JumpMenu name={name} current={address} epics={epics} />}
+            lead={
+              detail &&
+              (wide ? (
+                ring("md")
+              ) : (
+                <chakra.button type="button" aria-label="Show progress steps" aria-haspopup="dialog" cursor="pointer" onClick={() => setStepsOpen(true)}>
+                  {ring("sm")}
+                </chakra.button>
+              ))
+            }
+            heading={
+              <>
+                <JumpMenu name={name} current={address} epics={epics} />
+                {!wide && detail && <StepLine detail={detail} onOpen={() => setStepsOpen(true)} />}
+              </>
+            }
           />
         </Box>
         <SessionStrip
@@ -169,7 +186,7 @@ function DesignBody({
       <Box
         display="grid"
         gridTemplateColumns={{ base: "1fr", lg: "minmax(0, 1fr) 300px" }}
-        gridTemplateRows={{ base: "auto minmax(0, 1fr)", lg: "minmax(0, 1fr)" }}
+        gridTemplateRows={"minmax(0, 1fr)"}
         gap="4"
         flex="1"
         minH="0"
@@ -182,10 +199,10 @@ function DesignBody({
           display="flex"
           flexDirection="column"
           gap="3"
-          gridRow={{ base: 2, lg: 1 }}
+          gridRow={1}
           gridColumn={1}
         >
-          {wide && !questions && detail && showsImplLink(detail) && (
+          {!questions && detail && showsImplLink(detail) && (
             <ImplLink address={detail.impl_address!} />
           )}
           <DesignChat
@@ -205,17 +222,11 @@ function DesignBody({
             }}
           />
         </Box>
-        {/* On a phone Progress sits above the chat. */}
-        <Box
-          aria-label="Progress"
-          role="region"
-          gridRow={1}
-          gridColumn={{ base: 1, lg: 2 }}
-          minH="0"
-          overflowY="auto"
-        >
-          {detail && <Progress detail={detail} wide={wide} />}
-        </Box>
+        {wide && (
+          <Box aria-label="Progress" role="region" gridRow={1} gridColumn={2} minH="0" overflowY="auto">
+            {detail && <Progress detail={detail} />}
+          </Box>
+        )}
       </Box>
     </>
   );

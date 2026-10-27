@@ -252,38 +252,66 @@ test("the implementation epic link shows only at Branch and Done, once the epic 
   expect(within(screen.getByRole("region", { name: "Chat" })).getByRole("link", { name: /Open implementation epic/ })).toBeTruthy();
 });
 
-test("on a phone Progress is a segment bar and a line that expands on tap", async () => {
+const onPhone = async (body: () => Promise<void>) => {
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   try {
+    await body();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+};
+const sheet = () => screen.queryByRole("dialog", { name: "Design progress steps" });
+
+test("on a phone the step line sits under the name and opens the steps sheet", () =>
+  onPhone(async () => {
     const rows = [ticketRow("02", "Done one", { rendered_status: "done" }), ticketRow("03", "Chat content", { current: true }), ticketRow("04", "Last")];
-    render([map("a")], [], "/d/gx:a", detailOf({ rows, impl_address: "gx:a-impl" }));
-    const p = await progress();
-    expect(await p.findByRole("progressbar", { name: "Design progress" })).toBeTruthy();
-    const line = p.getByRole("button", { name: /^Resolve tickets · 03 Chat content \(2 of 3\)/ });
-    expect(p.queryByText("Grill findings")).toBeNull();
-    expect(p.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
+    render([map("a")], [], "/d/gx:a", detailOf({ rows, impl_address: "gx:a-impl", ring_progress: 40 }));
+    const line = await screen.findByRole("button", { name: /^Resolve tickets · 03 Chat content \(2 of 3\)/ });
+    expect(screen.getByRole("heading", { level: 1 }).compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Progress" })).toBeNull();
+    expect(sheet()).toBeNull();
     fireEvent.click(line);
-    const modal = within(screen.getByRole("dialog", { name: "Design progress steps" }));
+    const modal = within(sheet() as HTMLElement);
+    expect(modal.getByText("Progress · 40%")).toBeTruthy();
     expect(modal.getByText("Grill findings")).toBeTruthy();
     expect(modal.getByText("Chat content")).toBeTruthy();
-  } finally {
-    vi.unstubAllGlobals();
-  }
-});
+  }));
 
-test("Escape closes the phone steps modal", async () => {
-  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
-  try {
+test("on a phone the header ring opens the same sheet", () =>
+  onPhone(async () => {
+    render([map("a")], [], "/d/gx:a", detailOf({ ring_progress: 40 }));
+    fireEvent.click(await screen.findByRole("button", { name: "Show progress steps" }));
+    expect(within(sheet() as HTMLElement).getByText("Progress · 40%")).toBeTruthy();
+  }));
+
+test.each([
+  ["Close", () => fireEvent.click(screen.getByRole("button", { name: "Close" }))],
+  ["Escape", () => fireEvent.keyDown(document.body, { key: "Escape" })],
+  [
+    "a backdrop press",
+    () => {
+      const backdrop = (sheet() as HTMLElement).parentElement as HTMLElement;
+      fireEvent.mouseDown(backdrop);
+      fireEvent.click(backdrop);
+    },
+  ],
+])("%s closes the phone steps sheet", (_n, close) =>
+  onPhone(async () => {
     render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(1) }));
-    const p = await progress();
-    fireEvent.click(await p.findByRole("button", { name: /^Resolve tickets/ }));
-    expect(screen.getByRole("dialog", { name: "Design progress steps" })).toBeTruthy();
-    fireEvent.keyDown(document.body, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "Design progress steps" })).toBeNull();
-  } finally {
-    vi.unstubAllGlobals();
-  }
-});
+    fireEvent.click(await screen.findByRole("button", { name: /^Resolve tickets/ }));
+    expect(sheet()).toBeTruthy();
+    close();
+    expect(sheet()).toBeNull();
+  }),
+);
+
+test("on a phone the implementation epic link sits in the Chat region at Branch", () =>
+  onPhone(async () => {
+    render([map("a")], [], "/d/gx:a", detailOf({ steps: stepsAt(6), impl_address: "gx:a-impl" }));
+    const link = await screen.findByRole("link", { name: /Open implementation epic/ });
+    expect(within(screen.getByRole("region", { name: "Chat" })).getByRole("link", { name: /Open implementation epic/ })).toBe(link);
+  }));
 
 const deletable = detailOf({ deletable: true });
 

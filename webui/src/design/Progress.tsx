@@ -1,12 +1,11 @@
-import { Box, Link, Text } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
+import { Box, Link, Text, chakra } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 import type { EpicDetail } from "../epic/detail";
 import { idOf, isCancelled, isFolded } from "../epic/rows";
 import type { EpicDetailRow, MapStep } from "../generated/server";
 import { epicHref, ticketHref } from "../hrefs";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
-import { SegmentedBar, type Segment } from "../ui/progress-bar/SegmentedBar";
 import type { Tone } from "../ui/tone";
 
 // The generated file is imported for types only: its tygo constants are not runtime values.
@@ -116,37 +115,66 @@ function summaryLine(steps: MapStep[], rows: EpicDetailRow[]): string {
   return `${step.label} · ${idOf(rows[at].address)} ${rows[at].title} (${at + 1} of ${rows.length})`;
 }
 
-function MobileProgress({ detail, steps }: { detail: EpicDetail; steps: MapStep[] }) {
-  const [open, setOpen] = useState(false);
-  const segments: Segment[] = steps.map((s) => ({ key: s.step, tone: markOf(s).tone, count: 1 }));
+/** The phone's step line under the Design name; it and the header ring open the steps sheet. */
+export function StepLine({ detail, onOpen }: { detail: EpicDetail; onOpen: () => void }) {
   return (
-    <Box display="flex" flexDirection="column" gap="2">
-      <SegmentedBar segments={segments} value={steps.filter((s) => s.state === "done").length} label="Design progress" />
-      <Button emphasis="ghost" tone="muted" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        {summaryLine(steps, detail.rows)} {open ? "▴" : "▾"}
-      </Button>
-      {open && (
-        <Modal label="Design progress steps" onClose={() => setOpen(false)} overflow="auto">
-          <Steps steps={steps} rows={detail.rows} />
-          <Button emphasis="ghost" onClick={() => setOpen(false)}>
-            Close
-          </Button>
-        </Modal>
-      )}
-      {showsImplLink(detail) && <ImplLink address={detail.impl_address!} />}
-    </Box>
+    <chakra.button
+      type="button"
+      aria-haspopup="dialog"
+      onClick={onOpen}
+      display="flex"
+      gap="1"
+      maxW="full"
+      fontSize="sm"
+      color="text.muted"
+      cursor="pointer"
+      textAlign="left"
+    >
+      <Text as="span" truncate>
+        {summaryLine(detail.steps ?? [], detail.rows)}
+      </Text>
+      <Text as="span" aria-hidden flexShrink="0">
+        ▾
+      </Text>
+    </chakra.button>
   );
 }
 
-/** The Design's Progress: its eight steps, and the map's tickets under Resolve tickets. On desktop the impl link sits in the chat header. */
-export function Progress({ detail, wide }: { detail: EpicDetail; wide: boolean }) {
-  const steps = detail.steps ?? [];
-  // On desktop a panel like the Designs sidebar, only as tall as its steps.
-  return wide ? (
+/** The phone's bottom sheet with the step tree. `ring` is a small ProgressRing. */
+export function StepsSheet({ detail, ring, onClose }: { detail: EpicDetail; ring: ReactNode; onClose: () => void }) {
+  return (
+    <Modal
+      label="Design progress steps"
+      onClose={onClose}
+      backdrop={{ alignItems: "flex-end", p: "0" }}
+      bg="surface.raised"
+      borderTopRadius="xl"
+      borderBottomRadius="0"
+      w="full"
+      maxH="80%"
+      overflow="auto"
+    >
+      <Box aria-hidden data-testid="grab-handle" alignSelf="center" w="36px" h="4px" borderRadius="full" bg="border" flexShrink="0" />
+      <Box display="flex" alignItems="center" gap="2">
+        {ring}
+        <Text fontWeight="700" flex="1">
+          Progress · {detail.ring_progress ?? 0}%
+        </Text>
+        <Button emphasis="ghost" tone="muted" onClick={onClose}>
+          Close
+        </Button>
+      </Box>
+      <Steps steps={detail.steps ?? []} rows={detail.rows} />
+    </Modal>
+  );
+}
+
+/** The desktop Progress sidebar: the Design's eight steps, and the map's tickets under Resolve tickets. */
+export function Progress({ detail }: { detail: EpicDetail }) {
+  // A panel like the Designs sidebar, only as tall as its steps.
+  return (
     <Box bg="surface.raised" px="3" py="4">
-      <Steps steps={steps} rows={detail.rows} />
+      <Steps steps={detail.steps ?? []} rows={detail.rows} />
     </Box>
-  ) : (
-    <MobileProgress detail={detail} steps={steps} />
   );
 }
