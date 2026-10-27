@@ -1,6 +1,7 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react";
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Button } from "../ui/button/Button";
+import { Modal } from "../ui/modal/Modal";
 import { postOpenDesign, type OpenDesign } from "./open";
 import { useDesignWrite } from "./SessionControls";
 import { useVisualViewportHeight } from "./useVisualViewportHeight";
@@ -78,8 +79,6 @@ export function NewDesignForm({
   const [confirming, setConfirming] = useState(false);
   const { run, pending } = useDesignWrite();
   const sheet = useRef<HTMLDivElement>(null);
-  // A drag that starts in the sheet and ends on the backdrop fires a click there; only a press on the backdrop closes.
-  const pressedBackdrop = useRef(false);
 
   const patch = (p: Partial<typeof draft>) => {
     const next = { ...draft, ...p };
@@ -107,10 +106,7 @@ export function NewDesignForm({
   };
 
   const keyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      onClose();
-    } else if (e.key === "Tab") {
+    if (e.key === "Tab") {
       const items = [...(sheet.current?.querySelectorAll<HTMLElement>("input, textarea, select, button:not(:disabled)") ?? [])];
       const [first, last] = [items[0], items[items.length - 1]];
       if (e.shiftKey && document.activeElement === first) (e.preventDefault(), last?.focus());
@@ -119,142 +115,124 @@ export function NewDesignForm({
   };
 
   return (
-    <Box
-      position="fixed"
-      {...(sheetMode ? viewport.overlay : { inset: "0" })}
-      zIndex="modal"
-      bg="overlay"
-      display="flex"
-      alignItems={sheetMode ? "flex-end" : "center"}
-      justifyContent="center"
-      p={sheetMode ? "0" : "4"}
-      onMouseDown={(e) => (pressedBackdrop.current = e.target === e.currentTarget)}
-      onClick={(e) => pressedBackdrop.current && e.target === e.currentTarget && onClose()}
+    <Modal
+      label="New Design"
+      onClose={onClose}
+      backdrop={sheetMode ? { inset: undefined, ...viewport.overlay, alignItems: "flex-end", p: "0" } : undefined}
+      ref={sheet}
+      as="form"
+      onSubmit={submit}
+      onKeyDown={keyDown}
+      bg="surface.raised"
+      borderTopRadius={sheetMode ? "xl" : "lg"}
+      borderBottomRadius={sheetMode ? "0" : "lg"}
+      w={sheetMode ? "full" : "720px"}
+      h={sheetMode ? viewport.sheetHeight : "520px"}
+      p="0"
+      gap="0"
+      overflow="hidden"
     >
-      <Box
-        ref={sheet}
-        as="form"
-        role="dialog"
-        aria-modal="true"
-        aria-label="New Design"
-        onSubmit={submit}
-        onKeyDown={keyDown}
-        onClick={(e) => e.stopPropagation()}
-        bg="surface.raised"
-        borderWidth="1px"
-        borderColor="border"
-        borderTopRadius={sheetMode ? "xl" : "lg"}
-        borderBottomRadius={sheetMode ? "0" : "lg"}
-        w={sheetMode ? "full" : "720px"}
-        h={sheetMode ? viewport.sheetHeight : "520px"}
-        maxW="full"
-        maxH="full"
-        display="flex"
-        flexDirection="column"
-        overflow="hidden"
-      >
-        {sheetMode && <Box aria-hidden data-testid="grab-handle" alignSelf="center" w="36px" h="4px" mt="2" borderRadius="full" bg="border" flexShrink="0" />}
-        <Box display="flex" alignItems="center" gap="2" p="3" borderBottomWidth="1px" borderColor="border" flexShrink="0">
-          {projects.length > 1 && (
-            <>
-              <chakra.select
-                aria-label="Project"
-                value={draft.project}
-                onChange={(e) => patch({ project: e.target.value })}
-                fontSize="16px"
-                h="40px"
-                px="3"
-                borderRadius="8px"
-                bg="tone.running.bg"
-                color="tone.running.fg"
-                fontWeight="600"
-              >
-                {projects.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </chakra.select>
-              <Text color="text.dim" fontSize="lg">
-                /
-              </Text>
-            </>
-          )}
-          <chakra.input
-            aria-label="Epic slug"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            autoFocus
-            {...field}
-            flex="1"
-            minW="0"
-            h="40px"
-            px="3"
-            fontWeight="600"
-            placeholder="my-epic"
-            value={draft.slug}
-            onChange={(e) => patch({ slug: e.target.value })}
-          />
-          <chakra.button
-            type="button"
-            aria-label="Close"
-            title="Close (keeps the draft)"
-            onClick={onClose}
-            color="text.dim"
-            fontSize="xl"
-            lineHeight="1"
-            w="36px"
-            h="36px"
-            flexShrink="0"
-            borderRadius="8px"
-            _hover={{ bg: "surface", color: "text" }}
-          >
-            ×
-          </chakra.button>
-        </Box>
-        <chakra.textarea
-          aria-label="Rough idea"
+      {sheetMode && <Box aria-hidden data-testid="grab-handle" alignSelf="center" w="36px" h="4px" mt="2" borderRadius="full" bg="border" flexShrink="0" />}
+      <Box display="flex" alignItems="center" gap="2" p="3" borderBottomWidth="1px" borderColor="border" flexShrink="0">
+        {projects.length > 1 && (
+          <>
+            <chakra.select
+              aria-label="Project"
+              value={draft.project}
+              onChange={(e) => patch({ project: e.target.value })}
+              fontSize="16px"
+              h="40px"
+              px="3"
+              borderRadius="8px"
+              bg="tone.running.bg"
+              color="tone.running.fg"
+              fontWeight="600"
+            >
+              {projects.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </chakra.select>
+            <Text color="text.dim" fontSize="lg">
+              /
+            </Text>
+          </>
+        )}
+        <chakra.input
+          aria-label="Epic slug"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          autoFocus
           {...field}
           flex="1"
-          minH="0"
-          m="3"
-          resize="none"
-          px="4"
-          py="3"
-          lineHeight="1.6"
-          placeholder="What is the problem? Who hits it? What does done look like?"
-          value={draft.idea}
-          onChange={(e) => patch({ idea: e.target.value })}
+          minW="0"
+          h="40px"
+          px="3"
+          fontWeight="600"
+          placeholder="my-epic"
+          value={draft.slug}
+          onChange={(e) => patch({ slug: e.target.value })}
         />
-        <Box display="flex" alignItems="center" gap="2" p="3" borderTopWidth="1px" borderColor="border" bg="surface" flexShrink="0">
-          {confirming ? (
-            <>
-              <Text flex="1" fontSize="sm" color="tone.paused.fg" fontWeight="600">
-                Discard this draft?
-              </Text>
-              <Button type="button" emphasis="ghost" tone="muted" onClick={() => setConfirming(false)}>
-                Keep
-              </Button>
-              <Button type="button" tone="paused" onClick={discard}>
-                Discard
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button type="button" emphasis="ghost" tone="muted" flex={sheetMode ? "1" : undefined} onClick={() => (hasText(draft) ? setConfirming(true) : discard())}>
-                Discard
-              </Button>
-              {!sheetMode && <Box flex="1" />}
-              <Button type="submit" tone="running" flex={sheetMode ? "2" : undefined} disabled={pending}>
-                {pending && <Spinner size="sm" />}
-                Start design
-              </Button>
-            </>
-          )}
-        </Box>
+        <chakra.button
+          type="button"
+          aria-label="Close"
+          title="Close (keeps the draft)"
+          onClick={onClose}
+          color="text.dim"
+          fontSize="xl"
+          lineHeight="1"
+          w="36px"
+          h="36px"
+          flexShrink="0"
+          borderRadius="8px"
+          _hover={{ bg: "surface", color: "text" }}
+        >
+          ×
+        </chakra.button>
       </Box>
-    </Box>
+      <chakra.textarea
+        aria-label="Rough idea"
+        {...field}
+        flex="1"
+        minH="0"
+        m="3"
+        resize="none"
+        px="4"
+        py="3"
+        lineHeight="1.6"
+        placeholder="What is the problem? Who hits it? What does done look like?"
+        value={draft.idea}
+        onChange={(e) => patch({ idea: e.target.value })}
+      />
+      <Box display="flex" alignItems="center" gap="2" p="3" borderTopWidth="1px" borderColor="border" bg="surface" flexShrink="0">
+        {confirming ? (
+          <>
+            <Text flex="1" fontSize="sm" color="tone.paused.fg" fontWeight="600">
+              Discard this draft?
+            </Text>
+            <Button type="button" emphasis="ghost" tone="muted" onClick={() => setConfirming(false)}>
+              Keep
+            </Button>
+            <Button type="button" tone="paused" onClick={discard}>
+              Discard
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button type="button" emphasis="ghost" tone="muted" flex={sheetMode ? "1" : undefined} onClick={() => (hasText(draft) ? setConfirming(true) : discard())}>
+              Discard
+            </Button>
+            {!sheetMode && <Box flex="1" />}
+            <Button type="submit" tone="running" flex={sheetMode ? "2" : undefined} disabled={pending}>
+              {pending && <Spinner size="sm" />}
+              Start design
+            </Button>
+          </>
+        )}
+      </Box>
+    </Modal>
   );
 }

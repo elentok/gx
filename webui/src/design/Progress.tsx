@@ -1,10 +1,11 @@
 import { Box, Link, Text } from "@chakra-ui/react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { EpicDetail } from "../epic/detail";
 import { idOf, isCancelled, isFolded } from "../epic/rows";
 import type { EpicDetailRow, MapStep } from "../generated/server";
 import { epicHref, ticketHref } from "../hrefs";
 import { Button } from "../ui/button/Button";
+import { Modal } from "../ui/modal/Modal";
 import { SegmentedBar, type Segment } from "../ui/progress-bar/SegmentedBar";
 import type { Tone } from "../ui/tone";
 
@@ -118,12 +119,6 @@ function summaryLine(steps: MapStep[], rows: EpicDetailRow[]): string {
 function MobileProgress({ detail, steps }: { detail: EpicDetail; steps: MapStep[] }) {
   const [open, setOpen] = useState(false);
   const segments: Segment[] = steps.map((s) => ({ key: s.step, tone: markOf(s).tone, count: 1 }));
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
   return (
     <Box display="flex" flexDirection="column" gap="2">
       <SegmentedBar segments={segments} value={steps.filter((s) => s.state === "done").length} label="Design progress" />
@@ -131,30 +126,12 @@ function MobileProgress({ detail, steps }: { detail: EpicDetail; steps: MapStep[
         {summaryLine(steps, detail.rows)} {open ? "▴" : "▾"}
       </Button>
       {open && (
-        <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4" onClick={() => setOpen(false)}>
-          <Box
-            role="dialog"
-            aria-modal="true"
-            aria-label="Design progress steps"
-            bg="surface"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="md"
-            p="3"
-            maxW="full"
-            maxH="full"
-            overflow="auto"
-            display="flex"
-            flexDirection="column"
-            gap="2"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Steps steps={steps} rows={detail.rows} />
-            <Button emphasis="ghost" onClick={() => setOpen(false)}>
-              Close
-            </Button>
-          </Box>
-        </Box>
+        <Modal label="Design progress steps" onClose={() => setOpen(false)} overflow="auto">
+          <Steps steps={steps} rows={detail.rows} />
+          <Button emphasis="ghost" onClick={() => setOpen(false)}>
+            Close
+          </Button>
+        </Modal>
       )}
       {showsImplLink(detail) && <ImplLink address={detail.impl_address!} />}
     </Box>
