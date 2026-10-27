@@ -86,10 +86,10 @@ test.describe("65. Design actions menu", () => {
     const shown = menu.getByRole("menuitem", { name: /^design-epic/ });
     await expect(shown).toHaveAttribute("aria-current", "true");
     await expect(shown).toContainText("✓");
-    await expect(menu.getByRole("button", nav("Stop design-epic"))).toHaveCount(0);
+    await expect(menu.getByRole("menuitem", nav("Stop design-epic"))).toHaveCount(0);
     const other = menu.getByRole("menuitem", { name: /^Claude Code/ });
     await expect(other).toHaveAttribute("aria-current", "false");
-    await expect(menu.getByRole("button", nav("Stop Claude Code"))).toBeVisible();
+    await expect(menu.getByRole("menuitem", nav("Stop Claude Code"))).toBeVisible();
 
     // Picking the other row shows it: it has no round, so the Questions sheet goes.
     await other.click();
@@ -99,7 +99,7 @@ test.describe("65. Design actions menu", () => {
     await expect(menu.getByRole("menuitem", { name: /^Claude Code/ })).toHaveAttribute("aria-current", "true");
     const before = await sessionRows(fixture, "design-epic");
     expect(before.filter((r) => /exited/.test(r))).toHaveLength(0);
-    await menu.getByRole("button", nav("Stop design-epic")).click();
+    await menu.getByRole("menuitem", nav("Stop design-epic")).click();
     await expect
       .poll(async () => (await sessionRows(fixture, "design-epic")).filter((r) => /exited/.test(r)).length)
       .toBe(1);
