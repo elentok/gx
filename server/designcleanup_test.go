@@ -19,6 +19,11 @@ func (f designsFixture) openDesignWorktree(t *testing.T, commit bool) (dir, id s
 		t.Fatalf("open = %+v", res)
 	}
 	dir, _ = readMeta(t, f.h, res.Session.ID)["dir"].(string)
+	// The open's stamp write is rescanned after a debounce; a rescan that lands
+	// after the test moves the step would take the new step as its baseline.
+	if err := f.h.Client.TicketChanged(f.ctx, "proj:map"); err != nil {
+		t.Fatal(err)
+	}
 	if commit {
 		if err := os.WriteFile(filepath.Join(dir, "design.md"), []byte("design\n"), 0o644); err != nil {
 			t.Fatal(err)

@@ -95,26 +95,31 @@ func (s *Server) reportSessionStep(req ReportStepRequest) (SessionResult, error)
 // stampDesignStart records the first design session on the map epic behind
 // address. The stamp is write-once, so every later session leaves it.
 func (s *Server) stampDesignStart(address string, now time.Time) error {
-	project, rest, _ := strings.Cut(address, ":")
-	epic, _, _ := strings.Cut(rest, "/")
-	dir, err := s.projectDir(project)
-	if err != nil {
+	epicDir, ok, err := s.epicDir(address)
+	if err != nil || !ok {
 		return err
 	}
-	return tickets.StampEpicDesignStarted(filepath.Join(dir, epic), now)
+	return tickets.StampEpicDesignStarted(epicDir, now)
+}
+
+// epicDir resolves address ("project:epic" or "project:epic/NN") to its epic
+// directory; ok is false when the address names no epic.
+func (s *Server) epicDir(address string) (dir string, ok bool, err error) {
+	project, rest, found := strings.Cut(address, ":")
+	epic, _, _ := strings.Cut(rest, "/")
+	if !found || epic == "" {
+		return "", false, nil
+	}
+	projectDir, err := s.projectDir(project)
+	if err != nil {
+		return "", false, err
+	}
+	return filepath.Join(projectDir, epic), true, nil
 }
 
 // onMapEpic reports whether address ("project:epic" or "project:epic/NN")
 // is on a map epic; an unknown project or epic is not.
 func (s *Server) onMapEpic(address string) bool {
-	project, rest, ok := strings.Cut(address, ":")
-	epic, _, _ := strings.Cut(rest, "/")
-	if !ok || epic == "" {
-		return false
-	}
-	dir, err := s.projectDir(project)
-	if err != nil {
-		return false
-	}
-	return tickets.IsMapEpic(filepath.Join(dir, epic))
+	dir, ok, err := s.epicDir(address)
+	return err == nil && ok && tickets.IsMapEpic(dir)
 }

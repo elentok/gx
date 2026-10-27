@@ -12,6 +12,13 @@ test("23. Phone, Epics page", async ({ page, start }) => {
   expect(second!.x).toBe(first!.x);
   expect(second!.y).toBeGreaterThan(first!.y);
 
+  // The card's time label stays on one line.
+  const time = card(page, "paused-epic").getByTestId("time");
+  await expect(time).toBeVisible();
+  const timeBox = await time.boundingBox();
+  const timeLineHeight = await time.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+  expect(timeBox!.height).toBeLessThanOrEqual(timeLineHeight * 1.5);
+
   // The back link stays on one line with the short or the full count.
   await page.evaluate(() => (location.hash = "#/d/demo:design-live"));
   const back = page.getByRole("link", { name: /^← Epics · 9 more/ });

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 func (f designsFixture) openNew(t *testing.T, slug, idea string) server.SessionResult {
@@ -99,6 +100,23 @@ func TestDesignsOpenNew_StampsTheDesignStart(t *testing.T) {
 	}
 	if designStartedAt(t, f.mapPath("fresh-idea")) == "" {
 		t.Error("New Design wrote no design_started_at")
+	}
+}
+
+func TestCreateSession_RefusedNameLeavesNoDesignStamp(t *testing.T) {
+	f := startDesigns(t)
+	req := func(ticket string) server.CreateSessionRequest {
+		return server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: "taken", UniqueName: true, Ticket: ticket, Harness: string(agentfake.HarnessKind)}
+	}
+	if res, err := f.h.Client.CreateSession(f.ctx, req("proj:plain")); err != nil || res.Session == nil {
+		t.Fatalf("holder = %+v, %v", res, err)
+	}
+	res, err := f.h.Client.CreateSession(f.ctx, req("proj:map"))
+	if err != nil || !res.Refused || res.Reason != server.ReasonSessionNameTaken {
+		t.Fatalf("second = %+v, %v; want %s", res, err, server.ReasonSessionNameTaken)
+	}
+	if got := designStartedAt(t, f.mapPath("map")); got != "" {
+		t.Errorf("a refused session left %q", got)
 	}
 }
 

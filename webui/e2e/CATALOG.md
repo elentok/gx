@@ -293,6 +293,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Scenario:** `united`, at 375 px wide (`test.use({ viewport })`)
 - **Pass:**
   - Two cards of Needs you share a left edge and the second sits below the first.
+  - A card's `time` element is no taller than 1.5 line heights.
   - On `#/d/demo:design-live` the back link reads "← Epics · 9 more" (or the full text) on one line.
 
 ## 41. Phone, New Design sheet

@@ -168,17 +168,18 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		ConversationID: conv,
 		CreatedAt:      time.Now(),
 	}
-	if meta.Design && meta.Ticket != "" {
-		if err := s.stampDesignStart(meta.Ticket, meta.CreatedAt); err != nil {
-			return SessionResult{}, err
-		}
-	}
 	dir, err := s.saveNewSession(&meta, req.UniqueName)
 	if errors.Is(err, errSessionNameTaken) {
 		return sessionRefusal(ReasonSessionNameTaken, fmt.Sprintf("a live session is already named %q", meta.Name)), nil
 	}
 	if err != nil {
 		return SessionResult{}, err
+	}
+	if meta.Design && meta.Ticket != "" {
+		// Cosmetic: a failed stamp must not fail the session.
+		if err := s.stampDesignStart(meta.Ticket, meta.CreatedAt); err != nil {
+			s.log.Warn("stamp design start", "session", meta.ID, "ticket", meta.Ticket, "err", err)
+		}
 	}
 	id := meta.ID
 	s.recordConversation(meta)
