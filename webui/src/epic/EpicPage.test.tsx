@@ -246,6 +246,14 @@ test("done and cancelled card titles are 14px", async () => {
   }
 });
 
+test("card titles wrap instead of ending in an ellipsis", async () => {
+  live([doneTk("01", 1)]);
+  const title = (await cardOf("01")).querySelector("[data-title]") as HTMLElement;
+  const style = getComputedStyle(title);
+  expect(style.whiteSpace).not.toBe("nowrap");
+  expect(style.textOverflow).not.toBe("ellipsis");
+});
+
 test.each([
   ["phone", true],
   ["wide", false],

@@ -191,9 +191,7 @@ function Line({
           fontWeight={bold ? 500 : undefined}
           minW="0"
           flex="1 1 0"
-          overflow="hidden"
-          textOverflow="ellipsis"
-          whiteSpace="nowrap"
+          overflowWrap="anywhere"
         >
           {title}
         </Text>
