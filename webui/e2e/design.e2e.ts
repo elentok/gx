@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, holdRoute, nav, section, test, type Fixture } from "./fixture";
+import { card, expect, holdRoute, nav, section, sessionRows, test, type Fixture } from "./fixture";
 
 // The card's title opens the epic page, whose Start button starts the session and moves on.
 // The Design page before the start is reached by its route.
@@ -530,9 +530,6 @@ const startDesign = async (page: Page, slug: string) => {
   await dialog.getByRole("button", nav("Start design")).click();
   await expect(page).toHaveURL(new RegExp(`#/d/demo:${slug}$`));
 };
-
-const sessionRows = async (fixture: Fixture, slug: string) =>
-  (await fixture.cli("agents", "list")).split("\n").filter((l) => l.includes(slug));
 
 // Stops the session of `slug` through the CLI; its row is found by slug in `gx agents list`.
 const stopSession = async (fixture: Fixture, slug: string) => {

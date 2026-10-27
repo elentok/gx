@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { card, expect, nav, test } from "./fixture";
+import { card, expect, nav, sessionRows, test } from "./fixture";
 
 const openDesign = async (page: Page) => {
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
@@ -50,5 +50,86 @@ test.describe("64. Design ring", () => {
     await page.getByRole("button", nav("Start design session")).click();
     await expect(ring(page)).toHaveAttribute("data-tone", "running");
     await expect(page.getByTestId("comet")).toBeVisible();
+  });
+});
+
+const moreActions = (page: Page) => page.getByRole("button", nav("More actions"));
+const actionsMenu = (page: Page) => page.getByRole("menu", nav("More actions"));
+
+test.describe("65. Design actions menu", () => {
+  test("one live session: New session lives in the menu only", async ({ page, start }) => {
+    await start("design");
+    await expect(card(page, "design-epic")).toBeVisible();
+    await openDesign(page);
+    await expect(moreActions(page)).toHaveCount(0);
+
+    await page.getByRole("button", nav("Start design session")).click();
+    await expect(page.getByRole("group", nav("Questions"))).toBeVisible();
+    await expect(page.getByRole("button", { name: /^New session/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /\d+ live/ })).toHaveCount(0);
+
+    await moreActions(page).click();
+    const item = actionsMenu(page).getByRole("menuitem", { name: /^New session/ });
+    await expect(item).toHaveAccessibleName("New session Stop this session and start a fresh one");
+    await expect(actionsMenu(page).getByText(/^Live sessions/)).toHaveCount(0);
+  });
+
+  test("two live sessions: the list shows the shown one, switches and stops", async ({ page, start }) => {
+    const fixture = await start("design-two-live");
+    await expect(card(page, "design-epic")).toBeVisible();
+    await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
+    await expect(page.getByRole("group", nav("Questions"))).toBeVisible();
+
+    await moreActions(page).click();
+    const menu = actionsMenu(page);
+    await expect(menu.getByText("Live sessions · 2")).toBeVisible();
+    const shown = menu.getByRole("menuitem", { name: /^design-epic/ });
+    await expect(shown).toHaveAttribute("aria-current", "true");
+    await expect(shown).toContainText("✓");
+    await expect(menu.getByRole("button", nav("Stop design-epic"))).toHaveCount(0);
+    const other = menu.getByRole("menuitem", { name: /^Claude Code/ });
+    await expect(other).toHaveAttribute("aria-current", "false");
+    await expect(menu.getByRole("button", nav("Stop Claude Code"))).toBeVisible();
+
+    // Picking the other row shows it: it has no round, so the Questions sheet goes.
+    await other.click();
+    await expect(page.getByRole("group", nav("Questions"))).toHaveCount(0);
+
+    await moreActions(page).click();
+    await expect(menu.getByRole("menuitem", { name: /^Claude Code/ })).toHaveAttribute("aria-current", "true");
+    const before = await sessionRows(fixture, "design-epic");
+    expect(before.filter((r) => /exited/.test(r))).toHaveLength(0);
+    await menu.getByRole("button", nav("Stop design-epic")).click();
+    await expect
+      .poll(async () => (await sessionRows(fixture, "design-epic")).filter((r) => /exited/.test(r)).length)
+      .toBe(1);
+  });
+
+  test("390px: the menu is a bottom sheet with a grab handle", async ({ page, start }) => {
+    await start("design-two-live");
+    await page.setViewportSize({ width: 375, height: 800 });
+    await expect(card(page, "design-epic")).toBeVisible();
+    await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
+    await moreActions(page).click();
+    const menu = actionsMenu(page);
+    await expect(menu.getByTestId("grab-handle")).toBeVisible();
+    const box = (await menu.boundingBox())!;
+    expect(box.width).toBe(375);
+    expect(box.y + box.height).toBeGreaterThan(780);
+  });
+
+  test("1440px: the menu is a popover under ⋯", async ({ page, start }) => {
+    await start("design-two-live");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(card(page, "design-epic")).toBeVisible();
+    await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
+    const trigger = (await moreActions(page).boundingBox())!;
+    await moreActions(page).click();
+    await expect(actionsMenu(page).getByTestId("grab-handle")).toHaveCount(0);
+    // The positioner places the popover after it mounts, so wait for it to leave the origin.
+    await expect.poll(async () => (await actionsMenu(page).boundingBox())!.y).toBeGreaterThanOrEqual(trigger.y + trigger.height);
+    const box = (await actionsMenu(page).boundingBox())!;
+    expect(box.x).toBeLessThan(trigger.x + trigger.width);
+    expect(box.x + box.width).toBeGreaterThan(trigger.x);
   });
 });

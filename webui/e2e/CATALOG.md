@@ -12,7 +12,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flow 64).
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 64, 65).
 
 ## 1. Queue an epic
 
@@ -710,3 +710,21 @@ an exited session.
   - The ring label equals the Epic page's. Before Start `data-tone` is `muted`.
   - With round one up it is `waiting` and no comet shows. With the step at Done it is `done`.
   - On `design-working` after Start it is `running` and the comet shows.
+
+## 65. Design actions menu
+
+- **Scenario:** `design` (one live session), `design-two-live`
+- **Steps:**
+  1. On `design` open `#/d/demo:design-epic`, then click Start design session and open "More actions".
+  2. On `design-two-live` open the menu, pick the "Claude Code" row, reopen it and click Stop on "design-epic".
+  3. On `design-two-live` open the menu at 375px and at 1440px.
+- **Pass:**
+  - Before Start there is no "More actions" button. After Start no "New session" or "N live" button
+    sits outside the menu. "New session" reads "Stop this session and start a fresh one" and there is
+    no "Live sessions" heading.
+  - With two sessions the menu shows "Live sessions · 2", a ✓ and `aria-current` on the shown row,
+    and Stop only on the other. Picking the other row hides the Questions sheet (that session has no
+    round). Stop makes `gx agents list` show one exited session.
+  - At 375px the menu is a full-width bottom sheet with a grab handle. At 1440px it is a popover
+    with no grab handle: its top is below the ⋯ button's bottom and it overlaps ⋯ horizontally.
+- **Note:** the menu's role name is "More actions" (the trigger's name), not "Design actions".

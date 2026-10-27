@@ -109,6 +109,10 @@ export const test = base.extend<{
 /** Matches a role's accessible name exactly. */
 export const nav = (name: string) => ({ name, exact: true });
 
+/** The `gx agents list` rows that mention `slug` (tab-separated, the session id first). */
+export const sessionRows = async (fixture: Fixture, slug: string) =>
+  (await fixture.cli("agents", "list")).split("\n").filter((l) => l.includes(slug));
+
 /** A section of the Epics page, expanded if it starts collapsed. */
 export async function section(page: Page, title: string) {
   const region = page.getByRole("region", { name: new RegExp(`^${title}`) });
