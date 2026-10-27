@@ -2,17 +2,20 @@ import { createSystem, defaultConfig, defineConfig, type SystemStyleObject } fro
 import { KINDS, TONES, type Kind, type Tone } from "./tone";
 
 // The only file allowed to hold raw colors and font names; see raw-style.test.ts.
-const toneColors: Record<Tone, { fg: string; bg: string }> = {
+const toneColors: Record<Tone, { fg: string; bg: string; text?: string }> = {
   running: { fg: "#6cb4ff", bg: "rgba(108, 180, 255, 0.16)" },
   waiting: { fg: "#f2b845", bg: "rgba(242, 184, 69, 0.16)" },
-  paused: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)" },
+  paused: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)", text: "#ffb3ad" },
   deadlocked: { fg: "#ff7066", bg: "rgba(255, 112, 102, 0.16)" },
   done: { fg: "#55d996", bg: "rgba(85, 217, 150, 0.16)" },
   muted: { fg: "#b4bcc8", bg: "rgba(180, 188, 200, 0.14)" },
 };
 
 const toneTokens = Object.fromEntries(
-  TONES.map((t) => [t, { fg: { value: toneColors[t].fg }, bg: { value: toneColors[t].bg } }]),
+  TONES.map((t) => {
+    const { fg, bg, text } = toneColors[t];
+    return [t, { fg: { value: fg }, bg: { value: bg }, ...(text && { text: { value: text } }) }];
+  }),
 );
 
 const kindColors: Record<Kind, { fg: string; bg: string }> = {
@@ -56,7 +59,7 @@ export const themeConfig = defineConfig({
       colors: {
         surface: { DEFAULT: { value: "#0a0d11" }, raised: { value: "#141920" } },
         overlay: { value: "rgba(0, 0, 0, 0.7)" },
-        hairline: { value: "#252c36" },
+        hairline: { DEFAULT: { value: "#252c36" }, folded: { value: "#1d232c" } },
         text: {
           DEFAULT: { value: "#ffffff" },
           muted: { value: "#c9d0da" },

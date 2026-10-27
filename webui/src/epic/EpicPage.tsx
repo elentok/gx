@@ -219,14 +219,14 @@ function LandBlockNotice({
         width="16"
         height="16"
         fill="none"
-        stroke="#ff7066"
+        stroke="var(--chakra-colors-tone-paused-fg)"
         strokeWidth="1.5"
         style={{ flexShrink: 0, marginTop: 3 }}
       >
         <circle cx="8" cy="8" r="6.5" />
         <path d="M8 7.2v4M8 4.8v.1" strokeLinecap="round" />
       </svg>
-      <Box flex="1" fontSize="14px" lineHeight="1.5" color="#ffb3ad">
+      <Box flex="1" fontSize="14px" lineHeight="1.5" color="tone.paused.text">
         <Text data-reason>{`Can't merge: ${reason}`}</Text>
         {dirty && (detail.land_block_files?.length ?? 0) > 0 && (
           <Box as="ul" data-testid="land-block-files" pl="5" fontFamily="mono">

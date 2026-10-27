@@ -17,7 +17,7 @@ import {
   toneOf,
 } from "./rows";
 
-const RUNNING_BLUE = "#6cb4ff";
+const toneVar = (tone: string) => `var(--chakra-colors-tone-${tone}-fg)`;
 
 // A 30% arc on a faint track, spinning.
 function Spinner() {
@@ -46,7 +46,7 @@ function Spinner() {
         cy="5"
         r="4"
         fill="none"
-        stroke={RUNNING_BLUE}
+        stroke={toneVar("running")}
         strokeWidth="2"
         strokeLinecap="round"
         strokeDasharray="7.54 25.13"
@@ -70,7 +70,7 @@ function Check() {
       <path
         d="M2 6.5l2.7 2.7L10 3.3"
         fill="none"
-        stroke="#55d996"
+        stroke={toneVar("done")}
         strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -112,7 +112,7 @@ function Dot({ row }: { row: EpicDetailRow }) {
 }
 
 const metaColor = (row: EpicDetailRow) =>
-  isRunning(row) ? RUNNING_BLUE : cardLook(row).kind === "note" ? "#ff7066" : "text.dim";
+  isRunning(row) ? "tone.running.fg" : cardLook(row).kind === "note" ? "tone.paused.fg" : "text.dim";
 
 // Wide: one row. Phone: the meta drops to a second line, indented under the title.
 function Line({
@@ -169,7 +169,7 @@ function Line({
         <Dot row={row} />
         <Text
           as="span"
-          fontFamily="ui-monospace, monospace"
+          fontFamily="mono"
           fontSize="12px"
           color="text.dim"
           flexShrink={0}
@@ -223,7 +223,7 @@ function CardFrame({
       borderWidth="1px"
       borderColor={
         folded
-          ? "#1d232c"
+          ? "hairline.folded"
           : isRunning(row)
             ? "rgba(108,180,255,0.40)"
             : "hairline"
