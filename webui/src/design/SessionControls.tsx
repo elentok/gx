@@ -199,6 +199,7 @@ export function DesignActionsMenu({
                   display="flex"
                   alignItems="center"
                   justifyContent="space-between"
+                  w="full"
                   gap="2"
                   pe="2"
                   borderRadius="md"
@@ -209,6 +210,7 @@ export function DesignActionsMenu({
                     aria-current={s.id === shown.id}
                     onClick={() => onSelect(s.id)}
                     flex="1"
+                    w="auto"
                     minW="0"
                     justifyContent="space-between"
                     {...item}
@@ -226,13 +228,14 @@ export function DesignActionsMenu({
                       disabled={pending}
                       onClick={() => run(() => stop({ id: s.id, state: stateToken(s) }))}
                       cursor="pointer"
-                      flexShrink="0"
+                      flex="none"
+                      w="auto"
                       minH="32px"
                       px="2.5"
                       borderWidth="1px"
                       borderColor="tone.deadlocked.fg"
                       borderRadius="md"
-                      fontSize="sm"
+                      fontSize="13px"
                       fontWeight="600"
                       color="tone.deadlocked.fg"
                     >
