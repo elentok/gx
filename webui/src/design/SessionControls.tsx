@@ -143,7 +143,22 @@ export function DesignActionsMenu({
       onOpenChange={(e) => !e.open && setConfirming(false)}
     >
       <Menu.Trigger asChild>
-        <chakra.button type="button" aria-label="More actions" cursor="pointer" color="text.muted" fontSize="xl" lineHeight="1" px="2">
+        <chakra.button
+          type="button"
+          aria-label="More actions"
+          cursor="pointer"
+          color="text.muted"
+          fontSize="xl"
+          lineHeight="1"
+          w="44px"
+          h="44px"
+          borderWidth="1px"
+          borderColor="border"
+          borderRadius="md"
+          display="inline-flex"
+          alignItems="center"
+          justifyContent="center"
+        >
           ⋯
         </chakra.button>
       </Menu.Trigger>

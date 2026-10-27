@@ -727,6 +727,8 @@ an exited session.
     round). Stop makes `gx agents list` show one exited session.
   - At 375px the menu is a full-width bottom sheet with a grab handle. At 1440px it is a popover
     with no grab handle: its top is below the ⋯ button's bottom and it overlaps ⋯ horizontally.
+  - The ⋯ button is a 44px square with a 1px border. At 1440px its top is above the title's bottom
+    (level with the header row, not below it).
 - **Note:** the menu's role name is "More actions" (the trigger's name), not "Design actions".
 
 ## 66. Note box

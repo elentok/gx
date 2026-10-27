@@ -124,6 +124,12 @@ test.describe("65. Design actions menu", () => {
     await expect(card(page, "design-epic")).toBeVisible();
     await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
     const trigger = (await moreActions(page).boundingBox())!;
+    expect(trigger.width).toBe(44);
+    expect(trigger.height).toBe(44);
+    await expect(moreActions(page)).toHaveCSS("border-top-width", "1px");
+    // Level with the title row, not below it: the Progress sidebar starts under the header.
+    const title = (await page.getByRole("heading", { level: 1 }).first().boundingBox())!;
+    expect(trigger.y).toBeLessThan(title.y + title.height);
     await moreActions(page).click();
     await expect(actionsMenu(page).getByTestId("grab-handle")).toHaveCount(0);
     // The positioner places the popover after it mounts, so wait for it to leave the origin.

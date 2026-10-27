@@ -144,7 +144,7 @@ function DesignBody({
         mt="4"
         mb="3"
         display="flex"
-        alignItems="flex-end"
+        alignItems="flex-start"
         justifyContent="space-between"
         gap="4"
         flex="none"
