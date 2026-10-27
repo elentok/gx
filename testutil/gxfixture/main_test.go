@@ -449,6 +449,55 @@ func TestUnitedScenario_HasADraftImplEpic(t *testing.T) {
 	r.stop(t)
 }
 
+func TestUnitedScenario_CarriesTheCardTimeStamps(t *testing.T) {
+	r := start(t, "united")
+	root := filepath.Dir(filepath.Dir(r.StateDir))
+	read := func(path ...string) string {
+		data, err := os.ReadFile(filepath.Join(append([]string{root, "data", "gx", "tickets"}, path...)...))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	for _, c := range []struct{ project, epic, stamp string }{
+		{"demo", "ready-epic", "created_at: "},
+		{"demo", "idle-epic", "created_at: "},
+		{"demo", "design-live", "design_started_at: "},
+		{"demo", "design-stopped", "design_started_at: "},
+		{"demo", "running-epic", "started_at: "},
+		{"auto", "awaiting-auto-epic", "started_at: "},
+		{"demo", "awaiting-epic", "completed_at: "},
+		{"demo", "blocked-merge-epic", "completed_at: "},
+		{"demo", "dirty-trunk-epic", "completed_at: "},
+	} {
+		if meta := read(c.project, c.epic, "ticket.md"); !strings.Contains(meta, c.stamp) {
+			t.Errorf("%s lacks %q:\n%s", c.epic, c.stamp, meta)
+		}
+	}
+	if got := read("demo", "deadlock-epic", "issues", "01-first.md"); !strings.Contains(got, "claimed_at: ") {
+		t.Errorf("deadlock-epic/01 lacks claimed_at:\n%s", got)
+	}
+	created := strings.SplitN(strings.SplitN(read("demo", "ready-epic", "ticket.md"), "created_at: ", 2)[1], "\n", 2)[0]
+	at, err := time.Parse(time.RFC3339, created)
+	if err != nil || time.Since(at) > time.Hour {
+		t.Errorf("ready-epic created_at %q is not minutes old (%v)", created, err)
+	}
+	r.stop(t)
+}
+
+func TestDesignScenario_StampsTheMapsDesignStart(t *testing.T) {
+	r := start(t, "design")
+	root := filepath.Dir(filepath.Dir(r.StateDir))
+	meta, err := os.ReadFile(filepath.Join(root, "data", "gx", "tickets", "demo", "design-epic", "ticket.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(meta), "design_started_at: ") || !strings.Contains(string(meta), "kind: map") {
+		t.Errorf("design-epic ticket.md:\n%s", meta)
+	}
+	r.stop(t)
+}
+
 func TestConfigFlag_WritesTheKeyIntoTheFixtureConfig(t *testing.T) {
 	r := startWith(t, "empty", "--config", "server.remote-control=true", "--config", "extra.name=hello")
 	root := filepath.Dir(filepath.Dir(r.StateDir))
