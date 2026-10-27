@@ -40,17 +40,17 @@ import {
 const DONE_SHOWN = 3;
 
 // The done cards under their divider: the newest few, then the rest on request (not remembered).
-function DoneGroup({ rows, ctx }: { rows: EpicDetailRow[]; ctx: RowContext }) {
+function DoneGroup({ rows, ctx, heads }: { rows: EpicDetailRow[]; ctx: RowContext; heads: boolean }) {
   const [all, setAll] = useState(false);
   if (rows.length === 0) return null;
   const done = doneRows(rows);
   const shown = all ? done : done.slice(0, DONE_SHOWN);
   return (
-    <Box mt="4" display="flex" flexDirection="column" gap="3">
-      <Box data-done-divider display="flex" alignItems="center" gap="3" color="text.muted" fontSize="sm">
-        <Box flex="1" borderTopWidth="1px" borderColor="border" />
+    <Box display="flex" flexDirection="column" gap="8px">
+      <Box data-done-divider display="flex" alignItems="center" gap="12px" color="text.dim" fontSize="13px" mt={heads ? "0" : "16px"} mb="-4px">
+        <Box flex="1" borderTopWidth="1px" borderColor="#252c36" />
         {doneHeading(done)}
-        <Box flex="1" borderTopWidth="1px" borderColor="border" />
+        <Box flex="1" borderTopWidth="1px" borderColor="#252c36" />
       </Box>
       {shown.map((r) => (
         <TicketCard key={r.address} row={r} meta={doneMeta(r, ctx)} indent={0} />
@@ -73,7 +73,7 @@ function EpicBody({ detail, now, designLive, fixAgent }: { detail: EpicDetail; n
           <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} fixAgent={fixAgent} />
         ))}
       </Box>
-      <DoneGroup rows={detail.rows.filter(isFolded)} ctx={ctx} />
+      <DoneGroup rows={detail.rows.filter(isFolded)} ctx={ctx} heads={detail.rows.every(isFolded)} />
     </>
   );
 }

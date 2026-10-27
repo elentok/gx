@@ -8,7 +8,15 @@ import { StatusIcon } from "../ui/status-icon/StatusIcon";
 import { type EpicDetailRow } from "./detail";
 import { FixAgentDialog } from "./FixAgentDialog";
 import type { FixAgent } from "./fixAgent";
-import { cardLook, type CardLook, idOf, isRunning, toneOf } from "./rows";
+import {
+  cardLook,
+  type CardLook,
+  idOf,
+  isCancelled,
+  isFolded,
+  isRunning,
+  toneOf,
+} from "./rows";
 
 const RUNNING_BLUE = "#6cb4ff";
 
@@ -47,10 +55,34 @@ function Spinner() {
   );
 }
 
+// The done card's mark: a bare check, no circle.
+function Check() {
+  return (
+    <chakra.svg
+      role="img"
+      aria-label="Done"
+      data-tone="done"
+      viewBox="0 0 12 12"
+      w="12px"
+      h="12px"
+    >
+      <path
+        d="M2 6.5l2.7 2.7L10 3.3"
+        fill="none"
+        stroke="#55d996"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </chakra.svg>
+  );
+}
+
 function Dot({ row }: { row: EpicDetailRow }) {
   const tone = toneOf(row);
   let mark;
   if (isRunning(row)) mark = <Spinner />;
+  else if (isFolded(row) && !isCancelled(row)) mark = <Check />;
   else if (tone === "done") mark = <StatusIcon kind="done" tone={tone} />;
   else
     mark = (
@@ -143,7 +175,13 @@ function Line({
         </Text>
         <Text
           as="span"
-          color="white"
+          color={
+            isCancelled(row)
+              ? "text.dim"
+              : isFolded(row)
+                ? "text.muted"
+                : "white"
+          }
           fontWeight={bold ? 500 : undefined}
           minW="0"
           flex="1 1 0"
@@ -171,15 +209,23 @@ function CardFrame({
   wide: boolean;
   children: React.ReactNode;
 }) {
+  // Done and cancelled cards are outline only.
+  const folded = isFolded(row);
   return (
     <Box
-      bg="#141920"
+      bg={folded ? undefined : "#141920"}
       borderWidth="1px"
-      borderColor={isRunning(row) ? "rgba(108,180,255,0.40)" : "#252c36"}
+      borderColor={
+        folded
+          ? "#1d232c"
+          : isRunning(row)
+            ? "rgba(108,180,255,0.40)"
+            : "#252c36"
+      }
       borderRadius="12px"
-      h={wide ? "48px" : undefined}
+      h={wide ? (folded ? "44px" : "48px") : undefined}
       px={wide ? "16px" : "14px"}
-      py={wide ? undefined : "10px"}
+      py={wide ? undefined : folded ? "9px" : "10px"}
       display="flex"
       alignItems="center"
     >
