@@ -56,11 +56,11 @@ describe("TopBar", () => {
     expect(container.querySelector("[aria-current]")).toBeNull();
   });
 
-  it("shows the Paused chip and the Live or Offline dot, and no AFK", () => {
+  it("shows the Paused chip, the Offline dot only while offline, and no AFK", () => {
     const first = renderThemed(<TopBar active="epics" build="v1.2.3" mode="paused" connected afk onToggleAfk={() => {}} />);
     expect(first.queryByText("AFK", { ignore: "[hidden] *" })).toBeNull();
     expect(first.getByText("Paused")).toBeTruthy();
-    expect(first.getByRole("status", { name: "Live" })).toBeTruthy();
+    expect(first.queryByRole("status", { name: "Live" })).toBeNull();
     first.unmount();
     const second = renderThemed(<TopBar active="epics" mode="running" connected={false} />);
     expect(second.queryByText("Paused")).toBeNull();
