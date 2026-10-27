@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { SessionRoundCard } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { Button } from "../ui/button/Button";
+import { NoteBox } from "./NoteBox";
 import {
   choicesOf,
   isAnswered,
@@ -121,18 +122,19 @@ export function Question({
           aria-pressed={noteOpen}
           onClick={() => setNoteOpen((o) => !o)}
         >
-          📝 Note
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+            <path d="M3 13l.7-3L10.5 3.2a1.4 1.4 0 0 1 2 2L5.7 12 3 13z" />
+          </svg>
+          Note
         </Button>
       </Box>
       {noteOpen && (
-        <Textarea
-          size="sm"
-          borderRadius="12px"
-          rows={3}
-          aria-label={`Note text for question ${card.label}`}
+        <NoteBox
+          name={`question ${card.label}`}
+          title={`Note on ${nameOf(card)} - ${card.title}`}
           placeholder="Note on this question"
           value={answer.note ?? ""}
-          onChange={(e) => onChange({ ...answer, note: e.target.value })}
+          onChange={(note) => onChange({ ...answer, note })}
         />
       )}
     </Box>

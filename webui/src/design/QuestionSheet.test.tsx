@@ -35,7 +35,7 @@ test.each([
   );
 });
 
-test.each([false, true])("note opens three rows tall (big=%s)", (big) => {
+test.each([false, true])("note opens five rows tall (big=%s)", (big) => {
   renderThemed(
     <Question
       card={card()}
@@ -48,8 +48,38 @@ test.each([false, true])("note opens three rows tall (big=%s)", (big) => {
   fireEvent.click(screen.getByLabelText("Note on question 1"));
   expect(screen.getByLabelText("Note text for question 1")).toHaveProperty(
     "rows",
-    3,
+    5,
   );
+});
+
+test("the question note's large editor is titled with the question and its text reaches onAnswers", () => {
+  const seen: Answers[] = [];
+  function Harness() {
+    const [answers, setAnswers] = useState<Answers>({});
+    return (
+      <QuestionSheet
+        round={[card({ label: "2", title: "Pick one" })]}
+        answers={answers}
+        onAnswers={(u) =>
+          setAnswers((a) => {
+            const next = u(a);
+            seen.push(next);
+            return next;
+          })
+        }
+      />
+    );
+  }
+  renderThemed(<Harness />);
+  fireEvent.click(screen.getByLabelText("Note on question 2"));
+  fireEvent.click(screen.getByLabelText("Open the note in a large editor"));
+  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
+    "Note on Q2 - Pick one",
+  );
+  fireEvent.change(screen.getByLabelText("Note text in the large editor"), {
+    target: { value: "hello" },
+  });
+  expect(seen.at(-1)?.["2"]?.note).toBe("hello");
 });
 
 describe("a move scrolls the body to the top", () => {
