@@ -228,15 +228,15 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	if rec := tickets.RecommendationOf(evs); rec != nil && t.PausedClass() != "" {
 		d.Recommendation = &DetailRecommendation{Verb: rec.Choice, Diagnosis: rec.Text}
 	}
-	var last *tickets.PauseRound
-	if d.Actions, last, err = s.detailFor(ref, t, evs, d.Permission); err != nil {
+	rounds := tickets.Rounds(evs)
+	if d.Actions, err = s.detailFor(ref.addr.String(), t, rounds, d.Permission); err != nil {
 		return TicketDetail{}, err
 	}
 	d.ActionInfo = actionInfo(d.Actions)
-	if last == nil {
+	if len(rounds) == 0 {
 		return d, nil
 	}
-	rounds := tickets.Rounds(evs)
+	last := &rounds[len(rounds)-1]
 	for _, r := range rounds[:len(rounds)-1] {
 		d.Rounds = append(d.Rounds, detailRound(r, false))
 	}
@@ -254,22 +254,21 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	return d, nil
 }
 
-// detailFor is what a person may do with a parsed ticket now, plus its latest
-// pause round (nil when it has none). The ticket detail and ticketRecommend
-// both read their actions from here.
-func (s *Server) detailFor(ref ticketRef, t schema.Ticket, evs []tickets.LogEvent, card *PermissionCard) ([]string, *tickets.PauseRound, error) {
+// detailFor is what a person may do with a parsed ticket now, given its pause
+// rounds. The ticket detail and ticketRecommend both read their actions from here.
+func (s *Server) detailFor(addr string, t schema.Ticket, rounds []tickets.PauseRound, card *PermissionCard) ([]string, error) {
 	var last *tickets.PauseRound
-	if rounds := tickets.Rounds(evs); len(rounds) > 0 {
+	if len(rounds) > 0 {
 		last = &rounds[len(rounds)-1]
 	}
 	gone := false
 	if t.PausedClass() != "" {
 		var err error
-		if gone, err = s.agentGone(ref.addr.String()); err != nil {
-			return nil, nil, err
+		if gone, err = s.agentGone(addr); err != nil {
+			return nil, err
 		}
 	}
-	return detailActions(t, last, gone, card), last, nil
+	return detailActions(t, last, gone, card), nil
 }
 
 // brokenDetail is the small payload of a file that fails to parse: nothing the

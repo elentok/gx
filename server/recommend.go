@@ -38,7 +38,7 @@ func (s *Server) ticketRecommend(req QueueRequest) (QueueResult, error) {
 		if err != nil {
 			return QueueResult{}, err
 		}
-		actions, _, err := s.detailFor(ref, t, evs, nil)
+		actions, err := s.detailFor(ref.addr.String(), t, tickets.Rounds(evs), nil)
 		if err != nil {
 			return QueueResult{}, err
 		}
