@@ -84,14 +84,13 @@ func TestEpicList_JoinedCardPhases(t *testing.T) {
 
 func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	cfg := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
 	store := t.TempDir()
 	tix := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 	writeEpicFiles(t, store, "m", joinedMapMD("done"), tix)
 	writeEpicFiles(t, store, "m-impl", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
 
-	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithEnv("CLAUDE_CONFIG_DIR="+cfg), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	hs, err := h.Client.Handshake(t.Context())
 	if err != nil {
 		t.Fatal(err)

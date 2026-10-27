@@ -107,7 +107,6 @@ func TestTranscriptPaths_StatusChangeEndsABackedOffMiss(t *testing.T) {
 // and so a miss: finding the expected one proves the glob was never run.
 func TestClaudeTranscript_StatsTheExpectedSlugDirBeforeGlobbing(t *testing.T) {
 	config := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", config)
 	cwd := "/work/proj"
 	want := filepath.Join(config, "projects", transcript.Slugify(cwd), "conv.jsonl")
 	other := filepath.Join(config, "projects", "-elsewhere", "conv.jsonl")
@@ -119,7 +118,7 @@ func TestClaudeTranscript_StatsTheExpectedSlugDirBeforeGlobbing(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	s := &Server{log: slog.New(slog.DiscardHandler)}
+	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}}
 	got, ok := s.claudeTranscript("s1", sessionMeta{Dir: cwd, ConversationID: "conv"})
 	if !ok || got != want {
 		t.Fatalf("claudeTranscript = %q, %v, want %q", got, ok, want)

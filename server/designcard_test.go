@@ -48,7 +48,6 @@ func actionKinds(r server.EpicListRow) []server.CardActionKind {
 
 func TestEpicList_DesignCards(t *testing.T) {
 	cfg := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	four := map[string]string{
 		"01-a.md": issueMD("01", "done", "", "A"), "02-b.md": issueMD("02", "done", "", "B"),
@@ -65,7 +64,7 @@ func TestEpicList_DesignCards(t *testing.T) {
 	writeEpicFiles(t, store, "d-pct", mapMD("design_step: resolve-tickets\n"), four)
 	writeEpicFiles(t, store, "d-done", "---\nstatus: done\nkind: map\ndesign_step: done\n---\n", map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
 
-	f := startDesignsIn(t, store)
+	f := startDesignsIn(t, store, servertest.WithEnv("CLAUDE_CONFIG_DIR="+cfg))
 	startDesign := func(ticket string) (id, conv string) {
 		res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: ticket})
 		if err != nil || res.Session == nil {
@@ -145,8 +144,7 @@ func TestEpicList_DesignCountdownCarriesItsDeadline(t *testing.T) {
 
 func TestEpicList_NewDesignLifecycle(t *testing.T) {
 	cfg := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
-	f := startDesigns(t)
+	f := startDesigns(t, servertest.WithEnv("CLAUDE_CONFIG_DIR="+cfg))
 	res := f.openNew(t, "fresh-idea", "an idea")
 	if res.Refused || res.Session == nil {
 		t.Fatalf("open = %+v", res)

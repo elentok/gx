@@ -55,8 +55,7 @@ func TestPersonVerb_StartOverCancelsTheOpenInvestigateChild(t *testing.T) {
 func TestInvestigateVerb_MergeLeavesItsOwnTicket(t *testing.T) {
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
-	t.Setenv(server.InvestigateEnv, "proj:epic-a/01a")
-	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+	res, err := h.Client.AsInvestigator("proj:epic-a/01a").Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
 	if err != nil || res.Refused {
 		t.Fatalf("merge = %+v, %v; want merged", res, err)
 	}
@@ -66,8 +65,7 @@ func TestInvestigateVerb_MergeLeavesItsOwnTicket(t *testing.T) {
 func TestInvestigateVerb_StartOverLeavesItsOwnTicket(t *testing.T) {
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
-	t.Setenv(server.InvestigateEnv, "proj:epic-a/01a")
-	res, err := h.Client.Repair(context.Background(), "start-over", server.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
+	res, err := h.Client.AsInvestigator("proj:epic-a/01a").Repair(context.Background(), "start-over", server.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
 	if err != nil || res.Refused {
 		t.Fatalf("start-over = %+v, %v; want started over", res, err)
 	}

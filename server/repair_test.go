@@ -104,7 +104,6 @@ func TestRepair_ResumeAndUnparkRefusalsNameStatusAndVerb(t *testing.T) {
 // committed to when commit is set, and returns the ticket's path.
 func pausedIteration(t *testing.T, kind string, commit bool) (*servertest.Harness, string) {
 	t.Helper()
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
