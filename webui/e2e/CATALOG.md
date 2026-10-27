@@ -145,8 +145,14 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
   refetches Progress without a reload.
 - **Steps:** run `gx tickets set demo:design-epic --design-step <step>` for spec, review,
   grill-findings, create-tickets, branch, done.
-- **Pass:** each step becomes current in turn (Done becomes done), earlier steps read done, and
-  "Open implementation epic →" shows only at Branch and Done.
+- **Widths:** 1440 px and 375 px, one test each.
+- **Pass:**
+  - At 1440 px each step becomes current in turn in the Progress region (Done becomes done) and
+    earlier steps read done.
+  - At 375 px the steps live in the steps sheet; the step line reads "Resolve tickets · …" before
+    Branch and is gone after the last step.
+  - On both widths "Open implementation epic →" shows only at Branch and Done, in the Chat region
+    within 80 px of its top.
 
 ## 10. Auto-advance
 
@@ -313,13 +319,16 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Scenario:** `design`, at 375 px wide
 - **Steps:**
   1. Open `#/d/demo:design-epic` and start the session.
-  2. Click the Progress summary, then Close in the modal. Open it again and press Escape.
-  3. Tap the title; click Close on the sheet.
-  4. Press Send with nothing answered, then Escape. Press ⤢, then ⤡.
+  2. Click the step line, then Close in the sheet. Open it with the ring and press Escape. Open
+     it again and tap the backdrop above the sheet.
+  3. Press Chat, then Questions in the View toggle.
+  4. Press Send with nothing answered, then Escape.
+  5. Tap the title; click Close on the sheet.
 - **Pass:**
-  - The composer has no Focus button. The Send popover is at most 343 px wide, inside the viewport and overlaps the sheet.
-  - Focus mode keeps the Progress summary above the sheet and hides the messages; ⤡ leaves.
-  - The summary opens the "Design progress steps" modal with Resolve tickets current. Close and Escape both close it.
+  - The Questions view is up after Start: the first message is hidden and no "Progress" region (segmented bar) is on the page.
+  - The step line "Resolve tickets · …" opens the "Design progress steps" sheet with Resolve tickets current; the ring opens it too. Close, Escape and a backdrop tap each close it.
+  - No ⤢/⤡ buttons; Chat shows the first message, Questions hides it.
+  - The step line sits above the sheet. The Send popover is at most 343 px wide, inside the viewport and overlaps the sheet.
   - Note reads only its icon; the Auto button still shows "Auto-advance" and "Auto-queue".
   - The title opens a "Jump to epic" sheet that fills the screen; Close closes it.
 
@@ -465,8 +474,12 @@ an exited session.
 ## 43. New session on a stopped Design
 
 - **Scenario:** `ready`
-- **Steps:** start `retry-design`, stop its session, stay on `#/d/demo:retry-design`; click the header "New session".
-- **Pass:** no dialog and no Epic slug field appear, and `gx agents list` shows a second session for it.
+- **Steps:**
+  1. Start `retry-design`, stop its session, stay on `#/d/demo:retry-design`; open the ⋯ menu and click "New session".
+  2. Start `live-design` and leave it live; open the ⋯ menu, click "New session" and dismiss the browser confirm. Do it again and accept it.
+- **Pass:**
+  - On the stopped Design the item reads "New session" with the hint "Start a fresh session". No dialog and no Epic slug field appear, and `gx agents list` shows a second session for it.
+  - On the live one the hint is "Stop this session and start a fresh one". Cancel starts nothing; OK leaves two sessions, the old one exited and one live.
 
 ## 44. Failure banner New session
 
@@ -478,16 +491,16 @@ an exited session.
 
 - **Scenario:** `ready`; the second test uses `design`.
 - **Steps:**
-  1. Start `delete-me`; "Delete design" is absent. Stop its session with the page open.
-  2. Click "Delete design", then Keep, then "Delete design" and Delete (with `/v1/designs/delete` held).
+  1. Start `delete-me`; open the ⋯ menu: "Delete design" is absent. Stop its session with the page open.
+  2. In the ⋯ menu click "Delete design", then Keep, then "Delete design" and Delete (with `/v1/designs/delete` held).
   3. Start `delete-me` again.
-  4. On `design`, open `#/d/demo:design-epic`.
+  4. On `design`, open `#/d/demo:design-epic`, start the session and open the ⋯ menu.
 - **Pass:**
-  - "Delete design" appears with no reload. Keep returns to the page with the button still there.
+  - "Delete design" appears in the menu with no reload. Keep returns to the menu with the item still there.
   - The confirm Delete is disabled while the call runs.
   - Delete goes to `#/epics`, the card is gone and `gx tickets show demo:delete-me` fails.
   - The second New Design with `delete-me` succeeds.
-  - `design-epic` (charted) shows no "Delete design".
+  - `design-epic` (charted) lists no "Delete design" in the menu.
 
 ## 46. gx designs delete
 

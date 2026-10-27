@@ -127,22 +127,36 @@ test("24. Phone, Design page", async ({ page, start }) => {
 
   await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
   await page.getByRole("button", nav("Start design session")).click();
-  await expect(page.getByText("Two questions before the spec.")).toBeVisible();
+  // The Questions view is up: the first message is hidden.
+  const view = page.getByRole("group", nav("View"));
+  const chatText = page.getByText("Two questions before the spec.");
+  await expect(view.getByRole("button", { name: /^Questions/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(chatText).toBeHidden();
 
-  // Progress is a segment bar whose summary opens a modal with the steps.
-  const progress = page.getByRole("region", nav("Progress"));
-  await progress.getByRole("button", { name: /Resolve tickets/ }).click();
+  // A step line under the name and the ring open the steps sheet; there is no segmented bar.
+  await expect(page.getByRole("region", nav("Progress"))).toHaveCount(0);
+  const stepLine = page.getByRole("button", { name: /^Resolve tickets · / });
   const steps = page.getByRole("dialog", nav("Design progress steps"));
-  await expect(steps.locator('li[data-step="resolve-tickets"][data-state="current"]')).toBeVisible();
+  const current = steps.locator('li[data-step="resolve-tickets"][data-state="current"]');
+  await stepLine.click();
+  await expect(current).toBeVisible();
   await steps.getByRole("button", nav("Close")).click();
   await expect(steps).toHaveCount(0);
-  await progress.getByRole("button", { name: /Resolve tickets/ }).click();
-  await expect(steps).toBeVisible();
+  await page.getByRole("button", nav("Show progress steps")).click();
+  await expect(current).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(steps).toHaveCount(0);
+  await stepLine.click();
+  await expect(steps).toBeVisible();
+  await page.mouse.click(187, 20);
+  await expect(steps).toHaveCount(0);
 
-  // The composer has no Focus button; the sheet's own button is the way in.
-  await expect(page.locator('[aria-label="Composer"]').getByRole("button", { name: /focus/i })).toHaveCount(0);
+  // The View toggle replaces the focus buttons: Chat shows the first message, Questions hides it.
+  await expect(page.getByRole("button", { name: /focus mode/ })).toHaveCount(0);
+  await view.getByRole("button", nav("Chat")).click();
+  await expect(chatText).toBeVisible();
+  await view.getByRole("button", { name: /^Questions/ }).click();
+  await expect(chatText).toBeHidden();
 
   // Send with gaps: the popover fits the screen and overlaps the sheet.
   const questions = page.getByRole("group", nav("Questions"));
@@ -159,13 +173,9 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await page.keyboard.press("Escape");
   await expect(popover).toHaveCount(0);
 
-  // Focus mode keeps the Progress summary above the sheet and hides the messages.
-  await questions.getByRole("button", nav("Enter focus mode")).click();
-  await expect(page.getByText("Two questions before the spec.")).toHaveCount(0);
-  const summary = (await progress.getByRole("button", { name: /Resolve tickets/ }).boundingBox())!;
-  expect(summary.y + summary.height).toBeLessThanOrEqual((await questions.boundingBox())!.y);
-  await questions.getByRole("button", nav("Leave focus mode")).click();
-  await expect(page.getByText("Two questions before the spec.")).toBeVisible();
+  // The step line stays above the sheet in the Questions view.
+  const line = (await stepLine.boundingBox())!;
+  expect(line.y + line.height).toBeLessThanOrEqual((await questions.boundingBox())!.y);
 
   // Note loses its text; the Auto button keeps both names.
   await expect(page.getByRole("button", nav("Note"))).toHaveText("✎");

@@ -341,21 +341,46 @@ test.describe("49. Questions and Chat views", () => {
 });
 
 test.describe("9. Design progress to the end", () => {
-  test("walks every step to Done", async ({ page, start }) => {
-    const fixture = await start("design");
-    await openDesign(page);
-    await expect(page.getByText("Open implementation epic →")).toHaveCount(0);
+  const steps = ["spec", "review", "grill-findings", "create-tickets", "branch", "done"];
 
-    const steps = ["spec", "review", "grill-findings", "create-tickets", "branch", "done"];
+  // The link shows only at Branch and Done, at the top of the Chat region.
+  const expectImplLink = async (page: Page, name: string) => {
+    const link = page.getByRole("region", nav("Chat")).getByRole("link", { name: /^Open implementation epic/ });
+    const linked = name === "branch" || name === "done";
+    await expect(link).toHaveCount(linked ? 1 : 0);
+    if (!linked) return;
+    const region = (await page.getByRole("region", nav("Chat")).boundingBox())!;
+    expect((await link.boundingBox())!.y - region.y).toBeLessThan(80);
+  };
+
+  test("1440px: the Progress region shows each step in turn", async ({ page, start }) => {
+    const fixture = await start("design");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openDesign(page);
+    await expectImplLink(page, "resolve-tickets");
+
     for (const [i, name] of steps.entries()) {
       await fixture.cli("tickets", "set", "demo:design-epic", "--design-step", name);
       const state = name === "done" ? "done" : "current";
       await expect(step(page, name, state)).toBeVisible();
       await expect(step(page, steps[i - 1] ?? "resolve-tickets", "done")).toBeVisible();
-      const linked = name === "branch" || name === "done";
-      await expect(page.getByText("Open implementation epic →")).toHaveCount(linked ? 1 : 0);
+      await expectImplLink(page, name);
     }
     for (const s of ["chart", ...steps]) await expect(step(page, s, "done")).toBeVisible();
+  });
+
+  test("375px: the step line follows the step and the link shows at Branch and Done", async ({ page, start }) => {
+    const fixture = await start("design");
+    await page.setViewportSize({ width: 375, height: 812 });
+    await openDesign(page);
+    await expectImplLink(page, "resolve-tickets");
+    await expect(page.getByRole("button", { name: /^Resolve tickets/ })).toBeVisible();
+
+    for (const name of steps) {
+      await fixture.cli("tickets", "set", "demo:design-epic", "--design-step", name);
+      await expectImplLink(page, name);
+    }
+    await expect(page.getByRole("button", { name: /^Resolve tickets/ })).toHaveCount(0);
   });
 });
 
@@ -515,7 +540,11 @@ const stopSession = async (fixture: Fixture, slug: string) => {
   await fixture.cli("agents", "stop", (await sessionRows(fixture, slug))[0].split("\t")[0].trim());
 };
 
-const newSession = (page: Page) => page.getByRole("button", nav("New session"));
+// The ⋯ menu's items; opening it is a click on the trigger.
+const actionsMenu = async (page: Page) => {
+  await page.getByRole("button", nav("More actions")).click();
+  return page.getByRole("menu", nav("More actions"));
+};
 
 test.describe("42. Stopped session card", () => {
   test("the card moves to Ready to design as Not started with a Design button", async ({ page, start }) => {
@@ -532,20 +561,45 @@ test.describe("42. Stopped session card", () => {
 });
 
 test.describe("43. New session on a stopped Design", () => {
-  test("the header starts a new session and no form opens", async ({ page, start }) => {
+  test("the ⋯ menu starts a new session and no form opens", async ({ page, start }) => {
     const fixture = await start("ready");
     await startDesign(page, "retry-design");
     await stopSession(fixture, "retry-design");
 
-    // The banner and the header each have a "New session"; the header one is first in the page.
-    await expect(newSession(page).first()).toBeVisible();
+    const menu = await actionsMenu(page);
+    const item = menu.getByRole("menuitem", { name: /^New session/ });
+    await expect(item).toHaveAccessibleName("New session Start a fresh session");
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.getByRole("textbox", nav("Epic slug"))).toHaveCount(0);
 
-    await newSession(page).first().click();
+    await item.click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect.poll(async () => (await sessionRows(fixture, "retry-design")).length).toBe(2);
     await expect(page).toHaveURL(/#\/d\/demo:retry-design$/);
+  });
+
+  test("on a live session it asks first: Cancel starts nothing, OK starts a new session", async ({ page, start }) => {
+    const fixture = await start("ready");
+    await startDesign(page, "live-design");
+    await expect.poll(async () => (await sessionRows(fixture, "live-design")).length).toBe(1);
+    const [first] = await sessionRows(fixture, "live-design");
+    const firstId = first.split("\t")[0].trim();
+
+    const menu = await actionsMenu(page);
+    const item = menu.getByRole("menuitem", { name: /^New session/ });
+    await expect(item).toHaveAccessibleName("New session Stop this session and start a fresh one");
+
+    page.once("dialog", (d) => d.dismiss());
+    await item.click();
+    await expect(async () => expect(await sessionRows(fixture, "live-design")).toHaveLength(1)).toPass({ timeout: 2000 });
+
+    await actionsMenu(page);
+    page.once("dialog", (d) => d.accept());
+    await menu.getByRole("menuitem", { name: /^New session/ }).click();
+    await expect.poll(async () => (await sessionRows(fixture, "live-design")).length).toBe(2);
+    const rows = await sessionRows(fixture, "live-design");
+    expect(rows.find((r) => r.split("\t")[0].trim() === firstId)).toMatch(/exited/);
+    expect(rows.filter((r) => !/exited/.test(r))).toHaveLength(1);
   });
 });
 
@@ -568,10 +622,19 @@ test.describe("45. Delete design", () => {
   test("appears when the session stops with the page open, and Delete removes the design", async ({ page, start }) => {
     const fixture = await start("ready");
     await startDesign(page, "delete-me");
-    const del = page.getByRole("button", nav("Delete design"));
+    const menu = await actionsMenu(page);
+    const del = menu.getByRole("menuitem", { name: /^Delete design/ });
+    await expect(menu.getByRole("menuitem", { name: /^New session/ })).toBeVisible();
     await expect(del).toHaveCount(0);
+    // Escape goes to the menu once focus is inside it.
+    await expect.poll(() => menu.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect(menu).toHaveCount(0);
 
     await stopSession(fixture, "delete-me");
+    // The page has settled once the failure banner shows; a menu opened before that is remounted shut.
+    await expect(page.getByRole("region", nav("Session failure"))).toBeVisible();
+    await actionsMenu(page);
     await expect(del).toBeVisible();
 
     await del.click();
@@ -596,7 +659,10 @@ test.describe("45. Delete design", () => {
   test("a charted design has no Delete design", async ({ page, start }) => {
     await start("design");
     await openDesign(page);
-    await expect(page.getByRole("button", nav("Delete design"))).toHaveCount(0);
+    await page.getByRole("button", nav("Start design session")).click();
+    const menu = await actionsMenu(page);
+    await expect(menu.getByRole("menuitem", { name: /^New session/ })).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name: /^Delete design/ })).toHaveCount(0);
   });
 });
 
