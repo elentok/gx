@@ -110,6 +110,11 @@ test("five sections show in order with counts, Ready to design and Finished star
   expect(screen.queryByRole("link", { name: "done-a" })).toBeNull();
 });
 
+test("an empty section is hidden", async () => {
+  await loaded(listOf([row("need", { section: "needs-you" }), row("done-a", { state: "finished", section: "finished" })]));
+  expect(regionNames()).toEqual(["epics-needs-you", "epics-finished"]);
+});
+
 test("a toggle opens a collapsed section and closes an open one", async () => {
   await loaded(mixed());
   fireEvent.click(toggle("Finished"));

@@ -72,7 +72,7 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
   // A stored project that is gone, or a single project, acts as "All projects" without rewriting it.
   const filterProject = projects.length > 1 && projects.includes(storedProject) ? storedProject : undefined;
   const sections = list ? sectionsOf(list.epics, query, list.recently_finished, filterProject) : [];
-  const shown = searching ? sections.filter((s) => s.rows.length > 0) : sections;
+  const shown = sections.filter((s) => s.rows.length > 0);
   const chooseProject = (project: string) => {
     setStoredProject(project);
     try {
@@ -145,7 +145,7 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
         <Spinner label="Loading epics" />
       ) : list.epics.length === 0 ? (
         <EmptyState title="No epics yet.">{newDesign}</EmptyState>
-      ) : searching && shown.length === 0 ? (
+      ) : shown.length === 0 ? (
         <EmptyState title="No match" />
       ) : (
         shown.map((s) => <SectionBlock key={s.key} section={s} open={isOpen(s)} onToggle={() => toggle(s.key)} onChanged={retry} />)
