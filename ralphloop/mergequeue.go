@@ -22,6 +22,11 @@ func mergeLockDir(scratchDir, epic string) (string, error) {
 	return MergeLockDir(filepath.Join(scratchDir, epic))
 }
 
+// mergeLockDir is the package-level one under d's lock state dir.
+func (d Deps) mergeLockDir(scratchDir, epic string) (string, error) {
+	return MergeLockDirIn(d.MergeLockStateDir, filepath.Join(scratchDir, epic))
+}
+
 // mergeJob is the in-memory handoff from a build goroutine to the merge-queue
 // worker: everything mergeCherryPick/markDoneStampingCloseMetadata/
 // finishCleanup need that only exists as live-process state (pane/tab/
@@ -135,7 +140,7 @@ func runMergeQueue(d Deps, lp mergeQueueParams, mergeJobs map[string]mergeJob, m
 		if r.mergeDeferred {
 			if !deferredLogged {
 				deferredLogged = true
-				logMergeDeferred(lp.iterationParamsFor(job))
+				logMergeDeferred(d, lp.iterationParamsFor(job))
 			}
 			// Re-queue and retry on the next tick instead of waiting on the
 			// lock; a fresh build's wake just brings the retry forward.
@@ -160,9 +165,9 @@ func runMergeQueue(d Deps, lp mergeQueueParams, mergeJobs map[string]mergeJob, m
 
 // logMergeDeferred records why a merge is waiting, naming the lock's owner when
 // there is one.
-func logMergeDeferred(p iterationParams) {
+func logMergeDeferred(d Deps, p iterationParams) {
 	reason := "merge lock held or conflict pending"
-	if dir, err := mergeLockDir(p.ScratchDir, p.FeatureBranch); err == nil {
+	if dir, err := d.mergeLockDir(p.ScratchDir, p.FeatureBranch); err == nil {
 		if owner, err := ReadMergeLock(dir); err == nil && owner != nil {
 			reason = "merge lock held by " + owner.Describe()
 		}
@@ -229,7 +234,7 @@ func mergeOne(d Deps, lp mergeQueueParams, job mergeJob) outcome {
 
 	// The lock is shared with the human merge command, whose conflicted merge
 	// exits still holding it. Never wait on it: pause as deferred, retry next tick.
-	lockDir, err := mergeLockDir(p.ScratchDir, p.FeatureBranch)
+	lockDir, err := d.mergeLockDir(p.ScratchDir, p.FeatureBranch)
 	if err != nil {
 		return outcome{ticket: job.ticket, err: err}
 	}

@@ -59,8 +59,15 @@ var _ agentrunner.Nudger = (*Runner)(nil)
 // New gates on Claude transcript background tasks, unless the home directory
 // can't be found.
 func New() *Runner {
-	r := &Runner{started: map[string]agentrunner.StartOptions{}, CodexQuota: codexsession.LastRateLimit}
-	if home, err := os.UserHomeDir(); err == nil {
+	home, _ := os.UserHomeDir()
+	return NewIn(herdr.CLI{}, home)
+}
+
+// NewIn is New under cli, gating background tasks on the transcripts under
+// home. An empty home skips the gating.
+func NewIn(cli herdr.CLI, home string) *Runner {
+	r := &Runner{CLI: cli, started: map[string]agentrunner.StartOptions{}, CodexQuota: codexsession.LastRateLimit}
+	if home != "" {
 		r.BackgroundTasks = claudeui.BackgroundTasks(home, time.Now)
 	}
 	return r

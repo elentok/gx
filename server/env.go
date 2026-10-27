@@ -81,7 +81,33 @@ func (s *Server) defaultDeps() ralphloop.Deps {
 	var o ralphloop.DepsOverrides
 	o.Home, _ = s.envHome()
 	o.CodexHome, _ = s.codexHome()
+	o.StateDir, _ = s.lockStateDir()
 	return ralphloop.DefaultDepsWithOverrides(o)
+}
+
+// lockStateDir is the gx state dir of Config.Env that merge locks live under,
+// or "" for the process env, which ralphloop resolves itself.
+func (s *Server) lockStateDir() (string, error) {
+	if s.cfg.Env == nil {
+		return "", nil
+	}
+	if dir := harness.LookupEnv(s.cfg.Env, "XDG_STATE_HOME"); dir != "" {
+		return filepath.Join(dir, "gx"), nil
+	}
+	home, err := s.envHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".local", "state", "gx"), nil
+}
+
+// mergeLockDir is the merge lock dir of the epic at epicPath.
+func (s *Server) mergeLockDir(epicPath string) (string, error) {
+	stateDir, err := s.lockStateDir()
+	if err != nil {
+		return "", err
+	}
+	return ralphloop.MergeLockDirIn(stateDir, epicPath)
 }
 
 // typing is the typing rules for the claude sessions this server runs, reading

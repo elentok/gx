@@ -435,7 +435,7 @@ func mergeBuilt(d Deps, p iterationParams, built *builtAwaitingMergeError) error
 	for waited := time.Duration(0); r.mergeDeferred && waited < mergeDeferCap; waited += mergeDeferRetryInterval {
 		if !logged {
 			logged = true
-			logMergeDeferred(p)
+			logMergeDeferred(d, p)
 		}
 		d.Sleep(mergeDeferRetryInterval)
 		r = mergeOne(d, lp, built.job)

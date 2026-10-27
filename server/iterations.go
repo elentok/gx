@@ -81,7 +81,8 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 	it := IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID}
 	if runner.Name() == runnerHerdr {
 		it.Pane = sess.ID
-		if agent, err := herdr.AgentGet(label); err == nil {
+		cli := herdr.CLI{Env: s.cfg.Env}
+		if agent, err := cli.AgentGet(label); err == nil {
 			it.Tab = agent.TabID
 		}
 	}

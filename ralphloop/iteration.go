@@ -790,7 +790,7 @@ func cherryPickWithConflictResolution(d Deps, p iterationParams, base, branch, s
 		}
 		// A merge marker means the sequencer state is a human's pending
 		// conflict, not crash debris: aborting would discard their work.
-		lockDir, err := mergeLockDir(p.ScratchDir, p.FeatureBranch)
+		lockDir, err := d.mergeLockDir(p.ScratchDir, p.FeatureBranch)
 		if err != nil {
 			return MergeResult{}, "", err
 		}

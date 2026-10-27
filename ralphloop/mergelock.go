@@ -29,9 +29,17 @@ var mergeLockStateDir = config.StateDir
 // epic's feature branch (CLI or server) contends for the same lock whichever
 // path it reached the epic by.
 func MergeLockDir(epicPath string) (string, error) {
-	state, err := mergeLockStateDir()
-	if err != nil {
-		return "", fmt.Errorf("resolving merge lock dir: %w", err)
+	return MergeLockDirIn("", epicPath)
+}
+
+// MergeLockDirIn is MergeLockDir under stateDir; empty means the process's.
+func MergeLockDirIn(stateDir, epicPath string) (string, error) {
+	state := stateDir
+	if state == "" {
+		var err error
+		if state, err = mergeLockStateDir(); err != nil {
+			return "", fmt.Errorf("resolving merge lock dir: %w", err)
+		}
 	}
 	epicPath = filepath.Clean(epicPath)
 	return filepath.Join(state, "land-locks", tickets.ProjectName(filepath.Dir(epicPath)), filepath.Base(epicPath)), nil

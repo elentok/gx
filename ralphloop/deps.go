@@ -56,6 +56,9 @@ type Deps struct {
 	// RenameBranch renames a local branch, for setting an iteration branch
 	// aside under an attic name.
 	RenameBranch func(repoDir, oldName, newName string) error
+	// MergeLockStateDir is the state dir the merge locks live under; empty
+	// means the process's.
+	MergeLockStateDir string
 	// Runner hosts the iteration's agent.
 	Runner       agentrunner.Runner
 	RevParse     func(dir, ref string) (string, error)
@@ -193,6 +196,8 @@ type DepsOverrides struct {
 	// Path, when non-empty, overrides os.Getenv("PATH") for codex/herdr/
 	// package-manager executable lookups (PreflightAgent, InstallDeps).
 	Path string
+	// StateDir, when non-empty, is the gx state dir merge locks live under.
+	StateDir string
 }
 
 // DefaultDepsWithOverrides is DefaultDeps with overrides applied to the
@@ -226,6 +231,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		DeleteBranch:         deleteBranch,
 		RenameBranch:         renameBranch,
 		Runner:               runner,
+		MergeLockStateDir:    overrides.StateDir,
 		RevParse:             git.RevParse,
 		MergeBase:            git.MergeBase,
 		CommitsAhead:         git.CommitsAhead,

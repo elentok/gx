@@ -25,7 +25,7 @@ const interruptedMergingReason = "interrupted merging recorded on restart"
 // holds it any more. A lock with a marker is a human's pending conflict and a
 // live owner is still merging, so both are left alone.
 func recoverInterruptedMerging(d Deps, rp reconcileParams, epic tickets.Epic) error {
-	lockDir, err := mergeLockDir(rp.Paths.ScratchDir, epic.Name)
+	lockDir, err := d.mergeLockDir(rp.Paths.ScratchDir, epic.Name)
 	if err != nil {
 		return fmt.Errorf("resolving merge lock dir: %w", err)
 	}
@@ -118,7 +118,7 @@ func recordInterruptedMerging(d Deps, rp reconcileParams, epic tickets.Epic, own
 // merge-queue worker and `gx server tickets merge` take, recording the pre-pick HEAD
 // so a merging cut short can be finished on restart.
 func withMergeLock(d Deps, p iterationParams, merge func() error) error {
-	lockDir, err := mergeLockDir(p.ScratchDir, p.FeatureBranch)
+	lockDir, err := d.mergeLockDir(p.ScratchDir, p.FeatureBranch)
 	if err != nil {
 		return err
 	}

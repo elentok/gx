@@ -38,7 +38,7 @@ func (s *Server) recoverMerges() {
 }
 
 func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
-	lockDir, err := ralphloop.MergeLockDir(epicPath)
+	lockDir, err := s.mergeLockDir(epicPath)
 	if err != nil {
 		return err
 	}

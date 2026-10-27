@@ -24,6 +24,8 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
@@ -230,6 +232,10 @@ type Config struct {
 	ConfigWatchDebounce time.Duration // zero means the default
 
 	HerdrRetryInterval time.Duration // zero means the default
+
+	// RunnerWait is the default runner's configured wait; zero means
+	// config.LoadRunnerWait().
+	RunnerWait time.Duration
 
 	// Sleep paces the ralphloop waits (finish debounce, poll backoffs); nil
 	// means time.Sleep. Tests shrink it so each merge skips the real seconds.
@@ -446,7 +452,13 @@ type Server struct {
 func New(cfg Config) (*Server, error) {
 	if cfg.Runner == nil {
 		h := herdrrunner.New()
-		h.N = config.LoadRunnerWait()
+		if cfg.Env != nil {
+			h = herdrrunner.NewIn(herdr.CLI{Env: cfg.Env}, harness.LookupEnv(cfg.Env, "HOME"))
+		}
+		h.N = cfg.RunnerWait
+		if h.N == 0 {
+			h.N = config.LoadRunnerWait()
+		}
 		cfg.Runner = h
 	}
 	if cfg.Notifier == nil {
