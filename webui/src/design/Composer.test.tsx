@@ -696,8 +696,19 @@ test("a second Send click closes the popover and sends nothing", async () => {
 
 test("a popover row opens the sheet at that question and focuses its first control, even folded", async () => {
   const post = vi.fn<PostPrompt>(async () => ok);
-  const { s, popover } = await sendWithGaps(post);
+  const { s, popover: gaps } = await sendWithGaps(post);
+  // Folding needs the Chat view; close the popover first and open it again after.
+  fireEvent.keyDown(gaps, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "Chat" }));
   fireEvent.click(s.getByRole("button", { name: "Fold questions" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  const popover = await screen.findByRole("alertdialog");
+  await waitFor(() =>
+    expect(document.activeElement).toBe(
+      within(popover).getByRole("button", { name: "Send anyway" }),
+    ),
+  );
   fireEvent.click(within(popover).getByRole("button", { name: /Q3/ }));
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
   await waitFor(() =>

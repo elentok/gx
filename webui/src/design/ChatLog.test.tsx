@@ -277,6 +277,7 @@ test("a round opens a sheet that folds, and its stepper marks and jumps", async 
   expect(within(sheet).getByRole("button", { name: "Question 3" }).getAttribute("aria-current")).toBe("step");
   expect(within(sheet).getByRole("textbox", { name: "Answer to question 3" })).toBeTruthy();
 
+  fireEvent.click(viewButton("Chat"));
   fireEvent.click(within(sheet).getByRole("button", { name: "Fold questions" }));
   expect(within(sheet).queryByRole("textbox", { name: "Answer to question 3" })).toBeNull();
   fireEvent.click(within(sheet).getByRole("button", { name: "Open questions" }));
@@ -375,48 +376,55 @@ const focusChat = () =>
     }),
   );
 
-test("focus mode hides the messages and the impl link; banner, notice and composer stay", async () => {
+const view = () => screen.getByRole("group", { name: "View" });
+const viewButton = (name: RegExp | string) => within(view()).getByRole("button", { name });
+const inQuestions = () => screen.queryByText("earlier talk") === null;
+const showChat = async () => {
+  fireEvent.click(viewButton("Chat"));
+  await screen.findByText("earlier talk");
+};
+const showQuestions = () => fireEvent.click(viewButton(/^Questions/));
+
+test("a round opens in Questions: messages and impl link hidden, toggle counts answers; banner, notice and composer stay", async () => {
   renderChat([session({ failure: { kind: "stalled", label: "Stalled" } as SessionInfo["failure"] })], focusChat(), undefined, implDetail);
   const sheet = await screen.findByRole("group", { name: "Questions" });
-  expect(screen.getByText("earlier talk")).toBeTruthy();
-  expect(screen.getByRole("link", { name: /Open implementation epic/ })).toBeTruthy();
-  fireEvent.click(within(sheet).getByRole("button", { name: "Enter focus mode" }));
-  expect(screen.queryByText("earlier talk")).toBeNull();
+  expect(inQuestions()).toBe(true);
   expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
-  expect(screen.getByRole("group", { name: "Questions" })).toBeTruthy();
+  expect(viewButton(/^Questions/).textContent).toBe("Questions (0 of 2)");
+  expect(viewButton(/^Questions/).getAttribute("aria-pressed")).toBe("true");
+  expect(viewButton("Chat").getAttribute("aria-pressed")).toBe("false");
   expect(screen.getByLabelText("Session failure")).toBeTruthy();
   expect(screen.getByRole("form", { name: "Composer" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Leave focus mode" }));
-  expect(await screen.findByText("earlier talk")).toBeTruthy();
+  fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
+  expect(viewButton(/^Questions/).textContent).toBe("Questions (1 of 2)");
+  await showChat();
   expect(screen.getByRole("link", { name: /Open implementation epic/ })).toBeTruthy();
+  expect(viewButton("Chat").getAttribute("aria-pressed")).toBe("true");
 });
 
-test("focus mode keeps the gx stopped notice", async () => {
+test("Questions keeps the gx stopped notice", async () => {
   renderChat([session({ actionable: { reason: "boom", gx_raised: true } })], focusChat());
-  fireEvent.click(within(await screen.findByRole("group", { name: "Questions" })).getByRole("button", { name: "Enter focus mode" }));
+  await screen.findByRole("group", { name: "Questions" });
   expect(screen.getByRole("region", { name: "gx stopped" })).toBeTruthy();
 });
 
-test("fold leaves focus mode; unfolding with the focus button enters it", async () => {
+test("the Chat view's sheet folds; the Questions view's sheet has no fold chevron and no focus button", async () => {
   renderChat([session()], focusChat());
   const sheet = await screen.findByRole("group", { name: "Questions" });
-  fireEvent.click(within(sheet).getByRole("button", { name: "Enter focus mode" }));
-  expect(screen.queryByText("earlier talk")).toBeNull();
+  expect(within(sheet).queryByRole("button", { name: /Fold questions|Open questions/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /focus mode/ })).toBeNull();
+  await showChat();
   fireEvent.click(within(sheet).getByRole("button", { name: "Fold questions" }));
-  expect(await screen.findByText("earlier talk")).toBeTruthy();
   expect(within(sheet).queryByRole("button", { name: "Alpha" })).toBeNull();
-  fireEvent.click(within(sheet).getByRole("button", { name: "Enter focus mode" }));
-  expect(screen.queryByText("earlier talk")).toBeNull();
+  expect(screen.queryByRole("button", { name: /focus mode/ })).toBeNull();
+  showQuestions();
   expect(within(sheet).getByRole("button", { name: "Alpha" })).toBeTruthy();
+  expect(inQuestions()).toBe(true);
 });
 
-const enterFocus = async () =>
-  fireEvent.click(within(await screen.findByRole("group", { name: "Questions" })).getByRole("button", { name: "Enter focus mode" }));
-const inFocus = () => screen.queryByText("earlier talk") === null;
-
-test("Escape leaves focus mode, also from the note field", async () => {
+test("Escape shows the chat, also from the note field", async () => {
   renderChat([session()], focusChat());
-  await enterFocus();
+  await screen.findByRole("group", { name: "Questions" });
   fireEvent.click(screen.getByRole("button", { name: "Note" }));
   fireEvent.keyDown(screen.getByRole("textbox", { name: "Message" }), { key: "Escape" });
   expect(await screen.findByText("earlier talk")).toBeTruthy();
@@ -424,13 +432,13 @@ test("Escape leaves focus mode, also from the note field", async () => {
 
 test("Escape with the Send popover open closes only the popover", async () => {
   renderChat([session()], focusChat());
-  await enterFocus();
+  await screen.findByRole("group", { name: "Questions" });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   const popover = await screen.findByRole("alertdialog", { name: "Unanswered questions" });
   await act(async () => {});
   fireEvent.keyDown(popover, { key: "Escape" });
   await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-  expect(inFocus()).toBe(true);
+  expect(inQuestions()).toBe(true);
   fireEvent.keyDown(document.body, { key: "Escape" });
   expect(await screen.findByText("earlier talk")).toBeTruthy();
 });
@@ -439,12 +447,12 @@ test("Escape with the phone steps modal open closes only the modal", async () =>
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   try {
     renderChat([session()], focusChat(), undefined, implDetail);
-    await enterFocus();
+    await screen.findByRole("group", { name: "Questions" });
     fireEvent.click(await screen.findByRole("button", { name: /^Branch/ }));
     await screen.findByRole("dialog", { name: "Design progress steps" });
     fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Design progress steps" })).toBeNull());
-    expect(inFocus()).toBe(true);
+    expect(inQuestions()).toBe(true);
     fireEvent.keyDown(document.body, { key: "Escape" });
     expect(await screen.findByText("earlier talk")).toBeTruthy();
   } finally {
@@ -454,57 +462,62 @@ test("Escape with the phone steps modal open closes only the modal", async () =>
 
 test("Escape with the failure banner's screen modal open closes only the modal", async () => {
   renderChat([session({ failure: { kind: "stalled", label: "Stalled" } as SessionInfo["failure"] })], focusChat());
-  await enterFocus();
+  await screen.findByRole("group", { name: "Questions" });
   fireEvent.click(await screen.findByRole("button", { name: "Screen" }));
   await screen.findByRole("dialog", { name: "Screen" });
   fireEvent.keyDown(document.body, { key: "Escape" });
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Screen" })).toBeNull());
-  expect(inFocus()).toBe(true);
+  expect(inQuestions()).toBe(true);
   fireEvent.keyDown(document.body, { key: "Escape" });
   expect(await screen.findByText("earlier talk")).toBeTruthy();
 });
 
-test("a successful send leaves focus mode; a refused send keeps it and shows the error", async () => {
+test("a successful send shows the chat; a refused send keeps Questions and shows the error", async () => {
   const post = vi
     .fn<PostPrompt>()
     .mockResolvedValueOnce({ refused: true, reason: "text-too-long", message: "text is over the limit" })
     .mockResolvedValue({});
   renderChat([session()], focusChat(), post);
-  await enterFocus();
+  await screen.findByRole("group", { name: "Questions" });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
   expect(await screen.findByText("text is over the limit")).toBeTruthy();
-  expect(inFocus()).toBe(true);
+  expect(inQuestions()).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
   expect(await screen.findByText("earlier talk")).toBeTruthy();
 });
 
-test("a new round starts docked, and a round that goes away ends focus mode", async () => {
+test("a new round opens Questions again, and a round that goes away shows the chat with no toggle", async () => {
   let current = focusChat();
   const { emit } = renderChat([session()], (...a) => current(...a));
-  await enterFocus();
-  expect(inFocus()).toBe(true);
+  await screen.findByRole("group", { name: "Questions" });
+  await showChat();
   current = okChat(chatOf([msg({ text: "earlier talk" })], { round: [card({ label: "1", title: "other", body: "Else?" })] }));
   await emit("s-a");
-  expect(await screen.findByText("earlier talk")).toBeTruthy();
-  await enterFocus();
-  expect(inFocus()).toBe(true);
+  await waitFor(() => expect(inQuestions()).toBe(true));
   current = okChat(chatOf([msg({ text: "earlier talk" })]));
   await emit("s-a");
   expect(await screen.findByText("earlier talk")).toBeTruthy();
+  expect(screen.queryByRole("group", { name: "View" })).toBeNull();
 });
 
-test("a fresh mount with a round draft opens docked", async () => {
+test("no round: no toggle, the messages show", async () => {
+  renderChat([session()], okChat(chatOf([msg({ text: "earlier talk" })])));
+  expect(await screen.findByText("earlier talk")).toBeTruthy();
+  expect(screen.queryByRole("group", { name: "View" })).toBeNull();
+});
+
+test("a fresh mount with a round draft opens Questions", async () => {
   renderChat([session()], focusChat());
   fireEvent.click(within(await screen.findByRole("group", { name: "Questions" })).getByRole("button", { name: "Alpha" }));
   cleanup();
   renderChat([session()], focusChat());
   await screen.findByRole("group", { name: "Questions" });
-  expect(inFocus()).toBe(false);
+  expect(inQuestions()).toBe(true);
 });
 
-test("answers, the open question and the note survive switching modes; the text answer has five rows in focus", async () => {
+test("answers, the open question and the note survive two view switches; the text answer has five rows in Questions", async () => {
   renderChat([session()], focusChat());
   const sheet = await screen.findByRole("group", { name: "Questions" });
   fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
@@ -512,11 +525,12 @@ test("answers, the open question and the note survive switching modes; the text 
   fireEvent.click(screen.getByRole("button", { name: "Note" }));
   fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "for all" } });
   const answer = () => within(sheet).getByRole("textbox", { name: "Answer to question 3" }) as HTMLTextAreaElement;
-  expect(answer().rows).toBe(2);
-  fireEvent.click(within(sheet).getByRole("button", { name: "Enter focus mode" }));
   expect(answer().rows).toBe(5);
   fireEvent.change(answer(), { target: { value: "typed" } });
-  fireEvent.click(within(sheet).getByRole("button", { name: "Leave focus mode" }));
+  await showChat();
+  expect(answer().rows).toBe(2);
+  showQuestions();
+  await showChat();
   expect(answer().rows).toBe(2);
   expect(answer().value).toBe("typed");
   expect(within(sheet).getByRole("button", { name: "Question 1, answered" })).toBeTruthy();
@@ -531,6 +545,7 @@ test("defaulted questions render as plain text beside one card, and Send asks no
   const fetchChat = okChat(chatOf([msg({ text: defaultsText })], { round: [card({ label: "1", body: "First?" })] }));
   renderChat([session()], fetchChat, post);
   const sheet = await screen.findByRole("group", { name: "Questions" });
+  fireEvent.click(viewButton("Chat"));
   expect(screen.getByText("Decided unless you object")).toBeTruthy();
   expect(screen.getByText("Naming: use camelCase")).toBeTruthy();
   expect(screen.getByText("Order: alphabetical")).toBeTruthy();
@@ -559,5 +574,6 @@ test("an all-defaulted round shows one Accept these defaults card", async () => 
   expect(within(sheet).getByText("Q1 - Accept these defaults?")).toBeTruthy();
   expect(within(sheet).getByRole("button", { name: "Yes" })).toBeTruthy();
   expect(within(sheet).getByRole("button", { name: "No" })).toBeTruthy();
+  fireEvent.click(viewButton("Chat"));
   expect(screen.getByText("Naming: use camelCase")).toBeTruthy();
 });

@@ -20,7 +20,9 @@ import {
 } from "./FailureBanner";
 import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
+import { isAnswered } from "./round";
 import { useRoundDraft } from "./roundDraft";
+import { Button } from "../ui/button/Button";
 
 const KIND_NAMES: Record<string, string> = {
   shell: "shell",
@@ -134,11 +136,9 @@ function WorkingRow({ step, title }: WorkingStep) {
   );
 }
 
-// The sheet and the composer share the round's answers. The caller keys it by round, so a new round starts blank
-// while a refetch of the same round keeps every answer. The draft also survives a reload (see useRoundDraft).
+// The sheet and the composer share the round's answers (see useRoundDraft: they survive a reload).
 function ChatTail({
   session,
-  roundKey,
   chat,
   connected,
   post,
@@ -146,11 +146,11 @@ function ChatTail({
   done,
   nextTitle,
   actions,
-  focusMode,
-  onFocusMode,
+  questions,
+  onQuestions,
+  roundDraft,
 }: {
   session: SessionInfo;
-  roundKey: string;
   chat: SessionChatResponse;
   connected: boolean;
   post?: PostPrompt;
@@ -158,23 +158,21 @@ function ChatTail({
   done?: boolean;
   nextTitle?: string;
   actions: FailureActions;
-  focusMode: boolean;
-  onFocusMode: (on: boolean) => void;
+  questions: boolean;
+  onQuestions: (on: boolean) => void;
+  roundDraft: ReturnType<typeof useRoundDraft>;
 }) {
-  const { draft, setAnswers, setNotes, setIndex, clear } = useRoundDraft(
-    session.id,
-    roundKey,
-  );
+  const { draft, setAnswers, setNotes, setIndex, clear } = roundDraft;
   const { answers } = draft;
   const [focus, setFocus] = useState<{ index: number }>();
   const failure = visibleFailure(session.failure, done);
   const round = chat.round ?? [];
   return (
     // The bottom area: at most half the screen, so only the question body scrolls past that.
-    // In focus mode the cap is gone and the sheet takes the rest of the column.
+    // In the Questions view the cap is gone and the sheet takes the rest of the column.
     <Box
-      flex={focusMode ? "1" : "none"}
-      maxH={focusMode ? undefined : "50dvh"}
+      flex={questions ? "1" : "none"}
+      maxH={questions ? undefined : "50dvh"}
       display="flex"
       flexDirection="column"
       minH="0"
@@ -188,8 +186,7 @@ function ChatTail({
           focus={focus}
           initialIndex={draft.index}
           onIndex={setIndex}
-          focusMode={focusMode}
-          onFocusMode={onFocusMode}
+          questions={questions}
         />
       )}
       {failure && (
@@ -222,7 +219,7 @@ function ChatTail({
           onText={setNotes}
           onRoundSent={() => {
             clear();
-            onFocusMode(false);
+            onQuestions(false);
           }}
           onReview={(index) => setFocus({ index })}
         />
@@ -267,53 +264,100 @@ function ChatScroller({
   );
 }
 
-// The chat of a Claude session. Other harnesses have no chat, so DesignChat never mounts this for them.
-function ChatLog({
+function ViewToggle({
+  answered,
+  total,
+  questions,
+  onQuestions,
+}: {
+  answered: number;
+  total: number;
+  questions: boolean;
+  onQuestions: (on: boolean) => void;
+}) {
+  return (
+    <Box role="group" aria-label="View" display="flex" gap="2" flex="none">
+      <Button
+        size="sm"
+        emphasis={questions ? "main" : "secondary"}
+        aria-pressed={questions}
+        onClick={() => onQuestions(true)}
+      >
+        Questions ({answered} of {total})
+      </Button>
+      <Button
+        size="sm"
+        emphasis={questions ? "secondary" : "main"}
+        aria-pressed={!questions}
+        onClick={() => onQuestions(false)}
+      >
+        Chat
+      </Button>
+    </Box>
+  );
+}
+
+// Everything that depends on the round. The caller keys it by round, so a new round starts blank (and in the
+// Questions view) while a refetch of the same round keeps every answer.
+function ChatBody({
   session,
-  fetchChat,
+  roundKey,
+  chat,
+  connected,
   post,
+  onStale,
   done,
   nextTitle,
   working: step,
   actions,
-  focusMode,
-  onFocusMode,
+  questions,
+  onQuestions,
 }: {
   session: SessionInfo;
-  fetchChat?: FetchChat;
+  roundKey: string;
+  chat: SessionChatResponse;
+  connected: boolean;
   post?: PostPrompt;
+  onStale: () => void;
   done?: boolean;
   nextTitle?: string;
   working?: WorkingStep;
   actions: FailureActions;
-  focusMode: boolean;
-  onFocusMode: (on: boolean) => void;
+  questions: boolean;
+  onQuestions: (on: boolean) => void;
 }) {
-  const conn = useConnectionContext();
-  const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
-  const connected = useConnectionState(conn).connected;
-  const roundKey = (chat?.round ?? [])
-    .map((c) => `${c.label}:${c.title}`)
-    .join("|");
-  // A new round starts docked, and a round that went away without our send (another tab, the session moved on)
-  // leaves nothing to focus on.
-  useEffect(() => onFocusMode(false), [roundKey]);
+  const roundDraft = useRoundDraft(session.id, roundKey);
+  const round = chat.round ?? [];
+  const hasRound = round.length > 0;
+  // A new round opens in Questions; a round that went away (another tab, the session moved on) leaves Chat.
+  // A layout effect, so the first paint of a round is already the Questions view.
+  useLayoutEffect(() => onQuestions(hasRound), []);
   useEffect(() => {
-    if (!focusMode) return;
+    if (!questions) return;
     // Capture phase: judge the layers as they were before this same Escape closes one of them.
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || document.querySelector(LAYERS)) return;
-      onFocusMode(false);
+      onQuestions(false);
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [focusMode, onFocusMode]);
-  if (!chat) return null;
+  }, [questions, onQuestions]);
   const busy =
     session.status.state === "working" && !session.status.background;
   return (
     <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
-      {!focusMode && (
+      {hasRound && (
+        <ViewToggle
+          answered={
+            round.filter((c) => isAnswered(roundDraft.draft.answers[c.label]))
+              .length
+          }
+          total={round.length}
+          questions={questions}
+          onQuestions={onQuestions}
+        />
+      )}
+      {!questions && (
         <ChatScroller
           signal={`${chat.messages.length}|${chat.background.length}|${busy}`}
         >
@@ -332,20 +376,55 @@ function ChatLog({
         </ChatScroller>
       )}
       <ChatTail
-        key={roundKey}
         session={session}
-        roundKey={roundKey}
         chat={chat}
         connected={connected}
         post={post}
-        onStale={refetch}
+        onStale={onStale}
         done={done}
         nextTitle={nextTitle}
         actions={actions}
-        focusMode={focusMode}
-        onFocusMode={onFocusMode}
+        questions={questions}
+        onQuestions={onQuestions}
+        roundDraft={roundDraft}
       />
     </Box>
+  );
+}
+
+// The chat of a Claude session. Other harnesses have no chat, so DesignChat never mounts this for them.
+function ChatLog({
+  session,
+  fetchChat,
+  ...rest
+}: {
+  session: SessionInfo;
+  fetchChat?: FetchChat;
+  post?: PostPrompt;
+  done?: boolean;
+  nextTitle?: string;
+  working?: WorkingStep;
+  actions: FailureActions;
+  questions: boolean;
+  onQuestions: (on: boolean) => void;
+}) {
+  const conn = useConnectionContext();
+  const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
+  const connected = useConnectionState(conn).connected;
+  if (!chat) return null;
+  const roundKey = (chat.round ?? [])
+    .map((c) => `${c.label}:${c.title}`)
+    .join("|");
+  return (
+    <ChatBody
+      key={roundKey}
+      session={session}
+      roundKey={roundKey}
+      chat={chat}
+      connected={connected}
+      onStale={refetch}
+      {...rest}
+    />
   );
 }
 
@@ -358,8 +437,8 @@ export function DesignChat({
   nextTitle,
   working,
   actions,
-  focusMode = false,
-  onFocusMode = () => {},
+  questions = false,
+  onQuestions = () => {},
 }: {
   session?: SessionInfo;
   fetchChat?: FetchChat;
@@ -371,9 +450,9 @@ export function DesignChat({
   /** The step the busy row names, and the ticket during Resolve tickets. */
   working?: WorkingStep;
   actions: FailureActions;
-  /** Focus mode: only the questions sheet, the failure notices and the composer. The page owns it. */
-  focusMode?: boolean;
-  onFocusMode?: (on: boolean) => void;
+  /** The Questions view: only the questions sheet, the failure notices and the composer. The page owns it. */
+  questions?: boolean;
+  onQuestions?: (on: boolean) => void;
 }) {
   if (!session) return null;
   if (session.harness !== "claude") {
@@ -399,8 +478,8 @@ export function DesignChat({
       nextTitle={nextTitle}
       working={working}
       actions={actions}
-      focusMode={focusMode}
-      onFocusMode={onFocusMode}
+      questions={questions}
+      onQuestions={onQuestions}
     />
   );
 }

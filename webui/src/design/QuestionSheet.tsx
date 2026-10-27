@@ -53,7 +53,7 @@ function Choice({
   );
 }
 
-// One question of a round. `big` is the focus-mode size.
+// One question of a round. `big` is the Questions-view size.
 export function Question({
   card,
   answer,
@@ -195,8 +195,7 @@ export function QuestionSheet({
   focus,
   initialIndex = 0,
   onIndex,
-  focusMode = false,
-  onFocusMode,
+  questions = false,
 }: {
   round: SessionRoundCard[];
   answers: Answers;
@@ -206,11 +205,13 @@ export function QuestionSheet({
   /** The question the sheet opens at, and a listener for every move, so the caller can keep a draft. */
   initialIndex?: number;
   onIndex?: (index: number) => void;
-  /** Focus mode: the sheet fills its column and its questions render big. The page owns it. */
-  focusMode?: boolean;
-  onFocusMode?: (on: boolean) => void;
+  /** The Questions view: the sheet fills its column, renders big and cannot fold. The page owns it. */
+  questions?: boolean;
 }) {
   const [open, setOpen] = useState(true);
+  useEffect(() => {
+    if (questions) setOpen(true);
+  }, [questions]);
   const [index, setIndex] = useState(() =>
     Math.min(initialIndex, round.length - 1),
   );
@@ -281,7 +282,7 @@ export function QuestionSheet({
       display="flex"
       flexDirection="column"
       minH="0"
-      flex={focusMode ? "1" : undefined}
+      flex={questions ? "1" : undefined}
     >
       <Box
         px="3"
@@ -303,31 +304,17 @@ export function QuestionSheet({
         <Text fontSize="xs" color="text.dim">
           {done} of {round.length} answered
         </Text>
-        {onFocusMode && (
+        {!questions && (
           <Button
             emphasis="ghost"
             size="sm"
-            aria-label={focusMode ? "Leave focus mode" : "Enter focus mode"}
-            onClick={() => {
-              setOpen(true);
-              onFocusMode(!focusMode);
-            }}
+            aria-expanded={open}
+            aria-label={open ? "Fold questions" : "Open questions"}
+            onClick={() => setOpen((o) => !o)}
           >
-            {focusMode ? "⤡" : "⤢"}
+            {open ? "▾" : "▴"}
           </Button>
         )}
-        <Button
-          emphasis="ghost"
-          size="sm"
-          aria-expanded={open}
-          aria-label={open ? "Fold questions" : "Open questions"}
-          onClick={() => {
-            setOpen((o) => !o);
-            if (open) onFocusMode?.(false);
-          }}
-        >
-          {open ? "▾" : "▴"}
-        </Button>
       </Box>
       <Box
         display={open ? "flex" : "none"}
@@ -337,6 +324,8 @@ export function QuestionSheet({
       >
         <Box px="3" minH="0" flex="1" overflowY="auto">
           <Box
+            maxW={questions ? "820px" : undefined}
+            mx={questions ? "auto" : undefined}
             ref={row}
             onScroll={onScroll}
             display="flex"
@@ -359,7 +348,7 @@ export function QuestionSheet({
                 aria-hidden={k !== index}
               >
                 <Question
-                  big={focusMode}
+                  big={questions}
                   card={c}
                   answer={answers[c.label] ?? {}}
                   onChange={(a) =>
