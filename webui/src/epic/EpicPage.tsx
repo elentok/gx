@@ -9,7 +9,7 @@ import { hasDesignSession, liveSessions } from "../design/view";
 import { ActionMerge, ActionStashMerge, type EpicDetailRow, type EpicListRow, type SessionInfo } from "../generated/server";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { pageRing } from "./ring";
-import { MergeButton, StashMergeButton, isMergeable } from "../epics/MergeButton";
+import { MergeButton, StashMergeButton } from "../epics/MergeButton";
 import { designHref, epicHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
 import { useEpicList, waitingCount, type FetchEpicList } from "../epics/list";
@@ -96,7 +96,7 @@ function DesignSessionButton({ detail, open }: { detail: EpicDetail; open?: Open
 const QUEUE_LOCKED = "Queue unlocks once all tickets are published";
 
 // One bar under a hairline: the stats line on the left, the buttons on the right. On phones the buttons wrap to
-// their own row at a touch-friendly height. A paused epic's land-block reason sits under the bar.
+// their own row at a touch-friendly height. A land-blocked epic's notice sits under the bar, and it has no Merge.
 function EpicBar({
   address,
   detail,
@@ -167,40 +167,84 @@ function EpicBar({
           )}
           {detail.kind === "map" && <DesignSessionButton detail={detail} open={openDesign} />}
           {detail.queueable && <QueueButton address={address} state={detail.state ?? ""} onQueued={onChanged} />}
-          {isMergeable(detail.state, !!detail.land_block_reason) && (
-            <>
-              {detail.actions?.includes(ActionStashMerge) && (
-                <StashMergeButton
-                  address={address}
-                  state={detail.state ?? ""}
-                  onMerged={onChanged}
-                  label={detail.action_info?.[ActionStashMerge]?.label}
-                  tooltip={detail.action_info?.[ActionStashMerge]?.tooltip}
-                />
-              )}
-              <MergeButton
-                address={address}
-                state={detail.state ?? ""}
-                onMerged={onChanged}
-                label={detail.action_info?.[ActionMerge]?.label}
-                tooltip={detail.action_info?.[ActionMerge]?.tooltip}
-              />
-            </>
+          {detail.state === "awaiting-merge" && (
+            <MergeButton address={address} state={detail.state} onMerged={onChanged} />
           )}
         </Box>
       </Box>
-      {detail.state === "paused" && detail.land_block_reason && (
-        <Text data-reason mt="2" fontSize="sm" color="tone.paused.fg">
-          {detail.land_block_reason}
-        </Text>
-      )}
-      {detail.state === "paused" && (detail.land_block_files?.length ?? 0) > 0 && (
-        <Box as="ul" data-testid="land-block-files" mt="1" pl="5" fontSize="sm" fontFamily="mono" color="text.muted">
-          {detail.land_block_files?.map((f) => (
-            <li key={f}>{f}</li>
-          ))}
-        </Box>
-      )}
+      {landBlocked(detail) && <LandBlockNotice address={address} detail={detail} wide={wide} onChanged={onChanged} />}
+    </Box>
+  );
+}
+
+const landBlocked = (detail: EpicDetail) => detail.state === "paused" && !!detail.land_block_reason;
+
+const DIRTY_TRUNK = "dirty-trunk";
+
+// The merge block's reason with its fix buttons. A dirty trunk says it short and lists every clashing file.
+function LandBlockNotice({
+  address,
+  detail,
+  wide,
+  onChanged,
+}: {
+  address: string;
+  detail: EpicDetail;
+  wide: boolean;
+  onChanged: () => void;
+}) {
+  const state = detail.state ?? "";
+  const dirty = detail.land_block_kind === DIRTY_TRUNK;
+  const reason = dirty ? "Trunk has local changes" : detail.land_block_reason;
+  const info = (action: string) => ({ label: detail.action_info?.[action]?.label, tooltip: detail.action_info?.[action]?.tooltip });
+  const hasButtons = detail.actions?.some((a) => a === ActionStashMerge || a === ActionMerge);
+  return (
+    <Box
+      role="region"
+      aria-label="Merge blocked"
+      data-testid="land-block-notice"
+      mt="14px"
+      display="flex"
+      alignItems="flex-start"
+      gap="10px"
+      bg="rgba(255,112,102,0.10)"
+      borderRadius="10px"
+      px="14px"
+      py="10px"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 16 16"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="#ff7066"
+        strokeWidth="1.5"
+        style={{ flexShrink: 0, marginTop: 3 }}
+      >
+        <circle cx="8" cy="8" r="6.5" />
+        <path d="M8 7.2v4M8 4.8v.1" strokeLinecap="round" />
+      </svg>
+      <Box flex="1" fontSize="14px" lineHeight="1.5" color="#ffb3ad">
+        <Text data-reason>{`Can't merge: ${reason}`}</Text>
+        {dirty && (detail.land_block_files?.length ?? 0) > 0 && (
+          <Box as="ul" data-testid="land-block-files" pl="5" fontFamily="mono">
+            {detail.land_block_files?.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </Box>
+        )}
+        {hasButtons && (
+          <Box mt="2" display="flex" flexWrap="wrap" gap="2" css={wide ? undefined : { "& button": { height: "44px" } }}>
+            {detail.actions?.includes(ActionStashMerge) && (
+              <StashMergeButton address={address} state={state} onMerged={onChanged} {...info(ActionStashMerge)} />
+            )}
+            {detail.actions?.includes(ActionMerge) && (
+              <MergeButton address={address} state={state} onMerged={onChanged} {...info(ActionMerge)} />
+            )}
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }

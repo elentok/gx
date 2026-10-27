@@ -280,7 +280,7 @@ test("a Merge blocked epic shows its label and merge-block reason; a Merging epi
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "paused", total: 1, done: 1, land_block_reason: "rebase clash in a.go" }));
   await screen.findByTestId("stats-line");
   expect(statsLine()).toMatch(/^Paused · /);
-  expect(screen.getByText("rebase clash in a.go")).toBeTruthy();
+  expect(screen.getByText("Can't merge: rebase clash in a.go")).toBeTruthy();
   cleanup();
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "merging", total: 2, done: 1 }));
   await screen.findByTestId("stats-line");
@@ -680,7 +680,7 @@ test("the epic page Merge shows a refusal and an HTTP error in toasts", async ()
       new Response(JSON.stringify({ refused: true, reason: "stale-state", message: "the epic changed" })),
   );
   stubPosts(post);
-  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "paused", land_block_reason: "rebase clash" }));
+  renderAt("/e/gx:e", okFor, undefined, epicFetch({ state: "awaiting-merge" }));
   fireEvent.click(await screen.findByRole("button", { name: "Merge" }));
   expect(await screen.findByText("the epic changed")).toBeTruthy();
   post.mockImplementation(async () => new Response("boom: disk full", { status: 500 }));

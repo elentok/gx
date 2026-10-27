@@ -359,35 +359,46 @@ test("a draft -impl epic has a disabled Queue with its tooltip", async () => {
   expect(screen.queryByText("Still publishing tickets")).toBeNull();
 });
 
-test("the land-block reason is a notice under the bar only while paused; Merge follows isMergeable", async () => {
-  render("/e/gx:blog-impl", [], "loop", { detail: { state: "paused", land_block_reason: "rebase conflict" } });
-  expect((await screen.findByText("rebase conflict")).hasAttribute("data-reason")).toBe(true);
-  expect(screen.getByRole("button", { name: "Merge" })).toBeTruthy();
-  cleanup();
+const dirtyTrunk: Partial<EpicDetail> = {
+  state: "paused",
+  land_block_kind: "dirty-trunk",
+  land_block_reason: "Trunk has local changes: a.go, b.go, c.go, d.go, e.go and 2 more",
+  land_block_files: ["a.go", "b/c.go", "d.go", "e.go", "f.go", "g.go", "h.go"],
+  actions: ["stash-merge", "merge"],
+  action_info: {
+    "stash-merge": { label: "Stash, merge and restore", tooltip: "Set your changes aside." },
+    merge: { label: "Merge again", tooltip: "Merge the ticket's commits again." },
+  },
+};
+
+test("the land-block notice shows only while paused with a reason; an epic without one has none", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: { state: "running", land_block_reason: "stale reason" } });
   await statsOf();
-  expect(screen.queryByText("stale reason")).toBeNull();
+  expect(screen.queryByTestId("land-block-notice")).toBeNull();
+  expect(screen.queryByText(/stale reason/)).toBeNull();
+});
+
+test("a needs-rebase pause reads 'Can't merge: <reason>' with its action buttons inside the notice, none in the bar", async () => {
+  render("/e/gx:blog-impl", [], "loop", {
+    detail: { state: "paused", land_block_reason: "needs a rebase", actions: ["merge"], action_info: { merge: { label: "Merge again", tooltip: "Try again." } } },
+  });
+  const notice = await screen.findByTestId("land-block-notice");
+  expect(notice.textContent).toContain("Can't merge: needs a rebase");
+  expect(within(notice).getByRole("button", { name: "Merge again" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Merge" })).toBeNull();
 });
 
-test("a dirty-trunk pause lists every clashing file and offers both verbs with tooltips", async () => {
-  render("/e/gx:blog-impl", [], "loop", {
-    detail: {
-      state: "paused",
-      land_block_kind: "dirty-trunk",
-      land_block_reason: "Trunk has local changes",
-      land_block_files: ["a.go", "b/c.go", "d.go", "e.go"],
-      actions: ["stash-merge", "merge"],
-      action_info: {
-        "stash-merge": { label: "Stash, merge and restore", tooltip: "Set your changes aside." },
-        merge: { label: "Merge again", tooltip: "Merge the ticket's commits again." },
-      },
-    },
-  });
-  const files = await screen.findByTestId("land-block-files");
-  expect(Array.from(files.querySelectorAll("li")).map((li) => li.textContent)).toEqual(["a.go", "b/c.go", "d.go", "e.go"]);
-  expect(screen.getByRole("button", { name: "Stash, merge and restore" }).getAttribute("title")).toBe("Set your changes aside.");
-  expect(screen.getByRole("button", { name: "Merge again" }).getAttribute("title")).toBe("Merge the ticket's commits again.");
+test("a dirty-trunk pause says the short reason, lists every clashing file, then both verbs in order", async () => {
+  render("/e/gx:blog-impl", [], "loop", { detail: dirtyTrunk });
+  const notice = await screen.findByTestId("land-block-notice");
+  expect(notice.textContent).toContain("Can't merge: Trunk has local changes");
+  expect(notice.textContent).not.toContain("and 2 more");
+  const files = within(notice).getByTestId("land-block-files");
+  expect(Array.from(files.querySelectorAll("li")).map((li) => li.textContent)).toEqual(dirtyTrunk.land_block_files!);
+  const buttons = within(notice).getAllByRole("button");
+  expect(buttons.map((b) => b.textContent)).toEqual(["Stash, merge and restore", "Merge again"]);
+  expect(buttons[0].getAttribute("title")).toBe("Set your changes aside.");
+  expect(buttons[1].getAttribute("title")).toBe("Merge the ticket's commits again.");
 });
 
 test("the stash button posts to its route with the state token", async () => {
