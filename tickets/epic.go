@@ -145,8 +145,9 @@ func (e Epic) TotalCount() int {
 // here too, since its fork subtree is still outstanding work.
 func (e Epic) OpenCount() int {
 	open := 0
+	forkChildren := e.forkChildren()
 	for _, t := range e.Tickets {
-		if !e.RenderedStatus(t).Terminal() {
+		if !e.renderedStatus(t, forkChildren).Terminal() {
 			open++
 		}
 	}

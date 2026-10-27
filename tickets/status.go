@@ -183,14 +183,20 @@ func (t Ticket) baseStatus() RenderedStatus {
 // is synthesized rather than read from its file (see effectiveBlockedBy),
 // but is otherwise resolved the same way as every other ticket's.
 func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
+	return e.renderedStatus(t, e.forkChildren())
+}
+
+// renderedStatus is RenderedStatus with the fork-children map prebuilt, so a
+// pass over every ticket builds it once.
+func (e Epic) renderedStatus(t Ticket, forkChildren map[string][]Ticket) RenderedStatus {
 	base := t.baseStatus()
-	if base == StatusDone && e.Blocking(t) || e.pausedOnInvestigation(t, base) {
+	if base == StatusDone && e.blocking(t, forkChildren) || pausedOnInvestigation(t, base, forkChildren) {
 		return StatusWaitingForChildren
 	}
 	if base != StatusOpen && base != StatusClaimed {
 		return base
 	}
-	if len(e.UnresolvedBlockers(t)) > 0 || !e.ParentDone(t) {
+	if len(e.unresolvedBlockers(t, forkChildren)) > 0 || !e.ParentDone(t) {
 		return StatusBlocked
 	}
 	return base
@@ -202,22 +208,39 @@ func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
 // which is what separates a pause from a deadlock. The one rule the server,
 // ralph-loop and the Queue tab share.
 func (e Epic) IsPaused(t Ticket) bool {
-	switch e.RenderedStatus(t) {
+	return e.RenderedStatus(t).Paused()
+}
+
+// Paused is the status half of Epic.IsPaused, for callers that already hold the
+// status from RenderedStatuses.
+func (s RenderedStatus) Paused() bool {
+	switch s {
 	case StatusPausedAnswer, StatusPausedRepair, StatusError, StatusDraft:
 		return true
 	}
 	return false
 }
 
+// RenderedStatuses is RenderedStatus of every ticket, in e.Tickets order, for
+// one fork-children build instead of one per ticket.
+func (e Epic) RenderedStatuses() []RenderedStatus {
+	forkChildren := e.forkChildren()
+	out := make([]RenderedStatus, len(e.Tickets))
+	for i, t := range e.Tickets {
+		out[i] = e.renderedStatus(t, forkChildren)
+	}
+	return out
+}
+
 // pausedOnInvestigation reports whether t is paused while an investigate child
 // of it is still unfinished: it renders as waiting for that child. An
 // investigate ticket is the one fork child that works on a paused parent, so
 // ParentDone never holds it back.
-func (e Epic) pausedOnInvestigation(t Ticket, base RenderedStatus) bool {
+func pausedOnInvestigation(t Ticket, base RenderedStatus, forkChildren map[string][]Ticket) bool {
 	if base != StatusPausedRepair && base != StatusPausedAnswer {
 		return false
 	}
-	for _, child := range e.forkChildren()[ticketKey(t)] {
+	for _, child := range forkChildren[ticketKey(t)] {
 		if child.Type == string(schema.TypeInvestigate) && !child.IsTerminal() {
 			return true
 		}
@@ -376,13 +399,21 @@ func (e Epic) blocking(t Ticket, forkChildren map[string][]Ticket) bool {
 // (recursively forked) descendants. A blocker with no matching ticket in e
 // counts as unresolved (it can't be verified done).
 func (e Epic) UnresolvedBlockers(t Ticket) []string {
+	return e.unresolvedBlockers(t, nil)
+}
+
+// unresolvedBlockers is UnresolvedBlockers with the fork-children map
+// prebuilt; nil builds it when a Blocked by: token needs it.
+func (e Epic) unresolvedBlockers(t Ticket, forkChildren map[string][]Ticket) []string {
 	blockedBy := e.effectiveBlockedBy(t)
 	unresolved := slices.Clone(t.ExternalBlockers)
 	if len(blockedBy) == 0 {
 		return unresolved
 	}
 	byNumberAndSuffix := e.byNumberAndSuffix()
-	forkChildren := e.forkChildren()
+	if forkChildren == nil {
+		forkChildren = e.forkChildren()
+	}
 	for _, token := range blockedBy {
 		num, letters := splitBlockedByToken(token)
 		other, ok := byNumberAndSuffix[siblingKey(num, letters)]

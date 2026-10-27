@@ -174,11 +174,11 @@ func (s *Server) epicMergeTarget(a tickets.Address) string {
 	if i < 0 || epics[i].IsMap || !epics[i].AllDone() || !epics[i].MergedAt.IsZero() {
 		return ""
 	}
-	pf, err := config.ReadProjectFile(dir)
-	if err != nil || pf.Repo == nil {
+	repoPtr := s.mergeTargets.repoOf(dir)
+	if repoPtr == nil {
 		return ""
 	}
-	repo := *pf.Repo
+	repo := *repoPtr
 	// The target is a function of the loaded epics (a new scan is a new slice),
 	// project.json and the repo's refs, so those make the cache stamp.
 	stamp, cacheable := tickets.RefsStamp(repo, filepath.Join(dir, config.ProjectFileName))
@@ -204,11 +204,46 @@ var gitIsAncestor = git.IsAncestor
 // mergeTargetCache holds each epic's last merge target. Errors aren't stored,
 // so a failing resolve retries on the next snapshot.
 type mergeTargetCache struct {
-	mu sync.Mutex
-	m  map[tickets.Address]mergeTargetEntry
+	mu    sync.Mutex
+	m     map[tickets.Address]mergeTargetEntry
+	repos map[string]projectRepoEntry
 }
 
 type mergeTargetEntry struct{ stamp, target string }
+
+// projectRepoEntry is a project's parsed repo, valid while project.json keeps
+// its size and mtime. repo is nil when the file is unreadable or sets none.
+type projectRepoEntry struct {
+	size, mtime int64
+	repo        *string
+}
+
+// readProjectFile is swapped in tests to count reads.
+var readProjectFile = config.ReadProjectFile
+
+// repoOf is the repo project.json in dir names, nil when there is none. It
+// reads the file only when its size or mtime moved, since every snapshot asks.
+// Errors aren't stored, so a failing read retries on the next snapshot.
+func (c *mergeTargetCache) repoOf(dir string) *string {
+	fi, err := os.Stat(filepath.Join(dir, config.ProjectFileName))
+	if err != nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if e, ok := c.repos[dir]; ok && e.size == fi.Size() && e.mtime == fi.ModTime().UnixNano() {
+		return e.repo
+	}
+	pf, err := readProjectFile(dir)
+	if err != nil {
+		return nil
+	}
+	if c.repos == nil {
+		c.repos = map[string]projectRepoEntry{}
+	}
+	c.repos[dir] = projectRepoEntry{size: fi.Size(), mtime: fi.ModTime().UnixNano(), repo: pf.Repo}
+	return pf.Repo
+}
 
 func (c *mergeTargetCache) get(a tickets.Address, stamp string) (string, bool) {
 	c.mu.Lock()
