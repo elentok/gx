@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -92,26 +93,59 @@ var NotApprovableTools = []string{"ExitPlanMode", "AskUserQuestion"}
 // use. Agents ask through the ticket's Question section instead.
 const LoopDisallowedTools = "AskUserQuestion,EnterPlanMode,ExitPlanMode"
 
-// WithLoopDisallowedTools appends the claude ban on LoopDisallowedTools to
-// args unless args already carry it (ralphloop.AgentArgs does).
+// WithLoopDisallowedTools adds LoopDisallowedTools to the claude ban in args.
 func WithLoopDisallowedTools(args []string) []string {
-	if slices.Contains(args, "--disallowedTools") {
-		return args
-	}
-	return append(args, "--disallowedTools", LoopDisallowedTools)
+	return withDisallowedTools(args, LoopDisallowedTools)
 }
 
 // DesignDisallowedTools are the tools no design agent may use. Design agents
 // ask in gx-grilling rounds, which the web page renders.
 const DesignDisallowedTools = "AskUserQuestion"
 
-// WithDesignDisallowedTools appends the claude ban on DesignDisallowedTools to
-// args unless args already carry a ban of their own.
+// WithDesignDisallowedTools adds DesignDisallowedTools to the claude ban in
+// args.
 func WithDesignDisallowedTools(args []string) []string {
-	if slices.Contains(args, "--disallowedTools") {
-		return args
+	return withDisallowedTools(args, DesignDisallowedTools)
+}
+
+// withDisallowedTools merges every claude ban in args (--disallowedTools or
+// --disallowed-tools, its tools comma or space separated, or after =) into
+// one flag that starts with tools, at the first ban's place or at the end.
+// A ban the caller passes adds to tools; it never lifts one.
+func withDisallowedTools(args []string, tools string) []string {
+	merged := strings.Split(tools, ",")
+	add := func(list string) {
+		for _, tool := range strings.Split(list, ",") {
+			if tool = strings.TrimSpace(tool); tool != "" && !slices.Contains(merged, tool) {
+				merged = append(merged, tool)
+			}
+		}
 	}
-	return append(slices.Clone(args), "--disallowedTools", DesignDisallowedTools)
+	out := make([]string, 0, len(args)+2)
+	at := -1
+	for i := 0; i < len(args); i++ {
+		name, value, hasValue := strings.Cut(args[i], "=")
+		if name != "--disallowedTools" && name != "--disallowed-tools" {
+			out = append(out, args[i])
+			continue
+		}
+		if at < 0 {
+			at = len(out)
+		}
+		if hasValue {
+			add(value)
+			continue
+		}
+		for i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+			i++
+			add(args[i])
+		}
+	}
+	flag := []string{"--disallowedTools", strings.Join(merged, ",")}
+	if at < 0 {
+		return append(out, flag...)
+	}
+	return slices.Insert(out, at, flag...)
 }
 
 // Waiting is an agent that is not working: idle, or done.
