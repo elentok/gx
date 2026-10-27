@@ -57,6 +57,51 @@ func TestDesignsOpenNew_WritesTheMapThenStartsTheSession(t *testing.T) {
 	}
 }
 
+// designStartedAt returns the design_started_at line of a map's ticket.md, or "".
+func designStartedAt(t *testing.T, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(line, "design_started_at:") {
+			return line
+		}
+	}
+	return ""
+}
+
+func TestDesignsOpen_StampsTheDesignStartOnceAcrossSessions(t *testing.T) {
+	f := startDesigns(t)
+	path := filepath.Join(f.h.TicketStore, "proj", "map", "ticket.md")
+	if got := designStartedAt(t, path); got != "" {
+		t.Fatalf("stamp before any session: %q", got)
+	}
+	old := f.open(t, "proj:map", false).Session
+	first := designStartedAt(t, path)
+	if first == "" {
+		t.Fatal("the first design session wrote no design_started_at")
+	}
+	waitForHolder(t, filepath.Join(f.h.SessionsDir, old.ID))
+	if res := f.open(t, "proj:map", true); res.Refused || res.Session == nil {
+		t.Fatalf("second open = %+v", res)
+	}
+	if got := designStartedAt(t, path); got != first {
+		t.Errorf("stamp = %q after a second session, want %q", got, first)
+	}
+}
+
+func TestDesignsOpenNew_StampsTheDesignStart(t *testing.T) {
+	f := startDesigns(t)
+	if res := f.openNew(t, "fresh-idea", "an idea"); res.Refused || res.Session == nil {
+		t.Fatalf("open = %+v", res)
+	}
+	if designStartedAt(t, f.mapPath("fresh-idea")) == "" {
+		t.Error("New Design wrote no design_started_at")
+	}
+}
+
 func TestDesignsOpenNew_StartFailureIsOneResultWithStartError(t *testing.T) {
 	store := t.TempDir()
 	repo := testutil.TempRepo(t)

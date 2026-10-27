@@ -93,6 +93,9 @@ type Epic struct {
 	// QueuedAt is when the epic was first added to the queue; zero on an epic
 	// queued before the field existed.
 	QueuedAt time.Time
+	// DesignStartedAt is when a map's first design session opened; zero on a map
+	// designed before the field existed, which is never backfilled.
+	DesignStartedAt time.Time
 	// The stats fields come from ticket.md's frontmatter. The pointers read nil
 	// when unstamped, so a stamped zero differs from no stamp; ActualCost is
 	// stamped whenever TotalTokens is.

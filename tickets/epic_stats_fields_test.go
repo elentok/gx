@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -17,6 +18,20 @@ func writeEpicTicketMD(t *testing.T, content string) string {
 		t.Fatal(err)
 	}
 	return epic
+}
+
+func TestStampEpicDesignStarted_RoundTripsAndKeepsTheFirstStamp(t *testing.T) {
+	epic := writeEpicTicketMD(t, "---\nkind: map\n---\n\n# epic\n")
+	first := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	if err := StampEpicDesignStarted(epic, first); err != nil {
+		t.Fatal(err)
+	}
+	if err := StampEpicDesignStarted(epic, first.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if got := LoadEpicTicketMD(epic).DesignStartedAt; !got.Equal(first) {
+		t.Errorf("DesignStartedAt = %v, want %v", got, first)
+	}
 }
 
 func TestLoadEpicTicketMD_ReadsTheStatsFields(t *testing.T) {

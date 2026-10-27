@@ -54,7 +54,7 @@ func TestTicketsSet_EpicAddressRejectsRemovedProvisionalDestinationFlag(t *testi
 }
 
 func TestTicketsSet_EpicAddressRefusesServerStampedFields(t *testing.T) {
-	for _, flag := range []string{"--completed-at=2026-01-01T00:00:00Z", "--merged-at=2026-01-01T00:00:00Z", "--merged-at=", "--queued-at=2026-01-01T00:00:00Z", "--evolved-at=2026-01-01T00:00:00Z", "--evolve-skipped=true", "--evolve-ticket=mine:e/01", "--lines-added=1", "--lines-removed=1", "--total-tokens=1", "--actual-cost=1", "--had-codex=true", "--friction=x"} {
+	for _, flag := range []string{"--completed-at=2026-01-01T00:00:00Z", "--merged-at=2026-01-01T00:00:00Z", "--merged-at=", "--queued-at=2026-01-01T00:00:00Z", "--design-started-at=2026-01-01T00:00:00Z", "--evolved-at=2026-01-01T00:00:00Z", "--evolve-skipped=true", "--evolve-ticket=mine:e/01", "--lines-added=1", "--lines-removed=1", "--total-tokens=1", "--actual-cost=1", "--had-codex=true", "--friction=x"} {
 		d, ticketMD := setupEpicSetProject(t)
 		err := execute([]string{"tickets", "set", "mine:e", "--status=open", flag}, d)
 		var addrErr *tickets.AddressError

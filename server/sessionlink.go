@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/tickets"
 )
@@ -89,6 +90,18 @@ func (s *Server) reportSessionStep(req ReportStepRequest) (SessionResult, error)
 		return SessionResult{}, err
 	}
 	return SessionResult{Session: &info}, nil
+}
+
+// stampDesignStart records the first design session on the map epic behind
+// address. The stamp is write-once, so every later session leaves it.
+func (s *Server) stampDesignStart(address string, now time.Time) error {
+	project, rest, _ := strings.Cut(address, ":")
+	epic, _, _ := strings.Cut(rest, "/")
+	dir, err := s.projectDir(project)
+	if err != nil {
+		return err
+	}
+	return tickets.StampEpicDesignStarted(filepath.Join(dir, epic), now)
 }
 
 // onMapEpic reports whether address ("project:epic" or "project:epic/NN")

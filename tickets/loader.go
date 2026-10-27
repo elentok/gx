@@ -291,6 +291,8 @@ type ticketMDYAML struct {
 	MergedAt    *time.Time `yaml:"merged_at"`
 	QueuedAt    *time.Time `yaml:"queued_at"`
 
+	DesignStartedAt *time.Time `yaml:"design_started_at"`
+
 	LinesAdded   *int                    `yaml:"lines_added"`
 	LinesRemoved *int                    `yaml:"lines_removed"`
 	TotalTokens  *int64                  `yaml:"total_tokens"`
@@ -361,6 +363,9 @@ func loadEpicTicketMD(epic *Epic) {
 	}
 	if wire.QueuedAt != nil {
 		epic.QueuedAt = *wire.QueuedAt
+	}
+	if wire.DesignStartedAt != nil {
+		epic.DesignStartedAt = *wire.DesignStartedAt
 	}
 	epic.LinesAdded = wire.LinesAdded
 	epic.LinesRemoved = wire.LinesRemoved
@@ -440,6 +445,13 @@ func StampEpicStarted(scratchDir, epicName string, now time.Time) error {
 // recorded once, at genuine completion.
 func StampEpicCompleted(scratchDir, epicName string, now time.Time) error {
 	return StampEpicFields(filepath.Join(scratchDir, epicName), map[string]any{"completed_at": now})
+}
+
+// StampEpicDesignStarted writes design_started_at into epicPath's ticket.md
+// frontmatter, once: the first design session on a map sets it and later ones
+// leave it.
+func StampEpicDesignStarted(epicPath string, now time.Time) error {
+	return StampEpicFields(epicPath, map[string]any{"design_started_at": now})
 }
 
 // StampEpicMerged writes merged_at into epicPath's ticket.md frontmatter,

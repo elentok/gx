@@ -168,6 +168,11 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		ConversationID: conv,
 		CreatedAt:      time.Now(),
 	}
+	if meta.Design && meta.Ticket != "" {
+		if err := s.stampDesignStart(meta.Ticket, meta.CreatedAt); err != nil {
+			return SessionResult{}, err
+		}
+	}
 	dir, err := s.saveNewSession(&meta, req.UniqueName)
 	if errors.Is(err, errSessionNameTaken) {
 		return sessionRefusal(ReasonSessionNameTaken, fmt.Sprintf("a live session is already named %q", meta.Name)), nil
