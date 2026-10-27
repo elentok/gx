@@ -113,16 +113,16 @@ function render(
   return Object.assign(router, { setSessions });
 }
 
-test("the back link counts the other Needs-you cards from the loaded list", async () => {
+test("the Epics tab counts the other Needs-you cards from the loaded list", async () => {
   render([map("a", { section: "needs-you" }), map("b", { section: "needs-you" })], []);
-  expect(await screen.findByRole("link", { name: "← Epics · 1 more needs you" })).toBeTruthy();
+  expect(await screen.findByRole("link", { name: "Epics · 1 needs you" })).toBeTruthy();
 });
 
-test("the title row holds a back link, the Design name and the Sessions control, with no picker or state label", async () => {
+test("the title row holds the Design name and the Sessions control, with no picker or state label", async () => {
   render([map("a"), map("b")], [session("a", { status: { state: "working" } })]);
   const title = await screen.findByRole("heading", { level: 1 });
   expect(within(title).getByRole("button", { name: /^a/ })).toBeTruthy();
-  expect(screen.getByRole("link", { name: "← Epics" }).getAttribute("href")).toBe("/epics");
+  expect(screen.queryByRole("link", { name: /^←/ })).toBeNull();
   expect(screen.getByRole("button", { name: "New session" })).toBeTruthy();
   expect(screen.queryByLabelText("Filter Designs")).toBeNull();
   expect(screen.queryByRole("link", { name: /^b/ })).toBeNull();

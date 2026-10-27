@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { fetchTicketScreen, type FetchScreen } from "../design/screen";
 import { ScreenModal } from "../design/ScreenModal";
-import { BackLink } from "../nav/BackLink";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
 import { Button } from "../ui/button/Button";
@@ -11,7 +10,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
 import { ActionCard, needsActionCard } from "./ActionCard";
 import type { Sent } from "./answer";
-import { epicOfTicket, useTicketDetail, type FetchDetail } from "./detail";
+import { useTicketDetail, type FetchDetail } from "./detail";
 import { TicketHeader } from "./TicketHeader";
 import { hasSections, NothingHere, TicketSections } from "./TicketSections";
 
@@ -30,20 +29,14 @@ export function TicketPage({
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
   const [sent, setSent] = useState<Sent | null>(null);
   const [showScreen, setShowScreen] = useState(false);
-  const epicAddress = epicOfTicket(address);
-  const backTo = `/e/${epicAddress}`;
-  const backLabel = `← ${epicAddress.slice(epicAddress.indexOf(":") + 1)}`;
 
   return (
     <DetailPage mode="narrow">
         {notFound ? (
-          <>
-            <BackLink to={backTo} label={backLabel} />
-            <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
-          </>
+          <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
         ) : detail ? (
           <>
-            <PageHeader backTo={backTo} backLabel={backLabel} title={detail.title}>
+            <PageHeader title={detail.title}>
               <TicketHeader detail={detail} now={Date.now()} />
             </PageHeader>
             {detail.has_screen && (
@@ -68,10 +61,7 @@ export function TicketPage({
             )}
           </>
         ) : (
-          <>
-            <BackLink to={backTo} label={backLabel} />
-            <Spinner label="Loading ticket" />
-          </>
+          <Spinner label="Loading ticket" />
         )}
     </DetailPage>
   );

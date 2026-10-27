@@ -12,11 +12,14 @@ import type { TopBarTab } from "../ui/top-bar/TopBar";
 // `mode` sets the breakpoint `useWide` answers by for everything below.
 export function DetailPage({
   active,
+  waiting,
   fill,
   mode,
   children,
 }: {
   active?: TopBarTab;
+  /** Other epics in Needs you, counted on the Epics tab. */
+  waiting?: number;
   fill?: boolean;
   mode: PageMode;
   children: ReactNode;
@@ -28,7 +31,7 @@ export function DetailPage({
       <Box {...(fill && { h: "100dvh", display: "flex", flexDirection: "column" })}>
         {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
         <PageContainer fill={fill}>
-          <ConnectedTopBar active={active} />
+          <ConnectedTopBar active={active} waiting={waiting} />
           {children}
         </PageContainer>
       </Box>

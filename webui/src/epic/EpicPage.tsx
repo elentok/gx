@@ -12,7 +12,7 @@ import { pageRing } from "./ring";
 import { MergeButton, StashMergeButton } from "../epics/MergeButton";
 import { designHref, epicHref } from "../hrefs";
 import { QueueButton } from "../epics/QueueButton";
-import { useEpicList, waitingCount, type FetchEpicList } from "../epics/list";
+import { useEpicList, waitingCount, type EpicList, type FetchEpicList } from "../epics/list";
 import { JumpMenu } from "../nav/JumpMenu";
 import { Markdown } from "../markdown/Markdown";
 import { DetailPage } from "../page/DetailPage";
@@ -273,14 +273,15 @@ type EpicPageProps = {
 
 // The body reads `useWide`, so it renders inside DetailPage's page mode.
 export function EpicPage(props: EpicPageProps) {
+  const { list } = useEpicList(props.fetchList, useConnectionContext());
   return (
-    <DetailPage mode="narrow">
-      <EpicPageBody {...props} />
+    <DetailPage mode="narrow" waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}>
+      <EpicPageBody {...props} list={list} />
     </DetailPage>
   );
 }
 
-function EpicPageBody({ address, fetchDetail, openDesign, fetchList, fixAgent }: EpicPageProps) {
+function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: EpicPageProps & { list: EpicList | null }) {
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps the running clocks counting.
   const sessions = useConnectionState(conn).snapshot?.sessions ?? [];
@@ -288,7 +289,6 @@ function EpicPageBody({ address, fetchDetail, openDesign, fetchList, fixAgent }:
   const now = Date.now();
   const designLive = liveSessions(address, sessions).length > 0;
   const { detail, notFound, refetch } = useEpicDetail(address, conn, fetchDetail);
-  const { list } = useEpicList(fetchList, conn);
   // The payload has no name field: the epic name is the address after the project.
   const name = address.slice(address.indexOf(":") + 1);
   // A joined card lists both of its epics; the other one is the Design or its -impl epic.
@@ -309,9 +309,6 @@ function EpicPageBody({ address, fetchDetail, openDesign, fetchList, fixAgent }:
       ) : detail ? (
         <>
           <PageHeader
-            backTo="/epics"
-            backLabel="← Epics"
-            waiting={waitingCount(list?.epics ?? [], address)}
             title={name}
             lead={<EpicRing detail={detail} card={card} sessions={sessions} size={wide ? "md" : "sm"} />}
             heading={

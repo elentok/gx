@@ -1,6 +1,6 @@
 // Plain `<a href="#/...">` pushes a history entry with no router state, so the next page sees the
-// "default" location key and BackLink treats it as a direct load. Routing these clicks through the
-// router gives the entry a key.
+// "default" location key, as on a direct load. Routing these clicks through the router gives the
+// entry a key.
 export function routeHashLinkClicks(router: { navigate: (to: string) => unknown }): () => void {
   const onClick = (e: MouseEvent) => {
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

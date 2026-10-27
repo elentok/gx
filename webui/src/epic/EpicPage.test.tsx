@@ -75,21 +75,21 @@ function render(
 
 const joined = row("blog-impl", { addresses: ["gx:blog-impl", "gx:blog"], card_kind: "design" });
 
-test("the epic page has a back link to /epics and a title that opens the jump menu", async () => {
+test("the epic page has a title that opens the jump menu and no back link", async () => {
   render("/e/gx:blog-impl", [joined, row("other")]);
   const title = await screen.findByRole("heading", { level: 1 });
-  expect(screen.getByRole("link", { name: "← Epics" }).getAttribute("href")).toBe("/epics");
+  expect(screen.queryByRole("link", { name: /^←/ })).toBeNull();
   fireEvent.click(within(title).getByRole("button", { name: /^blog-impl/ }));
   expect(await screen.findByRole("dialog")).toBeTruthy();
 });
 
-test("the back link counts the other Needs-you cards from the loaded list", async () => {
+test("the Epics tab counts the other Needs-you cards from the loaded list", async () => {
   render("/e/gx:blog-impl", [
     { ...joined, section: "needs-you" },
     row("q1", { section: "needs-you" }),
     row("q2", { section: "needs-you" }),
   ]);
-  expect(await screen.findByRole("link", { name: "← Epics · 2 more need you" })).toBeTruthy();
+  expect(await screen.findByRole("link", { name: "Epics · 2 need you" })).toBeTruthy();
 });
 
 test("a Design's epic page has an Open implementation epic button that goes to the -impl page", async () => {

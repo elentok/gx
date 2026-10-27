@@ -19,13 +19,15 @@ interface Props {
   build?: string;
   mode?: QueueMode;
   connected: boolean;
+  /** Epics in Needs you other than the one on screen; it reads on the Epics tab and is left out at zero. */
+  waiting?: number;
   afk?: boolean;
   // The toggle shows only when the page can switch AFK mode.
   onToggleAfk?: () => void;
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected, afk = false, onToggleAfk }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, afk = false, onToggleAfk }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
   return (
     <Box as="nav" display="flex" alignItems="center" justifyContent="space-between" mb="4">
@@ -35,6 +37,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, afk =
             key={key}
             href={href}
             aria-current={key === active ? "page" : undefined}
+            aria-label={key === "epics" && waiting > 0 ? `${label} · ${waiting} ${waiting === 1 ? "needs" : "need"} you` : undefined}
             fontFamily="condensed"
             fontSize="xl"
             fontWeight="600"
@@ -44,6 +47,11 @@ export function TopBar({ active, tone = "running", build, mode, connected, afk =
             borderBottomColor={key === active ? `tone.${tone}.fg` : "transparent"}
           >
             {label}
+            {key === "epics" && waiting > 0 && (
+              <Text as="span" aria-hidden ml="2" color="tone.waiting.fg">
+                {waiting}
+              </Text>
+            )}
           </chakra.a>
         ))}
       </Box>

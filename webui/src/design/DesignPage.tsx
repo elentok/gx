@@ -3,8 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
-import { useEpicList, waitingCount, type FetchEpicList } from "../epics/list";
-import { BackLink } from "../nav/BackLink";
+import { useEpicList, waitingCount, type EpicList, type FetchEpicList } from "../epics/list";
 import { JumpMenu } from "../nav/JumpMenu";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
@@ -146,7 +145,6 @@ function DesignBody({
         flex="none"
       >
         <Box minW="0">
-          <BackLink to="/epics" label="← Epics" waiting={waitingCount(epics, address)} />
           <JumpMenu name={address.slice(address.indexOf(":") + 1)} current={address} epics={epics} />
         </Box>
         <SessionStrip
@@ -222,19 +220,24 @@ type DesignPageProps = {
   startFailure?: string;
 };
 
-// The body reads `useWide`, so it renders inside DetailPage's page mode.
+// The body reads `useWide`, so it renders inside DetailPage's page mode. The list loads out here
+// because the top bar counts its Needs-you cards.
 export function DesignPage(props: DesignPageProps) {
+  const { list, failed } = useEpicList(props.fetchList, useConnectionContext());
   return (
-    <DetailPage active="epics" fill mode="wide">
-      <DesignPageBody {...props} />
+    <DetailPage active="epics" fill mode="wide" waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}>
+      <DesignPageBody {...props} list={list} failed={failed} />
     </DetailPage>
   );
 }
 
-function DesignPageBody({ address, fetchList, deps = {}, startFailure }: DesignPageProps) {
-  const conn = useConnectionContext();
-  const { list, failed } = useEpicList(fetchList, conn);
-
+function DesignPageBody({
+  address,
+  deps = {},
+  startFailure,
+  list,
+  failed,
+}: DesignPageProps & { list: EpicList | null; failed: boolean }) {
   const wide = useWide();
 
   return (

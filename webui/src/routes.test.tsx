@@ -136,26 +136,6 @@ test("a failed refetch keeps the last page, and the Offline strip shows", async 
   expect(screen.getByText("Offline, reconnecting…")).toBeTruthy();
 });
 
-test("after a direct load the ticket back link falls back to its epic", async () => {
-  renderAt("/t/gx:e/01", okFor);
-  expect((await screen.findByRole("link", { name: "← e" })).getAttribute("href")).toBe("/e/gx:e");
-});
-
-test("after a direct load the epic back link falls back to the Epics page", async () => {
-  renderAt("/e/gx:e", okFor, undefined, epicFetch());
-  expect((await screen.findByRole("link", { name: "← Epics" })).getAttribute("href")).toBe("/epics");
-});
-
-test("a page reached inside the app keeps its labelled back link", async () => {
-  const router = createMemoryRouter(appRoutes({ ticket: okFor, epic: epicFetch() }), { initialEntries: ["/epics", "/e/gx:e"], initialIndex: 1 });
-  renderThemed(
-    <ConnectionContext.Provider value={fakeConnection(true)}>
-      <RouterProvider router={router} />
-    </ConnectionContext.Provider>,
-  );
-  expect((await screen.findByRole("link", { name: "← Epics" })).getAttribute("href")).toBe("/epics");
-});
-
 const epicOf = (over: Partial<EpicDetail> = {}): EpicDetail => ({
   address: "gx:e",
   kind: "loop",
@@ -372,12 +352,12 @@ const withDetail = (over: Partial<TicketDetail>): FetchDetail => async (address)
   detail: { ...detailOf(address), ...over },
 });
 
-test("the ticket header shows the epic link, the badge and only the stats the ticket has", async () => {
+test("the ticket header shows the Epic button, the badge and only the stats the ticket has", async () => {
   renderAt("/t/proj:work/01", withDetail({ type: "implement" }));
   await screen.findByRole("heading", { level: 1, name: "Title of proj:work/01" });
   expect(screen.getByText("open")).toBeTruthy();
   expect(screen.getByText("implement")).toBeTruthy();
-  expect(screen.getByRole("link", { name: "work" }).getAttribute("href")).toBe("#/e/proj:work");
+  expect(screen.getByRole("link", { name: "Epic: work" }).getAttribute("href")).toBe("#/e/proj:work");
   expect(screen.queryByRole("img", { name: "Running" })).toBeNull();
 });
 
@@ -443,7 +423,6 @@ test.each(["gx:e/99", "nonsense"])("an unknown or malformed ticket address (%s) 
   renderAt(`/t/${a}`, async () => ({ kind: "not-found" }));
   expect(await screen.findByText("Ticket not found")).toBeTruthy();
   expect(screen.getByText(`${a} does not exist.`)).toBeTruthy();
-  expect(screen.getByRole("link", { name: /^←/ })).toBeTruthy();
 });
 
 test("the ticket page refetches on an event for any ticket of its epic, not another epic's", async () => {

@@ -3,7 +3,7 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import { TopBar, type TopBarTab } from "../ui/top-bar/TopBar";
 
 // The top bar for pages that do not receive the connection state as a prop.
-export function ConnectedTopBar({ active }: { active?: TopBarTab }) {
+export function ConnectedTopBar({ active, waiting }: { active?: TopBarTab; waiting?: number }) {
   const { snapshot, connected } = useConnectionState(useConnectionContext());
   return (
     <TopBar
@@ -11,6 +11,7 @@ export function ConnectedTopBar({ active }: { active?: TopBarTab }) {
       build={snapshot?.build}
       mode={snapshot?.mode}
       connected={connected}
+      waiting={waiting}
       afk={snapshot?.afk}
       onToggleAfk={() => toggleAfk(snapshot?.afk)}
     />

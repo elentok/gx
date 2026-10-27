@@ -13,6 +13,13 @@ describe("TopBar", () => {
     expect(getByRole("link", { name: "Epics" }).hasAttribute("aria-current")).toBe(false);
   });
 
+  it("counts the waiting epics on the Epics tab and leaves out a zero", () => {
+    const { getByRole, unmount } = renderThemed(<TopBar connected waiting={3} />);
+    expect(getByRole("link", { name: "Epics · 3 need you" }).textContent).toBe("Epics3");
+    unmount();
+    expect(renderThemed(<TopBar connected waiting={0} />).getByRole("link", { name: "Epics" }).textContent).toBe("Epics");
+  });
+
   it("has no menu button without a toggle or a build", () => {
     const { queryByRole } = renderThemed(<TopBar connected />);
     expect(queryByRole("button", { name: "Menu" })).toBeNull();

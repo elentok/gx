@@ -55,7 +55,7 @@ test("a file that fails to parse shows the reduced page and an action card with 
 
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Broken");
   expect(screen.getByText("error")).toBeTruthy();
-  expect(screen.getByRole("link", { name: "demo" })).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Epic: demo" })).toBeTruthy();
   expect(within(card).getByText(/format is invalid/)).toBeTruthy();
   expect(within(card).getByText(/yaml: line 3: bad indent/)).toBeTruthy();
   expect(within(card).getByText(path)).toBeTruthy();
