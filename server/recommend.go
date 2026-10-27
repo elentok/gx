@@ -38,15 +38,11 @@ func (s *Server) ticketRecommend(req QueueRequest) (QueueResult, error) {
 		if err != nil {
 			return QueueResult{}, err
 		}
-		var latest *tickets.PauseRound
-		if rounds := tickets.Rounds(evs); len(rounds) > 0 {
-			latest = &rounds[len(rounds)-1]
-		}
-		gone, err := s.agentGone(ref.addr.String())
+		actions, _, err := s.detailFor(ref, t, evs, nil)
 		if err != nil {
 			return QueueResult{}, err
 		}
-		if !slices.Contains(detailActions(t, latest, gone, nil), verb) {
+		if !slices.Contains(actions, verb) {
 			return refusal(ReasonVerbNotOffered, verb+" is not an action of "+ref.addr.String()), nil
 		}
 		written, err := tickets.RecommendOpenRound(ref.ticket.Path, verb, diagnosis)

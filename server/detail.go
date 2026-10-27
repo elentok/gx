@@ -228,17 +228,19 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	if rec := tickets.RecommendationOf(evs); rec != nil && t.PausedClass() != "" {
 		d.Recommendation = &DetailRecommendation{Verb: rec.Choice, Diagnosis: rec.Text}
 	}
-	rounds := tickets.Rounds(evs)
-	if len(rounds) == 0 {
-		d.Actions = detailActions(t, nil, false, d.Permission)
-		d.ActionInfo = actionInfo(d.Actions)
+	var last *tickets.PauseRound
+	if d.Actions, last, err = s.detailFor(ref, t, evs, d.Permission); err != nil {
+		return TicketDetail{}, err
+	}
+	d.ActionInfo = actionInfo(d.Actions)
+	if last == nil {
 		return d, nil
 	}
-	last := rounds[len(rounds)-1]
+	rounds := tickets.Rounds(evs)
 	for _, r := range rounds[:len(rounds)-1] {
 		d.Rounds = append(d.Rounds, detailRound(r, false))
 	}
-	latest := detailRound(last, true)
+	latest := detailRound(*last, true)
 	if at := tickets.LastPrompt(evs, last.Question.Seq); !at.IsZero() && last.End == nil {
 		latest.PromptedAt = &at
 		latest.Prompt = "Prompt sent to the running agent at " + at.Local().Format("15:04")
@@ -246,18 +248,28 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	d.Latest = &latest
 	d.Answered = t.Status == schema.StatusOpen && latest.Outcome == RoundAnswered
 	d.Chat = roundChat(latest)
-	gone := false
-	if t.PausedClass() != "" {
-		if gone, err = s.agentGone(d.Address); err != nil {
-			return TicketDetail{}, err
-		}
-	}
-	d.Actions = detailActions(t, &last, gone, d.Permission)
-	d.ActionInfo = actionInfo(d.Actions)
 	if t.PausedClass() == schema.PauseClassAnswer && t.PauseReason == schema.PauseAmbiguousBase {
 		d.Bases = s.ambiguousBlockers(ref.addr)
 	}
 	return d, nil
+}
+
+// detailFor is what a person may do with a parsed ticket now, plus its latest
+// pause round (nil when it has none). The ticket detail and ticketRecommend
+// both read their actions from here.
+func (s *Server) detailFor(ref ticketRef, t schema.Ticket, evs []tickets.LogEvent, card *PermissionCard) ([]string, *tickets.PauseRound, error) {
+	var last *tickets.PauseRound
+	if rounds := tickets.Rounds(evs); len(rounds) > 0 {
+		last = &rounds[len(rounds)-1]
+	}
+	gone := false
+	if t.PausedClass() != "" {
+		var err error
+		if gone, err = s.agentGone(ref.addr.String()); err != nil {
+			return nil, nil, err
+		}
+	}
+	return detailActions(t, last, gone, card), last, nil
 }
 
 // brokenDetail is the small payload of a file that fails to parse: nothing the
