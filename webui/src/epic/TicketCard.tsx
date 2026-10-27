@@ -146,7 +146,7 @@ function Line({
       color={metaColor(row)}
       whiteSpace="nowrap"
       flexShrink={0}
-      pl={wide ? undefined : "54px"}
+      pl={wide ? undefined : "66px"}
     >
       {reserveLine ? " " : meta}
     </Text>
@@ -173,7 +173,8 @@ function Line({
           fontSize="12px"
           color="text.dim"
           flexShrink={0}
-          w={wide ? "28px" : "26px"}
+          whiteSpace="nowrap"
+          w={wide ? "40px" : "38px"}
         >
           {idOf(row.address)}
         </Text>
@@ -276,7 +277,7 @@ function NoteCard({
         flexDirection={wide ? "row" : "column"}
         alignItems={wide ? "center" : "stretch"}
         gap={wide ? "12px" : "10px"}
-        pl={wide ? "60px" : "54px"}
+        pl={wide ? "72px" : "66px"}
       >
         {note.text && (
           <Text

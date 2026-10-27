@@ -1,8 +1,8 @@
-import { Box } from "@chakra-ui/react";
+import { Box, type BoxProps } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import type { Tone } from "../tone";
 
-export function Badge({ tone = "muted", children }: { tone?: Tone; children: ReactNode }) {
+export function Badge({ tone = "muted", children, ...rest }: { tone?: Tone; children: ReactNode } & Omit<BoxProps, "children">) {
   return (
     <Box
       as="span"
@@ -16,6 +16,7 @@ export function Badge({ tone = "muted", children }: { tone?: Tone; children: Rea
       textTransform="uppercase"
       color={`tone.${tone}.fg`}
       bg={`tone.${tone}.bg`}
+      {...rest}
     >
       {children}
     </Box>

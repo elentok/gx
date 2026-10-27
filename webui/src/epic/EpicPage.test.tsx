@@ -224,8 +224,8 @@ const alignedRows = () => [
 ];
 
 test.each([
-  ["wide", 60],
-  ["phone", 54],
+  ["wide", 72],
+  ["phone", 66],
 ])("the title starts where the second row does (%s)", async (width, left) => {
   if (width === "phone") vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   try {

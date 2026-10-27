@@ -17,6 +17,7 @@ import { JumpMenu } from "../nav/JumpMenu";
 import { Markdown } from "../markdown/Markdown";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
+import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
@@ -39,7 +40,7 @@ import {
 
 const DONE_SHOWN = 3;
 
-// The done cards under their divider: the newest few, then the rest on request (not remembered).
+// The done cards under their badge: the newest few, then the rest on request (not remembered).
 function DoneGroup({ rows, ctx, heads }: { rows: EpicDetailRow[]; ctx: RowContext; heads: boolean }) {
   const [all, setAll] = useState(false);
   if (rows.length === 0) return null;
@@ -47,16 +48,14 @@ function DoneGroup({ rows, ctx, heads }: { rows: EpicDetailRow[]; ctx: RowContex
   const shown = all ? done : done.slice(0, DONE_SHOWN);
   return (
     <Box display="flex" flexDirection="column" gap="8px">
-      <Box data-done-divider display="flex" alignItems="center" gap="12px" color="text.dim" fontSize="13px" mt={heads ? "0" : "16px"} mb="-4px">
-        <Box flex="1" borderTopWidth="1px" borderColor="hairline" />
+      <Badge data-done-divider alignSelf="flex-start" mt={heads ? "0" : "16px"}>
         {doneHeading(done)}
-        <Box flex="1" borderTopWidth="1px" borderColor="hairline" />
-      </Box>
+      </Badge>
       {shown.map((r) => (
         <TicketCard key={r.address} row={r} meta={doneMeta(r, ctx)} indent={0} />
       ))}
       {done.length > DONE_SHOWN && (
-        <Button tone="muted" emphasis="secondary" size="sm" onClick={() => setAll(!all)}>
+        <Button tone="muted" emphasis="ghost" size="sm" alignSelf="flex-start" onClick={() => setAll(!all)}>
           {all ? "Show fewer" : `Show ${done.length - DONE_SHOWN} more`}
         </Button>
       )}
