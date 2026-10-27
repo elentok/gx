@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.39.0 - 2026-10-27
+
+- Added Design worktrees. Every Design now runs in its own `<map>-design` branch and worktree, and the server rebases that branch onto trunk at each session open. `gx agent link` prints the rebase note. Step 8 merges the design branch into `<map>-impl`. gx then removes the design worktree and branch, and deleting a map removes them too. `gx-design` refuses to work in the trunk checkout. Also added `gx designs worktree <project:epic>` and `POST /v1/designs/worktree`.
+- Added recovery for every pause from the web UI. One server table maps each pause kind to the verbs that recover it. The TUI, the web UI and `gx-investigate` offer only those verbs, and every refusal names the status and the verb to use. The web gains Retry, Merge again and Start over. Every write button shows a spinner while it runs and a toast for errors and refusals.
+- Added dirty-trunk merging. When uncommitted trunk files clash with a merge, gx backs them up to `refs/gx/backups`, sets them aside, fast-forwards and restores them, with no pause when the restore is clean. When it is not clean, the epic pauses and shows the file list with "Stash, merge and restore" and "Merge again". Stash, merge and restore leaves conflict markers and opens a trunk-conflict ticket in the target checkout. That ticket finishes once no markers are left, and Start over restores the backup. Backups older than 30 days are pruned. Also added `gx server epics stash-merge` and `POST /v1/epics/stash-merge`.
+- Added recommendations from `gx-investigate`. It may retry a repair or zero-commit pause by itself, within a guard rail. When it cannot, it leaves a diagnosis and marks one web button "Recommended". A person's recovery verb cancels the open investigate child.
+- Added "Fix it with an agent" to cards paused for repair on the Epic page. It opens a dialog with a `/gx-investigate` prompt, a Copy button and "Start gx agent". Also added `gx agents fix <project:epic/NN>`, `POST /v1/tickets/fix-agent` and the `agents.fix-agent-remote-control` setting.
+- Added a Grilling section to the Stats page, with Words read and Questions asked cards. gx saves the counts when a Design conversation ends and sweeps uncounted ones at server start. `gx tickets migrate` backfills older Design sessions.
+- Added verify budgets. `gx-to-tickets` splits a large verify into parts of at most 70K expected tokens, plus one collect ticket per round. ralphloop stops a verify session 20K below the smart zone with one finish-up prompt. A cap stop does not use up one of the 3 rounds. Also added `--section` to `gx tickets show`, and a hidden `gx tickets list` alias.
+- Added mock checks. `gx-prototype` stores the approved mock in the ticket store. `gx-to-spec` lists its Mock states, and `gx-to-tickets` adds a Mock check section to UI tickets. `gx-implement` and `gx-verify-epic` compare screenshots of the built page with the mock.
+- Added a Send popover in the Design page grilling sheet. It lists unanswered questions, with "Send anyway". Also added Focus mode, which fills the chat column with the sheet. It replaces the full-screen overlay.
+- Added a "N more need you" count on the back link of the Design and Epic pages.
+- Added `gx brief conflicts` and `gx brief playwright`, and `gxfixture --env`, which prints a sourceable env.
+- Changed the Epic page layout. The header has a ProgressRing and the kind badge. One bar holds a stats line and the buttons, and Can't merge notices show in a tinted box. Tickets are one-line cards with status words like "running · 4m · $0.62". Done and cancelled tickets sit under a divider with "Show N more", and a collapsed More stats card sits at the bottom. The Epic and Ticket pages switch to the wide layout at 640px. A Design's header now shows time and cost.
+- Changed the ticket verb `relaunch` to Retry. `relaunch` stays as a hidden alias for one release. Retry on an answer-class pause prompts the live agent.
+- Changed a merge ticket that rebased onto the claim-time trunk to count as done, even if trunk moved since. The merge-ticket retry cap rose from 2 to 3.
+- Changed `gx-grilling` to skip the "Shared understanding" question after a straightforward grilling. It prints a short summary of what it recorded instead. The Destination grilling never skips.
+- Changed a finished epic's label to "Merged" in the TUI and on the web.
+- Changed skill guidance. Bug-fix tickets need a check that the test fails on the old code. `gx-to-tickets` checks behaviour claims against the code. Code-review subagents get the spec. Implement, TDD and conflict skills never `cd` out of the worktree root.
+- Fixed clash detection missing files in new directories and the old path of renamed files.
+- Fixed Start over counting done and investigate fork children.
+- Fixed a verify session getting the stop prompt again after a corrective retry.
+- Fixed TUI answer, choose-base and reopen-and-retry falling through to resume.
+- Fixed the TUI Start session dropping the rebase note and trust flag, and hiding real errors.
+- Fixed backfilled Design records being added to token sums.
+- Fixed the New Design sheet: it now stays above the iOS keyboard, stops iOS AutoFill on the slug field, and stays open when a drag ends on the backdrop.
+
 ## v0.38.1 - 2026-10-26
 
 - Added a Delete design button to the Design page, for an uncharted design: a map with no Destination, no tickets and no live session. The button shows up without a reload once a session stops. Also added `gx designs delete <project:epic>` and `POST /v1/designs/delete`.
