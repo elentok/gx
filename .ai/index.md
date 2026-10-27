@@ -49,7 +49,7 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   worktree, so web tests work in a fresh worktree. `make web-test` still installs first, at the cost
   of a slower run.
 - Quiet web runs, from anywhere in the repo (always pass `-C webui`; the shell cwd persists between
-  calls, so never `cd webui`, and run prettier as `pnpm -C webui exec prettier ...`):
+  calls, so never `cd webui`):
   - `gx brief -C webui vitest src/epic`
   - `gx brief -C webui tsc`
   - one e2e flow: `gx brief -C webui playwright epics.e2e.ts -g "^2\."`. It adds the config and the

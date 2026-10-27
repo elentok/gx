@@ -72,6 +72,7 @@ Read this before you guess; each wrong guess costs a rebuild.
   - `finish` (default): commits and reports finished. The ticket merges and ends `done`.
   - `ask`: pauses with a question. The ticket shows as asking.
   - `fail`: the fake exits non-zero. The ticket becomes `needs-repair · Run failed`.
+  - `permission`: the fake blocks on a Bash permission prompt that only the pty runner can approve.
   - Anything that goes idle with no commit and no report is read as a stalled agent. The server
     nudges it after about 120s. Never wait for that: pick `fail` for a failed run.
 - **CLI writes reach the server late.** `gx tickets section/set/add` against the fixture changes
