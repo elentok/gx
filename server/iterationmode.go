@@ -30,9 +30,11 @@ type iterationMode struct {
 	// err is why a trunk-conflict ticket's checkout could not be found; prepare
 	// and resume fail with it instead of running the agent somewhere else.
 	err error
-	// markerFiles are the files a trunk-conflict ticket resolves, scanned in
-	// scratchDir when its agent reports finished; nil for every other ticket.
-	markerFiles []string
+	// finishCheck, when set, runs before a commitless ticket closes and may pause
+	// it instead; a trunk-conflict ticket scans its files for conflict markers.
+	finishCheck func(o ralphloop.OneIteration) (out ralphloop.FinishOutcome, paused bool, err error)
+	// afterDone, when set, runs once the ticket's finished report is adopted.
+	afterDone func()
 	// ref is the detached worktree's start for a commitless ticket in a real
 	// project; launch-only, so resume never needs it.
 	ref string
@@ -45,10 +47,14 @@ func (s *Server) iterationModeFor(addr tickets.Address, t tickets.Ticket) iterat
 	}
 	if typ == schema.TypeTrunkConflict {
 		dir, err := s.targetCheckout(addr)
-		m := iterationMode{commitless: true, scratchDir: dir, err: err}
+		m := iterationMode{commitless: true, scratchDir: dir, err: err, afterDone: func() { s.dropTrunkConflictBackup(addr) }}
+		// An epic with no recorded files still gets the scan.
+		var files []string
 		if e, ok := s.freshEpic(addr.Project, addr.Epic); ok {
-			// Never nil, so an epic with no recorded files still gets the scan.
-			m.markerFiles = append([]string{}, e.TrunkConflictFiles...)
+			files = e.TrunkConflictFiles
+		}
+		m.finishCheck = func(o ralphloop.OneIteration) (ralphloop.FinishOutcome, bool, error) {
+			return pauseOnMarkers(o, dir, files)
 		}
 		return m
 	}
@@ -132,8 +138,8 @@ func (m iterationMode) finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralp
 		}
 		return ralphloop.FinishMerge(d, o, w, pane, target)
 	case m.commitless:
-		if m.markerFiles != nil {
-			if out, paused, err := m.pauseOnMarkers(o); err != nil || paused {
+		if m.finishCheck != nil {
+			if out, paused, err := m.finishCheck(o); err != nil || paused {
 				return out, err
 			}
 		}
@@ -145,7 +151,7 @@ func (m iterationMode) finish(d ralphloop.Deps, o ralphloop.OneIteration, w ralp
 // pauseOnMarkers is the trunk-conflict ticket's check of an agent's finished
 // report: the report alone is not trusted, so files that still hold conflict
 // markers pause the ticket instead of closing it.
-func (m iterationMode) pauseOnMarkers(o ralphloop.OneIteration) (out ralphloop.FinishOutcome, paused bool, err error) {
+func pauseOnMarkers(o ralphloop.OneIteration, dir string, files []string) (out ralphloop.FinishOutcome, paused bool, err error) {
 	t, err := schema.ParseTicket(o.Ticket.Path)
 	if err != nil {
 		return ralphloop.FinishOutcome{}, false, fmt.Errorf("reading finished ticket: %w", err)
@@ -153,7 +159,7 @@ func (m iterationMode) pauseOnMarkers(o ralphloop.OneIteration) (out ralphloop.F
 	if t.IterationStatus != schema.IterationStatusFinished {
 		return ralphloop.FinishOutcome{}, false, nil
 	}
-	left := filesWithMarkers(m.scratchDir, m.markerFiles)
+	left := filesWithMarkers(dir, files)
 	if len(left) == 0 {
 		return ralphloop.FinishOutcome{}, false, nil
 	}

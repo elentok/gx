@@ -169,8 +169,10 @@ func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	if res, refused, err := staleTicket(epicPath, id, req); refused || err != nil {
-		return res, err
+	if req.RequireState {
+		if res, refused, err := staleTicket(epicPath, id, req); refused || err != nil {
+			return res, err
+		}
 	}
 	res, _, err := repair.Merge(repair.MergeInput{
 		EpicPath: epicPath, ID: id, From: req.From, To: req.To,
@@ -262,8 +264,10 @@ func (s *Server) repairStartOver(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	if res, refused, err := staleTicket(epicPath, id, req); refused || err != nil {
-		return res, err
+	if req.RequireState {
+		if res, refused, err := staleTicket(epicPath, id, req); refused || err != nil {
+			return res, err
+		}
 	}
 	if _, t, ferr := repair.FindEpicTicket(epicPath, id); ferr == nil && t.Type == string(schema.TypeTrunkConflict) {
 		addr := tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
@@ -384,10 +388,8 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 
 // webStale refuses a web verb whose token no longer names the ticket's open
 // pause round and class; a pause without an open round has nothing to name.
+// Callers check req.RequireState first.
 func webStale(ticketPath string, req RepairRequest) (RepairResult, bool, error) {
-	if !req.RequireState {
-		return RepairResult{}, false, nil
-	}
 	stale, err := ticketPauseStale(ticketPath, req.State)
 	if err != nil || !stale {
 		return RepairResult{}, false, err
@@ -398,9 +400,6 @@ func webStale(ticketPath string, req RepairRequest) (RepairResult, bool, error) 
 // staleTicket is webStale for the ticket id of the epic at epicPath. A ticket
 // that does not exist is left to the verb to refuse.
 func staleTicket(epicPath, id string, req RepairRequest) (RepairResult, bool, error) {
-	if !req.RequireState {
-		return RepairResult{}, false, nil
-	}
 	_, t, err := repair.FindEpicTicket(epicPath, id)
 	if err != nil {
 		return RepairResult{}, false, nil

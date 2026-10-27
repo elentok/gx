@@ -828,8 +828,8 @@ func (s *Server) settleRun(rc runContext, err error) {
 	s.notifyResult(addr, one.Ticket.Path)
 	s.notifyDone(addr, one.Ticket.Path)
 	s.fileFollowUp(addr, one.Ticket.Path)
-	if mode.markerFiles != nil {
-		s.dropTrunkConflictBackup(addr)
+	if mode.afterDone != nil {
+		mode.afterDone()
 	}
 	s.completeRootIfDone(root, one)
 }
