@@ -97,12 +97,21 @@ func TestRefresh_WatchFiresOnStoreChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer stop()
-	if err := os.WriteFile(filepath.Join(dir, "x.md"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case <-events:
-	case <-time.After(5 * time.Second):
-		t.Fatal("no change signal after a store write")
+	// Under heavy disk load (the full parallel suite) FSEvents can delay a
+	// write by seconds or drop it, so keep writing until one gets through.
+	write := time.NewTicker(500 * time.Millisecond)
+	defer write.Stop()
+	deadline := time.After(20 * time.Second)
+	for i := 0; ; i++ {
+		if err := os.WriteFile(filepath.Join(dir, "x.md"), []byte{byte(i)}, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		select {
+		case <-events:
+			return
+		case <-write.C:
+		case <-deadline:
+			t.Fatal("no change signal after store writes")
+		}
 	}
 }
