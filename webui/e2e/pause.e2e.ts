@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { realpath } from "node:fs/promises";
-import { card, expect, nav, test, type Fixture } from "./fixture";
+import { card, expect, nav, test, toasts, type Fixture } from "./fixture";
 
 interface Row {
   name: string;
@@ -228,7 +228,8 @@ test.describe("55. Fix it with an agent", () => {
     await second.goto(page.url());
     await openFixDialog(second);
     await fixDialog(second).getByRole("button", nav("Start gx agent")).click();
-    await expect(fixDialog(second).getByText("an agent is already fixing demo:paused-epic/07")).toBeVisible();
+    // The refusal is a toast, outside the dialog.
+    await expect(toasts(second).filter({ hasText: "an agent is already fixing demo:paused-epic/07" })).toBeVisible();
     expect((await sessions(fixture)).length).toBe(before + 1);
   });
 });
