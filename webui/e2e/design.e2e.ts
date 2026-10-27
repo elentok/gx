@@ -9,6 +9,9 @@ const openDesign = async (page: Page) => {
   await expect(page.getByRole("button", nav("Start design session"))).toBeVisible();
 };
 
+// A round opens in the Questions view; the chat messages show after a tap on Chat.
+const showChat = (page: Page) => page.getByRole("group", nav("View")).getByRole("button", nav("Chat")).click();
+
 const step = (page: Page, name: string, state: string) => page.locator(`li[data-step="${name}"][data-state="${state}"]`);
 
 test.describe("4. Start a design session", () => {
@@ -16,10 +19,14 @@ test.describe("4. Start a design session", () => {
     await start("design");
     await openDesign(page);
     await expect(step(page, "resolve-tickets", "current")).toBeVisible();
-    await expect(page.getByRole("link", { name: /^← Epics/ })).toHaveAccessibleName("← Epics");
+    await expect(page.getByRole("link", nav("Epics"))).toHaveAttribute("aria-current", "page");
+    // The charted design has no session, so its ⋯ menu would be empty and the button is absent.
+    await expect(page.getByRole("button", nav("More actions"))).toHaveCount(0);
 
     await page.getByRole("button", nav("Start design session")).click();
 
+    // The first message arrives with round one, which opens in the Questions view.
+    await showChat(page);
     await expect(page.getByText("Two questions before the spec.")).toBeVisible();
     await expect(page.getByRole("button", nav("Start design session"))).toHaveCount(0);
     await expect(step(page, "resolve-tickets", "current")).toBeVisible();
@@ -38,6 +45,8 @@ test.describe("5. Answer a round", () => {
     await expect(questions.getByRole("button", nav("Question 8b"))).toBeVisible();
     await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
 
+    // Answered from the Chat view, so the person's message shows once it is sent.
+    await showChat(page);
     await questions.getByRole("button", { name: /SQLite/ }).click();
     await expect(questions.getByText("Q8b - Migrate at startup?")).toBeVisible();
     await questions.getByRole("button", { name: /Yes/ }).click();
@@ -54,11 +63,13 @@ test.describe("5. Answer a round", () => {
     await expect(cont).toBeVisible();
 
     // Under load the run-end update can land after the first press ("the session changed"), so press again.
+    // Round Q9 arrives with "A fresh round." and opens in the Questions view, which hides the chat.
     await expect(async () => {
       await cont.click({ timeout: 2000 });
-      await expect(page.getByText("A fresh round.")).toBeVisible({ timeout: 2000 });
+      await expect(page.getByRole("group", nav("Questions")).getByText("Q9 - Keep going?")).toBeVisible({ timeout: 2000 });
     }).toPass();
-    await expect(page.getByRole("group", nav("Questions")).getByText("Q9 - Keep going?")).toBeVisible();
+    await showChat(page);
+    await expect(page.getByText("A fresh round.")).toBeVisible();
   });
 });
 
@@ -98,7 +109,8 @@ test.describe("47. Send popover", () => {
     await expect(questions.getByRole("button", nav("Question 8b"))).toHaveAttribute("aria-current", "step");
     await expect(questions.getByRole("group", nav("Question 8b of 2")).getByRole("button").first()).toBeFocused();
 
-    // A folded sheet opens at the question of the row.
+    // A folded sheet opens at the question of the row. Only the Chat view has the fold chevron.
+    await showChat(page);
     await questions.getByRole("button", nav("Fold questions")).click();
     await expect(questions.getByRole("button", nav("Open questions"))).toBeVisible();
     await send.click();
@@ -112,14 +124,15 @@ test.describe("47. Send popover", () => {
     await expect(popover.getByText("1 question is unanswered")).toBeVisible();
     await expect(popover.getByText("1 of 2 answered")).toBeVisible();
 
-    // Escape and a click on the chat close it and give focus back to Send.
+    // Escape and a click outside the popover close it and give focus back to Send.
     await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(popover).toHaveCount(0);
     await expect(send).toBeFocused();
+    await page.getByRole("group", nav("View")).getByRole("button", { name: /^Questions/ }).click();
     await send.click();
     await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
-    await page.getByText("Two questions before the spec.").click();
+    await questions.getByText("Q8 - Which store?").click();
     await expect(popover).toHaveCount(0);
     await expect(send).toBeFocused();
 
@@ -144,7 +157,7 @@ test.describe("47. Send popover", () => {
 test.describe("48. Fixed sheet rows", () => {
   test.use({ viewport: { width: 1280, height: 600 } });
 
-  for (const mode of ["docked", "focus mode"]) {
+  for (const mode of ["Questions view", "docked in the Chat view"]) {
   test(`the header and Prev/Next stay put while the body scrolls, ${mode}`, async ({ page, start }) => {
     await start("design", { autoAdvanceDelay: "1h" });
     await openDesign(page);
@@ -152,11 +165,11 @@ test.describe("48. Fixed sheet rows", () => {
 
     const questions = page.getByRole("group", nav("Questions"));
     await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
-    if (mode === "focus mode") await questions.getByRole("button", nav("Enter focus mode")).click();
+    if (mode !== "Questions view") await showChat(page);
     await questions.getByRole("button", nav("Note on question 8")).click();
     const note = questions.getByRole("textbox", nav("Note text for question 8"));
     await expect(note).toBeVisible();
-    await expect(note).toHaveAttribute("rows", "3");
+    await expect(note).toHaveAttribute("rows", "5");
 
     const dot = questions.getByRole("button", nav("Question 8"));
     const count = questions.getByText("0 of 2 answered");
@@ -177,6 +190,8 @@ test.describe("48. Fixed sheet rows", () => {
       next: await next.boundingBox(),
       top: (await questions.boundingBox())!.y,
     });
+    // Opening the note may already have scrolled to the bottom (the Questions view is taller).
+    await scroller.evaluate((el) => ((el as HTMLElement).scrollTop = 0));
     const before = await where();
     const scrollBefore = await scroller.evaluate((el) => (el as HTMLElement).scrollTop);
     await scroller.evaluate((el) => ((el as HTMLElement).scrollTop = (el as HTMLElement).scrollHeight));
@@ -370,8 +385,9 @@ test.describe("10. Auto-advance", () => {
 
     await expect(page.getByText(/Continuing in \ds/)).toBeVisible();
     await expect(page.getByRole("button", nav("Cancel"))).toBeVisible();
-    await expect(page.getByText("A fresh round.")).toBeVisible();
     await expect(page.getByRole("group", nav("Questions")).getByText("Q9 - Keep going?")).toBeVisible();
+    await showChat(page);
+    await expect(page.getByText("A fresh round.")).toBeVisible();
   });
 });
 
@@ -412,6 +428,7 @@ test.describe("13. Defaulted questions", () => {
     const questions = page.getByRole("group", nav("Questions"));
     await expect(questions.getByText("Q12 - Keep going?")).toBeVisible();
     await expect(questions.getByRole("button", { name: /^Question \d/ })).toHaveCount(1);
+    await showChat(page);
     await expect(page.getByText("Q10: keep the current store.")).toBeVisible();
     await expect(page.getByText("Q11: migrate at startup.")).toBeVisible();
 
@@ -430,6 +447,7 @@ test.describe("13. Defaulted questions", () => {
     const questions = page.getByRole("group", nav("Questions"));
     await expect(questions.getByText("Q12 - Accept these defaults?")).toBeVisible();
     await expect(questions.getByRole("button", { name: /^Question \d/ })).toHaveCount(1);
+    await showChat(page);
     await expect(page.getByText("Q10: keep the current store.")).toBeVisible();
     await expect
       .poll(async () => /"grilling":\s*true/.test(await fixture.cli("agents", "list", "--json")))
@@ -503,7 +521,7 @@ test.describe("42. Stopped session card", () => {
   test("the card moves to Ready to design as Not started with a Design button", async ({ page, start }) => {
     const fixture = await start("ready");
     await startDesign(page, "stopped-design");
-    await page.getByRole("link", nav("← Epics")).click();
+    await page.getByRole("link", nav("Epics")).click();
 
     await stopSession(fixture, "stopped-design");
     const ready = await section(page, "Ready to design");
@@ -609,6 +627,8 @@ test("50. Design epic page", async ({ page, start }) => {
   await expect(timed).not.toContainText("$");
 
   await page.getByRole("button", nav("Start design session")).click();
+  // The Design page opens in the Questions view, so the first message shows after a tap on Chat.
+  await showChat(page);
   await expect(page.getByText("Two questions before the spec.")).toBeVisible();
   await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
   await expect(ring).toHaveAttribute("data-tone", "running");

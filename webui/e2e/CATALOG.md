@@ -84,23 +84,26 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Steps:**
   1. Open the Epics page, then the Design page by its route (`#/d/demo:design-epic`); it shows
      "Start design session". No link reaches a Design page before its session starts.
-  2. Click Start design session.
-- **Pass:** The back link reads "← Epics" with no count. Progress shows Resolve tickets as the current step, and the chat shows the first scripted
-  message ("Two questions before the spec.") in place of the start button.
+  2. Click Start design session, then press Chat.
+- **Pass:** Before Start the Epics tab is `aria-current="page"` and the header has no "More actions"
+  button (a charted design with no session has an empty menu). Progress shows Resolve tickets as
+  the current step. After Start the start button is gone and, in the Chat view, the first scripted
+  message ("Two questions before the spec.") shows; round one opened in the Questions view.
 
 ## 5. Answer a round
 
 - **Scenario:** `design`
 - **Steps:**
   1. Start the session. Round one has `Q8` (options) and `Q8b` (yes/no).
-  2. Pick SQLite and Yes, then Send, with the `/v1/sessions/prompt` call held.
-  3. Click Continue.
+  2. Press Chat. Pick SQLite and Yes, then Send, with the `/v1/sessions/prompt` call held.
+  3. Click Continue (retried), then press Chat.
 - **Pass:**
   - The question dots and titles read `Q8` and `Q8b`.
   - Send is disabled while the call runs.
   - The chat shows the answers as the person's message, so the agent received them.
   - Continue shows after the agent's run-end line.
-  - Continue brings a fresh round with `Q9`.
+  - Continue brings a fresh round with `Q9`, which opens in the Questions view; "A fresh round."
+    shows after pressing Chat.
 
 ## 6. Outside changes show up
 
@@ -150,7 +153,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Scenario:** `design`, with a 3s countdown (`--auto-advance-delay`)
 - **Steps:** start the session, answer round one (SQLite, Yes), Send.
 - **Pass:** after the run-end line the Composer shows "Continuing in Ns" and Cancel; with no press
-  the fresh round ("A fresh round.", `Q9`) appears.
+  the fresh round (`Q9`) appears in the Questions view; "A fresh round." shows after pressing Chat.
 
 ## 11. Auto-advance, cancel
 
@@ -174,9 +177,9 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 ## 13. Defaulted questions
 
 - **Scenarios:** `design-mixed` (one asked question, two defaulted), `design-defaulted` (all defaulted)
-- **Steps:** start the session. In the mixed case answer the card Yes and Send.
+- **Steps:** start the session, press Chat. In the mixed case answer the card Yes and Send.
 - **Pass:**
-  - Mixed: one card ("Q12 - Keep going?"); Q10 and Q11 show as plain text; the sent answer
+  - Mixed: one card ("Q12 - Keep going?"); Q10 and Q11 show as plain text in the Chat view; the sent answer
     names Q12 only, nothing about Q10 or Q11.
   - All defaulted: one "Q12 - Accept these defaults?" card, the defaults as plain text, and the
     session's Actionable has `grilling` set.
@@ -497,15 +500,15 @@ an exited session.
 - **Scenario:** `design`
 - **Steps:**
   1. Start the session and press Send with nothing answered.
-  2. Click the `Q8b` row. Fold the sheet with ▾, press Send, click the `Q8` row.
+  2. Click the `Q8b` row. Press Chat, fold the sheet with ▾, press Send, click the `Q8` row.
   3. Pick SQLite on `Q8`, press Send.
-  4. Press Escape. Press Send and click the chat. Press Send twice.
+  4. Press Escape. Press Questions, press Send and click the question title (outside the popover). Press Send twice.
   5. Press Send, then Enter on the focused "Send anyway".
 - **Pass:**
   - A popover named "Unanswered questions" shows above Send, ends within 2 px of Send's right edge, and the composer keeps its height.
   - It reads "2 questions are unanswered" and "0 of 2 answered", with `Q8` and `Q8b` rows; after the answer, "1 question is unanswered" and "1 of 2 answered".
   - The `Q8b` row closes it, makes `Q8b` the current dot and focuses its first choice. On a folded sheet the `Q8` row opens the sheet at `Q8`.
-  - "Send anyway" is focused on open. Escape and a click on the chat close it and focus Send. The second Send press closes it and posts nothing.
+  - "Send anyway" is focused on open. Escape and a click outside it close it and focus Send. The second Send press closes it and posts nothing.
   - Enter sends the round with `Q8b` as "(unanswered)", with no second dialog and no "Answer them" button.
 
 ## 48. Fixed sheet rows
@@ -513,12 +516,13 @@ an exited session.
 - **Scenario:** `design`, at 1280x600.
 - **Steps:**
   1. Start the session, click "📝 Note" on `Q8`.
-  2. Scroll the question body to its end.
+  2. Scroll the question body to the top, then to its end.
 - **Pass:**
-  - The note's `rows` is 3.
+  - The note's `rows` is 5.
   - The dots, "0 of 2 answered" and the Prev/Next row keep their positions and stay visible.
   - The body's scroll position changes and the sheet's top edge does not.
-  - The same checks hold in focus mode (enter with ⤢ first).
+  - Run in two tests: the Questions view (the default) and the docked sheet in the Chat view
+    (press Chat first).
 
 ## 49. Questions and Chat views
 
@@ -545,7 +549,7 @@ an exited session.
 - **Scenario:** `design`
 - **Steps:**
   1. Write a long Destination section on `design-epic` with `gx tickets section`; open `#/e/demo:design-epic`.
-  2. Click Start design session; open the epic page again.
+  2. Click Start design session, press Chat to see the first message; open the epic page again.
 - **Pass:**
   - Before the session the ring reads a percentage with `data-tone="muted"`. The summary shows in full under the title.
   - The stats line starts with "Resolve tickets", shows a time ("2m") and has no "$".
