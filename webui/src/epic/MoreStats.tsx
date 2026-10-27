@@ -1,33 +1,67 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState } from "react";
+import { useWide } from "../design/useWide";
 import type { EpicDetail } from "./detail";
 import { statPreview, statRows } from "./stats";
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <chakra.svg
+      aria-hidden
+      viewBox="0 0 16 16"
+      w="16px"
+      h="16px"
+      flexShrink="0"
+      fill="none"
+      stroke="currentColor"
+      color="text.dim"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      transform={open ? "rotate(90deg)" : "none"}
+      transition="transform 0.15s"
+    >
+      <path d="M6 3.5 10.5 8 6 12.5" />
+    </chakra.svg>
+  );
+}
 
 // A collapsed card that opens onto the epic's stat rows; absent when there are none.
 export function MoreStats({ detail }: { detail: EpicDetail }) {
   const [open, setOpen] = useState(false);
+  const wide = useWide();
   const rows = statRows(detail);
   if (rows.length === 0) return null;
   return (
-    <Box mt="4" borderWidth="1px" borderColor="border" borderRadius="md">
+    <Box mt="28px" bg="surface.raised" borderWidth="1px" borderColor="#252c36" borderRadius="12px">
       <Box
         as="button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
         display="flex"
+        flexWrap={wide ? "nowrap" : "wrap"}
         w="full"
         alignItems="center"
-        gap="2"
-        px="3"
-        py="2"
+        columnGap="2"
+        rowGap="4px"
+        px={wide ? "16px" : "14px"}
+        py={wide ? "14px" : "12px"}
         textAlign="left"
         cursor="pointer"
       >
-        <Text as="span" aria-hidden>
-          {open ? "▾" : "▸"}
+        <Chevron open={open} />
+        <Text as="span" fontSize="15px" fontWeight="500">
+          More stats
         </Text>
-        <Text as="span">More stats</Text>
-        <Text as="span" ml="auto" fontSize="sm" color="text.muted">
+        <Text
+          as="span"
+          ml={wide ? "auto" : "0"}
+          pl={wide ? "0" : "28px"}
+          flexBasis={wide ? "auto" : "full"}
+          textAlign={wide ? "right" : "left"}
+          fontSize="13px"
+          color="text.dim"
+        >
           {statPreview(detail)}
         </Text>
       </Box>
