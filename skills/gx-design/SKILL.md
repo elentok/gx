@@ -28,6 +28,16 @@ state machine. The map's `design_step` field is what Progress shows. This skill 
 - A move to an earlier step needs `--allow-backward`. Pass `--allow-backward` only for a review finding that becomes a map ticket
   (steps 5 and 6) and for the move back to `review` for the second review (step 6a), never for any other move.
 
+## Prefer the correct fix
+
+ralph-loop builds the final design without a person watching, so a slower fix costs agent time,
+not the person's time. When a choice is between a quick fix (a workaround, a special case, a patch
+on the symptom) and a slower fix that is clean and correct (it fixes the cause, or puts the logic
+where it belongs), pick the correct fix. This applies to every recommended answer in a grilling
+round, every map ticket Resolution, every implementer's choice and self-decided question in the
+spec, and every ticket in the breakdown. Pick the quick fix only when the person asks for it, and
+then record the reason in the spec.
+
 ## Calling other skills
 
 Every call between bundled skills is a relative link to the callee's `SKILL.md`: `Read` it and
@@ -74,8 +84,8 @@ From here on, **never `cd` and never edit the trunk checkout**:
 
 - Every git command is `git -C <worktree> …`. Every file path is absolute under `<worktree>`.
 - Detection checks `docs/specs/<epic>.md` and the ADRs under `<worktree>`, not the trunk checkout.
-- Every subagent (gx-to-spec, the design reviews, gx-to-tickets) gets `<worktree>`'s absolute path
-  and this rule.
+- Every subagent (gx-to-spec, the design reviews, gx-to-tickets) gets `<worktree>`'s absolute path,
+  this rule, and the "Prefer the correct fix" section.
 - When the worktree is outside the start folder (bare repos), Claude may ask for permission on the
   first edits. Tell the person to allow them.
 - The server does not see a plain session, so it can remove the worktree mid-run. Before the run-end
@@ -206,6 +216,8 @@ Review the spec against the map it came from and its own template, not in the ab
   it back to the map.
 - Does `## Self-decided design questions` hold a choice you disagree with, or one that changes user
   stories or scope? Each one is a finding. File none otherwise.
+- Does the spec pick a quick fix where a clean, correct fix exists, without a reason from the
+  person? Each one is a finding (see "Prefer the correct fix").
 - Does the spec add a pause kind, or a new way into an existing one? Each one is a finding unless
   the spec says why gx cannot recover on its own and which web button ends the pause (see
   [ADR 0042](../../docs/adr/0042-few-pauses-all-recoverable-from-the-web.md)).
