@@ -12,7 +12,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 64, 65, 66).
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 64, 65, 66, 67, 68).
 
 ## 1. Queue an epic
 
@@ -740,3 +740,22 @@ an exited session.
   - The `Q8` note textbox is in the viewport. Its modal is named for `Q8`.
   - The composer "Message" box has `rows` 5. Its modal is "Note on this round". After Done the box holds the typed text, and after Send the chat shows it.
   - On `design-working` (no round) the "Message" box has 5 rows and the expand button, and its modal is "Message to the agent".
+
+## 67. Question top
+
+- **Scenario:** `design` (viewport 1280x600, auto-advance held)
+- **Steps:**
+  1. Click Start design session. In the Chat view too, open "Note on question 8" so the `Q8` body is taller than the sheet.
+  2. Scroll the `question-body` to its end, then move to `Q8b` by its dot. Go back to `Q8` (its dot is named "Question 8, answered" once answered), scroll to the end and repeat with Next →, with a pick (SQLite), and with a Send popover row (`Q8b`).
+  3. Run all of it in the Questions view and again docked in the Chat view.
+- **Pass:** each time the `Q8b` title's top is within 4px of the `question-body` top, and `Q8b` is the current question. Before each move the `Q8` body had scrolled (`scrollTop` above 0).
+
+## 68. Text size
+
+- **Scenario:** `design` (auto-advance held)
+- **Steps:**
+  1. Click Start design session. In the Questions view read the computed font size of the `Q8` title, its body ("SQLite or files?"), the first child of the SQLite choice and "0 of 2 answered".
+  2. Open the composer "Note", type "prompt size probe", answer both questions and click Send. Click Continue until `Q9` shows, then click Chat.
+  3. Read the font size of the chat message "Two questions before the spec.", the sent prompt and the docked `Q9` title.
+- **Pass:** the title is 24px, the body 17px, "n of m answered" 13px (the `xs` token), the choice 16px, the chat message and the prompt 16px, the docked title 18px.
+- **Note:** "Earlier messages hidden" is not checked: no scenario shows it (the chat is never truncated), and it uses the same `xs` size as "n of m answered".

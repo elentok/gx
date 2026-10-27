@@ -182,3 +182,103 @@ test.describe("66. Note box", () => {
     await expect(page.getByRole("dialog", nav("Message to the agent"))).toBeVisible();
   });
 });
+
+const showChat = (page: Page) => page.getByRole("group", nav("View")).getByRole("button", nav("Chat")).click();
+
+const fontSize = (el: Locator) => el.evaluate((node) => getComputedStyle(node).fontSize);
+
+test.describe("67. Question top", () => {
+  test.use({ viewport: { width: 1280, height: 600 } });
+
+  for (const mode of ["Questions view", "docked in the Chat view"]) {
+    test(`a move starts at the question's title, ${mode}`, async ({ page, start }) => {
+      await start("design", { autoAdvanceDelay: "1h" });
+      await openDesign(page);
+      await page.getByRole("button", nav("Start design session")).click();
+
+      const questions = page.getByRole("group", nav("Questions"));
+      await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
+      if (mode !== "Questions view") await showChat(page);
+      // An open note makes the Q8 body taller than the sheet at this height.
+      await questions.getByRole("button", nav("Note on question 8")).click();
+      await expect(questions.getByRole("textbox", nav("Note text for question 8"))).toBeVisible();
+
+      const body = questions.getByTestId("question-body");
+      const title = questions.getByText("Q8b - Migrate at startup?");
+      const toEnd = async () => {
+        await body.evaluate((el) => (el.scrollTop = el.scrollHeight));
+        expect(await body.evaluate((el) => el.scrollTop), "the Q8 body must scroll").toBeGreaterThan(0);
+      };
+      const expectTitleAtTop = async () => {
+        await expect(questions.getByRole("button", nav("Question 8b"))).toHaveAttribute("aria-current", "step");
+        await expect
+          .poll(async () => Math.abs((await title.boundingBox())!.y - (await body.boundingBox())!.y))
+          .toBeLessThanOrEqual(4);
+      };
+      const back = () => questions.getByRole("button", { name: /^Question 8(, answered)?$/ }).click();
+
+      await toEnd();
+      await questions.getByRole("button", nav("Question 8b")).click();
+      await expectTitleAtTop();
+
+      await back();
+      await toEnd();
+      await questions.getByRole("button", nav("Next →")).click();
+      await expectTitleAtTop();
+
+      await back();
+      await toEnd();
+      await questions.getByRole("button", { name: /SQLite/ }).click();
+      await expectTitleAtTop();
+
+      await back();
+      await toEnd();
+      await page.getByRole("button", nav("Send")).click();
+      await page
+        .getByRole("alertdialog", nav("Unanswered questions"))
+        .getByRole("button", { name: /^Q8b Migrate at startup\? ›$/ })
+        .click();
+      await expectTitleAtTop();
+    });
+  }
+});
+
+test.describe("68. Text size", () => {
+  test("chat, prompt, choice, titles, body and meta text", async ({ page, start }) => {
+    await start("design", { autoAdvanceDelay: "1h" });
+    await openDesign(page);
+    await page.getByRole("button", nav("Start design session")).click();
+
+    // Questions view.
+    const questions = page.getByRole("group", nav("Questions"));
+    await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
+    expect(await fontSize(questions.getByText("Q8 - Which store?"))).toBe("24px");
+    expect(await fontSize(questions.getByText("SQLite or files?"))).toBe("17px");
+    expect(await fontSize(questions.getByText("0 of 2 answered"))).toBe("13px");
+    const choice = questions.getByRole("button", { name: /SQLite/ });
+    expect(await fontSize(choice.locator(":scope > *").first())).toBe("16px");
+
+    // Send a round with a note, so the chat has a prompt.
+    await page.getByRole("button", nav("Note")).click();
+    await page.getByRole("textbox", nav("Message")).fill("prompt size probe");
+    await choice.click();
+    await questions.getByRole("button", { name: /Yes/ }).click();
+    await page.getByRole("button", nav("Send")).click();
+
+    // Chat view: the message, the prompt and the docked title (the next round, Q9).
+    // Continue starts the next round; under load the first press can land before the run ends, so press again.
+    const cont = page.getByRole("button", { name: /^Continue/ });
+    await expect(async () => {
+      await cont.click({ timeout: 2000 });
+      await expect(questions.getByText("Q9 - Keep going?")).toBeVisible({ timeout: 2000 });
+    }).toPass();
+    // The new round can reopen the Questions view just after Q9 shows, so press Chat until it sticks.
+    await expect(async () => {
+      await showChat(page);
+      await expect(page.getByText("Two questions before the spec.")).toBeVisible({ timeout: 2000 });
+    }).toPass();
+    expect(await fontSize(page.getByText("Two questions before the spec."))).toBe("16px");
+    expect(await fontSize(page.getByText("prompt size probe"))).toBe("16px");
+    expect(await fontSize(questions.getByText("Q9 - Keep going?"))).toBe("18px");
+  });
+});
