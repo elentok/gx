@@ -76,19 +76,21 @@ function MenuFrame({ sheet, children }: { sheet: boolean; children: ReactNode })
   if (!sheet) return <Menu.Positioner>{children}</Menu.Positioner>;
   return (
     <Menu.Context>
-      {(menu) => (
-        <Box
-          position="fixed"
-          inset="0"
-          zIndex="modal"
-          bg="overlay"
-          display="flex"
-          alignItems="flex-end"
-          onClick={(e) => e.target === e.currentTarget && menu.setOpen(false)}
-        >
-          {children}
-        </Box>
-      )}
+      {(menu) =>
+        menu.open && (
+          <Box
+            position="fixed"
+            inset="0"
+            zIndex="modal"
+            bg="overlay"
+            display="flex"
+            alignItems="flex-end"
+            onClick={(e) => e.target === e.currentTarget && menu.setOpen(false)}
+          >
+            {children}
+          </Box>
+        )
+      }
     </Menu.Context>
   );
 }

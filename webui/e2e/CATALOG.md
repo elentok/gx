@@ -520,22 +520,25 @@ an exited session.
   - The body's scroll position changes and the sheet's top edge does not.
   - The same checks hold in focus mode (enter with ⤢ first).
 
-## 49. Focus mode
+## 49. Questions and Chat views
 
-- **Scenario:** `design`
+- **Scenario:** `design` (and `design-working` for the last test)
 - **Steps:**
-  1. Start the session. Press ⤢ (left of ▾), then ⤡.
-  2. Enter, open the `Q8` note, focus its field, press Escape.
-  3. Enter, press Send with gaps, Escape twice. Repeat with Ctrl+K and the jump menu.
-  4. Pick SQLite, type a composer note, enter, leave.
-  5. Enter, press ▾; press ⤢ on the folded sheet.
-  6. Answer `Q8b`, press Send, then Continue.
+  1. Start the session. Pick SQLite.
+  2. Press Chat, fold and open ▾, press Questions. Press Escape.
+  3. In the Questions view, open the Send popover, the jump menu (Ctrl+K), the `Q8b` note modal and the ⋯ menu in turn. Press Escape twice each time.
+  4. Type a composer note, switch Chat, Questions, Chat, Questions.
+  5. Resize to 1440px, then to 375px; open the steps sheet from the step line and press Escape twice.
+  6. In a second test: press Chat, answer both questions, press Send, then Continue.
+  7. In a third test on `design-working`: start the session.
 - **Pass:**
-  - ⤢ sits left of ▾. Entering hides "Two questions before the spec."; the sheet is taller than half the viewport; the title, Progress region and composer stay; the question title is larger than docked; the button reads ⤡.
-  - Escape from the note field leaves. With a layer open, the first Escape closes only the Send popover or the jump menu, the second leaves.
-  - SQLite, `Q8b` as the current dot and the composer note survive entering and leaving.
-  - ▾ folds and leaves; ⤢ on the folded sheet unfolds and enters.
-  - Sending leaves with the sent round shown; Continue opens the `Q9` round docked. No "Questions, full screen" dialog appears.
+  - After Start the View toggle reads Questions (pressed) with "0 of 2"; the sheet is taller than half the viewport; "Two questions before the spec." is hidden. After SQLite it reads "1 of 2".
+  - In Chat the chat shows and ▾ folds and opens the sheet; in Questions there is no ▾. Escape in Questions shows the chat.
+  - With a layer open, the first Escape closes only the layer and the second shows the chat; at 375px the same for the steps sheet.
+  - SQLite, `Q8b` as the current dot and the composer note survive two switches. No "Enter focus mode" or "Leave focus mode" button exists.
+  - At 1440px the question title is at most 820px wide.
+  - Sending from Chat shows the answers in Chat; Continue brings the `Q9` round with Questions pressed.
+  - On `design-working` after Start there is no "View" group and no Questions sheet.
 
 ## 50. Design epic page
 
