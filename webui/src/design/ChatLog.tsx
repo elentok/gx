@@ -326,7 +326,7 @@ function SegButton({
       fontWeight="semibold"
       bg={on ? "surface" : "transparent"}
       color={on ? "text" : "text.muted"}
-      boxShadow={on ? "0 0 0 1px #3d4654" : "none"}
+      boxShadow={on ? "0 0 0 1px {colors.border}" : "none"}
       fontSize="15px"
       cursor="pointer"
     >
