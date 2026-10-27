@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { readPageCache, writePageCache } from "../pageCache";
 import type { Answers } from "./round";
 
-export type RoundDraft = { answers: Answers; notes: string; index: number; scroll: number };
+type RoundDraftData = { answers: Answers; notes: string; index: number; scroll: number };
 
-const EMPTY: RoundDraft = { answers: {}, notes: "", index: 0, scroll: 0 };
+const EMPTY: RoundDraftData = { answers: {}, notes: "", index: 0, scroll: 0 };
 
 // Scrolls to `initial` on mount, then reports every scroll position. Pass a stable `onScroll`.
 function useScrollRestore(initial: number, onScroll: (y: number) => void) {
@@ -18,11 +18,14 @@ function useScrollRestore(initial: number, onScroll: (y: number) => void) {
   }, [onScroll]);
 }
 
+/** What useRoundDraft returns: the draft and its setters. */
+export type RoundDraft = ReturnType<typeof useRoundDraft>;
+
 // A half-answered round survives a reload: its answers, the notes box, the open question and the page scroll.
 // pageCache keeps one entry per session, tagged with the round, so a new round never picks up an old draft.
 export function useRoundDraft(sessionId: string, roundKey: string) {
   const cacheKey = `round.${sessionId}`;
-  const [draft, setDraft] = useState<RoundDraft>(() => ({ ...EMPTY, ...readPageCache<RoundDraft>(cacheKey, roundKey) }));
+  const [draft, setDraft] = useState<RoundDraftData>(() => ({ ...EMPTY, ...readPageCache<RoundDraftData>(cacheKey, roundKey) }));
   // The scroll lives in a ref: every scroll event saving through state would repaint the page.
   const scroll = useRef(draft.scroll);
   const latest = useRef(draft);
@@ -30,7 +33,7 @@ export function useRoundDraft(sessionId: string, roundKey: string) {
   const sent = useRef(false);
 
   const save = useCallback(
-    (d: RoundDraft) => {
+    (d: RoundDraftData) => {
       if (!sent.current) writePageCache(cacheKey, { ...d, scroll: scroll.current }, roundKey);
     },
     [cacheKey, roundKey],

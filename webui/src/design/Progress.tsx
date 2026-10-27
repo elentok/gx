@@ -115,6 +115,9 @@ function summaryLine(steps: MapStep[], rows: EpicDetailRow[]): string {
   return `${step.label} · ${idOf(rows[at].address)} ${rows[at].title} (${at + 1} of ${rows.length})`;
 }
 
+// A detail from an older server has no steps.
+const stepsOf = (detail: EpicDetail) => detail.steps ?? [];
+
 /** The phone's step line under the Design name; it and the header ring open the steps sheet. */
 export function StepLine({ detail, onOpen }: { detail: EpicDetail; onOpen: () => void }) {
   return (
@@ -131,7 +134,7 @@ export function StepLine({ detail, onOpen }: { detail: EpicDetail; onOpen: () =>
       textAlign="left"
     >
       <Text as="span" truncate>
-        {summaryLine(detail.steps ?? [], detail.rows)}
+        {summaryLine(stepsOf(detail), detail.rows)}
       </Text>
       <Text as="span" aria-hidden flexShrink="0">
         ▾
@@ -164,7 +167,7 @@ export function StepsSheet({ detail, ring, onClose }: { detail: EpicDetail; ring
           Close
         </Button>
       </Box>
-      <Steps steps={detail.steps ?? []} rows={detail.rows} />
+      <Steps steps={stepsOf(detail)} rows={detail.rows} />
     </Modal>
   );
 }
@@ -174,7 +177,7 @@ export function Progress({ detail }: { detail: EpicDetail }) {
   // A panel like the Designs sidebar, only as tall as its steps.
   return (
     <Box bg="surface.raised" px="3" py="4">
-      <Steps steps={detail.steps ?? []} rows={detail.rows} />
+      <Steps steps={stepsOf(detail)} rows={detail.rows} />
     </Box>
   );
 }

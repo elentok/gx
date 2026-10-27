@@ -27,7 +27,7 @@ import {
 import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
 import { isAnswered } from "./round";
-import { useRoundDraft } from "./roundDraft";
+import { type RoundDraft, useRoundDraft } from "./roundDraft";
 
 const KIND_NAMES: Record<string, string> = {
   shell: "shell",
@@ -165,7 +165,7 @@ function ChatTail({
   actions: FailureActions;
   questions: boolean;
   onQuestions: (on: boolean) => void;
-  roundDraft: ReturnType<typeof useRoundDraft>;
+  roundDraft: RoundDraft;
 }) {
   const { draft, setAnswers, setNotes, setIndex, clear } = roundDraft;
   const { answers } = draft;

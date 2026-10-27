@@ -189,6 +189,12 @@ test("a plain message posts its text with the last message id", async () => {
   await waitFor(() => expect(box.value).toBe(""));
 });
 
+test("opening the composer focuses the Message textarea", async () => {
+  render({ post: vi.fn<PostPrompt>(async () => ok) });
+  const box = await openNote();
+  expect(document.activeElement).toBe(box);
+});
+
 test("the composer is disabled while the session is Working", async () => {
   render({
     state: "working",

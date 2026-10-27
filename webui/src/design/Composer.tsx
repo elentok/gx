@@ -216,6 +216,7 @@ export function Composer({
           placeholder={inRound ? "A note on this round" : "A message to the agent"}
           value={text}
           disabled={!enabled}
+          autoFocus
           onChange={setText}
         />
       )}

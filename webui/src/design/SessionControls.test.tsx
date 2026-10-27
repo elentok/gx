@@ -274,12 +274,36 @@ test("the Live sessions list switches the page and stops another session with a 
   await openMenu();
   expect(await screen.findByText("Live sessions · 2")).toBeTruthy();
   expect(screen.getByRole("menuitem", { name: "new" }).getAttribute("aria-current")).toBe("true");
-  expect(screen.queryByRole("button", { name: "Stop new" })).toBeNull();
+  expect(screen.queryByRole("menuitem", { name: "Stop new" })).toBeNull();
   fireEvent.click(screen.getByRole("menuitem", { name: "old" }));
   await waitFor(() => expect(chatFor).toHaveBeenCalledWith("old"));
   await openMenu();
-  fireEvent.click(await screen.findByRole("button", { name: "Stop new" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Stop new" }));
   await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "new", state: stateToken(newer) }));
+});
+
+test("arrow keys reach another session's Stop item; Enter stops it and the menu stays open", async () => {
+  const shown = session("new", { run_started_at: "2026-10-23T10:00:00Z", status_changed_at: "2026-10-23T10:00:00Z" });
+  const other = session("old", { run_started_at: "2026-10-23T09:00:00Z", status_changed_at: "2026-10-23T09:00:00Z" });
+  const stop = vi.fn(async () => ({}) as SessionResult);
+  render("/d/gx:a", [shown, other], { stop });
+  await openMenu();
+  const menu = await screen.findByRole("menu");
+  const stopItem = await screen.findByRole("menuitem", { name: "Stop old" });
+  // Zag keeps focus on the menu and highlights one item at a time: New session, new, old, Stop old.
+  const sessionItem = screen.getByRole("menuitem", { name: "old" });
+  const arrowTo = async (target: HTMLElement) => {
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    await waitFor(() => expect(target.hasAttribute("data-highlighted")).toBe(true));
+  };
+  await arrowTo(screen.getByRole("menuitem", { name: /New session/ }));
+  await arrowTo(screen.getByRole("menuitem", { name: "new" }));
+  await arrowTo(sessionItem);
+  await arrowTo(stopItem);
+  fireEvent.keyDown(menu, { key: "Enter" });
+  await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "old", state: stateToken(other) }));
+  expect(menu.isConnected).toBe(true);
+  expect(screen.getByRole("menu")).toBe(menu);
 });
 
 const phone = () => vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
@@ -297,7 +321,7 @@ test("on a phone the ⋯ menu is a bottom sheet with a grab handle and the deskt
     const menu = await screen.findByRole("menu");
     expect(screen.getByTestId("grab-handle")).toBeTruthy();
     expect(screen.getByText("Live sessions · 2")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Stop s2" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Stop s2" }));
     await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "s2", state: stateToken(other) }));
     fireEvent.click(await newSession());
     await waitFor(() => expect(openDesign).toHaveBeenCalled());

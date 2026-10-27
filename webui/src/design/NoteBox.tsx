@@ -22,6 +22,7 @@ export function NoteBox({
   onChange,
   label,
   disabled,
+  autoFocus = false,
 }: {
   /** What the note is on, for its labels: "question 2". */
   name: string;
@@ -33,6 +34,8 @@ export function NoteBox({
   /** The box's accessible name, when it is not "Note text for <name>". */
   label?: string;
   disabled?: boolean;
+  /** Focus the box when it mounts. */
+  autoFocus?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -45,6 +48,7 @@ export function NoteBox({
       <Textarea
         {...field}
         borderRadius="12px"
+        autoFocus={autoFocus}
         rows={5}
         lineHeight="1.5"
         py="2.5"

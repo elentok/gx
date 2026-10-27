@@ -192,17 +192,18 @@ export function DesignActionsMenu({
                     {s.id === shown.id && <Text as="span" aria-hidden color="tone.running.fg">✓</Text>}
                   </Menu.Item>
                   {s.id !== shown.id && (
-                    <Button
-                      size="sm"
-                      emphasis="secondary"
-                      tone="deadlocked"
+                    <Menu.Item
+                      value={`stop-${s.id}`}
+                      closeOnSelect={false}
                       aria-label={`Stop ${s.name || s.id}`}
                       disabled={pending}
                       onClick={() => run(() => stop({ id: s.id, state: stateToken(s) }))}
+                      {...item}
+                      color="tone.deadlocked.fg"
                     >
                       {pending && <Spinner size="sm" />}
                       Stop
-                    </Button>
+                    </Menu.Item>
                   )}
                 </Box>
               ))}
