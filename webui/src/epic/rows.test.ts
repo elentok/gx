@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { EpicDetail, EpicDetailRow } from "./detail";
-import { cardMeta, rowContext } from "./rows";
+import { cardLook, type CardLook, cardMeta, rowContext } from "./rows";
 
 const detailOf = (kind: EpicDetail["kind"], rows: EpicDetailRow[]): EpicDetail => ({
   address: "gx:e",
@@ -40,4 +40,12 @@ test.each([
 ] as [string, Partial<EpicDetailRow>, boolean, string][])("Design meta of %s", (_n, over, live, text) => {
   const r = row(over);
   expect(cardMeta(r, rowContext(detailOf("map", [r]), NOW, live))).toBe(text);
+});
+
+test.each([
+  ["an asking row", { needs_answer: true, question: "Which?" }, { kind: "note", text: "Which?", answerPath: "/t/gx:e/03" }],
+  ["a needs-repair row", { rendered_status: "needs-repair" }, { kind: "note", fix: true }],
+  ["a running row", { rendered_status: "claimed" }, { kind: "link" }],
+] as [string, Partial<EpicDetailRow>, CardLook][])("card look of %s", (_n, over, look) => {
+  expect(cardLook(row(over))).toEqual(look);
 });

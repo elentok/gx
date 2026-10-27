@@ -8,7 +8,7 @@ import { StatusIcon } from "../ui/status-icon/StatusIcon";
 import { type EpicDetailRow } from "./detail";
 import { FixAgentDialog } from "./FixAgentDialog";
 import type { FixAgent } from "./fixAgent";
-import { cardNote, idOf, isExpanded, isRunning, toneOf } from "./rows";
+import { cardLook, type CardLook, idOf, isRunning, toneOf } from "./rows";
 
 function Dot({ row }: { row: EpicDetailRow }) {
   const tone = toneOf(row);
@@ -58,8 +58,47 @@ function Line({ row, meta, titleLink }: { row: EpicDetailRow; meta: string; titl
   );
 }
 
-// A live ticket as one anchor to its page; a needs-you or needs-repair ticket stays expanded, with the title as the
-// link and its question or hint in a second row.
+// A needs-you or needs-repair ticket: the title is the link and its question or hint sits in a second row.
+function NoteCard({
+  row,
+  meta,
+  note,
+  fixAgent,
+}: {
+  row: EpicDetailRow;
+  meta: string;
+  note: Extract<CardLook, { kind: "note" }>;
+  fixAgent?: FixAgent;
+}) {
+  const navigate = useNavigate();
+  const [fixing, setFixing] = useState(false);
+  const { answerPath } = note;
+  return (
+    <>
+      <Line row={row} meta={meta} titleLink />
+      <Box display="flex" flexWrap="wrap" alignItems="center" gap="3" pl="6" mt="1">
+        {note.text && (
+          <Text data-hint fontSize="sm" color="text.muted">
+            {note.text}
+          </Text>
+        )}
+        {answerPath && (
+          <Button tone="paused" size="sm" onClick={() => navigate(answerPath)}>
+            Answer
+          </Button>
+        )}
+        {note.fix && (
+          <Button tone="paused" size="sm" onClick={() => setFixing(true)}>
+            Fix it with an agent
+          </Button>
+        )}
+      </Box>
+      {fixing && <FixAgentDialog row={row} fixAgent={fixAgent} onClose={() => setFixing(false)} />}
+    </>
+  );
+}
+
+// A live ticket as one anchor to its page, or a NoteCard when it needs a person.
 export function TicketCard({
   row,
   meta,
@@ -71,33 +110,11 @@ export function TicketCard({
   indent: number;
   fixAgent?: FixAgent;
 }) {
-  const navigate = useNavigate();
-  const [fixing, setFixing] = useState(false);
-  const note = isExpanded(row) ? cardNote(row) : undefined;
+  const look = cardLook(row);
   return (
     <Box data-indent={indent} data-tone={toneOf(row)} ml={indent * 6}>
-      {note ? (
-        <>
-          <Line row={row} meta={meta} titleLink />
-          <Box display="flex" flexWrap="wrap" alignItems="center" gap="3" pl="6" mt="1">
-            {note.text && (
-              <Text data-hint fontSize="sm" color="text.muted">
-                {note.text}
-              </Text>
-            )}
-            {note.answerHref && (
-              <Button tone="paused" size="sm" onClick={() => navigate(note.answerHref!.slice(1))}>
-                Answer
-              </Button>
-            )}
-            {note.fix && (
-              <Button tone="paused" size="sm" onClick={() => setFixing(true)}>
-                Fix it with an agent
-              </Button>
-            )}
-          </Box>
-          {fixing && <FixAgentDialog row={row} fixAgent={fixAgent} onClose={() => setFixing(false)} />}
-        </>
+      {look.kind === "note" ? (
+        <NoteCard row={row} meta={meta} note={look} fixAgent={fixAgent} />
       ) : (
         <Link href={ticketHref(row.address)} display="block" color="inherit" _hover={{ textDecoration: "none" }}>
           <Line row={row} meta={meta} />

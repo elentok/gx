@@ -1,7 +1,7 @@
 import { MapStepCurrent, MapStepDone, ProgressDone } from "../generated/server";
 import type { EpicDetail, EpicDetailRow } from "./detail";
 import type { Tone } from "../ui/tone";
-import { ticketHref } from "../hrefs";
+import { ticketPath } from "../hrefs";
 import { epicBadge } from "../view";
 
 type Bucket = "done" | "running" | "asking" | "waiting" | "children" | "attention";
@@ -147,14 +147,14 @@ function elapsedAndCost(row: EpicDetailRow, elapsed: number | undefined, ctx: Ro
   return [elapsed === undefined ? undefined : formatDuration(elapsed), row.cost === undefined ? undefined : formatCost(row.cost)];
 }
 
-// An asking or needs-repair card stays expanded: a second row under the line holds its question or hint.
-export const isExpanded = (row: EpicDetailRow) => !!row.needs_answer || row.rendered_status === "needs-repair";
+export type CardLook = { kind: "link" } | { kind: "note"; text?: string; answerPath?: string; fix?: boolean };
 
-// What an expanded card holds in its second row: the question and an Answer link, or a needs-repair fix button.
-export function cardNote(row: EpicDetailRow): { text?: string; answerHref?: string; fix?: boolean } {
-  if (row.needs_answer) return { text: row.question, answerHref: ticketHref(row.address) };
-  if (row.rendered_status === "needs-repair") return { fix: true };
-  return {};
+// An asking or needs-repair card stays expanded: a second row under the line holds its question and an Answer
+// button, or a needs-repair fix button. Every other card is one link to its ticket.
+export function cardLook(row: EpicDetailRow): CardLook {
+  if (row.needs_answer) return { kind: "note", text: row.question, answerPath: ticketPath(row.address) };
+  if (row.rendered_status === "needs-repair") return { kind: "note", fix: true };
+  return { kind: "link" };
 }
 
 // A blocked row reads "after NN" with no status word; an open row with no blockers is "ready".
