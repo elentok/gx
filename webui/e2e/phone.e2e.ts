@@ -160,7 +160,7 @@ test("24. Phone, Design page", async ({ page, start }) => {
 
   // Send with gaps: the popover fits the screen and overlaps the sheet.
   const questions = page.getByRole("group", nav("Questions"));
-  await page.getByRole("button", nav("Send")).click();
+  await page.getByRole("button", nav("Send answers")).click();
   const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
   await expect(popover).toBeVisible();
   const pop = (await popover.boundingBox())!;

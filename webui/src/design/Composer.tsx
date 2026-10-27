@@ -160,7 +160,7 @@ export function Composer({
     <>
       <Button ref={sendRef} disabled={!enabled} onClick={onSendRound}>
         {pending && <Spinner size="sm" />}
-        Send
+        Send answers
       </Button>
       <SendPopover
         open={gapsOpen && unanswered.length > 0}

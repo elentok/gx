@@ -291,6 +291,9 @@ function ViewToggle({
       borderRadius="10px"
       bg="surface.raised"
       flex="none"
+      alignSelf="flex-start"
+      w="320px"
+      maxW="100%"
     >
       <SegButton on={questions} onClick={() => onQuestions(true)}>
         Questions ({answered} of {total})

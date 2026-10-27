@@ -117,6 +117,7 @@ export function Question({
       <Box>
         <Button
           emphasis="ghost"
+          tone="muted"
           size="sm"
           aria-label={`Note on question ${card.label}`}
           aria-pressed={noteOpen}
@@ -341,7 +342,6 @@ export function QuestionSheet({
         >
           <Box
             maxW={questions ? "820px" : undefined}
-            mx={questions ? "auto" : undefined}
             ref={row}
             onScroll={onScroll}
             display="flex"

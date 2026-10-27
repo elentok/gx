@@ -52,8 +52,8 @@ test.describe("5. Answer a round", () => {
     await questions.getByRole("button", { name: /Yes/ }).click();
     await expect(questions.getByText("2 of 2 answered")).toBeVisible();
     const release = await holdRoute(page, "**/v1/sessions/prompt");
-    await page.getByRole("button", nav("Send")).click();
-    await expect(page.getByRole("button", nav("Send"))).toBeDisabled();
+    await page.getByRole("button", nav("Send answers")).click();
+    await expect(page.getByRole("button", nav("Send answers"))).toBeDisabled();
     release();
 
     // The agent got the answers: the chat shows them as the person's message.
@@ -80,7 +80,7 @@ test.describe("47. Send popover", () => {
     await page.getByRole("button", nav("Start design session")).click();
 
     const questions = page.getByRole("group", nav("Questions"));
-    const send = page.getByRole("button", nav("Send"));
+    const send = page.getByRole("button", nav("Send answers"));
     const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
     const composer = page.locator('[aria-label="Composer"]');
     await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
@@ -214,7 +214,7 @@ test.describe("49. Questions and Chat views", () => {
     const view = page.getByRole("group", nav("View"));
     const questionsTab = view.getByRole("button", { name: /^Questions/ });
     const chatTab = view.getByRole("button", nav("Chat"));
-    const send = page.getByRole("button", nav("Send"));
+    const send = page.getByRole("button", nav("Send answers"));
     const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
     const jump = page.getByRole("dialog", nav("Jump to epic"));
     const noteModal = page.getByRole("dialog", nav("Note on Q8b - Migrate at startup?"));
@@ -318,7 +318,7 @@ test.describe("49. Questions and Chat views", () => {
     await view.getByRole("button", nav("Chat")).click();
     await questions.getByRole("button", { name: /SQLite/ }).click();
     await questions.getByRole("button", { name: /Yes/ }).click();
-    await page.getByRole("button", nav("Send")).click();
+    await page.getByRole("button", nav("Send answers")).click();
     await expect(page.getByText("Q8b - Migrate at startup?: Yes")).toBeVisible();
 
     const cont = page.getByRole("button", { name: /^Continue/ });
@@ -391,7 +391,7 @@ const answerFirstRound = async (page: Page) => {
   const questions = page.getByRole("group", nav("Questions"));
   await questions.getByRole("button", { name: /SQLite/ }).click();
   await questions.getByRole("button", { name: /Yes/ }).click();
-  await page.getByRole("button", nav("Send")).click();
+  await page.getByRole("button", nav("Send answers")).click();
 };
 
 // The Auto button names each switch's state; the switches sit in the popover it opens.
@@ -458,7 +458,7 @@ test.describe("13. Defaulted questions", () => {
     await expect(page.getByText("Q11: migrate at startup.")).toBeVisible();
 
     await questions.getByRole("button", { name: /Yes/ }).click();
-    await page.getByRole("button", nav("Send")).click();
+    await page.getByRole("button", nav("Send answers")).click();
     await expect(page.getByText("Q12 - Keep going?: Yes")).toBeVisible();
     // Send asked nothing about the defaults.
     await expect(page.getByText(/Q1[01] - /)).toHaveCount(0);
@@ -508,7 +508,7 @@ test.describe("12. The auto-advance switch", () => {
     const questions = page.getByRole("group", nav("Questions"));
     await questions.getByRole("button", { name: /SQLite/ }).click();
     await questions.getByRole("button", { name: /Yes/ }).click();
-    await page.getByRole("button", nav("Send")).click();
+    await page.getByRole("button", nav("Send answers")).click();
     await expect(page.getByRole("button", { name: /^Continue/ })).toBeVisible();
     await expect(page.getByText(/Continuing in/)).toHaveCount(0);
 

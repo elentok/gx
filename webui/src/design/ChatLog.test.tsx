@@ -358,7 +358,7 @@ test("sending the round drops its draft", async () => {
   renderChat([session()], roundChat(), post);
   const sheet = await screen.findByRole("group", { name: "Questions" });
   fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   cleanup();
@@ -433,7 +433,7 @@ test("Escape shows the chat, also from the note field", async () => {
 test("Escape with the Send popover open closes only the popover", async () => {
   renderChat([session()], focusChat());
   await screen.findByRole("group", { name: "Questions" });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   const popover = await screen.findByRole("alertdialog", { name: "Unanswered questions" });
   await act(async () => {});
   fireEvent.keyDown(popover, { key: "Escape" });
@@ -512,11 +512,11 @@ test("a successful send shows the chat; a refused send keeps Questions and shows
     .mockResolvedValue({});
   renderChat([session()], focusChat(), post);
   await screen.findByRole("group", { name: "Questions" });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
   expect(await screen.findByText("text is over the limit")).toBeTruthy();
   expect(inQuestions()).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
   expect(await screen.findByText("earlier talk")).toBeTruthy();
 });
@@ -585,7 +585,7 @@ test("defaulted questions render as plain text beside one card, and Send asks no
   expect(within(sheet).getAllByRole("button", { name: /^Question \d/ })).toHaveLength(1);
 
   fireEvent.click(within(sheet).getByRole("button", { name: "Alpha" }));
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   const sent = JSON.stringify(post.mock.calls[0]);
   expect(sent).toContain("Q1");

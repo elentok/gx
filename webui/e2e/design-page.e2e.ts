@@ -166,7 +166,7 @@ test.describe("66. Note box", () => {
 
     await questions.getByRole("button", { name: /SQLite/ }).click();
     await questions.getByRole("button", { name: /Yes/ }).click();
-    await page.getByRole("button", nav("Send")).click();
+    await page.getByRole("button", nav("Send answers")).click();
     await expect(page.getByText("typed in the modal")).toBeVisible();
   });
 
@@ -233,7 +233,7 @@ test.describe("67. Question top", () => {
 
       await back();
       await toEnd();
-      await page.getByRole("button", nav("Send")).click();
+      await page.getByRole("button", nav("Send answers")).click();
       await page
         .getByRole("alertdialog", nav("Unanswered questions"))
         .getByRole("button", { name: /^Q8b Migrate at startup\? ›$/ })
@@ -263,7 +263,7 @@ test.describe("68. Text size", () => {
     await page.getByRole("textbox", nav("Message")).fill("prompt size probe");
     await choice.click();
     await questions.getByRole("button", { name: /Yes/ }).click();
-    await page.getByRole("button", nav("Send")).click();
+    await page.getByRole("button", nav("Send answers")).click();
 
     // Chat view: the message, the prompt and the docked title (the next round, Q9).
     // Continue starts the next round; under load the first press can land before the run ends, so press again.
