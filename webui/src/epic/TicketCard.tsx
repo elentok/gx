@@ -29,6 +29,7 @@ function Spinner() {
       viewBox="0 0 10 10"
       w="10px"
       h="10px"
+      flexShrink={0}
       animation="spin 1.05s linear infinite"
       _motionReduce={{ animation: "none" }}
     >
@@ -64,6 +65,7 @@ function Check() {
       viewBox="0 0 12 12"
       w="12px"
       h="12px"
+      flexShrink={0}
     >
       <path
         d="M2 6.5l2.7 2.7L10 3.3"

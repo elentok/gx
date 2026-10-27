@@ -195,6 +195,20 @@ test("a fork's card is indented and the running card has the spinning dot", asyn
   expect(within(await cardOf("01")).getByRole("img", { name: "Running" })).toBeTruthy();
 });
 
+// The mark box is narrower than its svgs, so they must not shrink as flex items.
+test("the spinner is a 10px svg and the done check a 12px svg that do not shrink", async () => {
+  live([tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }), doneTk("02", 1)]);
+  const svgOf = async (id: string, name: string) =>
+    within(await cardOf(id)).getByRole("img", { name }) as unknown as SVGElement;
+  for (const [svg, size] of [
+    [await svgOf("01", "Running"), "10px"],
+    [await svgOf("02", "Done"), "12px"],
+  ] as const) {
+    const style = getComputedStyle(svg);
+    expect([style.width, style.height, style.flexShrink]).toEqual([size, size, "0"]);
+  }
+});
+
 // jsdom has no layout, so the title's x is the sum of the widths and gaps before it.
 const px = (v: string) => parseFloat(v) || 0;
 const titleLeft = (card: HTMLElement) => {
