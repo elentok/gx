@@ -1,6 +1,6 @@
 import { Box, Heading } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { useWide } from "../design/useWide";
+import { useWide } from "../useWide";
 import { BackLink } from "../nav/BackLink";
 import { titleSize } from "../nav/titleSize";
 

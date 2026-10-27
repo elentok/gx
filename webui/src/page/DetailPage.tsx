@@ -1,7 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
-import { type PageMode, PageModeContext } from "../design/useWide";
+import { type PageMode, PageModeContext } from "../useWide";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";

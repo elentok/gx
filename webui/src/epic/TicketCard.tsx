@@ -2,7 +2,7 @@ import { Box, chakra, Link, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ticketHref } from "../hrefs";
-import { useWide } from "../design/useWide";
+import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
 import { type EpicDetailRow } from "./detail";
 import { FixAgentDialog } from "./FixAgentDialog";

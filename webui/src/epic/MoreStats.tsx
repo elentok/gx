@@ -1,6 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { useWide } from "../design/useWide";
+import { useWide } from "../useWide";
 import type { EpicDetail } from "./detail";
 import { statPreview, statRows } from "./stats";
 
