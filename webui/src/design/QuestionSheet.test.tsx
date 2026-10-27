@@ -1,8 +1,10 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
-import { afterEach, expect, test } from "vitest";
+import { useState } from "react";
+import { afterEach, describe, expect, test } from "vitest";
 import type { SessionRoundCard } from "../generated/server";
 import { renderThemed } from "../ui/render";
-import { Question } from "./QuestionSheet";
+import { Question, QuestionSheet } from "./QuestionSheet";
+import type { Answers } from "./round";
 
 afterEach(cleanup);
 
@@ -48,4 +50,73 @@ test.each([false, true])("note opens three rows tall (big=%s)", (big) => {
     "rows",
     3,
   );
+});
+
+describe("a move scrolls the body to the top", () => {
+  const round = [
+    card({ label: "1", kind: "yes-no", title: "A" }),
+    card({ label: "2", kind: "yes-no", title: "B" }),
+    card({ label: "3", kind: "text", title: "C" }),
+  ];
+  function Harness({ focus }: { focus?: { index: number } }) {
+    const [answers, setAnswers] = useState<Answers>({});
+    return (
+      <QuestionSheet
+        round={round}
+        answers={answers}
+        onAnswers={(u) => setAnswers(u)}
+        focus={focus}
+      />
+    );
+  }
+  const body = () => screen.getByTestId("question-body");
+  const scrolled = () => {
+    body().scrollTop = 120;
+  };
+
+  test.each([
+    ["a dot", () => fireEvent.click(screen.getByLabelText("Question 3"))],
+    ["Next", () => fireEvent.click(screen.getByText("Next →"))],
+    ["a pick", () => fireEvent.click(screen.getAllByText("Yes")[0])],
+  ])("%s", (_, move) => {
+    renderThemed(<Harness />);
+    scrolled();
+    move();
+    expect(body().scrollTop).toBe(0);
+  });
+
+  test("Prev", () => {
+    renderThemed(<Harness />);
+    fireEvent.click(screen.getByText("Next →"));
+    scrolled();
+    fireEvent.click(screen.getByText("← Prev"));
+    expect(body().scrollTop).toBe(0);
+  });
+
+  test("a new focus object, even for the same question", () => {
+    function Refocus() {
+      const [focus, setFocus] = useState<{ index: number }>({ index: 1 });
+      return (
+        <>
+          <button onClick={() => setFocus({ index: 1 })}>refocus</button>
+          <Harness focus={focus} />
+        </>
+      );
+    }
+    renderThemed(<Refocus />);
+    scrolled();
+    fireEvent.click(screen.getByText("refocus"));
+    expect(body().scrollTop).toBe(0);
+  });
+
+  test("a note toggle or typing on the same question leaves it alone", () => {
+    renderThemed(<Harness />);
+    fireEvent.click(screen.getByLabelText("Question 3"));
+    scrolled();
+    fireEvent.click(screen.getByLabelText("Note on question 3"));
+    fireEvent.change(screen.getByLabelText("Answer to question 3"), {
+      target: { value: "hi" },
+    });
+    expect(body().scrollTop).toBe(120);
+  });
 });

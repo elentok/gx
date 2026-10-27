@@ -217,6 +217,12 @@ export function QuestionSheet({
   );
   useEffect(() => onIndex?.(index), [index, onIndex]);
   const row = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  // A move starts at the question's title, not wherever the last one was left.
+  const toTop = () => {
+    if (body.current) body.current.scrollTop = 0;
+  };
+  useEffect(toTop, [index]);
   // Set while a smooth scroll we started is still moving, so its in-between frames don't set the question.
   const scrolling = useRef<number | undefined>(undefined);
 
@@ -225,6 +231,7 @@ export function QuestionSheet({
   useEffect(() => {
     if (!focus) return;
     setIndex(focus.index);
+    toTop();
     setOpen(true);
     setToFocus(focus);
   }, [focus]);
@@ -322,7 +329,14 @@ export function QuestionSheet({
         flex="1"
         minH="0"
       >
-        <Box px="3" minH="0" flex="1" overflowY="auto">
+        <Box
+          ref={body}
+          data-testid="question-body"
+          px="3"
+          minH="0"
+          flex="1"
+          overflowY="auto"
+        >
           <Box
             maxW={questions ? "820px" : undefined}
             mx={questions ? "auto" : undefined}
