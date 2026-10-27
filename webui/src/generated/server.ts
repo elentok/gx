@@ -480,6 +480,26 @@ export interface CardAction {
    */
   link?: string;
 }
+/**
+ * CardTimeKind says what the card's start time measures; the client words it.
+ */
+export type CardTimeKind = string;
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const CardTimeElapsed: CardTimeKind = "elapsed";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const CardTimeWaiting: CardTimeKind = "waiting";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const CardTimeCreated: CardTimeKind = "created";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const CardTimeFinished: CardTimeKind = "finished";
 
 //////////
 // source: epicdetail.go
@@ -800,6 +820,12 @@ export interface EpicListRow {
    * builds "Next run starts in Ns" from it.
    */
   countdown_ends_at?: string;
+  /**
+   * TimeKind and TimeStart are the card's time label: what it measures and when it
+   * starts. Both are empty when the start is unknown.
+   */
+  time_kind?: CardTimeKind;
+  time_start?: string;
 }
 /**
  * FollowUpCount is the number of draft and open tickets in one project's

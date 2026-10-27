@@ -109,6 +109,10 @@ type EpicListRow struct {
 	// CountdownEndsAt is the deadline of a Design's auto-advance countdown; the client
 	// builds "Next run starts in Ns" from it.
 	CountdownEndsAt time.Time `json:"countdown_ends_at,omitzero"`
+	// TimeKind and TimeStart are the card's time label: what it measures and when it
+	// starts. Both are empty when the start is unknown.
+	TimeKind  CardTimeKind `json:"time_kind,omitempty"`
+	TimeStart time.Time    `json:"time_start,omitzero"`
 }
 
 // FollowUpCount is the number of draft and open tickets in one project's
@@ -318,6 +322,7 @@ func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 			row.Section, row.StatePill, row.Reason, row.WaitingSince = SectionNeedsYou, n.Pill, n.Reason, n.Since
 			row.Actions = append([]CardAction{n.Action}, n.More...)
 		}
+		setLoopCardTime(&row, e.StartedAt, s.enqueuedAt(root.String()))
 	}
 	return row
 }
