@@ -133,17 +133,20 @@ function Line({
   ) : (
     row.title
   );
-  const metaNode = meta && (
+  // Done and cancelled cards are two lines on a phone even with no meta, so the list stays one height.
+  const reserveLine = !wide && isFolded(row) && !meta;
+  const metaNode = (meta || reserveLine) && (
     <Text
       as="span"
       data-meta
+      aria-hidden={reserveLine || undefined}
       fontSize="13px"
       color={metaColor(row)}
       whiteSpace="nowrap"
       flexShrink={0}
       pl={wide ? undefined : "54px"}
     >
-      {meta}
+      {reserveLine ? " " : meta}
     </Text>
   );
   return (

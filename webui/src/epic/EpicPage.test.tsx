@@ -232,6 +232,21 @@ test("done and cancelled card titles are 14px", async () => {
   }
 });
 
+test.each([
+  ["phone", true],
+  ["wide", false],
+])("a done card with no meta has a second line only on a phone (%s)", async (width, second) => {
+  if (width === "phone") vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    live([doneTk("01", 1, { elapsed: undefined, cost: undefined })]);
+    const card = await cardOf("01");
+    expect(card.textContent?.replace(" ", "")).toBe("01title 01");
+    expect(card.querySelector("[data-meta]") !== null).toBe(second);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("running, needs-answer and needs-repair cards use the mock meta wording", async () => {
   live([
     tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString(), cost: 0.4 }),
