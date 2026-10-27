@@ -41,7 +41,7 @@ function Choice({
       cursor="pointer"
       onClick={onClick}
     >
-      <Markdown inline flex="1" fontSize="sm">
+      <Markdown inline flex="1" fontSize="base">
         {label}
       </Markdown>
       {recommended && (
@@ -73,10 +73,10 @@ export function Question({
     <Box display="flex" flexDirection="column" gap={big ? "3" : "2"}>
       <Markdown
         inline
-        fontSize={big ? "xl" : "md"}
+        fontSize={big ? "title" : "subtitle"}
         fontWeight="600"
       >{`${nameOf(card)} - ${card.title}`}</Markdown>
-      {card.body && <Markdown fontSize="md">{card.body}</Markdown>}
+      {card.body && <Markdown fontSize={big ? "lg" : "md"}>{card.body}</Markdown>}
       {text ? (
         <>
           {card.note && (

@@ -29,6 +29,12 @@ expect(themeConfig.theme!.semanticTokens!.colors!.border).toBeDefined();
     expect(colors.text.dim).toBeDefined();
   });
 
+  it("has font size tokens for the Design page text", () => {
+    expect(system.token("fontSizes.base")).toBe("16px");
+    expect(system.token("fontSizes.subtitle")).toBe("18px");
+    expect(system.token("fontSizes.title")).toBe("24px");
+  });
+
   it("uses the condensed and text font families with a 6px bar", () => {
     expect(system.token("fonts.condensed")).toContain("Saira Condensed");
     expect(system.token("fonts.text")).toContain("Saira");

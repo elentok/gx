@@ -77,8 +77,12 @@ export const themeConfig = defineConfig({
         xs: { value: "13px" },
         sm: { value: "14px" },
         md: { value: "15px" },
+        // Phone-readable reading size, a step above md.
+        base: { value: "16px" },
         lg: { value: "17px" },
+        subtitle: { value: "18px" },
         xl: { value: "22px" },
+        title: { value: "24px" },
         "2xl": { value: "30px" },
       },
       spacing: {

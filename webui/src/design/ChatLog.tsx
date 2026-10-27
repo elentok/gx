@@ -54,7 +54,7 @@ function Entry({ m }: { m: SessionChatMessage }) {
         borderRadius="lg"
         px="3"
         py="2"
-        fontSize="sm"
+        fontSize="base"
         whiteSpace="pre-wrap"
       >
         {m.text}
@@ -77,7 +77,7 @@ function Entry({ m }: { m: SessionChatMessage }) {
       </Text>
     );
   }
-  return <Markdown fontSize="sm">{m.text}</Markdown>;
+  return <Markdown fontSize="base">{m.text}</Markdown>;
 }
 
 function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
