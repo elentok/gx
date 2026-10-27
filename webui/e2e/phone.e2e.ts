@@ -167,9 +167,9 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await questions.getByRole("button", nav("Leave focus mode")).click();
   await expect(page.getByText("Two questions before the spec.")).toBeVisible();
 
-  // Note loses its text, and the switch loses its label.
+  // Note loses its text; the Auto button keeps both names.
   await expect(page.getByRole("button", nav("Note"))).toHaveText("✎");
-  await expect(page.getByRole("switch")).not.toContainText("Auto-advance");
+  await expect(page.getByRole("button", { name: /^Auto:/ })).toHaveText("Auto-advanceAuto-queue");
 
   // A tap on the title opens a full-screen sheet; its close button closes it.
   await page.getByRole("heading", { level: 1 }).getByRole("button").click();

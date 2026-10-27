@@ -321,7 +321,14 @@ const answerFirstRound = async (page: Page) => {
   await page.getByRole("button", nav("Send")).click();
 };
 
-const autoSwitch = (page: Page, state: "on" | "off") => page.getByRole("switch", { name: `Auto-advance ${state}` });
+// The Auto button names each switch's state; the switches sit in the popover it opens.
+const autoButton = (page: Page, state: "on" | "off") =>
+  page.getByRole("button", { name: new RegExp(`^Auto: Auto-advance ${state}`) });
+const flipAuto = async (page: Page, from: "on" | "off") => {
+  await autoButton(page, from).click();
+  await page.getByRole("dialog", nav("Auto")).getByRole("switch", { name: `Auto-advance ${from}` }).click();
+  await page.keyboard.press("Escape");
+};
 
 test.describe("10. Auto-advance", () => {
   test("a fresh round follows the run end with no press", async ({ page, start }) => {
@@ -417,10 +424,10 @@ test.describe("12. The auto-advance switch", () => {
     await start("design", { autoAdvanceDelay: "30s" });
     await openDesign(page);
     await page.getByRole("button", nav("Start design session")).click();
-    await expect(autoSwitch(page, "on")).toBeVisible();
+    await expect(autoButton(page, "on")).toBeVisible();
 
-    await autoSwitch(page, "on").click();
-    await expect(autoSwitch(page, "off")).toBeVisible();
+    await flipAuto(page, "on");
+    await expect(autoButton(page, "off")).toBeVisible();
 
     const questions = page.getByRole("group", nav("Questions"));
     await questions.getByRole("button", { name: /SQLite/ }).click();
@@ -431,8 +438,8 @@ test.describe("12. The auto-advance switch", () => {
 
     // Under load the run-end update can land after the first press ("the session changed"), so press again.
     await expect(async () => {
-      await autoSwitch(page, "off").click();
-      await expect(autoSwitch(page, "on")).toBeVisible({ timeout: 2000 });
+      if (await autoButton(page, "off").isVisible()) await flipAuto(page, "off");
+      await expect(autoButton(page, "on")).toBeVisible({ timeout: 2000 });
     }).toPass();
     await expect(page.getByText(/Continuing in/)).toBeVisible();
   });

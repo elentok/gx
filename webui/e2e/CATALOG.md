@@ -165,9 +165,9 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 
 - **Scenario:** `design`, with a 30s countdown
 - **Steps:**
-  1. The switch reads "Auto-advance on" while the agent works.
-  2. Turn it off, answer round one, Send; the run ends.
-  3. Turn it on.
+  1. The Auto button reads "Auto-advance on" while the agent works.
+  2. Open the Auto menu, turn Auto-advance off, answer round one, Send; the run ends.
+  3. Turn it on again from the menu.
 - **Pass:** with the switch off the run end shows Continue and no countdown; turning it on starts
   "Continuing in Ns".
 
@@ -317,7 +317,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
   - The composer has no Focus button. The Send popover is at most 343 px wide, inside the viewport and overlaps the sheet.
   - Focus mode keeps the Progress summary above the sheet and hides the messages; ⤡ leaves.
   - The summary opens the "Design progress steps" modal with Resolve tickets current. Close and Escape both close it.
-  - Note reads only its icon; the Auto-advance switch has no text.
+  - Note reads only its icon; the Auto button still shows "Auto-advance" and "Auto-queue".
   - The title opens a "Jump to epic" sheet that fills the screen; Close closes it.
 
 ## 25. New Design from an empty page

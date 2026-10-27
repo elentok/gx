@@ -8,7 +8,7 @@ import {
   type CancelAutoAdvance,
   type SetAutoAdvance,
 } from "./open";
-import { useWide } from "../useWide";
+import { AutoMenu } from "./AutoMenu";
 
 export type RunCall = (call: () => Promise<Refusable>) => Promise<void>;
 
@@ -29,7 +29,7 @@ export function useAutoAdvanceCountdown(session: SessionInfo) {
     : Math.max(0, Math.ceil((deadline - now) / 1000));
 }
 
-// The switch, and the countdown with its Cancel while one runs.
+// The Auto menu, and the countdown with its Cancel while one runs.
 export function AutoAdvanceBar({
   session,
   disabled,
@@ -43,49 +43,35 @@ export function AutoAdvanceBar({
   setAutoAdvance: SetAutoAdvance;
   cancelAutoAdvance: CancelAutoAdvance;
 }) {
-  const wide = useWide();
   const secondsLeft = useAutoAdvanceCountdown(session);
   const state = stateToken(session);
   return (
     <Box display="flex" gap="3" alignItems="center">
-      <Button
-        emphasis="ghost"
-        tone="muted"
-        role="switch"
-        aria-checked={session.auto_advance}
-        aria-label={`Auto-advance ${session.auto_advance ? "on" : "off"}`}
-        disabled={disabled}
-        onClick={() =>
-          run(() =>
-            setAutoAdvance({
-              id: session.id,
-              state,
-              off: session.auto_advance,
-            }),
-          )
-        }
-      >
-        <Box
-          aria-hidden
-          w="28px"
-          h="16px"
-          borderRadius="full"
-          bg={session.auto_advance ? "tone.waiting.fg" : "text.dim"}
-          position="relative"
-          flexShrink={0}
-        >
-          <Box
-            position="absolute"
-            top="2px"
-            left={session.auto_advance ? "14px" : "2px"}
-            w="12px"
-            h="12px"
-            borderRadius="full"
-            bg="surface"
-          />
-        </Box>
-        {wide && <Text as="span">Auto-advance</Text>}
-      </Button>
+      <AutoMenu
+        switches={[
+          {
+            label: "Auto-advance",
+            description: "Go to the next step after a short countdown.",
+            on: session.auto_advance,
+            disabled,
+            onFlip: () =>
+              run(() =>
+                setAutoAdvance({
+                  id: session.id,
+                  state,
+                  off: session.auto_advance,
+                }),
+              ),
+          },
+          {
+            label: "Auto-queue",
+            description:
+              "Queue the implementation epic when it's ready. Coming soon.",
+            on: false,
+            disabled: true,
+          },
+        ]}
+      />
       {secondsLeft !== undefined && (
         <>
           <Text>Continuing in {secondsLeft}s</Text>

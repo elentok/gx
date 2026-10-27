@@ -200,22 +200,31 @@ test("the composer is disabled while the session is Working", async () => {
   expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
 });
 
-test("one line: the switch on the left; Note and Send on the right; the note box above the bar", async () => {
+const autoButton = () => screen.findByRole("button", { name: /^Auto:/ });
+
+// The Auto button opens the popover that holds the switches.
+const openAuto = async () => {
+  fireEvent.click(await autoButton());
+  return screen.findByRole("dialog", { name: "Auto" });
+};
+
+test("one line: the Auto menu on the left; Note and Send on the right; the note box above the bar", async () => {
   render({ post: vi.fn<PostPrompt>(async () => ok) });
-  const sw = await screen.findByRole("switch", { name: /Auto-advance/ });
+  const auto = await autoButton();
   const note = screen.getByRole("button", { name: "Note" });
   const send = screen.getByRole("button", { name: "Send" });
   const follows = (a: Node, b: Node) =>
     !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-  expect(follows(sw, note)).toBe(true);
+  expect(follows(auto, note)).toBe(true);
   expect(follows(note, send)).toBe(true);
   const box = await openNote();
-  expect(follows(box, sw)).toBe(true);
-  fireEvent.click(sw);
+  expect(follows(box, auto)).toBe(true);
+  const menu = await openAuto();
+  const sw = within(menu).getByRole("switch", { name: /Auto-advance/ });
   expect(sw.getAttribute("aria-checked")).toBe("true");
 });
 
-test("on a phone Note is icon-only and Auto-advance shows no word, the switch stays", async () => {
+test("on a phone Note is icon-only and the Auto button keeps both names", async () => {
   vi.stubGlobal("matchMedia", () => ({
     matches: false,
     addEventListener() {},
@@ -223,8 +232,7 @@ test("on a phone Note is icon-only and Auto-advance shows no word, the switch st
   }));
   try {
     render({});
-    const sw = await screen.findByRole("switch", { name: /Auto-advance/ });
-    expect(sw.textContent).toBe("");
+    expect((await autoButton()).textContent).toBe("Auto-advanceAuto-queue");
     expect(screen.getByRole("button", { name: "Note" }).textContent).toBe("✎");
   } finally {
     vi.unstubAllGlobals();
@@ -285,7 +293,12 @@ test("the auto-advance switch shows on and off, idle or working, and posts a fli
     .spyOn(globalThis, "fetch")
     .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
   render({ state: "working" });
-  const on = await screen.findByRole("switch", { name: /Auto-advance on/ });
+  expect((await autoButton()).getAttribute("aria-label")).toBe(
+    "Auto: Auto-advance on, Auto-queue off",
+  );
+  const on = within(await openAuto()).getByRole("switch", {
+    name: /Auto-advance on/,
+  });
   expect(on.getAttribute("aria-checked")).toBe("true");
   fireEvent.click(on);
   await waitFor(() =>
@@ -305,7 +318,9 @@ test("the auto-advance switch shows on and off, idle or working, and posts a fli
     .spyOn(globalThis, "fetch")
     .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
   render({ auto: { auto_advance: false } });
-  const off = await screen.findByRole("switch", { name: /Auto-advance off/ });
+  const off = within(await openAuto()).getByRole("switch", {
+    name: /Auto-advance off/,
+  });
   expect(off.getAttribute("aria-checked")).toBe("false");
   fireEvent.click(off);
   await waitFor(() =>
@@ -333,9 +348,18 @@ test("a countdown shows the seconds left and Cancel posts to the cancel route", 
   fetchSpy.mockRestore();
 });
 
+test("Auto-queue shows in the menu, off and disabled", async () => {
+  render({});
+  const queue = within(await openAuto()).getByRole("switch", {
+    name: "Auto-queue off",
+  });
+  expect(queue.getAttribute("aria-checked")).toBe("false");
+  expect((queue as HTMLButtonElement).disabled).toBe(true);
+});
+
 test("without a countdown there is no countdown text or Cancel", async () => {
   render({});
-  await screen.findByRole("switch");
+  await autoButton();
   expect(screen.queryByText(/Continuing in/)).toBeNull();
   expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
 });
@@ -378,7 +402,9 @@ test("a stale refusal keeps the draft and refetches the chat", async () => {
   const before = fetchChat.mock.calls.length;
   fireEvent.change(box, { target: { value: "keep me" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect(await screen.findByText("the conversation moved; review it first")).toBeTruthy();
+  expect(
+    await screen.findByText("the conversation moved; review it first"),
+  ).toBeTruthy();
   expect(box.value).toBe("keep me");
   await waitFor(() =>
     expect(fetchChat.mock.calls.length).toBeGreaterThan(before),
@@ -387,12 +413,19 @@ test("a stale refusal keeps the draft and refetches the chat", async () => {
 
 test("Send is disabled while the prompt is pending, and a server error shows its text in a toast", async () => {
   let fail: (e: Error) => void = () => {};
-  const post = vi.fn<PostPrompt>(() => new Promise((_, reject) => (fail = reject)));
+  const post = vi.fn<PostPrompt>(
+    () => new Promise((_, reject) => (fail = reject)),
+  );
   render({ post });
   const box = await openNote();
   fireEvent.change(box, { target: { value: "hello" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  await waitFor(() => expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true));
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: "Send" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true),
+  );
   fail(new WriteError("session is gone"));
   expect(await screen.findByText("session is gone")).toBeTruthy();
   expect(box.value).toBe("hello");

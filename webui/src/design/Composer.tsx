@@ -26,7 +26,7 @@ import { SendPopover } from "./SendPopover";
 import { useWide } from "../useWide";
 import { promptable } from "./view";
 
-// Under the chat, one line: the auto-advance switch, then Note and the main action. Nothing sends unless the session is Idle.
+// Under the chat, one line: the Auto menu, then Note and the main action. Nothing sends unless the session is Idle.
 export function Composer({
   session,
   lastMessage,
@@ -217,7 +217,7 @@ export function Composer({
           autoFocus
         />
       )}
-      {/* One line: the switch on the left, the main action on the right. */}
+      {/* One line: the Auto menu on the left, the main action on the right. */}
       <Box display="flex" gap="2" alignItems="center">
         {autoAdvanceBar}
         <Box flex="1" />
