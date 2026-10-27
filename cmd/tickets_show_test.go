@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"os"
@@ -27,6 +28,34 @@ func setupShowProject(t *testing.T) (repo, project string) {
 	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "epic"))
 	testutil.WriteFile(t, issues, "06-hello.md", showTicketFixture)
 	return repo, project
+}
+
+func TestExecute_TicketsList_IsHiddenAliasOfShow(t *testing.T) {
+	repo, _ := setupShowProject(t)
+
+	for _, addr := range []string{"mine:epic", "mine:epic/06"} {
+		want, err := runIn(t, repo, "tickets", "show", addr)
+		if err != nil {
+			t.Fatalf("show %s: %v", addr, err)
+		}
+		got, err := runIn(t, repo, "tickets", "list", addr)
+		if err != nil {
+			t.Fatalf("list %s: %v", addr, err)
+		}
+		if got != want {
+			t.Errorf("list %s printed %q, want show output %q", addr, got, want)
+		}
+	}
+
+	var help bytes.Buffer
+	tickets, _, _ := newRootCmd(deps{}).Find([]string{"tickets"})
+	tickets.SetOut(&help)
+	if err := tickets.Help(); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(help.String(), "list") {
+		t.Errorf("tickets help lists list:\n%s", help.String())
+	}
 }
 
 func TestExecute_TicketsShow_FullAndShortAddressesPrintCanonical(t *testing.T) {
