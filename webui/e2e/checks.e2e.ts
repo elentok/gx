@@ -1,3 +1,6 @@
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, nav, test, toasts } from "./fixture";
 
@@ -104,4 +107,45 @@ test("68. Set up checks, keep gx defaults", async ({ page, start }) => {
   await expect(dialog).toHaveCount(0);
   await expect(banner(page)).toHaveCount(0);
   expect(await demoMissing(fixture)).toBe(false);
+});
+
+test("69. Set up checks, refused commit", async ({ page, start }) => {
+  const fixture = await start("checks-missing");
+  const projects: { name: string; repo: string }[] = JSON.parse(await fixture.cli("project", "list", "--json"));
+  const repo = projects.find((p) => p.name === "demo")!.repo;
+  const file = join(repo, ".gx", "checks.json");
+  const draft = '{"test":{"full":"make draft"}}\n';
+  const head = () => execFileSync("git", ["-C", repo, "rev-parse", "HEAD"]).toString();
+  const before = head();
+
+  const dialog = await openSetup(page);
+  mkdirSync(join(repo, ".gx"), { recursive: true });
+  writeFileSync(file, draft);
+  await dialog.getByRole("button", nav("Save")).click();
+
+  await expect(dialog.getByRole("alert")).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect(banner(page)).toBeVisible();
+  expect(head()).toBe(before);
+  expect(readFileSync(file, "utf8")).toBe(draft);
+});
+
+test.describe("phone", () => {
+  test.use({ viewport: { width: 400, height: 800 } });
+
+  test("70. Phone, Set up checks", async ({ page, start }) => {
+    await start("checks-missing");
+    const dialog = await openSetup(page);
+
+    for (const kind of ["Format", "Lint", "Typecheck", "Test"]) {
+      const row = dialog.getByRole("group", nav(kind));
+      const label = (await row.locator("b").boundingBox())!;
+      const field = (await row.getByRole("combobox").boundingBox())!;
+      expect(field.y).toBeGreaterThanOrEqual(label.y + label.height);
+    }
+    const box = (await dialog.boundingBox())!;
+    expect(box.x + box.width).toBeLessThanOrEqual(400);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(400);
+    expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  });
 });

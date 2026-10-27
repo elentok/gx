@@ -1,6 +1,6 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
-import { useWrite } from "../useWrite";
+import { refusalText, useWrite } from "../useWrite";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { Modal } from "../ui/modal/Modal";
@@ -143,7 +143,8 @@ export function SetupDialog({
 }) {
   const [rows, setRows] = useState(() => presetRows(project));
   const [target, setTarget] = useState<SaveTarget>(project.save_targets.includes("repo") ? "repo" : "project.json");
-  const { run, pending } = useWrite();
+  const { run, pending, refusal, error } = useWrite();
+  const problem = refusal ? refusalText(refusal) : error;
   const checks = configOf(rows);
   const incomplete = rows.some((r) => r.mode === "use" && r.command.trim() === "");
 
@@ -227,7 +228,12 @@ export function SetupDialog({
           {previewOf(checks, target, project.trunk)}
         </Box>
       </details>
-      <Box display="flex" gap="2" justifyContent="flex-end">
+      {problem && (
+        <Text role="alert" fontSize="sm" color="tone.deadlocked.fg" overflowWrap="anywhere">
+          {problem}
+        </Text>
+      )}
+      <Box display="flex" gap="2" justifyContent="flex-end" flexWrap="wrap">
         <Button emphasis="ghost" tone="muted" disabled={pending} onClick={() => submit({})}>
           Keep gx defaults
         </Button>

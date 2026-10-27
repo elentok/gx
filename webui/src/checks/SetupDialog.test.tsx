@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { renderThemed } from "../ui/render";
+import { WriteError } from "../useWrite";
 import { SetupDialog } from "./SetupDialog";
 import type { SaveChecks } from "./setup";
 import type { ProjectChecks } from "./status";
@@ -38,8 +39,8 @@ const project = (over: Partial<ProjectChecks> = {}): ProjectChecks => ({
   ...over,
 });
 
-function open(over: Partial<ProjectChecks> = {}) {
-  const save = vi.fn<SaveChecks>(async () => ({}));
+function open(over: Partial<ProjectChecks> = {}, impl: SaveChecks = async () => ({})) {
+  const save = vi.fn<SaveChecks>(impl);
   const onSaved = vi.fn();
   const onClose = vi.fn();
   renderThemed(<SetupDialog project={project(over)} save={save} onSaved={onSaved} onClose={onClose} />);
@@ -138,6 +139,29 @@ test("a project with only project.json offers only that option", () => {
   expect(screen.queryByRole("radio", { name: /Commit/ })).toBeNull();
   expect(screen.getByRole<HTMLInputElement>("radio", { name: /project.json/ }).checked).toBe(true);
   expect(preview()).toContain("project.json");
+});
+
+test("a refused save shows its message in the dialog and keeps it open", async () => {
+  const { onSaved, onClose } = open({}, async () => ({ refused: true, message: "Uncommitted changes in .gx/checks.json" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  const alert = await screen.findByRole("alert");
+  expect(alert.textContent).toContain("Uncommitted changes in .gx/checks.json");
+  expect(onClose).not.toHaveBeenCalled();
+  expect(onSaved).not.toHaveBeenCalled();
+});
+
+test("a failed save shows the WriteError text, and a later good save clears it and closes", async () => {
+  let calls = 0;
+  const { onClose } = open({}, async () => {
+    if (calls++ === 0) throw new WriteError("trunk is locked");
+    return {};
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("trunk is locked");
+  expect(onClose).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
+  expect(screen.queryByRole("alert")).toBeNull();
 });
 
 test("the close button and Escape close without saving", () => {

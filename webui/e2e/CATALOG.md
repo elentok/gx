@@ -834,3 +834,20 @@ an exited session.
   - Each run closes the dialog and removes the banner, and `gx server checks` reports `demo` as
     not missing.
   - "Keep gx defaults" saves `{}`.
+
+## 69. Set up checks, refused commit
+
+- **Scenario:** `checks-missing`, project filter `demo`
+- **Steps:** write an uncommitted `.gx/checks.json` into `demo`'s repo, click "Set up checks", then
+  "Save" with the repo target.
+- **Pass:**
+  - The dialog stays open and shows the error near its actions. The banner stays.
+  - Trunk has no new commit and the local file is unchanged.
+
+## 70. Phone, Set up checks
+
+- **Scenario:** `checks-missing` at 400 px wide, project filter `demo`
+- **Steps:** click "Set up checks".
+- **Pass:**
+  - Each kind row stacks: the field sits below its label.
+  - The dialog is no wider than the viewport and the page has no horizontal scroll.

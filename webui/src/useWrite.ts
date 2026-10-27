@@ -22,18 +22,20 @@ export interface RunOptions<R> {
 /**
  * Runs one write at a time and tells the person how it went: a pending flag for the button's
  * spinner, an error or refusal toast, and a success toast when the caller asks for one. The
- * refusal is also returned so a caller can show a next step inline.
+ * refusal and the failure text are also returned so a caller can show them inline.
  */
 export function useWrite() {
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
   const [refusal, setRefusal] = useState<Refusable>();
+  const [error, setError] = useState<string>();
 
   async function run<R extends Refusable>(call: () => Promise<R>, { onDone, success }: RunOptions<R> = {}) {
     if (inFlight.current) return;
     inFlight.current = true;
     setPending(true);
     setRefusal(undefined);
+    setError(undefined);
     try {
       const res = await call();
       if (res.refused) {
@@ -45,12 +47,14 @@ export function useWrite() {
       if (toast) showToast(toast);
       onDone?.(res);
     } catch (err) {
-      showToast({ type: "error", title: err instanceof WriteError ? err.message : "Could not reach gx. Try again." });
+      const title = err instanceof WriteError ? err.message : "Could not reach gx. Try again.";
+      setError(title);
+      showToast({ type: "error", title });
     } finally {
       inFlight.current = false;
       setPending(false);
     }
   }
 
-  return { run, pending, refusal };
+  return { run, pending, refusal, error };
 }
