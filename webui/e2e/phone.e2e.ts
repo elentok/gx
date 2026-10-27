@@ -37,13 +37,57 @@ test.describe("53. Phone, epic page", () => {
   });
 
   test("a card's meta sits below its title", async ({ page, start }) => {
-    await start("mixed");
+    const fixture = await start("mixed");
+    const long = "A very long ticket title that would wrap onto a second line on a phone screen";
+    await fixture.cli("tickets", "add", "demo:mixed-epic", "--slug", "long-title", "--body", `# ${long}\n\n## What to build\n\nx`);
     await page.evaluate(() => (location.hash = "#/e/demo:mixed-epic"));
     const link = page.getByRole("link", { name: "02 open ready" });
     await expect(link).toBeVisible();
     const title = (await link.getByText("open", nav("open")).boundingBox())!;
     const meta = (await link.getByText("ready", nav("ready")).boundingBox())!;
     expect(meta.y).toBeGreaterThanOrEqual(title.y + title.height);
+    // The meta is indented 54px under the title.
+    await expect(link.locator("[data-meta]")).toHaveCSS("padding-left", "54px");
+
+    // A long title stays on one line.
+    const longTitle = page.getByText(long, nav(long));
+    await expect(longTitle).toBeVisible();
+    const box = (await longTitle.boundingBox())!;
+    const lineHeight = await longTitle.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
+    expect(box.height).toBeLessThanOrEqual(lineHeight * 1.5);
+  });
+
+  test("answer and fix buttons are full-width tap targets", async ({ page, start }) => {
+    // Recovery would turn 07 into a waiting parent, so it stays off as in flow 2.
+    await start("mixed", { config: { "recovery.enabled": "false" } });
+    await page.evaluate(() => (location.hash = "#/e/demo:mixed-epic"));
+    await page.getByRole("button", nav("Queue")).click();
+    const answer = page.getByRole("button", nav("Answer"));
+    const fix = page.getByRole("button", { name: "Fix it with an agent" });
+    await expect(answer).toBeVisible();
+    await expect(fix).toBeVisible();
+
+    const card = (button: typeof answer) =>
+      page.locator("div").filter({ has: button }).filter({ has: page.locator("a") }).last();
+    // Each button is as wide as the note row it sits in, less the 54px indent.
+    for (const button of [answer, fix]) {
+      const row = (await button.locator("xpath=ancestor::*[@data-note-row]").boundingBox())!;
+      const box = (await button.boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.width).toBeCloseTo(row.width - 54, 0);
+    }
+
+    // In 06's card the meta, question and Answer stack in that order, their text 54px from the content edge.
+    const askCard = card(answer);
+    const metaEl = askCard.locator("[data-meta]");
+    await expect(metaEl).toHaveCSS("padding-left", "54px");
+    const meta = (await metaEl.boundingBox())!;
+    const question = (await askCard.getByText("Which option should the fake worker take?").boundingBox())!;
+    const ab = (await answer.boundingBox())!;
+    expect(meta.y + meta.height).toBeLessThanOrEqual(question.y);
+    expect(question.y + question.height).toBeLessThanOrEqual(ab.y);
+    expect(meta.x + 54).toBeCloseTo(question.x, 0);
+    expect(ab.x).toBeCloseTo(question.x, 0);
   });
 });
 

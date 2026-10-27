@@ -45,9 +45,19 @@ test("2. Epic looks right", async ({ page, start }) => {
   await expect(page.getByTestId("stats-line")).toHaveText(/^Running · /);
   await expect(page.getByTestId("comet")).toBeVisible();
   await expect(page.getByText("4/7")).toBeVisible();
-  await expect(page.getByText("needs-answer · Waiting for your answer")).toBeVisible();
-  await expect(page.getByText("Which option should the fake worker take?")).toBeVisible();
-  await expect(page.getByRole("button", nav("Answer"))).toBeVisible();
+  // The innermost block holding both the 06 link and the Answer button is its card.
+  const asking = page
+    .locator("div")
+    .filter({ has: page.locator('a[href$="/t/demo:mixed-epic/06"]') })
+    .filter({ has: page.getByRole("button", nav("Answer")) })
+    .last();
+  await expect(asking.getByText("needs answer")).toBeVisible();
+  await expect(asking.getByText("Which option should the fake worker take?")).toBeVisible();
+  const answer = asking.getByRole("button", nav("Answer"));
+  await expect(answer).toBeVisible();
+  const title = (await asking.locator('a[href$="/t/demo:mixed-epic/06"]').boundingBox())!;
+  const answerBox = (await answer.boundingBox())!;
+  expect(answerBox.x).toBeGreaterThanOrEqual(title.x + title.width);
   const failed = page.locator('[data-tone="deadlocked"]').filter({ has: page.getByRole("link", { name: "fails" }) });
   await expect(failed.getByText("needs-repair · Run failed")).toBeVisible();
 
@@ -63,6 +73,11 @@ test("7. Epic completion", async ({ page, start }) => {
   await expect(progress.getByRole("link", { name: "finishing-epic" })).toBeVisible();
   await expect(card(page, "finishing-epic").getByText("1/2")).toBeVisible();
 
+  // While held, the running ticket's card meta starts with "running · ".
+  await card(page, "finishing-epic").getByRole("link", { name: "finishing-epic" }).click();
+  await expect(page.locator('a[href$="/t/demo:finishing-epic/02"] [data-meta]')).toHaveText(/^running · /);
+  await page.getByRole("link", nav("← Epics")).click();
+
   await fixture.release();
 
   // The last ticket merges; the epic leaves In progress for Finished.
@@ -71,12 +86,18 @@ test("7. Epic completion", async ({ page, start }) => {
   await expect(finished.getByRole("link", { name: "finishing-epic" })).toBeVisible();
   await expect(card(page, "finishing-epic").getByText("2/2")).toBeVisible();
   await card(page, "finishing-epic").getByRole("link", { name: "finishing-epic" }).click();
-  await expect(page.getByText("Finished · $0.00 · 0s agent time")).toBeVisible();
+  await expect(page.getByText("Merged · $0.00 · 0s agent time")).toBeVisible();
   await expect(page.getByText("2 done")).toBeVisible();
   await expect(page.getByText("2/2")).toBeVisible();
   await expect(page.getByTestId("comet")).toHaveCount(0);
   const more = page.getByRole("button", { name: /^More stats/ });
   await expect(more).toHaveAttribute("aria-expanded", "false");
+  // The divider comes first and More stats last on the page.
+  const divider = (await page.getByText("2 done", { exact: true }).boundingBox())!;
+  const moreBox = (await more.boundingBox())!;
+  const lastCard = (await page.locator('a[href*="/t/demo:finishing-epic/"]').last().boundingBox())!;
+  expect(moreBox.y).toBeGreaterThan(lastCard.y + lastCard.height - 1);
+  expect(divider.y).toBeLessThan(lastCard.y);
   await more.click();
   await expect(more).toHaveAttribute("aria-expanded", "true");
 });

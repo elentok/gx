@@ -573,6 +573,9 @@ test("50. Design epic page", async ({ page, start }) => {
   await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
   await expect(ring).toHaveAttribute("data-tone", "running");
   await expect(page.getByTestId("comet")).toBeVisible();
+  // A live session makes a design ticket's meta read "<type> · running" and adds a time.
+  await fixture.cli("tickets", "set", "demo:design-epic/01", "--status", "claimed");
+  await expect(page.getByRole("link", { name: /01 first implement · running · \d+[smh]$/ })).toBeVisible();
 });
 
 test.describe("46. gx designs delete", () => {

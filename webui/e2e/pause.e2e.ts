@@ -113,6 +113,9 @@ const rows: Row[] = [
   },
 ];
 
+const repairs = ["Run failed", "Merge conflict"];
+const onEpicPage = (row: Row) => (repairs.includes(row.reason) ? `needs-repair · ${row.reason}` : "needs answer");
+
 test.describe("3. Pause reasons and recovery", () => {
   for (const row of rows) {
     test(row.name, async ({ page, start }) => {
@@ -122,7 +125,8 @@ test.describe("3. Pause reasons and recovery", () => {
       await expect(card(page, row.epic).getByText(row.onQueue)).toBeVisible();
 
       await page.getByRole("link", { name: row.epic }).click();
-      if (row.epic === "paused-epic") await expect(page.getByText(row.reason).first()).toBeVisible();
+      // The epic page card shows the state and, for repairs, the reason; the ticket page shows the reason.
+      if (row.epic === "paused-epic") await expect(page.getByText(onEpicPage(row)).first()).toBeVisible();
       // The row's action link ("Answer →", "Review →") goes to the same page.
       await page.locator(`a[href$="/t/demo:${row.epic}/${row.id}"]`).filter({ hasNotText: "→" }).click();
 
@@ -141,6 +145,16 @@ test.describe("3. Pause reasons and recovery", () => {
     await page.getByRole("link", { name: "paused-epic" }).click();
     await expect(page.getByText("needs-repair · Run failed").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Fix it with an agent" })).toHaveCount(3);
+    // The tinted card keeps "Fix it with an agent" last in its second row.
+    const repair = page
+      .locator('[data-tone="deadlocked"]')
+      .filter({ has: page.locator('a[href$="/t/demo:paused-epic/07"]') })
+      .last();
+    await expect(repair.getByText("needs-repair · Run failed")).toBeVisible();
+    await expect(repair.getByRole("button").last()).toHaveText("Fix it with an agent");
+    const link = (await repair.locator("a").first().boundingBox())!;
+    const fix = (await repair.getByRole("button", { name: "Fix it with an agent" }).boundingBox())!;
+    expect(fix.y).toBeGreaterThanOrEqual(link.y + link.height);
 
     await page.locator('a[href$="/t/demo:paused-epic/07"]').filter({ hasNotText: "→" }).click();
     await expect(page.getByText("Run failed").first()).toBeVisible();

@@ -294,14 +294,18 @@ test("51. Merge from the epic page", async ({ page, start }) => {
   // A land-blocked epic shows the reason under the bar. Merge stays, as the retry: isMergeable allows a
   // paused epic with a land-block reason.
   await page.evaluate(() => (location.hash = "#/e/demo:blocked-merge-epic"));
-  await expect(page.getByText("needs a rebase")).toBeVisible();
-  await expect(page.getByRole("button", nav("Merge again"))).toBeVisible();
+  // The notice is the icon and the text block that holds the reason and the buttons.
+  const notice = page.locator("[data-reason]").locator("xpath=../..");
+  await expect(notice).toContainText("Can't merge: needs a rebase");
+  await expect(notice.locator("svg").first()).toHaveAttribute("aria-hidden", "true");
+  await expect(notice.getByRole("button", nav("Merge again"))).toBeVisible();
+  await expect(page.getByRole("button", nav("Merge"))).toHaveCount(0);
 });
 
 test("52. Draft impl epic", async ({ page, start }) => {
   await start("united");
   await page.evaluate(() => (location.hash = "#/e/demo:publishing-epic-impl"));
-  await expect(page.getByTestId("stats-line")).toHaveText(/^Publishing tickets/);
+  await expect(page.getByTestId("stats-line")).toHaveText("Publishing tickets · 1 ticket so far");
   const queue = page.getByRole("button", nav("Queue"));
   await expect(queue).toBeDisabled();
   await expect(page.getByTitle("Queue unlocks once all tickets are published")).toBeVisible();

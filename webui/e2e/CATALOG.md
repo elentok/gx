@@ -37,8 +37,8 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
     per live ticket: `02 open ready`, `03 blocked after 02`, `04 drafted draft`, `06 asks ready`,
     `07 fails ready`, then the cancelled `05 dropped cancelled`. There is no More stats card yet.
   - After queueing, the stats line starts with "Running" and the comet shows. The fake worker settles:
-    the ring reads `4/7`, ticket 06 is expanded with "needs-answer · Waiting for your answer", its
-    question and an Answer button. Ticket 07 is expanded in the deadlocked tone with "needs-repair · Run
+    the ring reads `4/7`, ticket 06 is expanded with "needs answer", its question and an Answer button
+    to the right of its title. Cancelled 05 reads "cancelled". Ticket 07 is expanded in the deadlocked tone with "needs-repair · Run
     failed" in its meta and a Fix it with an agent button. The flow turns recovery off, so 07 stays a
     needs-repair card instead of becoming a waiting parent of an investigate ticket. The Epics page card
     shows `4/7`, a pill and a reason.
@@ -55,8 +55,10 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Pass:**
   - The card names the epic's first pause only (`paused-epic`: "Seeded pause: self-reported" and
     "+4 more"; `approve-epic`: "wants to run: rg fixture"). The reason shows on the epic page row
-    and on the ticket page. Opening a ticket from its card lands on `#/t/<address>`. The Repair row's
-    card reads "needs-repair · Run failed".
+    and on the ticket page; the epic page row's card reads "needs answer" for the Answer rows and
+    "needs-repair · <reason>" for the repair rows. Opening a ticket from its card lands on
+    `#/t/<address>`. The Repair row's tinted card reads "needs-repair · Run failed" and "Fix it with an
+    agent" is the last button, in the card's second row.
   - The action clears the reason from the ticket page without a reload.
 - **Rows:**
 
@@ -115,9 +117,10 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Steps:**
   1. Open the Epics page; the `finishing-epic` card is in In progress and shows `1/2`.
   2. Release the hold; the last ticket finishes and merges.
-- **Pass:** the card is in the Finished section (collapsed until opened) as `2/2`; its epic page
-  reads "Finished · $0.00 · 0s agent time" with the ring `2/2`, no comet, the divider "2 done", and a
-  More stats card that is `aria-expanded` false, then true after a click.
+- **Pass:** before the release, the running ticket `02`'s card meta starts with "running · ". After it
+  the card is in the Finished section (collapsed until opened) as `2/2`; its epic page reads
+  "Merged · $0.00 · 0s agent time" with the ring `2/2`, no comet, the divider "2 done" above the
+  cards, and a More stats card below them that is `aria-expanded` false, then true after a click.
 
 ## 8. Edge states
 
@@ -541,7 +544,8 @@ an exited session.
   - Before the session the ring reads a percentage with `data-tone="muted"`. The summary shows in full under the title.
   - The stats line starts with "Resolve tickets", shows a time ("2m") and has no "$".
   - The open tickets read `01 first implement · ready` and `02 second implement · after 01`. The done ticket `03 timed` shows "2m" and no "$".
-  - After the start the ring is `running` and the comet shows.
+  - After the start the ring is `running` and the comet shows. Once `01` is claimed, its meta reads
+    "implement · running · <time>".
 
 ## 51. Merge from the epic page
 
@@ -549,21 +553,27 @@ an exited session.
 - **Steps:** open `#/e/demo:awaiting-epic`, then `#/e/demo:blocked-merge-epic`.
 - **Pass:**
   - `awaiting-epic` has a Merge button with `data-tone="done"`, last in the button group.
-  - `blocked-merge-epic` shows "needs a rebase" under the bar. The button reads "Merge again".
+  - `blocked-merge-epic` shows the notice "Can't merge: needs a rebase" with an `aria-hidden` svg icon.
+    The notice holds "Merge again"; the bar has no Merge button.
 
 ## 52. Draft impl epic
 
 - **Scenario:** `united`
 - **Steps:** open `#/e/demo:publishing-epic-impl`.
-- **Pass:** the stats line starts with "Publishing tickets". Queue is disabled and its wrapper has the title "Queue unlocks once all tickets are published".
+- **Pass:** the stats line reads exactly "Publishing tickets · 1 ticket so far". Queue is disabled and its wrapper has the title "Queue unlocks once all tickets are published".
 
 ## 53. Phone, epic page
 
-- **Scenario:** `united` at 375 px wide; the second test uses `mixed`.
-- **Steps:** open `#/e/demo:awaiting-epic`; open `#/e/demo:mixed-epic`.
+- **Scenario:** `united` at 375 px wide; the other tests use `mixed`.
+- **Steps:** open `#/e/demo:awaiting-epic`; open `#/e/demo:mixed-epic` (with a long-titled ticket
+  added); open it again with recovery off and click Queue.
 - **Pass:**
   - Every button of the bar sits below the stats line and is at least 44 px tall.
-  - On a card the meta text ("ready") sits below the title ("open").
+  - On a card the meta text ("ready") sits below the title ("open"), indented 54 px. A long title stays
+    on one line.
+  - Answer on 06 and "Fix it with an agent" on 07 are at least 44 px tall and as wide as their row
+    (less the 54 px indent). In 06's card the meta, question and Answer stack in that order, their text
+    54 px from the content edge.
 
 ## 54. Done list
 
@@ -583,7 +593,7 @@ an exited session.
   - The dialog shows `/gx-investigate demo:paused-epic/07 is needs-repair: Run failed`; Copy reads "Copied" and the clipboard holds the prompt.
   - After the start the dialog reads "Agent started. View it in the gx TUI Agents tab" and has no "Start gx agent".
   - `gx agents list` shows one more session, with harness `claude` and dir the trunk checkout of `demo`.
-  - The second dialog reads "an agent is already fixing demo:paused-epic/07" and `gx agents list` has no new session.
+  - The second start shows the toast "an agent is already fixing demo:paused-epic/07" and `gx agents list` has no new session.
 
 ## 56. Fix it with an agent, remote control
 
