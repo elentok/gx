@@ -9,3 +9,6 @@ webui/node_modules/
 webui/test-results/
 webui/dist/*
 !webui/dist/.gitkeep
+/gx
+**/node_modules/
+*.tsbuildinfo
