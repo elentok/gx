@@ -164,6 +164,10 @@ or test name. If no automated seam is appropriate for a ticket (pure documentati
 split, exploratory research), write an explicit `none` entry with the rationale — never leave the
 section silent.
 
+For a ticket that changes **skill text**, the seam is one shared test file per skill area (extend the
+existing one, e.g. `skills/mock_rules_test.go`), and each phrase is asserted once. Name the anchors as
+structural (headings, link paths, selector names, numbers), never long prose.
+
 For a **bug-fix ticket**, the regression seam must also say "the test must fail on the old code" and
 name the test form the Decisions chose (table test, server-level test, ...). A test that passes on
 the old code proves nothing. When a seam names `ClaimNext`, name the queue step that feeds it too

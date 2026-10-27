@@ -52,6 +52,11 @@ green, then pause the ticket with `gx tickets ask` (see
 [gx-local-tracker.md](../gx-local-tracker.md)): the question names the seam and why it
 cannot be observed, so the ticket author can approve a different seam.
 
+**Tests on skill text pin structure, not prose.** Collapse whitespace (newlines included) in both the
+skill text and the expected phrase, so a reflow never breaks the test. In Go, reuse `normalizeSpace`
+and `checkAnchors` from `skills/mock_rules_test.go`. Pin only structural anchors: headings, link
+paths, selector names, numbers. Assert a phrase once, in one shared test file per skill area.
+
 You can't test everything — agreeing the seams up front (in the ticket) is how testing effort goes
 on the critical paths and complex logic instead of every edge case.
 
