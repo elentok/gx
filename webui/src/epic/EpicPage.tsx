@@ -96,7 +96,7 @@ function DesignSessionButton({ detail, open }: { detail: EpicDetail; open?: Open
 const QUEUE_LOCKED = "Queue unlocks once all tickets are published";
 
 // One bar under a hairline: the stats line on the left, the buttons on the right. On phones the buttons wrap to
-// their own row at a touch-friendly height. A land-blocked epic's notice sits under the bar, and it has no Merge.
+// their own row at a touch-friendly height. A merge-blocked epic's notice sits under the bar, and it has no Merge.
 function EpicBar({
   address,
   detail,
@@ -172,17 +172,17 @@ function EpicBar({
           )}
         </Box>
       </Box>
-      {landBlocked(detail) && <LandBlockNotice address={address} detail={detail} wide={wide} onChanged={onChanged} />}
+      {mergeBlocked(detail) && <MergeBlockNotice address={address} detail={detail} wide={wide} onChanged={onChanged} />}
     </Box>
   );
 }
 
-const landBlocked = (detail: EpicDetail) => detail.state === "paused" && !!detail.land_block_reason;
+const mergeBlocked = (detail: EpicDetail) => detail.state === "paused" && !!detail.land_block_reason;
 
 const DIRTY_TRUNK = "dirty-trunk";
 
 // The merge block's reason with its fix buttons. A dirty trunk says it short and lists every clashing file.
-function LandBlockNotice({
+function MergeBlockNotice({
   address,
   detail,
   wide,
@@ -203,7 +203,7 @@ function LandBlockNotice({
     <Box
       role="region"
       aria-label="Merge blocked"
-      data-testid="land-block-notice"
+      data-testid="merge-block-notice"
       mt="14px"
       display="flex"
       alignItems="flex-start"
@@ -229,7 +229,7 @@ function LandBlockNotice({
       <Box flex="1" fontSize="14px" lineHeight="1.5" color="tone.paused.text">
         <Text data-reason>{`Can't merge: ${reason}`}</Text>
         {dirty && (detail.land_block_files?.length ?? 0) > 0 && (
-          <Box as="ul" data-testid="land-block-files" pl="5" fontFamily="mono">
+          <Box as="ul" data-testid="merge-block-files" pl="5" fontFamily="mono">
             {detail.land_block_files?.map((f) => (
               <li key={f}>{f}</li>
             ))}

@@ -15,7 +15,7 @@ import (
 
 const repairToken = "0:repair"
 
-// startFixAgent seeds epic "loop" in project proj with ticket 01 needs-repair.
+// startFixAgent seeds epic "loop" in project proj with ticket 01 paused for repair.
 func startFixAgent(t *testing.T, seed func(store string)) designsFixture {
 	t.Helper()
 	store := t.TempDir()
@@ -47,7 +47,7 @@ func TestFixAgent_StartsInTheTrunkCheckout(t *testing.T) {
 	}
 	meta := readMeta(t, f.h, res.Session.ID)
 	want := map[string]any{"dir": f.repo, "name": "fix-proj_cloop_s01", "harness": string(agentfake.HarnessKind),
-		"first_prompt": "/gx-investigate proj:loop/01 is needs-repair: Merge conflict"}
+		"first_prompt": "/gx-investigate proj:loop/01 is paused for repair: Merge conflict"}
 	for k, v := range want {
 		if meta[k] != v {
 			t.Errorf("meta[%s] = %v, want %v", k, meta[k], v)
@@ -63,11 +63,11 @@ func TestFixAgent_StartsInTheTrunkCheckout(t *testing.T) {
 
 func TestFixAgent_Refusals(t *testing.T) {
 	f := startFixAgent(t, func(store string) {
-		servertest.WriteTicketWith(t, store, "proj", "loop", "03", "parked", servertest.TicketOpts{PauseReason: "manual"})
+		servertest.WriteTicketWith(t, store, "proj", "loop", "03", "paused", servertest.TicketOpts{PauseReason: "manual"})
 		servertest.WriteTicketWith(t, store, "proj", "loop", "04", "probe", servertest.TicketOpts{Type: "investigate", Parent: "03"})
 	})
 	for _, tc := range []struct{ addr, reason, msg string }{
-		{"proj:loop/02", server.ReasonFixNotRepair, "not needs-repair"},
+		{"proj:loop/02", server.ReasonFixNotRepair, "not paused for repair"},
 		{"proj:loop/03", server.ReasonFixInvestigating, "proj:loop/04"},
 		{"proj:loop/99", server.ReasonFixUnknownTicket, "no ticket"},
 	} {

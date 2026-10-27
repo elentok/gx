@@ -316,7 +316,7 @@ func TestClassify_InvestigatePromptIsASlashPrompt(t *testing.T) {
 		t.Fatal(err)
 	}
 	tu := &tui{pid: PidFile{Cwd: dir}}
-	kind, _, _ := tu.classify("/gx-investigate demo:paused-epic/07 is needs-repair: Run failed")
+	kind, _, _ := tu.classify("/gx-investigate demo:paused-epic/07 is paused for repair: Run failed")
 	if kind != promptSlash {
 		t.Fatalf("kind = %v, want promptSlash", kind)
 	}

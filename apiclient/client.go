@@ -490,7 +490,7 @@ func (c *Client) DesignWorktree(ctx context.Context, req server.DesignWorktreeRe
 	return res, err
 }
 
-// FixAgent starts a fix agent for a needs-repair ticket. A refusal is a
+// FixAgent starts a fix agent for a ticket paused for repair. A refusal is a
 // result (Refused set), not an error.
 func (c *Client) FixAgent(ctx context.Context, req server.FixAgentRequest) (server.FixAgentResult, error) {
 	var res server.FixAgentResult

@@ -15,12 +15,12 @@ import (
 // Refusal reasons of the fix-agent route, beside the session ones.
 const (
 	ReasonFixUnknownTicket = "unknown-ticket"
-	ReasonFixNotRepair     = "not-needs-repair"
+	ReasonFixNotRepair     = "not-paused-for-repair"
 	ReasonFixInvestigating = "investigating"
 )
 
 // FixAgentRequest is the body of POST /v1/tickets/fix-agent. State is the
-// token of the needs-repair row the web saw, required on the web mux.
+// token of the row paused for repair the web saw, required on the web mux.
 type FixAgentRequest struct {
 	Address string `json:"address"`
 	State   string `json:"state,omitempty"`
@@ -36,7 +36,7 @@ func fixAgentRefusal(reason, msg string) FixAgentResult {
 	return FixAgentResult{SessionResult: sessionRefusal(reason, msg)}
 }
 
-// repairState is the web state token of a needs-repair ticket: the answerState
+// repairState is the web state token of a ticket paused for repair: the answerState
 // of its latest round's question (zero when it has none) and its pause class.
 func repairState(evs []tickets.LogEvent, class schema.PauseClass) string {
 	var q tickets.LogEvent
@@ -78,9 +78,9 @@ func fixAgentName(addr string) string {
 }
 
 // fixAgentPrompt is the prompt the fix agent starts from; a pause label
-// follows the colon, none leaves the sentence at "needs-repair".
+// follows the colon, none leaves the sentence at "paused for repair".
 func fixAgentPrompt(addr string, t tickets.Ticket) string {
-	prompt := "/gx-investigate " + addr + " is needs-repair"
+	prompt := "/gx-investigate " + addr + " is paused for repair"
 	if label := t.PauseReason.Label(); label != "" {
 		prompt += ": " + label
 	}
@@ -88,7 +88,7 @@ func fixAgentPrompt(addr string, t tickets.Ticket) string {
 }
 
 // startFixAgent starts a /gx-investigate session in the project's trunk
-// checkout for a needs-repair ticket.
+// checkout for a ticket paused for repair.
 func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, error) {
 	if web && req.State == "" {
 		return fixAgentRefusal(ReasonStale, "a state token is required; review the current pause"), nil
@@ -110,7 +110,7 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 		}
 	}
 	if t.PausedClass() != schema.PauseClassRepair {
-		return fixAgentRefusal(ReasonFixNotRepair, fmt.Sprintf("%s is not needs-repair", addr)), nil
+		return fixAgentRefusal(ReasonFixNotRepair, fmt.Sprintf("%s is not paused for repair", addr)), nil
 	}
 	if web && req.State != repairState(readLogLenient(t), t.PausedClass()) {
 		return fixAgentRefusal(ReasonStale, "the pause changed; review the current one"), nil

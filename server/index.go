@@ -184,7 +184,7 @@ func (i *index) refresh(storePath string) error {
 // changedEpicMeta lists, in address order, the epics whose design_step or
 // merge block differs between two scans. An epic's ticket.md edit changes no
 // TicketInfo, so without this a Progress view never learns the step moved and
-// an Epic page never learns a merge parked.
+// an Epic page never learns a merge paused.
 func changedEpicMeta(old, next map[string][]tickets.Epic) []string {
 	steps := func(m map[string][]tickets.Epic) map[string]string {
 		out := map[string]string{}

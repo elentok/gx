@@ -39,9 +39,9 @@ type EpicDetailRow struct {
 	Question string `json:"question,omitempty"`
 	// Reason is the plain-words pause reason of a paused loop-epic ticket.
 	Reason string `json:"reason,omitempty"`
-	// State is the token the fix-agent route needs; set on a needs-repair row.
+	// State is the token the fix-agent route needs; set on a row paused for repair.
 	State string `json:"state,omitempty"`
-	// FixPrompt is the prompt the fix agent starts from; set on a needs-repair row.
+	// FixPrompt is the prompt the fix agent starts from; set on a row paused for repair.
 	FixPrompt string `json:"fix_prompt,omitempty"`
 	// Current and Blocked are set on a map epic's rows: Current is the claimed
 	// ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.

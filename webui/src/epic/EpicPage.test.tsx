@@ -314,13 +314,13 @@ const openFixDialog = async () => {
 };
 
 test("the fix dialog shows the row's fix_prompt, with or without a reason", async () => {
-  live([repairRow({ reason: "dirty tree", fix_prompt: "/gx-investigate gx:blog/01 is needs-repair: from the server" })]);
+  live([repairRow({ reason: "dirty tree", fix_prompt: "/gx-investigate gx:blog/01 is paused for repair: from the server" })]);
   const dialog = await openFixDialog();
-  expect(dialog.getByText("/gx-investigate gx:blog/01 is needs-repair: from the server")).toBeTruthy();
+  expect(dialog.getByText("/gx-investigate gx:blog/01 is paused for repair: from the server")).toBeTruthy();
   expect(dialog.getByRole("button", { name: "Copy" })).toBeTruthy();
   cleanup();
-  live([repairRow({ fix_prompt: "/gx-investigate gx:blog/01 is needs-repair" })]);
-  expect((await openFixDialog()).getByText("/gx-investigate gx:blog/01 is needs-repair")).toBeTruthy();
+  live([repairRow({ fix_prompt: "/gx-investigate gx:blog/01 is paused for repair" })]);
+  expect((await openFixDialog()).getByText("/gx-investigate gx:blog/01 is paused for repair")).toBeTruthy();
 });
 
 test.each([
@@ -463,10 +463,10 @@ const dirtyTrunk: Partial<EpicDetail> = {
   },
 };
 
-test("the land-block notice shows only while paused with a reason; an epic without one has none", async () => {
+test("the merge-block notice shows only while paused with a reason; an epic without one has none", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: { state: "running", land_block_reason: "stale reason" } });
   await statsOf();
-  expect(screen.queryByTestId("land-block-notice")).toBeNull();
+  expect(screen.queryByTestId("merge-block-notice")).toBeNull();
   expect(screen.queryByText(/stale reason/)).toBeNull();
 });
 
@@ -474,7 +474,7 @@ test("a needs-rebase pause reads 'Can't merge: <reason>' with its action buttons
   render("/e/gx:blog-impl", [], "loop", {
     detail: { state: "paused", land_block_reason: "needs a rebase", actions: ["merge"], action_info: { merge: { label: "Merge again", tooltip: "Try again." } } },
   });
-  const notice = await screen.findByTestId("land-block-notice");
+  const notice = await screen.findByTestId("merge-block-notice");
   expect(notice.textContent).toContain("Can't merge: needs a rebase");
   expect(within(notice).getByRole("button", { name: "Merge again" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Merge" })).toBeNull();
@@ -489,22 +489,22 @@ test("a merge-conflict pause shows Merge but not Start over, which the epic addr
       action_info: { merge: { label: "Merge again", tooltip: "Try again." }, "start-over": { label: "Start over", tooltip: "Discard the work." } },
     },
   });
-  const notice = await screen.findByTestId("land-block-notice");
+  const notice = await screen.findByTestId("merge-block-notice");
   expect(within(notice).getAllByRole("button").map((b) => b.textContent)).toEqual(["Merge again"]);
 });
 
-test("a land-block notice with no actions renders no button row", async () => {
+test("a merge-block notice with no actions renders no button row", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: { state: "paused", land_block_reason: "needs a rebase", actions: [] } });
-  const notice = await screen.findByTestId("land-block-notice");
+  const notice = await screen.findByTestId("merge-block-notice");
   expect(within(notice).queryAllByRole("button")).toHaveLength(0);
 });
 
 test("a dirty-trunk pause says the short reason, lists every clashing file, then both verbs in order", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: dirtyTrunk });
-  const notice = await screen.findByTestId("land-block-notice");
+  const notice = await screen.findByTestId("merge-block-notice");
   expect(notice.textContent).toContain("Can't merge: Trunk has local changes");
   expect(notice.textContent).not.toContain("and 2 more");
-  const files = within(notice).getByTestId("land-block-files");
+  const files = within(notice).getByTestId("merge-block-files");
   expect(Array.from(files.querySelectorAll("li")).map((li) => li.textContent)).toEqual(dirtyTrunk.land_block_files!);
   const buttons = within(notice).getAllByRole("button");
   expect(buttons.map((b) => b.textContent)).toEqual(["Stash, merge and restore", "Merge again"]);

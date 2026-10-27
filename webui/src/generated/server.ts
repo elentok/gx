@@ -526,11 +526,11 @@ export interface EpicDetailRow {
    */
   reason?: string;
   /**
-   * State is the token the fix-agent route needs; set on a needs-repair row.
+   * State is the token the fix-agent route needs; set on a row paused for repair.
    */
   state?: string;
   /**
-   * FixPrompt is the prompt the fix agent starts from; set on a needs-repair row.
+   * FixPrompt is the prompt the fix agent starts from; set on a row paused for repair.
    */
   fix_prompt?: string;
   /**
@@ -937,7 +937,7 @@ export interface EpicSummary {
 // source: fixagent.go
 
 export const ReasonFixUnknownTicket = "unknown-ticket";
-export const ReasonFixNotRepair = "not-needs-repair";
+export const ReasonFixNotRepair = "not-paused-for-repair";
 export const ReasonFixInvestigating = "investigating";
 /**
  * Refusal reasons of the fix-agent route, beside the session ones.
@@ -945,7 +945,7 @@ export const ReasonFixInvestigating = "investigating";
 export type ReasonFix = typeof ReasonFixUnknownTicket | typeof ReasonFixNotRepair | typeof ReasonFixInvestigating;
 /**
  * FixAgentRequest is the body of POST /v1/tickets/fix-agent. State is the
- * token of the needs-repair row the web saw, required on the web mux.
+ * token of the row paused for repair the web saw, required on the web mux.
  */
 export interface FixAgentRequest {
   address: string;

@@ -532,7 +532,7 @@ func TestEpicDetail_UnknownAddress(t *testing.T) {
 	}
 }
 
-func TestEpicDetail_NeedsRepairRowCarriesTheStateToken(t *testing.T) {
+func TestEpicDetail_RepairRowCarriesTheStateToken(t *testing.T) {
 	h, base := startEpicDetail(t, func(store string) {
 		servertest.WriteTicketWith(t, store, "proj", "work", "01", "broken", servertest.TicketOpts{PauseReason: "merge-conflict"})
 		servertest.WriteTicketWith(t, store, "proj", "work", "02", "fine", servertest.TicketOpts{})
@@ -551,7 +551,7 @@ func TestEpicDetail_NeedsRepairRowCarriesTheStateToken(t *testing.T) {
 		}
 		wantPrompt := ""
 		if want != "" {
-			wantPrompt = "/gx-investigate " + r.Address + " is needs-repair: Merge conflict"
+			wantPrompt = "/gx-investigate " + r.Address + " is paused for repair: Merge conflict"
 		}
 		if r.FixPrompt != wantPrompt {
 			t.Errorf("%s fix_prompt = %q, want %q", r.Address, r.FixPrompt, wantPrompt)

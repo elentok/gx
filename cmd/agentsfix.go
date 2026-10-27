@@ -22,7 +22,7 @@ func newAgentsFixCmd() *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "fix <project:epic/NN>",
-		Short: "start an agent that investigates a needs-repair ticket",
+		Short: "start an agent that investigates a ticket paused for repair",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			cl, err := serverClient()

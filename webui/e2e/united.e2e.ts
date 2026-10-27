@@ -88,7 +88,7 @@ test("16. Needs you", async ({ page, start }) => {
   await expect(dirty.getByRole("button")).toHaveText(["Stash, merge and restore", "Merge again"]);
   await expect(dirty.getByTestId("pill")).toHaveText("Merge blocked");
   await expect(dirty.getByTestId("reason")).toHaveText("Trunk has local changes");
-  await expect(dirty.getByTestId("land-block-files")).toHaveCount(0);
+  await expect(dirty.getByTestId("merge-block-files")).toHaveCount(0);
   for (const name of ["running-epic", "queued-epic"]) {
     await expect(card(page, name).getByRole("button")).toHaveCount(0);
   }
@@ -291,8 +291,8 @@ test("51. Merge from the epic page", async ({ page, start }) => {
   await expect(merge).toHaveAttribute("data-tone", "done");
   await expect(merge.locator("xpath=..").getByRole("button").last()).toHaveText("Merge");
 
-  // A land-blocked epic shows the reason under the bar. Merge stays, as the retry: isMergeable allows a
-  // paused epic with a land-block reason.
+  // A merge-blocked epic shows the reason under the bar. Merge stays, as the retry: isMergeable allows a
+  // paused epic with a merge-block reason.
   await page.evaluate(() => (location.hash = "#/e/demo:blocked-merge-epic"));
   // The notice is the icon and the text block that holds the reason and the buttons.
   const notice = page.locator("[data-reason]").locator("xpath=../..");

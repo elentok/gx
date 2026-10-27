@@ -397,7 +397,7 @@ type Server struct {
 	registry       *runRegistry
 	savedRuns      []trackedRun // handles the previous server left; consumed by reclaimRuns
 	refused        refusals
-	heldLands      refusals // roots whose land waits for a trunk-conflict ticket, keyed by root
+	heldMerges     refusals // roots whose merge waits for a trunk-conflict ticket, keyed by root
 	merges         mergeGuard
 	adoptMu        sync.Mutex // a late-finish adoption holds it from its finish to the cancel of unstarted investigations; the runner claims under it
 	trunkLocks     trunkLocks

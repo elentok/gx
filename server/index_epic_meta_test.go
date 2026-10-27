@@ -27,7 +27,7 @@ func TestChangedEpicMeta(t *testing.T) {
 		{"step moved", scan("Plan", none), scan("Branch", none), []string{"p:design"}},
 		{"step first set", scan("", none), scan("Plan", none), []string{"p:design"}},
 		{"step cleared", scan("Plan", none), scan("", none), []string{"p:design"}},
-		{"merge parked", scan("", none), scan("", blocked), []string{"p:loop"}},
+		{"merge paused", scan("", none), scan("", blocked), []string{"p:loop"}},
 		{"merge block cleared", scan("", blocked), scan("", none), []string{"p:loop"}},
 		{"block files changed", scan("", blocked), scan("", moreFiles), []string{"p:loop"}},
 		{"block unchanged", scan("", blocked), scan("", blocked), nil},

@@ -242,7 +242,7 @@ function CardFrame({
   );
 }
 
-// A needs-you or needs-repair ticket: the title is the link and its question or hint sits in a second row.
+// A needs-you or repair-paused ticket: the title is the link and its question or hint sits in a second row.
 function NoteCard({
   row,
   meta,

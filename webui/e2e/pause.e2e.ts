@@ -194,7 +194,7 @@ test.describe("3. Pause reasons and recovery", () => {
 });
 
 const fixDialog = (page: Page) => page.getByRole("dialog", { name: "Fix it with an agent" });
-const fixPrompt = "/gx-investigate demo:paused-epic/07 is needs-repair: Run failed";
+const fixPrompt = "/gx-investigate demo:paused-epic/07 is paused for repair: Run failed";
 
 const openFixDialog = async (page: Page) => {
   const row = page.locator('a[href$="/t/demo:paused-epic/07"]').locator("xpath=ancestor::*[.//button][1]");

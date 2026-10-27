@@ -65,7 +65,7 @@ test("a dirty-trunk row renders both buttons and the reason, with no file list",
   expect(screen.getByRole("button", { name: "Stash, merge and restore" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Merge again" })).toBeTruthy();
   expect(text(screen.getByTestId("reason"))).toBe("Trunk has local changes");
-  expect(screen.queryByTestId("land-block-files")).toBeNull();
+  expect(screen.queryByTestId("merge-block-files")).toBeNull();
 });
 
 test("the stash button posts through the stash write with the state token", async () => {
@@ -160,7 +160,7 @@ test("a refused Merge shows its reason in a toast", async () => {
   expect(await screen.findByText("Conflicts with main")).toBeTruthy();
 });
 
-test("a parked Merge shows a warning toast with the message and a link to the epic", async () => {
+test("a paused Merge shows a warning toast with the message and a link to the epic", async () => {
   const merge = vi.fn().mockResolvedValue({ parked: true, message: "Rebase onto main failed" });
   const r = row({ state: "awaiting-merge", section: "needs-you", actions: [{ kind: "merge", label: "Merge" }] });
   renderThemed(<EpicCard row={r} writes={{ merge }} />);

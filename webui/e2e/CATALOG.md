@@ -590,7 +590,7 @@ an exited session.
   1. Open `paused-epic`; click "Fix it with an agent" on `07`; click Copy; click "Start gx agent".
   2. In a second page on the same server, open the dialog on `07` again; click "Start gx agent".
 - **Pass:**
-  - The dialog shows `/gx-investigate demo:paused-epic/07 is needs-repair: Run failed`; Copy reads "Copied" and the clipboard holds the prompt.
+  - The dialog shows `/gx-investigate demo:paused-epic/07 is paused for repair: Run failed`; Copy reads "Copied" and the clipboard holds the prompt.
   - After the start the dialog reads "Agent started. View it in the gx TUI Agents tab" and has no "Start gx agent".
   - `gx agents list` shows one more session, with harness `claude` and dir the trunk checkout of `demo`.
   - The second start shows the toast "an agent is already fixing demo:paused-epic/07" and `gx agents list` has no new session.
@@ -621,7 +621,7 @@ an exited session.
 - **Pass:**
   - The stats line reads "Paused · ...".
   - The "Merge blocked" notice reads "Can't merge: Trunk has local changes".
-  - Under it the file list (`land-block-files`) holds one item, `same.txt`.
+  - Under it the file list (`merge-block-files`) holds one item, `same.txt`.
   - Then "Stash, merge and restore" (with its tooltip) comes before "Merge again", all inside the notice.
 
 ## 59. Stash, merge and restore

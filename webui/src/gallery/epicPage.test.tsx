@@ -28,8 +28,8 @@ test("the running fork case indents the fork's card", async () => {
 
 test("the dirty-trunk case lists its files and both buttons", async () => {
   renderCase("dirty-trunk");
-  const notice = await screen.findByTestId("land-block-notice");
-  const files = within(notice).getByTestId("land-block-files");
+  const notice = await screen.findByTestId("merge-block-notice");
+  const files = within(notice).getByTestId("merge-block-files");
   expect(Array.from(files.querySelectorAll("li")).map((li) => li.textContent)).toEqual(["a.go", "b/c.go", "d.go"]);
   expect(within(notice).getAllByRole("button").map((b) => b.textContent)).toEqual(["Stash, merge and restore", "Merge again"]);
 });

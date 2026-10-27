@@ -61,7 +61,7 @@ func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, rep
 		lockKey = "epic:" + root.String()
 	} else if holder := s.trunkConflictHolder(root.Project, epics, repo, target, one.Epic); holder != "" {
 		// Not a pause: the root stays queued and claimRoot retries once the ticket is done.
-		s.heldLands.set(root.String(), true)
+		s.heldMerges.set(root.String(), true)
 		s.log.Info("land waits for a trunk-conflict ticket", "root", root, "holder", holder, "target", target)
 		return
 	}
@@ -88,17 +88,17 @@ func (s *Server) trunkConflictHolder(project string, epics []tickets.Epic, repo,
 	return ""
 }
 
-// retryHeldLand lands root again once the trunk-conflict ticket that held its
-// land is gone. The hold lives in memory only: a server restart forgets it.
-func (s *Server) retryHeldLand(root rootRef, e tickets.Epic, epics []tickets.Epic, repo string) {
-	if !s.heldLands.has(root.String()) {
+// retryHeldMerge merges root again once the trunk-conflict ticket that held its
+// merge is gone. The hold lives in memory only: a server restart forgets it.
+func (s *Server) retryHeldMerge(root rootRef, e tickets.Epic, epics []tickets.Epic, repo string) {
+	if !s.heldMerges.has(root.String()) {
 		return
 	}
 	_, _, target, err := s.epicRefs(root.Project, epics, root.Epic, repo)
 	if err == nil && s.trunkConflictHolder(root.Project, epics, repo, target, root.Epic) != "" {
 		return
 	}
-	s.heldLands.set(root.String(), false)
+	s.heldMerges.set(root.String(), false)
 	one := ralphloop.OneIteration{Epic: root.Epic, Ticket: lowestTicket(e)}
 	s.goSettle(func() { s.completeRootIfDone(root, one) })
 }

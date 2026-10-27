@@ -10,7 +10,7 @@ test("58. Dirty trunk on the Epic page", async ({ page, start }) => {
   // The notice holds the short reason, then the clashing files, then the buttons in that order.
   const notice = page.getByRole("region", nav("Merge blocked"));
   await expect(notice.locator("[data-reason]")).toHaveText("Can't merge: Trunk has local changes");
-  const files = notice.getByTestId("land-block-files");
+  const files = notice.getByTestId("merge-block-files");
   await expect(files.getByRole("listitem")).toHaveText(["same.txt"]);
 
   const stash = notice.getByRole("button", nav("Stash, merge and restore"));
@@ -54,5 +54,5 @@ test("60. Merge again on a dirty trunk", async ({ page, start }) => {
 
   // The page shows the fresh state, not the stale Awaiting merge.
   await expect(page.getByTestId("stats-line")).toHaveText(/^Paused · /);
-  await expect(page.getByTestId("land-block-files").getByRole("listitem")).toHaveText(["same.txt"]);
+  await expect(page.getByTestId("merge-block-files").getByRole("listitem")).toHaveText(["same.txt"]);
 });
