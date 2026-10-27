@@ -9,6 +9,7 @@ export function Chip({ tone = "muted", children }: { tone?: Tone; children: Reac
       as="span"
       data-tone={tone}
       display="inline-block"
+      whiteSpace="nowrap"
       px="3"
       borderRadius="lg"
       borderWidth="1px"

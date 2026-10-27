@@ -119,7 +119,9 @@ function KindRow({ row, check, onChange }: { row: Row; check: ProjectChecks["kin
         })}
       </Box>
       <Box display="flex" alignItems="center" gap="3" gridColumn={{ base: "auto", md: "2 / 4" }}>
-        {found ? <Chip tone="done">Recommended</Chip> : <Chip>Nothing found</Chip>}
+        <Box flexShrink="0">
+          {found ? <Chip tone="done">Recommended</Chip> : <Chip>Nothing found</Chip>}
+        </Box>
         <Text fontSize="xs" color="text.dim">
           {source}
         </Text>
