@@ -224,7 +224,13 @@ func (s *Server) saveConversationTotals(m sessionMeta, conversation string) {
 	if m.Harness == string(ralphloop.AgentCodex) {
 		agent = ralphloop.AgentCodex
 	}
-	tokens, cost, err := ralphloop.SessionsTotals([]ralphloop.SessionRef{{Agent: agent, Cwd: m.Dir, SessionID: conversation}})
+	home, err := s.totalsHome()
+	if err != nil {
+		s.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
+		return
+	}
+	codexHome, _ := s.codexHome()
+	tokens, cost, err := ralphloop.SessionsTotalsIn(home, codexHome, []ralphloop.SessionRef{{Agent: agent, Cwd: m.Dir, SessionID: conversation}})
 	if err != nil {
 		s.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
 		return

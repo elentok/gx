@@ -176,7 +176,16 @@ type SessionRef struct {
 // All-or-nothing: if any session cannot be read or found, it returns an error
 // and no partial sum. A Codex session adds its reported total and no cost.
 func SessionsTotals(refs []SessionRef) (tokens int64, cost float64, err error) {
-	sum, err := sumSessions(refs, errTranscriptNotFound, readFoundSessionStats)
+	return SessionsTotalsIn("", "", refs)
+}
+
+// SessionsTotalsIn is SessionsTotals reading Claude transcripts under home and
+// Codex sessions under codexHome; an empty one reads the process env's.
+func SessionsTotalsIn(home, codexHome string, refs []SessionRef) (tokens int64, cost float64, err error) {
+	sum, err := sumSessions(refs, errTranscriptNotFound, func(ref SessionRef) (sessionStats, AgentKind, bool, error) {
+		stats, err := readAgentSessionStatsIn(home, codexHome, sessionKey{agent: ref.Agent, cwd: ref.Cwd, sessionID: ref.SessionID})
+		return stats, ref.Agent, stats.ok, err
+	})
 	return sum.tokens, sum.cost, err
 }
 
@@ -208,12 +217,6 @@ func sumSessions(refs []SessionRef, notFound error, resolve func(SessionRef) (st
 		sum.hadCodex = sum.hadCodex || agent == AgentCodex
 	}
 	return sum, nil
-}
-
-// readFoundSessionStats reads ref's own transcript; a missing one is an error.
-func readFoundSessionStats(ref SessionRef) (sessionStats, AgentKind, bool, error) {
-	stats, err := readAgentSessionStats(sessionKey{agent: ref.Agent, cwd: ref.Cwd, sessionID: ref.SessionID})
-	return stats, ref.Agent, stats.ok, err
 }
 
 // SessionIDsTotals sums the total tokens and cost of the Claude sessions in
@@ -262,10 +265,25 @@ func SessionCost(cwd, sessionID string) (cost float64, ok bool, err error) {
 }
 
 func readAgentSessionStats(key sessionKey) (sessionStats, error) {
+	return readAgentSessionStatsIn("", "", key)
+}
+
+// readAgentSessionStatsIn is readAgentSessionStats under home (Claude) and
+// codexHome (Codex); an empty one reads the process env's.
+func readAgentSessionStatsIn(home, codexHome string, key sessionKey) (sessionStats, error) {
 	if key.agent != AgentCodex {
-		return readSessionStats(key.cwd, key.sessionID)
+		if home == "" || key.cwd == "" || key.sessionID == "" {
+			return readSessionStats(key.cwd, key.sessionID)
+		}
+		return readTranscriptStats(transcript.PathIn(home, key.cwd, key.sessionID))
 	}
-	stats, ok, err := codexsession.ReadStats(key.cwd, key.sessionID)
+	read := codexsession.ReadStats
+	if codexHome != "" {
+		read = func(cwd, id string) (codexsession.Stats, bool, error) {
+			return codexsession.ReadStatsIn(codexHome, cwd, id)
+		}
+	}
+	stats, ok, err := read(key.cwd, key.sessionID)
 	if err != nil || !ok {
 		return sessionStats{}, err
 	}

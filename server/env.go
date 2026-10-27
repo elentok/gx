@@ -23,6 +23,15 @@ func (s *Server) envHome() (string, error) {
 	return "", errors.New("HOME is not set in the server env")
 }
 
+// totalsHome is envHome, or "" for the process env, which ralphloop resolves
+// itself.
+func (s *Server) totalsHome() (string, error) {
+	if s.cfg.Env == nil {
+		return "", nil
+	}
+	return s.envHome()
+}
+
 // codexHome is the resolved codex dir of Config.Env, or "" for the process env,
 // which codexsession resolves itself.
 func (s *Server) codexHome() (string, error) {
