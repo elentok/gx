@@ -995,4 +995,9 @@ config. _Avoid_: suite, task, test target.
 with no check config uses only these.
 
 **Check config** — the project's own command per kind of check, committed in its repo. A kind it
-leaves out uses the gx default. _Avoid_: test config.
+leaves out uses the gx default. An empty check config means the project keeps the gx defaults.
+_Avoid_: test config.
+
+**Onboarding** — gx asking the person for a project's missing check config, with a recommended
+answer for each kind. A project with any check config, even an empty one, has nothing missing.
+_Avoid_: setup, init.
