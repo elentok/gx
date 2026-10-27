@@ -68,7 +68,7 @@ function EpicBody({ detail, now, designLive, fixAgent }: { detail: EpicDetail; n
   const ctx = rowContext(detail, now, designLive);
   return (
     <>
-      <Box mt="4" display="flex" flexDirection="column" gap="3">
+      <Box mt="28px" display="flex" flexDirection="column" gap="8px">
         {nestLive(detail.rows).map(({ row: r, indent }) => (
           <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} fixAgent={fixAgent} />
         ))}
