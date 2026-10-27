@@ -984,3 +984,15 @@ _Avoid_: external skill (for a vendored one).
 a 3-way merge of the upstream change into gx's copy, then a review of the result. **Port**: no
 merge; each upstream change is read and carried over by hand only if it matters to gx's copy. Port
 suits a copy gx has largely rewritten.
+
+## Checks
+
+**Check** — one kind of verification (format, lint, typecheck or test) gx runs on a project, either
+on the changed files or as a full run. It comes from the gx defaults or from the project's check
+config. _Avoid_: suite, task, test target.
+
+**gx defaults** — the checks gx picks by itself for a project, from the tools it finds. A project
+with no check config uses only these.
+
+**Check config** — the project's own command per kind of check, committed in its repo. A kind it
+leaves out uses the gx default. _Avoid_: test config.
