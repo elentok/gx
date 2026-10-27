@@ -282,6 +282,57 @@ test("the Live sessions list switches the page and stops another session with a 
   await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "new", state: stateToken(newer) }));
 });
 
+const phone = () => vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+
+test("on a phone the ⋯ menu is a bottom sheet with a grab handle and the desktop items", async () => {
+  phone();
+  try {
+    const s = session("s1");
+    const openDesign = vi.fn(async () => ok);
+    const stop = vi.fn(async () => ({}) as SessionResult);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const other = session("s2", { run_started_at: "2026-10-23T09:00:00Z", status_changed_at: "2026-10-23T09:00:00Z" });
+    render("/d/gx:a", [s, other], { openDesign, stop });
+    await openMenu();
+    const menu = await screen.findByRole("menu");
+    expect(screen.getByTestId("grab-handle")).toBeTruthy();
+    expect(screen.getByText("Live sessions · 2")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Stop s2" }));
+    await waitFor(() => expect(stop).toHaveBeenCalledWith({ id: "s2", state: stateToken(other) }));
+    fireEvent.click(await newSession());
+    await waitFor(() => expect(openDesign).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    expect(menu.isConnected).toBe(false);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("on a phone a press on the backdrop closes the sheet", async () => {
+  phone();
+  try {
+    render("/d/gx:a", [session("s1")]);
+    await openMenu();
+    const menu = await screen.findByRole("menu");
+    fireEvent.click(menu.parentElement!);
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("on a phone Delete design is in the sheet while it can run", async () => {
+  phone();
+  try {
+    render("/d/gx:a", [], {}, detailOf({ deletable: true }));
+    await openMenu();
+    expect(await screen.findByRole("menuitem", { name: "Delete design" })).toBeTruthy();
+    expect(screen.getByTestId("grab-handle")).toBeTruthy();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("a send goes to the session on screen", async () => {
   // The older run flipped state last; the newer run start still wins.
   const older = session("old", {

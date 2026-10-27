@@ -456,6 +456,26 @@ test("Escape with the ⋯ menu open closes only the menu", async () => {
   expect(await screen.findByText("earlier talk")).toBeTruthy();
 });
 
+test("Escape with the phone ⋯ sheet open closes only the sheet", async () => {
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    renderChat([session()], focusChat());
+    await screen.findByRole("group", { name: "Questions" });
+    fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
+    const menu = await screen.findByRole("menu");
+    // The menu takes Escape only once it is ready, so press until it closes.
+    await waitFor(() => {
+      fireEvent.keyDown(menu, { key: "Escape" });
+      expect(screen.queryByRole("menu")).toBeNull();
+    });
+    expect(inQuestions()).toBe(true);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(await screen.findByText("earlier talk")).toBeTruthy();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
 test("Escape with the phone steps modal open closes only the modal", async () => {
   vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   try {

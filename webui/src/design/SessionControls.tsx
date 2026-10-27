@@ -1,8 +1,9 @@
 import { Box, chakra, Menu, Spinner, Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useConnectionContext } from "../connection";
 import type { DesignOpenRequest, SessionInfo } from "../generated/server";
 import { Button } from "../ui/button/Button";
+import { useWide } from "../useWide";
 import { useWrite } from "../useWrite";
 import {
   postDeleteDesign,
@@ -70,6 +71,28 @@ export function startNew(
   run(() => open(body));
 }
 
+/** The popover's positioner, or on a phone a dimmed backdrop that holds the menu as a bottom sheet and closes it on a press. */
+function MenuFrame({ sheet, children }: { sheet: boolean; children: ReactNode }) {
+  if (!sheet) return <Menu.Positioner>{children}</Menu.Positioner>;
+  return (
+    <Menu.Context>
+      {(menu) => (
+        <Box
+          position="fixed"
+          inset="0"
+          zIndex="modal"
+          bg="overlay"
+          display="flex"
+          alignItems="flex-end"
+          onClick={(e) => e.target === e.currentTarget && menu.setOpen(false)}
+        >
+          {children}
+        </Box>
+      )}
+    </Menu.Context>
+  );
+}
+
 /**
  * The header's "⋯" menu: New session, the live sessions (with 2 or more), and Delete design while it
  * can run. Renders nothing when none of them applies.
@@ -99,10 +122,17 @@ export function DesignActionsMenu({
 }) {
   const { run, pending } = useDesignWrite();
   const [confirming, setConfirming] = useState(false);
+  const sheetMode = !useWide();
   const canDelete = deletable && live.length === 0;
   if (!shown && !canDelete) return null;
 
-  const item = { cursor: "pointer", color: "text", ps: "3", _highlighted: { bg: "surface" } } as const;
+  const item = {
+    cursor: "pointer",
+    color: "text",
+    ps: "3",
+    _highlighted: { bg: "surface" },
+    ...(sheetMode && { py: "3", fontSize: "md", minH: "44px" }),
+  } as const;
   return (
     <Menu.Root
       lazyMount
@@ -115,8 +145,15 @@ export function DesignActionsMenu({
           ⋯
         </chakra.button>
       </Menu.Trigger>
-      <Menu.Positioner>
-        <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="64">
+      <MenuFrame sheet={sheetMode}>
+        <Menu.Content
+          bg="surface.raised"
+          borderWidth="1px"
+          borderColor="border"
+          minW="64"
+          {...(sheetMode && { w: "full", borderTopRadius: "xl", borderBottomRadius: "0", pb: "6" })}
+        >
+          {sheetMode && <Box aria-hidden data-testid="grab-handle" alignSelf="center" w="36px" h="4px" my="2" borderRadius="full" bg="border" flexShrink="0" />}
           {shown && (
             <Menu.Item
               value="new-session"
@@ -126,7 +163,9 @@ export function DesignActionsMenu({
               alignItems="flex-start"
               {...item}
             >
-              New session
+              <Text as="span" fontWeight={sheetMode ? "600" : undefined}>
+                New session
+              </Text>
               <Text fontSize="xs" color="text.muted">
                 {shown.status.state === "exited" ? "Start a fresh session" : "Stop this session and start a fresh one"}
               </Text>
@@ -185,7 +224,7 @@ export function DesignActionsMenu({
               </Menu.Item>
             ))}
         </Menu.Content>
-      </Menu.Positioner>
+      </MenuFrame>
     </Menu.Root>
   );
 }
