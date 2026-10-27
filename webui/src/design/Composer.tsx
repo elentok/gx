@@ -19,6 +19,7 @@ import {
   type InterruptSession,
   type SetAutoAdvance,
 } from "./open";
+import { InterruptPopover } from "./InterruptPopover";
 import { postPrompt, type PostPrompt } from "./prompt";
 import { roundPrompt, unansweredOf, type Answers } from "./round";
 import { SendPopover } from "./SendPopover";
@@ -72,6 +73,8 @@ export function Composer({
   const [open, setOpen] = useState(false);
   const [gapsOpen, setGapsOpen] = useState(false);
   const sendRef = useRef<HTMLButtonElement>(null);
+  const [interruptOpen, setInterruptOpen] = useState(false);
+  const interruptRef = useRef<HTMLButtonElement>(null);
   const [text, setTextState] = useState(initialText);
   const setText = (t: string) => {
     setTextState(t);
@@ -100,8 +103,10 @@ export function Composer({
   // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
   const working = session.status.state === "working" && !promptable(session);
   const run: RunCall = (call) => (connected ? write(call) : Promise.resolve());
-  const onInterrupt = () =>
-    run(() => interrupt({ id: session.id, state: stateToken(session) }));
+  const onInterrupt = () => {
+    setInterruptOpen(false);
+    return run(() => interrupt({ id: session.id, state: stateToken(session) }));
+  };
 
   const inRound = round.length > 0;
   const sendRound = () => {
@@ -122,14 +127,25 @@ export function Composer({
   const canContinue = !!next?.action.action?.length;
   // Interrupt while the agent works; Continue after a run-end line unless a note or round is waiting to go.
   const mainButton = working ? (
-    <Button
-      tone="deadlocked"
-      disabled={!connected || pending}
-      onClick={onInterrupt}
-    >
-      {pending && <Spinner size="sm" />}
-      Interrupt
-    </Button>
+    <>
+      <Button
+        ref={interruptRef}
+        tone="deadlocked"
+        disabled={!connected || pending}
+        aria-expanded={interruptOpen}
+        onClick={() => setInterruptOpen(!interruptOpen)}
+      >
+        {pending && <Spinner size="sm" />}
+        Interrupt
+      </Button>
+      <InterruptPopover
+        open={interruptOpen}
+        disabled={!connected || pending}
+        anchorRef={interruptRef}
+        onConfirm={onInterrupt}
+        onClose={() => setInterruptOpen(false)}
+      />
+    </>
   ) : canContinue && !inRound && text.trim() === "" ? (
     <Button
       aria-label={nextTitle ? `Continue ${nextTitle}` : "Continue"}

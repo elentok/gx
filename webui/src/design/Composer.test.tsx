@@ -241,7 +241,7 @@ test("Interrupt replaces Send while working, Continue replaces it after a run-en
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
 });
 
-test("a Working session offers Interrupt in place of Send, posting the state token", async () => {
+test("a Working session offers Interrupt in place of Send, posting the state token after a confirm", async () => {
   const fetchSpy = vi
     .spyOn(globalThis, "fetch")
     .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
@@ -250,6 +250,13 @@ test("a Working session offers Interrupt in place of Send, posting the state tok
   expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
   expect(box.disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Interrupt" }));
+  const confirm = await screen.findByRole("alertdialog", {
+    name: "Interrupt the agent?",
+  });
+  expect(
+    fetchSpy.mock.calls.some(([url]) => url === "/v1/sessions/interrupt"),
+  ).toBe(false);
+  fireEvent.click(within(confirm).getByRole("button", { name: "Interrupt" }));
   await waitFor(() =>
     expect(fetchSpy).toHaveBeenCalledWith(
       "/v1/sessions/interrupt",
@@ -331,6 +338,23 @@ test("without a countdown there is no countdown text or Cancel", async () => {
   await screen.findByRole("switch");
   expect(screen.queryByText(/Continuing in/)).toBeNull();
   expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+});
+
+test("Cancel in the Interrupt confirm closes it without posting", async () => {
+  const fetchSpy = vi
+    .spyOn(globalThis, "fetch")
+    .mockResolvedValue(new Response(JSON.stringify(ok), { status: 200 }));
+  render({ state: "working" });
+  fireEvent.click(await screen.findByRole("button", { name: "Interrupt" }));
+  const confirm = await screen.findByRole("alertdialog", {
+    name: "Interrupt the agent?",
+  });
+  fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  expect(
+    fetchSpy.mock.calls.some(([url]) => url === "/v1/sessions/interrupt"),
+  ).toBe(false);
+  fetchSpy.mockRestore();
 });
 
 test("an Idle session has no Interrupt", async () => {
