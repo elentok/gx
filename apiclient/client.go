@@ -684,6 +684,18 @@ func (c *Client) DiskStatus(ctx context.Context) (server.DiskReport, error) {
 	return rep, err
 }
 
+// ChecksStatus is each project's check config and detected commands. An empty
+// project means every registered project.
+func (c *Client) ChecksStatus(ctx context.Context, project string) (server.ChecksStatus, error) {
+	var st server.ChecksStatus
+	q := url.Values{}
+	if project != "" {
+		q.Set("project", project)
+	}
+	err := c.get(ctx, "/v1/checks/status?"+q.Encode(), &st)
+	return st, err
+}
+
 // BudgetIncrease raises the live budget limits until the server restarts. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) BudgetIncrease(ctx context.Context, req server.BudgetIncreaseRequest) (server.BudgetResult, error) {
