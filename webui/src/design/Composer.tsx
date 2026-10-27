@@ -131,7 +131,7 @@ export function Composer({
     <>
       <Button
         ref={interruptRef}
-        tone="deadlocked"
+        emphasis="secondary"
         disabled={!connected || pending}
         aria-expanded={interruptOpen}
         onClick={() => setInterruptOpen(!interruptOpen)}
@@ -200,7 +200,7 @@ export function Composer({
       position="sticky"
       bottom="0"
       bg="surface"
-      borderTopWidth="1px"
+      borderTopWidth={wide ? "1px" : "0"}
       py="3"
       display="flex"
       flexDirection="column"

@@ -265,6 +265,8 @@ function ChatScroller({
         stuck.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80;
       }}
     >
+      {/* A short chat sits at the bottom, next to the composer; the spacer shrinks away once the chat scrolls. */}
+      <Box flex="1" aria-hidden />
       {children}
     </Box>
   );
