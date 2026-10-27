@@ -259,7 +259,11 @@ var designBase = scenario{
 		}},
 	},
 	designSteps: map[string]string{project + ":design-epic": string(tickets.StepResolveTickets)},
-	epicMeta:    map[string]string{project + ":design-epic": "status: open\nkind: map\ndesign_started_at: 2026-01-01T09:00:00Z\n"},
+	epicMeta: map[string]string{
+		project + ":design-epic": "status: open\nkind: map\ndesign_started_at: 2026-01-01T09:00:00Z\n",
+		// The held worker never stamps started_at, which a running card's time reads.
+		project + ":design-epic-impl": "status: open\ncreated_at: 2026-01-01T09:30:00Z\nstarted_at: 2026-01-01T09:45:00Z\n",
+	},
 }
 
 // grillingStats is the design scenario with conversation records that carry

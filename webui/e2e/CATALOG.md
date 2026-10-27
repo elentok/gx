@@ -235,6 +235,8 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
   - The status reads "Designing" with a percentage in the ring, then "Creating tickets (N so far)..."
     with "…", then "Not started" with `n/m` at Branch, then "Implementing..." once queued. The title
     opens `#/e/demo:design-epic-impl` from Branch on.
+  - The time reads a bare duration while Designing, "created ... ago" at Branch, and a bare
+    duration once queued.
   - The impl epic page has an "Open design" button and the design epic page an "Open implementation
     epic" button (no arrows); each opens the other's page.
 
@@ -661,3 +663,16 @@ an exited session.
   - The left edges of all live card titles (not done, not cancelled) are equal.
   - The long title shows on one line with `text-overflow: ellipsis`.
   - Each meta's right edge is 16 px inside its card's border.
+
+## 63. Card times
+
+- **Scenario:** `united`
+- **Steps:** open the Epics page and expand every section. Run `gx server queue remove demo:queued-epic`, then `gx server queue add demo:queued-epic`.
+- **Pass:**
+  - Every card but `follow-ups` reads `project · time · status`. Needs-you times read "waiting ...".
+  - `running-epic`, `queued-epic`, the queued one-off, `design-live` and `design-stopped` show a bare
+    duration. `queued-epic` reads "<1m" after the re-queue.
+  - `ready-epic` reads "created ... ago" and its time has a tooltip. `design-new`, `draft-epic` and
+    `idle-epic` read "created ... ago".
+  - `follow-ups` has no time and reads "demo · 1 bug, 1 idea".
+  - The Finished one-offs read "... ago".

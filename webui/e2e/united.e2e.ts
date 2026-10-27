@@ -130,6 +130,8 @@ test("18. Joined card", async ({ page, start }) => {
   await expect(page.getByRole("link", { name: "design-epic-impl", exact: true })).toHaveCount(0);
   await expect(joined.getByTestId("status")).toHaveText("Designing");
   await expect(joined.getByText(/%$/)).toBeVisible();
+  const bare = /^(<1m|\d+[mhdw]( \d+[mhd])?)$/;
+  await expect(joined.getByTestId("time")).toHaveText(bare);
   await expect(joined.getByRole("link", { name: "design-epic", exact: true })).toHaveAttribute("href", "#/e/demo:design-epic");
 
   await fixture.cli("tickets", "set", "demo:design-epic", "--design-step", "create-tickets");
@@ -138,8 +140,10 @@ test("18. Joined card", async ({ page, start }) => {
 
   await fixture.cli("tickets", "set", "demo:design-epic", "--design-step", "branch");
   await expect(joined.getByTestId("status")).toHaveText("Not started");
+  await expect(joined.getByTestId("time")).toHaveText(/^created .+ ago$/);
   await fixture.cli("server", "queue", "add", "demo:design-epic-impl");
   await expect(joined.getByTestId("status")).toHaveText("Implementing...");
+  await expect(joined.getByTestId("time")).toHaveText(bare);
   await expect(joined.getByText(/^\d+\/\d+$/)).toBeVisible();
   await expect(joined.getByRole("link", { name: "design-epic", exact: true })).toHaveAttribute("href", "#/e/demo:design-epic-impl");
 
@@ -169,6 +173,51 @@ test("19. Follow-ups triage", async ({ page, start }) => {
 
   await first.getByRole("link", { name: "follow-ups", exact: true }).click();
   await expect(page).toHaveURL(/#\/e\/demo:follow-ups$/);
+});
+
+// The fixture's times are relative to the run, so the labels are matched by shape.
+test("63. Card times", async ({ page, start }) => {
+  const fixture = await start("united");
+  await section(page, "Ready to design");
+  await section(page, "Finished");
+
+  const time = (name: string) => card(page, name).getByTestId("time");
+  const line = (name: string) => card(page, name).getByTestId("status").locator("xpath=..");
+
+  // Every card but follow-ups has a time between the project and the status.
+  const cards = page.locator("[data-section]");
+  const count = await cards.count();
+  expect(count).toBeGreaterThan(0);
+  for (let i = 0; i < count; i++) {
+    const c = cards.nth(i);
+    if ((await c.getByRole("link").first().textContent()) === "follow-ups") continue;
+    await expect(c.getByTestId("time")).toHaveCount(1);
+    await expect(c.getByTestId("status").locator("xpath=..")).toHaveText(/^(demo|auto) · .+ · .+$/);
+  }
+
+  // Some fixture stamps are fixed dates, so an age can be weeks.
+  const AGE = String.raw`(<1m|\d+[mhdw]( \d+[mhd])?)`;
+  for (const name of NEEDS_YOU) await expect(time(name)).toHaveText(new RegExp(`^waiting ${AGE}$`));
+  for (const name of ["running-epic", "queued-epic", "queued", "design-live", "design-stopped"]) {
+    await expect(time(name)).toHaveText(new RegExp(`^${AGE}$`));
+  }
+
+  // A queued epic times from its latest queueing.
+  await fixture.cli("server", "queue", "remove", "demo:queued-epic");
+  await fixture.cli("server", "queue", "add", "demo:queued-epic");
+  await expect(time("queued-epic")).toHaveText("<1m");
+
+  await expect(time("ready-epic")).toHaveText(/^created (<1m|\d+m) ago$/);
+  await expect(time("ready-epic")).toHaveAttribute("title", /.+/);
+  for (const name of ["design-new", "draft-epic", "idle-epic"]) {
+    await expect(time(name)).toHaveText(/^created .+ ago$/);
+  }
+
+  await expect(time("follow-ups")).toHaveCount(0);
+  await expect(line("follow-ups")).toHaveText("demo · 1 bug, 1 idea");
+
+  // The united fixture caps Finished at two cards, so only the two newest one-offs show.
+  for (const name of ["done-a", "done-b"]) await expect(time(name)).toHaveText(/^.+ ago$/);
 });
 
 const menuButton = (page: Page) => page.getByRole("button", nav("Menu"));
