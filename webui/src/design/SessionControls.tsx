@@ -169,7 +169,7 @@ export function DesignActionsMenu({
           bg="surface.raised"
           borderWidth="1px"
           borderColor="border"
-          minW="64"
+          minW={sheetMode ? "64" : "340px"}
           {...(sheetMode && { w: "full", borderTopRadius: "xl", borderBottomRadius: "0", pb: "6" })}
         >
           {sheetMode && <Box aria-hidden data-testid="grab-handle" alignSelf="center" w="36px" h="4px" my="2" borderRadius="full" bg="border" flexShrink="0" />}
@@ -215,7 +215,7 @@ export function DesignActionsMenu({
                     justifyContent="space-between"
                     {...item}
                   >
-                    <Text as="span" truncate>
+                    <Text as="span" truncate fontSize="13px" fontWeight="600">
                       {s.name || s.id}
                     </Text>
                     {s.id === shown.id && <Text as="span" aria-hidden color="tone.running.fg">✓</Text>}
