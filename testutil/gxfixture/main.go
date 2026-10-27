@@ -6,6 +6,7 @@
 //	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] [--auto-advance-delay <duration>] <scenario>
 //
 // --auto-advance-delay shortens the server's run-end countdown (default 10s).
+// --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 //
 // A binary left out is built with `go build`, which needs the module as the
@@ -46,6 +47,23 @@ type Output struct {
 	Gx string `json:"gx"`
 }
 
+// ShellEnv is the output as `export` lines a shell can source: the CLI env, then
+// GXF_* variables for the rest. Values are single-quoted.
+func (o Output) ShellEnv() string {
+	var b strings.Builder
+	export := func(k, v string) { fmt.Fprintf(&b, "export %s='%s'\n", k, strings.ReplaceAll(v, "'", `'\''`)) }
+	for _, kv := range o.Env {
+		k, v, _ := strings.Cut(kv, "=")
+		export(k, v)
+	}
+	export("GXF_WEB_URL", o.WebURL)
+	export("GXF_GX", o.Gx)
+	export("GXF_HOLD_FILE", o.HoldFile)
+	export("GXF_STATE_DIR", o.StateDir)
+	export("GXF_SOCKET", o.Socket)
+	return b.String()
+}
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "gxfixture:", err)
@@ -56,11 +74,13 @@ func main() {
 func run(args []string) (err error) {
 	var gxBin, fakeBin, name, autoAdvance string
 	var configs []string
-	var hold bool
+	var hold, shellEnv bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--hold":
 			hold = true
+		case "--env":
+			shellEnv = true
 		case "--auto-advance-delay":
 			if i+1 == len(args) {
 				return fmt.Errorf("%s needs a value", args[i])
@@ -182,11 +202,16 @@ func run(args []string) (err error) {
 			return fmt.Errorf("open design %s: %w\n%s", addr, err, out)
 		}
 	}
-	out, err := json.Marshal(Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin})
-	if err != nil {
-		return err
+	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin}
+	if shellEnv {
+		fmt.Print(o.ShellEnv())
+	} else {
+		out, err := json.Marshal(o)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(out))
 	}
-	fmt.Println(string(out))
 
 	select {
 	case <-ctx.Done():

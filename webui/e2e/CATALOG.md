@@ -5,6 +5,10 @@ Run with `make web-e2e`. Each flow starts its own fixture server (`testutil/gxfi
 Retries are off. Locators use roles and visible text, plus `data-testid` `pill` and `reason` on
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.
 
+Before you write a flow, read "How the fixture behaves" in `skills/gx-ui-check/SKILL.md`: how a fake
+worker outcome maps to ticket status, why fixture CLI writes land late, how to set an epic summary,
+and "read `test-results/**/error-context.md` first on a locator failure".
+
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),

@@ -32,6 +32,11 @@ $TMPDIR/gx-ui/gxfixture --gx $TMPDIR/gx-ui/gx --fakeclaude $TMPDIR/gx-ui/claude 
 - Pass `--hold` only for a flow that says so (flow 7, and the Stash flow on `dirty-trunk`). It
   freezes the workers until you delete the file named by `hold_file`.
 - Each run is its own isolated server and state. Start one per flow.
+- To run `gx` against the fixture from the shell, pass `--env` and source the output. It prints
+  `export` lines instead of the JSON: the `env` entries, plus `GXF_WEB_URL`, `GXF_GX`,
+  `GXF_HOLD_FILE`, `GXF_STATE_DIR` and `GXF_SOCKET`. Redirect the background run's stdout to a file,
+  wait for it to fill, then `source` it in the same shell as your `gx` calls. Do not retype the
+  `HOME`/`XDG_*` exports.
 
 The JSON line has these fields:
 
@@ -54,6 +59,29 @@ The JSON line has these fields:
 
 Send SIGTERM to the fixture process (stop the background task). It shuts down the server and its
 agents and removes its state. Stop it even when the flow failed.
+
+## How the fixture behaves
+
+Read this before you guess; each wrong guess costs a rebuild.
+
+- **Fake worker outcome → ticket status.** The worker's behaviour is per ticket
+  (`agentfake.Behaviour*`, set by a scenario's `behaviour`):
+  - `finish` (default): commits and reports finished. The ticket merges and ends `done`.
+  - `ask`: pauses with a question. The ticket shows as asking.
+  - `fail`: the fake exits non-zero. The ticket becomes `needs-repair · Run failed`.
+  - Anything that goes idle with no commit and no report is read as a stalled agent. The server
+    nudges it after about 120s. Never wait for that: pick `fail` for a failed run.
+- **CLI writes reach the server late.** `gx tickets section/set/add` against the fixture changes
+  files, and the server picks them up some time later. Do not add `sleep` or `waitForTimeout`. Poll
+  the page with `expect(...).toPass()` or `expect.poll`. The delay is a known gap, not a bug in your
+  flow.
+- **Epic summary.** The page summary is the epic body's `## Summary` section (`## Destination` for a
+  map). A scenario's `epicMeta` writes only frontmatter, so set the summary with
+  `gx tickets section <epic> Summary -` after the fixture is up (see the late-write note above).
+- **Find a locator from the failure.** On a locator failure, read
+  `webui/test-results/<test>/error-context.md` first. It holds the page snapshot with the exact
+  accessible names (for example "Done 03 timed 2m", not "03 timed"). Fix all the locators it shows
+  before you re-run.
 
 ## Porting e2e flows
 
