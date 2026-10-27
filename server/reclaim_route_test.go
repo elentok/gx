@@ -11,6 +11,8 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -126,7 +128,11 @@ func TestReclaim_FinishesThroughTheRunsOwnRunner(t *testing.T) {
 // finished through headless, which had no such session, and was left unwatched.
 func TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr(t *testing.T) {
 	headless := newRenamedFake("headless", nativerunner.VerdictLive)
-	_, ticketPath := restartUnder(t, "", headless, map[string]agentrunner.Runner{"herdr": herdrrunner.New()})
+	others := map[string]agentrunner.Runner{}
+	// The runner reaches the fake herdr through the server's own env.
+	_, ticketPath := restartUnder(t, "", headless, others, func(c *server.Config) {
+		others["herdr"] = herdrrunner.NewIn(herdr.CLI{Env: c.Env}, harness.LookupEnv(c.Env, "HOME"))
+	})
 	waitStatus(t, ticketPath, schema.StatusDone)
 }
 

@@ -1,8 +1,8 @@
 // Package servertest is seam A: an in-process server on a temp state dir,
 // temp socket and temp ticket store, with the fake herdr executable first in
-// PATH, driven only through the API client. Like herdrfake.Start it calls
-// t.Setenv, so tests using it must not be parallel, and the package's
-// TestMain must call herdrfake.RunHelperProcess.
+// PATH of the server's Config.Env, driven only through the API client. Start
+// changes no process env, so harnesses may run in parallel subtests; the
+// package's TestMain must call herdrfake.RunHelperProcess.
 package servertest
 
 import (
@@ -434,14 +434,19 @@ func StartWithTCP(t *testing.T) *Harness {
 	return startWith(t, t.TempDir(), "127.0.0.1:0", false)
 }
 
+// shortTempRoot is the temp root of a harness's state dir, short enough for the
+// holder sockets below it.
+const shortTempRoot = "/tmp"
+
 // processHome is HOME as the test process started, to tell a test that set its
 // own from one that left the real one.
 var processHome = os.Getenv("HOME")
 
 func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func(*server.Config)) *Harness {
 	t.Helper()
-	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that.
-	stateDir, err := os.MkdirTemp("", "gxs")
+	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that,
+	// and so can macOS's default temp root once a holder socket sits under it.
+	stateDir, err := os.MkdirTemp(shortTempRoot, "gxs")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -472,32 +477,28 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		}
 		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
 	})
-	herdrfake.StartState(t, h.Herdr)
+	_, herdrEnv := herdrfake.StartStateEnv(t, h.Herdr)
 
-	// The herdr runner's wait N defaults to 5s, which every launch's slash
-	// command prompt would sit out: the fake agent starts no turn. Read from
-	// the config file, so give the server a home with a short one, unless the
-	// test already set up its own.
 	ownHome := os.Getenv("HOME") != processHome
-	if !ownHome {
-		home := t.TempDir()
-		t.Setenv("HOME", home)
-		if err := os.MkdirAll(filepath.Join(home, ".config", "gx"), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(filepath.Join(home, ".config", "gx", "config.json"), []byte(`{"runner-wait":"100ms"}`), 0o644); err != nil {
-			t.Fatal(err)
-		}
-	}
 
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
-	// The server's env is the process env plus a poisoned home and a clean
-	// config dir of its own, so code that reads HOME where it should read
-	// CLAUDE_CONFIG_DIR trips the canary. A test that already set its own HOME
-	// keeps it, and the config dir it set with it.
-	h.cfg.Env = os.Environ()
+	// The herdr runner's wait N defaults to 5s, which every launch's slash
+	// command prompt would sit out: the fake agent starts no turn.
+	h.cfg.RunnerWait = 100 * time.Millisecond
+	// The server's env is the process env plus the fake herdr, a poisoned home
+	// and a clean config dir of its own, so code that reads HOME where it should
+	// read CLAUDE_CONFIG_DIR trips the canary. A test that already set its own
+	// HOME keeps it, and the config dir it set with it. The merge locks go under
+	// the stateDir, not the real home's state dir.
+	h.cfg.Env = append(os.Environ(), herdrEnv...)
+	xdgState := filepath.Join(stateDir, "xdg-state")
+	if err := os.MkdirAll(xdgState, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	h.cfg.Env = append(h.cfg.Env, "XDG_STATE_HOME="+xdgState)
 	if !ownHome {
+		h.cfg.Env = append(h.cfg.Env, "HOME="+filepath.Join(stateDir, "home"))
 		h.cfg.Env = append(h.cfg.Env, claudeenv.In(filepath.Join(stateDir, "claude-home"))...)
 	}
 	// Every merge pauses on ralphloop's 3s finish debounce; the fake agents

@@ -67,7 +67,6 @@ func TestTicketScreen_PtyAgentReturnsItsSavedScreen(t *testing.T) {
 // path must fit a unix socket's length cap, which the default temp dir exceeds.
 func startTicketScreenShortPath(t *testing.T) *servertest.Harness {
 	t.Helper()
-	t.Setenv("TMPDIR", "/tmp")
 	return startTicketScreen(t)
 }
 

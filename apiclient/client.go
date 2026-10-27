@@ -27,6 +27,8 @@ type Client struct {
 	http     *http.Client
 	readOnly bool
 	origin   string
+
+	investigator string
 }
 
 // AsTUI marks the client's writes as coming from the TUI; an unmarked client
@@ -36,12 +38,24 @@ func (c *Client) AsTUI() *Client {
 	return c
 }
 
+// AsInvestigator tags the client's writes as made by the investigator agent
+// working on addr. A client without it reads the investigator from the process
+// env, as the real CLI does inside an investigator session.
+func (c *Client) AsInvestigator(addr string) *Client {
+	c.investigator = addr
+	return c
+}
+
 // setOrigin tags a write request with the client's origin.
 func (c *Client) setOrigin(r *http.Request) {
 	if c.origin != "" {
 		r.Header.Set(server.OriginHeader, c.origin)
 	}
-	if addr := os.Getenv(server.InvestigateEnv); addr != "" {
+	addr := c.investigator
+	if addr == "" {
+		addr = os.Getenv(server.InvestigateEnv)
+	}
+	if addr != "" {
 		r.Header.Set(server.InvestigateHeader, addr)
 	}
 }

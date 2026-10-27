@@ -18,9 +18,11 @@ import (
 
 // orphanMergeLock leaves the lock a merge that died mid-flight would: a dead
 // owner, no marker.
-func orphanMergeLock(t *testing.T, store string) string {
+func orphanMergeLock(t *testing.T, h *servertest.Harness, store string) string {
 	t.Helper()
-	dir, err := ralphloop.MergeLockDir(filepath.Join(store, "proj", "epic-a"))
+	// The lock root is the server's config's, not the process's.
+	stateDir := filepath.Join(h.Env("XDG_STATE_HOME"), "gx")
+	dir, err := ralphloop.MergeLockDirIn(stateDir, filepath.Join(store, "proj", "epic-a"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +58,6 @@ func restartAndSettle(t *testing.T, h *servertest.Harness, want string) {
 
 func startCrashedMerge(t *testing.T) (h *servertest.Harness, store, repo, lockDir string) {
 	t.Helper()
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	store, repo = t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -65,7 +66,7 @@ func startCrashedMerge(t *testing.T) (h *servertest.Harness, store, repo, lockDi
 	if err := h.Stop(); err != nil {
 		t.Fatal(err)
 	}
-	lockDir = orphanMergeLock(t, store)
+	lockDir = orphanMergeLock(t, h, store)
 	return h, store, repo, lockDir
 }
 

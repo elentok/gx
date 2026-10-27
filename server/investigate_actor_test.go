@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
@@ -33,10 +34,9 @@ func startInvestigateEnv(t *testing.T, kind events.Kind) *servertest.Harness {
 
 func retryAs(t *testing.T, h *servertest.Harness, investigator string) server.QueueResult {
 	t.Helper()
-	t.Setenv(server.InvestigateEnv, investigator)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", false)
+	res, err := apiclient.New(server.SocketPath(h.StateDir)).AsInvestigator(investigator).TicketRetry(ctx, "proj:epic-a/01", false)
 	if err != nil {
 		t.Fatal(err)
 	}

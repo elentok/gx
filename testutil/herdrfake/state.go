@@ -308,12 +308,25 @@ func (s *State) beat() {
 // own timeout.
 func StartState(t *testing.T, s *State) *Coordinator {
 	t.Helper()
+	c, env := StartStateEnv(t, s)
+	for _, kv := range env {
+		k, v, _ := strings.Cut(kv, "=")
+		t.Setenv(k, v)
+	}
+	return c
+}
+
+// StartStateEnv is StartState without the process environment change: it
+// returns the KEY=VALUE entries as StartEnv does, so tests using it may run in
+// parallel.
+func StartStateEnv(t *testing.T, s *State) (*Coordinator, []string) {
+	t.Helper()
 
 	stop := make(chan struct{})
 	t.Cleanup(func() { close(stop) })
 	go s.runWatchdog(stop)
 
-	return Start(t, s.Handler())
+	return StartEnv(t, s.Handler())
 }
 
 func (s *State) runWatchdog(stop <-chan struct{}) {

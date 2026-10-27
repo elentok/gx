@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
@@ -13,10 +14,9 @@ import (
 
 func recommendAs(t *testing.T, h *servertest.Harness, investigator, address, verb string) server.QueueResult {
 	t.Helper()
-	t.Setenv(server.InvestigateEnv, investigator)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	res, err := h.Client.TicketRecommend(ctx, address, verb, "the branch is fine, the agent just crashed")
+	res, err := apiclient.New(server.SocketPath(h.StateDir)).AsInvestigator(investigator).TicketRecommend(ctx, address, verb, "the branch is fine, the agent just crashed")
 	if err != nil {
 		t.Fatal(err)
 	}
