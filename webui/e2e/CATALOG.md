@@ -12,7 +12,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59).
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flow 64).
 
 ## 1. Queue an epic
 
@@ -697,3 +697,16 @@ an exited session.
     `idle-epic` read "created ... ago".
   - `follow-ups` has no time and reads "demo · 1 bug, 1 idea".
   - The Finished one-offs read "... ago".
+
+## 64. Design ring
+
+- **Scenario:** `design` (`design-working` for the running check)
+- **Steps:**
+  1. At 390px and at 1440px, open `#/e/demo:design-epic` and read its ring label. Open `#/d/demo:design-epic`.
+  2. Click Start design session and wait for round one. Run `gx tickets set demo:design-epic --design-step done`.
+  3. On `design-working`, click Start design session.
+- **Pass:**
+  - The ring holds a Design badge (`role="img"` named "Design"). Its right edge is left of the `h1`, on the same row.
+  - The ring label equals the Epic page's. Before Start `data-tone` is `muted`.
+  - With round one up it is `waiting` and no comet shows. With the step at Done it is `done`.
+  - On `design-working` after Start it is `running` and the comet shows.
