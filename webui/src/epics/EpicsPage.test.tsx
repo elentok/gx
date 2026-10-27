@@ -352,3 +352,38 @@ test("a failed first fetch is retried when the connection comes back", async () 
   expect(await screen.findByRole("link", { name: "x" })).toBeTruthy();
   expect(calls).toBe(2);
 });
+
+const T0 = Date.parse("2026-01-01T10:00:00Z");
+const timed = () => listOf([row("busy", { section: "in-progress", time_kind: "elapsed", time_start: new Date(T0).toISOString() })]);
+const timeText = () => screen.getByTestId("time").textContent;
+const fakeClock = (at: number) => {
+  vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
+  vi.setSystemTime(at);
+};
+
+test("the page clock moves a card's label every 30 seconds", async () => {
+  fakeClock(T0 + 5 * 60_000);
+  await loaded(timed());
+  expect(timeText()).toBe("5m");
+  act(() => {
+    vi.setSystemTime(T0 + 35 * 60_000);
+    vi.advanceTimersByTime(30_000);
+  });
+  expect(timeText()).toBe("35m");
+});
+
+test("a repaint of the same payload at a later time shows the later label", async () => {
+  fakeClock(T0 + 5 * 60_000);
+  await loaded(timed());
+  expect(timeText()).toBe("5m");
+  cleanup();
+  vi.setSystemTime(T0 + 2 * 3_600_000);
+  await loaded(timed());
+  expect(timeText()).toBe("2h");
+});
+
+test("cards without a time start no clock", async () => {
+  fakeClock(T0);
+  await loaded(listOf([row("busy", { section: "in-progress" })]));
+  expect(vi.getTimerCount()).toBe(0);
+});

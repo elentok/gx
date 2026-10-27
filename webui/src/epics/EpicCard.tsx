@@ -24,6 +24,7 @@ import { useWrite } from "../useWrite";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 import { EpicActionButton } from "./EpicActionButton";
 import { titleHref } from "./cardLinks";
+import { timeLabel } from "./cardTime";
 import { mergeToast } from "./MergeButton";
 import { postEpicMerge, postEpicStashMerge, postQueueAdd, type PostEpicWrite } from "./queue";
 import { RING_KIND, isCreatingTickets, isLive, needsYouTone, ringProgress, ringTone } from "./ring";
@@ -123,7 +124,19 @@ function ActionButtons({
 }
 
 /** One /v1/epics card row. */
-export function EpicCard({ row, writes = {}, onChanged = () => {} }: { row: EpicListRow; writes?: CardWrites; onChanged?: () => void }) {
+export function EpicCard({
+  row,
+  now = Date.now(),
+  writes = {},
+  onChanged = () => {},
+}: {
+  row: EpicListRow;
+  /** The page clock, in epoch milliseconds. */
+  now?: number;
+  writes?: CardWrites;
+  onChanged?: () => void;
+}) {
+  const time = timeLabel(row.time_kind, row.time_start, now);
   const kind = RING_KIND[row.card_kind ?? CardKindImplementation];
   const needsYou = row.section === SectionNeedsYou;
   const seconds = useCountdown(row.countdown_ends_at);
@@ -165,6 +178,14 @@ export function EpicCard({ row, writes = {}, onChanged = () => {} }: { row: Epic
               {row.project}
             </Text>
             {" · "}
+            {time && (
+              <>
+                <Text as="span" data-testid="time" color="text.dim" whiteSpace="nowrap" title={new Date(row.time_start ?? "").toLocaleString()}>
+                  {time}
+                </Text>
+                {" · "}
+              </>
+            )}
             <Text as="span" data-testid="status" color={`kind.${kind}.fg`}>
               {row.status_words}
             </Text>

@@ -280,3 +280,39 @@ test("a countdown reason ticks from the deadline", () => {
   });
   expect(text(screen.getByTestId("reason"))).toContain("Next run starts in 9s");
 });
+
+describe("time label", () => {
+  const start = "2026-01-01T10:00:00Z";
+  const NOW = Date.parse(start) + 125 * 60_000;
+  const timed = (time_kind: string) => row({ time_kind, time_start: start });
+  const line = () => text(screen.getByTestId("status").parentElement as HTMLElement);
+
+  test.each([
+    ["elapsed", "2h 5m"],
+    ["waiting", "waiting 2h 5m"],
+    ["created", "created 2h 5m ago"],
+    ["finished", "2h 5m ago"],
+  ])("%s kind reads %s", (kind, words) => {
+    renderThemed(<EpicCard row={timed(kind)} now={NOW} />);
+    expect(text(screen.getByTestId("time"))).toBe(words);
+    expect(line()).toBe(`gx · ${words} · Implementing...`);
+  });
+
+  test("the span does not wrap and its title is the local start", () => {
+    renderThemed(<EpicCard row={timed("elapsed")} now={NOW} />);
+    const el = screen.getByTestId("time");
+    expect(getComputedStyle(el).whiteSpace).toBe("nowrap");
+    expect(el.getAttribute("title")).toBe(new Date(start).toLocaleString());
+  });
+
+  test("no time means no span and no extra dot", () => {
+    renderThemed(<EpicCard row={row()} now={NOW} />);
+    expect(screen.queryByTestId("time")).toBeNull();
+    expect(line()).toBe("gx · Implementing...");
+  });
+
+  test("a later now moves the label", () => {
+    renderThemed(<EpicCard row={timed("elapsed")} now={NOW + 60 * 60_000} />);
+    expect(text(screen.getByTestId("time"))).toBe("3h 5m");
+  });
+});

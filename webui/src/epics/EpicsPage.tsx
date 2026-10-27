@@ -1,5 +1,5 @@
 import { Box, chakra, Input, Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useConnectionContext } from "../connection";
 import type { OpenDesign } from "../design/open";
@@ -23,7 +23,33 @@ function readStoredProject(): string {
   }
 }
 
-function SectionBlock({ section, open, onToggle, onChanged }: { section: Section; open: boolean; onToggle: () => void; onChanged: () => void }) {
+const TICK_MS = 30_000;
+
+/** One page clock for every card's time label; it runs only while `active`. */
+function usePageClock(active: boolean): number {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), TICK_MS);
+    return () => clearInterval(id);
+  }, [active]);
+  return now;
+}
+
+function SectionBlock({
+  section,
+  now,
+  open,
+  onToggle,
+  onChanged,
+}: {
+  section: Section;
+  now: number;
+  open: boolean;
+  onToggle: () => void;
+  onChanged: () => void;
+}) {
   const id = `epics-${section.key}`;
   return (
     <Box role="region" aria-labelledby={id} mt="6">
@@ -51,7 +77,7 @@ function SectionBlock({ section, open, onToggle, onChanged }: { section: Section
       {open && (
         <Box display="grid" gap="20px" gridTemplateColumns="repeat(auto-fill, minmax(min(100%, 360px), 1fr))">
           {section.rows.map((r) => (
-            <EpicCard key={r.address} row={r} onChanged={onChanged} />
+            <EpicCard key={r.address} row={r} now={now} onChanged={onChanged} />
           ))}
         </Box>
       )}
@@ -67,6 +93,7 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [designing, setDesigning] = useState(false);
   const [storedProject, setStoredProject] = useState(readStoredProject);
+  const now = usePageClock((list?.epics ?? []).some((e) => e.time_kind && e.time_start));
   const searching = query.trim() !== "";
   const projects = [...new Set((list?.epics ?? []).map((e) => e.project))];
   // A stored project that is gone, or a single project, acts as "All projects" without rewriting it.
@@ -148,7 +175,7 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
       ) : shown.length === 0 ? (
         <EmptyState title="No match" />
       ) : (
-        shown.map((s) => <SectionBlock key={s.key} section={s} open={isOpen(s)} onToggle={() => toggle(s.key)} onChanged={retry} />)
+        shown.map((s) => <SectionBlock key={s.key} section={s} now={now} open={isOpen(s)} onToggle={() => toggle(s.key)} onChanged={retry} />)
       )}
       {designing && (
         <NewDesignForm

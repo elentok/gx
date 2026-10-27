@@ -374,7 +374,7 @@ tickets is resolved. _Avoid_: "design session" for the map epic itself (a design
 session working on it); draft for a Not started Design (a draft is work set aside deliberately).
 
 **Epic card** — one card of the Epics page, rendered from one `/v1/epics` row: a progress ring, the
-title (the only link), a "project · status" line, a state pill and reason when the card needs
+title (the only link), a "project · time · status" line, a state pill and reason when the card needs
 attention, and a footer of at most two buttons. It has one of four **card kinds**: **Design** (a map
 epic, or a joined Design and its `-impl` epic until Branch), **Implementation** (a loop epic, or a
 joined card from Branch on), **One-off** (one ticket of the `one-offs` epic) and **Follow-ups** (one
