@@ -133,7 +133,9 @@ export function DesignActionsMenu({
     color: "text",
     ps: "3",
     _highlighted: { bg: "surface" },
-    ...(sheetMode && { py: "3", fontSize: "md", minH: "44px" }),
+    fontWeight: "600",
+    fontSize: "17px",
+    ...(sheetMode && { py: "3", minH: "44px" }),
   } as const;
   return (
     <Menu.Root
@@ -180,9 +182,7 @@ export function DesignActionsMenu({
               alignItems="flex-start"
               {...item}
             >
-              <Text as="span" fontWeight={sheetMode ? "600" : undefined}>
-                New session
-              </Text>
+              <Text as="span">New session</Text>
               <Text fontSize="xs" color="text.muted">
                 {shown.status.state === "exited" ? "Start a fresh session" : "Stop this session and start a fresh one"}
               </Text>
@@ -194,16 +194,28 @@ export function DesignActionsMenu({
                 Live sessions · {live.length}
               </Text>
               {live.map((s) => (
-                <Box key={s.id} display="flex" alignItems="center" justifyContent="space-between" gap="2" pe="2">
+                <Box
+                  key={s.id}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  gap="2"
+                  pe="2"
+                  borderRadius="md"
+                  bg={s.id === shown.id ? "surface" : undefined}
+                >
                   <Menu.Item
                     value={`session-${s.id}`}
                     aria-current={s.id === shown.id}
                     onClick={() => onSelect(s.id)}
                     flex="1"
+                    minW="0"
                     justifyContent="space-between"
                     {...item}
                   >
-                    {s.name || s.id}
+                    <Text as="span" truncate>
+                      {s.name || s.id}
+                    </Text>
                     {s.id === shown.id && <Text as="span" aria-hidden color="tone.running.fg">✓</Text>}
                   </Menu.Item>
                   {s.id !== shown.id && (
@@ -213,7 +225,15 @@ export function DesignActionsMenu({
                       aria-label={`Stop ${s.name || s.id}`}
                       disabled={pending}
                       onClick={() => run(() => stop({ id: s.id, state: stateToken(s) }))}
-                      {...item}
+                      cursor="pointer"
+                      flexShrink="0"
+                      minH="32px"
+                      px="2.5"
+                      borderWidth="1px"
+                      borderColor="tone.deadlocked.fg"
+                      borderRadius="md"
+                      fontSize="sm"
+                      fontWeight="600"
                       color="tone.deadlocked.fg"
                     >
                       {pending && <Spinner size="sm" />}
