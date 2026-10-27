@@ -21,8 +21,10 @@ type PaneReader func(pane string) (string, error)
 // ReadPaneRecent reads a pane's recent unwrapped output (matching
 // claude-box's own rate-limit detection source) so long lines aren't split
 // mid-word by terminal wrapping before the regex sees them.
-func ReadPaneRecent(pane string) (string, error) {
-	return herdr.AgentRead(pane, herdr.AgentReadOptions{Source: "recent-unwrapped"})
+func ReadPaneRecent(cli herdr.CLI) PaneReader {
+	return func(pane string) (string, error) {
+		return cli.AgentRead(pane, herdr.AgentReadOptions{Source: "recent-unwrapped"})
+	}
 }
 
 var (

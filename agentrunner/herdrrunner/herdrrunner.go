@@ -29,6 +29,8 @@ const pollInterval = 20 * time.Millisecond
 const backgroundTaskPollInterval = 2 * time.Second
 
 type Runner struct {
+	// CLI runs herdr. The zero CLI uses the process environment.
+	CLI herdr.CLI
 	// BackgroundTasks reports whether the agent behind s still has a
 	// background task running. herdr shows such an agent idle, but the task
 	// will wake it, so the runner reports it working. Nil means no gating.
@@ -72,29 +74,29 @@ func (r *Runner) WaitN() time.Duration {
 	return r.N
 }
 
-func (r *Runner) Healthy() error { return herdr.Ping() }
+func (r *Runner) Healthy() error { return r.CLI.Ping() }
 
 func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
-	wsID, err := herdr.EnsureWorkspace(opts.Epic, opts.Cwd)
+	wsID, err := r.CLI.EnsureWorkspace(opts.Epic, opts.Cwd)
 	if err != nil {
 		return agentrunner.Session{}, err
 	}
-	tab, err := herdr.TabCreate(herdr.TabCreateOptions{WorkspaceID: wsID, Cwd: opts.Cwd, Label: opts.Label, Env: opts.Env})
+	tab, err := r.CLI.TabCreate(herdr.TabCreateOptions{WorkspaceID: wsID, Cwd: opts.Cwd, Label: opts.Label, Env: opts.Env})
 	if err != nil {
 		return agentrunner.Session{}, err
 	}
-	agent, err := herdr.AgentStart(herdr.AgentStartOptions{Name: opts.Label, Kind: string(opts.Kind), Pane: tab.RootPaneID, AgentArgs: opts.Args})
+	agent, err := r.CLI.AgentStart(herdr.AgentStartOptions{Name: opts.Label, Kind: string(opts.Kind), Pane: tab.RootPaneID, AgentArgs: opts.Args})
 	adopted := false
 	if err != nil {
-		recovery, err := RecoverStart(err, opts.Label, opts.Cwd, tab.RootPaneID, !opts.NoAdopt, herdr.AgentExplain, herdr.AgentSendKeys)
+		recovery, err := RecoverStart(err, opts.Label, opts.Cwd, tab.RootPaneID, !opts.NoAdopt, r.CLI.AgentExplain, r.CLI.AgentSendKeys)
 		if recovery != StartResume {
-			_ = herdr.TabClose(tab.TabID)
+			_ = r.CLI.TabClose(tab.TabID)
 		}
 		switch {
 		case err != nil:
 			return agentrunner.Session{}, err
 		case recovery == StartAdopt:
-			if agent, err = herdr.AgentGet(opts.Label); err != nil {
+			if agent, err = r.CLI.AgentGet(opts.Label); err != nil {
 				return agentrunner.Session{}, err
 			}
 			adopted = true
@@ -157,7 +159,7 @@ func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(s
 	if err != nil {
 		return err
 	}
-	prompt := promptWithNudge(typing, submitSince(s, turn), herdr.AgentSendKeys, herdr.AgentWait, herdr.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
+	prompt := promptWithNudge(typing, r.submitSince(s, turn), r.CLI.AgentSendKeys, r.CLI.AgentWait, r.CLI.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
 	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: until})
 	var blocked *herdr.AgentBlockedError
 	switch {
@@ -184,11 +186,11 @@ var errTurnPassedUnseen = errors.New("turn started and ended between polls")
 // submitSince sends a prompt against turn. A turn can start and end between
 // herdr's polls, so its wait reports a stall though the seq moved: that turn
 // was delivered, and a nudge or retype would send the text twice.
-func submitSince(s agentrunner.Session, turn int) func(herdr.AgentPromptOptions) (herdr.Agent, error) {
+func (r *Runner) submitSince(s agentrunner.Session, turn int) func(herdr.AgentPromptOptions) (herdr.Agent, error) {
 	return func(o herdr.AgentPromptOptions) (herdr.Agent, error) {
-		agent, err := herdr.AgentPrompt(o)
+		agent, err := r.CLI.AgentPrompt(o)
 		if IsPollTimeout(err) {
-			if cur, getErr := herdr.AgentGet(s.ID); getErr == nil && cur.StateChangeSeq > turn {
+			if cur, getErr := r.CLI.AgentGet(s.ID); getErr == nil && cur.StateChangeSeq > turn {
 				return cur, errTurnPassedUnseen
 			}
 		}
@@ -233,7 +235,7 @@ func (r *Runner) awaitNotBusy(s agentrunner.Session) (int, error) {
 // the seq moved (a turn, a new conversation, a dialog) or herdr still shows
 // the agent idle after N.
 func (r *Runner) promptSlash(s agentrunner.Session, text string, turn int) error {
-	if _, err := herdr.AgentPrompt(herdr.AgentPromptOptions{Target: s.ID, Text: text}); err != nil {
+	if _, err := r.CLI.AgentPrompt(herdr.AgentPromptOptions{Target: s.ID, Text: text}); err != nil {
 		return mapNotFound(err)
 	}
 	now, sleep := r.clock()
@@ -289,7 +291,7 @@ func (r *Runner) confirmCompact(s agentrunner.Session, state string) error {
 	}
 	deadline := time.Now().Add(compactSubmitTimeout)
 	for {
-		text, err := ReadPaneRecent(s.ID)
+		text, err := ReadPaneRecent(r.CLI)(s.ID)
 		if err != nil {
 			return mapNotFound(err)
 		}
@@ -317,7 +319,7 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 	deadline := now().Add(timeout)
 	for {
 		remaining := deadline.Sub(now())
-		_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: s.ID, Until: until, TimeoutMs: max(1, int(remaining.Milliseconds()))})
+		_, err := r.CLI.AgentWait(herdr.AgentWaitOptions{Target: s.ID, Until: until, TimeoutMs: max(1, int(remaining.Milliseconds()))})
 		if err != nil && !IsPollTimeout(err) {
 			return agentrunner.Status{}, mapNotFound(err)
 		}
@@ -352,7 +354,7 @@ func (r *Runner) Interrupt(s agentrunner.Session) error {
 	if err := r.guard(s); err != nil {
 		return err
 	}
-	agent, err := herdr.AgentGet(s.ID)
+	agent, err := r.CLI.AgentGet(s.ID)
 	if err != nil {
 		return mapNotFound(err)
 	}
@@ -365,7 +367,7 @@ func (r *Runner) Interrupt(s agentrunner.Session) error {
 	default:
 		return nil
 	}
-	if err := herdr.AgentSendKeys(s.ID, key); err != nil {
+	if err := r.CLI.AgentSendKeys(s.ID, key); err != nil {
 		return mapNotFound(err)
 	}
 	if err := r.awaitIdle(s); err != nil {
@@ -378,7 +380,7 @@ func (r *Runner) Interrupt(s agentrunner.Session) error {
 	if kind == "codex" {
 		clear = "ctrl+u"
 	}
-	return mapNotFound(herdr.AgentSendKeys(s.ID, clear))
+	return mapNotFound(r.CLI.AgentSendKeys(s.ID, clear))
 }
 
 // awaitIdle waits up to N for herdr to show the agent idle or done.
@@ -387,7 +389,7 @@ func (r *Runner) awaitIdle(s agentrunner.Session) error {
 	deadline := now().Add(r.WaitN())
 	for {
 		remaining := deadline.Sub(now())
-		_, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: s.ID, Until: []string{"idle", "done"}, TimeoutMs: max(1, int(remaining.Milliseconds()))})
+		_, err := r.CLI.AgentWait(herdr.AgentWaitOptions{Target: s.ID, Until: []string{"idle", "done"}, TimeoutMs: max(1, int(remaining.Milliseconds()))})
 		if err == nil {
 			return nil
 		}
@@ -402,14 +404,14 @@ func (r *Runner) awaitIdle(s agentrunner.Session) error {
 }
 
 func (r *Runner) Stop(s agentrunner.Session) error {
-	agent, err := herdr.AgentGet(s.ID)
+	agent, err := r.CLI.AgentGet(s.ID)
 	if isNotFound(err) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if err := herdr.TabClose(agent.TabID); err != nil {
+	if err := r.CLI.TabClose(agent.TabID); err != nil {
 		return err
 	}
 	r.mu.Lock()
@@ -421,7 +423,7 @@ func (r *Runner) Stop(s agentrunner.Session) error {
 // Find looks the agent up by name, since only agents (not tabs) are named
 // after the session label for every launch path.
 func (r *Runner) Find(label string) (agentrunner.Session, bool, error) {
-	agent, err := herdr.AgentGet(label)
+	agent, err := r.CLI.AgentGet(label)
 	if isNotFound(err) {
 		return agentrunner.Session{}, false, nil
 	}
@@ -434,11 +436,11 @@ func (r *Runner) Find(label string) (agentrunner.Session, bool, error) {
 // List returns the epic workspace's named agents. Tab labels are not agent
 // names: ralph-loop's server launch labels a tab after its ticket.
 func (r *Runner) List(epic string) ([]agentrunner.Session, error) {
-	wsID, err := herdr.FindWorkspace(epic)
+	wsID, err := r.CLI.FindWorkspace(epic)
 	if err != nil || wsID == "" {
 		return nil, err
 	}
-	agents, err := herdr.AgentList()
+	agents, err := r.CLI.AgentList()
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +464,7 @@ func (r *Runner) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 	if opts.Kind == "codex" {
 		return r.codexRateLimit(s, opts.Cwd, now)
 	}
-	text, err := ReadPaneRecent(s.ID)
+	text, err := ReadPaneRecent(r.CLI)(s.ID)
 	if err != nil {
 		return time.Time{}, false, mapNotFound(err)
 	}
@@ -479,11 +481,11 @@ func (r *Runner) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 func (r *Runner) codexRateLimit(s agentrunner.Session, cwd string, now time.Time) (time.Time, bool, error) {
 	// s may predate herdr learning the agent's session id.
 	if s.SessionID == "" {
-		if agent, err := herdr.AgentGet(s.ID); err == nil {
+		if agent, err := r.CLI.AgentGet(s.ID); err == nil {
 			s.SessionID = agent.AgentSession
 		}
 	}
-	limit, exhausted, evidence, err := CodexQuotaOrContextExhaustion(r.CodexQuota, ReadPaneRecent, now, cwd, s.SessionID, s.ID)
+	limit, exhausted, evidence, err := CodexQuotaOrContextExhaustion(r.CodexQuota, ReadPaneRecent(r.CLI), now, cwd, s.SessionID, s.ID)
 	switch {
 	case err != nil:
 		return time.Time{}, false, mapNotFound(err)
@@ -511,7 +513,7 @@ func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	if a.Decision == agentrunner.DecisionDeny {
 		key = "esc"
 	}
-	return mapNotFound(herdr.AgentSendKeys(s.ID, key))
+	return mapNotFound(r.CLI.AgentSendKeys(s.ID, key))
 }
 
 func (r *Runner) requireBlocked(s agentrunner.Session) error {
@@ -539,7 +541,7 @@ func (r *Runner) denyWithReason(s agentrunner.Session, reason string) error {
 	if err := r.requireBlocked(s); err != nil {
 		return err
 	}
-	if err := herdr.AgentSendKeys(s.ID, "esc"); err != nil {
+	if err := r.CLI.AgentSendKeys(s.ID, "esc"); err != nil {
 		return mapNotFound(err)
 	}
 	err := r.awaitIdle(s)
@@ -618,7 +620,7 @@ func (r *Runner) status(s agentrunner.Session) (agentrunner.Status, error) {
 // herdrStatus is herdr's own view of the agent, before any background-task
 // override. A state herdr reports that gx doesn't know counts as working.
 func (r *Runner) herdrStatus(s agentrunner.Session) (agentrunner.Status, error) {
-	agent, err := herdr.AgentGet(s.ID)
+	agent, err := r.CLI.AgentGet(s.ID)
 	if err != nil {
 		return agentrunner.Status{}, mapNotFound(err)
 	}
@@ -629,7 +631,7 @@ func (r *Runner) herdrStatus(s agentrunner.Session) (agentrunner.Status, error) 
 		st.State = agentrunner.StateWorking
 	}
 	if st.State == agentrunner.StateBlocked {
-		st.BlockedReason = MatchedRuleID(herdr.AgentExplain, s.ID)
+		st.BlockedReason = MatchedRuleID(r.CLI.AgentExplain, s.ID)
 	}
 	return st, nil
 }
