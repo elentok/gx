@@ -7,6 +7,7 @@ describe("epicBadge", () => {
     expect(epicBadge("running")).toBe("Running");
     expect(epicBadge("waiting")).toBe("Waiting for a slot");
     expect(epicBadge("awaiting-merge")).toBe("Awaiting merge");
+    expect(epicBadge("finished")).toBe("Merged");
   });
 
   it("labels Waiting by queue mode and leaves Running unchanged", () => {

@@ -39,6 +39,7 @@ func TestEpicStatusLine_UsesStateLabels(t *testing.T) {
 		{server.EpicStateWaiting, icons.EpicQueued, "Waiting for a slot"},
 		{server.EpicStatePaused, icons.Warning, "Paused"},
 		{server.EpicStateMerging, "S", "Merging"},
+		{server.EpicStateFinished, icons.TicketDone, "Merged"},
 	}
 	for _, tt := range tests {
 		icon, text, _ := epicStatusLine(icons, server.EpicSummary{State: tt.state}, "S")

@@ -53,7 +53,7 @@ var epicStateLabels = map[server.EpicState]string{
 	server.EpicStateWaiting:       "Waiting for a slot",
 	server.EpicStateAwaitingMerge: "Awaiting merge",
 	server.EpicStateMerging:       "Merging",
-	server.EpicStateFinished:      "Finished",
+	server.EpicStateFinished:      "Merged",
 }
 
 // epicStatusLine picks an epic header's status-line icon, text, and color from
