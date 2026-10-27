@@ -129,6 +129,9 @@ to every page:
   (`webui/src/pageCache.ts`).
 - A page without data yet shows the centered `Spinner`, never skeleton placeholders.
 
+Testing a click on a Chakra menu item needs `waitFor`. See "Testing a Chakra menu" in
+`webui/README.md`.
+
 Web checks:
 
 - Type-check with `gx brief tsc`, not a hand-built `pnpm exec tsc ... | tail`.

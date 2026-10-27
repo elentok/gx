@@ -27,3 +27,14 @@ until the fetch lands.
 4. `src/test-setup.ts` clears `sessionStorage` after each test.
 5. While a page has no data yet, show `Spinner` from `src/ui/spinner/Spinner.tsx` with a label such
    as "Loading epics". It centers itself both ways. Do not draw skeleton placeholders.
+
+## Testing a Chakra menu
+
+Chakra v3 menus run on zag-js. Don't read zag sources in `node_modules`; the recipe is short.
+
+- Open the menu with `fireEvent.click` on its trigger, then `await findByRole("menuitem...")`.
+- A menu item's click handler runs on a later tick. Assert the callback inside `waitFor`, never
+  right after `fireEvent.click`. A direct `expect(spy).toHaveBeenCalled()` fails with 0 calls.
+- `src/test-setup.ts` already stubs `ResizeObserver` (jsdom has none; the popper needs it). Don't
+  add another stub.
+- Example: `src/ui/top-bar/TopBar.test.tsx` (the AFK menu item).
