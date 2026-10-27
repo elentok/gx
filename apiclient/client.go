@@ -684,6 +684,14 @@ func (c *Client) DiskStatus(ctx context.Context) (server.DiskReport, error) {
 	return rep, err
 }
 
+// SaveChecks saves one project's check config to the repo or project.json. A
+// refusal is a result (Refused set), not an error.
+func (c *Client) SaveChecks(ctx context.Context, req server.SaveChecksRequest) (server.SaveChecksResult, error) {
+	var res server.SaveChecksResult
+	err := c.post(ctx, "/v1/checks/save", req, &res)
+	return res, err
+}
+
 // ChecksStatus is each project's check config and detected commands. An empty
 // project means every registered project.
 func (c *Client) ChecksStatus(ctx context.Context, project string) (server.ChecksStatus, error) {

@@ -10,6 +10,27 @@ import (
 	"github.com/elentok/gx/server/servertest"
 )
 
+func TestServerChecksSave_JSONPrintsTheRouteResult(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	h := servertest.StartWithStore(t, t.TempDir())
+	if err := servertest.WriteEpic(h.TicketStore, "demo", ""); err != nil {
+		t.Fatal(err)
+	}
+	var out bytes.Buffer
+	req := server.SaveChecksRequest{Project: "demo", Target: server.SaveTargetProjectJSON, Checks: json.RawMessage(`{"test":false}`)}
+	if err := runServerChecksSave(context.Background(), h.Client, &out, req, true); err != nil {
+		t.Fatal(err)
+	}
+	var got server.SaveChecksResult
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Refused || got.Path == "" || got.Target != server.SaveTargetProjectJSON {
+		t.Errorf("--json = %s", out.String())
+	}
+}
+
 func TestServerChecks_JSONMatchesTheRoute(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("XDG_STATE_HOME", t.TempDir())

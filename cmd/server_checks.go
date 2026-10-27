@@ -2,13 +2,66 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/server"
 	"github.com/spf13/cobra"
 )
+
+func newServerChecksSaveCmd() *cobra.Command {
+	var jsonOut bool
+	var req server.SaveChecksRequest
+	var checks string
+	c := &cobra.Command{
+		Use:   "checks-save",
+		Short: "Save a project's check config to the repo or to project.json",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			cl, err := serverClient()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			req.Checks = json.RawMessage(checks)
+			return runServerChecksSave(ctx, cl, c.OutOrStdout(), req, jsonOut)
+		},
+	}
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
+	c.Flags().StringVar(&req.Project, "project", "", "project to save for")
+	c.Flags().StringVar(&req.Target, "target", server.SaveTargetRepo, "repo or project.json")
+	c.Flags().StringVar(&checks, "checks", "", "the check config, as the JSON .gx/checks.json holds")
+	_ = c.MarkFlagRequired("project")
+	_ = c.MarkFlagRequired("checks")
+	return c
+}
+
+func runServerChecksSave(ctx context.Context, cl *apiclient.Client, w io.Writer, req server.SaveChecksRequest, jsonOut bool) error {
+	res, err := cl.SaveChecks(ctx, req)
+	if err != nil {
+		return fmt.Errorf("server save failed: %w", err)
+	}
+	if jsonOut {
+		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+	}
+	switch {
+	case res.Refused:
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	case res.Commit != "":
+		fmt.Fprintf(w, "saved to %s: commit %s on %s\n", res.Target, res.Commit, res.Trunk)
+	case res.Path != "":
+		fmt.Fprintf(w, "saved to %s\n", res.Path)
+	default:
+		fmt.Fprintf(w, "%s already holds this config\n", res.Target)
+	}
+	return nil
+}
 
 func newServerChecksCmd() *cobra.Command {
 	var jsonOut bool
