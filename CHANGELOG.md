@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.40.0 - 2026-10-27
+
+- Added time labels to Epics page cards, on the line under the title: `gx · 2h 5m · Implementing...`. Needs you reads `waiting 7m`, In progress counts from the first claim, enqueue or first design session, Ready to queue and Ready to design read `created 3d ago`, and Finished reads `5h ago`. Labels tick while the page is open. Queue items now record their enqueue time, shown in `gx server queue items --json`, and a map stamps `design_started_at` on its first design session.
+- Added an Auto menu to the Design page footer, with Auto-advance and Auto-queue switches. Auto-queue stays disabled until the server supports it.
+- Added skill bundle install to `gx server start` and restart. It keeps the mode used last: a dev install re-links from its checkout, else gx installs managed copies. It never fails the start. A problem prints a warning and shows a toast in the web UI that stays until closed.
+- Added a confirm popover before Interrupt on the Design page, so a stray click can't end the agent's turn.
+- Changed the Design page layout. A question round opens in a Questions view that fills the column, with a "Questions (n of m) | Chat" toggle. This replaces focus mode. A progress ring sits left of the Design name. On a phone the current step shows under the name and opens a steps sheet. New session, the live-session list and Delete design moved into a "⋯" menu, which is a bottom sheet on a phone. Note boxes are 5 lines, scroll into view and open in a large editor. Moving to another question starts at its title. Chat and question text grew from 14px to 16px.
+- Changed the web UI to use one shared Modal for every dialog. It closes only on a backdrop press, not when a drag ends on the backdrop.
+- Changed the back links on the Design and Epic pages. The Needs-you count moved onto the Epics tab, and the Ticket page has an "Epic: <name>" button.
+- Changed the Epic page: ticket IDs get a wider column, siblings sort by number, the done count is a badge and Show more is a quiet button. Ticket card titles wrap instead of being cut off.
+- Changed the Epics page to hide empty sections.
+- Changed the top bar to show the connection dot only while offline. The AFK menu item is easier to read and shows a switch.
+- Changed the Stats page to split "Epics merged" into Epics merged and Designs completed. A map epic used to count each feature twice.
+- Changed design sessions to launch and resume with AskUserQuestion banned, as loop agents do. A `--disallowedTools` in `agents.claude-args` now merges into gx's own ban instead of replacing it.
+- Changed `gx-design` and `gx-triage-follow-ups` to prefer the correct fix over a quick one.
+- Changed markdown in the web UI to style fenced code blocks.
+- Fixed a Design Send whose Enter Claude swallowed, which left answers unsent in the input. Send now nudges until the turn starts, and raises an Actionable with the text if it gives up.
+- Fixed the closed phone "⋯" menu backdrop blocking every click.
+
 ## v0.39.0 - 2026-10-27
 
 - Added Design worktrees. Every Design now runs in its own `<map>-design` branch and worktree, and the server rebases that branch onto trunk at each session open. `gx agent link` prints the rebase note. Step 8 merges the design branch into `<map>-impl`. gx then removes the design worktree and branch, and deleting a map removes them too. `gx-design` refuses to work in the trunk checkout. Also added `gx designs worktree <project:epic>` and `POST /v1/designs/worktree`.
