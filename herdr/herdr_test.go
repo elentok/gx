@@ -8,11 +8,14 @@ import (
 	"testing"
 )
 
+func run(args ...string) ([]byte, error)      { return CLI{}.run(args...) }
+func runJSON(args []string, result any) error { return CLI{}.runJSON(args, result) }
+
 // withFakeCommand swaps runCommand for fn for the duration of the test.
 func withFakeCommand(t *testing.T, fn func(args ...string) ([]byte, error)) {
 	t.Helper()
 	prev := runCommand
-	runCommand = fn
+	runCommand = func(_ CLI, args ...string) ([]byte, error) { return fn(args...) }
 	t.Cleanup(func() { runCommand = prev })
 }
 
@@ -240,7 +243,7 @@ func TestBinary_FallsBackToHerdrBinPath(t *testing.T) {
 	t.Setenv("PATH", t.TempDir()) // no herdr here, as under launchd
 	t.Setenv("HERDR_BIN_PATH", bin)
 
-	if got := binary(); got != bin {
+	if got := (CLI{}).binary(); got != bin {
 		t.Errorf("binary() = %q, want %q", got, bin)
 	}
 }
@@ -257,7 +260,7 @@ func TestBinary_FallsBackToInstallDirs(t *testing.T) {
 	fallbackDirs = []string{dir}
 	t.Cleanup(func() { fallbackDirs = old })
 
-	if got := binary(); got != bin {
+	if got := (CLI{}).binary(); got != bin {
 		t.Errorf("binary() = %q, want %q", got, bin)
 	}
 }

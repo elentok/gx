@@ -59,7 +59,7 @@ type WorktreeCreateOptions struct {
 
 // WorktreeCreate creates and opens a new git worktree via `herdr worktree
 // create`.
-func WorktreeCreate(opts WorktreeCreateOptions) (Worktree, error) {
+func (c CLI) WorktreeCreate(opts WorktreeCreateOptions) (Worktree, error) {
 	args := []string{"worktree", "create"}
 	if opts.WorkspaceID != "" {
 		args = appendFlag(args, "--workspace", opts.WorkspaceID)
@@ -75,7 +75,7 @@ func WorktreeCreate(opts WorktreeCreateOptions) (Worktree, error) {
 	}
 
 	var result worktreeResultJSON
-	if err := runJSON(args, &result); err != nil {
+	if err := c.runJSON(args, &result); err != nil {
 		return Worktree{}, err
 	}
 	return result.toWorktree(), nil
@@ -92,7 +92,7 @@ type WorktreeOpenOptions struct {
 }
 
 // WorktreeOpen opens an existing git worktree via `herdr worktree open`.
-func WorktreeOpen(opts WorktreeOpenOptions) (Worktree, error) {
+func (c CLI) WorktreeOpen(opts WorktreeOpenOptions) (Worktree, error) {
 	args := []string{"worktree", "open"}
 	if opts.WorkspaceID != "" {
 		args = appendFlag(args, "--workspace", opts.WorkspaceID)
@@ -107,7 +107,7 @@ func WorktreeOpen(opts WorktreeOpenOptions) (Worktree, error) {
 	}
 
 	var result worktreeResultJSON
-	if err := runJSON(args, &result); err != nil {
+	if err := c.runJSON(args, &result); err != nil {
 		return Worktree{}, err
 	}
 	return result.toWorktree(), nil
@@ -115,11 +115,11 @@ func WorktreeOpen(opts WorktreeOpenOptions) (Worktree, error) {
 
 // WorktreeRemove removes the worktree checkout backing workspaceID via
 // `herdr worktree remove`.
-func WorktreeRemove(workspaceID string, force bool) error {
+func (c CLI) WorktreeRemove(workspaceID string, force bool) error {
 	args := []string{"worktree", "remove", "--workspace", workspaceID}
 	if force {
 		args = append(args, "--force")
 	}
-	_, err := run(args...)
+	_, err := c.run(args...)
 	return err
 }

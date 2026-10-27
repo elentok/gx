@@ -104,11 +104,27 @@ func (c *Coordinator) elapseTimedOutWaits(h Handler) Handler {
 // trackAgents), so a handler only has to model the states it cares about.
 func Start(t *testing.T, handler Handler) *Coordinator {
 	t.Helper()
+	c, env := StartEnv(t, handler)
+	for _, kv := range env {
+		k, v, _ := strings.Cut(kv, "=")
+		t.Setenv(k, v)
+	}
+	return c
+}
 
+// StartEnv serves the same fake as Start but leaves the process environment
+// alone. It returns the KEY=VALUE entries a child needs to reach the fake:
+// the fake herdr dir first in PATH, the helper socket and the GORACE tweak.
+// Layer them over a base environment (later entries win) and hand the result
+// to the code under test, so tests using it may run in parallel.
+func StartEnv(t *testing.T, handler Handler) (*Coordinator, []string) {
+	t.Helper()
+
+	var env []string
 	// The runners under test read claude's vim mode from its config; the host's
 	// own config must not decide whether a test types or presses `i`.
 	if os.Getenv("CLAUDE_CONFIG_DIR") == "" {
-		t.Setenv("CLAUDE_CONFIG_DIR", t.TempDir())
+		env = append(env, "CLAUDE_CONFIG_DIR="+t.TempDir())
 	}
 
 	sockDir, err := os.MkdirTemp("", "hf")
@@ -137,13 +153,15 @@ func Start(t *testing.T, handler Handler) *Coordinator {
 		t.Fatalf("herdrfake: symlink fake herdr executable: %v", err)
 	}
 
-	t.Setenv(helperSocketEnv, sockPath)
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	// Under -race, each helper would otherwise sleep on exit waiting for
-	// races to report, which made every fake herdr call slow.
-	t.Setenv("GORACE", strings.TrimSpace(os.Getenv("GORACE")+" atexit_sleep_ms=0"))
+	env = append(env,
+		helperSocketEnv+"="+sockPath,
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		// Under -race, each helper would otherwise sleep on exit waiting for
+		// races to report, which made every fake herdr call slow.
+		"GORACE="+strings.TrimSpace(os.Getenv("GORACE")+" atexit_sleep_ms=0"),
+	)
 
-	return c
+	return c, env
 }
 
 // serve accepts one connection per helper invocation until the listener

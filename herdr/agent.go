@@ -35,7 +35,7 @@ type AgentPromptOptions struct {
 // AgentPrompt submits a prompt to an agent via `herdr agent prompt`,
 // optionally waiting (combining the submit and wait into one call) for the
 // agent to settle into one of the requested states.
-func AgentPrompt(opts AgentPromptOptions) (Agent, error) {
+func (c CLI) AgentPrompt(opts AgentPromptOptions) (Agent, error) {
 	args := []string{"agent", "prompt", opts.Target, opts.Text}
 	if opts.Wait {
 		args = append(args, "--wait")
@@ -47,7 +47,7 @@ func AgentPrompt(opts AgentPromptOptions) (Agent, error) {
 		args = append(args, "--timeout", strconv.Itoa(opts.TimeoutMs))
 	}
 
-	return runAgentJSON(args)
+	return c.runAgentJSON(args)
 }
 
 // AgentStartOptions are the arguments/flags for AgentStart.
@@ -64,7 +64,7 @@ type AgentStartOptions struct {
 // AgentStart starts a supported interactive agent (e.g. claude) in an
 // existing pane via `herdr agent start`. The pane must already be at an
 // interactive shell prompt.
-func AgentStart(opts AgentStartOptions) (Agent, error) {
+func (c CLI) AgentStart(opts AgentStartOptions) (Agent, error) {
 	args := []string{"agent", "start", opts.Name, "--kind", opts.Kind, "--pane", opts.Pane}
 	if opts.TimeoutMs > 0 {
 		args = append(args, "--timeout", strconv.Itoa(opts.TimeoutMs))
@@ -74,7 +74,7 @@ func AgentStart(opts AgentStartOptions) (Agent, error) {
 		args = append(args, opts.AgentArgs...)
 	}
 
-	return runAgentJSON(args)
+	return c.runAgentJSON(args)
 }
 
 // AgentWaitOptions are the arguments/flags for AgentWait.
@@ -86,15 +86,15 @@ type AgentWaitOptions struct {
 
 // AgentGet returns the current state of an existing agent without waiting for
 // a transition or submitting another prompt.
-func AgentGet(target string) (Agent, error) {
-	return runAgentJSON([]string{"agent", "get", target})
+func (c CLI) AgentGet(target string) (Agent, error) {
+	return c.runAgentJSON([]string{"agent", "get", target})
 }
 
 // AgentWait blocks until target reaches one of the requested states (or any
 // of idle/done/blocked if Until is empty) via `herdr agent wait`, without
 // submitting a prompt. Used to wait out an already-working agent's turn,
 // e.g. after AgentPrompt's own --wait only confirmed the turn started.
-func AgentWait(opts AgentWaitOptions) (Agent, error) {
+func (c CLI) AgentWait(opts AgentWaitOptions) (Agent, error) {
 	args := []string{"agent", "wait", opts.Target}
 	for _, until := range opts.Until {
 		args = append(args, "--until", until)
@@ -103,15 +103,15 @@ func AgentWait(opts AgentWaitOptions) (Agent, error) {
 		args = append(args, "--timeout", strconv.Itoa(opts.TimeoutMs))
 	}
 
-	return runAgentJSON(args)
+	return c.runAgentJSON(args)
 }
 
 // AgentList returns every agent herdr knows, across all workspaces.
-func AgentList() ([]Agent, error) {
+func (c CLI) AgentList() ([]Agent, error) {
 	var result struct {
 		Agents []agentInfo `json:"agents"`
 	}
-	if err := runJSON([]string{"agent", "list"}, &result); err != nil {
+	if err := c.runJSON([]string{"agent", "list"}, &result); err != nil {
 		return nil, err
 	}
 	agents := make([]Agent, len(result.Agents))
@@ -152,11 +152,11 @@ func (info agentInfo) agent() Agent {
 // runAgentJSON runs a herdr command whose JSON result has a top-level
 // `agent` field of the AgentInfo shape (agent prompt/start/wait all do), and
 // parses it into an Agent.
-func runAgentJSON(args []string) (Agent, error) {
+func (c CLI) runAgentJSON(args []string) (Agent, error) {
 	var result struct {
 		Agent agentInfo `json:"agent"`
 	}
-	if err := runJSON(args, &result); err != nil {
+	if err := c.runJSON(args, &result); err != nil {
 		return Agent{}, err
 	}
 	return result.Agent.agent(), nil
@@ -175,8 +175,8 @@ type AgentExplainResult struct {
 // subcommands, explain's JSON is the bare diagnostic object rather than the
 // {"result": ...} envelope runJSON expects, so it parses the response
 // directly instead of going through runJSON.
-func AgentExplain(target string) (AgentExplainResult, error) {
-	out, err := run("agent", "explain", target, "--format", "json")
+func (c CLI) AgentExplain(target string) (AgentExplainResult, error) {
+	out, err := c.run("agent", "explain", target, "--format", "json")
 	if err != nil {
 		return AgentExplainResult{}, err
 	}
@@ -197,9 +197,9 @@ func AgentExplain(target string) (AgentExplainResult, error) {
 }
 
 // AgentSendKeys sends key presses to an agent via `herdr agent send-keys`.
-func AgentSendKeys(target string, keys ...string) error {
+func (c CLI) AgentSendKeys(target string, keys ...string) error {
 	args := append([]string{"agent", "send-keys", target}, keys...)
-	_, err := run(args...)
+	_, err := c.run(args...)
 	return err
 }
 
@@ -213,7 +213,7 @@ type AgentReadOptions struct {
 // AgentRead reads an agent pane's terminal output via `herdr agent read`.
 // Unlike the other herdr commands, this returns the raw terminal text
 // directly rather than a JSON envelope.
-func AgentRead(target string, opts AgentReadOptions) (string, error) {
+func (c CLI) AgentRead(target string, opts AgentReadOptions) (string, error) {
 	args := []string{"agent", "read", target}
 	args = appendFlag(args, "--source", opts.Source)
 	if opts.Lines > 0 {
@@ -221,7 +221,7 @@ func AgentRead(target string, opts AgentReadOptions) (string, error) {
 	}
 	args = appendFlag(args, "--format", opts.Format)
 
-	out, err := run(args...)
+	out, err := c.run(args...)
 	if err != nil {
 		return "", err
 	}

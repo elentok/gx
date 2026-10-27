@@ -2,14 +2,14 @@ package herdr
 
 // FindWorkspace returns the workspace_id of the herdr workspace labeled
 // label, or "" if none exists.
-func FindWorkspace(label string) (string, error) {
+func (c CLI) FindWorkspace(label string) (string, error) {
 	var result struct {
 		Workspaces []struct {
 			WorkspaceID string `json:"workspace_id"`
 			Label       string `json:"label"`
 		} `json:"workspaces"`
 	}
-	if err := runJSON([]string{"workspace", "list"}, &result); err != nil {
+	if err := c.runJSON([]string{"workspace", "list"}, &result); err != nil {
 		return "", err
 	}
 	for _, ws := range result.Workspaces {
@@ -23,13 +23,13 @@ func FindWorkspace(label string) (string, error) {
 // FindOrCreateWorkspace focuses the herdr workspace labeled label, creating
 // one rooted at cwd (and focusing it) if none exists yet. Returns the
 // workspace's id either way.
-func FindOrCreateWorkspace(label, cwd string) (string, error) {
-	id, err := FindWorkspace(label)
+func (c CLI) FindOrCreateWorkspace(label, cwd string) (string, error) {
+	id, err := c.FindWorkspace(label)
 	if err != nil {
 		return "", err
 	}
 	if id != "" {
-		if _, err := run("workspace", "focus", id); err != nil {
+		if _, err := c.run("workspace", "focus", id); err != nil {
 			return "", err
 		}
 		return id, nil
@@ -40,7 +40,7 @@ func FindOrCreateWorkspace(label, cwd string) (string, error) {
 			WorkspaceID string `json:"workspace_id"`
 		} `json:"workspace"`
 	}
-	if err := runJSON([]string{"workspace", "create", "--cwd", cwd, "--label", label, "--focus"}, &result); err != nil {
+	if err := c.runJSON([]string{"workspace", "create", "--cwd", cwd, "--label", label, "--focus"}, &result); err != nil {
 		return "", err
 	}
 	return result.Workspace.WorkspaceID, nil
@@ -51,8 +51,8 @@ func FindOrCreateWorkspace(label, cwd string) (string, error) {
 // way. Used by callers (e.g. a ralph-loop run launched from an already-
 // visible gx TUI) that want the workspace to exist but don't want the
 // running session yanked over to it.
-func EnsureWorkspace(label, cwd string) (string, error) {
-	id, err := FindWorkspace(label)
+func (c CLI) EnsureWorkspace(label, cwd string) (string, error) {
+	id, err := c.FindWorkspace(label)
 	if err != nil {
 		return "", err
 	}
@@ -65,14 +65,14 @@ func EnsureWorkspace(label, cwd string) (string, error) {
 			WorkspaceID string `json:"workspace_id"`
 		} `json:"workspace"`
 	}
-	if err := runJSON([]string{"workspace", "create", "--cwd", cwd, "--label", label}, &result); err != nil {
+	if err := c.runJSON([]string{"workspace", "create", "--cwd", cwd, "--label", label}, &result); err != nil {
 		return "", err
 	}
 	return result.Workspace.WorkspaceID, nil
 }
 
 // Ping reports whether herdr answers, via the cheapest read-only command.
-func Ping() error {
-	_, err := run("workspace", "list")
+func (c CLI) Ping() error {
+	_, err := c.run("workspace", "list")
 	return err
 }

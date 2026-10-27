@@ -14,21 +14,52 @@ import (
 	"strings"
 )
 
+// CLI runs herdr under an explicit environment. The zero CLI is the process
+// environment, which is what the package-level functions use.
+type CLI struct {
+	// Env is the child's environment as KEY=VALUE entries, like exec.Cmd.Env.
+	// Its PATH finds the herdr binary. Nil means the process environment.
+	Env []string
+}
+
 // runCommand is a seam so tests can fake `herdr` invocations without
 // spawning the real executable.
-var runCommand = func(args ...string) ([]byte, error) {
-	return exec.Command(binary(), args...).CombinedOutput()
+var runCommand = func(c CLI, args ...string) ([]byte, error) {
+	cmd := exec.Command(c.binary(), args...)
+	cmd.Env = c.Env
+	return cmd.CombinedOutput()
 }
 
 // fallbackDirs are where herdr is installed when the process's PATH lacks it,
 // as under launchd (PATH=/usr/bin:/bin:/usr/sbin:/sbin).
 var fallbackDirs = []string{"/opt/homebrew/bin", "/usr/local/bin"}
 
+// lookPath finds herdr on c's PATH.
+func (c CLI) lookPath() (string, error) {
+	if c.Env == nil {
+		return exec.LookPath("herdr")
+	}
+	for i := len(c.Env) - 1; i >= 0; i-- {
+		path, ok := strings.CutPrefix(c.Env[i], "PATH=")
+		if !ok {
+			continue
+		}
+		for _, dir := range filepath.SplitList(path) {
+			p := filepath.Join(dir, "herdr")
+			if info, err := os.Stat(p); err == nil && !info.IsDir() && info.Mode()&0o111 != 0 {
+				return p, nil
+			}
+		}
+		break
+	}
+	return "", exec.ErrNotFound
+}
+
 // binary resolves the herdr executable: PATH first, then HERDR_BIN_PATH (set
 // inside a herdr pane), then the usual install dirs. It returns "herdr" when
 // nothing is found, so exec reports the usual not-found error.
-func binary() string {
-	if p, err := exec.LookPath("herdr"); err == nil {
+func (c CLI) binary() string {
+	if p, err := c.lookPath(); err == nil {
 		return p
 	}
 	if p := os.Getenv("HERDR_BIN_PATH"); p != "" {
@@ -120,8 +151,8 @@ var candidateCwdPattern = regexp.MustCompile(`\bcwd=(\S+)`)
 // the failure is herdr's JSON error envelope with code "agent_name_taken",
 // "agent_blocked", "agent_name_lost", "agent_not_ready" or "agent_not_found",
 // the returned error is the matching typed error instead.
-func run(args ...string) ([]byte, error) {
-	out, err := runCommand(args...)
+func (c CLI) run(args ...string) ([]byte, error) {
+	out, err := runCommand(c, args...)
 	if err != nil {
 		wrapped := fmt.Errorf("$ herdr %s\n\n%w\n\n%s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
 		var resp struct {
@@ -155,8 +186,8 @@ func run(args ...string) ([]byte, error) {
 
 // runJSON shells out to herdr with args and unmarshals the `result` field of
 // its JSON response into result (a pointer), unless result is nil.
-func runJSON(args []string, result any) error {
-	out, err := run(args...)
+func (c CLI) runJSON(args []string, result any) error {
+	out, err := c.run(args...)
 	if err != nil {
 		return err
 	}

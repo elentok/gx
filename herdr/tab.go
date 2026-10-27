@@ -28,7 +28,7 @@ type CreatedTab struct {
 }
 
 // TabCreate creates a new tab via `herdr tab create`.
-func TabCreate(opts TabCreateOptions) (CreatedTab, error) {
+func (c CLI) TabCreate(opts TabCreateOptions) (CreatedTab, error) {
 	args := []string{"tab", "create"}
 	args = appendFlag(args, "--workspace", opts.WorkspaceID)
 	args = appendFlag(args, "--cwd", opts.Cwd)
@@ -46,7 +46,7 @@ func TabCreate(opts TabCreateOptions) (CreatedTab, error) {
 			PaneID string `json:"pane_id"`
 		} `json:"root_pane"`
 	}
-	if err := runJSON(args, &result); err != nil {
+	if err := c.runJSON(args, &result); err != nil {
 		return CreatedTab{}, err
 	}
 	return CreatedTab{
@@ -57,32 +57,32 @@ func TabCreate(opts TabCreateOptions) (CreatedTab, error) {
 
 // TabList lists the tabs in workspaceID (or every tab across workspaces if
 // workspaceID is "") via `herdr tab list`.
-func TabList(workspaceID string) ([]Tab, error) {
+func (c CLI) TabList(workspaceID string) ([]Tab, error) {
 	args := []string{"tab", "list"}
 	args = appendFlag(args, "--workspace", workspaceID)
 
 	var result struct {
 		Tabs []Tab `json:"tabs"`
 	}
-	if err := runJSON(args, &result); err != nil {
+	if err := c.runJSON(args, &result); err != nil {
 		return nil, err
 	}
 	return result.Tabs, nil
 }
 
 // TabFocus focuses tabID via `herdr tab focus`, returning the now-focused tab.
-func TabFocus(tabID string) (Tab, error) {
+func (c CLI) TabFocus(tabID string) (Tab, error) {
 	var result struct {
 		Tab Tab `json:"tab"`
 	}
-	if err := runJSON([]string{"tab", "focus", tabID}, &result); err != nil {
+	if err := c.runJSON([]string{"tab", "focus", tabID}, &result); err != nil {
 		return Tab{}, err
 	}
 	return result.Tab, nil
 }
 
 // TabClose closes tabID via `herdr tab close`.
-func TabClose(tabID string) error {
-	_, err := run("tab", "close", tabID)
+func (c CLI) TabClose(tabID string) error {
+	_, err := c.run("tab", "close", tabID)
 	return err
 }
