@@ -288,13 +288,9 @@ function ViewToggle({
       role="group"
       aria-label="View"
       display="flex"
-      gap="3px"
-      p="3px"
-      borderRadius="10px"
-      bg="surface.raised"
+      gap="2"
       flex="none"
       alignSelf="flex-start"
-      w="320px"
       maxW="100%"
     >
       <SegButton on={questions} onClick={() => onQuestions(true)}>
@@ -321,7 +317,8 @@ function SegButton({
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      flex="1"
+      flex="none"
+      whiteSpace="nowrap"
       py="2"
       px="3"
       borderRadius="8px"

@@ -317,6 +317,7 @@ export function QuestionSheet({
         {!questions && (
           <Button
             emphasis="ghost"
+            tone="muted"
             size="sm"
             aria-expanded={open}
             aria-label={open ? "Fold questions" : "Open questions"}
@@ -386,6 +387,7 @@ export function QuestionSheet({
         >
           <Button
             emphasis="ghost"
+            tone="muted"
             disabled={index === 0}
             onClick={() => setIndex(index - 1)}
           >
@@ -393,6 +395,7 @@ export function QuestionSheet({
           </Button>
           <Button
             emphasis="ghost"
+            tone="muted"
             disabled={index === round.length - 1}
             onClick={() => setIndex(index + 1)}
           >
