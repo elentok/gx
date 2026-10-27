@@ -195,6 +195,43 @@ test("a fork's card is indented and the running card has the spinning dot", asyn
   expect(within(await cardOf("01")).getByRole("img", { name: "Running" })).toBeTruthy();
 });
 
+// jsdom has no layout, so the title's x is the sum of the widths and gaps before it.
+const px = (v: string) => parseFloat(v) || 0;
+const titleLeft = (card: HTMLElement) => {
+  const mark = card.querySelector("[data-mark]") as HTMLElement;
+  const id = mark.nextElementSibling as HTMLElement;
+  const gap = px(getComputedStyle(mark.parentElement!).gap);
+  return px(getComputedStyle(mark).width) + gap + px(getComputedStyle(id).width) + gap;
+};
+const alignedRows = () => [
+  tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }),
+  tk("02", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?" }),
+  doneTk("03", 1),
+];
+
+test.each([
+  ["wide", 60],
+  ["phone", 54],
+])("the title starts where the second row does (%s)", async (width, left) => {
+  if (width === "phone") vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  try {
+    live(alignedRows());
+    for (const id of ["01", "02", "03"]) expect(titleLeft(await cardOf(id))).toBe(left);
+    const note = (await cardOf("02")).querySelector("[data-note-row]") as HTMLElement;
+    expect(px(getComputedStyle(note).paddingLeft)).toBe(left);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("done and cancelled card titles are 14px", async () => {
+  live([doneTk("01", 1), doneTk("02", 2, { rendered_status: "cancelled" })]);
+  for (const id of ["01", "02"]) {
+    const title = (await cardOf(id)).querySelector("[data-title]") as HTMLElement;
+    expect(getComputedStyle(title).fontSize).toBe("14px");
+  }
+});
+
 test("running, needs-answer and needs-repair cards use the mock meta wording", async () => {
   live([
     tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString(), cost: 0.4 }),

@@ -4,7 +4,6 @@ import { useNavigate } from "react-router";
 import { ticketHref } from "../hrefs";
 import { useWide } from "../design/useWide";
 import { Button } from "../ui/button/Button";
-import { StatusIcon } from "../ui/status-icon/StatusIcon";
 import { type EpicDetailRow } from "./detail";
 import { FixAgentDialog } from "./FixAgentDialog";
 import type { FixAgent } from "./fixAgent";
@@ -83,7 +82,6 @@ function Dot({ row }: { row: EpicDetailRow }) {
   let mark;
   if (isRunning(row)) mark = <Spinner />;
   else if (isFolded(row) && !isCancelled(row)) mark = <Check />;
-  else if (tone === "done") mark = <StatusIcon kind="done" tone={tone} />;
   else
     mark = (
       <Box
@@ -98,9 +96,10 @@ function Dot({ row }: { row: EpicDetailRow }) {
   return (
     <Box
       as="span"
+      data-mark
       flexShrink={0}
       display="inline-flex"
-      w="16px"
+      w="8px"
       h="16px"
       alignItems="center"
       justifyContent="center"
@@ -182,6 +181,8 @@ function Line({
                 ? "text.muted"
                 : "white"
           }
+          data-title
+          fontSize={isFolded(row) ? "14px" : undefined}
           fontWeight={bold ? 500 : undefined}
           minW="0"
           flex="1 1 0"
@@ -213,14 +214,14 @@ function CardFrame({
   const folded = isFolded(row);
   return (
     <Box
-      bg={folded ? undefined : "#141920"}
+      bg={folded ? undefined : "surface.raised"}
       borderWidth="1px"
       borderColor={
         folded
           ? "#1d232c"
           : isRunning(row)
             ? "rgba(108,180,255,0.40)"
-            : "#252c36"
+            : "hairline"
       }
       borderRadius="12px"
       h={wide ? (folded ? "44px" : "48px") : undefined}

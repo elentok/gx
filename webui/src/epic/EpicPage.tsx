@@ -48,9 +48,9 @@ function DoneGroup({ rows, ctx, heads }: { rows: EpicDetailRow[]; ctx: RowContex
   return (
     <Box display="flex" flexDirection="column" gap="8px">
       <Box data-done-divider display="flex" alignItems="center" gap="12px" color="text.dim" fontSize="13px" mt={heads ? "0" : "16px"} mb="-4px">
-        <Box flex="1" borderTopWidth="1px" borderColor="#252c36" />
+        <Box flex="1" borderTopWidth="1px" borderColor="hairline" />
         {doneHeading(done)}
-        <Box flex="1" borderTopWidth="1px" borderColor="#252c36" />
+        <Box flex="1" borderTopWidth="1px" borderColor="hairline" />
       </Box>
       {shown.map((r) => (
         <TicketCard key={r.address} row={r} meta={doneMeta(r, ctx)} indent={0} />

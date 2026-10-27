@@ -33,7 +33,7 @@ export function MoreStats({ detail }: { detail: EpicDetail }) {
   const rows = statRows(detail);
   if (rows.length === 0) return null;
   return (
-    <Box mt="28px" bg="surface.raised" borderWidth="1px" borderColor="#252c36" borderRadius="12px">
+    <Box mt="28px" bg="surface.raised" borderWidth="1px" borderColor="hairline" borderRadius="12px">
       <Box
         as="button"
         aria-expanded={open}
