@@ -87,7 +87,7 @@ full runs in a row under agent load [07, 09].
 29. As a person viewing "All projects", I want one banner that lists every missing project, each with its own "Set up checks" button, so that several projects don't stack banners. [06]
 30. As a person, I want "Not now" to hide the banner until the next page load and save nothing, so that I can put setup off without a lasting choice. [06]
 31. As a person, I want "Set up checks" to open a dialog with one row per kind: a command field, a Use command / gx default / Off switch, and a line naming where the command came from or what the gx default runs, so that I see every kind at once. [06]
-32. As a person, I want found commands preset to "Use command" with a "Recommended" chip, kinds with nothing recommended preset to "gx default" (showing a lower-ranked candidate in the disabled field, as the mock draws it), and the other candidates offered as suggestions with their sources, so that the usual answer is one click. [06, 11]
+32. As a person, I want found commands preset to "Use command" with a "Recommended" chip, kinds with no candidate preset to "gx default" with an empty disabled field ("No command found") and a "Nothing found" chip, and the other candidates offered as suggestions with their sources, so that the usual answer is one click. [06, 11]
 33. As a person, I want a "Save to" choice (commit `.gx/checks.json` on trunk, or `project.json`) and a collapsed "Show the file" preview of the exact file, so that I know what gets written. [06]
 34. As a person, I want Save to write the file, show a toast ("Committed .gx/checks.json on main") and remove the banner, so that I know it worked. [06]
 35. As a person, I want a "Keep gx defaults" button in the dialog that saves `{}`, so that the web matches the CLI. [06]
@@ -156,7 +156,9 @@ full runs in a row under agent load [07, 09].
   default.
 - `{files}` is replaced by the selected files: changed files on a changed-files run, every tracked
   file (`git ls-files`) on a `--full` run [11]. Commands run from the repo root. gx passes every
-  selected file; the project's own wrapper filters them.
+  selected file; the project's own wrapper filters them. When the expanded command would pass the
+  OS argument limit, gx splits the files into batches that fit and runs the command once per batch,
+  like `xargs`. The kind fails if any batch fails.
 - Resolution order: the repo file, else `checks` in the ticket store's `project.json`, else the gx
   defaults. No `.local` override file.
 - A project is missing check config only when it has neither the repo file nor `checks` in
@@ -206,6 +208,11 @@ full runs in a row under agent load [07, 09].
 - A commitless finish skips the guard.
 - The refusal is a non-zero CLI exit with a message. It adds no pause kind and no pause-to-verb row
   (ADR 0042).
+- An agent that is refused and cannot fix the cause (a branch fault it cannot fix) reports
+  `asking`, as it does today for a failing test it cannot fix. gx pauses the ticket with reason
+  `self-reported`, an existing pause. gx cannot recover on its own, because only a person can decide
+  what to do about a fault the agent could not fix. The ticket page's existing answer action ends
+  the pause.
 
 ### Detection and onboarding [05, 06]
 
@@ -333,7 +340,7 @@ CLI checks run in a temp repo made for the check.
 
 New fixture scenario to write: `checks-missing`. Projects `demo` and `auto`, both with repos and no
 check config. `demo`'s repo has a `Makefile` with a `test` target and a `package.json` with a
-`build` script. Existing scenarios get `{}` check config, so no current flow shows the banner.
+`build` script, which detection must not offer for any kind (typecheck shows "Nothing found"). Existing scenarios get `{}` check config, so no current flow shows the banner.
 
 New flows to write in `webui/e2e/CATALOG.md` (next free numbers):
 
@@ -361,14 +368,14 @@ Stories:
 9. `gx check` with one changed `.go` file and one untracked `.sh` file runs Go and shell rows only.
 10. `gx check --staged` after staging an unformatted `.go` file leaves the formatted file staged.
 11. `gx check --since HEAD~1` checks only that commit's files.
-12. `gx check --full` with `{"format": "echo {files}"}` logs every tracked file; with no config, the Go test row covers every package directory.
+12. `gx check --full` with `{"format": "echo {files}"}` logs every tracked file; with no config, the Go test row covers every package directory. In a temp repo with more tracked files than fit one command line, the command runs in several batches that together list every file, and a failing batch fails the kind.
 13. `gx check --kind lint` prints only the lint line.
 14. A failing configured command prints the summary path first, the log path and its last 20 lines; a failing gx-default Go test names the test.
 15. Exit codes: pass 0, fail 1, invalid JSON config 2, no changed files 3.
 16. A format command that sleeps then rewrites a file finishes before lint starts (log timestamps); output order is format, lint, typecheck, test.
 17. A clean tree: exit 3, "no applicable checks".
 18. In gx with no config, `gx check` on a changed `server/` file runs `gx brief go-test ./server`, not `make test-server`.
-19. Start `gx check` in the background and kill the shell: the summary file exists at the printed path.
+19. Start `gx check` in the background with its output discarded, wait for it to exit, then check that the summary file exists at the printed path.
 20. Interactive `gx project add` of a repo with a `Makefile` `test` target lists four kinds, `test` recommended from "Makefile · test".
 21. "skip" saves nothing and `gx project onboard` asks again; "edit" with invalid JSON is rejected like `gx project edit-config`.
 22. Choosing the repo makes one commit of `.gx/checks.json` on trunk; choosing `project.json` writes `checks`; a `vcs: none` project offers only `project.json`.
@@ -405,7 +412,7 @@ Stories:
 53. With a failing run, `--check-failures <addr>` per failing test succeeds; too few addresses or an unknown address is refused.
 54. A ticket with no commits finishes with no record line.
 55. Run `gx check`, commit, then finish: accepted.
-56. The refusal text names `gx check` and `--check-failures`; the ticket's status is unchanged and no pause appears.
+56. The refusal text names `gx check` and `--check-failures`; the ticket's status is unchanged and no pause appears. In a fixture, an agent that reports `asking` after a refusal leaves the ticket paused with reason `self-reported`, and the ticket page's answer action reopens it.
 57. After a run, the project's `.jsonl` has one line with every field; a line older than 30 days is gone after the next write.
 58. A configured command that calls `gx brief go-test` on a failing test: the record names the test, and the brief index line carries the run id.
 59. A configured command without `gx brief`: the record has exit 1 and no test names.
@@ -429,19 +436,21 @@ Stories:
 
 **Mock states**
 
-- `$(gx tickets root)/gx/better-tests/mocks/06-onboarding-web-view.html` · banner-filtered · 1100 px ·
+- `$(gx tickets root)/better-tests/mocks/06-onboarding-web-view.html` · banner-filtered · 1100 px ·
   `checks-missing` filtered to `demo` · top-bar, filter-row, missing-banner, not-now, set-up,
   epic-list
-- `$(gx tickets root)/gx/better-tests/mocks/06-onboarding-web-view.html` · banner-all-projects ·
+- `$(gx tickets root)/better-tests/mocks/06-onboarding-web-view.html` · banner-all-projects ·
   1100 px · `checks-missing` on All projects · top-bar, filter-row, missing-banner, set-up, not-now,
   epic-list
-- `$(gx tickets root)/gx/better-tests/mocks/06-onboarding-web-view.html` · setup-dialog · 1100 px ·
+- `$(gx tickets root)/better-tests/mocks/06-onboarding-web-view.html` · setup-dialog · 1100 px ·
   `checks-missing`, "Set up checks" on `demo`, preview open · top-bar, missing-banner, setup-dialog,
   kind-rows, save-target, file-preview, actions
-- `$(gx tickets root)/gx/better-tests/mocks/06-onboarding-web-view.html` · setup-dialog-phone ·
+  One change from the mock, on both setup-dialog states: the typecheck row has an empty disabled
+  field ("No command found") like the format and lint rows, not `pnpm -C webui build`.
+- `$(gx tickets root)/better-tests/mocks/06-onboarding-web-view.html` · setup-dialog-phone ·
   400 px · `checks-missing`, "Set up checks" on `demo` · setup-dialog, kind-rows, save-target,
   file-preview, actions
-- `$(gx tickets root)/gx/better-tests/mocks/06-onboarding-web-view.html` · saved · 1100 px ·
+- `$(gx tickets root)/better-tests/mocks/06-onboarding-web-view.html` · saved · 1100 px ·
   `checks-missing` after Save to the repo · top-bar, filter-row, epic-list, toast
 
 ## Out of Scope
