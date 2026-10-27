@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
@@ -335,7 +336,7 @@ func (s *Server) ensureRootQueued(root rootRef, first tickets.Ticket) error {
 				return nil, &r
 			}
 		}
-		return append(items, QueueItem{Address: addr, Agent: string(ralphloop.AgentClaude)}), nil
+		return append(items, QueueItem{Address: addr, Agent: string(ralphloop.AgentClaude), EnqueuedAt: time.Now()}), nil
 	})
 	return err
 }

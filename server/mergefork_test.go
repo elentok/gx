@@ -114,6 +114,15 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 		if !f.rootQueued(t) {
 			t.Error("root dequeued while its merge ticket runs")
 		}
+		q, err := f.h.Client.QueueItems(context.Background())
+		if err != nil {
+			t.Error(err)
+		}
+		for _, it := range q {
+			if it.EnqueuedAt.IsZero() {
+				t.Errorf("%s queued with no enqueue time", it.Address)
+			}
+		}
 		if md := f.epicMD(t); strings.Contains(md, "completed_at:") || strings.Contains(md, "merged_at:") {
 			t.Errorf("epic stamped while its merge ticket runs:\n%s", md)
 		}

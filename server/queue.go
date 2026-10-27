@@ -52,6 +52,9 @@ const (
 type QueueItem struct {
 	Address string `json:"address"`
 	Agent   string `json:"agent"`
+	// EnqueuedAt is set by the server on enqueue, never taken from a client. Items
+	// from a queue file written before the field existed have none.
+	EnqueuedAt time.Time `json:"enqueued_at,omitzero"`
 }
 
 // QueueResult is what every queue write returns: the queue after the write, or
@@ -345,7 +348,7 @@ func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 				return nil, &r
 			}
 		}
-		item := QueueItem{Address: addr, Agent: string(agent)}
+		item := QueueItem{Address: addr, Agent: string(agent), EnqueuedAt: time.Now()}
 		if req.Front {
 			return append([]QueueItem{item}, items...), nil
 		}
@@ -424,7 +427,7 @@ func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {
 			return refusal(ReasonAlreadyQueued, addr+" is listed twice"), nil
 		}
 		seen[addr] = true
-		items = append(items, QueueItem{Address: addr, Agent: string(agent)})
+		items = append(items, QueueItem{Address: addr, Agent: string(agent), EnqueuedAt: time.Now()})
 	}
 	return s.writeQueue("", func(cur []QueueItem) ([]QueueItem, *QueueResult) {
 		for _, it := range items {
@@ -448,6 +451,12 @@ func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {
 					r := refusal(ReasonTicketLive, live+" has a live iteration")
 					return nil, &r
 				}
+			}
+		}
+		// An address that was already queued keeps its time.
+		for i, it := range items {
+			if j := indexOfAddr(cur, it.Address); j >= 0 {
+				items[i].EnqueuedAt = cur[j].EnqueuedAt
 			}
 		}
 		return append(next, items...), nil
