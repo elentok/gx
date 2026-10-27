@@ -33,6 +33,17 @@ func reachedBranch(step ProgressStep) bool {
 	return slices.Index(tickets.DesignSteps, step) >= slices.Index(tickets.DesignSteps, ProgressBranch)
 }
 
+// designSection is the section of the map's own Design card, whether or not a
+// joined card currently shows the -impl epic instead. A finished Design only
+// stays in Needs you while a question is still waiting on an answer.
+func designSection(address string, m tickets.Epic, step ProgressStep, act designActivity) CardSection {
+	p := placeDesign(address, act, mapNotStarted(m, step), time.Time{})
+	if step == ProgressDone && p.section != SectionNeedsYou {
+		return SectionFinished
+	}
+	return p.section
+}
+
 // decorateDesignCard fills the card fields of a map row. impl is the card row of
 // the map's -impl epic, or nil when the map has none. A joined card lists the
 // active part's address first.

@@ -657,6 +657,11 @@ export interface EpicDetail {
    */
   ring_progress?: number /* int */;
   /**
+   * DesignSection is a map epic's own Design card section, which the page's tone
+   * reads even when a joined card shows the -impl epic instead.
+   */
+  design_section?: CardSection;
+  /**
    * Draft is set on a loop epic that is still being published into.
    */
   draft?: boolean;

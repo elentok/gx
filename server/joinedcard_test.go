@@ -116,6 +116,13 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	if r := row(); r.Section != server.SectionReadyToQueue {
 		t.Fatalf("before the question, section = %q, want ready-to-queue", r.Section)
 	}
+	designSection := func() server.CardSection {
+		_, d, _ := getEpicDetail(t, h, hs.WebURL, "proj:m")
+		return d.DesignSection
+	}
+	if got := designSection(); got != server.SectionFinished {
+		t.Fatalf("before the question, design_section = %q, want finished", got)
+	}
 
 	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:m"})
 	if err != nil || res.Session == nil {
@@ -137,6 +144,9 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 	}
 	if r.CardKind != server.CardKindImplementation {
 		t.Errorf("card kind = %q, want implementation", r.CardKind)
+	}
+	if got := designSection(); got != server.SectionNeedsYou {
+		t.Errorf("design_section = %q, want needs-you", got)
 	}
 	want := []server.CardAction{{Kind: server.CardActionAnswer, Label: "Answer", Target: "proj:m", Link: "#/d/proj:m"}}
 	if !slices.Equal(r.Actions, want) {

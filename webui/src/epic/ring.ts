@@ -26,11 +26,11 @@ export interface PageRing {
 const stepState = (d: EpicDetail, step: string) => d.steps?.find((s) => s.step === step)?.state;
 
 // A Design page's own tone, first match wins. It cannot lean on the card, which shows the -impl epic once one exists.
-function designTone(d: EpicDetail, card: EpicListRow | undefined, sessions: SessionInfo[]): Pick<PageRing, "tone" | "live"> {
+function designTone(d: EpicDetail, sessions: SessionInfo[]): Pick<PageRing, "tone" | "live"> {
   if (stepState(d, ProgressDone) === MapStepDone) return { tone: "done", live: false };
   const live = liveSessions(d.address, sessions);
   const actionable = live.some((s) => !!s.actionable?.reason);
-  if (card?.section === SectionNeedsYou || actionable) return { tone: "waiting", live: false };
+  if (d.design_section === SectionNeedsYou || actionable) return { tone: "waiting", live: false };
   const creating = stepState(d, ProgressCreateTickets) === MapStepCurrent && !!d.impl_address;
   if (creating || live.some((s) => s.status.state === "starting" || s.status.state === "working")) {
     return { tone: "running", live: true };
@@ -49,7 +49,7 @@ export function pageRing(d: EpicDetail, card: EpicListRow | undefined, sessions:
   const kind = card?.card_kind ? RING_KIND[card.card_kind] : isMap ? "design" : "implementation";
   if (isMap) {
     const pct = d.ring_progress ?? 0;
-    return { kind, ...designTone(d, card, sessions), progress: pct / 100, label: `${pct}%` };
+    return { kind, ...designTone(d, sessions), progress: pct / 100, label: `${pct}%` };
   }
   const tone = card && d.kind === "loop" ? { tone: ringTone(card), live: isLive(card) } : loopTone(d);
   return { kind, ...tone, progress: d.total ? d.done / d.total : 0, label: `${d.done}/${d.total}` };

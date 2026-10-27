@@ -130,6 +130,9 @@ type EpicDetail struct {
 	ImplAddress string    `json:"impl_address,omitempty"`
 	// RingProgress is a map epic's Design progress in percent, as on the Design card.
 	RingProgress int `json:"ring_progress,omitempty"`
+	// DesignSection is a map epic's own Design card section, which the page's tone
+	// reads even when a joined card shows the -impl epic instead.
+	DesignSection CardSection `json:"design_section,omitempty"`
 	// Draft is set on a loop epic that is still being published into.
 	Draft bool `json:"draft,omitempty"`
 	// Deletable is set on an uncharted design, the rule the designs delete route guards.
@@ -206,7 +209,9 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 		d.Deletable = deletable
 	}
 	d.Steps = mapSteps(e, byName)
-	if step := mapProgress(e); step == ProgressDone {
+	step := mapProgress(e)
+	d.DesignSection = designSection(d.Address, e, step, s.designActivities()[d.Address])
+	if step == ProgressDone {
 		d.RingProgress = 100
 	} else {
 		d.RingProgress = designPercent(e, step)

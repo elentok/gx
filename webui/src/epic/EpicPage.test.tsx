@@ -442,8 +442,8 @@ test.each([
   expect(!!screen.queryByTestId("comet")).toBe(comet);
 });
 
-test("a Design in Needs you reads waiting", async () => {
-  render("/e/gx:blog", [{ ...designCard, section: "needs-you" }], "map", { detail: { steps: steps("spec") } });
+test("a Design in Needs you reads waiting, even past Branch with no joined card for the page", async () => {
+  render("/e/gx:blog", [row("blog-impl")], "map", { detail: { steps: steps("branch"), design_section: "needs-you" } });
   await screen.findByText("0%");
   expect(ringOf().getAttribute("data-tone")).toBe("waiting");
   expect(screen.queryByTestId("comet")).toBeNull();
