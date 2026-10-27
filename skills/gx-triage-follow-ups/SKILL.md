@@ -16,6 +16,15 @@ commands, the Follow-ups format and the Map epics section; don't restate them he
 You are the main session. Subagents verify; you plan; the user approves once; then you write. This
 skill never grills: a design question is routed to a map epic, not asked.
 
+## Prefer the correct fix
+
+ralph-loop builds the fixes without a person watching, so a slower fix costs agent time, not the
+person's time. When a choice is between a quick fix (a workaround, a special case, a patch on the
+symptom) and a slower fix that is clean and correct (it fixes the cause, or puts the logic where it
+belongs), pick the correct fix. This applies to every suggested fix from step 1, every default
+answer to a `quick` question, and every ticket sent to the ready epic. Pick the quick fix only when
+the person asks for it, and then record the reason in the ticket body.
+
 ## 0. List the items
 
 `gx tickets show <project>:follow-ups` lists the epic's tickets. A follow-up without a `category`
@@ -28,7 +37,8 @@ about 8 in parallel; start the next batch as each finishes. Each gets the ticket
 brief:
 
 "Read the ticket with `gx tickets show`. Read the code and logs it cites and `git log` since it was
-filed. Do not reproduce it and do not run tests. Report: (1) verdict `relevant`, `fixed` or
+filed. Do not reproduce it and do not run tests. When a quick fix and a clean, correct fix both
+exist, suggest the correct one. Report: (1) verdict `relevant`, `fixed` or
 `obsolete`, with evidence (a commit, a file and line, a log line); (2) the files a fix would touch;
 (3) 0–N blocking questions, each tagged `quick` (one-line answer from the user) or `design` (a
 decision with trade-offs); (4) a suggested destination: ready epic as `implement`, or map epic as
