@@ -197,7 +197,8 @@ function LandBlockNotice({
   const dirty = detail.land_block_kind === DIRTY_TRUNK;
   const reason = dirty ? "Trunk has local changes" : detail.land_block_reason;
   const info = (action: string) => ({ label: detail.action_info?.[action]?.label, tooltip: detail.action_info?.[action]?.tooltip });
-  const hasButtons = detail.actions?.some((a) => a === ActionStashMerge || a === ActionMerge);
+  // Only the verbs the epic address can run. Start over needs a ticket id, so it is left out.
+  const runnable = [ActionStashMerge, ActionMerge].filter((a) => detail.actions?.includes(a));
   return (
     <Box
       role="region"
@@ -234,14 +235,12 @@ function LandBlockNotice({
             ))}
           </Box>
         )}
-        {hasButtons && (
+        {runnable.length > 0 && (
           <Box mt="2" display="flex" flexWrap="wrap" gap="2" css={wide ? undefined : { "& button": { height: "44px" } }}>
-            {detail.actions?.includes(ActionStashMerge) && (
-              <StashMergeButton address={address} state={state} onMerged={onChanged} {...info(ActionStashMerge)} />
-            )}
-            {detail.actions?.includes(ActionMerge) && (
-              <MergeButton address={address} state={state} onMerged={onChanged} {...info(ActionMerge)} />
-            )}
+            {runnable.map((a) => {
+              const Btn = a === ActionStashMerge ? StashMergeButton : MergeButton;
+              return <Btn key={a} address={address} state={state} onMerged={onChanged} {...info(a)} />;
+            })}
           </Box>
         )}
       </Box>

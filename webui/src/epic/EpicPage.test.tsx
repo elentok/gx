@@ -451,6 +451,25 @@ test("a needs-rebase pause reads 'Can't merge: <reason>' with its action buttons
   expect(screen.queryByRole("button", { name: "Merge" })).toBeNull();
 });
 
+test("a merge-conflict pause shows Merge but not Start over, which the epic address cannot run", async () => {
+  render("/e/gx:blog-impl", [], "loop", {
+    detail: {
+      state: "paused",
+      land_block_reason: "merge conflict",
+      actions: ["merge", "start-over"],
+      action_info: { merge: { label: "Merge again", tooltip: "Try again." }, "start-over": { label: "Start over", tooltip: "Discard the work." } },
+    },
+  });
+  const notice = await screen.findByTestId("land-block-notice");
+  expect(within(notice).getAllByRole("button").map((b) => b.textContent)).toEqual(["Merge again"]);
+});
+
+test("a land-block notice with no actions renders no button row", async () => {
+  render("/e/gx:blog-impl", [], "loop", { detail: { state: "paused", land_block_reason: "needs a rebase", actions: [] } });
+  const notice = await screen.findByTestId("land-block-notice");
+  expect(within(notice).queryAllByRole("button")).toHaveLength(0);
+});
+
 test("a dirty-trunk pause says the short reason, lists every clashing file, then both verbs in order", async () => {
   render("/e/gx:blog-impl", [], "loop", { detail: dirtyTrunk });
   const notice = await screen.findByTestId("land-block-notice");
