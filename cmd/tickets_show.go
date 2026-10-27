@@ -31,7 +31,7 @@ func currentEpic(cwd string) string {
 	if err != nil {
 		return ""
 	}
-	epic, _, _ := parseIterationBranch(branch)
+	epic, _, _ := tickets.ParseIterationBranch(branch)
 	return epic
 }
 

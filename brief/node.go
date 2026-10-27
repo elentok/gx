@@ -136,9 +136,11 @@ func (Vitest) Parse(out []byte, _ int) Outcome {
 		return Outcome{}
 	}
 	var failures []Unit
+	var ran []string
 	for _, f := range rep.TestResults {
 		failed := 0
 		for _, a := range f.AssertionResults {
+			ran = append(ran, Unit{Location: f.Name, Name: a.FullName}.String())
 			if a.Status == "failed" {
 				failed++
 				failures = append(failures, Unit{Location: f.Name, Name: a.FullName, Text: vitestText(a.FailureMessages)})
@@ -153,6 +155,7 @@ func (Vitest) Parse(out []byte, _ int) Outcome {
 		Units:    rep.NumTotalTests,
 		Summary:  fmt.Sprintf("%d tests", rep.NumTotalTests),
 		Failures: failures,
+		Tests:    ran,
 	}
 }
 

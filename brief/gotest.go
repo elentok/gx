@@ -52,6 +52,7 @@ type goPkg struct {
 // the failure units. Lines that are not JSON are ignored.
 func (GoTest) Parse(out []byte, _ int) Outcome {
 	tests := 0
+	var ran []string
 	pkgs := map[string]*goPkg{}
 	var order []*goPkg
 	pkg := func(name string) *goPkg {
@@ -92,6 +93,7 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 				continue
 			}
 			tests++
+			ran = append(ran, Unit{Location: ev.Package, Name: ev.Test}.String())
 			if ev.Action == "fail" {
 				p.tests = append(p.tests, ev.Test)
 			}
@@ -120,6 +122,7 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 		Units:    tests,
 		Summary:  fmt.Sprintf("%d tests in %d packages", tests, len(finished)),
 		Failures: failures,
+		Tests:    ran,
 	}
 }
 

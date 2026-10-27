@@ -121,7 +121,12 @@ func (Playwright) Parse(out []byte, _ int) Outcome {
 	if passed+failed == 0 && len(failures) == 0 {
 		return Outcome{}
 	}
-	return Outcome{Units: passed + failed, Summary: fmt.Sprintf("%d tests", passed+failed), Failures: failures}
+	// The line reporter names only the failing tests.
+	var ran []string
+	for _, u := range failures {
+		ran = append(ran, u.String())
+	}
+	return Outcome{Units: passed + failed, Summary: fmt.Sprintf("%d tests", passed+failed), Failures: failures, Tests: ran}
 }
 
 // RerunArgs is nil: a name filter would have to be rebuilt as a -g regex.

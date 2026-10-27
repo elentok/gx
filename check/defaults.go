@@ -312,7 +312,7 @@ func (r *runner) runDefault(kind string, log io.Writer, res *KindResult) {
 	steps, notes := r.defaultSteps(kind)
 	ran := 0
 	for _, s := range steps {
-		sr := r.runStep(s, log)
+		sr := r.runStep(kind, s, log)
 		switch {
 		case sr.skipped != "":
 			notes = append(notes, sr.skipped)
@@ -334,7 +334,7 @@ func (r *runner) runDefault(kind string, log io.Writer, res *KindResult) {
 	res.Notes = append(res.Notes, slices.Compact(notes)...)
 }
 
-func (r *runner) runStep(s step, log io.Writer) stepResult {
+func (r *runner) runStep(kind string, s step, log io.Writer) stepResult {
 	if s.name != "" {
 		if _, err := exec.LookPath(s.name); err != nil {
 			return stepResult{skipped: s.name + " not installed"}
@@ -350,11 +350,12 @@ func (r *runner) runStep(s step, log io.Writer) stepResult {
 		fmt.Fprintf(log, "$ %s\n", strings.Join(append([]string{s.name}, s.argv...), " "))
 		cmd := exec.Command(s.name, s.argv...)
 		cmd.Dir = s.dir
+		cmd.Env = r.childEnv(kind)
 		cmd.Stdout, cmd.Stderr = log, log
 		return stepResult{failed: cmd.Run() != nil}
 	}
 	fmt.Fprintf(log, "$ gx brief %s %s\n", s.brief.Name(), strings.Join(s.argv, " "))
-	exit, outcome := brief.RunOutcome(s.brief, brief.Options{Dir: s.dir, Args: s.argv, DataDir: r.dataDir, Out: log})
+	exit, outcome := brief.RunOutcome(s.brief, brief.Options{Dir: s.dir, Args: s.argv, DataDir: r.dataDir, Out: log, CheckRun: r.runID, CheckKind: kind})
 	sr := stepResult{failed: exit != brief.ExitPass}
 	for _, u := range outcome.Failures {
 		sr.failures = append(sr.failures, u.String())
@@ -373,6 +374,7 @@ func (r *runner) ensureInstalled(n installNeed) (string, error) {
 	var buf bytes.Buffer
 	cmd := exec.Command("sh", "-c", n.cmd)
 	cmd.Dir = n.dir
+	cmd.Env = r.childEnv("")
 	cmd.Stdout, cmd.Stderr = &buf, &buf
 	err := cmd.Run()
 	if r.installs == nil {

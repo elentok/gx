@@ -19,7 +19,13 @@ const indexName = "index.jsonl"
 // lockIndex takes an exclusive lock that appenders and the sweep share, so a
 // rewrite never drops a line appended while it runs.
 func lockIndex(logDir string) (unlock func(), err error) {
-	f, err := os.OpenFile(filepath.Join(logDir, indexName+".lock"), os.O_CREATE|os.O_RDWR, 0o644)
+	return LockFile(filepath.Join(logDir, indexName+".lock"))
+}
+
+// LockFile takes an exclusive lock on the file at path, creating it, until
+// unlock is called.
+func LockFile(path string) (unlock func(), err error) {
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, err
 	}

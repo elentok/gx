@@ -6,9 +6,12 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/brief"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -88,16 +91,48 @@ func TestBrief_GoTestPass(t *testing.T) {
 	if err := json.Unmarshal([]byte(lines[0]), &fields); err != nil {
 		t.Fatal(err)
 	}
-	if len(fields) != 8 {
+	if len(fields) != 9 {
 		t.Errorf("index fields = %v", fields)
 	}
-	for _, k := range []string{"time", "tool", "args", "dir", "exit", "units", "duration_ms", "log"} {
+	for _, k := range []string{"time", "tool", "args", "dir", "exit", "units", "duration_ms", "log", "tests"} {
 		if _, ok := fields[k]; !ok {
 			t.Errorf("index lacks %q", k)
 		}
 	}
 	if fields["tool"] != "go-test" || fields["units"] != float64(2) || fields["log"] != logPath {
 		t.Errorf("index = %v", fields)
+	}
+	want := []any{"example.com/tiny.TestA", "example.com/tiny.TestB"}
+	if !reflect.DeepEqual(fields["tests"], want) {
+		t.Errorf("tests = %v, want %v", fields["tests"], want)
+	}
+}
+
+func TestBrief_IndexInRepoCarriesBranchTreeAndCheckRun(t *testing.T) {
+	data := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", data)
+	t.Setenv(brief.EnvCheckRun, "run-1")
+	repo := testutil.TempRepo(t)
+	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
+	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) {}\nfunc TestB(t *testing.T) { t.Fail() }\n")
+
+	if out, code := runBriefCmd(t, repo, "go-test", "./..."); code != 1 {
+		t.Fatalf("exit = %d, out:\n%s", code, out)
+	}
+	var e brief.IndexEntry
+	if err := json.Unmarshal([]byte(indexLines(t, data)[0]), &e); err != nil {
+		t.Fatal(err)
+	}
+	tree, err := git.TreeID(repo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.Branch != "main" || e.TreeID != tree || e.CheckRun != "run-1" {
+		t.Errorf("branch %q, tree %q (want %q), check run %q", e.Branch, e.TreeID, tree, e.CheckRun)
+	}
+	if !reflect.DeepEqual(e.Tests, []string{"example.com/tiny.TestA", "example.com/tiny.TestB"}) ||
+		!reflect.DeepEqual(e.Failed, []string{"example.com/tiny.TestB"}) {
+		t.Errorf("tests %v, failed %v", e.Tests, e.Failed)
 	}
 }
 

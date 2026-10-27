@@ -11,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/elentok/gx/brief"
+	"github.com/elentok/gx/git"
 )
 
 // Exit codes of a run.
@@ -98,11 +101,13 @@ func Run(opts Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	runDir := filepath.Join(opts.DataDir, "check", time.Now().UTC().Format("20060102T150405.000000000"))
+	started := time.Now()
+	runID := started.UTC().Format("20060102T150405.000000000")
+	runDir := filepath.Join(opts.DataDir, "check", runID)
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return Result{}, err
 	}
-	r := &runner{root: root, runDir: runDir, dataDir: opts.DataDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit}
+	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit}
 	if r.limit <= 0 {
 		r.limit = DefaultArgLimit
 	}
@@ -119,14 +124,22 @@ func Run(opts Options) (Result, error) {
 	for i, k := range ordered {
 		if k == "format" {
 			results[i] = r.runKind(k)
-			continue
 		}
-		wg.Go(func() { results[i] = r.runKind(k) })
+	}
+	// The tree after format ran is the one the other kinds check.
+	r.treeID, _ = git.TreeID(root)
+	for i, k := range ordered {
+		if k != "format" {
+			wg.Go(func() { results[i] = r.runKind(k) })
+		}
 	}
 	wg.Wait()
 
 	res := Result{Summary: filepath.Join(runDir, "summary.txt"), Kinds: results, Exit: exitCode(results)}
 	if err := os.WriteFile(res.Summary, []byte(res.Render()), 0o644); err != nil {
+		return Result{}, err
+	}
+	if err := appendRecord(opts.DataDir, ProjectFor(root), r.newRecord(opts, started, res), started); err != nil {
 		return Result{}, err
 	}
 	return res, nil
@@ -148,8 +161,19 @@ func exitCode(results []KindResult) int {
 	return ExitPass
 }
 
+// childEnv is the environment of a command a kind starts: the caller's, plus
+// the run (and kind) that `gx brief` tags its index lines with.
+func (r *runner) childEnv(kind string) []string {
+	env := append(os.Environ(), brief.EnvCheckRun+"="+r.runID)
+	if kind != "" {
+		env = append(env, brief.EnvCheckKind+"="+kind)
+	}
+	return env
+}
+
 type runner struct {
 	root, runDir, dataDir string
+	runID, treeID         string
 	files                 []string
 	mode                  Mode
 	cfg                   Config
@@ -206,6 +230,7 @@ func (r *runner) runKind(kind string) KindResult {
 		for _, batch := range expandBatches(cmd, r.files, r.limit) {
 			sh := exec.Command("sh", "-c", batch)
 			sh.Dir = r.root
+			sh.Env = r.childEnv(kind)
 			sh.Stdout, sh.Stderr = logFile, logFile
 			if err := sh.Run(); err != nil {
 				res.Status = StatusFail

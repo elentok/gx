@@ -14,6 +14,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"github.com/elentok/gx/git"
 )
 
 // Exit codes of a brief run.
@@ -52,6 +54,9 @@ type Outcome struct {
 	Summary string
 	// Failures are the failure units of a failing run, grouped by location.
 	Failures []Unit
+	// Tests names the tests that ran, passed and failed, as `location.name`. A
+	// tool that cannot list the passing ones names the failing ones only.
+	Tests []string
 }
 
 // Options configure one run.
@@ -61,9 +66,21 @@ type Options struct {
 	Args    []string
 	DataDir string // gx data dir; logs and the index live under it
 	Out     io.Writer
+	// CheckRun and CheckKind tag the index line with the `gx check` run (and
+	// the kind of it) that started this one.
+	CheckRun  string
+	CheckKind string
 }
 
-// indexEntry is one line of index.jsonl.
+// EnvCheckRun and EnvCheckKind carry a `gx check` run and kind to its children.
+const (
+	EnvCheckRun  = "GX_CHECK_RUN"
+	EnvCheckKind = "GX_CHECK_KIND"
+)
+
+// IndexEntry is one line of index.jsonl.
+type IndexEntry = indexEntry
+
 type indexEntry struct {
 	Time       string   `json:"time"`
 	Tool       string   `json:"tool"`
@@ -73,6 +90,32 @@ type indexEntry struct {
 	Units      int      `json:"units"`
 	DurationMS int64    `json:"duration_ms"`
 	Log        string   `json:"log"`
+	Tests      []string `json:"tests"`
+	Failed     []string `json:"failed,omitempty"`
+	Branch     string   `json:"branch,omitempty"`
+	TreeID     string   `json:"tree_id,omitempty"`
+	CheckRun   string   `json:"check_run,omitempty"`
+	CheckKind  string   `json:"check_kind,omitempty"`
+}
+
+// ReadIndex returns the lines of the index under dataDir, oldest first. A
+// missing index is empty; a line that does not decode is skipped.
+func ReadIndex(dataDir string) ([]IndexEntry, error) {
+	data, err := os.ReadFile(filepath.Join(dataDir, "brief", indexName))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var entries []IndexEntry
+	for _, line := range bytes.Split(data, []byte("\n")) {
+		var e IndexEntry
+		if len(line) > 0 && json.Unmarshal(line, &e) == nil {
+			entries = append(entries, e)
+		}
+	}
+	return entries, nil
 }
 
 // Run executes the tool and prints its report to o.Out. It returns the exit
@@ -108,6 +151,10 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	defer logFile.Close()
 	sweep(logDir, start)
 
+	// Outside a git repo both stay empty.
+	branch, _ := git.CurrentBranch(dir)
+	treeID, _ := git.TreeID(dir)
+
 	out, exit, err := execute(plan.Bin, plan.Argv, dir, logFile)
 	if err != nil {
 		return cantRun(o.Out, err.Error()), Outcome{}
@@ -127,6 +174,14 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 		Units:      outcome.Units,
 		DurationMS: elapsed.Milliseconds(),
 		Log:        logPath,
+		Tests:      append([]string{}, outcome.Tests...),
+		Branch:     branch,
+		TreeID:     treeID,
+		CheckRun:   o.CheckRun,
+		CheckKind:  o.CheckKind,
+	}
+	for _, u := range outcome.Failures {
+		entry.Failed = append(entry.Failed, u.String())
 	}
 	if err := appendIndex(filepath.Join(logDir, "index.jsonl"), entry); err != nil {
 		return cantRun(o.Out, "cannot write index: "+err.Error()), Outcome{}

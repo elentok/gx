@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -89,7 +90,8 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 	if err != nil {
 		return err
 	}
-	code := brief.Run(tool, brief.Options{Dir: dir, Args: args[1:], CDir: cFlag, DataDir: dataDir, Out: c.OutOrStdout()})
+	code := brief.Run(tool, brief.Options{Dir: dir, Args: args[1:], CDir: cFlag, DataDir: dataDir, Out: c.OutOrStdout(),
+		CheckRun: os.Getenv(brief.EnvCheckRun), CheckKind: os.Getenv(brief.EnvCheckKind)})
 	if code != brief.ExitPass {
 		return &ExitError{Code: code}
 	}
