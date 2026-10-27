@@ -34,7 +34,6 @@ func TestDesignContinueAction_UsesAgentfakeDesignPromptPrefix(t *testing.T) {
 // Continue that resets with /new.
 func TestLastAssistantText_ReadsACodexRollout(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("CODEX_HOME", home)
 	path := filepath.Join(home, "sessions", "2026", "10", "25", "rollout-2026-10-25T10-00-00-conv.jsonl")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -43,7 +42,7 @@ func TestLastAssistantText_ReadsACodexRollout(t *testing.T) {
 	if err := os.WriteFile(path, []byte(line), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	s := &Server{log: slog.New(slog.DiscardHandler)}
+	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}
 	meta := sessionMeta{Harness: "codex", ConversationID: "conv"}
 
 	text, ok := s.lastAssistantText("s1", meta)

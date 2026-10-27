@@ -15,9 +15,7 @@ import (
 // draft.
 func startDraftSession(t *testing.T, req server.CreateSessionRequest, draft string) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
 	t.Helper()
-	t.Setenv(agentfake.ProgramDraftEnv, draft)
-	t.Setenv(agentfake.ProgramInputEnv, "1")
-	return startFakeSessionWith(t, req, withAlerts(true, true))
+	return startFakeSessionWith(t, req, withAlerts(true, true), servertest.WithEnv(agentfake.ProgramDraftEnv+"="+draft, agentfake.ProgramInputEnv+"=1"))
 }
 
 func TestDraft_FirstPromptClearsTheDraftAndTypes(t *testing.T) {
@@ -43,8 +41,7 @@ func TestDraft_ActionClearsTheDraftAndTypes(t *testing.T) {
 }
 
 func TestDraft_ActionDraftBeforeLaterStepIsCleared(t *testing.T) {
-	t.Setenv(agentfake.ProgramInputEnv, "1")
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, withAlerts(true, true))
+	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, withAlerts(true, true), servertest.WithEnv(agentfake.ProgramInputEnv+"=1"))
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
 
 	if res, err := h.Client.RunSessionAction(ctx, id); err != nil || res.Refused {

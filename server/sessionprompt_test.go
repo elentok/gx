@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -24,10 +25,8 @@ type promptFixture struct {
 
 func startPromptSession(t *testing.T) promptFixture {
 	t.Helper()
-	t.Setenv(agentfake.ProgramInputEnv, "1")
 	cfg := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
-	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = firstPromptGrace })
+	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = firstPromptGrace }, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg))
 	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)

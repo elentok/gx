@@ -21,7 +21,8 @@ import (
 const holderArg = "servertest-agent-holder"
 
 // TestPidEnv is the pid of the test process a test holder exits with, so a
-// test killed before its cleanup leaves no holder running. TestMain sets it.
+// test killed before its cleanup leaves no holder running. Start puts it in
+// the server's env.
 const TestPidEnv = "GX_SERVERTEST_PID"
 
 // WithTestHolder hosts interactive sessions in the test binary itself, whose
@@ -84,10 +85,6 @@ func RunSessionProcesses() {
 	// After the holder check: the holder's env carries the program's marker.
 	if os.Getenv(agentfake.ProgramEnv) == "1" {
 		agentfake.Program()
-	}
-	// The holders this test process starts inherit it, unless a test set one.
-	if os.Getenv(TestPidEnv) == "" {
-		_ = os.Setenv(TestPidEnv, strconv.Itoa(os.Getpid()))
 	}
 }
 

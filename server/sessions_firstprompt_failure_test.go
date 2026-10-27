@@ -17,13 +17,13 @@ import (
 
 const firstPromptStartTimeout = 300 * time.Millisecond
 
-func startFailingFirstPrompt(t *testing.T, prompt string) firstPromptFixture {
+// startFailingFirstPrompt's extra entries are KEY=VALUE env for the server.
+func startFailingFirstPrompt(t *testing.T, prompt string, extraEnv ...string) firstPromptFixture {
 	t.Helper()
-	t.Setenv(agentfake.ProgramInputEnv, "1")
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: prompt}, func(c *server.Config) {
 		c.PromptGrace = firstPromptGrace
 		c.FirstPromptStartTimeout = firstPromptStartTimeout
-	}, withAlerts(true, true))
+	}, withAlerts(true, true), servertest.WithEnv(append([]string{agentfake.ProgramInputEnv + "=1"}, extraEnv...)...))
 	return firstPromptFixture{h: h, ctx: ctx, evs: evs, id: id, conv: conv}
 }
 
@@ -54,8 +54,7 @@ func TestFirstPromptFailure_StillStartingRaisesActionable(t *testing.T) {
 }
 
 func TestFirstPromptFailure_BlockedTimeDoesNotCountAsStarting(t *testing.T) {
-	t.Setenv(agentfake.ProgramTrustEnv, "1")
-	f := startFailingFirstPrompt(t, "fix the bug")
+	f := startFailingFirstPrompt(t, "fix the bug", agentfake.ProgramTrustEnv+"=1")
 	time.Sleep(3 * firstPromptStartTimeout)
 	snap, err := f.h.Client.Snapshot(f.ctx)
 	if err != nil {

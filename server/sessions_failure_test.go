@@ -22,8 +22,7 @@ const (
 func startFailureSession(t *testing.T, chat bool, stall time.Duration) (*servertest.Harness, context.Context, <-chan server.Event, string, string, string) {
 	t.Helper()
 	cfg := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
-	opts := []func(*server.Config){servertest.WithStallThreshold(stall)}
+	opts := []func(*server.Config){servertest.WithStallThreshold(stall), servertest.WithEnv("CLAUDE_CONFIG_DIR=" + cfg)}
 	if chat {
 		opts = append(opts, servertest.WithChatHarness(string(agentfake.HarnessKind)))
 	}

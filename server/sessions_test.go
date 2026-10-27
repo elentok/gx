@@ -305,8 +305,7 @@ func TestTestHolder_ExitsWithItsTestProcess(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The holder watches this stand-in for the test process.
-	t.Setenv(servertest.TestPidEnv, strconv.Itoa(test.Process.Pid))
-	h, _, _, id, conv := startFakeSession(t)
+	h, _, _, id, conv := startFakeSession(t, servertest.WithEnv(servertest.TestPidEnv+"="+strconv.Itoa(test.Process.Pid)))
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))
 
 	_ = test.Process.Kill()
@@ -422,7 +421,6 @@ func TestSessionName_FallsBackToDisplayNameThenProjectN(t *testing.T) {
 }
 
 func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
-	t.Setenv(agentfake.ProgramTrustEnv, "1")
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic", "01", "a", "")
 	repo := testutil.TempRepo(t)
@@ -432,7 +430,7 @@ func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
 	gitOut(t, repo, "checkout", "-q", "-b", "other")
 	gitOut(t, repo, "commit", "-q", "--allow-empty", "-m", "off trunk")
 
-	h := servertest.StartWithStore(t, store, servertest.WithTestHolder())
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithEnv(agentfake.ProgramTrustEnv+"=1"))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	evs, err := h.Client.Events(ctx, 0)
@@ -495,8 +493,7 @@ func TestCreateSession_RequestCarriesMadeWorktreeAndRebaseNote(t *testing.T) {
 }
 
 func TestCreateSession_ExistingDirLeavesTrustDialog(t *testing.T) {
-	t.Setenv(agentfake.ProgramTrustEnv, "1")
-	h, ctx, evs, id, _ := startFakeSession(t)
+	h, ctx, evs, id, _ := startFakeSession(t, servertest.WithEnv(agentfake.ProgramTrustEnv+"=1"))
 	want := server.SessionStatus{State: server.SessionBlocked, Kind: "dialog"}
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status == want })
 	// Outlasts the holder's trust key repeat.
@@ -570,9 +567,9 @@ func waitForScreen(t *testing.T, c *nativerunner.HolderClient, text string) {
 
 // startFakeSession creates a fake-harness session and waits for its first
 // report, returning its id and conversation id.
-func startFakeSession(t *testing.T) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+func startFakeSession(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
 	t.Helper()
-	return startFakeSessionWith(t, server.CreateSessionRequest{})
+	return startFakeSessionWith(t, server.CreateSessionRequest{}, opts...)
 }
 
 // startFakeSessionWith is startFakeSession for req in project proj.

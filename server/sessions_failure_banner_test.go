@@ -30,7 +30,6 @@ type failureBannerFixture struct {
 func startFailureBannerSession(t *testing.T, web bool, opts ...func(*server.Config)) failureBannerFixture {
 	t.Helper()
 	cfg := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
@@ -39,6 +38,7 @@ func startFailureBannerSession(t *testing.T, web bool, opts ...func(*server.Conf
 	all := []func(*server.Config){
 		servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)),
 		servertest.WithStallThreshold(time.Minute), servertest.WithChatPollInterval(20 * time.Millisecond), withAlerts(true, true),
+		servertest.WithEnv("CLAUDE_CONFIG_DIR=" + cfg),
 		func(c *server.Config) {
 			if web {
 				c.WebAddr = "127.0.0.1:0"

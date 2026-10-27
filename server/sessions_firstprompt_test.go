@@ -16,13 +16,12 @@ const firstPromptGrace = 300 * time.Millisecond
 
 // startFirstPromptSession starts a session with an input box and a first
 // prompt, still waiting for its ready report.
-func startFirstPromptSession(t *testing.T, prompt string) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
+func startFirstPromptSession(t *testing.T, prompt string, extraEnv ...string) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
 	t.Helper()
-	t.Setenv(agentfake.ProgramInputEnv, "1")
 	return startFakeSessionWith(t, server.CreateSessionRequest{Prompt: prompt}, func(c *server.Config) {
 		c.PromptGrace = firstPromptGrace
 		c.ActionSlashSettle = 200 * time.Millisecond
-	})
+	}, servertest.WithEnv(append([]string{agentfake.ProgramInputEnv + "=1"}, extraEnv...)...))
 }
 
 // The agent's input box and the claude config dir come only from the server's
@@ -69,8 +68,7 @@ func TestFirstPrompt_RealPromptInVimNormalIsDeliveredAfterTheInsertSwitch(t *tes
 	if err := os.WriteFile(filepath.Join(dir, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("CLAUDE_CONFIG_DIR", dir)
-	_, _, _, _, conv := startFirstPromptSession(t, "fix the bug")
+	_, _, _, _, conv := startFirstPromptSession(t, "fix the bug", "CLAUDE_CONFIG_DIR="+dir)
 	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionVimNormal}); err != nil {
 		t.Fatal(err)
 	}

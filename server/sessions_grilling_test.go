@@ -30,7 +30,6 @@ func startGrillingSession(t *testing.T, ticket string) (*servertest.Harness, con
 func startGrillingSessionIn(t *testing.T, ticket, store string, opts ...func(*server.Config)) (*servertest.Harness, context.Context, <-chan server.Event, string, string, string) {
 	t.Helper()
 	cfg := t.TempDir()
-	t.Setenv("CLAUDE_CONFIG_DIR", cfg)
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
 	// A caller may seed the map with a design_step first.
@@ -39,7 +38,7 @@ func startGrillingSessionIn(t *testing.T, ticket, store string, opts ...func(*se
 			t.Fatal(err)
 		}
 	}
-	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), withAlerts(true, true)}, opts...)
+	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), withAlerts(true, true), servertest.WithEnv("CLAUDE_CONFIG_DIR=" + cfg)}, opts...)
 	h := servertest.StartWithStore(t, store, opts...)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)

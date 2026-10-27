@@ -13,10 +13,9 @@ import (
 
 func TestSaveConversationTotals_CodexDesignLeavesNoGrillingCounts(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 	root := t.TempDir()
 	m := sessionMeta{ID: "s1", Dir: "/work/dir", Harness: string(ralphloop.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}
-	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{ConversationsDir: root}}
+	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{ConversationsDir: root, Env: []string{"HOME=" + home}}}
 	s.recordConversation(m)
 
 	path := transcript.PathIn(home, m.Dir, m.ConversationID)

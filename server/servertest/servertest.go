@@ -497,6 +497,8 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		t.Fatal(err)
 	}
 	h.cfg.Env = append(h.cfg.Env, "XDG_STATE_HOME="+xdgState)
+	// The holders end with this test process, unless a test passes another pid.
+	h.cfg.Env = append(h.cfg.Env, TestPidEnv+"="+strconv.Itoa(os.Getpid()))
 	if !ownHome {
 		h.cfg.Env = append(h.cfg.Env, "HOME="+filepath.Join(stateDir, "home"))
 		h.cfg.Env = append(h.cfg.Env, claudeenv.In(filepath.Join(stateDir, "claude-home"))...)

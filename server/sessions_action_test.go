@@ -98,8 +98,7 @@ func TestRunAction_SlashCommandThatNeverWorksStillSendsTheRest(t *testing.T) {
 // box, so a slash step has a real input to check.
 func startInputSession(t *testing.T, settle time.Duration) (*servertest.Harness, context.Context, <-chan server.Event, string, string) {
 	t.Helper()
-	t.Setenv(agentfake.ProgramInputEnv, "1")
-	return startFakeSessionWith(t, server.CreateSessionRequest{}, func(c *server.Config) {
+	return startFakeSessionWith(t, server.CreateSessionRequest{}, servertest.WithEnv(agentfake.ProgramInputEnv+"=1"), func(c *server.Config) {
 		c.ActionStepStartTimeout = time.Minute
 		c.ActionSlashSettle = settle
 	})

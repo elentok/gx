@@ -14,18 +14,8 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-// writeGrillingRounds writes one round per timestamp to the conversation's
-// transcript, each answered by a person message.
-func writeGrillingRounds(t *testing.T, dir, conv string, at ...time.Time) {
-	t.Helper()
-	path, err := transcript.Path(dir, conv)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writeGrillingRoundsAt(t, path, at...)
-}
-
-// writeGrillingRoundsAt is writeGrillingRounds for a transcript at path.
+// writeGrillingRoundsAt writes one round per timestamp to the transcript at
+// path, each answered by a person message.
 func writeGrillingRoundsAt(t *testing.T, path string, at ...time.Time) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -60,16 +50,8 @@ func designMapStore(t *testing.T) string {
 	return store
 }
 
+// HOME is set only on the server.
 func TestSessionConversations_DesignCountsSavedWhenAConversationEnds(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	h := servertest.StartWithStore(t, designMapStore(t), servertest.WithTestHolder())
-	checkDesignCountsSaved(t, h, func(dir, conv string, at ...time.Time) {
-		writeGrillingRounds(t, dir, conv, at...)
-	})
-}
-
-// The same through Config.Env: HOME is set only on the server.
-func TestSessionConversations_DesignCountsSavedFromTheServerEnvHome(t *testing.T) {
 	home := t.TempDir()
 	h := servertest.StartWithStore(t, designMapStore(t), servertest.WithTestHolder(), servertest.WithEnv("HOME="+home))
 	checkDesignCountsSaved(t, h, func(dir, conv string, at ...time.Time) {
@@ -117,10 +99,10 @@ func checkDesignCountsSaved(t *testing.T, h *servertest.Harness, writeGrillingRo
 }
 
 func TestSessionConversations_NonDesignSessionLeavesNoCounts(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
+	home := t.TempDir()
+	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"}, servertest.WithEnv("HOME="+home))
 	dir, _ := readMeta(t, h, id)["dir"].(string)
-	writeGrillingRounds(t, dir, conv, time.Now())
+	writeGrillingRoundsAt(t, transcript.PathIn(home, dir, conv), time.Now())
 	stopFakeSession(ctx, t, h, evs, id)
 
 	rec := recordsByID(t, h.ConversationsDir)[conv]
