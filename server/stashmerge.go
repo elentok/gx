@@ -18,9 +18,9 @@ import (
 // trunk-conflict ticket carries the resolution; until it is done the epic is
 // not merged.
 func (s *Server) epicStashMerge(req QueueRequest) (QueueResult, error) {
-	m, refused, err := s.loadMergeEpic(req)
-	if refused != nil || err != nil {
-		return refusedOr(refused), err
+	m, err := s.loadMergeEpic(req)
+	if err != nil {
+		return mergeVerbError(err)
 	}
 	if m.epic.MergeBlockKind != string(events.DirtyTrunk) {
 		return refusal(ReasonNotDirtyTrunk, m.root.String()+" is not paused on a dirty trunk"), nil

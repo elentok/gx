@@ -21,9 +21,9 @@ import (
 // otherwise. A manual ticket resets the merge-ticket cap and merges the epic
 // whatever auto-ff-merge says.
 func (s *Server) epicMerge(req QueueRequest) (QueueResult, error) {
-	m, refused, err := s.loadMergeEpic(req)
-	if refused != nil || err != nil {
-		return refusedOr(refused), err
+	m, err := s.loadMergeEpic(req)
+	if err != nil {
+		return mergeVerbError(err)
 	}
 	first, _, target, err := s.epicRefs(m.root.Project, m.epics, m.root.Epic, m.repo)
 	if err != nil {
@@ -47,58 +47,72 @@ type mergeEpicRef struct {
 	epic      tickets.Epic
 }
 
-func refusedOr(r *QueueResult) QueueResult {
-	if r == nil {
-		return QueueResult{}
-	}
-	return *r
+// mergeRefused is the error loadMergeEpic returns when the verb must stop with
+// a refusal rather than fail.
+type mergeRefused struct{ res QueueResult }
+
+func (e mergeRefused) Error() string { return "merge refused: " + e.res.Reason }
+
+func refuseMerge(reason, msg string) error {
+	return mergeRefused{res: refusal(reason, msg)}
 }
 
-// loadMergeEpic resolves req's epic address for a manual merge verb. A non-nil
-// refusal means the verb stops there; req's state token, when it has one, must
-// match the epic's current state.
-func (s *Server) loadMergeEpic(req QueueRequest) (m mergeEpicRef, refused *QueueResult, err error) {
-	refuse := func(reason, msg string) (mergeEpicRef, *QueueResult, error) {
-		r := refusal(reason, msg)
-		return mergeEpicRef{}, &r, nil
+// mergeVerbError turns loadMergeEpic's error into the verb's return: a refusal
+// is a result, anything else an error.
+func mergeVerbError(err error) (QueueResult, error) {
+	var refused mergeRefused
+	if errors.As(err, &refused) {
+		return refused.res, nil
 	}
+	return QueueResult{}, err
+}
+
+// shownEpicState is the state a merge request's token names, in the Epic
+// page's vocabulary. An Epics card shows the list state, which calls a
+// merge-blocked epic "merge-blocked" where the Epic page says paused.
+func shownEpicState(shown EpicState, e tickets.Epic) EpicState {
+	if shown == EpicState(EpicListMergeBlocked) && epicMergeBlocked(e) {
+		return EpicStatePaused
+	}
+	return shown
+}
+
+// loadMergeEpic resolves req's epic address for a manual merge verb. A
+// mergeRefused error means the verb stops there; req's state token, when it has
+// one, must match the epic's current state.
+func (s *Server) loadMergeEpic(req QueueRequest) (mergeEpicRef, error) {
 	project, epic, ok := tickets.ParseEpicAddress(req.Address)
 	if !ok {
-		return refuse(ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)")
+		return mergeEpicRef{}, refuseMerge(ReasonInvalidAddress, req.Address+" is not an epic address (want project:epic)")
 	}
 	root := rootRef{Project: project, Epic: epic}
 	dir, repo, err := s.projectOf(project)
 	if err != nil {
-		return refuse(ReasonUnknownTicket, "no epic "+root.String())
+		return mergeEpicRef{}, refuseMerge(ReasonUnknownTicket, "no epic "+root.String())
 	}
 	epics, err := tickets.LoadResolved(project, dir)
 	if err != nil {
-		return mergeEpicRef{}, nil, err
+		return mergeEpicRef{}, err
 	}
 	i := slices.IndexFunc(epics, func(e tickets.Epic) bool { return filepath.Base(e.Path) == epic })
 	if i < 0 || len(epics[i].Tickets) == 0 {
-		return refuse(ReasonUnknownTicket, "no epic "+root.String())
+		return mergeEpicRef{}, refuseMerge(ReasonUnknownTicket, "no epic "+root.String())
 	}
 	e := epics[i]
 	if e.IsMap {
-		return refuse(ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand")
+		return mergeEpicRef{}, refuseMerge(ReasonMapEpic, root.String()+" is a map epic; its tickets are resolved by hand")
 	}
 	if !isMergeableEpic(root) {
-		return refuse(ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges")
+		return mergeEpicRef{}, refuseMerge(ReasonOneOffsEpic, root.String()+" is the one-offs inbox; it never merges")
 	}
-	// The web page sends the state it shows; the socket route sends none. An
-	// Epics card shows the list state, which calls a merge-blocked epic
-	// "merge-blocked" where the Epic page says paused.
+	// The web page sends the state it shows; the socket route sends none.
 	if shown := EpicState(req.State); shown != "" {
 		now := epicStateFor(root, e, s.registry.startedAtOf)
-		if shown == EpicState(EpicListMergeBlocked) && epicMergeBlocked(e) {
-			shown = EpicStatePaused
-		}
-		if shown != now {
-			return refuse(ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown))
+		if shown = shownEpicState(shown, e); shown != now {
+			return mergeEpicRef{}, refuseMerge(ReasonStale, fmt.Sprintf("%s is %s now, the page showed %s", root, now, shown))
 		}
 	}
-	return mergeEpicRef{root: root, dir: dir, repo: repo, epics: epics, epic: e}, nil, nil
+	return mergeEpicRef{root: root, dir: dir, repo: repo, epics: epics, epic: e}, nil
 }
 
 // epicMergeLocked is epicMerge's work under the trunk lock; the caller acts on
