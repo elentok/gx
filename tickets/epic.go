@@ -133,6 +133,10 @@ type Epic struct {
 	// FrontmatterErrs holds ticket.md field values that failed to parse, each
 	// prefixed with its field name; ValidateProject reports them.
 	FrontmatterErrs []string
+
+	// forks caches the fork-children map; only the loader sets it (see
+	// Epic.forkChildren).
+	forks *forkCache
 }
 
 // TotalCount is the epic's total ticket count.
@@ -145,9 +149,8 @@ func (e Epic) TotalCount() int {
 // here too, since its fork subtree is still outstanding work.
 func (e Epic) OpenCount() int {
 	open := 0
-	forkChildren := e.forkChildren()
 	for _, t := range e.Tickets {
-		if !e.renderedStatus(t, forkChildren).Terminal() {
+		if !e.RenderedStatus(t).Terminal() {
 			open++
 		}
 	}

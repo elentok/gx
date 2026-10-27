@@ -65,7 +65,7 @@ const loadEpicWorkers = 8
 
 func loadEpic(scratchDir, name string) Epic {
 	epicPath := filepath.Join(scratchDir, name)
-	epic := Epic{Name: name, Path: epicPath}
+	epic := Epic{Name: name, Path: epicPath, forks: &forkCache{}}
 	loadEpicTicketMD(&epic)
 
 	issuesDir := filepath.Join(epicPath, "issues")

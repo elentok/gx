@@ -67,7 +67,8 @@ func epicStateOf(e tickets.Epic) epicState {
 		return epicDone
 	}
 	state := epicDone
-	for _, status := range e.RenderedStatuses() {
+	for _, t := range e.Tickets {
+		status := e.RenderedStatus(t)
 		if status.Paused() {
 			state = epicPaused
 			continue

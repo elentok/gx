@@ -2,14 +2,43 @@ package tickets
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 )
+
+// A loaded epic builds the fork-children map once for every per-ticket status
+// call, and rebuilds it when its tickets change.
+func TestRenderedStatus_BuildsForkChildrenOncePerEpic(t *testing.T) {
+	root := "01"
+	e := Epic{forks: &forkCache{}, Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "done"},
+		{Number: 2, Identifier: "01a", Status: "open", Parent: &root},
+		{Number: 3, Identifier: "02", Status: "open", BlockedBy: []string{"01"}},
+	}}
+	before := forkChildrenBuilds.Load()
+	for _, tk := range e.Tickets {
+		e.RenderedStatus(tk)
+		e.IsPaused(tk)
+		e.UnresolvedBlockers(tk)
+	}
+	if got := forkChildrenBuilds.Load() - before; got != 1 {
+		t.Errorf("fork-children builds = %d, want 1", got)
+	}
+	if got := e.RenderedStatus(e.Tickets[0]); got != StatusWaitingForChildren {
+		t.Errorf("fork parent status = %v, want waiting-for-children", got)
+	}
+
+	e.Tickets = append(slices.Clone(e.Tickets), Ticket{Number: 4, Identifier: "01b", Status: "open", Parent: &root})
+	if got := len(e.forkChildren()[ticketKey(e.Tickets[0])]); got != 2 {
+		t.Errorf("children of 01 after append = %d, want 2", got)
+	}
+}
 
 // OpenCount must build the fork-children map once per pass, not once per
 // ticket: allocations grow linearly with the epic, not quadratically.
 func TestOpenCount_AllocationsStayLinearInEpicSize(t *testing.T) {
 	build := func(n int) Epic {
-		e := Epic{}
+		e := Epic{forks: &forkCache{}}
 		for i := 1; i <= n; i++ {
 			tk := Ticket{Number: i, Identifier: fmt.Sprintf("%02d", i), Status: "done"}
 			if i > 1 {

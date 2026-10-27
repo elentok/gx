@@ -4,6 +4,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
+	"unsafe"
 
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -183,12 +186,7 @@ func (t Ticket) baseStatus() RenderedStatus {
 // is synthesized rather than read from its file (see effectiveBlockedBy),
 // but is otherwise resolved the same way as every other ticket's.
 func (e Epic) RenderedStatus(t Ticket) RenderedStatus {
-	return e.renderedStatus(t, e.forkChildren())
-}
-
-// renderedStatus is RenderedStatus with the fork-children map prebuilt, so a
-// pass over every ticket builds it once.
-func (e Epic) renderedStatus(t Ticket, forkChildren map[string][]Ticket) RenderedStatus {
+	forkChildren := e.forkChildren()
 	base := t.baseStatus()
 	if base == StatusDone && e.blocking(t, forkChildren) || pausedOnInvestigation(t, base, forkChildren) {
 		return StatusWaitingForChildren
@@ -196,7 +194,7 @@ func (e Epic) renderedStatus(t Ticket, forkChildren map[string][]Ticket) Rendere
 	if base != StatusOpen && base != StatusClaimed {
 		return base
 	}
-	if len(e.unresolvedBlockers(t, forkChildren)) > 0 || !e.ParentDone(t) {
+	if len(e.UnresolvedBlockers(t)) > 0 || !e.ParentDone(t) {
 		return StatusBlocked
 	}
 	return base
@@ -211,25 +209,13 @@ func (e Epic) IsPaused(t Ticket) bool {
 	return e.RenderedStatus(t).Paused()
 }
 
-// Paused is the status half of Epic.IsPaused, for callers that already hold the
-// status from RenderedStatuses.
+// Paused is the status half of Epic.IsPaused.
 func (s RenderedStatus) Paused() bool {
 	switch s {
 	case StatusPausedAnswer, StatusPausedRepair, StatusError, StatusDraft:
 		return true
 	}
 	return false
-}
-
-// RenderedStatuses is RenderedStatus of every ticket, in e.Tickets order, for
-// one fork-children build instead of one per ticket.
-func (e Epic) RenderedStatuses() []RenderedStatus {
-	forkChildren := e.forkChildren()
-	out := make([]RenderedStatus, len(e.Tickets))
-	for i, t := range e.Tickets {
-		out[i] = e.renderedStatus(t, forkChildren)
-	}
-	return out
 }
 
 // pausedOnInvestigation reports whether t is paused while an investigate child
@@ -399,21 +385,13 @@ func (e Epic) blocking(t Ticket, forkChildren map[string][]Ticket) bool {
 // (recursively forked) descendants. A blocker with no matching ticket in e
 // counts as unresolved (it can't be verified done).
 func (e Epic) UnresolvedBlockers(t Ticket) []string {
-	return e.unresolvedBlockers(t, nil)
-}
-
-// unresolvedBlockers is UnresolvedBlockers with the fork-children map
-// prebuilt; nil builds it when a Blocked by: token needs it.
-func (e Epic) unresolvedBlockers(t Ticket, forkChildren map[string][]Ticket) []string {
 	blockedBy := e.effectiveBlockedBy(t)
 	unresolved := slices.Clone(t.ExternalBlockers)
 	if len(blockedBy) == 0 {
 		return unresolved
 	}
 	byNumberAndSuffix := e.byNumberAndSuffix()
-	if forkChildren == nil {
-		forkChildren = e.forkChildren()
-	}
+	forkChildren := e.forkChildren()
 	for _, token := range blockedBy {
 		num, letters := splitBlockedByToken(token)
 		other, ok := byNumberAndSuffix[siblingKey(num, letters)]
@@ -441,9 +419,44 @@ func (e Epic) byNumberAndSuffix() map[string]Ticket {
 // forkChildren maps a ticket's siblingKey to every other ticket in e whose
 // Parent points at it — the reverse of Ticket.Parent, and Blocking's only
 // source of fork-subtree membership.
+//
+// The map is built once per epic: an Epic from the loader carries a forkCache,
+// which every copy shares and rebuilds only when Tickets is a different slice.
+// A hand-built Epic has no cache and builds it per call.
 func (e Epic) forkChildren() map[string][]Ticket {
+	if e.forks == nil {
+		return buildForkChildren(e.Tickets)
+	}
+	return e.forks.get(e.Tickets)
+}
+
+// forkCache holds the fork-children map for one Tickets slice. Epic copies
+// share it, so it is guarded and keyed by the slice it was built from.
+type forkCache struct {
+	mu       sync.Mutex
+	first    *Ticket
+	n        int
+	children map[string][]Ticket
+}
+
+func (c *forkCache) get(ts []Ticket) map[string][]Ticket {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.children == nil || c.first != unsafe.SliceData(ts) || c.n != len(ts) {
+		c.children = buildForkChildren(ts)
+		c.first, c.n = unsafe.SliceData(ts), len(ts)
+	}
+	return c.children
+}
+
+// forkChildrenBuilds counts buildForkChildren calls, so a test can pin the
+// once-per-epic build.
+var forkChildrenBuilds atomic.Int64
+
+func buildForkChildren(ts []Ticket) map[string][]Ticket {
+	forkChildrenBuilds.Add(1)
 	index := make(map[string][]Ticket)
-	for _, t := range e.Tickets {
+	for _, t := range ts {
 		if t.Parent == nil {
 			continue
 		}
