@@ -27,6 +27,9 @@ line). Exit 0 means pass, 1 fail, 2 brief could not run the tool.
 Tools: go-test, vitest, tsc (vitest and tsc run from the node_modules/.bin found
 walking up to the git root)
 
+conflicts lists the unmerged files of an in-progress merge or rebase with the
+line numbers of their conflict markers (exit 1 while any remain, 0 when none).
+
 -C <dir> runs the tool in that directory. It must come before the tool name;
 everything after the tool name goes to the tool unchanged.`,
 		// Flag parsing is off so tool flags such as -run pass through; -C is
@@ -61,7 +64,8 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 		return c.Help()
 	}
 	tool, ok := briefTools[args[0]]
-	if !ok {
+	if !ok && args[0] != "conflicts" {
+		// conflicts is not a brief.Tool: it runs no child tool and keeps no log.
 		return briefUsageError(c, fmt.Sprintf("unknown tool %q", args[0]))
 	}
 	if dir == "" {
@@ -70,6 +74,12 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 			return err
 		}
 		dir = cwd
+	}
+	if args[0] == "conflicts" {
+		if code := brief.Conflicts(dir, c.OutOrStdout()); code != brief.ExitPass {
+			return &ExitError{Code: code}
+		}
+		return nil
 	}
 	dataDir, err := config.DataDir()
 	if err != nil {
