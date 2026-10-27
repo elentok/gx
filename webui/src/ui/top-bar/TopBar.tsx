@@ -70,9 +70,18 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
             <Menu.Positioner>
               <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40">
                 {onToggleAfk && (
-                  <Menu.CheckboxItem value="afk" checked={afk} onCheckedChange={onToggleAfk} cursor="pointer">
-                    <Menu.ItemIndicator color={`tone.${tone}.fg`} />
+                  <Menu.CheckboxItem
+                    value="afk"
+                    checked={afk}
+                    onCheckedChange={onToggleAfk}
+                    cursor="pointer"
+                    color="text"
+                    ps="3"
+                    justifyContent="space-between"
+                    _highlighted={{ bg: "surface" }}
+                  >
                     AFK
+                    <AfkSwitch on={afk} tone={tone} />
                   </Menu.CheckboxItem>
                 )}
                 {build && (
@@ -85,6 +94,27 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
           </Menu.Root>
         )}
       </Box>
+    </Box>
+  );
+}
+
+// A drawn switch: the menu item carries the checkbox role and state, so this is decoration only.
+function AfkSwitch({ on, tone }: { on: boolean; tone: Tone }) {
+  return (
+    <Box
+      aria-hidden
+      w="32px"
+      h="18px"
+      p="2px"
+      borderRadius="full"
+      borderWidth="1px"
+      borderColor={on ? `tone.${tone}.fg` : "border"}
+      bg={on ? `tone.${tone}.fg` : "surface"}
+      display="flex"
+      justifyContent={on ? "flex-end" : "flex-start"}
+      transition="background 0.1s"
+    >
+      <Box w="12px" h="12px" borderRadius="full" bg={on ? "surface" : "text.dim"} />
     </Box>
   );
 }
