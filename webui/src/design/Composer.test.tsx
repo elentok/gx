@@ -200,6 +200,55 @@ test("the composer is disabled while the session is Working", async () => {
   expect(screen.queryByRole("button", { name: /Continue/ })).toBeNull();
 });
 
+const expand = () => screen.getByLabelText("Open the note in a large editor");
+
+test("the box is 5 rows, scrolls into view and has the expand button; no round: Message to the agent", async () => {
+  const scrollIntoView = vi.fn();
+  Element.prototype.scrollIntoView = scrollIntoView;
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  const box = await openNote();
+  expect(box.rows).toBe(5);
+  expect(scrollIntoView).toHaveBeenCalled();
+  fireEvent.click(expand());
+  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
+    "Message to the agent",
+  );
+  fireEvent.change(screen.getByLabelText("Note text in the large editor"), {
+    target: { value: "from the modal" },
+  });
+  fireEvent.click(screen.getByText("Done"));
+  expect(box.value).toBe("from the modal");
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post).toHaveBeenCalledWith({
+    id: "s-a",
+    text: "from the modal",
+    last_message: "m9",
+  });
+});
+
+test("with a round the modal is Note on this round and its text goes in the Note part", async () => {
+  Element.prototype.scrollIntoView = vi.fn();
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ round: round() }) });
+  const box = await openNote();
+  expect(box.rows).toBe(5);
+  fireEvent.click(expand());
+  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
+    "Note on this round",
+  );
+  fireEvent.change(screen.getByLabelText("Note text in the large editor"), {
+    target: { value: "round note" },
+  });
+  fireEvent.click(screen.getByText("Done"));
+  expect(box.value).toBe("round note");
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0].text).toMatch(/\n\nNote:\nround note$/);
+});
+
 const autoButton = () => screen.findByRole("button", { name: /^Auto:/ });
 
 // The Auto button opens the popover that holds the switches.

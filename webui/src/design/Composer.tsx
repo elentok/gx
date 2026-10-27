@@ -1,4 +1,4 @@
-import { Box, Spinner, Text, Textarea } from "@chakra-ui/react";
+import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useRef, useState } from "react";
 import type {
   SessionInfo,
@@ -20,6 +20,7 @@ import {
   type SetAutoAdvance,
 } from "./open";
 import { InterruptPopover } from "./InterruptPopover";
+import { NoteBox } from "./NoteBox";
 import { postPrompt, type PostPrompt } from "./prompt";
 import { roundPrompt, unansweredOf, type Answers } from "./round";
 import { SendPopover } from "./SendPopover";
@@ -208,13 +209,14 @@ export function Composer({
       aria-label="Composer"
     >
       {open && (
-        <Textarea
-          aria-label="Message"
-          borderRadius="12px"
+        <NoteBox
+          name="the composer"
+          label="Message"
+          title={inRound ? "Note on this round" : "Message to the agent"}
+          placeholder={inRound ? "A note on this round" : "A message to the agent"}
           value={text}
           disabled={!enabled}
-          onChange={(e) => setText(e.target.value)}
-          autoFocus
+          onChange={setText}
         />
       )}
       {/* One line: the Auto menu on the left, the main action on the right. */}

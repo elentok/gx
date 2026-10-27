@@ -20,6 +20,8 @@ export function NoteBox({
   value,
   placeholder,
   onChange,
+  label,
+  disabled,
 }: {
   /** What the note is on, for its labels: "question 2". */
   name: string;
@@ -28,6 +30,9 @@ export function NoteBox({
   value: string;
   placeholder: string;
   onChange: (text: string) => void;
+  /** The box's accessible name, when it is not "Note text for <name>". */
+  label?: string;
+  disabled?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -46,8 +51,9 @@ export function NoteBox({
         ps="3"
         pe="46px"
         resize="none"
-        aria-label={`Note text for ${name}`}
+        aria-label={label ?? `Note text for ${name}`}
         placeholder={placeholder}
+        disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
