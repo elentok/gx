@@ -57,7 +57,10 @@ type ProjectFile struct {
 	Notifications *NotificationsConfig `json:"notifications,omitempty"`
 	// Evolve false opts the project out of evolve; absent or true follows the
 	// global mode.
-	Evolve         *bool `json:"evolve,omitempty"`
+	Evolve *bool `json:"evolve,omitempty"`
+	// Checks is the `gx check` config, kept raw so config does not import the
+	// check package; check.ParseConfig validates it.
+	Checks         json.RawMessage `json:"checks,omitempty"`
 	ExecutionQueue *struct {
 		MaxAgentsPerEpic *int `json:"max-agents-per-epic,omitempty"`
 		MaxOneOffAgents  *int `json:"max-one-off-agents,omitempty"`

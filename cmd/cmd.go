@@ -213,6 +213,7 @@ Run without a command to open the status UI.`,
 		newAgentHolderCmd(),
 		newTermCmd(d),
 		newBriefCmd(d),
+		newCheckCmd(d),
 		newDoctorCmd(d),
 		newVersionCmd(d),
 	)

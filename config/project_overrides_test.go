@@ -53,6 +53,16 @@ func TestParseProjectFile_RejectsBadTypes(t *testing.T) {
 	}
 }
 
+func TestParseProjectFile_AcceptsChecks(t *testing.T) {
+	pf, err := ParseProjectFile([]byte(`{"checks": {"test": "make test"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(pf.Checks) != `{"test": "make test"}` {
+		t.Errorf("Checks = %s", pf.Checks)
+	}
+}
+
 func TestReadProjectFile_UnknownEnumsLoadWithDefaults(t *testing.T) {
 	pf, err := ReadProjectFile(writeProjectJSON(t, `{"landing": "bogus", "vcs": "hg"}`))
 	if err != nil {

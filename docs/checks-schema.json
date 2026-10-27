@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/elentok/gx/main/docs/checks-schema.json",
+  "title": "gx checks",
+  "description": "A project's .gx/checks.json (or the checks key of project.json): the commands `gx check` runs. {files} in a command is replaced by the selected files.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "format": { "$ref": "#/definitions/check" },
+    "lint": { "$ref": "#/definitions/check" },
+    "typecheck": { "$ref": "#/definitions/check" },
+    "test": { "$ref": "#/definitions/check" }
+  },
+  "definitions": {
+    "check": {
+      "description": "A command for both scopes, false to turn the kind off, or a pair of commands.",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        { "const": false },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["full"],
+          "properties": {
+            "changed": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Command for a changed-files run. Absent: the gx default."
+            },
+            "full": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Command for a --full run, with {files} set to every tracked file."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

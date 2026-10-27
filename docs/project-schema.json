@@ -56,6 +56,10 @@
       "type": "boolean",
       "description": "false opts this project out of evolve. Absent or true follows the global evolve mode."
     },
+    "checks": {
+      "$ref": "checks-schema.json",
+      "description": "The gx check config for this project. A .gx/checks.json in the repo wins over this."
+    },
     "disk-space": {
       "type": "object",
       "additionalProperties": false,
