@@ -289,7 +289,7 @@ test("a Merge blocked epic shows its label and merge-block reason; a Merging epi
 
 test("live tickets show their status word, elapsed time and cost; the draft word shows on drafts", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
-  expect(await screen.findByText("claimed · 1h 1m")).toBeTruthy();
+  expect(await screen.findByText("running · 1h 1m")).toBeTruthy();
   expect(screen.getByText("needs-repair")).toBeTruthy();
   expect(screen.getByText("draft")).toBeTruthy();
   expect(screen.getByText("blocked · $0.10")).toBeTruthy();
@@ -297,7 +297,7 @@ test("live tickets show their status word, elapsed time and cost; the draft word
 
 test("only a claimed ticket on the epic page spins", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
-  await screen.findByText("claimed · 1h 1m");
+  await screen.findByText("running · 1h 1m");
   const arcs = screen.getAllByRole("img", { name: "Running" });
   expect(arcs).toHaveLength(1);
   expect(arcs[0].parentElement?.closest("[data-tone]")?.textContent).toContain("Title 03");
@@ -317,7 +317,7 @@ test("a map epic shows rows with title and status", async () => {
 test("every live, fold, Error and map row links to its ticket page", async () => {
   const hrefOf = (title: string) => screen.getByRole("link", { name: new RegExp(title) }).getAttribute("href");
   renderAt("/e/gx:e", okFor, undefined, epicFetch({ total: 6, done: 2, rows: loopRows }));
-  await screen.findByText("claimed · 1h 1m");
+  await screen.findByText("running · 1h 1m");
   for (const n of ["01", "02", "03", "04", "05", "06"]) expect(hrefOf(`Title ${n}`)).toBe(`#/t/gx:e/${n}`);
   cleanup();
   renderAt(
@@ -541,12 +541,12 @@ test("a running row's elapsed time and a running epic's wall clock tick", async 
     conn.start();
     const rows = [rowOf("01", "claimed", { claimed_at: "2026-01-01T09:58:00Z" })];
     renderAt("/e/gx:e", okFor, conn, epicFetch({ state: "running", total: 1, wall_clock: 600, rows }));
-    expect(await screen.findByText("claimed · 2m")).toBeTruthy();
+    expect(await screen.findByText("running · 2m")).toBeTruthy();
     expect(statsLine()).toBe("Running · 10m · $0.00 · 0s agent time");
     await act(async () => {
       await vi.advanceTimersByTimeAsync(TICK_MS * 2);
     });
-    expect(screen.getByText("claimed · 4m")).toBeTruthy();
+    expect(screen.getByText("running · 4m")).toBeTruthy();
     expect(statsLine()).toBe("Running · 12m · $0.00 · 0s agent time");
     conn.stop();
   } finally {

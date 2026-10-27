@@ -171,8 +171,11 @@ function stateOf(row: EpicDetailRow): { word?: string; after?: string } {
   const status = row.rendered_status;
   if (status === "open" && !after) return { word: "ready" };
   if (status === "blocked" && after) return { after };
+  if (isRunning(row)) return { word: "running", after };
   return { word: status, after };
 }
+
+const isAsking = (row: EpicDetailRow) => !!row.needs_answer || bucketOf(row) === "asking";
 
 // A Design row counts up only while a design session runs; its other rows carry no time or cost.
 function designMeta(row: EpicDetailRow, ctx: RowContext): string {
@@ -184,6 +187,7 @@ function designMeta(row: EpicDetailRow, ctx: RowContext): string {
 
 // The dim meta text of a live card: state word, pause reason, elapsed time, cost, then the blockers and fork note.
 export function cardMeta(row: EpicDetailRow, ctx: RowContext): string {
+  if (isAsking(row)) return "needs answer";
   if (ctx.detail.kind === "map") return designMeta(row, ctx);
   const { word, after } = stateOf(row);
   return joinDot(

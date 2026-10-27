@@ -195,6 +195,18 @@ test("a fork's card is indented and the running card has the spinning dot", asyn
   expect(within(await cardOf("01")).getByRole("img", { name: "Running" })).toBeTruthy();
 });
 
+test("running, needs-answer and needs-repair cards use the mock meta wording", async () => {
+  live([
+    tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString(), cost: 0.4 }),
+    tk("02", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?", cost: 1 }),
+    tk("03", { rendered_status: "needs-repair", reason: "Run failed" }),
+  ]);
+  expect((await cardOf("01")).textContent).toContain("running · 0s · $0.40");
+  expect((await cardOf("02")).textContent).toContain("needs answer");
+  expect((await cardOf("02")).textContent).not.toContain("needs-answer");
+  expect((await cardOf("03")).textContent).toContain("needs-repair · Run failed");
+});
+
 test("a needs-you card shows its question and an Answer button to the ticket page", async () => {
   live([tk("01", { rendered_status: "needs-answer", needs_answer: true, question: "Which db?" })]);
   const card = await cardOf("01");

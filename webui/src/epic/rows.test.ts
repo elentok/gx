@@ -24,7 +24,11 @@ test.each([
   ["a blocked row", { rendered_status: "blocked", blockers: ["01", "02"] }, "after 01 and 02"],
   ["a paused row keeps its reason and no link word", { rendered_status: "paused", reason: "needs a person" }, "paused · needs a person"],
   ["a failed row", { rendered_status: "error" }, "error"],
-  ["a merged-time row", { rendered_status: "claimed", elapsed: 90, cost: 1.5 }, "claimed · 1m · $1.50"],
+  ["a running row", { rendered_status: "claimed", elapsed: 180, cost: 0.4 }, "running · 3m · $0.40"],
+  ["a running row without cost", { rendered_status: "claimed", elapsed: 180 }, "running · 3m"],
+  ["a running fork whose parent is done", { rendered_status: "claimed", elapsed: 180, cost: 0.4, parent: "gx:e/07" }, "running · 3m · $0.40 · fork of 07"],
+  ["a needs-answer row", { rendered_status: "needs-answer", needs_answer: true, elapsed: 90, cost: 1.5 }, "needs answer"],
+  ["a needs-repair row", { rendered_status: "needs-repair", reason: "Run failed" }, "needs-repair · Run failed"],
   ["a fork whose parent is not drawn", { rendered_status: "open", parent: "gx:e/01" }, "ready · fork of 01"],
 ] as [string, Partial<EpicDetailRow>, string][])("loop meta of %s", (_n, over, text) => {
   const r = row(over);
@@ -34,9 +38,9 @@ test.each([
 test.each([
   ["ready", { type: "prototype" }, false, "prototype · ready"],
   ["blocked", { type: "grilling", rendered_status: "blocked", blockers: ["04"] }, false, "grilling · after 04"],
-  ["the rendered word", { type: "spec", rendered_status: "needs-answer" }, false, "spec · needs-answer"],
-  ["a claimed row with a live session", { type: "spec", rendered_status: "claimed", claimed_at: "2026-01-01T00:00:00Z" }, true, "spec · claimed · 10m"],
-  ["a claimed row with no live session", { type: "spec", rendered_status: "claimed", claimed_at: "2026-01-01T00:00:00Z" }, false, "spec · claimed"],
+  ["needs answer", { type: "spec", rendered_status: "needs-answer", needs_answer: true }, false, "needs answer"],
+  ["a running row with a live session", { type: "spec", rendered_status: "claimed", claimed_at: "2026-01-01T00:00:00Z" }, true, "spec · running · 10m"],
+  ["a running row with no live session", { type: "spec", rendered_status: "claimed", claimed_at: "2026-01-01T00:00:00Z" }, false, "spec · running"],
 ] as [string, Partial<EpicDetailRow>, boolean, string][])("Design meta of %s", (_n, over, live, text) => {
   const r = row(over);
   expect(cardMeta(r, rowContext(detailOf("map", [r]), NOW, live))).toBe(text);
