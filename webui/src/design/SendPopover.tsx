@@ -1,56 +1,54 @@
 import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import type { SessionRoundCard } from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { nameOf } from "./round";
 
 // Send with unanswered questions: a list of the gaps anchored on Send. A row jumps to its question; Send anyway sends.
 export function SendPopover({
+  open,
   unanswered,
   total,
   sendDisabled,
+  anchorRef,
   onSendAnyway,
   onAnswer,
   onClose,
-  children,
 }: {
-  /** Empty means closed. */
+  open: boolean;
   unanswered: SessionRoundCard[];
   total: number;
   sendDisabled: boolean;
+  /** The Send button the popover anchors on. */
+  anchorRef: RefObject<HTMLElement | null>;
   onSendAnyway: () => void;
   onAnswer: (c: SessionRoundCard) => void;
   onClose: () => void;
-  /** The Send button the popover anchors on. */
-  children: ReactNode;
 }) {
-  const anchor = useRef<HTMLDivElement>(null);
   const sendAnyway = useRef<HTMLButtonElement>(null);
   // A row hands focus to the question, so the popover must not give it back to Send.
-  const [restoreFocus, setRestoreFocus] = useState(true);
+  const restoreFocus = useRef(true);
+  useEffect(() => {
+    if (open) restoreFocus.current = true;
+  }, [open]);
   const n = unanswered.length;
   return (
     <Popover.Root
-      open={n > 0}
+      open={open}
       onOpenChange={(e) => !e.open && onClose()}
       initialFocusEl={() => sendAnyway.current}
-      finalFocusEl={() => anchor.current?.querySelector("button") ?? null}
-      restoreFocus={restoreFocus}
+      finalFocusEl={() => anchorRef.current}
+      restoreFocus={restoreFocus.current}
       // Send is not "outside": its own click toggles, so a second click can't reopen what the first closed.
-      persistentElements={[() => anchor.current]}
-      positioning={{ placement: "top-end", gutter: 10 }}
+      persistentElements={[() => anchorRef.current]}
+      positioning={{
+        placement: "top-end",
+        gutter: 10,
+        getAnchorRect: () => anchorRef.current?.getBoundingClientRect() ?? null,
+      }}
       lazyMount
       unmountOnExit
     >
-      <Popover.Anchor asChild>
-        <Box
-          ref={anchor}
-          display="inline-flex"
-          onClickCapture={() => setRestoreFocus(true)}
-        >
-          {children}
-        </Box>
-      </Popover.Anchor>
       <Portal>
         <Popover.Positioner>
           <Popover.Content
@@ -96,7 +94,7 @@ export function SendPopover({
                   <chakra.button
                     type="button"
                     onClick={() => {
-                      setRestoreFocus(false);
+                      restoreFocus.current = false;
                       onAnswer(c);
                       onClose();
                     }}

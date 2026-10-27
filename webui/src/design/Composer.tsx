@@ -1,5 +1,5 @@
 import { Box, Spinner, Text, Textarea } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
+import { useRef, useState } from "react";
 import type {
   SessionInfo,
   SessionNext,
@@ -70,7 +70,8 @@ export function Composer({
 }) {
   const wide = useWide();
   const [open, setOpen] = useState(false);
-  const [unanswered, setUnanswered] = useState<SessionRoundCard[]>([]);
+  const [gapsOpen, setGapsOpen] = useState(false);
+  const sendRef = useRef<HTMLButtonElement>(null);
   const [text, setTextState] = useState(initialText);
   const setText = (t: string) => {
     setTextState(t);
@@ -104,17 +105,17 @@ export function Composer({
 
   const inRound = round.length > 0;
   const sendRound = () => {
-    setUnanswered([]);
+    setGapsOpen(false);
     return send({ text: roundPrompt(round, answers, text) }, () => {
       setText("");
       onRoundSent?.();
     });
   };
-  const onSend = () => {
-    if (!inRound) return send({ text }, () => setText(""));
-    if (unanswered.length > 0) return setUnanswered([]);
-    const missing = unansweredOf(round, answers);
-    if (missing.length > 0) setUnanswered(missing);
+  const unanswered = unansweredOf(round, answers);
+  // With gaps, Send's click opens the popover instead of sending; a click while it is open closes it.
+  const onSendRound = () => {
+    if (gapsOpen) setGapsOpen(false);
+    else if (unanswered.length > 0) setGapsOpen(true);
     else sendRound();
   };
 
@@ -138,34 +139,34 @@ export function Composer({
       {pending && <Spinner size="sm" />}
       Continue
     </Button>
-  ) : (
-    withPopover(
-      <Button
-        disabled={!enabled || (!inRound && text.trim() === "")}
-        onClick={onSend}
-      >
+  ) : inRound ? (
+    <>
+      <Button ref={sendRef} disabled={!enabled} onClick={onSendRound}>
         {pending && <Spinner size="sm" />}
         Send
-      </Button>,
-    )
-  );
-  // With gaps, Send's click opens the popover instead of sending; a click while it is open closes it.
-  function withPopover(send: ReactNode) {
-    return (
+      </Button>
       <SendPopover
+        open={gapsOpen && unanswered.length > 0}
         unanswered={unanswered}
         total={round.length}
         sendDisabled={!enabled}
+        anchorRef={sendRef}
         onSendAnyway={sendRound}
         onAnswer={(c) =>
           onReview?.(round.findIndex((r) => r.label === c.label))
         }
-        onClose={() => setUnanswered([])}
-      >
-        {send}
-      </SendPopover>
-    );
-  }
+        onClose={() => setGapsOpen(false)}
+      />
+    </>
+  ) : (
+    <Button
+      disabled={!enabled || text.trim() === ""}
+      onClick={() => send({ text }, () => setText(""))}
+    >
+      {pending && <Spinner size="sm" />}
+      Send
+    </Button>
+  );
 
   const autoAdvanceBar = (
     <AutoAdvanceBar
