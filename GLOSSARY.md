@@ -184,8 +184,11 @@ what the person does. Replaces `park_kind`. A ticket stored before this field ex
 reason and is read as `zero-commit`, or `iteration-error` for a repair, until `gx tickets migrate`
 rewrites it. _Avoid_: Park kind, "gate park", "announce-and-stop park" (retired names).
 
-**Pause class** — `answer` or `repair`, derived from the **Pause reason**. It decides which verbs
-work on the ticket, `--wait` exit codes 3 (answer) and 4 (repair), notification wording and counts.
+**Pause class** — `answer` or `repair`, derived from the **Pause reason**, split by who acts next.
+`answer`: a person acts next, by replying to the waiting agent or by picking a choice that gx carries
+out. `repair`: gx or an investigation must fix something first. It decides `--wait` exit codes
+3 (answer) and 4 (repair), notification wording and counts, and only a repair pause gets an
+investigation.
 Replaces the split between the statuses `needs-answer` and `needs-repair`. It is not stored.
 
 **Resume** — lift a pause, and nothing else. A person resumes a Paused ticket with `gx server tickets
@@ -211,6 +214,12 @@ smart-zone pauses lift themselves and show no Resume. _Avoid_: Drain, Draining.
 `gx server tickets start-over`; the UI says "Start over". Replaces the ticket verb `reset`, not
 `git reset`.
 
+**Retry** — launch a fresh agent for a Paused ticket now, on the same branch, keeping its commits.
+It closes an idle leftover agent; a working one is stopped only on request (`--stop`, "Stop agent
+and retry"). `gx server tickets retry`; the UI says "Retry". The verb most repair-class pauses
+offer. Not **Resume**, which only lifts a pause, and not **Start over**, which throws the work
+away. Replaces the ticket verb `relaunch`. _Avoid_: relaunch.
+
 **Merge (ticket level)** — put a ticket's commits onto its **Target** branch. `gx server tickets
 merge` does what `land` did, and the UI shows the target ("Merge into the feature branch"). A
 **Merge ticket** is a ticket whose job is to merge. Epic-level merge states keep their names.
@@ -232,6 +241,7 @@ They survive only in one read shim and a few hidden aliases, until `gx:follow-up
 - Land, landing (ticket) → **Merge (ticket level)**.
 - Reset (ticket) → **Start over**.
 - Relaunch, `resume-on-start` (session) → **Restore**.
+- Relaunch (ticket) → **Retry**.
 
 **Recently finished** — the last few completed loop epics (by `completed_at`), listed apart from and
 dimmer than the live epics so a finished epic does not just vanish from the Queue. Map epics never
