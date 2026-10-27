@@ -12,8 +12,11 @@ import (
 
 // designPercent is the Designing progress in percent: the steps passed plus the
 // closed map tickets, over the steps from Chart to Branch plus the map tickets,
-// less one. It can go down when tickets are added.
+// less one. It can go down when tickets are added. A finished Design is 100.
 func designPercent(m tickets.Epic, step ProgressStep) int {
+	if step == ProgressDone {
+		return 100
+	}
 	closed := 0
 	for _, t := range m.Tickets {
 		if t.Status == string(schema.StatusDone) {
@@ -59,7 +62,7 @@ func decorateDesignCard(row *EpicListRow, m tickets.Epic, impl *EpicListRow, act
 	case row.ProgressStep == ProgressDone:
 		row.Section = SectionFinished
 		row.StatusWords = "Designed"
-		row.RingProgress = 100
+		row.RingProgress = designPercent(m, row.ProgressStep)
 	default:
 		row.RingProgress = designPercent(m, row.ProgressStep)
 		fallback := cmp.Or(lastActivity(m), m.CreatedAt)

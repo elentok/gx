@@ -211,11 +211,7 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 	d.Steps = mapSteps(e, byName)
 	step := mapProgress(e)
 	d.DesignSection = designSection(d.Address, e, step, s.designActivities()[d.Address])
-	if step == ProgressDone {
-		d.RingProgress = 100
-	} else {
-		d.RingProgress = designPercent(e, step)
-	}
+	d.RingProgress = designPercent(e, step)
 	d.Stats = epicStats(e, e.CompletedAt, now)
 	if _, ok := byName[e.Name+tickets.ImplEpicSuffix]; ok {
 		d.ImplAddress = rootRef{Project: root.Project, Epic: e.Name + tickets.ImplEpicSuffix}.String()
@@ -223,13 +219,9 @@ func (s *Server) buildMapDetail(root rootRef, epics []tickets.Epic, e tickets.Ep
 	current, blocked := mapTicketFlags(e)
 	for _, t := range e.Tickets {
 		status := e.RenderedStatus(t)
-		row := EpicDetailRow{
-			Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title,
-			RenderedStatus: status.Word(), Type: t.Type, Blockers: e.UnresolvedBlockers(t),
-			ClosedAt: t.FinishedAt(),
-			Current:  current.DisplayNumber() != "" && t.DisplayNumber() == current.DisplayNumber(),
-			Blocked:  blocked[t.DisplayNumber()],
-		}
+		row := baseRow(root, e, t, status)
+		row.Current = current.DisplayNumber() != "" && t.DisplayNumber() == current.DisplayNumber()
+		row.Blocked = blocked[t.DisplayNumber()]
 		if status == tickets.StatusClaimed {
 			row.ClaimedAt = t.ClaimedAt
 		}
@@ -316,14 +308,19 @@ func webShare(endings map[string]int) *float64 {
 	return &share
 }
 
+// baseRow is the part of a row both epic kinds share; status is e.RenderedStatus(t).
+func baseRow(root rootRef, e tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) EpicDetailRow {
+	return EpicDetailRow{
+		Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title, RenderedStatus: status.Word(),
+		Type: t.Type, Blockers: e.UnresolvedBlockers(t), ClosedAt: t.FinishedAt(),
+	}
+}
+
 // rowFor builds a loop epic's full row for t.
 func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) EpicDetailRow {
 	status := e.RenderedStatus(t)
-	row := EpicDetailRow{
-		Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title, RenderedStatus: status.Word(),
-		Type: t.Type, Elapsed: t.ElapsedTime, Cost: t.ActualCost, Blockers: e.UnresolvedBlockers(t),
-		ClosedAt: t.FinishedAt(),
-	}
+	row := baseRow(root, e, t, status)
+	row.Elapsed, row.Cost = t.ElapsedTime, t.ActualCost
 	if t.Parent != nil {
 		row.Parent = ticketAddress(root, *t.Parent)
 	}
