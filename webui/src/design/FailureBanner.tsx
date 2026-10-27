@@ -7,7 +7,7 @@ import { postResumeSession, stateToken, type OpenDesign, type ResumeSession } fr
 import { postPrompt, type PostPrompt } from "./prompt";
 import type { FetchScreen } from "./screen";
 import { ScreenModal } from "./ScreenModal";
-import { useDesignWrite, useStartNew } from "./SessionControls";
+import { startNew, useDesignWrite } from "./SessionControls";
 
 // The generated file is imported for types only: its tygo constants are not runtime values.
 const CRASHED = "crashed";
@@ -71,7 +71,6 @@ export function FailureBanner({
   const [cannotRestore, setCannotRestore] = useState(false);
   const sessionId = session.id;
   const restoreHidden = failure.recrashed || cannotRestore;
-  const startNew = useStartNew(address, session, open);
 
   const restore = () =>
     run(async () => {
@@ -89,7 +88,7 @@ export function FailureBanner({
 
   const onClick: Record<ButtonName, () => void> = {
     Restore: () => (setClicked("Restore"), restore()),
-    "New session": () => (setClicked("New session"), startNew.startNew()),
+    "New session": () => (setClicked("New session"), startNew(run, address, session, open)),
     Screen: () => setScreen(true),
     Retry: () => (setClicked("Retry"), retry()),
   };
@@ -124,10 +123,10 @@ export function FailureBanner({
               key={name}
               emphasis={name === "New session" && restoreHidden ? "main" : "secondary"}
               tone={name === "New session" && restoreHidden ? "running" : undefined}
-              disabled={pending || startNew.pending}
+              disabled={pending}
               onClick={onClick[name]}
             >
-              {(pending || startNew.pending) && clicked === name && <Spinner size="sm" />}
+              {pending && clicked === name && <Spinner size="sm" />}
               {name}
             </Button>
           ))}
