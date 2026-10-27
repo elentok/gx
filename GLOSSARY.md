@@ -995,6 +995,14 @@ config. _Avoid_: suite, task, test target.
 failure: a pass on retry is not a pass. A known flake is an open follow-up, not an entry on a list.
 _Avoid_: intermittent failure, known failure.
 
+**Pre-existing failure** — a test or flow that fails on the branch and fails the same way on its
+base, so the branch did not cause it. Like a flake, it is tracked as an open follow-up.
+_Avoid_: known failure, baseline failure.
+
+**Branch fault** — a test that fails on every rerun on the branch and passes on its base: the
+branch broke it. Only a branch fault is fixed or reported as the branch's problem.
+_Avoid_: regression (when the base was not checked).
+
 **gx defaults** — the checks gx picks by itself for a project, from the tools it finds. A project
 with no check config uses only these.
 
