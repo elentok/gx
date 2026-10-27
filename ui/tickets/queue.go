@@ -261,7 +261,7 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.watch, cmd = m.watch.Step(msg)
 		return m, cmd
 	case ticketMenuReadyMsg:
-		return m.handleTicketMenuReady(msg), nil
+		return m.handleTicketMenuReady(msg)
 	case ticketMenuPickMsg:
 		return m.handleTicketMenuPick(msg)
 	case epicMenuPickMsg:

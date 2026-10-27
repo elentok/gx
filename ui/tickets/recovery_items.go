@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/tickets/schema"
 )
 
 // recoverPrefix marks a menu pick that runs one of detail.actions; the rest of
@@ -20,8 +19,8 @@ type recoveryAction struct {
 	recommended       bool
 }
 
-// recoveryActions reads the server's verbs, with the pause-to-verb table's
-// label and tooltip for each. A nil detail offers none.
+// recoveryActions reads the server's verbs with the label and tooltip the
+// server sent for each. A nil detail offers none.
 func recoveryActions(d *server.TicketDetail) []recoveryAction {
 	if d == nil {
 		return nil
@@ -30,11 +29,7 @@ func recoveryActions(d *server.TicketDetail) []recoveryAction {
 	for _, word := range d.Actions {
 		info := d.ActionInfo[word]
 		if info.Label == "" {
-			if v, ok := schema.VerbOfWord(word); ok {
-				info = server.ActionInfo{Label: v.Label(), Tooltip: v.Tooltip()}
-			} else {
-				info.Label = word
-			}
+			info.Label = word
 		}
 		out = append(out, recoveryAction{
 			word: word, label: info.Label, help: info.Tooltip,
@@ -44,17 +39,18 @@ func recoveryActions(d *server.TicketDetail) []recoveryAction {
 	return out
 }
 
-// ticketDetail reads address's detail; nil when there is no server or the read
-// fails, which leaves the menu without recovery items.
-func ticketDetail(api ServerAPI, address string) *server.TicketDetail {
+// ticketDetail reads address's detail. With no server it returns nil and no
+// error; a failed read returns the error, and the menu opens without recovery
+// items.
+func ticketDetail(api ServerAPI, address string) (*server.TicketDetail, error) {
 	if api == nil {
-		return nil
+		return nil, nil
 	}
 	d, err := api.Detail(context.Background(), address)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return &d
+	return &d, nil
 }
 
 // recoveryWord is the verb of a recovery pick; ok is false for any other action.

@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/ui/contextmenu"
+	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/terminalrun"
 )
 
@@ -231,6 +232,16 @@ type ticketMenuReadyMsg struct {
 	target ticketTarget
 	prompt string
 	items  []contextmenu.Item[ticketTarget]
+	// detailErr is the failed detail read; the menu opens without recovery items.
+	detailErr error
+}
+
+// toast shows a failed detail read on the status line.
+func (msg ticketMenuReadyMsg) toast() tea.Cmd {
+	if msg.detailErr == nil {
+		return nil
+	}
+	return notify.Error("ticket detail: " + msg.detailErr.Error())
 }
 
 // newTicketMenuInput is what both tabs read from a ticket row when "m" is
@@ -259,8 +270,9 @@ func cmdTicketMenu(api ServerAPI, in ticketMenuInput) tea.Cmd {
 		it, live := serverIteration(api, address)
 		in.paneLive = live && it.Tab != ""
 		in.watchReason = watchReason(api, agentAddress(address, target.ticketID))
-		in.detail = ticketDetail(api, address)
-		return ticketMenuReadyMsg{target: target, prompt: prompt, items: ticketMenuItems(in)}
+		var err error
+		in.detail, err = ticketDetail(api, address)
+		return ticketMenuReadyMsg{target: target, prompt: prompt, items: ticketMenuItems(in), detailErr: err}
 	}
 }
 
@@ -318,13 +330,14 @@ func (m QueueModel) menuAnchor() contextmenu.Anchor {
 	return contextmenu.Anchor{X: 1, Y: 1 + queueHeaderReservedLines + line, H: h}
 }
 
-func (m Model) handleTicketMenuReady(msg ticketMenuReadyMsg) Model {
+func (m Model) handleTicketMenuReady(msg ticketMenuReadyMsg) (Model, tea.Cmd) {
 	pending := m.ticketMenuPending
 	m.ticketMenuPending = ""
-	if ticketMenuReadyApplies(msg, pending, m.selectedTicketPath(), m.ModalOpen()) {
-		m.ticketMenu = m.ticketMenu.Open(msg.target, msg.prompt, msg.items)
+	if !ticketMenuReadyApplies(msg, pending, m.selectedTicketPath(), m.ModalOpen()) {
+		return m, nil
 	}
-	return m
+	m.ticketMenu = m.ticketMenu.Open(msg.target, msg.prompt, msg.items)
+	return m, msg.toast()
 }
 
 // handleTicketMenuPick runs a pick only while its ticket is still the

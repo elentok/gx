@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestPauseRows_EveryKindHasARowWithAWebVerb(t *testing.T) {
-	if err := checkPauseRows(PauseKinds(), pauseRows, pauseVerbs, graphEventsNotPauses); err != nil {
+func TestPauseRows_EveryKindHasARow(t *testing.T) {
+	if err := checkPauseRows(PauseKinds(), pauseRows, graphEventsNotPauses); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -24,21 +24,15 @@ func TestPauseRows_GraphEventsNotPausesHoldsExactlyTwo(t *testing.T) {
 	}
 }
 
-func TestCheckPauseRows_FailsOnMissingRowAndCLIOnlyRow(t *testing.T) {
-	verbInfo := map[PauseVerb]VerbInfo{"web": {Web: true}, "cli": {Web: false}}
-	kinds := []PauseReason{"fake-missing", "fake-cli", "fake-ok", "fake-exempt"}
-	rows := map[PauseReason]PauseRow{
-		"fake-cli": {Verbs: []PauseVerb{"cli"}},
-		"fake-ok":  {Verbs: []PauseVerb{"cli", "web"}},
-	}
-	err := checkPauseRows(kinds, rows, verbInfo, []PauseReason{"fake-exempt"})
+func TestCheckPauseRows_FailsOnMissingRow(t *testing.T) {
+	kinds := []PauseReason{"fake-missing", "fake-ok", "fake-exempt"}
+	rows := map[PauseReason]PauseRow{"fake-ok": {Verbs: []PauseVerb{VerbRetry}}}
+	err := checkPauseRows(kinds, rows, []PauseReason{"fake-exempt"})
 	if err == nil {
 		t.Fatal("want an error")
 	}
-	for _, want := range []string{"fake-missing: no row", "fake-cli: no verb the web serves"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error %q lacks %q", err, want)
-		}
+	if want := "fake-missing: no row"; !strings.Contains(err.Error(), want) {
+		t.Errorf("error %q lacks %q", err, want)
 	}
 	for _, bad := range []string{"fake-ok", "fake-exempt"} {
 		if strings.Contains(err.Error(), bad) {
@@ -89,10 +83,18 @@ func TestPausedAskingAndForRepair(t *testing.T) {
 	}
 }
 
-func TestPauseVerbs_EveryVerbHasLabelAndTooltip(t *testing.T) {
+func TestPauseVerbs_EveryVerbHasWordLabelAndTooltip(t *testing.T) {
+	words := map[string]PauseVerb{}
 	for v, info := range pauseVerbs {
-		if info.Label == "" || info.Tooltip == "" {
-			t.Errorf("verb %q: label %q tooltip %q", v, info.Label, info.Tooltip)
+		if info.Word == "" || info.Label == "" || info.Tooltip == "" {
+			t.Errorf("verb %q: word %q label %q tooltip %q", v, info.Word, info.Label, info.Tooltip)
+		}
+		if other, dup := words[info.Word]; dup {
+			t.Errorf("verbs %q and %q share word %q", v, other, info.Word)
+		}
+		words[info.Word] = v
+		if got, ok := VerbOfWord(info.Word); !ok || got != v {
+			t.Errorf("VerbOfWord(%q) = %q, %v; want %q", info.Word, got, ok, v)
 		}
 	}
 	for r, row := range pauseRows {

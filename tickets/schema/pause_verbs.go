@@ -29,26 +29,26 @@ const (
 	ReceiverGx    PauseReceiver = "gx"
 )
 
-// VerbInfo is what the web and the TUI show for a verb. Web marks a verb the
-// web serves; the table check fails a row that has none.
+// VerbInfo is what the web and the TUI show for a verb. Word is how the
+// detail's actions and the refusals spell it.
 type VerbInfo struct {
+	Word    string
 	Label   string
 	Tooltip string
-	Web     bool
 }
 
-// pauseVerbs gives every verb its label and tooltip, so the web and the TUI
-// show the same text.
+// pauseVerbs gives every verb its word, label and tooltip, so the web and the
+// TUI show the same text.
 var pauseVerbs = map[PauseVerb]VerbInfo{
-	VerbAnswer:      {"Answer", "Reply to the agent. It goes on from where it stopped.", true},
-	VerbResume:      {"Resume", "Lift the pause. The ticket waits its turn in the queue.", true},
-	VerbRetry:       {"Retry", "Start a fresh agent now. Keeps the branch and its commits.", true},
-	VerbStartOver:   {"Start over", "Throw away the work and run again from the base. A backup branch is kept.", true},
-	VerbMergeAgain:  {"Merge again", "Merge the ticket's commits onto its target again.", true},
-	VerbChooseBase:  {"Choose base", "Pick the branch this ticket builds on. The agent goes on from there.", true},
-	VerbAllowDeny:   {"Allow / Deny", "Answer the agent's permission request. The agent goes on from where it stopped.", true},
-	VerbReopenRetry: {"Reopen and retry", "Reopen the ticket and start a fresh agent on the stranded commits.", true},
-	VerbStashMerge:  {"Stash, merge and restore", "Set your changes aside, merge, then put them back. Conflicts are left for you to fix.", true},
+	VerbAnswer:      {Word: "answer", Label: "Answer", Tooltip: "Reply to the agent. It goes on from where it stopped."},
+	VerbResume:      {Word: "resume", Label: "Resume", Tooltip: "Lift the pause. The ticket waits its turn in the queue."},
+	VerbRetry:       {Word: "retry", Label: "Retry", Tooltip: "Start a fresh agent now. Keeps the branch and its commits."},
+	VerbStartOver:   {Word: "start-over", Label: "Start over", Tooltip: "Throw away the work and run again from the base. A backup branch is kept."},
+	VerbMergeAgain:  {Word: "merge", Label: "Merge again", Tooltip: "Merge the ticket's commits onto its target again."},
+	VerbChooseBase:  {Word: "choose-base", Label: "Choose base", Tooltip: "Pick the branch this ticket builds on. The agent goes on from there."},
+	VerbAllowDeny:   {Word: "approve", Label: "Allow / Deny", Tooltip: "Answer the agent's permission request. The agent goes on from where it stopped."},
+	VerbReopenRetry: {Word: "reopen-and-retry", Label: "Reopen and retry", Tooltip: "Reopen the ticket and start a fresh agent on the stranded commits."},
+	VerbStashMerge:  {Word: "stash-merge", Label: "Stash, merge and restore", Tooltip: "Set your changes aside, merge, then put them back. Conflicts are left for you to fix."},
 }
 
 // Label is v's button text, or "" for an unknown verb.
@@ -57,26 +57,13 @@ func (v PauseVerb) Label() string { return pauseVerbs[v].Label }
 // Tooltip is v's help text, or "" for an unknown verb.
 func (v PauseVerb) Tooltip() string { return pauseVerbs[v].Tooltip }
 
-// verbWords spells the verbs whose detail action or CLI word differs from the
-// table's name.
-var verbWords = map[PauseVerb]string{
-	VerbMergeAgain:  "merge",
-	VerbAllowDeny:   "approve",
-	VerbReopenRetry: "reopen-and-retry",
-}
-
 // Word is the verb as the detail's actions and the refusals spell it.
-func (v PauseVerb) Word() string {
-	if w, ok := verbWords[v]; ok {
-		return w
-	}
-	return string(v)
-}
+func (v PauseVerb) Word() string { return pauseVerbs[v].Word }
 
 // VerbOfWord is the verb that Word spells as w.
 func VerbOfWord(w string) (PauseVerb, bool) {
-	for v := range pauseVerbs {
-		if v.Word() == w {
+	for v, info := range pauseVerbs {
+		if info.Word == w {
 			return v, true
 		}
 	}
@@ -188,20 +175,12 @@ func PauseKinds() []PauseReason {
 }
 
 // checkPauseRows reports each kind in kinds, other than the exempt ones, that
-// has no row or whose row lists no verb the web serves.
-func checkPauseRows(kinds []PauseReason, rows map[PauseReason]PauseRow, verbInfo map[PauseVerb]VerbInfo, exempt []PauseReason) error {
+// has no row.
+func checkPauseRows(kinds []PauseReason, rows map[PauseReason]PauseRow, exempt []PauseReason) error {
 	var problems []string
 	for _, k := range kinds {
-		if slices.Contains(exempt, k) {
-			continue
-		}
-		row, ok := rows[k]
-		if !ok {
+		if _, ok := rows[k]; !ok && !slices.Contains(exempt, k) {
 			problems = append(problems, fmt.Sprintf("%s: no row", k))
-			continue
-		}
-		if !slices.ContainsFunc(row.Verbs, func(v PauseVerb) bool { return verbInfo[v].Web }) {
-			problems = append(problems, fmt.Sprintf("%s: no verb the web serves", k))
 		}
 	}
 	if len(problems) > 0 {

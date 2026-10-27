@@ -30,8 +30,9 @@ type fakeServerAPI struct {
 	replaceRes server.QueueResult
 	removeRes  server.QueueResult
 	mergeRes   server.QueueResult
-	// detail is what Detail returns for any address.
+	// detail and detailErr are what Detail returns for any address.
 	detail     server.TicketDetail
+	detailErr  error
 	budget     server.BudgetStatus
 	iterations []server.IterationInfo
 	// designWorktree is what DesignWorktree returns.
@@ -123,7 +124,7 @@ func (f fakeServerAPI) EpicStashMerge(_ context.Context, address string) (server
 }
 
 func (f fakeServerAPI) Detail(context.Context, string) (server.TicketDetail, error) {
-	return f.detail, nil
+	return f.detail, f.detailErr
 }
 
 func (f fakeServerAPI) Repair(_ context.Context, verb string, req server.RepairRequest) (server.RepairResult, error) {

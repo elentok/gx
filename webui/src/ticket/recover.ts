@@ -5,6 +5,7 @@ import {
   ActionResume,
   ActionRetry,
   ActionStartOver,
+  type Action,
 } from "../generated/server";
 import { WriteError, type Refusable } from "../useWrite";
 
@@ -25,7 +26,8 @@ export interface RecoverBody {
 export type PostRecover = (action: string, body: RecoverBody) => Promise<Refusable>;
 
 // The web route each button posts to. The resume route also serves the verbs that lift a pause.
-const ROUTES: Record<string, string> = {
+// stash-merge has no route here yet, so the map is partial over the Action union.
+const ROUTES: Partial<Record<Action, string>> = {
   [ActionResume]: "/v1/tickets/resume",
   [ActionChooseBase]: "/v1/tickets/resume",
   [ActionReopenAndRetry]: "/v1/tickets/resume",
@@ -39,7 +41,9 @@ export const isRecoverAction = (action: string) => action in ROUTES;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export const postRecover: PostRecover = async (action, body) => {
-  const res = await fetch(ROUTES[action]!, {
+  const route = ROUTES[action as Action];
+  if (!route) throw new WriteError(`no route for ${action}`);
+  const res = await fetch(route, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

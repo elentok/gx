@@ -1,6 +1,7 @@
 package tickets
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
@@ -134,6 +135,33 @@ func TestRecoveryItems_NoDetailOffersNone(t *testing.T) {
 	items := ticketMenuItems(ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket})
 	if slices.ContainsFunc(items, func(it contextmenu.Item[ticketTarget]) bool { return it.Label == schema.VerbRetry.Label() }) {
 		t.Error("menu offers Retry without a detail")
+	}
+}
+
+// A failed detail read opens the menu without recovery items and reports the
+// error, instead of leaving the menu silently empty.
+func TestCmdTicketMenu_ReportsAFailedDetailRead(t *testing.T) {
+	api := fakeServerAPI{detailErr: errors.New("boom")}
+	ticket := tickets.Ticket{Path: "gx:alpha/02", Status: string(schema.StatusPaused), PauseReason: schema.PauseIterationError}
+	msg, ok := cmdTicketMenu(api, ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket})().(ticketMenuReadyMsg)
+	if !ok {
+		t.Fatal("no ticketMenuReadyMsg")
+	}
+	if msg.detailErr == nil || msg.toast() == nil {
+		t.Fatalf("detailErr = %v, toast = %v; want both set", msg.detailErr, msg.toast())
+	}
+	for _, v := range []schema.PauseVerb{schema.VerbRetry, schema.VerbStartOver} {
+		if slices.ContainsFunc(msg.items, func(it contextmenu.Item[ticketTarget]) bool { return it.Label == v.Label() }) {
+			t.Errorf("menu offers %q after a failed detail read", v.Label())
+		}
+	}
+}
+
+// The TUI trusts the server's ActionInfo; a word without one shows as itself.
+func TestRecoveryActions_NoActionInfoFallsBackToTheWord(t *testing.T) {
+	got := recoveryActions(&server.TicketDetail{Actions: []string{server.ActionRetry}})
+	if len(got) != 1 || got[0].label != server.ActionRetry || got[0].help != "" {
+		t.Fatalf("got %+v, want the bare word as label and no help", got)
 	}
 }
 

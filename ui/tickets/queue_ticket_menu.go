@@ -37,13 +37,14 @@ func (m QueueModel) selectedQueuePath() string {
 	return r.ticket.Path
 }
 
-func (m QueueModel) handleTicketMenuReady(msg ticketMenuReadyMsg) QueueModel {
+func (m QueueModel) handleTicketMenuReady(msg ticketMenuReadyMsg) (QueueModel, tea.Cmd) {
 	pending := m.ticketMenuPending
 	m.ticketMenuPending = ""
-	if ticketMenuReadyApplies(msg, pending, m.selectedQueuePath(), m.ModalOpen()) {
-		m.ticketMenu = m.ticketMenu.Open(msg.target, msg.prompt, msg.items)
+	if !ticketMenuReadyApplies(msg, pending, m.selectedQueuePath(), m.ModalOpen()) {
+		return m, nil
 	}
-	return m
+	m.ticketMenu = m.ticketMenu.Open(msg.target, msg.prompt, msg.items)
+	return m, msg.toast()
 }
 
 // handleTicketMenuPick runs a pick only while its ticket is still the
