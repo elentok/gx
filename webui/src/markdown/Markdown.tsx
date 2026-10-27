@@ -61,6 +61,16 @@ export const Markdown = memo(function Markdown({
           paddingInline: "1",
           fontSize: "0.9em",
         },
+        "& pre": {
+          background: "{colors.surface.raised}",
+          borderRadius: "{radii.md}",
+          paddingInline: "3",
+          paddingBlock: "2",
+          marginBlock: "2",
+          overflowX: "auto",
+          lineHeight: "1.5",
+        },
+        "& pre code": { background: "none", padding: 0, fontSize: "0.85em" },
       }}
     >
       <ReactMarkdown
