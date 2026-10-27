@@ -92,7 +92,7 @@ func runIteration(d Deps, p iterationParams) error {
 	if errors.As(err, &launchFail) {
 		return err
 	}
-	launchParams := p.launchAndPromptParams(label, l.ID, prompt, path, string(events.IterationStarted), string(events.IterationFinished))
+	launchParams := p.launchAndPromptParams(label, l.ID, prompt, path, string(events.IterationStarted), string(events.IterationFinished)).withVerifyCap()
 	launchParams.Session = l.Session
 	var sessionID string
 	if errors.Is(err, agentrunner.ErrNotReady) {
@@ -214,7 +214,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 
 	// StartEvent remains empty because reattachment must not imply a fresh
 	// launch; all later events use the recovered native session identity.
-	launchParams := p.launchAndPromptParams(label, session.ID, "", path, "", string(events.IterationFinished))
+	launchParams := p.launchAndPromptParams(label, session.ID, "", path, "", string(events.IterationFinished)).withVerifyCap()
 	finished := false
 	if alreadyFinished(string(agent.State)) {
 		// An idle pane at reattach gets the same debounce and background-task
@@ -517,7 +517,7 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, base, br
 	}
 
 	retrySessionID := cmp.Or(status.SessionID, sessionID)
-	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "")
+	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "").withVerifyCap()
 	launchParams.Session = s
 	if err := promptIdle(d, launchParams, retrySessionID, unexecutedToolCallCorrection); err != nil {
 		if errors.Is(err, errBlockedPanePaused) {
@@ -980,7 +980,6 @@ func reattachLiveConflictResolver(d Deps, p iterationParams, live agentrunner.Se
 
 	launchParams := p.launchAndPromptParams(label, live.ID, "", p.FeatureWorktree, "", "")
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
-	launchParams.noVerifyCap = true
 	if !alreadyFinished(string(agent.State)) {
 		if err := waitForFinish(d, launchParams, sessionID); err != nil {
 			return "", fmt.Errorf("waiting for reattached conflict-resolution agent %s to finish: %w", label, err)
@@ -1057,7 +1056,6 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 	launchParams := p.launchAndPromptParams(label, l.ID, prompt, p.FeatureWorktree, "", "")
 	launchParams.Session = l.Session
 	launchParams.FinishTimeoutMs = conflictResolutionTimeoutMs
-	launchParams.noVerifyCap = true
 	switch {
 	case err != nil:
 		err = fmt.Errorf("sending initial prompt: %w", err)

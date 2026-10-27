@@ -217,28 +217,29 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		// The cap stop goes first and takes the whole tick: if occupancy is
-		// also past the smart zone, the next poll runs its recovery.
-		stopped, err := vcap.checkAndStop(d, p, sessionID)
+		acted, err := guardTick(d, p, sessionID, vcap, recovery)
 		if err != nil {
 			return err
 		}
-		if stopped {
-			elapsedMs = 0
-			continue
-		}
-		// A gated give-up (the pane claimed completion the transcript never
-		// corroborated) is a failed recovery, not a failed iteration: the agent
-		// is still alive and may well compact on its own, so keep polling and
-		// let the next breach try again. Every other error still aborts.
-		breached, err := recovery.checkAndRecover(d, p, sessionID)
-		if err != nil {
-			return err
-		}
-		if breached {
+		if acted {
 			elapsedMs = 0
 		}
 	}
+}
+
+// guardTick is the occupancy guard of one timed-out poll: the verify cap, then
+// smart-zone recovery. acted reports that either interrupted the pane. The cap
+// stop goes first and takes the whole tick: if occupancy is also past the smart
+// zone, the next poll runs its recovery.
+func guardTick(d Deps, p launchAndPromptParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery) (acted bool, err error) {
+	if stopped, err := vcap.tick(d, p); err != nil || stopped {
+		return stopped, err
+	}
+	// A gated give-up (the pane claimed completion the transcript never
+	// corroborated) is a failed recovery, not a failed iteration: the agent
+	// is still alive and may well compact on its own, so keep polling and
+	// let the next breach try again. Every other error still aborts.
+	return recovery.checkAndRecover(d, p, sessionID)
 }
 
 // smartZoneCompactTimeoutMs bounds recoverSmartZoneBreach's wait for the

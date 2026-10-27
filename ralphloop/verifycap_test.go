@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/tickets"
 )
@@ -39,6 +40,7 @@ func runVerifyCapWait(t *testing.T, ticketType string, agent AgentKind, smartZon
 	p.Agent = agent
 	p.SmartZone = smartZone
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: ticketType}
+	p.verifyCap = true
 	p.ScratchDir = scratchDir
 	p.EpicName = "epic"
 	err := waitForFinish(d, p, "sess-19")
@@ -204,15 +206,35 @@ func TestWaitForFinish_VerifyCap_SmartZoneStillAppliesAfterwards(t *testing.T) {
 	}
 }
 
-func TestVerifyCap_NotAppliedToConflictResolutionPane(t *testing.T) {
+func TestVerifyCap_OptInOnly(t *testing.T) {
 	t.Parallel()
 	p := boundGiveUpParams()
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: "verify"}
-	if newVerifyCap(p, verifyCapTestZone) == nil {
-		t.Fatal("verify pane got no cap")
-	}
-	p.noVerifyCap = true
 	if newVerifyCap(p, verifyCapTestZone) != nil {
-		t.Error("conflict-resolution pane got a cap")
+		t.Error("a pane that did not opt in got a cap")
+	}
+	if newVerifyCap(p.withVerifyCap(), verifyCapTestZone) == nil {
+		t.Error("an opted-in verify pane got no cap")
+	}
+}
+
+func TestWaitIterationFinished_VerifyCap_FollowsOneIterationSmartZone(t *testing.T) {
+	t.Parallel()
+	zone := defaultSmartZone + 40_000
+	r := boundGiveUpRunner(func(wait int) bool { return wait <= 3 })
+	r.finishPollsOnly = false
+	scratchDir := epicScratchDir(t, "epic")
+	read := func(string, string) (int, bool, error) { return defaultSmartZone, true, nil }
+	d := Deps{Runner: r, ReadOccupancy: read, ReadCodexContext: read, Sleep: func(time.Duration) {}}
+	one := OneIteration{
+		Agent: AgentClaude, Epic: "epic", ScratchDir: scratchDir, SmartZone: zone,
+		Ticket: tickets.Ticket{Identifier: "19", Type: "verify"},
+	}
+	err := WaitIterationFinished(d, one, IterationWorktree{Label: "iter-19", Path: "/repo/iter-19"}, agentrunner.Session{Label: "iter-19", ID: "pane-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.interrupts != 0 {
+		t.Errorf("interrupts = %d, want 0: occupancy is under the raised cap", r.interrupts)
 	}
 }

@@ -61,6 +61,16 @@ type OneIteration struct {
 	// with no dwell: a headless agent's block is a tracker fact, not a pane
 	// guess. Herdr, pty and Codex leave it false and keep the dwell path.
 	PauseOnBlock bool
+	// SmartZone is the context-token ceiling the iteration's agent is held to,
+	// the same as the SmartZone run option; zero means defaultSmartZone.
+	SmartZone int
+}
+
+func (o OneIteration) smartZone() int {
+	if o.SmartZone <= 0 {
+		return defaultSmartZone
+	}
+	return o.SmartZone
 }
 
 // BlockedPausedError ends WaitIterationFinished when the agent blocked and the
@@ -195,7 +205,7 @@ func FinishIteration(d Deps, o OneIteration, w IterationWorktree, pane string) (
 		Ticket:          o.Ticket,
 		ScratchDir:      o.ScratchDir,
 		WorktreeLock:    &worktreeLock,
-		SmartZone:       defaultSmartZone,
+		SmartZone:       o.smartZone(),
 		Gate:            NewGate(),
 		Sink:            o.sink(),
 	}
@@ -319,20 +329,17 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 	p := launchAndPromptParams{
 		Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink(),
 		ScratchDir: o.ScratchDir, EpicName: o.Epic, Ticket: o.Ticket.Identifier, TicketPath: o.Ticket.Path,
-		TicketData: o.Ticket,
+		TicketData: o.Ticket, SmartZone: o.smartZone(), verifyCap: true,
 	}
-	vcap := newVerifyCap(p, defaultSmartZone)
+	vcap := newVerifyCap(p, p.SmartZone)
 	elapsedMs := 0
 	nudged := false
 	for {
 		st, err := d.Runner.Wait(s, waitStates, smartZonePollMs*time.Millisecond)
 		if err != nil {
 			if errors.Is(err, agentrunner.ErrTimeout) {
-				if vcap != nil {
-					sessionID := recordLiveSession(d, w.Label, o.Ticket.Path)
-					if _, err := vcap.checkAndStop(d, p, sessionID); err != nil {
-						return err
-					}
+				if _, err := vcap.tick(d, p); err != nil {
+					return err
 				}
 				continue
 			}

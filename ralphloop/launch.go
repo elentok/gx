@@ -145,6 +145,12 @@ func (p launchAndPromptParams) session() agentrunner.Session {
 	return agentrunner.Session{Label: p.Label, ID: p.Pane}
 }
 
+// withVerifyCap returns p opted into the verify token cap.
+func (p launchAndPromptParams) withVerifyCap() launchAndPromptParams {
+	p.verifyCap = true
+	return p
+}
+
 // launchAndPromptParams are the per-call inputs to launchAndPrompt.
 type launchAndPromptParams struct {
 	Label string // agent name/tab label, used in error messages
@@ -195,10 +201,9 @@ type launchAndPromptParams struct {
 	// rendering a chat message has the ticket's own fields (title, etc.)
 	// without re-reading TicketPath itself.
 	TicketData tickets.Ticket
-	// noVerifyCap exempts this pane from the verify token cap even when
-	// TicketData is a verify ticket: the conflict-resolution pane shares the
-	// ticket's params but is not the verify session.
-	noVerifyCap bool
+	// verifyCap opts this pane into the verify token cap when TicketData is a
+	// verify ticket. Only the main iteration launch sets it.
+	verifyCap bool
 	// StartEvent/FinishEvent are the run-log event types logged when the
 	// agent starts/finishes; "" skips logging that transition.
 	StartEvent  string
