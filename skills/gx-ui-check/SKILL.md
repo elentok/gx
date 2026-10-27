@@ -16,9 +16,12 @@ file. Use the `playwright-cli` skill for the browser commands.
 
 ## 1. Build and start a scenario
 
-Build once from the repo root, then start the scenario in the background:
+Build once from the repo root, then start the scenario in the background. The `gx` binary embeds
+`webui/dist`; without it the page shows "This build has no web UI". Build the UI first when
+`webui/dist/index.html` is missing:
 
 ```
+[ -f webui/dist/index.html ] || make web-build
 go build -o $TMPDIR/gx-ui/gx .
 go build -o $TMPDIR/gx-ui/claude ./testutil/agentfake/cmd/fakeclaude
 go build -o $TMPDIR/gx-ui/gxfixture ./testutil/gxfixture
