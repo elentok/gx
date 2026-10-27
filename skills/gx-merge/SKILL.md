@@ -126,16 +126,15 @@ skill — same conversation/context, not a detached sub-agent, matching
 Once the rebase is clean, go straight to the checks. Don't pause to show the
 rebased diff.
 
-Discover this repo's automated checks the same way
-`gx-resolving-merge-conflicts` does — don't hardcode a check command here —
-and run them in order: typecheck, tests, lint/format. Each failure kind has
-its own path; all paths run in both modes. Run format checks only on the
-files the branch changed (`git diff --name-only <target>...HEAD`): a repo-wide
-`gofmt -l` lists files the branch never touched.
+Run `gx check --since <target>`. Each failure kind in its output has its own
+path; all paths run in both modes.
 
-### Typecheck or lint failure: one fixer
+A relaunched merge (ticket mode, a previous `## Handoff` that lists failing
+tests) reruns those tests before it reports `finished`.
 
-The first time typecheck or lint/format fails in this run, launch **one**
+### Format, lint or typecheck failure: one fixer
+
+The first time a format, lint or typecheck kind fails in this run, launch **one**
 fixer subagent in `worktree_path` with the failing output. It fixes only what
 the output names, without changing behaviour, and commits on the rebased
 branch with the subject
@@ -150,20 +149,9 @@ commit.
 ### Test failure: flaky-test triage
 
 Launch a triage subagent in `worktree_path` with the failing tests and their
-output. For each failing test it:
-
-1. Reruns **only that test** 3 times through `gx brief` (e.g. Go: `gx brief
-   go-test -count=1 -run '^TestName$' ./pkg`).
-2. Lists the branch's diff: `git diff --name-only <target>...HEAD`.
-3. Calls it **flaky** only if it passed at least once **and** the diff touches
-   neither the test file nor any non-test file in the test's package (Go: the
-   test's directory). Anything else — failed all 3 times, the diff touches
-   that code, or unsure — is **the branch's fault**.
-4. For a branch-fault test only: runs it on `<target>` in a temporary
-   detached worktree (`git worktree add --detach <tmp> <target>`, removed
-   after), and says whether it **fails on trunk too**.
-
-It returns one verdict per test, with the rerun results and the diff evidence.
+output. It sorts each failing test with
+[the failing-tests rule](../gx-failing-tests.md) and returns one verdict per
+test, with the rerun results and the evidence.
 
 - **Branch-fault test that asserts behaviour the branch removed on purpose**
   (the diff or the ticket shows the removal) — update or delete it under

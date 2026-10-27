@@ -115,7 +115,18 @@ catalog:
 - `git merge-base main HEAD` is the fixed point. `git diff --stat <fixed-point>...HEAD` lists what changed.
 - For each changed web, CLI or server area, find the catalog flows that cover it. Add any the
   Verification section missed.
-- Run only these flows and the feature checks. Do not run the whole suite; CI does that.
+- Run these flows and the feature checks, then the full check below.
+
+Run `gx check --full` once per epic: in the lone ticket, or in the collect ticket when there are
+parts. Pick one, and say which in your ticket. Send each failure through
+[the failing-tests rule](../gx-failing-tests.md). A branch fault is a finding.
+
+A flow that fails at HEAD is rerun at `git merge-base main HEAD` in a temporary worktree. Rerun only on
+failure. A flow that fails there too is not the epic's fault: record it as `pre-existing, <follow-up
+addr>`.
+
+When the spec names a time target for a check kind, compare the `gx check --full` line's time with it.
+Read the Resolution the spec names, and write the result as a story line.
 
 ## 4. Run and record
 

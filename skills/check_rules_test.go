@@ -22,6 +22,13 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"verify", "gx-verify/SKILL.md", []string{
 			"gx check --staged", "`0`: pass", "`1`: fail", "`2`: could not run", "`3`: no applicable checks",
 		}},
+		{"merge", "gx-merge/SKILL.md", []string{"gx check --since <target>", "](../gx-failing-tests.md)"}},
+		{"verify-epic", "gx-verify-epic/SKILL.md", []string{
+			"gx check --full", "](../gx-failing-tests.md)", "git merge-base main HEAD", "pre-existing, <follow-up addr>",
+		}},
+		{"research", "gx-research/SKILL.md", []string{"`gx check`"}},
+		{"investigate", "gx-investigate/SKILL.md", []string{"`gx check`"}},
+		{"to-tickets", "gx-to-tickets/SKILL.md", []string{"iteration hint", "`gx brief`"}},
 		{"follow-up", "gx-follow-up/SKILL.md", []string{"search the candidates for that test name first"}},
 		{"index", "../.ai/index.md", []string{"Verify with `gx check` in the foreground, unpiped"}},
 	}
@@ -38,6 +45,8 @@ func TestCheckRulesAbsences(t *testing.T) {
 	}{
 		{"implement", "gx-implement/SKILL.md", []string{"whole package once at the end", "gofmt -l"}},
 		{"verify", "gx-verify/SKILL.md", []string{"## Check Table"}},
+		{"merge", "gx-merge/SKILL.md", []string{"touches neither the test file"}},
+		{"verify-epic", "gx-verify-epic/SKILL.md", []string{"CI does that"}},
 		{"index", "../.ai/index.md", []string{"make test-server", "-timeout 60s"}},
 	}
 	for _, c := range cases {

@@ -210,7 +210,7 @@ session. Everything above (background, state, diagnosis) applies unchanged; only
 - **Write the diagnosis into your own ticket** before the finish report, so it outlives the pane:
   `gx tickets section <your-addr> Findings -` with the final report (see Final report) on stdin.
   Do this in every unattended ending, including `No catalog entry matched`.
-- **Last step, always:** report on _your own_ ticket (not the failed one):
+- **Last step, always:** run `gx check` first. Then report on _your own_ ticket (not the failed one):
   `gx tickets set <your-addr> --iteration-status finished --commitless true`. Do it after the
   action, including when you only paused the failed ticket or filed a follow-up. Without it the
   server finds no report and pauses your ticket `zero-commit` ("no result reported"), which spawns
