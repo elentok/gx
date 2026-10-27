@@ -619,9 +619,10 @@ an exited session.
   epic's branch also adds)
 - **Steps:** open `#/e/demo:dirty-epic`.
 - **Pass:**
-  - The stats line reads "Paused · ...", and the reason says the changes clash with `same.txt`.
-  - The file list (`land-block-files`) holds one item, `same.txt`.
-  - "Stash, merge and restore" (with its tooltip) and "Merge again" are there.
+  - The stats line reads "Paused · ...".
+  - The "Merge blocked" notice reads "Can't merge: Trunk has local changes".
+  - Under it the file list (`land-block-files`) holds one item, `same.txt`.
+  - Then "Stash, merge and restore" (with its tooltip) comes before "Merge again", all inside the notice.
 
 ## 59. Stash, merge and restore
 
@@ -639,3 +640,24 @@ an exited session.
   - A warning toast says the changes clash with `same.txt`, with an "Open the paused epic" link to
     the epic.
   - The Epic page stays on "Paused" and shows the fresh file list (`same.txt`).
+
+## 61. Page modes at 760px
+
+- **Scenario:** `mixed` for the Epic page, `design` for the Design page; both at 760 px wide.
+- **Steps:** give `mixed-epic` a Summary section and open `#/e/demo:mixed-epic`; click the title.
+  Then open `#/d/demo:design-epic` and click the title.
+- **Pass:**
+  - The ring is 64 px wide. The summary's top is above the ring's bottom. The Queue button's top is
+    within one stats-line height of the stats line's top.
+  - A card's meta sits on its title's line, right of the title.
+  - The ⌘K hint shows, and the "Jump to epic" menu is a popover smaller than the window.
+  - On the Design page the "Jump to epic" sheet fills the window (0, 0, 760 x 900).
+
+## 62. Card columns
+
+- **Scenario:** `mixed` at desktop, with a ticket whose title is wider than its card added.
+- **Steps:** open `#/e/demo:mixed-epic`.
+- **Pass:**
+  - The left edges of all live card titles (not done, not cancelled) are equal.
+  - The long title shows on one line with `text-overflow: ellipsis`.
+  - Each meta's right edge is 16 px inside its card's border.
