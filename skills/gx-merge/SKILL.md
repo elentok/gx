@@ -165,7 +165,10 @@ output. For each failing test it:
 
 It returns one verdict per test, with the rerun results and the diff evidence.
 
-- **Any branch-fault test** — keep the rebased branch and **stop: `tests
+- **Branch-fault test that asserts behaviour the branch removed on purpose**
+  (the diff or the ticket shows the removal) — update or delete it under
+  "Fixing a failing test" below, without pausing. Treat the rest as below.
+- **Any other branch-fault test** — keep the rebased branch and **stop: `tests
   fail after rebase onto <target>: <tests>`** with the check output. If any
   of them fails on trunk too, the reason says so: `… (fails on trunk too)`.
 - **All flaky** — continue with the remaining checks. File one follow-up per
@@ -176,11 +179,13 @@ It returns one verdict per test, with the rerun results and the diff evidence.
 
 ### Fixing a failing test
 
-When a person's answer tells you to fix failing tests, first decide why each one fails:
+When a person's answer tells you to fix failing tests, or a failing test asserts behaviour the
+branch removed on purpose, first decide why each one fails:
 
 - **It caught a real bug** in the branch — fix the code, not the test.
-- **It is flaky, or checks behaviour the branch changed on purpose** — fix the test. A flaky test
-  waits for the event (poll with a timeout), never a fixed sleep.
+- **It is flaky, or checks behaviour the branch changed or removed on purpose** — fix the test, or
+  delete it when nothing is left to assert. Do this without asking. A flaky test waits for the
+  event (poll with a timeout), never a fixed sleep.
 
 Never weaken, skip or delete an assertion just to get green. If you can't tell which case it is,
 stop and say so. Commit on the rebased branch as `<branch>: Fix <test> after rebase onto <target>`,

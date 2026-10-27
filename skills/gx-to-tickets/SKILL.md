@@ -187,6 +187,13 @@ context overrun) rediscovering it, then misses shared fixtures and fails the ful
   and in-memory structs, server and CLI call sites, web code, and comments that mirror it (e.g. a
   "must match" note). Put every existing test that mentions it in Test seams, so the agent re-runs
   them instead of finding them by failure.
+- **Removed or changed behaviour**: when the ticket deletes or changes behaviour, run `rg` for the
+  removed names and the changed label or text across all tests, e2e flows and fixtures. Read every
+  hit in full (no `| head`). List each affected test in Test seams, and give a scoped run (`-run`
+  pattern or file list) that covers every hit. Don't scope by the new feature's name.
+- **Helper prerequisites**: for each helper or fixture a ticket cites, name its prerequisites (e.g.
+  `StartWithStore` needs a seeded project via `servertest.WriteTicket`) and its return value (e.g.
+  `CreateEpic` returns the epic dir).
 - **Wiring**: name the hidden registration points (route tables, allowlists, parity tests, the
   query-and-prop path that feeds a page) and give `file:func` for anything the ticket says only by
   line number or role. For a new server route, point at `.ai/index.md` "Adding a server route".
