@@ -226,6 +226,11 @@ Flows that need rewriting, because they assume the old layout:
 
 - Flow 4: the first message ("Two questions before the spec.") arrives with round one, so the
   Questions view hides it. Check it after tapping Chat.
+- Flows 5 and 10: "A fresh round." arrives in the same message as round `Q9`, so the Questions view
+  hides it. Check it after tapping Chat.
+- Flow 9 (phone): the same hidden-chat fix as flows 5 and 10, at 375px.
+- Flow 50: a message that arrives with a round is hidden by the Questions view. Check it after
+  tapping Chat.
 - Flow 13: the defaulted questions' plain text is in the chat. Check it in the Chat view.
 - Flow 24 (Phone, Design page): replace the Progress summary steps with the step line and the ring,
   and ⤢/⤡ with the toggle.
@@ -237,15 +242,15 @@ Flows that need rewriting, because they assume the old layout:
 - Flow 49 (Focus mode): rewrite as the Questions and Chat views flow (story 1 to 13).
 
 New scenario to write: `design-two-live`, the `design` scenario plus a second live session linked
-to `design-epic` (for example `gx agents create` then `gx agents link demo:design-epic`; the flow
-ticket confirms the route). It backs stories 26 and 27 and two Mock states.
+to `design-epic` (for example create a session, run `designs open`, then `gx agent link demo:design-epic` with
+the session id in `GX_AGENT_SESSION`; the scenario ticket confirms the route). It backs stories 26 and 27 and two Mock states.
 
 Story entries:
 
 1. Rewritten flow 49 on `design`: after start, the toggle reads Questions pressed and the sheet
    fills the column. Mock states phone-focus and desktop-focus.
 2. Rewritten flow 49: tap Chat, Send round one, Continue; the `Q9` round opens with Questions
-   pressed. Flow 5 still passes.
+   pressed. Rewritten flow 5 checks "A fresh round." in the Chat view.
 3. Rewritten flow 49: Chat then Questions switch the view. Mock state phone-chat-round-docked.
 4. Rewritten flow 49: the Questions button reads "0 of 2", then "1 of 2" after picking SQLite.
 5. Rewritten flow 49 on `design-working`: no "View" group. Mock state phone-chat-no-round.
