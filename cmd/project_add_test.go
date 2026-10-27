@@ -23,7 +23,7 @@ func TestProjectAdd_RegistersAndListsAndRefuses(t *testing.T) {
 
 	add := func(req server.AddProjectRequest) (string, error) {
 		var out bytes.Buffer
-		err := runProjectAdd(ctx, h.Client, &out, false, req)
+		err := runProjectAdd(ctx, h.Client, deps{}, &out, false, req)
 		return out.String(), err
 	}
 
@@ -32,8 +32,8 @@ func TestProjectAdd_RegistersAndListsAndRefuses(t *testing.T) {
 		t.Fatal(err)
 	}
 	name := filepath.Base(repo)
-	if want := "added project " + name + "\n"; out != want {
-		t.Errorf("add output = %q, want %q", out, want)
+	if want := "added project " + name + "\n"; !strings.HasPrefix(out, want) {
+		t.Errorf("add output = %q, want prefix %q", out, want)
 	}
 
 	pf, err := config.ReadProjectFile(filepath.Join(h.TicketStore, name))
@@ -76,7 +76,7 @@ func TestProjectAdd_DefaultNameIsDirHoldingBare(t *testing.T) {
 	h := servertest.Start(t)
 	bare := testutil.TempDotBareRepoWithWorktrees(t)
 	var out bytes.Buffer
-	if err := runProjectAdd(context.Background(), h.Client, &out, false, server.AddProjectRequest{Path: bare}); err != nil {
+	if err := runProjectAdd(context.Background(), h.Client, deps{}, &out, false, server.AddProjectRequest{Path: bare}); err != nil {
 		t.Fatal(err)
 	}
 	want := filepath.Base(bare)

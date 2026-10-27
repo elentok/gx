@@ -77,7 +77,7 @@ func newProjectCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runProjectAdd(c.Context(), cl, c.OutOrStdout(), addJSON,
+			return runProjectAdd(c.Context(), cl, d, c.OutOrStdout(), addJSON,
 				server.AddProjectRequest{Path: abs, Name: name, VCS: vcs})
 		},
 	}
@@ -126,7 +126,7 @@ func newProjectCmd(d deps) *cobra.Command {
 		},
 	}
 	setPath.Flags().BoolVar(&setJSON, "json", false, "emit structured JSON instead of human-readable text")
-	cmd.AddCommand(setPath, newProjectEditConfigCmd(d))
+	cmd.AddCommand(setPath, newProjectEditConfigCmd(d), newProjectOnboardCmd(d))
 	return cmd
 }
 
@@ -153,7 +153,15 @@ func runProjectEdit(ctx context.Context, w io.Writer, jsonOut bool, verb string,
 	return err
 }
 
-func runProjectAdd(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, req server.AddProjectRequest) error {
+// addProjectJSON is the `project add --json` object: the add result, plus the
+// unset check kinds and the command that sets them up when config is missing.
+type addProjectJSON struct {
+	server.AddProjectResult
+	ChecksMissing  []string `json:"checks_missing,omitempty"`
+	OnboardCommand string   `json:"onboard_command,omitempty"`
+}
+
+func runProjectAdd(ctx context.Context, cl *apiclient.Client, d deps, w io.Writer, jsonOut bool, req server.AddProjectRequest) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -165,7 +173,15 @@ func runProjectAdd(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 		return fmt.Errorf("server write failed: %w", err)
 	}
 	if jsonOut {
-		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+		out := addProjectJSON{AddProjectResult: res}
+		if !res.Refused {
+			if pc, err := missingChecks(ctx, cl, res.Name); err != nil {
+				return err
+			} else if pc != nil {
+				out.ChecksMissing, out.OnboardCommand = missingKinds(*pc), onboardCommand(res.Name)
+			}
+		}
+		return encodeProvenance(w, out, viaServer, callerActor(os.Getwd))
 	}
 	if res.Refused {
 		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
@@ -174,7 +190,10 @@ func runProjectAdd(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonO
 	if res.Existing {
 		verb = "already registered as"
 	}
-	_, err = fmt.Fprintf(w, "%s project %s\n", verb, res.Name)
+	if _, err = fmt.Fprintf(w, "%s project %s\n", verb, res.Name); err != nil {
+		return err
+	}
+	_, err = onboardChecks(ctx, cl, d, w, res.Name)
 	return err
 }
 
