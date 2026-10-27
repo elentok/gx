@@ -98,7 +98,8 @@ The approved mock is `$(gx tickets root)/design-page-redesign/mocks/01-design-pa
 23. As a person designing, I want a ⋯ button in the Design header, so that rare actions stay out of
     the way.
 24. As a person designing, I want New session in the ⋯ menu with the hint "Stop this session and
-    start a fresh one", so that I know what it does before I press it.
+    start a fresh one", so that I know what it does before I press it. When the shown session has
+    exited, the hint reads "Start a fresh session" instead, since nothing is running.
 25. As a person designing, I want New session to keep today's behavior (ask before it stops a live
     session, then start a new one), so that I never stop a session by mistake.
 26. As a person designing with 2 or more live sessions, I want the ⋯ menu to list them, with a check
@@ -135,7 +136,8 @@ The approved mock is `$(gx tickets root)/design-page-redesign/mocks/01-design-pa
 40. As a person designing, I want the modal title to name the note ("Note on this round" or the
     question's note), so that I know which note I am editing.
 41. As a person designing, I want the composer's message box (when no round is up) to get the same
-    5 lines and expand button, since it is the same box, so that the composer works one way.
+    5 lines and expand button, since it is the same box, with the modal titled "Message to the
+    agent", so that the composer works one way.
 
 ### Question navigation
 
@@ -251,7 +253,8 @@ Story entries:
    desktop-chat-no-round.
 7. Rewritten flow 49: Escape in the Questions view shows the chat.
 8. Rewritten flow 49: with the Send popover, the jump menu, the note modal and the ⋯ menu each
-   open, the first Escape closes only the layer and the second shows the chat. Flow 47 step 4.
+   open, and with the steps sheet open at 375px, the first Escape closes only the layer and the
+   second shows the chat. Flow 47 step 4.
 9. Rewritten flow 49: in the Chat view the docked sheet shows under the messages, and its fold
    chevron folds and opens it. Mock state phone-chat-round-docked.
 10. Rewritten flow 49: SQLite, `Q8b` as the current dot and a composer note survive two switches.
@@ -279,7 +282,8 @@ Story entries:
 24. New flow "Design actions menu": the menu has "New session" with the hint "Stop this session and
     start a fresh one".
 25. Flow 43 through the ⋯ menu. On a live session, New session asks first; Cancel starts nothing;
-    OK makes `gx agents list` show a new session and the old one exited.
+    OK makes `gx agents list` show a new session and the old one exited. On the stopped Design,
+    the ⋯ item reads "New session" with the hint "Start a fresh session".
 26. New flow "Design actions menu" on `design-two-live`: "Live sessions · 2", a check mark on the
     shown one, Stop on the other. Picking the other row shows it; Stop makes `gx agents list` show
     it exited. Mock states phone-overflow-menu and desktop-chat-round-docked-menu.
@@ -305,7 +309,7 @@ Story entries:
     Flow 11 step 2 still passes.
 40. New flow "Note box": the round note's modal is titled "Note on this round".
 41. New flow "Note box" on `design-working`: the composer's message box has 5 rows and the expand
-    button.
+    button, and its modal is titled "Message to the agent".
 42. New flow "Question top" on `design` at 1280x600: scroll `Q8` to its end, then move to `Q8b` by
     dot, Next, a pick and a Send popover row; each time the `Q8b` title is at the top of the sheet.
 43. New flow "Question top": the same checks in the Chat view's docked sheet.
