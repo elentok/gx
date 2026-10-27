@@ -120,7 +120,12 @@ function elapsedOf(row: EpicDetailRow, now: number): number | undefined {
 }
 
 // Own-epic blockers are bare numbers and cross-epic ones are "epic/NN", so the ids print as they came.
+// Past three blockers the rest fold into "+ N more", so the meta stays short beside the title.
+const shownBlockers = 3;
 function blockerNote(blockers: string[]): string {
+  if (blockers.length > shownBlockers) {
+    return `after ${blockers.slice(0, shownBlockers).join(", ")} + ${blockers.length - shownBlockers} more`;
+  }
   const head = blockers.slice(0, -1).join(", ");
   return `after ${head ? `${head} and ` : ""}${blockers[blockers.length - 1]}`;
 }

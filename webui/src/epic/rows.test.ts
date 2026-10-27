@@ -22,6 +22,8 @@ const NOW = Date.parse("2026-01-01T00:10:00Z");
 test.each([
   ["an open row with no blockers", { rendered_status: "open" }, "ready"],
   ["a blocked row", { rendered_status: "blocked", blockers: ["01", "02"] }, "after 01 and 02"],
+  ["a row blocked by three", { rendered_status: "blocked", blockers: ["01", "02", "03"] }, "after 01, 02 and 03"],
+  ["a row blocked by more than three", { rendered_status: "blocked", blockers: ["01", "02", "03", "04", "05"] }, "after 01, 02, 03 + 2 more"],
   ["a paused row keeps its reason and no link word", { rendered_status: "paused", reason: "needs a person" }, "paused · needs a person"],
   ["a failed row", { rendered_status: "error" }, "error"],
   ["a running row", { rendered_status: "claimed", elapsed: 180, cost: 0.4 }, "running · 3m · $0.40"],

@@ -195,14 +195,14 @@ test("a fork's card is indented and the running card has the spinning dot", asyn
   expect(within(await cardOf("01")).getByRole("img", { name: "Running" })).toBeTruthy();
 });
 
-// The mark box is narrower than its svgs, so they must not shrink as flex items.
-test("the spinner is a 10px svg and the done check a 12px svg that do not shrink", async () => {
+// The svgs fill the mark box, so they must not shrink as flex items.
+test("the spinner is a 14px svg and the done check a 16px svg that do not shrink", async () => {
   live([tk("01", { rendered_status: "claimed", claimed_at: new Date().toISOString() }), doneTk("02", 1)]);
   const svgOf = async (id: string, name: string) =>
     within(await cardOf(id)).getByRole("img", { name }) as unknown as SVGElement;
   for (const [svg, size] of [
-    [await svgOf("01", "Running"), "10px"],
-    [await svgOf("02", "Done"), "12px"],
+    [await svgOf("01", "Running"), "14px"],
+    [await svgOf("02", "Done"), "16px"],
   ] as const) {
     const style = getComputedStyle(svg);
     expect([style.width, style.height, style.flexShrink]).toEqual([size, size, "0"]);
@@ -224,8 +224,8 @@ const alignedRows = () => [
 ];
 
 test.each([
-  ["wide", 72],
-  ["phone", 66],
+  ["wide", 88],
+  ["phone", 80],
 ])("the title starts where the second row does (%s)", async (width, left) => {
   if (width === "phone") vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   try {
@@ -238,11 +238,13 @@ test.each([
   }
 });
 
-test("done and cancelled card titles are 14px", async () => {
-  live([doneTk("01", 1), doneTk("02", 2, { rendered_status: "cancelled" })]);
+test("live, done and cancelled card titles are all 16px", async () => {
+  live([tk("03"), doneTk("01", 1), doneTk("02", 2, { rendered_status: "cancelled" })]);
+  const live3 = (await cardOf("03")).querySelector("[data-title]") as HTMLElement;
+  expect(getComputedStyle(live3).fontSize).toBe("16px");
   for (const id of ["01", "02"]) {
     const title = (await cardOf(id)).querySelector("[data-title]") as HTMLElement;
-    expect(getComputedStyle(title).fontSize).toBe("14px");
+    expect(getComputedStyle(title).fontSize).toBe("16px");
   }
 });
 

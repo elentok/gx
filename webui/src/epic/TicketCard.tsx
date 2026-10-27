@@ -27,8 +27,8 @@ function Spinner() {
       aria-label="Running"
       data-tone="running"
       viewBox="0 0 10 10"
-      w="10px"
-      h="10px"
+      w="14px"
+      h="14px"
       flexShrink={0}
       animation="spin 1.05s linear infinite"
       _motionReduce={{ animation: "none" }}
@@ -63,8 +63,8 @@ function Check() {
       aria-label="Done"
       data-tone="done"
       viewBox="0 0 12 12"
-      w="12px"
-      h="12px"
+      w="16px"
+      h="16px"
       flexShrink={0}
     >
       <path
@@ -89,8 +89,8 @@ function Dot({ row }: { row: EpicDetailRow }) {
       <Box
         as="span"
         data-dot
-        w="8px"
-        h="8px"
+        w="10px"
+        h="10px"
         borderRadius="full"
         bg={`tone.${tone}.fg`}
       />
@@ -101,7 +101,7 @@ function Dot({ row }: { row: EpicDetailRow }) {
       data-mark
       flexShrink={0}
       display="inline-flex"
-      w="8px"
+      w="16px"
       h="16px"
       alignItems="center"
       justifyContent="center"
@@ -146,7 +146,12 @@ function Line({
       color={metaColor(row)}
       whiteSpace="nowrap"
       flexShrink={0}
-      pl={wide ? undefined : "66px"}
+      // Wide, a long meta cuts off with an ellipsis instead of squeezing the title.
+      maxW={wide ? "40%" : undefined}
+      overflow="hidden"
+      textOverflow="ellipsis"
+      title={reserveLine ? undefined : meta}
+      pl={wide ? undefined : "80px"}
     >
       {reserveLine ? " " : meta}
     </Text>
@@ -170,11 +175,11 @@ function Line({
         <Text
           as="span"
           fontFamily="mono"
-          fontSize="12px"
+          fontSize="16px"
           color="text.dim"
           flexShrink={0}
           whiteSpace="nowrap"
-          w={wide ? "40px" : "38px"}
+          w={wide ? "48px" : "44px"}
         >
           {idOf(row.address)}
         </Text>
@@ -188,7 +193,7 @@ function Line({
                 : "white"
           }
           data-title
-          fontSize={isFolded(row) ? "14px" : undefined}
+          fontSize="16px"
           fontWeight={bold ? 500 : undefined}
           minW="0"
           flex="1 1 0"
@@ -228,9 +233,9 @@ function CardFrame({
             : "hairline"
       }
       borderRadius="12px"
-      h={wide ? (folded ? "44px" : "48px") : undefined}
+      minH={wide ? (folded ? "44px" : "48px") : undefined}
       px={wide ? "16px" : "14px"}
-      py={wide ? undefined : folded ? "9px" : "10px"}
+      py={folded ? "9px" : "10px"}
       display="flex"
       alignItems="center"
     >
@@ -277,7 +282,7 @@ function NoteCard({
         flexDirection={wide ? "row" : "column"}
         alignItems={wide ? "center" : "stretch"}
         gap={wide ? "12px" : "10px"}
-        pl={wide ? "72px" : "66px"}
+        pl={wide ? "88px" : "80px"}
       >
         {note.text && (
           <Text
