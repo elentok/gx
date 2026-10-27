@@ -42,10 +42,9 @@ func currentEpic(cwd string) string {
 //
 // With a non-empty section it prints only that "## section" of the ticket, or
 // of every ticket of an epic that has it, each under a line naming the ticket.
+// A single ticket without the section is an error; --section and --json are
+// kept apart by the command's flag definitions.
 func runTicketsShow(cwd, addr string, jsonOut bool, section string, w io.Writer) error {
-	if section != "" && jsonOut {
-		return errors.New("--section is not supported with --json")
-	}
 	a, t, err := findTicket(cwd, addr)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) && addrErr.Code == tickets.CodeMalformedAddress {
@@ -63,6 +62,9 @@ func runTicketsShow(cwd, addr string, jsonOut bool, section string, w io.Writer)
 		return err
 	}
 	if section != "" {
+		if t.ReadErr == "" && !schema.HasSection(t.Body, section) {
+			return fmt.Errorf("no section %s in %s", section, a)
+		}
 		return printTicketSection(a, t, section, w)
 	}
 	return printTicket(a, t, jsonOut, w)
@@ -81,10 +83,9 @@ func printTicketSection(a tickets.Address, t tickets.Ticket, section string, w i
 	return err
 }
 
-// showEpicSection prints the named section of each of the epic's tickets.
-func showEpicSection(cwd, project, name, section string, w io.Writer) error {
-	var root string
-	var err error
+// resolveEpic finds the ticket root and project for an epic argument whose
+// project may be empty (the cwd project), and checks the epic exists.
+func resolveEpic(cwd, project, name string) (root, resolved, path string, err error) {
 	if project == "" {
 		root, err = ticketRoot(cwd)
 		project = tickets.ProjectName(root)
@@ -92,9 +93,19 @@ func showEpicSection(cwd, project, name, section string, w io.Writer) error {
 		root, err = projectRoot(cwd, project)
 	}
 	if err != nil {
-		return err
+		return "", "", "", err
 	}
-	if _, err := tickets.EpicTicketMDPath(root, project, name); err != nil {
+	path, err = tickets.EpicTicketMDPath(root, project, name)
+	if err != nil {
+		return "", "", "", err
+	}
+	return root, project, path, nil
+}
+
+// showEpicSection prints the named section of each of the epic's tickets.
+func showEpicSection(cwd, project, name, section string, w io.Writer) error {
+	root, project, _, err := resolveEpic(cwd, project, name)
+	if err != nil {
 		return err
 	}
 	epics, err := tickets.Load(root)
@@ -129,18 +140,7 @@ func parseEpicArg(s string) (project, epic string, ok bool) {
 
 // showEpic prints the epic's ticket.md verbatim, then one line per ticket.
 func showEpic(cwd, project, name string, w io.Writer) error {
-	var root string
-	var err error
-	if project == "" {
-		root, err = ticketRoot(cwd)
-		project = tickets.ProjectName(root)
-	} else {
-		root, err = projectRoot(cwd, project)
-	}
-	if err != nil {
-		return err
-	}
-	path, err := tickets.EpicTicketMDPath(root, project, name)
+	root, project, path, err := resolveEpic(cwd, project, name)
 	if err != nil {
 		return err
 	}

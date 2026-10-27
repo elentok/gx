@@ -178,8 +178,8 @@ func TestExecute_TicketsShow_SectionPrintsOnlyMatchingSections(t *testing.T) {
 	}
 
 	out, err := runIn(t, repo, "tickets", "show", "mine:epic/06", "--section", "Spec deviations")
-	if err != nil || out != "" {
-		t.Errorf("ticket without the section printed %q, err %v", out, err)
+	if err == nil || !strings.Contains(err.Error(), "no section Spec deviations in mine:epic/06") || out != "" {
+		t.Errorf("ticket without the section printed %q, err %v; want a missing-section error", out, err)
 	}
 	if _, err := runIn(t, repo, "tickets", "show", "mine:epic/07", "--section", "Spec deviations", "--json"); err == nil {
 		t.Error("--section with --json should refuse")

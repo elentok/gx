@@ -258,6 +258,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	}
 	showCmd.Flags().BoolVar(&showJSON, "json", false, "emit structured JSON instead of text")
 	showCmd.Flags().StringVar(&showSection, "section", "", "print only this ## section, from the ticket or from every ticket of an epic that has it")
+	showCmd.MarkFlagsMutuallyExclusive("json", "section")
 	cmd.AddCommand(showCmd)
 	cmd.AddCommand(newTicketsLogCmd(d))
 	cmd.AddCommand(newTicketsSetCmd(d))
