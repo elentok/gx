@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { card, expect, nav, sessionRows, test } from "./fixture";
 
 const openDesign = async (page: Page) => {
@@ -131,5 +131,54 @@ test.describe("65. Design actions menu", () => {
     const box = (await actionsMenu(page).boundingBox())!;
     expect(box.x).toBeLessThan(trigger.x + trigger.width);
     expect(box.x + box.width).toBeGreaterThan(trigger.x);
+  });
+});
+
+const expandNote = (scope: Locator | Page) => scope.getByRole("button", nav("Open the note in a large editor"));
+
+test.describe("66. Note box", () => {
+  test("rows, viewport, large editor, Done and Send", async ({ page, start }) => {
+    await start("design", { autoAdvanceDelay: "1h" });
+    await page.setViewportSize({ width: 375, height: 700 });
+    await expect(card(page, "design-epic")).toBeVisible();
+    await openDesign(page);
+    await page.getByRole("button", nav("Start design session")).click();
+
+    // The Q8 note: in the viewport, with the expand button and a Q8 modal.
+    const questions = page.getByRole("group", nav("Questions"));
+    await questions.getByRole("button", nav("Note on question 8")).click();
+    const qNote = questions.getByRole("textbox", nav("Note text for question 8"));
+    await expect(qNote).toBeInViewport();
+    await expandNote(questions).click();
+    await expect(page.getByRole("dialog", { name: /Q8/ })).toBeVisible();
+    await page.getByRole("button", nav("Done")).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // The composer note: 5 rows, expand button, "Note on this round", Done keeps the text.
+    await page.getByRole("button", nav("Note")).click();
+    const message = page.getByRole("textbox", nav("Message"));
+    await expect(message).toHaveAttribute("rows", "5");
+    await expandNote(page.getByRole("form", nav("Composer"))).click();
+    await expect(page.getByRole("dialog", nav("Note on this round"))).toBeVisible();
+    await page.getByRole("textbox", nav("Note text in the large editor")).fill("typed in the modal");
+    await page.getByRole("button", nav("Done")).click();
+    await expect(message).toHaveValue("typed in the modal");
+
+    await questions.getByRole("button", { name: /SQLite/ }).click();
+    await questions.getByRole("button", { name: /Yes/ }).click();
+    await page.getByRole("button", nav("Send")).click();
+    await expect(page.getByText("typed in the modal")).toBeVisible();
+  });
+
+  test("no round: the message box has 5 rows and the expand button", async ({ page, start }) => {
+    await start("design-working");
+    await expect(card(page, "design-epic")).toBeVisible();
+    await openDesign(page);
+    await page.getByRole("button", nav("Start design session")).click();
+    await page.getByRole("button", nav("Note")).click();
+    const message = page.getByRole("textbox", nav("Message"));
+    await expect(message).toHaveAttribute("rows", "5");
+    await expandNote(page).click();
+    await expect(page.getByRole("dialog", nav("Message to the agent"))).toBeVisible();
   });
 });

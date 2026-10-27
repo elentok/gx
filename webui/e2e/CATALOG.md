@@ -12,7 +12,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 64, 65).
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 64, 65, 66).
 
 ## 1. Queue an epic
 
@@ -728,3 +728,15 @@ an exited session.
   - At 375px the menu is a full-width bottom sheet with a grab handle. At 1440px it is a popover
     with no grab handle: its top is below the ⋯ button's bottom and it overlaps ⋯ horizontally.
 - **Note:** the menu's role name is "More actions" (the trigger's name), not "Design actions".
+
+## 66. Note box
+
+- **Scenario:** `design` (at 375px), `design-working`
+- **Steps:**
+  1. On `design` click Start design session, open "Note on question 8" and click "Open the note in a large editor". Click Done.
+  2. Click the composer "Note", then its expand button. Fill the large editor, click Done, answer both questions and click Send.
+  3. On `design-working` click Start design session, click "Note" and its expand button.
+- **Pass:**
+  - The `Q8` note textbox is in the viewport. Its modal is named for `Q8`.
+  - The composer "Message" box has `rows` 5. Its modal is "Note on this round". After Done the box holds the typed text, and after Send the chat shows it.
+  - On `design-working` (no round) the "Message" box has 5 rows and the expand button, and its modal is "Message to the agent".
