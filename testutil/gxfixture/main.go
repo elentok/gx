@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/conversations"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -197,9 +198,25 @@ func run(args []string) (err error) {
 			return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
 		}
 	}
+	// Plain sessions are made before openDesigns, which then starts the newer
+	// run, but linked after it: a map with a live design session makes `designs
+	// open` return that one instead of starting another.
+	plain := make(map[string]string)
+	for _, addr := range sc.linkedDesigns {
+		id, err := f.createPlainSession(addr)
+		if err != nil {
+			return err
+		}
+		plain[addr] = id
+	}
 	for _, addr := range sc.openDesigns {
 		if out, err := f.cli("designs", "open", addr); err != nil {
 			return fmt.Errorf("open design %s: %w\n%s", addr, err, out)
+		}
+	}
+	for addr, id := range plain {
+		if err := f.linkSession(id, addr); err != nil {
+			return err
 		}
 	}
 	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin}
@@ -419,6 +436,34 @@ func (f *fixture) cli(args ...string) ([]byte, error) {
 	cmd := exec.Command(f.gx, args...)
 	cmd.Env = f.env
 	return cmd.CombinedOutput()
+}
+
+// createPlainSession starts a session in the project repo that is not yet a
+// design session, and returns its id.
+func (f *fixture) createPlainSession(addr string) (string, error) {
+	out, err := f.cli("agents", "create", "--project", project, "--dir", filepath.Join(f.root, "repo"), "--prompt", "hello", "--json")
+	if err != nil {
+		return "", fmt.Errorf("create session for %s: %w\n%s", addr, err, out)
+	}
+	var res struct {
+		Session struct {
+			ID string `json:"id"`
+		} `json:"session"`
+	}
+	if err := json.Unmarshal(out, &res); err != nil || res.Session.ID == "" {
+		return "", fmt.Errorf("create session for %s: no session id in %s", addr, out)
+	}
+	return res.Session.ID, nil
+}
+
+// linkSession marks the session id a design session of the map at addr.
+func (f *fixture) linkSession(id, addr string) error {
+	cmd := exec.Command(f.gx, "agent", "link", addr)
+	cmd.Env = append(slices.Clone(f.env), nativerunner.AgentSessionEnv+"="+id)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("link %s to %s: %w\n%s", id, addr, err, out)
+	}
+	return nil
 }
 
 // waitReady polls until the server answers with its web URL.

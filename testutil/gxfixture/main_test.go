@@ -786,6 +786,32 @@ func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 	r.stop(t)
 }
 
+func TestDesignTwoLiveScenario_TwoSessionsNewestPlaysRoundOne(t *testing.T) {
+	r := start(t, "design-two-live")
+	var list []server.SessionInfo
+	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+		t.Fatal(err)
+	}
+	var live []server.SessionInfo
+	for _, s := range list {
+		if s.Ticket == designAddr && s.Design {
+			live = append(live, s)
+		}
+	}
+	if len(live) != 2 {
+		t.Fatalf("design sessions of %s = %+v, want 2", designAddr, list)
+	}
+	newest := live[0]
+	if live[1].RunStartedAt.After(newest.RunStartedAt) {
+		newest = live[1]
+	}
+	chat := r.waitChat(t, newest.ID, func(c server.SessionChatResponse) bool { return len(c.Round) > 0 })
+	if got := roundLabels(chat); !slices.Equal(got, []string{"8", "8b"}) {
+		t.Errorf("round labels = %v, want 8 and 8b", got)
+	}
+	r.stop(t)
+}
+
 // openDesign opens the design session of the scenario's map and returns its id.
 func (r *running) openDesign(t *testing.T) string {
 	t.Helper()

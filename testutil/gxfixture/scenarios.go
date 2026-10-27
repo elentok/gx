@@ -58,6 +58,9 @@ type scenario struct {
 	recentlyFinished int
 	// openDesigns lists the maps whose design session is opened once the server is up.
 	openDesigns []string
+	// linkedDesigns lists the maps that get an extra plain session, linked to the
+	// map as a design session before openDesigns runs, so it is the older run.
+	linkedDesigns []string
 	// conversations seeds the conversation records, and the time recording began
 	// (the "started" marker). It is called with the time of seeding, so the days
 	// it picks stay inside the stats range.
@@ -144,6 +147,14 @@ var scenarios = map[string]scenario{
 	// design session replays fakeclaude's scripted chat. Its implementation
 	// epic exists, so Progress links to it at Branch and Done.
 	"design": designBase,
+	// design-two-live: design plus two live design sessions on design-epic, for
+	// the ⋯ menu's "Live sessions" list. The older one is a plain session made by
+	// `gx agents create` and marked a design session by `gx agent link` (with
+	// GX_AGENT_SESSION set); it stays idle because its prompt has no /gx-design
+	// prefix. The newer one is the scripted design session `gx designs open`
+	// starts afterwards, so the page shows it with round one (Q8, Q8b) up. The
+	// link comes last: a live design session makes `designs open` return it.
+	"design-two-live": designTwoLive(),
 	// grilling-stats: design plus seeded Grilling counts. The totals below are
 	// per `gx server stats` range, days counted back from today; "all" is both
 	// projects:
@@ -264,6 +275,13 @@ var designBase = scenario{
 		// The held worker never stamps started_at, which a running card's time reads.
 		project + ":design-epic-impl": "status: open\ncreated_at: 2026-01-01T09:30:00Z\nstarted_at: 2026-01-01T09:45:00Z\n",
 	},
+}
+
+func designTwoLive() scenario {
+	sc := designBase
+	sc.linkedDesigns = []string{project + ":design-epic"}
+	sc.openDesigns = []string{project + ":design-epic"}
+	return sc
 }
 
 // grillingStats is the design scenario with conversation records that carry
