@@ -48,9 +48,25 @@ func NewStoreWatch(root string) (*StoreWatch, error) {
 	}()
 	return &StoreWatch{
 		Events: out,
+		// The stream callback sends on the unbuffered es.Events, so a batch that
+		// lands after the readers left blocks its GCD thread forever; enough of
+		// those starve later streams. Stop the stream while es.Events is still
+		// drained, then end the reader. The backstop poll in keepFresh covers any
+		// event lost on darwin too.
 		stop: func() {
-			close(done)
-			es.Stop()
+			stopped := make(chan struct{})
+			go func() {
+				es.Stop()
+				close(stopped)
+			}()
+			for {
+				select {
+				case <-es.Events:
+				case <-stopped:
+					close(done)
+					return
+				}
+			}
 		},
 		rewalk: func() {},
 	}, nil
