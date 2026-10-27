@@ -786,3 +786,29 @@ an exited session.
 - **Scenario:** `disk-low`
 - **Steps:** set clean to `fail`, free to `15G`, click "Clean now".
 - **Pass:** the strip shows the failure (`failed: …clean.sh`) inline and stays.
+
+## 72. Check config banner
+
+- **Scenario:** `checks-missing`
+- **Steps:** open the Epics page and filter to `demo`.
+- **Pass:**
+  - One "Missing check config" banner reads "demo has no check config. Agents run gx's built-in
+    checks until you set it up. gx found 1 command to suggest."
+  - It has a "Not now" and a "Set up checks" button. `auto` is not named.
+
+## 73. Check config banner, all projects
+
+- **Scenario:** `checks-missing`
+- **Steps:** open the Epics page with the project filter on "All projects".
+- **Pass:**
+  - One banner reads "2 projects have no check config. Agents run gx's built-in checks until you
+    set them up."
+  - It lists `auto` and `demo`, each with its own "Set up checks" button, and has one "Not now".
+
+## 74. Not now
+
+- **Scenario:** `checks-missing`
+- **Steps:** open the Epics page, watch the requests, click "Not now".
+- **Pass:**
+  - The banner is gone and the epic cards stay.
+  - No request went to `/v1/checks/save`.

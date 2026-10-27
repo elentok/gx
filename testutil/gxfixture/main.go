@@ -363,6 +363,12 @@ func (f *fixture) seed(sc scenario) error {
 		if err := servertest.WriteEpic(f.store, p, ""); err != nil {
 			return err
 		}
+		if !sc.noCheckConfig {
+			body := `{"name":"` + p + `","checks":{}}`
+			if err := os.WriteFile(filepath.Join(f.store, p, "project.json"), []byte(body), 0o644); err != nil {
+				return err
+			}
+		}
 	}
 	for _, e := range sc.epics {
 		if err := servertest.WriteEpic(f.store, e.project, e.name); err != nil {
@@ -404,13 +410,39 @@ func (f *fixture) seed(sc scenario) error {
 		if !slices.Contains(sc.manualMerge, e.project) {
 			extra += `,"auto-ff-merge":true`
 		}
-		if err := servertest.WriteProjectRepo(f.store, e.project, repo, extra); err != nil {
+		if !sc.noCheckConfig {
+			extra += `,"checks":{}`
+		}
+		projectRepo := repo
+		if slices.Contains(sc.ownRepos, e.project) {
+			projectRepo = filepath.Join(f.root, e.project+"-repo")
+			if err := f.initRepo(projectRepo); err != nil {
+				return err
+			}
+		}
+		if err := servertest.WriteProjectRepo(f.store, e.project, projectRepo, extra); err != nil {
 			return err
 		}
 		if isMap {
 			if out, err := f.cli("tickets", "set", addr, "--design-step", sc.designSteps[addr]); err != nil {
 				return fmt.Errorf("set design step of %s: %w\n%s", addr, err, out)
 			}
+		}
+	}
+	return nil
+}
+
+// initRepo makes a git repo in dir with one commit.
+func (f *fixture) initRepo(dir string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("# "+filepath.Base(dir)+"\n"), 0o644); err != nil {
+		return err
+	}
+	for _, args := range [][]string{{"init", "-b", "main"}, {"add", "."}, {"commit", "-m", "fixture"}} {
+		if err := f.git(dir, args...); err != nil {
+			return err
 		}
 	}
 	return nil

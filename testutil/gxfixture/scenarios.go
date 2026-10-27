@@ -70,6 +70,11 @@ type scenario struct {
 	recommend map[string]recommendation
 	// gitSetup shapes the project repo (branches, a dirty checkout) after its first commit.
 	gitSetup func(f *fixture, repo string) error
+	// noCheckConfig leaves the projects without a checks key in project.json; the
+	// other scenarios write an empty one, so the Epics page shows no banner.
+	noCheckConfig bool
+	// ownRepos lists the projects that get a repo of their own instead of the shared one.
+	ownRepos []string
 	// diskLow gives each project a cleanup command that follows the disk's clean file.
 	diskLow bool
 }
@@ -240,6 +245,34 @@ var scenarios = map[string]scenario{
 				return err
 			}
 			return os.WriteFile(filepath.Join(repo, "same.txt"), []byte("local"), 0o644)
+		},
+	},
+	// checks-missing: two projects with a repo and an epic each, neither with check
+	// config. demo's repo has a Makefile test target and a package.json with only
+	// a build script; auto has its own repo, so a save on demo leaves auto missing.
+	"checks-missing": {
+		epics: []epic{
+			{project, "demo-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}},
+			{"auto", "auto-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}},
+		},
+		noCheckConfig: true,
+		ownRepos:      []string{"auto"},
+		gitSetup: func(f *fixture, repo string) error {
+			files := map[string]string{
+				"Makefile":     "test:\n\tgo test ./...\n",
+				"package.json": `{"name":"demo","scripts":{"build":"tsc"}}` + "\n",
+			}
+			for name, body := range files {
+				if err := os.WriteFile(filepath.Join(repo, name), []byte(body), 0o644); err != nil {
+					return err
+				}
+			}
+			for _, args := range [][]string{{"add", "."}, {"commit", "-m", "build files"}} {
+				if err := f.git(repo, args...); err != nil {
+					return err
+				}
+			}
+			return nil
 		},
 	},
 	// many-done: an epic with five merged tickets closed at different times, and

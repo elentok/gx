@@ -943,3 +943,50 @@ func TestStart_AutoAdvanceDelayFlagIsAccepted(t *testing.T) {
 	r := startWith(t, "design", "--auto-advance-delay", "50ms")
 	r.stop(t)
 }
+
+// checksOf is `gx server checks --json`, by project.
+func (r *running) checksOf(t *testing.T) map[string]server.ProjectChecks {
+	t.Helper()
+	var st server.ChecksStatus
+	if err := json.Unmarshal([]byte(r.gx(t, "server", "checks", "--json")), &st); err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]server.ProjectChecks{}
+	for _, p := range st.Projects {
+		out[p.Project] = p
+	}
+	return out
+}
+
+func kindOf(p server.ProjectChecks, kind string) server.KindCheck {
+	for _, k := range p.Kinds {
+		if k.Kind == kind {
+			return k
+		}
+	}
+	return server.KindCheck{}
+}
+
+func TestChecksMissingScenarioReportsBothProjectsMissing(t *testing.T) {
+	got := start(t, "checks-missing").checksOf(t)
+	if !got["demo"].Missing || !got["auto"].Missing {
+		t.Fatalf("want demo and auto missing, got %+v", got)
+	}
+	test := kindOf(got["demo"], "test")
+	if test.Recommended == nil || test.Recommended.Source != "Makefile · test" {
+		t.Errorf("demo test recommendation = %+v", test.Recommended)
+	}
+	if tc := kindOf(got["demo"], "typecheck"); tc.Recommended != nil {
+		t.Errorf("demo typecheck should have no candidate, got %+v", tc.Recommended)
+	}
+}
+
+func TestOtherScenariosReportNoMissingChecks(t *testing.T) {
+	for _, name := range []string{"united", "empty"} {
+		for p, c := range start(t, name).checksOf(t) {
+			if c.Missing {
+				t.Errorf("%s: project %s reports missing checks", name, p)
+			}
+		}
+	}
+}

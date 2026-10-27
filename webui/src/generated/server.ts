@@ -58,6 +58,48 @@ export interface BudgetIncreaseRequest {
 export const ReasonNotAnIncrease = "not-an-increase";
 
 //////////
+// source: checkstatus.go
+
+/**
+ * ChecksStatus is what `gx server checks` and the web "Set up checks" dialog
+ * read: each project's check config today and what gx would recommend.
+ */
+export interface ChecksStatus {
+  projects: ProjectChecks[];
+}
+/**
+ * ProjectChecks is one project's check state.
+ */
+export interface ProjectChecks {
+  project: string;
+  /**
+   * Missing is true when the project has neither .gx/checks.json nor a
+   * checks key in project.json. A project with broken config is not missing.
+   */
+  missing: boolean;
+  trunk: string;
+  save_targets: string[];
+  /**
+   * Error is set when the repo file or the checks key is invalid.
+   */
+  error: string;
+  kinds: KindCheck[];
+}
+/**
+ * KindCheck is one kind's state and detection result.
+ */
+export interface KindCheck {
+  kind: string;
+  /**
+   * State is configured, gx-default or off.
+   */
+  state: string;
+  default: string;
+  recommended?: any /* check.Candidate */;
+  candidates: any /* check.Candidate */[];
+}
+
+//////////
 // source: designs.go
 
 export const ReasonDesignNotMapEpic = "not-map-epic";

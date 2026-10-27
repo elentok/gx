@@ -1,6 +1,8 @@
 import { Box, chakra, Input, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { MissingBanner } from "../checks/MissingBanner";
+import { fetchChecksStatus, type FetchChecksStatus } from "../checks/status";
 import { useConnectionContext } from "../connection";
 import type { OpenDesign } from "../design/open";
 import { NewDesignForm } from "../design/NewDesignForm";
@@ -9,6 +11,7 @@ import { DetailPage } from "../page/DetailPage";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { Spinner } from "../ui/spinner/Spinner";
+import { useFetched } from "../useFetched";
 import { EpicCard } from "./EpicCard";
 import { useEpicList, type FetchEpicList } from "./list";
 import { sectionsOf, type Section } from "./view";
@@ -85,10 +88,24 @@ function SectionBlock({
   );
 }
 
-export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList; openDesign?: OpenDesign }) {
+export function EpicsPage({
+  fetchList,
+  fetchChecks = fetchChecksStatus,
+  openDesign,
+  onSetUp = () => {},
+}: {
+  fetchList?: FetchEpicList;
+  fetchChecks?: FetchChecksStatus;
+  openDesign?: OpenDesign;
+  /** Opens the check setup dialog for a project. */
+  onSetUp?: (project: string) => void;
+}) {
   const conn = useConnectionContext();
   const navigate = useNavigate();
   const { list, failed, retry } = useEpicList(fetchList, conn);
+  // A failed read shows no banner: it is not worth an error state.
+  const checks = useFetched("checks", fetchChecks, conn).data;
+  const [bannerHidden, setBannerHidden] = useState(false);
   const [query, setQuery] = useState("");
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [designing, setDesigning] = useState(false);
@@ -98,6 +115,7 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
   const projects = [...new Set((list?.epics ?? []).map((e) => e.project))];
   // A stored project that is gone, or a single project, acts as "All projects" without rewriting it.
   const filterProject = projects.length > 1 && projects.includes(storedProject) ? storedProject : undefined;
+  const missing = (checks?.projects ?? []).filter((p) => p.missing && (filterProject === undefined || p.project === filterProject));
   const sections = list ? sectionsOf(list.epics, query, list.recently_finished, filterProject) : [];
   const shown = sections.filter((s) => s.rows.length > 0);
   const chooseProject = (project: string) => {
@@ -161,6 +179,7 @@ export function EpicsPage({ fetchList, openDesign }: { fetchList?: FetchEpicList
         )}
         {list && list.epics.length > 0 && newDesign}
       </Box>
+      {!bannerHidden && <MissingBanner missing={missing} onSetUp={onSetUp} onDismiss={() => setBannerHidden(true)} />}
       {failed ? (
         <Box mt="6" display="flex" alignItems="center" gap="3">
           <Text color="text.muted">Could not load epics</Text>
