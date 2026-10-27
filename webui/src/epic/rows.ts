@@ -224,10 +224,14 @@ export function doneHeading(rows: EpicDetailRow[]): string {
 
 export const MAX_INDENT = 2;
 
+// Ticket IDs compare their digit runs as numbers, so 29i9 comes before 29i10.
+const byId = new Intl.Collator("en", { numeric: true });
+
 // Rows of one group (live or folded) in display order: each fork follows its parent, indented one level per
-// generation up to MAX_INDENT. A row whose parent is in the other group or absent starts at the top level.
+// generation up to MAX_INDENT, and siblings go in ticket number order. A row whose parent is in the other
+// group or absent starts at the top level.
 function nestGroup(rows: EpicDetailRow[], inGroup: (r: EpicDetailRow) => boolean): { row: EpicDetailRow; indent: number }[] {
-  const group = rows.filter(inGroup);
+  const group = rows.filter(inGroup).sort((a, b) => byId.compare(idOf(a.address), idOf(b.address)));
   const addresses = new Set(group.map((r) => r.address));
   const children = new Map<string, EpicDetailRow[]>();
   const roots: EpicDetailRow[] = [];

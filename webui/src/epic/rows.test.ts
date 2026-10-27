@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { EpicDetail, EpicDetailRow } from "./detail";
-import { cardLook, type CardLook, cardMeta, designStatParts, loopStatParts, rowContext } from "./rows";
+import { cardLook, type CardLook, cardMeta, designStatParts, loopStatParts, nestLive, rowContext } from "./rows";
 
 const detailOf = (kind: EpicDetail["kind"], rows: EpicDetailRow[]): EpicDetail => ({
   address: "gx:e",
@@ -74,4 +74,9 @@ test("a finished epic reads Merged, in the done tone", () => {
 test("the Design step part is bright and has no tone", () => {
   const d = { ...detailOf("map", []), steps: [{ step: "spec", label: "spec", state: "current" }] } as unknown as EpicDetail;
   expect(designStatParts(d, false, NOW)[0]).toEqual({ text: "spec", bright: true });
+});
+
+test("live rows are in ticket number order, so 9 comes before 10", () => {
+  const rows = ["01", "10", "02", "09"].map((id) => row({ address: `gx:e/01${id === "01" ? "" : `i${Number(id)}`}`, parent: id === "01" ? undefined : "gx:e/01" }));
+  expect(nestLive(rows).map((r) => r.row.address)).toEqual(["gx:e/01", "gx:e/01i2", "gx:e/01i9", "gx:e/01i10"]);
 });
