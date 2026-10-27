@@ -30,6 +30,10 @@ description: "Use when you need to resolve an in-progress git merge/rebase confl
 6. **Never edit a ticket file or its status.** You may read tickets for context, but gx closes the
    conflict-resolution ticket itself when you exit; a hand-written status can pause the parent.
 
-7. **Finish with zero background shells.** If a call was moved to the background, read its output,
+7. **Never leave the worktree root with a bare `cd`.** The shell keeps the new directory, so the
+   next command runs in the wrong place. Use a subshell, `(cd webui && npx vitest ...)`, or
+   absolute paths. Use the same worktree root for Bash and for Read/Edit paths.
+
+8. **Finish with zero background shells.** If a call was moved to the background, read its output,
    then stop it (TaskStop). `TaskStop` is a deferred tool: if it isn't callable, load it first with
    `ToolSearch` query `select:TaskStop`. ralph-loop will not merge a ticket while one is open.

@@ -76,6 +76,9 @@ Then, while working:
   ticket while one is open.
 - **One check per Bash call.** A chained call (`rg ...; go test; gofmt -l`) can return the output
   of one segment only. Run each check in its own call.
+- **Never leave the worktree root with a bare `cd`.** The shell keeps the new directory, so the
+  next command runs in the wrong place. Use a subshell, `(cd webui && npx vitest ...)`, or absolute
+  paths. Use the same worktree root for Bash and for Read/Edit paths.
 - **When a test fails, decide why before you fix anything.** If it caught a real bug, fix the
   code. If it is flaky, or checks behaviour the ticket changed on purpose, fix the test: a flaky
   test waits for the event (poll with a timeout), never a fixed sleep. Never weaken, skip or delete

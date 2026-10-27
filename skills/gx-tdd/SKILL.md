@@ -81,5 +81,8 @@ on the critical paths and complex logic instead of every edge case.
 - **Red before green.** Write the failing test first, then only enough code to pass it. Don't
   anticipate future tests or add speculative features.
 - **One slice at a time.** One seam, one test, one minimal implementation per cycle.
+- **Never leave the worktree root with a bare `cd`.** The shell keeps the new directory, so the
+  next command runs in the wrong place. Run tests in a subshell, `(cd webui && npx vitest ...)`, or
+  with absolute paths. Use the same worktree root for Bash and for Read/Edit paths.
 - **Refactoring is not part of the loop.** It belongs to the review stage (`code-review`), not the
   red → green implementation cycle.
