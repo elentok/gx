@@ -12,14 +12,21 @@ import (
 	"strings"
 )
 
-// lockfiles map a lockfile to the frozen install of its package manager. The
-// same table lives in skills/gx-verify/SKILL.md.
-var lockfiles = []struct{ file, install string }{
-	{"pnpm-lock.yaml", "pnpm install --frozen-lockfile"},
-	{"package-lock.json", "npm ci"},
-	{"bun.lock", "bun install --frozen-lockfile"},
-	{"bun.lockb", "bun install --frozen-lockfile"},
-	{"yarn.lock", "yarn install --frozen-lockfile"},
+// Lockfile maps a lockfile to the runner and the frozen install of its package
+// manager.
+type Lockfile struct {
+	File    string
+	Runner  []string // runs a package's tool, as in `pnpm exec eslint`
+	Install string
+}
+
+// Lockfiles is the one Go owner of the lockfile table; `gx check` shares it.
+var Lockfiles = []Lockfile{
+	{"pnpm-lock.yaml", []string{"pnpm", "exec"}, "pnpm install --frozen-lockfile"},
+	{"package-lock.json", []string{"npx"}, "npm ci"},
+	{"bun.lock", []string{"bun", "x"}, "bun install --frozen-lockfile"},
+	{"bun.lockb", []string{"bun", "x"}, "bun install --frozen-lockfile"},
+	{"yarn.lock", []string{"yarn"}, "yarn install --frozen-lockfile"},
 }
 
 // findNodeBin walks from dir up to the git root and returns the first
@@ -58,9 +65,9 @@ func gitRoot(dir string) (string, error) {
 // dir. brief never runs it.
 func installAdvice(dir, root string) string {
 	for d := dir; ; d = filepath.Dir(d) {
-		for _, l := range lockfiles {
-			if _, err := os.Stat(filepath.Join(d, l.file)); err == nil {
-				return fmt.Sprintf("run `%s` in %s", l.install, d)
+		for _, l := range Lockfiles {
+			if _, err := os.Stat(filepath.Join(d, l.File)); err == nil {
+				return fmt.Sprintf("run `%s` in %s", l.Install, d)
 			}
 		}
 		if d == root {

@@ -78,13 +78,21 @@ type indexEntry struct {
 // Run executes the tool and prints its report to o.Out. It returns the exit
 // code for the process.
 func Run(tool Tool, o Options) int {
+	exit, _ := RunOutcome(tool, o)
+	return exit
+}
+
+// RunOutcome is Run that also returns what the tool found, for callers that
+// name the failures themselves. The Outcome is empty when the run could not
+// start (exit 2).
+func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	dir, err := filepath.Abs(o.Dir)
 	if err != nil {
-		return cantRun(o.Out, err.Error())
+		return cantRun(o.Out, err.Error()), Outcome{}
 	}
 	plan, err := tool.Plan(dir, o.Args)
 	if err != nil {
-		return cantRun(o.Out, err.Error())
+		return cantRun(o.Out, err.Error()), Outcome{}
 	}
 	if plan.Note != "" {
 		fmt.Fprintln(o.Out, plan.Note)
@@ -95,14 +103,14 @@ func Run(tool Tool, o Options) int {
 	logPath := filepath.Join(logDir, start.UTC().Format("20060102T150405.000000000")+"-"+tool.Name()+".log")
 	logFile, err := createLog(logDir, logPath)
 	if err != nil {
-		return cantRun(o.Out, "cannot write log: "+err.Error())
+		return cantRun(o.Out, "cannot write log: "+err.Error()), Outcome{}
 	}
 	defer logFile.Close()
 	sweep(logDir, start)
 
 	out, exit, err := execute(plan.Bin, plan.Argv, dir, logFile)
 	if err != nil {
-		return cantRun(o.Out, err.Error())
+		return cantRun(o.Out, err.Error()), Outcome{}
 	}
 	elapsed := time.Since(start)
 
@@ -121,9 +129,9 @@ func Run(tool Tool, o Options) int {
 		Log:        logPath,
 	}
 	if err := appendIndex(filepath.Join(logDir, "index.jsonl"), entry); err != nil {
-		return cantRun(o.Out, "cannot write index: "+err.Error())
+		return cantRun(o.Out, "cannot write index: "+err.Error()), Outcome{}
 	}
-	return report(tool, o, outcome, out, entry)
+	return report(tool, o, outcome, out, entry), outcome
 }
 
 // execute runs the command and returns its combined output and exit code. The

@@ -17,6 +17,9 @@ func (r Result) Render() string {
 			detail = fmt.Sprintf("%.2fs", k.Duration.Seconds())
 		}
 		fmt.Fprintf(&b, "%-4s  %-9s  %s\n", k.Status, k.Kind, detail)
+		for _, n := range k.Notes {
+			fmt.Fprintf(&b, "      %s\n", n)
+		}
 	}
 	failed := 0
 	for _, k := range r.Kinds {
@@ -25,6 +28,9 @@ func (r Result) Render() string {
 		}
 		failed++
 		fmt.Fprintf(&b, "\n%s log: %s\n", k.Kind, k.Log)
+		for _, name := range k.Failures {
+			fmt.Fprintf(&b, "  %s\n", name)
+		}
 		for _, line := range k.Tail {
 			fmt.Fprintf(&b, "  %s\n", line)
 		}

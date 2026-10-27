@@ -59,6 +59,12 @@ type KindResult struct {
 	Reason   string   // why a kind was skipped
 	Log      string   // set when the kind ran
 	Tail     []string // last lines of the log, set when the kind failed
+	// Failures name the failing tests of a failing gx default as brief renders
+	// them (`package.TestName`).
+	Failures []string
+	// Notes are lines printed under the kind: a skipped row of a gx default,
+	// what format rewrote.
+	Notes []string
 }
 
 // Result is the outcome of a run.
@@ -96,7 +102,7 @@ func Run(opts Options) (Result, error) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return Result{}, err
 	}
-	r := &runner{root: root, runDir: runDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit}
+	r := &runner{root: root, runDir: runDir, dataDir: opts.DataDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit}
 	if r.limit <= 0 {
 		r.limit = DefaultArgLimit
 	}
@@ -143,11 +149,17 @@ func exitCode(results []KindResult) int {
 }
 
 type runner struct {
-	root, runDir string
-	files        []string
-	mode         Mode
-	cfg          Config
-	limit        int
+	root, runDir, dataDir string
+	files                 []string
+	mode                  Mode
+	cfg                   Config
+	limit                 int
+
+	groupsOnce sync.Once
+	grp        *groups
+
+	installMu sync.Mutex
+	installs  map[string]installDone
 }
 
 func (r *runner) runKind(kind string) KindResult {
@@ -157,10 +169,7 @@ func (r *runner) runKind(kind string) KindResult {
 		return res
 	}
 	c, ok := r.cfg[kind]
-	switch {
-	case !ok:
-		return skip("gx default not built yet")
-	case c.Off:
+	if ok && c.Off {
 		return skip("off")
 	}
 	cmd := c.Full
@@ -168,11 +177,9 @@ func (r *runner) runKind(kind string) KindResult {
 		if len(r.files) == 0 {
 			return skip("no changed files")
 		}
-		if c.Changed == "" {
-			return skip("no changed command, gx default not built yet")
-		}
 		cmd = c.Changed
 	}
+	useDefault := !ok || cmd == ""
 
 	res.Log = filepath.Join(r.runDir, kind+".log")
 	start := time.Now()
@@ -183,16 +190,33 @@ func (r *runner) runKind(kind string) KindResult {
 		return res
 	}
 	defer logFile.Close()
-	for _, batch := range expandBatches(cmd, r.files, r.limit) {
-		sh := exec.Command("sh", "-c", batch)
-		sh.Dir = r.root
-		sh.Stdout, sh.Stderr = logFile, logFile
-		if err := sh.Run(); err != nil {
-			res.Status = StatusFail
+	var before map[string]string
+	if kind == "format" {
+		before = hashFiles(r.root, r.files)
+	}
+	if useDefault {
+		r.runDefault(kind, logFile, &res)
+		if res.Status == StatusSkip {
+			logFile.Close()
+			os.Remove(res.Log)
+			res.Log = ""
+			return res
+		}
+	} else {
+		for _, batch := range expandBatches(cmd, r.files, r.limit) {
+			sh := exec.Command("sh", "-c", batch)
+			sh.Dir = r.root
+			sh.Stdout, sh.Stderr = logFile, logFile
+			if err := sh.Run(); err != nil {
+				res.Status = StatusFail
+			}
 		}
 	}
 	res.Duration = time.Since(start)
-	if res.Status == StatusFail {
+	if before != nil {
+		r.afterFormat(before, &res)
+	}
+	if res.Status == StatusFail && len(res.Failures) == 0 && res.Tail == nil {
 		res.Tail = lastLines(res.Log, tailLines)
 	}
 	return res

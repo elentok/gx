@@ -208,10 +208,14 @@ func TempDotBareRepoWithWorktrees(t *testing.T, names ...string) string {
 	return outer
 }
 
-// WriteFile writes content to a file inside dir, creating it if needed.
+// WriteFile writes content to a file inside dir, creating it and its parent
+// directories if needed.
 func WriteFile(t *testing.T, dir, name, content string) {
 	t.Helper()
 	path := filepath.Join(dir, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("WriteFile %s: %v", path, err)
+	}
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
 		t.Fatalf("WriteFile %s: %v", path, err)
 	}

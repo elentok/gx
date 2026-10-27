@@ -45,6 +45,15 @@ type Unit struct {
 	Kind     UnitKind
 }
 
+// String names the failure on one line: `package.TestName` for a test, the
+// location and what failed otherwise.
+func (u Unit) String() string {
+	if u.Kind != KindTest {
+		return u.Location + " " + u.Kind.label()
+	}
+	return u.Location + "." + u.Name
+}
+
 // renderUnits prints the units under their location. Units of one location
 // must be adjacent.
 func renderUnits(w io.Writer, units []Unit) {
