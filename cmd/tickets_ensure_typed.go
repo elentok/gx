@@ -13,11 +13,12 @@ import (
 
 // typedTicketSpec is what differs between the epic's one-per-epic ticket
 // types. name doubles as the filename suffix and the label in messages;
-// bodyFormat takes the ticket id and the epic name.
+// bodyFormat takes the ticket id and the epic name, then bodyArgs.
 type typedTicketSpec struct {
 	ticketType schema.TicketType
 	name       string
 	bodyFormat string
+	bodyArgs   []any
 
 	contextWindow int
 }
@@ -59,7 +60,7 @@ func ensureTypedTicket(epicPath string, w io.Writer, spec typedTicketSpec) error
 	}
 	stub.StampCreated(time.Now().UTC(), address.String())
 
-	out, err := schema.MarshalTicket(stub, fmt.Sprintf(spec.bodyFormat, id, epic.Name))
+	out, err := schema.MarshalTicket(stub, fmt.Sprintf(spec.bodyFormat, append([]any{id, epic.Name}, spec.bodyArgs...)...))
 	if err != nil {
 		return fmt.Errorf("marshaling stub ticket: %w", err)
 	}

@@ -192,6 +192,32 @@ func implEpicPath(root, mapName string) string {
 	return filepath.Join(root, mapName+ImplEpicSuffix)
 }
 
+// EpicSpecPath names the spec of the epic at epicPath, or "" when there is
+// none. A repo spec (docs/specs/<epic>.md, or <map>.md for a <map>-impl epic)
+// is named repo-relative, the epic's own spec.md by its store path.
+func EpicSpecPath(epicPath string) string {
+	epic := filepath.Base(epicPath)
+	projectDir := filepath.Dir(epicPath)
+	store := filepath.Dir(projectDir)
+
+	if checkout := TrunkCheckout(store, filepath.Base(projectDir)); checkout != "" {
+		slugs := []string{epic}
+		if name, ok := strings.CutSuffix(epic, ImplEpicSuffix); ok {
+			slugs = append(slugs, name)
+		}
+		for _, slug := range slugs {
+			rel := filepath.Join("docs", "specs", slug+".md")
+			if fileExists(filepath.Join(checkout, rel)) {
+				return rel
+			}
+		}
+	}
+	if own := filepath.Join(epicPath, "spec.md"); fileExists(own) {
+		return own
+	}
+	return ""
+}
+
 // mapCompletedBy returns the map that creating the loop epic name completes.
 // Creating <map>-impl is what completes the map; BackfillEpicTimes applies the
 // same rule to epics that already exist.
