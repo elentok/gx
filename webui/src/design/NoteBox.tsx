@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button/Button";
 import { Modal } from "../ui/modal/Modal";
 import { useWide } from "../useWide";
+import { useVisualViewportHeight } from "./useVisualViewportHeight";
 
-const TOP_BAR = "48px";
+const TOP_BAR = 48;
 
 const field = {
   fontSize: "16px",
@@ -40,6 +41,8 @@ export function NoteBox({
   const [editing, setEditing] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const sheetMode = !useWide();
+  // The editor covers the visual viewport, so iOS's on-screen keyboard does not hide its bottom.
+  const viewport = useVisualViewportHeight(sheetMode ? TOP_BAR : 0);
   useEffect(() => {
     box.current?.scrollIntoView?.({ block: "nearest" });
   }, []);
@@ -87,11 +90,11 @@ export function NoteBox({
         <Modal
           label={title}
           onClose={() => setEditing(false)}
-          backdrop={
-            sheetMode
-              ? { top: TOP_BAR, inset: undefined, left: "0", right: "0", bottom: "0", p: "2", alignItems: "stretch" }
-              : undefined
-          }
+          backdrop={{
+            inset: undefined,
+            ...viewport.overlay,
+            ...(sheetMode && { p: "2", alignItems: "stretch" }),
+          }}
           bg="surface.raised"
           borderColor="border"
           borderRadius="12px"

@@ -12,9 +12,10 @@ const read = () => {
  * The bottom sheet's overlay box and CSS height. iOS Safari does not shrink the layout viewport for the
  * on-screen keyboard, so a `position: fixed; inset: 0` overlay reaches under it. The overlay instead
  * covers the visual viewport, and the sheet follows its height to keep the footer visible. Without
- * visualViewport the overlay is the full screen and the sheet is 88%.
+ * visualViewport the overlay is the full screen and the sheet is 88%. `topGap` leaves that many pixels
+ * at the top of the overlay uncovered, such as a top bar.
  */
-export const useVisualViewportHeight = () => {
+export const useVisualViewportHeight = (topGap = 0) => {
   const [vv, setVv] = useState(read);
   useEffect(() => {
     const target = window.visualViewport;
@@ -27,9 +28,9 @@ export const useVisualViewportHeight = () => {
       target.removeEventListener("scroll", on);
     };
   }, []);
-  if (!vv) return { sheetHeight: "88%", overlay: { inset: "0" } };
+  if (!vv) return { sheetHeight: "88%", overlay: { top: `${topGap}px`, left: "0", right: "0", bottom: "0" } };
   return {
     sheetHeight: `${Math.round(Math.min(SHEET_HEIGHT * window.innerHeight, vv.height - SHEET_TOP_GAP))}px`,
-    overlay: { top: `${vv.top}px`, left: "0", right: "0", height: `${vv.height}px` },
+    overlay: { top: `${vv.top + topGap}px`, left: "0", right: "0", height: `${vv.height - topGap}px` },
   };
 };
