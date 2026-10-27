@@ -31,6 +31,12 @@ func WithTestHolder() func(*server.Config) {
 	return func(c *server.Config) { c.Holder = []string{os.Args[0], holderArg} }
 }
 
+// WithEnv adds KEY=VALUE entries to the server's env, which its session holders
+// and their agents inherit. An entry wins over the harness default for its key.
+func WithEnv(entries ...string) func(*server.Config) {
+	return func(c *server.Config) { c.Env = append(c.Env, entries...) }
+}
+
 // WithChatHarness makes the session chat read transcripts of kind's sessions
 // instead of claude's.
 func WithChatHarness(kind string) func(*server.Config) {

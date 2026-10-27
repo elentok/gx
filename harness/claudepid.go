@@ -2,6 +2,7 @@ package harness
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -51,7 +52,7 @@ func ParsePidStatus(data []byte) (PidStatus, error) {
 // ClaudeSessionsDir is where claude writes its pid status files: under
 // CLAUDE_CONFIG_DIR when set, as claude itself resolves it, else ~/.claude.
 func ClaudeSessionsDir() (string, error) {
-	dir, _, err := claudeConfigDirs()
+	dir, _, err := claudeConfigDirs(nil)
 	if err != nil {
 		return "", err
 	}
@@ -59,24 +60,47 @@ func ClaudeSessionsDir() (string, error) {
 }
 
 // ClaudeProjectsDir is where claude writes its transcripts.
-func ClaudeProjectsDir() (string, error) {
-	dir, _, err := claudeConfigDirs()
+func ClaudeProjectsDir() (string, error) { return ClaudeProjectsDirIn(nil) }
+
+// ClaudeProjectsDirIn is ClaudeProjectsDir reading HOME and CLAUDE_CONFIG_DIR
+// from env (KEY=VALUE entries, the last one of a key wins). Nil env means the
+// process env.
+func ClaudeProjectsDirIn(env []string) (string, error) {
+	dir, _, err := claudeConfigDirs(env)
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(dir, "projects"), nil
 }
 
+// LookupEnv returns key from env, or from the process env when env is nil.
+func LookupEnv(env []string, key string) string {
+	if env == nil {
+		return os.Getenv(key)
+	}
+	value := ""
+	for _, kv := range env {
+		if k, v, ok := strings.Cut(kv, "="); ok && k == key {
+			value = v
+		}
+	}
+	return value
+}
+
 // claudeConfigDirs returns claude's config dir and the dir that holds its
 // global .claude.json: the same dir under CLAUDE_CONFIG_DIR, else ~/.claude and
 // the home dir.
-func claudeConfigDirs() (configDir, globalDir string, err error) {
-	if dir := os.Getenv("CLAUDE_CONFIG_DIR"); dir != "" {
+func claudeConfigDirs(env []string) (configDir, globalDir string, err error) {
+	if dir := LookupEnv(env, "CLAUDE_CONFIG_DIR"); dir != "" {
 		return dir, dir, nil
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", "", err
+	home := LookupEnv(env, "HOME")
+	if env == nil {
+		if home, err = os.UserHomeDir(); err != nil {
+			return "", "", err
+		}
+	} else if home == "" {
+		return "", "", errors.New("HOME is not set in the env")
 	}
 	return filepath.Join(home, ".claude"), home, nil
 }

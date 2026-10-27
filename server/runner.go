@@ -936,7 +936,7 @@ func (s *Server) depsFor(project string) ralphloop.Deps {
 
 // depsWith is the default deps talking to runner.
 func (s *Server) depsWith(runner agentrunner.Runner) ralphloop.Deps {
-	deps := ralphloop.DefaultDeps()
+	deps := s.defaultDeps()
 	deps.Runner = runner
 	if s.cfg.Sleep != nil {
 		deps.Sleep = s.cfg.Sleep

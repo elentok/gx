@@ -23,10 +23,12 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
+	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -476,7 +478,8 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// command prompt would sit out: the fake agent starts no turn. Read from
 	// the config file, so give the server a home with a short one, unless the
 	// test already set up its own.
-	if os.Getenv("HOME") == processHome {
+	ownHome := os.Getenv("HOME") != processHome
+	if !ownHome {
 		home := t.TempDir()
 		t.Setenv("HOME", home)
 		if err := os.MkdirAll(filepath.Join(home, ".config", "gx"), 0o755); err != nil {
@@ -489,6 +492,14 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
+	// The server's env is the process env plus a poisoned home and a clean
+	// config dir of its own, so code that reads HOME where it should read
+	// CLAUDE_CONFIG_DIR trips the canary. A test that already set its own HOME
+	// keeps it, and the config dir it set with it.
+	h.cfg.Env = os.Environ()
+	if !ownHome {
+		h.cfg.Env = append(h.cfg.Env, claudeenv.In(filepath.Join(stateDir, "claude-home"))...)
+	}
 	// Every merge pauses on ralphloop's 3s finish debounce; the fake agents
 	// settle at once, so a hundredth keeps the order without the wait.
 	h.cfg.Sleep = func(d time.Duration) { time.Sleep(d / 100) }
@@ -537,6 +548,9 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h.serve(t)
 	return h
 }
+
+// Env is key as the server sees it in its Config.Env.
+func (h *Harness) Env(key string) string { return harness.LookupEnv(h.cfg.Env, key) }
 
 // Restart stops the server and starts a new one on the same state dir, as a
 // crash-and-relaunch would.

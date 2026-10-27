@@ -692,8 +692,7 @@ func startR3(t *testing.T) *servertest.Harness {
 // zero-commit the way a real iteration does.
 func runToZeroCommitPause(t *testing.T, h *servertest.Harness, last string) {
 	t.Helper()
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+	home := h.Env("HOME")
 	_, _, cwd := registerLaunch(h)
 	var started atomic.Bool
 	var turns atomic.Int32

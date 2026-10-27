@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/sound"
@@ -141,7 +140,7 @@ func (s *Server) claudeTranscript(id string, meta sessionMeta) (string, bool) {
 		return "", false
 	}
 	return s.transcripts.resolve(conversationID, meta.Status.State, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
-		projects, err := harness.ClaudeProjectsDir()
+		projects, err := harness.ClaudeProjectsDirIn(s.cfg.Env)
 		if err != nil {
 			s.log.Warn("claude projects dir", "session", id, "err", err)
 			return "", false
@@ -171,7 +170,7 @@ func (s *Server) claudeTranscript(id string, meta sessionMeta) (string, bool) {
 // transcript, or from its codex rollout.
 func (s *Server) lastAssistantText(id string, meta sessionMeta) (string, bool) {
 	if meta.Harness == string(harness.Codex) {
-		text, ok, err := codexsession.LastAssistantText(meta.ConversationID)
+		text, ok, err := s.lastCodexText(meta.ConversationID)
 		if err != nil {
 			s.log.Warn("design actionable: read codex rollout", "session", id, "err", err)
 		}

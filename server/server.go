@@ -200,6 +200,11 @@ func SettingsFromConfig(cfg config.Config) Settings {
 type Config struct {
 	Settings
 
+	// Env is the environment the server runs under, as KEY=VALUE entries like
+	// exec.Cmd.Env. The server reads HOME, CLAUDE_CONFIG_DIR and CODEX_HOME from
+	// it and starts every session holder with it. Nil means the process env.
+	Env []string
+
 	StateDir    string
 	Build       string
 	TicketStore string // ticket-store root; kept fresh by watch + poll

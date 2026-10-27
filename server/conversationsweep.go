@@ -1,8 +1,6 @@
 package server
 
 import (
-	"os"
-
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
@@ -19,7 +17,7 @@ func (s *Server) sweepDesignCounts() {
 		s.log.Warn("sweep conversation counts", "err", err)
 		return
 	}
-	home, err := os.UserHomeDir()
+	home, err := s.envHome()
 	if err != nil {
 		s.log.Warn("sweep conversation counts", "err", err)
 		return

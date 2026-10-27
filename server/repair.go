@@ -177,7 +177,7 @@ func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
 	res, _, err := repair.Merge(repair.MergeInput{
 		EpicPath: epicPath, ID: id, From: req.From, To: req.To,
 		IgnoreLiveTab: req.IgnoreLiveTab, Continue: req.Continue, Abort: req.Abort, Source: req.origin, Cwd: cwd,
-	}, ralphloop.DefaultDeps())
+	}, s.defaultDeps())
 	if err != nil {
 		return repairRefusal(err), nil
 	}
@@ -291,7 +291,7 @@ func (s *Server) repairStartOver(req RepairRequest) (RepairResult, error) {
 func (s *Server) startOverDeps(address string) ralphloop.Deps {
 	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if s.cfg.Runner == nil || err != nil {
-		return ralphloop.DefaultDeps()
+		return s.defaultDeps()
 	}
 	// An unavailable runner is nil, which reports no session, as for an
 	// unreachable host.

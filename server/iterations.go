@@ -11,7 +11,6 @@ import (
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
-	"github.com/elentok/gx/transcript"
 )
 
 // IterationInfo is one live iteration in the /v1/iterations payload. The
@@ -95,7 +94,7 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 		it.Base = base
 	}
 	if sess.SessionID != "" {
-		if p, err := transcript.Path(worktree, sess.SessionID); err == nil {
+		if p, err := s.transcriptPath(worktree, sess.SessionID); err == nil {
 			it.Transcript = p
 		}
 	}

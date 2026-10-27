@@ -97,7 +97,7 @@ func (s *Server) planRecovery(f recovery.Failure) (recoveryPlan, bool) {
 		return recoveryPlan{}, false
 	}
 	log := s.ticketEvents(ref, f)
-	entry, matched := catalog.Match(failureSequence(log, f))
+	entry, matched := catalog.Match(s.failureSequence(log, f))
 	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
 	if !plan.decide(f, false) {
 		return recoveryPlan{}, false
@@ -120,7 +120,7 @@ func (s *Server) planEpicRecovery(f recovery.Failure, catalog recovery.Catalog) 
 	}
 	ref := ticketRef{addr: tickets.Address{Project: root.Project, Epic: root.Epic}, projectDir: projectDir, repo: repo}
 	log := s.ticketEvents(ref, f)
-	entry, matched := catalog.Match(failureSequence(log, f))
+	entry, matched := catalog.Match(s.failureSequence(log, f))
 	plan := recoveryPlan{ref: ref, log: log, entry: entry, matched: matched}
 	return plan, plan.decide(f, true)
 }
@@ -472,7 +472,7 @@ func clearsRecovery(t events.Type) bool {
 // the failure itself (already appended by the pause). A logged failure with no
 // kind, like the loop's gate hold, takes the failure's. A logged failure also
 // carries its session's last assistant text, which R2 and R3 read.
-func failureSequence(log []ralphloop.Event, f recovery.Failure) []recovery.Event {
+func (s *Server) failureSequence(log []ralphloop.Event, f recovery.Failure) []recovery.Event {
 	var seq []recovery.Event
 	for _, ev := range log {
 		seq = append(seq, recovery.Event{Type: events.Type(ev.Type), Kind: events.Kind(ev.Kind), Reason: ev.Reason, Time: ev.Time})
@@ -484,18 +484,18 @@ func failureSequence(log []ralphloop.Event, f recovery.Failure) []recovery.Event
 	if seq[n-1].Kind == "" {
 		seq[n-1].Kind = f.Kind
 	}
-	seq[n-1].Text = lastAssistantText(log[n-1])
+	seq[n-1].Text = s.lastLoggedAssistantText(log[n-1])
 	return seq
 }
 
 // lastAssistantText is the last assistant text of the session a logged event
 // names, or "" when it names none or the transcript cannot be read. Only
 // Claude transcripts are read.
-func lastAssistantText(ev ralphloop.Event) string {
+func (s *Server) lastLoggedAssistantText(ev ralphloop.Event) string {
 	if ev.AgentSession == "" || ev.Cwd == "" || (ev.Agent != "" && ev.Agent != ralphloop.AgentClaude) {
 		return ""
 	}
-	path, err := transcript.Path(ev.Cwd, ev.AgentSession)
+	path, err := s.transcriptPath(ev.Cwd, ev.AgentSession)
 	if err != nil {
 		return ""
 	}

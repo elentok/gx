@@ -11,7 +11,9 @@ import (
 	"github.com/elentok/gx/agentrunner/screen"
 )
 
-type claudeHarness struct{}
+// claudeHarness reads claude's config (vim mode) from env; nil is the process
+// env.
+type claudeHarness struct{ env []string }
 
 func (claudeHarness) Launch(opts LaunchOptions) Command {
 	return claudeCommand(append([]string{"--session-id", opts.SessionID}, opts.Args...), opts.Env)

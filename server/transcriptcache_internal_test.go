@@ -126,6 +126,23 @@ func TestClaudeTranscript_StatsTheExpectedSlugDirBeforeGlobbing(t *testing.T) {
 	}
 }
 
+func TestClaudeTranscript_ReadsTheConfigDirFromTheServerEnv(t *testing.T) {
+	config := t.TempDir()
+	cwd := "/work/proj"
+	want := filepath.Join(config, "projects", transcript.Slugify(cwd), "conv.jsonl")
+	if err := os.MkdirAll(filepath.Dir(want), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(want, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}}
+	got, ok := s.claudeTranscript("s1", sessionMeta{Dir: cwd, ConversationID: "conv"})
+	if !ok || got != want {
+		t.Fatalf("claudeTranscript = %q, %v, want %q", got, ok, want)
+	}
+}
+
 func TestAuthFailures_RechecksOnlyWhenTheFileChanged(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "c.jsonl")
 	if err := os.WriteFile(path, []byte("a\n"), 0o644); err != nil {

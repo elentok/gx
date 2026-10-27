@@ -9,7 +9,9 @@ import (
 	"github.com/elentok/gx/nativerunner"
 )
 
-// sessionTyping is the only harness the server types into.
+// sessionTyping is the only harness the server types into. It serves the parts
+// that read no env; ReadyToType reads claude's config, so it goes through
+// Server.typing.
 var sessionTyping = harness.ClaudeTyping()
 
 // errDraft means a person's draft would not clear, so gx did not type.

@@ -18,8 +18,8 @@ const (
 // ReadyToType makes sure claude's input is in insert mode when vim mode is on:
 // NORMAL mode shows no marker, so without the marker it presses `i` and
 // re-checks for about a second. false means give-up; the caller must not type.
-func (claudeHarness) ReadyToType(io TypingIO) bool {
-	if !claudeVimMode() {
+func (h claudeHarness) ReadyToType(io TypingIO) bool {
+	if !claudeVimMode(h.env) {
 		return true
 	}
 	if insertMarkerShown(io) {
@@ -62,8 +62,8 @@ func insertMarkerShown(io TypingIO) bool {
 
 // claudeVimMode re-reads claude's config on every call, so a mid-session
 // /config toggle is caught. Either file may hold editorMode.
-func claudeVimMode() bool {
-	configDir, globalDir, err := claudeConfigDirs()
+func claudeVimMode(env []string) bool {
+	configDir, globalDir, err := claudeConfigDirs(env)
 	if err != nil {
 		return false
 	}

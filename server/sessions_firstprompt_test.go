@@ -25,6 +25,32 @@ func startFirstPromptSession(t *testing.T, prompt string) (*servertest.Harness, 
 	})
 }
 
+// The agent's input box and the claude config dir come only from the server's
+// Config.Env; the harness default HOME is poisoned with vim mode, so a read of
+// HOME instead of CLAUDE_CONFIG_DIR would press `i` into the prompt.
+func TestFirstPrompt_TypedWhenTheAgentEnvAndConfigDirComeFromServerEnv(t *testing.T) {
+	_, _, _, _, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"}, func(c *server.Config) {
+		c.PromptGrace = firstPromptGrace
+	}, servertest.WithEnv(agentfake.ProgramInputEnv+"=1"))
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSubmitted(t, conv, "\"fix the bug\"\n")
+}
+
+func TestFirstPrompt_RealPromptInVimNormalIsDeliveredWithTheConfigDirFromServerEnv(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, _, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"}, func(c *server.Config) {
+		c.PromptGrace = firstPromptGrace
+	}, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+dir))
+	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionVimNormal}); err != nil {
+		t.Fatal(err)
+	}
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSubmitted(t, conv, "\"fix the bug\"\n")
+}
+
 func TestFirstPrompt_TypedOnReadyReportAndSubmittedOnce(t *testing.T) {
 	_, _, _, _, conv := startFirstPromptSession(t, "fix the bug")
 	report(t, conv, agentfake.Control{State: "idle"})

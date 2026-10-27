@@ -241,7 +241,7 @@ func (s *Server) saveConversationTotals(m sessionMeta, conversation string) {
 // conversation onto its record. Any non-Codex harness reads as Claude here, as
 // for totals.
 func (s *Server) saveConversationGrilling(m sessionMeta, conversation string) {
-	home, err := os.UserHomeDir()
+	home, err := s.envHome()
 	if err == nil {
 		err = grillround.Recount(s.cfg.ConversationsDir, home, conversation, m.Dir)
 	}
@@ -360,6 +360,7 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 	opts := harness.LaunchOptions{
 		SessionID: meta.ConversationID,
 		Args:      launchArgs(meta, s.settings.Load().AgentsClaudeArgs),
+		Env:       s.cfg.Env,
 	}
 	launch := h.Launch(opts)
 	if resume {

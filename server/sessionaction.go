@@ -174,7 +174,7 @@ func (s *Server) openActionRun(dir string, opts actionRunOpts) (*actionRun, func
 
 // step types one prompt and waits for it to end.
 func (r *actionRun) step(i int, prompt string) error {
-	if !sessionTyping.ReadyToType(nativerunner.HolderTypingIO(r.holder)) {
+	if !r.s.typing().ReadyToType(nativerunner.HolderTypingIO(r.holder)) {
 		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
 	}
 	if err := r.s.clearDraft(r.dir, r.holder); err != nil {

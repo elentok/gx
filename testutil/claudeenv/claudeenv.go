@@ -2,8 +2,6 @@
 package claudeenv
 
 import (
-	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +23,24 @@ func Isolate() (cleanup func()) {
 	if err != nil {
 		panic(err)
 	}
+	for _, kv := range In(home) {
+		k, v, _ := strings.Cut(kv, "=")
+		if v == "" {
+			// Unset rather than redirect: tests that give themselves a HOME of
+			// their own must still see it win over a package-wide XDG dir.
+			os.Unsetenv(k)
+			continue
+		}
+		os.Setenv(k, v)
+	}
+	return func() { os.RemoveAll(home) }
+}
+
+// In is Isolate without touching the process env: it fills the existing dir
+// home with the poisoned config and a clean config dir, and returns the env
+// entries (KEY=VALUE, for server.Config.Env or exec.Cmd.Env) that point at
+// them. The XDG dirs come back empty, which config's xdgBase ignores.
+func In(home string) []string {
 	write := func(path, content string) {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			panic(err)
@@ -40,24 +56,17 @@ func Isolate() (cleanup func()) {
 	if err := os.MkdirAll(cfg, 0o755); err != nil {
 		panic(err)
 	}
-	// Read the real caches before HOME changes: go derives its defaults from
-	// HOME, and a temp HOME would make every run re-download the modules.
+	env := []string{
+		"HOME=" + home,
+		"CLAUDE_CONFIG_DIR=" + cfg,
+		"XDG_CONFIG_HOME=", "XDG_STATE_HOME=", "XDG_DATA_HOME=", "XDG_CACHE_HOME=",
+	}
+	// go derives its cache defaults from HOME, and a temp HOME would make every
+	// child go command re-download the modules into a read-only tree.
 	if gocache, gomodcache, ok := goCaches(); ok {
-		os.Setenv("GOCACHE", gocache)
-		os.Setenv("GOMODCACHE", gomodcache)
+		env = append(env, "GOCACHE="+gocache, "GOMODCACHE="+gomodcache)
 	}
-	os.Setenv("HOME", home)
-	os.Setenv("CLAUDE_CONFIG_DIR", cfg)
-	// Unset rather than redirect: tests that give themselves a HOME of their
-	// own must still see it win over a package-wide XDG dir.
-	for _, k := range []string{"XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"} {
-		os.Unsetenv(k)
-	}
-	return func() {
-		if err := removeTree(home); err != nil {
-			fmt.Fprintf(os.Stderr, "claudeenv: removing %s: %v\n", home, err)
-		}
-	}
+	return env
 }
 
 // goCaches returns the GOCACHE and GOMODCACHE that go resolves right now.
@@ -71,27 +80,4 @@ func goCaches() (gocache, gomodcache string, ok bool) {
 		return "", "", false
 	}
 	return lines[0], lines[1], true
-}
-
-// removeTree deletes dir. Go leaves its module cache read-only, which makes
-// os.RemoveAll fail, so each entry becomes owner-writable first. A dir is
-// chmodded before WalkDir reads it.
-func removeTree(dir string) error {
-	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if d == nil {
-			return nil
-		}
-		mode := os.FileMode(0o600)
-		if d.IsDir() {
-			mode = 0o700
-		} else if d.Type()&fs.ModeSymlink != 0 {
-			return nil
-		}
-		if info, ierr := d.Info(); ierr == nil {
-			mode |= info.Mode().Perm()
-		}
-		_ = os.Chmod(path, mode)
-		return nil
-	})
-	return os.RemoveAll(dir)
 }

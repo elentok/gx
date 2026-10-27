@@ -651,7 +651,7 @@ func (s *Server) reopenEmptyClaim(t trackedRun) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if err := mode.discard(ralphloop.DefaultDeps(), one, wt); err != nil {
+	if err := mode.discard(s.defaultDeps(), one, wt); err != nil {
 		return false, err
 	}
 	const reason = "agent gone, no commits, no edits"
@@ -728,6 +728,6 @@ func (s *Server) resolveRun(t trackedRun) (ralphloop.OneIteration, ralphloop.Ite
 	}
 	one.Sink = s.finishSink(addr, one.Ticket.Path)
 	mode := s.iterationModeFor(addr, one.Ticket)
-	wt, err := mode.resume(ralphloop.DefaultDeps(), one, t.Base)
+	wt, err := mode.resume(s.defaultDeps(), one, t.Base)
 	return one, wt, mode, err
 }

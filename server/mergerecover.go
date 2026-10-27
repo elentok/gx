@@ -88,7 +88,7 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 		}
 		s.events.publish(EventTicketDone, addr)
 	case ralphloop.MergingRecoverable:
-		if err := abortHalfPick(run.FeatureWorktree); err != nil {
+		if err := s.abortHalfPick(run.FeatureWorktree); err != nil {
 			return fmt.Errorf("rolling back merge of %s: %w", addr, err)
 		}
 		s.events.publish(EventMergeRolledBack, addr)
@@ -102,8 +102,8 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 }
 
 // abortHalfPick drops a cherry-pick the crashed merge left in progress.
-func abortHalfPick(featureWorktree string) error {
-	d := ralphloop.DefaultDeps()
+func (s *Server) abortHalfPick(featureWorktree string) error {
+	d := s.defaultDeps()
 	inProgress, err := d.CherryPickInProgress(featureWorktree)
 	if err != nil || !inProgress {
 		return err

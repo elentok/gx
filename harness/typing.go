@@ -61,6 +61,10 @@ const ctrlU = "\x15"
 // server and the PTY runner type into.
 func ClaudeTyping() Typing { return claudeHarness{} }
 
+// ClaudeTypingIn is ClaudeTyping reading claude's config from env (see
+// LookupEnv).
+func ClaudeTypingIn(env []string) Typing { return claudeHarness{env: env} }
+
 // markerTyping is the typing part shared by harnesses whose input row starts
 // with a marker rune.
 type markerTyping struct {

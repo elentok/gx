@@ -22,6 +22,12 @@ func writeGrillingRounds(t *testing.T, dir, conv string, at ...time.Time) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	writeGrillingRoundsAt(t, path, at...)
+}
+
+// writeGrillingRoundsAt is writeGrillingRounds for a transcript at path.
+func writeGrillingRoundsAt(t *testing.T, path string, at ...time.Time) {
+	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -57,6 +63,22 @@ func designMapStore(t *testing.T) string {
 func TestSessionConversations_DesignCountsSavedWhenAConversationEnds(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	h := servertest.StartWithStore(t, designMapStore(t), servertest.WithTestHolder())
+	checkDesignCountsSaved(t, h, func(dir, conv string, at ...time.Time) {
+		writeGrillingRounds(t, dir, conv, at...)
+	})
+}
+
+// The same through Config.Env: HOME is set only on the server.
+func TestSessionConversations_DesignCountsSavedFromTheServerEnvHome(t *testing.T) {
+	home := t.TempDir()
+	h := servertest.StartWithStore(t, designMapStore(t), servertest.WithTestHolder(), servertest.WithEnv("HOME="+home))
+	checkDesignCountsSaved(t, h, func(dir, conv string, at ...time.Time) {
+		writeGrillingRoundsAt(t, transcript.PathIn(home, dir, conv), at...)
+	})
+}
+
+func checkDesignCountsSaved(t *testing.T, h *servertest.Harness, writeGrillingRounds func(dir, conv string, at ...time.Time)) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
 	evs, err := h.Client.Events(ctx, 0)
@@ -72,7 +94,7 @@ func TestSessionConversations_DesignCountsSavedWhenAConversationEnds(t *testing.
 	dir, _ := readMeta(t, h, id)["dir"].(string)
 	newer := conv + "-cleared"
 	local := time.Date(2026, 3, 4, 23, 59, 0, 0, time.Local)
-	writeGrillingRounds(t, dir, conv, local, local.Add(2*time.Minute))
+	writeGrillingRounds(dir, conv, local, local.Add(2*time.Minute))
 	clearFakeSession(ctx, t, h, evs, id, conv, newer)
 
 	recs := recordsByID(t, h.ConversationsDir)
@@ -87,7 +109,7 @@ func TestSessionConversations_DesignCountsSavedWhenAConversationEnds(t *testing.
 		t.Errorf("running conversation grilling = %+v; want none yet", recs[newer].Grilling)
 	}
 
-	writeGrillingRounds(t, dir, newer, local)
+	writeGrillingRounds(dir, newer, local)
 	stopFakeSession(ctx, t, h, evs, id)
 	if second := recordsByID(t, h.ConversationsDir)[newer].Grilling; len(second) != 1 {
 		t.Errorf("second grilling = %+v; want one round after exit", second)
