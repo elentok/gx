@@ -191,6 +191,27 @@ context overrun) rediscovering it, then misses shared fixtures and fails the ful
   removed names and the changed label or text across all tests, e2e flows and fixtures. Read every
   hit in full (no `| head`). List each affected test in Test seams, and give a scoped run (`-run`
   pattern or file list) that covers every hit. Don't scope by the new feature's name.
+
+### 4c. Check every claim against the code
+
+A ticket that states something the code contradicts costs the implementing agent a deviation and
+several runs. Before writing a ticket, check each of these against the code with `rg` or `fd`, and
+cite the file (`file:func`) in the ticket next to the claim:
+
+- **Current behaviour**: every sentence of the form "X shows / allows / hides / does Y". Read the
+  function that decides it (e.g. an `isMergeable` or `isExpanded` predicate), not just the label.
+  If the code or an existing e2e flow disagrees with the spec, say so in the ticket and state which
+  one wins.
+- **Reserved numbers**: catalog flow ids, ticket ids, migration numbers. Read the highest one now in
+  use; never write "from 50 up" from memory.
+- **Names a seam or hint relies on**: a fake, helper, package path or generated-type check. Run the
+  `rg` the implementing agent would run and confirm it hits. A seam that finds nothing is not a seam.
+- **Where a value is set**: when a ticket changes a field's value, name the function that sets it
+  (e.g. where a message id is assigned), not only the files that read it.
+- **Signature fallout**: when a hint says "do it as `other.ts` does", check that the pattern fits
+  here. If the shared function must change (e.g. become generic), say so.
+- **Wire shapes**: when the ticket reads a JSON payload, inline the field path (e.g.
+  `message.usage.input_tokens`).
 - **Helper prerequisites**: for each helper or fixture a ticket cites, name its prerequisites (e.g.
   `StartWithStore` needs a seeded project via `servertest.WriteTicket`) and its return value (e.g.
   `CreateEpic` returns the epic dir).
@@ -403,6 +424,9 @@ implementation list.
 - Seam 2: ...
 
 (Or, when no automated seam applies: `none — <rationale>`.)
+
+If the implementing agent drops or changes a seam named here, it must log that under
+`## Spec deviations`, with the reason.
 
 ## Where to look
 
