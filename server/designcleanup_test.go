@@ -147,7 +147,13 @@ func TestDesignCleanup_DesignOpenAfterBranchRunsTheCheck(t *testing.T) {
 func (f designsFixture) setDesignStepBranch(t *testing.T) {
 	t.Helper()
 	ticketMD := filepath.Join(f.h.TicketStore, "proj", "map", "ticket.md")
-	if err := os.WriteFile(ticketMD, []byte("---\nkind: map\ndesign_step: branch\n---\n"), 0o644); err != nil {
+	// Rename, not WriteFile: a truncating write can be rescanned half-written
+	// as an empty step, and the next rescan then sees a fresh transition.
+	tmp := ticketMD + ".tmp"
+	if err := os.WriteFile(tmp, []byte("---\nkind: map\ndesign_step: branch\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(tmp, ticketMD); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -183,6 +189,9 @@ func TestDesignCleanup_RescanWithoutStepChangeDoesNotCheckAgain(t *testing.T) {
 	f := startDesignsAt(t, "create-tickets")
 	dir, id := f.openDesignWorktree(t, true)
 	f.stop(t, id)
+	// The session-exit cleanup runs once the stop is saved. Let it finish
+	// before the branch and the edit exist, or it could be the one that warns.
+	waitFor(t, func() bool { return len(f.live(t)) == 0 })
 	gitOut(t, f.repo, "branch", "map-impl", "map-design")
 	wip := filepath.Join(dir, "wip.md")
 	if err := os.WriteFile(wip, []byte("wip\n"), 0o644); err != nil {
