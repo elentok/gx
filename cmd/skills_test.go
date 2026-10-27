@@ -19,6 +19,7 @@ func fakeSkillsDeps(t *testing.T, stdout *bytes.Buffer) deps {
 	claudeRoot := filepath.Join(t.TempDir(), "claude-skills")
 	codexRoot := filepath.Join(t.TempDir(), "codex-prompts")
 	manifestPath := filepath.Join(t.TempDir(), "manifest.json")
+	statusPath := filepath.Join(t.TempDir(), "skills-install.json")
 
 	return deps{
 		stdout: stdout,
@@ -28,6 +29,9 @@ func fakeSkillsDeps(t *testing.T, stdout *bytes.Buffer) deps {
 		},
 		skillsManifestPath: func() (string, error) {
 			return manifestPath, nil
+		},
+		skillsStatusPath: func() (string, error) {
+			return statusPath, nil
 		},
 	}
 }

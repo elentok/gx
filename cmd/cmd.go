@@ -56,8 +56,11 @@ type deps struct {
 	readAutoAdvance    func(sessionID string) (bool, error)
 	skillsAgentRoots   func() ([]string, error)
 	skillsManifestPath func() (string, error)
-	explainAgent       func(target string) (herdr.AgentExplainResult, error)
-	probeGhostty       func() error
+	// skillsStatusPath is where `gx server start` records a skill install
+	// problem for the server to show.
+	skillsStatusPath func() (string, error)
+	explainAgent     func(target string) (herdr.AgentExplainResult, error)
+	probeGhostty     func() error
 	// serverClient dials the server; nil means the real one (tests inject a fake).
 	serverClient func() (*apiclient.Client, error)
 }
@@ -101,6 +104,7 @@ func defaultDeps() deps {
 		readAutoAdvance:      readServerAutoAdvance,
 		skillsAgentRoots:     defaultSkillsAgentRoots,
 		skillsManifestPath:   defaultSkillsManifestPath,
+		skillsStatusPath:     defaultSkillsStatusPath,
 		explainAgent:         herdr.AgentExplain,
 		probeGhostty:         terminalrun.ProbeGhostty,
 	}
@@ -119,6 +123,14 @@ func defaultSkillsAgentRoots() ([]string, error) {
 
 func defaultSkillsManifestPath() (string, error) {
 	return skills.ManifestPath(skills.BundleID)
+}
+
+func defaultSkillsStatusPath() (string, error) {
+	stateDir, err := config.StateDir()
+	if err != nil {
+		return "", err
+	}
+	return skills.StatusPath(stateDir), nil
 }
 
 // Execute runs gx with the provided arguments.

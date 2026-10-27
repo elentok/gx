@@ -27,6 +27,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/subscription"
@@ -728,6 +729,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.RecentlyFinished = s.idx.recentlyFinished(s.settings.Load().RecentlyFinished)
 	snap.Mode = s.pause.currentMode()
 	snap.AFK = s.afk.isOn()
+	snap.SkillsInstallProblem = skills.ReadProblem(skills.StatusPath(s.cfg.StateDir))
 	sessions, err := s.listSessions()
 	if err != nil {
 		s.log.Warn("list sessions for snapshot", "err", err)

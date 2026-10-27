@@ -6,13 +6,21 @@ export interface ToastSpec {
   type: "success" | "error" | "warning" | "info";
   title: string;
   link?: { href: string; label: string };
+  description?: string;
+  /** Showing the same id again updates that toast instead of adding one. */
+  id?: string;
+  /** Stays until the close button or code removes it. */
+  persistent?: boolean;
 }
 
-export function showToast({ type, title, link }: ToastSpec) {
+export function showToast({ type, title, link, description, id, persistent }: ToastSpec) {
+  // Chakra spreads these over its defaults, so an undefined id or duration would erase them.
   toaster.create({
+    ...(id && { id }),
+    ...(persistent && { duration: Infinity }),
     type,
     title,
-    description: link && <Link href={link.href}>{link.label}</Link>,
+    description: link ? <Link href={link.href}>{link.label}</Link> : description,
   });
 }
 

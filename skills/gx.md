@@ -120,6 +120,12 @@ path to override), or `removed`. A conflict aborts the whole install, so re-runn
 install` after a `gx` upgrade is the way to refresh the bundle: unaffected files report `skipped`,
 changed ones report `updated`.
 
+`gx server start` and `gx server restart` run the same install before they start the server, so an
+upgrade refreshes the bundle on its own. They keep the mode you chose last: a `--dev` install is
+re-linked from the same checkout, anything else (or no install yet) gets managed copies. They never
+force. A conflict, or a dev checkout that is gone, prints a warning, the server still starts, and
+the web UI shows the problem until you close it or an install succeeds.
+
 ### Development mode
 
 Working from a gx source checkout, `--dev` symlinks this directory's files into both agents'

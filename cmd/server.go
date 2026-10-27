@@ -29,7 +29,7 @@ type KindInfo struct {
 	CauseHerdr bool   `json:"cause_herdr"`
 }
 
-func newServerCmd(_ deps) *cobra.Command {
+func newServerCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "server",
 		Short: "orchestrator daemon commands",
@@ -51,15 +51,16 @@ func newServerCmd(_ deps) *cobra.Command {
 	var restartMigrate bool
 	restartCmd := &cobra.Command{
 		Use:   "restart",
-		Short: "stop the server and start it again (use after upgrading gx)",
-		Long: `Stop the server and start it again.
+		Short: "stop the server, install the skill bundle and start it again (use after upgrading gx)",
+		Long: `Stop the server and start it again. The start installs gx's skill bundle
+first, like "gx server start".
 
 With --migrate, run "gx tickets migrate" on every project in the ticket store
 between the stop and the start. The stop does not wait for running tickets. If
 a migration fails, the failed store is named and the server stays stopped.`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runServerRestart(c.Context(), c.OutOrStdout(), restartMigrate)
+			return runServerRestart(c.Context(), d, c.OutOrStdout(), restartMigrate)
 		},
 	}
 	restartCmd.Flags().BoolVar(&restartMigrate, "migrate", false, "migrate every project's ticket store while the server is stopped")
@@ -72,10 +73,10 @@ a migration fails, the failed store is named and the server stays stopped.`,
 		},
 	}, &cobra.Command{
 		Use:   "start",
-		Short: "start the server detached from this terminal (no-op if already running)",
+		Short: "install the skill bundle, then start the server detached from this terminal (no-op if already running)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runServerStartCmd(c.Context(), c.OutOrStdout())
+			return runServerStartCmd(c.Context(), d, c.OutOrStdout())
 		},
 	}, restartCmd, &cobra.Command{
 		Use:   "stop",
@@ -421,7 +422,9 @@ func runServerInstall(w io.Writer) error {
 	return err
 }
 
-func runServerStartCmd(ctx context.Context, w io.Writer) error {
+// runServerStartCmd installs the skill bundle, then starts the server. A
+// skill install problem is a warning, never a failed start.
+func runServerStartCmd(ctx context.Context, d deps, w io.Writer) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -429,6 +432,7 @@ func runServerStartCmd(ctx context.Context, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+	refreshSkills(d, w)
 	c, err := serverClient()
 	if err != nil {
 		return err
@@ -455,7 +459,7 @@ func serverStarter(c *apiclient.Client) func(context.Context) error {
 	}
 }
 
-func runServerRestart(ctx context.Context, w io.Writer, migrate bool) error {
+func runServerRestart(ctx context.Context, d deps, w io.Writer, migrate bool) error {
 	return restartSteps(migrate,
 		func() error { return runServerStop(ctx, w) },
 		func() error {
@@ -465,7 +469,7 @@ func runServerRestart(ctx context.Context, w io.Writer, migrate bool) error {
 			}
 			return migrateAllProjects(cfg.TicketStore.Path, w)
 		},
-		func() error { return runServerStartCmd(ctx, w) },
+		func() error { return runServerStartCmd(ctx, d, w) },
 	)
 }
 

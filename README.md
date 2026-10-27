@@ -253,7 +253,8 @@ gx skills uninstall --force <relative-path>  # remove a specific locally-modifie
 
 Each target is reported as `installed`, `updated`, `skipped` (already up to date), `conflicted`
 (locally modified or unrelated content is left untouched — pass `--force <relative-path>` to
-override), or `removed`. See [skills/gx.md](skills/gx.md) for what's in the bundle.
+override), or `removed`. `gx server start` and `gx server restart` run this install for you and
+keep a `--dev` install as dev. See [skills/gx.md](skills/gx.md) for what's in the bundle.
 
 ## Configuration
 

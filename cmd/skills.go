@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/skills"
@@ -34,10 +35,15 @@ func newSkillsInstallCmd(d deps) *cobra.Command {
 			if forceAll {
 				policy = skills.ForceAll()
 			}
+			install := runSkillsInstall
 			if dev {
-				return runSkillsInstallDev(d, policy, c.OutOrStdout())
+				install = runSkillsInstallDev
 			}
-			return runSkillsInstall(d, policy, c.OutOrStdout())
+			if err := install(d, policy, c.OutOrStdout()); err != nil {
+				return err
+			}
+			clearSkillsProblem(d)
+			return nil
 		},
 	}
 	cmd.Flags().StringSliceVar(&force, "force", nil,
@@ -62,6 +68,14 @@ func newSkillsUninstallCmd(d deps) *cobra.Command {
 	cmd.Flags().StringSliceVar(&force, "force", nil,
 		"bundle-relative path(s) to force-remove despite local modification")
 	return cmd
+}
+
+// clearSkillsProblem drops the problem the last `gx server start` recorded,
+// so the web UI stops showing it once a manual install succeeds.
+func clearSkillsProblem(d deps) {
+	if path, err := d.skillsStatusPath(); err == nil {
+		_ = skills.WriteProblem(path, "")
+	}
 }
 
 // runSkillsInstall extracts gx's embedded canonical skill bundle to a
@@ -106,7 +120,7 @@ func runSkillsInstallDev(d deps, force skills.ForcePolicy, out io.Writer) error 
 		return err
 	}
 
-	return installSkills(d, force, out, "gx dev checkout: "+devRoot, sources, skills.ModeSymlink)
+	return installSkills(d, force, out, skills.DevSourcePrefix+devRoot, sources, skills.ModeSymlink)
 }
 
 // resolveDevRoot returns the root of the git repository (or, for a linked
@@ -126,24 +140,7 @@ func resolveDevRoot(dir string) (string, error) {
 // installSkills runs a single skill install, reporting per-target results
 // and turning a conflict into an actionable error message.
 func installSkills(d deps, force skills.ForcePolicy, out io.Writer, source string, sources []skills.SourceFile, mode skills.InstallMode) error {
-	roots, err := d.skillsAgentRoots()
-	if err != nil {
-		return err
-	}
-	manifestPath, err := d.skillsManifestPath()
-	if err != nil {
-		return err
-	}
-
-	req := skills.InstallRequest{
-		Source:     source,
-		AgentRoots: roots,
-		Files:      sources,
-		Force:      force,
-		Mode:       mode,
-	}
-
-	targets, installErr := skills.Install(manifestPath, req)
+	targets, installErr := installSkillTargets(d, force, source, sources, mode)
 	printTargetReport(out, targets, installErr == nil)
 
 	var conflictErr *skills.ConflictError
@@ -151,6 +148,122 @@ func installSkills(d deps, force skills.ForcePolicy, out io.Writer, source strin
 		return fmt.Errorf("%w; rerun with --force <path> for each conflicted path, or --force-all to override every conflict", installErr)
 	}
 	return installErr
+}
+
+// installSkillTargets runs a single skill install and returns its per-target
+// report without printing it.
+func installSkillTargets(d deps, force skills.ForcePolicy, source string, sources []skills.SourceFile, mode skills.InstallMode) ([]skills.Target, error) {
+	roots, err := d.skillsAgentRoots()
+	if err != nil {
+		return nil, err
+	}
+	manifestPath, err := d.skillsManifestPath()
+	if err != nil {
+		return nil, err
+	}
+	return skills.Install(manifestPath, skills.InstallRequest{
+		Source:     source,
+		AgentRoots: roots,
+		Files:      sources,
+		Force:      force,
+		Mode:       mode,
+	})
+}
+
+// refreshSkills reinstalls gx's skill bundle the way it was last installed:
+// dev symlinks from the same checkout, else managed copies (also when it was
+// never installed). It never forces and never fails its caller: a problem is
+// printed and recorded for the server to show, and a clean install clears
+// the record.
+func refreshSkills(d deps, out io.Writer) {
+	problem := refreshSkillsProblem(d, out)
+	if problem != "" {
+		fmt.Fprintf(out, "warning: skills: %s\n", problem)
+	}
+	path, err := d.skillsStatusPath()
+	if err == nil {
+		err = skills.WriteProblem(path, problem)
+	}
+	if err != nil {
+		fmt.Fprintf(out, "warning: record skill install result: %v\n", err)
+	}
+}
+
+func refreshSkillsProblem(d deps, out io.Writer) string {
+	manifestPath, err := d.skillsManifestPath()
+	if err != nil {
+		return err.Error()
+	}
+	m, err := skills.Load(manifestPath)
+	if err != nil && !errors.Is(err, skills.ErrNotExist) {
+		return err.Error()
+	}
+
+	fix := "run `gx skills install --force <path>` or `--force-all`"
+	source, mode := skills.BundleSource, skills.ModeManagedCopy
+	var sources []skills.SourceFile
+	if root, ok := skills.DevRoot(m); ok {
+		if _, err := os.Stat(root); err != nil {
+			return fmt.Sprintf("dev checkout %s is gone, skills left as they are; run `gx skills install`, or `gx skills install --dev` from a checkout", root)
+		}
+		if sources, err = skills.DevSourceFiles(root); err != nil {
+			return err.Error()
+		}
+		fix = "run `gx skills install --dev --force <path>` or `--force-all` from " + root
+		source, mode = skills.DevSourcePrefix+root, skills.ModeSymlink
+	} else {
+		tmpDir, err := os.MkdirTemp("", "gx-skills-bundle-*")
+		if err != nil {
+			return fmt.Sprintf("create scratch dir for bundle extraction: %v", err)
+		}
+		defer os.RemoveAll(tmpDir)
+		if sources, err = skills.ExtractBundle(tmpDir); err != nil {
+			return err.Error()
+		}
+	}
+
+	targets, err := installSkillTargets(d, skills.NewForcePolicy(), source, sources, mode)
+	if err != nil {
+		return installProblem(targets, err, fix)
+	}
+	fmt.Fprintf(out, "skills: %s\n", summarizeTargets(targets))
+	return ""
+}
+
+// installProblem describes a failed install, naming its conflicted paths and
+// fix, the hint that resolves them.
+func installProblem(targets []skills.Target, err error, fix string) string {
+	var conflictErr *skills.ConflictError
+	if !errors.As(err, &conflictErr) {
+		return err.Error()
+	}
+	var paths []string
+	for _, t := range targets {
+		if t.Status == skills.StatusConflicted {
+			paths = append(paths, t.RootRelPath())
+		}
+	}
+	return fmt.Sprintf("install refused, %d path(s) have local changes or content gx did not install: %s; %s",
+		len(paths), strings.Join(paths, ", "), fix)
+}
+
+// summarizeTargets counts a clean install's targets by status, e.g.
+// "2 installed, 1 updated", or "up to date" when nothing changed.
+func summarizeTargets(targets []skills.Target) string {
+	counts := map[skills.TargetStatus]int{}
+	for _, t := range targets {
+		counts[t.Status]++
+	}
+	var parts []string
+	for _, s := range []skills.TargetStatus{skills.StatusInstalled, skills.StatusUpdated} {
+		if n := counts[s]; n > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n, s))
+		}
+	}
+	if len(parts) == 0 {
+		return "up to date"
+	}
+	return strings.Join(parts, ", ")
 }
 
 // runSkillsUninstall removes gx's canonical skill bundle's manifest-owned

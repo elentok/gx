@@ -1106,6 +1106,11 @@ export interface Snapshot {
    */
   afk?: boolean;
   /**
+   * SkillsInstallProblem is why the skill install `gx server start` ran
+   * last did not finish; empty when it did. Filled in by the handler.
+   */
+  skills_install_problem?: string;
+  /**
    * Sessions are the interactive sessions, oldest first; filled in by the
    * handler.
    */
