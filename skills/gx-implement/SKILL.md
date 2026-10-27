@@ -74,15 +74,15 @@ Then, while working:
   then stop it (TaskStop) before reporting finished. `TaskStop` is a deferred tool: if it isn't
   callable, load it first with `ToolSearch` query `select:TaskStop`. ralph-loop will not merge a
   ticket while one is open.
-- **One check per Bash call.** A chained call (`rg ...; go test; gofmt -l`) can return the output
+- **One check per Bash call.** A chained call (`rg ...; go test; tsc`) can return the output
   of one segment only. Run each check in its own call.
 - **Never leave the worktree root with a bare `cd`.** The shell keeps the new directory, so the
   next command runs in the wrong place. Use a subshell, `(cd webui && npx vitest ...)`, or absolute
   paths. Use the same worktree root for Bash and for Read/Edit paths.
 - **When a test fails, decide why before you fix anything.** If it caught a real bug, fix the
-  code. If it is flaky, or checks behaviour the ticket changed on purpose, fix the test: a flaky
-  test waits for the event (poll with a timeout), never a fixed sleep. Never weaken, skip or delete
-  an assertion just to get green.
+  code. If it checks behaviour the ticket changed on purpose, fix the test: a flaky test waits for
+  the event (poll with a timeout), never a fixed sleep. Never weaken, skip or delete an assertion
+  just to get green. For any other failing test, follow [gx-failing-tests](../gx-failing-tests.md).
 - **Never report a result you did not see.** If a check's output is missing or cut off, re-run it.
   Do not claim "no remaining imports" or "gofmt is clean" from silence.
 - **Read files with the `Read` tool, not a shell command.** If a read ends in "(exporter
@@ -200,21 +200,15 @@ Run typechecking regularly and single test files regularly. At the end, test onl
 touched plus their direct importers (see `.ai/index.md` "Testing") — not the full suite.
 
 Run Go tests with `gx brief go-test`, not raw `go test`. While iterating, always pass
-`-timeout 60s` and `-run <pattern>` to `gx brief go-test`, and run one package per call. Run the
-whole package once at the end. `server/` is exempt from the 60s limit.
+`-timeout 60s` and `-run <pattern>` to `gx brief go-test`, and run one package per call.
+
+Before every commit, and before `--iteration-status finished`, run `gx check` once (changed files).
+It is the only package-wide run. Run it in the foreground, unpiped: no `tail`, no background.
+
+A new or changed test that waits on time or concurrency runs with `-count=20` before commit.
 
 When a test fails, search the log path (the last line of the output) with `rg` for the details.
 Don't re-run the test to get raw output.
-
-Tests in `server/` take over 120s, the Bash default timeout. Start them with `run_in_background`
-up front, then wait for the completion notice. Don't poll with Monitor or Workflow, don't write
-`sleep` or `until ...; do sleep` loops, and don't start a second run of the same suite while one is
-going.
-
-Before every commit, and before `--iteration-status finished`: run `gofmt -l` on the changed `.go`
-files only (e.g. `gofmt -l $(git diff --name-only HEAD -- '*.go')`; add `--cached`/new files as
-needed). The output must be empty — fix with `gofmt -w` on those files. Then follow [gx-verify](../gx-verify/SKILL.md) in `working-changes` mode. Never
-run `gofmt -l .`: files on main that are already unformatted are out of scope. No goimports.
 
 Claiming already writes `status: claimed` for you — never write it yourself.
 

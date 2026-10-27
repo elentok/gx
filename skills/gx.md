@@ -157,6 +157,7 @@ gx skills install --force gx.md --force gx-implement/SKILL.md ...   # one --forc
 skills/
   gx.md                — this file
   gx-local-tracker.md  — the shared local ticket tracker contract
+  gx-failing-tests.md  — the shared rule for sorting a failing test
   gx-to-tickets/
     SKILL.md
   gx-tdd/

@@ -51,7 +51,8 @@ straight to step 3.
 
 Otherwise the candidates are the tickets of `<project>:follow-ups` and
 `<project>:follow-ups-archived` only. List an epic's tickets with `gx tickets show <project:epic>`.
-Judge a match yourself, by title and `## Problem`: the same problem, not the same area.
+When the finding names a failing test, search the candidates for that test name first. Otherwise
+judge a match yourself, by title and `## Problem`: the same problem, not the same area.
 
 - **No match** → file it (step 3).
 - **An open ticket** → file nothing. Append a dated "seen again" entry naming the new source to its

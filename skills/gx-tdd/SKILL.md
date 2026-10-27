@@ -84,5 +84,8 @@ on the critical paths and complex logic instead of every edge case.
 - **Never leave the worktree root with a bare `cd`.** The shell keeps the new directory, so the
   next command runs in the wrong place. Run tests in a subshell, `(cd webui && npx vitest ...)`, or
   with absolute paths. Use the same worktree root for Bash and for Read/Edit paths.
+- **Time and concurrency tests run `-count=20`.** A new or changed test that waits on time or
+  concurrency runs with `-count=20` before commit.
+- **A failing test you did not expect** follows [gx-failing-tests](../gx-failing-tests.md).
 - **Refactoring is not part of the loop.** It belongs to the review stage (`code-review`), not the
   red → green implementation cycle.

@@ -32,15 +32,10 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   full suite runs in CI (`.github/workflows/ci.yml`, on pushes and PRs to `main`): `go test ./...
   -timeout=10m`, `make test-race`, and `go test ./e2e/...`.
 - Once a targeted run passes, stop. Don't rerun the full suite to double-check.
-- While iterating, always pass `-timeout 60s` and `-run <pattern>`. A hung fake otherwise waits for
-  the 10-minute default. Run the whole package once at the end. Also pass `-timeout` with `-count=N`
-  or `-race`. `server/` is exempt from the 60s limit.
-- Run packages one at a time. A multi-package run that moves to the background hides which package
-  hangs.
-- `server/` is the slowest package by far (minutes, close to the default `go test` timeout under
-  load). Run it only when you touched `server/` or `server/servertest/`, and scope it with `-run`.
-  For the whole package, run `make test-server`: it shards the package across 5 processes, about
-  2 min.
+- Verify with `gx check` in the foreground, unpiped. Iterate with `gx brief`. Never pipe, `tail` or
+  background either.
+- `server/` is the slowest package by far. Run it only when you touched `server/` or
+  `server/servertest/`, and scope it with `-run` while iterating.
 - Tests must never read the developer's real Claude config (their `editorMode: vim` changes
   outcomes). Call `claudeenv.Isolate()` (`testutil/claudeenv`) from every package's `TestMain`. It
   points `HOME` and a clean `CLAUDE_CONFIG_DIR` at a temp dir, unsets `XDG_*`, and leaves a vim-mode
@@ -59,8 +54,6 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   `shortTempDir` in `nativerunner` tests. The failure is `bind: invalid argument`.
 - Tests never read live machine state, such as sibling worktrees, real branches or the live
   server's state. Use `t.TempDir()` and `testutil.TempRepo`.
-- If a test run moves to the background, wait for its completion notice. Don't poll its output
-  file, and don't write `sleep` or `until ...; do sleep` loops.
 
 ## Adding a server route
 

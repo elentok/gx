@@ -1,0 +1,51 @@
+package skills
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestCheckRulesAnchors(t *testing.T) {
+	cases := []struct {
+		name  string
+		path  string
+		wants []string
+	}{
+		{"failing tests", "gx-failing-tests.md", []string{
+			"3 times", "git merge-base", "flake", "pre-existing failure", "branch fault",
+			"30 changed lines or fewer in at most 2 files", "](gx-follow-up/SKILL.md)",
+		}},
+		{"implement", "gx-implement/SKILL.md", []string{
+			"](../gx-failing-tests.md)", "-count=20", "`gx check`",
+		}},
+		{"tdd", "gx-tdd/SKILL.md", []string{"](../gx-failing-tests.md)", "-count=20"}},
+		{"verify", "gx-verify/SKILL.md", []string{
+			"gx check --staged", "`0`: pass", "`1`: fail", "`2`: could not run", "`3`: no applicable checks",
+		}},
+		{"follow-up", "gx-follow-up/SKILL.md", []string{"search the candidates for that test name first"}},
+		{"index", "../.ai/index.md", []string{"Verify with `gx check` in the foreground, unpiped"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) { checkAnchors(t, c.path, c.wants...) })
+	}
+}
+
+func TestCheckRulesAbsences(t *testing.T) {
+	cases := []struct {
+		name   string
+		path   string
+		unwant []string
+	}{
+		{"implement", "gx-implement/SKILL.md", []string{"whole package once at the end", "gofmt -l"}},
+		{"verify", "gx-verify/SKILL.md", []string{"## Check Table"}},
+		{"index", "../.ai/index.md", []string{"make test-server", "-timeout 60s"}},
+	}
+	for _, c := range cases {
+		text := normalizeSpace(readFile(t, c.path))
+		for _, bad := range c.unwant {
+			if strings.Contains(text, bad) {
+				t.Errorf("%s still holds %q", c.path, bad)
+			}
+		}
+	}
+}
