@@ -131,7 +131,11 @@ test("Cost cards with data on every day are not partial", async () => {
 test("the Grilling section sits between Cost and effort and Friction", async () => {
   renderStats(async () => statsOf());
   await screen.findByText("Words read");
-  const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-labelledby"));
+  // The toaster's own container is a region too; only the sections name themselves.
+  const names = screen
+    .getAllByRole("region")
+    .map((r) => r.getAttribute("aria-labelledby"))
+    .filter((n) => n !== null);
   expect(names).toEqual(["stats-throughput", "stats-cost", "stats-grilling", "stats-friction"]);
   expect(screen.getByText("Questions asked")).toBeTruthy();
 });
