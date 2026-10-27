@@ -288,10 +288,11 @@ function ViewToggle({
       role="group"
       aria-label="View"
       display="flex"
-      gap="2"
+      gap="3px"
+      p="3px"
       flex="none"
-      alignSelf="flex-start"
-      maxW="100%"
+      bg="surface.raised"
+      borderRadius="10px"
     >
       <SegButton on={questions} onClick={() => onQuestions(true)}>
         Questions ({answered} of {total})
@@ -317,16 +318,16 @@ function SegButton({
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      flex="none"
+      flex="1"
+      minH="40px"
       whiteSpace="nowrap"
-      py="2"
       px="3"
       borderRadius="8px"
       fontWeight="semibold"
       bg={on ? "surface" : "transparent"}
       color={on ? "text" : "text.muted"}
-      borderWidth={on ? "1px" : "0"}
-      borderColor="border"
+      boxShadow={on ? "0 0 0 1px #3d4654" : "none"}
+      fontSize="15px"
       cursor="pointer"
     >
       {children}
