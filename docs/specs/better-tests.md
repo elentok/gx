@@ -426,7 +426,7 @@ Stories:
 67. `go test ./server` finishes in 2 minutes or less, and `rg Setenv server testutil` shows no process env changes in the harness.
 68. Covered by 75 (the soak and timings).
 69. Covered by 75.
-70. Flow 24 passes; `webui/playwright.config.ts` has `retries: 0`.
+70. Flow 24 passes; `webui/e2e/playwright.config.ts` has `retries: 0`.
 71. Covered by 75.
 72. Covered by 63 and 75.
 73. gx's `.gx/checks.json` sets only `test.full`, and `gx check --full` starts e2e after `scripts/test.sh` ends.
