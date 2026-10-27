@@ -5,6 +5,7 @@ import (
 
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/grillround"
+	"github.com/elentok/gx/harness"
 )
 
 // sweepDesignCounts counts every Design conversation record of the Claude
@@ -24,13 +25,13 @@ func (s *Server) sweepDesignCounts() {
 		return
 	}
 	for _, r := range recs {
-		if r.Grilling != nil {
+		if r.Grilling != nil || r.Harness != string(harness.Claude) {
 			continue
 		}
 		if !r.Design && !(r.Ticket != "" && s.onMapEpic(r.Ticket)) {
 			continue
 		}
-		if err := grillround.Recount(s.cfg.ConversationsDir, home, r); err != nil {
+		if err := grillround.Recount(s.cfg.ConversationsDir, home, r.ID, r.Dir); err != nil {
 			s.log.Warn("sweep conversation counts", "conversation", r.ID, "err", err)
 		}
 	}

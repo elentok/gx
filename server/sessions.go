@@ -237,7 +237,7 @@ func (s *Server) saveConversationTotals(m sessionMeta, conversation string) {
 func (s *Server) saveConversationGrilling(m sessionMeta, conversation string) {
 	home, err := os.UserHomeDir()
 	if err == nil {
-		err = grillround.Recount(s.cfg.ConversationsDir, home, conversations.Record{ID: conversation, Dir: m.Dir, Harness: string(harness.Claude)})
+		err = grillround.Recount(s.cfg.ConversationsDir, home, conversation, m.Dir)
 	}
 	if err != nil {
 		s.log.Warn("count conversation grilling", "session", m.ID, "conversation", conversation, "err", err)

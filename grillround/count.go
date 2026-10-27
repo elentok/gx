@@ -3,21 +3,12 @@ package grillround
 import (
 	"regexp"
 	"strings"
-	"time"
 	"unicode"
 
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
-
-// Item is one counted Grilling round or closing summary. A summary has no
-// questions.
-type Item struct {
-	MessageID string
-	At        time.Time
-	Questions int
-	Words     int
-}
 
 var (
 	linkRE       = regexp.MustCompile(`\[([^\]]*)\]\([^)]*\)`)
@@ -29,11 +20,11 @@ var (
 // Count turns a conversation's chat messages into counted items: one per
 // Grilling round, and one per closing summary. msgs is the full ReadChat
 // output, before any cap or fence stripping.
-func Count(msgs []transcript.ChatMessage) []Item {
-	var items []Item
+func Count(msgs []transcript.ChatMessage) []conversations.GrillingItem {
+	var items []conversations.GrillingItem
 	answered := false // the turn before this one ended with an answered round that asks for a summary
 	for _, turn := range turns(msgs) {
-		var turnItems []Item
+		var turnItems []conversations.GrillingItem
 		turnItems, answered = countTurn(turn, answered)
 		items = append(items, turnItems...)
 	}
@@ -59,8 +50,8 @@ func turns(msgs []transcript.ChatMessage) [][]transcript.ChatMessage {
 // round: the last text before the run-end line or the next round is the summary.
 // asksSummary is true when the turn's last round is a straightforward one, so
 // the turn after the person's answer closes with a summary.
-func countTurn(turn []transcript.ChatMessage, wantSummary bool) (items []Item, asksSummary bool) {
-	var candidate *Item
+func countTurn(turn []transcript.ChatMessage, wantSummary bool) (items []conversations.GrillingItem, asksSummary bool) {
+	var candidate *conversations.GrillingItem
 	terminated := false
 	for _, m := range turn {
 		runEnd := RunEndLine.FindStringIndex(m.Text)
@@ -96,12 +87,12 @@ func countTurn(turn []transcript.ChatMessage, wantSummary bool) (items []Item, a
 	return items, asksSummary
 }
 
-func summaryItem(m transcript.ChatMessage, text string) *Item {
+func summaryItem(m transcript.ChatMessage, text string) *conversations.GrillingItem {
 	words := countWords(text)
 	if words == 0 {
 		return nil
 	}
-	return &Item{MessageID: m.ID, At: m.At, Words: words}
+	return &conversations.GrillingItem{MessageID: m.ID, At: m.At, Words: words}
 }
 
 // isShared reports whether a round is the "Shared understanding" question that
@@ -118,9 +109,9 @@ func isShared(text string) bool {
 
 // roundItem counts the questions and words of a message holding a round. The
 // text before the first card counts only for a Shared understanding round.
-func roundItem(m transcript.ChatMessage, shared bool) Item {
+func roundItem(m transcript.ChatMessage, shared bool) conversations.GrillingItem {
 	segs := Segments(m.Text)
-	item := Item{MessageID: m.ID, At: m.At, Questions: len(segs)}
+	item := conversations.GrillingItem{MessageID: m.ID, At: m.At, Questions: len(segs)}
 	if shared {
 		item.Words += countWords(m.Text[:markerRE.FindStringIndex(m.Text)[0]])
 	}

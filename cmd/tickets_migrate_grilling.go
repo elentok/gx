@@ -52,7 +52,7 @@ func backfillGrilling(root string, dryRun bool) ([]tickets.MigrationChange, erro
 			continue
 		}
 		if !dryRun {
-			if err := grillround.Recount(dir, home, r); err != nil {
+			if err := grillround.Recount(dir, home, r.ID, r.Dir); err != nil {
 				return changes, err
 			}
 		}
@@ -131,7 +131,7 @@ func saveBackfilledDesign(dir, home, cwd, id, ticket string, at time.Time) error
 	if err := conversations.Save(dir, rec); err != nil {
 		return err
 	}
-	return grillround.Recount(dir, home, rec)
+	return grillround.Recount(dir, home, rec.ID, rec.Dir)
 }
 
 func grillingChange(dir, id string) tickets.MigrationChange {

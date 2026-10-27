@@ -35,7 +35,7 @@ func TestRecount(t *testing.T) {
 	}
 	writeRound(t, home, rec.Dir, rec.ID)
 
-	if err := grillround.Recount(root, home, rec); err != nil {
+	if err := grillround.Recount(root, home, rec.ID, rec.Dir); err != nil {
 		t.Fatal(err)
 	}
 	first, _ := conversations.Read(root, rec.ID)
@@ -43,7 +43,7 @@ func TestRecount(t *testing.T) {
 		t.Fatalf("counts = %+v", first.Grilling)
 	}
 
-	if err := grillround.Recount(root, home, rec); err != nil {
+	if err := grillround.Recount(root, home, rec.ID, rec.Dir); err != nil {
 		t.Fatal(err)
 	}
 	if second, _ := conversations.Read(root, rec.ID); !reflect.DeepEqual(second, first) {
@@ -53,25 +53,10 @@ func TestRecount(t *testing.T) {
 	if err := os.Remove(transcript.PathIn(home, rec.Dir, rec.ID)); err != nil {
 		t.Fatal(err)
 	}
-	if err := grillround.Recount(root, home, rec); err != nil {
+	if err := grillround.Recount(root, home, rec.ID, rec.Dir); err != nil {
 		t.Fatal(err)
 	}
 	if kept, _ := conversations.Read(root, rec.ID); !reflect.DeepEqual(kept, first) {
 		t.Errorf("missing transcript changed the record: %+v", kept)
-	}
-}
-
-func TestRecount_SkipsCodex(t *testing.T) {
-	root, home := t.TempDir(), t.TempDir()
-	rec := conversations.Record{ID: "c2", Dir: "/work/dir", Harness: "codex"}
-	if err := conversations.Save(root, rec); err != nil {
-		t.Fatal(err)
-	}
-	writeRound(t, home, rec.Dir, rec.ID)
-	if err := grillround.Recount(root, home, rec); err != nil {
-		t.Fatal(err)
-	}
-	if got, _ := conversations.Read(root, rec.ID); got.Grilling != nil {
-		t.Errorf("codex record got counts: %+v", got.Grilling)
 	}
 }
