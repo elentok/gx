@@ -49,6 +49,8 @@ export const formatCost = (dollars: number) => `$${dollars.toFixed(2)}`;
 export interface StatPart {
   text: string;
   tone?: Tone;
+  // A toneless part that reads one step brighter than the line (the Design step, "Publishing tickets").
+  bright?: boolean;
 }
 
 const STATE_TONES: Record<NonNullable<EpicDetail["state"]>, Tone> = {
@@ -62,13 +64,19 @@ const STATE_TONES: Record<NonNullable<EpicDetail["state"]>, Tone> = {
 
 // A draft -impl epic is still being published into; a Waiting epic that holds no queue item is not waiting for a slot.
 function statePart(d: EpicDetail): StatPart | undefined {
-  if (d.draft && d.address.endsWith("-impl")) return { text: "Publishing tickets", tone: "muted" };
   if (!d.state) return undefined;
   return { text: d.state === "waiting" && !d.queued ? "Not queued" : epicBadge(d.state), tone: STATE_TONES[d.state] };
 }
 
 // A running epic's clock counts up, so it reads plain; every other one reads "took".
 export function loopStatParts(d: EpicDetail): StatPart[] {
+  if (d.draft && d.address.endsWith("-impl")) {
+    const n = d.rows.filter((r) => !isCancelled(r)).length;
+    return [
+      { text: "Publishing tickets", bright: true },
+      n > 0 ? { text: `${n} ${n === 1 ? "ticket" : "tickets"} so far` } : undefined,
+    ].filter((p): p is StatPart => !!p);
+  }
   const wall =
     d.wall_clock === undefined ? undefined : `${d.state === "running" ? "" : "took "}${formatDuration(d.wall_clock)}`;
   return [
@@ -95,7 +103,7 @@ export function designStatParts(d: EpicDetail, live: boolean, now: number): Stat
   const label = (doneStep?.state === MapStepDone ? doneStep : steps.find((s) => s.state === MapStepCurrent))?.label;
   const time = designTime(d, live, now);
   return [
-    label ? { text: label } : undefined,
+    label ? { text: label, bright: true } : undefined,
     time === undefined ? undefined : { text: formatDuration(time) },
     d.stats.cost === undefined ? undefined : { text: formatCost(d.stats.cost) },
   ].filter((p): p is StatPart => !!p);

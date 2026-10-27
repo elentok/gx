@@ -56,6 +56,7 @@ export const themeConfig = defineConfig({
       colors: {
         surface: { DEFAULT: { value: "#0a0d11" }, raised: { value: "#141920" } },
         overlay: { value: "rgba(0, 0, 0, 0.7)" },
+        hairline: { value: "#252c36" },
         text: {
           DEFAULT: { value: "#ffffff" },
           muted: { value: "#c9d0da" },

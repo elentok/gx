@@ -118,7 +118,7 @@ test.each([
   ["a waiting queued epic", { state: "waiting", queued: true }, "Waiting for a slot · took 2m · $1.50 · 5m agent time"],
   ["a running epic", { state: "running" }, "Running · 2m · $1.50 · 5m agent time"],
   ["a finished epic", { state: "finished" }, "Merged · took 2m · $1.50 · 5m agent time"],
-  ["a draft -impl epic", { state: "waiting", draft: true }, "Publishing tickets · took 2m · $1.50 · 5m agent time"],
+  ["a draft -impl epic", { state: "waiting", draft: true }, "Publishing tickets"],
   ["an epic that never started", { state: "waiting", queued: true, wall_clock: undefined }, "Waiting for a slot · $1.50 · 5m agent time"],
 ] as [string, Partial<EpicDetail>, string][])("the stats line of %s", async (_n, over, text) => {
   render("/e/gx:blog-impl", [], "loop", loop(over));

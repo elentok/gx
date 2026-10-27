@@ -1,6 +1,7 @@
 import type { EpicState, QueueMode } from "./snapshot";
 
-// The labels must match epicStateLabels in ui/tickets/queue_header.go.
+// The labels match epicStateLabels in ui/tickets/queue_header.go except finished: the web says "Merged", the TUI
+// still says "Finished" (gx:follow-ups/46).
 const STATE_LABELS: Record<EpicState, string> = {
   paused: "Paused",
   running: "Running",

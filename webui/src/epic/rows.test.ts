@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { EpicDetail, EpicDetailRow } from "./detail";
-import { cardLook, type CardLook, cardMeta, rowContext } from "./rows";
+import { cardLook, type CardLook, cardMeta, designStatParts, loopStatParts, rowContext } from "./rows";
 
 const detailOf = (kind: EpicDetail["kind"], rows: EpicDetailRow[]): EpicDetail => ({
   address: "gx:e",
@@ -48,4 +48,26 @@ test.each([
   ["a running row", { rendered_status: "claimed" }, { kind: "link" }],
 ] as [string, Partial<EpicDetailRow>, CardLook][])("card look of %s", (_n, over, look) => {
   expect(cardLook(row(over))).toEqual(look);
+});
+
+const draftImpl = (rows: EpicDetailRow[]): EpicDetail => ({ ...detailOf("loop", rows), address: "gx:e-impl", draft: true, state: "waiting" });
+const nOf = (n: number, status = "open") => Array.from({ length: n }, (_, i) => row({ address: `gx:e-impl/${i}`, rendered_status: status }));
+const PUBLISHING = { text: "Publishing tickets", bright: true };
+
+test.each([
+  ["no rows", [], [PUBLISHING]],
+  ["one row", nOf(1), [PUBLISHING, { text: "1 ticket so far" }]],
+  ["seven rows", nOf(7), [PUBLISHING, { text: "7 tickets so far" }]],
+  ["cancelled rows left out", [...nOf(2), ...nOf(3, "cancelled")], [PUBLISHING, { text: "2 tickets so far" }]],
+] as [string, EpicDetailRow[], unknown[]][])("a draft -impl epic with %s", (_n, rows, parts) => {
+  expect(loopStatParts({ ...draftImpl(rows), wall_clock: 60, cost_total: 2, agent_time: 30 })).toEqual(parts);
+});
+
+test("a finished epic reads Merged, in the done tone", () => {
+  expect(loopStatParts({ ...detailOf("loop", []), state: "finished" })[0]).toEqual({ text: "Merged", tone: "done" });
+});
+
+test("the Design step part is bright and has no tone", () => {
+  const d = { ...detailOf("map", []), steps: [{ step: "spec", label: "spec", state: "current" }] } as unknown as EpicDetail;
+  expect(designStatParts(d, false, NOW)[0]).toEqual({ text: "spec", bright: true });
 });

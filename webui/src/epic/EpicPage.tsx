@@ -129,13 +129,19 @@ function EpicBar({
       ? designStatParts(detail, designLive, now)
       : loopStatParts({ ...detail, wall_clock: wallClock });
   return (
-    <Box mt="4" borderTopWidth="1px" borderColor="border" pt="3">
+    <Box mt={wide ? "14px" : "12px"} borderTopWidth="1px" borderColor="hairline" pt={wide ? "14px" : "12px"}>
       <Box display="flex" flexWrap="wrap" alignItems="center" justifyContent="space-between" gap="3">
-        <Text data-testid="stats-line" fontSize="sm" color="text.muted">
+        <Text data-testid="stats-line" fontSize="14px" lineHeight="normal" color="text.dim">
           {parts.map((p, i) => (
             <Fragment key={i}>
               {i > 0 && " · "}
-              {p.tone ? <Text as="span" color={`tone.${p.tone}.fg`}>{p.text}</Text> : p.text}
+              {p.tone || p.bright ? (
+                <Text as="span" color={p.tone ? `tone.${p.tone}.fg` : "text.muted"}>
+                  {p.text}
+                </Text>
+              ) : (
+                p.text
+              )}
             </Fragment>
           ))}
         </Text>
