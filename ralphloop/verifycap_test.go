@@ -92,6 +92,28 @@ func TestWaitForFinish_VerifyCap_StopsVerifyButNotImplement(t *testing.T) {
 	}
 }
 
+func TestWaitForFinish_VerifyCap_FiredStateSurvivesASecondWait(t *testing.T) {
+	t.Parallel()
+	r := boundGiveUpRunner(func(wait int) bool { return wait == 1 || wait == 3 })
+	read := func(string, string) (int, bool, error) { return verifyCapTestZone, true, nil }
+	d := Deps{Runner: r, ReadOccupancy: read, ReadCodexContext: read, Sleep: func(time.Duration) {}}
+	p := boundGiveUpParams()
+	p.SmartZone = verifyCapTestZone
+	p.TicketData = tickets.Ticket{Identifier: "19", Type: "verify"}
+	p.ScratchDir = epicScratchDir(t, "epic")
+	p.EpicName = "epic"
+	p.verifyCap = true
+	p.verifyCapFired = new(bool)
+	for i := range 2 {
+		if err := waitForFinish(d, p, "sess-19"); err != nil {
+			t.Fatalf("wait %d: %v", i, err)
+		}
+	}
+	if got := len(r.Prompts("iter-19")); got != 1 {
+		t.Errorf("cap prompts across two waits = %d, want 1", got)
+	}
+}
+
 func TestWaitForFinish_VerifyCap_FailedPromptSendLogsCapStop(t *testing.T) {
 	t.Parallel()
 	got := runVerifyCapWait(t, "verify", AgentClaude, verifyCapTestZone, 3, constOccupancy(verifyCapTestZone),
