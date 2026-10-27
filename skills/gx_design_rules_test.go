@@ -30,6 +30,29 @@ func TestGxDesignChainingRules(t *testing.T) {
 	}
 }
 
+// gx-grilling names these two gx-design steps by number as the Destination grillings that always ask.
+func TestGxDesignStepNumbersMatchGxGrilling(t *testing.T) {
+	grilling := readFile(t, "gx-grilling/SKILL.md")
+	for _, want := range []string{
+		`"Chart the map" (gx-design step 1)`,
+		"unconfirmed-Destination grilling (gx-design step 2)",
+	} {
+		if !strings.Contains(grilling, want) {
+			t.Errorf("gx-grilling/SKILL.md lacks %q", want)
+		}
+	}
+	design := readFile(t, "gx-design/SKILL.md")
+	for _, want := range []string{
+		"\n1. **The map has no `## Destination`** → report the step as `chart`.",
+		"follow gx-wayfinder's \"Chart the map\"",
+		"\n2. **`destination_unconfirmed: true`** → follow `gx-grilling` on the Destination alone",
+	} {
+		if !strings.Contains(design, want) {
+			t.Errorf("gx-design/SKILL.md lacks %q", want)
+		}
+	}
+}
+
 func TestGxDesignSpecStepGrillsInPlace(t *testing.T) {
 	text := readFile(t, "gx-design/SKILL.md")
 	for _, want := range []string{
