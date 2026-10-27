@@ -1,5 +1,11 @@
-import { Box, Spinner as ChakraSpinner, Text } from "@chakra-ui/react";
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Box, chakra, Spinner as ChakraSpinner, Text } from "@chakra-ui/react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type {
   SessionBackgroundTask,
@@ -22,7 +28,6 @@ import type { PostPrompt } from "./prompt";
 import { QuestionSheet } from "./QuestionSheet";
 import { isAnswered } from "./round";
 import { useRoundDraft } from "./roundDraft";
-import { Button } from "../ui/button/Button";
 
 const KIND_NAMES: Record<string, string> = {
   shell: "shell",
@@ -243,7 +248,8 @@ function ChatScroller({
   const el = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
   useLayoutEffect(() => {
-    if (el.current && stuck.current) el.current.scrollTop = el.current.scrollHeight;
+    if (el.current && stuck.current)
+      el.current.scrollTop = el.current.scrollHeight;
   }, [signal]);
   return (
     <Box
@@ -276,24 +282,53 @@ function ViewToggle({
   onQuestions: (on: boolean) => void;
 }) {
   return (
-    <Box role="group" aria-label="View" display="flex" gap="2" flex="none">
-      <Button
-        size="sm"
-        emphasis={questions ? "main" : "secondary"}
-        aria-pressed={questions}
-        onClick={() => onQuestions(true)}
-      >
+    <Box
+      role="group"
+      aria-label="View"
+      display="flex"
+      gap="3px"
+      p="3px"
+      borderRadius="10px"
+      bg="surface.raised"
+      flex="none"
+    >
+      <SegButton on={questions} onClick={() => onQuestions(true)}>
         Questions ({answered} of {total})
-      </Button>
-      <Button
-        size="sm"
-        emphasis={questions ? "secondary" : "main"}
-        aria-pressed={!questions}
-        onClick={() => onQuestions(false)}
-      >
+      </SegButton>
+      <SegButton on={!questions} onClick={() => onQuestions(false)}>
         Chat
-      </Button>
+      </SegButton>
     </Box>
+  );
+}
+
+function SegButton({
+  on,
+  onClick,
+  children,
+}: {
+  on: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <chakra.button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      flex="1"
+      py="2"
+      px="3"
+      borderRadius="8px"
+      fontWeight="semibold"
+      bg={on ? "surface" : "transparent"}
+      color={on ? "text" : "text.muted"}
+      borderWidth={on ? "1px" : "0"}
+      borderColor="border"
+      cursor="pointer"
+    >
+      {children}
+    </chakra.button>
   );
 }
 
@@ -342,8 +377,7 @@ function ChatBody({
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [questions, onQuestions]);
-  const busy =
-    session.status.state === "working" && !session.status.background;
+  const busy = session.status.state === "working" && !session.status.background;
   return (
     <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
       {hasRound && (
