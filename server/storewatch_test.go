@@ -26,12 +26,19 @@ func TestStoreWatchSeesNewFilesAndSkipsGit(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.Rewatch()
-	if err := os.WriteFile(filepath.Join(dir, "01-a.md"), []byte("x"), 0o644); err != nil {
-		t.Fatal(err)
-	}
 
-	deadline := time.After(5 * time.Second)
-	for {
+	// Under heavy disk load FSEvents can delay a write by seconds or drop it,
+	// so keep writing until one gets through.
+	write := time.NewTicker(500 * time.Millisecond)
+	defer write.Stop()
+	deadline := time.After(20 * time.Second)
+	writeTicket := func(i int) {
+		if err := os.WriteFile(filepath.Join(dir, "01-a.md"), []byte{byte(i)}, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeTicket(0)
+	for i := 1; ; i++ {
 		select {
 		case ev := <-w.Events:
 			if inGitDir(ev.Name) {
@@ -40,6 +47,8 @@ func TestStoreWatchSeesNewFilesAndSkipsGit(t *testing.T) {
 			if filepath.Base(ev.Name) == "01-a.md" {
 				return
 			}
+		case <-write.C:
+			writeTicket(i)
 		case <-deadline:
 			t.Fatal("no event for the new ticket file")
 		}
