@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,7 +15,9 @@ export default function globalSetup() {
   const keep = join(webuiDir, "dist", ".gitkeep");
   if (!existsSync(keep)) writeFileSync(keep, "");
 
-  const dir = mkdtempSync(join(tmpdir(), "gx-e2e-bin-"));
+  // One fixed dir per worktree, overwritten each run, so nothing leaks into $TMPDIR.
+  const dir = join(webuiDir, ".e2e-bin");
+  mkdirSync(dir, { recursive: true });
   const build = (out: string, pkg: string) => {
     const path = join(dir, out);
     execFileSync("go", ["build", "-o", path, pkg], { cwd: repoRoot, stdio: "inherit" });
