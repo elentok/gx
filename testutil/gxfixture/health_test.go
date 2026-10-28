@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,6 +62,61 @@ func TestHealth_TheControlFilesSteerTheMeters(t *testing.T) {
 	r.setDisk(t, "free", "8G/500G")
 	r.waitHealth(t, "8G free of 500G", func(h server.HealthReport) bool {
 		return len(h.Disks.Disks) == 1 && h.Disks.Disks[0].FreeBytes == 8_000_000_000 && h.Disks.Disks[0].TotalBytes == 500_000_000_000
+	})
+}
+
+// cpuRow is the first CPU cause row of kind, or false.
+func cpuRow(h server.HealthReport, kind string) (server.CauseRow, bool) {
+	for _, row := range h.Causes.CPU.Rows {
+		if row.Kind == kind {
+			return row, true
+		}
+	}
+	return server.CauseRow{}, false
+}
+
+// waitCauses polls with wait=true until the CPU list is out of its reading marker and ok holds.
+func (r *running) waitCauses(t *testing.T, what string, ok func(server.HealthReport) bool) server.HealthReport {
+	t.Helper()
+	return r.waitHealth(t, what, func(h server.HealthReport) bool {
+		return h.Causes.CPU.Marker == server.CauseMarkerNone && ok(h)
+	})
+}
+
+func TestHealth_TheProcessTableNamesTheAgentByItsTicket(t *testing.T) {
+	r := start(t, "health")
+	defer r.stop(t)
+
+	const addr = project + ":health-epic/01"
+	rep := r.waitCauses(t, "agent, process and other-users rows", func(h server.HealthReport) bool {
+		a, ok := cpuRow(h, "agent")
+		_, plain := cpuRow(h, "process")
+		_, other := cpuRow(h, "other-users")
+		return ok && plain && other && a.Ticket == addr
+	})
+	if a, _ := cpuRow(rep, "agent"); a.Busiest != "go test" {
+		t.Errorf("busiest = %q, want go test", a.Busiest)
+	}
+	if p, _ := cpuRow(rep, "process"); p.Label != "build.js" {
+		t.Errorf("process label = %q, want build.js", p.Label)
+	}
+
+	processes := filepath.Join(r.HealthDir, "processes")
+	b, err := os.ReadFile(processes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	led := strings.Replace(string(b), " 800 100M node", " 6000 100M node", 1)
+	if led == string(b) {
+		t.Fatalf("no node row to change in %q", b)
+	}
+	led = strings.Replace(led, "busy 4500", "busy 8000", 1)
+	if err := writeHealthFile(processes, led); err != nil {
+		t.Fatal(err)
+	}
+	r.waitCauses(t, "build.js leading", func(h server.HealthReport) bool {
+		rows := h.Causes.CPU.Rows
+		return len(rows) > 0 && rows[0].Kind == "process" && rows[0].Label == "build.js"
 	})
 }
 

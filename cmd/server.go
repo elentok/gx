@@ -196,6 +196,15 @@ func runServer(ctx context.Context, d deps) error {
 	if v := os.Getenv("GX_HEALTH_FILE"); v != "" {
 		systemHealth = server.FileSystemHealth(v)
 	}
+	// Test hook: the process table for the cause lists comes from a control file too.
+	var processSource func() (syshealth.ProcessTable, error)
+	var processArgv func(int) []string
+	if v := os.Getenv("GX_HEALTH_PROCESSES"); v != "" {
+		processSource, processArgv = server.FileProcesses(v)
+		if _, err := processSource(); err != nil {
+			return fmt.Errorf("GX_HEALTH_PROCESSES: %w", err)
+		}
+	}
 	var healthPollInterval time.Duration
 	if v := os.Getenv("GX_HEALTH_INTERVAL"); v != "" {
 		if healthPollInterval, err = time.ParseDuration(v); err != nil {
@@ -205,7 +214,8 @@ func runServer(ctx context.Context, d deps) error {
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
-		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval})
+		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval,
+		ProcessSource: processSource, ProcessArgv: processArgv})
 	if err != nil {
 		return err
 	}

@@ -90,6 +90,21 @@ Read this before you guess; each wrong guess costs a rebuild.
   The `health` scenario is `disk-low` plus one queued epic whose first ticket is held running by
   a fake agent, so `gx server queue pause` has a queue to pause.
 
+- **Fake process table.** The popover's cause lists read `<health_dir>/processes`, one entry per
+  line, fields separated by spaces. Every scenario starts with two idle rows and no agent:
+  - `proc <pid> <ppid> <start> <cpu> <mem> <comm> [argv...]`: `start` is Unix seconds, `mem` a
+    size such as `200M`, `argv` the rest of the line (it names the row: `go test ./...` shows as
+    `go test`).
+  - `hidden <pid>`: an unreadable row.
+  - `busy <ticks>`: machine ticks busy per read; whatever it holds above the rows' sum is shown as
+    "other users" (needs a `hidden` row). Without it, the rows' sum.
+
+  `cpu` and `busy` are ticks _per read_, out of 10000 ticks a read: `cpu=1500` is 15% of the
+  machine for as long as the file stays. An empty or malformed file is a failed read (the lists
+  show "unavailable"). Write it through a temp file and `mv`, as for the disk. The `health`
+  scenario writes the fake agent's real claude and holder pids under its ticket (`demo:health-epic/01`,
+  with a busy `go test` child), a plain `node build.js` row and a hidden row, once the agent runs.
+
 - **Fake worker outcome → ticket status.** The worker's behaviour is per ticket
   (`agentfake.Behaviour*`, set by a scenario's `behaviour`):
   - `finish` (default): commits and reports finished. The ticket merges and ends `done`.

@@ -41,6 +41,9 @@ func durationOr(d, def time.Duration) time.Duration {
 // processSource is the configured table read and the argv lookup for its rows.
 func (s *Server) processSource() (func() (syshealth.ProcessTable, error), func(int) []string) {
 	if s.cfg.ProcessSource != nil {
+		if s.cfg.ProcessArgv != nil {
+			return s.cfg.ProcessSource, s.cfg.ProcessArgv
+		}
 		return s.cfg.ProcessSource, func(int) []string { return nil }
 	}
 	r := syshealth.DefaultProcess()

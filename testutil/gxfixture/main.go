@@ -213,6 +213,11 @@ func run(args []string) (err error) {
 			return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
 		}
 	}
+	if sc.agentProcs {
+		if err := f.tieAgentProcesses(ctx); err != nil {
+			return err
+		}
+	}
 	// Plain sessions are made before openDesigns, which then starts the newer
 	// run, but linked after it: a map with a live design session makes `designs
 	// open` return that one instead of starting another.

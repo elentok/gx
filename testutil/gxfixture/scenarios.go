@@ -54,6 +54,8 @@ type scenario struct {
 	projectExtra map[string]string
 	// hold keeps every worker running until the hold file is removed, as --hold does.
 	hold bool
+	// agentProcs writes the first fake agent's pids into the process table once it runs.
+	agentProcs bool
 	// recentlyFinished is the server.recently-finished cap; zero keeps the default.
 	recentlyFinished int
 	// openDesigns lists the maps whose design session is opened once the server is up.
@@ -106,9 +108,10 @@ var scenarios = map[string]scenario{
 			{"01", "held", servertest.TicketOpts{}},
 			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
 		}}},
-		queue:   []string{project + ":health-epic"},
-		hold:    true,
-		diskLow: true,
+		queue:      []string{project + ":health-epic"},
+		hold:       true,
+		diskLow:    true,
+		agentProcs: true,
 	},
 	// mixed: tickets in several states, and a worker that asks and fails.
 	"mixed": {
