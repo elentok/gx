@@ -168,9 +168,9 @@ func (m Model) completeBatchDelete() (Model, tea.Cmd) {
 		if result.err != nil {
 			m.lastJobLog = result.err.Error()
 			m.lastJobLabel = "Delete failed"
-			return m.enterLogsMode(), cmdLoadWorktrees(m.repo)
+			return m.enterLogsMode(), cmdLoadWorktrees(m.repo, m.settings.TicketStore)
 		}
-		return m, tea.Batch(notify.Info(fmt.Sprintf("Deleted %s", result.name)), cmdLoadWorktrees(m.repo))
+		return m, tea.Batch(notify.Info(fmt.Sprintf("Deleted %s", result.name)), cmdLoadWorktrees(m.repo, m.settings.TicketStore))
 	}
 
 	// Multi-delete: build a summary log.
@@ -203,7 +203,7 @@ func (m Model) completeBatchDelete() (Model, tea.Cmd) {
 
 	m.lastJobLog = strings.TrimRight(sb.String(), "\n")
 	m.lastJobLabel = "Delete summary"
-	return m.enterLogsMode(), cmdLoadWorktrees(m.repo)
+	return m.enterLogsMode(), cmdLoadWorktrees(m.repo, m.settings.TicketStore)
 }
 
 // deleteProgressModalView renders the progress modal for modeDeleteProgress.

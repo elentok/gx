@@ -13,17 +13,15 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/nav"
 )
 
 // Without server deps the Tickets tab reads the store and "D" is disabled.
 func TestTicketsFinishAndPauseWithoutServerIsDisabled(t *testing.T) {
-	// not parallel-safe: points XDG_DATA_HOME at a temp ticket store
 	repoDir := testutil.TempRepo(t)
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
-	t.Setenv("XDG_CONFIG_HOME", "")
-	project := filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets", "p")
+	store := t.TempDir()
+	project := filepath.Join(store, "p")
 	if err := os.MkdirAll(project, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -47,6 +45,7 @@ func TestTicketsFinishAndPauseWithoutServerIsDisabled(t *testing.T) {
 	m := New(*repo, Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabTickets, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
+		Settings:           ui.Settings{TicketStore: store},
 	})
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(120, 40))
 	defer tm.Quit()

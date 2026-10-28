@@ -7,14 +7,16 @@ import (
 
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
+	keymgr "github.com/elentok/gx/ui/keys"
 )
 
 // trunkFixture is a repo registered as project "p" with a "develop" worktree
 // one commit ahead of main and a "feature" worktree one commit ahead of main.
-// Not parallel-safe (sets env).
 type trunkFixture struct {
 	repo       git.Repo
 	projectDir string
+	store      string
 }
 
 func newTrunkFixture(t *testing.T, trunk string) trunkFixture {
@@ -32,7 +34,12 @@ func newTrunkFixture(t *testing.T, trunk string) trunkFixture {
 	if err != nil {
 		t.Fatalf("FindRepo: %v", err)
 	}
-	return trunkFixture{repo: *repo, projectDir: testutil.RegisterProject(t, repo.Root, trunk)}
+	projectDir, store := testutil.RegisterProject(t, repo.Root, trunk)
+	return trunkFixture{repo: *repo, projectDir: projectDir, store: store}
+}
+
+func (f trunkFixture) model() Model {
+	return NewWithSettings(f.repo, "", ui.Settings{TicketStore: f.store}, keymgr.Manager{})
 }
 
 func (f trunkFixture) setTrunk(t *testing.T, trunk string) {
@@ -44,7 +51,7 @@ func (f trunkFixture) setTrunk(t *testing.T, trunk string) {
 // the preview of the worktree on branch cursor.
 func reload(t *testing.T, m Model, cursor string) Model {
 	t.Helper()
-	next, _ := m.Update(cmdLoadWorktrees(m.repo)())
+	next, _ := m.Update(cmdLoadWorktrees(m.repo, m.settings.TicketStore)())
 	m = next.(Model)
 	for i, wt := range m.worktrees {
 		if wt.Branch == cursor {
@@ -63,7 +70,7 @@ func reload(t *testing.T, m Model, cursor string) Model {
 
 func TestReload_DevelopTrunk(t *testing.T) {
 	f := newTrunkFixture(t, "develop")
-	m := reload(t, New(f.repo, ""), "feature")
+	m := reload(t, f.model(), "feature")
 
 	if m.repo.Trunk != "develop" {
 		t.Fatalf("Trunk = %q, want develop", m.repo.Trunk)
@@ -82,7 +89,7 @@ func TestReload_DevelopTrunk(t *testing.T) {
 
 func TestReload_PicksUpTrunkEdit(t *testing.T) {
 	f := newTrunkFixture(t, "main")
-	m := reload(t, New(f.repo, ""), "feature")
+	m := reload(t, f.model(), "feature")
 	if m.worktrees[0].Branch != "main" {
 		t.Fatalf("first row = %q, want main", m.worktrees[0].Branch)
 	}
@@ -100,7 +107,7 @@ func TestReload_PicksUpTrunkEdit(t *testing.T) {
 
 func TestReload_MissingTrunkDegrades(t *testing.T) {
 	f := newTrunkFixture(t, "nope")
-	m := reload(t, New(f.repo, ""), "feature")
+	m := reload(t, f.model(), "feature")
 
 	if len(m.worktrees) != 3 {
 		t.Fatalf("worktrees = %d, want 3", len(m.worktrees))

@@ -14,7 +14,7 @@ import (
 )
 
 func (m Model) Init() tea.Cmd {
-	return cmdLoadWorktrees(m.repo)
+	return cmdLoadWorktrees(m.repo, m.settings.TicketStore)
 }
 
 func (m Model) InputFocused() bool {
@@ -124,25 +124,25 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		return m, tea.Batch(notify.Info(fmt.Sprintf("deleted worktree %s", msg.name)), cmdLoadWorktrees(m.repo))
+		return m, tea.Batch(notify.Info(fmt.Sprintf("deleted worktree %s", msg.name)), cmdLoadWorktrees(m.repo, m.settings.TicketStore))
 
 	case renameResultMsg:
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		return m, cmdLoadWorktrees(m.repo)
+		return m, cmdLoadWorktrees(m.repo, m.settings.TicketStore)
 
 	case cloneResultMsg:
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		return m, cmdLoadWorktrees(m.repo)
+		return m, cmdLoadWorktrees(m.repo, m.settings.TicketStore)
 
 	case newResultMsg:
 		if msg.err != nil {
 			return m.showError(msg.err.Error()), nil
 		}
-		return m, cmdLoadWorktrees(m.repo)
+		return m, cmdLoadWorktrees(m.repo, m.settings.TicketStore)
 
 	case newOpenResultMsg:
 		if msg.err != nil {
@@ -151,7 +151,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 		if !m.herdrTerminalDown() {
 			m = m.enterTerminalMenuFor(msg.name, msg.path)
 		}
-		return m, cmdLoadWorktrees(m.repo)
+		return m, cmdLoadWorktrees(m.repo, m.settings.TicketStore)
 
 	case terminalResultMsg:
 		if msg.err != nil {
@@ -326,7 +326,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.loading = true
-		return m, cmdLoadWorktrees(m.repo)
+		return m, cmdLoadWorktrees(m.repo, m.settings.TicketStore)
 
 	case forcePushResultMsg:
 		m.spinnerActive = false
@@ -355,7 +355,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.loading = true
-		return m, cmdLoadWorktrees(m.repo)
+		return m, cmdLoadWorktrees(m.repo, m.settings.TicketStore)
 
 	case trackResultMsg:
 		m.spinnerActive = false
@@ -373,7 +373,7 @@ func (m Model) Update(msg tea.Msg) (next tea.Model, cmd tea.Cmd) {
 			return m.showError(msg.err.Error()), nil
 		}
 		m.clipboard = nil
-		return m, tea.Batch(notify.Info(fmt.Sprintf("pasted %d file(s)", msg.n)), cmdLoadWorktrees(m.repo))
+		return m, tea.Batch(notify.Info(fmt.Sprintf("pasted %d file(s)", msg.n)), cmdLoadWorktrees(m.repo, m.settings.TicketStore))
 
 	case worktreesLoadedMsg:
 		m.loading = false

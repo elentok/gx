@@ -128,7 +128,7 @@ func NewModel(worktreeRoot string, settings ui.Settings, extraKeys keys.Manager)
 	sidebarTree.SetIsSelectable(func(n sidebarNode) bool {
 		return n.kind != nodeLoading && n.kind != nodeLoadError
 	})
-	scratchDir := scratchDirFor(worktreeRoot)
+	scratchDir := scratchDirFor(settings.TicketStore, worktreeRoot)
 	archivedLazy := tree.NewLazySection(0, func() ([]tickets.Epic, error) {
 		return tickets.LoadArchived(scratchDir)
 	})
@@ -473,7 +473,7 @@ func (m Model) handleSidebarMouseWheel(msg tea.MouseWheelMsg) (tea.Model, tea.Cm
 }
 
 func (m Model) scratchDir() string {
-	return scratchDirFor(m.worktreeRoot)
+	return scratchDirFor(m.settings.TicketStore, m.worktreeRoot)
 }
 
 // scratchDirFor resolves worktreeRoot's repo to its project directory in the
@@ -482,11 +482,11 @@ func (m Model) scratchDir() string {
 // fixtures that use a bare temp dir). A repo with no store project gets a
 // path that doesn't exist, which renders the empty state rather than reading
 // the legacy `.scratch`.
-func scratchDirFor(worktreeRoot string) string {
+func scratchDirFor(store, worktreeRoot string) string {
 	if _, err := git.FindRepo(worktreeRoot); err != nil {
 		return filepath.Join(worktreeRoot, ".scratch")
 	}
-	root, err := tickets.RootFor(worktreeRoot)
+	root, err := tickets.RootIn(store, worktreeRoot)
 	if err != nil {
 		return filepath.Join(worktreeRoot, ".gx-no-ticket-project")
 	}

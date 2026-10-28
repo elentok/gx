@@ -87,7 +87,7 @@ func TestReloadAssignsBranchHistoryClasses(t *testing.T) {
 	testutil.WriteFile(t, wtDir, "local.txt", "local\n")
 	testutil.CommitAll(t, wtDir, "local only")
 
-	m := newTestModelDefault(wtDir, "", settings)
+	m := newTestModelDefault(wtDir, "", ui.Settings{TicketStore: t.TempDir()})
 	got := map[string]git.BranchHistoryClass{}
 	for _, row := range m.listPanel.Rows() {
 		if row.kind != rowCommit {

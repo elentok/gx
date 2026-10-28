@@ -15,8 +15,8 @@ import (
 func pressRebase(t *testing.T, trunk string) (Model, tea.Cmd) {
 	t.Helper()
 	repoDir := rebaseRepo(t)
-	testutil.RegisterProject(t, repoDir, trunk)
-	return pressRebaseIn(repoDir)
+	_, store := testutil.RegisterProject(t, repoDir, trunk)
+	return pressRebaseIn(repoDir, store)
 }
 
 // rebaseRepo is a repo on branch feature/test with a local develop branch and
@@ -34,8 +34,10 @@ func rebaseRepo(t *testing.T) string {
 	return repo.Root
 }
 
-func pressRebaseIn(repoDir string) (Model, tea.Cmd) {
-	m := newTestModelDefault(repoDir)
+func pressRebaseIn(repoDir, store string) (Model, tea.Cmd) {
+	settings := DefaultSettings()
+	settings.TicketStore = store
+	m := newTestModel(repoDir, settings, "")
 	m.ready = true
 	m.focus = focusFiletree
 	updated, cmd := m.Update(tea.KeyPressMsg{Code: 'b', Text: "b"})
@@ -52,8 +54,8 @@ func TestRebaseTargetFollowsTrunk(t *testing.T) {
 func TestRebaseTargetLocalOnlyTrunk(t *testing.T) {
 	repoDir := rebaseRepo(t)
 	testutil.MustGitExported(t, repoDir, "branch", "local-trunk", "develop")
-	testutil.RegisterProject(t, repoDir, "local-trunk")
-	m, _ := pressRebaseIn(repoDir)
+	_, store := testutil.RegisterProject(t, repoDir, "local-trunk")
+	m, _ := pressRebaseIn(repoDir, store)
 	if !strings.Contains(m.confirmTitle, "on local-trunk?") {
 		t.Fatalf("confirm title = %q, want rebase on local-trunk", m.confirmTitle)
 	}
@@ -61,9 +63,9 @@ func TestRebaseTargetLocalOnlyTrunk(t *testing.T) {
 
 func TestRebaseUnreadableProjectFileWarns(t *testing.T) {
 	repoDir := rebaseRepo(t)
-	projectDir := testutil.RegisterProject(t, repoDir, "develop")
+	projectDir, store := testutil.RegisterProject(t, repoDir, "develop")
 	testutil.WriteFile(t, projectDir, "project.json", "{not json")
-	m, cmd := pressRebaseIn(repoDir)
+	m, cmd := pressRebaseIn(repoDir, store)
 	assertWarning(t, m, cmd, "project.json")
 }
 

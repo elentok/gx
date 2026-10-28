@@ -9,10 +9,10 @@ import (
 
 // cmdLoadWorktrees also resolves trunk again, so a project.json edit shows up
 // on the next reload.
-func cmdLoadWorktrees(repo git.Repo) tea.Cmd {
+func cmdLoadWorktrees(repo git.Repo, store string) tea.Cmd {
 	return func() tea.Msg {
 		wts, err := git.ListWorktrees(repo)
-		trunk, trunkErr := tickets.TrunkFor(repo.Root)
+		trunk, trunkErr := tickets.TrunkIn(store, repo.Root)
 		return worktreesLoadedMsg{worktrees: wts, err: err, trunk: trunk, trunkErr: trunkErr}
 	}
 }

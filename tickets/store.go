@@ -108,16 +108,6 @@ func RootIn(storePath, dir string) (string, error) {
 	return ProjectDir(storePath, repo.Root)
 }
 
-// RootFor is RootIn with the store path read from the process env.
-// Remove with its last ui callers (ticket 36a2).
-func RootFor(dir string) (string, error) {
-	cfg, err := config.Load()
-	if err != nil {
-		return "", err
-	}
-	return RootIn(cfg.TicketStore.Path, dir)
-}
-
 // RootForDirs is RootIn with the store path read from the config dirs holds.
 func RootForDirs(dirs config.Dirs, dir string) (string, error) {
 	cfg, err := dirs.Load()

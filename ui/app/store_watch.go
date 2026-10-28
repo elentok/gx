@@ -36,7 +36,7 @@ func (m Model) startStoreWatch() (Model, tea.Cmd) {
 	if m.store.running {
 		return m, nil
 	}
-	events, stop, err := ticketsui.WatchStore(ticketsui.ScratchDir(m.settings.ActiveWorktreePath))
+	events, stop, err := ticketsui.WatchStore(ticketsui.ScratchDir(m.settings.TicketStore, m.settings.ActiveWorktreePath))
 	if err != nil {
 		// The poll alone still keeps the rows fresh.
 		events, stop = nil, nil

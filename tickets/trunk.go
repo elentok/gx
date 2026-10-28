@@ -3,7 +3,6 @@ package tickets
 import (
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
@@ -83,22 +82,6 @@ func OpenRepoIn(storePath, dir string) (*git.Repo, error) {
 	}
 	repo.Trunk, err = trunkIn(storePath, repo.Root)
 	return repo, err
-}
-
-// TrunkFor is TrunkIn with the store path read from the process env.
-// Remove with its last ui callers (ticket 36a2).
-func TrunkFor(dir string) (string, error) {
-	cfg, err := config.Load()
-	if err != nil {
-		return "", err
-	}
-	return TrunkIn(cfg.TicketStore.Path, dir)
-}
-
-// OpenRepo is OpenRepoIn with the store path read from the process env.
-// Remove with its last ui callers (ticket 36a2).
-func OpenRepo(dir string) (*git.Repo, error) {
-	return OpenRepoDirs(config.DirsFrom(os.Environ()), dir)
 }
 
 // OpenRepoDirs is OpenRepoIn with the store path read from the config dirs

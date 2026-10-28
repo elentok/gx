@@ -17,8 +17,9 @@ type gotoPRMsg struct {
 func (m Model) cmdGotoPR() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
 	ref := m.ref
+	store := m.settings.TicketStore
 	return func() tea.Msg {
-		trunk, err := tickets.TrunkFor(worktreeRoot)
+		trunk, err := tickets.TrunkIn(store, worktreeRoot)
 		if err != nil {
 			return gotoPRMsg{fatalErr: err}
 		}

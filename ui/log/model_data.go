@@ -67,6 +67,7 @@ func (m Model) gitFilter() git.LogFilter {
 
 func (m Model) cmdReload() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
+	store := m.settings.TicketStore
 	startRef := m.startRef
 	filter := m.gitFilter()
 	statusDetail := m.pseudoStatusDetail()
@@ -75,7 +76,7 @@ func (m Model) cmdReload() tea.Cmd {
 		if err != nil {
 			return reloadMsg{err: err}
 		}
-		classes, branchDiverged, trunkErr := fetchBranchHistoryClasses(worktreeRoot, startRef)
+		classes, branchDiverged, trunkErr := fetchBranchHistoryClasses(store, worktreeRoot, startRef)
 		rows := make([]row, 0, len(entries)+1)
 		rows = append(rows, row{kind: rowPseudoStatus, detail: statusDetail})
 		for _, entry := range entries {
@@ -85,7 +86,7 @@ func (m Model) cmdReload() tea.Cmd {
 	}
 }
 
-func fetchBranchHistoryClasses(worktreeRoot, startRef string) (classes map[string]git.BranchHistoryClass, branchDiverged bool, trunkErr error) {
+func fetchBranchHistoryClasses(store, worktreeRoot, startRef string) (classes map[string]git.BranchHistoryClass, branchDiverged bool, trunkErr error) {
 	var branch string
 	if startRef == "HEAD" {
 		b, err := git.CurrentBranch(worktreeRoot)
@@ -110,7 +111,7 @@ func fetchBranchHistoryClasses(worktreeRoot, startRef string) (classes map[strin
 	}
 
 	// Trunk is resolved on every reload, so a project.json edit applies at once.
-	repo, trunkErr := tickets.OpenRepo(worktreeRoot)
+	repo, trunkErr := tickets.OpenRepoIn(store, worktreeRoot)
 	if repo == nil || trunkErr != nil {
 		return nil, branchDiverged, trunkErr
 	}

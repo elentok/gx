@@ -111,15 +111,15 @@ func (m Model) Init() tea.Cmd {
 func (m Model) newTicketsModel(root string, s ui.Settings) ticketsui.Model {
 	tm := ticketsui.NewModel(root, s, keys.New(Bindings()))
 	if m.settings.Server != nil {
-		tm = tm.WithServer(m.settings.Server.Client).WithCwdProject(cwdProjectName(root))
+		tm = tm.WithServer(m.settings.Server.Client).WithCwdProject(cwdProjectName(s.TicketStore, root))
 	}
 	return tm
 }
 
 // cwdProjectName is the registered project's address name for root's repo, or
 // "" when root is not in a registered project.
-func cwdProjectName(root string) string {
-	dir, err := gxtickets.RootFor(root)
+func cwdProjectName(store, root string) string {
+	dir, err := gxtickets.RootIn(store, root)
 	if err != nil {
 		return ""
 	}
@@ -139,7 +139,7 @@ func (m Model) newAgentsModel(s ui.Settings) agentsui.Model {
 		return agentsui.NewModel(nil, s)
 	}
 	return agentsui.NewModel(m.settings.Server.Client, s).WithLastViewedFile(agentsui.LastViewedFile(s.Dirs)).
-		WithCwdProject(cwdProjectName(m.settings.ActiveWorktreePath))
+		WithCwdProject(cwdProjectName(s.TicketStore, m.settings.ActiveWorktreePath))
 }
 
 func (m Model) View() tea.View {

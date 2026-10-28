@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
 )
 
 // deliverTrunk runs cmd (unwrapping tea.BatchMsg) and feeds any
@@ -34,9 +35,9 @@ func TestTrunkResolvesAsync(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FindRepo: %v", err)
 	}
-	projectDir := testutil.RegisterProject(t, repo.Root, "develop")
+	projectDir, store := testutil.RegisterProject(t, repo.Root, "develop")
 
-	m := newTestModel(repoDir, "HEAD")
+	m := newTestModelWithFilter(repoDir, "HEAD", "", ui.Settings{UseNerdFontIcons: true, TicketStore: store})
 	if m.trunk != "" {
 		t.Fatalf("trunk = %q before the load cmd ran, want none", m.trunk)
 	}

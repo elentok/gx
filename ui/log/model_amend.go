@@ -35,6 +35,7 @@ func (m Model) handleAmendDone(err error) (tea.Model, tea.Cmd) {
 
 func (m Model) cmdReloadFocusSubject(subject string) tea.Cmd {
 	root := m.worktreeRoot
+	store := m.settings.TicketStore
 	startRef := m.startRef
 	statusDetail := m.pseudoStatusDetail()
 	return func() tea.Msg {
@@ -42,7 +43,7 @@ func (m Model) cmdReloadFocusSubject(subject string) tea.Cmd {
 		if err != nil {
 			return reloadMsg{err: err}
 		}
-		classes, branchDiverged, trunkErr := fetchBranchHistoryClasses(root, startRef)
+		classes, branchDiverged, trunkErr := fetchBranchHistoryClasses(store, root, startRef)
 		rows := make([]row, 0, len(entries)+1)
 		rows = append(rows, row{kind: rowPseudoStatus, detail: statusDetail})
 		for _, entry := range entries {

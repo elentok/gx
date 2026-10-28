@@ -60,7 +60,7 @@ func (m Model) cmdLoadDisk() tea.Cmd {
 }
 
 // ScratchDir is the ticket store directory for worktreeRoot's repo.
-func ScratchDir(worktreeRoot string) string { return scratchDirFor(worktreeRoot) }
+func ScratchDir(store, worktreeRoot string) string { return scratchDirFor(store, worktreeRoot) }
 
 // WatchStore signals (debounced) on every change under dir. stop ends the
 // watch and closes the channel.

@@ -54,11 +54,12 @@ func (m Model) confirmAccept() (Model, tea.Cmd) {
 		titleTarget := strings.TrimSpace(m.confirmRemote)
 		if titleTarget == "" {
 			var err error
-			if titleTarget, err = detectRebaseTarget(m.worktreeRoot); err != nil {
+			if titleTarget, err = detectRebaseTarget(m.settings.TicketStore, m.worktreeRoot); err != nil {
 				return m, notify.Warning(err.Error())
 			}
 		}
 		runner := newStageActionRunner(actionRebase, m.worktreeRoot, titleTarget, m.confirmBranch)
+		runner.store = m.settings.TicketStore
 		m.openRunning("Rebase on "+titleTarget, runner)
 		return m, actionPollCmd()
 	case confirmRebasePopStash:
@@ -123,7 +124,7 @@ func (m *Model) prepareRebaseConfirm() error {
 	if branch == "" || branch == "HEAD" {
 		return fmt.Errorf("cannot rebase: detached HEAD")
 	}
-	target, err := detectRebaseTarget(m.worktreeRoot)
+	target, err := detectRebaseTarget(m.settings.TicketStore, m.worktreeRoot)
 	if err != nil {
 		return rebaseTargetError{err}
 	}
@@ -145,8 +146,8 @@ func (e rebaseTargetError) Unwrap() error { return e.error }
 
 // detectRebaseTarget resolves trunk on every call, so a project.json edit
 // applies at once. A missing trunk is an error, never a guessed branch.
-func detectRebaseTarget(root string) (string, error) {
-	repo, err := tickets.OpenRepo(root)
+func detectRebaseTarget(store, root string) (string, error) {
+	repo, err := tickets.OpenRepoIn(store, root)
 	if err != nil {
 		return "", err
 	}

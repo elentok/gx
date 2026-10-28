@@ -116,9 +116,10 @@ type TrunkLoadedMsg struct{ trunk string }
 
 func (m Model) cmdLoadTrunk() tea.Cmd {
 	worktreeRoot := m.worktreeRoot
+	store := m.settings.TicketStore
 	return func() tea.Msg {
 		// A trunk error only drops the trunk colour; the log and status views warn.
-		trunk, _ := tickets.TrunkFor(worktreeRoot)
+		trunk, _ := tickets.TrunkIn(store, worktreeRoot)
 		return TrunkLoadedMsg{trunk: trunk}
 	}
 }

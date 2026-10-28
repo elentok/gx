@@ -10,6 +10,8 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	teatest "github.com/elentok/gx/testutil/teatestv2"
+	"github.com/elentok/gx/ui"
+	keymgr "github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/worktrees"
 
 	tea "charm.land/bubbletea/v2"
@@ -28,7 +30,7 @@ func startTUI(t *testing.T, repoDir string) (git.Repo, *teatest.TestModel) {
 	if err != nil {
 		t.Fatalf("FindRepo: %v", err)
 	}
-	m := worktrees.New(*repo, "")
+	m := worktrees.NewWithSettings(*repo, "", ui.Settings{TicketStore: t.TempDir()}, keymgr.Manager{})
 	tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(termWidth, termHeight))
 	return *repo, tm
 }

@@ -26,13 +26,11 @@ const (
 	stageActionWait = 3 * time.Second
 )
 
-func newTestStatusModel(repoDir string) status.Model {
-	return status.NewModel(repoDir, false, status.DefaultSettings(), "", keys.Manager{})
-}
-
 func startStageTUI(t *testing.T, repoDir string) *teatest.TestModel {
 	t.Helper()
-	m := newTestStatusModel(repoDir)
+	settings := status.DefaultSettings()
+	settings.TicketStore = t.TempDir()
+	m := status.NewModel(repoDir, false, settings, "", keys.Manager{})
 	return teatest.NewTestModel(t, m, teatest.WithInitialTermSize(stageTermWidth, stageTermHeight))
 }
 

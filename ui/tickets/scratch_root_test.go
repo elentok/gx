@@ -15,13 +15,13 @@ import (
 // project directory in the ticket store. Not parallel-safe (sets env).
 func TestModel_ScratchDirResolvesThroughStore(t *testing.T) {
 	root := testutil.TempRepo(t)
-	project := addStoreProject(t, root)
+	project, store := addStoreProject(t, root)
 	sub := filepath.Join(root, "sub")
 	if err := os.Mkdir(sub, 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	m := NewModel(sub, ui.Settings{}, keys.New(nil))
+	m := NewModel(sub, ui.Settings{TicketStore: store}, keys.New(nil))
 	if got := m.scratchDir(); got != project {
 		t.Errorf("scratchDir() = %q, want %q (store project)", got, project)
 	}
@@ -39,7 +39,8 @@ func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("IdentifyDir: %v", err)
 	}
-	wantScratchRoot := addStoreProject(t, info.Repo.Root)
+	wantScratchRoot, store := addStoreProject(t, info.Repo.Root)
+	settings := ui.Settings{TicketStore: store}
 
 	ticketPath := filepath.Join(wantScratchRoot, "alpha", "issues", "01-first.md")
 	if err := os.MkdirAll(filepath.Dir(ticketPath), 0755); err != nil {
@@ -51,7 +52,7 @@ func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 	}
 
 	for _, wt := range []string{featureWt, otherWt} {
-		m := deliverLoad(t, NewModel(wt, ui.Settings{}, keys.New(nil)))
+		m := deliverLoad(t, NewModel(wt, settings, keys.New(nil)))
 		if got := m.scratchDir(); got != wantScratchRoot {
 			t.Errorf("Model.scratchDir() from %q = %q, want %q", wt, got, wantScratchRoot)
 		}
@@ -59,7 +60,7 @@ func TestScratchRoot_CallSitesAgreeAcrossWorktreesInBareRepo(t *testing.T) {
 			t.Fatalf("Model from %q: expected 1 epic loaded from shared .scratch, got %d", wt, len(m.epics))
 		}
 
-		qm := loadQueueModel(t, withChecked(NewQueueModel(wt, ui.Settings{}, keys.Manager{}), map[string]bool{}))
+		qm := loadQueueModel(t, withChecked(NewQueueModel(wt, settings, keys.Manager{}), map[string]bool{}))
 		if len(qm.epics) != 1 {
 			t.Fatalf("QueueModel from %q: expected 1 epic loaded from shared .scratch, got %d", wt, len(qm.epics))
 		}

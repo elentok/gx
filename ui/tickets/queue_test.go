@@ -756,7 +756,7 @@ func withChecked(m QueueModel, checked map[string]bool) QueueModel {
 // state the app shell delivers.
 func seedFromDisk(t *testing.T, m QueueModel) QueueModel {
 	t.Helper()
-	epics, err := tickets.Load(scratchDirFor(m.worktreeRoot))
+	epics, err := tickets.Load(scratchDirFor(m.settings.TicketStore, m.worktreeRoot))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1578,14 +1578,12 @@ func TestQueueModelClampSelectedSkipsFillerRowAfterRebuild(t *testing.T) {
 	}
 }
 
-// addStoreProject isolates HOME/XDG into temp dirs and registers repoRoot as a
-// project in the temp ticket store, returning the project dir.
-func addStoreProject(t *testing.T, repoRoot string) string {
+// addStoreProject registers repoRoot as a project in a temp ticket store,
+// returning the project dir and the store path for the model's settings.
+func addStoreProject(t *testing.T, repoRoot string) (project, store string) {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
-	t.Setenv("XDG_CONFIG_HOME", "")
-	project := filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets", "p")
+	store = t.TempDir()
+	project = filepath.Join(store, "p")
 	if err := os.MkdirAll(project, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -1596,7 +1594,7 @@ func addStoreProject(t *testing.T, repoRoot string) string {
 	if err := os.WriteFile(filepath.Join(project, "project.json"), data, 0644); err != nil {
 		t.Fatal(err)
 	}
-	return project
+	return project, store
 }
 
 func ticketPath(root, epic, name string) string {

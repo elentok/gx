@@ -45,6 +45,9 @@ type stageActionResult struct {
 type stageActionRunner struct {
 	kind stageActionKind
 	root string
+	// store is the ticket store the rebase target falls back to resolving
+	// trunk in when remote is empty.
+	store string
 
 	remote string
 	branch string
@@ -143,7 +146,7 @@ func (r *stageActionRunner) runRebase() stageActionResult {
 	}
 	target := strings.TrimSpace(r.remote)
 	if target == "" {
-		if target, err = detectRebaseTarget(r.root); err != nil {
+		if target, err = detectRebaseTarget(r.store, r.root); err != nil {
 			res.err = err
 			return res
 		}

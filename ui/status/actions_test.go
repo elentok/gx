@@ -39,7 +39,9 @@ func TestRebaseKeyOpensSpecificConfirm(t *testing.T) {
 	testutil.MustGitExported(t, repo, "commit", "-m", "init")
 	testutil.MustGitExported(t, repo, "checkout", "-b", "feature/test")
 
-	m := newTestModelDefault(repo)
+	settings := DefaultSettings()
+	settings.TicketStore = t.TempDir()
+	m := newTestModel(repo, settings, "")
 	m.ready = true
 	m.focus = focusFiletree
 

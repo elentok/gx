@@ -9,9 +9,9 @@ import (
 
 // newTrunkRepo returns a repo registered with trunk where "feature" is one
 // commit ahead of "develop", which is one commit ahead of main.
-func newTrunkRepo(t *testing.T, trunk string) string {
+func newTrunkRepo(t *testing.T, trunk string) (repoDir, store string) {
 	t.Helper()
-	repoDir := testutil.TempRepo(t)
+	repoDir = testutil.TempRepo(t)
 	for _, name := range []string{"develop", "feature"} {
 		testutil.MustGitExported(t, repoDir, "checkout", "-b", name)
 		testutil.WriteFile(t, repoDir, name+".txt", name)
@@ -21,15 +21,15 @@ func newTrunkRepo(t *testing.T, trunk string) string {
 	if err != nil {
 		t.Fatalf("FindRepo: %v", err)
 	}
-	testutil.RegisterProject(t, repo.Root, trunk)
-	return repoDir
+	_, store = testutil.RegisterProject(t, repo.Root, trunk)
+	return repoDir, store
 }
 
 func TestFetchBranchHistoryClasses_FollowsTrunk(t *testing.T) {
 	for trunk, want := range map[string]int{"develop": 1, "main": 2} {
 		t.Run(trunk, func(t *testing.T) {
-			repoDir := newTrunkRepo(t, trunk)
-			classes, _, trunkErr := fetchBranchHistoryClasses(repoDir, "HEAD")
+			repoDir, store := newTrunkRepo(t, trunk)
+			classes, _, trunkErr := fetchBranchHistoryClasses(store, repoDir, "HEAD")
 			if trunkErr != nil {
 				t.Fatalf("trunkErr = %v", trunkErr)
 			}
@@ -41,8 +41,8 @@ func TestFetchBranchHistoryClasses_FollowsTrunk(t *testing.T) {
 }
 
 func TestFetchBranchHistoryClasses_MissingTrunkWarnsWithoutFallback(t *testing.T) {
-	repoDir := newTrunkRepo(t, "nope")
-	classes, _, trunkErr := fetchBranchHistoryClasses(repoDir, "HEAD")
+	repoDir, store := newTrunkRepo(t, "nope")
+	classes, _, trunkErr := fetchBranchHistoryClasses(store, repoDir, "HEAD")
 	if trunkErr == nil {
 		t.Fatal("want a trunk error")
 	}
@@ -52,6 +52,7 @@ func TestFetchBranchHistoryClasses_MissingTrunkWarnsWithoutFallback(t *testing.T
 
 	m := newTestModel()
 	m.worktreeRoot, m.startRef = repoDir, "HEAD"
+	m.settings.TicketStore = store
 	msg := m.cmdReload()().(reloadMsg)
 	if msg.trunkErr == nil {
 		t.Fatal("want the reload to carry the trunk error")

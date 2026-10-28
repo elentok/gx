@@ -249,7 +249,7 @@ func (m Model) onSnapshot(snap server.Snapshot) (Model, tea.Cmd) {
 // firstLoadHint: reading the snapshot is not news, but not being in a
 // registered project is worth saying once, whichever tab is open.
 func (m Model) firstLoadHint() tea.Cmd {
-	scope := viewmodel.Scope{CwdProject: cwdProjectName(m.settings.ActiveWorktreePath)}
+	scope := viewmodel.Scope{CwdProject: cwdProjectName(m.settings.TicketStore, m.settings.ActiveWorktreePath)}
 	if hint := scope.UnregisteredHint(); hint != "" {
 		return notify.Info(hint)
 	}

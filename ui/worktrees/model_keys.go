@@ -182,7 +182,7 @@ func (m Model) dispatchBinding(id keymgr.BindingID) (tea.Model, tea.Cmd) {
 		if !m.spinnerActive {
 			m.loading = true
 			m.refreshing = true
-			return m, tea.Batch(notify.Progress("refresh", "refreshing..."), cmdLoadWorktrees(m.repo), cmdPruneRemotes(m.repo))
+			return m, tea.Batch(notify.Progress("refresh", "refreshing..."), cmdLoadWorktrees(m.repo, m.settings.TicketStore), cmdPruneRemotes(m.repo))
 		}
 		return m, nil
 	case bindingRemoteUpdate:

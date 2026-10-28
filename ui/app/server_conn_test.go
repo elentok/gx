@@ -12,9 +12,11 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/ui"
 	agentsui "github.com/elentok/gx/ui/agents"
 	"github.com/elentok/gx/ui/nav"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -75,6 +77,10 @@ func newServerShellOn(t *testing.T, client ServerClient, tab nav.TabID) Model {
 		InitialRoute:       nav.ViewState{Tab: tab, WorktreeRoot: repoDir},
 		ActiveWorktreePath: repoDir,
 		Server:             &ServerDeps{Client: client, Build: "test"},
+		Settings: ui.Settings{
+			TicketStore: t.TempDir(),
+			Dirs:        config.DirsFrom([]string{"HOME=" + t.TempDir()}),
+		},
 	})
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	// Deliver the tab's initial load so it leaves "loading…". The Tickets tab
