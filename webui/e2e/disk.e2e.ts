@@ -53,8 +53,6 @@ test("77. Disk hold", async ({ page, start }) => {
   await fixture.setDiskFree("11G");
   await expect(strip(page)).toContainText(`${DISK} is low`);
   await expect(strip(page)).not.toContainText("new tickets held");
-  // Without a CLI read the row stays "ready" although explain already says "claimed".
-  await fixture.cli("agents", "list");
   await expect(row.locator("[data-meta]")).toHaveText(/^running · /);
 });
 
