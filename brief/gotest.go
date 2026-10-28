@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -16,7 +18,8 @@ type GoTest struct{}
 func (GoTest) Name() string { return "go-test" }
 
 // Plan always adds -json and -v, once. Flags after -args belong to the test
-// binary and pass through untouched.
+// binary and pass through untouched. It caps GOMAXPROCS (see goTestProcs)
+// unless env already sets it.
 func (GoTest) Plan(env []string, _ string, args []string) (Invocation, error) {
 	exe, err := LookPath(env, "go")
 	if err != nil {
@@ -25,7 +28,27 @@ func (GoTest) Plan(env []string, _ string, args []string) (Invocation, error) {
 	rest, tail := splitArgs(args)
 	rest, _ = stripFlag(rest, false, "json", "v")
 	argv := append([]string{"test", "-json", "-v"}, rest...)
-	return Invocation{Bin: exe, Argv: append(argv, tail...)}, nil
+	procs := goTestProcs(runtime.NumCPU(), env)
+	return Invocation{Bin: exe, Argv: append(argv, tail...), Env: []string{"GOMAXPROCS=" + strconv.Itoa(procs)}}, nil
+}
+
+// goTestProcs is the GOMAXPROCS cap of one go test run, so that several runs
+// side by side (scripts/test.sh, parallel agents) do not saturate the machine.
+// It caps the packages in flight, the parallel tests, the compiler and the
+// test binaries together. The CPU budget is half the cores (all of them on 4
+// cores or fewer) unless GX_TEST_CPUS in env sets it, and one run gets two
+// fifths of it, as the server and go steps of scripts/test.sh do.
+func goTestProcs(cores int, env []string) int {
+	budget := cores
+	if cores > 4 {
+		budget = cores / 2
+	}
+	if v, ok := envValue(env, "GX_TEST_CPUS"); ok {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			budget = n
+		}
+	}
+	return max(1, budget*2/5)
 }
 
 type goTestEvent struct {

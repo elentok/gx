@@ -45,6 +45,9 @@ type Invocation struct {
 	Argv []string
 	// Note is printed before the result when not empty.
 	Note string
+	// Env holds KEY=VALUE defaults added to the child's environment. A
+	// variable the caller's environment already sets keeps the caller's value.
+	Env []string
 }
 
 // Outcome is what a tool found in the output of one run.
@@ -158,7 +161,7 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	branch, _ := git.CurrentBranch(dir)
 	treeID, _ := git.TreeID(dir)
 
-	out, exit, err := execute(plan.Bin, plan.Argv, dir, o.Env, logFile)
+	out, exit, err := execute(plan.Bin, plan.Argv, dir, withDefaults(o.Env, plan.Env), logFile)
 	if err != nil {
 		return cantRun(o.Out, err.Error()), Outcome{}
 	}

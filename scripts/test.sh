@@ -64,21 +64,15 @@ run_step() {
 	echo "$status $((SECONDS - start))" >"$work/$name.status"
 }
 
-# The steps share one CPU budget so the machine does not saturate. GOMAXPROCS
-# caps a Go step's packages in flight (-p) and its parallel tests (-parallel).
-# server and go get two fifths each, race and web get one worker each, so the
-# total is about the budget. Machines with 4 cores or fewer get no cap.
-cores=$(getconf _NPROCESSORS_ONLN)
-if ((cores > 4)); then budget=$((cores / 2)); else budget=$cores; fi
-budget=${GX_TEST_CPUS:-$budget}
-big=$((budget * 2 / 5))
-((big >= 1)) || big=1
-
+# The steps share one CPU budget so the machine does not saturate. `gx brief
+# go-test` caps every run it starts with GOMAXPROCS (brief/gotest.go goTestProcs:
+# two fifths of GX_TEST_CPUS), so the go and server steps get that cap by
+# default. race and web get one worker each, so the total is about the budget.
 run_step race env GOMAXPROCS=1 "$gx" brief go-test -race -timeout=10m -count=1 "${race_pkgs[@]}" &
 pids=("$!")
-run_step go env GOMAXPROCS="$big" "$gx" brief go-test -timeout=10m -count=1 "${other_pkgs[@]}" &
+run_step go "$gx" brief go-test -timeout=10m -count=1 "${other_pkgs[@]}" &
 pids+=("$!")
-run_step server env GOMAXPROCS="$big" "$gx" brief go-test -timeout=10m -count=1 ./server &
+run_step server "$gx" brief go-test -timeout=10m -count=1 ./server &
 pids+=("$!")
 run_step web make web-test GX="$gx" WEB_TEST_WORKERS=1 &
 pids+=("$!")

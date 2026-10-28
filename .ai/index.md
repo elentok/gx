@@ -32,7 +32,8 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   full suite runs in CI (`.github/workflows/ci.yml`, on pushes and PRs to `main`): `make test`
   (`scripts/test.sh`: race, other Go, server and web unit tests side by side), `make web-e2e`, and
   `go test ./e2e/...`. `make test` shares one CPU budget between its steps, half the cores by
-  default; set `GX_TEST_CPUS=<n>` to change it.
+  default; set `GX_TEST_CPUS=<n>` to change it. Every `gx brief go-test` run caps itself the same
+  way (GOMAXPROCS at two fifths of that budget) unless the environment already sets GOMAXPROCS.
 - Once a targeted run passes, stop. Don't rerun the full suite to double-check.
 - Verify with `gx check` in the foreground, unpiped. Iterate with `gx brief`. Never pipe, `tail` or
   background either.

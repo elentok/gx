@@ -13,6 +13,29 @@ func envOrEmpty(env []string) []string {
 	return append([]string{}, env...)
 }
 
+// envValue returns the last value of key in env, and whether it is set.
+func envValue(env []string, key string) (string, bool) {
+	value, found := "", false
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, key+"="); ok {
+			value, found = v, true
+		}
+	}
+	return value, found
+}
+
+// withDefaults returns env plus the defaults whose variable env does not set.
+func withDefaults(env, defaults []string) []string {
+	out := append([]string{}, env...)
+	for _, kv := range defaults {
+		key, _, _ := strings.Cut(kv, "=")
+		if _, set := envValue(env, key); !set {
+			out = append(out, kv)
+		}
+	}
+	return out
+}
+
 // LookPath resolves file against the PATH entry of env, as exec.LookPath does
 // against the process's PATH.
 func LookPath(env []string, file string) (string, error) {
