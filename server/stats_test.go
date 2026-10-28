@@ -62,13 +62,10 @@ func statsFixture(t *testing.T) (get func(query string) server.Stats) {
 	})
 }
 
-// statsStore serves the store built by setup, in a zone away from UTC so a
-// UTC-day bucket would disagree with the local one.
+// statsStore serves the store built by setup. TestMain keeps the local zone
+// away from UTC, so a UTC-day bucket would disagree with the local one.
 func statsStore(t *testing.T, setup func(store string)) (get func(query string) server.Stats) {
 	t.Helper()
-	old := time.Local
-	time.Local = time.FixedZone("test", 5*3600)
-	t.Cleanup(func() { time.Local = old })
 	h, base := startEpicDetail(t, setup)
 	return func(query string) server.Stats {
 		t.Helper()

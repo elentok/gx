@@ -266,13 +266,15 @@ func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {
 				// No poll may pick up the investigations before the verb runs.
 				p := pauseZeroCommit(t, headless, func(c *server.Config) { c.PollInterval = time.Hour })
-				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "02", "unstarted", servertest.TicketOpts{Type: "investigate", Parent: "01"})
-				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "03", "running", servertest.TicketOpts{Type: "investigate", Parent: "01", Status: "claimed"})
 				commitAgentWork(t, p.wtPath)
-				// No rescan ping: the verb itself must run the check.
+				// No rescan ping: the verb itself must run the check. The late finish
+				// lands before the children, so a loop wake-up under load cannot claim
+				// the unstarted one first.
 				if err := schema.UpdateTicket(p.ticketPath, p.finishedLate(false)); err != nil {
 					t.Fatal(err)
 				}
+				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "02", "unstarted", servertest.TicketOpts{Type: "investigate", Parent: "01"})
+				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "03", "running", servertest.TicketOpts{Type: "investigate", Parent: "01", Status: "claimed"})
 				ctx := context.Background()
 				if verb == "resume" {
 					res, err := p.h.Client.Repair(ctx, "resume", server.RepairRequest{Address: "proj:epic-a/01"})
