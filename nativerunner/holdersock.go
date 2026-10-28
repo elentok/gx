@@ -68,6 +68,11 @@ var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC, OpS
 // goes as a bracketed paste.
 const typedTextMax = 512
 
+// pasteSettle is how long TypeText waits after a paste. An Enter that lands
+// while claude is still ingesting the paste is read as part of it (a newline,
+// not a submit), so the caller's Enter needs this gap.
+var pasteSettle = 300 * time.Millisecond
+
 const (
 	holderIOTimeout = 5 * time.Second
 	// holderStopGrace is how long stop waits for the child to exit on
@@ -517,7 +522,11 @@ func (c *HolderClient) Paste(text string) error {
 // older holder gets plain keys.
 func (c *HolderClient) TypeText(text string) error {
 	if len(text) > typedTextMax && c.Supports(OpPaste) {
-		return c.Paste(text)
+		if err := c.Paste(text); err != nil {
+			return err
+		}
+		time.Sleep(pasteSettle)
+		return nil
 	}
 	return c.SendKeys(text)
 }
