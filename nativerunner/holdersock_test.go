@@ -3,6 +3,7 @@ package nativerunner_test
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/syshealth"
 )
 
 // echoChild prints a ready line, then echoes every line it reads.
@@ -84,6 +86,70 @@ func TestRunHolder_LongSocketPathNamesTheCap(t *testing.T) {
 	err := nativerunner.RunHolder(dir, []string{"true"})
 	if err == nil || !strings.Contains(err.Error(), "unix socket path") {
 		t.Fatalf("err = %v, want one naming the unix socket path length cap", err)
+	}
+}
+
+func TestHolderSocket_PingNamesPidsAndStartTimes(t *testing.T) {
+	_, c, _ := startHolder(t, echoChild)
+
+	if c.HolderPID() != os.Getpid() {
+		t.Errorf("holder pid = %d; want %d", c.HolderPID(), os.Getpid())
+	}
+	if c.ChildPID() <= 0 || c.ChildPID() == c.HolderPID() {
+		t.Fatalf("child pid = %d; want a pid apart from the holder's", c.ChildPID())
+	}
+	for _, tc := range []struct {
+		name string
+		pid  int
+		got  func() (int64, bool)
+	}{
+		{"holder", c.HolderPID(), c.HolderStart},
+		{"child", c.ChildPID(), c.ChildStart},
+	} {
+		want, err := syshealth.ProcessStart(tc.pid)
+		if err != nil {
+			t.Fatalf("%s start from syshealth: %v", tc.name, err)
+		}
+		got, ok := tc.got()
+		if !ok {
+			t.Errorf("%s start not known", tc.name)
+		} else if got < want-1 || got > want+1 {
+			t.Errorf("%s start = %d; want %d within 1s", tc.name, got, want)
+		}
+	}
+}
+
+func TestDialHolder_OldHolderStartTimesNotKnown(t *testing.T) {
+	dir := shortTempDir(t)
+	ln, err := net.Listen("unix", filepath.Join(dir, nativerunner.HolderSocketFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_, _ = conn.Write([]byte(`{"version":1,"ops":["deny-reason"],"pid":4242}` + "\n"))
+	}()
+
+	c, err := nativerunner.DialHolder(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ChildPID() != 4242 {
+		t.Errorf("child pid = %d; want 4242", c.ChildPID())
+	}
+	if c.HolderPID() != 0 {
+		t.Errorf("holder pid = %d; want 0 (not known)", c.HolderPID())
+	}
+	if _, ok := c.HolderStart(); ok {
+		t.Error("holder start reported known for an old holder")
+	}
+	if _, ok := c.ChildStart(); ok {
+		t.Error("child start reported known for an old holder")
 	}
 }
 

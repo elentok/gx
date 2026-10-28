@@ -97,9 +97,14 @@ type holderResponse struct {
 	Version int      `json:"version,omitempty"`
 	Ops     []string `json:"ops,omitempty"`
 	// Pid is the child's pid, reported by ping.
-	Pid        int      `json:"pid,omitempty"`
-	Screen     []string `json:"screen,omitempty"`
-	Scrollback []string `json:"scrollback,omitempty"`
+	Pid int `json:"pid,omitempty"`
+	// HolderPid, HolderStart and ChildStart are reported by ping. The starts are
+	// Unix seconds from syshealth.ProcessStart, zero when the read failed.
+	HolderPid   int      `json:"holder_pid,omitempty"`
+	HolderStart int64    `json:"holder_start,omitempty"`
+	ChildStart  int64    `json:"child_start,omitempty"`
+	Screen      []string `json:"screen,omitempty"`
+	Scrollback  []string `json:"scrollback,omitempty"`
 	// Claude is nil until claude's pid status file first appears.
 	Claude *PidStatus `json:"claude,omitempty"`
 	Turn   int        `json:"turn,omitempty"`
@@ -130,6 +135,8 @@ type holderServer struct {
 	scr  *screen.Screen
 	ptmx *os.File
 	proc *os.Process
+	// holderStart and childStart are read once; zero means the read failed.
+	holderStart, childStart int64
 	// pid is nil for a harness whose watcher has no pid status.
 	pid     harness.PidStatusWatcher
 	watcher harness.Watcher
@@ -203,7 +210,10 @@ func (h *holderServer) handle(conn net.Conn) {
 func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 	switch req.Op {
 	case opPing:
-		return holderResponse{Version: HolderProtocolVersion, Ops: h.ops, Pid: h.proc.Pid}, nil
+		return holderResponse{
+			Version: HolderProtocolVersion, Ops: h.ops, Pid: h.proc.Pid,
+			HolderPid: os.Getpid(), HolderStart: h.holderStart, ChildStart: h.childStart,
+		}, nil
 	case opStatus:
 		// The pid file's last status outlives claude, and the holder keeps
 		// answering while it flushes, so an exit must not read as idle.
@@ -443,6 +453,9 @@ type HolderClient struct {
 	version int
 	ops     []string
 	pid     int
+
+	holderPid               int
+	holderStart, childStart int64
 }
 
 // DialHolder pings the holder serving dir's holder.sock.
@@ -453,6 +466,7 @@ func DialHolder(dir string) (*HolderClient, error) {
 		return nil, err
 	}
 	c.version, c.ops, c.pid = resp.Version, resp.Ops, resp.Pid
+	c.holderPid, c.holderStart, c.childStart = resp.HolderPid, resp.HolderStart, resp.ChildStart
 	return c, nil
 }
 
@@ -461,6 +475,17 @@ func (c *HolderClient) Version() int { return c.version }
 
 // ChildPID is the pid of the agent the holder runs.
 func (c *HolderClient) ChildPID() int { return c.pid }
+
+// HolderPID is the holder's own pid, 0 when an older holder did not report it.
+func (c *HolderClient) HolderPID() int { return c.holderPid }
+
+// HolderStart is the holder's start time in Unix seconds. ok is false when an
+// older holder did not report it or the holder could not read it.
+func (c *HolderClient) HolderStart() (start int64, ok bool) { return c.holderStart, c.holderStart != 0 }
+
+// ChildStart is the agent's start time in Unix seconds, with the same ok rule
+// as HolderStart.
+func (c *HolderClient) ChildStart() (start int64, ok bool) { return c.childStart, c.childStart != 0 }
 
 // Supports reports whether the holder serves the optional op. Callers check
 // it before an optional op and fall back to the core ops, or refuse just that

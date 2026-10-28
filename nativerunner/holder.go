@@ -22,6 +22,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/syshealth"
 )
 
 // Files the holder keeps in a pty agent directory.
@@ -143,6 +144,9 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		_ = tty.Close()
 		return err
 	}
+	// A failed read leaves the start unset; ping still answers.
+	holderStart, _ := syshealth.ProcessStart(os.Getpid())
+	childStart, _ := syshealth.ProcessStart(cmd.Process.Pid)
 	exited := make(chan struct{})
 	watcher, err := h.Watch(cmd.Process.Pid, spawned, scr, exited)
 	if err != nil {
@@ -153,12 +157,14 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	}
 	pid, _ := watcher.(harness.PidStatusWatcher)
 	srv := &holderServer{
-		scr:     scr,
-		ptmx:    ptmx,
-		proc:    cmd.Process,
-		pid:     pid,
-		watcher: watcher,
-		name:    &displayName{read: h.DisplayName},
+		scr:         scr,
+		ptmx:        ptmx,
+		proc:        cmd.Process,
+		holderStart: holderStart,
+		childStart:  childStart,
+		pid:         pid,
+		watcher:     watcher,
+		name:        &displayName{read: h.DisplayName},
 		frames: newFrameHub(scr, cols, rows, func(cols, rows int) error {
 			// The screen first, so it already has the new size when the child
 			// redraws for it.
