@@ -1,6 +1,6 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useEffect, useState, type ReactNode } from "react";
-import type { HealthReport, HealthState, HealthThresholds } from "../generated/server";
+import type { DisksReport, HealthDisk, HealthReason, HealthReport, HealthState, HealthThresholds } from "../generated/server";
 import { fetchJson } from "../ticket/detail";
 import { STATE_COLOR } from "../ui/tray/stateColor";
 
@@ -31,6 +31,29 @@ interface Received {
 
 const gb = (bytes: number) => {
   const n = bytes / GIB;
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+};
+
+// A disk entry shows its own age once its reading is this much older than the server's clock.
+const STALE_SECONDS = 10;
+
+const DISK_ICON = (
+  <>
+    <rect x="2" y="3.5" width="14" height="11" rx="2" />
+    <path d="M2 10.5h14M12.5 12.5h.01" />
+  </>
+);
+
+const UNKNOWN_TEXT: Record<string, string> = {
+  waiting: "Waiting for a second reading",
+  unavailable: "Not available in this build",
+  error: "The last read failed",
+};
+const unknownText = (reason?: HealthReason) => UNKNOWN_TEXT[reason ?? ""] ?? "No reading yet";
+
+// A bare "G" in the disk thresholds is decimal, so free space uses it too.
+const diskGB = (bytes: number) => {
+  const n = bytes / 1e9;
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 };
 
@@ -75,20 +98,28 @@ export function HealthPopover() {
         icon={CPU_ICON}
         name="CPU"
         state={cpu.state}
-        value={`${Math.round(cpu.percent)}% busy`}
-        percent={cpu.percent}
-        sub={`1-minute average ${Math.round(cpu.average)}% · ${thresholdText(cpu.thresholds)}`}
+        value={cpu.state === "unknown" ? "—" : `${Math.round(cpu.percent)}% busy`}
+        percent={cpu.state === "unknown" ? 0 : cpu.percent}
+        sub={
+          cpu.state === "unknown"
+            ? unknownText(cpu.reason)
+            : `1-minute average ${Math.round(cpu.average)}% · ${thresholdText(cpu.thresholds)}`
+        }
       />
       <Row
         part="memory"
         icon={MEMORY_ICON}
         name="Memory"
         state={memory.state}
-        value={`${Math.round(memory.percent)}% used`}
-        percent={memory.percent}
-        sub={`${gb(memory.used_bytes)} of ${gb(memory.total_bytes)} GB${pressure} · ${thresholdText(memory.thresholds)}`}
+        value={memory.state === "unknown" ? "—" : `${Math.round(memory.percent)}% used`}
+        percent={memory.state === "unknown" ? 0 : memory.percent}
+        sub={
+          memory.state === "unknown"
+            ? unknownText(memory.reason)
+            : `${gb(memory.used_bytes)} of ${gb(memory.total_bytes)} GB${pressure} · ${thresholdText(memory.thresholds)}`
+        }
       />
-      <Box data-part="disk-slot" />
+      <DiskRow disks={report.disks} serverTime={report.time} />
       <Text px="14px" pt="2" pb="6px" borderTopWidth="1px" borderColor="hairline" fontSize="xs" color="text.faint" data-part="footer">
         {footer(report, at, now)}
       </Text>
@@ -111,17 +142,23 @@ function Row({
   value,
   percent,
   sub,
+  tagText,
+  children,
 }: {
   part: string;
   icon: ReactNode;
   name: string;
   state: HealthState;
   value: string;
-  percent: number;
+  /** Omitted when the row's bars are in its children. */
+  percent?: number;
   sub: string;
+  /** Replaces the state's default tag wording. */
+  tagText?: Partial<Record<HealthState, string>>;
+  children?: ReactNode;
 }) {
   const color = STATE_COLOR[state];
-  const tag = TAG[state];
+  const tag = (tagText ?? TAG)[state];
   // Only high and critical tint the icon and value; normal keeps the mock's neutral text.
   const raised = tag !== undefined;
   return (
@@ -153,12 +190,81 @@ function Row({
       <Text as="span" textAlign="right" fontWeight="500" fontVariantNumeric="tabular-nums" color={raised ? color : undefined}>
         {value}
       </Text>
-      <Box gridColumn="2 / 4" h="4px" borderRadius="2px" bg="hairline" overflow="hidden" mt="3px" mb="1px">
-        <Box h="100%" w={`${Math.min(Math.max(percent, 0), 100)}%`} bg={color} />
-      </Box>
+      {percent !== undefined && <Bar percent={percent} color={color} />}
+      {children}
       <Text as="span" gridColumn="2 / 4" fontSize="xs" lineHeight="1.45" color="text.dim">
         {sub}
       </Text>
+    </Box>
+  );
+}
+
+function Bar({ percent, color, part }: { percent: number; color: string; part?: string }) {
+  const clamped = Math.min(Math.max(percent, 0), 100);
+  return (
+    <Box gridColumn="2 / 4" h="4px" borderRadius="2px" bg="hairline" overflow="hidden" mt="3px" mb="1px" data-part={part} data-percent={Math.round(clamped)}>
+      <Box h="100%" w={`${clamped}%`} bg={color} />
+    </Box>
+  );
+}
+
+// Orders states for picking a row's worst disk.
+const SEVERITY: Record<HealthState, number> = { unknown: 0, normal: 1, high: 2, critical: 3 };
+
+function DiskRow({ disks, serverTime }: { disks: DisksReport; serverTime: string }) {
+  const list = disks.disks;
+  const read = list.filter((d) => d.state !== "unknown");
+  const worst = read.reduce<HealthDisk | undefined>((w, d) => (!w || d.free_bytes < w.free_bytes ? d : w), undefined);
+  const state = list.reduce<HealthState>((s, d) => (SEVERITY[d.state] > SEVERITY[s] ? d.state : s), "unknown");
+  return (
+    <Row
+      part="disk"
+      icon={DISK_ICON}
+      name="Disk"
+      state={state}
+      value={worst ? `${diskGB(worst.free_bytes)}G free` : "—"}
+      sub={`warns under ${disks.warn_below}, cleans under ${disks.clean_below}`}
+      tagText={{ high: "Under warn", critical: "Under clean" }}
+    >
+      <Box gridColumn="2 / 4" display="flex" flexDirection="column" gap="6px" mt="4px">
+        {list.map((d) => (
+          <DiskEntry key={d.id} disk={d} serverTime={serverTime} />
+        ))}
+      </Box>
+    </Row>
+  );
+}
+
+function DiskEntry({ disk, serverTime }: { disk: HealthDisk; serverTime: string }) {
+  const color = STATE_COLOR[disk.state];
+  const unknown = disk.state === "unknown";
+  const ageSeconds = Math.floor((Date.parse(serverTime) - Date.parse(disk.read_at)) / 1000);
+  const projects = disk.projects.join(", ");
+  const usedPercent = disk.total_bytes > 0 ? (1 - disk.free_bytes / disk.total_bytes) * 100 : 0;
+  return (
+    <Box data-part="disk-entry" data-state={disk.state}>
+      <Box display="flex" justifyContent="space-between" gap="2" fontSize="13px">
+        <Text as="span" fontSize="12px" color="text.muted" overflowWrap="anywhere">
+          {disk.name}
+        </Text>
+        <Text as="span" fontVariantNumeric="tabular-nums" color={color}>
+          {unknown ? "—" : `${diskGB(disk.free_bytes)}G free`}
+        </Text>
+      </Box>
+      {!unknown && <Bar part="disk-bar" percent={usedPercent} color={color} />}
+      <Text fontSize="xs" lineHeight="1.45" color="text.dim">
+        {unknown ? "No reading for this disk" : projects}
+      </Text>
+      {disk.held && (
+        <Text fontSize="xs" lineHeight="1.45" color={color}>
+          {`Dispatch held for ${projects}. Clean now is in the banner.`}
+        </Text>
+      )}
+      {ageSeconds > STALE_SECONDS && (
+        <Text fontSize="xs" color="text.faint">
+          {`read ${ageSeconds}s ago`}
+        </Text>
+      )}
     </Box>
   );
 }
