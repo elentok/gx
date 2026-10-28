@@ -112,12 +112,20 @@ func deadlockReason(root rootRef, e tickets.Epic, kind events.Kind) string {
 
 func ticketAddr(root rootRef, t tickets.Ticket) string { return root.String() + "/" + t.Identifier }
 
-func pausedReason(root rootRef, e tickets.Epic) string {
-	var parts []string
+func pausedTickets(e tickets.Epic) []tickets.Ticket {
+	var out []tickets.Ticket
 	for _, t := range e.Tickets {
 		if isPaused(e, t) {
-			parts = append(parts, ticketAddr(root, t))
+			out = append(out, t)
 		}
+	}
+	return out
+}
+
+func pausedReason(root rootRef, e tickets.Epic) string {
+	var parts []string
+	for _, t := range pausedTickets(e) {
+		parts = append(parts, ticketAddr(root, t))
 	}
 	return "every remaining ticket is paused: " + strings.Join(parts, ", ")
 }
@@ -157,6 +165,13 @@ func (s *Server) checkDeadlock(root rootRef, projectDir string, e tickets.Epic) 
 		return
 	}
 	reason := deadlockReason(root, e, kind)
+	if kind == events.AllPaused && e.AllAwaitAnswer(pausedTickets(e)) {
+		ev := ralphloop.Event{Type: string(events.WaitingForAnswer), Reason: reason}
+		if err := ralphloop.AppendEvent(projectDir, root.Epic, ev); err != nil {
+			s.log.Warn("cannot record waiting-for-answer", "root", root, "err", err)
+		}
+		return
+	}
 	ev := ralphloop.Event{Type: string(events.Deadlocked), Kind: string(kind), Reason: reason}
 	if err := ralphloop.AppendEvent(projectDir, root.Epic, ev); err != nil {
 		s.log.Warn("cannot record deadlock", "root", root, "err", err)

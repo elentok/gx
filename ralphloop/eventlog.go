@@ -251,6 +251,15 @@ func logDeadlocked(scratchDir, epicName string, kind events.Kind, reason string)
 	}
 }
 
+// logWaitingForAnswer records an epic whose every remaining ticket waits on a
+// person's answer. Callers invoke it on the transition only.
+func logWaitingForAnswer(scratchDir, epicName, reason string) {
+	err := logEvent(scratchDir, epicName, Event{Type: string(events.WaitingForAnswer), Reason: reason, Time: time.Now()})
+	if err != nil {
+		logger.Debug("logging waiting-for-answer: %v\n", err)
+	}
+}
+
 // logSchedulerScan appends one claimNext pass's scan as scheduler-scan events.
 // A big epic's scan doesn't fit one events.MaxLineBytes line, so it is split
 // across as many lines as needed; every line of one pass shares one Time.

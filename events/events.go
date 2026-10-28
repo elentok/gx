@@ -91,6 +91,9 @@ const (
 	Submitted         Type = "submitted"
 	SubmitRefused     Type = "submit-refused"
 	Deadlocked        Type = "deadlocked"
+	// WaitingForAnswer is an epic whose every remaining ticket is paused on a
+	// person's answer: a normal wait, not a deadlock, so no recovery runs.
+	WaitingForAnswer Type = "waiting-for-answer"
 	// TicketGraphDefect is a ticket file whose graph fields contradict its ID,
 	// found by a scan of the epic's issue files rather than by a run.
 	TicketGraphDefect Type = "ticket-graph-defect"

@@ -425,7 +425,7 @@ func deadlockedKinds(t *testing.T, scratchDir, epicName string) []string {
 func TestRun_Pause_EmitsDeadlockedOncePerEntry(t *testing.T) {
 	t.Parallel()
 	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-stuck.md": "---\nid: \"01\"\nstatus: paused\npause_reason: zero-commit\ntype: implement\n---\n# Stuck\n",
+		"01-stuck.md": "---\nid: \"01\"\nstatus: paused\npause_reason: iteration-error\ntype: implement\n---\n# Stuck\n",
 	})
 	d, _, _ := fakeDeps()
 	path := ticketPath(scratchDir, "my-epic", "01-stuck.md")
@@ -436,6 +436,47 @@ func TestRun_Pause_EmitsDeadlockedOncePerEntry(t *testing.T) {
 		if polls == 3 {
 			if got := deadlockedKinds(t, scratchDir, "my-epic"); !slices.Equal(got, []string{"all-paused"}) {
 				t.Errorf("deadlocked events after repeated polls = %v, want one all-paused", got)
+			}
+			if err := SetStatus(path, "open"); err != nil {
+				t.Errorf("SetStatus: %v", err)
+			}
+		}
+		return readyTimer(dur)
+	}
+
+	if err := Run(RunOptions{EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+}
+
+// TestRun_Pause_AnswerOnlyEmitsWaitingForAnswer: a pause that only a person's
+// answer clears is a normal wait, so it logs waiting-for-answer, not deadlocked.
+func TestRun_Pause_AnswerOnlyEmitsWaitingForAnswer(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "my-epic", map[string]string{
+		"01-asks.md": "---\nid: \"01\"\nstatus: paused\npause_reason: zero-commit\ntype: implement\n---\n# Asks\n",
+	})
+	d, _, _ := fakeDeps()
+	path := ticketPath(scratchDir, "my-epic", "01-asks.md")
+	polls := 0
+	d.PauseTimer = func(dur time.Duration) <-chan time.Time {
+		polls++
+		if polls == 3 {
+			if got := deadlockedKinds(t, scratchDir, "my-epic"); len(got) != 0 {
+				t.Errorf("deadlocked events = %v, want none", got)
+			}
+			evs, _, err := ReadEvents(scratchDir, "my-epic")
+			if err != nil {
+				t.Fatalf("ReadEvents: %v", err)
+			}
+			waits := 0
+			for _, ev := range evs {
+				if ev.Type == string(events.WaitingForAnswer) {
+					waits++
+				}
+			}
+			if waits != 1 {
+				t.Errorf("waiting-for-answer events = %d, want 1", waits)
 			}
 			if err := SetStatus(path, "open"); err != nil {
 				t.Errorf("SetStatus: %v", err)

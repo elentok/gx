@@ -803,7 +803,11 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				return fmt.Errorf("epic %q is deadlocked: no runnable tickets left, none done, and none a human could clear; check for a dependency cycle or a bad status", opts.EpicName)
 			}
 			if !paused {
-				logDeadlocked(scratchDir, opts.EpicName, events.AllPaused, "every remaining ticket is paused")
+				if epic.AllAwaitAnswer(stalled) {
+					logWaitingForAnswer(scratchDir, opts.EpicName, "every remaining ticket waits on an answer")
+				} else {
+					logDeadlocked(scratchDir, opts.EpicName, events.AllPaused, "every remaining ticket is paused")
+				}
 				stalledForSink := make([]StalledTicket, len(stalled))
 				for i, t := range stalled {
 					stalledForSink[i] = StalledTicket{

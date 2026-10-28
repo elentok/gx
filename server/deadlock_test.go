@@ -96,9 +96,8 @@ func TestDeadlock_BlockedOrWaitingNextToPausedIsAllPaused(t *testing.T) {
 		opts servertest.TicketOpts
 	}
 	pauses := map[string]servertest.TicketOpts{
-		"paused-answer": {PauseReason: "question"},
-		"error":         {Status: "error"},
-		"draft":         {Status: "draft"},
+		"error": {Status: "error"},
+		"draft": {Status: "draft"},
 	}
 	done := servertest.TicketOpts{Status: "done"}
 	cases := map[string][]tk{}
@@ -132,6 +131,44 @@ func TestDeadlock_BlockedOrWaitingNextToPausedIsAllPaused(t *testing.T) {
 			got := runLogOf(t, h, events.Deadlocked)
 			if len(got) != 1 || got[0].Kind != string(events.AllPaused) {
 				t.Errorf("deadlocked events = %+v, want one all-paused", got)
+			}
+		})
+	}
+}
+
+// An epic whose every pause waits on an answer is a normal wait: it logs
+// waiting-for-answer, never deadlocked, and starts no recovery. An answer pause
+// next to a repair pause is still a deadlock.
+func TestDeadlock_AnswerOnlyPausesLogWaitingForAnswer(t *testing.T) {
+	t.Parallel()
+	answer := servertest.TicketOpts{PauseReason: "self-reported"}
+	cases := map[string]struct {
+		second     servertest.TicketOpts
+		wantWait   bool
+		wantLocked bool
+	}{
+		"answer only":        {second: answer, wantWait: true},
+		"answer plus repair": {second: servertest.TicketOpts{Status: "error"}, wantLocked: true},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			store := t.TempDir()
+			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", answer)
+			servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "second", c.second)
+			servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+			h := servertest.StartWithStore(t, store)
+			if _, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", ""); err != nil {
+				t.Fatal(err)
+			}
+			h.Server.ClaimNext()
+			waitFor(t, func() bool {
+				return len(runLogOf(t, h, events.WaitingForAnswer))+len(runLogOf(t, h, events.Deadlocked)) > 0
+			})
+			if got := len(runLogOf(t, h, events.WaitingForAnswer)) > 0; got != c.wantWait {
+				t.Errorf("waiting-for-answer logged = %v, want %v", got, c.wantWait)
+			}
+			if got := len(runLogOf(t, h, events.Deadlocked)) > 0; got != c.wantLocked {
+				t.Errorf("deadlocked logged = %v, want %v", got, c.wantLocked)
 			}
 		})
 	}

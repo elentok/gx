@@ -209,6 +209,17 @@ func (e Epic) IsPaused(t Ticket) bool {
 	return e.RenderedStatus(t).Paused()
 }
 
+// AllAwaitAnswer reports whether ts is non-empty and every ticket in it is
+// paused on a person's answer, with no repair, error or draft among them.
+func (e Epic) AllAwaitAnswer(ts []Ticket) bool {
+	for _, t := range ts {
+		if e.RenderedStatus(t) != StatusPausedAnswer {
+			return false
+		}
+	}
+	return len(ts) > 0
+}
+
 // Paused is the status half of Epic.IsPaused.
 func (s RenderedStatus) Paused() bool {
 	switch s {
