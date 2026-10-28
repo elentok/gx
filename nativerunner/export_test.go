@@ -56,7 +56,15 @@ func SetHolderDenyTimeout(t *testing.T, d time.Duration) {
 	t.Cleanup(func() { holderDenyTimeout = old })
 }
 
-const FrameInterval = frameInterval
+const FrameInterval = defaultFrameInterval
+
+// SetFramePacing sets the attach pacing for the test, so a check can use
+// intervals far above any load delay. Call it before attaching.
+func SetFramePacing(t *testing.T, interval, echoWindow time.Duration) {
+	oldInterval, oldWindow := frameInterval, keyEchoWindow
+	frameInterval, keyEchoWindow = interval, echoWindow
+	t.Cleanup(func() { frameInterval, keyEchoWindow = oldInterval, oldWindow })
+}
 
 // ArmedFrameTimers is how many attach pacing timers are armed.
 func ArmedFrameTimers() int64 { return armedFrameTimers.Load() }

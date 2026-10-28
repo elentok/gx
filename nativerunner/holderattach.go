@@ -31,9 +31,11 @@ var ErrAttachUnsupported = errors.New("holder does not support attach")
 // An attach gets at most one frame per frameInterval, except within
 // keyEchoWindow of its own client's key, so typing echoes at once while a
 // burst of output still costs only a frame per display refresh.
-const (
-	frameInterval = 16 * time.Millisecond
-	keyEchoWindow = 32 * time.Millisecond
+const defaultFrameInterval = 16 * time.Millisecond
+
+var (
+	frameInterval = defaultFrameInterval
+	keyEchoWindow = 2 * defaultFrameInterval
 )
 
 // armedFrameTimers counts the pacing timers armed across all attaches.

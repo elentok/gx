@@ -164,11 +164,15 @@ func TestHolderAttach_BurstIsPacedThenStopsItsTimers(t *testing.T) {
 }
 
 func TestHolderAttach_KeyEchoSkipsThePacing(t *testing.T) {
+	// An interval far above any load delay: paced echoes take whole seconds,
+	// skipped ones take a few milliseconds.
+	const interval = 2 * time.Second
+	nativerunner.SetFramePacing(t, interval, interval/2)
 	c, _ := scriptHolder(t, `printf ready; exec cat`)
 	a := attach(t, c)
 	nextAttach(t, a)
 
-	const keys = 10
+	const keys = 5
 	start := time.Now()
 	for i := range keys {
 		if err := a.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
@@ -177,9 +181,7 @@ func TestHolderAttach_KeyEchoSkipsThePacing(t *testing.T) {
 		for echo := "ready" + strings.Repeat("x", i+1); !frameHas(nextAttach(t, a).Frame, echo); {
 		}
 	}
-	// Paced at one frame per interval, each echo would wait out the interval
-	// since the frame before it.
-	if took := time.Since(start); took >= keys*nativerunner.FrameInterval {
+	if took := time.Since(start); took >= interval {
 		t.Errorf("%d key echoes took %v; want each sooner than the frame interval", keys, took)
 	}
 }
