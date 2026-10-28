@@ -37,7 +37,7 @@ threshold and `"10G"` for the clean threshold.
   `config.json`. A project can replace it in its `project.json`, or set it empty to turn cleanup
   off. gx sends a chat notice that says how much the cleanup freed, how much is free now, and
   whether dispatch is still held. gx cleans again only after free space has climbed back above the
-  warn threshold.
+  higher of the warn threshold and the clean threshold plus 2G.
 - If the disk is still under the clean threshold after the cleanup, the hold stays. Running tickets
   keep running. Held tickets show a "disk low" verdict. Dispatch resumes on its own once free space
   climbs back above the clean threshold, and gx sends a chat notice when it does. The banner's
@@ -115,8 +115,9 @@ gx also stops the three leaks:
     clean, so that a command with relative paths runs in every project's repo, and a repeated
     `go clean -cache` costs almost nothing after the first run.
 23. As a person, I want gx to clean once when a disk crosses under the clean threshold, and again
-    only after free space has climbed back above the warn threshold, so that free space moving near
-    the clean threshold does not empty the Go cache again and again.
+    only after free space has climbed back above the higher of the warn threshold and the clean
+    threshold plus 2G, so that free space moving near the clean threshold does not empty the Go
+    cache again and again, even when both thresholds are equal or warn is off.
 24. As a person, I want gx never to clean after each iteration or before each queue, so that the
     shared Go cache stays warm in normal use.
 25. As a person, I want a chat notice after an automatic clean that says how much it freed, how
@@ -149,14 +150,17 @@ gx also stops the three leaks:
 36. As a person, I want a "Clean now" button on the banner, so that I can free space from the web
     UI without a terminal.
 37. As a person, I want "Clean now" to run the same commands an automatic clean runs for that disk,
-    so that the button and the automatic clean behave the same.
-38. As a person, I want "Clean now" to check free space again right after it finishes, so that a
-    hold ends at once when the clean freed enough.
+    and to end through the same end-of-clean rule, so that the button and the automatic clean
+    behave the same.
+38. As a person, I want "Clean now" to check free space again right after it finishes, and to send
+    one clean notice that carries the hold state and no separate resume notice, so that a hold ends
+    at once when the clean freed enough and the chat log shows one message per clean.
 39. As a person, I want "Clean now" on a disk with no cleanup command to skip the run and only check
     free space again, so that the button ends the hold once I have freed space by hand.
 40. As a person, I want the button disabled while the clean runs, so that I don't start it twice.
-41. As a person, I want "Clean now" refused with "clean already running" while any clean runs on
-    that disk, so that two cleans never run at once and I know why nothing new happened.
+41. As a person, I want no clean of either kind to start on a disk while another clean runs there,
+    and "Clean now" refused with "clean already running" in that case, so that two cleans never run
+    at once and I know why nothing new happened.
 42. As a person, I want a failed "Clean now" to show its reason in the banner strip, so that I know
     to free space another way.
 43. As a person, I want a CLI verb that runs the same clean and one that prints disk status, so that
@@ -170,8 +174,9 @@ gx also stops the three leaks:
     changes, using plain `git worktree remove` and never `--force`, so that gx never deletes work.
 46. As a person, I want gx to keep the worktree when any live agent session or pane the server
     tracks works inside it, so that no session loses its working directory.
-47. As a person, I want gx to keep the worktree when the epic's root is queued, so that an epic I
-    queued again keeps its checkout.
+47. As a person, I want gx to keep the worktree when the epic's root is queued, and never to remove
+    a worktree that a claim is setting up at the same time, so that an epic I queued again keeps its
+    checkout.
 48. As a person, I want gx to keep the worktree when the epic has open tickets, so that work still
     to do keeps its checkout.
 49. As a person, I want the epic branch kept after the removal, so that every commit and later reads
@@ -197,13 +202,26 @@ gx also stops the three leaks:
     the temp `HOME`, and to report an error when the removal fails, so that the temp dir is gone or
     the failure is visible.
 
+**Server restart**
+
+57. As a person, I want a server restart while a disk is low to hold dispatch from its first
+    reading, before any claim, and to send one warn notice and run one clean, so that a restart
+    never starts tickets on a full disk and never loses the clean.
+
 ## Implementation Decisions
 
 **Disk watcher (server)**
 
 - A new disk watcher in the server owns all of this. It keeps, per disk, the last free-space
-  reading, the warn mark, the clean state (armed, running or spent) and the hold. The web snapshot,
-  the claim path, the explain path and the clean route all read from it.
+  reading, the warn mark, a "clean running" flag, the automatic-clean state (armed or spent) and
+  the hold. The two clean fields are separate: both kinds of clean (automatic and "Clean now") set
+  and clear the running flag, and only the automatic clean changes armed or spent. The web
+  snapshot, the claim path, the explain path and the clean route all read from the watcher.
+- Nothing persists. On server start the watcher begins with no disks known, every warn mark clear,
+  every clean armed, no clean running and no hold. The first reading of a disk, from the timer or
+  the claim path, goes through the state machine before the claim path decides. A restart while a
+  disk is low therefore holds dispatch before any claim, sends one warn notice and runs one clean.
+  That clean is cheap, since the cache was already emptied before the restart.
 - A disk is a volume, identified by its device id, not by path. gx finds the disk of each project's
   repo path and the disk of the Go build cache. The Go cache path comes from `go env GOCACHE`. If
   `go` is missing or the command fails, gx logs it once and watches only the repo disks.
@@ -225,20 +243,29 @@ gx also stops the three leaks:
   warn notice. The mark clears only when a reading is above the warn threshold plus a fixed 2G
   margin. The margin is not a setting.
 - Clean and hold. A reading under the clean threshold sets the hold at once.
-  - If the clean is armed, gx marks it running, starts the cleanup work in the background, and
-    sends nothing yet. When the work ends, gx marks the clean spent, reads free space again, and
-    sends the clean notice. The hold stays if that reading is still under the clean threshold, and
-    clears otherwise (the clean notice then says dispatch is not held, and no separate resume
-    notice goes out).
-  - If the clean is spent or running, the hold stays and nothing runs.
+  - If the automatic clean is armed and no clean is running, gx marks the clean spent, sets the
+    running flag, starts the cleanup work in the background, and sends nothing yet. When the work
+    ends, the end-of-clean rule below runs.
+  - If the automatic clean is spent, or a clean of either kind is running, the hold stays and
+    nothing new runs. An armed clean stays armed while a "Clean now" runs; the next reading after
+    it ends decides.
   - If the disk has no cleanup work (every project on it set an empty command), the clean is marked
     spent at once and the clean notice says no cleanup command is set.
-- Re-arm. The clean re-arms when a reading is above the warn threshold. With the warn threshold
-  off, it re-arms above the clean threshold plus the same 2G margin.
+- End of clean. This one rule ends both kinds of clean. gx clears the running flag, reads free
+  space again, feeds that reading to the warn mark, and sets the hold from it: held if under the
+  clean threshold, not held otherwise. It sends exactly one clean notice, which carries the bytes
+  freed, the free space now and the hold state. It sends no resume notice, even when the hold
+  clears, and kicks the claim loop when it does. A clean never holds a disk that was not already
+  held: a "Clean now" on a warned, unheld disk leaves dispatch running while it runs, and its end
+  sets the hold only if the new reading is under the clean threshold.
+- Re-arm. The automatic clean re-arms when a reading is above the higher of the warn threshold and
+  the clean threshold plus 2G. The same 2G margin as the warn mark, fixed. This one rule covers
+  warn off and warn equal to clean (which the clamp in story 8 can produce).
 - Resume. A held disk whose reading is at or above the clean threshold, with no clean running,
-  clears the hold, sends the resume notice and kicks the claim loop.
-- Nothing is claimed for a project while any of its disks is held, and a disk is held for the whole
-  time a clean runs on it.
+  clears the hold, sends the resume notice and kicks the claim loop. Readings while a clean runs
+  never clear the hold; the end-of-clean rule does.
+- Nothing is claimed for a project while any of its disks is held. An automatic clean always runs
+  on a held disk, so dispatch stays held for the whole automatic clean.
 - Running builds are not stopped during a clean. `go clean -cache` can delete cache entries that a
   running `go build` or `go test` is reading. gx accepts that. Such a failure looks like any failed
   build, and the ticket's normal retry and pause handling covers it.
@@ -293,11 +320,11 @@ gx also stops the three leaks:
   running, the projects that watch it and the last clean result (bytes freed, or the failure
   reason). When no disk is warned or held, the list is empty.
 - A disk status read route and a "clean now" write route, each with a matching `gx server` CLI verb.
-  The write takes a disk id. It runs the disk's cleanup work (or none, if the disk has none), reads
-  free space again, feeds that reading to the state machine, and sends the clean notice. It returns
-  the bytes freed, the free space after and the hold state. It refuses with a reason for an unknown
-  disk, and with "clean already running" while an automatic clean or another "Clean now" runs on
-  that disk. A "Clean now" does not change whether the automatic clean is armed. Both routes go in
+  The write takes a disk id. It refuses with a reason for an unknown disk, and with "clean already
+  running" while the disk's running flag is set. Otherwise it sets the running flag, runs the
+  disk's cleanup work (or none, if the disk has none), and ends through the end-of-clean rule, so
+  it sends one clean notice and no resume notice. It returns the bytes freed, the free space after
+  and the hold state. A "Clean now" does not change whether the automatic clean is armed. Both routes go in
   the route table, the CLI parity list, the web mux (the write in the web writes list) and the web
   allowlist test. The implementer picks route paths and verb names.
 - A disk status change (warn, clean start, clean end, hold, resume) publishes a server event so the
@@ -311,8 +338,8 @@ gx also stops the three leaks:
   - clean: the disk, the bytes freed, the free space now, and whether dispatch is held (or that no
     cleanup command is set, or that the command failed);
   - resume: the disk, its free space, that dispatch resumed.
-- One notice per state change, never one per reading. A "Clean now" from the web sends the clean
-  notice too, so the chat log matches what happened.
+- One notice per state change, never one per reading. Each clean, automatic or "Clean now", sends
+  exactly one clean notice and no resume notice, so the chat log matches what happened.
 
 **Web banner**
 
@@ -339,7 +366,12 @@ gx also stops the three leaks:
   trunk lock, so the dequeue that follows the stamp has happened and the "not queued" check sees
   the final queue. The implementer picks how (for example, the background task takes the same
   trunk-lock key the stamping path held).
-- The removal checks, in order, and keeps the worktree on the first failure:
+- The removal checks, in order, and keeps the worktree on the first failure. Checks 2 to 5 run
+  inside one hold of the ralph-loop worktree lock, the same lock the claim path takes when it
+  creates or reuses a feature worktree (`withWorktreeLock`, used by `PrepareFeature`). A claim then
+  either sets up the worktree before the checks run (the root is queued, so the worktree is kept)
+  or after the remove (gx recreates the missing worktree). Queue adds do not take the trunk lock,
+  so the trunk lock cannot give this guarantee.
   1. The worktree is not the trunk checkout, and the root is not the one-offs root.
   2. No live agent session or pane that the server tracks has its working directory inside the
      worktree. This covers every kind: ralph-loop iteration and merge-ticket agents, design
@@ -349,9 +381,9 @@ gx also stops the three leaks:
   4. The epic has no open tickets.
   5. `git worktree remove` without `--force` succeeds, so git refuses a worktree with staged,
      unstaged or untracked changes.
-- It holds the ralph-loop worktree lock while it runs `git worktree remove`. That lock is an
-  unexported package variable in ralphloop today, so ralphloop exports a small helper that runs a
-  function under it.
+- The worktree lock is an unexported package variable in ralphloop today, so ralphloop exports a
+  small helper that runs a function under it. The server runs checks 2 to 5 inside one call of
+  that helper.
 - A failed check or a git refusal logs the epic, the worktree path and the reason, and keeps the
   worktree. It never pauses the epic and never fails the merge.
 - The epic branch stays. gx already recreates a missing feature worktree if the epic is queued
@@ -479,7 +511,8 @@ Entries:
     (argv, repo) pairs, one per repo; two projects that share a repo path and command record one.
 23. Go test (seam 1): free space moves around the clean threshold, staying under the warn threshold;
     the cleanup runs once. It runs again only after a reading above the warn threshold and a new
-    drop under the clean threshold. With warn 0, it re-arms only 2G above the clean threshold.
+    drop under the clean threshold. With warn 0, and with warn equal to clean, a reading just above
+    the clean threshold does not re-arm; one 2G above it does.
 24. Go test (seam 1): a finished iteration and a queue add with free space above the clean
     threshold run no cleanup.
 25. Go test (seam 1): the clean notice carries bytes freed, free space now and the hold state, for
@@ -504,15 +537,21 @@ Entries:
 35. Go test (seam 1): a hold that clears on a later reading sends one resume notice.
 36. Flow A.
 37. Go test (seam 1): "Clean now" for a disk runs the same (argv, repo) pairs as the automatic
-    clean, recorded by the fake runner.
-38. Go test (seam 1): "Clean now" that frees enough clears the hold in its own response, with no
-    wait for the next minute reading. Flow B covers the hold clearing in the web UI.
+    clean, recorded by the fake runner. A "Clean now" leaves an armed automatic clean armed.
+38. Go test (seam 1): "Clean now" on a held disk that frees enough clears the hold in its own
+    response, with no wait for the next minute reading, and the fake chat gets exactly one clean
+    notice and no resume notice. "Clean now" on a warned, unheld disk: a claim while it runs
+    (runner blocked) still starts the ticket, and after it ends one clean notice goes out with
+    "not held" and no resume notice. Flow B covers the hold clearing in the web UI.
 39. Go test (seam 1): on a held disk whose only project has cleanup off, "Clean now" runs nothing;
     with free space raised by the fake first, it clears the hold in its response.
 40. Flow A (button disabled while the call is held). Vitest (seam 3): disabled while the snapshot
     says a clean is running.
 41. Go test (seam 1): with the fake runner blocking an automatic clean, "Clean now" is refused with
-    "clean already running"; a second "Clean now" during a first one is refused the same way. CLI
+    "clean already running"; a second "Clean now" during a first one is refused the same way. With
+    a "Clean now" blocked in the fake runner on an armed disk, a reading under the clean threshold
+    holds the disk but records no second run; after the "Clean now" ends, the disk is still armed
+    and the next low reading starts the automatic clean. CLI
     check: the clean verb against a disk with a running clean prints that reason and exits
     non-zero.
 42. Flow C. Vitest (seam 3): a refusal and a failure each show their reason inline in the strip.
@@ -527,7 +566,9 @@ Entries:
     live web session inside it is kept; the log names the reason.
 47. Go test (seam 6): a merged epic whose root is queued again before the removal runs keeps its
     worktree. A second test checks the normal merge, where the dequeue follows the stamp, does
-    remove it (the removal does not race the dequeue).
+    remove it (the removal does not race the dequeue). A third test holds the worktree lock, lets
+    the removal start and wait on it, re-queues the epic and lets a claim set up the feature
+    worktree under the lock first; the worktree survives the removal.
 48. Go test (seam 6): a merged epic with an open ticket keeps its worktree.
 49. Go test (seam 6): the epic branch exists after the removal.
 50. Go test (seam 6): the log line for a kept worktree names the epic, the path and the reason.
@@ -544,6 +585,10 @@ Entries:
 56. Go test (seam 5): a read-only tree in the temp `HOME` is removed by the cleanup; a forced
     failure is reported. Shell check: `go test ./testutil/claudeenv/ -timeout 60s` leaves no new
     `$TMPDIR/gx-claudeenv*` dir.
+57. Go test (seam 1): stop the server with free space under the clean threshold (after its clean
+    ran), start a new server on the same store with the fake still low and a ticket queued. The
+    first claim is held, the ticket shows "disk low", and the fake chat gets one warn notice and
+    one clean notice from the new server.
 
 ## Out of Scope
 
@@ -561,7 +606,7 @@ Entries:
 
 - The Go build cache is one shared folder (`~/Library/Caches/go-build` on this machine), so a clean
   makes the next build in every worktree cold. That is why gx cleans only on a crossing under the
-  clean threshold and re-arms only above the warn threshold.
+  clean threshold and re-arms only well above it.
 - On APFS, `du` overstates what removing a worktree frees, because pnpm clones files from its
   store. The clean notice reports the change in free space from statfs, not a `du` sum.
 - The research measured 28 GiB of `gx-e2e-bin-*` dirs and 2 GiB of `gx-claudeenv*` dirs in
