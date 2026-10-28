@@ -1,6 +1,24 @@
 package subscription
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestCheckFreshReadsHomeClaudeJSON(t *testing.T) {
+	home := t.TempDir()
+	if got := CheckFresh(home); got != StateUnknown {
+		t.Fatalf("CheckFresh(no file) = %v, want StateUnknown", got)
+	}
+	data := []byte(`{"oauthAccount":{"hasExtraUsageEnabled":true}}`)
+	if err := os.WriteFile(filepath.Join(home, ".claude.json"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := CheckFresh(home); got != StateEnabled {
+		t.Fatalf("CheckFresh() = %v, want StateEnabled", got)
+	}
+}
 
 func TestDetectEnabled(t *testing.T) {
 	data := []byte(`{"oauthAccount":{"hasExtraUsageEnabled":true}}`)

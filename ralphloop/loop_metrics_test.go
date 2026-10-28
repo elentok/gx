@@ -20,7 +20,7 @@ import (
 // setHomeEnv points $HOME at dir for the rest of the test, restored on
 // cleanup via a manual os.Setenv/os.Unsetenv pair rather than t.Setenv, which
 // panics once a test has called t.Parallel(). Production code in this
-// package (transcript.Path and friends) still resolves $HOME directly, so
+// package that still reads $HOME from the process env sees dir, so
 // this remains a process-wide mutation — a test using it must stay
 // non-parallel with any other test that also touches $HOME.
 func setHomeEnv(t *testing.T, dir string) {

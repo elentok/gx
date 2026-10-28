@@ -38,6 +38,44 @@ func startHolder(t *testing.T, child string) (dir string, c *nativerunner.Holder
 	return dir, c, errc
 }
 
+// pidChild writes a starting pid status file, then sets each status line it
+// reads, adding a waitingFor only while waiting, as claude does.
+const pidChild = `d="$HOME/.claude/sessions"; mkdir -p "$d"; f="$d/$$.json"; t=$(date +%s)000
+printf '{"pid":%s,"startedAt":%s}' $$ "$t" > "$f"; printf 'ready\n'
+while read -r s; do
+  w=""; [ "$s" = waiting ] && w=',"waitingFor":"input needed"'
+  printf '{"pid":%s,"startedAt":%s,"status":"%s"%s}' $$ "$t" "$s" "$w" > "$f.tmp" && mv "$f.tmp" "$f"
+  printf 'set:%s\n' "$s"
+done`
+
+func TestHolderSocket_StatusCountsTurns(t *testing.T) {
+	t.Setenv("HOME", shortTempDir(t))
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	_, c, _ := startHolder(t, pidChild)
+
+	waitForStatus(t, c, nativerunner.PidStatus{Status: nativerunner.ClaudeStarting}, 0)
+	steps := []nativerunner.PidStatus{
+		{Status: nativerunner.ClaudeBusy},
+		{Status: nativerunner.ClaudeWaiting, WaitingFor: "input needed"},
+		{Status: nativerunner.ClaudeBusy},
+		{Status: nativerunner.ClaudeIdle},
+	}
+	for i, want := range steps {
+		if err := c.SendKeys(want.Status + "\r"); err != nil {
+			t.Fatal(err)
+		}
+		waitForStatus(t, c, want, i+1)
+	}
+}
+
+func waitForStatus(t *testing.T, c *nativerunner.HolderClient, want nativerunner.PidStatus, turn int) {
+	t.Helper()
+	waitFor(t, fmt.Sprintf("status %+v at turn %d", want, turn), func() bool {
+		got, n, err := c.Status()
+		return err == nil && got != nil && *got == want && n == turn
+	})
+}
+
 func TestRunHolder_LongSocketPathNamesTheCap(t *testing.T) {
 	dir := filepath.Join(shortTempDir(t), strings.Repeat("d", 120))
 	if err := os.MkdirAll(dir, 0o755); err != nil {

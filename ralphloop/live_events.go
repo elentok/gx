@@ -59,7 +59,7 @@ type LiveEvent struct {
 	Branch     string
 	MergedSHA  string
 	// Cwd/SessionID (IterationStarted/TicketReattached only) let a consumer
-	// resolve the session's transcript itself (transcript.Path) to compute
+	// resolve the session's transcript itself (transcript.PathIn) to compute
 	// elapsed time from its first line's timestamp.
 	Cwd       string
 	SessionID string

@@ -98,7 +98,7 @@ type EventSink interface {
 	TicketClaimed(ticket tickets.Ticket)
 	// IterationStarted reports that label's agent has launched and been sent
 	// its initial prompt, for ticket. cwd/sessionID let a consumer resolve
-	// the session's transcript itself (transcript.Path) to compute elapsed
+	// the session's transcript itself (transcript.PathIn) to compute elapsed
 	// time from its first line's timestamp, rather than stamping "now"
 	// client-side. agent/paneID identify which agent kind and herdr
 	// pane/tab this iteration is running on, so a consumer outside ralphloop

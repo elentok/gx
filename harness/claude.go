@@ -34,7 +34,7 @@ func claudeCommand(args, env []string) Command {
 }
 
 func (h claudeHarness) Watch(pid int, spawned time.Time, scr Screen, stop <-chan struct{}) (Watcher, error) {
-	dir, err := ClaudeSessionsDir()
+	dir, err := ClaudeSessionsDirIn(h.env)
 	if err != nil {
 		return nil, err
 	}

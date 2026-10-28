@@ -49,13 +49,10 @@ func ParsePidStatus(data []byte) (PidStatus, error) {
 	return s, err
 }
 
-// ClaudeSessionsDir is where claude writes its pid status files: under
+// ClaudeSessionsDirIn is where claude writes its pid status files: under
 // CLAUDE_CONFIG_DIR when set, as claude itself resolves it, else ~/.claude.
-func ClaudeSessionsDir() (string, error) { return ClaudeSessionsDirIn(nil) }
-
-// ClaudeSessionsDirIn is ClaudeSessionsDir reading HOME and CLAUDE_CONFIG_DIR
-// from env (KEY=VALUE entries, the last one of a key wins). Nil env means the
-// process env.
+// HOME and CLAUDE_CONFIG_DIR come from env (KEY=VALUE entries, the last one of
+// a key wins). Nil env means the process env.
 func ClaudeSessionsDirIn(env []string) (string, error) {
 	dir, _, err := claudeConfigDirs(env)
 	if err != nil {
@@ -64,12 +61,8 @@ func ClaudeSessionsDirIn(env []string) (string, error) {
 	return filepath.Join(dir, "sessions"), nil
 }
 
-// ClaudeProjectsDir is where claude writes its transcripts.
-func ClaudeProjectsDir() (string, error) { return ClaudeProjectsDirIn(nil) }
-
-// ClaudeProjectsDirIn is ClaudeProjectsDir reading HOME and CLAUDE_CONFIG_DIR
-// from env (KEY=VALUE entries, the last one of a key wins). Nil env means the
-// process env.
+// ClaudeProjectsDirIn is where claude writes its transcripts, resolved like
+// ClaudeSessionsDirIn.
 func ClaudeProjectsDirIn(env []string) (string, error) {
 	dir, _, err := claudeConfigDirs(env)
 	if err != nil {

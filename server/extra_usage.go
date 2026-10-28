@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/subscription"
 )
@@ -34,7 +35,8 @@ func (s *Server) extraUsageOn() bool {
 	}
 	check := s.cfg.ExtraUsageCheck
 	if check == nil {
-		check = subscription.CheckFresh
+		home := harness.LookupEnv(s.cfg.Env, "HOME")
+		check = func() subscription.State { return subscription.CheckFresh(home) }
 	}
 	return check() == subscription.StateEnabled
 }

@@ -97,7 +97,7 @@ func PidFilePath(home string, pid int) string {
 // pidPathFor is PidFilePath, moved under CLAUDE_CONFIG_DIR when it is set, as
 // real claude does.
 func pidPathFor(home string, pid int) string {
-	if dir, err := harness.ClaudeSessionsDir(); err == nil {
+	if dir, err := harness.ClaudeSessionsDirIn(os.Environ()); err == nil {
 		return filepath.Join(dir, strconv.Itoa(pid)+".json")
 	}
 	return PidFilePath(home, pid)

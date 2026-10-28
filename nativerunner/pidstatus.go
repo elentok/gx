@@ -13,7 +13,4 @@ const (
 	ClaudeWaiting  = harness.ClaudeWaiting
 )
 
-var (
-	ParsePidStatus    = harness.ParsePidStatus
-	ClaudeSessionsDir = harness.ClaudeSessionsDir
-)
+var ParsePidStatus = harness.ParsePidStatus

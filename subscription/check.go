@@ -58,27 +58,22 @@ var (
 	checkState State
 )
 
-// Check returns the extra-usage state, reading Claude Code's cached account
-// state file once per gx process and caching the result for the process's
-// lifetime.
-func Check() State {
+// Check returns the extra-usage state, reading <home>/.claude.json once per gx
+// process and caching the result for the process's lifetime.
+func Check(home string) State {
 	checkOnce.Do(func() {
-		checkState = detectFromDefaultPath()
+		checkState = detectFrom(home)
 	})
 	return checkState
 }
 
-// CheckFresh re-reads the account state file on every call. A long-lived
-// server uses it instead of Check, whose per-process cache would go stale.
-func CheckFresh() State {
-	return detectFromDefaultPath()
+// CheckFresh re-reads <home>/.claude.json on every call. A long-lived server
+// uses it instead of Check, whose per-process cache would go stale.
+func CheckFresh(home string) State {
+	return detectFrom(home)
 }
 
-func detectFromDefaultPath() State {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return StateUnknown
-	}
+func detectFrom(home string) State {
 	data, err := os.ReadFile(filepath.Join(home, ".claude.json"))
 	if err != nil {
 		return StateUnknown
