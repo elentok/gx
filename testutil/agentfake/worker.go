@@ -3,6 +3,7 @@ package agentfake
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/check"
 )
 
 // WorkerConfigFile is read from the agent's working directory (the iteration
@@ -147,10 +150,21 @@ func finishTicket(cfg WorkerConfig, address string) error {
 			return fmt.Errorf("%s: %w\n%s", strings.Join(args, " "), err, out)
 		}
 	}
-	cmd := exec.Command(cfg.Gx, "tickets", "set", address, "--iteration-status", "finished")
-	cmd.Env = append(os.Environ(), cfg.Env...)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("gx tickets set: %w\n%s", err, out)
+	// The finish guard refuses a tree without a passing check run.
+	for _, args := range [][]string{
+		{"check"},
+		{"tickets", "set", address, "--iteration-status", "finished"},
+	} {
+		cmd := exec.Command(cfg.Gx, args...)
+		cmd.Env = append(os.Environ(), cfg.Env...)
+		out, err := cmd.CombinedOutput()
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && args[0] == "check" && exit.ExitCode() == check.ExitNone {
+			continue // nothing applies to the fixture repo, which the guard accepts
+		}
+		if err != nil {
+			return fmt.Errorf("gx %s: %w\n%s", args[0], err, out)
+		}
 	}
 	return nil
 }

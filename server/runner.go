@@ -462,6 +462,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	if err := ralphloop.ClaimWithBase(t.Path, resolvedBase); err != nil {
 		return false, fmt.Errorf("claim %s: %w", ticketAddr, err)
 	}
+	s.rescan() // the claim must show now, not when the backstop poll comes
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
 	model, effort := s.runAgentConfig(queued.Project, agent, Run{})
@@ -810,6 +811,8 @@ func (s *Server) settleRun(rc runContext, err error) {
 		one.Model, one.Effort = s.runAgentConfig(addr.Project, one.Agent, run)
 		one.KeepAskedAgent = keepsAskedAgent(run)
 		out, err = mode.finish(deps, one, wt, run.Session.ID)
+		// The finish path wrote the merge or the pause; the store watch is only a hint.
+		s.rescan()
 	}
 	if err != nil {
 		s.log.Warn("finish iteration", "ticket", ticketAddr, "err", err)

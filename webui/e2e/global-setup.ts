@@ -20,7 +20,8 @@ export default function globalSetup() {
   mkdirSync(dir, { recursive: true });
   const build = (out: string, pkg: string) => {
     const path = join(dir, out);
-    execFileSync("go", ["build", "-o", path, pkg], { cwd: repoRoot, stdio: "inherit" });
+    // Without cgo fsnotify watches with kqueue: the cgo FSEvents watcher misses events on some test machines.
+    execFileSync("go", ["build", "-o", path, pkg], { cwd: repoRoot, stdio: "inherit", env: { ...process.env, CGO_ENABLED: "0" } });
     return path;
   };
   process.env.GX_E2E_GX = build("gx", "github.com/elentok/gx");

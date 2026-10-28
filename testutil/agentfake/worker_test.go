@@ -60,6 +60,33 @@ func TestWorkTicket_FinishCommitsAndReports(t *testing.T) {
 	}
 }
 
+// The finish guard (cmd/tickets_finish_guard.go) wants a passing `gx check` on
+// the committed tree before a finished report.
+func TestWorkTicket_FinishChecksTheCommittedTreeBeforeReporting(t *testing.T) {
+	cfg, gxLog := workerEnv(t)
+	if err := WorkTicket(cfg, "p:e/01"); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(readLog(t, gxLog)), "\n")
+	if len(lines) != 2 || lines[0] != "check" || !strings.HasPrefix(lines[1], "tickets set p:e/01 --iteration-status finished") {
+		t.Errorf("gx calls = %q, want check then the finished report", lines)
+	}
+}
+
+func TestWorkTicket_FinishAcceptsACheckWithNothingToRun(t *testing.T) {
+	cfg, gxLog := workerEnv(t)
+	script := "#!/bin/sh\necho \"$@\" >> " + gxLog + "\n[ \"$1\" = check ] && exit 3\nexit 0\n"
+	if err := os.WriteFile(cfg.Gx, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := WorkTicket(cfg, "p:e/01"); err != nil {
+		t.Fatal(err)
+	}
+	if got := readLog(t, gxLog); !strings.Contains(got, "--iteration-status finished") {
+		t.Errorf("gx log = %q, want a finished report", got)
+	}
+}
+
 func TestWorkTicket_FailCommitsAndReportsNothing(t *testing.T) {
 	cfg, gxLog := workerEnv(t)
 	cfg.Behaviour = map[string]string{"p:e/01": BehaviourFail}
