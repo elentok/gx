@@ -54,5 +54,7 @@ export default defineConfig({
     // Testing Library registers its between-test cleanup only when globals exist.
     globals: true,
     setupFiles: ["./src/test-setup.ts"],
+    // Vitest's default timed out a quick test while other sessions loaded the machine.
+    testTimeout: 20_000,
   },
 });
