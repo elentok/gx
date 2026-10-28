@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -441,14 +442,17 @@ func (l *budgetLedger) save(now time.Time) error {
 	return os.Rename(tmp, l.path)
 }
 
-// iterationCost is the cumulative cost of a live iteration; ok is false when it
-// has none (no session yet, or an agent without a transcript cost).
-func iterationCost(it IterationInfo) (float64, bool) {
-	if it.Session == "" {
-		return 0, false
+// iterationCostIn is the cumulative cost of a live iteration; ok is false when
+// it has none (no session yet, an agent without a transcript cost, or no HOME
+// in env to read the transcript under).
+func iterationCostIn(env []string) func(IterationInfo) (float64, bool) {
+	return func(it IterationInfo) (float64, bool) {
+		if it.Session == "" {
+			return 0, false
+		}
+		cost, ok, err := ralphloop.SessionCost(harness.LookupEnv(env, "HOME"), it.Worktree, it.Session)
+		return cost, ok && err == nil
 	}
-	cost, ok, err := ralphloop.SessionCost(it.Worktree, it.Session)
-	return cost, ok && err == nil
 }
 
 // budgetIteration is the live iteration of address as its runner sees it, so a

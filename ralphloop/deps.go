@@ -60,6 +60,9 @@ type Deps struct {
 	// MergeLockStateDir is the state dir the merge locks live under; empty
 	// means the process's.
 	MergeLockStateDir string
+	// SessionHomes are where the report metrics read session transcripts from;
+	// an empty one reports its sessions as not found.
+	SessionHomes SessionHomes
 	// Runner hosts the iteration's agent.
 	Runner       agentrunner.Runner
 	RevParse     func(dir, ref string) (string, error)
@@ -234,6 +237,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		RenameBranch:         renameBranch,
 		Runner:               runner,
 		MergeLockStateDir:    overrides.StateDir,
+		SessionHomes:         SessionHomes{Claude: overrides.Home, Codex: overrides.CodexHome},
 		RevParse:             git.RevParse,
 		MergeBase:            git.MergeBase,
 		CommitsAhead:         git.CommitsAhead,

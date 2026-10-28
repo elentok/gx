@@ -25,14 +25,13 @@ func writeSubagentTranscript(t *testing.T, home, cwd, session, name, usage strin
 func TestReadSessionStats_TotalTokensIncludeSubagents(t *testing.T) {
 	const cwd, session = "/work/tree", "sess-1"
 	home := t.TempDir()
-	setHomeEnv(t, home)
 	writeFakeTranscript(t, home, cwd, session, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), [3]any{"claude-sonnet-4-5", 1000, 200})
 	writeSubagentTranscript(t, home, cwd, session, "agent-a.jsonl",
 		`{"input_tokens":100,"output_tokens":20,"cache_read_input_tokens":30,"cache_creation_input_tokens":40}`)
 	writeSubagentTranscript(t, home, cwd, session, "agent-b.jsonl",
 		`{"input_tokens":1,"output_tokens":2,"cache_read_input_tokens":3,"cache_creation_input_tokens":4}`)
 
-	got, err := readSessionStats(cwd, session)
+	got, err := readSessionStats(home, cwd, session)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,14 +50,13 @@ func TestSessionsTotals(t *testing.T) {
 	const cwd = "/work/tree"
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	home := t.TempDir()
-	setHomeEnv(t, home)
-	t.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
+	homes := SessionHomes{Claude: home, Codex: filepath.Join(home, ".codex")}
 	writeFakeTranscript(t, home, cwd, "sess-a", start, [3]any{"claude-sonnet-4-5", 1000, 0})
 	writeFakeTranscript(t, home, cwd, "sess-b", start, [3]any{"claude-sonnet-4-5", 2000, 0})
 	claudeCost := 3000.0/1e6*3 + 20.0/1e6*15
 
 	t.Run("two readable sessions add up", func(t *testing.T) {
-		tokens, cost, err := SessionsTotals([]SessionRef{
+		tokens, cost, err := SessionsTotals(homes, []SessionRef{
 			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-a"},
 			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-b"},
 		})
@@ -71,7 +69,7 @@ func TestSessionsTotals(t *testing.T) {
 	})
 
 	t.Run("one missing transcript fails the whole sum", func(t *testing.T) {
-		tokens, cost, err := SessionsTotals([]SessionRef{
+		tokens, cost, err := SessionsTotals(homes, []SessionRef{
 			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-a"},
 			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-missing"},
 		})
@@ -91,7 +89,7 @@ func TestSessionsTotals(t *testing.T) {
 		if err := writeCodexUsageLine(rollout, 2, 500, 7777); err != nil {
 			t.Fatal(err)
 		}
-		tokens, cost, err := SessionsTotals([]SessionRef{
+		tokens, cost, err := SessionsTotals(homes, []SessionRef{
 			{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-a"},
 			{Agent: AgentCodex, Cwd: cwd, SessionID: "codex-1"},
 		})

@@ -47,6 +47,8 @@ type MergeDeps struct {
 	CherryPickInProgress func(dir string) (bool, error)
 	AppendTrailers       func(dir string, trailers ...git.Trailer) error
 	MergedTickets        func(dir, featureBranch string) (map[string]bool, error)
+	// SessionHomes are where the merging session's transcripts are read from.
+	SessionHomes SessionHomes
 }
 
 // MergeParams describes one ticket merging onto FeatureBranch.
@@ -79,6 +81,7 @@ func mergeDepsFor(d Deps) MergeDeps {
 		CherryPickInProgress: d.CherryPickInProgress,
 		AppendTrailers:       d.AppendTrailers,
 		MergedTickets:        mergedTickets,
+		SessionHomes:         d.SessionHomes,
 	}
 }
 
@@ -96,7 +99,7 @@ func MergeTicket(d MergeDeps, lp MergeParams) (MergeResult, error) {
 		if err != nil {
 			return MergeResult{}, err
 		}
-		stamped, err := stampAppliedMetrics(lp)
+		stamped, err := stampAppliedMetrics(d, lp)
 		if err != nil {
 			return MergeResult{}, err
 		}
@@ -181,7 +184,7 @@ func alreadyApplied(d MergeDeps, lp MergeParams) (bool, error) {
 // merged commit is already trailered, so nothing is amended. A nonzero cost
 // means a prior merging stamped it; no recoverable session means nothing to
 // stamp.
-func stampAppliedMetrics(lp MergeParams) (bool, error) {
+func stampAppliedMetrics(d MergeDeps, lp MergeParams) (bool, error) {
 	if lp.TicketPath == "" || lp.Session.ID == "" {
 		return false, nil
 	}
@@ -196,7 +199,7 @@ func stampAppliedMetrics(lp MergeParams) (bool, error) {
 	if t.TotalTokens != nil {
 		return false, nil
 	}
-	_, ok, err := writeMergedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
+	_, ok, err := writeMergedMetrics(d.SessionHomes, lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
 	if err != nil {
 		return false, fmt.Errorf("writing merged metrics for ticket %s: %w", lp.TicketID, err)
 	}
@@ -250,7 +253,7 @@ func mergeTrailerValue(lp MergeParams) string {
 // a session was recoverable — in a single amend, and resolves the merged SHA.
 // Metrics are omitted, never fabricated, when no session is recoverable.
 func stampMerged(d MergeDeps, lp MergeParams) (MergeResult, error) {
-	m, hasMetrics, err := writeMergedMetrics(lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
+	m, hasMetrics, err := writeMergedMetrics(d.SessionHomes, lp.Session.Agent, lp.Session.Cwd, lp.Session.ID, lp.TicketPath)
 	if err != nil {
 		return MergeResult{}, fmt.Errorf("writing merged metrics for ticket %s: %w", lp.TicketID, err)
 	}

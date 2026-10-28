@@ -354,7 +354,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 		// the one place gx writes status: done with no cherry-pick, so it does
 		// so itself here rather than trusting the ticket file to already say
 		// done.
-		commitlessAdopted, err := adoptCommitlessFinish(p, path, pane, sessionID)
+		commitlessAdopted, err := adoptCommitlessFinish(d, p, path, pane, sessionID)
 		if err != nil {
 			return err
 		}
@@ -397,7 +397,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 			}
 
 			if ahead == 0 {
-				commitlessAdopted, err := adoptCommitlessFinish(p, path, pane, sessionID)
+				commitlessAdopted, err := adoptCommitlessFinish(d, p, path, pane, sessionID)
 				if err != nil {
 					return err
 				}
@@ -548,7 +548,7 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, base, br
 // (populated once at claim time) because the report is written by the agent
 // during the iteration this call is completing. Callers are responsible for
 // only invoking this when ahead == 0 — it does not check commit count itself.
-func adoptCommitlessFinish(p iterationParams, path, pane, sessionID string) (adopted bool, err error) {
+func adoptCommitlessFinish(d Deps, p iterationParams, path, pane, sessionID string) (adopted bool, err error) {
 	current, err := schema.ParseTicket(p.Ticket.Path)
 	if err != nil {
 		return false, fmt.Errorf("reading ticket %s for commitless check: %w", p.Ticket.Path, err)
@@ -556,7 +556,7 @@ func adoptCommitlessFinish(p iterationParams, path, pane, sessionID string) (ado
 	if !current.IsCommitless() || current.IterationStatus != schema.IterationStatusFinished {
 		return false, nil
 	}
-	stampCommitlessMetrics(p, path, sessionID)
+	stampCommitlessMetrics(d.SessionHomes, p, path, sessionID)
 	if err := MarkDone(p.Ticket.Path); err != nil {
 		return false, fmt.Errorf("marking commitless ticket %s done: %w", p.Ticket.Identifier, err)
 	}
@@ -625,7 +625,7 @@ func backfillDoneMetadata(d Deps, p iterationParams) error {
 	if !ok {
 		return MarkDone(p.Ticket.Path)
 	}
-	if _, _, err := writeMergedMetrics(agent, sessionCwd, sessionID, p.Ticket.Path); err != nil {
+	if _, _, err := writeMergedMetrics(d.SessionHomes, agent, sessionCwd, sessionID, p.Ticket.Path); err != nil {
 		return fmt.Errorf("writing merged metrics for ticket %s: %w", p.Ticket.Identifier, err)
 	}
 	return markDoneWithCompactions(d, agent, p.Ticket.Path, sessionCwd, sessionID)
@@ -659,19 +659,19 @@ func recoverIterationSession(p iterationParams) (sessionID, cwd string, agent Ag
 // their existing zero value rather than failing the finish, since the ticket
 // is already done and these fields are a display convenience, not a
 // precondition for closing it.
-func stampCommitlessMetrics(p iterationParams, cwd, sessionID string) {
+func stampCommitlessMetrics(homes SessionHomes, p iterationParams, cwd, sessionID string) {
 	if sessionID != "" {
-		writeMergedMetrics(p.Agent, cwd, sessionID, p.Ticket.Path)
+		writeMergedMetrics(homes, p.Agent, cwd, sessionID, p.Ticket.Path)
 		return
 	}
 	sid, sessionCwd, agent, ok := recoverIterationSession(p)
 	if !ok {
 		// No session to recover: still stamp the ticket's own session_ids
 		// (zero when it has none).
-		writeMergedMetrics(p.Agent, "", "", p.Ticket.Path)
+		writeMergedMetrics(homes, p.Agent, "", "", p.Ticket.Path)
 		return
 	}
-	writeMergedMetrics(agent, sessionCwd, sid, p.Ticket.Path)
+	writeMergedMetrics(homes, agent, sessionCwd, sid, p.Ticket.Path)
 }
 
 // mergeCherryPick cherry-picks base..branch onto the feature branch (resolving

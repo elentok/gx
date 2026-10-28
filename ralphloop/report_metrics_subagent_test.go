@@ -16,14 +16,13 @@ func TestReadSessionStats_SubagentTranscripts(t *testing.T) {
 
 	setup := func(t *testing.T) (home string) {
 		home = t.TempDir()
-		setHomeEnv(t, home)
 		writeFakeTranscript(t, home, cwd, session, start, [3]any{"claude-sonnet-4-5", 1000, 0})
 		return home
 	}
 
 	t.Run("sums subagent cost, keeps peak occupancy of the main transcript", func(t *testing.T) {
 		home := setup(t)
-		main, err := readSessionStats(cwd, session)
+		main, err := readSessionStats(home, cwd, session)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -38,7 +37,7 @@ func TestReadSessionStats_SubagentTranscripts(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		got, err := readSessionStats(cwd, session)
+		got, err := readSessionStats(home, cwd, session)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -52,8 +51,8 @@ func TestReadSessionStats_SubagentTranscripts(t *testing.T) {
 	})
 
 	t.Run("no subagents dir leaves cost unchanged", func(t *testing.T) {
-		setup(t)
-		got, err := readSessionStats(cwd, session)
+		home := setup(t)
+		got, err := readSessionStats(home, cwd, session)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,7 +66,6 @@ func TestReadSessionStats_SubagentTranscripts(t *testing.T) {
 func TestReadSessionStats_UndatedBoundaryDoesNotBoundSession(t *testing.T) {
 	const cwd, session = "/work/tree", "sess-1"
 	home := t.TempDir()
-	setHomeEnv(t, home)
 	path := transcript.PathIn(home, cwd, session)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatal(err)
@@ -79,7 +77,7 @@ func TestReadSessionStats_UndatedBoundaryDoesNotBoundSession(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := readSessionStats(cwd, session)
+	got, err := readSessionStats(home, cwd, session)
 	if err != nil {
 		t.Fatal(err)
 	}

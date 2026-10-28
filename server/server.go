@@ -602,7 +602,7 @@ func New(cfg Config) (*Server, error) {
 		pause:       pause,
 		afk:         afk,
 		ledger:      ledger,
-		costOf:      iterationCost,
+		costOf:      iterationCostIn(cfg.Env),
 		mergeInto:   git.MergeBranchInto,
 		mergedProbe: git.IsAncestor,
 		events:      events,

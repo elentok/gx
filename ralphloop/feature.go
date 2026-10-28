@@ -72,7 +72,7 @@ func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target strin
 			}
 			return FinishOutcome{Status: schema.StatusLegacyRepair, Kind: kind, Reason: reason}, nil
 		}
-		if adopted, err = adoptCommitlessFinish(p, w.Path, pane, sessionID); err != nil {
+		if adopted, err = adoptCommitlessFinish(d, p, w.Path, pane, sessionID); err != nil {
 			return FinishOutcome{}, err
 		}
 		if !adopted {

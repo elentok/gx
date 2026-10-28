@@ -52,7 +52,8 @@ func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.
 	// CODEX_HOME pointed at fixtures via setProcessEnv rather than
 	// DepsOverrides — that way deps' default resolution and the rollout
 	// writer agree on the same directory.
-	setProcessEnv(t, "HOME", t.TempDir())
+	home := t.TempDir()
+	setProcessEnv(t, "HOME", home)
 	codexHome := t.TempDir()
 	setProcessEnv(t, "CODEX_HOME", codexHome)
 
@@ -105,6 +106,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.
 	hf := herdrfake.StartState(t, s)
 
 	deps := testDeps()
+	deps.SessionHomes = SessionHomes{Claude: home, Codex: codexHome}
 	useFakeClock(deps, hf)
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }

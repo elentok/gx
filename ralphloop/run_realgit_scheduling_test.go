@@ -66,7 +66,8 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	// pointed at the fixture via setHomeEnv rather than DepsOverrides.Home —
 	// that way deps' default HOME resolution and NewClaudeCompact's agree on
 	// the same directory.
-	setHomeEnv(t, t.TempDir())
+	home := t.TempDir()
+	setHomeEnv(t, home)
 	const smartZone = 100
 	var mu sync.Mutex
 	var virtualTime time.Duration
@@ -294,6 +295,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	hf := herdrfake.Start(t, handler)
 
 	deps := testDeps()
+	deps.SessionHomes = SessionHomes{Claude: home}
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }

@@ -1,7 +1,6 @@
 package ralphloop
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -11,24 +10,26 @@ import (
 )
 
 // stampTotalsFixture writes a done ticket with the given session_ids and
-// returns its path and the worktree cwd every session runs in.
-func stampTotalsFixture(t *testing.T, sessionIDs string) (ticketPath, cwd string) {
+// returns its path, the worktree cwd every session runs in and the temp homes
+// the sessions live under.
+func stampTotalsFixture(t *testing.T, sessionIDs string) (ticketPath, cwd string, homes SessionHomes) {
 	t.Helper()
-	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
+	homes = SessionHomes{Claude: t.TempDir(), Codex: filepath.Join(t.TempDir(), "codex")}
+	// recordedConversationTotals still reads the conversations dir from the
+	// process HOME.
 	setHomeEnv(t, t.TempDir())
-	t.Setenv("CODEX_HOME", filepath.Join(t.TempDir(), "codex"))
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: implement\nsession_ids: " + sessionIDs + "\n---\n# A\n",
 	})
-	return filepath.Join(scratchDir, "epic", "issues", "01-a.md"), iterationWorktreePath("/fake/worktrees", "epic", "01")
+	return filepath.Join(scratchDir, "epic", "issues", "01-a.md"), iterationWorktreePath("/fake/worktrees", "epic", "01"), homes
 }
 
 func TestWriteMergedMetrics_StampsTokensAndCostOverEverySession(t *testing.T) {
-	ticketPath, cwd := stampTotalsFixture(t, "[sess-1, sess-2]")
+	ticketPath, cwd, homes := stampTotalsFixture(t, "[sess-1, sess-2]")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, "", cwd, "sess-1", start, [3]any{"claude-sonnet-5", 1000, 0})
-	writeFakeTranscript(t, "", cwd, "sess-2", start, [3]any{"claude-sonnet-5", 2000, 5000})
-	wantTokens, wantCost, err := SessionsTotals([]SessionRef{
+	writeFakeTranscript(t, homes.Claude, cwd, "sess-1", start, [3]any{"claude-sonnet-5", 1000, 0})
+	writeFakeTranscript(t, homes.Claude, cwd, "sess-2", start, [3]any{"claude-sonnet-5", 2000, 5000})
+	wantTokens, wantCost, err := SessionsTotals(homes, []SessionRef{
 		{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-1"},
 		{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-2"},
 	})
@@ -36,7 +37,7 @@ func TestWriteMergedMetrics_StampsTokensAndCostOverEverySession(t *testing.T) {
 		t.Fatalf("SessionsTotals: %v", err)
 	}
 
-	m, ok, err := writeMergedMetrics(AgentClaude, cwd, "sess-2", ticketPath)
+	m, ok, err := writeMergedMetrics(homes, AgentClaude, cwd, "sess-2", ticketPath)
 	if err != nil || !ok {
 		t.Fatalf("writeMergedMetrics = %v, %v", ok, err)
 	}
@@ -54,12 +55,12 @@ func TestWriteMergedMetrics_StampsTokensAndCostOverEverySession(t *testing.T) {
 }
 
 func TestWriteMergedMetrics_UnreadableSession_LeavesTicketUnstamped(t *testing.T) {
-	ticketPath, cwd := stampTotalsFixture(t, "[sess-1, sess-missing, sess-2]")
+	ticketPath, cwd, homes := stampTotalsFixture(t, "[sess-1, sess-missing, sess-2]")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, "", cwd, "sess-1", start, [3]any{"claude-sonnet-5", 1000, 0})
-	writeFakeTranscript(t, "", cwd, "sess-2", start, [3]any{"claude-sonnet-5", 2000, 5000})
+	writeFakeTranscript(t, homes.Claude, cwd, "sess-1", start, [3]any{"claude-sonnet-5", 1000, 0})
+	writeFakeTranscript(t, homes.Claude, cwd, "sess-2", start, [3]any{"claude-sonnet-5", 2000, 5000})
 
-	m, ok, err := writeMergedMetrics(AgentClaude, cwd, "sess-2", ticketPath)
+	m, ok, err := writeMergedMetrics(homes, AgentClaude, cwd, "sess-2", ticketPath)
 	if err != nil || !ok {
 		t.Fatalf("writeMergedMetrics = %v, %v", ok, err)
 	}
@@ -89,15 +90,15 @@ func recordConversation(t *testing.T, ticketPath string, totals *conversations.T
 }
 
 func TestWriteMergedMetrics_RecordedConversation_AddsToStamp(t *testing.T) {
-	ticketPath, cwd := stampTotalsFixture(t, "[sess-1]")
-	writeFakeTranscript(t, "", cwd, "sess-1", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), [3]any{"claude-sonnet-5", 1000, 0})
-	sessTokens, sessCost, err := SessionsTotals([]SessionRef{{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-1"}})
+	ticketPath, cwd, homes := stampTotalsFixture(t, "[sess-1]")
+	writeFakeTranscript(t, homes.Claude, cwd, "sess-1", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), [3]any{"claude-sonnet-5", 1000, 0})
+	sessTokens, sessCost, err := SessionsTotals(homes, []SessionRef{{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-1"}})
 	if err != nil {
 		t.Fatalf("SessionsTotals: %v", err)
 	}
 	recordConversation(t, ticketPath, &conversations.Totals{TotalTokens: 300, Cost: 0.5})
 
-	if _, _, err := writeMergedMetrics(AgentClaude, cwd, "sess-1", ticketPath); err != nil {
+	if _, _, err := writeMergedMetrics(homes, AgentClaude, cwd, "sess-1", ticketPath); err != nil {
 		t.Fatalf("writeMergedMetrics: %v", err)
 	}
 
@@ -108,11 +109,11 @@ func TestWriteMergedMetrics_RecordedConversation_AddsToStamp(t *testing.T) {
 }
 
 func TestWriteMergedMetrics_RecordedConversationWithoutTotals_LeavesTicketUnstamped(t *testing.T) {
-	ticketPath, cwd := stampTotalsFixture(t, "[sess-1]")
-	writeFakeTranscript(t, "", cwd, "sess-1", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), [3]any{"claude-sonnet-5", 1000, 0})
+	ticketPath, cwd, homes := stampTotalsFixture(t, "[sess-1]")
+	writeFakeTranscript(t, homes.Claude, cwd, "sess-1", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), [3]any{"claude-sonnet-5", 1000, 0})
 	recordConversation(t, ticketPath, nil)
 
-	m, _, err := writeMergedMetrics(AgentClaude, cwd, "sess-1", ticketPath)
+	m, _, err := writeMergedMetrics(homes, AgentClaude, cwd, "sess-1", ticketPath)
 	if err != nil {
 		t.Fatalf("writeMergedMetrics: %v", err)
 	}
@@ -124,14 +125,14 @@ func TestWriteMergedMetrics_RecordedConversationWithoutTotals_LeavesTicketUnstam
 }
 
 func TestWriteMergedMetrics_MixedCodexTicket_StampsClaudeCostAndMarker(t *testing.T) {
-	ticketPath, cwd := stampTotalsFixture(t, "[sess-claude, sess-codex]")
+	ticketPath, cwd, homes := stampTotalsFixture(t, "[sess-claude, sess-codex]")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, "", cwd, "sess-claude", start, [3]any{"claude-sonnet-5", 1000, 0})
-	claudeTokens, claudeCost, err := SessionsTotals([]SessionRef{{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-claude"}})
+	writeFakeTranscript(t, homes.Claude, cwd, "sess-claude", start, [3]any{"claude-sonnet-5", 1000, 0})
+	claudeTokens, claudeCost, err := SessionsTotals(homes, []SessionRef{{Agent: AgentClaude, Cwd: cwd, SessionID: "sess-claude"}})
 	if err != nil {
 		t.Fatalf("SessionsTotals: %v", err)
 	}
-	rollout := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "rollout-sess-codex.jsonl")
+	rollout := filepath.Join(homes.Codex, "sessions", "rollout-sess-codex.jsonl")
 	if err := writeCodexSessionMeta(rollout, 0, "sess-codex", cwd); err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +140,7 @@ func TestWriteMergedMetrics_MixedCodexTicket_StampsClaudeCostAndMarker(t *testin
 		t.Fatal(err)
 	}
 
-	if _, _, err := writeMergedMetrics(AgentCodex, cwd, "sess-codex", ticketPath); err != nil {
+	if _, _, err := writeMergedMetrics(homes, AgentCodex, cwd, "sess-codex", ticketPath); err != nil {
 		t.Fatalf("writeMergedMetrics: %v", err)
 	}
 
@@ -156,11 +157,11 @@ func TestWriteMergedMetrics_MixedCodexTicket_StampsClaudeCostAndMarker(t *testin
 }
 
 func TestStampCommitlessMetrics_NoSession_StampsZero(t *testing.T) {
-	ticketPath, cwd := stampTotalsFixture(t, "[]")
+	ticketPath, cwd, homes := stampTotalsFixture(t, "[]")
 	p := iterationParams{WorktreeDir: "/fake/worktrees", FeatureBranch: "epic", Agent: AgentClaude,
 		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: filepath.Dir(filepath.Dir(filepath.Dir(ticketPath)))}
 
-	stampCommitlessMetrics(p, cwd, "")
+	stampCommitlessMetrics(homes, p, cwd, "")
 
 	got := mustParse(t, ticketPath)
 	if got.TotalTokens == nil || *got.TotalTokens != 0 || got.ActualCost != 0 || got.HadCodex {
@@ -169,8 +170,8 @@ func TestStampCommitlessMetrics_NoSession_StampsZero(t *testing.T) {
 }
 
 func TestStampCommitlessMetrics_AllCodex_StampsTokensZeroCostAndMarker(t *testing.T) {
-	ticketPath, cwd := stampTotalsFixture(t, "[sess-codex]")
-	rollout := filepath.Join(os.Getenv("CODEX_HOME"), "sessions", "rollout-sess-codex.jsonl")
+	ticketPath, cwd, homes := stampTotalsFixture(t, "[sess-codex]")
+	rollout := filepath.Join(homes.Codex, "sessions", "rollout-sess-codex.jsonl")
 	if err := writeCodexSessionMeta(rollout, 0, "sess-codex", cwd); err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +181,7 @@ func TestStampCommitlessMetrics_AllCodex_StampsTokensZeroCostAndMarker(t *testin
 	p := iterationParams{WorktreeDir: "/fake/worktrees", Agent: AgentCodex,
 		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}}
 
-	stampCommitlessMetrics(p, cwd, "sess-codex")
+	stampCommitlessMetrics(homes, p, cwd, "sess-codex")
 
 	got := mustParse(t, ticketPath)
 	if got.TotalTokens == nil || *got.TotalTokens != 7000 || got.ActualCost != 0 || !got.HadCodex {

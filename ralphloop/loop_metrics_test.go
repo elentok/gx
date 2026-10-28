@@ -41,13 +41,14 @@ func setHomeEnv(t *testing.T, dir string) {
 // compactedMergingFixture writes a transcript whose occupancy peaks before a
 // compaction and ends far lower, and wires d's live readers to report the
 // post-compaction (last) value, so a test can tell peak from last.
-func compactedMergingFixture(t *testing.T, cwd, sessionID string) (d Deps, peak int) {
+func compactedMergingFixture(t *testing.T, home, cwd, sessionID string) (d Deps, peak int) {
 	t.Helper()
-	writeFakeTranscript(t, "", cwd, sessionID, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	writeFakeTranscript(t, home, cwd, sessionID, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		[3]any{"claude-sonnet-5", 1000, 129000},
 		[3]any{"claude-sonnet-5", 1000, 69000},
 	)
 	d, _, _ = fakeDeps()
+	d.SessionHomes = SessionHomes{Claude: home}
 	d.ReadOccupancy = func(cwd, sessionID string) (int, bool, error) { return 70000, true, nil }
 	d.ReadCompactions = func(cwd, sessionID string) (int, bool, error) { return 1, true, nil }
 	return d, 130000
@@ -58,15 +59,13 @@ func compactedMergingFixture(t *testing.T, cwd, sessionID string) (d Deps, peak 
 // keeps mergeCherryPick's peak actual_context_window instead of overwriting it
 // with the post-compaction occupancy.
 func TestMergeAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
-	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
-	setHomeEnv(t, t.TempDir())
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	sessionID := "sess-merge-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
-	d, peak := compactedMergingFixture(t, cwd, sessionID)
+	d, peak := compactedMergingFixture(t, t.TempDir(), cwd, sessionID)
 	p := iterationParams{
 		WorktreeDir: "/fake/worktrees", FeatureWorktree: "/fake/feature", FeatureBranch: "epic", Agent: AgentClaude,
 		Ticket: tickets.Ticket{Identifier: "01", Path: ticketPath}, ScratchDir: scratchDir, Sink: noopEventSink{},
@@ -89,15 +88,13 @@ func TestMergeAndMarkDone_CompactedSession_StampsPeakNotLast(t *testing.T) {
 // reattached close: mergeCherryPick has no session to stamp from, so the
 // backfill recovers the run log's session and must stamp its peak itself.
 func TestMergeAndMarkDone_ReattachedCompactedSession_BackfillsPeak(t *testing.T) {
-	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
-	setHomeEnv(t, t.TempDir())
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
 	})
 	ticketPath := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
 	sessionID := "sess-orig-01"
 	cwd := "/fake/worktrees/epic-item-01"
-	d, peak := compactedMergingFixture(t, cwd, sessionID)
+	d, peak := compactedMergingFixture(t, t.TempDir(), cwd, sessionID)
 	if err := logEvent(scratchDir, "epic", Event{
 		Type: string(eventsc.IterationStarted), Ticket: "01", Agent: AgentClaude, AgentSession: sessionID, Cwd: cwd,
 	}); err != nil {
@@ -193,9 +190,7 @@ func TestRun_FreshIteration_OmitsContextWindowWhenOccupancyUnavailable(t *testin
 // duration into the merged ticket's actual_context_window/elapsed_time
 // frontmatter fields.
 func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmatter(t *testing.T) {
-	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
-	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
@@ -205,12 +200,13 @@ func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmat
 	sessionID := "sess-merge-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, "", cwd, sessionID, start,
+	writeFakeTranscript(t, home, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
 
 	d, _, _ := fakeDeps()
+	d.SessionHomes = SessionHomes{Claude: home}
 	p := iterationParams{
 		WorktreeDir:     "/fake/worktrees",
 		FeatureWorktree: "/fake/feature",
@@ -247,9 +243,7 @@ func TestMergeCherryPick_WritesActualContextWindowAndElapsedTimeToTicketFrontmat
 // writeMergedMetrics wrote to the ticket's frontmatter, all in the merged
 // commit's message via a single Deps.AppendTrailers call.
 func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
-	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
-	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
@@ -259,7 +253,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	sessionID := "sess-merge-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, "", cwd, sessionID, start,
+	writeFakeTranscript(t, home, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
@@ -267,6 +261,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 
 	d, _, _ := fakeDeps()
+	d.SessionHomes = SessionHomes{Claude: home}
 	d.AppendTrailers = git.AppendTrailers
 	d.RevParse = git.RevParse
 
@@ -323,9 +318,7 @@ func TestMergeCherryPick_StampsTokensAndElapsedTrailers(t *testing.T) {
 // ticket 02's own IterationFinished has already been recorded, so ticket 02's
 // stats are captured while ticket 01 is still genuinely in progress.
 func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
-	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
-	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
@@ -333,6 +326,7 @@ func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 	})
 
 	d, _, _ := fakeDeps()
+	d.SessionHomes = SessionHomes{Claude: home}
 	release01 := make(chan struct{})
 	onRunnerWait(d, func(s agentrunner.Session) {
 		if s.Label == iterLabel("epic", "01") {
@@ -341,11 +335,11 @@ func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 	})
 
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, "", iterationWorktreePath("/fake/worktrees", "epic", "01"), "sess-pane-"+iterLabel("epic", "01"), start,
+	writeFakeTranscript(t, home, iterationWorktreePath("/fake/worktrees", "epic", "01"), "sess-pane-"+iterLabel("epic", "01"), start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
-	writeFakeTranscript(t, "", iterationWorktreePath("/fake/worktrees", "epic", "02"), "sess-pane-"+iterLabel("epic", "02"), start.Add(20*time.Second),
+	writeFakeTranscript(t, home, iterationWorktreePath("/fake/worktrees", "epic", "02"), "sess-pane-"+iterLabel("epic", "02"), start.Add(20*time.Second),
 		[3]any{"claude-sonnet-5", 3000, 0},
 		[3]any{"claude-sonnet-5", 4000, 9000},
 	)
@@ -457,9 +451,7 @@ func TestRun_LogsDepsInstalledEventWithCommand(t *testing.T) {
 // finishing session's stats, the same way mergeCherryPick's writeMergedMetrics
 // does for a committed finish, and stamps them into the ticket's frontmatter.
 func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsedTime(t *testing.T) {
-	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
-	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: code-review\ncommitless: true\n---\n# A\n",
@@ -469,7 +461,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 	sessionID := "sess-commitless-01"
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "01")
 	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	writeFakeTranscript(t, "", cwd, sessionID, start,
+	writeFakeTranscript(t, home, cwd, sessionID, start,
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)
@@ -481,7 +473,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 		ScratchDir:  scratchDir,
 	}
 
-	stampCommitlessMetrics(p, cwd, sessionID)
+	stampCommitlessMetrics(SessionHomes{Claude: home}, p, cwd, sessionID)
 
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
@@ -504,9 +496,7 @@ func TestStampCommitlessMetrics_FreshSession_WritesActualContextWindowAndElapsed
 // (no sessionID and no prior iteration-started event to backfill from)
 // leaves actual_context_window/elapsed_time at 0 rather than erroring.
 func TestStampCommitlessMetrics_NoDiscoverableSession_LeavesFieldsZeroWithoutError(t *testing.T) {
-	// not parallel-safe: setHomeEnv mutates the process-wide $HOME env var.
 	home := t.TempDir()
-	setHomeEnv(t, home)
 
 	scratchDir := writeEpic(t, "epic", map[string]string{
 		"01-a.md": "---\nid: \"01\"\nstatus: done\ntype: code-review\ncommitless: true\n---\n# A\n",
@@ -521,7 +511,7 @@ func TestStampCommitlessMetrics_NoDiscoverableSession_LeavesFieldsZeroWithoutErr
 		ScratchDir:    scratchDir,
 	}
 
-	stampCommitlessMetrics(p, iterationWorktreePath("/fake/worktrees", "epic", "01"), "")
+	stampCommitlessMetrics(SessionHomes{Claude: home}, p, iterationWorktreePath("/fake/worktrees", "epic", "01"), "")
 
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {

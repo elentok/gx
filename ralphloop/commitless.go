@@ -81,7 +81,7 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) 
 		asked, err = adoptAskingReport(p, w.Path, pane, sessionID)
 		adopted = asked
 		if err == nil && !adopted {
-			adopted, err = adoptCommitlessFinish(p, w.Path, pane, sessionID)
+			adopted, err = adoptCommitlessFinish(d, p, w.Path, pane, sessionID)
 		}
 	}
 	if err != nil {

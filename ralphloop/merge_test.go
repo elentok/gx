@@ -187,9 +187,10 @@ func TestMergeTicket_Conflict_IsAResultNotAnError(t *testing.T) {
 // file with the given frontmatter cost and a recoverable Claude session.
 func appliedSessionFixture(t *testing.T, cost string) (lp MergeParams, d MergeDeps, ticketPath string) {
 	t.Helper()
-	setHomeEnv(t, t.TempDir())
+	home := t.TempDir()
 	_, lp = mergeFixture(t, false)
 	d = mergeDepsFor(testDeps())
+	d.SessionHomes = SessionHomes{Claude: home}
 	if res, err := MergeTicket(d, lp); err != nil || res.Outcome != Merged {
 		t.Fatalf("first MergeTicket = (%+v, %v), want Merged", res, err)
 	}
@@ -200,7 +201,7 @@ func appliedSessionFixture(t *testing.T, cost string) (lp MergeParams, d MergeDe
 		t.Fatalf("WriteFile: %v", err)
 	}
 	cwd := iterationWorktreePath("/fake/worktrees", "epic", "03")
-	writeFakeTranscript(t, "", cwd, "sess-applied", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	writeFakeTranscript(t, home, cwd, "sess-applied", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 		[3]any{"claude-sonnet-5", 1000, 0},
 		[3]any{"claude-sonnet-5", 2000, 5000},
 	)

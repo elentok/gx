@@ -85,19 +85,24 @@ type sessionKey struct {
 	sessionID string
 }
 
-// readSessionStats reads the Claude Code transcript for the session
+// SessionHomes are the directories session transcripts are read from. An
+// empty one means "none": its sessions are reported as not found.
+type SessionHomes struct {
+	// Claude is the home whose .claude/projects holds Claude transcripts.
+	Claude string
+	// Codex is the Codex home (the resolved ~/.codex-equivalent directory).
+	Codex string
+}
+
+// readSessionStats reads the Claude Code transcript under home for the session
 // launched in cwd with the given id. ok is false (not an error) if the
 // transcript can't be found yet — a mid-run report may ask about a session
 // still being written, or one whose cwd/id weren't captured.
-func readSessionStats(cwd, sessionID string) (sessionStats, error) {
-	if cwd == "" || sessionID == "" {
+func readSessionStats(home, cwd, sessionID string) (sessionStats, error) {
+	if home == "" || cwd == "" || sessionID == "" {
 		return sessionStats{}, nil
 	}
-	path, err := transcript.Path(cwd, sessionID)
-	if err != nil {
-		return sessionStats{}, err
-	}
-	return readTranscriptStats(path)
+	return readTranscriptStats(transcript.PathIn(home, cwd, sessionID))
 }
 
 // readTranscriptStats is readSessionStats for the transcript at path.
@@ -171,18 +176,13 @@ type SessionRef struct {
 	SessionID string
 }
 
-// SessionsTotals sums the total tokens and cost of every session in refs.
-// All-or-nothing: if any session cannot be read or found, it returns an error
-// and no partial sum. A Codex session adds its reported total and no cost.
-func SessionsTotals(refs []SessionRef) (tokens int64, cost float64, err error) {
-	return SessionsTotalsIn("", "", refs)
-}
-
-// SessionsTotalsIn is SessionsTotals reading Claude transcripts under home and
-// Codex sessions under codexHome; an empty one reads the process env's.
-func SessionsTotalsIn(home, codexHome string, refs []SessionRef) (tokens int64, cost float64, err error) {
+// SessionsTotals sums the total tokens and cost of every session in refs, read
+// under homes. All-or-nothing: if any session cannot be read or found, it
+// returns an error and no partial sum. A Codex session adds its reported total
+// and no cost.
+func SessionsTotals(homes SessionHomes, refs []SessionRef) (tokens int64, cost float64, err error) {
 	sum, err := sumSessions(refs, errTranscriptNotFound, func(ref SessionRef) (sessionStats, AgentKind, bool, error) {
-		stats, err := readAgentSessionStatsIn(home, codexHome, sessionKey{agent: ref.Agent, cwd: ref.Cwd, sessionID: ref.SessionID})
+		stats, err := readAgentSessionStats(homes, sessionKey{agent: ref.Agent, cwd: ref.Cwd, sessionID: ref.SessionID})
 		return stats, ref.Agent, stats.ok, err
 	})
 	return sum.tokens, sum.cost, err
@@ -251,34 +251,24 @@ func SessionIDsTotals(home string, ids []string) (tokens int64, cost float64, er
 // callers outside this package (ui/tickets' live cost aggregator). ok is
 // false (not an error) if the transcript can't be found yet, matching
 // readSessionStats.
-func SessionCost(cwd, sessionID string) (cost float64, ok bool, err error) {
-	stats, err := readSessionStats(cwd, sessionID)
+func SessionCost(home, cwd, sessionID string) (cost float64, ok bool, err error) {
+	stats, err := readSessionStats(home, cwd, sessionID)
 	if err != nil {
 		return 0, false, err
 	}
 	return stats.cost, stats.ok, nil
 }
 
-func readAgentSessionStats(key sessionKey) (sessionStats, error) {
-	return readAgentSessionStatsIn("", "", key)
-}
-
-// readAgentSessionStatsIn is readAgentSessionStats under home (Claude) and
-// codexHome (Codex); an empty one reads the process env's.
-func readAgentSessionStatsIn(home, codexHome string, key sessionKey) (sessionStats, error) {
+// readAgentSessionStats reads key's session under homes; an empty home reports
+// it as not found.
+func readAgentSessionStats(homes SessionHomes, key sessionKey) (sessionStats, error) {
 	if key.agent != AgentCodex {
-		if home == "" || key.cwd == "" || key.sessionID == "" {
-			return readSessionStats(key.cwd, key.sessionID)
-		}
-		return readTranscriptStats(transcript.PathIn(home, key.cwd, key.sessionID))
+		return readSessionStats(homes.Claude, key.cwd, key.sessionID)
 	}
-	read := codexsession.ReadStats
-	if codexHome != "" {
-		read = func(cwd, id string) (codexsession.Stats, bool, error) {
-			return codexsession.ReadStatsIn(codexHome, cwd, id)
-		}
+	if homes.Codex == "" {
+		return sessionStats{}, nil
 	}
-	stats, ok, err := read(key.cwd, key.sessionID)
+	stats, ok, err := codexsession.ReadStatsIn(homes.Codex, key.cwd, key.sessionID)
 	if err != nil || !ok {
 		return sessionStats{}, err
 	}
@@ -307,10 +297,10 @@ func readAgentSessionStatsIn(home, codexHome string, key sessionKey) (sessionSta
 // plus sessionID, independent of whether sessionID's own transcript was
 // readable: all-or-nothing, so one unreadable session leaves total_tokens and
 // actual_cost unstamped. A ticket with no session stamps zero.
-func writeMergedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (m mergedMetrics, ok bool, err error) {
+func writeMergedMetrics(homes SessionHomes, agent AgentKind, cwd, sessionID, ticketPath string) (m mergedMetrics, ok bool, err error) {
 	// A read error is treated like a transcript that is not there yet: the
 	// no-op case above.
-	stats, err := readAgentSessionStats(sessionKey{agent: agent, cwd: cwd, sessionID: sessionID})
+	stats, err := readAgentSessionStats(homes, sessionKey{agent: agent, cwd: cwd, sessionID: sessionID})
 	if err != nil {
 		stats = sessionStats{}
 	}
@@ -321,7 +311,7 @@ func writeMergedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (m m
 		}
 		return mergedMetrics{}, false, err
 	}
-	sum, totalsErr := collectTicketTotals(agent, cwd, sessionID, ticketPath, current)
+	sum, totalsErr := collectTicketTotals(homes, agent, cwd, sessionID, ticketPath, current)
 	if !stats.ok && totalsErr != nil {
 		return mergedMetrics{}, false, nil
 	}
@@ -350,8 +340,8 @@ func writeMergedMetrics(agent AgentKind, cwd, sessionID, ticketPath string) (m m
 
 // collectTicketTotals sums every session of the ticket plus its recorded
 // conversations. Any error means the sum would undercount.
-func collectTicketTotals(agent AgentKind, cwd, sessionID, ticketPath string, ticket schema.Ticket) (sessionSum, error) {
-	sum, err := ticketSessionsTotals(agent, cwd, sessionID, ticket.SessionIDs)
+func collectTicketTotals(homes SessionHomes, agent AgentKind, cwd, sessionID, ticketPath string, ticket schema.Ticket) (sessionSum, error) {
+	sum, err := ticketSessionsTotals(homes, agent, cwd, sessionID, ticket.SessionIDs)
 	if err != nil {
 		return sessionSum{}, err
 	}
@@ -397,7 +387,7 @@ func recordedConversationTotals(path, id string) (conversations.Totals, error) {
 
 // ticketSessionsTotals sums tokens and cost over ids plus current. A session's
 // agent is only known for current; any other is tried as Claude, then Codex.
-func ticketSessionsTotals(agent AgentKind, cwd, current string, ids []string) (sessionSum, error) {
+func ticketSessionsTotals(homes SessionHomes, agent AgentKind, cwd, current string, ids []string) (sessionSum, error) {
 	if current != "" && !slices.Contains(ids, current) {
 		ids = append(slices.Clone(ids), current)
 	}
@@ -411,7 +401,7 @@ func ticketSessionsTotals(agent AgentKind, cwd, current string, ids []string) (s
 			kinds = []AgentKind{agent}
 		}
 		for _, kind := range kinds {
-			stats, err := readAgentSessionStats(sessionKey{agent: kind, cwd: cwd, sessionID: ref.SessionID})
+			stats, err := readAgentSessionStats(homes, sessionKey{agent: kind, cwd: cwd, sessionID: ref.SessionID})
 			if err != nil || stats.ok {
 				return stats, kind, stats.ok, err
 			}

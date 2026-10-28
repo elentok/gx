@@ -230,7 +230,7 @@ func (s *Server) saveConversationTotals(m sessionMeta, conversation string) {
 		return
 	}
 	codexHome, _ := s.codexHome()
-	tokens, cost, err := ralphloop.SessionsTotalsIn(home, codexHome, []ralphloop.SessionRef{{Agent: agent, Cwd: m.Dir, SessionID: conversation}})
+	tokens, cost, err := ralphloop.SessionsTotals(ralphloop.SessionHomes{Claude: home, Codex: codexHome}, []ralphloop.SessionRef{{Agent: agent, Cwd: m.Dir, SessionID: conversation}})
 	if err != nil {
 		s.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
 		return
