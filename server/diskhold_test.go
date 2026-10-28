@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -125,14 +126,23 @@ func TestDiskHold_LowDiskStopsClaimAndExplains(t *testing.T) {
 }
 
 // Seam: pre-claim reading (story 11): the timer never fires, so only the
-// claim path can notice the drop.
+// claim path can notice the drop. It holds the disk and starts the clean.
 func TestDiskHold_PreClaimReadingHoldsBeforeTheTimer(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb, func(c *server.Config) { c.DiskPollInterval = time.Hour })
+	cleaner := &fakeCleaner{}
+	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb, func(c *server.Config) {
+		c.DiskPollInterval = time.Hour
+		c.CleanupRunner = cleaner.run
+		c.DiskSpace.CleanupCommand = []string{"go", "clean", "-cache"}
+	})
 	r.disks.SetFree(repo, 3*gb)
 	r.queue(t, "proj:epic-a/01")
 	r.neverStarts(t)
 	assertLowReason(t, r.explainWhen(t, "proj:epic-a/01", server.VerdictDiskLow), "/vol-proj", "3.0 GB")
+	waitFor(t, func() bool { return len(cleaner.recorded()) >= 1 })
+	if got, want := cleaner.recorded(), []string{"go clean -cache @ " + repo}; !slices.Equal(got, want) {
+		t.Errorf("clean calls = %q, want %q", got, want)
+	}
 }
 
 // Seam: the Go cache disk alone holds the project (story 10 part, story 29).
