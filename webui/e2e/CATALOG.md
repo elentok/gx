@@ -562,7 +562,8 @@ an exited session.
 - **Scenario:** `design`
 - **Steps:**
   1. Write a long Destination section on `design-epic` with `gx tickets section`; open `#/e/demo:design-epic`.
-  2. Click Start design session, press Chat to see the first message; open the epic page again.
+  2. Click Start design session, then open the epic page again at once. (Once round one lands the
+     session waits for answers and the ring is `waiting`, so the ring is read before that.)
 - **Pass:**
   - Before the session the ring reads a percentage with `data-tone="muted"`. The summary shows in full under the title.
   - The stats line starts with "Resolve tickets", shows a time ("2m") and has no "$".

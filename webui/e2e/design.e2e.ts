@@ -97,7 +97,8 @@ test.describe("47. Send popover", () => {
     await expect(rowQ8b).toBeVisible();
     await expect(popover.getByRole("button", nav("Send anyway"))).toBeFocused();
 
-    // The popover sits above Send and ends at its right edge.
+    // The popover sits above Send and ends at its right edge. It scales in, so it is measured once settled.
+    await popover.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
     const pop = (await popover.boundingBox())!;
     const btn = (await send.boundingBox())!;
     expect(pop.y + pop.height).toBeLessThan(btn.y);
@@ -690,15 +691,19 @@ test("50. Design epic page", async ({ page, start }) => {
   await expect(timed).not.toContainText("$");
 
   await page.getByRole("button", nav("Start design session")).click();
-  // The Design page opens in the Questions view, so the first message shows after a tap on Chat.
-  await showChat(page);
-  await expect(page.getByText("Two questions before the spec.")).toBeVisible();
+  // Once the first round lands the session waits for answers and the ring turns "waiting", so the
+  // running ring is read first. The epic page is reopened for it; the Design page has no ring.
   await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
   await expect(ring).toHaveAttribute("data-tone", "running");
   await expect(page.getByTestId("comet")).toBeVisible();
   // A live session makes a design ticket's meta read "<type> · running" and adds a time.
   await fixture.cli("tickets", "set", "demo:design-epic/01", "--status", "claimed");
-  await expect(page.getByRole("link", { name: /01 first implement · running · \d+[smh]$/ })).toBeVisible();
+  // The server reads the claim a moment after the CLI wrote it, so the page is opened until it shows.
+  await expect(async () => {
+    await page.evaluate(() => (location.hash = "#/epics"));
+    await page.evaluate(() => (location.hash = "#/e/demo:design-epic"));
+    await expect(page.getByRole("link", { name: /01 first implement · running · \d+[smh]$/ })).toBeVisible({ timeout: 1000 });
+  }).toPass();
 });
 
 test.describe("46. gx designs delete", () => {
