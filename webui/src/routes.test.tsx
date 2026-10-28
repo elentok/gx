@@ -591,10 +591,14 @@ test("a draft non-impl epic and an open impl epic show no Queue button", async (
   expect(screen.queryByRole("button", { name: "Queue" })).toBeNull();
 });
 
-// The epic page also GETs the epic list for its jump menu; keep that out of the recorded POSTs.
+// The pages also GET the epic list and the checks status; keep those out of the recorded POSTs.
 function stubPosts(post: (url: string, init: RequestInit) => Promise<Response>) {
+  const gets: Record<string, unknown> = {
+    "/v1/epics": { epics: [], follow_ups: [] },
+    "/v1/checks/status": { projects: [] },
+  };
   vi.stubGlobal("fetch", (url: string, init: RequestInit) =>
-    url === "/v1/epics" ? Promise.resolve(new Response(JSON.stringify({ epics: [], follow_ups: [] }))) : post(url, init),
+    url in gets ? Promise.resolve(new Response(JSON.stringify(gets[url]))) : post(url, init),
   );
 }
 
