@@ -56,7 +56,7 @@ test.describe("64. Design ring", () => {
 const moreActions = (page: Page) => page.getByRole("button", nav("More actions"));
 const actionsMenu = (page: Page) => page.getByRole("menu", nav("More actions"));
 
-test.describe("65. Design actions menu", () => {
+test.describe("72. Design actions menu", () => {
   test("one live session: New session lives in the menu only", async ({ page, start }) => {
     await start("design");
     await expect(card(page, "design-epic")).toBeVisible();
@@ -142,7 +142,7 @@ test.describe("65. Design actions menu", () => {
 
 const expandNote = (scope: Locator | Page) => scope.getByRole("button", nav("Open the note in a large editor"));
 
-test.describe("66. Note box", () => {
+test.describe("73. Note box", () => {
   test("rows, viewport, large editor, Done and Send", async ({ page, start }) => {
     await start("design", { autoAdvanceDelay: "1h" });
     await page.setViewportSize({ width: 375, height: 700 });
@@ -193,7 +193,7 @@ const showChat = (page: Page) => page.getByRole("group", nav("View")).getByRole(
 
 const fontSize = (el: Locator) => el.evaluate((node) => getComputedStyle(node).fontSize);
 
-test.describe("67. Question top", () => {
+test.describe("74. Question top", () => {
   test.use({ viewport: { width: 1280, height: 600 } });
 
   for (const mode of ["Questions view", "docked in the Chat view"]) {
@@ -249,7 +249,7 @@ test.describe("67. Question top", () => {
   }
 });
 
-test.describe("68. Text size", () => {
+test.describe("75. Text size", () => {
   test("chat, prompt, choice, titles, body and meta text", async ({ page, start }) => {
     await start("design", { autoAdvanceDelay: "1h" });
     await openDesign(page);

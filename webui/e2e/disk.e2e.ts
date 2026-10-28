@@ -6,7 +6,7 @@ const DISK = "fixture disk";
 /** The disk strip; other live regions share its role, so it is found by the disk name. */
 const strip = (page: Page) => page.getByRole("status").filter({ hasText: DISK });
 
-test("69. Disk banner and Clean now", async ({ page, start }) => {
+test("76. Disk banner and Clean now", async ({ page, start }) => {
   const fixture = await start("disk-low");
   await fixture.setDiskFree("15G");
   await expect(strip(page)).toContainText(`${DISK} is low`);
@@ -33,7 +33,7 @@ test("69. Disk banner and Clean now", async ({ page, start }) => {
   await expect(strip(page)).toHaveCount(0);
 });
 
-test("70. Disk hold", async ({ page, start }) => {
+test("77. Disk hold", async ({ page, start }) => {
   const fixture = await start("disk-low", { hold: true });
   await fixture.setDiskClean("6G");
   await fixture.setDiskFree("5G");
@@ -56,7 +56,7 @@ test("70. Disk hold", async ({ page, start }) => {
   await expect(row.locator("[data-meta]")).toHaveText(/^running · /);
 });
 
-test("71. Clean now fails", async ({ page, start }) => {
+test("78. Clean now fails", async ({ page, start }) => {
   const fixture = await start("disk-low");
   await fixture.setDiskClean("fail");
   await fixture.setDiskFree("15G");
