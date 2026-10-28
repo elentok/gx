@@ -60,15 +60,21 @@ func FindRepo(dir string) (*Repo, error) {
 // IdentifyDir returns context about the directory: which repo it belongs to,
 // whether it's a worktree root, etc.
 func IdentifyDir(dir string) (*DirInfo, error) {
-	gitDir := runAllowFail(dir, []string{"rev-parse", "--git-dir"})
-	if gitDir == "" {
+	// IdentifyDir runs on hot paths and every git child process is a fork/exec,
+	// so the common case (inside a worktree) is one rev-parse. --show-toplevel
+	// fails outside a worktree, which sends bare repos to the second call.
+	fields := strings.Split(runAllowFail(dir, []string{"rev-parse", "--git-dir", "--is-inside-work-tree", "--git-common-dir", "--show-toplevel"}), "\n")
+	if len(fields) == 4 && fields[1] == "true" {
+		return identifyWorktree(dir, fields[2], fields[3])
+	}
+	fields = strings.Split(runAllowFail(dir, []string{"rev-parse", "--git-dir", "--is-inside-work-tree", "--git-common-dir"}), "\n")
+	if len(fields) != 3 || fields[0] == "" {
 		return nil, fmt.Errorf("%w at %q", ErrNoRepo, dir)
 	}
-
-	isInsideWorktree := runAllowFail(dir, []string{"rev-parse", "--is-inside-work-tree"}) == "true"
-
+	gitDir, isInsideWorktree := fields[0], fields[1] == "true"
 	if isInsideWorktree {
-		return identifyWorktree(dir)
+		// Only reachable if git changed between the two calls.
+		return nil, fmt.Errorf("inside worktree at %q but --show-toplevel failed", dir)
 	}
 
 	// Bare repo: gitDir "." means the current dir is the git dir itself.
@@ -95,8 +101,7 @@ func IdentifyDir(dir string) (*DirInfo, error) {
 	}, nil
 }
 
-func identifyWorktree(dir string) (*DirInfo, error) {
-	topLevel := runAllowFail(dir, []string{"rev-parse", "--show-toplevel"})
+func identifyWorktree(dir, commonDir, topLevel string) (*DirInfo, error) {
 	if topLevel == "" {
 		return nil, fmt.Errorf("inside worktree at %q but --show-toplevel failed", dir)
 	}
@@ -105,7 +110,6 @@ func identifyWorktree(dir string) (*DirInfo, error) {
 	// even from inside a linked worktree, where --git-dir instead points at
 	// .git/worktrees/<name>. Using --git-dir here would misclassify a linked
 	// worktree of a regular repo as belonging to a bare repo.
-	commonDir := runAllowFail(dir, []string{"rev-parse", "--git-common-dir"})
 	if commonDir == "" {
 		return nil, fmt.Errorf("cannot resolve git common dir for %q", dir)
 	}
