@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.40.2 - 2026-10-28
+
+- Fixed long Design page answers being typed into the agent but never submitted. The native runner now waits after a paste before sending Enter, so claude no longer reads the Enter as part of the bracketed paste.
+
 ## v0.40.1 - 2026-10-28
 
 - Changed Epic page ticket cards to grow with their content. A long "after ..." blocker list no longer squeezes the title: the list is capped and anything past three blockers folds into "+ N more". Titles and ticket numbers are now 16px, and status marks are bigger.
