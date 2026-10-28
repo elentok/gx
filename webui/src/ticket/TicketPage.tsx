@@ -4,6 +4,7 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import { fetchTicketScreen, type FetchScreen } from "../design/screen";
 import { ScreenModal } from "../design/ScreenModal";
 import { DetailPage } from "../page/DetailPage";
+import { VerdictLine, verdictText } from "../verdict";
 import { PageHeader } from "../page/PageHeader";
 import { Button } from "../ui/button/Button";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -25,7 +26,7 @@ export function TicketPage({
 }) {
   const conn = useConnectionContext();
   // Subscribing re-renders the page every tick, which keeps a running ticket's clock counting.
-  useConnectionState(conn);
+  const verdict = verdictText(useConnectionState(conn).snapshot?.pending, address);
   const { detail, notFound, refetch } = useTicketDetail(address, conn, fetchDetail);
   const [sent, setSent] = useState<Sent | null>(null);
   const [showScreen, setShowScreen] = useState(false);
@@ -38,6 +39,11 @@ export function TicketPage({
           <>
             <PageHeader title={detail.title}>
               <TicketHeader detail={detail} now={Date.now()} />
+              {verdict && (
+                <Box mt="2">
+                  <VerdictLine text={verdict} />
+                </Box>
+              )}
             </PageHeader>
             {detail.has_screen && (
               <Box mt="2">

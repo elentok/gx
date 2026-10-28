@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { ticketHref } from "../hrefs";
 import { useWide } from "../useWide";
+import { VerdictLine } from "../verdict";
 import { Button } from "../ui/button/Button";
 import { type EpicDetailRow } from "./detail";
 import { FixAgentDialog } from "./FixAgentDialog";
@@ -333,11 +334,13 @@ export function TicketCard({
   meta,
   indent,
   fixAgent,
+  verdict,
 }: {
   row: EpicDetailRow;
   meta: string;
   indent: number;
   fixAgent?: FixAgent;
+  verdict?: string;
 }) {
   const look = cardLook(row);
   const wide = useWide();
@@ -358,6 +361,7 @@ export function TicketCard({
         >
           <CardFrame row={row} wide={wide}>
             <Line row={row} meta={meta} wide={wide} />
+            {verdict && <VerdictLine text={verdict} pl={wide ? "88px" : "80px"} />}
           </CardFrame>
         </Link>
       )}

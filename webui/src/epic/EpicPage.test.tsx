@@ -2,7 +2,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
-import type { EpicDetail, EpicList, EpicListRow } from "../generated/server";
+import type { EpicDetail, EpicList, EpicListRow, PendingRow } from "../generated/server";
 import { appRoutes } from "../routes";
 import type { FixAgent } from "./fixAgent";
 import { renderThemed } from "../ui/render";
@@ -44,10 +44,10 @@ function render(
   path: string,
   epics: EpicListRow[],
   kind: EpicDetail["kind"] = "loop",
-  extra: { sessions?: unknown[]; detail?: Partial<EpicDetail>; hang?: boolean; notFound?: boolean; fixAgent?: FixAgent } = {},
+  extra: { sessions?: unknown[]; detail?: Partial<EpicDetail>; hang?: boolean; notFound?: boolean; fixAgent?: FixAgent; pending?: PendingRow[] } = {},
 ) {
   const state = {
-    snapshot: { sessions: extra.sessions ?? [] },
+    snapshot: { sessions: extra.sessions ?? [], pending: extra.pending ?? [] },
     connected: true,
     loadedOnce: true,
     tick: 0,
@@ -187,6 +187,23 @@ test("a live ticket is one link to its page with id, title and meta; paused rows
   expect((await cardOf("02")).textContent).toContain("after 01");
   expect((await cardOf("03")).textContent).toContain("paused · needs a person");
   expect(screen.queryByText("Open →")).toBeNull();
+});
+
+const pend = (n: string, verdict: string, reason?: string): PendingRow => ({ address: `gx:blog/${n}`, agent: "", verdict, reason });
+const liveWith = (pending: PendingRow[], rows: object[]) =>
+  render("/e/gx:blog-impl", [], "loop", { pending, detail: { total: rows.length, rows: rows as EpicDetail["rows"] } });
+
+test("a queued ticket's row shows its verdict and reason, and the other rows show none", async () => {
+  liveWith([pend("01", "disk low", "/tmp has 5G free")], [tk("01"), tk("02")]);
+  const card = await cardOf("01");
+  expect(within(card).getByText("disk low: /tmp has 5G free")).toBeTruthy();
+  expect(card.querySelector("[data-meta]")?.textContent).not.toContain("disk low");
+  expect((await cardOf("02")).querySelector("[data-verdict]")).toBeNull();
+});
+
+test("a claimed row shows no verdict line", async () => {
+  liveWith([pend("01", "claimed")], [tk("01")]);
+  expect((await cardOf("01")).querySelector("[data-verdict]")).toBeNull();
 });
 
 test("a fork's card is indented and the running card has the spinning dot", async () => {

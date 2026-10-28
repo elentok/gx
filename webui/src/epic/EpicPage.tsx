@@ -5,6 +5,7 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import type { OpenDesign } from "../design/open";
 import { StartDesignButton } from "../design/SessionControls";
 import { useWide } from "../useWide";
+import { verdictText } from "../verdict";
 import { hasDesignSession, liveSessions } from "../design/view";
 import { ActionMerge, ActionStashMerge, type EpicDetailRow } from "../generated/server";
 import { EpicRing } from "./EpicRing";
@@ -64,11 +65,12 @@ function DoneGroup({ rows, ctx, heads }: { rows: EpicDetailRow[]; ctx: RowContex
 
 function EpicBody({ detail, now, designLive, fixAgent }: { detail: EpicDetail; now: number; designLive: boolean; fixAgent?: FixAgent }) {
   const ctx = rowContext(detail, now, designLive);
+  const pending = useConnectionState(useConnectionContext()).snapshot?.pending;
   return (
     <>
       <Box mt="28px" display="flex" flexDirection="column" gap="8px">
         {nestLive(detail.rows).map(({ row: r, indent }) => (
-          <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} fixAgent={fixAgent} />
+          <TicketCard key={r.address} row={r} meta={cardMeta(r, ctx)} indent={indent} fixAgent={fixAgent} verdict={verdictText(pending, r.address)} />
         ))}
       </Box>
       <DoneGroup rows={detail.rows.filter(isFolded)} ctx={ctx} heads={detail.rows.every(isFolded)} />

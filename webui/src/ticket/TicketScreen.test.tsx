@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import canned from "../canned-detail.json";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { FetchScreen } from "../design/screen";
-import type { TicketDetail } from "../generated/server";
+import type { PendingRow, TicketDetail } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import type { FetchDetail } from "./detail";
@@ -16,7 +16,8 @@ const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => 
 
 const base: TicketDetail = { ...(canned as TicketDetail), runs: [], related: [], epic: "gx:demo" };
 
-async function renderTicket(detail: TicketDetail, ticketScreen?: FetchScreen) {
+async function renderTicket(detail: TicketDetail, ticketScreen?: FetchScreen, pending: PendingRow[] = []) {
+  state.snapshot = { tickets: [], epics: [], pending } as unknown as ConnectionState["snapshot"];
   const fetchDetail: FetchDetail = async () => ({ kind: "ok", detail });
   const router = createMemoryRouter(appRoutes({ ticket: fetchDetail, ticketScreen }), { initialEntries: ["/t/gx:demo/12"] });
   renderThemed(
@@ -41,4 +42,14 @@ test("a ticket without a pty agent has no Screen button", async () => {
   await renderTicket({ ...base, has_screen: undefined });
 
   expect(screen.queryByRole("button", { name: "Screen" })).toBeNull();
+});
+
+test("the ticket page shows the ticket's verdict under the header, and nothing without a pending row", async () => {
+  const mine: PendingRow = { address: "gx:demo/12", agent: "", verdict: "disk low", reason: "/tmp has 5G free" };
+  await renderTicket(base, undefined, [{ ...mine, address: "gx:demo/13", verdict: "concurrency cap" }]);
+  expect(document.querySelector("[data-verdict]")).toBeNull();
+  cleanup();
+
+  await renderTicket(base, undefined, [mine]);
+  expect(screen.getByText("disk low: /tmp has 5G free")).toBeTruthy();
 });
