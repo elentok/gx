@@ -114,5 +114,8 @@ func ParseAddress(s string, ctx AddressContext) (Address, error) {
 	if epic == "" {
 		return Address{}, &AddressError{CodeEpicRequired, fmt.Sprintf("%q names no epic and the current directory is not inside one", s)}
 	}
+	if len(id) == 1 && id[0] >= '0' && id[0] <= '9' {
+		id = "0" + id // ids are stored zero-padded to two digits
+	}
 	return Address{Project: project, Epic: epic, ID: id}, nil
 }

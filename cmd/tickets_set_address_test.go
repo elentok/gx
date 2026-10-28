@@ -40,6 +40,18 @@ func TestExecute_TicketsSet_AddressWritesSameFileAsPath(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsSet_UnpaddedIDResolvesPaddedTicket(t *testing.T) {
+	repo, _ := setupShowProject(t)
+
+	out, err := runIn(t, repo, "tickets", "set", "mine:epic/6", "--status", "draft")
+	if err != nil {
+		t.Fatalf("set unpadded: %v", err)
+	}
+	if want := "mine:epic/06: updated (status=draft)\n"; out != want {
+		t.Errorf("set printed %q, want %q", out, want)
+	}
+}
+
 func TestExecute_TicketsSet_UnknownAddressRefused(t *testing.T) {
 	repo, _ := setupShowProject(t)
 
