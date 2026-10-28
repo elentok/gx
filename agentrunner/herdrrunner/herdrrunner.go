@@ -6,7 +6,6 @@ package herdrrunner
 import (
 	"errors"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -56,15 +55,8 @@ var _ agentrunner.Runner = (*Runner)(nil)
 var _ agentrunner.HealthChecker = (*Runner)(nil)
 var _ agentrunner.Nudger = (*Runner)(nil)
 
-// New gates on Claude transcript background tasks, unless the home directory
-// can't be found.
-func New() *Runner {
-	home, _ := os.UserHomeDir()
-	return NewIn(herdr.CLI{}, home)
-}
-
-// NewIn is New under cli, gating background tasks on the transcripts under
-// home. An empty home skips the gating.
+// NewIn runs herdr under cli, gating background tasks on the Claude
+// transcripts under home. An empty home skips the gating.
 func NewIn(cli herdr.CLI, home string) *Runner {
 	r := &Runner{CLI: cli, started: map[string]agentrunner.StartOptions{}, CodexQuota: codexsession.LastRateLimit}
 	if home != "" {
@@ -165,6 +157,9 @@ func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(s
 	typing, err := harness.LookupTyping(kind)
 	if err != nil {
 		return err
+	}
+	if kind == harness.Claude {
+		typing = harness.ClaudeTypingIn(r.CLI.Env)
 	}
 	prompt := promptWithNudge(typing, r.submitSince(s, turn), r.CLI.AgentSendKeys, r.CLI.AgentWait, r.CLI.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
 	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: until})

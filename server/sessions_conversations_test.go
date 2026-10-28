@@ -101,12 +101,9 @@ func TestSessionConversations_SurviveRemoveAndSkipUnlinked(t *testing.T) {
 
 // writeTranscriptTurns writes a Claude transcript for the conversation, one
 // assistant turn per input-token count, each with 10 output tokens.
-func writeTranscriptTurns(t *testing.T, dir, conv string, inputs ...int) {
+func writeTranscriptTurns(t *testing.T, h *servertest.Harness, dir, conv string, inputs ...int) {
 	t.Helper()
-	path, err := transcript.Path(dir, conv)
-	if err != nil {
-		t.Fatal(err)
-	}
+	path := transcript.PathIn(h.Env("HOME"), dir, conv)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +122,7 @@ func TestSessionConversations_TotalsSavedWhenAConversationEnds(t *testing.T) {
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
 	dir, _ := readMeta(t, h, id)["dir"].(string)
 	newer := conv + "-cleared"
-	writeTranscriptTurns(t, dir, conv, 100, 200)
+	writeTranscriptTurns(t, h, dir, conv, 100, 200)
 	clearFakeSession(ctx, t, h, evs, id, conv, newer)
 
 	recs := recordsByID(t, h.ConversationsDir)
@@ -137,7 +134,7 @@ func TestSessionConversations_TotalsSavedWhenAConversationEnds(t *testing.T) {
 		t.Errorf("running conversation totals = %+v; want none yet", recs[newer].Totals)
 	}
 
-	writeTranscriptTurns(t, dir, newer, 50)
+	writeTranscriptTurns(t, h, dir, newer, 50)
 	stopFakeSession(ctx, t, h, evs, id)
 	second := recordsByID(t, h.ConversationsDir)[newer].Totals
 	if second == nil || second.TotalTokens != 60 || second.Cost <= 0 {

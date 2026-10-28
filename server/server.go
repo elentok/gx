@@ -450,11 +450,11 @@ type Server struct {
 // New prepares the state dir, takes the server lock and binds the socket.
 // It does not serve until Serve is called.
 func New(cfg Config) (*Server, error) {
+	if cfg.Env == nil {
+		cfg.Env = os.Environ()
+	}
 	if cfg.Runner == nil {
-		h := herdrrunner.New()
-		if cfg.Env != nil {
-			h = herdrrunner.NewIn(herdr.CLI{Env: cfg.Env}, harness.LookupEnv(cfg.Env, "HOME"))
-		}
+		h := herdrrunner.NewIn(herdr.CLI{Env: cfg.Env}, harness.LookupEnv(cfg.Env, "HOME"))
 		h.N = cfg.RunnerWait
 		if h.N == 0 {
 			h.N = config.LoadRunnerWait()

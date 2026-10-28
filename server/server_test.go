@@ -14,7 +14,6 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -26,10 +25,7 @@ const testFlushInterval = 100 * time.Millisecond
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
 	herdrfake.RunHelperProcess()
-	cleanup := claudeenv.Isolate()
-	code := m.Run()
-	cleanup()
-	os.Exit(code)
+	os.Exit(m.Run())
 }
 
 func TestHandshake_ReturnsAPIVersionAndBuild(t *testing.T) {

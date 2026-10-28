@@ -2,6 +2,8 @@ package herdrrunner
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -26,6 +28,10 @@ var graceMs = int(claudeui.DefaultNudgeCaps.Grace / time.Millisecond)
 func claudeTyping() harness.Typing { return kindTyping(harness.Claude) }
 
 func kindTyping(kind agentrunner.Kind) harness.Typing {
+	if kind == harness.Claude {
+		// An empty config dir, so the host's own vim mode can't leak in.
+		return harness.ClaudeTypingIn([]string{"CLAUDE_CONFIG_DIR=" + filepath.Join(os.TempDir(), "gx-no-claude-config")})
+	}
 	ty, err := harness.LookupTyping(kind)
 	if err != nil {
 		panic(err)

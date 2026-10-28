@@ -45,7 +45,7 @@ type Pty struct {
 	// Procs stamps pid start times; defaults to ps.
 	Procs ProcessTable
 	// BackgroundTasks reports whether the claude behind s still runs a
-	// background task; defaults to reading its transcript under $HOME.
+	// background task. Nil means no gating.
 	BackgroundTasks func(s agentrunner.Session) bool
 	// N is the configured runner wait; zero means agentrunner.DefaultN.
 	N time.Duration
@@ -974,14 +974,7 @@ func (p *Pty) escThenPrompt(ss *ptySession, reason string) error {
 }
 
 func (p *Pty) backgroundTasks(s agentrunner.Session) bool {
-	if p.BackgroundTasks != nil {
-		return p.BackgroundTasks(s)
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false
-	}
-	return claudeui.BackgroundTasks(home, time.Now)(s)
+	return p.BackgroundTasks != nil && p.BackgroundTasks(s)
 }
 
 func (p *Pty) pollInterval() time.Duration {

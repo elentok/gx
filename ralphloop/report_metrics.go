@@ -3,7 +3,6 @@ package ralphloop
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -220,15 +219,11 @@ func sumSessions(refs []SessionRef, notFound error, resolve func(SessionRef) (st
 }
 
 // SessionIDsTotals sums the total tokens and cost of the Claude sessions in
-// ids, finding each transcript by id alone: the worktree a session ran in may
+// ids, finding each transcript under home by id alone: the worktree a session ran in may
 // be gone. All-or-nothing, like SessionsTotals; an id with no transcript, or
 // with several, wraps tickets.ErrUnreadable; so does one that cannot be parsed.
 // Any other error is a real I/O failure.
-func SessionIDsTotals(ids []string) (tokens int64, cost float64, err error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return 0, 0, err
-	}
+func SessionIDsTotals(home string, ids []string) (tokens int64, cost float64, err error) {
 	refs := make([]SessionRef, len(ids))
 	for i, id := range ids {
 		refs[i] = SessionRef{Agent: AgentClaude, SessionID: id}

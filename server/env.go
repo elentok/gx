@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 
 	"github.com/elentok/gx/codexsession"
@@ -11,33 +10,17 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-// envHome is the home dir the server reads: HOME of Config.Env, or the process
-// home when Config.Env is nil.
+// envHome is the home dir the server reads: HOME of Config.Env, which New
+// fills from the process env when the caller leaves it nil.
 func (s *Server) envHome() (string, error) {
-	if s.cfg.Env == nil {
-		return os.UserHomeDir()
-	}
 	if home := harness.LookupEnv(s.cfg.Env, "HOME"); home != "" {
 		return home, nil
 	}
 	return "", errors.New("HOME is not set in the server env")
 }
 
-// totalsHome is envHome, or "" for the process env, which ralphloop resolves
-// itself.
-func (s *Server) totalsHome() (string, error) {
-	if s.cfg.Env == nil {
-		return "", nil
-	}
-	return s.envHome()
-}
-
-// codexHome is the resolved codex dir of Config.Env, or "" for the process env,
-// which codexsession resolves itself.
+// codexHome is the resolved codex dir of Config.Env.
 func (s *Server) codexHome() (string, error) {
-	if s.cfg.Env == nil {
-		return "", nil
-	}
 	if dir := harness.LookupEnv(s.cfg.Env, "CODEX_HOME"); dir != "" {
 		return dir, nil
 	}
@@ -54,17 +37,11 @@ func (s *Server) lastCodexText(id string) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	if home == "" {
-		return codexsession.LastAssistantText(id)
-	}
 	return codexsession.LastAssistantTextIn(home, id)
 }
 
 // transcriptPath is the claude transcript path of a session run in cwd.
 func (s *Server) transcriptPath(cwd, sessionID string) (string, error) {
-	if s.cfg.Env == nil {
-		return transcript.Path(cwd, sessionID)
-	}
 	home, err := s.envHome()
 	if err != nil {
 		return "", err
@@ -72,12 +49,8 @@ func (s *Server) transcriptPath(cwd, sessionID string) (string, error) {
 	return transcript.PathIn(home, cwd, sessionID), nil
 }
 
-// defaultDeps is ralphloop's default deps reading Config.Env's home dirs. A nil
-// Config.Env keeps the process env.
+// defaultDeps is ralphloop's default deps reading Config.Env's home dirs.
 func (s *Server) defaultDeps() ralphloop.Deps {
-	if s.cfg.Env == nil {
-		return ralphloop.DefaultDeps()
-	}
 	var o ralphloop.DepsOverrides
 	o.Home, _ = s.envHome()
 	o.CodexHome, _ = s.codexHome()
@@ -85,12 +58,8 @@ func (s *Server) defaultDeps() ralphloop.Deps {
 	return ralphloop.DefaultDepsWithOverrides(o)
 }
 
-// lockStateDir is the gx state dir of Config.Env that merge locks live under,
-// or "" for the process env, which ralphloop resolves itself.
+// lockStateDir is the gx state dir of Config.Env that merge locks live under.
 func (s *Server) lockStateDir() (string, error) {
-	if s.cfg.Env == nil {
-		return "", nil
-	}
 	if dir := harness.LookupEnv(s.cfg.Env, "XDG_STATE_HOME"); dir != "" {
 		return filepath.Join(dir, "gx"), nil
 	}

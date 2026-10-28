@@ -20,10 +20,27 @@ import (
 
 func TestMain(m *testing.M) {
 	herdrfake.RunHelperProcess()
-	cleanup := claudeenv.Isolate()
+	home, err := os.MkdirTemp("", "gx-herdrrunner")
+	if err != nil {
+		panic(err)
+	}
+	cleanEnv = claudeenv.In(home)
 	code := m.Run()
-	cleanup()
+	os.RemoveAll(home)
 	os.Exit(code)
+}
+
+// cleanEnv points HOME at a poisoned home and CLAUDE_CONFIG_DIR at a clean
+// config, so a runner reading claude's config from the real home fails loudly.
+var cleanEnv []string
+
+// testEnv is the process env with cleanEnv on top. It is read at call time:
+// herdrfake publishes its socket through the process env.
+func testEnv() []string { return append(os.Environ(), cleanEnv...) }
+
+// newTestRunner is a runner under testEnv, without background-task gating.
+func newTestRunner() *herdrrunner.Runner {
+	return herdrrunner.NewIn(herdr.CLI{Env: testEnv()}, "")
 }
 
 func TestConformance(t *testing.T) {
@@ -38,7 +55,7 @@ func TestConformance(t *testing.T) {
 		var tasksMu sync.Mutex
 		tasks := map[string]bool{}
 		newRunner := func() agentrunner.Runner {
-			r := herdrrunner.New()
+			r := newTestRunner()
 			r.N = 200 * time.Millisecond
 			r.BackgroundTasks = func(s agentrunner.Session) bool {
 				tasksMu.Lock()
@@ -139,7 +156,7 @@ func TestList_TabLabelDiffersFromAgentName(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := herdrrunner.New().List("epic")
+	got, err := newTestRunner().List("epic")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +170,7 @@ func startAgent(t *testing.T, kind agentrunner.Kind, quota herdrrunner.CodexQuot
 	t.Helper()
 	state := herdrfake.NewState(t)
 	herdrfake.StartAgentHost(t, state)
-	r := herdrrunner.New()
+	r := newTestRunner()
 	r.BackgroundTasks = nil
 	r.CodexQuota = quota
 	s, err := r.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: kind})
@@ -174,11 +191,11 @@ func TestStart_AdoptsLiveAgentOnSameCwd(t *testing.T) {
 	state := herdrfake.NewState(t)
 	herdrfake.StartAgentHost(t, state)
 	opts := agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"}
-	s, err := herdrrunner.New().Start(opts)
+	s, err := newTestRunner().Start(opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := herdrrunner.New()
+	r := newTestRunner()
 	if err := r.Prompt(s, "do it"); err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +204,7 @@ func TestStart_AdoptsLiveAgentOnSameCwd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := herdrrunner.New().Start(opts)
+	got, err := newTestRunner().Start(opts)
 	if err != nil || got.ID != s.ID {
 		t.Fatalf("second Start = %+v, %v; want %+v adopted", got, err, s)
 	}
@@ -370,7 +387,7 @@ func TestRateLimit_CodexQuotaReadErrorIsReturned(t *testing.T) {
 
 func TestFind_UnknownLabel(t *testing.T) {
 	herdrfake.StartAgentHost(t, herdrfake.NewState(t))
-	_, ok, err := herdrrunner.New().Find("nobody")
+	_, ok, err := newTestRunner().Find("nobody")
 	if err != nil || ok {
 		t.Fatalf("Find = ok %v, err %v; want not found, nil", ok, err)
 	}

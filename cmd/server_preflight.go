@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
@@ -62,6 +63,7 @@ const fallbackProject = "_default"
 // it is built for a fallback project.
 func serverRunner(c agentrunner.Choice, stateDir string, n time.Duration) (r agentrunner.Runner, runnerFor func(runner, project string) agentrunner.Runner) {
 	type pair struct{ runner, project string }
+	home, _ := os.UserHomeDir() // "" skips the background-task gating
 	var mu sync.Mutex
 	built := map[pair]agentrunner.Runner{}
 	runnerFor = func(runner, project string) agentrunner.Runner {
@@ -74,13 +76,17 @@ func serverRunner(c agentrunner.Choice, stateDir string, n time.Duration) (r age
 		var r agentrunner.Runner
 		switch agentrunner.Choice(runner) {
 		case agentrunner.ChoiceHerdr:
-			h := herdrrunner.New()
+			h := herdrrunner.NewIn(herdr.CLI{}, home)
 			h.N = n
 			r = h
 		case agentrunner.ChoiceHeadless:
 			r = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project), N: n}
 		case agentrunner.ChoicePTY:
-			r = &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project), N: n}
+			p := &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project), N: n}
+			if home != "" {
+				p.BackgroundTasks = claudeui.BackgroundTasks(home, time.Now)
+			}
+			r = p
 		default:
 			return nil
 		}

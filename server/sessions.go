@@ -224,7 +224,7 @@ func (s *Server) saveConversationTotals(m sessionMeta, conversation string) {
 	if m.Harness == string(ralphloop.AgentCodex) {
 		agent = ralphloop.AgentCodex
 	}
-	home, err := s.totalsHome()
+	home, err := s.envHome()
 	if err != nil {
 		s.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)
 		return

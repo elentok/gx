@@ -111,8 +111,12 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 	}
 	if err == nil {
 		var stamped []tickets.MigrationChange
-		stamped, err = tickets.BackfillTicketTotals(scratchRoot, ralphloop.SessionIDsTotals, conflictSessionsUnder(scratchRoot))
-		changes = mergeChanges(changes, stamped)
+		var home string
+		if home, err = os.UserHomeDir(); err == nil {
+			totals := func(ids []string) (int64, float64, error) { return ralphloop.SessionIDsTotals(home, ids) }
+			stamped, err = tickets.BackfillTicketTotals(scratchRoot, totals, conflictSessionsUnder(scratchRoot))
+			changes = mergeChanges(changes, stamped)
+		}
 	}
 	if err == nil {
 		var frictions []tickets.MigrationChange

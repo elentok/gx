@@ -496,17 +496,18 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// The ticket store is the one repo product code creates in a server test;
 	// without this its commits start detached auto maintenance.
 	h.cfg.Env = git.WithMaintenanceOff(h.cfg.Env)
-	xdgState := filepath.Join(stateDir, "xdg-state")
-	if err := os.MkdirAll(xdgState, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	h.cfg.Env = append(h.cfg.Env, "XDG_STATE_HOME="+xdgState)
 	// The holders end with this test process, unless a test passes another pid.
 	h.cfg.Env = append(h.cfg.Env, TestPidEnv+"="+strconv.Itoa(os.Getpid()))
 	if !ownHome {
 		h.cfg.Env = append(h.cfg.Env, "HOME="+filepath.Join(stateDir, "home"))
 		h.cfg.Env = append(h.cfg.Env, claudeenv.In(filepath.Join(stateDir, "claude-home"))...)
 	}
+	// Last, so claudeenv.In's empty XDG_STATE_HOME doesn't win.
+	xdgState := filepath.Join(stateDir, "xdg-state")
+	if err := os.MkdirAll(xdgState, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	h.cfg.Env = append(h.cfg.Env, "XDG_STATE_HOME="+xdgState)
 	// Every merge pauses on ralphloop's 3s finish debounce; the fake agents
 	// settle at once, so a hundredth keeps the order without the wait.
 	h.cfg.Sleep = func(d time.Duration) { time.Sleep(d / 100) }
