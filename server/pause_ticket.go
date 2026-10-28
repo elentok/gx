@@ -22,6 +22,11 @@ func (s *Server) pauseTicket(scratchDir string, addr tickets.Address, ticketPath
 	} else if err != nil {
 		return err
 	}
+	// The index must see its own write now: the watch is only a hint, and a
+	// pause it misses would leave the ticket looking claimed until the backstop poll.
+	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {
+		s.log.Warn("refresh after pause", "ticket", addr.String(), "err", err)
+	}
 	s.events.publish(EventTicketPaused, addr.String())
 	s.announcePause(addr, ticketPath, kind, reason)
 	return nil

@@ -179,6 +179,11 @@ func TestDesignCleanup_StepMovingToBranchRemovesWithoutSessionExit(t *testing.T)
 		t.Fatalf("design worktree or branch removed before the step moved")
 	}
 	f.setDesignStepBranch(t)
+	// The watch is only a hint; rescan now instead of waiting on it. Tests that
+	// count checks leave this out: a second concurrent rescan would be a second check.
+	if err := f.h.Client.TicketChanged(f.ctx, "proj:map"); err != nil {
+		t.Fatal(err)
+	}
 	waitFor(t, func() bool { return f.designGone(t, dir) })
 }
 
