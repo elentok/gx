@@ -29,6 +29,14 @@ type InputsDigest struct {
 // writeDigests writes a text-only digest per session of every row into dir and
 // records them on the rows.
 func writeDigests(env evolveEnv, t evolveTarget, dir string, table *InputsTable) error {
+	// A conflict resolver runs as a fork, but its events are logged on the
+	// parent, so the fork's own row is the session's owner.
+	owned := map[string]bool{}
+	for _, row := range table.Rows {
+		for _, id := range row.Sessions {
+			owned[id] = true
+		}
+	}
 	for i := range table.Rows {
 		row := &table.Rows[i]
 		sessions := []struct{ id, kind string }{}
@@ -36,7 +44,9 @@ func writeDigests(env evolveEnv, t evolveTarget, dir string, table *InputsTable)
 			sessions = append(sessions, struct{ id, kind string }{id, digestMain})
 		}
 		for _, id := range row.ConflictSessions {
-			sessions = append(sessions, struct{ id, kind string }{id, digestConflict})
+			if !owned[id] {
+				sessions = append(sessions, struct{ id, kind string }{id, digestConflict})
+			}
 		}
 		for _, s := range sessions {
 			ds, err := digestSession(env, t, dir, row.ID, s.id, s.kind)

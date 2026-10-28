@@ -148,6 +148,11 @@ func TestEvolveInputs_TableOutput(t *testing.T) {
 func TestEvolveInputs_WritesDigests(t *testing.T) {
 	t.Parallel()
 	fx := inputsFixture(t)
+	// The conflict resolver runs as a fork of 04, so res-1 is the fork's own session.
+	fork := "---\nid: \"09\"\nstatus: done\ntype: conflict-resolution\nparent: \"04\"\nactual_context_window: 1\nelapsed_time: 100\nactual_cost: 1\nsession_ids: [res-1]\n---\nBody.\n"
+	if err := os.WriteFile(filepath.Join(fx.epic, "issues", "09-fork.md"), []byte(fork), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	root := t.TempDir()
 	put := func(path, content string) {
 		t.Helper()
@@ -221,5 +226,19 @@ func TestEvolveInputs_WritesDigests(t *testing.T) {
 	check("02", 1, "s2b", "main", "missing", "")
 	check("03", 0, "s3", "main", "codex", "codex-s3")
 	check("04", 0, "merge-1", "conflict", "missing", "")
-	check("04", 1, "res-1", "conflict", "claude", "resolved")
+	if len(digests["04"]) != 1 {
+		t.Errorf("ticket 04 digests = %+v, want only merge-1: res-1 belongs to its fork", digests["04"])
+	}
+	check("09", 0, "res-1", "main", "claude", "resolved")
+	files := 0
+	for _, ds := range digests {
+		for _, d := range ds {
+			if d.Session == "res-1" {
+				files++
+			}
+		}
+	}
+	if files != 1 {
+		t.Errorf("res-1 digested %d times, want once", files)
+	}
 }
