@@ -104,7 +104,7 @@ func TestSettingsFromConfigIncludesExecutionQueueLimits(t *testing.T) {
 	cfg.ExecutionQueue.MaxConcurrentTicketsPerEpic = 3
 	cfg.ExecutionQueue.MaxConcurrentEpics = 4
 
-	settings := settingsFromConfig(cfg)
+	settings := settingsFromConfig(config.Dirs{}, cfg)
 	if got := settings.MaxConcurrentTicketsPerEpic(); got != 3 {
 		t.Fatalf("MaxConcurrentTicketsPerEpic() = %d, want 3", got)
 	}

@@ -13,7 +13,6 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/elentok/gx/agentrunner/screen"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/clip"
@@ -110,12 +109,12 @@ type Model struct {
 func NewModel(client SessionClient, settings ui.Settings) Model {
 	sp := spinner.New()
 	sp.Spinner = ui.ProgressSpinnerFor(settings.UseNerdFontIcons)
-	m := Model{client: client, settings: settings, spinner: sp, sidebarMemo: &ui.Memo{}, mainMemo: &ui.Memo{}, joinMemo: &ui.Memo{}, dial: dialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: listFormProjects,
+	m := Model{client: client, settings: settings, spinner: sp, sidebarMemo: &ui.Memo{}, mainMemo: &ui.Memo{}, joinMemo: &ui.Memo{}, dial: dialHolderAttach, clipWrite: clip.Write, now: time.Now, listProjects: func() ([]formProject, error) { return listFormProjects(settings.TicketStore) },
 		focused: true, termProgram: os.Getenv("TERM_PROGRAM")}
 	if client != nil {
 		m.reporter = &focusReporter{client: client}
 	}
-	if data, err := config.DataDir(); err == nil {
+	if data, err := settings.Dirs.DataDir(); err == nil {
 		m.sessionsDir = filepath.Join(data, "sessions")
 	}
 	return m

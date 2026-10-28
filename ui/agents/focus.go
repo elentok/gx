@@ -22,8 +22,8 @@ const focusReportTimeout = 5 * time.Second
 
 // LastViewedFile is where the tab remembers the session viewed last, so a
 // new TUI opens on it; empty when the state dir is unknown.
-func LastViewedFile() string {
-	dir, err := config.StateDir()
+func LastViewedFile(dirs config.Dirs) string {
+	dir, err := dirs.StateDir()
 	if err != nil {
 		return ""
 	}

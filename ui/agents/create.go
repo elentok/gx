@@ -111,12 +111,8 @@ type sessionCreatedMsg struct {
 }
 
 // listFormProjects reads the ticket store's projects and each one's worktrees.
-func listFormProjects() ([]formProject, error) {
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, err
-	}
-	dirs, err := tickets.ProjectDirs(cfg.TicketStore.Path)
+func listFormProjects(ticketStore string) ([]formProject, error) {
+	dirs, err := tickets.ProjectDirs(ticketStore)
 	if err != nil {
 		return nil, err
 	}

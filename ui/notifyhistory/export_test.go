@@ -7,8 +7,11 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ui/notify"
 )
+
+func homeDirs(home string) config.Dirs { return config.DirsFrom([]string{"HOME=" + home}) }
 
 func TestSanitizeFilename(t *testing.T) {
 	tests := []struct {
@@ -35,10 +38,9 @@ func TestSanitizeFilename(t *testing.T) {
 
 func TestWriteExport_FileContentMatchesEntries(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 
 	entries := sampleEntries()
-	path, err := writeExport(entries, "myrepo", "mywt")
+	path, err := writeExport(homeDirs(home), entries, "myrepo", "mywt")
 	if err != nil {
 		t.Fatalf("writeExport: %v", err)
 	}
@@ -65,9 +67,8 @@ func TestWriteExport_FileContentMatchesEntries(t *testing.T) {
 
 func TestUpdateKey_WWExportsVisibleEntries(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 
-	m := New().Open(sampleEntries(), "repo", "wt")
+	m := New().WithDirs(homeDirs(home)).Open(sampleEntries(), "repo", "wt")
 	// Filter down to a single entry before exporting, so the export must
 	// respect the filtered set, not the full entry list.
 	m, _ = m.Update(keyMsg('/'))
@@ -128,9 +129,8 @@ func TestExport_ErrorWhenCacheDirCannotBeCreated(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, ".cache"), []byte("not a dir"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	t.Setenv("HOME", home)
 
-	m := New().Open(sampleEntries(), "repo", "wt")
+	m := New().WithDirs(homeDirs(home)).Open(sampleEntries(), "repo", "wt")
 	m, _ = m.Update(keyMsg('w'))
 	_, cmd := m.Update(keyMsg('w'))
 	if cmd == nil {

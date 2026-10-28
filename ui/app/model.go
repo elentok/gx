@@ -78,7 +78,7 @@ func New(repo git.Repo, settings Settings) Model {
 		livePageByTab: make(map[nav.TabID]livePage),
 		notify:        notify.New(settings.UseNerdFontIcons),
 		notifyLog:     notifylog.New(),
-		notifyHistory: notifyhistory.New(),
+		notifyHistory: notifyhistory.New().WithDirs(settings.Dirs),
 		gate:          reloadgate.New(),
 		conn:          &atomic.Pointer[ServerConn]{},
 	}
@@ -138,7 +138,7 @@ func (m Model) newAgentsModel(s ui.Settings) agentsui.Model {
 	if m.settings.Server == nil {
 		return agentsui.NewModel(nil, s)
 	}
-	return agentsui.NewModel(m.settings.Server.Client, s).WithLastViewedFile(agentsui.LastViewedFile()).
+	return agentsui.NewModel(m.settings.Server.Client, s).WithLastViewedFile(agentsui.LastViewedFile(s.Dirs)).
 		WithCwdProject(cwdProjectName(m.settings.ActiveWorktreePath))
 }
 

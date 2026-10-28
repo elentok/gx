@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/ui/notify"
 	"github.com/elentok/gx/ui/notifylog"
 	"github.com/elentok/gx/ui/search"
@@ -20,6 +21,7 @@ type Model struct {
 	entries      []notifylog.Entry
 	repoName     string
 	worktreeName string
+	dirs         config.Dirs
 
 	search   search.Model
 	scroll   int
@@ -28,6 +30,13 @@ type Model struct {
 
 func New() Model {
 	return Model{}
+}
+
+// WithDirs sets where the ww export finds the cache dir; the zero Dirs knows
+// none, so an export then fails.
+func (m Model) WithDirs(dirs config.Dirs) Model {
+	m.dirs = dirs
+	return m
 }
 
 // Open shows the modal over entries (oldest first, as notifylog.Log.Entries

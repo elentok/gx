@@ -66,7 +66,7 @@ func runWorktrees(dirs config.Dirs, _ string) error {
 		InitialRoute:       nav.ViewState{Tab: nav.TabWorktrees},
 		ActiveWorktreePath: activeWorktreePath,
 		Server:             serverDeps(dirs),
-		Settings:           settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(dirs, cfg),
 	})
 	return runApp(dirs, m, cfg)
 }
@@ -109,7 +109,7 @@ func runStatus(dirs config.Dirs, target string) error {
 		InitialRoute:       nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: root, InitialPath: initialPath},
 		ActiveWorktreePath: root,
 		Server:             serverDeps(dirs),
-		Settings:           settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(dirs, cfg),
 	})
 	return runApp(dirs, m, cfg)
 }
@@ -145,7 +145,7 @@ func runLog(dirs config.Dirs, opts LogOptions) error {
 		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: opts.Ref, FilterPath: opts.File},
 		ActiveWorktreePath: root,
 		Server:             serverDeps(dirs),
-		Settings:           settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(dirs, cfg),
 	})
 	return runApp(dirs, m, cfg)
 }
@@ -181,7 +181,7 @@ func runShow(dirs config.Dirs, ref string) error {
 		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
 		Server:             serverDeps(dirs),
-		Settings:           settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(dirs, cfg),
 	})
 	return runApp(dirs, m, cfg)
 }
@@ -217,7 +217,7 @@ func runStash(dirs config.Dirs) error {
 		InitialRoute:       nav.ViewState{Tab: nav.TabStash, WorktreeRoot: root},
 		ActiveWorktreePath: root,
 		Server:             serverDeps(dirs),
-		Settings:           settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(dirs, cfg),
 	})
 	return runApp(dirs, m, cfg)
 }
@@ -253,7 +253,7 @@ func runPRs(dirs config.Dirs, allRepos bool) error {
 		InitialRoute:       nav.ViewState{Tab: nav.TabPRs, WorktreeRoot: root, AllRepos: allRepos},
 		ActiveWorktreePath: root,
 		Server:             serverDeps(dirs),
-		Settings:           settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(dirs, cfg),
 	})
 	return runApp(dirs, m, cfg)
 }
@@ -278,7 +278,7 @@ func runTab(dirs config.Dirs, tab nav.TabID) error {
 		InitialRoute:       nav.ViewState{Tab: tab, WorktreeRoot: root},
 		ActiveWorktreePath: root,
 		Server:             serverDeps(dirs),
-		Settings:           settingsFromConfig(cfg),
+		Settings:           settingsFromConfig(dirs, cfg),
 	})
 	return runApp(dirs, m, cfg)
 }
@@ -332,7 +332,7 @@ var herdrUnavailable = func() bool {
 	return liveProbe.PingHerdr(agentrunner.HerdrPingTimeout) != nil
 }
 
-func settingsFromConfig(cfg config.Config) ui.Settings {
+func settingsFromConfig(dirs config.Dirs, cfg config.Config) ui.Settings {
 	return ui.Settings{
 		HerdrUnavailable: herdrUnavailable(),
 		UseNerdFontIcons: cfg.UseNerdFontIcons,
@@ -343,6 +343,7 @@ func settingsFromConfig(cfg config.Config) ui.Settings {
 		DiffContextLines: cfg.StageDiffContextLines,
 		NameAliases:      cfg.NameAliases,
 		TicketStore:      cfg.TicketStore.Path,
+		Dirs:             dirs,
 		LogConfig:        cfg.Log,
 		ExecutionQueue:   cfg.ExecutionQueue,
 		Notifications:    cfg.Notifications,

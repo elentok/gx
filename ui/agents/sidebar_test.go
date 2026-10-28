@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	ticketsui "github.com/elentok/gx/ui/tickets"
@@ -42,7 +43,8 @@ func fixtureSessions() []server.SessionInfo {
 
 func sidebarModel(t *testing.T, nerd bool, sessions []server.SessionInfo, width, height int) Model {
 	t.Helper()
-	m := NewModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: nerd})
+	dirs := config.DirsFrom([]string{"HOME=" + t.TempDir()})
+	m := NewModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: nerd, Dirs: dirs})
 	// Start on the first session in the sidebar, past the opening focus.
 	m.opened = true
 	m = withState(t, m, &viewmodel.State{Sessions: sessions}, ticketsui.ServerLinkUp)

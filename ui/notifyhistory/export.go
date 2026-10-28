@@ -18,7 +18,7 @@ import (
 var invalidFilenameChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
 func (m Model) export() (Model, tea.Cmd) {
-	path, err := writeExport(m.visibleEntries(), m.repoName, m.worktreeName)
+	path, err := writeExport(m.dirs, m.visibleEntries(), m.repoName, m.worktreeName)
 	if err != nil {
 		return m, notify.Error("export notifications: " + err.Error())
 	}
@@ -40,8 +40,8 @@ func (m Model) yank() (Model, tea.Cmd) {
 	return m, notify.Success("copied notifications")
 }
 
-func writeExport(entries []notifylog.Entry, repoName, worktreeName string) (string, error) {
-	base, err := config.UserCacheDir()
+func writeExport(dirs config.Dirs, entries []notifylog.Entry, repoName, worktreeName string) (string, error) {
+	base, err := dirs.UserCacheDir()
 	if err != nil {
 		return "", err
 	}

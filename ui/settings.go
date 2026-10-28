@@ -28,7 +28,11 @@ type Settings struct {
 	NameAliases      map[string]string // used by the worktrees view
 	// TicketStore is the ticket store's root, where the tickets tabs resolve
 	// a server-mode address to its ticket file.
-	TicketStore    string
+	TicketStore string
+	// Dirs resolves gx's config, state, data and cache dirs and the user's home
+	// from the env cmd was started with. The zero value knows none of them, so
+	// each read reports "unknown" rather than falling back to the process env.
+	Dirs           config.Dirs
 	LogConfig      config.LogConfig
 	ExecutionQueue config.ExecutionQueueConfig
 	Notifications  config.NotificationsConfig
