@@ -1,5 +1,7 @@
 package syshealth
 
+import "runtime"
+
 // Process is one row of the process table.
 type Process struct {
 	PID  int
@@ -23,6 +25,20 @@ type ProcessReader interface {
 	Read() (ProcessTable, error)
 	Argv(pid int) []string
 }
+
+// DefaultProcess returns the process reader for the OS gx is running on. An
+// unknown OS gets a reader that reports ErrUnavailable.
+func DefaultProcess() ProcessReader {
+	if _, r := selectProcessBackend(runtime.GOOS); r != nil {
+		return r
+	}
+	return unavailableProcessReader{}
+}
+
+type unavailableProcessReader struct{}
+
+func (unavailableProcessReader) Read() (ProcessTable, error) { return ProcessTable{}, ErrUnavailable }
+func (unavailableProcessReader) Argv(int) []string           { return nil }
 
 // selectProcessBackend picks the process backend for goos, like selectBackend.
 // An unknown OS gets nil.

@@ -726,6 +726,14 @@ func (c *Client) Health(ctx context.Context) (server.HealthReport, error) {
 	return rep, err
 }
 
+// HealthWait is Health with the `wait` option: a CPU list still reading is
+// held back until the server's second process read ends.
+func (c *Client) HealthWait(ctx context.Context) (server.HealthReport, error) {
+	var rep server.HealthReport
+	err := c.get(ctx, "/v1/health?wait", &rep)
+	return rep, err
+}
+
 // BudgetIncrease raises the live budget limits until the server restarts. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) BudgetIncrease(ctx context.Context, req server.BudgetIncreaseRequest) (server.BudgetResult, error) {

@@ -1196,8 +1196,41 @@ export interface DisksReport {
   disks: HealthDisk[];
 }
 /**
- * HealthReport is the health route's result. It holds the watcher's stored
- * values and takes no new reading.
+ * CauseMarker replaces a cause list's rows: the process table is unavailable,
+ * or the CPU list is waiting for its second read.
+ */
+export const CauseMarkerNone = "";
+export const CauseMarkerReading = "reading";
+export const CauseMarkerUnavailable = "unavailable";
+export type CauseMarker = typeof CauseMarkerNone | typeof CauseMarkerReading | typeof CauseMarkerUnavailable;
+/**
+ * CauseRow is one row of a cause list. CPU is a percent of the whole machine.
+ */
+export interface CauseRow {
+  kind: string;
+  label: string;
+  busiest?: string;
+  ticket?: string;
+  cpu: number /* float64 */;
+  mem_bytes: number /* uint64 */;
+}
+/**
+ * CauseList is the top rows of one list, or a marker in their place.
+ */
+export interface CauseList {
+  marker?: CauseMarker;
+  rows: CauseRow[];
+}
+/**
+ * HealthCauses are the top 3 by CPU and by memory.
+ */
+export interface HealthCauses {
+  cpu: CauseList;
+  memory: CauseList;
+}
+/**
+ * HealthReport is the health route's result. The meters are the watcher's
+ * stored values; only the cause lists can cause a new process read.
  */
 export interface HealthReport {
   host: string;
@@ -1205,6 +1238,7 @@ export interface HealthReport {
   cpu: CPUReport;
   memory: MemoryReport;
   disks: DisksReport;
+  causes: HealthCauses;
 }
 
 //////////

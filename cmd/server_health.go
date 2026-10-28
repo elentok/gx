@@ -37,7 +37,7 @@ func newServerHealthCmd(d deps) *cobra.Command {
 }
 
 func runServerHealth(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool) error {
-	rep, err := cl.Health(ctx)
+	rep, err := cl.HealthWait(ctx)
 	if err != nil {
 		return fmt.Errorf("server read failed: %w", err)
 	}
@@ -64,8 +64,33 @@ func runServerHealth(ctx context.Context, cl *apiclient.Client, w io.Writer, jso
 		}
 		lines = append(lines, line)
 	}
+	lines = append(lines, causeLines("top by cpu", rep.Causes.CPU, func(r server.CauseRow) string {
+		return fmt.Sprintf("%.1f%%", r.CPU)
+	})...)
+	lines = append(lines, causeLines("top by memory", rep.Causes.Memory, func(r server.CauseRow) string {
+		return config.ByteSize(r.MemBytes).String()
+	})...)
 	_, err = fmt.Fprintln(w, strings.Join(lines, "\n"))
 	return err
+}
+
+// causeLines is one cause list; a marker takes the place of its rows.
+func causeLines(title string, list server.CauseList, value func(server.CauseRow) string) []string {
+	switch list.Marker {
+	case server.CauseMarkerReading:
+		return []string{title + ": reading…"}
+	case server.CauseMarkerUnavailable:
+		return []string{title + ": processes unavailable"}
+	}
+	lines := []string{title + ":"}
+	for _, r := range list.Rows {
+		line := "  " + r.Label + " " + value(r)
+		if r.Busiest != "" {
+			line += " (" + r.Busiest + ")"
+		}
+		lines = append(lines, line)
+	}
+	return lines
 }
 
 // meterLine is one CPU or memory line; an unknown meter names its reason.

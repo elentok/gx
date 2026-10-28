@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"time"
@@ -65,14 +66,47 @@ type DisksReport struct {
 	Disks      []HealthDisk `json:"disks"`
 }
 
-// HealthReport is the health route's result. It holds the watcher's stored
-// values and takes no new reading.
+// CauseMarker replaces a cause list's rows: the process table is unavailable,
+// or the CPU list is waiting for its second read.
+type CauseMarker string
+
+const (
+	CauseMarkerNone        CauseMarker = ""
+	CauseMarkerReading     CauseMarker = "reading"
+	CauseMarkerUnavailable CauseMarker = "unavailable"
+)
+
+// CauseRow is one row of a cause list. CPU is a percent of the whole machine.
+type CauseRow struct {
+	Kind     string  `json:"kind"`
+	Label    string  `json:"label"`
+	Busiest  string  `json:"busiest,omitempty"`
+	Ticket   string  `json:"ticket,omitempty"`
+	CPU      float64 `json:"cpu"`
+	MemBytes uint64  `json:"mem_bytes"`
+}
+
+// CauseList is the top rows of one list, or a marker in their place.
+type CauseList struct {
+	Marker CauseMarker `json:"marker,omitempty"`
+	Rows   []CauseRow  `json:"rows"`
+}
+
+// HealthCauses are the top 3 by CPU and by memory.
+type HealthCauses struct {
+	CPU    CauseList `json:"cpu"`
+	Memory CauseList `json:"memory"`
+}
+
+// HealthReport is the health route's result. The meters are the watcher's
+// stored values; only the cause lists can cause a new process read.
 type HealthReport struct {
 	Host   string       `json:"host"`
 	Time   time.Time    `json:"time"`
 	CPU    CPUReport    `json:"cpu"`
 	Memory MemoryReport `json:"memory"`
 	Disks  DisksReport  `json:"disks"`
+	Causes HealthCauses `json:"causes"`
 }
 
 func pressureName(level int) string {
@@ -87,7 +121,7 @@ func pressureName(level int) string {
 	return ""
 }
 
-func (s *Server) healthReport() HealthReport {
+func (s *Server) healthReport(ctx context.Context, wait bool) HealthReport {
 	w := &s.healthW
 	w.mu.Lock()
 	h, l := w.health, w.latest
@@ -110,10 +144,12 @@ func (s *Server) healthReport() HealthReport {
 		Memory: MemoryReport{Percent: l.memPct, UsedBytes: l.memUsed, TotalBytes: l.memTotal, Average: l.memAvg,
 			Pressure: pressureName(l.pressure), Level: h.Memory.Level, State: h.Memory.State, Reason: h.Memory.Reason,
 			Thresholds: HealthThresholds{High: syshealth.MemHigh, Critical: syshealth.MemCritical}, ReadAt: h.Memory.ReadAt},
-		Disks: DisksReport{WarnBelow: sizeOrOff(ds.WarnBelow), CleanBelow: sizeOrOff(ds.CleanBelow), Disks: disks},
+		Disks:  DisksReport{WarnBelow: sizeOrOff(ds.WarnBelow), CleanBelow: sizeOrOff(ds.CleanBelow), Disks: disks},
+		Causes: s.healthCauses(ctx, wait),
 	}
 }
 
-func (s *Server) healthRead(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, s.healthReport())
+func (s *Server) healthRead(w http.ResponseWriter, r *http.Request) {
+	_, wait := r.URL.Query()["wait"]
+	writeJSON(w, s.healthReport(r.Context(), wait))
 }

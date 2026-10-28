@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/syshealth"
 )
 
 func TestServerHealth_TextNamesHostCPUMemoryAndEachDisk(t *testing.T) {
@@ -45,6 +46,26 @@ func TestServerHealth_JSONMatchesTheRoute(t *testing.T) {
 	host, _ := os.Hostname()
 	if got.Host != host || len(got.Disks.Disks) < 2 || got.Disks.Disks[0].TotalBytes == 0 || got.Disks.WarnBelow != "20G" {
 		t.Errorf("--json = %s", out.String())
+	}
+}
+
+// Seam: the verb calls the route with `wait`, so a quiet server answers with the
+// full CPU list, not the reading marker (story 55).
+func TestServerHealth_UsesWaitAndPrintsBothLists(t *testing.T) {
+	h := startDiskStatusServer(t, config.DiskSpaceConfig{WarnBelow: 20 * diskGB, CleanBelow: 10 * diskGB})
+	h.Processes.Set(
+		syshealth.Process{PID: 4001, PPID: 1, StartUnix: 1000, Comm: "busybee", CPUTicks: 400, MemBytes: 1 << 20},
+		syshealth.Process{PID: 4002, PPID: 1, StartUnix: 1000, Comm: "hog", CPUTicks: 10, MemBytes: 1 << 30},
+	)
+
+	var out bytes.Buffer
+	if err := runServerHealth(context.Background(), h.Client, &out, false); err != nil {
+		t.Fatal(err)
+	}
+	text := out.String()
+	cpu, mem, _ := strings.Cut(text, "top by memory:")
+	if strings.Contains(text, "reading") || !strings.Contains(cpu, "busybee 40.0%") || !strings.Contains(mem, "hog 1073741824") {
+		t.Errorf("output lacks the lists:\n%s", text)
 	}
 }
 

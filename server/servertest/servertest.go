@@ -42,7 +42,9 @@ type Harness struct {
 	// Disks is the free-space source, unless an option set its own FreeSpace.
 	Disks *FakeDisks
 	// System is the CPU and memory source, unless an option set its own SystemHealth.
-	System      *FakeSystem
+	System *FakeSystem
+	// Processes is the process table source, unless an option set its own ProcessSource.
+	Processes   *FakeProcesses
 	StateDir    string
 	SessionsDir string // the interactive sessions' state dirs
 	// ConversationsDir holds the linked sessions' conversation records.
@@ -570,6 +572,11 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h.System = NewFakeSystem()
 	if h.cfg.SystemHealth == nil {
 		h.cfg.SystemHealth = h.System.Read
+	}
+	// The real source reads the test machine's process table.
+	h.Processes = NewFakeProcesses()
+	if h.cfg.ProcessSource == nil {
+		h.cfg.ProcessSource = h.Processes.Read
 	}
 	// The real runner would empty the developer's Go cache on a low-disk machine.
 	if h.cfg.CleanupRunner == nil {

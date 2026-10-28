@@ -230,6 +230,7 @@ type Server struct {
 	cpuSpikes cpuSpikes
 	disks     diskWatch
 	healthW   healthWatch
+	procs     procWatch
 	// chats caches parsed session chats by transcript file.
 	chats chatCache
 	// transcripts caches where each conversation's transcript is.

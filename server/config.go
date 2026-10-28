@@ -85,6 +85,21 @@ type Config struct {
 	// HealthPollInterval is how often the health watcher reads; zero means 5 seconds.
 	HealthPollInterval time.Duration
 
+	// ProcessSource takes one process table read for the health route's cause
+	// lists; nil reads the real table.
+	ProcessSource func() (syshealth.ProcessTable, error)
+	// ProcessSecondReadDelay is the wait between the first and the second
+	// process read after a quiet spell; zero means 1 second.
+	ProcessSecondReadDelay time.Duration
+	// ProcessShareWindow is how long a process read answers later calls, from
+	// the read's own time; zero means 1 second.
+	ProcessShareWindow time.Duration
+	// ProcessCutoff is the age after which a process read is too old to be the
+	// first of a pair; zero means 15 seconds. It must exceed the popover's poll.
+	ProcessCutoff time.Duration
+	// ProcessWaitCap is the longest a `wait` call blocks; zero means 5 seconds.
+	ProcessWaitCap time.Duration
+
 	BudgetKillGrace time.Duration // wait between ctrl+c and closing a pane; zero means the default
 
 	// HardLimitGrace is how long a reload-lowered hard limit waits before it
