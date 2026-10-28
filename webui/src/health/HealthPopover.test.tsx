@@ -1,7 +1,8 @@
 import { act, fireEvent, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Health, HealthDisk, HealthReport } from "../generated/server";
+import type { CauseRow, Health, HealthCauses, HealthDisk, HealthReport } from "../generated/server";
+import { ticketHref } from "../hrefs";
 import { renderThemed } from "../ui/render";
 import { Tray } from "../ui/tray/Tray";
 
@@ -110,6 +111,101 @@ describe("Tray popover", () => {
     await waitFor(() => expect(queryByText("gx server")).toBeNull());
     await act(() => vi.advanceTimersByTimeAsync(15000));
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  describe("cause lists", () => {
+    const causeRow = (over: Partial<CauseRow>): CauseRow => ({ kind: "process", label: "x", cpu: 0, mem_bytes: 0, ...over });
+    const withCauses = (causes: HealthCauses, over: Partial<HealthReport> = {}) => {
+      respondWith({ ...report(), causes, ...over });
+    };
+    const part = (name: string) => document.querySelector(`[data-part='${name}']`)!;
+
+    it("lists the CPU and memory rows with right-aligned numbers", async () => {
+      withCauses({
+        cpu: { rows: [causeRow({ label: "node", cpu: 42.4 }), causeRow({ label: "other users", kind: "other", cpu: 9 })] },
+        memory: { rows: [causeRow({ label: "claude (not gx)", kind: "claude", mem_bytes: 2.5 * GIB })] },
+      });
+      await openTray();
+      const cpuRows = part("cpu-causes").querySelectorAll("[data-part='cause-row']");
+      expect(cpuRows).toHaveLength(2);
+      expect(cpuRows[0].textContent).toContain("node");
+      const cpuValue = cpuRows[0].querySelector("[data-part='cause-value']")!;
+      expect(cpuValue.textContent).toBe("42%");
+      expect(getComputedStyle(cpuValue).textAlign).toBe("right");
+      const memValue = part("memory-causes").querySelector("[data-part='cause-value']")!;
+      expect(memValue.textContent).toBe("2.5 GB");
+      expect(getComputedStyle(memValue).textAlign).toBe("right");
+      expect(part("memory-causes").textContent).toContain("claude (not gx)");
+    });
+
+    it("links an agent row to its ticket page with the busiest process in grey", async () => {
+      withCauses({
+        cpu: { rows: [causeRow({ kind: "agent", label: "gx:foo/03", ticket: "gx:foo/03", busiest: "go test", cpu: 30 })] },
+        memory: { rows: [] },
+      });
+      await openTray();
+      const row = part("cpu-causes").querySelector("[data-part='cause-row']")!;
+      const link = row.querySelector("a")!;
+      expect(link.textContent).toBe("gx:foo/03");
+      expect(link.getAttribute("href")).toBe(ticketHref("gx:foo/03"));
+      expect(row.textContent).toContain("gx:foo/03 · go test");
+      expect(row.querySelector("[data-part='cause-busiest']")!.textContent).toBe("go test");
+    });
+
+    it("shows a session name as plain text", async () => {
+      withCauses({ cpu: { rows: [causeRow({ kind: "agent", label: "design-1", cpu: 5 })] }, memory: { rows: [] } });
+      await openTray();
+      const row = part("cpu-causes").querySelector("[data-part='cause-row']")!;
+      expect(row.textContent).toContain("design-1");
+      expect(row.querySelector("a")).toBeNull();
+    });
+
+    it("replaces both lists with 'processes unavailable'", async () => {
+      withCauses({ cpu: { marker: "unavailable", rows: [] }, memory: { marker: "unavailable", rows: [] } });
+      await openTray();
+      expect(part("cpu-causes").textContent).toBe("processes unavailable");
+      expect(part("memory-causes").textContent).toBe("processes unavailable");
+    });
+
+    it("shows the lists whatever the meter state", async () => {
+      const r = report({ state: "unknown", reason: "waiting" });
+      r.causes = { cpu: { rows: [causeRow({ label: "node", cpu: 10 })] }, memory: { rows: [causeRow({ label: "node", mem_bytes: GIB })] } };
+      respondWith(r);
+      await openTray();
+      expect(part("memory-causes").textContent).toContain("node");
+    });
+
+    it("shows 'reading…' and makes one extra call with wait, whose answer replaces the list", async () => {
+      const reading = report();
+      reading.causes = { cpu: { marker: "reading", rows: [] }, memory: { rows: [] } };
+      const ready = report();
+      ready.causes = { cpu: { rows: [causeRow({ label: "node", cpu: 40 })] }, memory: { rows: [] } };
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      fetchMock.mockImplementation(async (url: string) => {
+        if (url.includes("wait")) {
+          await gate;
+          return new Response(JSON.stringify(ready));
+        }
+        return new Response(JSON.stringify(reading));
+      });
+      await openTray();
+      await waitFor(() => expect(part("cpu-causes").textContent).toBe("reading…"));
+      expect(fetchMock.mock.calls.map((c) => c[0])).toEqual(["/v1/health", "/v1/health?wait"]);
+      release();
+      await waitFor(() => expect(part("cpu-causes").textContent).toContain("node"));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("cuts a long label with an ellipsis", async () => {
+      withCauses({ cpu: { rows: [causeRow({ label: "a-very-long-process-name-".repeat(6), cpu: 3 })] }, memory: { rows: [] } });
+      await openTray();
+      const label = part("cpu-causes").querySelector("[data-part='cause-label']")!;
+      const style = getComputedStyle(label);
+      expect(style.textOverflow).toBe("ellipsis");
+      expect(style.overflow).toBe("hidden");
+      expect(style.whiteSpace).toBe("nowrap");
+    });
   });
 
   describe("disk row", () => {

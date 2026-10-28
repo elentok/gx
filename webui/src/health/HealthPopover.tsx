@@ -1,6 +1,7 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Link, Text } from "@chakra-ui/react";
 import { useEffect, useState, type ReactNode } from "react";
-import type { DisksReport, Health, HealthDisk, HealthReason, HealthReport, HealthState, HealthThresholds } from "../generated/server";
+import type { CauseList as CauseListData, CauseRow, DisksReport, Health, HealthDisk, HealthReason, HealthReport, HealthState, HealthThresholds } from "../generated/server";
+import { ticketHref } from "../hrefs";
 import { readPageCache, writePageCache } from "../pageCache";
 import { fetchJson } from "../ticket/detail";
 import { STATE_COLOR } from "../ui/tray/stateColor";
@@ -82,17 +83,19 @@ export function HealthPopover({ health, connected = true }: { health: Health; co
   useEffect(() => {
     if (!connected) return;
     let live = true;
-    const load = () =>
-      fetchJson<HealthReport>("/v1/health", "health")
+    // A "reading" CPU list gets one `wait` call, which the server answers when the list exists.
+    const load = (wait = false): Promise<void> =>
+      fetchJson<HealthReport>(wait ? "/v1/health?wait" : "/v1/health", "health")
         .then((res) => {
           if (!live || res.kind !== "ok") return;
           const next = { report: res.detail, at: Date.now() };
           writePageCache(CACHE_KEY, next);
           setReceived(next);
+          if (!wait && res.detail.causes.cpu.marker === "reading") return load(true);
         })
         .catch(() => {});
-    load();
-    const poll = setInterval(load, POLL_MS);
+    void load();
+    const poll = setInterval(() => void load(), POLL_MS);
     return () => {
       live = false;
       clearInterval(poll);
@@ -126,6 +129,7 @@ export function HealthPopover({ health, connected = true }: { health: Health; co
             : `1-minute average ${Math.round(cpu.average)}% · ${thresholdText(cpu.thresholds)}`
         }
       />
+      <CauseList part="cpu-causes" list={report.causes.cpu} value={(r) => `${Math.round(r.cpu)}%`} />
       <Row
         part="memory"
         icon={MEMORY_ICON}
@@ -139,6 +143,7 @@ export function HealthPopover({ health, connected = true }: { health: Health; co
             : `${gb(memory.used_bytes)} of ${gb(memory.total_bytes)} GB${pressure} · ${thresholdText(memory.thresholds)}`
         }
       />
+      <CauseList part="memory-causes" list={report.causes.memory} value={(r) => bytesText(r.mem_bytes)} />
       <DiskRow disks={report.disks} serverTime={report.time} />
       <Text px="14px" pt="2" pb="6px" borderTopWidth="1px" borderColor="hairline" fontSize="xs" color="text.faint" data-part="footer">
         {connected ? footer(report, at, now) : offlineFooter(at, now)}
@@ -244,6 +249,37 @@ function Bar({ percent, color, part }: { percent: number; color: string; part?: 
   return (
     <Box gridColumn="2 / 4" h="4px" borderRadius="2px" bg="hairline" overflow="hidden" mt="3px" mb="1px" data-part={part} data-percent={Math.round(clamped)}>
       <Box h="100%" w={`${clamped}%`} bg={color} />
+    </Box>
+  );
+}
+
+const bytesText = (bytes: number) => (bytes >= GIB ? `${gb(bytes)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`);
+
+const CAUSE_MARKER_TEXT: Record<string, string> = { unavailable: "processes unavailable", reading: "reading…" };
+
+function CauseList({ part, list, value }: { part: string; list: CauseListData; value: (row: CauseRow) => string }) {
+  const marker = list.marker ? CAUSE_MARKER_TEXT[list.marker] : undefined;
+  return (
+    <Box px="14px" pb="2" fontSize="xs" lineHeight="1.45" color="text.dim" data-part={part}>
+      {marker ??
+        list.rows.map((row, i) => (
+          <Box key={i} display="flex" gap="2" data-part="cause-row">
+            <Text as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" data-part="cause-label">
+              {row.ticket ? <Link href={ticketHref(row.ticket)}>{row.label}</Link> : row.label}
+              {row.ticket && row.busiest && (
+                <>
+                  {" · "}
+                  <Text as="span" color="text.faint" data-part="cause-busiest">
+                    {row.busiest}
+                  </Text>
+                </>
+              )}
+            </Text>
+            <Text as="span" textAlign="right" fontVariantNumeric="tabular-nums" data-part="cause-value">
+              {value(row)}
+            </Text>
+          </Box>
+        ))}
     </Box>
   );
 }
