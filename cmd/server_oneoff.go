@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +23,7 @@ const exitServerNotRunning = 8
 // same dedupe key.
 const exitDuplicateLive = 7
 
-func newServerOneOffCmd() *cobra.Command {
+func newServerOneOffCmd(d deps) *cobra.Command {
 	var req server.OneOffRequest
 	var jsonOut, wait bool
 	var timeout time.Duration
@@ -34,7 +35,7 @@ func newServerOneOffCmd() *cobra.Command {
 			if len(args) == 0 && req.File == "" {
 				return errors.New("a one-off needs a prompt argument or --file")
 			}
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}
@@ -54,7 +55,7 @@ func newServerOneOffCmd() *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			return runServerOneOff(ctx, cl, c.OutOrStdout(), c.ErrOrStderr(), jsonOut, wait, timeout, req)
+			return runServerOneOff(ctx, d.dirs(), cl, c.OutOrStdout(), c.ErrOrStderr(), jsonOut, wait, timeout, req)
 		},
 	}
 	cmd.Flags().StringVar(&req.Project, "project", "", "project to create the ticket in (default: the project owning the current directory, else scratch)")
@@ -77,7 +78,7 @@ func newServerOneOffCmd() *cobra.Command {
 
 // runServerOneOff never starts the server: a dead socket is a refusal with a
 // `gx server start` hint, exit code 8, and nothing spooled.
-func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Writer, jsonOut, wait bool, timeout time.Duration, req server.OneOffRequest) error {
+func runServerOneOff(ctx context.Context, dirs config.Dirs, cl *apiclient.Client, w, errW io.Writer, jsonOut, wait bool, timeout time.Duration, req server.OneOffRequest) error {
 	res, err := cl.OneOff(ctx, req)
 	switch {
 	case apiclient.IsNotRunning(err):
@@ -105,7 +106,7 @@ func runServerOneOff(ctx context.Context, cl *apiclient.Client, w, errW io.Write
 		return d.err
 	}
 	cwd, _ := os.Getwd()
-	return runOneOffWait(ctx, cl, archivedLookup(cwd), resultW, errW, res.Address, timeout)
+	return runOneOffWait(ctx, cl, archivedLookup(dirs, cwd), resultW, errW, res.Address, timeout)
 }
 
 // oneOffDecision is what a submit result means for the process, independent of

@@ -35,7 +35,7 @@ func newServerCmd(d deps) *cobra.Command {
 		Short: "orchestrator daemon commands",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runServer(c.Context())
+			return runServer(c.Context(), d)
 		},
 	}
 	var statusJSON bool
@@ -44,7 +44,7 @@ func newServerCmd(d deps) *cobra.Command {
 		Short: "show whether the server is running, with its pid and build",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runServerStatus(c.Context(), statusJSON, c.OutOrStdout())
+			return runServerStatus(c.Context(), d.dirs(), statusJSON, c.OutOrStdout())
 		},
 	}
 	status.Flags().BoolVar(&statusJSON, "json", false, "emit structured JSON instead of human-readable text")
@@ -69,7 +69,7 @@ a migration fails, the failed store is named and the server stays stopped.`,
 		Short: "register a launchd agent that starts the server at login and after a crash (macOS)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runServerInstall(c.OutOrStdout())
+			return runServerInstall(d.dirs(), c.OutOrStdout())
 		},
 	}, &cobra.Command{
 		Use:   "start",
@@ -83,7 +83,7 @@ a migration fails, the failed store is named and the server stays stopped.`,
 		Short: "stop the running server (SIGTERM) and wait for it to exit",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runServerStop(c.Context(), c.OutOrStdout())
+			return runServerStop(c.Context(), d.dirs(), c.OutOrStdout())
 		},
 	})
 	var logOpts serverLogsOpts
@@ -92,7 +92,7 @@ a migration fails, the failed store is named and the server stays stopped.`,
 		Short: "print the server log (server.log)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			stateDir, err := config.StateDir()
+			stateDir, err := d.dirs().StateDir()
 			if err != nil {
 				return err
 			}
@@ -115,7 +115,7 @@ a migration fails, the failed store is named and the server stays stopped.`,
 		Short: "print the server's ticket index and sequence number",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runServerSnapshot(c.Context(), snapJSON, c.OutOrStdout())
+			return runServerSnapshot(c.Context(), d.dirs(), snapJSON, c.OutOrStdout())
 		},
 	}
 	snapshot.Flags().BoolVar(&snapJSON, "json", false, "emit structured JSON instead of human-readable text")
@@ -136,17 +136,18 @@ a migration fails, the failed store is named and the server stays stopped.`,
 	}
 	kinds.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	eventsCmd.AddCommand(kinds)
-	cmd.AddCommand(eventsCmd, newServerLocksCmd(), newServerTicketsCmd(), newServerEpicsCmd(), newServerStatsCmd(), newServerIterationsCmd(), newServerAgentsCmd(), newServerQueueCmd(), newServerOneOffCmd(), newServerReloadConfigCmd(), newServerConfigStatusCmd(), newServerChecksCmd(), newServerChecksSaveCmd(), newServerDiskCmd(), newServerCPUSpikeCmd(), newServerWebTokenCmd(), newServerWebURLCmd())
+	cmd.AddCommand(eventsCmd, newServerLocksCmd(d), newServerTicketsCmd(d), newServerEpicsCmd(d), newServerStatsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d), newServerQueueCmd(d), newServerOneOffCmd(d), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d), newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDiskCmd(), newServerCPUSpikeCmd(d), newServerWebTokenCmd(d), newServerWebURLCmd(d))
 	return cmd
 }
 
 // runServer runs the foreground server until interrupted.
-func runServer(ctx context.Context) error {
-	stateDir, err := config.StateDir()
+func runServer(ctx context.Context, d deps) error {
+	dirs := d.dirs()
+	stateDir, err := dirs.StateDir()
 	if err != nil {
 		return err
 	}
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return err
 	}
@@ -159,7 +160,7 @@ func runServer(ctx context.Context) error {
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr
 	}
-	configPath, err := config.FilePath()
+	configPath, err := dirs.FilePath()
 	if err != nil {
 		return err
 	}
@@ -190,7 +191,7 @@ func runServer(ctx context.Context) error {
 	}
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
-		AutoAdvanceDelay: autoAdvanceDelay, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval})
+		AutoAdvanceDelay: autoAdvanceDelay, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env})
 	if err != nil {
 		return err
 	}
@@ -202,8 +203,8 @@ func runServer(ctx context.Context) error {
 	return srv.Serve(ctx)
 }
 
-func serverClient() (*apiclient.Client, error) {
-	stateDir, err := config.StateDir()
+func serverClient(dirs config.Dirs) (*apiclient.Client, error) {
+	stateDir, err := dirs.StateDir()
 	if err != nil {
 		return nil, err
 	}
@@ -230,26 +231,26 @@ type StatusInfo struct {
 	ConfigError string `json:"config_error,omitempty"`
 }
 
-func runServerStatus(ctx context.Context, jsonOut bool, w io.Writer) error {
+func runServerStatus(ctx context.Context, dirs config.Dirs, jsonOut bool, w io.Writer) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	c, err := serverClient()
+	c, err := serverClient(dirs)
 	if err != nil {
 		return err
 	}
-	return runServerStatusWith(ctx, c, jsonOut, w)
+	return runServerStatusWith(ctx, dirs, c, jsonOut, w)
 }
 
-func runServerStatusWith(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
-	cfg, cfgErr := config.Load()
+func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Client, jsonOut bool, w io.Writer) error {
+	cfg, cfgErr := dirs.Load()
 	if cfgErr != nil {
 		cfg = config.Default()
 	}
 	info := StatusInfo{}
 	n, err := c.Negotiate(ctx, getVersion())
 	if err == nil {
-		stateDir, serr := config.StateDir()
+		stateDir, serr := dirs.StateDir()
 		if serr != nil {
 			return serr
 		}
@@ -276,7 +277,7 @@ func runServerStatusWith(ctx context.Context, c *apiclient.Client, jsonOut bool,
 		info.ConfigError = cfgErr.Error()
 	}
 	if !info.Running {
-		if stateDir, serr := config.StateDir(); serr == nil {
+		if stateDir, serr := dirs.StateDir(); serr == nil {
 			if pid, held := server.LockHeldBy(stateDir); held {
 				info.Starting, info.Pid = true, pid
 			}
@@ -418,8 +419,8 @@ func installedService(stateDir string) serviceManager {
 	return a
 }
 
-func runServerInstall(w io.Writer) error {
-	stateDir, err := config.StateDir()
+func runServerInstall(dirs config.Dirs, w io.Writer) error {
+	stateDir, err := dirs.StateDir()
 	if err != nil {
 		return err
 	}
@@ -437,15 +438,16 @@ func runServerInstall(w io.Writer) error {
 // runServerStartCmd installs the skill bundle, then starts the server. A
 // skill install problem is a warning, never a failed start.
 func runServerStartCmd(ctx context.Context, d deps, w io.Writer) error {
+	dirs := d.dirs()
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	stateDir, err := config.StateDir()
+	stateDir, err := dirs.StateDir()
 	if err != nil {
 		return err
 	}
 	refreshSkills(d, w)
-	c, err := serverClient()
+	c, err := serverClient(dirs)
 	if err != nil {
 		return err
 	}
@@ -461,9 +463,9 @@ func serverSpawn(stateDir string) spawnFunc {
 }
 
 // serverStarter is runServerStart without output, for the TUI.
-func serverStarter(c *apiclient.Client) func(context.Context) error {
+func serverStarter(dirs config.Dirs, c *apiclient.Client) func(context.Context) error {
 	return func(ctx context.Context) error {
-		stateDir, err := config.StateDir()
+		stateDir, err := dirs.StateDir()
 		if err != nil {
 			return err
 		}
@@ -472,10 +474,11 @@ func serverStarter(c *apiclient.Client) func(context.Context) error {
 }
 
 func runServerRestart(ctx context.Context, d deps, w io.Writer, migrate bool) error {
+	dirs := d.dirs()
 	return restartSteps(migrate,
-		func() error { return runServerStop(ctx, w) },
+		func() error { return runServerStop(ctx, dirs, w) },
 		func() error {
-			cfg, err := config.Load()
+			cfg, err := dirs.Load()
 			if err != nil {
 				return err
 			}
@@ -516,12 +519,12 @@ func migrateAllProjects(storePath string, w io.Writer) error {
 	return nil
 }
 
-func runServerStop(ctx context.Context, w io.Writer) error {
-	stateDir, err := config.StateDir()
+func runServerStop(ctx context.Context, dirs config.Dirs, w io.Writer) error {
+	stateDir, err := dirs.StateDir()
 	if err != nil {
 		return err
 	}
-	c, err := serverClient()
+	c, err := serverClient(dirs)
 	if err != nil {
 		return err
 	}
@@ -585,11 +588,11 @@ func processAlive(pid int) bool {
 // merge is not reported as a failure.
 const stopTimeout = server.DefaultMergeStopTimeout + 15*time.Second
 
-func runServerSnapshot(ctx context.Context, jsonOut bool, w io.Writer) error {
+func runServerSnapshot(ctx context.Context, dirs config.Dirs, jsonOut bool, w io.Writer) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	c, err := serverClient()
+	c, err := serverClient(dirs)
 	if err != nil {
 		return err
 	}

@@ -13,8 +13,8 @@ const pingTimeout = time.Second
 // so the stream updates at once. Best effort: the file is already written and
 // is the truth, so a down server (or any failure) is silent — the server's own
 // watch and poll pick the change up when it runs.
-func pingServer(path string) {
-	pingLabels(serverClient, ticketLabel(path))
+func pingServer(d deps, path string) {
+	pingLabels(d.dial(), ticketLabel(path))
 }
 
 // pingLabels is pingServer for callers that already hold the labels, such as a

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/tickets"
@@ -77,7 +78,7 @@ func runDoctor(args []string, d deps) error {
 	// A broken repo can't resolve its project, so the trunk check would only
 	// repeat the repair issue above.
 	if findErr == nil {
-		if issue := checkTrunk(cwd, repo.Root); issue != nil {
+		if issue := checkTrunk(d.dirs(), cwd, repo.Root); issue != nil {
 			issues = append(issues, *issue)
 		}
 	}
@@ -204,8 +205,8 @@ func runDoctorGhosttyCheck(d deps, getenv func(string) string) error {
 
 // checkTrunk reports a missing trunk or unreadable project.json for cwd's
 // project. It never offers a fix: picking a branch is the owner's call.
-func checkTrunk(cwd, repoRoot string) *git.Issue {
-	projectDir, err := tickets.RootFor(cwd)
+func checkTrunk(dirs config.Dirs, cwd, repoRoot string) *git.Issue {
+	projectDir, err := tickets.RootForDirs(dirs, cwd)
 	if errors.Is(err, tickets.ErrNoProject) {
 		return nil
 	}

@@ -80,7 +80,7 @@ func TestExecute_TicketsSet_MultiFieldSuccess(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=draft", "--blocked-by=01,03"}, d)
 	if err != nil {
@@ -190,7 +190,7 @@ func TestExecute_TicketsSet_ValidationFailureWritesNothing(t *testing.T) {
 	writeTicketFile(t, path, original)
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=bogus-status"}, d)
 	if err == nil {
@@ -216,7 +216,7 @@ func TestExecute_TicketsSet_Commitless(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
 
 	err := execute([]string{"tickets", "set", path, "--commitless=true"}, d)
 	if err != nil {
@@ -243,7 +243,7 @@ func TestExecute_TicketsSet_OrchestrationStatusesRefused(t *testing.T) {
 			original := "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n"
 			writeTicketFile(t, path, original)
 
-			d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+			d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
 			err := execute([]string{"tickets", "set", path, "--status=" + status}, d)
 			if err == nil || !strings.Contains(err.Error(), "orchestration status") {
 				t.Fatalf("error = %v, want an orchestration-status refusal", err)
@@ -270,7 +270,7 @@ func TestExecute_TicketsSet_MapEpicClaimsAndCloses(t *testing.T) {
 	}
 	path := filepath.Join(epic, "issues", "04-pick.md")
 	writeTicketFile(t, path, "---\nid: \"04\"\nstatus: open\ntype: grilling\n---\nBody.\n")
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
 
 	for _, args := range [][]string{{"--status=claimed"}, {"--status=done", "--commitless=true"}} {
 		if err := execute(append([]string{"tickets", "set", path}, args...), d); err != nil {
@@ -324,7 +324,7 @@ func TestExecute_TicketsSet_StatusOpenAcceptedWithBody(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: draft\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
 	if err != nil {
@@ -347,7 +347,7 @@ func TestExecute_TicketsSet_RepairPausedToOpenAccepted(t *testing.T) {
 	writeTicketFile(t, path, "---\nid: \"04b\"\nstatus: paused\npause_reason: merge-error\ntype: implement\n---\nBody.\n")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: envFor(t)}
 
 	err := execute([]string{"tickets", "set", path, "--status=open"}, d)
 	if err != nil {

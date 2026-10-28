@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -15,11 +16,12 @@ import (
 // createdAt, closes it with `set --status=done`, and returns the stored ticket.
 func closeMapTicket(t *testing.T, createdAt time.Time, recs ...conversations.Record) schema.Ticket {
 	t.Helper()
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
-	root, err := conversations.DefaultDir()
+	env := tempEnv(t)
+	data, err := config.DirsFrom(env).DataDir()
 	if err != nil {
 		t.Fatal(err)
 	}
+	root := filepath.Join(data, "conversations")
 	if err := conversations.MarkStarted(root, time.Now().Add(-time.Hour)); err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +38,7 @@ func closeMapTicket(t *testing.T, createdAt time.Time, recs ...conversations.Rec
 			t.Fatal(err)
 		}
 	}
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t)}
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), getwd: nonAgentGetwd(t), env: env}
 	if err := execute([]string{"tickets", "set", path, "--status=done", "--commitless=true"}, d); err != nil {
 		t.Fatal(err)
 	}

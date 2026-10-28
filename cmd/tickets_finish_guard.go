@@ -19,7 +19,7 @@ import (
 // worktree's current tree. The refusal is a plain error: it writes nothing and
 // never pauses (ADR 0042). A ticket with no iteration branch or worktree, or a
 // branch with no commits, skips the guard.
-func checkFinishedGuard(c *cobra.Command, path string, getwd func() (string, error)) error {
+func checkFinishedGuard(dirs config.Dirs, c *cobra.Command, path string, getwd func() (string, error)) error {
 	if v, _ := c.Flags().GetString("iteration-status"); schema.IterationStatus(v) != schema.IterationStatusFinished {
 		return nil
 	}
@@ -63,11 +63,11 @@ func checkFinishedGuard(c *cobra.Command, path string, getwd func() (string, err
 	if err != nil {
 		return fmt.Errorf("%s: reading the tree of %s: %w", ticketLabel(path), wt, err)
 	}
-	dataDir, err := config.DataDir()
+	dataDir, err := dirs.DataDir()
 	if err != nil {
 		return err
 	}
-	recs, err := check.ReadRecords(dataDir, check.ProjectFor(wt))
+	recs, err := check.ReadRecords(dataDir, check.ProjectForDirs(dirs, wt))
 	if err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func checkFinishedGuard(c *cobra.Command, path string, getwd func() (string, err
 		return err
 	}
 	for _, a := range addrs {
-		if _, _, err := findTicket(cwd, a); err != nil {
+		if _, _, err := findTicket(dirs, cwd, a); err != nil {
 			return fmt.Errorf("%s: --check-failures %s: %w", label, a, err)
 		}
 	}

@@ -64,19 +64,27 @@ type deps struct {
 	probeGhostty     func() error
 	// serverClient dials the server; nil means the real one (tests inject a fake).
 	serverClient func() (*apiclient.Client, error)
+	// env is the process environment every config dir is resolved from.
+	env []string
 }
+
+// dirs resolves the config, data and state directories from the deps env.
+func (d deps) dirs() config.Dirs { return config.DirsFrom(d.env) }
 
 // dial returns the injected server client factory, or the real one.
 func (d deps) dial() func() (*apiclient.Client, error) {
 	if d.serverClient != nil {
 		return d.serverClient
 	}
-	return serverClient
+	return func() (*apiclient.Client, error) { return serverClient(d.dirs()) }
 }
 
 func defaultDeps() deps {
-	cfg, _ := config.Load()
+	env := os.Environ()
+	dirs := config.DirsFrom(env)
+	cfg, _ := dirs.Load()
 	return deps{
+		env:    env,
 		stdin:  os.Stdin,
 		stdout: os.Stdout,
 		stderr: os.Stderr,
@@ -84,16 +92,16 @@ func defaultDeps() deps {
 		confirmForce: func(prompt string) (bool, error) {
 			return confirm.RunWithNerd(prompt, cfg.UseNerdFontIcons)
 		},
-		runWorktrees:         runWorktrees,
-		runStatus:            runStatus,
-		runLog:               runLog,
-		runShow:              runShow,
-		runStash:             runStash,
-		runPRs:               runPRs,
-		runTab:               runTab,
+		runWorktrees:         func(target string) error { return runWorktrees(dirs, target) },
+		runStatus:            func(target string) error { return runStatus(dirs, target) },
+		runLog:               func(opts LogOptions) error { return runLog(dirs, opts) },
+		runShow:              func(ref string) error { return runShow(dirs, ref) },
+		runStash:             func() error { return runStash(dirs) },
+		runPRs:               func(allRepos bool) error { return runPRs(dirs, allRepos) },
+		runTab:               func(tab nav.TabID) error { return runTab(dirs, tab) },
 		choosePushDivergence: choosePushDivergence,
-		initConfig:           config.Init,
-		loadConfig:           config.Load,
+		initConfig:           dirs.Init,
+		loadConfig:           dirs.Load,
 		getenv:               os.Getenv,
 		goos:                 runtime.GOOS,
 		userHomeDir:          os.UserHomeDir,
@@ -102,7 +110,7 @@ func defaultDeps() deps {
 		readClaudeOccupancy:  transcript.LastAssistantOccupancy,
 		verifyCodexSession:   codexsession.VerifyIdentity,
 		readCodexContext:     codexsession.LastContextTokens,
-		readAutoAdvance:      readServerAutoAdvance,
+		readAutoAdvance:      func(sessionID string) (bool, error) { return readServerAutoAdvance(dirs, sessionID) },
 		skillsAgentRoots:     defaultSkillsAgentRoots,
 		skillsManifestPath:   defaultSkillsManifestPath,
 		skillsStatusPath:     defaultSkillsStatusPath,
@@ -137,10 +145,11 @@ func defaultSkillsStatusPath() (string, error) {
 // Execute runs gx with the provided arguments.
 func Execute(args []string) error {
 	config.WarnOnMigrateFailure(os.Stderr)
-	if dir, err := config.StateDir(); err == nil {
+	d := defaultDeps()
+	if dir, err := d.dirs().StateDir(); err == nil {
 		logger.SetDir(dir)
 	}
-	return execute(args, defaultDeps())
+	return execute(args, d)
 }
 
 // execute builds the cobra command tree from the given deps and runs it against
@@ -190,7 +199,7 @@ Run without a command to open the status UI.`,
 	root.AddCommand(
 		newAgentCmd(d),
 		newAgentsCmd(d),
-		newDesignsCmd(),
+		newDesignsCmd(d),
 		newClaudeCmd(d),
 		newWorktreesCmd(d),
 		newPushCmd(d),
@@ -205,7 +214,7 @@ Run without a command to open the status UI.`,
 		newEvolveCmd(d),
 		newProjectCmd(d),
 		newBudgetCmd(d),
-		newAFKCmd(),
+		newAFKCmd(d),
 		newMergeCmd(d),
 		newCleanupCmd(d),
 		newSkillsCmd(d),

@@ -367,16 +367,16 @@ func defaultEvolveEnv(d deps) (evolveEnv, error) {
 		merged: defaultMerged(cfg.TicketStore.Path)}
 	// Missing dirs only cost digests, which then report "missing".
 	env.homeDir, _ = d.userHomeDir()
-	env.stateDir, _ = config.StateDir()
-	env.dataDir, _ = config.DataDir()
+	env.stateDir, _ = d.dirs().StateDir()
+	env.dataDir, _ = d.dirs().DataDir()
 	env.codexHome = sessionlookup.DefaultRoots().CodexHome
 	if cwd, err := os.Getwd(); err == nil {
-		if root, err := ticketRoot(cwd); err == nil {
+		if root, err := ticketRoot(d.dirs(), cwd); err == nil {
 			env.cwdProject = tickets.ProjectName(root)
 		}
 	}
 	env.submit = func(ctx context.Context, req server.OneOffRequest) (server.OneOffResult, error) {
-		cl, err := serverClient()
+		cl, err := d.dial()()
 		if err != nil {
 			return server.OneOffResult{}, err
 		}

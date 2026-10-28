@@ -30,7 +30,7 @@ func TestRunTicketsAddBody_CreatesOpenTicketUnderParent(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "12", "child", "## What to build\n\nDo it.\n", addFrontmatter{}, false, &stdout, io.Discard); err != nil {
+	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "12", "child", "## What to build\n\nDo it.\n", addFrontmatter{}, false, &stdout, io.Discard); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -63,7 +63,7 @@ func TestRunTicketsAddBody_MergesBodyFrontmatter(t *testing.T) {
 	body := "---\nid: \"07\"\nstatus: open\nblocked_by: [\"01\"]\ntype: grilling\nexpected_context_window: 60000\n---\n\n# Decide it\n\n## Question\n\nWhich?\n"
 
 	var stdout, stderr bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "", "decide", body, addFrontmatter{}, false, &stdout, &stderr); err != nil {
+	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "decide", body, addFrontmatter{}, false, &stdout, &stderr); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -99,7 +99,7 @@ func TestRunTicketsAddBody_BadBodyFrontmatterRefusesWithoutWriting(t *testing.T)
 			t.Parallel()
 			epicPath, issuesDir := newAddEpic(t)
 			body := "---\n" + fm + "---\n\n# T\n\nBody.\n"
-			if err := runTicketsAddBody(epicPath, "", "bad", body, addFrontmatter{}, false, io.Discard, io.Discard); err == nil {
+			if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "bad", body, addFrontmatter{}, false, io.Discard, io.Discard); err == nil {
 				t.Fatal("want a refusal")
 			}
 			if entries, _ := os.ReadDir(issuesDir); len(entries) != 0 {
@@ -114,7 +114,7 @@ func TestRunTicketsAddBody_EmptyBodyFailsWithoutWriting(t *testing.T) {
 	epicPath, issuesDir := newAddEpic(t)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "", "empty", "  \n", addFrontmatter{}, false, &stdout, io.Discard); err == nil {
+	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "empty", "  \n", addFrontmatter{}, false, &stdout, io.Discard); err == nil {
 		t.Fatal("want error for empty body, got nil")
 	}
 	entries, _ := os.ReadDir(issuesDir)
@@ -128,7 +128,7 @@ func TestRunTicketsAddBody_JSON(t *testing.T) {
 	epicPath, _ := newAddEpic(t)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "", "thing", "body\n", addFrontmatter{}, true, &stdout, io.Discard); err != nil {
+	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "thing", "body\n", addFrontmatter{}, true, &stdout, io.Discard); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 	var got struct{ Address, Path string }
@@ -187,7 +187,7 @@ func TestRunTicketsSection_WritesAndPrintsAddress(t *testing.T) {
 	writeTicket(t, path, "01", "open", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsSection(path, "Notes", "hello\n", false, &stdout); err != nil {
+	if err := runTicketsSection(deps{env: envFor(t)}, path, "Notes", "hello\n", false, &stdout); err != nil {
 		t.Fatalf("runTicketsSection: %v", err)
 	}
 	raw, _ := os.ReadFile(path)

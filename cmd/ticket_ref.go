@@ -14,14 +14,14 @@ import (
 // findTicket resolves addr (full or short form) against the cwd project. An
 // address that names nothing is refused with a tickets.AddressError carrying
 // a stable code.
-func findTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
-	a, t, err := lookupTicket(cwd, addr)
+func findTicket(dirs config.Dirs, cwd, addr string) (tickets.Address, tickets.Ticket, error) {
+	a, t, err := lookupTicket(dirs, cwd, addr)
 	var ae *tickets.AddressError
 	if !errors.As(err, &ae) || (ae.Code != tickets.CodeUnknownTicket && ae.Code != tickets.CodeUnknownEpic) {
 		return a, t, err
 	}
 	// An archived one-off keeps answering to its old address.
-	root, rootErr := projectRoot(cwd, a.Project)
+	root, rootErr := projectRoot(dirs, cwd, a.Project)
 	if rootErr != nil {
 		return a, t, err
 	}
@@ -31,8 +31,8 @@ func findTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
 	return a, t, err
 }
 
-func lookupTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
-	cwdRoot, rootErr := ticketRoot(cwd)
+func lookupTicket(dirs config.Dirs, cwd, addr string) (tickets.Address, tickets.Ticket, error) {
+	cwdRoot, rootErr := ticketRoot(dirs, cwd)
 	ctxProject := ""
 	if rootErr == nil {
 		ctxProject = tickets.ProjectName(cwdRoot)
@@ -45,7 +45,7 @@ func lookupTicket(cwd, addr string) (tickets.Address, tickets.Ticket, error) {
 		// A short form needs the cwd project, which cwd doesn't have.
 		return a, tickets.Ticket{}, rootErr
 	}
-	root, err := projectRoot(cwd, a.Project)
+	root, err := projectRoot(dirs, cwd, a.Project)
 	if err != nil {
 		return a, tickets.Ticket{}, err
 	}
@@ -78,11 +78,11 @@ func isUnknownTicket(err error) bool {
 // cwd project or any other. An unregistered name is refused with
 // tickets.CodeUnknownProject. add, show, set and section use it; close and
 // move are meant to reuse it.
-func projectRoot(cwd, project string) (string, error) {
-	if root, err := ticketRoot(cwd); err == nil && tickets.ProjectName(root) == project {
+func projectRoot(dirs config.Dirs, cwd, project string) (string, error) {
+	if root, err := ticketRoot(dirs, cwd); err == nil && tickets.ProjectName(root) == project {
 		return root, nil
 	}
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return "", err
 	}
@@ -93,7 +93,7 @@ func projectRoot(cwd, project string) (string, error) {
 // address — into the ticket file's path. An existing file always wins, so a
 // path never gets reinterpreted; anything that is not an address either is
 // passed through for the caller's own "no such file" error.
-func resolveTicketRef(getwd func() (string, error), arg string) (string, error) {
+func resolveTicketRef(dirs config.Dirs, getwd func() (string, error), arg string) (string, error) {
 	if _, err := os.Stat(arg); err == nil || getwd == nil {
 		return arg, nil
 	}
@@ -102,13 +102,13 @@ func resolveTicketRef(getwd func() (string, error), arg string) (string, error) 
 		return "", err
 	}
 	if project, epic, ok := tickets.ParseEpicAddress(arg); ok {
-		root, err := projectRoot(cwd, project)
+		root, err := projectRoot(dirs, cwd, project)
 		if err != nil {
 			return "", err
 		}
 		return tickets.EpicTicketMDPath(root, project, epic)
 	}
-	_, t, err := findTicket(cwd, arg)
+	_, t, err := findTicket(dirs, cwd, arg)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) && addrErr.Code == tickets.CodeMalformedAddress {
 		return arg, nil

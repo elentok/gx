@@ -23,14 +23,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func runWorktrees(_ string) error {
+func runWorktrees(dirs config.Dirs, _ string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
 	// A trunk error still returns a repo; the worktrees view shows it as a warning.
-	repo, err := tickets.OpenRepo(cwd)
+	repo, err := tickets.OpenRepoDirs(dirs, cwd)
 	if repo == nil {
 		return err
 	}
@@ -58,20 +58,20 @@ func runWorktrees(_ string) error {
 		activeWorktreePath = info.WorktreeRoot
 	}
 
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabWorktrees},
 		ActiveWorktreePath: activeWorktreePath,
-		Server:             serverDeps(),
+		Server:             serverDeps(dirs),
 		Settings:           settingsFromConfig(cfg),
 	})
-	return runApp(m, cfg)
+	return runApp(dirs, m, cfg)
 }
 
-func runStatus(target string) error {
+func runStatus(dirs config.Dirs, target string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -97,7 +97,7 @@ func runStatus(target string) error {
 		}
 	}
 
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return err
 	}
@@ -108,13 +108,13 @@ func runStatus(target string) error {
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabStatus, WorktreeRoot: root, InitialPath: initialPath},
 		ActiveWorktreePath: root,
-		Server:             serverDeps(),
+		Server:             serverDeps(dirs),
 		Settings:           settingsFromConfig(cfg),
 	})
-	return runApp(m, cfg)
+	return runApp(dirs, m, cfg)
 }
 
-func runLog(opts LogOptions) error {
+func runLog(dirs config.Dirs, opts LogOptions) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -137,20 +137,20 @@ func runLog(opts LogOptions) error {
 		return err
 	}
 
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: opts.Ref, FilterPath: opts.File},
 		ActiveWorktreePath: root,
-		Server:             serverDeps(),
+		Server:             serverDeps(dirs),
 		Settings:           settingsFromConfig(cfg),
 	})
-	return runApp(m, cfg)
+	return runApp(dirs, m, cfg)
 }
 
-func runShow(ref string) error {
+func runShow(dirs config.Dirs, ref string) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -173,20 +173,20 @@ func runShow(ref string) error {
 		return err
 	}
 
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabLog, WorktreeRoot: root, Ref: ref},
 		ActiveWorktreePath: root,
-		Server:             serverDeps(),
+		Server:             serverDeps(dirs),
 		Settings:           settingsFromConfig(cfg),
 	})
-	return runApp(m, cfg)
+	return runApp(dirs, m, cfg)
 }
 
-func runStash() error {
+func runStash(dirs config.Dirs) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -209,20 +209,20 @@ func runStash() error {
 		return err
 	}
 
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabStash, WorktreeRoot: root},
 		ActiveWorktreePath: root,
-		Server:             serverDeps(),
+		Server:             serverDeps(dirs),
 		Settings:           settingsFromConfig(cfg),
 	})
-	return runApp(m, cfg)
+	return runApp(dirs, m, cfg)
 }
 
-func runPRs(allRepos bool) error {
+func runPRs(dirs config.Dirs, allRepos bool) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -245,21 +245,21 @@ func runPRs(allRepos bool) error {
 		return err
 	}
 
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: nav.TabPRs, WorktreeRoot: root, AllRepos: allRepos},
 		ActiveWorktreePath: root,
-		Server:             serverDeps(),
+		Server:             serverDeps(dirs),
 		Settings:           settingsFromConfig(cfg),
 	})
-	return runApp(m, cfg)
+	return runApp(dirs, m, cfg)
 }
 
 // runTab opens the TUI on tab (`gx tickets`, `gx agents`).
-func runTab(tab nav.TabID) error {
+func runTab(dirs config.Dirs, tab nav.TabID) error {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -270,17 +270,17 @@ func runTab(tab nav.TabID) error {
 		return err
 	}
 
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return err
 	}
 	m := app.New(*repo, app.Settings{
 		InitialRoute:       nav.ViewState{Tab: tab, WorktreeRoot: root},
 		ActiveWorktreePath: root,
-		Server:             serverDeps(),
+		Server:             serverDeps(dirs),
 		Settings:           settingsFromConfig(cfg),
 	})
-	return runApp(m, cfg)
+	return runApp(dirs, m, cfg)
 }
 
 // tabTarget finds the repo and worktree root tab opens on from cwd. The
@@ -315,12 +315,12 @@ func tabTarget(cwd string, tab nav.TabID) (*git.Repo, string, error) {
 
 // serverDeps carries the API client and the "start the server" action the TUI
 // offers when it is down.
-func serverDeps() *app.ServerDeps {
-	c, err := serverClient()
+func serverDeps(dirs config.Dirs) *app.ServerDeps {
+	c, err := serverClient(dirs)
 	if err != nil {
 		return nil
 	}
-	return &app.ServerDeps{Client: c.AsTUI(), Build: getVersion(), Start: serverStarter(c)}
+	return &app.ServerDeps{Client: c.AsTUI(), Build: getVersion(), Start: serverStarter(dirs, c)}
 }
 
 // herdrUnavailable reports herdr missing from PATH or not answering. It is
@@ -375,10 +375,10 @@ func resolveStatusTargetPath(worktreeRoot, cwd, target string) (string, error) {
 
 // runApp runs the TUI with a CPU watchdog beside it: a spike is captured here
 // and reported to the server, which decides whether to file a ticket.
-func runApp(m tea.Model, cfg config.Config) error {
+func runApp(dirs config.Dirs, m tea.Model, cfg config.Config) error {
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
-	if stateDir, err := config.StateDir(); err == nil {
+	if stateDir, err := dirs.StateDir(); err == nil {
 		w := &cpuwatch.Watcher{
 			Config: server.CPUWatchConfig(cfg.CPUWatchdog),
 			Source: "tui",

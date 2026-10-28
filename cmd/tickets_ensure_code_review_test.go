@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -20,8 +21,8 @@ func TestResolveEpicArg_BareNameAndFullPathResolveToSameEpic(t *testing.T) {
 	epicDir := filepath.Join(project, "widget-epic")
 	testutil.Mkdir(t, epicDir)
 
-	bareResolved := resolveEpicArg("widget-epic", repoDir)
-	fullResolved := resolveEpicArg(epicDir, repoDir)
+	bareResolved := resolveEpicArg(config.DirsFrom(envFor(t)), "widget-epic", repoDir)
+	fullResolved := resolveEpicArg(config.DirsFrom(envFor(t)), epicDir, repoDir)
 
 	if bareResolved != epicDir {
 		t.Errorf("resolveEpicArg(bare name) = %q, want %q", bareResolved, epicDir)
@@ -40,10 +41,10 @@ func TestResolveEpicArg_ProjectEpicAddressResolvesInCurrentAndOtherProject(t *te
 	testutil.Mkdir(t, filepath.Join(mine, "widget-epic"))
 	testutil.Mkdir(t, filepath.Join(other, "gadget-epic"))
 
-	if got, want := resolveEpicArg("mine:widget-epic", repoDir), filepath.Join(mine, "widget-epic"); got != want {
+	if got, want := resolveEpicArg(config.DirsFrom(envFor(t)), "mine:widget-epic", repoDir), filepath.Join(mine, "widget-epic"); got != want {
 		t.Errorf("resolveEpicArg(current project address) = %q, want %q", got, want)
 	}
-	if got, want := resolveEpicArg("other:gadget-epic", repoDir), filepath.Join(other, "gadget-epic"); got != want {
+	if got, want := resolveEpicArg(config.DirsFrom(envFor(t)), "other:gadget-epic", repoDir), filepath.Join(other, "gadget-epic"); got != want {
 		t.Errorf("resolveEpicArg(other project address) = %q, want %q", got, want)
 	}
 }
@@ -53,7 +54,7 @@ func TestResolveEpicArg_UnknownBareNameReturnedUnchanged(t *testing.T) {
 	repoDir := testutil.TempRepo(t)
 	addProject(t, store, "mine", repoDir)
 
-	resolved := resolveEpicArg("no-such-epic", repoDir)
+	resolved := resolveEpicArg(config.DirsFrom(envFor(t)), "no-such-epic", repoDir)
 
 	if resolved != "no-such-epic" {
 		t.Errorf("resolveEpicArg(unknown name) = %q, want it returned unchanged", resolved)
@@ -68,7 +69,7 @@ func TestCompleteEpicNames_ListsEpicsExcludingDotDirectories(t *testing.T) {
 	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "widget-epic"))
 	testutil.Mkdir(t, filepath.Join(project, ".archive"))
 
-	names, err := completeEpicNames(repoDir)
+	names, err := completeEpicNames(config.DirsFrom(envFor(t)), repoDir)
 	if err != nil {
 		t.Fatalf("completeEpicNames: %v", err)
 	}

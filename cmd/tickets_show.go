@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -44,8 +45,8 @@ func currentEpic(cwd string) string {
 // of every ticket of an epic that has it, each under a line naming the ticket.
 // A single ticket without the section is an error; --section and --json are
 // kept apart by the command's flag definitions.
-func runTicketsShow(cwd, addr string, jsonOut bool, section string, w io.Writer) error {
-	a, t, err := findTicket(cwd, addr)
+func runTicketsShow(dirs config.Dirs, cwd, addr string, jsonOut bool, section string, w io.Writer) error {
+	a, t, err := findTicket(dirs, cwd, addr)
 	var addrErr *tickets.AddressError
 	if errors.As(err, &addrErr) && addrErr.Code == tickets.CodeMalformedAddress {
 		if project, epic, ok := parseEpicArg(addr); ok {
@@ -53,9 +54,9 @@ func runTicketsShow(cwd, addr string, jsonOut bool, section string, w io.Writer)
 				return &tickets.AddressError{Code: tickets.CodeEpicJSON, Msg: "--json is not supported for an epic address"}
 			}
 			if section != "" {
-				return showEpicSection(cwd, project, epic, section, w)
+				return showEpicSection(dirs, cwd, project, epic, section, w)
 			}
-			return showEpic(cwd, project, epic, w)
+			return showEpic(dirs, cwd, project, epic, w)
 		}
 	}
 	if err != nil {
@@ -85,12 +86,12 @@ func printTicketSection(a tickets.Address, t tickets.Ticket, section string, w i
 
 // resolveEpic finds the ticket root and project for an epic argument whose
 // project may be empty (the cwd project), and checks the epic exists.
-func resolveEpic(cwd, project, name string) (root, resolved, path string, err error) {
+func resolveEpic(dirs config.Dirs, cwd, project, name string) (root, resolved, path string, err error) {
 	if project == "" {
-		root, err = ticketRoot(cwd)
+		root, err = ticketRoot(dirs, cwd)
 		project = tickets.ProjectName(root)
 	} else {
-		root, err = projectRoot(cwd, project)
+		root, err = projectRoot(dirs, cwd, project)
 	}
 	if err != nil {
 		return "", "", "", err
@@ -103,8 +104,8 @@ func resolveEpic(cwd, project, name string) (root, resolved, path string, err er
 }
 
 // showEpicSection prints the named section of each of the epic's tickets.
-func showEpicSection(cwd, project, name, section string, w io.Writer) error {
-	root, project, _, err := resolveEpic(cwd, project, name)
+func showEpicSection(dirs config.Dirs, cwd, project, name, section string, w io.Writer) error {
+	root, project, _, err := resolveEpic(dirs, cwd, project, name)
 	if err != nil {
 		return err
 	}
@@ -139,8 +140,8 @@ func parseEpicArg(s string) (project, epic string, ok bool) {
 }
 
 // showEpic prints the epic's ticket.md verbatim, then one line per ticket.
-func showEpic(cwd, project, name string, w io.Writer) error {
-	root, project, path, err := resolveEpic(cwd, project, name)
+func showEpic(dirs config.Dirs, cwd, project, name string, w io.Writer) error {
+	root, project, path, err := resolveEpic(dirs, cwd, project, name)
 	if err != nil {
 		return err
 	}

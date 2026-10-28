@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
@@ -32,7 +33,7 @@ func TestRunTicketsEpicAdd_CreatesEpics(t *testing.T) {
 		{"mine:p", "loop", "draft", "---\ndestination_unconfirmed: true\n---\n\n# P\n", []string{"destination_unconfirmed: true", "# P"}},
 	} {
 		var out bytes.Buffer
-		if err := runTicketsEpicAdd(cwd, tc.arg, tc.kind, tc.status, tc.body, &out); err != nil {
+		if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, tc.arg, tc.kind, tc.status, tc.body, &out); err != nil {
 			t.Fatalf("%s: %v", tc.arg, err)
 		}
 		name := strings.TrimPrefix(tc.arg, "mine:")
@@ -61,7 +62,7 @@ func TestRunTicketsEpicAdd_StampsCreatedAtAndMapCompletedAt(t *testing.T) {
 		if arg == "mine:other" {
 			kind = "loop"
 		}
-		if err := runTicketsEpicAdd(cwd, arg, kind, "open", "", &bytes.Buffer{}); err != nil {
+		if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, arg, kind, "open", "", &bytes.Buffer{}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -71,7 +72,7 @@ func TestRunTicketsEpicAdd_StampsCreatedAtAndMapCompletedAt(t *testing.T) {
 	if !tickets.LoadEpicTicketMD(filepath.Join(project, "m")).CompletedAt.IsZero() {
 		t.Error("map completed before its impl epic exists")
 	}
-	if err := runTicketsEpicAdd(cwd, "mine:m-impl", "loop", "open", "", &bytes.Buffer{}); err != nil {
+	if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "mine:m-impl", "loop", "open", "", &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	m := tickets.LoadEpicTicketMD(filepath.Join(project, "m"))
@@ -79,7 +80,7 @@ func TestRunTicketsEpicAdd_StampsCreatedAtAndMapCompletedAt(t *testing.T) {
 	if impl.CreatedAt.IsZero() || m.CompletedAt.IsZero() || !m.CompletedAt.Equal(impl.CreatedAt) {
 		t.Errorf("map completed_at %v, impl created_at %v; want equal and set", m.CompletedAt, impl.CreatedAt)
 	}
-	if err := runTicketsEpicAdd(cwd, "mine:other-impl", "loop", "open", "", &bytes.Buffer{}); err != nil {
+	if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "mine:other-impl", "loop", "open", "", &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	if !tickets.LoadEpicTicketMD(filepath.Join(project, "other")).CompletedAt.IsZero() {
@@ -89,7 +90,7 @@ func TestRunTicketsEpicAdd_StampsCreatedAtAndMapCompletedAt(t *testing.T) {
 
 func TestRunTicketsEpicAdd_RefusalsWriteNothing(t *testing.T) {
 	cwd, project := setupEpicAddProject(t)
-	if err := runTicketsEpicAdd(cwd, "mine:exists", "loop", "open", "", &bytes.Buffer{}); err != nil {
+	if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "mine:exists", "loop", "open", "", &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	before, _ := os.ReadFile(filepath.Join(project, "exists", "ticket.md"))
@@ -108,7 +109,7 @@ func TestRunTicketsEpicAdd_RefusalsWriteNothing(t *testing.T) {
 		{"bad kind", "mine:x", "tree", "", "kind"},
 		{"kind conflict", "mine:x", "map", "---\nkind: loop\n---\n\n# X\n", "conflicts"},
 	} {
-		err := runTicketsEpicAdd(cwd, tc.arg, tc.kind, "", tc.body, &bytes.Buffer{})
+		err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, tc.arg, tc.kind, "", tc.body, &bytes.Buffer{})
 		if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 			t.Errorf("%s: err = %v, want containing %q", tc.name, err, tc.wantErr)
 		}
@@ -120,7 +121,7 @@ func TestRunTicketsEpicAdd_RefusalsWriteNothing(t *testing.T) {
 		t.Errorf("existing epic changed:\n%s", after)
 	}
 
-	err := runTicketsEpicAdd(cwd, "nope:x", "loop", "open", "", &bytes.Buffer{})
+	err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "nope:x", "loop", "open", "", &bytes.Buffer{})
 	var addrErr *tickets.AddressError
 	if !errors.As(err, &addrErr) || addrErr.Code != tickets.CodeUnknownProject {
 		t.Errorf("unknown project: err = %v, want %s", err, tickets.CodeUnknownProject)

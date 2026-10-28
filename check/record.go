@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/brief"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 )
@@ -65,12 +66,20 @@ func recordPath(dataDir, project string) string {
 
 // ProjectFor is the project name records of the repo at dir are filed under:
 // the registered project's name, else the repo root's base name.
-func ProjectFor(dir string) string {
+func ProjectFor(dir string) string { return projectFor(tickets.RootFor, dir) }
+
+// ProjectForDirs is ProjectFor with the ticket store found through dirs
+// instead of the process env.
+func ProjectForDirs(dirs config.Dirs, dir string) string {
+	return projectFor(func(root string) (string, error) { return tickets.RootForDirs(dirs, root) }, dir)
+}
+
+func projectFor(rootFor func(string) (string, error), dir string) string {
 	root, err := repoRoot(dir)
 	if err != nil {
 		return filepath.Base(dir)
 	}
-	if projectDir, err := tickets.RootFor(root); err == nil {
+	if projectDir, err := rootFor(root); err == nil {
 		return tickets.ProjectName(projectDir)
 	}
 	return filepath.Base(root)

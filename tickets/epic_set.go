@@ -45,6 +45,9 @@ type EpicUpdate struct {
 	// in the same write as every other field, and an existing stamp is kept, so
 	// the first completion wins.
 	CompletedAt *time.Time
+	// ConversationsDir is where CompletedAt reads the recorded conversations;
+	// empty means conversations.DefaultDir.
+	ConversationsDir string
 }
 
 // UpdateEpicFields applies u to the frontmatter of the epic ticket.md at
@@ -75,7 +78,7 @@ func UpdateEpicFields(ticketPath string, u EpicUpdate) error {
 	var completion map[string]any
 	if u.CompletedAt != nil {
 		var err error
-		if completion, err = mapCompletionFields(filepath.Dir(ticketPath), *u.CompletedAt); err != nil {
+		if completion, err = mapCompletionFields(u.ConversationsDir, filepath.Dir(ticketPath), *u.CompletedAt); err != nil {
 			return err
 		}
 	}

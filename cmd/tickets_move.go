@@ -23,7 +23,7 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	if err != nil {
 		return err
 	}
-	a, src, err := findTicket(cwd, addr)
+	a, src, err := findTicket(d.dirs(), cwd, addr)
 	if err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 		dstProject, dstEpic = m[1], m[2]
 	}
 	if dstProject != a.Project {
-		if _, err := projectRoot(cwd, dstProject); err != nil {
+		if _, err := projectRoot(d.dirs(), cwd, dstProject); err != nil {
 			return err
 		}
 		return tickets.MoveRefusal(tickets.CodeMoveCrossProject, "target epic %q is in project %q, not %q", dstEpic, dstProject, a.Project)
@@ -57,7 +57,7 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 	}
 	defer unlock()
 
-	if err := refuseIfActive(d.dial(), a); err != nil {
+	if err := refuseIfActive(d.dirs(), d.dial(), a); err != nil {
 		return err
 	}
 
@@ -80,8 +80,8 @@ func runTicketsMove(d deps, addr, target, slug string, dryRun, jsonOut bool, w i
 // refuseIfActive refuses a ticket that is queued or has a live iteration. A
 // reachable server answers; otherwise the persisted queue and run files do, and
 // if those can't be read either the move is refused rather than guessed.
-func refuseIfActive(dial func() (*apiclient.Client, error), a tickets.Address) error {
-	active, err := activeAddresses(dial)
+func refuseIfActive(dirs config.Dirs, dial func() (*apiclient.Client, error), a tickets.Address) error {
+	active, err := activeAddresses(dirs, dial)
 	if err != nil {
 		return tickets.MoveRefusal(tickets.CodeMoveActive, "cannot tell whether %s is queued or live: %v", a, err)
 	}
@@ -91,7 +91,7 @@ func refuseIfActive(dial func() (*apiclient.Client, error), a tickets.Address) e
 	return nil
 }
 
-func activeAddresses(dial func() (*apiclient.Client, error)) ([]string, error) {
+func activeAddresses(dirs config.Dirs, dial func() (*apiclient.Client, error)) ([]string, error) {
 	if cl, err := dial(); err == nil {
 		ctx, cancel := context.WithTimeout(context.Background(), pingTimeout)
 		defer cancel()
@@ -108,7 +108,7 @@ func activeAddresses(dial func() (*apiclient.Client, error)) ([]string, error) {
 			return out, nil
 		}
 	}
-	stateDir, err := config.StateDir()
+	stateDir, err := dirs.StateDir()
 	if err != nil {
 		return nil, err
 	}

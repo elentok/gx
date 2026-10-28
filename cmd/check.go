@@ -76,10 +76,11 @@ func runCheck(c *cobra.Command, d deps, staged, full bool, since, kinds string) 
 		return err
 	}
 	opts.Dir = dir
-	if opts.DataDir, err = config.DataDir(); err != nil {
+	if opts.DataDir, err = d.dirs().DataDir(); err != nil {
 		return err
 	}
-	opts.ProjectChecks = func() (json.RawMessage, error) { return projectChecks(dir) }
+	opts.ProjectChecks = func() (json.RawMessage, error) { return projectChecks(d.dirs(), dir) }
+	opts.ProjectFor = func(dir string) string { return check.ProjectForDirs(d.dirs(), dir) }
 
 	res, err := check.Run(opts)
 	if err != nil {
@@ -94,8 +95,8 @@ func runCheck(c *cobra.Command, d deps, staged, full bool, since, kinds string) 
 
 // projectChecks is the checks key of the ticket store's project.json for the
 // repo at dir. An unregistered repo has none.
-func projectChecks(dir string) (json.RawMessage, error) {
-	projectDir, err := tickets.RootFor(dir)
+func projectChecks(dirs config.Dirs, dir string) (json.RawMessage, error) {
+	projectDir, err := tickets.RootForDirs(dirs, dir)
 	if errors.Is(err, tickets.ErrNoProject) {
 		return nil, nil
 	}

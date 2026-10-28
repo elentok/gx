@@ -17,7 +17,6 @@ func gitIn(t *testing.T, dir string, args ...string) {
 }
 
 func TestBrief_ConflictsListsUnmergedFilesWithMarkerLines(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "a.txt", "one\ntwo\nthree\n")
 	gitIn(t, repo, "add", ".")

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -15,8 +16,8 @@ import (
 // in shell tooling like `cd $(gx tickets root)/$(gx tickets epics | fzf)`.
 // When mapsOnly is set, only epics with a ticket.md of kind: map (Epic.IsMap) are
 // printed.
-func runTicketsEpics(cwd string, w io.Writer, mapsOnly bool) error {
-	root, err := ticketRoot(cwd)
+func runTicketsEpics(dirs config.Dirs, cwd string, w io.Writer, mapsOnly bool) error {
+	root, err := ticketRoot(dirs, cwd)
 	if err != nil {
 		return err
 	}

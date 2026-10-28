@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/tickets"
@@ -133,11 +134,11 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 		Short: "validated, sparse frontmatter writes to a ticket, by address or file path",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			path, err := resolveTicketRef(d.getwd, args[0])
+			path, err := resolveTicketRef(d.dirs(), d.getwd, args[0])
 			if err != nil {
 				return err
 			}
-			return runTicketsSet(c, path, c.OutOrStdout(), c.ErrOrStderr(), d.getwd, d.dial())
+			return runTicketsSet(d.dirs(), c, path, c.OutOrStdout(), c.ErrOrStderr(), d.getwd, d.dial())
 		},
 	}
 
@@ -174,7 +175,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 // runEpicSet is runTicketsSet for an epic's ticket.md, validated against the
 // epic schema rather than the ticket one. A server-stamped field refuses with
 // tickets.CodeServerStamped before anything is written.
-func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
+func runEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
 	epicDir := filepath.Dir(path)
 	// Nothing completes a map by itself unless a -impl epic appears, so a person may.
 	handCompletable := tickets.IsMapEpic(epicDir)
@@ -226,6 +227,11 @@ func runEpicSet(c *cobra.Command, path string, w io.Writer, getwd func() (string
 			}
 		}
 		update.CompletedAt = &at
+		data, err := dirs.DataDir()
+		if err != nil {
+			return err
+		}
+		update.ConversationsDir = filepath.Join(data, "conversations")
 		changed = append(changed, "completed_at="+at.Format(time.RFC3339))
 	}
 	var notices []string
@@ -341,7 +347,7 @@ func inMapEpic(path string) bool {
 
 // mapDoneStamp is the tokens and cost to stamp when c closes a map epic's
 // ticket, from its recorded conversations; nil when nothing should be stamped.
-func mapDoneStamp(c *cobra.Command, path string) (*conversations.Totals, error) {
+func mapDoneStamp(dirs config.Dirs, c *cobra.Command, path string) (*conversations.Totals, error) {
 	if v, _ := c.Flags().GetString("status"); !c.Flags().Changed("status") || schema.Status(v) != schema.StatusDone || !inMapEpic(path) {
 		return nil, nil
 	}
@@ -349,10 +355,11 @@ func mapDoneStamp(c *cobra.Command, path string) (*conversations.Totals, error) 
 	if err != nil {
 		return nil, err
 	}
-	root, err := conversations.DefaultDir()
+	data, err := dirs.DataDir()
 	if err != nil {
 		return nil, err
 	}
+	root := filepath.Join(data, "conversations")
 	sum, ok, err := conversations.SumTotals(root, ticketLabel(path), current.CreatedAt)
 	if err != nil || !ok {
 		return nil, err
@@ -363,9 +370,9 @@ func mapDoneStamp(c *cobra.Command, path string) (*conversations.Totals, error) 
 // runTicketsSet applies every flag actually passed on c to path's ticket via
 // schema.UpdateTicket, then prints a summary of just the fields changed this
 // call. Flags never passed leave their Ticket field exactly as parsed.
-func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
+func runTicketsSet(dirs config.Dirs, c *cobra.Command, path string, w, stderr io.Writer, getwd func() (string, error), dial func() (*apiclient.Client, error)) error {
 	if isEpicTicketMD(path) {
-		return runEpicSet(c, path, w, getwd, dial)
+		return runEpicSet(dirs, c, path, w, getwd, dial)
 	}
 	if c.Flags().Changed("exported-at") {
 		return fmt.Errorf("%s: exported_at is gx-managed and not settable via `tickets set`", path)
@@ -391,7 +398,7 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 		if err := checkIterationStatusFinishedGuard(c, path); err != nil {
 			return err
 		}
-		if err := checkFinishedGuard(c, path, getwd); err != nil {
+		if err := checkFinishedGuard(dirs, c, path, getwd); err != nil {
 			return err
 		}
 	}
@@ -429,7 +436,7 @@ func runTicketsSet(c *cobra.Command, path string, w, stderr io.Writer, getwd fun
 
 	var changed []string
 
-	stamp, err := mapDoneStamp(c, path)
+	stamp, err := mapDoneStamp(dirs, c, path)
 	if err != nil {
 		return err
 	}

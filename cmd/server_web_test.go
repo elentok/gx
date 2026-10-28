@@ -13,9 +13,26 @@ import (
 
 func startWebServer(t *testing.T) *servertest.Harness {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	return servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+}
+
+func TestServerStatus_NotRunningFromATempEnv(t *testing.T) {
+	var stdout bytes.Buffer
+	d := deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: tempEnv(t)}
+	if err := execute([]string{"server", "status"}, d); err != nil {
+		t.Fatalf("server status: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "not running") {
+		t.Errorf("status = %q, want it to say not running", stdout.String())
+	}
+}
+
+func TestServerWebURL_NoHomeInEnvIsAnError(t *testing.T) {
+	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}}
+	err := execute([]string{"server", "web-url"}, d)
+	if err == nil || !strings.Contains(err.Error(), "no HOME in env") {
+		t.Errorf("err = %v, want it to mention no HOME in env", err)
+	}
 }
 
 func webGet(t *testing.T, url string, cookies ...*http.Cookie) *http.Response {
@@ -111,8 +128,6 @@ func TestWebURL_QRFlagPrintsAQRForTheTokenedURL(t *testing.T) {
 }
 
 func TestWebURL_WebListenerOffIsAnError(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	h := servertest.Start(t)
 	err := runWebURL(context.Background(), h.Client, h.StateDir, false, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "web UI is off") {

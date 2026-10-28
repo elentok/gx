@@ -45,7 +45,7 @@ func TestRecoveryCatalog_EmptyEntriesIsArray(t *testing.T) {
 }
 
 func TestRecoveryCatalog_ViaRootCommand(t *testing.T) {
-	root := newRootCmd(deps{})
+	root := newRootCmd(deps{env: envFor(t)})
 	var out bytes.Buffer
 	root.SetOut(&out)
 	root.SetArgs([]string{"recovery", "catalog", "--json"})

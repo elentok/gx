@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -56,7 +57,7 @@ func TestRunMerge_CleanFastForward(t *testing.T) {
 	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 
 	var stdout bytes.Buffer
-	if err := runMerge(mainDir, "feature", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -81,7 +82,7 @@ func TestRunMerge_Diverged(t *testing.T) {
 	commitFile(t, mainDir, "main-only.txt", "diverge")
 
 	var stdout bytes.Buffer
-	if err := runMerge(mainDir, "feature", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -108,7 +109,7 @@ func TestRunMerge_ResolvesWorktreeDirNameToRealBranch(t *testing.T) {
 	commitFile(t, filepath.Join(repoDir, "item-01"), "work.txt", "hi")
 
 	var stdout bytes.Buffer
-	if err := runMerge(mainDir, "item-01", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "item-01", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -125,7 +126,7 @@ func TestRunMerge_NoMatchingWorktreeTreatsArgAsLiteralBranch(t *testing.T) {
 	testutil.MustGitExported(t, mainDir, "branch", "literal-branch")
 
 	var stdout bytes.Buffer
-	if err := runMerge(mainDir, "literal-branch", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "literal-branch", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -144,7 +145,7 @@ func TestRunMerge_TextOutput(t *testing.T) {
 	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 
 	var stdout bytes.Buffer
-	if err := runMerge(mainDir, "feature", false, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", false, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 	if got, want := stdout.String(), "merged onto main\n"; got != want {
@@ -163,11 +164,12 @@ func revParse(t *testing.T, dir, ref string) string {
 
 // registerWithTrunk isolates the ticket store and registers repoDir as a
 // project whose project.json sets trunk. Not parallel-safe (sets env).
-func registerWithTrunk(t *testing.T, repoDir, trunk string) {
+func registerWithTrunk(t *testing.T, repoDir, trunk string) (projectDir string) {
 	t.Helper()
-	projectDir := addProject(t, isolateTicketStore(t), "p", repoDir)
+	projectDir = addProject(t, isolateTicketStore(t), "p", repoDir)
 	testutil.WriteFile(t, projectDir, "project.json",
 		`{"name":"p","repo":"`+repoDir+`","trunk":"`+trunk+`"}`)
+	return projectDir
 }
 
 // mergeEpicSetup registers repoDir as a project holding epic e, whose
@@ -191,7 +193,7 @@ func TestRunMerge_EpicBranchStampsMergedAtOnly(t *testing.T) {
 	ticketMD := mergeEpicSetup(t, repoDir, "")
 	commitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
 
-	if err := runMerge(mainDir, "e", true, &bytes.Buffer{}); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "e", true, &bytes.Buffer{}); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -209,7 +211,7 @@ func TestRunMerge_EpicBranchKeepsExistingCompletedAt(t *testing.T) {
 	ticketMD := mergeEpicSetup(t, repoDir, "2026-01-02T03:04:05Z")
 	commitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
 
-	if err := runMerge(mainDir, "e", true, &bytes.Buffer{}); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "e", true, &bytes.Buffer{}); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -228,7 +230,7 @@ func TestRunMerge_NeedsRebaseLeavesEpicUnmerged(t *testing.T) {
 	commitFile(t, filepath.Join(repoDir, "e"), "e.txt", "hi")
 	commitFile(t, mainDir, "main-only.txt", "diverge")
 
-	if err := runMerge(mainDir, "e", true, &bytes.Buffer{}); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "e", true, &bytes.Buffer{}); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -243,7 +245,7 @@ func TestRunMerge_NonEpicBranchStampsNothing(t *testing.T) {
 	before, _ := os.ReadFile(ticketMD)
 	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 
-	if err := runMerge(mainDir, "feature", true, &bytes.Buffer{}); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &bytes.Buffer{}); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -260,7 +262,7 @@ func TestRunMerge_LandsOnConfiguredTrunk(t *testing.T) {
 	mainBefore := revParse(t, mainDir, "main")
 
 	var stdout bytes.Buffer
-	if err := runMerge(mainDir, "feature", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 
@@ -285,7 +287,7 @@ func TestRunMerge_TextOutputNamesConfiguredTrunk(t *testing.T) {
 	testutil.MustGitExported(t, mainDir, "branch", "-f", "develop", "main")
 
 	var stdout bytes.Buffer
-	if err := runMerge(mainDir, "feature", false, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", false, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 	if got := stdout.String(); !strings.HasPrefix(got, "needs rebase: feature onto develop\n") {
@@ -299,7 +301,7 @@ func TestRunMerge_UnregisteredRepoUsesDetectedDefault(t *testing.T) {
 	commitFile(t, filepath.Join(repoDir, "feature"), "feature.txt", "hi")
 
 	var stdout bytes.Buffer
-	if err := runMerge(mainDir, "feature", true, &stdout); err != nil {
+	if err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout); err != nil {
 		t.Fatalf("runMerge: %v", err)
 	}
 	if got, want := decodeMergeResult(t, &stdout), (MergeResult{Status: "merged", Target: "main"}); got != want {
@@ -314,7 +316,7 @@ func TestRunMerge_MissingTrunkFailsWithSharedError(t *testing.T) {
 	mainBefore := revParse(t, mainDir, "main")
 
 	var stdout bytes.Buffer
-	err := runMerge(mainDir, "feature", true, &stdout)
+	err := runMerge(config.DirsFrom(envFor(t)), mainDir, "feature", true, &stdout)
 	var missing *tickets.ErrTrunkMissing
 	if !errors.As(err, &missing) || missing.Trunk != "develop" {
 		t.Fatalf("err = %v, want ErrTrunkMissing for develop", err)

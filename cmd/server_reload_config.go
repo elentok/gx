@@ -12,14 +12,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newServerReloadConfigCmd() *cobra.Command {
+func newServerReloadConfigCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	c := &cobra.Command{
 		Use:   "reload-config",
 		Short: "Reload the global config.json into the running server",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}

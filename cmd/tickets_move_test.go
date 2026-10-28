@@ -402,6 +402,7 @@ func moveWithServer(t *testing.T, f moveFixture, cl func() (*apiclient.Client, e
 		stderr:       bytes.NewBuffer(nil),
 		getwd:        func() (string, error) { return f.repo, nil },
 		serverClient: cl,
+		env:          envFor(t),
 	}
 	return execute([]string{"tickets", "move", "src/01", "dst"}, d)
 }
@@ -471,8 +472,7 @@ func TestTicketsMove_ServerDownReadsPersistedQueueAndRuns(t *testing.T) {
 	for _, file := range []string{"queue.json", "runs.json"} {
 		t.Run(file, func(t *testing.T) {
 			f := setupMoveProject(t)
-			stateDir := t.TempDir()
-			t.Setenv("XDG_STATE_HOME", stateDir)
+			stateDir := envValue(envFor(t), "XDG_STATE_HOME")
 			if err := os.MkdirAll(filepath.Join(stateDir, "gx"), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -487,7 +487,6 @@ func TestTicketsMove_ServerDownReadsPersistedQueueAndRuns(t *testing.T) {
 
 func TestTicketsMove_SuccessPingsOldAndNewAddress(t *testing.T) {
 	f := setupMoveProject(t)
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	cl, pings := fakeMoveServer(t, nil, nil)
 	if err := moveWithServer(t, f, cl); err != nil {
 		t.Fatal(err)

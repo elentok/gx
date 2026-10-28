@@ -12,7 +12,7 @@ import (
 	"github.com/elentok/gx/server"
 )
 
-func newAFKCmd() *cobra.Command {
+func newAFKCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:       "afk [on|off]",
@@ -24,7 +24,7 @@ func newAFKCmd() *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}

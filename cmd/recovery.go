@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/recovery"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +15,7 @@ type CatalogInfo struct {
 	NotCatalogued map[string]string `json:"not_catalogued"`
 }
 
-func newRecoveryCmd(_ deps) *cobra.Command {
+func newRecoveryCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "recovery",
 		Short: "recovery catalog commands",
@@ -28,7 +27,7 @@ func newRecoveryCmd(_ deps) *cobra.Command {
 		Short: "print the recovery catalog with the user's kill switch and disables applied",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cfg, err := config.Load()
+			cfg, err := d.dirs().Load()
 			if err != nil {
 				return err
 			}

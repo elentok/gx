@@ -15,7 +15,7 @@ import (
 // and the exit code.
 func runCheckCmd(t *testing.T, cwd string, args ...string) (string, int) {
 	t.Helper()
-	root := newRootCmd(deps{getwd: func() (string, error) { return cwd, nil }})
+	root := newRootCmd(deps{getwd: func() (string, error) { return cwd, nil }, env: envFor(t)})
 	var out bytes.Buffer
 	root.SetOut(&out)
 	root.SetErr(&out)
@@ -35,7 +35,6 @@ func runCheckCmd(t *testing.T, cwd string, args ...string) (string, int) {
 // fresh data dir.
 func checkRepo(t *testing.T, checksJSON string) string {
 	t.Helper()
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	repo := testutil.TempRepo(t)
 	testutil.Mkdir(t, filepath.Join(repo, ".gx"))
 	testutil.WriteFile(t, repo, ".gx/checks.json", checksJSON)
@@ -55,7 +54,6 @@ func logOf(t *testing.T, out, kind string) string {
 }
 
 func TestCheck_ConfiguredTestKindAlsoFromLinkedWorktree(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	repo, wt := testutil.TempRepoWithLinkedWorktree(t, "feature")
 	for _, dir := range []string{repo, wt} {
 		testutil.Mkdir(t, filepath.Join(dir, ".gx"))
@@ -122,7 +120,7 @@ func TestCheck_ChangedPairMissingSkipsUntilFull(t *testing.T) {
 
 func TestCheck_ProjectJSONFallbackAndRepoFileWins(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	projectDir := testutil.RegisterProject(t, repo, "main")
+	projectDir := registerWithTrunk(t, repo, "main")
 	testutil.WriteFile(t, projectDir, "project.json",
 		`{"name":"p","repo":"`+repo+`","trunk":"main","checks":{"test":"echo from-project"}}`)
 

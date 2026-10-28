@@ -33,7 +33,7 @@ func TestDesignsOpenCmd_UsageErrors(t *testing.T) {
 		"project without idea": {"fresh", "--project", "proj"},
 		"new with new design":  {"fresh", "--new", "--idea", "x", "--project", "proj"},
 	} {
-		cmd := newDesignsOpenCmd()
+		cmd := newDesignsOpenCmd(deps{env: envFor(t)})
 		cmd.SetArgs(args)
 		cmd.SilenceUsage, cmd.SilenceErrors = true, true
 		if err := cmd.Execute(); err == nil || !strings.Contains(err.Error(), "--") {

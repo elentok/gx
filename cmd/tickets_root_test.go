@@ -11,16 +11,12 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
-// isolateTicketStore points HOME and XDG_DATA_HOME at temp dirs (so neither the
+// isolateTicketStore gives the test a temp HOME and XDG dirs (so neither the
 // user's config.json nor their real store is read) and returns the store path.
-// Not parallel-safe: it sets env vars.
+// The env is available to the test as envFor(t).
 func isolateTicketStore(t *testing.T) string {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	t.Setenv("XDG_CONFIG_HOME", "")
-	return filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets")
+	return filepath.Join(envValue(envFor(t), "XDG_DATA_HOME"), "gx", "tickets")
 }
 
 // addProject writes <store>/<name>/project.json pointing at repoPath and
@@ -48,6 +44,7 @@ func runIn(t *testing.T, cwd string, args ...string) (string, error) {
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return cwd, nil },
+		env:    envFor(t),
 	}
 	err := execute(args, d)
 	return stdout.String(), err
@@ -73,7 +70,7 @@ func TestExecute_TicketsRoot_HonorsConfiguredStorePath(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	custom := filepath.Join(t.TempDir(), "custom-store")
 	project := addProject(t, custom, "mine", repo)
-	cfgDir := filepath.Join(os.Getenv("HOME"), ".config", "gx")
+	cfgDir := filepath.Join(envValue(envFor(t), "HOME"), ".config", "gx")
 	if err := os.MkdirAll(cfgDir, 0755); err != nil {
 		t.Fatal(err)
 	}

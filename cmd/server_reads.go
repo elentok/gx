@@ -24,11 +24,11 @@ import (
 
 // serverRead fetches one read payload from the server and prints it: as
 // indented JSON, or through text when jsonOut is false.
-func serverRead[T any](ctx context.Context, jsonOut bool, w io.Writer, fetch func(context.Context, *apiclient.Client) (T, error), text func(io.Writer, T) error) error {
+func serverRead[T any](dial func() (*apiclient.Client, error), ctx context.Context, jsonOut bool, w io.Writer, fetch func(context.Context, *apiclient.Client) (T, error), text func(io.Writer, T) error) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	c, err := serverClient()
+	c, err := dial()
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,7 @@ func newProjectCmd(d deps) *cobra.Command {
 		Short: "list projects with their ticket counts by status (asks the server)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]server.ProjectInfo, error) { return cl.Projects(ctx) },
 				printProjects)
 		},
@@ -73,7 +73,7 @@ func newProjectCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}
@@ -92,7 +92,7 @@ func newProjectCmd(d deps) *cobra.Command {
 		Short: "unregister a project (its tickets stay in the store; refused while any are queued or running)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}
@@ -117,7 +117,7 @@ func newProjectCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}
@@ -197,7 +197,7 @@ func runProjectAdd(ctx context.Context, cl *apiclient.Client, d deps, w io.Write
 	return err
 }
 
-func newBudgetCmd(_ deps) *cobra.Command {
+func newBudgetCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "budget", Short: "daily budget", Args: cobra.NoArgs}
 	var jsonOut bool
 	status := &cobra.Command{
@@ -205,7 +205,7 @@ func newBudgetCmd(_ deps) *cobra.Command {
 		Short: "show today's total spend and the budget limits (asks the server)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (server.BudgetStatus, error) { return cl.Budget(ctx) },
 				printBudget)
 		},
@@ -219,16 +219,16 @@ func newBudgetCmd(_ deps) *cobra.Command {
 		Short: "lift the budget latches so new work can start (asks the server)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return runBudgetOverride(c, overrideJSON)
+			return runBudgetOverride(d.dial(), c, overrideJSON)
 		},
 	}
 	override.Flags().BoolVar(&overrideJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(override)
-	cmd.AddCommand(newBudgetIncreaseCmd())
+	cmd.AddCommand(newBudgetIncreaseCmd(d))
 	return cmd
 }
 
-func newBudgetIncreaseCmd() *cobra.Command {
+func newBudgetIncreaseCmd(d deps) *cobra.Command {
 	var soft, hard float64
 	var jsonOut bool
 	cmd := &cobra.Command{
@@ -246,7 +246,7 @@ func newBudgetIncreaseCmd() *cobra.Command {
 			if req.Soft == nil && req.Hard == nil {
 				return fmt.Errorf("pass --soft or --hard")
 			}
-			return runBudgetWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.BudgetResult, error) {
+			return runBudgetWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.BudgetResult, error) {
 				return cl.BudgetIncrease(ctx, req)
 			})
 		},
@@ -258,20 +258,20 @@ func newBudgetIncreaseCmd() *cobra.Command {
 }
 
 // runBudgetOverride mirrors runServerQueueWrite.
-func runBudgetOverride(c *cobra.Command, jsonOut bool) error {
-	return runBudgetWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.BudgetResult, error) {
+func runBudgetOverride(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool) error {
+	return runBudgetWrite(dial, c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.BudgetResult, error) {
 		return cl.BudgetOverride(ctx)
 	})
 }
 
 // runBudgetWrite runs one budget write: with --json the result or refusal is
 // the output; otherwise a refusal is an error.
-func runBudgetWrite(c *cobra.Command, jsonOut bool, write func(context.Context, *apiclient.Client) (server.BudgetResult, error)) error {
+func runBudgetWrite(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool, write func(context.Context, *apiclient.Client) (server.BudgetResult, error)) error {
 	ctx := c.Context()
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	cl, err := serverClient()
+	cl, err := dial()
 	if err != nil {
 		return err
 	}
@@ -345,14 +345,14 @@ func budgetState(b server.BudgetStatus) string {
 	return "ok"
 }
 
-func newServerLocksCmd() *cobra.Command {
+func newServerLocksCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "locks",
 		Short: "list held locks with their owners",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]server.LockInfo, error) { return cl.Locks(ctx) },
 				printLocks)
 		},
@@ -361,14 +361,14 @@ func newServerLocksCmd() *cobra.Command {
 	return cmd
 }
 
-func newServerIterationsCmd() *cobra.Command {
+func newServerIterationsCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "iterations",
 		Short: "list live iterations with pane, worktree, branch, base and transcript path",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]server.IterationInfo, error) {
 					return cl.Iterations(ctx)
 				},
@@ -379,7 +379,7 @@ func newServerIterationsCmd() *cobra.Command {
 	return cmd
 }
 
-func newServerQueueCmd() *cobra.Command {
+func newServerQueueCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "queue", Short: "server-wide queue", Args: cobra.NoArgs}
 	var jsonOut bool
 	list := &cobra.Command{
@@ -387,7 +387,7 @@ func newServerQueueCmd() *cobra.Command {
 		Short: "list every ticket with the scheduler's verdict on it",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]server.QueueEntry, error) { return cl.Queue(ctx) },
 				printQueue)
 		},
@@ -400,7 +400,7 @@ func newServerQueueCmd() *cobra.Command {
 		Short: "list the queued tickets in order",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) ([]server.QueueItem, error) { return cl.QueueItems(ctx) },
 				printQueueItems)
 		},
@@ -414,7 +414,7 @@ func newServerQueueCmd() *cobra.Command {
 		Short: "append a ticket, or a whole epic, to the server-wide queue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.QueueAdd(ctx, args[0], agent)
 			})
 		},
@@ -425,7 +425,7 @@ func newServerQueueCmd() *cobra.Command {
 		Short: "remove a ticket from the server-wide queue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.QueueRemove(ctx, args[0])
 			})
 		},
@@ -440,7 +440,7 @@ func newServerQueueCmd() *cobra.Command {
 			for _, a := range args[1:] {
 				items = append(items, server.QueueItem{Address: a, Agent: replaceAgent})
 			}
-			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.QueueReplace(ctx, args[0], items)
 			})
 		},
@@ -455,7 +455,7 @@ func newServerQueueCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("position %q is not a number", args[1])
 			}
-			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.QueueMove(ctx, args[0], pos)
 			})
 		},
@@ -466,7 +466,7 @@ func newServerQueueCmd() *cobra.Command {
 			Short: short,
 			Args:  cobra.NoArgs,
 			RunE: func(c *cobra.Command, _ []string) error {
-				return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 					return do(cl, ctx)
 				})
 			},
@@ -485,12 +485,12 @@ func newServerQueueCmd() *cobra.Command {
 
 // serverQueueWrite runs one queue write. With --json the result or refusal is
 // the output; otherwise a refusal is an error.
-func serverQueueWrite(c *cobra.Command, jsonOut bool, do func(context.Context, *apiclient.Client) (server.QueueResult, error)) error {
+func serverQueueWrite(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool, do func(context.Context, *apiclient.Client) (server.QueueResult, error)) error {
 	ctx := c.Context()
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	cl, err := serverClient()
+	cl, err := dial()
 	if err != nil {
 		return err
 	}
@@ -566,7 +566,7 @@ func printQueueItems(w io.Writer, items []server.QueueItem) error {
 	return nil
 }
 
-func newServerTicketsCmd() *cobra.Command {
+func newServerTicketsCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "tickets", Short: "ticket reads and writes", Args: cobra.NoArgs}
 	var jsonOut bool
 	history := &cobra.Command{
@@ -574,7 +574,7 @@ func newServerTicketsCmd() *cobra.Command {
 		Short: "print a ticket's events from its epic's run log",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (server.History, error) {
 					return cl.History(ctx, args[0])
 				},
@@ -590,7 +590,7 @@ func newServerTicketsCmd() *cobra.Command {
 		Short: "explain why the scheduler would or wouldn't pick a ticket",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(c.Context(), explainJSON, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), explainJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (server.Explanation, error) {
 					return cl.Explain(ctx, args[0])
 				},
@@ -606,7 +606,7 @@ func newServerTicketsCmd() *cobra.Command {
 		Short: "show a ticket's pause rounds, state token and applicable actions",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(c.Context(), detailJSON, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), detailJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (server.TicketDetail, error) {
 					return cl.Detail(ctx, args[0])
 				},
@@ -626,7 +626,7 @@ func newServerTicketsCmd() *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}
@@ -651,7 +651,7 @@ func newServerTicketsCmd() *cobra.Command {
 			Args:   cobra.ExactArgs(1),
 			Hidden: name == "park",
 			RunE: func(c *cobra.Command, args []string) error {
-				return serverQueueWrite(c, pauseJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return serverQueueWrite(d.dial(), c, pauseJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 					return cl.TicketPause(ctx, args[0], pauseReason)
 				})
 			},
@@ -667,7 +667,7 @@ func newServerTicketsCmd() *cobra.Command {
 		Short: "clear a ticket's mutes and reopen it if it was paused by a fault",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(c, unmuteJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, unmuteJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.TicketUnmute(ctx, args[0])
 			})
 		},
@@ -681,7 +681,7 @@ func newServerTicketsCmd() *cobra.Command {
 		Short: "cancel a ticket and its non-terminal descendants",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(c, cancelJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, cancelJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.TicketCancel(ctx, args[0], cancelStop)
 			})
 		},
@@ -696,7 +696,7 @@ func newServerTicketsCmd() *cobra.Command {
 		Short: "run a ticket's latest recovery proposal",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(c, approveJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, approveJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.TicketApprove(ctx, args[0])
 			})
 		},
@@ -713,7 +713,7 @@ func newServerTicketsCmd() *cobra.Command {
 			Args:   cobra.ExactArgs(1),
 			Hidden: name == "relaunch",
 			RunE: func(c *cobra.Command, args []string) error {
-				return serverQueueWrite(c, retryJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+				return serverQueueWrite(d.dial(), c, retryJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 					return cl.TicketRetry(ctx, args[0], retryStop)
 				})
 			},
@@ -729,7 +729,7 @@ func newServerTicketsCmd() *cobra.Command {
 		Short: "type text into the live pane of a ticket's iteration",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverQueueWrite(c, nudgeJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, nudgeJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.TicketNudge(ctx, args[0], args[1])
 			})
 		},
@@ -752,7 +752,7 @@ func newServerTicketsCmd() *cobra.Command {
 				}
 				diagnosis = string(b)
 			}
-			return serverQueueWrite(c, recJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, recJSON, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.TicketRecommend(ctx, args[0], recVerb, diagnosis)
 			})
 		},
@@ -761,7 +761,7 @@ func newServerTicketsCmd() *cobra.Command {
 	recommend.Flags().String("diagnosis", "", "the diagnosis, or - to read it from stdin")
 	recommend.Flags().BoolVar(&recJSON, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(recommend)
-	cmd.AddCommand(newTicketsAnswerCmd(deps{}, true))
+	cmd.AddCommand(newTicketsAnswerCmd(d, true))
 
 	var followJSON bool
 	follow := &cobra.Command{
@@ -775,7 +775,7 @@ func newServerTicketsCmd() *cobra.Command {
 			}
 			ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			client, err := serverClient()
+			client, err := d.dial()()
 			if err != nil {
 				return err
 			}
@@ -784,7 +784,7 @@ func newServerTicketsCmd() *cobra.Command {
 	}
 	follow.Flags().BoolVar(&followJSON, "json", false, "emit one JSON object per line instead of human-readable text")
 	cmd.AddCommand(follow)
-	addServerRepairCmds(cmd)
+	addServerRepairCmds(cmd, d)
 	return cmd
 }
 

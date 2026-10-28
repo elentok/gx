@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
 )
@@ -16,10 +17,11 @@ import (
 func mapWithConversations(t *testing.T, preRecording bool, recs ...conversations.Record) (cwd, project string) {
 	t.Helper()
 	cwd, project = setupEpicAddProject(t)
-	root, err := conversations.DefaultDir()
+	data, err := config.DirsFrom(envFor(t)).DataDir()
 	if err != nil {
 		t.Fatal(err)
 	}
+	root := filepath.Join(data, "conversations")
 	started := time.Now().Add(-time.Hour)
 	if preRecording {
 		started = time.Now().Add(time.Hour)
@@ -27,7 +29,7 @@ func mapWithConversations(t *testing.T, preRecording bool, recs ...conversations
 	if err := conversations.MarkStarted(root, started); err != nil {
 		t.Fatal(err)
 	}
-	if err := runTicketsEpicAdd(cwd, "mine:m", "map", "open", "", &bytes.Buffer{}); err != nil {
+	if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "mine:m", "map", "open", "", &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, r := range recs {
@@ -48,7 +50,7 @@ func sumRecs() []conversations.Record {
 
 func TestRunTicketsEpicAdd_MapStampsConversationTotalsAtImplCreation(t *testing.T) {
 	cwd, project := mapWithConversations(t, false, sumRecs()...)
-	if err := runTicketsEpicAdd(cwd, "mine:m-impl", "loop", "open", "", &bytes.Buffer{}); err != nil {
+	if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "mine:m-impl", "loop", "open", "", &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	m := tickets.LoadEpicTicketMD(filepath.Join(project, "m"))
@@ -60,7 +62,7 @@ func TestRunTicketsEpicAdd_MapStampsConversationTotalsAtImplCreation(t *testing.
 func TestRunTicketsEpicAdd_MapMissingTotalsStampsNoTokens(t *testing.T) {
 	recs := append(sumRecs(), conversations.Record{ID: "d", Ticket: "mine:m/02"})
 	cwd, project := mapWithConversations(t, false, recs...)
-	if err := runTicketsEpicAdd(cwd, "mine:m-impl", "loop", "open", "", &bytes.Buffer{}); err != nil {
+	if err := runTicketsEpicAdd(config.DirsFrom(envFor(t)), cwd, "mine:m-impl", "loop", "open", "", &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	m := tickets.LoadEpicTicketMD(filepath.Join(project, "m"))
@@ -71,7 +73,7 @@ func TestRunTicketsEpicAdd_MapMissingTotalsStampsNoTokens(t *testing.T) {
 
 func TestExecute_TicketsSet_MapCompletedAtStampsConversationTotals(t *testing.T) {
 	cwd, project := mapWithConversations(t, false, sumRecs()...)
-	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return cwd, nil }}
+	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return cwd, nil }, env: envFor(t)}
 	if err := execute([]string{"tickets", "set", "mine:m", "--completed-at=now"}, d); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +85,7 @@ func TestExecute_TicketsSet_MapCompletedAtStampsConversationTotals(t *testing.T)
 
 func TestExecute_TicketsSet_PreRecordingMapCompletedAtStampsNoTokens(t *testing.T) {
 	cwd, project := mapWithConversations(t, true, sumRecs()...)
-	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return cwd, nil }}
+	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return cwd, nil }, env: envFor(t)}
 	if err := execute([]string{"tickets", "set", "mine:m", "--completed-at=now"}, d); err != nil {
 		t.Fatal(err)
 	}

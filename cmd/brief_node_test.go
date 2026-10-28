@@ -42,13 +42,7 @@ func recorded(t *testing.T, rec string) []string {
 	return strings.Split(strings.TrimSpace(string(raw)), "\n")
 }
 
-func nodeEnv(t *testing.T) {
-	t.Helper()
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
-}
-
 func TestBrief_VitestAndTscPass(t *testing.T) {
-	nodeEnv(t)
 	repo := testutil.TempRepo(t)
 	nodeStub(t, repo, "vitest", "vitest-pass.json", 0)
 	nodeStub(t, repo, "tsc", "tsc-pass.txt", 0)
@@ -67,7 +61,6 @@ func TestBrief_VitestAndTscPass(t *testing.T) {
 }
 
 func TestBrief_VitestNoTestsRan(t *testing.T) {
-	nodeEnv(t)
 	repo := testutil.TempRepo(t)
 	nodeStub(t, repo, "vitest", "", 0)
 	out, code := runBriefCmd(t, repo, "vitest")
@@ -77,7 +70,6 @@ func TestBrief_VitestNoTestsRan(t *testing.T) {
 }
 
 func TestBrief_NodeBinaryWalkUp(t *testing.T) {
-	nodeEnv(t)
 	repo := testutil.TempRepo(t)
 	rec := nodeStub(t, repo, "tsc", "tsc-pass.txt", 0)
 	web := filepath.Join(repo, "webui")
@@ -104,7 +96,6 @@ func TestBrief_NodeBinaryWalkUp(t *testing.T) {
 }
 
 func TestBrief_NodeForcedArgs(t *testing.T) {
-	nodeEnv(t)
 	repo := testutil.TempRepo(t)
 	vrec := nodeStub(t, repo, "vitest", "vitest-pass.json", 0)
 	trec := nodeStub(t, repo, "tsc", "tsc-pass.txt", 0)
@@ -130,7 +121,6 @@ func TestBrief_NodeForcedArgs(t *testing.T) {
 }
 
 func TestBrief_VitestWatchFalseReachesVitest(t *testing.T) {
-	nodeEnv(t)
 	repo := testutil.TempRepo(t)
 	rec := nodeStub(t, repo, "vitest", "vitest-pass.json", 0)
 	out, code := runBriefCmd(t, repo, "vitest", "--watch=false")
@@ -143,7 +133,6 @@ func TestBrief_VitestWatchFalseReachesVitest(t *testing.T) {
 }
 
 func TestBrief_NodeExit2Causes(t *testing.T) {
-	nodeEnv(t)
 	repoWith := func(lock string) string {
 		repo := testutil.TempRepo(t)
 		if lock != "" {
@@ -196,7 +185,6 @@ func TestBrief_NodeExit2Causes(t *testing.T) {
 // of 9 failing tests (7 in "seven", one nested, one with a long message).
 func vitestFailRepo(t *testing.T) string {
 	t.Helper()
-	nodeEnv(t)
 	repo := testutil.TempRepo(t)
 	nodeStub(t, repo, "vitest", "vitest-fail.json", 1)
 	return repo
@@ -259,7 +247,6 @@ func TestBrief_VitestRerunKeepsArgsAndC(t *testing.T) {
 }
 
 func TestBrief_VitestImportErrorIsLabelledFileFailed(t *testing.T) {
-	nodeEnv(t)
 	repo := testutil.TempRepo(t)
 	nodeStub(t, repo, "vitest", "vitest-import-error.json", 1)
 	out, code := runBriefCmd(t, repo, "vitest")
@@ -270,7 +257,6 @@ func TestBrief_VitestImportErrorIsLabelledFileFailed(t *testing.T) {
 }
 
 func TestBrief_VitestCrashedReporterFallsBackToRawHead(t *testing.T) {
-	nodeEnv(t)
 	repo := testutil.TempRepo(t)
 	nodeStub(t, repo, "vitest", "vitest-truncated.json", 1)
 	out, code := runBriefCmd(t, repo, "vitest")
@@ -296,7 +282,6 @@ func TestBrief_VitestLogHasFullOutputAndIsLast(t *testing.T) {
 // 7 files, one error each except the last, which has two (one multi-line).
 func tscFailRepo(t *testing.T, sample string) string {
 	t.Helper()
-	nodeEnv(t)
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "tsconfig.json", "{}")
 	nodeStub(t, repo, "tsc", sample, 2)
@@ -341,7 +326,6 @@ func TestBrief_TscLongDiagnosticIsCut(t *testing.T) {
 }
 
 func TestBrief_NodeUnparsedFailureFallsBackToRawHead(t *testing.T) {
-	nodeEnv(t)
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "tsconfig.json", "{}")
 	for _, tool := range []string{"vitest", "tsc"} {

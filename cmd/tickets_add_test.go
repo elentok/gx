@@ -28,7 +28,7 @@ func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "03-do-third-thing.md"), "03", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "", "do-fourth-thing", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "do-fourth-thing", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 
@@ -56,7 +56,7 @@ func TestRunTicketsAddBody_NewEpicWritesTicketMD(t *testing.T) {
 	epicPath := filepath.Join(t.TempDir(), "new-epic")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "", "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
+	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -80,7 +80,7 @@ func TestRunTicketsAddBody_ExistingEpicKeepsTicketMD(t *testing.T) {
 	testutil.WriteFile(t, epicPath, "ticket.md", want)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAddBody(epicPath, "", "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
+	if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, "", "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
 		t.Fatalf("runTicketsAddBody: %v", err)
 	}
 
@@ -96,7 +96,7 @@ func TestRunTicketsAdd_ExistingEpicWithoutTicketMDIsRepaired(t *testing.T) {
 	testutil.Mkdir(t, filepath.Join(epicPath, "issues"))
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "", "x", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "x", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 
@@ -116,7 +116,7 @@ func TestRunTicketsAdd_WritesStatusDraft(t *testing.T) {
 	testutil.EnsureEpicTicketMD(t, epicPath)
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "", "do-thing", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "do-thing", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 
@@ -141,7 +141,7 @@ func TestRunTicketsAddBody_StampsCreatedAndOriginalAddress(t *testing.T) {
 
 	for _, parent := range []string{"", "01"} {
 		var stdout bytes.Buffer
-		if err := runTicketsAddBody(epicPath, parent, "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
+		if err := runTicketsAddBody(deps{env: envFor(t)}, epicPath, parent, "x", "# X\n", addFrontmatter{}, false, &stdout, nil); err != nil {
 			t.Fatalf("runTicketsAddBody(parent %q): %v", parent, err)
 		}
 		printed := strings.TrimSpace(stdout.String())
@@ -165,7 +165,7 @@ func TestRunTicketsAdd_EmptySlugFails(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	err := runTicketsAdd(epicPath, "", "", &stdout)
+	err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "", &stdout)
 	if err == nil {
 		t.Fatal("runTicketsAdd with empty slug: want error, got nil")
 	}
@@ -189,7 +189,7 @@ func TestRunTicketsAdd_LetteredChild(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "12", "child-a", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12", "child-a", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 	firstPath := addedPath(t, epicPath, stdout.String())
@@ -198,7 +198,7 @@ func TestRunTicketsAdd_LetteredChild(t *testing.T) {
 	}
 
 	stdout.Reset()
-	if err := runTicketsAdd(epicPath, "12", "child-b", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12", "child-b", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd (second call): %v", err)
 	}
 	secondPath := addedPath(t, epicPath, stdout.String())
@@ -218,7 +218,7 @@ func TestRunTicketsAdd_WritesParentFrontmatter(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "12-parent.md"), "12", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "12", "child-a", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12", "child-a", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 	gotPath := addedPath(t, epicPath, stdout.String())
@@ -253,7 +253,7 @@ func TestRunTicketsAdd_LeavesParentUntouched(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "12", "child-a", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12", "child-a", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 
@@ -277,7 +277,7 @@ func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "12b-child.md"), "12b", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "12b", "grandchild-1", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12b", "grandchild-1", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd: %v", err)
 	}
 	firstPath := addedPath(t, epicPath, stdout.String())
@@ -286,7 +286,7 @@ func TestRunTicketsAdd_NumericLevelPastLetteredParent(t *testing.T) {
 	}
 
 	stdout.Reset()
-	if err := runTicketsAdd(epicPath, "12b", "grandchild-2", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12b", "grandchild-2", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd (second call): %v", err)
 	}
 	secondPath := addedPath(t, epicPath, stdout.String())
@@ -306,7 +306,7 @@ func TestRunTicketsAdd_LetteredNumericParentAllocatesNextSibling(t *testing.T) {
 	writeTicket(t, filepath.Join(issuesDir, "12b1-child.md"), "12b1", "done", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "12b1", "sibling", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "12b1", "sibling", &stdout); err != nil {
 		t.Fatalf("runTicketsAdd(parent=12b1): %v", err)
 	}
 	gotPath := addedPath(t, epicPath, stdout.String())
@@ -334,7 +334,7 @@ func TestRunTicketsAdd_ConcurrentCallsAllocateDistinctIDs(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			var buf bytes.Buffer
-			errs[i] = runTicketsAdd(epicPath, "", "concurrent", &buf)
+			errs[i] = runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "concurrent", &buf)
 			paths[i] = strings.TrimSpace(buf.String())
 		}(i)
 	}

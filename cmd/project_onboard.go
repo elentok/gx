@@ -27,7 +27,7 @@ func newProjectOnboardCmd(d deps) *cobra.Command {
 			if len(args) == 1 {
 				name = args[0]
 			}
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}

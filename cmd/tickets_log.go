@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -20,7 +21,7 @@ func newTicketsLogCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsLog(cwd, args[0], eventType, c.OutOrStdout())
+			return runTicketsLog(d.dirs(), cwd, args[0], eventType, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().StringVar(&eventType, "type", "", "only events of this type, e.g. pause.question")
@@ -29,8 +30,8 @@ func newTicketsLogCmd(d deps) *cobra.Command {
 
 // runTicketsLog is file-only: the log sits beside the ticket file, so it needs
 // no server route.
-func runTicketsLog(cwd, addr, eventType string, w io.Writer) error {
-	_, t, err := findTicket(cwd, addr)
+func runTicketsLog(dirs config.Dirs, cwd, addr, eventType string, w io.Writer) error {
+	_, t, err := findTicket(dirs, cwd, addr)
 	if err != nil {
 		return err
 	}

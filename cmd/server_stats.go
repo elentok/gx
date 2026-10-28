@@ -11,7 +11,7 @@ import (
 )
 
 // newServerStatsCmd shows the per-day stats the web UI's Stats page draws.
-func newServerStatsCmd() *cobra.Command {
+func newServerStatsCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	var days int
 	var project string
@@ -20,7 +20,7 @@ func newServerStatsCmd() *cobra.Command {
 		Short: "show per-day throughput, cost and friction stats through the gx server",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(c.Context(), jsonOut, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), jsonOut, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (server.Stats, error) {
 					return cl.Stats(ctx, days, project)
 				},

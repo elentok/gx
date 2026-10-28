@@ -19,7 +19,7 @@ import (
 // and the exit code.
 func runBriefCmd(t *testing.T, cwd string, args ...string) (string, int) {
 	t.Helper()
-	root := newRootCmd(deps{getwd: func() (string, error) { return cwd, nil }})
+	root := newRootCmd(deps{getwd: func() (string, error) { return cwd, nil }, env: envFor(t)})
 	var out bytes.Buffer
 	root.SetOut(&out)
 	root.SetErr(&out)
@@ -50,8 +50,7 @@ func lastLine(out string) string {
 }
 
 func TestBrief_GoTestPass(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", data)
+	data := envValue(envFor(t), "XDG_DATA_HOME")
 	mod := goModule(t)
 
 	out, code := runBriefCmd(t, mod, "go-test", "./...")
@@ -109,8 +108,7 @@ func TestBrief_GoTestPass(t *testing.T) {
 }
 
 func TestBrief_IndexInRepoCarriesBranchTreeAndCheckRun(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", data)
+	data := envValue(envFor(t), "XDG_DATA_HOME")
 	t.Setenv(brief.EnvCheckRun, "run-1")
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
@@ -137,7 +135,6 @@ func TestBrief_IndexInRepoCarriesBranchTreeAndCheckRun(t *testing.T) {
 }
 
 func TestBrief_GoTestArgs(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	bin := t.TempDir()
 	rec := filepath.Join(t.TempDir(), "args")
 	script := "#!/bin/sh\npwd > '" + rec + "'\nfor a in \"$@\"; do echo \"$a\" >> '" + rec + "'; done\n"
@@ -176,7 +173,6 @@ func evalSymlinks(t *testing.T, p string) string {
 }
 
 func TestBrief_NoTestsRan(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	dir := t.TempDir()
 	testutil.WriteFile(t, dir, "go.mod", "module example.com/empty\n\ngo 1.21\n")
 	testutil.WriteFile(t, dir, "x.go", "package empty\n")
@@ -188,7 +184,6 @@ func TestBrief_NoTestsRan(t *testing.T) {
 }
 
 func TestBrief_GoMissingExits2(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	t.Setenv("PATH", t.TempDir())
 
 	out, code := runBriefCmd(t, t.TempDir(), "go-test")
@@ -236,8 +231,10 @@ func TestBrief_NoArgsAndHelpPrintHelp(t *testing.T) {
 }
 
 func TestBrief_UnwritableLogExits2(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", data)
+	data := envValue(envFor(t), "XDG_DATA_HOME")
+	if err := os.MkdirAll(data, 0o700); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chmod(data, 0o500); err != nil {
 		t.Fatal(err)
 	}
@@ -282,8 +279,7 @@ func failingModule(t *testing.T, withBuildError bool) string {
 }
 
 func TestBrief_GoTestFailures(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", data)
+	data := envValue(envFor(t), "XDG_DATA_HOME")
 	mod := failingModule(t, false)
 
 	out, code := runBriefCmd(t, mod, "go-test", "-count=1", "./...")
@@ -351,7 +347,6 @@ func TestBrief_GoTestFailures(t *testing.T) {
 // Seam 2: a package that does not build is one unit named by the package, and
 // the other package's failures are still reported.
 func TestBrief_GoTestBuildErrorIsOneUnit(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	out, code := runBriefCmd(t, failingModule(t, true), "go-test", "-count=1", "./...")
 	if code != 1 {
 		t.Fatalf("exit = %d, out:\n%s", code, out)
@@ -368,7 +363,6 @@ func TestBrief_GoTestBuildErrorIsOneUnit(t *testing.T) {
 }
 
 func TestBrief_GoTestRerunKeepsArgsAndC(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	mod := failingModule(t, false)
 
 	out, code := runBriefCmd(t, t.TempDir(), "-C", mod, "go-test", "-run", "TestC|TestD", "-count=1", "./a")
@@ -382,7 +376,6 @@ func TestBrief_GoTestRerunKeepsArgsAndC(t *testing.T) {
 }
 
 func TestBrief_GoTestBuildErrorOnlyHasNoRerun(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	dir := t.TempDir()
 	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, dir, "b.go", "package bad\n\nfunc F() int { return \"x\" }\n")
@@ -395,7 +388,6 @@ func TestBrief_GoTestBuildErrorOnlyHasNoRerun(t *testing.T) {
 }
 
 func TestBrief_GoTestPanicBeforeAnyTest(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	dir := t.TempDir()
 	testutil.WriteFile(t, dir, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, dir, "p_test.go", "package p\n\nimport \"testing\"\n\nfunc TestMain(m *testing.M) { panic(\"boom\") }\nfunc TestP(t *testing.T) {}\n")

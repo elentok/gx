@@ -29,12 +29,12 @@ import (
 // becomes the stub's filename suffix (<id>-<slug>.md), so the file is written
 // with a real name instead of a placeholder the caller has to remember to
 // rename.
-func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
+func runTicketsAdd(d deps, epicPath, parent, slug string, w io.Writer) error {
 	path, _, err := createTicket(epicPath, parent, slug, nil, addFrontmatter{})
 	if err != nil {
 		return err
 	}
-	pingServer(path)
+	pingServer(d, path)
 	// The address, like everywhere else the CLI names a ticket: `set` and
 	// `section` accept it to fill the stub in, and `show` gives the path.
 	return printTicketRef(path, false, w)
@@ -47,7 +47,7 @@ func runTicketsAdd(epicPath, parent, slug string, w io.Writer) error {
 // The fields come from flags (see addFieldFlags) or, kept for older callers,
 // from a frontmatter block opening the body: its settable fields are merged in
 // rather than written as a second block. See bodyFrontmatter.
-func runTicketsAddBody(epicPath, parent, slug, body string, flags addFrontmatter, jsonOut bool, w, stderr io.Writer) error {
+func runTicketsAddBody(d deps, epicPath, parent, slug, body string, flags addFrontmatter, jsonOut bool, w, stderr io.Writer) error {
 	fm, text, err := bodyFrontmatter(body)
 	if err != nil {
 		return err
@@ -74,7 +74,7 @@ func runTicketsAddBody(epicPath, parent, slug, body string, flags addFrontmatter
 		}
 	}
 	printNotices(stderr, notices)
-	pingServer(path)
+	pingServer(d, path)
 	return printTicketRef(path, jsonOut, w)
 }
 
@@ -332,18 +332,18 @@ func resolveAddTarget(d deps, arg, parentFlag string) (epicPath, parent string, 
 	if err != nil {
 		return "", "", err
 	}
-	epicPath = resolveEpicArg(arg, cwd)
+	epicPath = resolveEpicArg(d.dirs(), arg, cwd)
 	if info, statErr := os.Stat(epicPath); statErr == nil && info.IsDir() {
 		return epicPath, parentFlag, nil
 	}
 	if m := projectEpicRe.FindStringSubmatch(arg); m != nil {
-		root, err := projectRoot(cwd, m[1])
+		root, err := projectRoot(d.dirs(), cwd, m[1])
 		if err != nil {
 			return "", "", err
 		}
 		return filepath.Join(root, m[2]), parentFlag, nil
 	}
-	_, t, findErr := findTicket(cwd, arg)
+	_, t, findErr := findTicket(d.dirs(), cwd, arg)
 	if findErr != nil {
 		// Not an address either: let the epic path's own error surface.
 		return epicPath, parentFlag, nil

@@ -22,12 +22,12 @@ import (
 // ticket store as the project for the repo at cwd (see
 // tickets.MigrateIntoStore). The project is named projectFlag, else after the
 // repo directory: for a bare layout, the directory holding .bare.
-func runTicketsMigrateToStore(cwd, oldRoot, projectFlag string, dryRun bool, w io.Writer) error {
+func runTicketsMigrateToStore(dirs config.Dirs, cwd, oldRoot, projectFlag string, dryRun bool, w io.Writer) error {
 	repo, err := git.FindRepo(cwd)
 	if err != nil {
 		return fmt.Errorf("not inside a git repo: %w", err)
 	}
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return err
 	}

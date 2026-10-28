@@ -17,7 +17,7 @@ import (
 
 // addServerRepairCmds adds the four repair verbs to `gx server tickets`. They
 // send the caller's cwd and branch; the server evaluates the guards.
-func addServerRepairCmds(parent *cobra.Command) {
+func addServerRepairCmds(parent *cobra.Command, d deps) {
 	var req server.RepairRequest
 	var jsonOut bool
 	verb := func(name, use, short string, args cobra.PositionalArgs, flags func(*cobra.Command)) *cobra.Command {
@@ -34,11 +34,14 @@ func addServerRepairCmds(parent *cobra.Command) {
 				req.Cwd = cwd
 				// An unreadable branch (not a repo) means no guard applies.
 				req.Branch, _ = git.CurrentBranch(cwd)
-				cl, err := serverClient()
+				cl, err := d.dial()()
 				if err != nil {
 					return err
 				}
-				return runServerRepair(c.Context(), cl, c.OutOrStdout(), jsonOut, name, req, directRepair)
+				direct := func(verb string, req server.RepairRequest) (server.RepairResult, error) {
+					return directRepair(d.dirs(), verb, req)
+				}
+				return runServerRepair(c.Context(), cl, c.OutOrStdout(), jsonOut, name, req, direct)
 			},
 		}
 		c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
@@ -69,8 +72,8 @@ func addServerRepairCmds(parent *cobra.Command) {
 const directNotice = "server not running — ran directly under merge lock"
 
 // directRepair runs a verb in-process against the configured ticket store.
-func directRepair(verb string, req server.RepairRequest) (server.RepairResult, error) {
-	cfg, err := config.Load()
+func directRepair(dirs config.Dirs, verb string, req server.RepairRequest) (server.RepairResult, error) {
+	cfg, err := dirs.Load()
 	if err != nil {
 		return server.RepairResult{}, err
 	}

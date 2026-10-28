@@ -19,11 +19,11 @@ import (
 func registeredCheckRepo(t *testing.T, checksJSON string) (repo, data string) {
 	t.Helper()
 	repo = testutil.TempRepo(t)
-	testutil.RegisterProject(t, repo, "main")
+	registerWithTrunk(t, repo, "main")
 	testutil.Mkdir(t, filepath.Join(repo, ".gx"))
 	testutil.WriteFile(t, repo, ".gx/checks.json", checksJSON)
 	testutil.CommitAll(t, repo, "checks")
-	return repo, filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx")
+	return repo, filepath.Join(envValue(envFor(t), "XDG_DATA_HOME"), "gx")
 }
 
 func kindRecord(t *testing.T, rec check.Record, kind string) check.KindRecord {
@@ -131,6 +131,9 @@ func TestCheck_BriefCalledByConfiguredCommandNamesFailingTests(t *testing.T) {
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	repo, data := registeredCheckRepo(t, `{"test":"gx brief go-test ./..."}`)
+	// The spawned `gx brief` is a child process: it finds the data dir in the
+	// process env, not in the deps env.
+	t.Setenv("XDG_DATA_HOME", filepath.Dir(data))
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) {}\nfunc TestB(t *testing.T) { t.Fail() }\n")
 	testutil.CommitAll(t, repo, "module")

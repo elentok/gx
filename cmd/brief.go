@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/brief"
-	"github.com/elentok/gx/config"
 )
 
 // briefTools lists the wrapped tools by subcommand name.
@@ -86,7 +85,7 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 		}
 		return nil
 	}
-	dataDir, err := config.DataDir()
+	dataDir, err := d.dirs().DataDir()
 	if err != nil {
 		return err
 	}

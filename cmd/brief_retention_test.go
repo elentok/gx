@@ -31,8 +31,7 @@ func indexLines(t *testing.T, data string) []string {
 }
 
 func TestBrief_SweepRemovesOldLogsAndIndexLines(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", data)
+	data := envValue(envFor(t), "XDG_DATA_HOME")
 	dir := briefDir(data)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -74,8 +73,7 @@ func TestBrief_SweepRemovesOldLogsAndIndexLines(t *testing.T) {
 }
 
 func TestBrief_SweepErrorDoesNotFailRun(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", data)
+	data := envValue(envFor(t), "XDG_DATA_HOME")
 	dir := briefDir(data)
 	// A directory named like a log, an unparsable index line and an index
 	// that can only be rewritten through an unwritable temp path.
@@ -97,8 +95,7 @@ func TestBrief_SweepErrorDoesNotFailRun(t *testing.T) {
 }
 
 func TestBrief_SignalKilledChildIsFailure(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", data)
+	data := envValue(envFor(t), "XDG_DATA_HOME")
 	fakeGo(t, "echo partial-output\nkill -9 $$")
 
 	out, code := runBriefCmd(t, t.TempDir(), "go-test")
@@ -118,8 +115,7 @@ func TestBrief_SignalKilledChildIsFailure(t *testing.T) {
 }
 
 func TestBrief_InterruptIsForwardedToChild(t *testing.T) {
-	data := t.TempDir()
-	t.Setenv("XDG_DATA_HOME", data)
+	data := envValue(envFor(t), "XDG_DATA_HOME")
 	started := filepath.Join(t.TempDir(), "started")
 	fakeGo(t, "trap 'echo got-interrupt; exit 3' INT\necho partial-output\ntouch "+started+"\nwhile :; do sleep 0.05; done")
 

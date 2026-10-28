@@ -60,11 +60,12 @@ func (f *finishFixture) recordTree(t *testing.T, tree string, exit int, kindFilt
 	if err != nil {
 		t.Fatal(err)
 	}
-	dataDir, err := config.DataDir()
+	dirs := config.DirsFrom(envFor(t))
+	dataDir, err := dirs.DataDir()
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dataDir, "check", check.ProjectFor(f.wt)+".jsonl")
+	path := filepath.Join(dataDir, "check", check.ProjectForDirs(dirs, f.wt)+".jsonl")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +81,7 @@ func (f *finishFixture) recordTree(t *testing.T, tree string, exit int, kindFilt
 
 func (f *finishFixture) finish(t *testing.T, extra ...string) error {
 	t.Helper()
-	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return f.wt, nil }}
+	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return f.wt, nil }, env: envFor(t)}
 	return execute(append([]string{"tickets", "set", f.ticket, "--iteration-status=finished"}, extra...), d)
 }
 

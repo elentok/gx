@@ -5,7 +5,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 )
 
@@ -19,7 +18,7 @@ func runStashify(args []string, d deps) error {
 		return err
 	}
 
-	cfg, _ := config.Load()
+	cfg, _ := d.dirs().Load()
 	nerd := cfg.UseNerdFontIcons
 
 	changes, err := git.UncommittedChanges(cwd)

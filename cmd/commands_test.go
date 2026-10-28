@@ -18,7 +18,7 @@ func TestNewEpicScopedCmd_ResolvesEpicArgAndInvokesRun(t *testing.T) {
 
 	var gotEpicPath string
 	var gotArgs []string
-	d := deps{getwd: func() (string, error) { return repoDir, nil }}
+	d := deps{getwd: func() (string, error) { return repoDir, nil }, env: envFor(t)}
 	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(epicPath string, args []string, out io.Writer) error {
 		gotEpicPath = epicPath
 		gotArgs = args
@@ -84,7 +84,7 @@ func TestNewEpicScopedCmd_ValidArgsFunctionListsEpicNames(t *testing.T) {
 	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "widget-epic"))
 	testutil.EnsureEpicTicketMD(t, filepath.Join(project, "bugs-05"))
 
-	d := deps{getwd: func() (string, error) { return repoDir, nil }}
+	d := deps{getwd: func() (string, error) { return repoDir, nil }, env: envFor(t)}
 	cmd := newEpicScopedCmd(d, "widget <epic>", "test command", func(string, []string, io.Writer) error { return nil })
 
 	names, directive := cmd.ValidArgsFunction(cmd, nil, "")

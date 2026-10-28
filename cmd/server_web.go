@@ -11,21 +11,20 @@ import (
 	"rsc.io/qr"
 
 	"github.com/elentok/gx/apiclient"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 )
 
 // qrQuietZone is the blank border, in modules, that scanners need around a code.
 const qrQuietZone = 2
 
-func newServerWebTokenCmd() *cobra.Command {
+func newServerWebTokenCmd(d deps) *cobra.Command {
 	var rotate bool
 	c := &cobra.Command{
 		Use:   "web-token",
 		Short: "Print the web UI token, or replace it with --rotate (signs out every browser)",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			stateDir, err := config.StateDir()
+			stateDir, err := d.dirs().StateDir()
 			if err != nil {
 				return err
 			}
@@ -36,18 +35,18 @@ func newServerWebTokenCmd() *cobra.Command {
 	return c
 }
 
-func newServerWebURLCmd() *cobra.Command {
+func newServerWebURLCmd(d deps) *cobra.Command {
 	var showQR bool
 	c := &cobra.Command{
 		Use:   "web-url",
 		Short: "Print the web UI link with its token",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			stateDir, err := config.StateDir()
+			stateDir, err := d.dirs().StateDir()
 			if err != nil {
 				return err
 			}
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}

@@ -14,14 +14,14 @@ import (
 
 // newServerEpicsCmd lists the epics and holds the verbs that take an epic
 // address; every `gx server tickets` verb takes a ticket address.
-func newServerEpicsCmd() *cobra.Command {
+func newServerEpicsCmd(d deps) *cobra.Command {
 	var listJSON, allFinished bool
 	cmd := &cobra.Command{
 		Use:   "epics",
 		Short: "list every epic the Epics page shows, or act on a whole epic through the gx server",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(c.Context(), listJSON, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), listJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (server.EpicList, error) {
 					return cl.Epics(ctx)
 				},
@@ -39,7 +39,7 @@ func newServerEpicsCmd() *cobra.Command {
 			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {
 				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
 			}
-			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.EpicMerge(ctx, args[0])
 			})
 		},
@@ -55,7 +55,7 @@ func newServerEpicsCmd() *cobra.Command {
 			if _, _, ok := tickets.ParseEpicAddress(args[0]); !ok {
 				return fmt.Errorf("%s is not an epic address (want project:epic)", args[0])
 			}
-			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				return cl.EpicStashMerge(ctx, args[0])
 			})
 		},
@@ -69,7 +69,7 @@ func newServerEpicsCmd() *cobra.Command {
 		Short: "show an epic's state, progress and ticket rows",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return serverRead(c.Context(), detailJSON, c.OutOrStdout(),
+			return serverRead(d.dial(), c.Context(), detailJSON, c.OutOrStdout(),
 				func(ctx context.Context, cl *apiclient.Client) (server.EpicDetail, error) {
 					return cl.EpicDetail(ctx, args[0])
 				},

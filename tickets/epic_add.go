@@ -92,6 +92,12 @@ func (f EpicFields) validate() error {
 // a refusal leaves the store untouched. An epic directory that already exists
 // refuses, with or without a ticket.md.
 func CreateEpic(projectDir, name string, fields EpicFields, body string) (string, error) {
+	return CreateEpicIn("", projectDir, name, fields, body)
+}
+
+// CreateEpicIn is CreateEpic reading the recorded conversations of a map it
+// completes from conversationsDir; empty means conversations.DefaultDir.
+func CreateEpicIn(conversationsDir, projectDir, name string, fields EpicFields, body string) (string, error) {
 	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, "/:\\") {
 		return "", fmt.Errorf("invalid epic name %q", name)
 	}
@@ -129,7 +135,7 @@ func CreateEpic(projectDir, name string, fields EpicFields, body string) (string
 	}
 	// Stamp the map before creating anything, so a failure leaves no new epic.
 	if mapPath, ok := mapCompletedBy(projectDir, name, fields.Kind); ok {
-		if err := StampMapCompletion(mapPath, fields.CreatedAt); err != nil {
+		if err := stampMapCompletion(conversationsDir, mapPath, fields.CreatedAt); err != nil {
 			return "", err
 		}
 	}
@@ -161,19 +167,28 @@ func CreateEpic(projectDir, name string, fields EpicFields, body string) (string
 // conversation lacking totals, gets no tokens or cost. Stamping never
 // overwrites, so the first completion wins.
 func StampMapCompletion(mapPath string, at time.Time) error {
-	fields, err := mapCompletionFields(mapPath, at)
+	return stampMapCompletion("", mapPath, at)
+}
+
+func stampMapCompletion(conversationsDir, mapPath string, at time.Time) error {
+	fields, err := mapCompletionFields(conversationsDir, mapPath, at)
 	if err != nil {
 		return err
 	}
 	return StampEpicFields(mapPath, fields)
 }
 
-// mapCompletionFields are the frontmatter keys StampMapCompletion writes.
-func mapCompletionFields(mapPath string, at time.Time) (map[string]any, error) {
+// mapCompletionFields are the frontmatter keys StampMapCompletion writes. The
+// conversations are read from conversationsDir, or conversations.DefaultDir
+// when it is empty.
+func mapCompletionFields(conversationsDir, mapPath string, at time.Time) (map[string]any, error) {
 	fields := map[string]any{"completed_at": at}
-	root, err := conversations.DefaultDir()
-	if err != nil {
-		return nil, err
+	root := conversationsDir
+	if root == "" {
+		var err error
+		if root, err = conversations.DefaultDir(); err != nil {
+			return nil, err
+		}
 	}
 	label := ProjectName(filepath.Dir(mapPath)) + ":" + filepath.Base(mapPath)
 	sum, ok, err := conversations.SumEpicTotals(root, label, LoadEpicTicketMD(mapPath).CreatedAt)

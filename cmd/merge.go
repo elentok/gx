@@ -27,8 +27,8 @@ type MergeResult struct {
 // merge of it into the repo's trunk — never cwd's current branch — and reports
 // the outcome to w. It never rebases, never pushes, and stops without further
 // mutation on a non-fast-forward refusal.
-func runMerge(cwd, branchArg string, jsonOut bool, w io.Writer) error {
-	repo, err := tickets.OpenRepo(cwd)
+func runMerge(dirs config.Dirs, cwd, branchArg string, jsonOut bool, w io.Writer) error {
+	repo, err := tickets.OpenRepoDirs(dirs, cwd)
 	if repo == nil {
 		return fmt.Errorf("not inside a git repo: %w", err)
 	}
@@ -50,7 +50,7 @@ func runMerge(cwd, branchArg string, jsonOut bool, w io.Writer) error {
 
 	result := MergeResult{Status: "merged", Target: repo.Trunk}
 	if outcome.Merged {
-		if err := stampMergedEpic(repo.Root, branch); err != nil {
+		if err := stampMergedEpic(dirs, repo.Root, branch); err != nil {
 			return fmt.Errorf("merged %s onto %s, but stamping merged_at failed: %w", branch, repo.Trunk, err)
 		}
 	} else {
@@ -73,11 +73,11 @@ func runMerge(cwd, branchArg string, jsonOut bool, w io.Writer) error {
 // branch (an epic's branch is named after its directory). A branch of no
 // epic, or a repo no project registers, stamps nothing. completed_at is left
 // alone: it records the epic's outcome, not its merge.
-func stampMergedEpic(repoRoot, branch string) error {
+func stampMergedEpic(dirs config.Dirs, repoRoot, branch string) error {
 	if branch == "" || filepath.Base(branch) != branch {
 		return nil
 	}
-	cfg, err := config.Load()
+	cfg, err := dirs.Load()
 	if err != nil {
 		return err
 	}

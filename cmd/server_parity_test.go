@@ -95,7 +95,7 @@ var routeVerbs = map[string]string{
 
 func TestRouteTableHasCLIVerbs(t *testing.T) {
 	t.Parallel()
-	root := newRootCmd(deps{})
+	root := newRootCmd(deps{env: tempEnv(t)})
 	patterns := server.RoutePatterns()
 	for _, p := range patterns {
 		verb, ok := routeVerbs[p]

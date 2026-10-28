@@ -30,7 +30,7 @@ func newTicketsAnswerCmd(d deps, withState bool) *cobra.Command {
 				}
 				req.Text = text
 			}
-			return serverQueueWrite(c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
+			return serverQueueWrite(d.dial(), c, jsonOut, func(ctx context.Context, cl *apiclient.Client) (server.QueueResult, error) {
 				res, err := cl.TicketAnswer(ctx, req)
 				if err == nil && res.Refused && res.Reason == server.ReasonStale && !jsonOut {
 					res.Message = staleMessage(res)

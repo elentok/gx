@@ -108,8 +108,22 @@ func RootFor(dir string) (string, error) {
 	return rootForRepo(repo.Root)
 }
 
+// RootForDirs is RootFor with the config and data dirs taken from dirs
+// instead of the process env.
+func RootForDirs(dirs config.Dirs, dir string) (string, error) {
+	repo, err := git.FindRepo(dir)
+	if err != nil {
+		return "", fmt.Errorf("not inside a git repo: %w", err)
+	}
+	return rootForRepoWith(dirs.Load, repo.Root)
+}
+
 func rootForRepo(repoRoot string) (string, error) {
-	cfg, err := config.Load()
+	return rootForRepoWith(config.Load, repoRoot)
+}
+
+func rootForRepoWith(load func() (config.Config, error), repoRoot string) (string, error) {
+	cfg, err := load()
 	if err != nil {
 		return "", err
 	}

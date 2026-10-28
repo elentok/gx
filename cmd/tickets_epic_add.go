@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"github.com/elentok/gx/config"
@@ -14,12 +15,16 @@ import (
 // epic in the cwd's project) and prints its address-less name, project:epic.
 // An unknown project refuses with tickets.CodeUnknownProject before anything is
 // written.
-func runTicketsEpicAdd(cwd, arg, kind, status, body string, w io.Writer) error {
-	projectDir, project, name, err := resolveEpicTarget(cwd, arg)
+func runTicketsEpicAdd(cfgDirs config.Dirs, cwd, arg, kind, status, body string, w io.Writer) error {
+	projectDir, project, name, err := resolveEpicTarget(cfgDirs, cwd, arg)
 	if err != nil {
 		return err
 	}
-	if _, err := tickets.CreateEpic(projectDir, name, tickets.EpicFields{Kind: kind, Status: status}, body); err != nil {
+	data, err := cfgDirs.DataDir()
+	if err != nil {
+		return err
+	}
+	if _, err := tickets.CreateEpicIn(filepath.Join(data, "conversations"), projectDir, name, tickets.EpicFields{Kind: kind, Status: status}, body); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(w, "%s:%s\n", project, name)
@@ -28,16 +33,16 @@ func runTicketsEpicAdd(cwd, arg, kind, status, body string, w io.Writer) error {
 
 // resolveEpicTarget splits arg into its project directory, project name and
 // epic name. A bare epic name belongs to the cwd's project.
-func resolveEpicTarget(cwd, arg string) (projectDir, project, name string, err error) {
+func resolveEpicTarget(cfgDirs config.Dirs, cwd, arg string) (projectDir, project, name string, err error) {
 	project, name, hasProject := strings.Cut(arg, ":")
 	if !hasProject {
 		name = arg
-		if projectDir, err = ticketRoot(cwd); err != nil {
+		if projectDir, err = ticketRoot(cfgDirs, cwd); err != nil {
 			return "", "", "", err
 		}
 		return projectDir, tickets.ProjectName(projectDir), name, nil
 	}
-	cfg, err := config.Load()
+	cfg, err := cfgDirs.Load()
 	if err != nil {
 		return "", "", "", err
 	}
@@ -73,7 +78,7 @@ func newTicketsEpicCmd(d deps) *cobra.Command {
 					return err
 				}
 			}
-			return runTicketsEpicAdd(cwd, args[0], kind, status, body, c.OutOrStdout())
+			return runTicketsEpicAdd(d.dirs(), cwd, args[0], kind, status, body, c.OutOrStdout())
 		},
 	}
 	addCmd.Flags().StringVar(&kind, "kind", "", "map or loop (required unless the body's frontmatter sets it)")
@@ -96,7 +101,7 @@ func newTicketsEpicSetCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			projectDir, project, name, err := resolveEpicTarget(cwd, args[0])
+			projectDir, project, name, err := resolveEpicTarget(d.dirs(), cwd, args[0])
 			if err != nil {
 				return err
 			}
@@ -104,7 +109,7 @@ func newTicketsEpicSetCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runEpicSet(c, path, c.OutOrStdout(), d.getwd, d.dial())
+			return runEpicSet(d.dirs(), c, path, c.OutOrStdout(), d.getwd, d.dial())
 		},
 	}
 	cmd.Flags().String("kind", "", "set kind (map or loop)")

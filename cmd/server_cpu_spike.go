@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newServerCPUSpikeCmd() *cobra.Command {
+func newServerCPUSpikeCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	var spike cpuwatch.Spike
 	c := &cobra.Command{
@@ -20,7 +20,7 @@ func newServerCPUSpikeCmd() *cobra.Command {
 			"agent to find the cause, subject to cpu-watchdog's cooldown.",
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}

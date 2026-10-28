@@ -17,7 +17,7 @@ import (
 // files one writes the same shape. The ticket is always draft + research; a
 // body asking for anything else is refused. Every check runs before anything
 // is written.
-func runTicketsFollowUpAdd(epicPath, body, category string, jsonOut bool, w io.Writer) error {
+func runTicketsFollowUpAdd(d deps, epicPath, body, category string, jsonOut bool, w io.Writer) error {
 	if filepath.Base(filepath.Clean(epicPath)) != followUpsEpic {
 		return &tickets.AddressError{Code: tickets.CodeNotFollowUpsEpic, Msg: "follow-up add targets a " + followUpsEpic + " epic, not " + filepath.Base(epicPath)}
 	}
@@ -71,7 +71,7 @@ func runTicketsFollowUpAdd(epicPath, body, category string, jsonOut bool, w io.W
 	if err != nil {
 		return err
 	}
-	pingServer(path)
+	pingServer(d, path)
 	return printTicketRef(path, jsonOut, w)
 }
 

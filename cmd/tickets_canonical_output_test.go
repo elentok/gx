@@ -26,7 +26,7 @@ func TestRunTicketsAdd_PrintsAddressNotPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stdout bytes.Buffer
-	if err := runTicketsAdd(epicPath, "", "do-thing", &stdout); err != nil {
+	if err := runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "do-thing", &stdout); err != nil {
 		t.Fatal(err)
 	}
 	got := strings.TrimSpace(stdout.String())

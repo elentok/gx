@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -56,8 +57,8 @@ func runAgentFits(d deps, out io.Writer, agent, session, cwd, stepName string) e
 
 // readServerAutoAdvance reads the switch live from the server. A session the
 // server does not list is an error, so the caller stops instead of chaining.
-func readServerAutoAdvance(sessionID string) (bool, error) {
-	cl, err := serverClient()
+func readServerAutoAdvance(dirs config.Dirs, sessionID string) (bool, error) {
+	cl, err := serverClient(dirs)
 	if err != nil {
 		return false, err
 	}

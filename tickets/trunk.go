@@ -75,16 +75,30 @@ func TrunkFor(dir string) (string, error) {
 // still returns a usable Repo, with an empty Trunk, so callers that can
 // degrade keep it; only a FindRepo failure returns no Repo.
 func OpenRepo(dir string) (*git.Repo, error) {
+	return openRepoWith(config.Load, dir)
+}
+
+// OpenRepoDirs is OpenRepo with the config and data dirs taken from dirs
+// instead of the process env.
+func OpenRepoDirs(dirs config.Dirs, dir string) (*git.Repo, error) {
+	return openRepoWith(dirs.Load, dir)
+}
+
+func openRepoWith(load func() (config.Config, error), dir string) (*git.Repo, error) {
 	repo, err := git.FindRepo(dir)
 	if err != nil {
 		return nil, err
 	}
-	repo.Trunk, err = trunkForRoot(repo.Root)
+	repo.Trunk, err = trunkWith(load, repo.Root)
 	return repo, err
 }
 
 func trunkForRoot(repoRoot string) (string, error) {
-	projectDir, err := rootForRepo(repoRoot)
+	return trunkWith(config.Load, repoRoot)
+}
+
+func trunkWith(load func() (config.Config, error), repoRoot string) (string, error) {
+	projectDir, err := rootForRepoWith(load, repoRoot)
 	if errors.Is(err, ErrNoProject) {
 		return checkTrunk(&ErrTrunkMissing{Repo: repoRoot, Trunk: remoteDefaultBranch(repoRoot)})
 	}

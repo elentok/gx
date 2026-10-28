@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -54,12 +55,12 @@ func TestServerOneOff_TypeFlagReachesTheServerRequest(t *testing.T) {
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
 
-	if newServerOneOffCmd().Flag("type") == nil {
+	if newServerOneOffCmd(deps{env: envFor(t)}).Flag("type") == nil {
 		t.Fatal("no --type flag")
 	}
 	var out bytes.Buffer
 	req := server.OneOffRequest{Prompt: "retro", Type: "evolve"}
-	if err := runServerOneOff(context.Background(), apiclient.New(sock), &out, &out, false, false, 0, req); err != nil {
+	if err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), apiclient.New(sock), &out, &out, false, false, 0, req); err != nil {
 		t.Fatal(err)
 	}
 	if got.Type != "evolve" {
@@ -85,7 +86,7 @@ func TestServerOneOff_NameFlagPrintsTheSharedEpicAddress(t *testing.T) {
 
 	var out bytes.Buffer
 	req := server.OneOffRequest{Prompt: "x", Name: "foo"}
-	if err := runServerOneOff(context.Background(), apiclient.New(sock), &out, &out, false, false, 0, req); err != nil {
+	if err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), apiclient.New(sock), &out, &out, false, false, 0, req); err != nil {
 		t.Fatal(err)
 	}
 	if got.Name != "foo" || !strings.Contains(out.String(), "gx:one-offs/12") {
@@ -95,7 +96,7 @@ func TestServerOneOff_NameFlagPrintsTheSharedEpicAddress(t *testing.T) {
 
 func TestServerOneOff_RemovedFlagsAreUnknown(t *testing.T) {
 	for _, flag := range []string{"commits", "base"} {
-		if newServerOneOffCmd().Flag(flag) != nil {
+		if newServerOneOffCmd(deps{env: envFor(t)}).Flag(flag) != nil {
 			t.Errorf("--%s still exists; a one-off never commits", flag)
 		}
 	}
@@ -104,7 +105,7 @@ func TestServerOneOff_RemovedFlagsAreUnknown(t *testing.T) {
 func TestServerOneOff_DuplicateWaitFollowsExistingTicket(t *testing.T) {
 	cl := dupServer(t, string(schema.StatusLegacyAnswer))
 	var out, errOut bytes.Buffer
-	err := runServerOneOff(context.Background(), cl, &out, &errOut, false, true, 0, server.OneOffRequest{Prompt: "x"})
+	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, false, true, 0, server.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != 3 {
 		t.Fatalf("err = %v; want exit code 3 from the existing ticket", err)
@@ -117,7 +118,7 @@ func TestServerOneOff_DuplicateWaitFollowsExistingTicket(t *testing.T) {
 func TestServerOneOff_DuplicateWithoutWaitStillExitsSeven(t *testing.T) {
 	cl := dupServer(t, "claimed")
 	var out, errOut bytes.Buffer
-	err := runServerOneOff(context.Background(), cl, &out, &errOut, false, false, 0, server.OneOffRequest{Prompt: "x"})
+	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, false, false, 0, server.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != exitDuplicateLive {
 		t.Fatalf("err = %v; want exit code 7", err)
@@ -127,7 +128,7 @@ func TestServerOneOff_DuplicateWithoutWaitStillExitsSeven(t *testing.T) {
 func TestServerOneOff_JSONDuplicateWithoutWaitExitsSeven(t *testing.T) {
 	cl := dupServer(t, "claimed")
 	var out, errOut bytes.Buffer
-	err := runServerOneOff(context.Background(), cl, &out, &errOut, true, false, 0, server.OneOffRequest{Prompt: "x"})
+	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, true, false, 0, server.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != exitDuplicateLive {
 		t.Fatalf("err = %v; want exit code 7", err)
@@ -140,7 +141,7 @@ func TestServerOneOff_JSONDuplicateWithoutWaitExitsSeven(t *testing.T) {
 func TestServerOneOff_JSONDuplicateWaitFollowsExistingTicket(t *testing.T) {
 	cl := dupServer(t, string(schema.StatusLegacyAnswer))
 	var out, errOut bytes.Buffer
-	err := runServerOneOff(context.Background(), cl, &out, &errOut, true, true, 0, server.OneOffRequest{Prompt: "x"})
+	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, true, true, 0, server.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != 3 {
 		t.Fatalf("err = %v; want exit code 3 from the existing ticket", err)
@@ -164,7 +165,7 @@ func TestServerOneOff_JSONOtherRefusalFails(t *testing.T) {
 	go func() { _ = srv.Serve(ln) }()
 	t.Cleanup(func() { _ = srv.Close() })
 	var out, errOut bytes.Buffer
-	err = runServerOneOff(context.Background(), apiclient.New(sock), &out, &errOut, true, false, 0, server.OneOffRequest{Prompt: "x"})
+	err = runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), apiclient.New(sock), &out, &errOut, true, false, 0, server.OneOffRequest{Prompt: "x"})
 	if err == nil {
 		t.Fatal("err = nil; want a refusal failure")
 	}
@@ -176,7 +177,7 @@ func TestServerOneOff_JSONOtherRefusalFails(t *testing.T) {
 func TestServerOneOff_ExitsEightWhenNoServerRunning(t *testing.T) {
 	cl := apiclient.New(filepath.Join(shortTempDir(t), "a.sock"))
 	var out, errOut bytes.Buffer
-	err := runServerOneOff(context.Background(), cl, &out, &errOut, false, false, 0, server.OneOffRequest{Prompt: "x"})
+	err := runServerOneOff(context.Background(), config.DirsFrom(envFor(t)), cl, &out, &errOut, false, false, 0, server.OneOffRequest{Prompt: "x"})
 	var exitErr *ExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != 8 {
 		t.Fatalf("err = %v; want exit code 8", err)

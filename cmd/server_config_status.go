@@ -13,14 +13,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newServerConfigStatusCmd() *cobra.Command {
+func newServerConfigStatusCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	c := &cobra.Command{
 		Use:   "config-status",
 		Short: "Show the last config reload, startup-only changes waiting for a restart and any hard-limit countdown",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}

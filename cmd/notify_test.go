@@ -17,7 +17,7 @@ func TestExecute_Notify_Enable_ClearsTransportMuteAndReportsIt(t *testing.T) {
 	storeProjectFor(t, repo)
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), env: envFor(t)}
 
 	if err := execute([]string{"notify", "--disable", "telegram"}, d); err != nil {
 		t.Fatalf("execute notify --disable: %v", err)
@@ -51,6 +51,7 @@ func TestExecute_Notify_Disable_TripsTransportMuteAndReportsIt(t *testing.T) {
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return repo, nil },
+		env:    envFor(t),
 	}
 
 	if err := execute([]string{"notify", "--disable", "slack"}, d); err != nil {
@@ -74,9 +75,7 @@ func TestExecute_Notify_Disable_TripsTransportMuteAndReportsIt(t *testing.T) {
 }
 
 func TestExecute_Notify_EnableDisable_UnknownTransportRejected(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-
-	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil)}
+	d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), env: envFor(t)}
 	err := execute([]string{"notify", "--enable", "carrier-pigeon"}, d)
 	if err == nil || !strings.Contains(err.Error(), "carrier-pigeon") {
 		t.Fatalf("expected unknown-transport error, got: %v", err)
@@ -95,6 +94,7 @@ func TestExecute_Notify_Status_ReportsTicketsWithMutes(t *testing.T) {
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return dir, nil },
+		env:    envFor(t),
 	}
 	if err := execute([]string{"notify", "--status"}, d); err != nil {
 		t.Fatalf("execute notify --status: %v", err)
@@ -146,7 +146,7 @@ func TestExecute_Notify_PerDestinationMutes(t *testing.T) {
 	}
 
 	// A state file from before destinations existed: transport-keyed.
-	statePath, err := notificationStatePath()
+	statePath, err := notificationStatePath(config.DirsFrom(envFor(t)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,6 +160,7 @@ func TestExecute_Notify_PerDestinationMutes(t *testing.T) {
 		t.Helper()
 		var out bytes.Buffer
 		d := deps{stdout: &out, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return repo, nil },
+			env: envFor(t),
 			loadConfig: func() (config.Config, error) {
 				cfg := config.Default()
 				cfg.TicketStore.Path = store

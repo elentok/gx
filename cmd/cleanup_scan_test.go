@@ -68,6 +68,7 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return dir, nil },
@@ -123,6 +124,7 @@ func TestExecute_CleanupScan_ReportsAtticRefsAndKeepsThem(t *testing.T) {
 	run := func(args ...string) string {
 		var stdout bytes.Buffer
 		d := deps{
+			env:    envFor(t),
 			stdout: &stdout,
 			stderr: bytes.NewBuffer(nil),
 			getwd:  func() (string, error) { return dir, nil },
@@ -166,6 +168,7 @@ func TestExecute_CleanupScan_NoAtticRefsIsEmptyList(t *testing.T) {
 	storeProjectFor(t, dir)
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return dir, nil },
@@ -187,6 +190,7 @@ func TestExecute_CleanupScan_HousekeepingReportsTrackedFilesAndMissingGitignore(
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return dir, nil },
@@ -219,6 +223,7 @@ func TestExecute_CleanupScan_HousekeepingSkippedAtBareRootWithNoWorktree(t *test
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return dir, nil },
@@ -244,6 +249,7 @@ func TestExecute_CleanupScan_NotAGitRepo(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: &stderr,
 		getwd:  func() (string, error) { return dir, nil },
@@ -264,7 +270,7 @@ func TestExecute_CleanupScan_FollowsConfiguredTrunk(t *testing.T) {
 	testutil.MustGitExported(t, dir, "checkout", "main")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return dir, nil }}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return dir, nil }, env: envFor(t)}
 	if err := execute([]string{"cleanup", "scan", "--json"}, d); err != nil {
 		t.Fatalf("cleanup scan: %v", err)
 	}
@@ -293,7 +299,7 @@ func TestExecute_CleanupScan_MissingTrunkStopsBeforeReporting(t *testing.T) {
 	registerWithTrunk(t, dir, "develop")
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return dir, nil }}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), getwd: func() (string, error) { return dir, nil }, env: envFor(t)}
 	err := execute([]string{"cleanup", "scan", "--json"}, d)
 	var missing *tickets.ErrTrunkMissing
 	if !errors.As(err, &missing) {

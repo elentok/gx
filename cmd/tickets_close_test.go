@@ -159,6 +159,7 @@ func TestExecute_TicketsClose_RefusesQueuedAndLiveTickets(t *testing.T) {
 			cl, pings := fakeMoveServer(t, tc.queue, tc.live)
 			before := moveTreeSnapshot(t, f.project)
 			d := deps{
+				env:          envFor(t),
 				stdout:       bytes.NewBuffer(nil),
 				stderr:       bytes.NewBuffer(nil),
 				getwd:        func() (string, error) { return f.repo, nil },

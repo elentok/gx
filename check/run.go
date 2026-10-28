@@ -52,6 +52,9 @@ type Options struct {
 	// ProjectChecks supplies the project.json fallback config. It is called only
 	// when the repo has no .gx/checks.json.
 	ProjectChecks func() (json.RawMessage, error)
+	// ProjectFor names the project a run record is filed under; nil means
+	// ProjectFor (the process env finds the ticket store).
+	ProjectFor func(dir string) string
 }
 
 // KindResult is one kind's line of the result.
@@ -139,7 +142,11 @@ func Run(opts Options) (Result, error) {
 	if err := os.WriteFile(res.Summary, []byte(res.Render()), 0o644); err != nil {
 		return Result{}, err
 	}
-	if err := appendRecord(opts.DataDir, ProjectFor(root), r.newRecord(opts, started, res), started); err != nil {
+	projectFor := opts.ProjectFor
+	if projectFor == nil {
+		projectFor = ProjectFor
+	}
+	if err := appendRecord(opts.DataDir, projectFor(root), r.newRecord(opts, started, res), started); err != nil {
 		return Result{}, err
 	}
 	return res, nil

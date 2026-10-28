@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/tickets"
 )
@@ -64,20 +65,20 @@ func scanAtticRefs(repo git.Repo) ([]string, error) {
 // .scratch (tickets.Load already excludes .archive and other dot-prefixed
 // directories), computes the repo-wide housekeeping report, and prints the
 // result to w either as human-readable text or as JSON.
-func runCleanupScan(cwd string, jsonOut bool, w io.Writer) error {
+func runCleanupScan(dirs config.Dirs, cwd string, jsonOut bool, w io.Writer) error {
 	info, err := git.IdentifyDir(cwd)
 	if err != nil {
 		return fmt.Errorf("not inside a git repo: %w", err)
 	}
 	// A "merged?" check against an unresolved trunk can't be trusted, so
 	// stop before reporting anything the gx-cleanup skill would delete on.
-	openRepo, err := tickets.OpenRepo(cwd)
+	openRepo, err := tickets.OpenRepoDirs(dirs, cwd)
 	if err != nil {
 		return err
 	}
 	repo := *openRepo
 
-	root, err := ticketRoot(cwd)
+	root, err := ticketRoot(dirs, cwd)
 	if err != nil {
 		return err
 	}

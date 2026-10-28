@@ -50,6 +50,7 @@ func TestDoctor_NoIssues(t *testing.T) {
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return outerDir, nil },
@@ -69,6 +70,7 @@ func TestDoctor_PrintsRuntimeTerminalInfo(t *testing.T) {
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return outerDir, nil },
@@ -107,6 +109,7 @@ func TestDoctor_PauseWaitsForEnter(t *testing.T) {
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdin:  strings.NewReader("\n"),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
@@ -124,6 +127,7 @@ func TestDoctor_PauseWaitsForEnter(t *testing.T) {
 func TestDoctor_UnknownFlag(t *testing.T) {
 	t.Parallel()
 	d := deps{
+		env:   envFor(t),
 		getwd: func() (string, error) { return "", errors.New("should not be called") },
 	}
 
@@ -148,6 +152,7 @@ func TestDoctor_ReportsIssue(t *testing.T) {
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return outerDir, nil },
@@ -176,6 +181,7 @@ func TestDoctor_Fix_AppliesWhenConfirmed(t *testing.T) {
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:          envFor(t),
 		stdout:       &stdout,
 		stderr:       bytes.NewBuffer(nil),
 		getwd:        func() (string, error) { return outerDir, nil },
@@ -203,6 +209,7 @@ func TestDoctor_CheckBlockedForm_Pass(t *testing.T) {
 	var stdout bytes.Buffer
 	var gotTarget string
 	d := deps{
+		env:    envFor(t),
 		stdin:  strings.NewReader("\n"),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
@@ -227,6 +234,7 @@ func TestDoctor_CheckBlockedForm_FailsOnWrongRule(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdin:  strings.NewReader("\n"),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
@@ -247,6 +255,7 @@ func TestDoctor_CheckBlockedForm_FailsOnWrongRule(t *testing.T) {
 func TestDoctor_CheckBlockedForm_RequiresTarget(t *testing.T) {
 	t.Parallel()
 	d := deps{
+		env:   envFor(t),
 		getwd: func() (string, error) { return "", errors.New("should not be called") },
 	}
 
@@ -271,6 +280,7 @@ func TestDoctor_Fix_SkipsWhenDeclined(t *testing.T) {
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:          envFor(t),
 		stdout:       &stdout,
 		stderr:       bytes.NewBuffer(nil),
 		getwd:        func() (string, error) { return outerDir, nil },
@@ -297,7 +307,7 @@ func TestDoctor_ReportsMissingTrunkWithoutFixing(t *testing.T) {
 		t.Fatal(err)
 	}
 	registerWithTrunk(t, repo.Root, "develop")
-	projectFile := filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets", "p", "project.json")
+	projectFile := filepath.Join(envValue(envFor(t), "XDG_DATA_HOME"), "gx", "tickets", "p", "project.json")
 	before, err := os.ReadFile(projectFile)
 	if err != nil {
 		t.Fatal(err)
@@ -305,6 +315,7 @@ func TestDoctor_ReportsMissingTrunkWithoutFixing(t *testing.T) {
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:          envFor(t),
 		stdout:       &stdout,
 		stderr:       bytes.NewBuffer(nil),
 		getwd:        func() (string, error) { return outerDir, nil },
@@ -339,6 +350,7 @@ func TestDoctor_HealthyTrunkReportsNothing(t *testing.T) {
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		getwd:  func() (string, error) { return outerDir, nil },

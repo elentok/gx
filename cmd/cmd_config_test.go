@@ -18,6 +18,7 @@ import (
 func TestExecute_ConfigEdit_RequiresEditor(t *testing.T) {
 	t.Parallel()
 	d := deps{
+		env:    envFor(t),
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
 		initConfig: func() (string, error) {
@@ -40,6 +41,7 @@ func TestExecute_ConfigEdit_RunsEditor(t *testing.T) {
 	var stdout bytes.Buffer
 	var gotEditor, gotPath string
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		initConfig: func() (string, error) {
@@ -73,6 +75,7 @@ func TestExecute_ConfigDefaults_PrintsJSON(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 	}
@@ -114,6 +117,7 @@ func TestExecute_ConfigShow_PrintsJSON(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		loadConfig: func() (config.Config, error) {
@@ -136,6 +140,7 @@ func TestExecute_ConfigShow_PrintsJSON(t *testing.T) {
 func TestExecute_ConfigShow_PropagatesError(t *testing.T) {
 	t.Parallel()
 	d := deps{
+		env:    envFor(t),
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
 		loadConfig: func() (config.Config, error) {
@@ -152,6 +157,7 @@ func TestExecute_ConfigTestNotifications_NoneConfiguredPrintsNoticeAndSucceeds(t
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		loadConfig: func() (config.Config, error) {
@@ -175,6 +181,7 @@ func TestExecute_ConfigTestNotifications_SlackConfiguredSendsAndReportsSuccess(t
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		loadConfig: func() (config.Config, error) {
@@ -200,6 +207,7 @@ func TestExecute_ConfigTestNotifications_SlackFailureReportsErrorAndPropagates(t
 
 	var stdout, stderr bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: &stderr,
 		loadConfig: func() (config.Config, error) {
@@ -220,6 +228,7 @@ func TestExecute_ConfigTestNotifications_SlackFailureReportsErrorAndPropagates(t
 func TestExecute_ConfigTestNotifications_PropagatesLoadConfigError(t *testing.T) {
 	t.Parallel()
 	d := deps{
+		env:    envFor(t),
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
 		loadConfig: func() (config.Config, error) {
@@ -236,6 +245,7 @@ func TestExecute_Notify_NoneConfiguredPrintsNoticeAndSucceeds(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		loadConfig: func() (config.Config, error) {
@@ -251,8 +261,6 @@ func TestExecute_Notify_NoneConfiguredPrintsNoticeAndSucceeds(t *testing.T) {
 }
 
 func TestExecute_Notify_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	var gotBody string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
@@ -263,6 +271,7 @@ func TestExecute_Notify_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
 
 	var stdout bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: bytes.NewBuffer(nil),
 		loadConfig: func() (config.Config, error) {
@@ -283,8 +292,6 @@ func TestExecute_Notify_SlackConfiguredSendsAndReportsSuccess(t *testing.T) {
 }
 
 func TestExecute_Notify_SlackFailurePropagatesErrorWithoutDoubleReporting(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -292,6 +299,7 @@ func TestExecute_Notify_SlackFailurePropagatesErrorWithoutDoubleReporting(t *tes
 
 	var stdout, stderr bytes.Buffer
 	d := deps{
+		env:    envFor(t),
 		stdout: &stdout,
 		stderr: &stderr,
 		loadConfig: func() (config.Config, error) {
@@ -317,6 +325,7 @@ func TestExecute_Notify_SlackFailurePropagatesErrorWithoutDoubleReporting(t *tes
 func TestExecute_Notify_PropagatesLoadConfigError(t *testing.T) {
 	t.Parallel()
 	d := deps{
+		env:    envFor(t),
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
 		loadConfig: func() (config.Config, error) {
@@ -332,6 +341,7 @@ func TestExecute_Notify_PropagatesLoadConfigError(t *testing.T) {
 func TestExecute_Notify_RequiresMessageArg(t *testing.T) {
 	t.Parallel()
 	d := deps{
+		env:    envFor(t),
 		stdout: bytes.NewBuffer(nil),
 		stderr: bytes.NewBuffer(nil),
 	}

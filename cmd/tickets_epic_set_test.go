@@ -24,7 +24,7 @@ func setupEpicSetProject(t *testing.T) (d deps, ticketMD string) {
 	if err := os.WriteFile(ticketMD, []byte(epicTicketMD), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return cwd, nil }}, ticketMD
+	return deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, getwd: func() (string, error) { return cwd, nil }, env: envFor(t)}, ticketMD
 }
 
 func TestTicketsSet_EpicAddressWritesSettableFieldsAndKeepsTheRest(t *testing.T) {

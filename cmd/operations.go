@@ -127,7 +127,7 @@ func runPush(d deps) error {
 		return fmt.Errorf("cannot push from detached HEAD")
 	}
 
-	cfg, _ := config.Load()
+	cfg, _ := d.dirs().Load()
 	nerd := cfg.UseNerdFontIcons
 
 	remote := git.BranchRemote(info.Repo, branch)
@@ -275,7 +275,7 @@ func relativeDate(t time.Time) string {
 }
 
 func runEditConfig(d deps) error {
-	path, err := config.FilePath()
+	path, err := d.dirs().FilePath()
 	if err != nil {
 		return err
 	}
@@ -370,7 +370,7 @@ func isKnownNotifyTransport(name string) bool {
 func notifyDestinations(d deps) ([]ralphloop.Destination, error) {
 	load := d.loadConfig
 	if load == nil {
-		load = config.Load
+		load = d.dirs().Load
 	}
 	cfg, err := load()
 	if err != nil {
@@ -442,7 +442,7 @@ func sendNotify(text string, d deps) error {
 		return err
 	}
 
-	statePath, err := notificationStatePath()
+	statePath, err := notificationStatePath(d.dirs())
 	if err != nil {
 		return err
 	}
@@ -500,7 +500,7 @@ func runNotifySetMute(transport, project string, muted bool, d deps) error {
 		return fmt.Errorf("project %q has no %s destination", project, transport)
 	}
 
-	statePath, err := notificationStatePath()
+	statePath, err := notificationStatePath(d.dirs())
 	if err != nil {
 		return err
 	}
@@ -534,8 +534,8 @@ func runNotifySetMute(transport, project string, muted bool, d deps) error {
 
 // notificationStatePath is the real notification state file, under gx's state
 // dir.
-func notificationStatePath() (string, error) {
-	dir, err := config.StateDir()
+func notificationStatePath(dirs config.Dirs) (string, error) {
+	dir, err := dirs.StateDir()
 	if err != nil {
 		return "", err
 	}
@@ -545,7 +545,7 @@ func notificationStatePath() (string, error) {
 // runNotifyStatus reports every destination's mute state and projects, plus
 // every ticket under the current repo's tracker root carrying a non-empty Mutes.
 func runNotifyStatus(d deps) error {
-	statePath, err := notificationStatePath()
+	statePath, err := notificationStatePath(d.dirs())
 	if err != nil {
 		return err
 	}
@@ -572,7 +572,7 @@ func runNotifyStatus(d deps) error {
 	if err != nil {
 		return err
 	}
-	root, err := ticketRoot(cwd)
+	root, err := ticketRoot(d.dirs(), cwd)
 	if err != nil {
 		return err
 	}

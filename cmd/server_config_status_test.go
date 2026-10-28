@@ -16,15 +16,14 @@ import (
 )
 
 func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	dirs := config.DirsFrom(tempEnv(t))
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
 	ctx := context.Background()
 
 	var out bytes.Buffer
-	if err := runServerStatusWith(ctx, h.Client, false, &out); err != nil {
+	if err := runServerStatusWith(ctx, dirs, h.Client, false, &out); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(out.String(), "config:") {
@@ -49,7 +48,7 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 	}
 
 	out.Reset()
-	if err := runServerStatusWith(ctx, h.Client, true, &out); err != nil {
+	if err := runServerStatusWith(ctx, dirs, h.Client, true, &out); err != nil {
 		t.Fatal(err)
 	}
 	var info StatusInfo
@@ -61,7 +60,7 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 	}
 
 	out.Reset()
-	if err := runServerStatusWith(ctx, h.Client, false, &out); err != nil {
+	if err := runServerStatusWith(ctx, dirs, h.Client, false, &out); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{"config:\n  last reload: warning (command, ", "\n  restart needed for: server.tcp-listen\n"} {
@@ -72,9 +71,8 @@ func TestConfigStatus_ShowsLastReloadAndPendingKey(t *testing.T) {
 }
 
 func TestServerStatus_BrokenConfigStillReportsTheError(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	env := tempEnv(t)
+	home := envValue(env, "HOME")
 	if err := os.MkdirAll(filepath.Join(home, ".config", "gx"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +82,7 @@ func TestServerStatus_BrokenConfigStillReportsTheError(t *testing.T) {
 	h := servertest.Start(t)
 
 	var out bytes.Buffer
-	if err := runServerStatusWith(context.Background(), h.Client, false, &out); err != nil {
+	if err := runServerStatusWith(context.Background(), config.DirsFrom(env), h.Client, false, &out); err != nil {
 		t.Fatalf("status: %v", err)
 	}
 	if !strings.HasPrefix(out.String(), "config error: config ") || !strings.Contains(out.String(), "\nrunning\n") {
@@ -93,15 +91,14 @@ func TestServerStatus_BrokenConfigStillReportsTheError(t *testing.T) {
 }
 
 func TestServerStatus_PrintsWebURLWithToken(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	dirs := config.DirsFrom(tempEnv(t))
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	token, err := server.ReadWebToken(h.StateDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Status reads the token from the user's state dir, which the harness does not use.
-	stateDir, err := config.StateDir()
+	stateDir, err := dirs.StateDir()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +114,7 @@ func TestServerStatus_PrintsWebURLWithToken(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := runServerStatusWith(context.Background(), h.Client, false, &out); err != nil {
+	if err := runServerStatusWith(context.Background(), dirs, h.Client, false, &out); err != nil {
 		t.Fatal(err)
 	}
 	if want := "web: " + hs.WebURL + "/?gx_token=" + token + "\n"; !strings.Contains(out.String(), want) {

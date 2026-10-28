@@ -5,14 +5,15 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
 // completeEpicNames lists the current epic directory names under cwd's repo,
 // read live off disk, for the ensure-code-review command's shell completion.
-func completeEpicNames(cwd string) ([]string, error) {
-	root, err := ticketRoot(cwd)
+func completeEpicNames(dirs config.Dirs, cwd string) ([]string, error) {
+	root, err := ticketRoot(dirs, cwd)
 	if err != nil {
 		return nil, err
 	}
@@ -32,14 +33,14 @@ func completeEpicNames(cwd string) ([]string, error) {
 // `gx tickets show` does. Otherwise arg is tried as a bare epic name against
 // the current repo's ticket-store root (`gx tickets root`); if that directory
 // doesn't exist, arg is returned unchanged so a full path still works.
-func resolveEpicArg(arg, cwd string) string {
+func resolveEpicArg(dirs config.Dirs, arg, cwd string) string {
 	if project, epic, ok := tickets.ParseEpicAddress(arg); ok {
-		if root, err := projectRoot(cwd, project); err == nil {
+		if root, err := projectRoot(dirs, cwd, project); err == nil {
 			return filepath.Join(root, epic)
 		}
 		return arg
 	}
-	root, err := ticketRoot(cwd)
+	root, err := ticketRoot(dirs, cwd)
 	if err != nil {
 		return arg
 	}

@@ -11,8 +11,6 @@ import (
 )
 
 func TestServerChecksSave_JSONPrintsTheRouteResult(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	h := servertest.StartWithStore(t, t.TempDir())
 	if err := servertest.WriteEpic(h.TicketStore, "demo", ""); err != nil {
 		t.Fatal(err)
@@ -32,8 +30,6 @@ func TestServerChecksSave_JSONPrintsTheRouteResult(t *testing.T) {
 }
 
 func TestServerChecks_JSONMatchesTheRoute(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	h := servertest.StartWithStore(t, t.TempDir())
 	ctx := context.Background()
 

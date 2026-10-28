@@ -35,7 +35,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	a, src, err := findTicket(cwd, addr)
+	a, src, err := findTicket(d.dirs(), cwd, addr)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	}
 	root := filepath.Dir(filepath.Dir(filepath.Dir(src.Path)))
 
-	if err := refuseIfActive(d.dial(), a); err != nil {
+	if err := refuseIfActive(d.dirs(), d.dial(), a); err != nil {
 		return err
 	}
 
@@ -75,7 +75,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 		}
 		return err
 	}
-	pingServer(p.NewPath)
+	pingServer(d, p.NewPath)
 	return printMove(w, p, false, "")
 }
 
@@ -89,13 +89,13 @@ func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 		return err
 	}
 	if project == "" {
-		cwdRoot, err := ticketRoot(cwd)
+		cwdRoot, err := ticketRoot(d.dirs(), cwd)
 		if err != nil {
 			return err
 		}
 		project = tickets.ProjectName(cwdRoot)
 	}
-	root, err := projectRoot(cwd, project)
+	root, err := projectRoot(d.dirs(), cwd, project)
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 		if err != nil {
 			return err
 		}
-		pingServer(p.NewPath)
+		pingServer(d, p.NewPath)
 		if err := printMove(w, p, false, ""); err != nil {
 			return err
 		}

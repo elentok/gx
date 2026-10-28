@@ -10,7 +10,7 @@ import (
 // runTicketsSection replaces (or appends) the "## heading" section of path's
 // ticket body with content, under the per-ticket lock, and prints the ticket's
 // address.
-func runTicketsSection(path, heading, content string, jsonOut bool, w io.Writer) error {
+func runTicketsSection(d deps, path, heading, content string, jsonOut bool, w io.Writer) error {
 	if isEpicTicketMD(path) {
 		// An epic's frontmatter is not a ticket's, so it is edited in place
 		// rather than parsed as a Ticket.
@@ -25,6 +25,6 @@ func runTicketsSection(path, heading, content string, jsonOut bool, w io.Writer)
 	if err != nil {
 		return err
 	}
-	pingServer(path)
+	pingServer(d, path)
 	return printTicketRef(path, jsonOut, w)
 }

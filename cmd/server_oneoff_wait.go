@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -77,13 +78,13 @@ type movedLookup func(address string) (server.TicketInfo, bool)
 
 // archivedLookup is the movedLookup that reads the store, so it needs no
 // server and works across a restart.
-func archivedLookup(cwd string) movedLookup {
+func archivedLookup(dirs config.Dirs, cwd string) movedLookup {
 	return func(address string) (server.TicketInfo, bool) {
 		a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 		if err != nil || a.Project == "" {
 			return server.TicketInfo{}, false
 		}
-		root, err := projectRoot(cwd, a.Project)
+		root, err := projectRoot(dirs, cwd, a.Project)
 		if err != nil {
 			return server.TicketInfo{}, false
 		}

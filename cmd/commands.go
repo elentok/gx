@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ui/nav"
 
@@ -29,14 +28,14 @@ func newEpicScopedCmd(d deps, use, short string, run func(epicPath string, args 
 			if err != nil {
 				return err
 			}
-			return run(resolveEpicArg(args[0], cwd), args, c.OutOrStdout())
+			return run(resolveEpicArg(d.dirs(), args[0], cwd), args, c.OutOrStdout())
 		},
 		ValidArgsFunction: func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 			cwd, err := d.getwd()
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveError
 			}
-			names, err := completeEpicNames(cwd)
+			names, err := completeEpicNames(d.dirs(), cwd)
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveError
 			}
@@ -225,13 +224,13 @@ func newTicketsCmd(d deps) *cobra.Command {
 		},
 		RunE: func(c *cobra.Command, args []string) error {
 			if validateAll {
-				cfg, err := config.Load()
+				cfg, err := d.dirs().Load()
 				if err != nil {
 					return err
 				}
 				return runTicketsValidateAll(cfg.TicketStore.Path, c.OutOrStdout(), c.ErrOrStderr())
 			}
-			path, err := resolveTicketRef(d.getwd, args[0])
+			path, err := resolveTicketRef(d.dirs(), d.getwd, args[0])
 			if err != nil {
 				return err
 			}
@@ -253,7 +252,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runTicketsShow(cwd, args[0], showJSON, showSection, c.OutOrStdout())
+			return runTicketsShow(d.dirs(), cwd, args[0], showJSON, showSection, c.OutOrStdout())
 		},
 	}
 	showCmd.Flags().BoolVar(&showJSON, "json", false, "emit structured JSON instead of text")
@@ -283,7 +282,7 @@ log shows no open question on the web. A second run changes nothing.`,
 			if err != nil {
 				return err
 			}
-			return runTicketsMigrateToStore(cwd, args[0], migrateProject, migrateDryRun, c.OutOrStdout())
+			return runTicketsMigrateToStore(d.dirs(), cwd, args[0], migrateProject, migrateDryRun, c.OutOrStdout())
 		},
 	}
 	migrateCmd.Flags().BoolVar(&migrateToStore, "to-store", false, "copy the old tree into the ticket store (old tree is left untouched)")
@@ -299,7 +298,7 @@ log shows no open question on the web. A second run changes nothing.`,
 			if err != nil {
 				return err
 			}
-			return runTicketsRoot(cwd, c.OutOrStdout())
+			return runTicketsRoot(d.dirs(), cwd, c.OutOrStdout())
 		},
 	})
 	var mapsOnly bool
@@ -312,7 +311,7 @@ log shows no open question on the web. A second run changes nothing.`,
 			if err != nil {
 				return err
 			}
-			return runTicketsEpics(cwd, c.OutOrStdout(), mapsOnly)
+			return runTicketsEpics(d.dirs(), cwd, c.OutOrStdout(), mapsOnly)
 		},
 	}
 	epicsCmd.Flags().BoolVar(&mapsOnly, "maps", false, "only print epics with ticket.md kind: map")
@@ -354,13 +353,13 @@ log shows no open question on the web. A second run changes nothing.`,
 				if len(flags.set) > 0 {
 					return fmt.Errorf("field flags need --body; fill a stub's fields in with `tickets set`")
 				}
-				return runTicketsAdd(epicPath, parent, addSlug, out)
+				return runTicketsAdd(d, epicPath, parent, addSlug, out)
 			}
 			body, err := readBodyArg(d, addBody)
 			if err != nil {
 				return err
 			}
-			return runTicketsAddBody(epicPath, parent, addSlug, body, flags, addJSON, out, d.stderr)
+			return runTicketsAddBody(d, epicPath, parent, addSlug, body, flags, addJSON, out, d.stderr)
 		})
 	addCmd.Flags().String("blocked-by", "", "with --body, set blocked_by (comma-separated ticket IDs; omitted means none)")
 	addCmd.Flags().String("type", "", "with --body, set the type field (default implement)")
@@ -392,7 +391,7 @@ log shows no open question on the web. A second run changes nothing.`,
 			if err != nil {
 				return err
 			}
-			return runTicketsFollowUpAdd(epicPath, body, followUpCategory, followUpJSON, c.OutOrStdout())
+			return runTicketsFollowUpAdd(d, epicPath, body, followUpCategory, followUpJSON, c.OutOrStdout())
 		},
 	}
 	followUpAddCmd.Flags().StringVar(&followUpBody, "body", "-", "follow-up body, or - to read it from stdin")
@@ -409,7 +408,7 @@ log shows no open question on the web. A second run changes nothing.`,
 		Short: "replace or append one ## section of a ticket's body, content from the argument or stdin (-)",
 		Args:  cobra.ExactArgs(3),
 		RunE: func(c *cobra.Command, args []string) error {
-			path, err := resolveTicketRef(d.getwd, args[0])
+			path, err := resolveTicketRef(d.dirs(), d.getwd, args[0])
 			if err != nil {
 				return err
 			}
@@ -417,7 +416,7 @@ log shows no open question on the web. A second run changes nothing.`,
 			if err != nil {
 				return err
 			}
-			return runTicketsSection(path, args[1], content, sectionJSON, c.OutOrStdout())
+			return runTicketsSection(d, path, args[1], content, sectionJSON, c.OutOrStdout())
 		},
 	}
 	sectionCmd.Flags().BoolVar(&sectionJSON, "json", false, "emit {address, path} JSON")
@@ -464,7 +463,7 @@ func newMergeCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runMerge(cwd, args[0], jsonOut, c.OutOrStdout())
+			return runMerge(d.dirs(), cwd, args[0], jsonOut, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
@@ -486,7 +485,7 @@ func newCleanupCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runCleanupScan(cwd, jsonOut, c.OutOrStdout())
+			return runCleanupScan(d.dirs(), cwd, jsonOut, c.OutOrStdout())
 		},
 	}
 	scan.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")

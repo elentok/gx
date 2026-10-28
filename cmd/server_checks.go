@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newServerChecksSaveCmd() *cobra.Command {
+func newServerChecksSaveCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	var req server.SaveChecksRequest
 	var checks string
@@ -21,7 +21,7 @@ func newServerChecksSaveCmd() *cobra.Command {
 		Short: "Save a project's check config to the repo or to project.json",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}
@@ -63,7 +63,7 @@ func runServerChecksSave(ctx context.Context, cl *apiclient.Client, w io.Writer,
 	return nil
 }
 
-func newServerChecksCmd() *cobra.Command {
+func newServerChecksCmd(d deps) *cobra.Command {
 	var jsonOut bool
 	var project string
 	c := &cobra.Command{
@@ -71,7 +71,7 @@ func newServerChecksCmd() *cobra.Command {
 		Short: "Show each project's check config and the check commands gx would recommend",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}
