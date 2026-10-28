@@ -233,6 +233,11 @@ type Config struct {
 	// agent starts; nil means the real one. Tests fake it so no package manager runs.
 	InstallDeps func(path, logDir string) ([]string, error)
 
+	// CleanupRunner runs one disk cleanup command in dir; nil runs the real command.
+	CleanupRunner func(ctx context.Context, argv []string, dir string) ([]byte, error)
+	// CleanupTimeout is the time limit per cleanup command; zero means ten minutes.
+	CleanupTimeout time.Duration
+
 	// Runner is the configured agent runner; nil means herdr. Herdr health
 	// is only probed when it reports health (agentrunner.HealthChecker).
 	Runner agentrunner.Runner

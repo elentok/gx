@@ -449,6 +449,8 @@ export interface DiskStatus {
   warned: boolean;
   held: boolean;
   read_at: string;
+  cleaning: boolean;
+  last_clean: string; // bytes freed, the failure, or that no command is set
 }
 /**
  * DiskReport is the disk status route's result: the effective thresholds as

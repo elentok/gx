@@ -526,6 +526,10 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	if h.cfg.FreeSpace == nil {
 		h.cfg.FreeSpace = h.Disks.Read
 	}
+	// The real runner would empty the developer's Go cache on a low-disk machine.
+	if h.cfg.CleanupRunner == nil {
+		h.cfg.CleanupRunner = func(context.Context, []string, string) ([]byte, error) { return nil, nil }
+	}
 	if h.cfg.GoCacheDir == nil {
 		goCache := t.TempDir()
 		h.cfg.GoCacheDir = func() (string, error) { return goCache, nil }

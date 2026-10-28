@@ -175,7 +175,7 @@ func describeInstallFailure(ctx context.Context, dir string, command []string, o
 	if len(bytes.TrimSpace(out)) == 0 {
 		return fmt.Errorf("%s: %w", joined, runErr)
 	}
-	reason := fmt.Sprintf("%s: %s", joined, outputTail(out))
+	reason := fmt.Sprintf("%s: %s", joined, OutputTail(out))
 	if logPath := writeInstallLog(logDir, dir, out); logPath != "" {
 		reason += " (full output: " + logPath + ")"
 	}
@@ -216,9 +216,9 @@ func discardAfterInstallFailure(installErr, discardErr error) error {
 // installTailBytes caps how much of a failed install's output reaches the error.
 const installTailBytes = 2000
 
-// outputTail is the last installTailBytes of out, starting on a line boundary
+// OutputTail is the last installTailBytes of out, starting on a line boundary
 // when it had to cut.
-func outputTail(out []byte) string {
+func OutputTail(out []byte) string {
 	out = bytes.TrimSpace(out)
 	if len(out) <= installTailBytes {
 		return string(out)

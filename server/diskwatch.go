@@ -51,19 +51,26 @@ type DiskStatus struct {
 	Warned    bool      `json:"warned"`
 	Held      bool      `json:"held"`
 	ReadAt    time.Time `json:"read_at"`
+	Cleaning  bool      `json:"cleaning"`
+	LastClean string    `json:"last_clean"` // bytes freed, the failure, or that no command is set
 }
 
 type diskState struct {
-	reading  DiskReading
-	at       time.Time
-	projects []string
-	warned   bool
-	held     bool // dispatch is held: free space dropped under the clean threshold
+	reading   DiskReading
+	at        time.Time
+	projects  []string
+	warned    bool
+	held      bool // dispatch is held: free space dropped under the clean threshold
+	spent     bool // the automatic clean ran; it re-arms once free space climbs well above the line
+	cleaning  bool // a clean is running; it alone clears the hold
+	cleanFree uint64
+	lastClean string
 }
 
 func (st *diskState) status(id string) DiskStatus {
 	return DiskStatus{ID: id, Name: st.reading.Name, FreeBytes: st.reading.Free,
-		Projects: slices.Clone(st.projects), Warned: st.warned, Held: st.held, ReadAt: st.at}
+		Projects: slices.Clone(st.projects), Warned: st.warned, Held: st.held, ReadAt: st.at,
+		Cleaning: st.cleaning, LastClean: st.lastClean}
 }
 
 // diskWatch is the per-disk state. Every reading goes through observe, under mu.
@@ -76,9 +83,10 @@ type diskWatch struct {
 }
 
 // observe applies one reading to the state machine. projects is who watches
-// the disk now; nil keeps the last list. It reports whether the disk is held
-// after this reading.
-func (s *Server) observe(r DiskReading, projects []string, now time.Time) (held bool) {
+// the disk now; nil keeps the last list. probe is a path on the disk, read
+// again when a clean ends. end is set only by the end of a clean. It reports
+// whether the disk is held after this reading.
+func (s *Server) observe(r DiskReading, probe string, projects []string, now time.Time, end *cleanEnd) (held bool) {
 	ds := s.settings.Load().DiskSpace
 	warn, clean := uint64(ds.WarnBelow), uint64(ds.CleanBelow)
 	d := &s.disks
@@ -95,20 +103,41 @@ func (s *Server) observe(r DiskReading, projects []string, now time.Time) (held 
 	if projects != nil {
 		st.projects = projects
 	}
-	var changed, warnSet, holdSet, resumed bool
+	var changed, warnSet, holdSet, resumed, startClean bool
 	switch {
 	case !st.warned && warn > 0 && r.Free < warn:
 		st.warned, changed, warnSet = true, true, true
 	case st.warned && (warn == 0 || r.Free > warn+diskWarnMargin):
 		st.warned, changed = false, true
 	}
+	// The end-of-clean reading never re-arms; a later one does.
+	if end == nil && st.spent && r.Free > max(warn, clean+diskWarnMargin) {
+		st.spent = false
+	}
+	low := clean > 0 && r.Free < clean
 	switch {
-	case !st.held && clean > 0 && r.Free < clean:
+	case end != nil:
+		// One rule ends every clean: the fresh reading decides the hold.
+		st.cleaning = false
+		st.lastClean = "freed " + humanize.Bytes(max(r.Free, st.cleanFree)-st.cleanFree)
+		if end.failed != "" {
+			st.lastClean = "failed: " + end.failed
+		}
+		changed = true
+		if st.held != low {
+			st.held, resumed = low, !low
+		}
+	case !st.held && low:
 		st.held, changed, holdSet = true, true, true
-	case st.held && (clean == 0 || r.Free >= clean):
+	case st.held && !low && !st.cleaning:
 		st.held, changed, resumed = false, true, true
 	}
+	if end == nil && low && !st.spent && !st.cleaning {
+		st.spent, st.cleaning, st.cleanFree = true, true, r.Free
+		changed, startClean = true, true
+	}
 	held = st.held
+	disk, projectList, lastClean := r.Name, slices.Clone(st.projects), st.lastClean
 	d.mu.Unlock()
 	if !changed {
 		return held
@@ -124,9 +153,17 @@ func (s *Server) observe(r DiskReading, projects []string, now time.Time) (held 
 	}
 	if resumed {
 		s.log.Info("disk recovered, resuming dispatch", "disk", r.Name, "free", r.Free)
-		s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
-			Detail: humanize.Bytes(r.Free) + " free; queued tickets start again"})
+		if end == nil {
+			s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
+				Detail: humanize.Bytes(r.Free) + " free; queued tickets start again"})
+		}
 		s.kickRunner()
+	}
+	if end != nil {
+		s.sendCleanNotice(disk, lastClean, r.Free, held)
+	}
+	if startClean {
+		s.startClean(r.ID, probe, projectList)
 	}
 	return held
 }
@@ -166,7 +203,7 @@ func (s *Server) freshHeldDisk(project string) (DiskStatus, bool) {
 			s.log.Warn("read free space", "path", p, "err", err)
 			continue
 		}
-		if s.observe(r, nil, now) && held == nil {
+		if s.observe(r, p, nil, now, nil) && held == nil {
 			d := DiskStatus{ID: r.ID, Name: r.Name, FreeBytes: r.Free}
 			held = &d
 		}
@@ -262,6 +299,7 @@ func (s *Server) checkDisks() {
 	}
 	type watched struct {
 		reading  DiskReading
+		probe    string
 		projects []string
 	}
 	byDisk := map[string]*watched{}
@@ -273,7 +311,7 @@ func (s *Server) checkDisks() {
 		}
 		w := byDisk[r.ID]
 		if w == nil {
-			w = &watched{reading: r}
+			w = &watched{reading: r, probe: path}
 			byDisk[r.ID] = w
 		}
 		if !slices.Contains(w.projects, project) {
@@ -294,7 +332,7 @@ func (s *Server) checkDisks() {
 	now := time.Now()
 	for _, w := range byDisk {
 		slices.Sort(w.projects)
-		s.observe(w.reading, w.projects, now)
+		s.observe(w.reading, w.probe, w.projects, now, nil)
 	}
 }
 
