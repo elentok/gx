@@ -72,14 +72,17 @@ func TestLockHeldBy(t *testing.T) {
 	l.release()
 	// A process forked by a parallel test can still hold the inherited fd for a
 	// moment after release, as the same-pid retry in acquireLock expects.
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.After(5 * time.Second)
+	tick := time.NewTicker(20 * time.Millisecond)
+	defer tick.Stop()
 	for {
 		if _, held := LockHeldBy(dir); !held {
 			return
 		}
-		if time.Now().After(deadline) {
+		select {
+		case <-deadline:
 			t.Fatal("released lock: should not be held")
+		case <-tick.C:
 		}
-		time.Sleep(20 * time.Millisecond)
 	}
 }
