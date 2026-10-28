@@ -515,6 +515,44 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 	}
 }
 
+// Seam: a ticket that already has a registry entry is not launched a second
+// time; the claim moves on to the next frontier ticket of the root.
+func TestRunner_SkipsAFrontierTicketThatIsAlreadyTracked(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.MaxAgentsPerRoot = 2
+		c.PollInterval = 50 * time.Millisecond
+	})
+	registerLaunch(h)
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01"})
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs, err := h.Client.Events(ctx, snap.Seq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	for ev := range evs {
+		if ev.Type == server.EventIterationStarted {
+			if ev.Address != "proj:epic-a/02" {
+				t.Fatalf("started %s, want proj:epic-a/02", ev.Address)
+			}
+			return
+		}
+	}
+	t.Fatal("no iteration started")
+}
+
 // Seam A: a project's max-agents holds it to that many live agents while
 // another project uses the free slots; editing the cap applies at the next
 // decision, with no restart.

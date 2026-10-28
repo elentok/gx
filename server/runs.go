@@ -409,6 +409,29 @@ func (r *runRegistry) clearWaiting(address string) {
 	}
 }
 
+// putIfAbsent records t unless its ticket already has an entry, so two claims
+// of one ticket cannot both launch.
+func (r *runRegistry) putIfAbsent(t trackedRun) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.runs[t.Address]; ok {
+		return false
+	}
+	r.runs[t.Address] = t
+	r.save()
+	return true
+}
+
+// deleteStarted drops the entry at address only if it is the one started at
+// startedAt, so a failed launch never removes another run's entry.
+func (r *runRegistry) deleteStarted(address string, startedAt time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if cur, ok := r.runs[address]; ok && cur.StartedAt.Equal(startedAt) {
+		r.deleteLocked(address)
+	}
+}
+
 func (r *runRegistry) put(t trackedRun) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

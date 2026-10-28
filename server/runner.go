@@ -349,7 +349,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 			continue
 		}
 		s.checkDeadlock(root, projectDir, e)
-		t, ok := nextTicket(e)
+		t, ok := s.nextUntracked(addr.Project, e)
 		if !ok {
 			s.retryHeldMerge(root, e, loaded, repo)
 			return false, nil
@@ -400,6 +400,18 @@ func nextTicket(e tickets.Epic) (tickets.Ticket, bool) {
 		return tickets.Ticket{}, false
 	}
 	return frontier[0], true
+}
+
+// nextUntracked is the first frontier ticket of e with no registry entry. The
+// last scan can still list a ticket whose launch already began.
+func (s *Server) nextUntracked(project string, e tickets.Epic) (tickets.Ticket, bool) {
+	for _, t := range ralphloop.Frontier(e) {
+		addr := tickets.Address{Project: project, Epic: filepath.Base(e.Path), ID: t.Identifier}
+		if !s.registry.has(addr.String()) {
+			return t, true
+		}
+	}
+	return tickets.Ticket{}, false
 }
 
 // projectOf finds the project's directory in the store and the repo its
@@ -512,13 +524,15 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		Run:  Run{Address: ticketAddr, Agent: string(agent), Runner: deps.Runner.Name(), Model: one.Model, Effort: one.Effort},
 		Root: root.String(), Repo: repo, TicketPath: t.Path, StartedAt: time.Now(), State: runLaunching,
 	}
-	s.registry.put(entry)
+	if !s.registry.putIfAbsent(entry) {
+		return false, nil // a stale scan offered a ticket that is already running
+	}
 	run, wt, err := s.prepareAndLaunch(deps, &one, ticket, mode, func(wt ralphloop.IterationWorktree) {
 		entry.Workspace, entry.Base, entry.Cwd = one.WorkspaceID, wt.Base(), wt.Path
 		s.registry.put(entry)
 	})
 	if err != nil {
-		s.registry.delete(ticketAddr)
+		s.registry.deleteStarted(ticketAddr, entry.StartedAt)
 		// Handing the claim back would make the next tick retry the same failure
 		// forever, so a person is told instead.
 		kind, reason := events.IterationError, "launch failed: "+err.Error()
