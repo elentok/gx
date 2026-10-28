@@ -1,19 +1,13 @@
-import { Box, chakra } from "@chakra-ui/react";
-import type { Health, HealthState, MeterHealth } from "../../generated/server";
+import { Box, chakra, Popover, Portal } from "@chakra-ui/react";
+import type { Health, MeterHealth } from "../../generated/server";
+import { HealthPopover } from "../../health/HealthPopover";
+import { STATE_COLOR } from "./stateColor";
 
 const METERS = [
   { key: "cpu", letter: "C", name: "CPU" },
   { key: "memory", letter: "M", name: "memory" },
   { key: "disk", letter: "D", name: "disk" },
 ] as const;
-
-// Normal is the faint grey; high and critical borrow the waiting and paused tones.
-const STATE_COLOR: Record<HealthState, string> = {
-  normal: "text.faint",
-  high: "tone.waiting.fg",
-  critical: "tone.paused.fg",
-  unknown: "text.faint",
-};
 
 // Levels 0 to 4 fill a fifth more each, so level 0 still shows a sliver and level 4 fills the bar.
 const fillPercent = (level: number) => (Math.min(Math.max(level, 0), 4) + 1) * 20;
@@ -22,28 +16,49 @@ export function trayLabel(health: Health): string {
   return `System health: ${METERS.map(({ key, name }) => `${name} ${health[key].state}`).join("; ")}`;
 }
 
-// The popover opens from this button in a later ticket.
 export function Tray({ health }: { health: Health }) {
+  // The body mounts only while open, so its polling starts and stops with the popover.
   return (
-    <chakra.button
-      type="button"
-      aria-label={trayLabel(health)}
-      h="30px"
-      display="flex"
-      alignItems="flex-start"
-      gap="3px"
-      pt="2px"
-      px="6px"
-      borderWidth="1px"
-      borderColor="transparent"
-      borderRadius="md"
-      cursor="pointer"
-      _hover={{ bg: "tone.muted.bg", borderColor: "border" }}
-    >
-      {METERS.map(({ key, letter }) => (
-        <Meter key={key} letter={letter} meter={health[key]} />
-      ))}
-    </chakra.button>
+    <Popover.Root positioning={{ placement: "bottom-end" }} lazyMount unmountOnExit>
+      <Popover.Trigger asChild>
+        <chakra.button
+          type="button"
+          aria-label={trayLabel(health)}
+          h="30px"
+          display="flex"
+          alignItems="flex-start"
+          gap="3px"
+          pt="2px"
+          px="6px"
+          borderWidth="1px"
+          borderColor="transparent"
+          borderRadius="md"
+          cursor="pointer"
+          _hover={{ bg: "tone.muted.bg", borderColor: "border" }}
+        >
+          {METERS.map(({ key, letter }) => (
+            <Meter key={key} letter={letter} meter={health[key]} />
+          ))}
+        </chakra.button>
+      </Popover.Trigger>
+      <Portal>
+        <Popover.Positioner>
+          <Popover.Content
+            role="dialog"
+            aria-label="System health"
+            bg="surface.raised"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="8px"
+            boxShadow="lg"
+            color="text"
+            w="min(320px, calc(100vw - 32px))"
+          >
+            <HealthPopover />
+          </Popover.Content>
+        </Popover.Positioner>
+      </Portal>
+    </Popover.Root>
   );
 }
 
