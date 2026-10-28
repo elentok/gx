@@ -270,8 +270,11 @@ gx also stops the three leaks:
   running `go build` or `go test` is reading. gx accepts that. Such a failure looks like any failed
   build, and the ticket's normal retry and pause handling covers it.
 - The cleanup runs outside the server's request path, with a timeout. A failure logs the command,
-  the working directory, its exit code and the tail of its output. The clean notice says it failed,
-  and the hold stays.
+  the working directory, its exit code and the tail of its output. The clean notice says it failed.
+  The end-of-clean rule then sets the hold from the new reading, so a disk that is still low stays
+  held.
+- The automatic clean runs in the background. "Clean now" runs inside its request, so it can answer
+  with its own result. Both use the same per-command time limit (a constant, not a setting).
 - The thresholds and the cleanup commands reload with `config.json` and `project.json`, like the
   budget limits and the project cap today.
 
@@ -285,6 +288,17 @@ gx also stops the three leaks:
 - The explain path gets a new verdict, "disk low", for an unclaimed, queued ticket whose project
   watches a held disk. Its reason names the disk and its free space. The TUI Queue tab and
   `gx server explain` already print verdict text, so the TUI gets no new element.
+- A relaunch (by a person or by automatic recovery) on a held disk is refused with a "disk low"
+  reason, like the budget refusal. Relaunch does not go through the claim path, so without this an
+  automatic retry after a "no space left" failure would start a ticket on a full disk.
+- The snapshot's pending rows today skip a queue entry for a whole epic. Every whole-epic entry now
+  gives one row for the ticket the claim path would start next, with its verdict. This applies to
+  every verdict kind, so the TUI shows verdicts for the usual queue shape.
+- The web shows each queued, unclaimed ticket's verdict and reason on its row on the epic page and
+  on the ticket page, from the snapshot's pending rows. This also applies to every verdict kind. A
+  claimed or running ticket shows none.
+- The hold is not a ticket pause reason. Nothing has started, so nothing is paused, and the hold
+  ends on its own when space returns.
 
 **Why the hold is allowed (ADR 0042)**
 
@@ -320,13 +334,15 @@ gx also stops the three leaks:
   running, the projects that watch it and the last clean result (bytes freed, or the failure
   reason). When no disk is warned or held, the list is empty.
 - A disk status read route and a "clean now" write route, each with a matching `gx server` CLI verb.
+  The status route lists every disk gx knows, with its thresholds, free space and reading time, not
+  only the warned or held ones the snapshot lists.
   The write takes a disk id. It refuses with a reason for an unknown disk, and with "clean already
   running" while the disk's running flag is set. Otherwise it sets the running flag, runs the
   disk's cleanup work (or none, if the disk has none), and ends through the end-of-clean rule, so
   it sends one clean notice and no resume notice. It returns the bytes freed, the free space after
   and the hold state. A "Clean now" does not change whether the automatic clean is armed. Both routes go in
-  the route table, the CLI parity list, the web mux (the write in the web writes list) and the web
-  allowlist test. The implementer picks route paths and verb names.
+  the route table and the CLI parity list. Only the write goes in the web mux (the web writes list)
+  and the web allowlist test; the web reads disks from the snapshot. The implementer picks route paths and verb names.
 - A disk status change (warn, clean start, clean end, hold, resume) publishes a server event so the
   web and TUI refresh without polling. The implementer picks the event name.
 
@@ -461,8 +477,9 @@ New scenario to write: `disk-low` (Testing seam 4). New flows to write:
   threshold and check the strip stays; set it 2G above and check the strip goes away.
 - **Flow B, "Disk hold":** scenario `disk-low` with free space under the clean threshold and a
   cleanup that frees too little. Queue the scenario's epic. Check the strip says new tickets are
-  held and the ticket shows "disk low". Raise free space above the clean threshold and check,
-  without a reload, that the strip leaves the held state and the ticket starts.
+  held and the ticket's row on the epic page shows "disk low". Raise free space above the clean
+  threshold and check, without a reload, that the strip leaves the held state and the ticket
+  starts.
 - **Flow C, "Clean now fails":** scenario `disk-low` with a cleanup command that exits non-zero.
   Click "Clean now" and check the strip shows the failure reason inline and stays.
 
@@ -531,8 +548,10 @@ Entries:
     held.
 32. Go test (seam 1): a queued one-off under a held disk does not start and shows "disk low".
 33. Flow B (verdict in the web UI). CLI check: `gx server explain <ticket>` on the held fixture
-    prints "disk low" with the disk and free space. The TUI Queue tab prints the same verdict text,
-    so no TUI check is needed beyond the explain output.
+    prints "disk low" with the disk and free space. Go test (seam 1): a whole queued epic gives a
+    pending row for its next ticket with the verdict. Go test (`ui/tickets`): the TUI Queue tab shows
+    that verdict for a ticket of a whole queued epic. Vitest (seam 3): the epic page row and the
+    ticket page show a pending row's verdict.
 34. Flow B (ticket starts after space returns, no click). Go test (seam 1).
 35. Go test (seam 1): a hold that clears on a later reading sends one resume notice.
 36. Flow A.
@@ -564,11 +583,10 @@ Entries:
     log names the reason.
 46. Go test (seam 6): a feature worktree with a live agent pane inside it is kept, and one with a
     live web session inside it is kept; the log names the reason.
-47. Go test (seam 6): a merged epic whose root is queued again before the removal runs keeps its
-    worktree. A second test checks the normal merge, where the dequeue follows the stamp, does
-    remove it (the removal does not race the dequeue). A third test holds the worktree lock, lets
-    the removal start and wait on it, re-queues the epic and lets a claim set up the feature
-    worktree under the lock first; the worktree survives the removal.
+47. Go test (seam 6): a queue add refuses an epic with `merged_at` set, so a merged epic cannot be
+    queued again. The test queues the root while the epic is unmerged, stamps `merged_at`, starts
+    the removal and checks the worktree is kept. A second test checks the normal merge, where the
+    dequeue follows the stamp, does remove it (the removal does not race the dequeue).
 48. Go test (seam 6): a merged epic with an open ticket keeps its worktree.
 49. Go test (seam 6): the epic branch exists after the removal.
 50. Go test (seam 6): the log line for a kept worktree names the epic, the path and the reason.
