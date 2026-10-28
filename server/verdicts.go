@@ -3,6 +3,7 @@ package server
 import (
 	"cmp"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -204,19 +205,52 @@ func (s *Server) pendingRows() []PendingRow {
 		byProject[project] = loadResult{epics, err}
 		return epics, err
 	}
-	for _, item := range s.queued.list() {
+	items := s.queued.list()
+	// A ticket queued alone has its own row; its epic's entry adds none for it.
+	covered := map[string]bool{}
+	for _, item := range items {
+		if addr, err := parseQueuedAddress(item.Address); err == nil && addr.ID != "" {
+			covered[addr.String()] = true
+		}
+	}
+	for _, item := range items {
 		addr, err := parseQueuedAddress(item.Address)
-		// An epic entry has no single ticket to explain.
-		if err != nil || addr.ID == "" {
+		if err != nil {
 			continue
+		}
+		address := item.Address
+		if addr.ID == "" {
+			next, ok := s.nextQueuedTicket(addr, epicsOf)
+			if !ok || covered[next.String()] {
+				continue
+			}
+			addr, address = next, next.String()
+			covered[address] = true
 		}
 		ex, err := s.explainQueued(addr, epicsOf)
 		if err != nil {
 			ex = Explanation{Verdict: "error", Reason: err.Error()}
 		}
-		rows = append(rows, PendingRow{Address: item.Address, Agent: item.Agent, Verdict: ex.Verdict, Reason: ex.Reason})
+		rows = append(rows, PendingRow{Address: address, Agent: item.Agent, Verdict: ex.Verdict, Reason: ex.Reason})
 	}
 	return rows
+}
+
+// nextQueuedTicket is the ticket a whole-epic queue entry would start next, if
+// its epic is readable and has a frontier.
+func (s *Server) nextQueuedTicket(epic tickets.Address, epicsOf func(project string) ([]tickets.Epic, error)) (tickets.Address, bool) {
+	epics, err := epicsOf(epic.Project)
+	if err != nil {
+		return tickets.Address{}, false
+	}
+	for _, e := range epics {
+		if filepath.Base(e.Path) != epic.Epic {
+			continue
+		}
+		t, ok := nextTicket(e)
+		return tickets.Address{Project: epic.Project, Epic: epic.Epic, ID: t.Identifier}, ok
+	}
+	return tickets.Address{}, false
 }
 
 // publishVerdictChanges streams one event per queued ticket whose verdict word

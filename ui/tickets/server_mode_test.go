@@ -309,6 +309,30 @@ func TestServerMode_PendingRowRendersVerdictSubtext(t *testing.T) {
 	}
 }
 
+// A whole queued epic gives one row, for its next ticket; only that ticket
+// shows a verdict.
+func TestServerMode_WholeQueuedEpicShowsTheVerdictOnItsNextTicketOnly(t *testing.T) {
+	m := newServerModel(t)
+	snap := server.Snapshot{Seq: 1,
+		Tickets: []server.TicketInfo{
+			{Address: "gx:alpha/01", Title: "First", Status: "open"},
+			{Address: "gx:alpha/02", Title: "Second", Status: "open"},
+		},
+		Pending: []server.PendingRow{{Address: "gx:alpha/01", Verdict: "disk low", Reason: "2 GB free"}},
+	}
+	m = withState(m, snap)
+
+	var bodies [][]string
+	for _, e := range m.buildSidebarEntries() {
+		if e.Value.kind == nodeTicket {
+			bodies = append(bodies, e.Body)
+		}
+	}
+	if len(bodies) != 2 || len(bodies[0]) != 1 || !strings.Contains(bodies[0][0], "disk low: 2 GB free") || len(bodies[1]) != 0 {
+		t.Fatalf("subtexts = %q", bodies)
+	}
+}
+
 // Seam D: "enter" on a paused row issues the detail's first verb (resume here).
 func TestServerMode_EnterResumesAPausedRow(t *testing.T) {
 	var calls []string

@@ -349,12 +349,11 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 			continue
 		}
 		s.checkDeadlock(root, projectDir, e)
-		frontier := ralphloop.Frontier(e)
-		if len(frontier) == 0 {
+		t, ok := nextTicket(e)
+		if !ok {
 			s.retryHeldMerge(root, e, loaded, repo)
 			return false, nil
 		}
-		t := frontier[0]
 		ticketAddr := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}.String()
 		// A missed watch event can leave the index behind the file; claiming
 		// on that view could schedule the wrong thing, so wait for the index.
@@ -370,6 +369,16 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 		return s.claimAndLaunch(root, addr, t, repo, ticketAgent(t, ralphloop.AgentKind(item.Agent)), loaded)
 	}
 	return false, nil
+}
+
+// nextTicket is the ticket a claim of e's root starts next: the first of its
+// frontier. The pending rows name the same one.
+func nextTicket(e tickets.Epic) (tickets.Ticket, bool) {
+	frontier := ralphloop.Frontier(e)
+	if len(frontier) == 0 {
+		return tickets.Ticket{}, false
+	}
+	return frontier[0], true
 }
 
 // projectOf finds the project's directory in the store and the repo its
