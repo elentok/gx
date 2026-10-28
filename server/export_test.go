@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
@@ -19,6 +20,11 @@ var (
 	HardGraceTitle = hardGraceTitle
 	TicketAgent    = ticketAgent
 )
+
+// LiveDiskSpace is the disk-space settings the server currently runs on.
+func (s *Server) LiveDiskSpace() config.DiskSpaceConfig {
+	return s.settings.Load().DiskSpace
+}
 
 // LiveDesignSessionID is the ID of epicAddr's newest live design session
 // leaving out excludeID, or "".

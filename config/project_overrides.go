@@ -24,6 +24,7 @@ var projectKeys = map[string]map[string]bool{
 	"notifications":   nil,
 	"evolve":          nil,
 	"execution-queue": {"max-agents-per-epic": true, "max-one-off-agents": true},
+	"disk-space":      {"cleanup-command": true},
 }
 
 // checkProjectKeys rejects any key outside the whitelist, naming it. Global-only
@@ -69,6 +70,11 @@ func (c Config) WithProject(pf ProjectFile) Config {
 	}
 	if pf.ExecutionQueue != nil && pf.ExecutionQueue.MaxOneOffAgents != nil {
 		c.ExecutionQueue.MaxOneOffAgents = clampExecutionQueueLimit(*pf.ExecutionQueue.MaxOneOffAgents)
+	}
+	if d := pf.DiskSpace; d != nil && d.CleanupCommand != nil {
+		// An empty list is "off for this project", unlike the nil-means-unset
+		// rule below.
+		c.DiskSpace.CleanupCommand = slices.Clone(*d.CleanupCommand)
 	}
 	if a := pf.Agents; a != nil {
 		c.Agents.Claude = overlayAgent(c.Agents.Claude, a.Claude)

@@ -128,6 +128,10 @@ type Settings struct {
 	// CPUWatchdog is config cpu-watchdog: when a CPU spike files a ticket.
 	CPUWatchdog config.CPUWatchdogConfig
 
+	// DiskSpace is config disk-space: the free-space thresholds and cleanup
+	// command. Zero thresholds mean off, so hand-built Settings stay off.
+	DiskSpace config.DiskSpaceConfig
+
 	// RecentlyFinished is config server.recently-finished: how many completed
 	// epics the snapshot lists. Zero lists none; the config layer supplies
 	// config.DefaultRecentlyFinished when the key is unset.
@@ -185,6 +189,7 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		AgentsClaudeArgs:            cfg.Agents.ClaudeArgs,
 		AgentsFixAgentRemoteControl: cfg.Agents.FixAgentRemoteControl,
 		CPUWatchdog:                 cfg.CPUWatchdog,
+		DiskSpace:                   cfg.DiskSpace,
 		RecentlyFinished:            cfg.Server.RecentlyFinished,
 		AgentsClaude:                cfg.Agents.Claude,
 		AgentsCodex:                 cfg.Agents.Codex,

@@ -67,6 +67,7 @@ type Config struct {
 	Server                ServerConfig         `json:"server"`
 	Recovery              RecoveryConfig       `json:"recovery"`
 	CPUWatchdog           CPUWatchdogConfig    `json:"cpu-watchdog"`
+	DiskSpace             DiskSpaceConfig      `json:"disk-space"`
 	// AgentRunner is auto, herdr, headless or pty. It is validated when the
 	// server starts, not here, so a bad value never breaks the TUI.
 	AgentRunner string `json:"agent-runner"`
@@ -162,6 +163,7 @@ func Default() Config {
 		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished, Web: WebConfig{DevURL: DefaultWebDevURL}},
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		CPUWatchdog:           DefaultCPUWatchdogConfig(),
+		DiskSpace:             DefaultDiskSpaceConfig(),
 		AgentRunner:           "auto",
 		RunnerWait:            agentrunner.DefaultN,
 		Evolve:                EvolveOff,
@@ -313,6 +315,11 @@ func Parse(data []byte) (Config, error) {
 			Sustain          *string  `json:"sustain"`
 			Cooldown         *string  `json:"cooldown"`
 		} `json:"cpu-watchdog"`
+		DiskSpace *struct {
+			WarnBelow      *string  `json:"warn-below"`
+			CleanBelow     *string  `json:"clean-below"`
+			CleanupCommand []string `json:"cleanup-command"`
+		} `json:"disk-space"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return cfg, fmt.Errorf("parse: %w", err)
@@ -541,6 +548,12 @@ func Parse(data []byte) (Config, error) {
 			if d, err := time.ParseDuration(*w.Cooldown); err == nil && d >= 0 {
 				cfg.CPUWatchdog.Cooldown = d
 			}
+		}
+	}
+	if d := raw.DiskSpace; d != nil {
+		var err error
+		if cfg.DiskSpace, err = applyDiskSpace(cfg.DiskSpace, d.WarnBelow, d.CleanBelow, d.CleanupCommand); err != nil {
+			return cfg, err
 		}
 	}
 

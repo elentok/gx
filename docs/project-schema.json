@@ -56,6 +56,16 @@
       "type": "boolean",
       "description": "false opts this project out of evolve. Absent or true follows the global evolve mode."
     },
+    "disk-space": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cleanup-command": {
+          "$ref": "config-schema.json#/properties/disk-space/properties/cleanup-command",
+          "description": "Replaces the global cleanup command for this project. An empty list turns cleanup off for it; an absent key keeps the global command."
+        }
+      }
+    },
     "execution-queue": {
       "type": "object",
       "additionalProperties": false,

@@ -62,6 +62,11 @@ type ProjectFile struct {
 		MaxAgentsPerEpic *int `json:"max-agents-per-epic,omitempty"`
 		MaxOneOffAgents  *int `json:"max-one-off-agents,omitempty"`
 	} `json:"execution-queue,omitempty"`
+	DiskSpace *struct {
+		// CleanupCommand is a pointer to a slice so an empty list (cleanup off
+		// for this project) differs from an absent key (keep the global command).
+		CleanupCommand *[]string `json:"cleanup-command,omitempty"`
+	} `json:"disk-space,omitempty"`
 }
 
 // LandingOnLanded is the landing policy where a blocker releases its dependents

@@ -372,6 +372,29 @@
         }
       }
     },
+    "disk-space": {
+      "type": "object",
+      "description": "When gx warns about low free disk space, when it cleans, and the command it cleans with. Sizes are strings such as \"20G\", \"500M\" or \"1500000000\" (a bare unit letter is decimal: G is 10^9 bytes; \"GiB\" is 2^30). A config reload applies them with no restart.",
+      "additionalProperties": false,
+      "properties": {
+        "warn-below": {
+          "type": "string",
+          "default": "20G",
+          "description": "Free space below which gx warns. \"0\" turns the warning off. Raised to clean-below when it is non-zero and lower. Default: \"20G\"."
+        },
+        "clean-below": {
+          "type": "string",
+          "default": "10G",
+          "description": "Free space below which gx runs cleanup-command. \"0\" turns cleaning off. Default: \"10G\"."
+        },
+        "cleanup-command": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["go", "clean", "-cache"],
+          "description": "The cleanup command as an argv list, not a shell string. An empty list turns cleanup off. A project's project.json can replace it. Default: [\"go\", \"clean\", \"-cache\"]."
+        }
+      }
+    },
     "subscription": {
       "type": "object",
       "description": "Subscription extra-usage safety check.",
