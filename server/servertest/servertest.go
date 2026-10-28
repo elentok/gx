@@ -356,7 +356,7 @@ func WaitFor(t *testing.T, timeout time.Duration, what string, cond func() bool)
 
 // Poll is WaitFor without the failure: it reports whether cond held in time.
 func Poll(timeout time.Duration, cond func() bool) bool {
-	for deadline := time.Now().Add(timeout); !cond(); time.Sleep(5 * time.Millisecond) {
+	for deadline := time.Now().Add(timeout); !cond(); time.Sleep(20 * time.Millisecond) {
 		if time.Now().After(deadline) {
 			return false
 		}
@@ -537,8 +537,8 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// PollInterval also turns off keepFresh's 15s backstop, so tests no longer
 	// depend on store watch events arriving.
 	h.cfg.PollInterval = 200 * time.Millisecond
-	h.cfg.BudgetPollInterval = 50 * time.Millisecond
-	h.cfg.ChatPollInterval = 50 * time.Millisecond
+	h.cfg.BudgetPollInterval = 100 * time.Millisecond
+	h.cfg.ChatPollInterval = 100 * time.Millisecond
 	for _, o := range opts {
 		o(&h.cfg)
 	}

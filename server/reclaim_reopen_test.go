@@ -63,8 +63,12 @@ func editAgentWork(t *testing.T, wtPath string) {
 }
 
 func runnerShapes(t *testing.T, test func(t *testing.T, headless bool)) {
-	t.Run("herdr", func(t *testing.T) { test(t, false) })
-	t.Run("headless", func(t *testing.T) { test(t, true) })
+	for name, headless := range map[string]bool{"herdr": false, "headless": true} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			test(t, headless)
+		})
+	}
 }
 
 func TestReclaim_DeadEmptyClaimReopens(t *testing.T) {
