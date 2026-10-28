@@ -877,6 +877,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(freshDone); s.keepFresh(freshCtx) }()
 	herdrDone := make(chan struct{})
 	go func() { defer close(herdrDone); s.keepHerdrChecked(freshCtx) }()
+	// A claim must not see a low disk before the watcher has recorded its projects.
+	s.checkDisks()
 	claimDone := make(chan struct{})
 	go func() { defer close(claimDone); s.keepClaiming(freshCtx) }()
 	pruneDone := make(chan struct{})

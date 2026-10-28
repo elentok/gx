@@ -340,13 +340,13 @@ func (s *Server) checkDisks() {
 	}
 }
 
-// keepDisksWatched reads free space at start and then on a timer until ctx ends.
+// keepDisksWatched reads free space on a timer until ctx ends. The serve path
+// takes the first reading itself, before the claim loop starts.
 func (s *Server) keepDisksWatched(ctx context.Context) {
 	interval := s.cfg.DiskPollInterval
 	if interval <= 0 {
 		interval = defaultDiskPoll
 	}
-	s.checkDisks()
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 	for {

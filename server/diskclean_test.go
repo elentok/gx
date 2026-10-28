@@ -376,6 +376,31 @@ func TestDiskClean_TwoProjectsOnOneDiskSendOneNotice(t *testing.T) {
 	}
 }
 
+// A restart with a ticket already queued must see the low disk with its
+// projects before the first claim, so the real command runs and no notice says
+// there was nothing to clean.
+func TestDiskClean_RestartWithAQueuedTicketRunsTheRealCommandOnce(t *testing.T) {
+	r := startCleanRig(t, map[string]string{"proj": ""}, 20*gb, 10*gb)
+	r.clean.block = make(chan struct{})
+	r.queue(t, "proj:epic-a/01")
+	r.setFree(3 * gb)
+	r.waitCalls(t, 1)
+	close(r.clean.block)
+	r.waitClean(t, 1)
+	r.h.Restart(t)
+	r.start, _, _ = registerLaunch(r.h)
+	r.waitClean(t, 2)
+	r.wantCalls(t, 2)
+	for _, b := range r.bodies() {
+		if strings.Contains(b, "no cleanup command set") {
+			t.Errorf("notice = %s, want the real command to run", b)
+		}
+	}
+	if len(*r.start) != 0 {
+		t.Errorf("a claim started on a held disk: %v", *r.start)
+	}
+}
+
 // Story 57.
 func TestDiskClean_RestartOnALowDiskWarnsHoldsAndCleansAgain(t *testing.T) {
 	r := startCleanRig(t, map[string]string{"proj": ""}, 20*gb, 10*gb)
