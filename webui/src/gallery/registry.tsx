@@ -28,6 +28,7 @@ import { SidebarItem } from "../ui/sidebar/SidebarItem";
 import { SidebarSection } from "../ui/sidebar/SidebarSection";
 import { Spinner } from "../ui/spinner/Spinner";
 import { StatCard } from "../ui/stat-card/StatCard";
+import { DiskStrip } from "../ui/disk-strip/DiskStrip";
 import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { TopBar } from "../ui/top-bar/TopBar";
@@ -398,6 +399,17 @@ export const galleryEntries: GalleryEntry[] = [
   { name: "Chip", cases: perTone((tone) => <Chip tone={tone}>{tone}</Chip>) },
   { name: "LiveDot", cases: perTone((tone) => <LiveDot tone={tone} label={tone} />) },
   { name: "Strip", cases: perTone((tone) => <Strip tone={tone}>{tone}</Strip>) },
+  {
+    name: "DiskStrip",
+    cases: [
+      { label: "warned", node: <DiskStrip name="Macintosh HD" free="4.2 GB" held={false} cleaning={false} pending={false} onClean={() => {}} /> },
+      { label: "held", node: <DiskStrip name="Macintosh HD" free="900 MB" held cleaning={false} pending={false} onClean={() => {}} /> },
+      { label: "cleaning", node: <DiskStrip name="Macintosh HD" free="4.2 GB" held={false} cleaning pending={false} onClean={() => {}} /> },
+      { label: "pending", node: <DiskStrip name="Macintosh HD" free="4.2 GB" held={false} cleaning={false} pending onClean={() => {}} /> },
+      { label: "refused", node: <DiskStrip name="Macintosh HD" free="4.2 GB" held={false} cleaning={false} pending={false} problem="A clean already runs on this disk." onClean={() => {}} /> },
+      { label: "failed", node: <DiskStrip name="Macintosh HD" free="900 MB" held cleaning={false} pending={false} problem="failed: exit status 1" onClean={() => {}} /> },
+    ],
+  },
   {
     name: "Modal",
     // The Modal has no tone of its own; the tone cases show it holding a button in that tone.

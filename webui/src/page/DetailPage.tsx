@@ -6,6 +6,7 @@ import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
 import type { TopBarTab } from "../ui/top-bar/TopBar";
+import { DiskStrips } from "./DiskStrips";
 
 // The frame every page shares: offline strip, page container and the connected top bar.
 // `fill` makes the page exactly the window tall; its children then share the space below the top bar.
@@ -30,6 +31,7 @@ export function DetailPage({
     <PageModeContext.Provider value={mode}>
       <Box {...(fill && { h: "100dvh", display: "flex", flexDirection: "column" })}>
         {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
+        <DiskStrips />
         <PageContainer fill={fill}>
           <ConnectedTopBar active={active} waiting={waiting} />
           {children}

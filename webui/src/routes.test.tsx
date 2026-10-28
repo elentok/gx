@@ -4,6 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, createConnection, TICK_MS, type Connection, type ConnectionState } from "./connection";
 import { appRoutes } from "./routes";
 import type { EpicDetail, EpicDetailRow, FetchEpicDetail } from "./epic/detail";
+import type { DiskStatus } from "./generated/server";
 import type { Snapshot } from "./snapshot";
 import type { DetailResult, FetchDetail, TicketDetail } from "./ticket/detail";
 import { renderThemed } from "./ui/render";
@@ -37,12 +38,13 @@ const detailOf = (address: string): TicketDetail => ({
 const okFor: FetchDetail = async (address) => ({ kind: "ok", detail: detailOf(address) });
 
 // A connection that never touches the network: the state is whatever the test sets.
-function fakeConnection(connected: boolean) {
-  const state: ConnectionState = { snapshot: emptySnapshot, connected, loadedOnce: true, tick: 0, streams: 0 };
+function fakeConnection(connected: boolean, snapshot: Snapshot = emptySnapshot) {
+  const state: ConnectionState = { snapshot, connected, loadedOnce: true, tick: 0, streams: 0 };
   return {
     getState: () => state,
     subscribe: () => () => {},
     onEvent: () => () => {},
+    refresh: () => {},
   } as unknown as Connection;
 }
 
@@ -666,4 +668,79 @@ test("the epic page Merge shows a refusal and an HTTP error in toasts", async ()
   fireEvent.click(screen.getByRole("button", { name: "Merge" }));
   expect(await screen.findByText("boom: disk full")).toBeTruthy();
   vi.unstubAllGlobals();
+});
+
+const diskOf = (over: Partial<DiskStatus> = {}): DiskStatus => ({
+  id: "d1",
+  name: "Macintosh HD",
+  free_bytes: 4_200_000_000,
+  projects: ["gx"],
+  warned: true,
+  held: false,
+  read_at: "",
+  cleaning: false,
+  last_clean: "",
+  ...over,
+});
+
+const withDisks = (...disks: DiskStatus[]) => fakeConnection(true, { ...emptySnapshot, disks });
+
+test("no disk strip with an empty disk list", async () => {
+  renderAt("/epics", okFor);
+  await waitFor(() => expect(currentTab()).toBe("Epics"));
+  expect(screen.queryByRole("button", { name: "Clean now" })).toBeNull();
+});
+
+test.each([
+  ["/epics", undefined],
+  ["/e/gx:e", epicFetch()],
+  ["/t/gx:e/01", undefined],
+] as const)("%s shows the disk strip", async (path, epic) => {
+  renderAt(path, okFor, withDisks(diskOf()), epic);
+  expect(await screen.findByRole("button", { name: "Clean now" })).toBeTruthy();
+  expect(screen.getByText(/Macintosh HD/)).toBeTruthy();
+});
+
+test("two disks give two strips, a held one without a warn mark still shows, and both sit below Offline", async () => {
+  const conn = fakeConnection(false, {
+    ...emptySnapshot,
+    disks: [diskOf(), diskOf({ id: "d2", name: "Data", warned: false, held: true })],
+  });
+  renderAt("/epics", okFor, conn);
+  expect(await screen.findAllByRole("button", { name: "Clean now" })).toHaveLength(2);
+  const strips = screen.getAllByRole("status").filter((s) => s.getAttribute("data-tone") !== null);
+  expect(strips[0]!.textContent).toContain("Offline");
+  expect(strips[1]!.getAttribute("data-tone")).toBe("waiting");
+  expect(strips[2]!.getAttribute("data-tone")).toBe("paused");
+});
+
+test("Clean now posts the disk id", async () => {
+  const post = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ freed_bytes: 1 })));
+  stubPosts(post);
+  renderAt("/epics", okFor, withDisks(diskOf()));
+  fireEvent.click(await screen.findByRole("button", { name: "Clean now" }));
+  await waitFor(() => expect(post).toHaveBeenCalled());
+  expect(post.mock.calls[0]![0]).toBe("/v1/disk/clean");
+  expect(JSON.parse(post.mock.calls[0]![1].body as string)).toEqual({ disk: "d1" });
+  vi.unstubAllGlobals();
+});
+
+test("a refusal shows inline and the strip stays; a failed last clean shows too", async () => {
+  stubPosts(async () => new Response(JSON.stringify({ refused: true, reason: "clean-running", message: "a clean already runs" })));
+  renderAt("/epics", okFor, withDisks(diskOf({ last_clean: "failed: exit 1" })));
+  expect((await screen.findByRole("alert")).textContent).toBe("failed: exit 1");
+  fireEvent.click(screen.getByRole("button", { name: "Clean now" }));
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("a clean already runs"));
+  expect(screen.getByRole("button", { name: "Clean now" })).toBeTruthy();
+  vi.unstubAllGlobals();
+});
+
+test("a cached snapshot with a disk renders the strip before the first fetch lands", async () => {
+  const conn = createConnection({
+    cache: { load: () => ({ ...emptySnapshot, disks: [diskOf()] }), save: () => {} },
+    fetchSnapshot: () => new Promise(() => {}),
+    openStream: () => new Promise(() => {}),
+  });
+  renderAt("/epics", okFor, conn);
+  expect(await screen.findByRole("button", { name: "Clean now" })).toBeTruthy();
 });
