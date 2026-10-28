@@ -16,6 +16,7 @@ packages:
       - epiclist.go
       - epicsummary.go
       - fixagent.go
+      - healthreport.go
       - healthtypes.go
       - index.go
       - pause.go

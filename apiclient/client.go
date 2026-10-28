@@ -698,6 +698,7 @@ func (c *Client) DiskStatus(ctx context.Context) (server.DiskReport, error) {
 	return rep, err
 }
 
+<<<<<<< HEAD
 // SaveChecks saves one project's check config to the repo or project.json. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) SaveChecks(ctx context.Context, req server.SaveChecksRequest) (server.SaveChecksResult, error) {
@@ -716,6 +717,13 @@ func (c *Client) ChecksStatus(ctx context.Context, project string) (server.Check
 	}
 	err := c.get(ctx, "/v1/checks/status?"+q.Encode(), &st)
 	return st, err
+}
+
+// Health is the machine's health: host, CPU, memory and every watched disk.
+func (c *Client) Health(ctx context.Context) (server.HealthReport, error) {
+	var rep server.HealthReport
+	err := c.get(ctx, "/v1/health", &rep)
+	return rep, err
 }
 
 // BudgetIncrease raises the live budget limits until the server restarts. A

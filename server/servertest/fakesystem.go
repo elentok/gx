@@ -18,6 +18,7 @@ type FakeSystem struct {
 	busy     float64
 	queue    []float64
 	mem      float64
+	pressure int
 	idle     uint64
 	total    uint64
 	reads    int
@@ -39,6 +40,10 @@ func (f *FakeSystem) QueueBusy(pcts ...float64) {
 
 // SetMem sets the memory percent used of every later reading.
 func (f *FakeSystem) SetMem(pct float64) { f.update(func() { f.mem = pct }) }
+
+// SetPressure sets the macOS pressure level of every later reading; 0 is no
+// pressure value, as on Linux.
+func (f *FakeSystem) SetPressure(level int) { f.update(func() { f.pressure = level }) }
 
 // Fail makes later readings fail with err; nil makes them succeed again.
 // Pass syshealth.ErrUnavailable for a machine with no backend.
@@ -75,5 +80,6 @@ func (f *FakeSystem) Read() (syshealth.Reading, error) {
 	return syshealth.Reading{
 		CPUIdle: f.idle, CPUTotal: f.total, TickRate: f.tickRate, Cores: f.cores,
 		MemPercent: f.mem, MemTotal: memTotal, MemUsed: uint64(f.mem / 100 * memTotal),
+		Pressure: f.pressure,
 	}, nil
 }

@@ -1131,6 +1131,83 @@ export interface FixAgentResult extends SessionResult {
 }
 
 //////////
+// source: healthreport.go
+
+export const PressureNormal = "normal";
+export const PressureWarn = "warn";
+export const PressureCritical = "critical";
+/**
+ * Pressure names the macOS memory pressure level; the field is absent on Linux.
+ */
+export type Pressure = typeof PressureNormal | typeof PressureWarn | typeof PressureCritical;
+/**
+ * HealthThresholds are the average percents where a meter turns high and critical.
+ */
+export interface HealthThresholds {
+  high: number /* float64 */;
+  critical: number /* float64 */;
+}
+/**
+ * CPUReport is the CPU meter in the health route.
+ */
+export interface CPUReport {
+  percent: number /* float64 */;
+  average: number /* float64 */;
+  level: number /* int */;
+  state: HealthState;
+  reason?: HealthReason;
+  thresholds: HealthThresholds;
+  read_at: string;
+}
+/**
+ * MemoryReport is the memory meter in the health route.
+ */
+export interface MemoryReport {
+  percent: number /* float64 */;
+  used_bytes: number /* uint64 */;
+  total_bytes: number /* uint64 */;
+  average: number /* float64 */;
+  pressure?: string;
+  level: number /* int */;
+  state: HealthState;
+  reason?: HealthReason;
+  thresholds: HealthThresholds;
+  read_at: string;
+}
+/**
+ * HealthDisk is one watched disk in the health route.
+ */
+export interface HealthDisk {
+  id: string;
+  name: string;
+  free_bytes: number /* uint64 */;
+  total_bytes: number /* uint64 */;
+  state: HealthState;
+  held: boolean;
+  projects: string[];
+  read_at: string;
+}
+/**
+ * DisksReport is every watched disk with the disk thresholds as size strings.
+ */
+export interface DisksReport {
+  warn_below: string;
+  clean_below: string;
+  disks: HealthDisk[];
+}
+/**
+ * HealthReport is the health route's result. It holds the watcher's stored
+ * values and takes no new reading.
+ */
+export interface HealthReport {
+  host: string;
+  time: string;
+  cpu: CPUReport;
+  memory: MemoryReport;
+  disks: DisksReport;
+}
+
+//////////
 // source: healthtypes.go
 
 /**

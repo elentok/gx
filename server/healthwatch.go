@@ -46,6 +46,14 @@ type healthWatch struct {
 	started bool
 	cpu     meterTrack
 	mem     meterTrack
+	latest  latestReading
+}
+
+// latestReading is the newest raw values the health route shows beside the meters.
+type latestReading struct {
+	cpuPct, cpuAvg, memPct, memAvg float64
+	memUsed, memTotal              uint64
+	pressure                       int
 }
 
 func (s *Server) initHealth() {
@@ -69,15 +77,20 @@ func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
 		unknown := MeterHealth{State: HealthStateUnknown, Reason: reason, ReadAt: now}
 		w.health.CPU, w.health.Memory = unknown, unknown
 		w.prev = nil
+		w.latest = latestReading{}
 	default:
 		busy, reason := syshealth.BusyPercent(w.prev, r)
 		w.prev = &r
+		w.latest.cpuPct, w.latest.cpuAvg = 0, 0
 		if reason != "" {
 			w.health.CPU = MeterHealth{State: HealthStateUnknown, Reason: HealthReason(reason), ReadAt: now}
 		} else {
 			w.health.CPU = w.cpu.next(old.CPU, busy, now)
+			w.latest.cpuPct, w.latest.cpuAvg = busy, w.cpu.win.Average()
 		}
 		w.health.Memory = w.mem.next(old.Memory, r.MemPercent, now)
+		w.latest.memPct, w.latest.memAvg = r.MemPercent, w.mem.win.Average()
+		w.latest.memUsed, w.latest.memTotal, w.latest.pressure = r.MemUsed, r.MemTotal, r.Pressure
 	}
 	cur, first := w.health, !w.started
 	w.started = true
