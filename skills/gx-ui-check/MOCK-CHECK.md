@@ -28,7 +28,11 @@ steps. The browser commands come from the `playwright-cli` skill.
 5. Locate the same part on the built page. You choose how: roles, visible text or a CSS selector.
 6. Resize the viewport to the state's width before each state. Screenshot the mock and the built
    page at that width, at device scale factor 1, cropped to the selector. Never take a full page at retina scale.
-7. Compare the two screenshots side by side by eye. List each difference.
+   Save one crop per part and state, named `<state>-<part>-mock.png` and `<state>-<part>-built.png`.
+7. `Read` both PNGs and compare them side by side by eye. List each difference. A `Read` that returns
+   an empty result means the state is unchecked: do not infer the look from computed styles.
+8. Give every listed state one result line: `pass`, `fail` (with the differences) or `unchecked`
+   (with the reason).
 
 ## What wins
 
