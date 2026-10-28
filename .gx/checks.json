@@ -1,0 +1,5 @@
+{
+  "test": {
+    "full": "scripts/test.sh && make web-e2e"
+  }
+}
