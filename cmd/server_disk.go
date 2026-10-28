@@ -15,7 +15,7 @@ import (
 	"github.com/elentok/gx/server"
 )
 
-func newServerDiskCmd() *cobra.Command {
+func newServerDiskCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "disk", Short: "disk space gx watches", Args: cobra.NoArgs}
 	var jsonOut bool
 	status := &cobra.Command{
@@ -23,7 +23,7 @@ func newServerDiskCmd() *cobra.Command {
 		Short: "Show the disk-space thresholds and every disk gx watches",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}
@@ -43,7 +43,7 @@ func newServerDiskCmd() *cobra.Command {
 		Short: "Run the cleanup of a disk now (disk id or name)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := serverClient()
+			cl, err := d.dial()()
 			if err != nil {
 				return err
 			}
