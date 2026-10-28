@@ -303,6 +303,18 @@ func TestDiskClean_NoCleanInNormalUse(t *testing.T) {
 	r.queue(t, "proj:epic-a/01")
 	waitFor(t, func() bool { return len(*r.start) >= 1 })
 	r.wantCalls(t, 0)
+
+	path := filepath.Join(r.store, "proj", "epic-a", "issues", "01-first.md")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finished := strings.Replace(string(raw), "---\n", "---\ncommitless: true\niteration_status: finished\n", 1)
+	if err := os.WriteFile(path, []byte(finished), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, func() bool { return len(r.h.Server.Runs()) == 0 })
+	r.wantCalls(t, 0)
 }
 
 // Story 25.
