@@ -21,6 +21,9 @@ This skill never edits code. Its only output is new tickets — each one carryin
 ticket's id>`, the sole edge between them — plus its own ticket's body and closing status. Nothing
 about the tickets it opens is recorded on this ticket.
 
+Change files with `Edit`/`Write` only, never `sed -i`, `cat >` or a heredoc. Write the file first
+(a scratch body, say), then use it. The guard hook rejects shell file writes.
+
 Before starting, run `gx tickets validate <addr>` on the ticket you're about to claim. If it fails,
 stop and fix the ticket's frontmatter before doing anything else.
 

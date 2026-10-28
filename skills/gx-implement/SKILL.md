@@ -66,7 +66,9 @@ Then, while working:
   grep returns kilobytes for.
 - **Delegate any survey wider than ~3 files** to a subagent - you keep the conclusion, not the file
   dumps.
-- **Edit code with `Edit`/`Write`, never a shell script** (python/sed heredocs, `cat >`). A
+- **Change any file with `Edit`/`Write`, never a shell command** (python/sed heredocs, `cat >`,
+  `cat >>`, `sed -i`). This covers scratch files and ticket bodies too: Write the file first, then
+  use it. The guard hook rejects these calls, and a batched call may be half-applied by then. A
   heredoc that hangs is invisible; an `Edit` that fails says why.
 - **Never run a command that can read stdin**: give `rg`/`grep` an explicit path (`rg foo .`),
   never a bare `cat`. Stdin never closes here, so it hangs forever.

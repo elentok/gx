@@ -18,6 +18,8 @@ func TestCheckRulesAnchors(t *testing.T) {
 		{"implement", "gx-implement/SKILL.md", []string{
 			"](../gx-failing-tests.md)", "-count=20", "`gx check`",
 		}},
+		{"implement edit-only", "gx-implement/SKILL.md", []string{"`sed -i`", "Write the file first"}},
+		{"code-review edit-only", "gx-code-review/SKILL.md", []string{"`Edit`/`Write`", "`sed -i`", "`cat >`", "Write the file first"}},
 		{"tdd", "gx-tdd/SKILL.md", []string{"](../gx-failing-tests.md)", "-count=20"}},
 		{"verify", "gx-verify/SKILL.md", []string{
 			"gx check --staged", "`0`: pass", "`1`: fail", "`2`: could not run", "`3`: no applicable checks",
