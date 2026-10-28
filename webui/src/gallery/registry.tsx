@@ -401,7 +401,9 @@ export const galleryEntries: GalleryEntry[] = [
   { name: "Strip", cases: perTone((tone) => <Strip tone={tone}>{tone}</Strip>) },
   {
     name: "DiskStrip",
+    // The strip has no tone of its own: it is "paused" when held and "waiting" otherwise, so the other tones show the unheld look.
     cases: [
+      ...perTone((tone) => <DiskStrip name="Macintosh HD" free="4.2 GB" held={tone === "paused"} cleaning={false} pending={false} onClean={() => {}} />),
       { label: "warned", node: <DiskStrip name="Macintosh HD" free="4.2 GB" held={false} cleaning={false} pending={false} onClean={() => {}} /> },
       { label: "held", node: <DiskStrip name="Macintosh HD" free="900 MB" held cleaning={false} pending={false} onClean={() => {}} /> },
       { label: "cleaning", node: <DiskStrip name="Macintosh HD" free="4.2 GB" held={false} cleaning pending={false} onClean={() => {}} /> },
