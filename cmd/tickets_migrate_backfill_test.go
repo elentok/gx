@@ -57,7 +57,7 @@ func TestExecute_TicketsMigrate_BackfillsMergedAtForLandedLoopEpics(t *testing.T
 	}
 
 	var stdout bytes.Buffer
-	if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}}); err != nil {
+	if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
 		t.Fatalf("execute tickets migrate: %v", err)
 	}
 
@@ -86,7 +86,7 @@ func TestExecute_TicketsMigrate_BackfillsMergedAtForLandedLoopEpics(t *testing.T
 		before[name], _ = os.ReadFile(filepath.Join(root, name, "ticket.md"))
 	}
 	var second bytes.Buffer
-	if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &second, stderr: &bytes.Buffer{}}); err != nil {
+	if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &second, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
 		t.Fatalf("second execute tickets migrate: %v", err)
 	}
 	if strings.TrimSpace(second.String()) != "no changes" {

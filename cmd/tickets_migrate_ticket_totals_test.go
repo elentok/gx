@@ -17,10 +17,7 @@ import (
 // HOME in a project directory no worktree maps to, as a deleted worktree leaves it.
 func writeHomelessTranscript(t *testing.T, id string, input int) {
 	t.Helper()
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
-	}
+	home := envValue(envFor(t), "HOME")
 	line := `{"type":"assistant","timestamp":"2026-01-01T00:00:00Z","message":{"model":"claude-sonnet-4-5","usage":{"input_tokens":` +
 		strconv.Itoa(input) + `,"output_tokens":10}}}`
 	writeSessionFixture(t, home, "-gone-worktree-"+id, id, []string{line})
@@ -54,7 +51,7 @@ func TestExecute_TicketsMigrate_BackfillsTicketTokensAndCost(t *testing.T) {
 	run := func() string {
 		t.Helper()
 		var stdout bytes.Buffer
-		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}}); err != nil {
+		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
 			t.Fatalf("execute: %v", err)
 		}
 		return stdout.String()

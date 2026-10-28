@@ -39,6 +39,9 @@ func (d Dirs) Home() (string, error) {
 	return home, nil
 }
 
+// Environ is the env entries d resolves from, for a child process's Env.
+func (d Dirs) Environ() []string { return d.env }
+
 // Getenv is the env's value for key, or "" when it is unset.
 func (d Dirs) Getenv(key string) string { return d.lookup(key) }
 

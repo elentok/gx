@@ -48,7 +48,7 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 	}
 
 	var stdout bytes.Buffer
-	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil)}
+	d := deps{stdout: &stdout, stderr: bytes.NewBuffer(nil), env: envFor(t)}
 
 	if err := execute([]string{"tickets", "migrate", root}, d); err != nil {
 		t.Fatalf("execute tickets migrate: %v", err)
@@ -140,7 +140,7 @@ func TestExecute_TicketsMigrate_Success(t *testing.T) {
 	}
 
 	var secondStdout bytes.Buffer
-	d2 := deps{stdout: &secondStdout, stderr: bytes.NewBuffer(nil)}
+	d2 := deps{stdout: &secondStdout, stderr: bytes.NewBuffer(nil), env: envFor(t)}
 	if err := execute([]string{"tickets", "migrate", root}, d2); err != nil {
 		t.Fatalf("second execute tickets migrate: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestExecute_TicketsMigrate_InvalidResultWritesNothing(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	d := deps{stdout: &stdout, stderr: &stderr}
+	d := deps{stdout: &stdout, stderr: &stderr, env: envFor(t)}
 
 	err = execute([]string{"tickets", "migrate", root}, d)
 	if err == nil {

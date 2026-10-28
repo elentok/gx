@@ -12,6 +12,8 @@ import (
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/config"
 )
 
 const launchdLabel = "com.elentok.gx.server"
@@ -54,11 +56,11 @@ func launchdEnviron(getenv func(string) string) map[string]string {
 	return environ
 }
 
-func newLaunchdAgent(stateDir string) (*launchdAgent, error) {
+func newLaunchdAgent(dirs config.Dirs, stateDir string) (*launchdAgent, error) {
 	if runtime.GOOS != "darwin" {
 		return nil, fmt.Errorf("gx server install is only supported on macOS")
 	}
-	home, err := os.UserHomeDir()
+	home, err := dirs.Home()
 	if err != nil {
 		return nil, err
 	}
@@ -71,13 +73,19 @@ func newLaunchdAgent(stateDir string) (*launchdAgent, error) {
 		stateDir:  stateDir,
 		exe:       exe,
 		uid:       os.Getuid(),
-		environ:   launchdEnviron(os.Getenv),
-		run:       runLaunchctl,
+		environ:   launchdEnviron(dirs.Getenv),
+		run:       runLaunchctl(dirs.Environ()),
 	}, nil
 }
 
-func runLaunchctl(args ...string) error {
-	out, err := exec.Command("launchctl", args...).CombinedOutput()
+func runLaunchctl(env []string) func(args ...string) error {
+	return func(args ...string) error { return launchctl(env, args...) }
+}
+
+func launchctl(env []string, args ...string) error {
+	cmd := exec.Command("launchctl", args...)
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("launchctl %s: %w: %s", strings.Join(args, " "), err, bytes.TrimSpace(out))
 	}

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
@@ -18,25 +19,26 @@ import (
 // "mapped", under an isolated HOME and data dir.
 type grillingEnv struct {
 	root, trunk, home, records string
+	env                        []string
 }
 
 func newGrillingEnv(t *testing.T) grillingEnv {
 	t.Helper()
 	repoDir, _ := mergeTestRepo(t, nil)
-	store, home := t.TempDir(), t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	store := t.TempDir()
+	env := tempEnv(t)
+	home := envValue(env, "HOME")
 	root := filepath.Join(store, "proj")
 	if err := os.MkdirAll(filepath.Join(root, "mapped"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	testutil.WriteFile(t, root, "project.json", `{"repo": "`+repoDir+`", "trunk": "main"}`)
 	testutil.WriteFile(t, filepath.Join(root, "mapped"), "ticket.md", "---\nstatus: open\nkind: map\n---\n")
-	records, err := conversations.DefaultDir()
+	records, err := conversations.DirIn(config.DirsFrom(env))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return grillingEnv{root: root, trunk: tickets.TrunkCheckout(store, "proj"), home: home, records: records}
+	return grillingEnv{root: root, trunk: tickets.TrunkCheckout(store, "proj"), home: home, records: records, env: env}
 }
 
 // writeGrillingTranscript writes a transcript of cwd that opens with the given
@@ -92,7 +94,7 @@ func (e grillingEnv) snapshot(t *testing.T) map[string]string {
 
 func migrateGrilling(t *testing.T, e grillingEnv, args ...string) {
 	t.Helper()
-	if err := execute(append([]string{"tickets", "migrate", e.root}, args...), deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}}); err != nil {
+	if err := execute(append([]string{"tickets", "migrate", e.root}, args...), deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, env: e.env}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
 }

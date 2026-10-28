@@ -490,7 +490,7 @@ func New(cfg Config) (*Server, error) {
 		cfg.SessionsDir = filepath.Join(data, "sessions")
 	}
 	if cfg.ConversationsDir == "" {
-		dir, err := conversations.DefaultDir()
+		dir, err := conversations.DirIn(config.DirsFrom(cfg.Env))
 		if err != nil {
 			return nil, err
 		}

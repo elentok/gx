@@ -385,7 +385,7 @@ func runServerStart(ctx context.Context, c *apiclient.Client, w io.Writer, spawn
 // spawnDetached re-executes this binary as `gx server` in its own session with
 // no terminal, so closing the launching terminal cannot stop it. exec.Cmd
 // already closes every fd except stdio, and stdio is /dev/null plus the log.
-func spawnDetached(stateDir string) spawnFunc {
+func spawnDetached(env []string, stateDir string) spawnFunc {
 	return func() error {
 		exe, err := os.Executable()
 		if err != nil {
@@ -399,9 +399,7 @@ func spawnDetached(stateDir string) spawnFunc {
 			return err
 		}
 		defer logf.Close()
-		child := exec.Command(exe, "server")
-		child.Stdout, child.Stderr = logf, logf // Stdin nil = /dev/null
-		child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+		child := detachedServerCmd(exe, env, logf)
 		if err := child.Start(); err != nil {
 			return fmt.Errorf("start server: %w", err)
 		}
@@ -409,10 +407,20 @@ func spawnDetached(stateDir string) spawnFunc {
 	}
 }
 
+// detachedServerCmd builds the `gx server` child spawnDetached starts, running
+// under env.
+func detachedServerCmd(exe string, env []string, logf *os.File) *exec.Cmd {
+	child := exec.Command(exe, "server")
+	child.Env = env
+	child.Stdout, child.Stderr = logf, logf // Stdin nil = /dev/null
+	child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	return child
+}
+
 // installedService returns the OS supervisor when `gx server install` has been
 // run, nil otherwise. Once installed it is the only way to start the server.
-func installedService(stateDir string) serviceManager {
-	a, err := newLaunchdAgent(stateDir)
+func installedService(dirs config.Dirs, stateDir string) serviceManager {
+	a, err := newLaunchdAgent(dirs, stateDir)
 	if err != nil || !a.Installed() {
 		return nil
 	}
@@ -424,7 +432,7 @@ func runServerInstall(dirs config.Dirs, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	a, err := newLaunchdAgent(stateDir)
+	a, err := newLaunchdAgent(dirs, stateDir)
 	if err != nil {
 		return err
 	}
@@ -451,15 +459,15 @@ func runServerStartCmd(ctx context.Context, d deps, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return runServerStart(ctx, c, w, serverSpawn(stateDir))
+	return runServerStart(ctx, c, w, serverSpawn(dirs, stateDir))
 }
 
 // serverSpawn is the installed service when there is one, else a detached child.
-func serverSpawn(stateDir string) spawnFunc {
-	if svc := installedService(stateDir); svc != nil {
+func serverSpawn(dirs config.Dirs, stateDir string) spawnFunc {
+	if svc := installedService(dirs, stateDir); svc != nil {
 		return svc.Start
 	}
-	return spawnDetached(stateDir)
+	return spawnDetached(dirs.Environ(), stateDir)
 }
 
 // serverStarter is runServerStart without output, for the TUI.
@@ -469,7 +477,7 @@ func serverStarter(dirs config.Dirs, c *apiclient.Client) func(context.Context) 
 		if err != nil {
 			return err
 		}
-		return runServerStart(ctx, c, io.Discard, serverSpawn(stateDir))
+		return runServerStart(ctx, c, io.Discard, serverSpawn(dirs, stateDir))
 	}
 }
 
@@ -482,7 +490,7 @@ func runServerRestart(ctx context.Context, d deps, w io.Writer, migrate bool) er
 			if err != nil {
 				return err
 			}
-			return migrateAllProjects(cfg.TicketStore.Path, w)
+			return migrateAllProjects(dirs, cfg.TicketStore.Path, w)
 		},
 		func() error { return runServerStartCmd(ctx, d, w) },
 	)
@@ -504,7 +512,7 @@ func restartSteps(migrate bool, stop, migrateStores, start func() error) error {
 
 // migrateAllProjects runs `gx tickets migrate` on every project in the store
 // and stops at the first failure.
-func migrateAllProjects(storePath string, w io.Writer) error {
+func migrateAllProjects(cfgDirs config.Dirs, storePath string, w io.Writer) error {
 	dirs, err := tickets.ProjectDirs(storePath)
 	if err != nil {
 		return err
@@ -512,7 +520,7 @@ func migrateAllProjects(storePath string, w io.Writer) error {
 	for _, dir := range dirs {
 		name := filepath.Base(dir)
 		fmt.Fprintf(w, "migrating %s\n", name)
-		if err := runTicketsMigrate(dir, false, w); err != nil {
+		if err := runTicketsMigrate(cfgDirs, dir, false, w); err != nil {
 			return fmt.Errorf("migrate %s: %w", name, err)
 		}
 	}
@@ -529,7 +537,7 @@ func runServerStop(ctx context.Context, dirs config.Dirs, w io.Writer) error {
 		return err
 	}
 	sig := func(pid int) error { return syscall.Kill(pid, syscall.SIGTERM) }
-	if svc := installedService(stateDir); svc != nil {
+	if svc := installedService(dirs, stateDir); svc != nil {
 		sig = func(int) error { return svc.Stop() }
 	}
 	return stopServer(ctx, c, w, sig)

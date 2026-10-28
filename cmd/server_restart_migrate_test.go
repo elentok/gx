@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/config"
 )
 
 // writeStoreProject makes <store>/<name> a project holding one epic with the
@@ -33,7 +35,7 @@ func TestMigrateAllProjects_MigratesEveryStoreAndNamesEach(t *testing.T) {
 	b := writeStoreProject(t, store, "beta", map[string]string{"01-a.md": legacyNeedsAnswer})
 
 	var out bytes.Buffer
-	if err := migrateAllProjects(store, &out); err != nil {
+	if err := migrateAllProjects(config.DirsFrom(tempEnv(t)), store, &out); err != nil {
 		t.Fatalf("migrateAllProjects: %v", err)
 	}
 
@@ -61,7 +63,7 @@ func TestMigrateAllProjects_FailureNamesTheStore(t *testing.T) {
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
 	})
 
-	err := migrateAllProjects(store, &bytes.Buffer{})
+	err := migrateAllProjects(config.DirsFrom(tempEnv(t)), store, &bytes.Buffer{})
 	if err == nil {
 		t.Fatal("want an error for a store that cannot migrate")
 	}

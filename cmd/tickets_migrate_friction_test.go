@@ -33,7 +33,7 @@ func TestExecute_TicketsMigrate_BackfillsFrictionSummaries(t *testing.T) {
 	run := func() string {
 		t.Helper()
 		var stdout bytes.Buffer
-		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}}); err != nil {
+		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
 			t.Fatalf("execute: %v", err)
 		}
 		return stdout.String()

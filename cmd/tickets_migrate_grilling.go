@@ -24,15 +24,15 @@ const designCommand = "/gx-design"
 // without a marker). The latter get a record against "project:epic", whatever
 // state the epic is in. With dryRun it only reports. A root that is not a store
 // project has no conversations to count.
-func backfillGrilling(root string, dryRun bool) ([]tickets.MigrationChange, error) {
+func backfillGrilling(dirs config.Dirs, root string, dryRun bool) ([]tickets.MigrationChange, error) {
 	if _, err := config.ReadProjectFile(root); err != nil {
 		return nil, nil
 	}
-	dir, err := conversations.DefaultDir()
+	dir, err := conversations.DirIn(dirs)
 	if err != nil {
 		return nil, err
 	}
-	home, err := os.UserHomeDir()
+	home, err := dirs.Home()
 	if err != nil {
 		return nil, err
 	}

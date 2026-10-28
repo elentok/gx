@@ -478,7 +478,7 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 		return sessionRefusal(ReasonDesignBranchClash, msg), nil
 	}
 
-	if err := createMap(dir, slug, idea); err != nil {
+	if err := createMap(s.cfg.ConversationsDir, dir, slug, idea); err != nil {
 		return SessionResult{}, err
 	}
 	d, err := s.resolveDesignDir(req.Project, slug, "")
@@ -489,8 +489,8 @@ func (s *Server) openNewDesign(req DesignOpenRequest) (SessionResult, error) {
 }
 
 // createMap writes the uncharted map epic for a New Design, at the Chart step.
-func createMap(dir, slug, idea string) error {
-	epicPath, err := tickets.CreateEpic(dir, slug, tickets.EpicFields{Kind: tickets.KindMap, Status: string(schema.StatusOpen)}, "## Initial prompt\n\n"+idea+"\n")
+func createMap(conversationsDir, dir, slug, idea string) error {
+	epicPath, err := tickets.CreateEpic(conversationsDir, dir, slug, tickets.EpicFields{Kind: tickets.KindMap, Status: string(schema.StatusOpen)}, "## Initial prompt\n\n"+idea+"\n")
 	if err != nil {
 		return err
 	}

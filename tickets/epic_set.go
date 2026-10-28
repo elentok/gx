@@ -46,7 +46,6 @@ type EpicUpdate struct {
 	// the first completion wins.
 	CompletedAt *time.Time
 	// ConversationsDir is where CompletedAt reads the recorded conversations;
-	// empty means conversations.DefaultDir.
 	ConversationsDir string
 }
 

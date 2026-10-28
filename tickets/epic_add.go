@@ -90,14 +90,9 @@ func (f EpicFields) validate() error {
 // with its own frontmatter block of settable fields; kind and status given
 // there and in fields must agree. Every check runs before the first write, so
 // a refusal leaves the store untouched. An epic directory that already exists
-// refuses, with or without a ticket.md.
-func CreateEpic(projectDir, name string, fields EpicFields, body string) (string, error) {
-	return CreateEpicIn("", projectDir, name, fields, body)
-}
-
-// CreateEpicIn is CreateEpic reading the recorded conversations of a map it
-// completes from conversationsDir; empty means conversations.DefaultDir.
-func CreateEpicIn(conversationsDir, projectDir, name string, fields EpicFields, body string) (string, error) {
+// refuses, with or without a ticket.md. A map the new epic completes is
+// stamped from the conversations recorded in conversationsDir.
+func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, body string) (string, error) {
 	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, "/:\\") {
 		return "", fmt.Errorf("invalid epic name %q", name)
 	}
@@ -135,7 +130,7 @@ func CreateEpicIn(conversationsDir, projectDir, name string, fields EpicFields, 
 	}
 	// Stamp the map before creating anything, so a failure leaves no new epic.
 	if mapPath, ok := mapCompletedBy(projectDir, name, fields.Kind); ok {
-		if err := stampMapCompletion(conversationsDir, mapPath, fields.CreatedAt); err != nil {
+		if err := StampMapCompletion(conversationsDir, mapPath, fields.CreatedAt); err != nil {
 			return "", err
 		}
 	}
@@ -166,11 +161,7 @@ func CreateEpicIn(conversationsDir, projectDir, name string, fields EpicFields, 
 // it or its tickets. A map created before gx recorded conversations, or with a
 // conversation lacking totals, gets no tokens or cost. Stamping never
 // overwrites, so the first completion wins.
-func StampMapCompletion(mapPath string, at time.Time) error {
-	return stampMapCompletion("", mapPath, at)
-}
-
-func stampMapCompletion(conversationsDir, mapPath string, at time.Time) error {
+func StampMapCompletion(conversationsDir, mapPath string, at time.Time) error {
 	fields, err := mapCompletionFields(conversationsDir, mapPath, at)
 	if err != nil {
 		return err
@@ -179,19 +170,11 @@ func stampMapCompletion(conversationsDir, mapPath string, at time.Time) error {
 }
 
 // mapCompletionFields are the frontmatter keys StampMapCompletion writes. The
-// conversations are read from conversationsDir, or conversations.DefaultDir
-// when it is empty.
+// conversations are read from conversationsDir.
 func mapCompletionFields(conversationsDir, mapPath string, at time.Time) (map[string]any, error) {
 	fields := map[string]any{"completed_at": at}
-	root := conversationsDir
-	if root == "" {
-		var err error
-		if root, err = conversations.DefaultDir(); err != nil {
-			return nil, err
-		}
-	}
 	label := ProjectName(filepath.Dir(mapPath)) + ":" + filepath.Base(mapPath)
-	sum, ok, err := conversations.SumEpicTotals(root, label, LoadEpicTicketMD(mapPath).CreatedAt)
+	sum, ok, err := conversations.SumEpicTotals(conversationsDir, label, LoadEpicTicketMD(mapPath).CreatedAt)
 	if err != nil {
 		return nil, err
 	}

@@ -227,11 +227,11 @@ func runEpicSet(dirs config.Dirs, c *cobra.Command, path string, w io.Writer, ge
 			}
 		}
 		update.CompletedAt = &at
-		data, err := dirs.DataDir()
+		records, err := conversations.DirIn(dirs)
 		if err != nil {
 			return err
 		}
-		update.ConversationsDir = filepath.Join(data, "conversations")
+		update.ConversationsDir = records
 		changed = append(changed, "completed_at="+at.Format(time.RFC3339))
 	}
 	var notices []string
@@ -355,11 +355,10 @@ func mapDoneStamp(dirs config.Dirs, c *cobra.Command, path string) (*conversatio
 	if err != nil {
 		return nil, err
 	}
-	data, err := dirs.DataDir()
+	root, err := conversations.DirIn(dirs)
 	if err != nil {
 		return nil, err
 	}
-	root := filepath.Join(data, "conversations")
 	sum, ok, err := conversations.SumTotals(root, ticketLabel(path), current.CreatedAt)
 	if err != nil || !ok {
 		return nil, err

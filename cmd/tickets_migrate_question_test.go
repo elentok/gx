@@ -24,7 +24,7 @@ func TestExecute_TicketsMigrate_MovesNeedsAnswerIntoLog(t *testing.T) {
 
 	run := func() string {
 		var stdout bytes.Buffer
-		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}}); err != nil {
+		if err := execute([]string{"tickets", "migrate", root}, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
 			t.Fatalf("execute tickets migrate: %v", err)
 		}
 		return stdout.String()

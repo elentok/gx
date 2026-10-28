@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -64,7 +66,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 	}
 	friction := ralphloop.Friction(a.ID, runEvents, log)
 
-	created, err := ensureArchiveEpic(root, filepath.Join(root, followUpsEpic))
+	created, err := ensureArchiveEpic(d.dirs(), root, filepath.Join(root, followUpsEpic))
 	if err != nil {
 		return err
 	}
@@ -117,7 +119,7 @@ func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 	if len(swept) == 0 {
 		return nil
 	}
-	if _, err := ensureArchiveEpic(root, filepath.Join(root, followUpsEpic)); err != nil {
+	if _, err := ensureArchiveEpic(d.dirs(), root, filepath.Join(root, followUpsEpic)); err != nil {
 		return err
 	}
 	for _, t := range swept {
@@ -137,15 +139,19 @@ func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
 
 // ensureArchiveEpic creates the archive epic draft when missing, of the same
 // kind as the follow-ups epic it archives. It reports whether it created it.
-func ensureArchiveEpic(root, followUpsPath string) (bool, error) {
+func ensureArchiveEpic(dirs config.Dirs, root, followUpsPath string) (bool, error) {
 	if info, err := os.Stat(filepath.Join(root, followUpsArchivedEpic)); err == nil && info.IsDir() {
 		return false, nil
+	}
+	records, err := conversations.DirIn(dirs)
+	if err != nil {
+		return false, err
 	}
 	kind := tickets.KindLoop
 	if tickets.IsMapEpic(followUpsPath) {
 		kind = tickets.KindMap
 	}
-	_, err := tickets.CreateEpic(root, followUpsArchivedEpic, tickets.EpicFields{Kind: kind, Status: string(schema.StatusDraft)}, "")
+	_, err = tickets.CreateEpic(records, root, followUpsArchivedEpic, tickets.EpicFields{Kind: kind, Status: string(schema.StatusDraft)}, "")
 	return err == nil, err
 }
 

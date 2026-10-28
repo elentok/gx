@@ -38,7 +38,7 @@ func TestExecute_TicketsMigrate_MarksMapDoneWhenImplMerged(t *testing.T) {
 	run := func(args ...string) string {
 		t.Helper()
 		var stdout bytes.Buffer
-		if err := execute(append([]string{"tickets", "migrate", root}, args...), deps{stdout: &stdout, stderr: &bytes.Buffer{}}); err != nil {
+		if err := execute(append([]string{"tickets", "migrate", root}, args...), deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
 			t.Fatalf("execute tickets migrate: %v", err)
 		}
 		return stdout.String()

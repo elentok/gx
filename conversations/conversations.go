@@ -54,9 +54,12 @@ type Totals struct {
 	Cost        float64 `json:"cost"`
 }
 
-// DefaultDir is where the server keeps the records: <data>/conversations.
-func DefaultDir() (string, error) {
-	data, err := config.DataDir()
+// DefaultDir is DirIn the process env: for callers with no env of their own.
+func DefaultDir() (string, error) { return DirIn(config.DirsFrom(os.Environ())) }
+
+// DirIn is where the server keeps the records: <data>/conversations.
+func DirIn(dirs config.Dirs) (string, error) {
+	data, err := dirs.DataDir()
 	if err != nil {
 		return "", err
 	}

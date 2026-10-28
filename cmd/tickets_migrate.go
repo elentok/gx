@@ -68,7 +68,7 @@ func runTicketsMigrateToStore(dirs config.Dirs, cwd, oldRoot, projectFlag string
 // to destination_unconfirmed (see tickets.MigrateDestinationUnconfirmed). Last, it rewrites the old needs-answer and
 // needs-repair tickets to paused (see tickets.PlanPauseMigration); with dryRun
 // it only prints that plan.
-func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
+func runTicketsMigrate(dirs config.Dirs, scratchRoot string, dryRun bool, w io.Writer) error {
 	steps, err := tickets.PlanPauseMigration(scratchRoot)
 	if err != nil {
 		return err
@@ -82,7 +82,7 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 		if err != nil {
 			return err
 		}
-		grilling, err := backfillGrilling(scratchRoot, true)
+		grilling, err := backfillGrilling(dirs, scratchRoot, true)
 		if err != nil {
 			return err
 		}
@@ -102,7 +102,7 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 	if err != nil {
 		return err
 	}
-	backfilled, err := tickets.BackfillMergedAt(scratchRoot, epicLandedUnder(scratchRoot))
+	backfilled, err := tickets.BackfillMergedAt(scratchRoot, epicLandedUnder(dirs, scratchRoot))
 	changes := append(result.Changes, backfilled...)
 	if err == nil {
 		var timed []tickets.MigrationChange
@@ -112,7 +112,7 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 	if err == nil {
 		var stamped []tickets.MigrationChange
 		var home string
-		if home, err = os.UserHomeDir(); err == nil {
+		if home, err = dirs.Home(); err == nil {
 			totals := func(ids []string) (int64, float64, error) { return ralphloop.SessionIDsTotals(home, ids) }
 			stamped, err = tickets.BackfillTicketTotals(scratchRoot, totals, conflictSessionsUnder(scratchRoot))
 			changes = mergeChanges(changes, stamped)
@@ -125,7 +125,7 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 	}
 	if err == nil {
 		var totals []tickets.MigrationChange
-		totals, err = tickets.BackfillEpicTotals(scratchRoot, epicTrailerLinesUnder(scratchRoot))
+		totals, err = tickets.BackfillEpicTotals(scratchRoot, epicTrailerLinesUnder(dirs, scratchRoot))
 		changes = mergeChanges(changes, totals)
 	}
 	if err == nil {
@@ -150,7 +150,7 @@ func runTicketsMigrate(scratchRoot string, dryRun bool, w io.Writer) error {
 	}
 	if err == nil {
 		var grilling []tickets.MigrationChange
-		grilling, err = backfillGrilling(scratchRoot, false)
+		grilling, err = backfillGrilling(dirs, scratchRoot, false)
 		changes = mergeChanges(changes, grilling)
 	}
 	if err == nil {
@@ -271,7 +271,7 @@ func mergeChanges(changes, extra []tickets.MigrationChange) []tickets.MigrationC
 // else trunk). The repo is resolved on first use, so a root with nothing to
 // backfill never needs one. A root outside any repo has nothing that could
 // have landed, so no epic counts as landed.
-func epicLandedUnder(root string) func(tickets.Epic) (bool, error) {
+func epicLandedUnder(dirs config.Dirs, root string) func(tickets.Epic) (bool, error) {
 	var repoRoot, trunk string
 	noRepo := false
 	return func(e tickets.Epic) (bool, error) {
@@ -280,7 +280,7 @@ func epicLandedUnder(root string) func(tickets.Epic) (bool, error) {
 		}
 		if repoRoot == "" {
 			var err error
-			repoRoot, trunk, err = trackerRepo(root)
+			repoRoot, trunk, err = trackerRepo(dirs, root)
 			if errors.Is(err, git.ErrNoRepo) {
 				noRepo = true
 				return false, nil
@@ -356,13 +356,13 @@ func ticketFrictionUnder(root string) func(epicName string, t tickets.Ticket) (s
 // gone, so it falls back to the epic's target, where the commits landed. The
 // repo is resolved on first use, like epicLandedUnder's. A root with no repo
 // leaves lines unstamped rather than failing the migration.
-func epicTrailerLinesUnder(root string) func(tickets.Epic) (int, int, bool, error) {
+func epicTrailerLinesUnder(dirs config.Dirs, root string) func(tickets.Epic) (int, int, bool, error) {
 	var repoRoot, trunk string
 	var resolved bool
 	return func(e tickets.Epic) (int, int, bool, error) {
 		if !resolved {
 			resolved = true
-			repoRoot, trunk, _ = trackerRepo(root)
+			repoRoot, trunk, _ = trackerRepo(dirs, root)
 		}
 		if repoRoot == "" {
 			return 0, 0, false, nil
@@ -381,12 +381,12 @@ func epicTrailerLinesUnder(root string) func(tickets.Epic) (int, int, bool, erro
 
 // trackerRepo is the repo and trunk of a tracker root: project.json's repo
 // for a ticket-store project, else the repo holding an old .scratch tree.
-func trackerRepo(root string) (repoRoot, trunk string, err error) {
+func trackerRepo(dirs config.Dirs, root string) (repoRoot, trunk string, err error) {
 	if pf, err := config.ReadProjectFile(root); err == nil && pf.Repo != nil && *pf.Repo != "" {
 		trunk, err := tickets.Trunk(root, *pf.Repo)
 		return *pf.Repo, trunk, err
 	}
-	repo, err := tickets.OpenRepo(root)
+	repo, err := tickets.OpenRepoDirs(dirs, root)
 	if err != nil {
 		return "", "", err
 	}

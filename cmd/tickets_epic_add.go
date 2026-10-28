@@ -3,10 +3,10 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -20,11 +20,11 @@ func runTicketsEpicAdd(cfgDirs config.Dirs, cwd, arg, kind, status, body string,
 	if err != nil {
 		return err
 	}
-	data, err := cfgDirs.DataDir()
+	records, err := conversations.DirIn(cfgDirs)
 	if err != nil {
 		return err
 	}
-	if _, err := tickets.CreateEpicIn(filepath.Join(data, "conversations"), projectDir, name, tickets.EpicFields{Kind: kind, Status: status}, body); err != nil {
+	if _, err := tickets.CreateEpic(records, projectDir, name, tickets.EpicFields{Kind: kind, Status: status}, body); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(w, "%s:%s\n", project, name)

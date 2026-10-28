@@ -57,7 +57,7 @@ func TestExecute_TicketsMigrate_BackfillsCreationFromStoreHistory(t *testing.T) 
 		t.Helper()
 		var stdout bytes.Buffer
 		argv := append([]string{"tickets", "migrate", project}, args...)
-		if err := execute(argv, deps{stdout: &stdout, stderr: &bytes.Buffer{}}); err != nil {
+		if err := execute(argv, deps{stdout: &stdout, stderr: &bytes.Buffer{}, env: envFor(t)}); err != nil {
 			t.Fatalf("execute %v: %v", argv, err)
 		}
 		return stdout.String()

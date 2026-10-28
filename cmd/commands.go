@@ -276,7 +276,7 @@ log shows no open question on the web. A second run changes nothing.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			if !migrateToStore {
-				return runTicketsMigrate(args[0], migrateDryRun, c.OutOrStdout())
+				return runTicketsMigrate(d.dirs(), args[0], migrateDryRun, c.OutOrStdout())
 			}
 			cwd, err := d.getwd()
 			if err != nil {

@@ -369,7 +369,7 @@ func defaultEvolveEnv(d deps) (evolveEnv, error) {
 	env.homeDir, _ = d.userHomeDir()
 	env.stateDir, _ = d.dirs().StateDir()
 	env.dataDir, _ = d.dirs().DataDir()
-	env.codexHome = sessionlookup.DefaultRoots().CodexHome
+	env.codexHome = sessionlookup.RootsFrom(d.env).CodexHome
 	if cwd, err := os.Getwd(); err == nil {
 		if root, err := ticketRoot(d.dirs(), cwd); err == nil {
 			env.cwdProject = tickets.ProjectName(root)
