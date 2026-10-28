@@ -3,6 +3,7 @@ package brief
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -89,6 +90,27 @@ func TestPlaywrightPlan_AddsConfigAndLineReporter(t *testing.T) {
 	}
 	if !strings.Contains(inv.Note, "replaced") {
 		t.Errorf("note = %q, want a replaced-reporter note", inv.Note)
+	}
+}
+
+func TestPlaywrightPlan_BareFlowNumbersBecomeOneAnchoredGrep(t *testing.T) {
+	dir := playwrightDir(t, true)
+	os.MkdirAll(filepath.Join(dir, "dist"), 0o755)
+	os.WriteFile(filepath.Join(dir, "dist", "index.html"), nil, 0o644)
+
+	inv, err := Playwright{}.Plan(nil, dir, []string{"disk.e2e.ts", "69", "70", "--workers", "2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"test", "--reporter=line", "-c", playwrightConfig, "disk.e2e.ts", "--workers", "2", "-g", `› (69|70)\. `}
+	if !slices.Equal(inv.Argv, want) {
+		t.Errorf("argv = %v, want %v", inv.Argv, want)
+	}
+	// Playwright matches -g against "[project] › file:line:col › title", so a
+	// "^" anchor on the bare title never matches; the pattern must find a flow.
+	re := regexp.MustCompile(want[len(want)-1])
+	if !re.MatchString("[chromium] › disk.e2e.ts:9:1 › 69. Disk banner") || re.MatchString("[chromium] › disk.e2e.ts:9:1 › 169. Other") {
+		t.Errorf("pattern %q must match flow 69 and not 169", want[len(want)-1])
 	}
 }
 

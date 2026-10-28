@@ -53,8 +53,10 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   calls, so never `cd webui`):
   - `gx brief -C webui vitest src/epic`
   - `gx brief -C webui tsc`
-  - one e2e flow: `gx brief -C webui playwright epics.e2e.ts -g "^2\."`. It adds the config and the
-    line reporter, and runs `make web-build` only when `webui/dist/index.html` is missing.
+  - e2e flows: `gx brief -C webui playwright disk.e2e.ts 76 77`. Bare flow numbers become one `-g`
+    pattern. Never write `-g "^76\."`: Playwright matches `-g` against `[project] › file › title`,
+    so a `^` anchor finds no tests. It adds the config and the line reporter, and runs
+    `make web-build` only when `webui/dist/index.html` is missing.
 - Unix socket paths are capped near 100 bytes, and `t.TempDir()` can exceed that. Holder-socket
   tests (anything that binds `holder.sock`) need a short `TMPDIR` or a short state root; use
   `shortTempDir` in `nativerunner` tests. The failure is `bind: invalid argument`.

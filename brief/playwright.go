@@ -45,6 +45,7 @@ func (Playwright) Plan(env []string, dir string, args []string) (Invocation, err
 	if replaced {
 		note = "brief: --reporter replaced with line"
 	}
+	rest = flowNumbersToGrep(rest)
 	argv := []string{"test", "--reporter=line"}
 	if !slices.ContainsFunc(rest, func(a string) bool {
 		return a == "-c" || a == "--config" || strings.HasPrefix(a, "--config=")
@@ -64,6 +65,29 @@ func (Playwright) Plan(env []string, dir string, args []string) (Invocation, err
 		}
 	}
 	return Invocation{Bin: bin, Argv: append(argv, rest...), Note: note}, nil
+}
+
+// flowNumbersToGrep replaces bare flow numbers (`disk.e2e.ts 69 70`) with one
+// -g pattern. Playwright matches -g against "[project] › file:line:col › title",
+// so a "^" anchor on the bare title never matches; "› " is the anchor instead.
+// A number after a flag is that flag's value (`--workers 2`) and stays.
+func flowNumbersToGrep(args []string) []string {
+	var out, nums []string
+	for i, a := range args {
+		if isDigits(a) && (i == 0 || !strings.HasPrefix(args[i-1], "-")) {
+			nums = append(nums, a)
+			continue
+		}
+		out = append(out, a)
+	}
+	if len(nums) == 0 {
+		return args
+	}
+	return append(out, "-g", `› (`+strings.Join(nums, "|")+`)\. `)
+}
+
+func isDigits(s string) bool {
+	return s != "" && strings.Trim(s, "0123456789") == ""
 }
 
 var (

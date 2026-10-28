@@ -596,7 +596,7 @@ Entries:
     the root is dequeued; the worktree is removed only after the test releases the lock.
 53. Go test (seam 6): the one-offs root's worktree stays; a completed but unmerged epic (auto merge
     off) keeps its worktree; a ticket finish in the feature worktree before the merge keeps it.
-54. Shell check: run one flow twice (`gx brief -C webui playwright epics.e2e.ts -g "^1\."`); count
+54. Shell check: run one flow twice (`gx brief -C webui playwright epics.e2e.ts 1`); count
     `$TMPDIR/gx-e2e-bin-*` before and after (no new dirs), and the fixed bin path in the worktree
     exists with `gx`, `claude` and `gxfixture`.
 55. Go test (seam 5): after `Isolate`, `go env GOCACHE GOMODCACHE` point outside the temp `HOME`.
