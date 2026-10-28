@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
+	"github.com/elentok/gx/syshealth"
 )
 
 type Config struct {
@@ -78,6 +79,11 @@ type Config struct {
 	GoCacheDir func() (string, error)
 	// DiskPollInterval is how often the disk watcher reads; zero means one minute.
 	DiskPollInterval time.Duration
+
+	// SystemHealth takes one CPU and memory reading; nil reads the real machine.
+	SystemHealth syshealth.Reader
+	// HealthPollInterval is how often the health watcher reads; zero means 5 seconds.
+	HealthPollInterval time.Duration
 
 	BudgetKillGrace time.Duration // wait between ctrl+c and closing a pane; zero means the default
 

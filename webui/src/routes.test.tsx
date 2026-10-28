@@ -14,6 +14,11 @@ afterEach(cleanup);
 const emptySnapshot: Snapshot = {
   seq: 1,
   budget: { day: "", total: 0, soft_limit: 0, hard_limit: 0, budget_paused: false, hard_latched: false },
+  health: {
+    cpu: { level: 0, state: "unknown", reason: "waiting", read_at: "" },
+    memory: { level: 0, state: "unknown", reason: "waiting", read_at: "" },
+    disk: { level: 0, state: "unknown", reason: "waiting", read_at: "" },
+  },
   tickets: [],
   pending: [],
   sessions: [],

@@ -8,6 +8,11 @@
     "budget_paused": false,
     "hard_latched": false
   },
+  "health": {
+    "cpu": { "level": 0, "state": "unknown", "reason": "waiting", "read_at": "" },
+    "memory": { "level": 0, "state": "unknown", "reason": "waiting", "read_at": "" },
+    "disk": { "level": 0, "state": "unknown", "reason": "waiting", "read_at": "" }
+  },
   "mode": "running",
   "tickets": [
     {

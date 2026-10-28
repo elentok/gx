@@ -229,6 +229,7 @@ type Server struct {
 	// cpuSpikes holds the CPU ticket cooldown.
 	cpuSpikes cpuSpikes
 	disks     diskWatch
+	healthW   healthWatch
 	// chats caches parsed session chats by transcript file.
 	chats chatCache
 	// transcripts caches where each conversation's transcript is.
@@ -483,6 +484,7 @@ func New(cfg Config) (*Server, error) {
 	s.bindWeb()
 	// A down herdr never stops the server; it is reported and retried.
 	s.checkHerdr()
+	s.initHealth()
 	return s, nil
 }
 
@@ -623,6 +625,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Budget = s.budgetStatus(time.Now())
 	snap.ExtraUsage = s.extraUsageOn()
 	snap.Disks = s.listedDisks()
+	snap.Health = s.currentHealth()
 	snap.Pending = s.pendingRows()
 	snap.Epics = s.epicSummaries(snap.Tickets)
 	snap.RecentlyFinished = s.idx.recentlyFinished(s.settings.Load().RecentlyFinished)
@@ -769,6 +772,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(cpuDone); s.keepCPUWatched(freshCtx) }()
 	disksDone := make(chan struct{})
 	go func() { defer close(disksDone); s.keepDisksWatched(freshCtx) }()
+	healthDone := make(chan struct{})
+	go func() { defer close(healthDone); s.keepHealthWatched(freshCtx) }()
 	sweepDone := make(chan struct{})
 	go func() { defer close(sweepDone); s.sweepDesignCounts() }()
 	var err error
@@ -797,6 +802,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	<-gatesDone
 	<-cpuDone
 	<-disksDone
+	<-healthDone
 	<-sweepDone
 	// A watcher reload still in flight can start a countdown, so stop it after.
 	s.configWatch.running.Wait()

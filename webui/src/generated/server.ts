@@ -1126,6 +1126,50 @@ export interface FixAgentResult extends SessionResult {
 }
 
 //////////
+// source: healthtypes.go
+
+/**
+ * HealthState is what a Tray meter shows.
+ */
+export const HealthStateNormal = "normal";
+export const HealthStateHigh = "high";
+export const HealthStateCritical = "critical";
+export const HealthStateUnknown = "unknown";
+export type HealthState = typeof HealthStateNormal | typeof HealthStateHigh | typeof HealthStateCritical | typeof HealthStateUnknown;
+/**
+ * HealthReason says why a meter is HealthStateUnknown; it is empty otherwise.
+ */
+export const HealthReasonNone = "";
+export const HealthReasonWaiting = "waiting";
+export const HealthReasonUnavailable = "unavailable";
+export const HealthReasonError = "error";
+export type HealthReason = typeof HealthReasonNone | typeof HealthReasonWaiting | typeof HealthReasonUnavailable | typeof HealthReasonError;
+/**
+ * MeterHealth is one Tray meter: its fill (0 to 4), state and reading time.
+ */
+export interface MeterHealth {
+  level: number /* int */;
+  state: HealthState;
+  reason?: HealthReason;
+  /**
+   * ReadAt is when the meter's value was last read; zero before the first read.
+   */
+  read_at: string;
+}
+/**
+ * Health is the snapshot's system health: CPU, memory and disk meters.
+ */
+export interface Health {
+  cpu: MeterHealth;
+  memory: MeterHealth;
+  disk: MeterHealth;
+}
+/**
+ * EventHealthChanged is emitted when a health meter's level or state changes.
+ */
+export const EventHealthChanged = "health-changed";
+
+//////////
 // source: index.go
 
 /**
@@ -1234,6 +1278,10 @@ export interface Snapshot {
    * Disks lists the disks under the warn threshold; filled in by the handler.
    */
   disks?: DiskStatus[];
+  /**
+   * Health is the CPU, memory and disk meters; filled in by the handler.
+   */
+  health: Health;
   tickets: TicketInfo[];
   /**
    * Pending is every queue entry with its explain verdict, so a client never

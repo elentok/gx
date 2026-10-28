@@ -40,7 +40,9 @@ type Harness struct {
 	Server *server.Server // for reading the run registry; drive everything else through Client
 	Herdr  *herdrfake.State
 	// Disks is the free-space source, unless an option set its own FreeSpace.
-	Disks       *FakeDisks
+	Disks *FakeDisks
+	// System is the CPU and memory source, unless an option set its own SystemHealth.
+	System      *FakeSystem
 	StateDir    string
 	SessionsDir string // the interactive sessions' state dirs
 	// ConversationsDir holds the linked sessions' conversation records.
@@ -563,6 +565,11 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h.Disks = &FakeDisks{}
 	if h.cfg.FreeSpace == nil {
 		h.cfg.FreeSpace = h.Disks.Read
+	}
+	// The real source reads the test machine's CPU and memory.
+	h.System = NewFakeSystem()
+	if h.cfg.SystemHealth == nil {
+		h.cfg.SystemHealth = h.System.Read
 	}
 	// The real runner would empty the developer's Go cache on a low-disk machine.
 	if h.cfg.CleanupRunner == nil {
