@@ -244,6 +244,13 @@ type Config struct {
 
 	BudgetPollInterval time.Duration // zero means the default
 
+	// FreeSpace reads the disk holding a path; nil reads the real one.
+	FreeSpace func(path string) (DiskReading, error)
+	// GoCacheDir finds the Go build cache; nil runs `go env GOCACHE`.
+	GoCacheDir func() (string, error)
+	// DiskPollInterval is how often the disk watcher reads; zero means one minute.
+	DiskPollInterval time.Duration
+
 	BudgetKillGrace time.Duration // wait between ctrl+c and closing a pane; zero means the default
 
 	// HardLimitGrace is how long a reload-lowered hard limit waits before it
@@ -350,6 +357,7 @@ type Server struct {
 	reloads  reloadHistory
 	// cpuSpikes holds the CPU ticket cooldown.
 	cpuSpikes cpuSpikes
+	disks     diskWatch
 	// chats caches parsed session chats by transcript file.
 	chats chatCache
 	// transcripts caches where each conversation's transcript is.
@@ -729,6 +737,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Build = s.cfg.Build
 	snap.Budget = s.budgetStatus(time.Now())
 	snap.ExtraUsage = s.extraUsageOn()
+	snap.Disks = s.warnedDisks()
 	snap.Pending = s.pendingRows()
 	snap.Epics = s.epicSummaries(snap.Tickets)
 	snap.RecentlyFinished = s.idx.recentlyFinished(s.settings.Load().RecentlyFinished)
@@ -871,6 +880,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(gatesDone); s.keepGatesWatched(freshCtx) }()
 	cpuDone := make(chan struct{})
 	go func() { defer close(cpuDone); s.keepCPUWatched(freshCtx) }()
+	disksDone := make(chan struct{})
+	go func() { defer close(disksDone); s.keepDisksWatched(freshCtx) }()
 	sweepDone := make(chan struct{})
 	go func() { defer close(sweepDone); s.sweepDesignCounts() }()
 	var err error
@@ -898,6 +909,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	<-budgetDone
 	<-gatesDone
 	<-cpuDone
+	<-disksDone
 	<-sweepDone
 	// A watcher reload still in flight can start a countdown, so stop it after.
 	s.configWatch.running.Wait()

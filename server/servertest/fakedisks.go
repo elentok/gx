@@ -1,0 +1,53 @@
+package servertest
+
+import (
+	"sync"
+
+	"github.com/elentok/gx/server"
+)
+
+// plentyFree is what a path with no entry reports: far above any threshold.
+const plentyFree = 1 << 40
+
+// FakeDisks is a free-space source a test steers per path between readings.
+// A path with no entry reports one shared disk with plenty of space.
+type FakeDisks struct {
+	mu     sync.Mutex
+	byPath map[string]server.DiskReading
+}
+
+// Put sets what path reports: its disk id, display name and free bytes.
+func (f *FakeDisks) Put(path, id, name string, free uint64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.byPath == nil {
+		f.byPath = map[string]server.DiskReading{}
+	}
+	f.byPath[path] = server.DiskReading{ID: id, Name: name, Free: free}
+}
+
+// SetFree changes path's free bytes and keeps its disk id and name.
+func (f *FakeDisks) SetFree(path string, free uint64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	r := f.read(path)
+	r.Free = free
+	if f.byPath == nil {
+		f.byPath = map[string]server.DiskReading{}
+	}
+	f.byPath[path] = r
+}
+
+// Read is the server.Config FreeSpace source.
+func (f *FakeDisks) Read(path string) (server.DiskReading, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.read(path), nil
+}
+
+func (f *FakeDisks) read(path string) server.DiskReading {
+	if r, ok := f.byPath[path]; ok {
+		return r
+	}
+	return server.DiskReading{ID: "fake", Name: "/fake", Free: plentyFree}
+}

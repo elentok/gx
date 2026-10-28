@@ -87,8 +87,10 @@ type Snapshot struct {
 	Budget BudgetStatus `json:"budget"`
 	// ExtraUsage is set while the account auto-purchases extra usage, so the
 	// enqueue confirm can warn; filled in by the handler.
-	ExtraUsage bool         `json:"extra_usage,omitempty"`
-	Tickets    []TicketInfo `json:"tickets"`
+	ExtraUsage bool `json:"extra_usage,omitempty"`
+	// Disks lists the disks under the warn threshold; filled in by the handler.
+	Disks   []DiskStatus `json:"disks,omitempty"`
+	Tickets []TicketInfo `json:"tickets"`
 	// Pending is every queue entry with its explain verdict, so a client never
 	// asks per row. Filled in by the handler, like HerdrUnavailable.
 	Pending []PendingRow `json:"pending"`

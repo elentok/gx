@@ -6,6 +6,7 @@ packages:
       - budget.go
       - designs.go
       - detail.go
+      - diskwatch.go
       - detailrelated.go
       - detailruns.go
       - epiccard.go

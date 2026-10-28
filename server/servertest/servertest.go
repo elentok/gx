@@ -32,9 +32,11 @@ import (
 
 // Harness is a running test server.
 type Harness struct {
-	Client      *apiclient.Client
-	Server      *server.Server // for reading the run registry; drive everything else through Client
-	Herdr       *herdrfake.State
+	Client *apiclient.Client
+	Server *server.Server // for reading the run registry; drive everything else through Client
+	Herdr  *herdrfake.State
+	// Disks is the free-space source, unless an option set its own FreeSpace.
+	Disks       *FakeDisks
 	StateDir    string
 	SessionsDir string // the interactive sessions' state dirs
 	// ConversationsDir holds the linked sessions' conversation records.
@@ -517,6 +519,16 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// notice into the chat on a machine that has it on.
 	if h.cfg.ExtraUsageCheck == nil {
 		h.cfg.ExtraUsageCheck = func() subscription.State { return subscription.StateDisabled }
+	}
+	// The real source reads the test machine's disk, and a default-threshold
+	// reload could then send a warn notice into the chat.
+	h.Disks = &FakeDisks{}
+	if h.cfg.FreeSpace == nil {
+		h.cfg.FreeSpace = h.Disks.Read
+	}
+	if h.cfg.GoCacheDir == nil {
+		goCache := t.TempDir()
+		h.cfg.GoCacheDir = func() (string, error) { return goCache, nil }
 	}
 	h.serve(t)
 	return h

@@ -407,6 +407,35 @@ export interface DetailRun {
 }
 
 //////////
+// source: diskwatch.go
+
+/**
+ * NoticeDiskWarn is the notify kind for a disk that dropped under the warn threshold.
+ */
+export const NoticeDiskWarn = "disk-warn";
+/**
+ * EventDiskWarnChanged is emitted when a disk's warn mark is set or cleared.
+ */
+export const EventDiskWarnChanged = "disk-warn-changed";
+/**
+ * DiskReading is one free-space reading of a disk (a volume, not a path).
+ */
+export interface DiskReading {
+  ID: string; // device id, shared by every path on the volume
+  Name: string; // mount point or volume name
+  Free: number /* uint64 */; // bytes available to a non-root user
+}
+/**
+ * DiskStatus is one warned disk in the snapshot.
+ */
+export interface DiskStatus {
+  id: string;
+  name: string;
+  free_bytes: number /* uint64 */;
+  projects: string[];
+}
+
+//////////
 // source: epiccard.go
 
 /**
@@ -1089,6 +1118,10 @@ export interface Snapshot {
    * enqueue confirm can warn; filled in by the handler.
    */
   extra_usage?: boolean;
+  /**
+   * Disks lists the disks under the warn threshold; filled in by the handler.
+   */
+  disks?: DiskStatus[];
   tickets: TicketInfo[];
   /**
    * Pending is every queue entry with its explain verdict, so a client never
