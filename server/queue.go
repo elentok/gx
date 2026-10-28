@@ -348,7 +348,7 @@ func (s *Server) queueAddItem(req QueueRequest) (QueueResult, error) {
 				return nil, &r
 			}
 		}
-		item := QueueItem{Address: addr, Agent: string(agent), EnqueuedAt: time.Now()}
+		item := newQueueItem(addr, agent)
 		if req.Front {
 			return append([]QueueItem{item}, items...), nil
 		}
@@ -427,7 +427,7 @@ func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {
 			return refusal(ReasonAlreadyQueued, addr+" is listed twice"), nil
 		}
 		seen[addr] = true
-		items = append(items, QueueItem{Address: addr, Agent: string(agent), EnqueuedAt: time.Now()})
+		items = append(items, newQueueItem(addr, agent))
 	}
 	return s.writeQueue("", func(cur []QueueItem) ([]QueueItem, *QueueResult) {
 		for _, it := range items {
@@ -453,14 +453,21 @@ func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {
 				}
 			}
 		}
-		// An address that was already queued keeps its time.
-		for i, it := range items {
+		// An address that was already queued keeps its time. items is copied, not
+		// mutated, so a rerun of this callback starts from the same stamps.
+		for _, it := range items {
 			if j := indexOfAddr(cur, it.Address); j >= 0 {
-				items[i].EnqueuedAt = cur[j].EnqueuedAt
+				it.EnqueuedAt = cur[j].EnqueuedAt
 			}
+			next = append(next, it)
 		}
-		return append(next, items...), nil
+		return next, nil
 	})
+}
+
+// newQueueItem is the one place an enqueue time is stamped.
+func newQueueItem(addr string, agent ralphloop.AgentKind) QueueItem {
+	return QueueItem{Address: addr, Agent: string(agent), EnqueuedAt: time.Now()}
 }
 
 func projectOfAddress(addr string) string {
