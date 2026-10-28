@@ -1,9 +1,51 @@
 package git
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestRun_UsesExactlyTheGivenEnv(t *testing.T) {
+	dir := t.TempDir()
+	trace := filepath.Join(t.TempDir(), "trace2.json")
+	env := append(os.Environ(), "GIT_TRACE2_EVENT="+trace)
+	if _, _, err := Run(dir, env, "init", "-q"); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(trace)
+	if err != nil || len(raw) == 0 {
+		t.Fatalf("trace file from the given env: %q, %v", raw, err)
+	}
+}
+
+func TestRunWith_AllowsExitCodesAndFeedsStdin(t *testing.T) {
+	dir := t.TempDir()
+	env := NonInteractiveEnv()
+	if _, _, err := Run(dir, env, "init", "-q"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Run(dir, env, "diff", "--no-index", "--quiet", "/dev/null", "/etc/hosts"); err == nil {
+		t.Fatal("exit 1 should be an error without AllowExit")
+	}
+	if _, _, err := RunWith(dir, env, RunOptions{AllowExit: map[int]bool{1: true}}, "diff", "--no-index", "--quiet", "/dev/null", "/etc/hosts"); err != nil {
+		t.Fatalf("allowed exit 1: %v", err)
+	}
+	out, _, err := RunWith(dir, env, RunOptions{Stdin: strings.NewReader("hello\n")}, "hash-object", "--stdin")
+	if err != nil || len(out) != 40 {
+		t.Fatalf("hash-object --stdin = %q, %v", out, err)
+	}
+}
+
+func TestRun_FailureIsARunError(t *testing.T) {
+	_, _, err := Run(t.TempDir(), NonInteractiveEnv(), "rev-parse", "--verify", "nope")
+	var runErr *RunError
+	if !errors.As(err, &runErr) || runErr.Code == 0 {
+		t.Fatalf("err = %#v, want *RunError with a code", err)
+	}
+}
 
 func TestRunError_Error(t *testing.T) {
 	e := &RunError{

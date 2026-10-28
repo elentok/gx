@@ -23,6 +23,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
@@ -492,6 +493,9 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// HOME keeps it, and the config dir it set with it. The merge locks go under
 	// the stateDir, not the real home's state dir.
 	h.cfg.Env = append(os.Environ(), herdrEnv...)
+	// The ticket store is the one repo product code creates in a server test;
+	// without this its commits start detached auto maintenance.
+	h.cfg.Env = git.WithMaintenanceOff(h.cfg.Env)
 	xdgState := filepath.Join(stateDir, "xdg-state")
 	if err := os.MkdirAll(xdgState, 0o755); err != nil {
 		t.Fatal(err)

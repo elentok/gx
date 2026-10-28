@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/brief"
+	"github.com/elentok/gx/git"
 )
 
 // The gx defaults: what a kind runs when the config has no command for it.
@@ -421,11 +422,9 @@ func (r *runner) afterFormat(before map[string]string, res *KindResult) {
 		return
 	}
 	for _, batch := range chunkFiles(changed, r.limit) {
-		cmd := exec.Command("git", append([]string{"add", "--"}, batch...)...)
-		cmd.Dir = r.root
-		if out, err := cmd.CombinedOutput(); err != nil {
+		if stdout, stderr, err := git.Run(r.root, git.NonInteractiveEnv(), append([]string{"add", "--"}, batch...)...); err != nil {
 			res.Status = StatusFail
-			res.Tail = []string{"git add: " + firstLine(strings.TrimSpace(string(out)))}
+			res.Tail = []string{"git add: " + firstLine(strings.TrimSpace(stdout+"\n"+stderr))}
 			return
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -302,35 +301,13 @@ func StageIntentPath(worktreeRoot, path string) error {
 }
 
 func runGitAllowExitCodes(dir string, stdin []byte, allowed map[int]bool, args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
+	o := RunOptions{AllowExit: allowed}
 	if stdin != nil {
-		cmd.Stdin = bytes.NewReader(stdin)
+		o.Stdin = bytes.NewReader(stdin)
 	}
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-	err := cmd.Run()
-	out := strings.TrimRight(outBuf.String(), "\r\n")
-	if err == nil {
-		return out, nil
+	out, _, err := RunWith(dir, NonInteractiveEnv(), o, args...)
+	if runErr, ok := err.(*RunError); ok && runErr.Stderr == "" {
+		runErr.Stderr = runErr.Stdout
 	}
-	exitErr, ok := err.(*exec.ExitError)
-	if !ok {
-		return out, fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
-	}
-	if allowed[exitErr.ExitCode()] {
-		return out, nil
-	}
-	stderr := strings.TrimSpace(strings.TrimRight(errBuf.String(), "\r\n"))
-	if stderr == "" {
-		stderr = strings.TrimSpace(out)
-	}
-	return out, &RunError{
-		Args:   args,
-		Dir:    dir,
-		Stdout: strings.TrimSpace(out),
-		Stderr: stderr,
-		Code:   exitErr.ExitCode(),
-	}
+	return out, err
 }

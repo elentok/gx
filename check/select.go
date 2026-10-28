@@ -3,8 +3,9 @@ package check
 import (
 	"bytes"
 	"fmt"
-	"os/exec"
 	"strings"
+
+	"github.com/elentok/gx/git"
 )
 
 // Mode says which files a run covers.
@@ -21,13 +22,9 @@ const (
 // gitLines runs git in dir and splits its NUL-separated output (-z keeps odd
 // file names intact).
 func gitLines(dir string, args ...string) ([]string, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	out, stderr, err := git.RunRaw(dir, git.NonInteractiveEnv(), args...)
 	if err != nil {
-		msg := strings.TrimSpace(stderr.String())
+		msg := strings.TrimSpace(stderr)
 		if msg == "" {
 			msg = err.Error()
 		}
@@ -48,13 +45,11 @@ func firstLine(s string) string {
 }
 
 func repoRoot(dir string) (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-	cmd.Dir = dir
-	out, err := cmd.Output()
+	out, _, err := git.Run(dir, git.NonInteractiveEnv(), "rev-parse", "--show-toplevel")
 	if err != nil {
 		return "", fmt.Errorf("not inside a git repo: %s", dir)
 	}
-	return strings.TrimSpace(string(out)), nil
+	return strings.TrimSpace(out), nil
 }
 
 // selectFiles lists the root-relative files for mode.

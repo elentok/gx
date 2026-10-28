@@ -262,18 +262,9 @@ func choosePushDivergence(_ io.Reader, _ io.Writer, div *git.PushDivergence) (in
 }
 
 func runGitInteractive(dir string, in io.Reader, out, errOut io.Writer, args ...string) error {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Stdin = in
-	cmd.Stdout = out
-	cmd.Stderr = errOut
-	if err := cmd.Run(); err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return &git.RunError{Args: args, Dir: dir, Code: exitErr.ExitCode()}
-		}
-		return fmt.Errorf("git %s: %w", strings.Join(args, " "), err)
-	}
-	return nil
+	// The plain process env, not NonInteractiveEnv: fetch and push may prompt for credentials.
+	_, _, err := git.RunWith(dir, os.Environ(), git.RunOptions{Stdin: in, Stdout: out, Stderr: errOut}, args...)
+	return err
 }
 
 func relativeDate(t time.Time) string {

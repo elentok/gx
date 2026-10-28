@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -28,30 +29,81 @@ func run(dir string, args []string) (stdout, stderr string, err error) {
 	return runEnv(dir, NonInteractiveEnv(), args)
 }
 
-// runEnv is run with an explicit environment.
-func runEnv(dir string, env, args []string) (stdout, stderr string, err error) {
+// RunOptions tunes RunWith.
+type RunOptions struct {
+	Stdin io.Reader
+	// Stdout and Stderr, when set, receive the stream instead of the captured
+	// copy RunWith returns.
+	Stdout, Stderr io.Writer
+	// AllowExit lists non-zero exit codes that count as success.
+	AllowExit map[int]bool
+}
+
+// Run executes git in dir with exactly env as its environment and returns
+// trimmed stdout and stderr. Returns a *RunError if the command exits non-zero.
+func Run(dir string, env []string, args ...string) (stdout, stderr string, err error) {
+	return RunWith(dir, env, RunOptions{}, args...)
+}
+
+// RunWith is Run with stdin, output writers and allowed exit codes.
+func RunWith(dir string, env []string, o RunOptions, args ...string) (stdout, stderr string, err error) {
+	var outBuf, errBuf bytes.Buffer
+	runErr := runCore(dir, env, o, &outBuf, &errBuf, args)
+	stdout = strings.TrimRight(outBuf.String(), "\r\n")
+	stderr = strings.TrimRight(errBuf.String(), "\r\n")
+	return stdout, stderr, wrapRunErr(runErr, dir, args, stdout, stderr, o.AllowExit)
+}
+
+// RunRaw is Run for output that must stay byte-exact (NUL-separated lists,
+// blobs): stdout is not trimmed.
+func RunRaw(dir string, env []string, args ...string) (stdout []byte, stderr string, err error) {
+	var outBuf, errBuf bytes.Buffer
+	runErr := runCore(dir, env, RunOptions{}, &outBuf, &errBuf, args)
+	stderr = strings.TrimRight(errBuf.String(), "\r\n")
+	return outBuf.Bytes(), stderr, wrapRunErr(runErr, dir, args, outBuf.String(), stderr, nil)
+}
+
+// runCore is the one place gx starts a git child.
+func runCore(dir string, env []string, o RunOptions, outBuf, errBuf *bytes.Buffer, args []string) error {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
 	cmd.Env = env
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-	runErr := cmd.Run()
-	stdout = strings.TrimRight(outBuf.String(), "\r\n")
-	stderr = strings.TrimRight(errBuf.String(), "\r\n")
-	if runErr != nil {
-		if exitErr, ok := runErr.(*exec.ExitError); ok {
-			return stdout, stderr, &RunError{
-				Args:   args,
-				Dir:    dir,
-				Stdout: strings.TrimSpace(stdout),
-				Stderr: strings.TrimSpace(stderr),
-				Code:   exitErr.ExitCode(),
-			}
-		}
-		return stdout, stderr, fmt.Errorf("git %s: %w", strings.Join(args, " "), runErr)
+	if o.Stdin != nil {
+		cmd.Stdin = o.Stdin
 	}
-	return stdout, stderr, nil
+	cmd.Stdout, cmd.Stderr = outBuf, errBuf
+	if o.Stdout != nil {
+		cmd.Stdout = o.Stdout
+	}
+	if o.Stderr != nil {
+		cmd.Stderr = o.Stderr
+	}
+	return cmd.Run()
+}
+
+func wrapRunErr(runErr error, dir string, args []string, stdout, stderr string, allow map[int]bool) error {
+	if runErr == nil {
+		return nil
+	}
+	exitErr, ok := runErr.(*exec.ExitError)
+	if !ok {
+		return fmt.Errorf("git %s: %w", strings.Join(args, " "), runErr)
+	}
+	if allow[exitErr.ExitCode()] {
+		return nil
+	}
+	return &RunError{
+		Args:   args,
+		Dir:    dir,
+		Stdout: strings.TrimSpace(stdout),
+		Stderr: strings.TrimSpace(stderr),
+		Code:   exitErr.ExitCode(),
+	}
+}
+
+// runEnv is run with an explicit environment.
+func runEnv(dir string, env, args []string) (stdout, stderr string, err error) {
+	return Run(dir, env, args...)
 }
 
 // runNoOptionalLocks executes a git command with optional index-refresh locks disabled.
@@ -71,10 +123,7 @@ func runAllowFail(dir string, args []string) string {
 // fails. Unlike run/runAllowFail, it does not trim trailing newlines, so it is
 // safe for binary output such as `cat-file -p` on a blob.
 func runRawAllowFail(dir string, args []string) []byte {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = NonInteractiveEnv()
-	out, err := cmd.Output()
+	out, _, err := RunRaw(dir, NonInteractiveEnv(), args...)
 	if err != nil {
 		return nil
 	}

@@ -6,7 +6,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	gitpkg "github.com/elentok/gx/git"
 )
+
+func git(dir string, args ...string) (string, error) { return runGit(dir, nil, args...) }
 
 func logLines(t *testing.T, dir string) []string {
 	t.Helper()
@@ -83,7 +87,7 @@ func TestImmediate_CommitsWithMessageInsideStore(t *testing.T) {
 
 func TestImmediate_NoLoopIsNoop(t *testing.T) {
 	dir := t.TempDir()
-	if err := EnsureRepo(dir); err != nil {
+	if err := EnsureRepo(dir, nil); err != nil {
 		t.Fatal(err)
 	}
 	write(t, dir, "t.md", "x")
@@ -92,6 +96,34 @@ func TestImmediate_NoLoopIsNoop(t *testing.T) {
 	}
 	if got := logLines(t, dir); len(got) != 0 {
 		t.Fatalf("committed without a loop: %v", got)
+	}
+}
+
+func TestOptionsEnv_ReachesEveryGitChild(t *testing.T) {
+	remote := t.TempDir()
+	if _, err := git(remote, "init", "-q", "--bare"); err != nil {
+		t.Fatal(err)
+	}
+	trace := filepath.Join(t.TempDir(), "trace2.json")
+	env := append(gitpkg.NonInteractiveEnv(), "GIT_TRACE2_EVENT="+trace)
+	dir := t.TempDir()
+	l, err := StartWith(dir, Options{Debounce: time.Hour, PushRemote: remote, Env: env})
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, dir, "a.md", "x")
+	if err := Immediate(filepath.Join(dir, "a.md"), "pause"); err != nil {
+		t.Fatal(err)
+	}
+	l.Stop()
+	raw, err := os.ReadFile(trace)
+	if err != nil {
+		t.Fatalf("trace file not written, env did not reach git: %v", err)
+	}
+	for _, cmd := range []string{"init", "add", "commit", "push"} {
+		if !strings.Contains(string(raw), `"name":"`+cmd+`"`) {
+			t.Errorf("no %s git child traced in:\n%s", cmd, raw)
+		}
 	}
 }
 

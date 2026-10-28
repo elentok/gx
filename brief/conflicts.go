@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/elentok/gx/git"
 )
 
 // Conflicts prints the in-progress operation and each unmerged file with the
@@ -38,10 +39,8 @@ func Conflicts(dir string, w io.Writer) int {
 }
 
 func gitOut(dir string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	out, err := cmd.Output()
-	return strings.TrimSpace(string(out)), err
+	out, _, err := git.Run(dir, git.NonInteractiveEnv(), args...)
+	return strings.TrimSpace(out), err
 }
 
 func inProgressOp(top string) string {

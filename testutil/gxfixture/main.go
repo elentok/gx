@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/conversations"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -276,7 +277,7 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 		"GIT_AUTHOR_NAME=gxfixture", "GIT_AUTHOR_EMAIL=gxfixture@example.com",
 		"GIT_COMMITTER_NAME=gxfixture", "GIT_COMMITTER_EMAIL=gxfixture@example.com",
 	)
-	return env, cliEnv
+	return git.WithMaintenanceOff(env), cliEnv
 }
 
 // writeConfig writes the fixture's config. overrides are `dotted.key=<json>`
@@ -469,12 +470,8 @@ func seedPauseRound(ticketPath, reason string, rec recommendation) error {
 
 // git runs a git command in dir with the fixture's identity.
 func (f *fixture) git(dir string, args ...string) error {
-	cmd := exec.Command("git", args...)
-	cmd.Dir, cmd.Env = dir, f.env
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git %s: %w\n%s", strings.Join(args, " "), err, out)
-	}
-	return nil
+	_, _, err := git.Run(dir, f.env, args...)
+	return err
 }
 
 func (f *fixture) cli(args ...string) ([]byte, error) {

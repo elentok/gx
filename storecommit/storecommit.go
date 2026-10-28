@@ -8,40 +8,47 @@ package storecommit
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	gitpkg "github.com/elentok/gx/git"
 )
 
-// EnsureRepo makes dir a git repo, initializing it if missing.
-func EnsureRepo(dir string) error {
+// EnsureRepo makes dir a git repo, initializing it if missing. env is the
+// environment of every git child; nil means git.NonInteractiveEnv().
+func EnsureRepo(dir string, env []string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
 		return nil
 	}
-	_, err := git(dir, "init", "-q")
+	_, err := runGit(dir, env, "init", "-q")
 	return err
 }
 
-func git(dir string, args ...string) (string, error) {
-	cmd := exec.Command("git", append([]string{"-C", dir,
-		"-c", "user.name=gx", "-c", "user.email=gx@localhost", "-c", "commit.gpgsign=false"}, args...)...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, out)
+func runGit(dir string, env []string, args ...string) (string, error) {
+	if env == nil {
+		env = gitpkg.NonInteractiveEnv()
 	}
-	return string(out), nil
+	stdout, _, err := gitpkg.Run("", env, append([]string{"-C", dir,
+		"-c", "user.name=gx", "-c", "user.email=gx@localhost", "-c", "commit.gpgsign=false"}, args...)...)
+	if err != nil {
+		return "", err
+	}
+	return stdout, nil
 }
+
+func (l *Loop) git(args ...string) (string, error) { return runGit(l.dir, l.env, args...) }
 
 // countDirty returns how many files differ from HEAD and a signature of them
 // that changes on every edit: the status text alone would not, since a file
 // already shown as modified stays " M" however often it is rewritten.
-func countDirty(dir string) (int, string, error) {
-	out, err := git(dir, "status", "--porcelain", "-uall")
+func (l *Loop) countDirty() (int, string, error) {
+	dir := l.dir
+	out, err := l.git("status", "--porcelain", "-uall")
 	if err != nil {
 		return 0, "", err
 	}
@@ -65,6 +72,7 @@ func countDirty(dir string) (int, string, error) {
 // Loop is a running store commit loop.
 type Loop struct {
 	dir  string
+	env  []string   // environment of every git child; nil means git.NonInteractiveEnv()
 	refs int        // guarded by regMu
 	mu   sync.Mutex // serializes commits
 	stop chan struct{}
@@ -91,6 +99,8 @@ type Options struct {
 	PushRemote string
 	// OnError receives push failures; they never block or fail a commit.
 	OnError func(error)
+	// Env is the environment of every git child. Nil means git.NonInteractiveEnv().
+	Env []string
 }
 
 var (
@@ -123,7 +133,7 @@ func startWith(dir string, o Options, poll time.Duration) (*Loop, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := EnsureRepo(dir); err != nil {
+	if err := EnsureRepo(dir, o.Env); err != nil {
 		return nil, err
 	}
 	regMu.Lock()
@@ -134,7 +144,7 @@ func startWith(dir string, o Options, poll time.Duration) (*Loop, error) {
 		l.refs++
 		return l, nil
 	}
-	l := &Loop{dir: dir, debounce: o.Debounce, poll: poll, refs: 1, stop: make(chan struct{}), done: make(chan struct{}),
+	l := &Loop{dir: dir, env: o.Env, debounce: o.Debounce, poll: poll, refs: 1, stop: make(chan struct{}), done: make(chan struct{}),
 		pushRemote: o.PushRemote, onError: o.OnError, pushKick: make(chan struct{}, 1), pushStop: make(chan struct{}), pushDone: make(chan struct{})}
 	reg[dir] = l
 	go l.run()
@@ -188,7 +198,7 @@ func (l *Loop) runPush() {
 		if remote == "" {
 			return
 		}
-		if _, err := git(l.dir, "push", remote, "HEAD"); err != nil && l.onError != nil {
+		if _, err := l.git("push", remote, "HEAD"); err != nil && l.onError != nil {
 			l.onError(err)
 		}
 	}
@@ -225,7 +235,7 @@ func (l *Loop) run() {
 			ticking = poll
 			t.Reset(poll)
 		}
-		n, sig, err := countDirty(l.dir)
+		n, sig, err := l.countDirty()
 		if err != nil || n == 0 {
 			lastSig = ""
 			continue
@@ -246,17 +256,17 @@ func (l *Loop) run() {
 func (l *Loop) commit(msg string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	n, _, err := countDirty(l.dir)
+	n, _, err := l.countDirty()
 	if err != nil || n == 0 {
 		return err
 	}
 	if msg == "" {
 		msg = fmt.Sprintf("sync: %d files", n)
 	}
-	if _, err := git(l.dir, "add", "-A"); err != nil {
+	if _, err := l.git("add", "-A"); err != nil {
 		return err
 	}
-	if _, err = git(l.dir, "commit", "-q", "-m", msg); err != nil {
+	if _, err = l.git("commit", "-q", "-m", msg); err != nil {
 		return err
 	}
 	select {

@@ -11,13 +11,13 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
@@ -353,8 +353,8 @@ func statusWarnings(n apiclient.Negotiation, storePath string) []string {
 }
 
 func hasPushRemote(storePath string) bool {
-	out, err := exec.Command("git", "-C", storePath, "remote").Output()
-	return err == nil && strings.TrimSpace(string(out)) != ""
+	remotes, err := git.ListRemotes(git.Repo{Root: storePath})
+	return err == nil && len(remotes) > 0
 }
 
 // spawnFunc launches a detached server and returns once it exits or the

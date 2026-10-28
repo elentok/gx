@@ -980,6 +980,7 @@ func (s *Server) startStoreCommits() (stop func(), err error) {
 		Debounce:   set.storeCommitDebounce(),
 		PushRemote: set.StorePushRemote,
 		OnError:    func(err error) { s.log.Warn("store push failed", "err", err) },
+		Env:        s.cfg.Env,
 	})
 	s.storeCommits = loop
 	s.reloadMu.Unlock()

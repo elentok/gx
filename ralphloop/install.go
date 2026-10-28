@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/git"
 )
 
 // lockfileManagers maps each tracked lockfile name to the package manager that
@@ -89,13 +90,9 @@ type lockfileDir struct {
 // lockfileDirs lists the directories of the worktree at path that hold a
 // tracked lockfile, sorted by path.
 func lockfileDirs(path string) ([]lockfileDir, error) {
-	cmd := exec.Command("git", "ls-files", "-z")
-	cmd.Dir = path
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	out, err := cmd.Output()
+	out, stderr, err := git.RunRaw(path, git.NonInteractiveEnv(), "ls-files", "-z")
 	if err != nil {
-		return nil, fmt.Errorf("git ls-files: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return nil, fmt.Errorf("git ls-files: %w: %s", err, strings.TrimSpace(stderr))
 	}
 	byDir := map[string][]string{}
 	for _, tracked := range strings.Split(string(out), "\x00") {

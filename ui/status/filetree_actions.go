@@ -1,9 +1,7 @@
 package status
 
 import (
-	"bytes"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -195,19 +193,6 @@ func amendPreview(root string) (subject string, files []string, err error) {
 }
 
 func execGitCapture(root string, args ...string) (string, string, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = root
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-	err := cmd.Run()
-	stdout := strings.TrimSpace(outBuf.String())
-	stderr := strings.TrimSpace(errBuf.String())
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			return stdout, stderr, &git.RunError{Args: args, Dir: root, Stdout: stdout, Stderr: stderr, Code: ee.ExitCode()}
-		}
-		return stdout, stderr, err
-	}
-	return stdout, stderr, nil
+	stdout, stderr, err := git.Run(root, git.NonInteractiveEnv(), args...)
+	return strings.TrimSpace(stdout), strings.TrimSpace(stderr), err
 }

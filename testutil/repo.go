@@ -49,7 +49,7 @@ func TempRepo(t *testing.T) string {
 
 // repoTemplateName is the shared template repo under os.TempDir(); bump the
 // version whenever TempRepo's content changes.
-const repoTemplateName = "gx-testutil-repo-template-v1"
+const repoTemplateName = "gx-testutil-repo-template-v2"
 
 // repoTemplate returns a repo TempRepo copies instead of running its seven
 // git commands per test. Every test binary shares one template across runs:
@@ -89,7 +89,7 @@ func TempBareRepo(t *testing.T) string {
 	// Remove the empty TempDir so git clone can create it cleanly
 	os.RemoveAll(bare)
 	RetryRemoveAll(t, bare)
-	mustRun(t, ".", "git", "clone", "--bare", src, bare)
+	cloneBare(t, src, bare)
 	// Configure origin to populate refs/remotes/origin/* on fetch (bare clones
 	// use refs/heads/* by default), then fetch so remote tracking refs exist.
 	mustGit(t, bare, "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*")
@@ -118,7 +118,7 @@ func TempBareRepoWithMainWorktreeAhead(t *testing.T, featureNames ...string) str
 	bare := evalDir(t, t.TempDir())
 	os.RemoveAll(bare)
 	RetryRemoveAll(t, bare)
-	mustRun(t, ".", "git", "clone", "--bare", src, bare)
+	cloneBare(t, src, bare)
 	mustGit(t, bare, "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*")
 	mustGit(t, bare, "fetch", "origin")
 	mustGit(t, bare, "branch", "--set-upstream-to=origin/main", "main")
@@ -187,7 +187,7 @@ func TempDotBareRepoWithWorktrees(t *testing.T, names ...string) string {
 	RetryRemoveAll(t, outer)
 
 	bareDir := filepath.Join(outer, ".bare")
-	mustRun(t, ".", "git", "clone", "--bare", src, bareDir)
+	cloneBare(t, src, bareDir)
 	mustGit(t, bareDir, "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*")
 	mustGit(t, bareDir, "fetch", "origin")
 	mustGit(t, bareDir, "branch", "--set-upstream-to=origin/main", "main")
@@ -233,12 +233,27 @@ func EnsureEpicTicketMD(t *testing.T, epicDir string) {
 	WriteFile(t, epicDir, "ticket.md", "---\nstatus: open\n---\n")
 }
 
+// cloneBare clones src as a bare repo at dest. A clone does not copy repo
+// config, so the maintenance setting is written into the new repo.
+func cloneBare(t *testing.T, src, dest string) {
+	t.Helper()
+	mustGit(t, ".", "clone", "--bare", src, dest)
+	mustGit(t, dest, "config", "maintenance.auto", "false")
+}
+
+// configUser also turns off auto maintenance in the repo's own config: a commit
+// otherwise starts a detached `git maintenance run --auto` that can outlive
+// the test, and its lock file under .git/objects makes t.TempDir's cleanup fail
+// with "directory not empty". Repo config reaches git calls that product code
+// makes on the repo too, which a process env setting would reach only by
+// changing the whole test process.
 func configUser(t *testing.T, dir string) {
 	t.Helper()
 	mustGit(t, dir, "config", "user.email", "test@test.com")
 	mustGit(t, dir, "config", "user.name", "Test")
 	mustGit(t, dir, "config", "gc.auto", "0")
 	mustGit(t, dir, "config", "gc.autoDetach", "false")
+	mustGit(t, dir, "config", "maintenance.auto", "false")
 }
 
 // Mkdir creates a directory, failing the test if it can't.
@@ -306,9 +321,11 @@ func AmendLastCommit(t *testing.T, dir string) {
 	mustGit(t, dir, "commit", "--amend", "--no-edit")
 }
 
+// mustGit turns auto maintenance off per command for the commands that run
+// before the repo config exists.
 func mustGit(t *testing.T, dir string, args ...string) {
 	t.Helper()
-	mustRun(t, dir, "git", args...)
+	mustRun(t, dir, "git", append([]string{"-c", "maintenance.auto=false"}, args...)...)
 }
 
 // MustGitExported runs a git command in dir, failing the test on error.

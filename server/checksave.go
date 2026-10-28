@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -172,8 +171,8 @@ func (s *Server) saveChecksToRepo(dir string, req SaveChecksRequest) (SaveChecks
 
 // gitOut runs git in dir; the error carries git's output.
 func gitOut(dir string, args ...string) (string, error) {
-	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
-	text := strings.TrimSpace(string(out))
+	stdout, stderr, err := git.Run(dir, git.NonInteractiveEnv(), args...)
+	text := strings.TrimSpace(stdout + "\n" + stderr)
 	if err != nil {
 		return text, &gitError{args: args, out: text, err: err}
 	}

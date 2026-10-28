@@ -1,9 +1,7 @@
 package git
 
 import (
-	"bytes"
 	"fmt"
-	"os/exec"
 	"strings"
 )
 
@@ -82,25 +80,6 @@ func StashPushAuto(root string) (string, error) {
 }
 
 func runWithExtraEnv(dir string, args []string, extraEnv []string) (string, error) {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Env = append(NonInteractiveEnv(), extraEnv...)
-	var outBuf, errBuf bytes.Buffer
-	cmd.Stdout = &outBuf
-	cmd.Stderr = &errBuf
-	runErr := cmd.Run()
-	out := strings.TrimRight(outBuf.String()+errBuf.String(), "\r\n")
-	if runErr != nil {
-		if ee, ok := runErr.(*exec.ExitError); ok {
-			return out, &RunError{
-				Args:   args,
-				Dir:    dir,
-				Stdout: strings.TrimSpace(outBuf.String()),
-				Stderr: strings.TrimSpace(errBuf.String()),
-				Code:   ee.ExitCode(),
-			}
-		}
-		return out, fmt.Errorf("git %s: %w", strings.Join(args, " "), runErr)
-	}
-	return out, nil
+	stdout, stderr, err := Run(dir, append(NonInteractiveEnv(), extraEnv...), args...)
+	return joinOutput(stdout, stderr), err
 }
