@@ -245,10 +245,17 @@ func usageFromLine(line transcriptLine) Usage {
 // session launched in cwd, or ok=false if no assistant turn has landed in
 // its transcript yet.
 func LastAssistantOccupancy(cwd, sessionID string) (occupancy int, ok bool, err error) {
-	path, err := Path(cwd, sessionID)
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return 0, false, err
 	}
+	return LastAssistantOccupancyIn(home, cwd, sessionID)
+}
+
+// LastAssistantOccupancyIn is LastAssistantOccupancy with an explicit home
+// directory in place of os.UserHomeDir().
+func LastAssistantOccupancyIn(home, cwd, sessionID string) (occupancy int, ok bool, err error) {
+	path := PathIn(home, cwd, sessionID)
 	// A session that started in another directory (the bare repo) and moved
 	// into the checkout is stored under the folder it started in.
 	usage, ok, err := LastAssistantUsage(Resolve(path))

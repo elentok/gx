@@ -30,13 +30,17 @@ func (d Dirs) lookup(key string) string {
 	return value
 }
 
-func (d Dirs) home() (string, error) {
+// Home is the env's HOME. An env with no HOME is an error.
+func (d Dirs) Home() (string, error) {
 	home := d.lookup("HOME")
 	if home == "" {
 		return "", errors.New("no HOME in env")
 	}
 	return home, nil
 }
+
+// Getenv is the env's value for key, or "" when it is unset.
+func (d Dirs) Getenv(key string) string { return d.lookup(key) }
 
 // xdgBase resolves an XDG base directory: the env var when it holds an
 // absolute path (the XDG spec says relative values are invalid and must be
@@ -45,7 +49,7 @@ func (d Dirs) xdgBase(envKey string, fallback ...string) (string, error) {
 	if v := d.lookup(envKey); filepath.IsAbs(v) {
 		return v, nil
 	}
-	home, err := d.home()
+	home, err := d.Home()
 	if err != nil {
 		return "", err
 	}
@@ -87,7 +91,7 @@ func (d Dirs) UserStateDir() (string, error) {
 // set). It's the single source of truth other gx packages call into for
 // this decision.
 func (d Dirs) UserConfigDir() (string, error) {
-	home, err := d.home()
+	home, err := d.Home()
 	if err != nil {
 		return "", err
 	}
@@ -98,7 +102,7 @@ func (d Dirs) UserConfigDir() (string, error) {
 // platform, mirroring UserConfigDir's deliberate bypass of per-OS/XDG
 // resolution.
 func (d Dirs) UserCacheDir() (string, error) {
-	home, err := d.home()
+	home, err := d.Home()
 	if err != nil {
 		return "", err
 	}

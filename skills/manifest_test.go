@@ -7,29 +7,13 @@ import (
 	"testing"
 )
 
-func TestManifestPathUsesUserConfigDir(t *testing.T) {
+func TestManifestPathIsUnderTheGivenConfigDir(t *testing.T) {
 	tmp := t.TempDir()
-	prev := userConfigDirFn
-	userConfigDirFn = func() (string, error) { return tmp, nil }
-	t.Cleanup(func() { userConfigDirFn = prev })
 
-	got, err := ManifestPath("my-skill")
-	if err != nil {
-		t.Fatalf("ManifestPath: %v", err)
-	}
+	got := ManifestPath(tmp, "my-skill")
 	want := filepath.Join(tmp, "gx", "skills", "my-skill.json")
 	if got != want {
 		t.Fatalf("ManifestPath = %q, want %q", got, want)
-	}
-}
-
-func TestManifestPathPropagatesUserConfigDirError(t *testing.T) {
-	prev := userConfigDirFn
-	userConfigDirFn = func() (string, error) { return "", errors.New("boom") }
-	t.Cleanup(func() { userConfigDirFn = prev })
-
-	if _, err := ManifestPath("my-skill"); err == nil {
-		t.Fatal("ManifestPath: expected error, got nil")
 	}
 }
 

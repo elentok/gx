@@ -7,6 +7,27 @@ import (
 	"testing"
 )
 
+func TestRootsFrom(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		env  []string
+		want Roots
+	}{
+		{"home only", []string{"HOME=/h"}, Roots{Home: "/h", CodexHome: "/h/.codex"}},
+		{"codex home set", []string{"HOME=/h", "CODEX_HOME=/c"}, Roots{Home: "/h", CodexHome: "/c"}},
+		{"no home", []string{"CODEX_HOME="}, Roots{}},
+		{"codex home without home", []string{"CODEX_HOME=/c"}, Roots{CodexHome: "/c"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := RootsFrom(tt.env); got != tt.want {
+				t.Errorf("RootsFrom(%v) = %+v, want %+v", tt.env, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLookup_MixedDirectory(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

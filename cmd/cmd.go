@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/logger"
+	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/transcript"
 	"github.com/elentok/gx/ui/nav"
@@ -83,6 +84,7 @@ func defaultDeps() deps {
 	env := os.Environ()
 	dirs := config.DirsFrom(env)
 	cfg, _ := dirs.Load()
+	roots := sessionlookup.RootsFrom(env)
 	return deps{
 		env:    env,
 		stdin:  os.Stdin,
@@ -104,38 +106,48 @@ func defaultDeps() deps {
 		loadConfig:           dirs.Load,
 		getenv:               os.Getenv,
 		goos:                 runtime.GOOS,
-		userHomeDir:          os.UserHomeDir,
+		userHomeDir:          dirs.Home,
 		runEditor:            runEditorCommand,
 		stdinIsTerminal:      func() bool { return isTerminalFile(os.Stdin) },
-		readClaudeOccupancy:  transcript.LastAssistantOccupancy,
-		verifyCodexSession:   codexsession.VerifyIdentity,
-		readCodexContext:     codexsession.LastContextTokens,
-		readAutoAdvance:      func(sessionID string) (bool, error) { return readServerAutoAdvance(dirs, sessionID) },
-		skillsAgentRoots:     defaultSkillsAgentRoots,
-		skillsManifestPath:   defaultSkillsManifestPath,
-		skillsStatusPath:     defaultSkillsStatusPath,
-		explainAgent:         herdr.AgentExplain,
-		probeGhostty:         terminalrun.ProbeGhostty,
+		readClaudeOccupancy: func(cwd, sessionID string) (int, bool, error) {
+			return transcript.LastAssistantOccupancyIn(roots.Home, cwd, sessionID)
+		},
+		verifyCodexSession: func(cwd, sessionID string) (bool, error) {
+			return codexsession.VerifyIdentityIn(roots.CodexHome, cwd, sessionID)
+		},
+		readCodexContext: func(cwd, sessionID string) (int, bool, error) {
+			return codexsession.LastContextTokensIn(roots.CodexHome, cwd, sessionID)
+		},
+		readAutoAdvance:    func(sessionID string) (bool, error) { return readServerAutoAdvance(dirs, sessionID) },
+		skillsAgentRoots:   func() ([]string, error) { return defaultSkillsAgentRoots(dirs) },
+		skillsManifestPath: func() (string, error) { return defaultSkillsManifestPath(dirs) },
+		skillsStatusPath:   func() (string, error) { return defaultSkillsStatusPath(dirs) },
+		explainAgent:       herdr.AgentExplain,
+		probeGhostty:       terminalrun.ProbeGhostty,
 	}
 }
 
 // defaultSkillsAgentRoots resolves gx's canonical skill bundle's two install
 // targets under the real user's home directory: Claude Code's user skill
 // discovery root and Codex's user custom-prompt discovery root.
-func defaultSkillsAgentRoots() ([]string, error) {
-	home, err := os.UserHomeDir()
+func defaultSkillsAgentRoots(dirs config.Dirs) ([]string, error) {
+	home, err := dirs.Home()
 	if err != nil {
 		return nil, fmt.Errorf("resolve user home dir: %w", err)
 	}
 	return []string{skills.ClaudeSkillsRoot(home), skills.CodexSkillsRoot(home)}, nil
 }
 
-func defaultSkillsManifestPath() (string, error) {
-	return skills.ManifestPath(skills.BundleID)
+func defaultSkillsManifestPath(dirs config.Dirs) (string, error) {
+	base, err := dirs.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve user config dir: %w", err)
+	}
+	return skills.ManifestPath(base, skills.BundleID), nil
 }
 
-func defaultSkillsStatusPath() (string, error) {
-	stateDir, err := config.StateDir()
+func defaultSkillsStatusPath(dirs config.Dirs) (string, error) {
+	stateDir, err := dirs.StateDir()
 	if err != nil {
 		return "", err
 	}

@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/elentok/gx/config"
 )
 
 // CurrentSchemaVersion is the manifest schema version this build writes and
@@ -59,17 +57,11 @@ var (
 	ErrUnsupportedVersion = errors.New("manifest schema version is unsupported")
 )
 
-var userConfigDirFn = config.UserConfigDir
-
 // ManifestPath returns the manifest file path for the skill identified by
-// id, following gx's existing user configuration-directory convention
-// (typically ~/.config/gx/skills/<id>.json).
-func ManifestPath(id string) (string, error) {
-	base, err := userConfigDirFn()
-	if err != nil {
-		return "", fmt.Errorf("resolve user config dir: %w", err)
-	}
-	return filepath.Join(base, "gx", "skills", id+".json"), nil
+// id under the user configuration base dir (typically
+// ~/.config/gx/skills/<id>.json).
+func ManifestPath(configBase, id string) string {
+	return filepath.Join(configBase, "gx", "skills", id+".json")
 }
 
 // Load reads and validates the manifest at path. It returns ErrNotExist if
