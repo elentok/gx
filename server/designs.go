@@ -120,7 +120,9 @@ func (s *Server) resolveDesignDir(project, epic, excludeID string) (designDir, e
 func (s *Server) cleanupDesign(project, epic string) {
 	if err := s.tryCleanupDesign(project, epic); err != nil {
 		s.log.Warn("design cleanup kept the worktree and branch", "map", project+":"+epic, "err", err)
+		return
 	}
+	s.log.Info("design cleanup checked", "map", project+":"+epic)
 }
 
 func (s *Server) tryCleanupDesign(project, epic string) error {
@@ -192,6 +194,7 @@ func (s *Server) scanDesignCleanups() {
 			if prev == step || !pastBranchStep(step) {
 				continue
 			}
+			s.log.Info("design step moved past branch", "map", project+":"+epic, "step", step)
 			s.goSettle(func() { s.cleanupDesign(project, epic) })
 		}
 	}

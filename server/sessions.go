@@ -956,6 +956,7 @@ func (s *Server) updateSessionMeta(dir, id string, change func(*sessionMeta) boo
 	meta, exitedDesign, err := s.saveSessionMetaUpdate(dir, id, change)
 	if exitedDesign {
 		if project, epic, ok := strings.Cut(epicAddress(meta.Ticket), ":"); ok {
+			time.Sleep(s.cfg.SessionExitCleanupDelay)
 			s.cleanupDesign(project, epic)
 		}
 	}

@@ -289,6 +289,9 @@ type Config struct {
 	// ActionStepStartTimeout bounds how long an Action step waits for its
 	// prompt to go Working; zero means DefaultActionStepStartTimeout.
 	ActionStepStartTimeout time.Duration
+	// SessionExitCleanupDelay is how long the design cleanup of a session exit
+	// waits before it checks, so a test can make one run late.
+	SessionExitCleanupDelay time.Duration
 	// ActionSlashSettle is how long a slash step must stay Idle after typing
 	// to count as done; zero means DefaultActionSlashSettle.
 	ActionSlashSettle time.Duration

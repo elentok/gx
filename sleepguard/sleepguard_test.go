@@ -63,7 +63,6 @@ var allowed = map[string]int{
 	"server/conversationsweep_test.go":              1,
 	"server/deadlock_test.go":                       2,
 	"server/designcard_test.go":                     1,
-	"server/designcleanup_test.go":                  1,
 	"server/epicmerge_test.go":                      1,
 	"server/epicnotice_test.go":                     1,
 	"server/frictionstamp_test.go":                  1,

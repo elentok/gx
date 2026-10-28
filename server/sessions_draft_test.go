@@ -65,7 +65,8 @@ func TestDraft_ActionDraftBeforeLaterStepIsCleared(t *testing.T) {
 	if err := att.SendKey(screen.Key{Code: 'x', Text: "x"}); err != nil {
 		t.Fatal(err)
 	}
-	waitForScreen(t, c, "x")
+	// Not a bare "x": the placeholder's "fix" has one, so it matches at once.
+	waitForScreen(t, c, "❯ x")
 	report(t, conv, agentfake.Control{State: "done"})
 
 	waitForSubmitted(t, conv, "\"first-step\"\n\"second-step\"\n")

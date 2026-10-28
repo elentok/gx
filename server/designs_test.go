@@ -109,7 +109,7 @@ func TestDesignsOpen_CreatesWithTheTuiPrefill(t *testing.T) {
 }
 
 // startDesignsAt is startDesigns with the map's design_step set (none when empty).
-func startDesignsAt(t *testing.T, step string) designsFixture {
+func startDesignsAt(t *testing.T, step string, opts ...func(*server.Config)) designsFixture {
 	t.Helper()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
@@ -121,7 +121,7 @@ func startDesignsAt(t *testing.T, step string) designsFixture {
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte(fm+"---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return startDesignsIn(t, store)
+	return startDesignsIn(t, store, opts...)
 }
 
 func TestDesignsOpen_AfterBranchStartsInTheTrunkCheckout(t *testing.T) {

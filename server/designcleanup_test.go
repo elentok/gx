@@ -55,6 +55,11 @@ func (f designsFixture) waitForCleanupWarning(t *testing.T) {
 	})
 }
 
+func (f designsFixture) waitForLog(t *testing.T, msg string, n int) {
+	t.Helper()
+	waitFor(t, func() bool { return strings.Count(f.serverLog(t), msg) >= n })
+}
+
 func (f designsFixture) designGone(t *testing.T, dir string) bool {
 	t.Helper()
 	_, err := os.Stat(dir)
@@ -167,6 +172,10 @@ func (f designsFixture) setDesignStepBranch(t *testing.T) {
 	if err := os.Rename(tmp, ticketMD); err != nil {
 		t.Fatal(err)
 	}
+	// Rescan now, not when the file watcher or the backstop poll gets to it.
+	if err := f.h.Client.TicketChanged(f.ctx, "proj:map"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDesignCleanup_StepMovingToBranchRemovesWithoutSessionExit(t *testing.T) {
@@ -205,12 +214,13 @@ func TestDesignCleanup_StepMovingToBranchWithDirtyWorktreeKeepsBothAndWarns(t *t
 
 func TestDesignCleanup_RescanWithoutStepChangeDoesNotCheckAgain(t *testing.T) {
 	t.Parallel()
-	f := startDesignsAt(t, "create-tickets")
+	f := startDesignsAt(t, "create-tickets", func(c *server.Config) { c.SessionExitCleanupDelay = 600 * time.Millisecond })
 	dir, id := f.openDesignWorktree(t, true)
 	f.stop(t, id)
-	// The session-exit cleanup runs once the stop is saved. Let it finish
-	// before the branch and the edit exist, or it could be the one that warns.
-	waitFor(t, func() bool { return len(f.live(t)) == 0 })
+	// The session-exit cleanup runs after the exit is saved, so the live count
+	// is no signal. Let it finish before the branch and the edit exist, or it
+	// could be the one that warns, or later removes the worktree.
+	f.waitForLog(t, "design cleanup checked", 1)
 	gitOut(t, f.repo, "branch", "map-impl", "map-design")
 	wip := filepath.Join(dir, "wip.md")
 	if err := os.WriteFile(wip, []byte("wip\n"), 0o644); err != nil {
@@ -221,8 +231,12 @@ func TestDesignCleanup_RescanWithoutStepChangeDoesNotCheckAgain(t *testing.T) {
 	if err := os.Remove(wip); err != nil {
 		t.Fatal(err)
 	}
-	f.setDesignStepBranch(t) // rescans with the step unchanged
-	time.Sleep(500 * time.Millisecond)
+	// The rescan notices a step change before it starts a cleanup, so once it
+	// returns, no second check is on its way.
+	f.setDesignStepBranch(t)
+	if n := strings.Count(f.serverLog(t), "design step moved past branch"); n != 1 {
+		t.Errorf("step moved past branch %d times, want 1", n)
+	}
 	if !f.designKept(t, dir) {
 		t.Errorf("an unchanged step ran the cleanup check again")
 	}
