@@ -969,6 +969,13 @@ line** tallies the epic states across the Queue (`done · in progress · paused 
 Zero clauses are suppressed except `done` and `total`, which always render. Counts are always
 **epic-truth** — recomputed from disk over the whole epic — never scoped to one run's own progress.
 
+## Web top bar
+
+**Tray** — the group of system health icons on the right side of the web top bar: CPU load, memory
+use and free disk space of the gx server's machine. Each icon shows a state; its popover shows the
+values. The name comes from the macOS menu bar.
+_Avoid_: status area, indicators bar
+
 ## Skills
 
 **Bundled skill** — a skill that ships inside gx and is installed with it. Every bundled skill is
