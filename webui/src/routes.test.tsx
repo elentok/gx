@@ -683,6 +683,7 @@ const diskOf = (over: Partial<DiskStatus> = {}): DiskStatus => ({
   id: "d1",
   name: "Macintosh HD",
   free_bytes: 4_200_000_000,
+  total_bytes: 500_000_000_000,
   projects: ["gx"],
   warned: true,
   held: false,

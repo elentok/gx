@@ -19,8 +19,9 @@ func readFreeSpace(path string) (DiskReading, error) {
 		return DiskReading{}, err
 	}
 	return DiskReading{
-		ID:   strconv.FormatUint(uint64(st.Dev), 10),
-		Name: unix.ByteSliceToString(fs.Mntonname[:]),
-		Free: fs.Bavail * uint64(fs.Bsize),
+		ID:    strconv.FormatUint(uint64(st.Dev), 10),
+		Name:  unix.ByteSliceToString(fs.Mntonname[:]),
+		Free:  fs.Bavail * uint64(fs.Bsize),
+		Total: fs.Blocks * uint64(fs.Bsize),
 	}, nil
 }

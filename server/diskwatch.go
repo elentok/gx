@@ -39,20 +39,23 @@ type DiskReading struct {
 	ID   string // device id, shared by every path on the volume
 	Name string // mount point or volume name
 	Free uint64 // bytes available to a non-root user
+	// Total is the size of the volume in bytes.
+	Total uint64
 }
 
 // DiskStatus is one disk, in the snapshot (warned or held disks only) and in
 // the disk status route (every known disk).
 type DiskStatus struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	FreeBytes uint64    `json:"free_bytes"`
-	Projects  []string  `json:"projects"`
-	Warned    bool      `json:"warned"`
-	Held      bool      `json:"held"`
-	ReadAt    time.Time `json:"read_at"`
-	Cleaning  bool      `json:"cleaning"`
-	LastClean string    `json:"last_clean"` // bytes freed, the failure, or that no command is set
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	FreeBytes  uint64    `json:"free_bytes"`
+	TotalBytes uint64    `json:"total_bytes"`
+	Projects   []string  `json:"projects"`
+	Warned     bool      `json:"warned"`
+	Held       bool      `json:"held"`
+	ReadAt     time.Time `json:"read_at"`
+	Cleaning   bool      `json:"cleaning"`
+	LastClean  string    `json:"last_clean"` // bytes freed, the failure, or that no command is set
 }
 
 type diskState struct {
@@ -70,7 +73,7 @@ type diskState struct {
 
 func (st *diskState) status(id string) DiskStatus {
 	return DiskStatus{ID: id, Name: st.reading.Name, FreeBytes: st.reading.Free,
-		Projects: slices.Clone(st.projects), Warned: st.warned, Held: st.held, ReadAt: st.at,
+		TotalBytes: st.reading.Total, Projects: slices.Clone(st.projects), Warned: st.warned, Held: st.held, ReadAt: st.at,
 		Cleaning: st.cleaning, LastClean: st.lastClean}
 }
 
@@ -163,6 +166,7 @@ func (s *Server) transition(r DiskReading, probe string, projects []string, now 
 	fn func(st *diskState, warn, clean uint64) diskChange) diskChange {
 	ds := s.settings.Load().DiskSpace
 	d := &s.disks
+	defer s.observeDiskHealth(now) // runs after the unlock below
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	st := d.disks[r.ID]

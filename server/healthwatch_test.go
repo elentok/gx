@@ -149,9 +149,6 @@ func TestHealth_UnknownReasons(t *testing.T) {
 		if got.CPU.State != server.HealthStateUnknown || got.CPU.Reason != server.HealthReasonWaiting {
 			t.Fatalf("cpu = %+v, want unknown/waiting", got.CPU)
 		}
-		if got.Disk.State != server.HealthStateUnknown || got.Disk.Reason != server.HealthReasonWaiting {
-			t.Fatalf("disk = %+v, want unknown/waiting", got.Disk)
-		}
 	})
 	for name, tc := range map[string]struct {
 		err    error

@@ -20,5 +20,6 @@ func readFreeSpace(path string) (DiskReading, error) {
 		return DiskReading{}, err
 	}
 	id := strconv.FormatUint(uint64(st.Dev), 10)
-	return DiskReading{ID: id, Name: "device " + id, Free: uint64(fs.Bavail) * uint64(fs.Bsize)}, nil
+	bsize := uint64(fs.Bsize)
+	return DiskReading{ID: id, Name: "device " + id, Free: uint64(fs.Bavail) * bsize, Total: fs.Blocks * bsize}, nil
 }

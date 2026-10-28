@@ -30,10 +30,28 @@ func TestFileFreeSpace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a.Free != 15_000_000_000 {
-		t.Fatalf("free = %d, want 15G", a.Free)
+	if a.Free != 15_000_000_000 || a.Total != 500_000_000_000 {
+		t.Fatalf("reading = %+v, want 15G free of 500G", a)
 	}
 	if a != b {
 		t.Fatalf("two paths read %+v and %+v, want one disk", a, b)
+	}
+
+	if err := os.WriteFile(free, []byte("8G/200G\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := read("/a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Free != 8_000_000_000 || c.Total != 200_000_000_000 {
+		t.Fatalf("reading = %+v, want 8G free of 200G", c)
+	}
+
+	if err := os.WriteFile(free, []byte("8G/bogus\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := read("/a"); err == nil {
+		t.Fatal("a bad total should be a read error")
 	}
 }

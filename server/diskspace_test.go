@@ -24,6 +24,9 @@ func TestReadFreeSpace_ReturnsFreeBytesAndStableID(t *testing.T) {
 	if a.Free == 0 || a.ID == "" || a.Name == "" {
 		t.Errorf("reading = %+v, want free bytes, id and name", a)
 	}
+	if a.Total <= a.Free {
+		t.Errorf("total = %d, want above free %d", a.Total, a.Free)
+	}
 	if a.ID != b.ID {
 		t.Errorf("ids differ on one disk: %q vs %q", a.ID, b.ID)
 	}

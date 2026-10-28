@@ -87,6 +87,40 @@ func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
 	}
 }
 
+// observeDiskHealth recomputes the disk meter from the disk watcher's own
+// status, the same list the disk status route shows, so the Tray and the banner
+// agree. It publishes an event only when the disk level or state changed.
+func (s *Server) observeDiskHealth(now time.Time) {
+	disks := s.diskStatuses(false)
+	cleanBelow := uint64(s.settings.Load().DiskSpace.CleanBelow)
+	in := make([]syshealth.Disk, len(disks))
+	for i, d := range disks {
+		in[i] = syshealth.Disk{Free: d.FreeBytes, Total: d.TotalBytes, Warned: d.Warned, Held: d.Held, CleanBelow: cleanBelow}
+	}
+	worst := syshealth.WorstDisk(in)
+	w := &s.healthW
+	w.mu.Lock()
+	old := w.health.Disk
+	cur := waitingMeter
+	if worst >= 0 {
+		level := -1
+		if old.State != HealthStateUnknown {
+			level = old.Level
+		}
+		cur = MeterHealth{
+			Level:  syshealth.NextLevel(level, in[worst].PercentUsed()),
+			State:  HealthState(in[worst].State()),
+			ReadAt: now,
+		}
+	}
+	w.health.Disk = cur
+	started := w.started
+	w.mu.Unlock()
+	if started && meterChanged(old, cur) {
+		s.events.publish(EventHealthChanged, "")
+	}
+}
+
 // meterChanged compares what a client shows; the reading time alone is no change.
 func meterChanged(a, b MeterHealth) bool {
 	return a.Level != b.Level || a.State != b.State || a.Reason != b.Reason

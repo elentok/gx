@@ -521,6 +521,10 @@ export interface DiskReading {
   ID: string; // device id, shared by every path on the volume
   Name: string; // mount point or volume name
   Free: number /* uint64 */; // bytes available to a non-root user
+  /**
+   * Total is the size of the volume in bytes.
+   */
+  Total: number /* uint64 */;
 }
 /**
  * DiskStatus is one disk, in the snapshot (warned or held disks only) and in
@@ -530,6 +534,7 @@ export interface DiskStatus {
   id: string;
   name: string;
   free_bytes: number /* uint64 */;
+  total_bytes: number /* uint64 */;
   projects: string[];
   warned: boolean;
   held: boolean;
