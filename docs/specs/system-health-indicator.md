@@ -333,9 +333,15 @@ the disk-space epic built them. The same Tray sits in the same place at phone wi
   - the pty and headless native runners: the claude pid and holder pid from the agent's
     `meta.json`;
   - the herdr runner: the pane's shell pid from `herdr pane process-info`, cached once per pane,
-    since a pane's shell pid never changes;
-  - web sessions: the holder pid and the claude pid from the holder ping (`ChildPID`);
+    since a pane's shell pid never changes. herdr gives no start time, so when the pane is first
+    cached the runner reads the shell pid's start time from the process reader and stores it with
+    the pid;
+  - web sessions: the holder pid and the claude pid from the holder ping. Today the ping returns
+    only the child pid (`ChildPID`), so the ping is extended to also return the holder pid and the
+    start times (Unix seconds) of the holder and the claude child, read with the process reader. A
+    holder too old to send them gives no owner for that session;
   - the gx server: its own pid.
+- Every known pid carries a start time. There is no match by pid alone.
 - Each process read builds one pid-to-owner map. For each process, walk up the parent pids from the
   same read (no extra calls) until a known pid. Check start times so a reused pid never matches.
 - Start times use one type everywhere in the owner walk: Unix seconds.
@@ -444,7 +450,10 @@ Seams:
    display-name rule (each subcommand tool, each interpreter, `python3.12`, `sh -c`, `node -e`, an
    interpreter with no script, a claude match named "claude", no argv) and the claude rule (each
    of the three matches, and a non-claude node process). A test that a `meta.json` `lstart` value
-   parses to the reader's start time for the same process.
+   parses to the reader's start time for the same process. A holder test that the ping's holder pid
+   and both start times match the reader's values, and that an older holder's ping reports them as
+   not known. A herdr runner test that the shell pid's start time is read once, when the pane is
+   first cached.
 3. **CLI.** `cmd` tests for `gx server health` against a fake server, plus
    `TestRouteTableHasCLIVerbs` and `TestWeb_EverythingElseIs404`.
 4. **Web.** Vitest for the Tray and the popover: every state of each meter, unknown, offline fade,
