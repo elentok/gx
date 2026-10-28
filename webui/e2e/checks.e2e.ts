@@ -28,6 +28,13 @@ test("64. Check config banner", async ({ page, start }) => {
   await expect(b).not.toContainText("auto");
   await expect(b.getByRole("button", nav("Not now"))).toBeVisible();
   await expect(b.getByRole("button", nav("Set up checks"))).toBeVisible();
+
+  // Wide screens keep the buttons on the text's row, to its right (mock banner-filtered).
+  await page.setViewportSize({ width: 1100, height: 800 });
+  const text = (await b.locator("p").boundingBox())!;
+  const notNow = (await b.getByRole("button", nav("Not now")).boundingBox())!;
+  expect(notNow.x).toBeGreaterThanOrEqual(text.x + text.width);
+  expect(notNow.y).toBeLessThan(text.y + text.height);
 });
 
 test("65. Check config banner, all projects", async ({ page, start }) => {

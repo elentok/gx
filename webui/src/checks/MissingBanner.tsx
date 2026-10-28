@@ -23,7 +23,7 @@ export function MissingBanner({
       aria-label="Missing check config"
       mt="4"
       display="flex"
-      flexWrap="wrap"
+      flexWrap={{ base: "wrap", md: "nowrap" }}
       gap="3"
       justifyContent="space-between"
       alignItems={one ? "center" : "flex-start"}
