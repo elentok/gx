@@ -2,6 +2,7 @@ package claudeenv
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -48,3 +49,27 @@ func TestIn_ReturnsEnvEntriesAndLeavesTheProcessEnvAlone(t *testing.T) {
 		}
 	}
 }
+
+func TestIn_GoCachesStayOutsideTempHome(t *testing.T) {
+	if _, err := exec.LookPath("go"); err != nil {
+		t.Skip("go not on PATH")
+	}
+	home := t.TempDir()
+
+	env := In(home)
+
+	for _, k := range []string{"GOCACHE", "GOMODCACHE"} {
+		var got string
+		for _, kv := range env {
+			if key, val, _ := strings.Cut(kv, "="); key == k {
+				got = val
+			}
+		}
+		if got == "" {
+			t.Errorf("env has no %s entry", k)
+		} else if strings.HasPrefix(got, home) {
+			t.Errorf("%s = %q is under the temp HOME %q, want the real cache", k, got, home)
+		}
+	}
+}
+

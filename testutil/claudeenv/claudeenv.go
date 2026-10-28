@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // poisoned puts claude into vim mode, which changes how the ready-to-type step
