@@ -59,6 +59,7 @@ func (r *running) cardsOf(t *testing.T) []server.EpicListRow {
 }
 
 func TestUnitedScenarioHasACardPerSectionAndReason(t *testing.T) {
+	t.Parallel()
 	r := start(t, "united")
 	// name|section|pill. Running, queued and permission cards appear once the
 	// server has launched the workers, so the list is polled.
@@ -146,9 +147,18 @@ func startWith(t *testing.T, scenario string, env []string, flags ...string) *ru
 	}
 	r := &running{cmd: cmd}
 	t.Cleanup(func() {
-		if !r.stopped {
+		if r.stopped {
+			return
+		}
+		// SIGTERM lets the fixture stop its server and holders; a kill orphans them.
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		done := make(chan struct{})
+		go func() { _ = cmd.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(30 * time.Second):
 			_ = cmd.Process.Kill()
-			_ = cmd.Wait()
+			<-done
 		}
 	})
 	line, err := bufio.NewReader(stdout).ReadBytes('\n')
@@ -222,8 +232,10 @@ func get(t *testing.T, url string) int {
 }
 
 func TestScenarios_StartAnswerAndStop(t *testing.T) {
+	t.Parallel()
 	for _, name := range scenarioNames() {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 			r := start(t, name)
 			if r.StateDir == "" || r.HoldFile == "" || r.Socket == "" {
 				t.Fatalf("output = %+v, want state dir, socket and hold file", r.Output)
@@ -278,6 +290,7 @@ func TestShellEnv_ExportsTheCLIEnvAndTheFixtureVariablesQuoted(t *testing.T) {
 }
 
 func TestFixture_NeverTouchesTheRealHomeOrState(t *testing.T) {
+	t.Parallel()
 	decoy := t.TempDir()
 	env := []string{"HOME=" + decoy, "CLAUDE_CONFIG_DIR=" + filepath.Join(decoy, "claude")}
 	for _, k := range []string{"XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CONFIG_HOME"} {
@@ -296,6 +309,7 @@ func TestFixture_NeverTouchesTheRealHomeOrState(t *testing.T) {
 }
 
 func TestFinishingScenario_LastTicketFinishesAndMerges(t *testing.T) {
+	t.Parallel()
 	r := start(t, "finishing")
 	const last = "demo:finishing-epic/02"
 	deadline := time.Now().Add(90 * time.Second)
@@ -334,6 +348,32 @@ func (r *running) web(t *testing.T) *web {
 // post sends a write as the web page does and fails on a refusal.
 func (w *web) post(t *testing.T, path string, body any) {
 	t.Helper()
+	if data, ok := w.try(t, path, body); !ok {
+		t.Fatalf("POST %s refused: %s", path, data)
+	}
+}
+
+// postWhenIdle is post, retried while the server still reports the session as
+// working: its status lags the fake's turn, as promptWhenIdle describes.
+func (r *running) postWhenIdle(t *testing.T, id, path string, body any) {
+	t.Helper()
+	w := r.web(t)
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		data, ok := w.try(t, path, body)
+		if ok {
+			return
+		}
+		if !strings.Contains(data, "session-not-idle") || time.Now().After(deadline) {
+			t.Fatalf("POST %s refused: %s", path, data)
+		}
+		r.waitIdle(t, id)
+	}
+}
+
+// try posts once and reports whether the server took the write; data is the response.
+func (w *web) try(t *testing.T, path string, body any) (data string, ok bool) {
+	t.Helper()
 	raw, _ := json.Marshal(body)
 	req, err := http.NewRequest(http.MethodPost, w.origin+path, strings.NewReader(string(raw)))
 	if err != nil {
@@ -346,13 +386,12 @@ func (w *web) post(t *testing.T, path string, body any) {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
-	data, _ := io.ReadAll(resp.Body)
+	raw, _ = io.ReadAll(resp.Body)
 	var out struct {
 		Refused bool `json:"refused"`
 	}
-	if err := json.Unmarshal(data, &out); err != nil || resp.StatusCode != http.StatusOK || out.Refused {
-		t.Fatalf("POST %s = %d: %s", path, resp.StatusCode, data)
-	}
+	err = json.Unmarshal(raw, &out)
+	return fmt.Sprintf("%d: %s", resp.StatusCode, raw), err == nil && resp.StatusCode == http.StatusOK && !out.Refused
 }
 
 func (r *running) detail(t *testing.T, address string) server.TicketDetail {
@@ -406,6 +445,7 @@ func (r *running) issueFiles(t *testing.T, project, epic string) map[string]stri
 }
 
 func TestManyDoneScenario_FiveMergedWithDistinctCloseTimesAndOneOpen(t *testing.T) {
+	t.Parallel()
 	r := start(t, "many-done")
 	closed := map[string]bool{}
 	open := 0
@@ -428,6 +468,7 @@ func TestManyDoneScenario_FiveMergedWithDistinctCloseTimesAndOneOpen(t *testing.
 }
 
 func TestDesignScenario_HasATimedDoneTicket(t *testing.T) {
+	t.Parallel()
 	r := start(t, "design")
 	data := r.issueFiles(t, "demo", "design-epic")["03-timed.md"]
 	for _, want := range []string{"status: done\n", "claimed_at: 2026-01-01T10:00:00Z\n", "done_at: 2026-01-01T10:02:30Z\n"} {
@@ -439,6 +480,7 @@ func TestDesignScenario_HasATimedDoneTicket(t *testing.T) {
 }
 
 func TestUnitedScenario_HasADraftImplEpic(t *testing.T) {
+	t.Parallel()
 	r := start(t, "united")
 	root := filepath.Dir(filepath.Dir(r.StateDir))
 	meta, err := os.ReadFile(filepath.Join(root, "data", "gx", "tickets", "demo", "publishing-epic-impl", "ticket.md"))
@@ -452,6 +494,7 @@ func TestUnitedScenario_HasADraftImplEpic(t *testing.T) {
 }
 
 func TestUnitedScenario_CarriesTheCardTimeStamps(t *testing.T) {
+	t.Parallel()
 	r := start(t, "united")
 	root := filepath.Dir(filepath.Dir(r.StateDir))
 	read := func(path ...string) string {
@@ -488,6 +531,7 @@ func TestUnitedScenario_CarriesTheCardTimeStamps(t *testing.T) {
 }
 
 func TestDesignScenario_StampsTheMapsDesignStart(t *testing.T) {
+	t.Parallel()
 	r := start(t, "design")
 	root := filepath.Dir(filepath.Dir(r.StateDir))
 	meta, err := os.ReadFile(filepath.Join(root, "data", "gx", "tickets", "demo", "design-epic", "ticket.md"))
@@ -501,6 +545,7 @@ func TestDesignScenario_StampsTheMapsDesignStart(t *testing.T) {
 }
 
 func TestConfigFlag_WritesTheKeyIntoTheFixtureConfig(t *testing.T) {
+	t.Parallel()
 	r := startWith(t, "empty", nil, "--config", "server.remote-control=true", "--config", "extra.name=hello")
 	root := filepath.Dir(filepath.Dir(r.StateDir))
 	raw, err := os.ReadFile(filepath.Join(root, "home", ".config", "gx", "config.json"))
@@ -526,6 +571,7 @@ func TestConfigFlag_WritesTheKeyIntoTheFixtureConfig(t *testing.T) {
 }
 
 func TestPausedScenario_OneTicketPerRecoveryPath(t *testing.T) {
+	t.Parallel()
 	r := start(t, "paused")
 	cases := []struct {
 		id, reason, action string
@@ -580,6 +626,7 @@ func (r *running) roundTypes(t *testing.T, project, epic, id string) []string {
 }
 
 func TestPausedScenario_EachPauseHasTheRoundOfItsKind(t *testing.T) {
+	t.Parallel()
 	r := start(t, "paused")
 	// A question only where the reply goes to the agent.
 	for id, want := range map[string]string{
@@ -606,6 +653,7 @@ func TestPausedScenario_EachPauseHasTheRoundOfItsKind(t *testing.T) {
 }
 
 func TestDirtyTrunkScenario_RootPausedOnADirtyCheckout(t *testing.T) {
+	t.Parallel()
 	r := start(t, "dirty-trunk")
 	repo := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "repo")
 	status, err := exec.Command("git", "-C", repo, "status", "--porcelain").Output()
@@ -628,6 +676,7 @@ func TestDirtyTrunkScenario_RootPausedOnADirtyCheckout(t *testing.T) {
 }
 
 func TestPausedScenario_WebRecoveryClearsEachPause(t *testing.T) {
+	t.Parallel()
 	r := start(t, "paused")
 	w := r.web(t)
 
@@ -749,6 +798,7 @@ func roundLabels(chat server.SessionChatResponse) []string {
 }
 
 func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
+	t.Parallel()
 	r := start(t, "design")
 	if step := r.currentStep(t); step != server.ProgressResolveTickets {
 		t.Errorf("current step = %q, want resolve-tickets", step)
@@ -773,8 +823,7 @@ func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 		t.Fatalf("round labels = %v, want 8 and 8b", got)
 	}
 
-	r.waitIdle(t, id)
-	r.gx(t, "agents", "prompt", id, "SQLite, and yes to the migration")
+	r.promptWhenIdle(t, id, "SQLite, and yes to the migration")
 	chat = r.waitChat(t, id, func(c server.SessionChatResponse) bool { return c.Next != nil })
 	if len(chat.Next.Action.Action) == 0 {
 		t.Errorf("next = %+v, want the Continue action", chat.Next)
@@ -783,7 +832,7 @@ func TestDesignScenario_SeededMapAndScriptedChat(t *testing.T) {
 	// Continue as the page sends it; the CLI's run-action needs the session's
 	// Actionable, which an answer typed by the server does not clear.
 	r.waitIdle(t, id)
-	r.web(t).post(t, "/v1/sessions/prompt", map[string]any{"id": id, "continue": true, "last_message": chat.Messages[len(chat.Messages)-1].ID})
+	r.postWhenIdle(t, id, "/v1/sessions/prompt", map[string]any{"id": id, "continue": true, "last_message": chat.Messages[len(chat.Messages)-1].ID})
 	r.waitChat(t, id, func(c server.SessionChatResponse) bool { return slices.Equal(roundLabels(c), []string{"9"}) })
 	r.stop(t)
 }
@@ -864,6 +913,7 @@ func agentTexts(chat server.SessionChatResponse) []string {
 }
 
 func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
+	t.Parallel()
 	const runEnd = "scripted run is over"
 	tests := []struct {
 		scenario string
@@ -878,6 +928,7 @@ func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.scenario, func(t *testing.T) {
+			t.Parallel()
 			// A long countdown keeps the server from answering run-end lines itself.
 			r := startWith(t, tt.scenario, nil, "--auto-advance-delay", "1h")
 			id := r.openDesign(t)
@@ -896,6 +947,7 @@ func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
 }
 
 func TestGrillingStatsScenario_StatsReturnTheSeededTotals(t *testing.T) {
+	t.Parallel()
 	r := start(t, "grilling-stats")
 	tests := []struct {
 		args             []string
@@ -941,6 +993,7 @@ func TestGrillingStatsScenario_StatsReturnTheSeededTotals(t *testing.T) {
 }
 
 func TestStart_AutoAdvanceDelayFlagIsAccepted(t *testing.T) {
+	t.Parallel()
 	r := startWith(t, "design", nil, "--auto-advance-delay", "50ms")
 	r.stop(t)
 }
@@ -969,6 +1022,7 @@ func kindOf(p server.ProjectChecks, kind string) server.KindCheck {
 }
 
 func TestChecksMissingScenarioReportsBothProjectsMissing(t *testing.T) {
+	t.Parallel()
 	got := start(t, "checks-missing").checksOf(t)
 	if !got["demo"].Missing || !got["auto"].Missing {
 		t.Fatalf("want demo and auto missing, got %+v", got)
@@ -983,6 +1037,7 @@ func TestChecksMissingScenarioReportsBothProjectsMissing(t *testing.T) {
 }
 
 func TestOtherScenariosReportNoMissingChecks(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"united", "empty"} {
 		for p, c := range start(t, name).checksOf(t) {
 			if c.Missing {

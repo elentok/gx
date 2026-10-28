@@ -173,6 +173,7 @@ func TestProjectOnboard_EditValidSaves(t *testing.T) {
 }
 
 func TestProjectOnboard_KeepDefaultsSavesEmptyConfig(t *testing.T) {
+	t.Parallel()
 	e := newOnboardEnv(t)
 	if err := e.add(t, e.deps(t, true, "3\n2\n"), false); err != nil {
 		t.Fatal(err)

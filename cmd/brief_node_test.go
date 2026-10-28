@@ -96,6 +96,7 @@ func TestBrief_NodeBinaryWalkUp(t *testing.T) {
 }
 
 func TestBrief_NodeForcedArgs(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	vrec := nodeStub(t, repo, "vitest", "vitest-pass.json", 0)
 	trec := nodeStub(t, repo, "tsc", "tsc-pass.txt", 0)

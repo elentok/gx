@@ -56,6 +56,7 @@ func launchHolder() {
 }
 
 func TestHolder_OutlivesLauncherAndRecordsChildExit(t *testing.T) {
+	t.Parallel()
 	dir := shortTempDir(t)
 	stop := filepath.Join(dir, "stop")
 	const sessionID = "11111111-2222-4333-8444-555555555555"

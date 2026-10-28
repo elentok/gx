@@ -69,6 +69,7 @@ func ptyKeysTyped(t *testing.T, p *nativerunner.Pty, text string) (string, error
 // to a clean config dir types straight away, and vim mode in the config dir
 // presses `i` first, which the TUI fake never answers with an INSERT marker.
 func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
+	t.Parallel()
 	t.Run("poisoned home, clean config dir", func(t *testing.T) {
 		p := newPty(t)
 		p.Env = append(claudeenv.In(t.TempDir()), holderEnv+"=1", agentfake.TUIEnv+"=1")
@@ -94,6 +95,7 @@ func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
 // With BackgroundTasks nil, a Pty reads the transcript under the HOME in its
 // Env, and gates on nothing without one.
 func TestPty_BackgroundTasksFallbackReadsEnvHome(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 	if err != nil {
@@ -141,7 +143,8 @@ func TestPty_Conformance(t *testing.T) {
 	runnertest.Run(t, func(t *testing.T) runnertest.Harness {
 		p := newPty(t)
 		return runnertest.Harness{
-			Runner: p,
+			Runner:   p,
+			Parallel: true,
 			FinishTurn: func(t *testing.T, s agentrunner.Session) {
 				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionFinish})
 			},
@@ -246,8 +249,9 @@ func blockedPty(t *testing.T, p *nativerunner.Pty, stalled bool) agentrunner.Ses
 }
 
 func TestPty_DenyReasonFallbackOnOlderHolder(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
-	t.Setenv(holderNoOpsEnv, "1")
+	p.Env = append(p.Env, holderNoOpsEnv+"=1")
 	s := blockedPty(t, p, false)
 
 	if err := p.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: "use rg"}); err != nil {
@@ -272,9 +276,9 @@ func TestPty_DenyReasonIdleTimeoutIsSessionDied(t *testing.T) {
 		{"fallback", "1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			p := newPty(t)
-			t.Setenv(holderDenyTimeoutEnv, "200ms")
-			t.Setenv(holderNoOpsEnv, tc.noOps)
+			p.Env = append(p.Env, holderDenyTimeoutEnv+"=200ms", holderNoOpsEnv+"="+tc.noOps)
 			s := blockedPty(t, p, true)
 
 			err := p.Answer(s, agentrunner.Answer{Decision: agentrunner.DecisionDeny, Text: "use rg"})
@@ -297,9 +301,9 @@ func TestPty_StartAnswersTrustDialog(t *testing.T) {
 		{"first key dropped", "1"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			p := newPty(t)
-			t.Setenv(agentfake.TUITrustEnv, "1")
-			t.Setenv(agentfake.TUITrustDropKeyEnv, tc.dropKey)
+			p.Env = append(p.Env, agentfake.TUITrustEnv+"=1", agentfake.TUITrustDropKeyEnv+"="+tc.dropKey)
 			s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 			if err != nil {
 				t.Fatal(err)
@@ -313,6 +317,7 @@ func TestPty_StartAnswersTrustDialog(t *testing.T) {
 }
 
 func TestPty_StartFailsFastWhenClaudeExits(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	p.Claude = "false"
 	began := time.Now()
@@ -326,9 +331,10 @@ func TestPty_StartFailsFastWhenClaudeExits(t *testing.T) {
 }
 
 func TestPty_StartWithoutPidFileFailsWithScreen(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	p.StartTimeout = 500 * time.Millisecond
-	t.Setenv(agentfake.TUINoPidFileEnv, "1")
+	p.Env = append(p.Env, agentfake.TUINoPidFileEnv+"=1")
 	_, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 	if !errors.Is(err, agentrunner.ErrMissingCapability) || !strings.Contains(err.Error(), "Welcome to Claude Code") {
 		t.Fatalf("Start = %v; want ErrMissingCapability with the screen", err)
@@ -339,6 +345,7 @@ func TestPty_StartWithoutPidFileFailsWithScreen(t *testing.T) {
 }
 
 func TestPty_StuckPromptNudgesAndRetypesOnce(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 	if err != nil {
@@ -360,6 +367,7 @@ func TestPty_StuckPromptNudgesAndRetypesOnce(t *testing.T) {
 }
 
 func TestPty_MultiLinePromptKeepsRawLF(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 	if err != nil {
@@ -380,6 +388,7 @@ func TestPty_MultiLinePromptKeepsRawLF(t *testing.T) {
 }
 
 func TestPty_BlockedReasonIsWaitingFor(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 	if err != nil {
@@ -394,6 +403,7 @@ func TestPty_BlockedReasonIsWaitingFor(t *testing.T) {
 }
 
 func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	cwd := t.TempDir()
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: cwd, Kind: "claude"})
@@ -445,6 +455,7 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 }
 
 func TestPty_ResumeStartsClaudeWithResumeAlone(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	const prev = "0b1f6c2e-5d1a-4a53-9a57-0c8f2f7f3a11"
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude", ResumeSessionID: prev})
@@ -473,6 +484,7 @@ func TestPty_ResumeStartsClaudeWithResumeAlone(t *testing.T) {
 }
 
 func TestPty_ClaudeExitIsSessionDiedWithCode(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 	if err != nil {
@@ -489,6 +501,7 @@ func TestPty_ClaudeExitIsSessionDiedWithCode(t *testing.T) {
 // The holder's status reports the exit while it winds down, before exit-code is
 // on disk.
 func TestPty_ExitBeforeExitCodeFileIsClaudeExited(t *testing.T) {
+	t.Parallel()
 	p := &nativerunner.Pty{Root: t.TempDir()}
 	err := nativerunner.Died(p, "e-01", fmt.Errorf("wait: %w", &nativerunner.ClaudeExitedError{Code: 3}))
 	if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.HasSuffix(err.Error(), ": claude exited (code 3)") || strings.Contains(err.Error(), "holder failed") {
@@ -497,6 +510,7 @@ func TestPty_ExitBeforeExitCodeFileIsClaudeExited(t *testing.T) {
 }
 
 func TestPty_HolderCrashIsSessionDied(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 	if err != nil {
@@ -534,6 +548,7 @@ func TestPty_HolderCrashIsSessionDied(t *testing.T) {
 }
 
 func TestPty_StopRemovesHolderSock(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 	if err != nil {
@@ -552,6 +567,7 @@ func TestPty_StopRemovesHolderSock(t *testing.T) {
 }
 
 func TestPty_CleanupRemovesStaleHolderSock(t *testing.T) {
+	t.Parallel()
 	p := &nativerunner.Pty{Root: t.TempDir()}
 	dir := filepath.Join(p.Root, "e-01")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -572,6 +588,7 @@ func TestPty_CleanupRemovesStaleHolderSock(t *testing.T) {
 // An upgrade must never pause a live pty run: a holder that predates the
 // version field and every optional op is still adopted.
 func TestPty_ReattachAdoptsOlderHolder(t *testing.T) {
+	t.Parallel()
 	p, dir := preparePtyAgent(t, ptyAgentProcs())
 	serveOldHolder(t, dir, map[string]any{
 		"ping":   map[string]any{"pid": agentPID},
@@ -610,6 +627,7 @@ func (g *gatedProcs) Lookup(pid int) (nativerunner.Process, bool, error) {
 // Reattach's ps lookup and holder dial can be slow, so they must not block
 // calls for the runner's other sessions.
 func TestPty_ReattachDoesNotBlockOtherCalls(t *testing.T) {
+	t.Parallel()
 	procs := &gatedProcs{fakeProcs: ptyAgentProcs(), entered: make(chan struct{}), release: make(chan struct{})}
 	p, dir := preparePtyAgent(t, procs.fakeProcs)
 	p.Procs = procs
@@ -647,6 +665,7 @@ func TestPty_ReattachDoesNotBlockOtherCalls(t *testing.T) {
 // Interactive claude stays alive after its turn, so any pty agent found dead
 // died, even one whose last turn ended.
 func TestPty_ReattachDeadAgentDied(t *testing.T) {
+	t.Parallel()
 	reused := nativerunner.Process{Start: "Tue Oct  7 09:00:00 2026", Cmdline: "claude --session-id " + agentSID}
 	tests := []struct {
 		name   string
@@ -762,8 +781,9 @@ func serveOldHolder(t *testing.T, dir string, resps map[string]any) {
 // While a deny-reason step runs, the holder refuses keys, and the runner
 // reports that as ErrNotReady rather than a dead session.
 func TestPty_KeysDuringDenyReasonAreNotReady(t *testing.T) {
+	t.Parallel()
 	p := newPty(t)
-	t.Setenv(holderDenyTimeoutEnv, "1500ms")
+	p.Env = append(p.Env, holderDenyTimeoutEnv+"=1500ms")
 	s := blockedPty(t, p, true)
 
 	denied := make(chan error, 1)

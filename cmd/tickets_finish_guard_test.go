@@ -97,6 +97,7 @@ func (f *finishFixture) assertUnwritten(t *testing.T) {
 }
 
 func TestExecute_TicketsSet_FinishGuard(t *testing.T) {
+	t.Parallel()
 	t.Run("commit with no record is refused", func(t *testing.T) {
 		f := newFinishFixture(t)
 		commitFile(t, f.wt, "a.txt", "a")

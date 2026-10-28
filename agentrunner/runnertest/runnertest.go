@@ -51,6 +51,9 @@ type Harness struct {
 	OpenDialogOnNextPrompt func(t *testing.T, s agentrunner.Session)
 	// Skip maps a scenario this runner can't pass yet to the reason why.
 	Skip map[string]string
+	// Parallel runs the scenario beside the others. Set it only when the
+	// harness shares no process state (env vars, cwd) across scenarios.
+	Parallel bool
 }
 
 // waitTimeout bounds every Wait expected to succeed.
@@ -104,6 +107,9 @@ func Run(t *testing.T, newHarness func(t *testing.T) Harness) {
 			h := newHarness(t)
 			if reason, ok := h.Skip[sc.name]; ok {
 				t.Skip(reason)
+			}
+			if h.Parallel {
+				t.Parallel()
 			}
 			sc.fn(t, h)
 		})

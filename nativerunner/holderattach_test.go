@@ -185,6 +185,7 @@ func TestHolderAttach_KeyEchoSkipsThePacing(t *testing.T) {
 }
 
 func TestHolderAttach_SlowClientRecoversWithAFullFrame(t *testing.T) {
+	t.Parallel()
 	// Redraws every row but the first, so only a full frame carries them all.
 	c, dir := scriptHolder(t, `printf ready; `+waitGo+
 		`i=0; while true; do line=$(printf '%0190d' $i); r=2; `+

@@ -58,6 +58,7 @@ func gitOut(t *testing.T, dir string, args ...string) string {
 }
 
 func TestCheck_DefaultsRunOnlyRowsOfChangedFiles(t *testing.T) {
+	t.Parallel()
 	repo := checkRepo(t, `{}`)
 	tools := fakeTools(t, nil, "gofmt", "shfmt", "shellcheck", "basedpyright", "ty", "go")
 	testutil.WriteFile(t, repo, "a.go", "package a\n")
@@ -223,6 +224,7 @@ func TestCheck_FullRunTestsEveryGoDirectory(t *testing.T) {
 }
 
 func TestCheck_FailingGoTestIsNamedUnderTheTestLine(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestBroken(t *testing.T) { t.Fatal(\"boom\") }\nfunc TestFine(t *testing.T) {}\n")

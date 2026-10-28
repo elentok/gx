@@ -31,6 +31,7 @@ func indexLines(t *testing.T, data string) []string {
 }
 
 func TestBrief_SweepRemovesOldLogsAndIndexLines(t *testing.T) {
+	t.Parallel()
 	data := envValue(envFor(t), "XDG_DATA_HOME")
 	dir := briefDir(data)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -73,6 +74,7 @@ func TestBrief_SweepRemovesOldLogsAndIndexLines(t *testing.T) {
 }
 
 func TestBrief_SweepErrorDoesNotFailRun(t *testing.T) {
+	t.Parallel()
 	data := envValue(envFor(t), "XDG_DATA_HOME")
 	dir := briefDir(data)
 	// A directory named like a log, an unparsable index line and an index

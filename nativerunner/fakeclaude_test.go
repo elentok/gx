@@ -33,6 +33,7 @@ func fakeclaudeRunner(t *testing.T) *nativerunner.Pty {
 }
 
 func TestFakeclaude_PtyReadsScreenAndAnswersPermission(t *testing.T) {
+	t.Parallel()
 	p := fakeclaudeRunner(t)
 	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
 	if err != nil {

@@ -2,11 +2,22 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 )
+
+// goBuildCache is the real Go build cache. A temp HOME would give each child
+// `go test` a cold cache, so every one recompiles the standard library.
+var goBuildCache = sync.OnceValue(func() string {
+	out, err := exec.Command("go", "env", "GOCACHE").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+})
 
 // tempEnv returns an env (KEY=VALUE entries) rooted in a fresh temp HOME, with
 // every XDG base dir under it. Pass it as the env field of deps, or to
@@ -17,6 +28,7 @@ func tempEnv(t *testing.T) []string {
 	home := t.TempDir()
 	return []string{
 		"HOME=" + home,
+		"GOCACHE=" + goBuildCache(),
 		"PATH=" + os.Getenv("PATH"),
 		"XDG_CONFIG_HOME=" + filepath.Join(home, ".config"),
 		"XDG_DATA_HOME=" + filepath.Join(home, ".local", "share"),

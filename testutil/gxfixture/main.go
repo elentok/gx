@@ -123,7 +123,7 @@ func run(args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(root)
+	defer removeAll(root)
 	// /tmp is a symlink on macOS: claude slugs transcripts by the real path, so
 	// record dirs must use it too.
 	if root, err = filepath.EvalSymlinks(root); err != nil {
@@ -550,6 +550,18 @@ func (f *fixture) shutdown(srv *exec.Cmd, exited <-chan error) {
 		<-exited
 	}
 	_ = exec.Command("pkill", "-f", f.root).Run()
+}
+
+// removeAll retries because a holder that pkill just signalled can still be
+// writing into dir while it dies, which fails a single RemoveAll.
+func removeAll(dir string) {
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+		if os.RemoveAll(dir) == nil {
+			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				return
+			}
+		}
+	}
 }
 
 // binary returns given when set, and otherwise builds pkg into out.

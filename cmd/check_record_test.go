@@ -122,6 +122,7 @@ func TestCheck_ConfiguredCommandWithoutBriefRecordsNoTestNames(t *testing.T) {
 }
 
 func TestCheck_BriefCalledByConfiguredCommandNamesFailingTests(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("builds the gx binary")
 	}

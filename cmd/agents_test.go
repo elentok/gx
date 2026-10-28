@@ -78,6 +78,7 @@ func TestAgentsChat_JSON(t *testing.T) {
 }
 
 func TestAgentsScreen_JSON(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
 	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
