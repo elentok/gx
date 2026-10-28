@@ -738,7 +738,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Build = s.cfg.Build
 	snap.Budget = s.budgetStatus(time.Now())
 	snap.ExtraUsage = s.extraUsageOn()
-	snap.Disks = s.warnedDisks()
+	snap.Disks = s.listedDisks()
 	snap.Pending = s.pendingRows()
 	snap.Epics = s.epicSummaries(snap.Tickets)
 	snap.RecentlyFinished = s.idx.recentlyFinished(s.settings.Load().RecentlyFinished)

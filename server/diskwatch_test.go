@@ -197,7 +197,7 @@ func TestDiskWatch_HysteresisSendsOneNoticePerDrop(t *testing.T) {
 // Seam: a zero warn threshold never marks a disk.
 func TestDiskWatch_ZeroWarnThresholdSendsNothing(t *testing.T) {
 	repo := t.TempDir()
-	r := startDiskRig(t, map[string]string{"proj": repo}, 0)
+	r := startDiskRig(t, map[string]string{"proj": repo}, 0, func(c *server.Config) { c.DiskSpace.CleanBelow = 0 })
 	r.disks.Put(repo, "d1", "/vol1", 1)
 	letWatcherRead()
 	if d := r.disksWhen(t, "no disks", noDisks); len(d) != 0 || r.notice() != 0 {

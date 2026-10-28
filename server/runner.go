@@ -328,6 +328,9 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 	if _, missing := s.unavailablePath(addr.Project); missing {
 		return false, nil
 	}
+	if _, held := s.freshHeldDisk(addr.Project); held {
+		return false, nil
+	}
 	if _, missing := s.trunkMissing.get(addr.Project); missing {
 		return false, nil
 	}

@@ -252,6 +252,9 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if res, refused := s.budgetRefusal(); refused {
 			return res, nil
 		}
+		if d, held := s.freshHeldDisk(ref.addr.Project); held {
+			return refusal(ReasonDiskLow, diskLowReason(d)), nil
+		}
 		if res, refused, err := s.settleLive([]tickets.Address{ref.addr}, req.Stop, ReasonAgentWorking, isWorking); refused || err != nil {
 			return res, err
 		}

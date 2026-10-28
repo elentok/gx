@@ -418,6 +418,18 @@ export const NoticeDiskWarn = "disk-warn";
  */
 export const EventDiskWarnChanged = "disk-warn-changed";
 /**
+ * NoticeDiskResume is the notify kind for a held disk that climbed back to the clean threshold.
+ */
+export const NoticeDiskResume = "disk-resume";
+/**
+ * VerdictDiskLow is the explain verdict for a queued ticket whose project watches a held disk.
+ */
+export const VerdictDiskLow = "disk low";
+/**
+ * ReasonDiskLow refuses a relaunch while a disk of the ticket's project is held.
+ */
+export const ReasonDiskLow = "disk-low";
+/**
  * DiskReading is one free-space reading of a disk (a volume, not a path).
  */
 export interface DiskReading {
@@ -426,8 +438,8 @@ export interface DiskReading {
   Free: number /* uint64 */; // bytes available to a non-root user
 }
 /**
- * DiskStatus is one disk, in the snapshot (warned disks only) and in the disk
- * status route (every known disk).
+ * DiskStatus is one disk, in the snapshot (warned or held disks only) and in
+ * the disk status route (every known disk).
  */
 export interface DiskStatus {
   id: string;
@@ -435,6 +447,7 @@ export interface DiskStatus {
   free_bytes: number /* uint64 */;
   projects: string[];
   warned: boolean;
+  held: boolean;
   read_at: string;
 }
 /**

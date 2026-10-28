@@ -21,6 +21,12 @@ const (
 	NoticeDiskWarn = "disk-warn"
 	// EventDiskWarnChanged is emitted when a disk's warn mark is set or cleared.
 	EventDiskWarnChanged = "disk-warn-changed"
+	// NoticeDiskResume is the notify kind for a held disk that climbed back to the clean threshold.
+	NoticeDiskResume = "disk-resume"
+	// VerdictDiskLow is the explain verdict for a queued ticket whose project watches a held disk.
+	VerdictDiskLow = "disk low"
+	// ReasonDiskLow refuses a relaunch while a disk of the ticket's project is held.
+	ReasonDiskLow = "disk-low"
 
 	defaultDiskPoll = time.Minute
 	// diskWarnMargin is how far above the warn threshold a disk must climb
@@ -35,14 +41,15 @@ type DiskReading struct {
 	Free uint64 // bytes available to a non-root user
 }
 
-// DiskStatus is one disk, in the snapshot (warned disks only) and in the disk
-// status route (every known disk).
+// DiskStatus is one disk, in the snapshot (warned or held disks only) and in
+// the disk status route (every known disk).
 type DiskStatus struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
 	FreeBytes uint64    `json:"free_bytes"`
 	Projects  []string  `json:"projects"`
 	Warned    bool      `json:"warned"`
+	Held      bool      `json:"held"`
 	ReadAt    time.Time `json:"read_at"`
 }
 
@@ -51,18 +58,29 @@ type diskState struct {
 	at       time.Time
 	projects []string
 	warned   bool
+	held     bool // dispatch is held: free space dropped under the clean threshold
+}
+
+func (st *diskState) status(id string) DiskStatus {
+	return DiskStatus{ID: id, Name: st.reading.Name, FreeBytes: st.reading.Free,
+		Projects: slices.Clone(st.projects), Warned: st.warned, Held: st.held, ReadAt: st.at}
 }
 
 // diskWatch is the per-disk state. Every reading goes through observe, under mu.
 type diskWatch struct {
 	mu    sync.Mutex
 	disks map[string]*diskState
+
+	goCacheOnce sync.Once
+	goCachePath string
 }
 
 // observe applies one reading to the state machine. projects is who watches
-// the disk now; nil keeps the last list.
-func (s *Server) observe(r DiskReading, projects []string, now time.Time) {
-	warn := uint64(s.settings.Load().DiskSpace.WarnBelow)
+// the disk now; nil keeps the last list. It reports whether the disk is held
+// after this reading.
+func (s *Server) observe(r DiskReading, projects []string, now time.Time) (held bool) {
+	ds := s.settings.Load().DiskSpace
+	warn, clean := uint64(ds.WarnBelow), uint64(ds.CleanBelow)
 	d := &s.disks
 	d.mu.Lock()
 	st := d.disks[r.ID]
@@ -77,45 +95,112 @@ func (s *Server) observe(r DiskReading, projects []string, now time.Time) {
 	if projects != nil {
 		st.projects = projects
 	}
-	var changed, set bool
+	var changed, warnSet, holdSet, resumed bool
 	switch {
 	case !st.warned && warn > 0 && r.Free < warn:
-		st.warned, changed, set = true, true, true
+		st.warned, changed, warnSet = true, true, true
 	case st.warned && (warn == 0 || r.Free > warn+diskWarnMargin):
 		st.warned, changed = false, true
 	}
+	switch {
+	case !st.held && clean > 0 && r.Free < clean:
+		st.held, changed, holdSet = true, true, true
+	case st.held && (clean == 0 || r.Free >= clean):
+		st.held, changed, resumed = false, true, true
+	}
+	held = st.held
 	d.mu.Unlock()
 	if !changed {
-		return
+		return held
 	}
 	s.events.publish(EventDiskWarnChanged, "")
-	if set {
+	if warnSet {
 		s.log.Warn("disk low on space", "disk", r.Name, "free", r.Free, "warn_below", warn)
 		s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskWarn, Emoji: "💾", Title: "low disk space on " + r.Name,
 			Detail: humanize.Bytes(r.Free) + " free, under the warn threshold of " + humanize.Bytes(warn)})
 	}
+	if holdSet {
+		s.log.Warn("disk low, holding dispatch", "disk", r.Name, "free", r.Free, "clean_below", clean)
+	}
+	if resumed {
+		s.log.Info("disk recovered, resuming dispatch", "disk", r.Name, "free", r.Free)
+		s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
+			Detail: humanize.Bytes(r.Free) + " free; queued tickets start again"})
+		s.kickRunner()
+	}
+	return held
 }
 
-// diskStatuses lists the known disks by id; warnedOnly keeps those whose warn
-// mark is set.
-func (s *Server) diskStatuses(warnedOnly bool) []DiskStatus {
+// heldDiskOf returns the first held disk project watches, from the watcher's
+// state. It takes no reading.
+func (s *Server) heldDiskOf(project string) (DiskStatus, bool) {
+	for _, d := range s.diskStatuses(false) {
+		if d.Held && slices.Contains(d.Projects, project) {
+			return d, true
+		}
+	}
+	return DiskStatus{}, false
+}
+
+// freshHeldDisk reads every disk project watches (its repo disk and the Go
+// cache disk) and returns the first one that is held. A project with no repo
+// path has no disk to read.
+func (s *Server) freshHeldDisk(project string) (DiskStatus, bool) {
+	dir, err := s.projectDir(project)
+	if err != nil {
+		return DiskStatus{}, false
+	}
+	pf, err := config.ReadProjectFile(dir)
+	if err != nil || pf.Repo == nil {
+		return DiskStatus{}, false
+	}
+	paths := []string{*pf.Repo}
+	if gc := s.goCache(); gc != "" {
+		paths = append(paths, gc)
+	}
+	var held *DiskStatus
+	now := time.Now()
+	for _, p := range paths {
+		r, err := s.freeSpace(p)
+		if err != nil {
+			s.log.Warn("read free space", "path", p, "err", err)
+			continue
+		}
+		if s.observe(r, nil, now) && held == nil {
+			d := DiskStatus{ID: r.ID, Name: r.Name, FreeBytes: r.Free}
+			held = &d
+		}
+	}
+	if held == nil {
+		return DiskStatus{}, false
+	}
+	return *held, true
+}
+
+// diskLowReason says which disk holds dispatch and how much is free on it.
+func diskLowReason(d DiskStatus) string {
+	return d.Name + " has " + humanize.Bytes(d.FreeBytes) + " free"
+}
+
+// diskStatuses lists the known disks by id; listedOnly keeps those whose warn
+// mark is set or that are held.
+func (s *Server) diskStatuses(listedOnly bool) []DiskStatus {
 	d := &s.disks
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	var out []DiskStatus
 	for id, st := range d.disks {
-		if warnedOnly && !st.warned {
+		if listedOnly && !st.warned && !st.held {
 			continue
 		}
-		out = append(out, DiskStatus{ID: id, Name: st.reading.Name, FreeBytes: st.reading.Free,
-			Projects: slices.Clone(st.projects), Warned: st.warned, ReadAt: st.at})
+		out = append(out, st.status(id))
 	}
 	slices.SortFunc(out, func(a, b DiskStatus) int { return strings.Compare(a.ID, b.ID) })
 	return out
 }
 
-// warnedDisks lists the disks whose warn mark is set, by id.
-func (s *Server) warnedDisks() []DiskStatus { return s.diskStatuses(true) }
+// listedDisks lists the disks the snapshot shows: warn mark set or held, by id.
+func (s *Server) listedDisks() []DiskStatus { return s.diskStatuses(true) }
 
 // DiskReport is the disk status route's result: the effective thresholds as
 // size strings ("off" when a threshold is off) and every known disk.
@@ -144,8 +229,15 @@ func (s *Server) freeSpace(path string) (DiskReading, error) {
 	return readFreeSpace(path)
 }
 
-// goCachePath asks go for its build cache; "" means it is not watched.
-func (s *Server) goCachePath() string {
+// goCache is the build cache path, looked up once: the claim path needs it on every tick.
+func (s *Server) goCache() string {
+	d := &s.disks
+	d.goCacheOnce.Do(func() { d.goCachePath = s.lookupGoCache() })
+	return d.goCachePath
+}
+
+// lookupGoCache asks go for its build cache; "" means it is not watched.
+func (s *Server) lookupGoCache() string {
 	lookup := s.cfg.GoCacheDir
 	if lookup == nil {
 		lookup = func() (string, error) {
@@ -162,7 +254,8 @@ func (s *Server) goCachePath() string {
 }
 
 // checkDisks reads every project's repo disk and the Go cache disk once.
-func (s *Server) checkDisks(goCache string) {
+func (s *Server) checkDisks() {
+	goCache := s.goCache()
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		return
@@ -211,8 +304,7 @@ func (s *Server) keepDisksWatched(ctx context.Context) {
 	if interval <= 0 {
 		interval = defaultDiskPoll
 	}
-	goCache := s.goCachePath()
-	s.checkDisks(goCache)
+	s.checkDisks()
 	tick := time.NewTicker(interval)
 	defer tick.Stop()
 	for {
@@ -220,7 +312,7 @@ func (s *Server) keepDisksWatched(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
-			s.checkDisks(goCache)
+			s.checkDisks()
 		}
 	}
 }
