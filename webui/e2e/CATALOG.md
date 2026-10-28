@@ -30,7 +30,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
   1. Open the Epics page; the `mixed-epic` card reads `demo` and `2/7`.
   2. Open `mixed-epic`.
   3. Click Queue on the epic page.
-  4. Click "← Epics".
+  4. Click the top bar's "Epics" link.
 - **Pass:**
   - Before queueing, the epic page shows the ring `2/7` with the Implementation badge and no comet, the
     stats line "Not queued · $0.00 · 0s agent time", the divider "1 done, 1 cancelled", and one card link
@@ -132,7 +132,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Steps:**
   1. Open the Epics page; the `empty-epic` card is in In progress, reading "Implemented".
   2. Open `empty-epic`.
-  3. Click "← Epics" and open `blocked-epic`.
+  3. Click the top bar's "Epics" link and open `blocked-epic`.
 - **Pass:**
   - `empty-epic` reads "No tickets yet" with ring `0/0` and no More stats card.
   - `blocked-epic` shows the cards `02 waiting after 01` and `01 unmerged ready`.
@@ -279,7 +279,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
   - Down selects the second row and Enter opens its epic page; the menu closes.
   - `design-live` opens `#/d/demo:design-live`, `running-epic` opens `#/e/demo:running-epic`, and the
     one-off opens `#/t/demo:one-offs/02`.
-  - On the one-off's ticket page the back link reads "← one-offs" with no count.
+  - On the one-off's ticket page the top bar's Epics link reads "Epics" with no count.
 - **Not covered:** the `design-epic` Design of the spec text. `united` has no joined card, so the Design
   pick uses `design-live`.
 
@@ -288,11 +288,11 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Scenario:** `united`
 - **Steps:**
   1. Open `#/e/demo:paused-epic`, `#/d/demo:design-live`, then `#/e/demo:running-epic`.
-  2. Click the count text of the back link.
+  2. Click the count text of the Epics link.
   3. Open `#/e/demo:running-epic`; run `gx tickets set demo:paused-epic/01 --status open`.
 - **Pass:**
-  - The back link reads "← Epics · 8 more need you" on `paused-epic` (itself in Needs you) and
-    "· 9 more need you" on the other two pages. A stopped Design is not in Needs you.
+  - The top bar's Epics link reads "Epics · 8 need you" on `paused-epic` (itself in Needs you) and
+    "Epics · 9 need you" on the other two pages. A stopped Design is not in Needs you.
   - The title button has no number and no `waiting-count` element exists.
   - Clicking the count text opens `#/epics`.
   - The count drops from 9 to 8 with no reload.
@@ -303,7 +303,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Pass:**
   - Two cards of Needs you share a left edge and the second sits below the first.
   - A card's `time` element is no taller than 1.5 line heights.
-  - On `#/d/demo:design-live` the back link reads "← Epics · 9 more" (or the full text) on one line.
+  - On `#/d/demo:design-live` the top bar's Epics link reads "Epics · 9 need you" on one line.
 
 ## 41. Phone, New Design sheet
 
@@ -342,7 +342,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Scenario:** `ready`
 - **Steps:**
   1. Click New Design (right of the filter); fill the name `fresh-design` and an idea; Start design.
-  2. Click "← Epics", open New Design again, press Escape, then click the new card's title.
+  2. Click the top bar's "Epics" link, open New Design again, press Escape, then click the new card's title.
 - **Pass:**
   - The form is a "New Design" dialog with a header row (no project pill in `ready`, which has one
     project) and an idea box taller than half the dialog. The placeholders read `my-epic` and

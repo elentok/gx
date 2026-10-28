@@ -66,13 +66,13 @@ test("21. Jump menu keyboard and picks", async ({ page, start }) => {
     if (pick !== "queued") await expect(title).toContainText(pick);
   }
 
-  // A one-off's ticket page has no count on its back link.
-  await expect(page.getByRole("link", { name: /^← one-offs/ }).first()).toHaveAccessibleName("← one-offs");
+  // A one-off's ticket page has no count on its Epics tab.
+  await expect(page.getByRole("link", { name: /^Epics/ }).first()).toHaveAccessibleName("Epics");
 });
 
 test("22. Back link count", async ({ page, start }) => {
   const fx = await start("united");
-  const back = (n: number) => page.getByRole("link", nav(`← Epics · ${n} more need you`));
+  const back = (n: number) => page.getByRole("link", nav(`Epics · ${n} need you`));
 
   // Eight other cards need you from a Needs-you epic, nine from one that does not.
   await goto(page, "#/e/demo:paused-epic");
@@ -82,20 +82,20 @@ test("22. Back link count", async ({ page, start }) => {
   await goto(page, "#/e/demo:running-epic");
   await expect(back(9)).toBeVisible();
 
-  // The count is smaller than "← Epics", not the link's colour, and has no pill background.
-  const style = await back(9).getByText("· 9 more need you").evaluate((el) => {
+  // The count is not the link's colour and has no pill background.
+  const style = await back(9).getByText("9", { exact: true }).evaluate((el) => {
     const cs = getComputedStyle(el);
     const link = getComputedStyle(el.closest("a")!);
-    return { smaller: parseFloat(cs.fontSize) < parseFloat(link.fontSize), recolored: cs.color !== link.color, bg: cs.backgroundColor };
+    return { recolored: cs.color !== link.color, bg: cs.backgroundColor };
   });
-  expect(style).toEqual({ smaller: true, recolored: true, bg: "rgba(0, 0, 0, 0)" });
+  expect(style).toEqual({ recolored: true, bg: "rgba(0, 0, 0, 0)" });
 
   // The title button carries no number and nothing is called waiting-count.
   await expect(page.getByRole("heading", { level: 1 }).getByRole("button")).not.toContainText(/\d/);
   await expect(page.getByTestId("waiting-count")).toHaveCount(0);
 
   // Clicking the count text itself opens the Epics page.
-  await back(9).getByText("· 9 more need you").click();
+  await back(9).getByText("9", { exact: true }).click();
   await expect(page).toHaveURL(/#\/epics$/);
 
   // The count follows the server with no reload.

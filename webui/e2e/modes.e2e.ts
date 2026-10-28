@@ -62,7 +62,7 @@ test.describe("61. Page modes at 760px", () => {
 
 test("62. Card columns", async ({ page, start }) => {
   const fixture = await start("mixed");
-  const long = "A very long ticket title that is wider than its card on a desktop screen, so it must be cut short with an ellipsis at the end";
+  const long = "A very long ticket title that is wider than its card on a desktop screen, so it must wrap onto further lines. ".repeat(3).trim();
   await fixture.cli("tickets", "add", "demo:mixed-epic", "--slug", "long-title", "--body", `# ${long}\n\n## What to build\n\nx`);
   await goto(page, "#/e/demo:mixed-epic");
   await expect(page.getByText(long, nav(long))).toBeVisible();
@@ -74,7 +74,7 @@ test("62. Card columns", async ({ page, start }) => {
       let frameEl = el.querySelector("[data-meta]")!.parentElement!;
       while (getComputedStyle(frameEl).borderTopWidth === "0px") frameEl = frameEl.parentElement!;
       const frame = frameEl.getBoundingClientRect();
-      const titleEl = [...el.querySelectorAll("span")].find((s) => getComputedStyle(s).textOverflow === "ellipsis")!;
+      const titleEl = el.querySelector("[data-title]")!;
       const title = titleEl.getBoundingClientRect();
       const cs = getComputedStyle(titleEl);
       return {
@@ -92,10 +92,10 @@ test("62. Card columns", async ({ page, start }) => {
   // Every title starts in the same column.
   for (const r of rows) expect(r.left).toBe(rows[0].left);
 
-  // The long title keeps to one line and is cut with an ellipsis.
+  // The long title wraps onto more lines instead of being cut with an ellipsis.
   const wide = rows.find((r) => r.text === long)!;
-  expect(wide.textOverflow).toBe("ellipsis");
-  expect(wide.height).toBeLessThanOrEqual(wide.lineHeight * 1.5);
+  expect(wide.textOverflow).not.toBe("ellipsis");
+  expect(wide.height).toBeGreaterThan(wide.lineHeight * 1.5);
 
   // Each meta ends 16px short of its card's right edge, inside the 1px border.
   for (const r of rows) expect(r.gap).toBeCloseTo(16, 0);

@@ -8,7 +8,7 @@ import {
   type CancelAutoAdvance,
   type SetAutoAdvance,
 } from "./open";
-import { AutoMenu } from "./AutoMenu";
+import { AutoMenu, type AutoMenuState } from "./AutoMenu";
 
 export type RunCall = (call: () => Promise<Refusable>) => Promise<void>;
 
@@ -36,18 +36,21 @@ export function AutoAdvanceBar({
   run,
   setAutoAdvance,
   cancelAutoAdvance,
+  menu,
 }: {
   session: SessionInfo;
   disabled: boolean;
   run: RunCall;
   setAutoAdvance: SetAutoAdvance;
   cancelAutoAdvance: CancelAutoAdvance;
+  menu: AutoMenuState;
 }) {
   const secondsLeft = useAutoAdvanceCountdown(session);
   const state = stateToken(session);
   return (
     <Box display="flex" gap="3" alignItems="center">
       <AutoMenu
+        state={menu}
         switches={[
           {
             label: "Auto-advance",

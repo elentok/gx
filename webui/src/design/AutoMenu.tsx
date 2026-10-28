@@ -1,5 +1,5 @@
 import { Box, chakra, Popover, Portal, Text } from "@chakra-ui/react";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 
 // A switch's look: a track with a knob, amber when on. `mini` is the one inside the Auto button.
 function Track({ on, mini }: { on: boolean; mini?: boolean }) {
@@ -36,9 +36,11 @@ export type AutoSwitch = {
   onFlip?: () => void;
 };
 
+/** Controlled by the caller: the round-keyed subtree remounts when a round lands, which must not close the popover. */
+export type AutoMenuState = { open: boolean; setOpen: (open: boolean) => void };
+
 // The Auto button: one mini switch per row, named as in the popover it opens.
-export function AutoMenu({ switches }: { switches: AutoSwitch[] }) {
-  const [open, setOpen] = useState(false);
+export function AutoMenu({ switches, state: { open, setOpen } }: { switches: AutoSwitch[]; state: AutoMenuState }) {
   const anchor = useRef<HTMLButtonElement>(null);
   return (
     <>

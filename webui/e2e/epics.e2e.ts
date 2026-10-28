@@ -61,7 +61,7 @@ test("2. Epic looks right", async ({ page, start }) => {
   const failed = page.locator('[data-tone="deadlocked"]').filter({ has: page.getByRole("link", { name: "fails" }) });
   await expect(failed.getByText("needs-repair · Run failed")).toBeVisible();
 
-  await page.getByRole("link", nav("← Epics")).click();
+  await page.getByRole("link", { name: /^Epics/ }).click();
   await expect(mixed.getByText("4/7")).toBeVisible();
   await expect(mixed.getByTestId("pill")).toBeVisible();
   await expect(mixed.getByTestId("reason")).toBeVisible();
@@ -76,7 +76,7 @@ test("7. Epic completion", async ({ page, start }) => {
   // While held, the running ticket's card meta starts with "running · ".
   await card(page, "finishing-epic").getByRole("link", { name: "finishing-epic" }).click();
   await expect(page.locator('a[href$="/t/demo:finishing-epic/02"] [data-meta]')).toHaveText(/^running · /);
-  await page.getByRole("link", nav("← Epics")).click();
+  await page.getByRole("link", { name: /^Epics/ }).click();
 
   await fixture.release();
 
@@ -121,7 +121,7 @@ test("8. Edge states", async ({ page, start }) => {
   await expect(page.getByText("0/0")).toBeVisible();
   await expect(page.getByRole("button", { name: /^More stats/ })).toHaveCount(0);
 
-  await page.getByRole("link", nav("← Epics")).click();
+  await page.getByRole("link", { name: /^Epics/ }).click();
   await page.getByRole("link", { name: "blocked-epic" }).click();
   await expect(page.getByRole("link", { name: "02 waiting after 01" })).toBeVisible();
   await expect(page.getByRole("link", { name: "01 unmerged ready" })).toBeVisible();

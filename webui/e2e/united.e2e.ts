@@ -29,6 +29,7 @@ test("15. Redirects", async ({ page, start }) => {
 
 test("16. Needs you", async ({ page, start }) => {
   await start("united");
+  await expect(page.getByRole("heading", { level: 2 })).toHaveCount(5);
   const titles = await page.getByRole("heading", { level: 2 }).allTextContents();
   expect(titles.map((t) => t.replace(/[▾▸\d]/g, "").trim())).toEqual([
     "Needs you",
@@ -77,7 +78,8 @@ test("16. Needs you", async ({ page, start }) => {
   await expect(page).toHaveURL(/#\/epics$/);
   await card(page, "paused-epic").getByRole("link", { name: "paused-epic", exact: true }).click();
   await expect(page).toHaveURL(/#\/e\/demo:paused-epic$/);
-  await page.getByRole("link", { name: /^← Epics/ }).click();
+  await page.getByRole("link", { name: /^Epics/ }).click();
+  await expect(page).toHaveURL(/#\/epics$/);
 
   // Only merge-blocked and awaiting-merge cards offer Merge.
   for (const name of ["blocked-merge-epic", "awaiting-epic"]) {
@@ -230,10 +232,10 @@ test("28. Menu: AFK, build text, Paused chip", async ({ page, start }) => {
   const paused = bar.getByText("Paused", { exact: true });
   await expect(paused).toHaveCount(0);
 
-  // The hamburger sits right of the Live dot.
-  const live = await page.getByRole("status", nav("Live")).boundingBox();
+  // The Live dot shows only when offline, so the hamburger is checked against the last tab.
+  const stats = await bar.getByRole("link", nav("Stats")).boundingBox();
   const button = await menuButton(page).boundingBox();
-  expect(button!.x).toBeGreaterThan(live!.x);
+  expect(button!.x).toBeGreaterThan(stats!.x);
 
   await menuButton(page).click();
   await expect(afkItem(page)).toHaveAttribute("aria-checked", "false");

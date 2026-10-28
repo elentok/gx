@@ -15,6 +15,7 @@ import type {
 } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { useSessionChat, type FetchChat } from "./chat";
+import type { AutoMenuState } from "./AutoMenu";
 import { Composer } from "./Composer";
 import {
   FailureBanner,
@@ -154,6 +155,7 @@ function ChatTail({
   questions,
   onQuestions,
   roundDraft,
+  autoMenu,
 }: {
   session: SessionInfo;
   chat: SessionChatResponse;
@@ -166,6 +168,7 @@ function ChatTail({
   questions: boolean;
   onQuestions: (on: boolean) => void;
   roundDraft: RoundDraft;
+  autoMenu: AutoMenuState;
 }) {
   const { draft, setAnswers, setNotes, setIndex, clear } = roundDraft;
   const { answers } = draft;
@@ -227,6 +230,7 @@ function ChatTail({
             onQuestions(false);
           }}
           onReview={(index) => setFocus({ index })}
+          autoMenu={autoMenu}
         />
       )}
     </Box>
@@ -350,6 +354,7 @@ function ChatBody({
   actions,
   questions,
   onQuestions,
+  autoMenu,
 }: {
   session: SessionInfo;
   roundKey: string;
@@ -363,6 +368,7 @@ function ChatBody({
   actions: FailureActions;
   questions: boolean;
   onQuestions: (on: boolean) => void;
+  autoMenu: AutoMenuState;
 }) {
   const roundDraft = useRoundDraft(session.id, roundKey);
   const round = chat.round ?? [];
@@ -424,6 +430,7 @@ function ChatBody({
         questions={questions}
         onQuestions={onQuestions}
         roundDraft={roundDraft}
+        autoMenu={autoMenu}
       />
     </Box>
   );
@@ -448,6 +455,8 @@ function ChatLog({
   const conn = useConnectionContext();
   const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
   const connected = useConnectionState(conn).connected;
+  // Lives above the keyed ChatBody: a round landing remounts it and must not close the Auto popover.
+  const [autoMenuOpen, setAutoMenuOpen] = useState(false);
   if (!chat) return null;
   const roundKey = (chat.round ?? [])
     .map((c) => `${c.label}:${c.title}`)
@@ -455,6 +464,7 @@ function ChatLog({
   return (
     <ChatBody
       key={roundKey}
+      autoMenu={{ open: autoMenuOpen, setOpen: setAutoMenuOpen }}
       session={session}
       roundKey={roundKey}
       chat={chat}

@@ -19,11 +19,10 @@ test("23. Phone, Epics page", async ({ page, start }) => {
   const timeLineHeight = await time.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
   expect(timeBox!.height).toBeLessThanOrEqual(timeLineHeight * 1.5);
 
-  // The back link stays on one line with the short or the full count.
+  // The Epics tab stays on one line with its count.
   await page.evaluate(() => (location.hash = "#/d/demo:design-live"));
-  const back = page.getByRole("link", { name: /^← Epics · 9 more/ });
+  const back = page.getByRole("link", { name: /^Epics · 9 need you$/ });
   await expect(back).toBeVisible();
-  await expect(back).toContainText(/· 9 more( need you)?$/);
   const line = await back.boundingBox();
   const lineHeight = await back.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
   expect(line!.height).toBeLessThanOrEqual(lineHeight * 1.5);
@@ -56,12 +55,14 @@ test.describe("53. Phone, epic page", () => {
     // The meta is indented 54px under the title.
     await expect(link.locator("[data-meta]")).toHaveCSS("padding-left", "54px");
 
-    // A long title stays on one line.
+    // A long title wraps, and its meta sits below the whole title.
     const longTitle = page.getByText(long, nav(long));
     await expect(longTitle).toBeVisible();
     const box = (await longTitle.boundingBox())!;
     const lineHeight = await longTitle.evaluate((el) => parseFloat(getComputedStyle(el).lineHeight));
-    expect(box.height).toBeLessThanOrEqual(lineHeight * 1.5);
+    expect(box.height).toBeGreaterThan(lineHeight * 1.5);
+    const longMeta = (await longTitle.locator("xpath=ancestor::a").locator("[data-meta]").boundingBox())!;
+    expect(longMeta.y).toBeGreaterThanOrEqual(box.y + box.height);
   });
 
   test("answer and fix buttons are full-width tap targets", async ({ page, start }) => {

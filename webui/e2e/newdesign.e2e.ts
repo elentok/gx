@@ -57,7 +57,7 @@ test("26. New Design form", async ({ page, start }) => {
   expect(shown).not.toContain("Destination");
 
   // A reopened modal is empty. The card of the Designing epic opens its epic page.
-  await page.getByRole("link", nav("← Epics")).click();
+  await page.getByRole("link", { name: /^Epics/ }).click();
   const reopened = fields(await openDialog(page));
   await expect(reopened.slug).toHaveValue("");
   await expect(reopened.idea).toHaveValue("");

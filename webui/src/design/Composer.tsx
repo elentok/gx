@@ -10,6 +10,7 @@ import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
 import { useWrite } from "../useWrite";
 import { AutoAdvanceBar, type RunCall } from "./AutoAdvanceBar";
+import type { AutoMenuState } from "./AutoMenu";
 import {
   postAutoAdvance,
   postCancelAutoAdvance,
@@ -45,6 +46,7 @@ export function Composer({
   onText,
   onRoundSent,
   onReview,
+  autoMenu,
 }: {
   session: SessionInfo;
   /** The id of the last chat message the page saw. */
@@ -69,6 +71,8 @@ export function Composer({
   onRoundSent?: () => void;
   /** A row of the unanswered popover: open the sheet at that question. */
   onReview?: (index: number) => void;
+  /** The Auto popover's open state, kept by the caller so a remount of the composer does not close it. */
+  autoMenu: AutoMenuState;
 }) {
   const wide = useWide();
   const [open, setOpen] = useState(false);
@@ -192,6 +196,7 @@ export function Composer({
       run={run}
       setAutoAdvance={setAutoAdvance}
       cancelAutoAdvance={cancelAutoAdvance}
+      menu={autoMenu}
     />
   );
 
