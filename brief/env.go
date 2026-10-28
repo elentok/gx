@@ -13,9 +13,9 @@ func envOrEmpty(env []string) []string {
 	return append([]string{}, env...)
 }
 
-// lookPath resolves file against the PATH entry of env, as exec.LookPath does
+// LookPath resolves file against the PATH entry of env, as exec.LookPath does
 // against the process's PATH.
-func lookPath(env []string, file string) (string, error) {
+func LookPath(env []string, file string) (string, error) {
 	pathEnv := ""
 	for _, kv := range env {
 		if v, ok := strings.CutPrefix(kv, "PATH="); ok {

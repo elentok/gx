@@ -129,11 +129,8 @@ func TestCheck_BriefCalledByConfiguredCommandNamesFailingTests(t *testing.T) {
 	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "gx"), "github.com/elentok/gx").CombinedOutput(); err != nil {
 		t.Fatalf("go build: %v\n%s", err, out)
 	}
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	prependPath(t, bin)
 	repo, data := registeredCheckRepo(t, `{"test":"gx brief go-test ./..."}`)
-	// The spawned `gx brief` is a child process: it finds the data dir in the
-	// process env, not in the deps env.
-	t.Setenv("XDG_DATA_HOME", filepath.Dir(data))
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) {}\nfunc TestB(t *testing.T) { t.Fail() }\n")
 	testutil.CommitAll(t, repo, "module")

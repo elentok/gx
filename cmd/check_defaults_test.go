@@ -33,7 +33,7 @@ func fakeTools(t *testing.T, body map[string]string, names ...string) (logPath s
 			t.Fatal(err)
 		}
 	}
-	t.Setenv("PATH", bin)
+	setEnvFor(t, "PATH", bin)
 	return logPath
 }
 

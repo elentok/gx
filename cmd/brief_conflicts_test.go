@@ -27,7 +27,8 @@ func TestBrief_ConflictsListsUnmergedFilesWithMarkerLines(t *testing.T) {
 	gitIn(t, repo, "checkout", "main")
 	testutil.WriteFile(t, repo, "a.txt", "one\nmain\nthree\n")
 	gitIn(t, repo, "commit", "-am", "main")
-	gitIn(t, repo, "merge", "side")
+	// Pinned: a user's merge.conflictstyle=diff3 adds a base section and shifts the lines.
+	gitIn(t, repo, "-c", "merge.conflictstyle=merge", "merge", "side")
 
 	out, code := runBriefCmd(t, repo, "conflicts")
 	if code != 1 {

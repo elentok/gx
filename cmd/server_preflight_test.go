@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner"
 )
 
@@ -68,7 +69,7 @@ func TestPreflightAgentRunner(t *testing.T) {
 
 func TestServerRunner_HeadlessAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
 	state := t.TempDir()
-	_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, state, 0)
+	_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, config.DirsFrom(envFor(t)), state, 0)
 	h, ok := runnerFor("headless", "proj").(*nativerunner.Headless)
 	if !ok {
 		t.Fatalf("runnerFor(headless, proj) = %T, want *Headless", runnerFor("headless", "proj"))
@@ -86,7 +87,7 @@ func TestServerRunner_EveryRunnerCarriesN(t *testing.T) {
 		n    time.Duration
 		want time.Duration
 	}{{9 * time.Second, 9 * time.Second}, {0, agentrunner.DefaultN}} {
-		_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, t.TempDir(), tc.n)
+		_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, config.DirsFrom(envFor(t)), t.TempDir(), tc.n)
 		got := map[string]time.Duration{
 			"herdr":    runnerFor("herdr", "p").(*herdrrunner.Runner).WaitN(),
 			"headless": runnerFor("headless", "p").(*nativerunner.Headless).WaitN(),
@@ -102,7 +103,7 @@ func TestServerRunner_EveryRunnerCarriesN(t *testing.T) {
 
 func TestServerRunner_PtyAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
 	state := t.TempDir()
-	r, runnerFor := serverRunner(agentrunner.ChoicePTY, state, 0)
+	r, runnerFor := serverRunner(agentrunner.ChoicePTY, config.DirsFrom(envFor(t)), state, 0)
 	if r.Name() != "pty" {
 		t.Errorf("default runner Name = %q, want pty", r.Name())
 	}
@@ -119,7 +120,7 @@ func TestServerRunner_PtyAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
 }
 
 func TestServerRunner_BuildsAnyRunnerPerPairLazily(t *testing.T) {
-	_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, t.TempDir(), 0)
+	_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, config.DirsFrom(envFor(t)), t.TempDir(), 0)
 	herdrA := runnerFor("herdr", "a")
 	if herdrA == nil || herdrA.Name() != "herdr" {
 		t.Fatalf("runnerFor(herdr, a) = %v, want a herdr runner", herdrA)
@@ -139,23 +140,23 @@ func TestServerRunner_BuildsAnyRunnerPerPairLazily(t *testing.T) {
 }
 
 func TestServerRunner_HeadlessDefaultRunnerHasARoot(t *testing.T) {
-	r, _ := serverRunner(agentrunner.ChoiceHeadless, t.TempDir(), 0)
+	r, _ := serverRunner(agentrunner.ChoiceHeadless, config.DirsFrom(envFor(t)), t.TempDir(), 0)
 	if h, ok := r.(*nativerunner.Headless); !ok || h.Root == "" {
 		t.Errorf("default runner = %#v, want a *Headless with a Root", r)
 	}
 }
 
 func TestServerRunner_NamesComeFromTheRunners(t *testing.T) {
-	if r, _ := serverRunner(agentrunner.ChoiceHerdr, t.TempDir(), 0); r.Name() != "herdr" {
+	if r, _ := serverRunner(agentrunner.ChoiceHerdr, config.DirsFrom(envFor(t)), t.TempDir(), 0); r.Name() != "herdr" {
 		t.Errorf("herdr Name = %q", r.Name())
 	}
-	if r, _ := serverRunner(agentrunner.ChoiceHeadless, t.TempDir(), 0); r.Name() != "headless" {
+	if r, _ := serverRunner(agentrunner.ChoiceHeadless, config.DirsFrom(envFor(t)), t.TempDir(), 0); r.Name() != "headless" {
 		t.Errorf("headless Name = %q", r.Name())
 	}
 }
 
 func TestServerRunner_HerdrServerCanBuildHeadless(t *testing.T) {
-	_, runnerFor := serverRunner(agentrunner.ChoiceHerdr, t.TempDir(), 0)
+	_, runnerFor := serverRunner(agentrunner.ChoiceHerdr, config.DirsFrom(envFor(t)), t.TempDir(), 0)
 	if _, ok := runnerFor("headless", "proj").(*nativerunner.Headless); !ok {
 		t.Error("a herdr server must still reach a headless run's runner")
 	}

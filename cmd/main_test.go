@@ -5,17 +5,13 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
-// TestMain keeps merge locks (which live in the state dir) off the machine's
-// real one, and serves the herdr fake's helper process.
+// TestMain serves the session processes and the herdr fake's helper process.
+// Tests get their dirs from envFor, so nothing here touches the process env.
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
 	herdrfake.RunHelperProcess()
-	cleanup := claudeenv.Isolate()
-	code := m.Run()
-	cleanup()
-	os.Exit(code)
+	os.Exit(m.Run())
 }

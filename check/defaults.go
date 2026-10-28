@@ -336,10 +336,13 @@ func (r *runner) runDefault(kind string, log io.Writer, res *KindResult) {
 }
 
 func (r *runner) runStep(kind string, s step, log io.Writer) stepResult {
+	exe := s.name
 	if s.name != "" {
-		if _, err := exec.LookPath(s.name); err != nil {
+		path, err := brief.LookPath(r.env, s.name)
+		if err != nil {
 			return stepResult{skipped: s.name + " not installed"}
 		}
+		exe = path
 	}
 	if s.install != nil {
 		if out, err := r.ensureInstalled(*s.install); err != nil {
@@ -349,7 +352,7 @@ func (r *runner) runStep(kind string, s step, log io.Writer) stepResult {
 	}
 	if s.brief == nil {
 		fmt.Fprintf(log, "$ %s\n", strings.Join(append([]string{s.name}, s.argv...), " "))
-		cmd := exec.Command(s.name, s.argv...)
+		cmd := exec.Command(exe, s.argv...)
 		cmd.Dir = s.dir
 		cmd.Env = r.childEnv(kind)
 		cmd.Stdout, cmd.Stderr = log, log

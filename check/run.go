@@ -55,6 +55,9 @@ type Options struct {
 	// ProjectFor names the project a run record is filed under; nil means
 	// ProjectFor (the process env finds the ticket store).
 	ProjectFor func(dir string) string
+	// Env is the environment every command a run starts gets, and the PATH
+	// tools are looked up on. Empty means none, never the process env.
+	Env []string
 }
 
 // KindResult is one kind's line of the result.
@@ -110,7 +113,7 @@ func Run(opts Options) (Result, error) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return Result{}, err
 	}
-	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit}
+	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit, env: opts.Env}
 	if r.limit <= 0 {
 		r.limit = DefaultArgLimit
 	}
@@ -171,7 +174,7 @@ func exitCode(results []KindResult) int {
 // childEnv is the environment of a command a kind starts: the caller's, plus
 // the run (and kind) that `gx brief` tags its index lines with.
 func (r *runner) childEnv(kind string) []string {
-	env := append(os.Environ(), brief.EnvCheckRun+"="+r.runID)
+	env := append(slices.Clone(r.env), brief.EnvCheckRun+"="+r.runID)
 	if kind != "" {
 		env = append(env, brief.EnvCheckKind+"="+kind)
 	}
@@ -185,6 +188,7 @@ type runner struct {
 	mode                  Mode
 	cfg                   Config
 	limit                 int
+	env                   []string
 
 	groupsOnce sync.Once
 	grp        *groups

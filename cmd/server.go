@@ -155,7 +155,7 @@ func runServer(ctx context.Context, d deps) error {
 	if err != nil {
 		return err
 	}
-	runner, runnerFor := serverRunner(choice, stateDir, cfg.RunnerWait)
+	runner, runnerFor := serverRunner(choice, dirs, stateDir, cfg.RunnerWait)
 	var tcpAddr string
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr

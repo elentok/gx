@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
 )
@@ -60,9 +61,9 @@ const fallbackProject = "_default"
 // its agent dirs are per project; runnerFor is nil for a runner it cannot build.
 // The returned runner answers host health and projects runnerFor never sees, so
 // it is built for a fallback project.
-func serverRunner(c agentrunner.Choice, stateDir string, n time.Duration) (r agentrunner.Runner, runnerFor func(runner, project string) agentrunner.Runner) {
+func serverRunner(c agentrunner.Choice, dirs config.Dirs, stateDir string, n time.Duration) (r agentrunner.Runner, runnerFor func(runner, project string) agentrunner.Runner) {
 	type pair struct{ runner, project string }
-	home, _ := os.UserHomeDir()
+	home, _ := dirs.Home()
 	var mu sync.Mutex
 	built := map[pair]agentrunner.Runner{}
 	runnerFor = func(runner, project string) agentrunner.Runner {
@@ -81,7 +82,7 @@ func serverRunner(c agentrunner.Choice, stateDir string, n time.Duration) (r age
 		case agentrunner.ChoiceHeadless:
 			r = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project), N: n}
 		case agentrunner.ChoicePTY:
-			r = &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project), N: n, Env: os.Environ()}
+			r = &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project), N: n, Env: dirs.Environ()}
 		default:
 			return nil
 		}

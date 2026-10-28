@@ -76,6 +76,7 @@ func runCheck(c *cobra.Command, d deps, staged, full bool, since, kinds string) 
 		return err
 	}
 	opts.Dir = dir
+	opts.Env = d.env
 	if opts.DataDir, err = d.dirs().DataDir(); err != nil {
 		return err
 	}

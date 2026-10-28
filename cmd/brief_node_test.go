@@ -79,7 +79,7 @@ func TestBrief_NodeBinaryWalkUp(t *testing.T) {
 	// A global tsc on PATH must never be used.
 	globalBin := t.TempDir()
 	globalRec := nodeStub(t, globalBin, "tsc", "", 0)
-	t.Setenv("PATH", filepath.Join(globalBin, "node_modules", ".bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
+	prependPath(t, filepath.Join(globalBin, "node_modules", ".bin"))
 
 	for _, args := range [][]string{{"-C", web, "tsc", "--noEmit"}, {"-C", filepath.Join(web, "src"), "tsc", "-p", "..", "--noEmit"}} {
 		if out, code := runBriefCmd(t, repo, args...); code != 0 {
