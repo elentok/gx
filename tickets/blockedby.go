@@ -18,7 +18,7 @@ import (
 // bad ref is reported at once.
 func (e Epic) CheckBlockedBy(t Ticket) error {
 	t.BlockedBy = slices.DeleteFunc(slices.Clone(t.BlockedBy), crossEpicRef)
-	return errors.Join(newProjectGraph("", []Epic{e}).checkBlockedBy(e.Name, t)...)
+	return errors.Join(newProjectGraph("", []Epic{e}, nil).checkBlockedBy(e.Name, t)...)
 }
 
 // flagDanglingBlockers records CheckBlockedBy's verdict on each ticket that
@@ -58,7 +58,13 @@ func qualifiedRefs(refs []string) []string {
 // the same check ValidateRefs runs. release decides
 // when a whole-epic ref is resolved.
 func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic {
-	g := newProjectGraph(project, epics)
+	return resolveCrossEpic(project, release, epics, nil)
+}
+
+// resolveCrossEpic is ResolveCrossEpic with the project's archived epic names,
+// so a blocker on an archived epic counts as satisfied.
+func resolveCrossEpic(project string, release EpicRelease, epics []Epic, archived map[string]bool) []Epic {
+	g := newProjectGraph(project, epics, archived)
 	g.release = release
 	out := slices.Clone(epics)
 	for i := range out {
@@ -99,7 +105,7 @@ func ResolveCrossEpic(project string, release EpicRelease, epics []Epic) []Epic 
 // blocked on as a whole: a whole-epic ref or one widened to its epic, its own
 // or its epic's. Whether the blocker still blocks is not asked.
 func EpicsWaitedOn(project string, epics []Epic) map[string]bool {
-	g := newProjectGraph(project, epics)
+	g := newProjectGraph(project, epics, nil)
 	waited := map[string]bool{}
 	for _, e := range epics {
 		for _, t := range e.Tickets {
@@ -155,7 +161,11 @@ func CheckBlockedByWrite(path string, st schema.Ticket) ([]string, error) {
 		})
 		post[i].Tickets = append(post[i].Tickets, t)
 	}
-	g := newProjectGraph(ProjectName(root), post)
+	archived, err := ArchivedEpicNames(root)
+	if err != nil {
+		return nil, err
+	}
+	g := newProjectGraph(ProjectName(root), post, archived)
 	errs := g.checkBlockedBy(epic, t)
 	if !t.IsTerminal() {
 		errs = append(errs, g.cycleErrors(epic, t)...)
@@ -183,7 +193,11 @@ func CheckEpicBlockedByWrite(ticketMD string, refs []string) ([]string, error) {
 		return nil, &AddressError{Code: CodeUnknownEpic, Msg: fmt.Sprintf("no epic %q", name)}
 	}
 	post[i].BlockedBy = refs
-	g := newProjectGraph(ProjectName(root), post)
+	archived, err := ArchivedEpicNames(root)
+	if err != nil {
+		return nil, err
+	}
+	g := newProjectGraph(ProjectName(root), post, archived)
 	if errs := g.epicBlockedByErrors(post[i]); len(errs) > 0 {
 		return nil, errors.Join(errs...)
 	}
@@ -214,5 +228,9 @@ func LoadResolved(project, dir string) ([]Epic, error) {
 	// An unreadable project.json falls back to the default policy, the
 	// strictest release rule, so a whole-epic blocker fails closed.
 	pf, _ := config.ReadProjectFile(dir)
-	return ResolveCrossEpic(project, EpicReleaseOf(pf), epics), nil
+	archived, err := ArchivedEpicNames(dir)
+	if err != nil {
+		return nil, err
+	}
+	return resolveCrossEpic(project, EpicReleaseOf(pf), epics, archived), nil
 }

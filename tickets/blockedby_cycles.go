@@ -62,6 +62,10 @@ type projectGraph struct {
 	release EpicRelease
 	tickets map[string]Ticket
 	epics   map[string]Epic
+	// archived holds the names of epics moved to .archive. An archived epic is
+	// done and merged, so a ref to it is satisfied; a live epic of the same
+	// name wins.
+	archived map[string]bool
 	// children maps a node to its fork children (the reverse of Ticket.Parent).
 	children map[string][]string
 	// wait maps each node to the nodes it must wait on (see buildWait).
@@ -73,10 +77,12 @@ func nodeKey(epic string, t Ticket) string { return epic + "/" + ticketKey(t) }
 func isEpicKey(key string) bool { return !strings.Contains(key, "/") }
 
 // newProjectGraph indexes epics (all of one project, named project; the name
-// only decides which qualified refs are "this project's").
-func newProjectGraph(project string, epics []Epic) *projectGraph {
+// only decides which qualified refs are "this project's"). archived is the
+// project's ArchivedEpicNames, or nil when the caller has no project dir.
+func newProjectGraph(project string, epics []Epic, archived map[string]bool) *projectGraph {
 	g := &projectGraph{
 		project:  project,
+		archived: archived,
 		tickets:  map[string]Ticket{},
 		epics:    map[string]Epic{},
 		children: map[string][]string{},
@@ -123,6 +129,9 @@ func (g *projectGraph) resolve(epic, ref string) (string, error) {
 		if moved, ok := g.archivedOriginal(Address{Project: g.project, Epic: target, ID: token}); ok {
 			return moved, nil
 		}
+		if g.isArchived(target) {
+			return target + "/" + siblingKey(num, letters), nil
+		}
 		where := "this epic"
 		if target != epic {
 			where = fmt.Sprintf("epic %q", target)
@@ -130,6 +139,12 @@ func (g *projectGraph) resolve(epic, ref string) (string, error) {
 		return "", fmt.Errorf("%q names no ticket in %s", ref, where)
 	}
 	return key, nil
+}
+
+// isArchived reports whether name is an archived epic with no live twin.
+func (g *projectGraph) isArchived(name string) bool {
+	_, live := g.epics[name]
+	return g.archived[name] && !live
 }
 
 // archivedOriginal is the node key of the archived one-off that was moved from
@@ -173,6 +188,8 @@ func (g *projectGraph) resolveBlocker(epic, ref string) (string, error) {
 		return g.widen(epic, key), nil
 	}
 	switch target, ok := g.epics[name]; {
+	case project == g.project && g.isArchived(name):
+		return name, nil
 	case project != g.project:
 		return "", &AddressError{CodeBlockedByOtherProject, fmt.Sprintf("%q names another project (cross-project blocking not supported)", ref)}
 	case name == epic:
@@ -358,6 +375,9 @@ func (g *projectGraph) subtree(root string) []string {
 // g.release needs, so an empty epic blocks until stamped and a ticket added
 // to a finished epic blocks again.
 func (g *projectGraph) blocking(key string) bool {
+	if g.isArchived(key) {
+		return false
+	}
 	for _, k := range g.expand(key) {
 		if !g.tickets[k].IsTerminal() {
 			return true

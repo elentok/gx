@@ -76,7 +76,7 @@ func TestResolveBlocker_TokenSyntax(t *testing.T) {
 		{Name: "a", Tickets: doneTicket()},
 		{Name: "12", Tickets: doneTicket()},
 		{Name: "d", Tickets: doneTicket()},
-	})
+	}, nil)
 	for ref, want := range map[string]string{
 		"a":      "a",
 		"p:a":    "a",
@@ -100,7 +100,7 @@ func TestResolveBlocker_RejectsWithCodes(t *testing.T) {
 		{Name: "a", Tickets: doneTicket()},
 		{Name: "m", IsMap: true, Tickets: doneTicket()},
 		{Name: "d", Tickets: doneTicket()},
-	})
+	}, nil)
 	for ref, code := range map[string]string{
 		"q:a": CodeBlockedByOtherProject,
 		"d":   CodeBlockedByOwnEpic,
@@ -113,6 +113,51 @@ func TestResolveBlocker_RejectsWithCodes(t *testing.T) {
 		if !errors.As(err, &ae) || ae.Code != code {
 			t.Errorf("%q: err = %v, want code %s", ref, err, code)
 		}
+	}
+}
+
+func TestResolveCrossEpic_ArchivedEpicIsSatisfied(t *testing.T) {
+	archived := map[string]bool{"gone": true}
+	for _, ref := range []string{"gone", "p:gone", "gone/06"} {
+		epics := wholeEpic(doneTicket(), true, true)
+		epics[1].Tickets[0].BlockedBy = []string{ref}
+		d := resolveCrossEpic("p", EpicRelease{}, epics, archived)[1]
+		if got := d.RenderedStatus(d.Tickets[0]); got != StatusOpen {
+			t.Errorf("%q: got %v, want open", ref, got)
+		}
+	}
+	// A typo still errors, and a live epic wins a name clash.
+	epics := wholeEpic(nil, false, false)
+	epics[1].Tickets[0].BlockedBy = []string{"zz"}
+	if d := resolveCrossEpic("p", EpicRelease{}, epics, archived)[1]; d.RenderedStatus(d.Tickets[0]) != StatusError {
+		t.Errorf("typo: got %v, want error", d.RenderedStatus(d.Tickets[0]))
+	}
+	epics = wholeEpic(nil, false, false)
+	if got := resolveCrossEpic("p", EpicRelease{}, epics, map[string]bool{"a": true})[1]; got.RenderedStatus(got.Tickets[0]) != StatusBlocked {
+		t.Errorf("live epic with archived twin: got %v, want blocked", got.RenderedStatus(got.Tickets[0]))
+	}
+}
+
+func TestValidateProject_ArchivedBlockerEpic(t *testing.T) {
+	root := t.TempDir()
+	write := func(path, body string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, path), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(".archive/old/ticket.md", "---\ntype: epic\n---\n# old\n")
+	write("live/ticket.md", "---\ntype: epic\n---\n# live\n")
+	write("live/issues/01-a.md", "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by: [old]\n---\n# a\n")
+	if err := ValidateProject(root); err != nil {
+		t.Errorf("archived blocker: %v", err)
+	}
+	write("live/issues/01-a.md", "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by: [typo]\n---\n# a\n")
+	if err := ValidateProject(root); err == nil || !strings.Contains(err.Error(), CodeUnknownEpic) {
+		t.Errorf("typo: err = %v, want unknown-epic", err)
 	}
 }
 

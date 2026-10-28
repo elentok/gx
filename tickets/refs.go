@@ -90,7 +90,7 @@ func RewriteRefsInFile(path string, fn func(ref string) string) (bool, error) {
 // ref must resolve, and none may close a wait cycle. Done and
 // cancelled tickets are skipped, as in ValidateProject.
 func ValidateRefs(project string, epics []Epic) []error {
-	g := newProjectGraph(project, epics)
+	g := newProjectGraph(project, epics, nil)
 	var errs []error
 	for _, e := range epics {
 		errs = append(errs, g.epicBlockedByErrors(e)...)

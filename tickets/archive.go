@@ -37,6 +37,26 @@ func CountArchivedEpics(scratchDir string) (int, error) {
 	return count, nil
 }
 
+// ArchivedEpicNames is the set of epic names under scratchDir's ".archive"
+// directory, from the same flat listing as CountArchivedEpics. A missing
+// directory is an empty set.
+func ArchivedEpicNames(scratchDir string) (map[string]bool, error) {
+	entries, err := os.ReadDir(ArchiveDir(scratchDir))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	names := map[string]bool{}
+	for _, entry := range entries {
+		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+			names[entry.Name()] = true
+		}
+	}
+	return names, nil
+}
+
 // LoadArchived walks scratchDir's ".archive" directory the same way Load
 // walks ".scratch/", reusing the same per-epic parsing (including malformed/
 // unreadable ticket file handling). It's a separate entry point from Load,

@@ -25,7 +25,11 @@ func ValidateProject(projectDir string) error {
 	if err != nil {
 		return err
 	}
-	graph := newProjectGraph(ProjectName(projectDir), epics)
+	archived, err := ArchivedEpicNames(projectDir)
+	if err != nil {
+		return err
+	}
+	graph := newProjectGraph(ProjectName(projectDir), epics, archived)
 	vcsNone := isVCSNone(projectDir)
 	var errs []error
 	for _, epic := range epics {

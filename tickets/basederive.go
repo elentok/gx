@@ -25,7 +25,7 @@ import (
 // never the base: its branch may already be deleted. Branch ancestry (the
 // server's retarget step) stays the fallback for an unstamped epic.
 func DeriveRootBase(project string, epics []Epic, epic string, t Ticket, onMerged bool) (string, error) {
-	g := newProjectGraph(project, epics)
+	g := newProjectGraph(project, epics, nil)
 	var e Epic
 	merged := map[string]bool{}
 	for _, c := range epics {
@@ -88,7 +88,7 @@ func DeriveLeafBase(project string, epics []Epic, epic string, t Ticket) (string
 	if t.Commitless || t.Base != "" {
 		return "", nil
 	}
-	g := newProjectGraph(project, epics)
+	g := newProjectGraph(project, epics, nil)
 	var siblings []string
 	for _, ref := range t.BlockedBy {
 		key, err := g.resolve(epic, ref)

@@ -30,7 +30,11 @@ func ProjectWarnings(projectDir string) ([]Warning, error) {
 	if err != nil {
 		return nil, err
 	}
-	graph := newProjectGraph(ProjectName(projectDir), epics)
+	archived, err := ArchivedEpicNames(projectDir)
+	if err != nil {
+		return nil, err
+	}
+	graph := newProjectGraph(ProjectName(projectDir), epics, archived)
 	var warnings []Warning
 	for _, epic := range epics {
 		lastClaim := lastClaimBases(filepath.Join(epic.Path, "run-log.jsonl"))
