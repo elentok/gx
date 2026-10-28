@@ -13,9 +13,11 @@ import (
 
 // briefTools lists the wrapped tools by subcommand name.
 var briefTools = map[string]brief.Tool{
-	"go-test": brief.GoTest{},
-	"vitest":  brief.Vitest{},
-	"tsc":     brief.Tsc{},
+	"go-test":  brief.GoTest{},
+	"go-build": brief.GoBuild{},
+	"go-vet":   brief.GoVet{},
+	"vitest":   brief.Vitest{},
+	"tsc":      brief.Tsc{},
 
 	"playwright": brief.Playwright{},
 }
@@ -27,8 +29,10 @@ func newBriefCmd(d deps) *cobra.Command {
 		Long: `Run a dev tool and print one result line and the log path (always the last
 line). Exit 0 means pass, 1 fail, 2 brief could not run the tool.
 
-Tools: go-test, vitest, tsc, playwright (the node tools run from the
-node_modules/.bin found walking up to the git root). playwright needs -C webui:
+Tools: go-test, go-build, go-vet, vitest, tsc, playwright, conflicts (the node
+tools run from the node_modules/.bin found walking up to the git root).
+go-build and go-vet print one line when clean and group errors by file.
+playwright needs -C webui:
 it adds -c e2e/playwright.config.ts, uses the line reporter and runs
 make web-build only when webui/dist/index.html is missing. Bare numbers after
 the test file select flows (playwright disk.e2e.ts 76 77); -g is passed through.

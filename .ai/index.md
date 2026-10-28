@@ -49,6 +49,9 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
 - Run web tests through `make web-test`. gx installs dependencies when it creates an iteration
   worktree, so web tests work in a fresh worktree. `make web-test` still installs first, at the cost
   of a slower run.
+- `gx brief` tools: `go-test`, `go-build`, `go-vet`, `vitest`, `tsc`, `playwright`, `conflicts`.
+  Any other name exits 2 with `unknown tool`. Use `gx brief go-build ./...` and
+  `gx brief go-vet ./cmd`, never `go build ./... | tail`.
 - Quiet web runs, from anywhere in the repo (always pass `-C webui`; the shell cwd persists between
   calls, so never `cd webui`):
   - `gx brief -C webui vitest src/epic`

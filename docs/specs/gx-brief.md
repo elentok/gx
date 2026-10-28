@@ -21,7 +21,7 @@ Three more problems remain:
 - The full output of every run is saved to a log file. The last line of every run names its path, so an agent searches the log instead of re-running the command.
 - The exit code tells the caller what happened: 0 pass, 1 fail, 2 brief could not run the tool.
 
-The v1 tools are `go-test`, `vitest` and `tsc`. `brief` runs the local binary, never `npx` or a global install. It never installs dependencies: when they are missing, it prints one line naming the install command and exits 2.
+The v1 tools are `go-test`, `vitest` and `tsc`. `go-build` and `go-vet` were added later: each prints one line when clean and groups `file.go:line:col` diagnostics by file on a failure. `brief` runs the local binary, never `npx` or a global install. It never installs dependencies: when they are missing, it prints one line naming the install command and exits 2.
 
 `brief` compacts the output of a command it is given. It does not choose which commands verify a project. That belongs to gx:project-checks.
 
