@@ -114,6 +114,38 @@ func TestExecute_CleanupScan_EpicsJSON(t *testing.T) {
 	}
 }
 
+func TestExecute_CleanupScan_SkipsOnDemandContainerEpics(t *testing.T) {
+	dir := testutil.TempRepo(t)
+	project := storeProjectFor(t, dir)
+
+	writeCleanupScanTicket(t, project, tickets.FollowUpsEpic, "01-work.md", "01", "done", "implement")
+	writeCleanupScanTicket(t, project, tickets.ArchivedFollowUpsEpic, "01-work.md", "01", "done", "implement")
+	writeCleanupScanTicket(t, project, "real-epic", "01-work.md", "01", "done", "implement")
+
+	var stdout bytes.Buffer
+	d := deps{
+		env:    envFor(t),
+		stdout: &stdout,
+		stderr: bytes.NewBuffer(nil),
+		getwd:  func() (string, error) { return dir, nil },
+	}
+	if err := execute([]string{"cleanup", "scan", "--json"}, d); err != nil {
+		t.Fatalf("execute cleanup scan --json: %v", err)
+	}
+
+	var result CleanupScanResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	var names []string
+	for _, e := range result.Epics {
+		names = append(names, e.Name)
+	}
+	if !slices.Equal(names, []string{"real-epic"}) {
+		t.Errorf("epics = %v, want only [real-epic]", names)
+	}
+}
+
 func TestExecute_CleanupScan_ReportsAtticRefsAndKeepsThem(t *testing.T) {
 	dir := testutil.TempRepo(t)
 	storeProjectFor(t, dir)

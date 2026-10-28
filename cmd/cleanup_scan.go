@@ -90,6 +90,11 @@ func runCleanupScan(dirs config.Dirs, cwd string, jsonOut bool, w io.Writer) err
 	result := CleanupScanResult{Epics: []EpicScan{}}
 	activeEpics := []tickets.Epic{}
 	for _, epic := range epics {
+		// Containers that gx tickets recreates on demand are never work to
+		// archive: archiving one makes the next close split its history.
+		if epic.Name == tickets.FollowUpsEpic || epic.Name == tickets.ArchivedFollowUpsEpic {
+			continue
+		}
 		activeEpics = append(activeEpics, epic)
 		scan, err := scanEpic(repo, epic)
 		if err != nil {
