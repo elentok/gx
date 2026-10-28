@@ -38,6 +38,8 @@ test("77. Disk hold", async ({ page, start }) => {
   await fixture.setDiskClean("6G");
   await fixture.setDiskFree("5G");
   await expect(strip(page)).toContainText("new tickets held");
+  // The auto-clean frees 1G and sets free space to 6G; a free-space write before it lands would be overwritten.
+  await expect(strip(page)).toContainText("6.0 GB free");
 
   await card(page, "disk-epic").getByRole("button", nav("Queue")).click();
   await card(page, "disk-epic").getByRole("link", { name: "disk-epic", exact: true }).click();

@@ -72,6 +72,8 @@ test.describe("53. Phone, epic page", () => {
     await page.getByRole("button", nav("Queue")).click();
     const answer = page.getByRole("button", nav("Answer"));
     const fix = page.getByRole("button", { name: "Fix it with an agent" });
+    // 07 only starts once 02 and 03 have merged, each after the server's 3s finish debounce, as in flow 2.
+    await expect(page.getByText("4/7")).toBeVisible({ timeout: 30_000 });
     await expect(answer).toBeVisible();
     await expect(fix).toBeVisible();
 
