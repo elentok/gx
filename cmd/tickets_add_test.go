@@ -428,6 +428,7 @@ func TestExecute_TicketsAdd_FieldFlagErrors(t *testing.T) {
 		"bool conflict":       {"--body", "---\ncommitless: false\n---\n\n# X\n", "--commitless", "true"},
 		"bad type":            {"--body", "# X\n", "--type", "nope"},
 		"bad window":          {"--body", "# X\n", "--expected-context-window", "lots"},
+		"window in K":         {"--body", "# X\n", "--expected-context-window", "57"},
 		"bad commitless":      {"--body", "# X\n", "--commitless", "maybe"},
 		"bad category":        {"--body", "# X\n", "--category", "nope"},
 		"dangling blocked_by": {"--body", "# X\n", "--blocked-by", "07"},

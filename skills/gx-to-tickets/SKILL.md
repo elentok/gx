@@ -370,8 +370,8 @@ Each Mock states line counts its 8K once, even when two stories share a state.
 A part's fixed base is 15K (fixture start and the ticket read). A collect ticket's fixed estimate is
 30K. Keep these numbers in one place so gx-evolve can compare them with the actual token counts.
 
-Implement tickets use the same table: add 10K to `expected_context_window` per mock state in the
-ticket's `## Mock check`, and allow at most 4 mock states per implement ticket. Both the 10K and the
+Implement tickets use the same table: add 10000 to `expected_context_window` per mock state in the
+ticket's `## Mock check`, and allow at most 4 mock states per implement ticket. Both the 10000 and the
 cap count mock states: one state section of the mock file, one name at one width. Over the cap,
 split the ticket. The first ticket builds the parts and checks the first 4 states. A follow-on
 implement ticket, blocked by the first, checks the remaining states and fixes what differs.

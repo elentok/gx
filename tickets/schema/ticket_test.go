@@ -177,6 +177,23 @@ func TestValidate_NegativeExpectedContextWindow(t *testing.T) {
 	}
 }
 
+func TestValidate_ExpectedContextWindowUnit(t *testing.T) {
+	for _, n := range []int{1, 20, 57, 999} {
+		tk := validTicket()
+		tk.ExpectedContextWindow = n
+		if err := Validate(tk); err == nil {
+			t.Errorf("expected_context_window %d: want error (looks like K, not tokens), got nil", n)
+		}
+	}
+	for _, n := range []int{0, 1000, 35000} {
+		tk := validTicket()
+		tk.ExpectedContextWindow = n
+		if err := Validate(tk); err != nil {
+			t.Errorf("expected_context_window %d: unexpected error: %v", n, err)
+		}
+	}
+}
+
 func TestValidate_NegativeActualContextWindow(t *testing.T) {
 	tk := validTicket()
 	tk.ActualContextWindow = -1

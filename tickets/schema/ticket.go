@@ -129,6 +129,9 @@ const (
 	TypeTrunkConflict TicketType = "trunk-conflict"
 )
 
+// MinExpectedContextWindow is the smallest non-zero expected_context_window.
+const MinExpectedContextWindow = 1000
+
 var validTypes = map[TicketType]bool{
 	TypeResearch:           true,
 	TypeGrilling:           true,
@@ -242,8 +245,10 @@ type Ticket struct {
 	// It is the only direction the edge is stored in — the reverse (a ticket's
 	// children) is derived by scanning an epic for tickets pointing at it, so
 	// there is no second copy for a fork to forget to update.
-	Parent                *TicketID
-	Type                  TicketType
+	Parent *TicketID
+	Type   TicketType
+	// ExpectedContextWindow is in full tokens. Non-zero values under
+	// MinExpectedContextWindow are rejected: they are K-unit typos.
 	ExpectedContextWindow int
 	ActualContextWindow   int
 	ElapsedTime           int
@@ -397,6 +402,8 @@ func Validate(t Ticket) error {
 	}
 	if t.ExpectedContextWindow < 0 {
 		errs = append(errs, fmt.Errorf("expected_context_window: must be non-negative, got %d", t.ExpectedContextWindow))
+	} else if t.ExpectedContextWindow > 0 && t.ExpectedContextWindow < MinExpectedContextWindow {
+		errs = append(errs, fmt.Errorf("expected_context_window: %d is under %d; write full tokens (20000), not K (20)", t.ExpectedContextWindow, MinExpectedContextWindow))
 	}
 	if t.ActualContextWindow < 0 {
 		errs = append(errs, fmt.Errorf("actual_context_window: must be non-negative, got %d", t.ActualContextWindow))

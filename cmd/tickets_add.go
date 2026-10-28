@@ -184,6 +184,9 @@ func (fm addFrontmatter) validate() error {
 	if fm.ExpectedContextWindow < 0 {
 		return errors.New("expected_context_window must not be negative")
 	}
+	if fm.ExpectedContextWindow > 0 && fm.ExpectedContextWindow < schema.MinExpectedContextWindow {
+		return fmt.Errorf("expected_context_window %d is under %d; write full tokens (20000), not K (20)", fm.ExpectedContextWindow, schema.MinExpectedContextWindow)
+	}
 	return nil
 }
 

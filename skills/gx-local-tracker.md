@@ -91,7 +91,7 @@ Fields:
 - **`category`** (enum) — `bug` or `idea`. Optional on any ticket; required on a follow-up (see
   "Follow-ups"). Not named `kind`, which already means `kind: map` on an epic.
 - **`expected_context_window`** (non-negative int) — the estimated tokens the implementation will
-  occupy.
+  occupy, in full tokens (`20000`, not `20`). Non-zero values under 1000 are rejected.
 - **`commitless`** (bool) — set `true` when a ticket intentionally finishes an iteration with no
   commit (e.g. it turned out to need only a fork, or the behavior already existed). Pass it in the
   same `set` call as `--iteration-status finished` — otherwise the ticket still reads as

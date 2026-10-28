@@ -248,7 +248,8 @@ or touched code of other passed stories. Only a fix round raises N.
   current table into it as its starting table (step 5).
 
 **Opening tickets.** Use `gx tickets add <epic> --parent <this ticket id> --slug <slug>
-[--type verify] [--blocked-by <ids>] --expected-context-window <K> --body -`.
+[--type verify] [--blocked-by <ids>] --expected-context-window <tokens> --body -`.
+`<tokens>` is full tokens (`57000`), never K (`57`); values under 1000 are rejected.
 
 - Every ticket you open is your child. Nothing about it is recorded on this ticket.
 - Each gets `expected_context_window`: the sum of its per-story estimates plus the base (parts), or
