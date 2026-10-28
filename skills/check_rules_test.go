@@ -25,6 +25,7 @@ func TestCheckRulesAnchors(t *testing.T) {
 			"gx check --staged", "`0`: pass", "`1`: fail", "`2`: could not run", "`3`: no applicable checks",
 		}},
 		{"merge", "gx-merge/SKILL.md", []string{"gx check --since <target>", "](../gx-failing-tests.md)"}},
+		{"merge small drift", "gx-merge/SKILL.md", []string{"### Small test drift", "10 lines or fewer", "## Spec deviations"}},
 		{"verify-epic", "gx-verify-epic/SKILL.md", []string{
 			"gx check --full", "](../gx-failing-tests.md)", "git merge-base main HEAD", "pre-existing, <follow-up addr>",
 		}},

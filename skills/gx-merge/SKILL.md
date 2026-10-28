@@ -156,6 +156,8 @@ test, with the rerun results and the evidence.
 - **Branch-fault test that asserts behaviour the branch removed on purpose**
   (the diff or the ticket shows the removal) — update or delete it under
   "Fixing a failing test" below, without pausing. Treat the rest as below.
+- **Branch-fault test whose expected value or list is stale, with a small fix** — see "Small
+  test drift" below. Fix it without pausing.
 - **Any other branch-fault test** — keep the rebased branch and **stop: `tests
   fail after rebase onto <target>: <tests>`** with the check output. If any
   of them fails on trunk too, the reason says so: `… (fails on trunk too)`.
@@ -178,6 +180,17 @@ branch removed on purpose, first decide why each one fails:
 Never weaken, skip or delete an assertion just to get green. If you can't tell which case it is,
 stop and say so. Commit on the rebased branch as `<branch>: Fix <test> after rebase onto <target>`,
 then rerun **all** checks from the start.
+
+### Small test drift
+
+Fix a failing test yourself, without `gx tickets ask`, when the fix only updates an expected value
+or list to match behaviour the diff shows on purpose, and it changes 10 lines or fewer. Fix it as
+in "Fixing a failing test". In ticket mode, log it under `## Spec deviations`
+(`gx tickets section <addr> "Spec deviations" -`): one bullet with the test, the old and new
+expectation, and why.
+
+Ask only when the fix means choosing between two test designs (for example, exempting a case
+versus adding cases). That is a product choice.
 
 ### All checks pass
 
