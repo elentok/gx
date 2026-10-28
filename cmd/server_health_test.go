@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -66,6 +68,19 @@ func TestServerHealth_UsesWaitAndPrintsBothLists(t *testing.T) {
 	cpu, mem, _ := strings.Cut(text, "top by memory:")
 	if strings.Contains(text, "reading") || !strings.Contains(cpu, "busybee 40.0%") || !strings.Contains(mem, "hog 1073741824") {
 		t.Errorf("output lacks the lists:\n%s", text)
+	}
+}
+
+// Seam 3: an agent row prints as `<address> · <busiest process>`.
+func TestServerHealth_AgentRowShowsAddressAndBusiestProcess(t *testing.T) {
+	list := server.CauseList{Rows: []server.CauseRow{
+		{Kind: "agent", Label: "gx:foo/03", Ticket: "gx:foo/03", Busiest: "go test", CPU: 12.5},
+		{Kind: "process", Label: "hog", CPU: 3},
+	}}
+	got := causeLines("top by cpu", list, func(r server.CauseRow) string { return fmt.Sprintf("%.1f%%", r.CPU) })
+	want := []string{"top by cpu:", "  gx:foo/03 · go test 12.5%", "  hog 3.0%"}
+	if !slices.Equal(got, want) {
+		t.Errorf("lines = %q, want %q", got, want)
 	}
 }
 

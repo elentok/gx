@@ -164,7 +164,7 @@ func (s *Server) healthCauses(ctx context.Context, wait bool) HealthCauses {
 	if first == nil {
 		first = cur
 	}
-	lists := syshealth.TopCauses(*first, *cur, serverOwners(*cur), argv)
+	lists := syshealth.TopCauses(*first, *cur, s.healthOwners(*cur), argv)
 	out := HealthCauses{CPU: causeList(lists.CPU), Memory: causeList(lists.Memory)}
 	if prev == nil {
 		out.CPU = CauseList{Marker: CauseMarkerReading}

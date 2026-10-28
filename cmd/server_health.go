@@ -84,11 +84,11 @@ func causeLines(title string, list server.CauseList, value func(server.CauseRow)
 	}
 	lines := []string{title + ":"}
 	for _, r := range list.Rows {
-		line := "  " + r.Label + " " + value(r)
+		label := r.Label
 		if r.Busiest != "" {
-			line += " (" + r.Busiest + ")"
+			label += " · " + r.Busiest
 		}
-		lines = append(lines, line)
+		lines = append(lines, "  "+label+" "+value(r))
 	}
 	return lines
 }

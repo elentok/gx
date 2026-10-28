@@ -227,10 +227,11 @@ type Server struct {
 	reloadMu sync.Mutex // serializes config reloads
 	reloads  reloadHistory
 	// cpuSpikes holds the CPU ticket cooldown.
-	cpuSpikes cpuSpikes
-	disks     diskWatch
-	healthW   healthWatch
-	procs     procWatch
+	cpuSpikes  cpuSpikes
+	disks      diskWatch
+	healthW    healthWatch
+	procs      procWatch
+	ownerCache ownerCache
 	// chats caches parsed session chats by transcript file.
 	chats chatCache
 	// transcripts caches where each conversation's transcript is.
