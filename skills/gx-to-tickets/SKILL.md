@@ -198,6 +198,12 @@ context overrun) rediscovering it, then misses shared fixtures and fails the ful
   removed names and the changed label or text across all tests, e2e flows and fixtures. Read every
   hit in full (no `| head`). List each affected test in Test seams, and give a scoped run (`-run`
   pattern or file list) that covers every hit. Don't scope by the new feature's name.
+- **Caller lists are verified, not recalled**: build every list of call sites with gopls
+  `go_symbol_references` (not from memory or a ticket's prose) and stamp it `verified at <commit>`
+  (`git rev-parse --short HEAD`). If gopls is unavailable, use `rg` and label the list
+  `not verified`, so the implementer knows to re-check it.
+- **Doc pointers**: cite only a doc section you opened and confirmed exists (file and heading). A
+  pointer to guidance that is not there sends the agent searching.
 
 ### 4c. Check every claim against the code
 
