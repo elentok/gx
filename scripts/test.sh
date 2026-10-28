@@ -2,7 +2,10 @@
 # Runs every non-e2e test step side by side, then prints one line per step and
 # the failing steps with their `gx brief` reports.
 #
-# Usage: scripts/test.sh
+# Usage: [GX_TEST_CPUS=<n>] scripts/test.sh
+#
+# GX_TEST_CPUS is the CPU budget for all steps together. It defaults to half the
+# cores (all of them on a machine with 4 cores or fewer).
 #
 # The steps are separate processes, each with its own output file:
 #   race    the PTY-runner packages under -race (a vt emulator shared with a
@@ -61,13 +64,23 @@ run_step() {
 	echo "$status $((SECONDS - start))" >"$work/$name.status"
 }
 
-run_step race "$gx" brief go-test -race -timeout=10m -count=1 "${race_pkgs[@]}" &
+# The steps share one CPU budget so the machine does not saturate. GOMAXPROCS
+# caps a Go step's packages in flight (-p) and its parallel tests (-parallel).
+# server and go get two fifths each, race and web get one worker each, so the
+# total is about the budget. Machines with 4 cores or fewer get no cap.
+cores=$(getconf _NPROCESSORS_ONLN)
+if ((cores > 4)); then budget=$((cores / 2)); else budget=$cores; fi
+budget=${GX_TEST_CPUS:-$budget}
+big=$((budget * 2 / 5))
+((big >= 1)) || big=1
+
+run_step race env GOMAXPROCS=1 "$gx" brief go-test -race -timeout=10m -count=1 "${race_pkgs[@]}" &
 pids=("$!")
-run_step go "$gx" brief go-test -timeout=10m -count=1 "${other_pkgs[@]}" &
+run_step go env GOMAXPROCS="$big" "$gx" brief go-test -timeout=10m -count=1 "${other_pkgs[@]}" &
 pids+=("$!")
-run_step server "$gx" brief go-test -timeout=10m -count=1 ./server &
+run_step server env GOMAXPROCS="$big" "$gx" brief go-test -timeout=10m -count=1 ./server &
 pids+=("$!")
-run_step web make web-test GX="$gx" &
+run_step web make web-test GX="$gx" WEB_TEST_WORKERS=1 &
 pids+=("$!")
 for pid in "${pids[@]}"; do
 	wait "$pid" || true

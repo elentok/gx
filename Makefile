@@ -25,10 +25,13 @@ web-dev:
 web-dev-proxy:
 	cd webui && pnpm install --frozen-lockfile && GX_WEBUI_PROXY=1 pnpm dev
 
+# WEB_TEST_WORKERS caps vitest's workers; scripts/test.sh sets it to share the CPU budget.
+WEB_TEST_WORKERS ?=
+
 web-test:
 	cd webui && pnpm install --frozen-lockfile
 	$(GX) brief -C webui tsc
-	$(GX) brief -C webui vitest
+	$(GX) brief -C webui vitest $(if $(WEB_TEST_WORKERS),--maxWorkers=$(WEB_TEST_WORKERS))
 
 # Browser flows against fixture servers (webui/e2e/CATALOG.md); the gx binary embeds the built UI.
 web-e2e: web-build

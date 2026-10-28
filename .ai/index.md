@@ -31,7 +31,8 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
 - ralph-loop's land step runs no tests: it only cherry-picks commits onto the feature branch. The
   full suite runs in CI (`.github/workflows/ci.yml`, on pushes and PRs to `main`): `make test`
   (`scripts/test.sh`: race, other Go, server and web unit tests side by side), `make web-e2e`, and
-  `go test ./e2e/...`.
+  `go test ./e2e/...`. `make test` shares one CPU budget between its steps, half the cores by
+  default; set `GX_TEST_CPUS=<n>` to change it.
 - Once a targeted run passes, stop. Don't rerun the full suite to double-check.
 - Verify with `gx check` in the foreground, unpiped. Iterate with `gx brief`. Never pipe, `tail` or
   background either.
