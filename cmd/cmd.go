@@ -107,8 +107,10 @@ func defaultDeps() deps {
 		getenv:               os.Getenv,
 		goos:                 runtime.GOOS,
 		userHomeDir:          dirs.Home,
-		runEditor:            runEditorCommand,
-		stdinIsTerminal:      func() bool { return isTerminalFile(os.Stdin) },
+		runEditor: func(editor, path string, in io.Reader, out, errOut io.Writer) error {
+			return runEditorCommand(env, editor, path, in, out, errOut)
+		},
+		stdinIsTerminal: func() bool { return isTerminalFile(os.Stdin) },
 		readClaudeOccupancy: func(cwd, sessionID string) (int, bool, error) {
 			return transcript.LastAssistantOccupancyIn(roots.Home, cwd, sessionID)
 		},

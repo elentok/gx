@@ -77,9 +77,9 @@ func TestPlaywrightPlan_AddsConfigAndLineReporter(t *testing.T) {
 	dir := playwrightDir(t, true)
 	os.MkdirAll(filepath.Join(dir, "dist"), 0o755)
 	os.WriteFile(filepath.Join(dir, "dist", "index.html"), nil, 0o644)
-	buildWeb = func(string) error { t.Fatal("built although dist/index.html exists"); return nil }
+	buildWeb = func([]string, string) error { t.Fatal("built although dist/index.html exists"); return nil }
 
-	inv, err := Playwright{}.Plan(dir, []string{"--reporter=list", "epics.e2e.ts", "-g", "^2\\."})
+	inv, err := Playwright{}.Plan(nil, dir, []string{"--reporter=list", "epics.e2e.ts", "-g", "^2\\."})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,19 +95,24 @@ func TestPlaywrightPlan_AddsConfigAndLineReporter(t *testing.T) {
 func TestPlaywrightPlan_BuildsWebOnlyWhenDistIsMissing(t *testing.T) {
 	dir := playwrightDir(t, true)
 	var builtAt string
-	buildWeb = func(root string) error { builtAt = root; return nil }
+	var builtEnv []string
+	buildWeb = func(env []string, root string) error { builtAt, builtEnv = root, env; return nil }
 
-	if _, err := (Playwright{}).Plan(dir, nil); err != nil {
+	env := []string{"PATH=/fake/bin"}
+	if _, err := (Playwright{}).Plan(env, dir, nil); err != nil {
 		t.Fatal(err)
 	}
 	if builtAt != filepath.Dir(dir) {
 		t.Errorf("built at %q, want the git root %q", builtAt, filepath.Dir(dir))
 	}
+	if !slices.Equal(builtEnv, env) {
+		t.Errorf("built with env %v, want %v", builtEnv, env)
+	}
 }
 
 func TestPlaywrightPlan_RefusesADirWithoutTheConfig(t *testing.T) {
 	dir := playwrightDir(t, false)
-	_, err := Playwright{}.Plan(dir, nil)
+	_, err := Playwright{}.Plan(nil, dir, nil)
 	if err == nil || !strings.Contains(err.Error(), "-C webui") {
 		t.Errorf("err = %v, want advice to use -C webui", err)
 	}

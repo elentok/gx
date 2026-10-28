@@ -39,6 +39,7 @@ func runStashify(args []string, d deps) error {
 	printBadge(d.stderr, nerd, "󱐋 Running "+runLabel+"\u2026", "Running "+runLabel+"\u2026")
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Dir = cwd
+	cmd.Env = append([]string{}, d.env...)
 	cmd.Stdin = d.stdin
 	cmd.Stdout = d.stdout
 	cmd.Stderr = d.stderr

@@ -411,7 +411,7 @@ func spawnDetached(env []string, stateDir string) spawnFunc {
 // under env.
 func detachedServerCmd(exe string, env []string, logf *os.File) *exec.Cmd {
 	child := exec.Command(exe, "server")
-	child.Env = env
+	child.Env = append([]string{}, env...)
 	child.Stdout, child.Stderr = logf, logf // Stdin nil = /dev/null
 	child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	return child

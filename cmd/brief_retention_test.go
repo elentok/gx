@@ -16,7 +16,7 @@ func fakeGo(t *testing.T, body string) {
 	if err := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	prependPath(t, bin)
 }
 
 func briefDir(data string) string { return filepath.Join(data, "gx", "brief") }

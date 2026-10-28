@@ -21,6 +21,9 @@ type IO struct {
 	In  io.Reader
 	Out io.Writer
 	Err io.Writer
+	// Env is the child's whole environment; empty means none, never the
+	// process's.
+	Env []string
 }
 
 // Run executes program with args, wiring the child's stdin/stdout/stderr to
@@ -30,6 +33,7 @@ type IO struct {
 // exit code, so a pane launched for the command stays visible until dismissed.
 func Run(program string, args []string, io IO) int {
 	cmd := exec.Command(program, args...)
+	cmd.Env = append([]string{}, io.Env...)
 	cmd.Stdin = io.In
 	cmd.Stdout = io.Out
 	cmd.Stderr = io.Err

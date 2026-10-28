@@ -12,7 +12,7 @@ import (
 type shellTool struct{ script string }
 
 func (shellTool) Name() string { return "shell" }
-func (s shellTool) Plan(dir string, args []string) (Invocation, error) {
+func (s shellTool) Plan(_ []string, dir string, args []string) (Invocation, error) {
 	return Invocation{Bin: "sh", Argv: []string{"-c", s.script}}, nil
 }
 func (shellTool) Parse(out []byte, exit int) Outcome  { return Outcome{Units: 1, Summary: "1 thing"} }

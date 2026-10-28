@@ -43,6 +43,27 @@ func envFor(t *testing.T) []string {
 	return env
 }
 
+// setEnvFor sets key in the env envFor(t) returns from now on. It replaces
+// t.Setenv for anything that runs through the deps env.
+func setEnvFor(t *testing.T, key, value string) {
+	t.Helper()
+	top, _, _ := strings.Cut(t.Name(), "/")
+	old := envFor(t)
+	env := make([]string, 0, len(old)+1)
+	for _, kv := range old {
+		if !strings.HasPrefix(kv, key+"=") {
+			env = append(env, kv)
+		}
+	}
+	testEnvs.Store(top, append(env, key+"="+value))
+}
+
+// prependPath puts dir first on the PATH of envFor(t).
+func prependPath(t *testing.T, dir string) {
+	t.Helper()
+	setEnvFor(t, "PATH", dir+string(os.PathListSeparator)+envValue(envFor(t), "PATH"))
+}
+
 // envValue returns the value of key in env, or "".
 func envValue(env []string, key string) string {
 	v := ""

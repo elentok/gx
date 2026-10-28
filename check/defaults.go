@@ -356,7 +356,7 @@ func (r *runner) runStep(kind string, s step, log io.Writer) stepResult {
 		return stepResult{failed: cmd.Run() != nil}
 	}
 	fmt.Fprintf(log, "$ gx brief %s %s\n", s.brief.Name(), strings.Join(s.argv, " "))
-	exit, outcome := brief.RunOutcome(s.brief, brief.Options{Dir: s.dir, Args: s.argv, DataDir: r.dataDir, Out: log, CheckRun: r.runID, CheckKind: kind})
+	exit, outcome := brief.RunOutcome(s.brief, brief.Options{Dir: s.dir, Args: s.argv, DataDir: r.dataDir, Out: log, Env: r.childEnv(kind), CheckRun: r.runID, CheckKind: kind})
 	sr := stepResult{failed: exit != brief.ExitPass}
 	for _, u := range outcome.Failures {
 		sr.failures = append(sr.failures, u.String())

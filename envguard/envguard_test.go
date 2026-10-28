@@ -46,11 +46,8 @@ type entry struct {
 // goes down: take the value from config or the caller, then lower the count.
 // "to remove" entries are later tickets' work.
 var allowed = map[site]entry{
-	{"brief/brief.go", ruleChildEnv}:                      {1, reasonRemove},
 	{"claudehistory/projects.go", ruleHomeDir}:            {2, reasonRemove},
-	{"cmd/operations.go", ruleChildEnv}:                   {1, reasonStartup},
 	{"cmd/server_preflight.go", ruleHomeDir}:              {1, reasonStartup},
-	{"cmd/stashify.go", ruleChildEnv}:                     {1, reasonStartup},
 	{"codexsession/session.go", ruleEnvRead}:              {1, reasonRemove},
 	{"codexsession/session.go", ruleHomeDir}:              {1, reasonRemove},
 	{"server/server.go", ruleConfigEnv}:                   {2, reasonStartup},
@@ -70,7 +67,6 @@ var allowed = map[site]entry{
 	{"harness/claudepid.go", ruleHomeDir}:                 {1, reasonRemove},
 	{"osnotify/osnotify.go", ruleChildEnv}:                {1, reasonRemove},
 	{"ralphloop/deps.go", ruleChildEnv}:                   {1, reasonRemove},
-	{"runner/runner.go", ruleChildEnv}:                    {1, reasonRemove},
 	{"server/servertest/servertest.go", ruleEnvRead}:      {2, reasonRemove},
 	{"sessionlookup/lookup.go", ruleEnvRead}:              {1, reasonRemove},
 	{"sessionlookup/lookup.go", ruleHomeDir}:              {1, reasonRemove},

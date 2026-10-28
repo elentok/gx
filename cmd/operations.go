@@ -602,13 +602,14 @@ func runNotifyStatus(d deps) error {
 	return nil
 }
 
-func runEditorCommand(editor, path string, in io.Reader, out, errOut io.Writer) error {
+func runEditorCommand(env []string, editor, path string, in io.Reader, out, errOut io.Writer) error {
 	parts := strings.Fields(editor)
 	if len(parts) == 0 {
 		return fmt.Errorf("$EDITOR is empty")
 	}
 	args := append(parts[1:], path)
 	cmd := exec.Command(parts[0], args...)
+	cmd.Env = append([]string{}, env...)
 	cmd.Stdin = in
 	cmd.Stdout = out
 	cmd.Stderr = errOut

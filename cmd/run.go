@@ -19,6 +19,7 @@ func runRun(args []string, d deps) error {
 		In:  d.stdin,
 		Out: d.stdout,
 		Err: d.stderr,
+		Env: d.env,
 	})
 	if code != 0 {
 		return &ExitError{Code: code}

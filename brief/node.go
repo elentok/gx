@@ -83,7 +83,7 @@ func (Vitest) Name() string { return "vitest" }
 
 // Plan finds the binary, refuses watch mode and runs vitest once with the JSON
 // reporter. `related` keeps its place as the subcommand.
-func (Vitest) Plan(dir string, args []string) (Invocation, error) {
+func (Vitest) Plan(_ []string, dir string, args []string) (Invocation, error) {
 	for _, a := range args {
 		if a == "--watch" || a == "-w" || a == "--watch=true" {
 			return Invocation{}, errors.New("vitest --watch is not supported; brief runs vitest once")
@@ -195,7 +195,7 @@ type Tsc struct{}
 func (Tsc) Name() string { return "tsc" }
 
 // Plan finds the binary and checks that there is a tsconfig to compile.
-func (Tsc) Plan(dir string, args []string) (Invocation, error) {
+func (Tsc) Plan(_ []string, dir string, args []string) (Invocation, error) {
 	bin, err := findNodeBin(dir, "tsc")
 	if err != nil {
 		return Invocation{}, err

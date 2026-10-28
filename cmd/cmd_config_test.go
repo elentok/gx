@@ -369,7 +369,7 @@ func TestRelativeDate_NonZero(t *testing.T) {
 func TestRunEditorCommand_Success(t *testing.T) {
 	t.Parallel()
 	path := t.TempDir() + "/file.txt"
-	err := runEditorCommand("touch", path, bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil))
+	err := runEditorCommand(tempEnv(t), "touch", path, bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil))
 	if err != nil {
 		t.Fatalf("runEditorCommand touch: %v", err)
 	}
@@ -380,7 +380,7 @@ func TestRunEditorCommand_Success(t *testing.T) {
 
 func TestRunEditorCommand_Failure(t *testing.T) {
 	t.Parallel()
-	err := runEditorCommand("false", "/irrelevant", bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil))
+	err := runEditorCommand(tempEnv(t), "false", "/irrelevant", bytes.NewBuffer(nil), bytes.NewBuffer(nil), bytes.NewBuffer(nil))
 	if err == nil {
 		t.Fatal("expected error from false command")
 	}
@@ -390,11 +390,25 @@ func TestRunEditorCommand_MultiWordEditor(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer
 	// Verify a multi-word $EDITOR (e.g. "code --wait") gets split correctly.
-	err := runEditorCommand("echo hello", "/dev/null", bytes.NewBuffer(nil), &stdout, bytes.NewBuffer(nil))
+	err := runEditorCommand(tempEnv(t), "echo hello", "/dev/null", bytes.NewBuffer(nil), &stdout, bytes.NewBuffer(nil))
 	if err != nil {
 		t.Fatalf("runEditorCommand multi-word: %v", err)
 	}
 	if !strings.Contains(stdout.String(), "hello") {
 		t.Fatalf("expected hello in output, got: %q", stdout.String())
+	}
+}
+
+func TestRunEditorCommand_ChildGetsTheGivenEnv(t *testing.T) {
+	t.Setenv("EDITOR_LEAK", "leaked")
+	var stdout bytes.Buffer
+	env := append(tempEnv(t), "EDITOR_PROBE=given")
+	// printenv takes the variable names as its args; the "path" is the second name.
+	err := runEditorCommand(env, "printenv EDITOR_PROBE", "EDITOR_LEAK", bytes.NewBuffer(nil), &stdout, bytes.NewBuffer(nil))
+	if err == nil {
+		t.Fatal("printenv should exit 1: EDITOR_LEAK is not in the given env")
+	}
+	if got := strings.TrimSpace(stdout.String()); got != "given" {
+		t.Fatalf("child env output = %q, want only the given EDITOR_PROBE", got)
 	}
 }

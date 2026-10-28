@@ -15,9 +15,10 @@ import (
 const playwrightConfig = "e2e/playwright.config.ts"
 
 // buildWeb builds the web UI. It is a variable so tests do not run make.
-var buildWeb = func(root string) error {
+var buildWeb = func(env []string, root string) error {
 	cmd := exec.Command("make", "web-build")
 	cmd.Dir = root
+	cmd.Env = envOrEmpty(env)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
 		return fmt.Errorf("make web-build failed: %v\n%s", err, strings.Join(lines[max(0, len(lines)-10):], "\n"))
@@ -34,7 +35,7 @@ func (Playwright) Name() string { return "playwright" }
 // runs the line reporter. The gx binary embeds webui/dist, so a missing
 // dist/index.html triggers `make web-build`; the global setup rebuilds it
 // anyway, which is the only reason to build it here.
-func (Playwright) Plan(dir string, args []string) (Invocation, error) {
+func (Playwright) Plan(env []string, dir string, args []string) (Invocation, error) {
 	bin, err := findNodeBin(dir, "playwright")
 	if err != nil {
 		return Invocation{}, err
@@ -58,7 +59,7 @@ func (Playwright) Plan(dir string, args []string) (Invocation, error) {
 		if err != nil {
 			return Invocation{}, err
 		}
-		if err := buildWeb(root); err != nil {
+		if err := buildWeb(env, root); err != nil {
 			return Invocation{}, err
 		}
 	}

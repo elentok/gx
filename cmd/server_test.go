@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -61,6 +62,16 @@ func TestServerEventsKinds_ViaRootCommand(t *testing.T) {
 	}
 	if !json.Valid(out.Bytes()) {
 		t.Errorf("not JSON: %s", out.String())
+	}
+}
+
+func TestDetachedServerCmd_RunsUnderTheGivenEnv(t *testing.T) {
+	env := []string{"HOME=/h", "PATH=/p"}
+	if got := detachedServerCmd("gx", env, nil).Env; !slices.Equal(got, env) {
+		t.Errorf("Env = %v, want %v", got, env)
+	}
+	if got := detachedServerCmd("gx", nil, nil).Env; got == nil {
+		t.Error("an empty env must stay empty, not inherit the process env (nil Env)")
 	}
 }
 

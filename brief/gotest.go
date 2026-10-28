@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"slices"
 	"strings"
@@ -18,8 +17,8 @@ func (GoTest) Name() string { return "go-test" }
 
 // Plan always adds -json and -v, once. Flags after -args belong to the test
 // binary and pass through untouched.
-func (GoTest) Plan(_ string, args []string) (Invocation, error) {
-	exe, err := exec.LookPath("go")
+func (GoTest) Plan(env []string, _ string, args []string) (Invocation, error) {
+	exe, err := lookPath(env, "go")
 	if err != nil {
 		return Invocation{}, errors.New("go not found on PATH")
 	}

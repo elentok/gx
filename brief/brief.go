@@ -29,8 +29,9 @@ const (
 type Tool interface {
 	Name() string
 	// Plan finds the executable and builds its arguments for the caller's
-	// args. An error exits 2.
-	Plan(dir string, args []string) (Invocation, error)
+	// args. env is the environment the run uses: executables are looked up on
+	// its PATH, and children start with it. An error exits 2.
+	Plan(env []string, dir string, args []string) (Invocation, error)
 	// Parse reads the raw output of a run that exited with the given code.
 	Parse(out []byte, exit int) Outcome
 	// RerunArgs returns the caller's args changed to run only the failing
@@ -66,6 +67,9 @@ type Options struct {
 	Args    []string
 	DataDir string // gx data dir; logs and the index live under it
 	Out     io.Writer
+	// Env is the child's whole environment; empty means none, never the
+	// process's.
+	Env []string
 	// CheckRun and CheckKind tag the index line with the `gx check` run (and
 	// the kind of it) that started this one.
 	CheckRun  string
@@ -133,7 +137,7 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	if err != nil {
 		return cantRun(o.Out, err.Error()), Outcome{}
 	}
-	plan, err := tool.Plan(dir, o.Args)
+	plan, err := tool.Plan(o.Env, dir, o.Args)
 	if err != nil {
 		return cantRun(o.Out, err.Error()), Outcome{}
 	}
@@ -155,7 +159,7 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 	branch, _ := git.CurrentBranch(dir)
 	treeID, _ := git.TreeID(dir)
 
-	out, exit, err := execute(plan.Bin, plan.Argv, dir, logFile)
+	out, exit, err := execute(plan.Bin, plan.Argv, dir, o.Env, logFile)
 	if err != nil {
 		return cantRun(o.Out, err.Error()), Outcome{}
 	}
@@ -192,11 +196,12 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 // execute runs the command and returns its combined output and exit code. The
 // output is also written to logFile as it arrives, so a killed run keeps its
 // partial log.
-func execute(exe string, argv []string, dir string, logFile io.Writer) (out []byte, exit int, err error) {
+func execute(exe string, argv []string, dir string, env []string, logFile io.Writer) (out []byte, exit int, err error) {
 	var buf bytes.Buffer
 	w := io.MultiWriter(&buf, logFile)
 	cmd := exec.Command(exe, argv...)
 	cmd.Dir = dir
+	cmd.Env = envOrEmpty(env)
 	cmd.Stdout = w
 	cmd.Stderr = w
 	if err := runForwardingSignals(cmd); err != nil {

@@ -109,7 +109,7 @@ func TestBrief_GoTestPass(t *testing.T) {
 
 func TestBrief_IndexInRepoCarriesBranchTreeAndCheckRun(t *testing.T) {
 	data := envValue(envFor(t), "XDG_DATA_HOME")
-	t.Setenv(brief.EnvCheckRun, "run-1")
+	setEnvFor(t, brief.EnvCheckRun, "run-1")
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "go.mod", "module example.com/tiny\n\ngo 1.21\n")
 	testutil.WriteFile(t, repo, "a_test.go", "package tiny\n\nimport \"testing\"\n\nfunc TestA(t *testing.T) {}\nfunc TestB(t *testing.T) { t.Fail() }\n")
@@ -142,7 +142,7 @@ func TestBrief_GoTestArgs(t *testing.T) {
 	if err := os.Chmod(filepath.Join(bin, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	prependPath(t, bin)
 	proj := evalSymlinks(t, t.TempDir())
 
 	_, code := runBriefCmd(t, t.TempDir(), "-C", proj, "go-test", "-v", "-run", "TestX", "-count=1", "./a", "./b")
@@ -184,7 +184,7 @@ func TestBrief_NoTestsRan(t *testing.T) {
 }
 
 func TestBrief_GoMissingExits2(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
+	setEnvFor(t, "PATH", t.TempDir())
 
 	out, code := runBriefCmd(t, t.TempDir(), "go-test")
 	if code != 2 {
