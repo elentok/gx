@@ -144,8 +144,8 @@ func RunCleanupCommand(ctx context.Context, argv []string, dir string) ([]byte, 
 }
 
 // endClean ends every clean: it reads the disk again and lets observe set the
-// hold from that reading.
-func (s *Server) endClean(id, probe, failed string) {
+// hold from that reading. It returns that reading and whether the disk is held.
+func (s *Server) endClean(id, probe, failed string) (DiskReading, bool) {
 	r, err := s.freeSpace(probe)
 	if err != nil {
 		s.log.Warn("read free space", "path", probe, "err", err)
@@ -154,7 +154,7 @@ func (s *Server) endClean(id, probe, failed string) {
 		r = d.disks[id].reading
 		d.mu.Unlock()
 	}
-	s.observe(r, probe, nil, time.Now(), &cleanEnd{failed: failed})
+	return r, s.observe(r, probe, nil, time.Now(), &cleanEnd{failed: failed})
 }
 
 // sendCleanNotice sends the one notice of a clean.

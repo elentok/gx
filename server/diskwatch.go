@@ -65,6 +65,7 @@ type diskState struct {
 	cleaning  bool // a clean is running; it alone clears the hold
 	cleanFree uint64
 	lastClean string
+	probe     string // a path on the disk, read again when a clean ends
 }
 
 func (st *diskState) status(id string) DiskStatus {
@@ -100,6 +101,9 @@ func (s *Server) observe(r DiskReading, probe string, projects []string, now tim
 		d.disks[r.ID] = st
 	}
 	st.reading, st.at = r, now
+	if probe != "" {
+		st.probe = probe
+	}
 	if projects != nil {
 		st.projects = projects
 	}

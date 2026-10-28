@@ -669,6 +669,14 @@ func (c *Client) ConfigStatus(ctx context.Context) (server.ConfigStatus, error) 
 	return st, err
 }
 
+// CleanDisk runs the cleanup of one disk now. A refusal is a result (Refused
+// set), not an error.
+func (c *Client) CleanDisk(ctx context.Context, disk string) (server.CleanNowResult, error) {
+	var res server.CleanNowResult
+	err := c.post(ctx, "/v1/disk/clean", server.CleanNowRequest{Disk: disk}, &res)
+	return res, err
+}
+
 // DiskStatus is the disk-space thresholds and every disk the watcher knows.
 func (c *Client) DiskStatus(ctx context.Context) (server.DiskReport, error) {
 	var rep server.DiskReport

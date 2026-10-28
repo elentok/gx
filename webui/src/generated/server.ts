@@ -407,6 +407,38 @@ export interface DetailRun {
 }
 
 //////////
+// source: diskcleannow.go
+
+/**
+ * ReasonUnknownDisk refuses a "clean now" for a disk the watcher does not know.
+ */
+export const ReasonUnknownDisk = "unknown-disk";
+/**
+ * ReasonCleanRunning refuses a "clean now" while any clean runs on the disk.
+ */
+export const ReasonCleanRunning = "clean-running";
+export type Reason = typeof ReasonUnknownDisk | typeof ReasonCleanRunning;
+/**
+ * CleanNowRequest names the disk to clean.
+ */
+export interface CleanNowRequest {
+  disk: string;
+}
+/**
+ * CleanNowResult is the answer to a "clean now". A failed command is an answer
+ * (Failure set), not a refusal.
+ */
+export interface CleanNowResult {
+  freed_bytes: number /* uint64 */;
+  free_bytes: number /* uint64 */;
+  held: boolean;
+  failure?: string;
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+
+//////////
 // source: diskwatch.go
 
 /**

@@ -112,6 +112,23 @@ func TestDiskStatus_OffThresholdPrintsOff(t *testing.T) {
 	}
 }
 
+func TestDiskClean_PrintsFreedAndFreeAfterAndRefusalFails(t *testing.T) {
+	h := startDiskStatusServer(t, config.DiskSpaceConfig{WarnBelow: 20 * diskGB, CleanBelow: 10 * diskGB})
+
+	var out bytes.Buffer
+	if err := runDiskClean(context.Background(), h.Client, &out, "d-low", false); err != nil {
+		t.Fatal(err)
+	}
+	if want := "freed 0, 5G free now, dispatch held\n"; out.String() != want {
+		t.Errorf("output = %q, want %q", out.String(), want)
+	}
+
+	out.Reset()
+	if err := runDiskClean(context.Background(), h.Client, &out, "nope", false); err == nil {
+		t.Errorf("unknown disk returned no error, output = %q", out.String())
+	}
+}
+
 func TestDiskStatus_JSONMatchesTheRoute(t *testing.T) {
 	h := startDiskStatusServer(t, config.DiskSpaceConfig{WarnBelow: 20 * diskGB, CleanBelow: 10 * diskGB})
 

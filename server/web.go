@@ -134,6 +134,7 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/tickets/fix-agent": func(s *Server) http.HandlerFunc { return s.fixAgentWeb() },
 	"POST /v1/sessions/focus":    func(s *Server) http.HandlerFunc { return s.sessionFocusWriteWeb },
 	"POST /v1/afk":               func(s *Server) http.HandlerFunc { return s.afkWrite },
+	"POST /v1/disk/clean":        func(s *Server) http.HandlerFunc { return s.diskCleanWrite },
 }
 
 // checkWriteRequest returns why a non-GET request is refused, or "". It is the
