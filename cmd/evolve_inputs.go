@@ -87,6 +87,8 @@ type InputsTable struct {
 	Slower             []SlowerRow `json:"slower"`
 	SlowerBaselineRuns int         `json:"slower_baseline_runs"`
 	Flakes             []FlakeRow  `json:"flakes"`
+	// FlakesNoTree counts failing check records skipped for lacking a tree id.
+	FlakesNoTree int `json:"flakes_no_tree"`
 }
 
 // buildInputsTable derives every row from frontmatter, the run log and the
@@ -293,6 +295,7 @@ func runEvolveInputs(env evolveEnv, w io.Writer, arg string, asJSON bool) error 
 		return err
 	}
 	table.Slower, table.SlowerBaselineRuns, table.Flakes = checks.slower, checks.baselineRuns, checks.flakes
+	table.FlakesNoTree = checks.flakesNoTree
 	if table.DigestDir, err = os.MkdirTemp(env.tempDir, "gx-evolve-digests-"); err != nil {
 		return err
 	}

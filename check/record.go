@@ -51,6 +51,7 @@ type Record struct {
 	Worktree   string       `json:"worktree"`
 	Head       string       `json:"head"`
 	TreeID     string       `json:"tree_id"`
+	TreeError  string       `json:"tree_error,omitempty"` // set when TreeID is empty
 	Link       string       `json:"link"`
 	Epic       string       `json:"epic,omitempty"`   // set for LinkTicket
 	Ticket     string       `json:"ticket,omitempty"` // set for LinkTicket
@@ -124,6 +125,7 @@ func (r *runner) newRecord(opts Options, started time.Time, res Result) Record {
 		KindFilter: strings.Join(opts.Kinds, ","),
 		Worktree:   r.root,
 		TreeID:     r.treeID,
+		TreeError:  r.treeErr,
 		Link:       LinkOther,
 	}
 	rec.Branch, _ = git.CurrentBranch(r.root)

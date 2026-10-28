@@ -47,6 +47,8 @@ type epicChecks struct {
 	// baselineRunsMax no slower row is reported.
 	baselineRuns int
 	flakes       []FlakeRow
+	// flakesNoTree counts failing records flake detection skipped for lacking a tree id.
+	flakesNoTree int
 }
 
 // buildEpicChecks reads the check record and brief index through their
@@ -80,7 +82,7 @@ func buildEpicChecks(env evolveEnv, t evolveTarget) (epicChecks, error) {
 
 	var out epicChecks
 	out.slower, out.baselineRuns = slowerRows(recs, verifyBranches, firstClaim)
-	out.flakes = flakeRows(recs, index, branches)
+	out.flakes, out.flakesNoTree = flakeRows(recs, index, branches)
 	return out, nil
 }
 
@@ -135,11 +137,18 @@ func slowerRows(recs []check.Record, verifyBranches map[string]bool, firstClaim 
 	return rows, len(baseline)
 }
 
-func flakeRows(recs []check.Record, index []brief.IndexEntry, branches map[string]bool) []FlakeRow {
-	var rows []FlakeRow
+// flakeRows also counts the records with failures it had to skip for lacking a
+// tree id, old records included.
+func flakeRows(recs []check.Record, index []brief.IndexEntry, branches map[string]bool) (rows []FlakeRow, noTree int) {
 	seen := map[string]bool{}
 	for i, rec := range recs {
-		if !branches[rec.Branch] || rec.TreeID == "" {
+		if !branches[rec.Branch] {
+			continue
+		}
+		if rec.TreeID == "" {
+			if slices.ContainsFunc(rec.Kinds, func(k check.KindRecord) bool { return len(k.Failed) > 0 }) {
+				noTree++
+			}
 			continue
 		}
 		for _, k := range rec.Kinds {
@@ -155,7 +164,7 @@ func flakeRows(recs []check.Record, index []brief.IndexEntry, branches map[strin
 			}
 		}
 	}
-	return rows
+	return rows, noTree
 }
 
 // laterPass names the first later passing run of test on rec's tree: a `gx
@@ -199,7 +208,12 @@ func printEpicChecks(w io.Writer, table InputsTable) error {
 			return err
 		}
 	}
-	if len(table.Slower)+len(table.Flakes) > 0 {
+	if table.FlakesNoTree > 0 {
+		if _, err := fmt.Fprintf(w, "\nskipped %d records with no tree", table.FlakesNoTree); err != nil {
+			return err
+		}
+	}
+	if len(table.Slower)+len(table.Flakes)+table.FlakesNoTree > 0 {
 		_, err := fmt.Fprintln(w)
 		return err
 	}

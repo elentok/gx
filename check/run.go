@@ -136,7 +136,9 @@ func Run(opts Options) (Result, error) {
 		}
 	}
 	// The tree after format ran is the one the other kinds check.
-	r.treeID, _ = git.TreeID(root)
+	if r.treeID, err = git.TreeID(root); err != nil {
+		r.treeErr = err.Error()
+	}
 	for i, k := range ordered {
 		if k != "format" {
 			wg.Go(func() { results[i] = r.runKind(k) })
@@ -187,6 +189,7 @@ func (r *runner) childEnv(kind string) []string {
 type runner struct {
 	root, runDir, dataDir string
 	runID, treeID         string
+	treeErr               string // why treeID is empty; recorded so flake detection can say it skipped the run
 	files                 []string
 	mode                  Mode
 	cfg                   Config

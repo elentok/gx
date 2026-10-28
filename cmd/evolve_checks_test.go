@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -150,6 +151,27 @@ func TestEvolveInputs_FlakeRow(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestEvolveInputs_FlakeSkipsRecordWithNoTree(t *testing.T) {
+	t.Parallel()
+	f, data := checksFixture(t)
+	failing := check.Record{Run: "r1", Time: claimBase.Format(time.RFC3339), Scope: "changed",
+		Branch: "ralph-loop/epic-item-02", TreeError: "not a git repository",
+		Kinds: []check.KindRecord{{Kind: "test", Status: check.StatusFail, Failed: []string{"pkg.TestX"}}}}
+	passing := fullRun("r2", claimBase.Add(time.Minute), "ralph-loop/epic-item-02", "", 1)
+	writeJSONL(t, filepath.Join(data, "check", "proj.jsonl"), []check.Record{failing, passing})
+	table := inputsTable(t, f)
+	if len(table.Flakes) != 0 || table.FlakesNoTree != 1 {
+		t.Errorf("flakes = %+v, no tree = %d", table.Flakes, table.FlakesNoTree)
+	}
+	var out bytes.Buffer
+	if err := printEpicChecks(&out, table); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "skipped 1 records with no tree") {
+		t.Errorf("output = %q", out.String())
 	}
 }
 
