@@ -42,8 +42,13 @@ type Runner struct {
 	Sleep func(time.Duration)
 	// N is the configured runner wait; zero means agentrunner.DefaultN.
 	N time.Duration
+	// PIDStart reads one pid's start time for OwnerPIDs. Nil means
+	// syshealth.ProcessStart.
+	PIDStart func(pid int) (int64, error)
 
 	mu sync.Mutex
+	// shells caches each pane's shell pid with its start time, keyed by pane id.
+	shells map[string]agentrunner.OwnerPID
 	// started remembers what RateLimit needs from Start, keyed by label.
 	started map[string]agentrunner.StartOptions
 	// held marks the sessions (by pane id) in the middle of a deny with a

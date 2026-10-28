@@ -12,3 +12,5 @@ func NewDarwinProcessReader() *DarwinProcessReader { return &DarwinProcessReader
 func (*DarwinProcessReader) Read() (ProcessTable, error) { return ProcessTable{}, ErrUnavailable }
 
 func (*DarwinProcessReader) Argv(int) []string { return nil }
+
+func darwinProcessStart(int) (int64, error) { return 0, ErrUnavailable }

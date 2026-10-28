@@ -162,6 +162,23 @@ func (c CLI) runAgentJSON(args []string) (Agent, error) {
 	return result.Agent.agent(), nil
 }
 
+// PaneShellPID returns the pid of the shell running in pane, via `herdr pane
+// process-info`.
+func PaneShellPID(pane string) (int, error) {
+	var result struct {
+		ProcessInfo struct {
+			ShellPID int `json:"shell_pid"`
+		} `json:"process_info"`
+	}
+	if err := runJSON([]string{"pane", "process-info", "--pane", pane}, &result); err != nil {
+		return 0, err
+	}
+	if result.ProcessInfo.ShellPID <= 0 {
+		return 0, fmt.Errorf("herdr pane process-info %s: no shell_pid", pane)
+	}
+	return result.ProcessInfo.ShellPID, nil
+}
+
 // AgentExplainResult is herdr's own diagnosis of a pane's current state:
 // which detection rule its pane monitor matched and the state that rule
 // assigns.

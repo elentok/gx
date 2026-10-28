@@ -99,6 +99,14 @@ func readDarwinPid(pid int, numer, denom uint64) Process {
 	}
 }
 
+func darwinProcessStart(pid int) (int64, error) {
+	var bi C.struct_proc_bsdinfo
+	if r := C.bsdinfo(C.int(pid), &bi); r < 0 {
+		return 0, fmt.Errorf("proc_pidinfo %d: errno %d", pid, -int(r))
+	}
+	return int64(bi.pbi_start_tvsec), nil
+}
+
 // darwinFootprint is ri_phys_footprint, the memory figure Activity Monitor shows.
 func darwinFootprint(pid int) (uint64, bool) {
 	var out C.ulonglong
