@@ -52,8 +52,11 @@ type Options struct {
 	// ProjectChecks supplies the project.json fallback config. It is called only
 	// when the repo has no .gx/checks.json.
 	ProjectChecks func() (json.RawMessage, error)
+	// TicketStore is the ticket store's root, where a run record finds its
+	// project and the trunk. Empty means no store.
+	TicketStore string
 	// ProjectFor names the project a run record is filed under; nil means
-	// ProjectFor (the process env finds the ticket store).
+	// ProjectIn the TicketStore.
 	ProjectFor func(dir string) string
 	// Env is the environment every command a run starts gets, and the PATH
 	// tools are looked up on. Empty means none, never the process env.
@@ -113,7 +116,7 @@ func Run(opts Options) (Result, error) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return Result{}, err
 	}
-	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit, env: opts.Env}
+	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit, env: opts.Env, ticketStore: opts.TicketStore}
 	if r.limit <= 0 {
 		r.limit = DefaultArgLimit
 	}
@@ -147,7 +150,7 @@ func Run(opts Options) (Result, error) {
 	}
 	projectFor := opts.ProjectFor
 	if projectFor == nil {
-		projectFor = ProjectFor
+		projectFor = func(dir string) string { return ProjectIn(opts.TicketStore, dir) }
 	}
 	if err := appendRecord(opts.DataDir, projectFor(root), r.newRecord(opts, started, res), started); err != nil {
 		return Result{}, err
@@ -189,6 +192,7 @@ type runner struct {
 	cfg                   Config
 	limit                 int
 	env                   []string
+	ticketStore           string
 
 	groupsOnce sync.Once
 	grp        *groups

@@ -3,6 +3,7 @@ package tickets
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
@@ -61,44 +62,61 @@ func Trunk(projectDir, repoRoot string) (string, error) {
 	return checkTrunk(&ErrTrunkMissing{Project: ProjectName(projectDir), Repo: repoRoot, Trunk: remoteDefaultBranch(repoRoot)})
 }
 
-// TrunkFor resolves the trunk of dir's repo. A repo no project registers uses
-// its detected default, still existence-checked.
-func TrunkFor(dir string) (string, error) {
+// TrunkIn resolves the trunk of dir's repo, finding its project in the ticket
+// store at storePath. A repo no project registers uses its detected default,
+// still existence-checked.
+func TrunkIn(storePath, dir string) (string, error) {
 	repo, err := git.FindRepo(dir)
 	if err != nil {
 		return "", fmt.Errorf("not inside a git repo: %w", err)
 	}
-	return trunkForRoot(repo.Root)
+	return trunkIn(storePath, repo.Root)
 }
 
-// OpenRepo is FindRepo with Trunk set from the resolver. A resolver error
+// OpenRepoIn is FindRepo with Trunk set from the resolver. A resolver error
 // still returns a usable Repo, with an empty Trunk, so callers that can
 // degrade keep it; only a FindRepo failure returns no Repo.
-func OpenRepo(dir string) (*git.Repo, error) {
-	return openRepoWith(config.Load, dir)
-}
-
-// OpenRepoDirs is OpenRepo with the config and data dirs taken from dirs
-// instead of the process env.
-func OpenRepoDirs(dirs config.Dirs, dir string) (*git.Repo, error) {
-	return openRepoWith(dirs.Load, dir)
-}
-
-func openRepoWith(load func() (config.Config, error), dir string) (*git.Repo, error) {
+func OpenRepoIn(storePath, dir string) (*git.Repo, error) {
 	repo, err := git.FindRepo(dir)
 	if err != nil {
 		return nil, err
 	}
-	repo.Trunk, err = trunkWith(load, repo.Root)
+	repo.Trunk, err = trunkIn(storePath, repo.Root)
 	return repo, err
 }
 
-func trunkForRoot(repoRoot string) (string, error) {
-	return trunkWith(config.Load, repoRoot)
+// TrunkFor is TrunkIn with the store path read from the process env.
+// Remove with its last ui callers (ticket 36a2).
+func TrunkFor(dir string) (string, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return "", err
+	}
+	return TrunkIn(cfg.TicketStore.Path, dir)
 }
 
-func trunkWith(load func() (config.Config, error), repoRoot string) (string, error) {
-	projectDir, err := rootForRepoWith(load, repoRoot)
+// OpenRepo is OpenRepoIn with the store path read from the process env.
+// Remove with its last ui callers (ticket 36a2).
+func OpenRepo(dir string) (*git.Repo, error) {
+	return OpenRepoDirs(config.DirsFrom(os.Environ()), dir)
+}
+
+// OpenRepoDirs is OpenRepoIn with the store path read from the config dirs
+// holds.
+func OpenRepoDirs(dirs config.Dirs, dir string) (*git.Repo, error) {
+	cfg, err := dirs.Load()
+	if err != nil {
+		repo, ferr := git.FindRepo(dir)
+		if ferr != nil {
+			return nil, ferr
+		}
+		return repo, err
+	}
+	return OpenRepoIn(cfg.TicketStore.Path, dir)
+}
+
+func trunkIn(storePath, repoRoot string) (string, error) {
+	projectDir, err := ProjectDir(storePath, repoRoot)
 	if errors.Is(err, ErrNoProject) {
 		return checkTrunk(&ErrTrunkMissing{Repo: repoRoot, Trunk: remoteDefaultBranch(repoRoot)})
 	}

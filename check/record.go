@@ -64,12 +64,14 @@ func recordPath(dataDir, project string) string {
 	return filepath.Join(dataDir, "check", project+".jsonl")
 }
 
-// ProjectFor is the project name records of the repo at dir are filed under:
-// the registered project's name, else the repo root's base name.
-func ProjectFor(dir string) string { return projectFor(tickets.RootFor, dir) }
+// ProjectIn is the project name records of the repo at dir are filed under:
+// the registered project's name in the ticket store at storePath, else the
+// repo root's base name.
+func ProjectIn(storePath, dir string) string {
+	return projectFor(func(root string) (string, error) { return tickets.RootIn(storePath, root) }, dir)
+}
 
-// ProjectForDirs is ProjectFor with the ticket store found through dirs
-// instead of the process env.
+// ProjectForDirs is ProjectIn with the store path read from dirs.
 func ProjectForDirs(dirs config.Dirs, dir string) string {
 	return projectFor(func(root string) (string, error) { return tickets.RootForDirs(dirs, root) }, dir)
 }
@@ -128,7 +130,7 @@ func (r *runner) newRecord(opts Options, started time.Time, res Result) Record {
 	rec.Head, _ = git.RevParse(r.root, "HEAD")
 	if epic, id, ok := tickets.ParseIterationBranch(rec.Branch); ok {
 		rec.Link, rec.Epic, rec.Ticket = LinkTicket, epic, id
-	} else if trunk, err := tickets.TrunkFor(r.root); err == nil && trunk == rec.Branch {
+	} else if trunk, err := tickets.TrunkIn(r.ticketStore, r.root); err == nil && trunk == rec.Branch {
 		rec.Link = LinkTrunk
 	}
 

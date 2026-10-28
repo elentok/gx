@@ -11,14 +11,11 @@ import (
 )
 
 // trunkFixture is a real repo registered as project "p" in a temp ticket
-// store. Not parallel-safe (sets env).
+// store; filepath.Dir(projectDir) is the store.
 func trunkFixture(t *testing.T, projectJSON string) (repo, projectDir string) {
 	t.Helper()
 	repo = testutil.TempRepo(t)
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_DATA_HOME", t.TempDir())
-	t.Setenv("XDG_CONFIG_HOME", "")
-	projectDir = filepath.Join(os.Getenv("XDG_DATA_HOME"), "gx", "tickets", "p")
+	projectDir = filepath.Join(t.TempDir(), "p")
 	testutil.Mkdir(t, projectDir)
 	if projectJSON != "" {
 		testutil.WriteFile(t, projectDir, "project.json", projectJSON)
@@ -68,9 +65,9 @@ func TestTrunk_UnsetUsesRemoteDefaultAndIsNotWrittenBack(t *testing.T) {
 	body := registered(repo, "")
 	testutil.WriteFile(t, projectDir, "project.json", body)
 
-	got, err := TrunkFor(repo)
+	got, err := TrunkIn(filepath.Dir(projectDir), repo)
 	if err != nil || got != "develop" {
-		t.Fatalf("TrunkFor() = %q, %v; want develop", got, err)
+		t.Fatalf("TrunkIn() = %q, %v; want develop", got, err)
 	}
 	after, _ := os.ReadFile(filepath.Join(projectDir, "project.json"))
 	if string(after) != body {
@@ -163,20 +160,20 @@ func TestTrunk_UnreadableProjectFile(t *testing.T) {
 	}
 }
 
-func TestTrunkFor_UnregisteredRepoUsesDetectedDefault(t *testing.T) {
-	repo, _ := trunkFixture(t, "")
+func TestTrunkIn_UnregisteredRepoUsesDetectedDefault(t *testing.T) {
+	repo, projectDir := trunkFixture(t, "")
 
-	got, err := TrunkFor(repo)
+	got, err := TrunkIn(filepath.Dir(projectDir), repo)
 	if err != nil || got != "main" {
-		t.Fatalf("TrunkFor() = %q, %v; want main", got, err)
+		t.Fatalf("TrunkIn() = %q, %v; want main", got, err)
 	}
 }
 
-func TestTrunkFor_UnregisteredRepoMissingNamesRepo(t *testing.T) {
-	repo, _ := trunkFixture(t, "")
+func TestTrunkIn_UnregisteredRepoMissingNamesRepo(t *testing.T) {
+	repo, projectDir := trunkFixture(t, "")
 	testutil.MustGitExported(t, repo, "branch", "-m", "main", "other")
 
-	_, err := TrunkFor(repo)
+	_, err := TrunkIn(filepath.Dir(projectDir), repo)
 	var missing *ErrTrunkMissing
 	if !errors.As(err, &missing) || missing.Project != "" {
 		t.Fatalf("err = %v, want unregistered *ErrTrunkMissing", err)
@@ -192,9 +189,9 @@ func TestOpenRepo_SetsTrunk(t *testing.T) {
 	testutil.MustGitExported(t, repo, "branch", "develop")
 	testutil.WriteFile(t, projectDir, "project.json", registered(repo, `,"trunk":"develop"`))
 
-	r, err := OpenRepo(repo)
+	r, err := OpenRepoIn(filepath.Dir(projectDir), repo)
 	if err != nil || r.Trunk != "develop" {
-		t.Fatalf("OpenRepo() = %+v, %v; want Trunk develop", r, err)
+		t.Fatalf("OpenRepoIn() = %+v, %v; want Trunk develop", r, err)
 	}
 }
 
@@ -202,7 +199,7 @@ func TestOpenRepo_ResolverErrorKeepsUsableRepo(t *testing.T) {
 	repo, projectDir := trunkFixture(t, "")
 	testutil.WriteFile(t, projectDir, "project.json", registered(repo, `,"trunk":"develop"`))
 
-	r, err := OpenRepo(repo)
+	r, err := OpenRepoIn(filepath.Dir(projectDir), repo)
 	var missing *ErrTrunkMissing
 	if !errors.As(err, &missing) {
 		t.Fatalf("err = %v, want *ErrTrunkMissing", err)
@@ -213,9 +210,9 @@ func TestOpenRepo_ResolverErrorKeepsUsableRepo(t *testing.T) {
 }
 
 func TestOpenRepo_NotARepo(t *testing.T) {
-	r, err := OpenRepo(t.TempDir())
+	r, err := OpenRepoIn(t.TempDir(), t.TempDir())
 	if err == nil || r != nil {
-		t.Errorf("OpenRepo() = %+v, %v; want nil repo and an error", r, err)
+		t.Errorf("OpenRepoIn() = %+v, %v; want nil repo and an error", r, err)
 	}
 }
 

@@ -81,6 +81,9 @@ func runCheck(c *cobra.Command, d deps, staged, full bool, since, kinds string) 
 		return err
 	}
 	opts.ProjectChecks = func() (json.RawMessage, error) { return projectChecks(d.dirs(), dir) }
+	if cfg, err := d.dirs().Load(); err == nil {
+		opts.TicketStore = cfg.TicketStore.Path
+	}
 	opts.ProjectFor = func(dir string) string { return check.ProjectForDirs(d.dirs(), dir) }
 
 	res, err := check.Run(opts)

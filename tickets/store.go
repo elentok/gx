@@ -98,36 +98,33 @@ func forEachProject(storePath string, fn func(dir string, pf config.ProjectFile)
 	return nil
 }
 
-// RootFor resolves dir's repo to its project directory in the configured
-// ticket store. It is the one way callers find the ticket root.
+// RootIn resolves dir's repo to its project directory in the ticket store at
+// storePath.
+func RootIn(storePath, dir string) (string, error) {
+	repo, err := git.FindRepo(dir)
+	if err != nil {
+		return "", fmt.Errorf("not inside a git repo: %w", err)
+	}
+	return ProjectDir(storePath, repo.Root)
+}
+
+// RootFor is RootIn with the store path read from the process env.
+// Remove with its last ui callers (ticket 36a2).
 func RootFor(dir string) (string, error) {
-	repo, err := git.FindRepo(dir)
-	if err != nil {
-		return "", fmt.Errorf("not inside a git repo: %w", err)
-	}
-	return rootForRepo(repo.Root)
-}
-
-// RootForDirs is RootFor with the config and data dirs taken from dirs
-// instead of the process env.
-func RootForDirs(dirs config.Dirs, dir string) (string, error) {
-	repo, err := git.FindRepo(dir)
-	if err != nil {
-		return "", fmt.Errorf("not inside a git repo: %w", err)
-	}
-	return rootForRepoWith(dirs.Load, repo.Root)
-}
-
-func rootForRepo(repoRoot string) (string, error) {
-	return rootForRepoWith(config.Load, repoRoot)
-}
-
-func rootForRepoWith(load func() (config.Config, error), repoRoot string) (string, error) {
-	cfg, err := load()
+	cfg, err := config.Load()
 	if err != nil {
 		return "", err
 	}
-	return ProjectDir(cfg.TicketStore.Path, repoRoot)
+	return RootIn(cfg.TicketStore.Path, dir)
+}
+
+// RootForDirs is RootIn with the store path read from the config dirs holds.
+func RootForDirs(dirs config.Dirs, dir string) (string, error) {
+	cfg, err := dirs.Load()
+	if err != nil {
+		return "", err
+	}
+	return RootIn(cfg.TicketStore.Path, dir)
 }
 
 // ProjectName is the name addresses carry for projectDir: project.json's
