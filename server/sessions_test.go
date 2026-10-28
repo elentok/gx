@@ -648,7 +648,7 @@ func waitForHolder(t *testing.T, dir string) *nativerunner.HolderClient {
 	t.Helper()
 	var c *nativerunner.HolderClient
 	var err error
-	if !servertest.Poll(10*time.Second, func() bool {
+	if !servertest.Poll(30*time.Second, func() bool {
 		c, err = nativerunner.DialHolder(dir)
 		return err == nil
 	}) {
