@@ -38,9 +38,12 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
   `server/servertest/`, and scope it with `-run` while iterating. A plain `go test ./server` runs
   the tests in parallel and takes about 2 minutes.
 - Tests must never read the developer's real Claude config (their `editorMode: vim` changes
-  outcomes). Call `claudeenv.Isolate()` (`testutil/claudeenv`) from every package's `TestMain`. It
-  points `HOME` and a clean `CLAUDE_CONFIG_DIR` at a temp dir, unsets `XDG_*`, and leaves a vim-mode
-  `~/.claude.json` as a canary: code that reads `HOME` instead of `CLAUDE_CONFIG_DIR` fails loudly.
+  outcomes). Pass `HOME`, `CLAUDE_CONFIG_DIR` and the rest through config (`claudeenv.In(home)`
+  returns the env entries for `server.Config.Env` or `exec.Cmd.Env`, with a vim-mode `~/.claude.json`
+  as a canary: code that reads `HOME` instead of `CLAUDE_CONFIG_DIR` fails loudly). New test
+  packages must not call `claudeenv.Isolate()`. `envguard/envguard_test.go` bans new process-env
+  reads of `HOME`, `PATH`, `XDG_*`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME`, `os.UserHomeDir()` and
+  `exec.Command` without a `.Env =`; its allowlist lists what is left.
 - Run web tests through `make web-test`. gx installs dependencies when it creates an iteration
   worktree, so web tests work in a fresh worktree. `make web-test` still installs first, at the cost
   of a slower run.
