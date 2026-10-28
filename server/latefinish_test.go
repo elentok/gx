@@ -237,6 +237,7 @@ func TestLateFinish_AgentGoneStillAdopts(t *testing.T) {
 		{"commitless", false, true, "closed commitless"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			runnerShapes(t, func(t *testing.T, headless bool) {
 				p := pauseZeroCommit(t, headless)
 				p.agentGone()
@@ -261,6 +262,7 @@ func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
 	t.Parallel()
 	for _, verb := range []string{"resume", "relaunch"} {
 		t.Run(verb, func(t *testing.T) {
+			t.Parallel()
 			runnerShapes(t, func(t *testing.T, headless bool) {
 				// No poll may pick up the investigations before the verb runs.
 				p := pauseZeroCommit(t, headless, func(c *server.Config) { c.PollInterval = time.Hour })
@@ -342,17 +344,17 @@ func TestLateFinish_FailedConditionStaysPaused(t *testing.T) {
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			runnerShapes(t, func(t *testing.T, headless bool) {
-				p := pauseZeroCommit(t, headless)
-				// Every condition is checked before the agent is looked up; with
-				// it gone a wrong adoption skips the settle wait and shows at once.
-				p.agentGone()
-				if tc.commit {
-					commitAgentWork(t, p.wtPath)
-				}
-				p.report(t, tc.mutate(p))
-				p.staysPaused(t)
-			})
+			t.Parallel()
+			// The conditions are runner-independent, so one shape covers them.
+			p := pauseZeroCommit(t, true)
+			// Every condition is checked before the agent is looked up; with
+			// it gone a wrong adoption skips the settle wait and shows at once.
+			p.agentGone()
+			if tc.commit {
+				commitAgentWork(t, p.wtPath)
+			}
+			p.report(t, tc.mutate(p))
+			p.staysPaused(t)
 		})
 	}
 }
