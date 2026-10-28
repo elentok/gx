@@ -41,6 +41,19 @@ func TestApplyMove_CarriesLogAndToleratesNone(t *testing.T) {
 	}
 }
 
+func TestPlanMove_ArchivedBlockerIsNotABreak(t *testing.T) {
+	root := t.TempDir()
+	oldPath := filepath.Join(root, "src", "issues", "01-one.md")
+	writeFile(t, oldPath, "---\nid: \"01\"\nstatus: open\ntype: implement\nblocked_by:\n  - gone/01\n---\n\n# 01 — One\n")
+	writeFile(t, filepath.Join(root, "dst", "issues", ".keep"), "")
+	writeFile(t, filepath.Join(root, ".archive", "gone", "issues", ".keep"), "")
+
+	a := Address{Project: "p", Epic: "src", ID: "01"}
+	if _, err := PlanMove(root, a, Ticket{Identifier: "01", Path: oldPath}, "dst", "", MoveOpts{}); err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+}
+
 func TestResumeMove_StillMovesLog(t *testing.T) {
 	root := t.TempDir()
 	oldPath := filepath.Join(root, "src", "issues", "01-one.md")

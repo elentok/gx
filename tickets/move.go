@@ -319,12 +319,16 @@ func (p *MovePlan) planInbound(root string, epics []Epic) error {
 		}
 	}
 
+	archived, err := ArchivedEpicNames(root)
+	if err != nil {
+		return err
+	}
 	before := map[string]bool{}
-	for _, err := range ValidateRefs(project, epics) {
+	for _, err := range ValidateRefs(project, epics, archived) {
 		before[err.Error()] = true
 	}
 	var broken []string
-	for _, err := range ValidateRefs(project, post) {
+	for _, err := range ValidateRefs(project, post, archived) {
 		if !before[err.Error()] {
 			broken = append(broken, err.Error())
 		}

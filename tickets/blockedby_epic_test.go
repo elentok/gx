@@ -188,7 +188,7 @@ func TestValidateRefs_WholeEpicCycleNamesTheEpic(t *testing.T) {
 		{Name: "a", Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"d/01"}}}},
 		{Name: "d", Tickets: []Ticket{{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"a"}}}},
 	}
-	errs := ValidateRefs("p", epics)
+	errs := ValidateRefs("p", epics, nil)
 	if len(errs) == 0 || !strings.Contains(errors.Join(errs...).Error(), "01 → a → a/01 → 01") {
 		t.Errorf("errs = %v, want a cycle through the whole epic a", errs)
 	}
@@ -251,7 +251,7 @@ func TestValidateRefs_WidenedOnlyCycleNamesTheToken(t *testing.T) {
 			{Number: 2, Identifier: "02", Status: "open"},
 		}},
 	}
-	msg := errors.Join(ValidateRefs("p", epics)...).Error()
+	msg := errors.Join(ValidateRefs("p", epics, nil)...).Error()
 	if !strings.Contains(msg, `blocked_by "d/02" (widened to epic "d") closes a cycle`) {
 		t.Errorf("errs = %s, want the widened d/02 token named", msg)
 	}
@@ -263,8 +263,29 @@ func TestValidateRefs_WidenedOnlyCycleNamesTheToken(t *testing.T) {
 
 	epics[1].Tickets[1].Commitless = true
 	epics[0].Tickets[0].Commitless = true
-	if errs := ValidateRefs("p", epics); len(errs) != 0 {
+	if errs := ValidateRefs("p", epics, nil); len(errs) != 0 {
 		t.Errorf("both targets commitless: errs = %v, want none", errs)
+	}
+}
+
+func TestValidateRefs_ArchivedBlocker(t *testing.T) {
+	epics := []Epic{{Name: "d", Tickets: []Ticket{
+		{Number: 1, Identifier: "01", Status: "open", BlockedBy: []string{"gone/01"}},
+	}}}
+	for _, tc := range []struct {
+		name     string
+		archived map[string]bool
+		wantErr  bool
+	}{
+		{"archived epic named", map[string]bool{"gone": true}, false},
+		{"archived set empty", nil, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateRefs("p", epics, tc.archived)
+			if got := len(errs) != 0; got != tc.wantErr {
+				t.Errorf("errs = %v, want error: %v", errs, tc.wantErr)
+			}
+		})
 	}
 }
 
