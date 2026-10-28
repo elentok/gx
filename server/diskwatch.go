@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"net/http"
 	"os/exec"
 	"slices"
 	"strings"
@@ -34,12 +35,15 @@ type DiskReading struct {
 	Free uint64 // bytes available to a non-root user
 }
 
-// DiskStatus is one warned disk in the snapshot.
+// DiskStatus is one disk, in the snapshot (warned disks only) and in the disk
+// status route (every known disk).
 type DiskStatus struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	FreeBytes uint64   `json:"free_bytes"`
-	Projects  []string `json:"projects"`
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	FreeBytes uint64    `json:"free_bytes"`
+	Projects  []string  `json:"projects"`
+	Warned    bool      `json:"warned"`
+	ReadAt    time.Time `json:"read_at"`
 }
 
 type diskState struct {
@@ -92,19 +96,45 @@ func (s *Server) observe(r DiskReading, projects []string, now time.Time) {
 	}
 }
 
-// warnedDisks lists the disks whose warn mark is set, by id.
-func (s *Server) warnedDisks() []DiskStatus {
+// diskStatuses lists the known disks by id; warnedOnly keeps those whose warn
+// mark is set.
+func (s *Server) diskStatuses(warnedOnly bool) []DiskStatus {
 	d := &s.disks
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	var out []DiskStatus
 	for id, st := range d.disks {
-		if st.warned {
-			out = append(out, DiskStatus{ID: id, Name: st.reading.Name, FreeBytes: st.reading.Free, Projects: slices.Clone(st.projects)})
+		if warnedOnly && !st.warned {
+			continue
 		}
+		out = append(out, DiskStatus{ID: id, Name: st.reading.Name, FreeBytes: st.reading.Free,
+			Projects: slices.Clone(st.projects), Warned: st.warned, ReadAt: st.at})
 	}
 	slices.SortFunc(out, func(a, b DiskStatus) int { return strings.Compare(a.ID, b.ID) })
 	return out
+}
+
+// warnedDisks lists the disks whose warn mark is set, by id.
+func (s *Server) warnedDisks() []DiskStatus { return s.diskStatuses(true) }
+
+// DiskReport is the disk status route's result: the effective thresholds as
+// size strings ("off" when a threshold is off) and every known disk.
+type DiskReport struct {
+	WarnBelow  string       `json:"warn_below"`
+	CleanBelow string       `json:"clean_below"`
+	Disks      []DiskStatus `json:"disks"`
+}
+
+func (s *Server) diskStatusRead(w http.ResponseWriter, _ *http.Request) {
+	ds := s.settings.Load().DiskSpace
+	writeJSON(w, DiskReport{WarnBelow: sizeOrOff(ds.WarnBelow), CleanBelow: sizeOrOff(ds.CleanBelow), Disks: s.diskStatuses(false)})
+}
+
+func sizeOrOff(b config.ByteSize) string {
+	if b == 0 {
+		return "off"
+	}
+	return b.String()
 }
 
 func (s *Server) freeSpace(path string) (DiskReading, error) {

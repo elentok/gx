@@ -426,13 +426,25 @@ export interface DiskReading {
   Free: number /* uint64 */; // bytes available to a non-root user
 }
 /**
- * DiskStatus is one warned disk in the snapshot.
+ * DiskStatus is one disk, in the snapshot (warned disks only) and in the disk
+ * status route (every known disk).
  */
 export interface DiskStatus {
   id: string;
   name: string;
   free_bytes: number /* uint64 */;
   projects: string[];
+  warned: boolean;
+  read_at: string;
+}
+/**
+ * DiskReport is the disk status route's result: the effective thresholds as
+ * size strings ("off" when a threshold is off) and every known disk.
+ */
+export interface DiskReport {
+  warn_below: string;
+  clean_below: string;
+  disks: DiskStatus[];
 }
 
 //////////

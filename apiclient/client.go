@@ -669,6 +669,13 @@ func (c *Client) ConfigStatus(ctx context.Context) (server.ConfigStatus, error) 
 	return st, err
 }
 
+// DiskStatus is the disk-space thresholds and every disk the watcher knows.
+func (c *Client) DiskStatus(ctx context.Context) (server.DiskReport, error) {
+	var rep server.DiskReport
+	err := c.get(ctx, "/v1/disk/status", &rep)
+	return rep, err
+}
+
 // BudgetIncrease raises the live budget limits until the server restarts. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) BudgetIncrease(ctx context.Context, req server.BudgetIncreaseRequest) (server.BudgetResult, error) {

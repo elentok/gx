@@ -623,6 +623,7 @@ var routeTable = []struct {
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
 	{"POST /v1/config/reload", (*Server).configReloadWrite},
 	{"GET /v1/config/status", (*Server).configStatusRead},
+	{"GET /v1/disk/status", (*Server).diskStatusRead},
 	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},
 	{"GET /v1/tickets/history", (*Server).history},
 	{"GET /v1/tickets/explain", (*Server).explain},
