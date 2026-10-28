@@ -1,6 +1,7 @@
 import { execFile, spawn } from "node:child_process";
-import { rm } from "node:fs/promises";
+import { rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test as base, type Page } from "@playwright/test";
 
@@ -14,6 +15,7 @@ interface FixtureOutput {
   env: string[];
   gx: string;
   hold_file: string;
+  disk_dir: string;
 }
 
 export interface Fixture {
@@ -23,6 +25,17 @@ export interface Fixture {
   cliEnv(extra: Record<string, string>, ...args: string[]): Promise<string>;
   /** Lets the workers frozen by `start(scenario, { hold: true })` finish. */
   release(): Promise<void>;
+  /** Sets the free space the server reads from the fake disk, a size string such as `15G`. */
+  setDiskFree(size: string): Promise<void>;
+  /** Sets what the next cleanup does: a size string frees to it, `fail` fails, empty does nothing. Set it before free. */
+  setDiskClean(behaviour: string): Promise<void>;
+}
+
+// A rename keeps the server from reading a half-written control file.
+async function writeControl(dir: string, name: string, value: string): Promise<void> {
+  const tmp = join(dir, `${name}.e2e-tmp`);
+  await writeFile(tmp, `${value}\n`);
+  await rename(tmp, join(dir, name));
 }
 
 /** Starts a fresh fixture server for `scenario` and signs the page in. */
@@ -70,6 +83,8 @@ async function startFixture(
     async release() {
       await rm(out.hold_file, { force: true });
     },
+    setDiskFree: (size) => writeControl(out.disk_dir, "free", size),
+    setDiskClean: (behaviour) => writeControl(out.disk_dir, "clean", behaviour),
   };
   // The first visit trades the token in web_url for the web cookie.
   await page.goto(out.web_url);

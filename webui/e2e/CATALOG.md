@@ -12,7 +12,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 64, 65, 66, 67, 68).
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 64, 65, 66, 67, 68), `disk.e2e.ts` (flows 69, 70, 71).
 
 ## 1. Queue an epic
 
@@ -762,3 +762,27 @@ an exited session.
   4. Click Continue until `Q9` shows, click Chat and read the font size of the docked `Q9` title.
 - **Pass:** the title is 24px, the body 17px, "n of m answered" 13px (the `xs` token), the choice 16px, the chat message and the prompt 16px, the docked title 18px.
 - **Note:** "Earlier messages hidden" is not checked: no scenario shows it (the chat is never truncated), and it uses the same `xs` size as "n of m answered".
+
+## 69. Disk banner and Clean now
+
+- **Scenario:** `disk-low`
+- **Steps:**
+  1. Set the fake disk's free space to `15G` (under warn, above clean). Open an epic page and a ticket page, then go back to Epics.
+  2. Click "Clean now" with `/v1/disk/clean` held, then release it.
+  3. Set free to `21G`, then `23G`.
+- **Pass:** the strip names "fixture disk" with "Clean now" on all three pages. The button is disabled while the call is held. At 21G the strip shows the new free space and stays. At 23G it is gone.
+
+## 70. Disk hold
+
+- **Scenario:** `disk-low` (workers held)
+- **Steps:**
+  1. Set clean to `6G`, then free to `5G`. Queue `disk-epic`. Open its page.
+  2. Run `gx server tickets explain demo:disk-epic/01`.
+  3. Set free to `11G`.
+- **Pass:** the strip says new tickets are held. Ticket 01 shows the "disk low" verdict and never reads `running · `. Explain prints "disk low" and the disk name. At 11G the strip stays as a warning without the held text, and ticket 01 reads `running · ` with no reload.
+
+## 71. Clean now fails
+
+- **Scenario:** `disk-low`
+- **Steps:** set clean to `fail`, free to `15G`, click "Clean now".
+- **Pass:** the strip shows the failure (`failed: …clean.sh`) inline and stays.
