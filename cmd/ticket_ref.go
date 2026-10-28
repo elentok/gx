@@ -89,6 +89,24 @@ func projectRoot(dirs config.Dirs, cwd, project string) (string, error) {
 	return tickets.ProjectDirByName(cfg.TicketStore.Path, project)
 }
 
+// resolveProject is projectRoot for a command with an optional project
+// argument: an empty one means the cwd's project. It returns the name too.
+func resolveProject(d deps, project string) (root, name string, err error) {
+	cwd, err := d.getwd()
+	if err != nil {
+		return "", "", err
+	}
+	if project == "" {
+		cwdRoot, err := ticketRoot(d.dirs(), cwd)
+		if err != nil {
+			return "", "", err
+		}
+		project = tickets.ProjectName(cwdRoot)
+	}
+	root, err = projectRoot(d.dirs(), cwd, project)
+	return root, project, err
+}
+
 // resolveTicketRef turns a command's ticket argument — a file path or an
 // address — into the ticket file's path. An existing file always wins, so a
 // path never gets reinterpreted; anything that is not an address either is

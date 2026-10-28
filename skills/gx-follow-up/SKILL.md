@@ -50,9 +50,11 @@ its state (open, archived `fixed`, or other archived) before picking an outcome.
 straight to step 3.
 
 Otherwise the candidates are the tickets of `<project>:follow-ups` and
-`<project>:follow-ups-archived` only. List an epic's tickets with `gx tickets show <project:epic>`.
-When the finding names a failing test, search the candidates for that test name first. Otherwise
-judge a match yourself, by title and `## Problem`: the same problem, not the same area.
+`<project>:follow-ups-archived` only. Find them with
+`gx tickets follow-up search --project <project> <words...>`: it matches any word in a title or
+`## Problem` and prints address, status and title per hit, plus the close reason for an archived
+hit. Never print the whole listings. When the finding names a failing test, search the candidates
+for that test name first. Judge each hit yourself, by title and `## Problem`: the same problem, not the same area.
 
 - **No match** → file it (step 3).
 - **An open ticket** → file nothing. Append a dated "seen again" entry naming the new source to its

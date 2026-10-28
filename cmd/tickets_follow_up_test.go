@@ -148,6 +148,31 @@ func TestExecute_TicketsFollowUpAdd_HelpListsRequiredSections(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsFollowUpSearch_MatchesOpenAndArchivedWithReason(t *testing.T) {
+	f := setupCloseProject(t)
+	fu := filepath.Join(f.project, followUpsEpic, "issues")
+	testutil.WriteFile(t, fu, "05-disk.md", "---\nid: \"05\"\nstatus: draft\ntype: research\n---\n\n# 05 — Cleanup\n\n## Problem\n\nThe Disk fills up.\n")
+	testutil.WriteFile(t, fu, "06-menu.md", "---\nid: \"06\"\nstatus: open\ntype: research\n---\n\n# 06 — Menu\n\n## Problem\n\nEscape misbehaves.\n\n## Suggested fix\n\nguard\n")
+	if _, err := runIn(t, f.repo, "tickets", "close", "follow-ups/06", "--reason", "obsolete"); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runIn(t, f.repo, "tickets", "follow-up", "search", "disk", "escape")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "mine:follow-ups/05  draft  Cleanup\nmine:follow-ups-archived/01  cancelled  Menu  (obsolete)\n"
+	if out != want {
+		t.Errorf("search = %q, want %q", out, want)
+	}
+
+	// A word only in a non-Problem section does not match.
+	out, err = runIn(t, f.repo, "tickets", "follow-up", "search", "--project", "mine", "guard")
+	if err != nil || out != "" {
+		t.Errorf("search guard = %q, %v; want no hits", out, err)
+	}
+}
+
 func dirEntries(t *testing.T, dir string) string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)

@@ -86,18 +86,7 @@ func runTicketsClose(d deps, addr, reason, note string, w io.Writer) error {
 // gets one naming its original address. An empty project argument means the
 // cwd project.
 func runTicketsCloseSweep(d deps, project string, w io.Writer) error {
-	cwd, err := d.getwd()
-	if err != nil {
-		return err
-	}
-	if project == "" {
-		cwdRoot, err := ticketRoot(d.dirs(), cwd)
-		if err != nil {
-			return err
-		}
-		project = tickets.ProjectName(cwdRoot)
-	}
-	root, err := projectRoot(d.dirs(), cwd, project)
+	root, project, err := resolveProject(d, project)
 	if err != nil {
 		return err
 	}

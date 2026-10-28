@@ -402,6 +402,20 @@ log shows no open question on the web. A second run changes nothing.`,
 	followUpAddCmd.Flags().StringVar(&followUpCategory, "category", "", "bug or idea (alternative to category: in the body frontmatter)")
 	followUpAddCmd.Flags().BoolVar(&followUpJSON, "json", false, "emit {address, path} JSON")
 	followUpCmd.AddCommand(followUpAddCmd)
+	var followUpProject string
+	followUpSearchCmd := &cobra.Command{
+		Use:   "search <words...>",
+		Short: "find open and archived follow-ups whose title or Problem mentions any word",
+		Long: "Find open and archived follow-ups whose title or ## Problem mentions any of the words\n" +
+			"(case-insensitive, OR). Prints address, status and title per hit; an archived hit also\n" +
+			"shows its close reason.",
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			return runTicketsFollowUpSearch(d, followUpProject, args, c.OutOrStdout())
+		},
+	}
+	followUpSearchCmd.Flags().StringVar(&followUpProject, "project", "", "project to search (default: the cwd's)")
+	followUpCmd.AddCommand(followUpSearchCmd)
 	cmd.AddCommand(followUpCmd)
 	cmd.AddCommand(newTicketsEpicCmd(d))
 	cmd.AddCommand(newTicketsAskCmd(d))
