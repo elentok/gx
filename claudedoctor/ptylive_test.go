@@ -10,7 +10,6 @@ import (
 	"github.com/elentok/gx/claudedoctor"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil/agentfake"
-	"github.com/elentok/gx/testutil/claudeenv"
 )
 
 // The test binary doubles as the PTY holder and, under it, as the TUI fake.
@@ -28,10 +27,7 @@ func TestMain(m *testing.M) {
 	if os.Getenv(agentfake.TUIEnv) == "1" {
 		agentfake.TUIClaude()
 	}
-	cleanup := claudeenv.Isolate()
-	code := m.Run()
-	cleanup()
-	os.Exit(code)
+	os.Exit(m.Run())
 }
 
 func TestPtyLive_RecordsTrustFrameAndWaitingSnapshot(t *testing.T) {
@@ -51,16 +47,13 @@ func TestPtyLive_RecordsTrustFrameAndWaitingSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(root) })
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("CLAUDE_CONFIG_DIR", "")
-	t.Setenv(holderEnv, "1")
-	t.Setenv(agentfake.TUIEnv, "1")
-	t.Setenv(agentfake.TUITrustEnv, "1")
+	home := t.TempDir()
 	p := &nativerunner.Pty{Root: root, Holder: []string{exe}, Claude: exe,
+		Env:          []string{"HOME=" + home, "CLAUDE_CONFIG_DIR=", holderEnv + "=1", agentfake.TUIEnv + "=1", agentfake.TUITrustEnv + "=1"},
 		PollInterval: 10 * time.Millisecond, StartTimeout: 10 * time.Second, PromptGrace: 500 * time.Millisecond}
 
 	rec, err := claudedoctor.PtyLive(p, t.TempDir(), func(s agentrunner.Session) error {
-		if err := agentfake.SendTUIControl(os.Getenv("HOME"), s.SessionID, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt"}); err != nil {
+		if err := agentfake.SendTUIControl(home, s.SessionID, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt"}); err != nil {
 			return err
 		}
 		_, err := p.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 5*time.Second)

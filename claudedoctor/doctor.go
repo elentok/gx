@@ -55,6 +55,9 @@ type Recording struct {
 
 type Input struct {
 	ClaudeVersion string
+	// Env is the KEY=VALUE env the live checks give their children and read
+	// HOME from. Empty means no home, not the process env.
+	Env []string
 	Recording
 }
 
@@ -71,7 +74,17 @@ type Result struct {
 type Source struct {
 	Live          bool
 	ClaudeVersion string
+	Env           []string
 	Session       func(name string) (Recording, error)
+}
+
+// explicitEnv turns a nil env into an empty one, so harness lookups read no
+// home instead of the process env.
+func explicitEnv(env []string) []string {
+	if env == nil {
+		return []string{}
+	}
+	return env
 }
 
 // ErrNoLiveSession is what a live Source returns for a canned session it
@@ -117,7 +130,7 @@ func runCheck(c Check, src Source, status map[string]Status, sessions map[string
 		return r
 	}
 
-	in := Input{ClaudeVersion: src.ClaudeVersion}
+	in := Input{ClaudeVersion: src.ClaudeVersion, Env: src.Env}
 	if c.Session != "" {
 		rec, ok := sessions[c.Session]
 		if !ok {

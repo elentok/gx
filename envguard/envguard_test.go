@@ -46,10 +46,7 @@ type entry struct {
 // "to remove" entries are later tickets' work.
 var allowed = map[site]entry{
 	{"brief/brief.go", ruleChildEnv}:                      {1, reasonRemove},
-	{"claudedoctor/headless.go", ruleChildEnv}:            {5, reasonRemove},
-	{"claudedoctor/headless.go", ruleHomeDir}:             {1, reasonRemove},
 	{"claudehistory/projects.go", ruleHomeDir}:            {2, reasonRemove},
-	{"cmd/claude_doctor.go", ruleChildEnv}:                {2, reasonStartup},
 	{"cmd/cmd.go", ruleHomeDir}:                           {1, reasonStartup},
 	{"cmd/operations.go", ruleChildEnv}:                   {1, reasonStartup},
 	{"cmd/server_preflight.go", ruleHomeDir}:              {1, reasonStartup},

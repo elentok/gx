@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 )
 
@@ -22,7 +23,7 @@ const PtyLiveLabel = "doctor"
 // pid status change from launch on, so the trust dialog Start answers itself
 // is still captured.
 func PtyLive(p *nativerunner.Pty, cwd string, drive func(agentrunner.Session) error) (Recording, error) {
-	rec := &ptyRecorder{dir: filepath.Join(p.Root, PtyLiveLabel)}
+	rec := &ptyRecorder{dir: filepath.Join(p.Root, PtyLiveLabel), env: p.Env}
 	done := make(chan struct{})
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -59,6 +60,7 @@ func PtyLive(p *nativerunner.Pty, cwd string, drive func(agentrunner.Session) er
 
 type ptyRecorder struct {
 	dir    string
+	env    []string
 	holder *nativerunner.HolderClient
 	Recording
 	lastStatus string
@@ -84,7 +86,7 @@ func (r *ptyRecorder) sample() {
 // snapshot keeps the raw pid status file each time its status or waitingFor
 // changes; the status-less file claude writes first is not a snapshot.
 func (r *ptyRecorder) snapshot() {
-	sessions, err := nativerunner.ClaudeSessionsDir()
+	sessions, err := harness.ClaudeSessionsDirIn(explicitEnv(r.env))
 	if err != nil {
 		return
 	}

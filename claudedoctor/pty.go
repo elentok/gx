@@ -23,7 +23,7 @@ var ptyChecks = []Check{
 // checkHolderSurvivesKickstart starts `gx agent-holder` detached from a
 // launchd job that is then kickstarted; holder.sock must still answer. The
 // holder runs sleep, not claude: only the holder's survival is in question.
-func checkHolderSurvivesKickstart(Input) (string, bool) {
+func checkHolderSurvivesKickstart(in Input) (string, bool) {
 	exe, err := os.Executable()
 	if err != nil {
 		return err.Error(), false
@@ -37,7 +37,7 @@ func checkHolderSurvivesKickstart(Input) (string, bool) {
 
 	start := fmt.Sprintf(`%s %q agent-holder --session-id doctor --dir %q -- sleep 600 </dev/null >/dev/null 2>&1`,
 		setsid, exe, dir)
-	return holderSurvives(dir, func() (int, error) { return kickstartJob(dir, start) })
+	return holderSurvives(dir, func() (int, error) { return kickstartJob(in.Env, dir, start) })
 }
 
 // holderSurvives runs kickstart, which starts a holder serving dir and

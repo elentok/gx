@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 )
 
@@ -128,11 +129,11 @@ func checkSessionID(in Input) (string, bool) {
 // directory: gx finds a dead agent's work there.
 func checkTranscriptWritten(in Input) (string, bool) {
 	init, _ := initEvent(parseEvents(in.Events))
-	home, err := os.UserHomeDir()
+	projects, err := harness.ClaudeProjectsDirIn(explicitEnv(in.Env))
 	if err != nil {
 		return err.Error(), false
 	}
-	matches, _ := filepath.Glob(filepath.Join(home, ".claude", "projects", "*", init.SessionID+".jsonl"))
+	matches, _ := filepath.Glob(filepath.Join(projects, "*", init.SessionID+".jsonl"))
 	if len(matches) == 0 {
 		return "no transcript for " + init.SessionID, false
 	}
@@ -271,7 +272,7 @@ func checkCompact(in Input) (string, bool) {
 // startDetached starts a headless claude in its own session with stdin held
 // open by a fifo, the way a launcher would, and returns its pid. dir holds
 // the fifo and is the caller's to remove.
-func startDetached(dir string) (int, error) {
+func startDetached(env []string, dir string) (int, error) {
 	fifo := filepath.Join(dir, "in")
 	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
 		return 0, err
@@ -281,6 +282,7 @@ func startDetached(dir string) (int, error) {
 	script := fmt.Sprintf(`exec 3<>%q; claude -p --input-format stream-json --output-format stream-json --verbose <&3 >%q 2>&1 & echo $! > %q`,
 		fifo, filepath.Join(dir, "out"), pidFile)
 	cmd := exec.Command("sh", "-c", script)
+	cmd.Env = env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Run(); err != nil {
 		return 0, err
@@ -303,13 +305,13 @@ func readPid(path string) (int, error) {
 
 func alive(pid int) bool { return syscall.Kill(pid, 0) == nil }
 
-func checkSurvivesLauncherExit(Input) (string, bool) {
+func checkSurvivesLauncherExit(in Input) (string, bool) {
 	dir, err := os.MkdirTemp("", "gx-doctor-")
 	if err != nil {
 		return err.Error(), false
 	}
 	defer os.RemoveAll(dir)
-	pid, err := startDetached(dir)
+	pid, err := startDetached(in.Env, dir)
 	if err != nil {
 		return err.Error(), false
 	}
@@ -329,7 +331,7 @@ const setsid = `/usr/bin/perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV'`
 // start command, then `launchctl kickstart -k`s it: that kills the job's
 // process group, which a setsid'd process must not be in. It returns the
 // started pid once kickstart has had time to land; the caller kills it.
-func kickstartJob(dir, start string) (int, error) {
+func kickstartJob(env []string, dir, start string) (int, error) {
 	if _, err := exec.LookPath("launchctl"); err != nil {
 		return 0, errors.New("launchctl not found")
 	}
@@ -337,16 +339,22 @@ func kickstartJob(dir, start string) (int, error) {
 	target := fmt.Sprintf("gui/%d/%s", os.Getuid(), label)
 	pidFile := filepath.Join(dir, "pid")
 	script := fmt.Sprintf(`%s & echo $! > %q; sleep 600`, start, pidFile)
-	if out, err := exec.Command("launchctl", "submit", "-l", label, "--", "sh", "-c", script).CombinedOutput(); err != nil {
+	submit := exec.Command("launchctl", "submit", "-l", label, "--", "sh", "-c", script)
+	submit.Env = env
+	if out, err := submit.CombinedOutput(); err != nil {
 		return 0, fmt.Errorf("launchctl submit: %v: %s", err, out)
 	}
-	defer exec.Command("launchctl", "remove", label).Run()
+	remove := exec.Command("launchctl", "remove", label)
+	remove.Env = env
+	defer remove.Run()
 
 	pid, err := readPid(pidFile)
 	if err != nil {
 		return 0, err
 	}
-	if out, err := exec.Command("launchctl", "kickstart", "-k", target).CombinedOutput(); err != nil {
+	kickstart := exec.Command("launchctl", "kickstart", "-k", target)
+	kickstart.Env = env
+	if out, err := kickstart.CombinedOutput(); err != nil {
 		return pid, fmt.Errorf("launchctl kickstart: %v: %s", err, out)
 	}
 	time.Sleep(2 * time.Second)
@@ -355,7 +363,7 @@ func kickstartJob(dir, start string) (int, error) {
 
 // checkSurvivesKickstart starts claude detached from a launchd job that is
 // then kickstarted.
-func checkSurvivesKickstart(Input) (string, bool) {
+func checkSurvivesKickstart(in Input) (string, bool) {
 	dir, err := os.MkdirTemp("", "gx-doctor-")
 	if err != nil {
 		return err.Error(), false
@@ -368,7 +376,7 @@ func checkSurvivesKickstart(Input) (string, bool) {
 	}
 	start := fmt.Sprintf(`exec 3<>%q; %s claude -p --input-format stream-json --output-format stream-json --verbose <&3 >%q 2>&1`,
 		fifo, setsid, filepath.Join(dir, "out"))
-	pid, err := kickstartJob(dir, start)
+	pid, err := kickstartJob(in.Env, dir, start)
 	if pid > 0 {
 		defer syscall.Kill(pid, syscall.SIGKILL)
 	}
@@ -383,9 +391,11 @@ func checkSurvivesKickstart(Input) (string, bool) {
 
 // checkPrintModeHooksBlocked: with hooks disabled, `claude -p` must still
 // start and answer, using the user's other settings.
-func checkPrintModeHooksBlocked(Input) (string, bool) {
-	out, err := exec.Command("claude", "-p", "reply with the word ok",
-		"--output-format", "json", "--settings", `{"disableAllHooks":true}`).Output()
+func checkPrintModeHooksBlocked(in Input) (string, bool) {
+	cmd := exec.Command("claude", "-p", "reply with the word ok",
+		"--output-format", "json", "--settings", `{"disableAllHooks":true}`)
+	cmd.Env = in.Env
+	out, err := cmd.Output()
 	if err != nil {
 		return fmt.Sprintf("claude -p failed: %v", err), false
 	}

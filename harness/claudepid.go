@@ -51,8 +51,13 @@ func ParsePidStatus(data []byte) (PidStatus, error) {
 
 // ClaudeSessionsDir is where claude writes its pid status files: under
 // CLAUDE_CONFIG_DIR when set, as claude itself resolves it, else ~/.claude.
-func ClaudeSessionsDir() (string, error) {
-	dir, _, err := claudeConfigDirs(nil)
+func ClaudeSessionsDir() (string, error) { return ClaudeSessionsDirIn(nil) }
+
+// ClaudeSessionsDirIn is ClaudeSessionsDir reading HOME and CLAUDE_CONFIG_DIR
+// from env (KEY=VALUE entries, the last one of a key wins). Nil env means the
+// process env.
+func ClaudeSessionsDirIn(env []string) (string, error) {
+	dir, _, err := claudeConfigDirs(env)
 	if err != nil {
 		return "", err
 	}

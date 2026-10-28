@@ -57,13 +57,15 @@ whose dependency did not pass is skipped. Never checks herdr.`,
 
 // liveDoctorSource runs checks against the installed claude.
 func liveDoctorSource() claudedoctor.Source {
-	ptyRun := sync.OnceValues(livePty)
+	env := os.Environ()
+	ptyRun := sync.OnceValues(func() (claudedoctor.Recording, error) { return livePty(env) })
 	src := claudedoctor.Source{
 		Live: true,
+		Env:  env,
 		Session: func(name string) (claudedoctor.Recording, error) {
 			switch name {
 			case "turn":
-				events, err := liveTurn()
+				events, err := liveTurn(env)
 				return claudedoctor.Recording{Events: events}, err
 			case "pty-status", "pty-trust":
 				return ptyRun()
@@ -71,7 +73,9 @@ func liveDoctorSource() claudedoctor.Source {
 			return claudedoctor.Recording{}, fmt.Errorf("%w: %s", claudedoctor.ErrNoLiveSession, name)
 		},
 	}
-	if out, err := exec.Command("claude", "--version").Output(); err == nil {
+	version := exec.Command("claude", "--version")
+	version.Env = env
+	if out, err := version.Output(); err == nil {
 		src.ClaudeVersion = claudedoctor.ParseVersion(string(out))
 	}
 	return src
@@ -80,7 +84,7 @@ func liveDoctorSource() claudedoctor.Source {
 // livePty runs one real claude through the PTY runner in a fresh temp dir, so
 // it shows the trust dialog, then opens /model to reach a waiting status. One
 // run serves every pty session.
-func livePty() (claudedoctor.Recording, error) {
+func livePty(env []string) (claudedoctor.Recording, error) {
 	// Short root: holder.sock lives under it and socket paths are length-capped.
 	root, err := os.MkdirTemp("", "gxd")
 	if err != nil {
@@ -92,7 +96,7 @@ func livePty() (claudedoctor.Recording, error) {
 		return claudedoctor.Recording{}, err
 	}
 	defer os.RemoveAll(cwd)
-	p := &nativerunner.Pty{Root: root}
+	p := &nativerunner.Pty{Root: root, Env: env}
 	return claudedoctor.PtyLive(p, cwd, func(s agentrunner.Session) error {
 		if err := p.Prompt(s, "/model"); err != nil {
 			return err
@@ -103,7 +107,7 @@ func livePty() (claudedoctor.Recording, error) {
 }
 
 // liveTurn runs one real headless turn and returns its raw events.
-func liveTurn() ([]json.RawMessage, error) {
+func liveTurn(env []string) ([]json.RawMessage, error) {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return nil, err
@@ -120,6 +124,7 @@ func liveTurn() ([]json.RawMessage, error) {
 	}
 	cmd := exec.Command("claude", "-p", "--input-format", "stream-json", "--output-format", "stream-json",
 		"--verbose", "--session-id", id)
+	cmd.Env = env
 	cmd.Stdin = strings.NewReader(string(msg) + "\n")
 	out, err := cmd.Output()
 	if err != nil {

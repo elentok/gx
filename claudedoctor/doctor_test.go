@@ -335,6 +335,34 @@ func TestRun_LiveChecksSkipOnFixtures(t *testing.T) {
 	}
 }
 
+func TestRun_TranscriptWrittenReadsTheHomeInEnv(t *testing.T) {
+	t.Parallel()
+	const id = "11111111-2222-4333-8444-555555555555"
+	home := t.TempDir()
+	projects := filepath.Join(home, ".claude", "projects", "p")
+	if err := os.MkdirAll(projects, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projects, id+".jsonl"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	init := json.RawMessage(`{"type":"system","subtype":"init","session_id":"` + id + `"}`)
+	table := []Check{{Runner: "headless", Name: "transcript", Mode: Live, Session: "turn", Run: checkTranscriptWritten}}
+	run := func(env []string) Result {
+		src := Source{Live: true, Env: env, Session: func(string) (Recording, error) {
+			return Recording{Events: []json.RawMessage{init}}, nil
+		}}
+		return Run(table, "headless", src)[0]
+	}
+
+	if got := run([]string{"HOME=" + home, "CLAUDE_CONFIG_DIR="}); got.Status != Pass {
+		t.Errorf("home in env: %s %q, want PASS", got.Status, got.Detail)
+	}
+	if got := run([]string{"PATH=/bin"}); got.Status != Fail {
+		t.Errorf("no HOME in env: %s %q, want FAIL", got.Status, got.Detail)
+	}
+}
+
 func TestRun_OnlyRunsTheRequestedRunner(t *testing.T) {
 	t.Parallel()
 	table := []Check{
