@@ -231,6 +231,11 @@ cite the file (`file:func`) in the ticket next to the claim:
 - **Wiring**: name the hidden registration points (route tables, allowlists, parity tests, the
   query-and-prop path that feeds a page) and give `file:func` for anything the ticket says only by
   line number or role. For a new server route, point at `.ai/index.md` "Adding a server route".
+- **CLI commands the ticket quotes**: run `--help` on every `gx` command (and subcommand) written
+  into the ticket, and use the name and flags it prints. Never write a command from memory.
+- **`-run` patterns**: run the pattern with `go test -list '<pattern>'` and confirm it matches
+  exactly the intended tests. Keep it as narrow as the seams allow; a broad pattern can hit the
+  test-run time cap.
 - **Behaviour that must not change**: list one seam per state or variant of that behaviour, not only
   the ones the ticket edits.
 
