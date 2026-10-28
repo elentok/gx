@@ -448,9 +448,11 @@ test("Escape with the ⋯ menu open closes only the menu", async () => {
   await screen.findByRole("group", { name: "Questions" });
   fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
   const menu = await screen.findByRole("menu");
-  await act(async () => {});
-  fireEvent.keyDown(menu, { key: "Escape" });
-  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  // The menu takes Escape only once it is ready, so press until it closes.
+  await waitFor(() => {
+    fireEvent.keyDown(menu, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
   expect(inQuestions()).toBe(true);
   fireEvent.keyDown(document.body, { key: "Escape" });
   expect(await screen.findByText("earlier talk")).toBeTruthy();

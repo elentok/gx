@@ -179,7 +179,9 @@ test("a plain message posts its text with the last message id", async () => {
   render({ post });
   const box = await openNote();
   fireEvent.change(box, { target: { value: "hello there" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+  await waitFor(() => expect(send.disabled).toBe(false));
+  fireEvent.click(send);
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   expect(post).toHaveBeenCalledWith({
     id: "s-a",
@@ -391,7 +393,8 @@ test("a countdown shows the seconds left and Cancel posts to the cancel route", 
   render({
     auto: { auto_advance_at: new Date(Date.now() + 9500).toISOString() },
   });
-  expect(await screen.findByText(/Continuing in 10s/)).toBeTruthy();
+  // The seconds depend on render time, so the test waits for the text, not for a number.
+  expect(await screen.findByText(/Continuing in \d+s/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   await waitFor(() =>
     expect(fetchSpy).toHaveBeenCalledWith(

@@ -147,8 +147,7 @@ func RunOutcome(tool Tool, o Options) (int, Outcome) {
 
 	start := time.Now()
 	logDir := filepath.Join(o.DataDir, "brief")
-	logPath := filepath.Join(logDir, start.UTC().Format("20060102T150405.000000000")+"-"+tool.Name()+".log")
-	logFile, err := createLog(logDir, logPath)
+	logFile, logPath, err := createLog(logDir, start.UTC().Format("20060102T150405.000000000")+"-"+tool.Name())
 	if err != nil {
 		return cantRun(o.Out, "cannot write log: "+err.Error()), Outcome{}
 	}
@@ -247,11 +246,21 @@ func cantRun(w io.Writer, msg string) int {
 	return ExitCantRun
 }
 
-func createLog(dir, path string) (*os.File, error) {
+// createLog never reuses a name: two runs of one tool can start in the same
+// nanosecond (parallel `make test` units), so a taken name gets a counter.
+func createLog(dir, stem string) (*os.File, string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	name := stem + ".log"
+	for n := 2; ; n++ {
+		path := filepath.Join(dir, name)
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+		if !errors.Is(err, os.ErrExist) {
+			return f, path, err
+		}
+		name = fmt.Sprintf("%s-%d.log", stem, n)
+	}
 }
 
 // appendIndex writes the whole line in one O_APPEND write so concurrent runs

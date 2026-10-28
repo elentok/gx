@@ -18,6 +18,26 @@ func (s shellTool) Plan(_ []string, dir string, args []string) (Invocation, erro
 func (shellTool) Parse(out []byte, exit int) Outcome  { return Outcome{Units: 1, Summary: "1 thing"} }
 func (shellTool) RerunArgs([]string, []Unit) []string { return nil }
 
+func TestCreateLog_SameStemTwiceGetsDistinctFiles(t *testing.T) {
+	dir := t.TempDir()
+	first, firstPath, err := createLog(dir, "20260101T000000.000000000-go-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer first.Close()
+	second, secondPath, err := createLog(dir, "20260101T000000.000000000-go-test")
+	if err != nil {
+		t.Fatalf("second log with the same stem: %v", err)
+	}
+	defer second.Close()
+	if firstPath == secondPath {
+		t.Fatalf("both logs share %s", firstPath)
+	}
+	if !strings.HasSuffix(secondPath, ".log") {
+		t.Fatalf("second log %s lost its .log suffix", secondPath)
+	}
+}
+
 func TestRun_WritesLogWhileToolRuns(t *testing.T) {
 	dataDir := t.TempDir()
 	release := filepath.Join(t.TempDir(), "release")

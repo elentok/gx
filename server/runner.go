@@ -354,6 +354,9 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 			s.retryHeldMerge(root, e, loaded, repo)
 			return false, nil
 		}
+		if s.parentAwaitsAdoption(projectDir, addr, e, t) {
+			return false, nil
+		}
 		ticketAddr := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}.String()
 		// A missed watch event can leave the index behind the file; claiming
 		// on that view could schedule the wrong thing, so wait for the index.
@@ -369,6 +372,24 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 		return s.claimAndLaunch(root, addr, t, repo, ticketAgent(t, ralphloop.AgentKind(item.Agent)), loaded)
 	}
 	return false, nil
+}
+
+// parentAwaitsAdoption reports whether t's parent reported finished after its
+// pause and is not adopted yet. The report alone makes t claimable, so without
+// this a claim landing between the report and the adoption's lock (adoptMu)
+// launches an investigation the adoption is about to cancel.
+func (s *Server) parentAwaitsAdoption(dir string, addr tickets.Address, e tickets.Epic, t tickets.Ticket) bool {
+	if t.Parent == nil {
+		return false
+	}
+	for _, p := range e.Tickets {
+		if p.Identifier != *t.Parent || !adoptablePause(schema.Status(p.Status), p.PauseReason) {
+			continue
+		}
+		_, ok := lateFinishOf(dir, tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: p.Identifier}, p.Path)
+		return ok
+	}
+	return false
 }
 
 // nextTicket is the ticket a claim of e's root starts next: the first of its

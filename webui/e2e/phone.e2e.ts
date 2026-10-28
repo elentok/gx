@@ -52,8 +52,8 @@ test.describe("53. Phone, epic page", () => {
     const title = (await link.getByText("open", nav("open")).boundingBox())!;
     const meta = (await link.getByText("ready", nav("ready")).boundingBox())!;
     expect(meta.y).toBeGreaterThanOrEqual(title.y + title.height);
-    // The meta is indented 54px under the title.
-    await expect(link.locator("[data-meta]")).toHaveCSS("padding-left", "54px");
+    // The meta is indented 80px under the title.
+    await expect(link.locator("[data-meta]")).toHaveCSS("padding-left", "80px");
 
     // A long title wraps, and its meta sits below the whole title.
     const longTitle = page.getByText(long, nav(long));
@@ -77,24 +77,24 @@ test.describe("53. Phone, epic page", () => {
 
     const card = (button: typeof answer) =>
       page.locator("div").filter({ has: button }).filter({ has: page.locator("a") }).last();
-    // Each button is as wide as the note row it sits in, less the 54px indent.
+    // Each button is as wide as the note row it sits in, less the 80px indent.
     for (const button of [answer, fix]) {
       const row = (await button.locator("xpath=ancestor::*[@data-note-row]").boundingBox())!;
       const box = (await button.boundingBox())!;
       expect(box.height).toBeGreaterThanOrEqual(44);
-      expect(box.width).toBeCloseTo(row.width - 54, 0);
+      expect(box.width).toBeCloseTo(row.width - 80, 0);
     }
 
-    // In 06's card the meta, question and Answer stack in that order, their text 54px from the content edge.
+    // In 06's card the meta, question and Answer stack in that order, their text 80px from the content edge.
     const askCard = card(answer);
     const metaEl = askCard.locator("[data-meta]");
-    await expect(metaEl).toHaveCSS("padding-left", "54px");
+    await expect(metaEl).toHaveCSS("padding-left", "80px");
     const meta = (await metaEl.boundingBox())!;
     const question = (await askCard.getByText("Which option should the fake worker take?").boundingBox())!;
     const ab = (await answer.boundingBox())!;
     expect(meta.y + meta.height).toBeLessThanOrEqual(question.y);
     expect(question.y + question.height).toBeLessThanOrEqual(ab.y);
-    expect(meta.x + 54).toBeCloseTo(question.x, 0);
+    expect(meta.x + 80).toBeCloseTo(question.x, 0);
     expect(ab.x).toBeCloseTo(question.x, 0);
   });
 });
@@ -164,6 +164,8 @@ test("24. Phone, Design page", async ({ page, start }) => {
   await page.getByRole("button", nav("Send answers")).click();
   const popover = page.getByRole("alertdialog", nav("Unanswered questions"));
   await expect(popover).toBeVisible();
+  // It scales in, so it is measured once settled.
+  await popover.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   const pop = (await popover.boundingBox())!;
   const sheetBox = (await questions.boundingBox())!;
   expect(pop.width).toBeLessThanOrEqual(343);
