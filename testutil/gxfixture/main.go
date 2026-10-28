@@ -291,7 +291,9 @@ func (f *fixture) writeConfig(port, recentlyFinished int, overrides []string) er
 	if recentlyFinished > 0 {
 		server["recently-finished"] = recentlyFinished
 	}
-	cfg := map[string]any{"agent-runner": "pty", "runner-wait": "100ms", "server": server}
+	// A wait shorter than a loaded fake's first turn reads as an undelivered
+	// prompt: the runner kills the agent mid-finish and relaunches it.
+	cfg := map[string]any{"agent-runner": "pty", "runner-wait": "2s", "server": server}
 	for _, kv := range overrides {
 		key, raw, ok := strings.Cut(kv, "=")
 		if !ok || key == "" {
