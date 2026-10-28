@@ -159,7 +159,7 @@ func applyBlock(q *Question, block string) error {
 	dec := yaml.NewDecoder(bytes.NewReader([]byte(block)))
 	dec.KnownFields(true)
 	if err := dec.Decode(&b); err != nil {
-		return fmt.Errorf("invalid gx-question YAML: %w", err)
+		return fmt.Errorf("invalid gx-question YAML: %w (a value holding `: ` or ` #` breaks it: wrap the label, consequence, yes and no values in double quotes)", err)
 	}
 	switch b.Type {
 	case QuestionYesNo:

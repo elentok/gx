@@ -68,6 +68,7 @@ func TestParseQuestionStrict_Errors(t *testing.T) {
 		name, block, want string
 	}{
 		{"bad yaml", "type: [\n", "invalid gx-question YAML"},
+		{"colon in label", "type: options\noptions:\n  - id: a\n    label: Fix: now\n  - id: b\n    label: B\n", "wrap the label, consequence, yes and no values in double quotes"},
 		{"unknown type", "type: poll\n", "unknown question type"},
 		{"duplicate ids", "type: options\noptions:\n  - {id: a, label: A}\n  - {id: a, label: B}\n", "duplicate option id"},
 		{"recommended outside options", opts(2) + "recommended: zz\n", "not an option id"},
