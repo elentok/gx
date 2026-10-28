@@ -51,6 +51,9 @@ const (
 	BehaviourFinish = "finish"
 	// BehaviourAsk pauses the ticket with a question and commits nothing.
 	BehaviourAsk = "ask"
+	// BehaviourRefuseAsk commits, reports finished without running `gx check` so
+	// the finish guard refuses, then pauses the ticket with a question.
+	BehaviourRefuseAsk = "refuse-ask"
 	// BehaviourFail commits and reports nothing. The TUI fake then exits non-zero,
 	// which the server reads as a failed run.
 	BehaviourFail = "fail"
@@ -85,6 +88,8 @@ func WorkTicket(cfg WorkerConfig, address string) error {
 		return nil
 	case BehaviourAsk:
 		return askQuestion(cfg, address)
+	case BehaviourRefuseAsk:
+		return refuseThenAsk(cfg, address)
 	}
 	waitHold(cfg)
 	return finishTicket(cfg, address)
@@ -137,7 +142,21 @@ func RunWorker(in io.Reader, out io.Writer) error {
 	return nil
 }
 
-func finishTicket(cfg WorkerConfig, address string) error {
+// refuseThenAsk commits, reports finished with no `gx check` run, expects the
+// finish guard to refuse, then asks.
+func refuseThenAsk(cfg WorkerConfig, address string) error {
+	if err := commitWork(address); err != nil {
+		return err
+	}
+	cmd := exec.Command(cfg.Gx, "tickets", "set", address, "--iteration-status", "finished")
+	cmd.Env = append(os.Environ(), cfg.Env...)
+	if out, err := cmd.CombinedOutput(); err == nil {
+		return fmt.Errorf("gx tickets set: the finish guard accepted a finish with no check run\n%s", out)
+	}
+	return askQuestion(cfg, address)
+}
+
+func commitWork(address string) error {
 	name := "done-" + strings.NewReplacer(":", "-", "/", "-").Replace(address) + ".txt"
 	if err := os.WriteFile(name, []byte("done\n"), 0o644); err != nil {
 		return err
@@ -149,6 +168,13 @@ func finishTicket(cfg WorkerConfig, address string) error {
 		if out, err := exec.Command(args[0], args[1:]...).CombinedOutput(); err != nil {
 			return fmt.Errorf("%s: %w\n%s", strings.Join(args, " "), err, out)
 		}
+	}
+	return nil
+}
+
+func finishTicket(cfg WorkerConfig, address string) error {
+	if err := commitWork(address); err != nil {
+		return err
 	}
 	// The finish guard refuses a tree without a passing check run.
 	for _, args := range [][]string{

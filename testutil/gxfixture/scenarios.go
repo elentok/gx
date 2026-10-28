@@ -123,6 +123,15 @@ var scenarios = map[string]scenario{
 		}}},
 		queue: []string{project + ":finishing-epic"},
 	},
+	// refused-ask: queued, and its only ticket commits, is refused by the finish
+	// guard (no `gx check` run) and then asks.
+	"refused-ask": {
+		epics: []epic{{project, "refused-epic", []ticket{
+			{"01", "refused", servertest.TicketOpts{}},
+		}}},
+		queue:     []string{project + ":refused-epic"},
+		behaviour: map[string]string{project + ":refused-epic/01": agentfake.BehaviourRefuseAsk},
+	},
 	// paused: one ticket per recovery path. Every paused ticket opens a pause
 	// round. The approve epic is queued, so its worker really blocks on a
 	// permission prompt in the pty runner; the other epic is not, so nothing

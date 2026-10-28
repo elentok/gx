@@ -118,6 +118,34 @@ func TestWorkTicket_AskSendsAQuestionAndCommitsNothing(t *testing.T) {
 	}
 }
 
+func TestWorkTicket_RefuseAskCommitsGetsRefusedThenAsks(t *testing.T) {
+	cfg, gxLog := workerEnv(t)
+	cfg.Behaviour = map[string]string{"p:e/01": BehaviourRefuseAsk}
+	script := "#!/bin/sh\necho \"$@\" >> " + gxLog + "\n[ \"$2\" = set ] && { echo refused >&2; exit 1; }\ncat >> " + gxLog + "\n"
+	if err := os.WriteFile(cfg.Gx, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	before := commitCount(t)
+	if err := WorkTicket(cfg, "p:e/01"); err != nil {
+		t.Fatal(err)
+	}
+	if got := commitCount(t); got != before+1 {
+		t.Errorf("commits = %d, want %d", got, before+1)
+	}
+	lines := strings.Split(strings.TrimSpace(readLog(t, gxLog)), "\n")
+	if len(lines) < 2 || !strings.HasPrefix(lines[0], "tickets set p:e/01 --iteration-status finished") || !strings.HasPrefix(lines[1], "tickets ask p:e/01 --body -") {
+		t.Errorf("gx calls = %q, want the refused finish and then the question", lines)
+	}
+}
+
+func TestWorkTicket_RefuseAskFailsWhenTheFinishIsAccepted(t *testing.T) {
+	cfg, _ := workerEnv(t)
+	cfg.Behaviour = map[string]string{"p:e/01": BehaviourRefuseAsk}
+	if err := WorkTicket(cfg, "p:e/01"); err == nil {
+		t.Fatal("want an error when the finish guard does not refuse")
+	}
+}
+
 func TestWorkTicket_HoldDelaysOnlyTheFinishAndTimesOut(t *testing.T) {
 	cfg, gxLog := workerEnv(t)
 	cfg.Hold = filepath.Join(t.TempDir(), "hold")

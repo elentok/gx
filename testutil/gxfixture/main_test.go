@@ -367,6 +367,25 @@ func TestFinishingScenario_LastTicketFinishesAndMerges(t *testing.T) {
 	r.stop(t)
 }
 
+func TestRefusedAskScenario_RefusedFinishThenAskPausesSelfReported(t *testing.T) {
+	t.Parallel()
+	r := start(t, "refused-ask")
+	const addr = "demo:refused-epic/01"
+	deadline := time.Now().Add(60 * time.Second)
+	for r.ticketStatus(t, addr) != "needs-answer" {
+		if time.Now().After(deadline) {
+			t.Logf("history:\n%s", r.gx(t, "server", "tickets", "history", addr))
+			t.Fatalf("ticket %s is %q, want needs-answer", addr, r.ticketStatus(t, addr))
+		}
+		time.Sleep(time.Second)
+	}
+	d := r.detail(t, addr)
+	if d.PauseReason != "self-reported" || d.Latest == nil {
+		t.Errorf("pause_reason = %q, latest = %v; want self-reported with an open round", d.PauseReason, d.Latest)
+	}
+	r.stop(t)
+}
+
 // web is a client of the fixture's web server, with the cookie the token URL sets.
 type web struct {
 	client *http.Client
