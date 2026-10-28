@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -9,8 +11,12 @@ import (
 
 // runTicketsSection replaces (or appends) the "## heading" section of path's
 // ticket body with content, under the per-ticket lock, and prints the ticket's
-// address.
-func runTicketsSection(d deps, path, heading, content string, jsonOut bool, w io.Writer) error {
+// address. Blank content is refused unless clear is set: an empty stdin (a
+// probe piped through head, a failed upstream command) must not wipe a section.
+func runTicketsSection(d deps, path, heading, content string, clear, jsonOut bool, w io.Writer) error {
+	if strings.TrimSpace(content) == "" && !clear {
+		return fmt.Errorf("refusing to blank section %q: content is empty (pass --clear to blank it on purpose)", heading)
+	}
 	if isEpicTicketMD(path) {
 		// An epic's frontmatter is not a ticket's, so it is edited in place
 		// rather than parsed as a Ticket.

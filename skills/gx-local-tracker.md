@@ -150,7 +150,8 @@ conversation history.
   address (`project:epic`, or a bare `epic` in the cwd project) `show` prints the epic's `ticket.md`
   (frontmatter and body) followed by its tickets, one `id  status  title` line each (no `--json`).
   An all-numeric bare argument resolves as a ticket ID, so an epic named like `2024` needs its
-  `project:epic` form. Change a body section with `gx tickets section <addr> <heading> <content|->`,
+  `project:epic` form. Change a body section with `gx tickets section <addr> <heading> <content|->`
+  (empty content is refused; `--clear` blanks a section; without content it prints the section),
   change fields with `gx tickets set <addr>`. Never read or write a ticket file by path —
   `gx tickets root` / `gx tickets epics` are for humans and scripts.
 - **Write a body once**: write the text to a scratchpad file with the Write tool, then pipe it in:

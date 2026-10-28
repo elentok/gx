@@ -406,24 +406,42 @@ log shows no open question on the web. A second run changes nothing.`,
 	cmd.AddCommand(newTicketsEpicCmd(d))
 	cmd.AddCommand(newTicketsAskCmd(d))
 	cmd.AddCommand(newTicketsAnswerCmd(d, false))
-	var sectionJSON bool
+	var sectionJSON, sectionClear bool
 	sectionCmd := &cobra.Command{
-		Use:   "section <addr|path> <heading> <content|->",
-		Short: "replace or append one ## section of a ticket's body, content from the argument or stdin (-)",
-		Args:  cobra.ExactArgs(3),
+		Use:   "section <addr|path> <heading> [<content|->]",
+		Short: "print (2 args) or replace/append (3 args) one ## section of a ticket's body; content from the argument or stdin (-)",
+		Long: "With <addr> and <heading> only, prints the section (same as show --section).\n" +
+			"With content, replaces or appends the section; empty or whitespace-only content is refused.\n" +
+			"To blank a section on purpose: gx tickets section --clear <addr> <heading>.",
+		Args: func(_ *cobra.Command, args []string) error {
+			if sectionClear {
+				return cobra.ExactArgs(2)(nil, args)
+			}
+			return cobra.RangeArgs(2, 3)(nil, args)
+		},
 		RunE: func(c *cobra.Command, args []string) error {
+			if len(args) == 2 && !sectionClear {
+				cwd, err := d.getwd()
+				if err != nil {
+					return err
+				}
+				return runTicketsShow(d.dirs(), cwd, args[0], false, args[1], c.OutOrStdout())
+			}
 			path, err := resolveTicketRef(d.dirs(), d.getwd, args[0])
 			if err != nil {
 				return err
 			}
-			content, err := readBodyArg(d, args[2])
-			if err != nil {
-				return err
+			content := ""
+			if !sectionClear {
+				if content, err = readBodyArg(d, args[2]); err != nil {
+					return err
+				}
 			}
-			return runTicketsSection(d, path, args[1], content, sectionJSON, c.OutOrStdout())
+			return runTicketsSection(d, path, args[1], content, sectionClear, sectionJSON, c.OutOrStdout())
 		},
 	}
 	sectionCmd.Flags().BoolVar(&sectionJSON, "json", false, "emit {address, path} JSON")
+	sectionCmd.Flags().BoolVar(&sectionClear, "clear", false, "blank the section (takes no content)")
 	// Content is free text that often starts with "-" (a markdown list), so
 	// flags must come before the positional args.
 	sectionCmd.Flags().SetInterspersed(false)

@@ -187,7 +187,7 @@ func TestRunTicketsSection_WritesAndPrintsAddress(t *testing.T) {
 	writeTicket(t, path, "01", "open", "implement")
 
 	var stdout bytes.Buffer
-	if err := runTicketsSection(deps{env: envFor(t)}, path, "Notes", "hello\n", false, &stdout); err != nil {
+	if err := runTicketsSection(deps{env: envFor(t)}, path, "Notes", "hello\n", false, false, &stdout); err != nil {
 		t.Fatalf("runTicketsSection: %v", err)
 	}
 	raw, _ := os.ReadFile(path)
@@ -199,5 +199,33 @@ func TestRunTicketsSection_WritesAndPrintsAddress(t *testing.T) {
 	}
 	if got := strings.TrimSpace(stdout.String()); !strings.HasSuffix(got, "widget-epic/01") {
 		t.Errorf("stdout = %q, want an address", got)
+	}
+}
+
+func TestRunTicketsSection_BlankContentRefusedUnlessCleared(t *testing.T) {
+	t.Parallel()
+	for _, blank := range []string{"", " \n\t\n"} {
+		_, issuesDir := newAddEpic(t)
+		path := filepath.Join(issuesDir, "01-a.md")
+		writeTicket(t, path, "01", "open", "implement")
+		if err := runTicketsSection(deps{env: envFor(t)}, path, "Notes", "keep me\n", false, false, io.Discard); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		before, _ := os.ReadFile(path)
+
+		err := runTicketsSection(deps{env: envFor(t)}, path, "Notes", blank, false, false, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "--clear") {
+			t.Errorf("blank %q: err = %v, want a refusal naming --clear", blank, err)
+		}
+		if after, _ := os.ReadFile(path); string(after) != string(before) {
+			t.Errorf("blank %q changed the ticket:\n%s", blank, after)
+		}
+
+		if err := runTicketsSection(deps{env: envFor(t)}, path, "Notes", "", true, false, io.Discard); err != nil {
+			t.Fatalf("clear: %v", err)
+		}
+		if after, _ := os.ReadFile(path); strings.Contains(string(after), "keep me") {
+			t.Errorf("--clear left the old text:\n%s", after)
+		}
 	}
 }
