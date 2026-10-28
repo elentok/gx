@@ -698,7 +698,6 @@ func (c *Client) DiskStatus(ctx context.Context) (server.DiskReport, error) {
 	return rep, err
 }
 
-<<<<<<< HEAD
 // SaveChecks saves one project's check config to the repo or project.json. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) SaveChecks(ctx context.Context, req server.SaveChecksRequest) (server.SaveChecksResult, error) {

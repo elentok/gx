@@ -51,6 +51,8 @@ type Output struct {
 	Gx string `json:"gx"`
 	// DiskDir holds the fake disk's control files: free and clean.
 	DiskDir string `json:"disk_dir"`
+	// HealthDir holds the fake CPU and memory control file: system.
+	HealthDir string `json:"health_dir"`
 }
 
 // ShellEnv is the output as `export` lines a shell can source: the CLI env, then
@@ -65,6 +67,7 @@ func (o Output) ShellEnv() string {
 	export("GXF_WEB_URL", o.WebURL)
 	export("GXF_GX", o.Gx)
 	export("GXF_DISK_DIR", o.DiskDir)
+	export("GXF_HEALTH_DIR", o.HealthDir)
 	export("GXF_HOLD_FILE", o.HoldFile)
 	export("GXF_STATE_DIR", o.StateDir)
 	export("GXF_SOCKET", o.Socket)
@@ -168,6 +171,9 @@ func run(args []string) (err error) {
 	if err := f.setupDisk(); err != nil {
 		return err
 	}
+	if err := f.setupHealth(); err != nil {
+		return err
+	}
 	if err := f.writeConfig(port, sc.recentlyFinished, configs); err != nil {
 		return err
 	}
@@ -228,7 +234,7 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
-	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir()}
+	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir()}
 	if shellEnv {
 		fmt.Print(o.ShellEnv())
 	} else {

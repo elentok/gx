@@ -33,14 +33,14 @@ $TMPDIR/gx-ui/gxfixture --gx $TMPDIR/gx-ui/gx --fakeclaude $TMPDIR/gx-ui/claude 
   fixture started any other way keeps running after you finish, with its `gx server` and fake agents.
   As a backstop it exits when its parent process dies or after 2 hours.
 - The scenario names are in the catalog (`empty`, `ready`, `mixed`, `finishing`, `paused`, `united`,
-  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`, `disk-low`). An unknown name makes the command list
+  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`, `disk-low`, `health`). An unknown name makes the command list
   the known ones.
 - Pass `--hold` only for a flow that says so (flow 7, and the Stash flow on `dirty-trunk`). It
   freezes the workers until you delete the file named by `hold_file`.
 - Each run is its own isolated server and state. Start one per flow.
 - To run `gx` against the fixture from the shell, pass `--env` and source the output. It prints
   `export` lines instead of the JSON: the `env` entries, plus `GXF_WEB_URL`, `GXF_GX`,
-  `GXF_DISK_DIR`, `GXF_HOLD_FILE`, `GXF_STATE_DIR` and `GXF_SOCKET`. Redirect the background run's stdout to a file,
+  `GXF_DISK_DIR`, `GXF_HEALTH_DIR`, `GXF_HOLD_FILE`, `GXF_STATE_DIR` and `GXF_SOCKET`. Redirect the background run's stdout to a file,
   wait for it to fill, then `source` it in the same shell as your `gx` calls. Do not retype the
   `HOME`/`XDG_*` exports.
 
@@ -52,6 +52,7 @@ The JSON line has these fields:
   and no other.
 - `hold_file`: the file that holds the workers when you passed `--hold`.
 - `disk_dir`: the directory of the fake disk's control files (see "How the fixture behaves").
+- `health_dir`: the directory of the fake CPU and memory control file (see "How the fixture behaves").
 
 ## 2. Open the page and run a flow
 
@@ -78,6 +79,16 @@ Read this before you guess; each wrong guess costs a rebuild.
   `<disk_dir>/clean`: a size string is written to `free` (the cleanup "frees" up to that value),
   `fail` prints a message and exits 1, and an empty or missing file does nothing. Set `clean` first,
   then `free`. Write each file to a temp file and `mv` it over, so the server never reads half a file.
+  `free` also takes `free/total` (`8G/500G`); the total defaults to `500G`.
+
+- **Fake CPU and memory.** Every scenario reads them from `<health_dir>/system`, space-separated
+  `key=value` pairs: `cpu=20` (percent busy, or `cpu=unavailable` for the unknown state), `mem=50`
+  (percent used), optional `total=16G` (memory size) and `pressure=none|normal|warn|critical`. It
+  starts at `cpu=20 mem=50 pressure=none`, so no scenario shows a warning unless a flow raises it.
+  The server rereads it about every 100ms; the 12-reading average settles in about a second. An
+  empty or malformed file is a failed read. Write it through a temp file and `mv`, as for the disk.
+  The `health` scenario is `disk-low` plus one queued epic whose first ticket is held running by
+  a fake agent, so `gx server queue pause` has a queue to pause.
 
 - **Fake worker outcome → ticket status.** The worker's behaviour is per ticket
   (`agentfake.Behaviour*`, set by a scenario's `behaviour`):

@@ -99,6 +99,17 @@ var scenarios = map[string]scenario{
 		}}},
 		diskLow: true,
 	},
+	// health: disk-low plus one fake agent held running on a queued epic, so the
+	// busy state can pause the queue and a process table has an agent to tie to.
+	"health": {
+		epics: []epic{{project, "health-epic", []ticket{
+			{"01", "held", servertest.TicketOpts{}},
+			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
+		}}},
+		queue:   []string{project + ":health-epic"},
+		hold:    true,
+		diskLow: true,
+	},
 	// mixed: tickets in several states, and a worker that asks and fails.
 	"mixed": {
 		epics: []epic{{project, "mixed-epic", []ticket{

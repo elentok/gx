@@ -275,13 +275,14 @@ func TestScenarios_StartAnswerAndStop(t *testing.T) {
 func TestShellEnv_ExportsTheCLIEnvAndTheFixtureVariablesQuoted(t *testing.T) {
 	o := Output{
 		WebURL: "http://127.0.0.1:1/?token=a b", StateDir: "/tmp/s", Socket: "/tmp/s.sock", HoldFile: "/tmp/h",
-		Gx: "/bin/gx", DiskDir: "/tmp/disk", Env: []string{"HOME=/tmp/it's/home", "XDG_DATA_HOME=/tmp/d"},
+		Gx: "/bin/gx", DiskDir: "/tmp/disk", HealthDir: "/tmp/health", Env: []string{"HOME=/tmp/it's/home", "XDG_DATA_HOME=/tmp/d"},
 	}
 	want := "export HOME='/tmp/it'\\''s/home'\n" +
 		"export XDG_DATA_HOME='/tmp/d'\n" +
 		"export GXF_WEB_URL='http://127.0.0.1:1/?token=a b'\n" +
 		"export GXF_GX='/bin/gx'\n" +
 		"export GXF_DISK_DIR='/tmp/disk'\n" +
+		"export GXF_HEALTH_DIR='/tmp/health'\n" +
 		"export GXF_HOLD_FILE='/tmp/h'\n" +
 		"export GXF_STATE_DIR='/tmp/s'\n" +
 		"export GXF_SOCKET='/tmp/s.sock'\n"

@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -189,9 +190,22 @@ func runServer(ctx context.Context, d deps) error {
 			return fmt.Errorf("GX_DISK_WATCH_INTERVAL: %w", err)
 		}
 	}
+	// Test hook: gxfixture reads CPU and memory from a control file and shortens the
+	// health read interval, so a flow can steer the Tray meters from outside the process.
+	var systemHealth syshealth.Reader
+	if v := os.Getenv("GX_HEALTH_FILE"); v != "" {
+		systemHealth = server.FileSystemHealth(v)
+	}
+	var healthPollInterval time.Duration
+	if v := os.Getenv("GX_HEALTH_INTERVAL"); v != "" {
+		if healthPollInterval, err = time.ParseDuration(v); err != nil {
+			return fmt.Errorf("GX_HEALTH_INTERVAL: %w", err)
+		}
+	}
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
-		AutoAdvanceDelay: autoAdvanceDelay, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env})
+		AutoAdvanceDelay: autoAdvanceDelay, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
+		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval})
 	if err != nil {
 		return err
 	}
