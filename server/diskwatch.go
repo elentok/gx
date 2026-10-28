@@ -124,6 +124,9 @@ func (s *Server) observe(r DiskReading, probe string, projects []string, now tim
 		// One rule ends every clean: the fresh reading decides the hold.
 		st.cleaning = false
 		st.lastClean = "freed " + humanize.Bytes(max(r.Free, st.cleanFree)-st.cleanFree)
+		if end.noWork {
+			st.lastClean = noCleanCommand
+		}
 		if end.failed != "" {
 			st.lastClean = "failed: " + end.failed
 		}

@@ -130,6 +130,9 @@ func TestDiskCleanNow_NoCleanupWorkOnlyReadsAgain(t *testing.T) {
 		t.Fatalf("result = %+v", res)
 	}
 	r.wantCalls(t, 0)
+	if body := r.waitClean(t, 2); !strings.Contains(body, "no cleanup command set") || strings.Contains(body, "freed") {
+		t.Errorf("notice = %s, want no cleanup command set", body)
+	}
 }
 
 // Story 41.

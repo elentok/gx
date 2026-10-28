@@ -58,9 +58,10 @@ func (s *Server) cleanNow(id string) CleanNowResult {
 	st.cleanFree = before
 	d.mu.Unlock()
 
-	failed := s.runCleanWork(s.cleanWork(projects))
-	r, held := s.endClean(id, probe, failed)
-	return CleanNowResult{FreedBytes: max(r.Free, before) - before, FreeBytes: r.Free, Held: held, Failure: failed}
+	work := s.cleanWork(projects)
+	end := cleanEnd{failed: s.runCleanWork(work), noWork: len(work) == 0}
+	r, held := s.endClean(id, probe, end)
+	return CleanNowResult{FreedBytes: max(r.Free, before) - before, FreeBytes: r.Free, Held: held, Failure: end.failed}
 }
 
 func (s *Server) diskCleanWrite(w http.ResponseWriter, r *http.Request) {

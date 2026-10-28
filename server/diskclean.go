@@ -34,8 +34,12 @@ type cleanCmd struct {
 func (c cleanCmd) String() string { return strings.Join(c.argv, " ") }
 
 // cleanEnd marks an observe call as the end of a clean. failed names the first
-// failed command; empty means every command succeeded.
-type cleanEnd struct{ failed string }
+// failed command; empty means every command succeeded. noWork means there was
+// no command to run.
+type cleanEnd struct {
+	failed string
+	noWork bool
+}
 
 // cleanWork is the distinct (argv, repo) pairs of every project that watches
 // the disk and has a cleanup command, in a stable order. It reads the settings
@@ -80,7 +84,7 @@ func (s *Server) startClean(id, probe string, projects []string) {
 	}
 	s.events.publish(EventDiskWarnChanged, "")
 	s.goSettle(func() {
-		s.endClean(id, probe, s.runCleanWork(work))
+		s.endClean(id, probe, cleanEnd{failed: s.runCleanWork(work)})
 	})
 }
 
@@ -145,7 +149,7 @@ func RunCleanupCommand(ctx context.Context, argv []string, dir string) ([]byte, 
 
 // endClean ends every clean: it reads the disk again and lets observe set the
 // hold from that reading. It returns that reading and whether the disk is held.
-func (s *Server) endClean(id, probe, failed string) (DiskReading, bool) {
+func (s *Server) endClean(id, probe string, end cleanEnd) (DiskReading, bool) {
 	r, err := s.freeSpace(probe)
 	if err != nil {
 		s.log.Warn("read free space", "path", probe, "err", err)
@@ -154,7 +158,7 @@ func (s *Server) endClean(id, probe, failed string) (DiskReading, bool) {
 		r = d.disks[id].reading
 		d.mu.Unlock()
 	}
-	return r, s.observe(r, probe, nil, time.Now(), &cleanEnd{failed: failed})
+	return r, s.observe(r, probe, nil, time.Now(), &end)
 }
 
 // sendCleanNotice sends the one notice of a clean.
