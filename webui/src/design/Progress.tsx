@@ -5,7 +5,7 @@ import { idOf, isCancelled, isFolded } from "../epic/rows";
 import type { EpicDetailRow, MapStep } from "../generated/server";
 import { epicHref, ticketHref } from "../hrefs";
 import { Button } from "../ui/button/Button";
-import { Modal } from "../ui/modal/Modal";
+import { BottomSheet } from "../ui/modal/BottomSheet";
 import type { Tone } from "../ui/tone";
 
 // The generated file is imported for types only: its tygo constants are not runtime values.
@@ -146,18 +146,7 @@ export function StepLine({ detail, onOpen }: { detail: EpicDetail; onOpen: () =>
 /** The phone's bottom sheet with the step tree. `ring` is a small ProgressRing. */
 export function StepsSheet({ detail, ring, onClose }: { detail: EpicDetail; ring: ReactNode; onClose: () => void }) {
   return (
-    <Modal
-      label="Design progress steps"
-      onClose={onClose}
-      backdrop={{ alignItems: "flex-end", p: "0" }}
-      bg="surface.raised"
-      borderTopRadius="xl"
-      borderBottomRadius="0"
-      w="full"
-      maxH="80%"
-      overflow="auto"
-    >
-      <Box aria-hidden data-testid="grab-handle" alignSelf="center" w="36px" h="4px" borderRadius="full" bg="border" flexShrink="0" />
+    <BottomSheet label="Design progress steps" onClose={onClose} bg="surface.raised">
       <Box display="flex" alignItems="center" gap="2">
         {ring}
         <Text fontWeight="700" flex="1">
@@ -168,7 +157,7 @@ export function StepsSheet({ detail, ring, onClose }: { detail: EpicDetail; ring
         </Button>
       </Box>
       <Steps steps={stepsOf(detail)} rows={detail.rows} />
-    </Modal>
+    </BottomSheet>
   );
 }
 

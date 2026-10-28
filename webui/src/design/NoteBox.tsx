@@ -1,11 +1,8 @@
 import { Box, chakra, Text, Textarea } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button/Button";
-import { Modal } from "../ui/modal/Modal";
+import { BottomSheet } from "../ui/modal/BottomSheet";
 import { useWide } from "../useWide";
-import { useVisualViewportHeight } from "./useVisualViewportHeight";
-
-const TOP_BAR = 48;
 
 const field = {
   fontSize: "16px",
@@ -41,8 +38,6 @@ export function NoteBox({
   const [editing, setEditing] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const sheetMode = !useWide();
-  // The editor covers the visual viewport, so iOS's on-screen keyboard does not hide its bottom.
-  const viewport = useVisualViewportHeight(sheetMode ? TOP_BAR : 0);
   useEffect(() => {
     box.current?.scrollIntoView?.({ block: "nearest" });
   }, []);
@@ -87,20 +82,15 @@ export function NoteBox({
         </svg>
       </chakra.button>
       {editing && (
-        <Modal
+        <BottomSheet
           label={title}
           onClose={() => setEditing(false)}
-          backdrop={{
-            inset: undefined,
-            ...viewport.overlay,
-            ...(sheetMode && { p: "2", alignItems: "stretch" }),
-          }}
+          belowTopBar
+          fillViewport
+          desktop={{ borderRadius: "12px", w: "860px", h: "680px", p: "5" }}
           bg="surface.raised"
           borderColor="border"
-          borderRadius="12px"
-          w={sheetMode ? "full" : "860px"}
-          h={sheetMode ? "full" : "680px"}
-          p={sheetMode ? "4" : "5"}
+          p="4"
           gap="3"
         >
           <Box display="flex" alignItems="center" gap="2">
@@ -142,7 +132,7 @@ export function NoteBox({
             </Text>
             <Button onClick={() => setEditing(false)}>Done</Button>
           </Box>
-        </Modal>
+        </BottomSheet>
       )}
     </Box>
   );

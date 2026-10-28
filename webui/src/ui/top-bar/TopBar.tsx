@@ -1,8 +1,10 @@
 import { Box, chakra, Menu, Text } from "@chakra-ui/react";
+import { useEffect, useRef } from "react";
 import { STATS_HREF } from "../../hrefs";
 import type { QueueMode } from "../../snapshot";
 import { Chip } from "../chip/Chip";
 import { LiveDot } from "../live-dot/LiveDot";
+import { TOP_BAR_HEIGHT_VAR } from "../modal/useVisualViewportHeight";
 import type { Tone } from "../tone";
 
 export type TopBarTab = "epics" | "stats";
@@ -29,8 +31,23 @@ interface Props {
 // Plain anchors, not router links, so the gallery can render it without a router.
 export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, afk = false, onToggleAfk }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
+  const nav = useRef<HTMLElement>(null);
+  // Sheets that sit below the bar read its real height from the root.
+  useEffect(() => {
+    const el = nav.current;
+    if (!el) return;
+    const publish = () => document.documentElement.style.setProperty(TOP_BAR_HEIGHT_VAR, `${el.offsetHeight}px`);
+    publish();
+    if (typeof ResizeObserver === "undefined") return () => document.documentElement.style.removeProperty(TOP_BAR_HEIGHT_VAR);
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty(TOP_BAR_HEIGHT_VAR);
+    };
+  }, []);
   return (
-    <Box as="nav" display="flex" alignItems="center" justifyContent="space-between" mb="4">
+    <Box as="nav" ref={nav} display="flex" alignItems="center" justifyContent="space-between" mb="4">
       <Box display="flex" gap="5">
         {TABS.map(({ key, label, href }) => (
           <chakra.a

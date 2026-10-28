@@ -1,10 +1,9 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react";
 import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Button } from "../ui/button/Button";
-import { Modal } from "../ui/modal/Modal";
+import { BottomSheet } from "../ui/modal/BottomSheet";
 import { postOpenDesign, type OpenDesign } from "./open";
 import { useDesignWrite } from "./SessionControls";
-import { useVisualViewportHeight } from "./useVisualViewportHeight";
 import { useWide } from "../useWide";
 
 export interface NewDesignDraft {
@@ -71,7 +70,6 @@ export function NewDesignForm({
   onClose: () => void;
 }) {
   const sheetMode = !useWide();
-  const viewport = useVisualViewportHeight();
   const [draft, setDraft] = useState(() => {
     const saved = readDraft();
     return { slug: saved.slug ?? "", idea: saved.idea ?? "", project: startingProject(saved, projects, filterProject) };
@@ -115,24 +113,20 @@ export function NewDesignForm({
   };
 
   return (
-    <Modal
+    <BottomSheet
       label="New Design"
       onClose={onClose}
-      backdrop={sheetMode ? { inset: undefined, ...viewport.overlay, alignItems: "flex-end", p: "0" } : undefined}
+      fillViewport
+      desktop={{ borderRadius: "lg", w: "720px", h: "520px" }}
       ref={sheet}
       as="form"
       onSubmit={submit}
       onKeyDown={keyDown}
       bg="surface.raised"
-      borderTopRadius={sheetMode ? "xl" : "lg"}
-      borderBottomRadius={sheetMode ? "0" : "lg"}
-      w={sheetMode ? "full" : "720px"}
-      h={sheetMode ? viewport.sheetHeight : "520px"}
       p="0"
       gap="0"
       overflow="hidden"
     >
-      {sheetMode && <Box aria-hidden data-testid="grab-handle" alignSelf="center" w="36px" h="4px" mt="2" borderRadius="full" bg="border" flexShrink="0" />}
       <Box display="flex" alignItems="center" gap="2" p="3" borderBottomWidth="1px" borderColor="border" flexShrink="0">
         {projects.length > 1 && (
           <>
@@ -233,6 +227,6 @@ export function NewDesignForm({
           </>
         )}
       </Box>
-    </Modal>
+    </BottomSheet>
   );
 }

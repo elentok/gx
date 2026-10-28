@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { useConnectionContext } from "../connection";
 import type { DesignOpenRequest, SessionInfo } from "../generated/server";
 import { Button } from "../ui/button/Button";
+import { GrabHandle, sheetPanel } from "../ui/modal/BottomSheet";
 import { useWide } from "../useWide";
 import { useWrite } from "../useWrite";
 import {
@@ -95,6 +96,129 @@ function MenuFrame({ sheet, children }: { sheet: boolean; children: ReactNode })
   );
 }
 
+const menuItemStyle = (sheetMode: boolean) =>
+  ({
+    cursor: "pointer",
+    color: "text",
+    ps: "3",
+    _highlighted: { bg: "surface" },
+    fontWeight: "600",
+    fontSize: "17px",
+    ...(sheetMode && { py: "3", minH: "44px" }),
+  }) as const;
+type MenuItemStyle = ReturnType<typeof menuItemStyle>;
+
+/** The live sessions: pick one to show it, or stop one that is not shown. */
+function LiveSessionRows({
+  item,
+  live,
+  shown,
+  pending,
+  onSelect,
+  onStop,
+}: {
+  item: MenuItemStyle;
+  live: SessionInfo[];
+  shown: SessionInfo;
+  pending: boolean;
+  onSelect: (id: string) => void;
+  onStop: (s: SessionInfo) => void;
+}) {
+  return (
+    <>
+      <Text px="3" pt="2" mt="1" borderTopWidth="1px" borderColor="border" fontSize="xs" letterSpacing="wider" textTransform="uppercase" color="text.muted">
+        Live sessions · {live.length}
+      </Text>
+      {live.map((s) => (
+        <Box
+          key={s.id}
+          display="flex"
+          alignItems="center"
+          justifyContent="space-between"
+          w="full"
+          gap="2"
+          pe="2"
+          borderRadius="md"
+          bg={s.id === shown.id ? "surface" : undefined}
+        >
+          <Menu.Item
+            value={`session-${s.id}`}
+            aria-current={s.id === shown.id}
+            onClick={() => onSelect(s.id)}
+            flex="1"
+            w="auto"
+            minW="0"
+            justifyContent="space-between"
+            {...item}
+          >
+            <Text as="span" truncate fontSize="13px" fontWeight="600">
+              {s.name || s.id}
+            </Text>
+            {s.id === shown.id && <Text as="span" aria-hidden color="tone.running.fg">✓</Text>}
+          </Menu.Item>
+          {s.id !== shown.id && (
+            <Menu.Item
+              value={`stop-${s.id}`}
+              closeOnSelect={false}
+              aria-label={`Stop ${s.name || s.id}`}
+              disabled={pending}
+              onClick={() => onStop(s)}
+              cursor="pointer"
+              flex="none"
+              w="auto"
+              minH="32px"
+              px="2.5"
+              borderWidth="1px"
+              borderColor="tone.deadlocked.fg"
+              borderRadius="md"
+              fontSize="13px"
+              fontWeight="600"
+              color="tone.deadlocked.fg"
+            >
+              {pending && <Spinner size="sm" />}
+              Stop
+            </Menu.Item>
+          )}
+        </Box>
+      ))}
+    </>
+  );
+}
+
+/** "Delete design", which asks to confirm in place before it deletes. */
+function DeleteRow({
+  item,
+  pending,
+  confirming,
+  setConfirming,
+  onDelete,
+}: {
+  item: MenuItemStyle;
+  pending: boolean;
+  confirming: boolean;
+  setConfirming: (confirming: boolean) => void;
+  onDelete: () => void;
+}) {
+  if (!confirming)
+    return (
+      <Menu.Item value="delete-design" closeOnSelect={false} onClick={() => setConfirming(true)} {...item} color="tone.paused.fg">
+        Delete design
+      </Menu.Item>
+    );
+  return (
+    <Box display="flex" alignItems="center" gap="2" px="3" py="1.5">
+      <Text fontSize="sm">Delete this design?</Text>
+      <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => setConfirming(false)}>
+        Keep
+      </Button>
+      <Button size="sm" tone="paused" disabled={pending} onClick={onDelete}>
+        {pending && <Spinner size="sm" />}
+        Delete
+      </Button>
+    </Box>
+  );
+}
+
 /**
  * The header's "⋯" menu: New session, the live sessions (with 2 or more), and Delete design while it
  * can run. Renders nothing when none of them applies.
@@ -128,15 +252,7 @@ export function DesignActionsMenu({
   const canDelete = deletable && live.length === 0;
   if (!shown && !canDelete) return null;
 
-  const item = {
-    cursor: "pointer",
-    color: "text",
-    ps: "3",
-    _highlighted: { bg: "surface" },
-    fontWeight: "600",
-    fontSize: "17px",
-    ...(sheetMode && { py: "3", minH: "44px" }),
-  } as const;
+  const item = menuItemStyle(sheetMode);
   return (
     <Menu.Root
       lazyMount
@@ -170,9 +286,9 @@ export function DesignActionsMenu({
           borderWidth="1px"
           borderColor="border"
           minW={sheetMode ? "64" : "340px"}
-          {...(sheetMode && { w: "full", borderTopRadius: "xl", borderBottomRadius: "0", pb: "6" })}
+          {...(sheetMode && { ...sheetPanel, pb: "6" })}
         >
-          {sheetMode && <Box aria-hidden data-testid="grab-handle" alignSelf="center" w="36px" h="4px" my="2" borderRadius="full" bg="border" flexShrink="0" />}
+          {sheetMode && <GrabHandle my="2" />}
           {shown && (
             <Menu.Item
               value="new-session"
@@ -189,81 +305,24 @@ export function DesignActionsMenu({
             </Menu.Item>
           )}
           {shown && live.length > 1 && (
-            <>
-              <Text px="3" pt="2" mt="1" borderTopWidth="1px" borderColor="border" fontSize="xs" letterSpacing="wider" textTransform="uppercase" color="text.muted">
-                Live sessions · {live.length}
-              </Text>
-              {live.map((s) => (
-                <Box
-                  key={s.id}
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  w="full"
-                  gap="2"
-                  pe="2"
-                  borderRadius="md"
-                  bg={s.id === shown.id ? "surface" : undefined}
-                >
-                  <Menu.Item
-                    value={`session-${s.id}`}
-                    aria-current={s.id === shown.id}
-                    onClick={() => onSelect(s.id)}
-                    flex="1"
-                    w="auto"
-                    minW="0"
-                    justifyContent="space-between"
-                    {...item}
-                  >
-                    <Text as="span" truncate fontSize="13px" fontWeight="600">
-                      {s.name || s.id}
-                    </Text>
-                    {s.id === shown.id && <Text as="span" aria-hidden color="tone.running.fg">✓</Text>}
-                  </Menu.Item>
-                  {s.id !== shown.id && (
-                    <Menu.Item
-                      value={`stop-${s.id}`}
-                      closeOnSelect={false}
-                      aria-label={`Stop ${s.name || s.id}`}
-                      disabled={pending}
-                      onClick={() => run(() => stop({ id: s.id, state: stateToken(s) }))}
-                      cursor="pointer"
-                      flex="none"
-                      w="auto"
-                      minH="32px"
-                      px="2.5"
-                      borderWidth="1px"
-                      borderColor="tone.deadlocked.fg"
-                      borderRadius="md"
-                      fontSize="13px"
-                      fontWeight="600"
-                      color="tone.deadlocked.fg"
-                    >
-                      {pending && <Spinner size="sm" />}
-                      Stop
-                    </Menu.Item>
-                  )}
-                </Box>
-              ))}
-            </>
+            <LiveSessionRows
+              item={item}
+              live={live}
+              shown={shown}
+              pending={pending}
+              onSelect={onSelect}
+              onStop={(s) => run(() => stop({ id: s.id, state: stateToken(s) }))}
+            />
           )}
-          {canDelete &&
-            (confirming ? (
-              <Box display="flex" alignItems="center" gap="2" px="3" py="1.5">
-                <Text fontSize="sm">Delete this design?</Text>
-                <Button size="sm" emphasis="secondary" disabled={pending} onClick={() => setConfirming(false)}>
-                  Keep
-                </Button>
-                <Button size="sm" tone="paused" disabled={pending} onClick={() => run(() => remove({ epic: address }), { onDone: onDeleted })}>
-                  {pending && <Spinner size="sm" />}
-                  Delete
-                </Button>
-              </Box>
-            ) : (
-              <Menu.Item value="delete-design" closeOnSelect={false} onClick={() => setConfirming(true)} {...item} color="tone.paused.fg">
-                Delete design
-              </Menu.Item>
-            ))}
+          {canDelete && (
+            <DeleteRow
+              item={item}
+              pending={pending}
+              confirming={confirming}
+              setConfirming={setConfirming}
+              onDelete={() => run(() => remove({ epic: address }), { onDone: onDeleted })}
+            />
+          )}
         </Menu.Content>
       </MenuFrame>
     </Menu.Root>

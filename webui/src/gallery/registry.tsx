@@ -19,6 +19,7 @@ import { DayChart } from "../ui/day-chart/DayChart";
 import { LineChart } from "../ui/day-chart/LineChart";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { LiveDot } from "../ui/live-dot/LiveDot";
+import { BottomSheet } from "../ui/modal/BottomSheet";
 import { Modal } from "../ui/modal/Modal";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
@@ -438,13 +439,33 @@ export const galleryEntries: GalleryEntry[] = [
           </Modal>
         </ModalFrame>
       )),
+    ],
+  },
+  {
+    name: "BottomSheet",
+    // A bottom sheet on a phone and a centered dialog on a wide screen; the tone cases show it holding a button in that tone.
+    cases: [
+      ...perTone((tone) => (
+        <WideContext.Provider value={false}>
+          <ModalFrame h="200px" w="400px">
+            <BottomSheet label={tone} onClose={() => {}}>
+              <Text>{ticket.title}</Text>
+              <Box display="flex" justifyContent="flex-end">
+                <Button emphasis="main" tone={tone}>
+                  {tone}
+                </Button>
+              </Box>
+            </BottomSheet>
+          </ModalFrame>
+        </WideContext.Provider>
+      )),
       {
-        label: "bottom sheet",
+        label: "wide",
         node: (
           <ModalFrame h="200px" w="400px">
-            <Modal label="bottom sheet" onClose={() => {}} backdrop={{ alignItems: "flex-end", p: "0" }} w="full" borderTopRadius="xl" borderBottomRadius="0">
+            <BottomSheet label="wide" onClose={() => {}}>
               <Text>{ticket.title}</Text>
-            </Modal>
+            </BottomSheet>
           </ModalFrame>
         ),
       },
