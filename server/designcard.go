@@ -58,30 +58,24 @@ func decorateDesignCard(row *EpicListRow, m tickets.Epic, impl *EpicListRow, act
 	}
 	switch {
 	case impl != nil && reachedBranch(row.ProgressStep):
+		// The impl epic's time pair carries over; joinImplementation resets it on a question.
 		joinImplementation(row, impl, act)
+		return
 	case row.ProgressStep == ProgressDone:
 		row.Section = SectionFinished
 		row.StatusWords = "Designed"
 		row.RingProgress = designPercent(m, row.ProgressStep)
-		row.setTime(CardTimeFinished, row.CompletedAt)
 	default:
 		row.RingProgress = designPercent(m, row.ProgressStep)
 		fallback := cmp.Or(lastActivity(m), m.CreatedAt)
 		placeDesign(row.Address, act, mapNotStarted(m, row.ProgressStep), fallback).applyTo(row)
-		switch row.Section {
-		case SectionReadyToDesign:
-			row.setTime(CardTimeCreated, m.CreatedAt)
-		case SectionNeedsYou:
-			row.setTime(CardTimeWaiting, row.WaitingSince)
-		default:
-			row.setTime(CardTimeElapsed, m.DesignStartedAt)
-		}
 		if row.ProgressStep == ProgressCreateTickets && impl != nil && row.StatusWords == "Designing" {
 			// The ring has no fraction to show yet; the client draws its placeholder.
 			row.RingProgress = 0
 			row.StatusWords = fmt.Sprintf("Creating tickets (%d so far)...", impl.Total)
 		}
 	}
+	row.setCardTime(cardTimeSources{startedAt: m.DesignStartedAt})
 }
 
 // joinImplementation turns a map row into the Implementation card of the joined
@@ -105,7 +99,7 @@ func joinImplementation(row *EpicListRow, impl *EpicListRow, act designActivity)
 	if p := placeDesign(m.Address, act, false, act.askedAt); p.pill == PillQuestion {
 		row.Section, row.StatePill, row.Reason = SectionNeedsYou, p.pill, p.reason
 		row.WaitingSince, row.Actions = p.waitingSince, p.actions
-		row.setTime(CardTimeWaiting, row.WaitingSince)
+		row.setCardTime(cardTimeSources{})
 		row.Addresses = []string{m.Address, impl.Address}
 	}
 }

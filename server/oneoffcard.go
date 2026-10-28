@@ -13,7 +13,7 @@ import (
 
 // oneOffCards lists the cards of e's one-off tickets, none when e holds none. A
 // done or archived one-off gets a Finished card; capFinishedOneOffs trims those.
-func (s *Server) oneOffCards(project string, e tickets.Epic) []EpicListRow {
+func (s *Server) oneOffCards(project string, e tickets.Epic, queue queueIndex) []EpicListRow {
 	if !IsOneOffEpic(e) {
 		return nil
 	}
@@ -21,7 +21,7 @@ func (s *Server) oneOffCards(project string, e tickets.Epic) []EpicListRow {
 	for _, f := range finishedOneOffs(project, e) {
 		row := oneOffRow(f.Address, f.Name, project)
 		row.State, row.Section, row.CompletedAt = EpicListFinished, SectionFinished, f.CompletedAt
-		row.setTime(CardTimeFinished, finishedAt(row))
+		row.setCardTime(cardTimeSources{})
 		rows = append(rows, row)
 	}
 	if filepath.Base(e.Path) == OneOffsArchivedEpic {
@@ -35,17 +35,15 @@ func (s *Server) oneOffCards(project string, e tickets.Epic) []EpicListRow {
 			row.State, row.Section = EpicListPaused, SectionNeedsYou
 			row.StatePill, row.Reason, row.Actions = n.Pill, n.Reason, []CardAction{n.Action}
 			row.WaitingSince = cmp.Or(n.Since, t.ClaimedAt, lastActivity(e))
-			row.setTime(CardTimeWaiting, row.WaitingSince)
 		} else if e.RenderedStatus(t) == tickets.StatusClaimed {
 			row.State, row.Section = EpicListRunning, SectionInProgress
-			row.setTime(CardTimeElapsed, t.ClaimedAt)
-		} else if slot := s.queueSlot(addr.String()); slot > 0 {
+		} else if slot := queue.slot(addr.String()); slot > 0 {
 			row.State, row.Section = EpicListQueued, SectionInProgress
 			row.QueueSlot, row.StatusWords = slot, fmt.Sprintf("Queued #%d", slot)
-			row.setTime(CardTimeElapsed, s.enqueuedAt(addr.String()))
 		} else {
 			continue
 		}
+		row.setCardTime(cardTimeSources{startedAt: t.ClaimedAt, enqueuedAt: queue.enqueuedAt(addr.String())})
 		rows = append(rows, row)
 	}
 	return rows

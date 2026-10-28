@@ -183,6 +183,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 	}
 	list := EpicList{Epics: []EpicListRow{}, FollowUps: []FollowUpCount{}}
 	designs := s.designActivities()
+	queue := s.newQueueIndex()
 	for _, dir := range dirs {
 		project := tickets.ProjectName(dir)
 		epics, err := s.projectEpics(project)
@@ -196,7 +197,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 				}
 			}
 		}
-		list.Epics = append(list.Epics, s.projectCards(project, epics, designs)...)
+		list.Epics = append(list.Epics, s.projectCards(project, epics, designs, queue)...)
 	}
 	list.RecentlyFinished = s.settings.Load().RecentlyFinished
 	list.Epics = capFinishedOneOffs(list.Epics, list.RecentlyFinished)
@@ -207,7 +208,7 @@ func (s *Server) epicList(w http.ResponseWriter, _ *http.Request) {
 // projectCards builds one project's cards: follow-ups, one-offs, loop and map
 // epics, then pending Design cards. A listed map's card shows its -impl epic,
 // so that epic gets no row of its own.
-func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity) []EpicListRow {
+func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[string]designActivity, queue queueIndex) []EpicListRow {
 	merged := map[string]bool{}
 	byName := map[string]tickets.Epic{}
 	for _, e := range epics {
@@ -234,19 +235,19 @@ func (s *Server) projectCards(project string, epics []tickets.Epic, designs map[
 		}
 	}
 	for _, e := range epics {
-		rows = append(rows, s.oneOffCards(project, e)...)
+		rows = append(rows, s.oneOffCards(project, e, queue)...)
 	}
 	for _, e := range epics {
 		if !epicListed(e) || isJoinedImpl(e) {
 			continue
 		}
-		row := s.epicListRow(project, e)
+		row := s.epicListRow(project, e, queue)
 		row.BlockedByEpics = unmergedBlockers(project, e, merged)
 		if e.IsMap {
 			row.ProgressStep = mapProgress(e)
 			var impl *EpicListRow
 			if implEpic, ok := joined[e.Name]; ok {
-				r := s.epicListRow(project, implEpic)
+				r := s.epicListRow(project, implEpic, queue)
 				impl = &r
 			}
 			decorateDesignCard(&row, e, impl, designs[row.Address])
@@ -296,7 +297,7 @@ func lastActivity(e tickets.Epic) time.Time {
 	return newest
 }
 
-func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
+func (s *Server) epicListRow(project string, e tickets.Epic, queue queueIndex) EpicListRow {
 	root := rootRef{Project: project, Epic: e.Name}
 	queued := s.rootQueued(root)
 	queueable := epicQueueable(e, queued)
@@ -316,13 +317,13 @@ func (s *Server) epicListRow(project string, e tickets.Epic) EpicListRow {
 		row.MergeBlockKind, row.MergeBlockReason = e.MergeBlockKind, e.MergeBlockReason
 	}
 	if !e.IsMap {
-		row.QueueSlot = s.rootQueuePosition(root)
+		row.QueueSlot = queue.slot(root.String())
 		decorateLoopCard(&row, row.QueueSlot)
 		if n, ok := s.loopNeedsYou(root, e, row.State); ok {
 			row.Section, row.StatePill, row.Reason, row.WaitingSince = SectionNeedsYou, n.Pill, n.Reason, n.Since
 			row.Actions = append([]CardAction{n.Action}, n.More...)
 		}
-		setLoopCardTime(&row, e.StartedAt, s.enqueuedAt(root.String()))
+		row.setCardTime(cardTimeSources{startedAt: e.StartedAt, enqueuedAt: queue.enqueuedAt(root.String())})
 	}
 	return row
 }

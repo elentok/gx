@@ -129,45 +129,39 @@ func queueKey(a tickets.Address) string {
 	return rootOf(a).String()
 }
 
-// queueSlot is the 1-based slot of key among the queue's slots, or 0 when the
-// queue holds none. An epic's tickets share one slot; each one-off ticket has its own.
-func (s *Server) queueSlot(key string) int {
-	var seen []string
+// queueIndex maps queue keys (see queueKey) to their slot and earliest enqueue
+// time. It is built once per /v1/epics request, not per card.
+type queueIndex struct {
+	slots    map[string]int
+	enqueued map[string]time.Time
+}
+
+// newQueueIndex indexes the queue. A slot is 1-based, in queue order; an epic's
+// tickets share one slot and each one-off ticket has its own. A key whose items
+// have no enqueue time has no entry in enqueued.
+func (s *Server) newQueueIndex() queueIndex {
+	idx := queueIndex{slots: map[string]int{}, enqueued: map[string]time.Time{}}
 	for _, it := range s.queued.list() {
 		a, err := parseQueuedAddress(it.Address)
 		if err != nil {
 			continue
 		}
 		k := queueKey(a)
-		if !slices.Contains(seen, k) {
-			seen = append(seen, k)
+		if _, ok := idx.slots[k]; !ok {
+			idx.slots[k] = len(idx.slots) + 1
 		}
-		if k == key {
-			return len(seen)
-		}
-	}
-	return 0
-}
-
-// rootQueuePosition is the 1-based slot of root among the queued epics, in queue
-// order, or 0 when the queue holds none of its tickets.
-func (s *Server) rootQueuePosition(root rootRef) int { return s.queueSlot(root.String()) }
-
-// enqueuedAt is the earliest enqueue time among the queue items whose key (see
-// queueKey) is key; zero when none has one.
-func (s *Server) enqueuedAt(key string) time.Time {
-	var earliest time.Time
-	for _, it := range s.queued.list() {
-		a, err := parseQueuedAddress(it.Address)
-		if err != nil || queueKey(a) != key || it.EnqueuedAt.IsZero() {
-			continue
-		}
-		if earliest.IsZero() || it.EnqueuedAt.Before(earliest) {
-			earliest = it.EnqueuedAt
+		if at := idx.enqueued[k]; !it.EnqueuedAt.IsZero() && (at.IsZero() || it.EnqueuedAt.Before(at)) {
+			idx.enqueued[k] = it.EnqueuedAt
 		}
 	}
-	return earliest
+	return idx
 }
+
+// slot is the 1-based slot of key, or 0 when the queue holds none of its items.
+func (q queueIndex) slot(key string) int { return q.slots[key] }
+
+// enqueuedAt is the earliest enqueue time among key's items; zero when none has one.
+func (q queueIndex) enqueuedAt(key string) time.Time { return q.enqueued[key] }
 
 // CardTimeKind says what the card's start time measures; the client words it.
 type CardTimeKind string
@@ -180,32 +174,42 @@ const (
 	CardTimeFinished CardTimeKind = "finished"
 )
 
-// setTime sets the card's time pair; a zero start leaves the card without one.
-func (r *EpicListRow) setTime(kind CardTimeKind, start time.Time) {
-	if start.IsZero() {
-		r.TimeKind, r.TimeStart = "", time.Time{}
-		return
-	}
-	r.TimeKind, r.TimeStart = kind, start
+// cardTimeSources are the times a card's time pair draws on beyond the row itself.
+type cardTimeSources struct {
+	// startedAt is when the card's work began: the epic's started_at, a Design's
+	// design start or a one-off's claim.
+	startedAt time.Time
+	// enqueuedAt is the earliest enqueue time of the card's queue items.
+	enqueuedAt time.Time
 }
 
-// setLoopCardTime sets the time pair of a loop epic row from its section.
-// startedAt is the epic's started_at; enqueuedAt its earliest queue item time.
-func setLoopCardTime(row *EpicListRow, startedAt, enqueuedAt time.Time) {
+// cardTimeFor maps the row's section to the card's time pair; a section without
+// one, or a zero start, gives none. Call it once, after the row's section is final.
+func cardTimeFor(row EpicListRow, src cardTimeSources) (CardTimeKind, time.Time) {
+	var kind CardTimeKind
+	var start time.Time
 	switch row.Section {
 	case SectionNeedsYou:
-		row.setTime(CardTimeWaiting, row.WaitingSince)
+		kind, start = CardTimeWaiting, row.WaitingSince
 	case SectionInProgress:
+		kind, start = CardTimeElapsed, src.startedAt
 		if row.State == EpicListQueued {
-			row.setTime(CardTimeElapsed, cmp.Or(enqueuedAt, row.QueuedAt))
-		} else {
-			row.setTime(CardTimeElapsed, startedAt)
+			start = cmp.Or(src.enqueuedAt, row.QueuedAt)
 		}
 	case SectionReadyToQueue, SectionReadyToDesign:
-		row.setTime(CardTimeCreated, row.CreatedAt)
+		kind, start = CardTimeCreated, row.CreatedAt
 	case SectionFinished:
-		row.setTime(CardTimeFinished, finishedAt(*row))
+		kind, start = CardTimeFinished, finishedAt(row)
 	}
+	if start.IsZero() {
+		return "", time.Time{}
+	}
+	return kind, start
+}
+
+// setCardTime sets the row's time pair from cardTimeFor.
+func (r *EpicListRow) setCardTime(src cardTimeSources) {
+	r.TimeKind, r.TimeStart = cardTimeFor(*r, src)
 }
 
 // inProgressRank orders In progress: running, then queued, then the rest, then
