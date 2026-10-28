@@ -214,26 +214,37 @@ func (s *Server) pendingRows() []PendingRow {
 		}
 	}
 	for _, item := range items {
-		addr, err := parseQueuedAddress(item.Address)
-		if err != nil {
+		target, ok := s.queuedTarget(item, covered, epicsOf)
+		if !ok {
 			continue
 		}
-		address := item.Address
-		if addr.ID == "" {
-			next, ok := s.nextQueuedTicket(addr, epicsOf)
-			if !ok || covered[next.String()] {
-				continue
-			}
-			addr, address = next, next.String()
-			covered[address] = true
-		}
-		ex, err := s.explainQueued(addr, epicsOf)
+		ex, err := s.explainQueued(target, epicsOf)
 		if err != nil {
 			ex = Explanation{Verdict: "error", Reason: err.Error()}
 		}
-		rows = append(rows, PendingRow{Address: address, Agent: item.Agent, Verdict: ex.Verdict, Reason: ex.Reason})
+		rows = append(rows, PendingRow{Address: target.String(), Agent: item.Agent, Verdict: ex.Verdict, Reason: ex.Reason})
 	}
 	return rows
+}
+
+// queuedTarget is the ticket a queue entry gets a row for: the ticket itself,
+// or the next ticket of a whole-epic entry. It is false for an unparseable
+// entry and for an epic entry whose next ticket is unknown or already covered;
+// a chosen epic ticket is marked covered.
+func (s *Server) queuedTarget(item QueueItem, covered map[string]bool, epicsOf func(project string) ([]tickets.Epic, error)) (tickets.Address, bool) {
+	addr, err := parseQueuedAddress(item.Address)
+	if err != nil {
+		return tickets.Address{}, false
+	}
+	if addr.ID != "" {
+		return addr, true
+	}
+	next, ok := s.nextQueuedTicket(addr, epicsOf)
+	if !ok || covered[next.String()] {
+		return tickets.Address{}, false
+	}
+	covered[next.String()] = true
+	return next, true
 }
 
 // nextQueuedTicket is the ticket a whole-epic queue entry would start next, if
