@@ -16,6 +16,7 @@ interface FixtureOutput {
   gx: string;
   hold_file: string;
   disk_dir: string;
+  health_dir: string;
 }
 
 export interface Fixture {
@@ -29,6 +30,8 @@ export interface Fixture {
   setDiskFree(size: string): Promise<void>;
   /** Sets what the next cleanup does: a size string frees to it, `fail` fails, empty does nothing. Set it before free. */
   setDiskClean(behaviour: string): Promise<void>;
+  /** Sets the fake CPU and memory the server reads, space-separated pairs such as `cpu=75 mem=85`. */
+  setHealth(values: string): Promise<void>;
 }
 
 // A rename keeps the server from reading a half-written control file.
@@ -85,6 +88,7 @@ async function startFixture(
     },
     setDiskFree: (size) => writeControl(out.disk_dir, "free", size),
     setDiskClean: (behaviour) => writeControl(out.disk_dir, "clean", behaviour),
+    setHealth: (values) => writeControl(out.health_dir, "system", values),
   };
   // The first visit trades the token in web_url for the web cookie.
   await page.goto(out.web_url);

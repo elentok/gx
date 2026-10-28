@@ -852,3 +852,18 @@ an exited session.
 - **Pass:**
   - Each kind row stacks: the field sits below its label.
   - The dialog is no wider than the viewport and the page has no horizontal scroll.
+
+## 79. Tray states
+
+- **Scenario:** `health`
+- **Steps:**
+  1. Set free space to `450G/500G`. On the Epics page, the `health-epic` page and its ticket 01 page, set CPU and memory to `cpu=10 mem=10`, `cpu=75 mem=85`, `cpu=95 mem=95`, then `cpu=unavailable mem=10`. Wait for the meters after each set.
+  2. Repeat at 1100px and at 390px wide. Never reload.
+- **Pass:** the C and M meters read normal, high, critical, then unknown, with fills of 3px, 12px (CPU) or 15px (memory), 15px, then no fill. D stays normal. The same holds on all three pages at both widths.
+- **Note:** the fixture fails the whole reading when CPU is unavailable, so memory goes unknown too.
+
+## 80. Held disk in the popover
+
+- **Scenario:** `health`
+- **Steps:** set free to `5G`, click the Tray, read the disk entry in the "System health" dialog.
+- **Pass:** the D meter is critical. The disk entry is critical, says dispatch is held and points to "Clean now".
