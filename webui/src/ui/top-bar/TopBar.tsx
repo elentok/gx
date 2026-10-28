@@ -1,11 +1,13 @@
 import { Box, chakra, Menu, Text } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
+import type { Health } from "../../generated/server";
 import { STATS_HREF } from "../../hrefs";
 import type { QueueMode } from "../../snapshot";
 import { Chip } from "../chip/Chip";
 import { LiveDot } from "../live-dot/LiveDot";
 import { TOP_BAR_HEIGHT_VAR } from "../modal/useVisualViewportHeight";
 import type { Tone } from "../tone";
+import { Tray } from "../tray/Tray";
 
 export type TopBarTab = "epics" | "stats";
 
@@ -24,12 +26,14 @@ interface Props {
   /** Epics in Needs you other than the one on screen; it reads on the Epics tab and is left out at zero. */
   waiting?: number;
   afk?: boolean;
+  // Absent until the first snapshot lands, so the Tray is left out then.
+  health?: Health;
   // The toggle shows only when the page can switch AFK mode.
   onToggleAfk?: () => void;
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, afk = false, onToggleAfk }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, afk = false, health, onToggleAfk }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
   const nav = useRef<HTMLElement>(null);
   // Sheets that sit below the bar read its real height from the root.
@@ -75,6 +79,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
       <Box display="flex" alignItems="center" gap="2">
         {queueChip && <Chip tone="waiting">{queueChip}</Chip>}
         {!connected && <LiveDot tone="muted" label="Offline" />}
+        {health && <Tray health={health} />}
         {(onToggleAfk || build) && (
           <Menu.Root closeOnSelect={false} lazyMount unmountOnExit positioning={{ placement: "bottom-end" }}>
             <Menu.Trigger asChild>

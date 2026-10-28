@@ -64,6 +64,7 @@ export const themeConfig = defineConfig({
           DEFAULT: { value: "#ffffff" },
           muted: { value: "#c9d0da" },
           dim: { value: "#a3acba" },
+          faint: { value: "#6b7584" },
         },
         tone: toneTokens,
         kind: kindTokens,

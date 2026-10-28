@@ -745,6 +745,17 @@ test("a refusal shows inline and the strip stays; a failed last clean shows too"
   vi.unstubAllGlobals();
 });
 
+test("a cached snapshot with health paints the Tray before the first fetch lands", async () => {
+  const meter = (state: "normal" | "high") => ({ level: 2, state, read_at: "" });
+  const conn = createConnection({
+    cache: { load: () => ({ ...emptySnapshot, health: { cpu: meter("high"), memory: meter("normal"), disk: meter("normal") } }), save: () => {} },
+    fetchSnapshot: () => new Promise(() => {}),
+    openStream: () => new Promise(() => {}),
+  });
+  renderAt("/epics", okFor, conn);
+  expect(await screen.findByRole("button", { name: "System health: CPU high; memory normal; disk normal" })).toBeTruthy();
+});
+
 test("a cached snapshot with a disk renders the strip before the first fetch lands", async () => {
   const conn = createConnection({
     cache: { load: () => ({ ...emptySnapshot, disks: [diskOf()] }), save: () => {} },

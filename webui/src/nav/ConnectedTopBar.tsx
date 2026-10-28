@@ -13,6 +13,7 @@ export function ConnectedTopBar({ active, waiting }: { active?: TopBarTab; waiti
       connected={connected}
       waiting={waiting}
       afk={snapshot?.afk}
+      health={snapshot?.health}
       onToggleAfk={() => toggleAfk(snapshot?.afk)}
     />
   );

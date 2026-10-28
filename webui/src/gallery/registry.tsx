@@ -33,6 +33,8 @@ import { DiskStrip } from "../ui/disk-strip/DiskStrip";
 import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { TopBar } from "../ui/top-bar/TopBar";
+import { Tray } from "../ui/tray/Tray";
+import type { Health, HealthState } from "../generated/server";
 import { KINDS, TONES, type Tone } from "../ui/tone";
 
 export interface GalleryCase {
@@ -172,6 +174,21 @@ const EpicPageFrame = ({ detail, fixing }: { detail: EpicDetail; fixing?: boolea
     </ConnectionContext.Provider>
   );
 };
+
+const toneState: Record<Tone, HealthState> = {
+  running: "normal",
+  done: "normal",
+  waiting: "high",
+  paused: "critical",
+  deadlocked: "critical",
+  muted: "unknown",
+};
+const stateLevel: Record<HealthState, number> = { normal: 1, high: 3, critical: 4, unknown: 0 };
+const mixedHealth = (cpu: HealthState, memory: HealthState, disk: HealthState): Health => {
+  const meterOf = (state: HealthState) => ({ level: stateLevel[state], state, read_at: "" });
+  return { cpu: meterOf(cpu), memory: meterOf(memory), disk: meterOf(disk) };
+};
+const trayHealth = (state: HealthState) => mixedHealth(state, state, state);
 
 const chartDays =["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -410,6 +427,18 @@ export const galleryEntries: GalleryEntry[] = [
   { name: "Chip", cases: perTone((tone) => <Chip tone={tone}>{tone}</Chip>) },
   { name: "LiveDot", cases: perTone((tone) => <LiveDot tone={tone} label={tone} />) },
   { name: "Strip", cases: perTone((tone) => <Strip tone={tone}>{tone}</Strip>) },
+  {
+    name: "Tray",
+    // The Tray has no tone of its own: its states are normal, high, critical and unknown, so the tone
+    // cases show the nearest state (waiting is high, paused and deadlocked are critical, muted is unknown).
+    cases: [
+      ...perTone((tone) => <Tray health={trayHealth(toneState[tone])} />),
+      { label: "calm", node: <Tray health={trayHealth("normal")} /> },
+      { label: "busy", node: <Tray health={mixedHealth("normal", "high", "normal")} /> },
+      { label: "critical", node: <Tray health={mixedHealth("normal", "high", "critical")} /> },
+      { label: "unknown", node: <Tray health={trayHealth("unknown")} /> },
+    ],
+  },
   {
     name: "DiskStrip",
     // The strip has no tone of its own: it is "paused" when held and "waiting" otherwise, so the other tones show the unheld look.
