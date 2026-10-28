@@ -867,3 +867,20 @@ an exited session.
 - **Scenario:** `health`
 - **Steps:** set free to `5G`, click the Tray, read the disk entry in the "System health" dialog.
 - **Pass:** the D meter is critical. The disk entry is critical, says dispatch is held and points to "Clean now".
+
+## 74. Tray popover
+
+- **Scenario:** `health`
+- **Steps:**
+  1. Set free to `450G/500G` and click the Tray. Wait for the agent row in the CPU cause list.
+  2. Read the header, rows, thresholds, cause lists, disk entry and footer. Watch the footer count up.
+  3. Set `cpu=60 mem=10`.
+  4. Press Esc.
+  5. Set the width to 390px and open the Tray again.
+- **Pass:** the header shows `gx server` and the host. CPU, memory and disk rows show, with "high at N%, critical at N%" on CPU and memory. The CPU list links `demo:health-epic/01` to its ticket page, names `go test` and lists "other users". The disk entry names the project. The footer reads "Updated Ns ago" and N grows. Within 5s the CPU row reads "60% busy". Esc closes the popover. At 390px the popover and its rows stay inside the screen and cause names are cut short with an ellipsis.
+
+## 75. Tray offline
+
+- **Scenario:** `health`
+- **Steps:** set `cpu=75 mem=85`, open the popover once and close it, stop the fixture server, then open the popover.
+- **Pass:** the Tray fades and keeps C and M at high. The popover footer reads "Offline. Values from Ns ago." and the CPU row still shows "75% busy".

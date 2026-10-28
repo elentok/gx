@@ -32,6 +32,10 @@ export interface Fixture {
   setDiskClean(behaviour: string): Promise<void>;
   /** Sets the fake CPU and memory the server reads, space-separated pairs such as `cpu=75 mem=85`. */
   setHealth(values: string): Promise<void>;
+  /** Replaces the fake process table the popover's cause lists read: `proc`, `hidden` and `busy` lines. */
+  setProcesses(lines: string): Promise<void>;
+  /** Stops the fixture server mid-flow. Teardown skips a server that is already stopped. */
+  stopServer(): Promise<void>;
 }
 
 // A rename keeps the server from reading a half-written control file.
@@ -64,6 +68,14 @@ async function startFixture(
     { stdio: ["ignore", "pipe", "inherit"] },
   );
   const exited = new Promise<void>((resolve) => proc.once("exit", () => resolve()));
+  let stopping: Promise<void> | undefined;
+  const stop = () => {
+    stopping ??= (async () => {
+      if (proc.exitCode === null && proc.signalCode === null) proc.kill("SIGTERM");
+      await exited;
+    })();
+    return stopping;
+  };
   const out = await new Promise<FixtureOutput>((resolve, reject) => {
     let buf = "";
     proc.stdout!.on("data", (chunk: Buffer) => {
@@ -89,17 +101,13 @@ async function startFixture(
     setDiskFree: (size) => writeControl(out.disk_dir, "free", size),
     setDiskClean: (behaviour) => writeControl(out.disk_dir, "clean", behaviour),
     setHealth: (values) => writeControl(out.health_dir, "system", values),
+    setProcesses: (lines) => writeControl(out.health_dir, "processes", lines),
+    stopServer: stop,
   };
   // The first visit trades the token in web_url for the web cookie.
   await page.goto(out.web_url);
   await page.evaluate((key) => ((window as unknown as Record<string, unknown>)[key] = true), NO_RELOAD);
-  return {
-    fixture,
-    stop: async () => {
-      proc.kill("SIGTERM");
-      await exited;
-    },
-  };
+  return { fixture, stop };
 }
 
 /**
