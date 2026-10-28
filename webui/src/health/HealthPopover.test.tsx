@@ -39,7 +39,7 @@ const report = (over: Partial<HealthReport["memory"]> = {}, serverTime = "2026-0
     read_at: "2026-01-01T10:00:00Z",
     ...over,
   },
-  disks: { warn_below: "20G", clean_below: "10G", disks: [] },
+  disks: { warn_below: "20G", clean_below: "10G", state: "unknown", level: 0, reason: "waiting", disks: [] },
   causes: { cpu: { rows: [] }, memory: { rows: [] } },
 });
 
@@ -220,11 +220,30 @@ describe("Tray popover", () => {
       read_at: "2026-01-01T10:00:00Z",
       ...over,
     });
-    const withDisks = (disks: HealthDisk[]) => {
+    // The meter and worst disk are the server's; by default the last disk is the worst.
+    const withDisks = (disks: HealthDisk[], meter: Partial<HealthReport["disks"]> = {}) => {
+      const worst = disks[disks.length - 1];
       const r = report();
-      r.disks = { warn_below: "20G", clean_below: "10G", disks };
+      r.disks = { warn_below: "20G", clean_below: "10G", state: worst?.state ?? "unknown", level: 3, worst_id: worst?.id, disks, ...meter };
       respondWith(r);
     };
+
+    it("shows the server's worst disk even when another has less free space", async () => {
+      withDisks(
+        [disk({ id: "d1", name: "big", free_bytes: 300 * GB, total_bytes: 1000 * GB, state: "high" }), disk({ id: "d2", name: "small", free_bytes: 3 * GB, total_bytes: 10 * GB })],
+        { worst_id: "d1", state: "high" },
+      );
+      const { getAllByText, getByText } = await openTray();
+      expect(getAllByText("300G free")).toHaveLength(2);
+      expect(getAllByText("3G free")).toHaveLength(1);
+      expect(getByText("High")).toBeTruthy();
+    });
+
+    it("says why the disk meter has no reading", async () => {
+      withDisks([], { state: "unknown", reason: "waiting", worst_id: undefined });
+      const { getByText } = await openTray();
+      expect(getByText("No disk reading yet · warns under 20G, cleans under 10G")).toBeTruthy();
+    });
 
     it("lists every disk with free space, bar, state and projects, plus thresholds", async () => {
       withDisks([disk(), disk({ id: "d2", name: "work", free_bytes: 8 * GB, state: "high", projects: ["site"], held: false })]);

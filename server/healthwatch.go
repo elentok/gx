@@ -26,15 +26,28 @@ type meterTrack struct {
 func (m *meterTrack) next(prev MeterHealth, v float64, at time.Time) MeterHealth {
 	m.win.Add(v)
 	avg := m.win.Average()
-	level := -1
-	if prev.State != HealthStateUnknown {
-		level = prev.Level
-	}
 	return MeterHealth{
-		Level:  syshealth.NextLevel(level, avg),
+		Level:  syshealth.NextLevel(levelSeed(prev), avg),
 		State:  HealthState(syshealth.NextState(syshealth.State(prev.State), avg, m.high, m.crit)),
 		ReadAt: at,
 	}
+}
+
+// levelSeed is the level a new reading starts from: none after an unknown meter.
+func levelSeed(prev MeterHealth) int {
+	if prev.State == HealthStateUnknown {
+		return -1
+	}
+	return prev.Level
+}
+
+// syshealthDisks converts the disk watcher's statuses for the health rules.
+func syshealthDisks(statuses []DiskStatus, cleanBelow uint64) []syshealth.Disk {
+	in := make([]syshealth.Disk, len(statuses))
+	for i, d := range statuses {
+		in[i] = syshealth.Disk{Free: d.FreeBytes, Total: d.TotalBytes, Warned: d.Warned, Held: d.Held, CleanBelow: cleanBelow}
+	}
+	return in
 }
 
 // healthWatch is the CPU and memory meters. Every reading goes through observe.
@@ -104,24 +117,15 @@ func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
 // status, the same list the disk status route shows, so the Tray and the banner
 // agree. It publishes an event only when the disk level or state changed.
 func (s *Server) observeDiskHealth(now time.Time) {
-	disks := s.diskStatuses(false)
-	cleanBelow := uint64(s.settings.Load().DiskSpace.CleanBelow)
-	in := make([]syshealth.Disk, len(disks))
-	for i, d := range disks {
-		in[i] = syshealth.Disk{Free: d.FreeBytes, Total: d.TotalBytes, Warned: d.Warned, Held: d.Held, CleanBelow: cleanBelow}
-	}
+	in := syshealthDisks(s.diskStatuses(false), uint64(s.settings.Load().DiskSpace.CleanBelow))
 	worst := syshealth.WorstDisk(in)
 	w := &s.healthW
 	w.mu.Lock()
 	old := w.health.Disk
 	cur := waitingMeter
 	if worst >= 0 {
-		level := -1
-		if old.State != HealthStateUnknown {
-			level = old.Level
-		}
 		cur = MeterHealth{
-			Level:  syshealth.NextLevel(level, in[worst].PercentUsed()),
+			Level:  syshealth.NextLevel(levelSeed(old), in[worst].PercentUsed()),
 			State:  HealthState(in[worst].State()),
 			ReadAt: now,
 		}

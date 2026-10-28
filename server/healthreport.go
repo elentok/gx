@@ -60,9 +60,15 @@ type HealthDisk struct {
 }
 
 // DisksReport is every watched disk with the disk thresholds as size strings.
+// State, Level and Reason are the disk meter the Tray's D bar shows; WorstID
+// is the disk that meter follows, empty when there are no disks.
 type DisksReport struct {
 	WarnBelow  string       `json:"warn_below"`
 	CleanBelow string       `json:"clean_below"`
+	State      HealthState  `json:"state"`
+	Level      int          `json:"level"`
+	Reason     HealthReason `json:"reason,omitempty"`
+	WorstID    string       `json:"worst_id,omitempty"`
 	Disks      []HealthDisk `json:"disks"`
 }
 
@@ -129,11 +135,16 @@ func (s *Server) healthReport(ctx context.Context, wait bool) HealthReport {
 
 	ds := s.settings.Load().DiskSpace
 	cleanBelow := uint64(ds.CleanBelow)
-	disks := make([]HealthDisk, 0)
-	for _, d := range s.diskStatuses(false) {
-		state := syshealth.Disk{Free: d.FreeBytes, Total: d.TotalBytes, Warned: d.Warned, Held: d.Held, CleanBelow: cleanBelow}.State()
+	statuses := s.diskStatuses(false)
+	in := syshealthDisks(statuses, cleanBelow)
+	disks := make([]HealthDisk, 0, len(statuses))
+	for i, d := range statuses {
 		disks = append(disks, HealthDisk{ID: d.ID, Name: d.Name, FreeBytes: d.FreeBytes, TotalBytes: d.TotalBytes,
-			State: HealthState(state), Held: d.Held, Projects: d.Projects, ReadAt: d.ReadAt})
+			State: HealthState(in[i].State()), Held: d.Held, Projects: d.Projects, ReadAt: d.ReadAt})
+	}
+	worstID := ""
+	if worst := syshealth.WorstDisk(in); worst >= 0 {
+		worstID = statuses[worst].ID
 	}
 	host, _ := os.Hostname()
 	return HealthReport{
@@ -144,7 +155,8 @@ func (s *Server) healthReport(ctx context.Context, wait bool) HealthReport {
 		Memory: MemoryReport{Percent: l.memPct, UsedBytes: l.memUsed, TotalBytes: l.memTotal, Average: l.memAvg,
 			Pressure: pressureName(l.pressure), Level: h.Memory.Level, State: h.Memory.State, Reason: h.Memory.Reason,
 			Thresholds: HealthThresholds{High: syshealth.MemHigh, Critical: syshealth.MemCritical}, ReadAt: h.Memory.ReadAt},
-		Disks:  DisksReport{WarnBelow: sizeOrOff(ds.WarnBelow), CleanBelow: sizeOrOff(ds.CleanBelow), Disks: disks},
+		Disks: DisksReport{WarnBelow: sizeOrOff(ds.WarnBelow), CleanBelow: sizeOrOff(ds.CleanBelow),
+			State: h.Disk.State, Level: h.Disk.Level, Reason: h.Disk.Reason, WorstID: worstID, Disks: disks},
 		Causes: s.healthCauses(ctx, wait),
 	}
 }

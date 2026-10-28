@@ -1189,10 +1189,16 @@ export interface HealthDisk {
 }
 /**
  * DisksReport is every watched disk with the disk thresholds as size strings.
+ * State, Level and Reason are the disk meter the Tray's D bar shows; WorstID
+ * is the disk that meter follows, empty when there are no disks.
  */
 export interface DisksReport {
   warn_below: string;
   clean_below: string;
+  state: HealthState;
+  level: number /* int */;
+  reason?: HealthReason;
+  worst_id?: string;
   disks: HealthDisk[];
 }
 /**

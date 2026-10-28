@@ -3,8 +3,10 @@
 /// <reference types="vite/client" />
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import type { ReactElement } from "react";
 import { expect, it } from "vitest";
 import config from "../../vite.config";
+import type { Health } from "../generated/server";
 import { TONES } from "../ui/tone";
 import { galleryEntries } from "./registry";
 
@@ -79,6 +81,16 @@ it("shows the jump menu rows in every case the spec lists", () => {
   for (const label of ["design", "implementation", "one-off", "follow-ups", "Needs you", "current", "cursor", "finished"]) {
     expect(labels, label).toContain(label);
   }
+});
+
+it("shows the Tray busy and critical cases in the mock's meter states", () => {
+  const cases = galleryEntries.find((e) => e.name === "Tray")?.cases ?? [];
+  const states = (label: string) => {
+    const health = (cases.find((c) => c.label === label)?.node as ReactElement<{ health: Health }>).props.health;
+    return [health.cpu.state, health.memory.state, health.disk.state];
+  };
+  expect(states("busy")).toEqual(["high", "normal", "high"]);
+  expect(states("critical")).toEqual(["critical", "critical", "critical"]);
 });
 
 it("keeps gallery.html out of the production build input", () => {

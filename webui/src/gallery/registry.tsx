@@ -434,8 +434,8 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [
       ...perTone((tone) => <Tray health={trayHealth(toneState[tone])} />),
       { label: "calm", node: <Tray health={trayHealth("normal")} /> },
-      { label: "busy", node: <Tray health={mixedHealth("normal", "high", "normal")} /> },
-      { label: "critical", node: <Tray health={mixedHealth("normal", "high", "critical")} /> },
+      { label: "busy", node: <Tray health={mixedHealth("high", "normal", "high")} /> },
+      { label: "critical", node: <Tray health={mixedHealth("critical", "critical", "critical")} /> },
       { label: "unknown", node: <Tray health={trayHealth("unknown")} /> },
     ],
   },

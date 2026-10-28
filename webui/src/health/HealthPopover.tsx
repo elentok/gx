@@ -52,6 +52,8 @@ const UNKNOWN_TEXT: Record<string, string> = {
   error: "The last read failed",
 };
 const unknownText = (reason?: HealthReason) => UNKNOWN_TEXT[reason ?? ""] ?? "No reading yet";
+// The disk meter has no second reading to wait for.
+const diskUnknownText = (reason?: HealthReason) => (reason === "waiting" ? "No disk reading yet" : unknownText(reason));
 
 // A bare "G" in the disk thresholds is decimal, so free space uses it too.
 const diskGB = (bytes: number) => {
@@ -284,22 +286,19 @@ function CauseList({ part, list, value }: { part: string; list: CauseListData; v
   );
 }
 
-// Orders states for picking a row's worst disk.
-const SEVERITY: Record<HealthState, number> = { unknown: 0, normal: 1, high: 2, critical: 3 };
-
+// The server picks the worst disk, so the row and the Tray's D bar agree.
 function DiskRow({ disks, serverTime }: { disks: DisksReport; serverTime: string }) {
   const list = disks.disks;
-  const read = list.filter((d) => d.state !== "unknown");
-  const worst = read.reduce<HealthDisk | undefined>((w, d) => (!w || d.free_bytes < w.free_bytes ? d : w), undefined);
-  const state = list.reduce<HealthState>((s, d) => (SEVERITY[d.state] > SEVERITY[s] ? d.state : s), "unknown");
+  const worst = list.find((d) => d.id === disks.worst_id);
+  const thresholds = `warns under ${disks.warn_below}, cleans under ${disks.clean_below}`;
   return (
     <Row
       part="disk"
       icon={DISK_ICON}
       name="Disk"
-      state={state}
-      value={worst ? `${diskGB(worst.free_bytes)}G free` : "—"}
-      sub={`warns under ${disks.warn_below}, cleans under ${disks.clean_below}`}
+      state={disks.state}
+      value={worst && disks.state !== "unknown" ? `${diskGB(worst.free_bytes)}G free` : "—"}
+      sub={disks.state === "unknown" ? `${diskUnknownText(disks.reason)} · ${thresholds}` : thresholds}
       tagText={{ high: "Under warn", critical: "Under clean" }}
     >
       <Box gridColumn="2 / 4" display="flex" flexDirection="column" gap="6px" mt="4px">

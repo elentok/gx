@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -109,5 +110,34 @@ func TestHealthRoute_UnknownCarriesItsReason(t *testing.T) {
 	rep := healthRouteWhen(t, h, "unavailable", func(r server.HealthReport) bool { return r.CPU.Reason == server.HealthReasonUnavailable })
 	if rep.Memory.State != server.HealthStateUnknown || rep.Memory.Reason != server.HealthReasonUnavailable {
 		t.Errorf("memory = %+v", rep.Memory)
+	}
+}
+
+// Seam: the Disks report names the disk the D bar follows, the warned one, even
+// when another disk has less free space.
+func TestHealthRoute_DisksReportNamesTheWorstDisk(t *testing.T) {
+	repo, goCache := t.TempDir(), t.TempDir()
+	r := startDiskRig(t, map[string]string{"proj": repo}, 20*routeGB, func(c *server.Config) {
+		c.GoCacheDir = func() (string, error) { return goCache, nil }
+	})
+	// d1 is small and normal, d2 is large and under the warn size.
+	r.disks.PutSized(repo, "d1", "/vol1", 25*routeGB, 30*routeGB)
+	r.disks.PutSized(goCache, "d2", "/vol2", 15*routeGB, 1000*routeGB)
+	rep := healthRouteWhen(t, r.h, "d2 as the worst disk", func(rep server.HealthReport) bool { return rep.Disks.WorstID == "d2" })
+	if d := healthDisk(rep, "d2"); d.State != server.HealthStateHigh {
+		t.Errorf("d2 = %+v, want high", d)
+	}
+	if rep.Disks.State != server.HealthStateHigh {
+		t.Errorf("disk meter = %+v, want high", rep.Disks)
+	}
+}
+
+func TestHealthRoute_NoDisksMeterIsUnknownWithAReason(t *testing.T) {
+	r := startDiskRig(t, nil, 20*routeGB, func(c *server.Config) {
+		c.FreeSpace = func(string) (server.DiskReading, error) { return server.DiskReading{}, errors.New("no disk") }
+	})
+	rep := healthRouteWhen(t, r.h, "an unknown disk meter", func(server.HealthReport) bool { return true })
+	if rep.Disks.State != server.HealthStateUnknown || rep.Disks.Reason == server.HealthReasonNone || rep.Disks.WorstID != "" {
+		t.Errorf("disks = %+v, want unknown with a reason and no worst disk", rep.Disks)
 	}
 }
