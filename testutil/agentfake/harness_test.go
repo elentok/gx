@@ -41,12 +41,11 @@ type heldProgram struct {
 // alone, so env reaches it through HolderOptions.Env rather than cmd.Env.
 func holdProgram(t *testing.T, cmd harness.Command, conv string, env ...string) *heldProgram {
 	t.Helper()
-	// The holder's watch runs in this process, so it reads the dir from here.
 	progDir := NewProgramDir(t)
-	t.Setenv(ProgramDirEnv, progDir)
 	env = append([]string{ProgramEnv + "=1", ProgramDirEnv + "=" + progDir}, env...)
 	watchers := make(chan harness.Watcher, 1)
-	harness.Register(capturingKind, capturingHarness{watchers: watchers})
+	// The holder's watch runs in this process, so it gets the dir directly.
+	harness.Register(capturingKind, capturingHarness{Harness: Harness{Dir: progDir}, watchers: watchers})
 	dir, err := os.MkdirTemp("", "gxh")
 	if err != nil {
 		t.Fatal(err)

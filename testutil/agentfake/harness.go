@@ -29,6 +29,9 @@ func RegisterHarness() {
 // set. Its status comes from OSC 7501 reports alone.
 type Harness struct {
 	NoResume bool
+	// Dir is the program's side-channel dir the in-process Watch reads. Empty
+	// means ProgramDirEnv, as for a program that runs in this process's env.
+	Dir string
 }
 
 func (Harness) Launch(opts harness.LaunchOptions) harness.Command {
@@ -51,7 +54,7 @@ func programCommand(flag, conversationID string, opts harness.LaunchOptions) har
 }
 
 func (h Harness) Watch(pid int, _ time.Time, scr harness.Screen, _ <-chan struct{}) (harness.Watcher, error) {
-	return &programWatcher{pid: pid, startup: func() bool {
+	return &programWatcher{pid: pid, dir: h.Dir, startup: func() bool {
 		return scr != nil && h.StartupScreen(nil, scr.Rows()).Dialog != harness.NoDialog
 	}}, nil
 }
@@ -82,6 +85,7 @@ func (Harness) DisplayName(raw []byte) (string, bool) {
 
 type programWatcher struct {
 	pid int
+	dir string
 	// startup reports the trust dialog on screen, as claude's watcher does.
 	startup func() bool
 	mu      sync.Mutex
@@ -116,7 +120,11 @@ func (w *programWatcher) Status() harness.Status {
 // ConversationID rereads the program's file each time, so a program that
 // took over a reused pid replaces a stale id.
 func (w *programWatcher) ConversationID() string {
-	data, err := os.ReadFile(programConversationPath(w.pid))
+	dir := w.dir
+	if dir == "" {
+		dir = programDir()
+	}
+	data, err := os.ReadFile(programConversationPath(dir, w.pid))
 	if err != nil {
 		return ""
 	}

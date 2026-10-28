@@ -116,8 +116,8 @@ func programReadyPath(dir, conversationID string) string {
 
 // programConversationPath is where the fake program running as pid writes
 // its conversation id for the Watch, which knows only the pid.
-func programConversationPath(pid int) string {
-	return filepath.Join(programDir(), strconv.Itoa(pid)+".conversation")
+func programConversationPath(dir string, pid int) string {
+	return filepath.Join(dir, strconv.Itoa(pid)+".conversation")
 }
 
 // SendProgramControl writes c to the side channel of the fake program
@@ -168,7 +168,7 @@ func runProgram() (int, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return 0, err
 	}
-	convPath := programConversationPath(os.Getpid())
+	convPath := programConversationPath(dir, os.Getpid())
 	if err := os.WriteFile(convPath, []byte(id), 0o644); err != nil {
 		return 0, err
 	}

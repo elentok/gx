@@ -55,12 +55,6 @@ jobs:
         # give concurrency-sensitive tests (e.g. pause/resume against a permit cap)
         # more room to legitimately run long; 2m and 5m both timed out on tests
         # that pass reliably (and fast) locally.
-        # A commit's detached auto maintenance can outlive a test and break
-        # its t.TempDir cleanup; the Makefile exports the same for local runs.
-        env:
-          GIT_CONFIG_COUNT: "1"
-          GIT_CONFIG_KEY_0: maintenance.auto
-          GIT_CONFIG_VALUE_0: "false"
         run: make test
 
       - name: Build

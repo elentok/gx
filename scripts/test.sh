@@ -18,6 +18,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# A commit's detached auto maintenance can outlive a test and break its
+# t.TempDir cleanup. Repos made by testutil carry the setting in their config;
+# this covers packages that make repos with their own `git init`.
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=maintenance.auto
+export GIT_CONFIG_VALUE_0=false
+
 module=github.com/elentok/gx
 race_pkgs=(
 	./agentrunner/screen
