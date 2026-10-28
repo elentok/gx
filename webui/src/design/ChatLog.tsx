@@ -14,7 +14,7 @@ import type {
   SessionInfo,
 } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
-import { useSessionChat, type FetchChat } from "./chat";
+import { roundKeyOf } from "./chat";
 import type { AutoMenuState } from "./AutoMenu";
 import { Composer } from "./Composer";
 import {
@@ -373,9 +373,6 @@ function ChatBody({
   const roundDraft = useRoundDraft(session.id, roundKey);
   const round = chat.round ?? [];
   const hasRound = round.length > 0;
-  // A new round opens in Questions; a round that went away (another tab, the session moved on) leaves Chat.
-  // A layout effect, so the first paint of a round is already the Questions view.
-  useLayoutEffect(() => onQuestions(hasRound), []);
   useEffect(() => {
     if (!questions) return;
     // Capture phase: judge the layers as they were before this same Escape closes one of them.
@@ -439,11 +436,13 @@ function ChatBody({
 // The chat of a Claude session. Other harnesses have no chat, so DesignChat never mounts this for them.
 function ChatLog({
   session,
-  fetchChat,
+  chat,
+  refetch,
   ...rest
 }: {
   session: SessionInfo;
-  fetchChat?: FetchChat;
+  chat: SessionChatResponse;
+  refetch: () => void;
   post?: PostPrompt;
   done?: boolean;
   nextTitle?: string;
@@ -453,14 +452,10 @@ function ChatLog({
   onQuestions: (on: boolean) => void;
 }) {
   const conn = useConnectionContext();
-  const { detail: chat, refetch } = useSessionChat(session.id, conn, fetchChat);
   const connected = useConnectionState(conn).connected;
   // Lives above the keyed ChatBody: a round landing remounts it and must not close the Auto popover.
   const [autoMenuOpen, setAutoMenuOpen] = useState(false);
-  if (!chat) return null;
-  const roundKey = (chat.round ?? [])
-    .map((c) => `${c.label}:${c.title}`)
-    .join("|");
+  const roundKey = roundKeyOf(chat);
   return (
     <ChatBody
       key={roundKey}
@@ -478,17 +473,20 @@ function ChatLog({
 /** The center column of a Design: its session's chat, or an empty chat when it has none. */
 export function DesignChat({
   session,
-  fetchChat,
+  chat,
+  refetch,
   post,
   done,
   nextTitle,
   working,
   actions,
-  questions = false,
-  onQuestions = () => {},
+  questions,
+  onQuestions,
 }: {
   session?: SessionInfo;
-  fetchChat?: FetchChat;
+  /** The Claude session's chat, fetched by the page; null while it loads. */
+  chat?: SessionChatResponse | null;
+  refetch: () => void;
   post?: PostPrompt;
   /** The Design's Progress is Done: no composer, no `ended` banner. */
   done?: boolean;
@@ -497,9 +495,9 @@ export function DesignChat({
   /** The step the busy row names, and the ticket during Resolve tickets. */
   working?: WorkingStep;
   actions: FailureActions;
-  /** The Questions view: only the questions sheet, the failure notices and the composer. The page owns it. */
-  questions?: boolean;
-  onQuestions?: (on: boolean) => void;
+  /** The Questions view: only the questions sheet, the failure notices and the composer. The page derives it. */
+  questions: boolean;
+  onQuestions: (on: boolean) => void;
 }) {
   if (!session) return null;
   if (session.harness !== "claude") {
@@ -515,11 +513,13 @@ export function DesignChat({
       </>
     );
   }
+  if (!chat) return null;
   return (
     <ChatLog
       key={session.id}
       session={session}
-      fetchChat={fetchChat}
+      chat={chat}
+      refetch={refetch}
       post={post}
       done={done}
       nextTitle={nextTitle}

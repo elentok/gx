@@ -537,6 +537,21 @@ test("a new round opens Questions again, and a round that goes away shows the ch
   expect(screen.queryByRole("group", { name: "View" })).toBeNull();
 });
 
+test("switching from a Claude session in Questions to another harness leaves Questions: the impl link is back", async () => {
+  renderChat(
+    [session(), session({ id: "s-b", name: "other", harness: "codex", run_started_at: ago(2) })],
+    focusChat(),
+    undefined,
+    implDetail,
+  );
+  await screen.findByRole("group", { name: "Questions" });
+  expect(screen.queryByRole("link", { name: /Open implementation epic/ })).toBeNull();
+  fireEvent.click(await screen.findByRole("button", { name: "More actions" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "other" }));
+  expect(await screen.findByRole("link", { name: /Open implementation epic/ })).toBeTruthy();
+  expect(screen.queryByRole("group", { name: "View" })).toBeNull();
+});
+
 test("no round: no toggle, the messages show", async () => {
   renderChat([session()], okChat(chatOf([msg({ text: "earlier talk" })])));
   expect(await screen.findByText("earlier talk")).toBeTruthy();

@@ -9,7 +9,7 @@ import { useEpicList, waitingCount, type EpicList, type FetchEpicList } from "..
 import { JumpMenu } from "../nav/JumpMenu";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
-import type { FetchChat } from "./chat";
+import { roundKeyOf, useSessionChat, type FetchChat } from "./chat";
 import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
 import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./open";
@@ -96,8 +96,7 @@ function DesignBody({
   const connState = useConnectionState(conn);
   const sessions = connState.snapshot?.sessions ?? [];
   const [selected, setSelected] = useState<string>();
-  // Not stored: the message list and the impl link both read it, so it lives here.
-  const [questions, setQuestions] = useState(false);
+  const [toggle, setToggle] = useState<{ key: string; on: boolean }>();
   const [stepsOpen, setStepsOpen] = useState(false);
   const done = detail?.steps?.some(
     (s) => s.step === "done" && s.state === "done",
@@ -115,6 +114,12 @@ function DesignBody({
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session =
     live.find((s) => s.id === selected) ?? designSession(address, sessions);
+  const claude = session?.harness === "claude";
+  const { detail: chat, refetch: refetchChat } = useSessionChat(session && claude ? session.id : undefined, conn, deps.fetchChat);
+  // Derived, not stored, so it cannot go stale: a round opens in Questions, and the reader's toggle holds for
+  // that session and round only. The message list and the impl link both read it.
+  const viewKey = `${session?.id}|${roundKeyOf(chat)}`;
+  const questions = claude && (chat?.round?.length ?? 0) > 0 && (toggle?.key === viewKey ? toggle.on : true);
   // The busy row follows what the agent reported; Progress and Continue keep following the map.
   const running =
     detail?.steps?.find((s) => s.step === session?.reported_step) ?? current;
@@ -204,13 +209,14 @@ function DesignBody({
           )}
           <DesignChat
             session={session}
-            fetchChat={deps.fetchChat}
+            chat={chat}
+            refetch={refetchChat}
             post={deps.post}
             done={done}
             nextTitle={nextTitle}
             working={working}
             questions={questions}
-            onQuestions={setQuestions}
+            onQuestions={(on) => setToggle({ key: viewKey, on })}
             actions={{
               address,
               open: deps.open,
