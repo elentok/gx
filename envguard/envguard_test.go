@@ -30,8 +30,10 @@ const (
 	reasonStartup = "startup"
 	reasonChild   = "child program"
 	reasonTool    = "user tool"
-	reasonRemove  = "to remove"
 )
+
+// reasons are the only permanent reasons an allowlist entry may give.
+var reasons = []string{reasonConfig, reasonStartup, reasonChild, reasonTool}
 
 type site struct {
 	file, rule string
@@ -44,23 +46,19 @@ type entry struct {
 
 // allowed is the seed generated from the tree by the scan below. A count only
 // goes down: take the value from config or the caller, then lower the count.
-// "to remove" entries are later tickets' work.
 var allowed = map[site]entry{
 	{"server/server.go", ruleConfigEnv}:                   {2, reasonStartup},
 	{"sound/sound.go", ruleConfigEnv}:                     {2, reasonStartup},
 	{"harness/claudepid.go", ruleChildEnv}:                {1, reasonChild},
 	{"harness/claudepid.go", ruleHomeDir}:                 {1, reasonChild},
-	{"osnotify/osnotify.go", ruleChildEnv}:                {1, reasonRemove},
-	{"server/servertest/servertest.go", ruleEnvRead}:      {2, reasonRemove},
-	{"sound/sound.go", ruleChildEnv}:                      {1, reasonRemove},
+	{"osnotify/osnotify.go", ruleChildEnv}:                {1, reasonTool},
+	{"sound/sound.go", ruleChildEnv}:                      {1, reasonTool},
 	{"testutil/agentfake/design.go", ruleHomeDir}:         {1, reasonChild},
 	{"testutil/agentfake/tui.go", ruleHomeDir}:            {1, reasonChild},
 	{"testutil/agentfake/worker.go", ruleChildEnv}:        {1, reasonChild},
-	{"testutil/gxfixture/main.go", ruleChildEnv}:          {2, reasonRemove},
-	{"testutil/gxfixture/main.go", ruleEnvRead}:           {1, reasonRemove},
-	{"testutil/herdrctl/herdrctl.go", ruleChildEnv}:       {3, reasonRemove},
+	{"testutil/gxfixture/main.go", ruleChildEnv}:          {2, reasonStartup},
+	{"testutil/gxfixture/main.go", ruleEnvRead}:           {1, reasonStartup},
 	{"testutil/herdrfake/herdrfake.go", ruleEnvRead}:      {2, reasonChild},
-	{"testutil/repo.go", ruleChildEnv}:                    {1, reasonRemove},
 	{"ui/history/conversations_actions.go", ruleChildEnv}: {1, reasonTool},
 	{"ui/openurl.go", ruleChildEnv}:                       {2, reasonTool},
 	{"ui/reword/reword.go", ruleChildEnv}:                 {1, reasonTool},
@@ -243,9 +241,34 @@ func compare(found map[site]int, allow map[site]entry) []string {
 	return problems
 }
 
+// badReasons returns one problem per entry whose reason is not permanent.
+func badReasons(allow map[site]entry) []string {
+	var problems []string
+	for s, e := range allow {
+		if !slices.Contains(reasons, e.reason) {
+			problems = append(problems, fmt.Sprintf("%s: rule %s has reason %q, want one of %q", s.file, s.rule, e.reason, reasons))
+		}
+	}
+	sort.Strings(problems)
+	return problems
+}
+
 func TestNoEnvReads(t *testing.T) {
 	for _, p := range compare(scanTree(t), allowed) {
 		t.Error(p)
+	}
+	for _, p := range badReasons(allowed) {
+		t.Error(p)
+	}
+}
+
+func TestBadReasons_RejectsToRemove(t *testing.T) {
+	a := site{"a.go", ruleHomeDir}
+	if got := badReasons(map[site]entry{a: {1, reasonTool}}); len(got) != 0 {
+		t.Errorf("permanent reason rejected: %v", got)
+	}
+	if got := badReasons(map[site]entry{a: {1, "to remove"}}); len(got) != 1 {
+		t.Errorf("a %q entry gave %v, want one problem", "to remove", got)
 	}
 }
 

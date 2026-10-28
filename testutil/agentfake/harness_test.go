@@ -37,15 +37,11 @@ type heldProgram struct {
 	done    chan error
 }
 
-// holdProgram runs cmd in a real holder. The holder's child inherits this
-// process's environment, so env is set here rather than through cmd.Env.
+// holdProgram runs cmd in a real holder. The holder starts its child from argv
+// alone, so env reaches it through HolderOptions.Env rather than cmd.Env.
 func holdProgram(t *testing.T, cmd harness.Command, conv string, env ...string) *heldProgram {
 	t.Helper()
-	t.Setenv(ProgramEnv, "1")
-	for _, kv := range env {
-		k, v, _ := strings.Cut(kv, "=")
-		t.Setenv(k, v)
-	}
+	env = append([]string{ProgramEnv + "=1"}, env...)
 	watchers := make(chan harness.Watcher, 1)
 	harness.Register(capturingKind, capturingHarness{watchers: watchers})
 	dir, err := os.MkdirTemp("", "gxh")
@@ -55,7 +51,7 @@ func holdProgram(t *testing.T, cmd harness.Command, conv string, env ...string) 
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	p := &heldProgram{t: t, dir: dir, conv: conv, done: make(chan error, 1)}
 	go func() {
-		p.done <- nativerunner.RunHarnessHolder(dir, capturingKind, nativerunner.HolderOptions{}, append([]string{cmd.Name}, cmd.Args...))
+		p.done <- nativerunner.RunHarnessHolder(dir, capturingKind, nativerunner.HolderOptions{Env: env}, append([]string{cmd.Name}, cmd.Args...))
 	}()
 	select {
 	case p.watcher = <-watchers:

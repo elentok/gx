@@ -339,6 +339,7 @@ func mustRun(t *testing.T, dir, name string, args ...string) {
 	t.Helper()
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
+	cmd.Env = os.Environ()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("run %s %v in %s: %v\n%s", name, args, dir, err, out)

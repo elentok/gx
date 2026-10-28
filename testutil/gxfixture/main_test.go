@@ -126,14 +126,16 @@ type running struct {
 
 func start(t *testing.T, scenario string) *running {
 	t.Helper()
-	return startWith(t, scenario)
+	return startWith(t, scenario, nil)
 }
 
-// startWith starts the scenario with extra gxfixture flags.
-func startWith(t *testing.T, scenario string, flags ...string) *running {
+// startWith starts the scenario with extra gxfixture flags. env (KEY=VALUE)
+// goes after the test's own env in the fixture's.
+func startWith(t *testing.T, scenario string, env []string, flags ...string) *running {
 	t.Helper()
 	args := append([]string{"--gx", gxBin, "--fakeclaude", fakeBin}, flags...)
 	cmd := exec.Command(fixtureBin, append(args, scenario)...)
+	cmd.Env = append(os.Environ(), env...)
 	cmd.Stderr = os.Stderr
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -277,12 +279,11 @@ func TestShellEnv_ExportsTheCLIEnvAndTheFixtureVariablesQuoted(t *testing.T) {
 
 func TestFixture_NeverTouchesTheRealHomeOrState(t *testing.T) {
 	decoy := t.TempDir()
-	t.Setenv("HOME", decoy)
+	env := []string{"HOME=" + decoy, "CLAUDE_CONFIG_DIR=" + filepath.Join(decoy, "claude")}
 	for _, k := range []string{"XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CONFIG_HOME"} {
-		t.Setenv(k, filepath.Join(decoy, k))
+		env = append(env, k+"="+filepath.Join(decoy, k))
 	}
-	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(decoy, "claude"))
-	r := start(t, "ready")
+	r := startWith(t, "ready", env)
 	r.gx(t, "server", "snapshot", "--json")
 	r.stop(t)
 	entries, err := os.ReadDir(decoy)
@@ -500,7 +501,7 @@ func TestDesignScenario_StampsTheMapsDesignStart(t *testing.T) {
 }
 
 func TestConfigFlag_WritesTheKeyIntoTheFixtureConfig(t *testing.T) {
-	r := startWith(t, "empty", "--config", "server.remote-control=true", "--config", "extra.name=hello")
+	r := startWith(t, "empty", nil, "--config", "server.remote-control=true", "--config", "extra.name=hello")
 	root := filepath.Dir(filepath.Dir(r.StateDir))
 	raw, err := os.ReadFile(filepath.Join(root, "home", ".config", "gx", "config.json"))
 	if err != nil {
@@ -878,7 +879,7 @@ func TestDesignScripts_FakeAgentPlaysTheTurns(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.scenario, func(t *testing.T) {
 			// A long countdown keeps the server from answering run-end lines itself.
-			r := startWith(t, tt.scenario, "--auto-advance-delay", "1h")
+			r := startWith(t, tt.scenario, nil, "--auto-advance-delay", "1h")
 			id := r.openDesign(t)
 			for i, want := range tt.want {
 				r.waitChat(t, id, func(c server.SessionChatResponse) bool {
@@ -940,7 +941,7 @@ func TestGrillingStatsScenario_StatsReturnTheSeededTotals(t *testing.T) {
 }
 
 func TestStart_AutoAdvanceDelayFlagIsAccepted(t *testing.T) {
-	r := startWith(t, "design", "--auto-advance-delay", "50ms")
+	r := startWith(t, "design", nil, "--auto-advance-delay", "50ms")
 	r.stop(t)
 }
 

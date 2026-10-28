@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 )
 
 // poisoned puts claude into vim mode, which changes how the ready-to-type step
@@ -13,33 +12,11 @@ import (
 // without vim mode.
 const poisoned = `{"editorMode":"vim"}`
 
-// Isolate points HOME at a scratch directory, unsets the XDG dirs and sets
-// CLAUDE_CONFIG_DIR at a clean one inside it. The scratch HOME holds a
-// poisoned ~/.claude.json and ~/.claude/settings.json, so code that resolves
-// the config from HOME instead of CLAUDE_CONFIG_DIR trips the canary. Call it
-// from TestMain and run the returned cleanup before os.Exit.
-func Isolate() (cleanup func()) {
-	home, err := os.MkdirTemp("", "gx-claudeenv")
-	if err != nil {
-		panic(err)
-	}
-	for _, kv := range In(home) {
-		k, v, _ := strings.Cut(kv, "=")
-		if v == "" {
-			// Unset rather than redirect: tests that give themselves a HOME of
-			// their own must still see it win over a package-wide XDG dir.
-			os.Unsetenv(k)
-			continue
-		}
-		os.Setenv(k, v)
-	}
-	return func() { os.RemoveAll(home) }
-}
-
-// In is Isolate without touching the process env: it fills the existing dir
-// home with the poisoned config and a clean config dir, and returns the env
-// entries (KEY=VALUE, for server.Config.Env or exec.Cmd.Env) that point at
-// them. The XDG dirs come back empty, which config's xdgBase ignores.
+// In fills the existing dir home with a poisoned ~/.claude.json and
+// ~/.claude/settings.json and a clean config dir, and returns the env entries
+// (KEY=VALUE, for server.Config.Env or exec.Cmd.Env) that point at them. Code
+// that resolves the config from HOME instead of CLAUDE_CONFIG_DIR trips the
+// canary. The XDG dirs come back empty, which config's xdgBase ignores.
 func In(home string) []string {
 	write := func(path, content string) {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

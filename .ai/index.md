@@ -40,8 +40,8 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
 - Tests must never read the developer's real Claude config (their `editorMode: vim` changes
   outcomes). Pass `HOME`, `CLAUDE_CONFIG_DIR` and the rest through config (`claudeenv.In(home)`
   returns the env entries for `server.Config.Env` or `exec.Cmd.Env`, with a vim-mode `~/.claude.json`
-  as a canary: code that reads `HOME` instead of `CLAUDE_CONFIG_DIR` fails loudly). New test
-  packages must not call `claudeenv.Isolate()`. `envguard/envguard_test.go` bans new process-env
+  as a canary: code that reads `HOME` instead of `CLAUDE_CONFIG_DIR` fails loudly). Never use
+  `t.Setenv` or `os.Setenv` for these. `envguard/envguard_test.go` bans new process-env
   reads of `HOME`, `PATH`, `XDG_*`, `CLAUDE_CONFIG_DIR` and `CODEX_HOME`, `os.UserHomeDir()` and
   `exec.Command` without a `.Env =`; its allowlist lists what is left.
 - Run web tests through `make web-test`. gx installs dependencies when it creates an iteration

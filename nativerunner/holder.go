@@ -63,6 +63,8 @@ type HolderOptions struct {
 	Cols, Rows int
 	// Trust answers the harness's trust dialog while the child starts.
 	Trust bool
+	// Env (KEY=VALUE) is appended to the child's env.
+	Env []string
 }
 
 func (o HolderOptions) size() (cols, rows int) {
@@ -131,7 +133,7 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 	defer ln.Close()
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = tty, tty, tty
-	cmd.Env = terminalEnv(os.Environ())
+	cmd.Env = append(terminalEnv(os.Environ()), opts.Env...)
 	if opts.GXSession != "" {
 		cmd.Env = append(cmd.Env, AgentSessionEnv+"="+opts.GXSession)
 	}

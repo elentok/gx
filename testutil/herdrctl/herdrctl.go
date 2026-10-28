@@ -253,6 +253,7 @@ func (w *Workspace) waitOutput(flag, value string, timeout time.Duration) {
 	w.t.Helper()
 	cmd := exec.Command("herdr", "pane", "wait-output", w.RootPaneID,
 		flag, value, "--source", "visible", "--timeout", strconv.FormatInt(timeout.Milliseconds(), 10))
+	cmd.Env = sessionEnv()
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -363,9 +364,15 @@ func (w *Workspace) AgentExplain(target string) herdr.AgentExplainResult {
 	return result
 }
 
+// sessionEnv is the env of the herdr session these tests run inside:
+// RequireHerdr gates on its HERDR_ENV, and the herdr children need its socket
+// settings to reach the daemon.
+func sessionEnv() []string { return os.Environ() }
+
 func run(t *testing.T, args ...string) []byte {
 	t.Helper()
 	cmd := exec.Command("herdr", args...)
+	cmd.Env = sessionEnv()
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -380,6 +387,7 @@ func run(t *testing.T, args ...string) []byte {
 // gone.
 func tryRead(paneID string) (string, error) {
 	cmd := exec.Command("herdr", "pane", "read", paneID, "--source", "visible")
+	cmd.Env = sessionEnv()
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err

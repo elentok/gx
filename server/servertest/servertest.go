@@ -439,10 +439,6 @@ func StartWithTCP(t *testing.T) *Harness {
 // holder sockets below it.
 const shortTempRoot = "/tmp"
 
-// processHome is HOME as the test process started, to tell a test that set its
-// own from one that left the real one.
-var processHome = os.Getenv("HOME")
-
 func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func(*server.Config)) *Harness {
 	t.Helper()
 	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that,
@@ -480,8 +476,6 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	})
 	_, herdrEnv := herdrfake.StartStateEnv(t, h.Herdr)
 
-	ownHome := os.Getenv("HOME") != processHome
-
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
 	// The herdr runner's wait N defaults to 5s, which every launch's slash
@@ -489,19 +483,16 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h.cfg.RunnerWait = 100 * time.Millisecond
 	// The server's env is the process env plus the fake herdr, a poisoned home
 	// and a clean config dir of its own, so code that reads HOME where it should
-	// read CLAUDE_CONFIG_DIR trips the canary. A test that already set its own
-	// HOME keeps it, and the config dir it set with it. The merge locks go under
-	// the stateDir, not the real home's state dir.
+	// read CLAUDE_CONFIG_DIR trips the canary. The merge locks go under the
+	// stateDir, not the real home's state dir.
 	h.cfg.Env = append(os.Environ(), herdrEnv...)
 	// The ticket store is the one repo product code creates in a server test;
 	// without this its commits start detached auto maintenance.
 	h.cfg.Env = git.WithMaintenanceOff(h.cfg.Env)
 	// The holders end with this test process, unless a test passes another pid.
 	h.cfg.Env = append(h.cfg.Env, TestPidEnv+"="+strconv.Itoa(os.Getpid()))
-	if !ownHome {
-		h.cfg.Env = append(h.cfg.Env, "HOME="+filepath.Join(stateDir, "home"))
-		h.cfg.Env = append(h.cfg.Env, claudeenv.In(filepath.Join(stateDir, "claude-home"))...)
-	}
+	h.cfg.Env = append(h.cfg.Env, "HOME="+filepath.Join(stateDir, "home"))
+	h.cfg.Env = append(h.cfg.Env, claudeenv.In(filepath.Join(stateDir, "claude-home"))...)
 	// Last, so claudeenv.In's empty XDG_STATE_HOME doesn't win.
 	xdgState := filepath.Join(stateDir, "xdg-state")
 	if err := os.MkdirAll(xdgState, 0o755); err != nil {
