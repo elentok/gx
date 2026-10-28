@@ -41,7 +41,10 @@ type heldProgram struct {
 // alone, so env reaches it through HolderOptions.Env rather than cmd.Env.
 func holdProgram(t *testing.T, cmd harness.Command, conv string, env ...string) *heldProgram {
 	t.Helper()
-	env = append([]string{ProgramEnv + "=1"}, env...)
+	// The holder's watch runs in this process, so it reads the dir from here.
+	progDir := NewProgramDir(t)
+	t.Setenv(ProgramDirEnv, progDir)
+	env = append([]string{ProgramEnv + "=1", ProgramDirEnv + "=" + progDir}, env...)
 	watchers := make(chan harness.Watcher, 1)
 	harness.Register(capturingKind, capturingHarness{watchers: watchers})
 	dir, err := os.MkdirTemp("", "gxh")
@@ -108,6 +111,34 @@ func (p *heldProgram) rows() []string {
 func (p *heldProgram) waitScreen(text string) {
 	p.t.Helper()
 	p.waitFor("the screen shows "+text, func() bool { return strings.Contains(strings.Join(p.rows(), "\n"), text) })
+}
+
+func TestProgramDir_IsPerTestAndRemovedAfterIt(t *testing.T) {
+	var a, b string
+	t.Run("a", func(t *testing.T) {
+		a = NewProgramDir(t)
+		b = NewProgramDir(t)
+		if a == b {
+			t.Fatalf("two harnesses share %s", a)
+		}
+	})
+	for _, dir := range []string{a, b} {
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Errorf("%s outlived its test: %v", dir, err)
+		}
+	}
+}
+
+func TestSendProgramControl_WaitsUntilTheProgramOpenedItsFIFO(t *testing.T) {
+	old := fifoOpenWait
+	fifoOpenWait = 50 * time.Millisecond
+	t.Cleanup(func() { fifoOpenWait = old })
+	conv := newConversationID(t)
+	cmd := Harness{}.Launch(harness.LaunchOptions{SessionID: conv})
+	p := holdProgram(t, cmd, conv, ProgramFifoDelayEnv+"=500ms")
+
+	p.report("working", "", "")
+	p.waitStatus(harness.Status{State: harness.Working})
 }
 
 func newConversationID(t *testing.T) string {

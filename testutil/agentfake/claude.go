@@ -73,7 +73,7 @@ const controlType = "agentfake_control"
 
 // fifoOpenWait bounds how long SendControl waits for the agent to open its end
 // of the FIFO.
-const fifoOpenWait = 5 * time.Second
+var fifoOpenWait = 5 * time.Second
 
 // openFIFOWriter opens the FIFO at path for writing without blocking. A plain
 // O_WRONLY open waits forever when the agent has died, so a test that races an

@@ -29,6 +29,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
+	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
@@ -499,6 +500,8 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		t.Fatal(err)
 	}
 	h.cfg.Env = append(h.cfg.Env, "XDG_STATE_HOME="+xdgState)
+	// The fake program's side channels, per test rather than shared on the machine.
+	h.cfg.Env = append(h.cfg.Env, agentfake.ProgramDirEnv+"="+agentfake.NewProgramDir(t))
 	// Every merge pauses on ralphloop's 3s finish debounce; the fake agents
 	// settle at once, so a hundredth keeps the order without the wait.
 	h.cfg.Sleep = func(d time.Duration) { time.Sleep(d / 100) }

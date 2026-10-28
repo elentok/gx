@@ -7,8 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"sync"
 	"syscall"
+	"testing"
 	"time"
 
 	"github.com/charmbracelet/x/term"
@@ -42,29 +45,92 @@ const (
 	ActionSize = "size"
 )
 
-// ProgramDir holds the fake program's side channels. It is under the temp
-// dir rather than HOME so the holder, the program and the test agree on it
-// without passing HOME around.
-func ProgramDir() string {
+// ProgramDirEnv is the dir of the fake program's side channels. The holder and
+// the program read it from the env the server hands them; NewProgramDir makes
+// one per test.
+const ProgramDirEnv = "GX_AGENTFAKE_DIR"
+
+// ProgramFifoDelayEnv is a Go duration the program waits between making its
+// control FIFO and opening it, so a test can send in that window.
+const ProgramFifoDelayEnv = "GX_AGENTFAKE_PROGRAM_FIFO_DELAY"
+
+var (
+	dirsMu sync.Mutex
+	dirs   []string
+)
+
+// NewProgramDir makes the side-channel dir of one test's fake programs, removed
+// with the test. Put ProgramDirEnv=<dir> in the env the programs run with; the
+// test-side helpers (SendProgramControl, ProgramSubmittedPath) find the dir
+// of a conversation among the dirs made here.
+func NewProgramDir(t testing.TB) string {
+	dir := t.TempDir()
+	dirsMu.Lock()
+	dirs = append(dirs, dir)
+	dirsMu.Unlock()
+	t.Cleanup(func() {
+		dirsMu.Lock()
+		defer dirsMu.Unlock()
+		dirs = slices.DeleteFunc(dirs, func(d string) bool { return d == dir })
+	})
+	return dir
+}
+
+// programDir is the dir of the process's own side channels.
+func programDir() string {
+	if dir := os.Getenv(ProgramDirEnv); dir != "" {
+		return dir
+	}
 	return filepath.Join(os.TempDir(), "gx-agentfake")
+}
+
+// testDir is the dir of the program running conversationID, found by the
+// ready file the program leaves. Before the program started it is the newest
+// dir: the file the caller wants does not exist yet in any of them.
+func testDir(conversationID string) string {
+	dirsMu.Lock()
+	defer dirsMu.Unlock()
+	for _, dir := range dirs {
+		if _, err := os.Stat(filepath.Join(dir, conversationID+".ready")); err == nil {
+			return dir
+		}
+	}
+	if len(dirs) > 0 {
+		return dirs[len(dirs)-1]
+	}
+	return programDir()
 }
 
 // ProgramControlPath is the side-channel FIFO of the fake program running
 // conversationID.
 func ProgramControlPath(conversationID string) string {
-	return filepath.Join(ProgramDir(), conversationID+".ctl")
+	return filepath.Join(testDir(conversationID), conversationID+".ctl")
+}
+
+// programReadyPath marks that the program running conversationID has opened
+// its control FIFO. It stays after the program exits, so a test can still find
+// the program's dir.
+func programReadyPath(dir, conversationID string) string {
+	return filepath.Join(dir, conversationID+".ready")
 }
 
 // programConversationPath is where the fake program running as pid writes
 // its conversation id for the Watch, which knows only the pid.
 func programConversationPath(pid int) string {
-	return filepath.Join(ProgramDir(), strconv.Itoa(pid)+".conversation")
+	return filepath.Join(programDir(), strconv.Itoa(pid)+".conversation")
 }
 
 // SendProgramControl writes c to the side channel of the fake program
-// running conversationID, waiting for the program to create it.
+// running conversationID, waiting for the program to open it.
 func SendProgramControl(conversationID string, c Control) error {
-	return sendControlWhenReady(ProgramControlPath(conversationID), c)
+	return sendControlWhenReady(func() (string, bool) {
+		dir := testDir(conversationID)
+		ctl := filepath.Join(dir, conversationID+".ctl")
+		// The ready file outlives the program; the FIFO does not.
+		_, readyErr := os.Stat(programReadyPath(dir, conversationID))
+		_, ctlErr := os.Stat(ctl)
+		return ctl, readyErr == nil && ctlErr == nil
+	}, c)
 }
 
 // Program runs the fake program on the process's terminal and exits with the
@@ -98,7 +164,8 @@ func runProgram() (int, error) {
 			return 0, err
 		}
 	}
-	if err := os.MkdirAll(ProgramDir(), 0o755); err != nil {
+	dir := programDir()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return 0, err
 	}
 	convPath := programConversationPath(os.Getpid())
@@ -106,20 +173,33 @@ func runProgram() (int, error) {
 		return 0, err
 	}
 	defer os.Remove(convPath)
-	_ = os.Remove(ProgramSubmittedPath(id))
-	ctlPath := ProgramControlPath(id)
-	// A crashed run with the same id leaves its FIFO behind.
+	_ = os.Remove(programSubmittedPath(id))
+	readyPath := programReadyPath(dir, id)
+	ctlPath := filepath.Join(dir, id+".ctl")
+	// A crashed or earlier run with the same id leaves its marker and FIFO
+	// behind; a sender must not take them for this run's.
+	_ = os.Remove(readyPath)
 	_ = os.Remove(ctlPath)
 	if err := syscall.Mkfifo(ctlPath, 0o600); err != nil {
 		return 0, err
 	}
 	defer os.Remove(ctlPath)
+	if s := os.Getenv(ProgramFifoDelayEnv); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return 0, err
+		}
+		time.Sleep(d)
+	}
 	// Read-write so the FIFO never reads EOF between two senders.
 	ctl, err := os.OpenFile(ctlPath, os.O_RDWR, 0)
 	if err != nil {
 		return 0, err
 	}
 	defer ctl.Close()
+	if err := os.WriteFile(readyPath, nil, 0o644); err != nil {
+		return 0, err
+	}
 	p := &program{out: os.Stdout, trust: os.Getenv(ProgramTrustEnv) == "1", convPath: convPath, convID: id}
 	if os.Getenv(ProgramInputEnv) == "1" {
 		p.box = newInputBox(os.Stdout, os.Getenv(ProgramDraftEnv))

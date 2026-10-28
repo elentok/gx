@@ -44,7 +44,12 @@ const ProgramClearedSuffix = "-cleared"
 // ProgramSubmittedPath is the log of every submitted input of the fake
 // program running conversationID, one %q-quoted entry per line.
 func ProgramSubmittedPath(conversationID string) string {
-	return filepath.Join(ProgramDir(), conversationID+".submitted")
+	return filepath.Join(testDir(conversationID), conversationID+".submitted")
+}
+
+// programSubmittedPath is the same log, as the program itself finds it.
+func programSubmittedPath(conversationID string) string {
+	return filepath.Join(programDir(), conversationID+".submitted")
 }
 
 // ProgramInterruptEntry is what a Ctrl+C logs to ProgramSubmittedPath, so a
@@ -147,7 +152,7 @@ func (b *inputBox) control(c Control) bool {
 }
 
 func logSubmitted(conversationID, text string) error {
-	f, err := os.OpenFile(ProgramSubmittedPath(conversationID), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(programSubmittedPath(conversationID), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}

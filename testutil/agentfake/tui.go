@@ -132,7 +132,11 @@ func SendTUIControl(home, sessionID string, c Control) error {
 	if st, err := os.Stat(ackPath); err == nil {
 		handled = st.Size()
 	}
-	if err := sendControlWhenReady(TUIControlPath(home, sessionID), c); err != nil {
+	ctlPath := TUIControlPath(home, sessionID)
+	if err := sendControlWhenReady(func() (string, bool) {
+		_, err := os.Stat(ctlPath)
+		return ctlPath, err == nil
+	}, c); err != nil {
 		return err
 	}
 	if c.Action == ActionExit {
@@ -148,17 +152,19 @@ func SendTUIControl(home, sessionID string, c Control) error {
 	}
 }
 
-// sendControlWhenReady writes c to the side-channel FIFO at path, waiting for
-// the fake to create it.
-func sendControlWhenReady(path string, c Control) error {
+// sendControlWhenReady writes c to the side-channel FIFO that ready reports,
+// waiting until ready says the fake has it open. A FIFO that merely exists has
+// no reader yet, and a write to it fails with ENXIO.
+func sendControlWhenReady(ready func() (path string, ok bool), c Control) error {
 	for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(10 * time.Millisecond) {
-		if _, err := os.Stat(path); err == nil {
-			break
-		} else if time.Now().After(deadline) {
-			return err
+		path, ok := ready()
+		if ok {
+			return SendControl(path, c)
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("agentfake: %s never opened", path)
 		}
 	}
-	return SendControl(path, c)
 }
 
 // TUIClaude runs the fake interactive claude on the process's terminal and
