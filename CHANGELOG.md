@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.40.1 - 2026-10-28
+
+- Changed Epic page ticket cards to grow with their content. A long "after ..." blocker list no longer squeezes the title: the list is capped and anything past three blockers folds into "+ N more". Titles and ticket numbers are now 16px, and status marks are bigger.
+- Changed web UI badges to 16px by default.
+- Fixed the large note editor on the Design page hiding behind the iOS keyboard.
+
 ## v0.40.0 - 2026-10-27
 
 - Added time labels to Epics page cards, on the line under the title: `gx · 2h 5m · Implementing...`. Needs you reads `waiting 7m`, In progress counts from the first claim, enqueue or first design session, Ready to queue and Ready to design read `created 3d ago`, and Finished reads `5h ago`. Labels tick while the page is open. Queue items now record their enqueue time, shown in `gx server queue items --json`, and a map stamps `design_started_at` on its first design session.
