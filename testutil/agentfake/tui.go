@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/term"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -91,6 +92,15 @@ type PidFile struct {
 // PidFilePath is where claude running as pid under home writes its status.
 func PidFilePath(home string, pid int) string {
 	return filepath.Join(home, ".claude", "sessions", strconv.Itoa(pid)+".json")
+}
+
+// pidPathFor is PidFilePath, moved under CLAUDE_CONFIG_DIR when it is set, as
+// real claude does.
+func pidPathFor(home string, pid int) string {
+	if dir, err := harness.ClaudeSessionsDir(); err == nil {
+		return filepath.Join(dir, strconv.Itoa(pid)+".json")
+	}
+	return PidFilePath(home, pid)
 }
 
 // TUIControlPath is the side-channel FIFO of the TUI fake running sessionID
@@ -256,7 +266,7 @@ func runTUIClaude() (int, error) {
 		out:        os.Stdout,
 		ack:        ack,
 		opts:       opts,
-		pidPath:    PidFilePath(home, os.Getpid()),
+		pidPath:    pidPathFor(home, os.Getpid()),
 		ctlPath:    ctlPath,
 		transcript: transcript.PathIn(home, cwd, opts.sessionID),
 		pid: PidFile{

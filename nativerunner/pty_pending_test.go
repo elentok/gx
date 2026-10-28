@@ -30,7 +30,7 @@ func blockedOnDialog(t *testing.T, p *nativerunner.Pty, rows []string) agentrunn
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = p.Stop(s) })
-	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt", Dialog: rows})
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt", Dialog: rows})
 	if _, err := p.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 5*time.Second); err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestPty_ChangedDialogRefusesBeforeAnyKey(t *testing.T) {
 	seen := pendingOf(t, p, s).ID
 
 	// The next dialog replaces the one the person saw.
-	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt",
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt",
 		Dialog: permissionDialog("Bash command", "rm -rf build")})
 	deadline := time.Now().Add(5 * time.Second)
 	for pend := pendingOf(t, p, s); pend == nil || pend.ID == seen; pend = pendingOf(t, p, s) {

@@ -18,7 +18,6 @@ import (
 	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil/agentfake"
-	"github.com/elentok/gx/testutil/claudeenv"
 	"golang.org/x/sys/unix"
 )
 
@@ -48,10 +47,7 @@ func TestMain(m *testing.M) {
 	if os.Getenv(agentfake.ClaudeEnv) == "1" {
 		agentfake.Claude()
 	}
-	cleanup := claudeenv.Isolate()
-	code := m.Run()
-	cleanup()
-	os.Exit(code)
+	os.Exit(m.Run())
 }
 
 type launchRecord struct {

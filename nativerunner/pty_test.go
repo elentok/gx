@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -17,6 +18,7 @@ import (
 	"github.com/elentok/gx/agentrunner/runnertest"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/claudeenv"
 )
 
 // newPty returns a pty runner whose holder is this test binary and whose
@@ -28,12 +30,98 @@ func newPty(t *testing.T) *nativerunner.Pty {
 		t.Fatal(err)
 	}
 	root := shortTempDir(t)
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("CLAUDE_CONFIG_DIR", "")
-	t.Setenv(holderEnv, "1")
-	t.Setenv(agentfake.TUIEnv, "1")
 	t.Cleanup(func() { killAgents(root) })
-	return ptyOn(root, exe)
+	p := ptyOn(root, exe)
+	p.Env = ptyTestEnv(t.TempDir(), holderEnv+"=1", agentfake.TUIEnv+"=1")
+	return p
+}
+
+// ptyTestEnv is the env a test pty gives its holder: claude's home and no
+// config dir, plus the marker entries.
+func ptyTestEnv(home string, markers ...string) []string {
+	return append([]string{"HOME=" + home, "CLAUDE_CONFIG_DIR="}, markers...)
+}
+
+// ptyHome is the home p gives claude.
+func ptyHome(p *nativerunner.Pty) string {
+	home, _ := envValue(p.Env, "HOME")
+	return home
+}
+
+// ptyKeysTyped starts a session on p, prompts it with text and returns every
+// key the TUI fake read, and the Prompt error.
+func ptyKeysTyped(t *testing.T, p *nativerunner.Pty, text string) (string, error) {
+	t.Helper()
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+	promptErr := p.Prompt(s, text)
+	in, err := os.ReadFile(agentfake.TUIInputPath(ptyHome(p), s.SessionID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(in), promptErr
+}
+
+// Vim mode comes only from the config dir in Pty.Env: a poisoned home next
+// to a clean config dir types straight away, and vim mode in the config dir
+// presses `i` first, which the TUI fake never answers with an INSERT marker.
+func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
+	t.Run("poisoned home, clean config dir", func(t *testing.T) {
+		p := newPty(t)
+		p.Env = append(claudeenv.In(t.TempDir()), holderEnv+"=1", agentfake.TUIEnv+"=1")
+		in, err := ptyKeysTyped(t, p, "do it")
+		if err != nil || in != "do it\r" {
+			t.Fatalf("Prompt = %v, keys = %q; want typed with no i", err, in)
+		}
+	})
+	t.Run("vim mode in the config dir", func(t *testing.T) {
+		p := newPty(t)
+		p.Env = append(claudeenv.In(t.TempDir()), holderEnv+"=1", agentfake.TUIEnv+"=1")
+		cfg, _ := envValue(p.Env, "CLAUDE_CONFIG_DIR")
+		if err := os.WriteFile(filepath.Join(cfg, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		in, err := ptyKeysTyped(t, p, "do it")
+		if err == nil || !strings.HasPrefix(in, "i") || strings.Contains(in, "do it") {
+			t.Fatalf("Prompt = %v, keys = %q; want i pressed and the prompt not typed", err, in)
+		}
+	})
+}
+
+// With BackgroundTasks nil, a Pty reads the transcript under the HOME in its
+// Env, and gates on nothing without one.
+func TestPty_BackgroundTasksFallbackReadsEnvHome(t *testing.T) {
+	p := newPty(t)
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionBackground, Running: true})
+
+	withHome, noHome := ptyOn(p.Root, p.Claude), ptyOn(p.Root, p.Claude)
+	withHome.Env = p.Env
+	noHome.Env = slices.DeleteFunc(slices.Clone(p.Env), func(kv string) bool { return strings.HasPrefix(kv, "HOME=") })
+	for name, tc := range map[string]struct {
+		r    *nativerunner.Pty
+		want agentrunner.State
+	}{
+		"home in Env": {withHome, agentrunner.StateWorking},
+		"no HOME":     {noHome, agentrunner.StateIdle},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r, v, err := tc.r.Reattach("e-01")
+			if err != nil || v != nativerunner.VerdictLive {
+				t.Fatalf("Reattach = %v, %v; want live", err, v)
+			}
+			if st, err := tc.r.Status(r); err != nil || st.State != tc.want {
+				t.Fatalf("Status = %+v, %v; want %v", st, err, tc.want)
+			}
+		})
+	}
 }
 
 // ptyOn returns a fresh pty runner over root, as after a server restart.
@@ -55,44 +143,45 @@ func TestPty_Conformance(t *testing.T) {
 		return runnertest.Harness{
 			Runner: p,
 			FinishTurn: func(t *testing.T, s agentrunner.Session) {
-				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionFinish})
+				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionFinish})
 			},
 			// The reason is dropped: the suite answers allow, which only a
 			// permission prompt takes.
 			Block: func(t *testing.T, s agentrunner.Session, _ string) {
-				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt"})
+				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt"})
 			},
 			BlockOnDialog: func(t *testing.T, s agentrunner.Session, permission bool) {
 				waitingFor := "input needed"
 				if permission {
 					waitingFor = "permission prompt"
 				}
-				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: waitingFor})
+				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: waitingFor})
 			},
 			LastPrompt: func(t *testing.T, s agentrunner.Session) string {
 				return ptyLastPrompt(t, p, s)
 			},
 			Received: func(t *testing.T, s agentrunner.Session) string {
-				data, err := os.ReadFile(agentfake.TUIInputPath(os.Getenv("HOME"), s.SessionID))
+				data, err := os.ReadFile(agentfake.TUIInputPath(ptyHome(p), s.SessionID))
 				if err != nil {
 					t.Fatal(err)
 				}
 				return string(data)
 			},
 			OpenDialogOnNextPrompt: func(t *testing.T, s agentrunner.Session) {
-				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionDialog})
+				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionDialog})
 			},
 			FastTurn: func(t *testing.T, s agentrunner.Session) {
-				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionFast})
+				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionFast})
 			},
 			Stall: func(t *testing.T, s agentrunner.Session) {
-				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
+				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionStall})
 			},
 			BackgroundTask: func(t *testing.T, s agentrunner.Session, running bool) {
-				ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBackground, Running: running})
+				ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionBackground, Running: running})
 			},
 			Restart: func(t *testing.T) agentrunner.Runner {
 				r := ptyOn(p.Root, p.Claude)
+				r.Env = p.Env
 				entries, err := os.ReadDir(p.Root)
 				if err != nil {
 					t.Fatal(err)
@@ -109,9 +198,9 @@ func TestPty_Conformance(t *testing.T) {
 }
 
 // ptyControl sends c to the TUI fake behind s.
-func ptyControl(t *testing.T, s agentrunner.Session, c agentfake.Control) {
+func ptyControl(t *testing.T, p *nativerunner.Pty, s agentrunner.Session, c agentfake.Control) {
 	t.Helper()
-	if err := agentfake.SendTUIControl(os.Getenv("HOME"), s.SessionID, c); err != nil {
+	if err := agentfake.SendTUIControl(ptyHome(p), s.SessionID, c); err != nil {
 		t.Fatalf("control %s: %v", c.Action, err)
 	}
 }
@@ -147,9 +236,9 @@ func blockedPty(t *testing.T, p *nativerunner.Pty, stalled bool) agentrunner.Ses
 	// Stall goes first: controls arrive in order, so the blocked wait below
 	// also confirms the stall landed before any Esc.
 	if stalled {
-		ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
+		ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionStall})
 	}
-	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt"})
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "permission prompt"})
 	if _, err := p.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 5*time.Second); err != nil {
 		t.Fatal(err)
 	}
@@ -256,12 +345,12 @@ func TestPty_StuckPromptNudgesAndRetypesOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer p.Stop(s)
-	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionStall})
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionStall})
 
 	if err := p.Prompt(s, "do it"); !errors.Is(err, agentrunner.ErrNotDelivered) {
 		t.Fatalf("Prompt = %v; want ErrNotDelivered", err)
 	}
-	in, err := os.ReadFile(agentfake.TUIInputPath(os.Getenv("HOME"), s.SessionID))
+	in, err := os.ReadFile(agentfake.TUIInputPath(ptyHome(p), s.SessionID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +370,7 @@ func TestPty_MultiLinePromptKeepsRawLF(t *testing.T) {
 	if err := p.Prompt(s, "one\ntwo"); err != nil {
 		t.Fatalf("Prompt = %v", err)
 	}
-	in, err := os.ReadFile(agentfake.TUIInputPath(os.Getenv("HOME"), s.SessionID))
+	in, err := os.ReadFile(agentfake.TUIInputPath(ptyHome(p), s.SessionID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,7 +386,7 @@ func TestPty_BlockedReasonIsWaitingFor(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer p.Stop(s)
-	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "approve Bash"})
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionBlock, WaitingFor: "approve Bash"})
 	st, err := p.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 5*time.Second)
 	if err != nil || st.BlockedReason != "approve Bash" {
 		t.Fatalf("Wait = %+v, %v; want blocked on approve Bash", st, err)
@@ -390,7 +479,7 @@ func TestPty_ClaudeExitIsSessionDiedWithCode(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer p.Stop(s)
-	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionExit, Code: 3})
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionExit, Code: 3})
 	_, err = p.Wait(s, []agentrunner.State{agentrunner.StateBlocked}, 5*time.Second)
 	if !errors.Is(err, agentrunner.ErrSessionDied) || !strings.Contains(err.Error(), "claude exited (code 3)") {
 		t.Fatalf("Wait = %v; want session died with code 3", err)

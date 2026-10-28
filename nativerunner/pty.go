@@ -45,7 +45,8 @@ type Pty struct {
 	// Procs stamps pid start times; defaults to ps.
 	Procs ProcessTable
 	// BackgroundTasks reports whether the claude behind s still runs a
-	// background task. Nil means no gating.
+	// background task. Nil reads the transcript under the HOME in Env, and
+	// means no gating without one.
 	BackgroundTasks func(s agentrunner.Session) bool
 	// N is the configured runner wait; zero means agentrunner.DefaultN.
 	N time.Duration
@@ -58,6 +59,9 @@ type Pty struct {
 	sessions map[string]*ptySession
 	// starting holds labels whose Start is still launching.
 	starting map[string]struct{}
+
+	envProbeOnce sync.Once
+	envProbe     func(agentrunner.Session) bool
 }
 
 var (
@@ -989,7 +993,27 @@ func (p *Pty) escThenPrompt(ss *ptySession, reason string) error {
 }
 
 func (p *Pty) backgroundTasks(s agentrunner.Session) bool {
-	return p.BackgroundTasks != nil && p.BackgroundTasks(s)
+	if p.BackgroundTasks != nil {
+		return p.BackgroundTasks(s)
+	}
+	p.envProbeOnce.Do(func() {
+		if home := envValue(p.Env, "HOME"); home != "" {
+			p.envProbe = claudeui.BackgroundTasks(home, time.Now)
+		}
+	})
+	return p.envProbe != nil && p.envProbe(s)
+}
+
+// envValue is the last value of key in a KEY=VALUE list, as exec resolves
+// duplicates.
+func envValue(env []string, key string) string {
+	var v string
+	for _, kv := range env {
+		if k, val, ok := strings.Cut(kv, "="); ok && k == key {
+			v = val
+		}
+	}
+	return v
 }
 
 func (p *Pty) pollInterval() time.Duration {

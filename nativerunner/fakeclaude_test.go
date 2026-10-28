@@ -25,11 +25,9 @@ func fakeclaudeRunner(t *testing.T) *nativerunner.Pty {
 		t.Fatal(err)
 	}
 	root := shortTempDir(t)
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("CLAUDE_CONFIG_DIR", "")
-	t.Setenv(holderEnv, "1")
 	t.Cleanup(func() { killAgents(root) })
 	p := ptyOn(root, exe)
+	p.Env = ptyTestEnv(t.TempDir(), holderEnv+"=1")
 	p.Claude = bin
 	return p
 }
@@ -62,7 +60,7 @@ func TestFakeclaude_PtyReadsScreenAndAnswersPermission(t *testing.T) {
 	if st, err := p.Status(s); err != nil || st.State != agentrunner.StateWorking || st.Pending != nil {
 		t.Fatalf("Status = %+v, %v; want working with the prompt cleared", st, err)
 	}
-	ptyControl(t, s, agentfake.Control{Action: agentfake.ActionFinish})
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionFinish})
 	if _, err := p.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 5*time.Second); err != nil {
 		t.Fatalf("program did not continue to idle: %v", err)
 	}
