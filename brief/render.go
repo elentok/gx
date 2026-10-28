@@ -59,20 +59,28 @@ func (u Unit) String() string {
 // renderUnits prints the units under their location. Units of one location
 // must be adjacent.
 func renderUnits(w io.Writer, units []Unit) {
+	units, counts := collapseUnits(units)
 	prev := ""
 	for i, u := range units {
 		if i == 0 || u.Location != prev {
 			fmt.Fprintln(w, u.Location)
 			prev = u.Location
 		}
+		head := u.Name
 		if u.Kind != KindTest {
-			fmt.Fprintf(w, "  %s\n", u.Kind.label())
-		} else {
-			fmt.Fprintf(w, "  %s\n", u.Name)
+			head = u.Kind.label()
+		}
+		if counts[i] > 1 {
+			head += fmt.Sprintf(" (x%d)", counts[i])
 		}
 		if i >= maxFullUnits {
+			if loc := goFileLine.FindString(u.Text); loc != "" {
+				head += " " + loc
+			}
+			fmt.Fprintf(w, "  %s\n", head)
 			continue
 		}
+		fmt.Fprintf(w, "  %s\n", head)
 		for _, l := range limitText(u.Text) {
 			fmt.Fprintf(w, "    %s\n", l)
 		}
@@ -80,6 +88,26 @@ func renderUnits(w io.Writer, units []Unit) {
 	if len(units) > maxFullUnits {
 		fmt.Fprintf(w, "%d more failures are listed by name only; see the log for their text\n", len(units)-maxFullUnits)
 	}
+}
+
+// goFileLine finds the first file:line of a Go test failure in its output.
+var goFileLine = regexp.MustCompile(`[\w.-]+_test\.go:\d+`)
+
+// collapseUnits merges units that repeat another one exactly, as -count=N
+// does, and returns how many times each kept unit occurred. A repeat joins the
+// first occurrence, so units of one location stay adjacent.
+func collapseUnits(units []Unit) ([]Unit, []int) {
+	var out []Unit
+	var counts []int
+	for _, u := range units {
+		if i := slices.Index(out, u); i >= 0 {
+			counts[i]++
+			continue
+		}
+		out = append(out, u)
+		counts = append(counts, 1)
+	}
+	return out, counts
 }
 
 // limitText returns at most maxUnitLines lines, each cut at maxLineChars, with

@@ -209,6 +209,26 @@ func TestState_WatchdogDumpsTraceOnDeadlock(t *testing.T) {
 // with a synthetic failed() so it can simulate an assertion failure without
 // actually failing this test.
 func TestState_WatchdogDumpsTraceOnAssertionFailure(t *testing.T) {
+	t.Setenv("HERDRFAKE_DUMP", "1")
+	if got := assertionFailureLogs(t, 2*time.Second, true); !strings.Contains(got, "assertion failure") {
+		t.Fatalf("watchdog never dumped on assertion failure; logs so far:\n%s", got)
+	}
+}
+
+// TestState_WatchdogSkipsAssertionFailureDumpByDefault checks that without
+// HERDRFAKE_DUMP=1 a failed assertion alone prints nothing.
+func TestState_WatchdogSkipsAssertionFailureDumpByDefault(t *testing.T) {
+	t.Setenv("HERDRFAKE_DUMP", "")
+	if got := assertionFailureLogs(t, 300*time.Millisecond, false); strings.Contains(got, "watchdog dump") {
+		t.Fatalf("watchdog dumped on assertion failure without HERDRFAKE_DUMP=1:\n%s", got)
+	}
+}
+
+// assertionFailureLogs runs a watchdog over a State whose test has failed and
+// returns the logs after the wait. With stopOnDump it returns as soon as an
+// assertion-failure dump shows up.
+func assertionFailureLogs(t *testing.T, wait time.Duration, stopOnDump bool) string {
+	t.Helper()
 	var mu sync.Mutex
 	var logs []string
 
@@ -236,16 +256,13 @@ func TestState_WatchdogDumpsTraceOnAssertionFailure(t *testing.T) {
 
 	failed.Store(true)
 
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(wait)
 	for {
 		mu.Lock()
 		got := strings.Join(logs, "\n")
 		mu.Unlock()
-		if strings.Contains(got, "assertion failure") {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("watchdog never dumped on assertion failure; logs so far:\n%s", got)
+		if (stopOnDump && strings.Contains(got, "assertion failure")) || time.Now().After(deadline) {
+			return got
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

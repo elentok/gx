@@ -2,6 +2,7 @@ package herdrfake
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -302,7 +303,7 @@ func (s *State) beat() {
 // StartStateEnv wires State up like StartEnv: a fake herdr backed by State's
 // registered commands, plus a short real-time watchdog alongside it. If a
 // single command doesn't complete within watchdogDeadlockBudget, or the test
-// has already failed an assertion, the watchdog dumps State's full trace via
+// has already failed an assertion and HERDRFAKE_DUMP=1, the watchdog dumps State's full trace via
 // t.Log so a hung or failed scenario is diagnosable without waiting out its
 // own timeout. It returns the KEY=VALUE entries as StartEnv does.
 func StartStateEnv(t *testing.T, s *State) (*Coordinator, []string) {
@@ -326,7 +327,9 @@ func (s *State) runWatchdog(stop <-chan struct{}) {
 			if s.dumped.Load() {
 				continue
 			}
-			if s.failed() {
+			// Most assertion failures have nothing to do with the fake, and the
+			// dump buries the real failure in gx brief output.
+			if s.failed() && os.Getenv("HERDRFAKE_DUMP") == "1" {
 				s.dumpTrace("assertion failure")
 				continue
 			}

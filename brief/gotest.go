@@ -73,6 +73,9 @@ func (GoTest) Parse(out []byte, _ int) Outcome {
 		switch ev.Action {
 		case "build-output":
 			buildText[ev.ImportPath] = append(buildText[ev.ImportPath], strings.TrimRight(ev.Output, "\n"))
+		case "run":
+			// -count=N runs a test N times; keep the text of the latest run.
+			delete(pkg(ev.Package).testOutput, ev.Test)
 		case "output":
 			p := pkg(ev.Package)
 			l := strings.TrimRight(ev.Output, "\n")
