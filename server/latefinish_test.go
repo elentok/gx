@@ -45,7 +45,7 @@ type zeroCommitPaused struct {
 	stops func() int32
 }
 
-func pauseZeroCommit(t *testing.T, headless bool) zeroCommitPaused {
+func pauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) zeroCommitPaused {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -53,9 +53,9 @@ func pauseZeroCommit(t *testing.T, headless bool) zeroCommitPaused {
 	p := zeroCommitPaused{store: store, ticketPath: filepath.Join(store, "proj/epic-a/issues/01-first.md")}
 	if headless {
 		fake := &stopCounter{turnRunner: newTurnRunner(func(string, string) {})}
-		p.h = servertest.StartWithStore(t, store, func(c *server.Config) {
+		p.h = servertest.StartWithStore(t, store, append([]func(*server.Config){func(c *server.Config) {
 			c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
-		})
+		}}, opts...)...)
 		if res, err := p.h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
@@ -68,7 +68,7 @@ func pauseZeroCommit(t *testing.T, headless bool) zeroCommitPaused {
 		base := fake.stops.Load()
 		p.stops = func() int32 { return fake.stops.Load() - base }
 	} else {
-		p.h = servertest.StartWithStore(t, store)
+		p.h = servertest.StartWithStore(t, store, opts...)
 		runToZeroCommitPause(t, p.h, "done")
 		p.agentGone = func() {
 			p.h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
@@ -146,7 +146,7 @@ func (p zeroCommitPaused) adopted(t *testing.T) string {
 // staysPaused gives a scan time to act, then checks it did not.
 func (p zeroCommitPaused) staysPaused(t *testing.T) {
 	t.Helper()
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: a few 50ms polls
 	tk, err := schema.ParseTicket(p.ticketPath)
 	if err != nil {
 		t.Fatal(err)
@@ -262,7 +262,8 @@ func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
 	for _, verb := range []string{"resume", "relaunch"} {
 		t.Run(verb, func(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {
-				p := pauseZeroCommit(t, headless)
+				// No poll may pick up the investigations before the verb runs.
+				p := pauseZeroCommit(t, headless, func(c *server.Config) { c.PollInterval = time.Hour })
 				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "02", "unstarted", servertest.TicketOpts{Type: "investigate", Parent: "01"})
 				servertest.WriteTicketWith(t, p.store, "proj", "epic-a", "03", "running", servertest.TicketOpts{Type: "investigate", Parent: "01", Status: "claimed"})
 				commitAgentWork(t, p.wtPath)
@@ -296,7 +297,7 @@ func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
 					t.Errorf("running investigation status = %v, %v; want left alone", tk.Status, err)
 				}
 				// A launch would reclaim it.
-				time.Sleep(300 * time.Millisecond)
+				time.Sleep(200 * time.Millisecond) // negative wait: a few 50ms polls
 				if tk, err := schema.ParseTicket(p.ticketPath); err != nil || tk.Status != schema.StatusDone {
 					t.Errorf("status = %v, %v; want still done", tk.Status, err)
 				}

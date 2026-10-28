@@ -221,24 +221,24 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.DisableWatch = true // a missed watch event: only the poll catches the edit up
 		c.PollInterval = time.Hour
+		c.BudgetPollInterval = time.Hour // a budget poll also rescans, which would catch the index up
 	})
 	registerLaunch(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	// A pass that finds herdr unprobed claims nothing, which would hide the refusal.
-	for {
+	servertest.WaitFor(t, 10*time.Second, "herdr to be probed", func() bool {
 		snap, err := h.Client.Snapshot(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !snap.HerdrUnavailable {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return !snap.HerdrUnavailable
+	})
 
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	// The server rescans once right after start; let that finish so the edit merges after it.
+	// Not a condition wait: nothing observable marks the end of that rescan, and a snapshot
+	// that already lists the ticket does not (the edit then lands inside the rescan).
 	time.Sleep(300 * time.Millisecond)
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -250,28 +250,23 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	for {
+	servertest.WaitFor(t, 10*time.Second, "the claim-reread-mismatch verdict", func() bool {
 		ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ex.Verdict == server.VerdictClaimRereadMismatch {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return ex.Verdict == server.VerdictClaimRereadMismatch
+	})
 	if got, _ := os.ReadFile(path); !strings.Contains(string(got), "status: open") {
 		t.Fatalf("ticket was claimed on a stale index view:\n%s", got)
 	}
 
 	// A restart is the next pass over a fresh index: it sees the edit and claims.
 	h.Restart(t)
-	for !strings.Contains(readFile(t, path), "status: claimed") && !strings.Contains(readFile(t, path), "status: done") {
-		if ctx.Err() != nil {
-			t.Fatal("ticket was not claimed after the index caught up")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	servertest.WaitFor(t, 10*time.Second, "the ticket to be claimed after the index caught up", func() bool {
+		got := readFile(t, path)
+		return strings.Contains(got, "status: claimed") || strings.Contains(got, "status: done")
+	})
 }
 
 func readFile(t *testing.T, path string) string {
@@ -481,7 +476,12 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 		registerLaunch(h)
 		// One agent of the root is already running.
 		h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00"})
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		// The no-start case waits out the whole timeout, so it stays short.
+		timeout := time.Second
+		if tc.starts {
+			timeout = 20 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		snap, err := h.Client.Snapshot(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -595,21 +595,15 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 		}
 	}
 	var snap server.Snapshot
-	for {
+	// The claim reaches the index after the watch debounce, so the first row
+	// reads claimed a moment after the cap shows up.
+	servertest.WaitFor(t, 30*time.Second, "the first root claimed and the second at the cap", func() bool {
 		var err error
 		if snap, err = h.Client.Snapshot(ctx); err != nil {
 			t.Fatal(err)
 		}
-		// The claim reaches the index after the watch debounce, so the first row
-		// reads claimed a moment after the cap shows up.
-		if len(snap.Pending) == 2 && snap.Pending[0].Verdict == "claimed" && snap.Pending[1].Verdict == server.VerdictConcurrencyCap {
-			break
-		}
-		if ctx.Err() != nil {
-			t.Fatalf("pending = %+v, want the first root claimed and the second at the cap", snap.Pending)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return len(snap.Pending) == 2 && snap.Pending[0].Verdict == "claimed" && snap.Pending[1].Verdict == server.VerdictConcurrencyCap
+	})
 	evs, err := h.Client.Events(ctx, snap.Seq)
 	if err != nil {
 		t.Fatal(err)
@@ -700,23 +694,17 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
-	for {
+	// A slot is taken a moment before its ticket reads "claimed", so the first
+	// two verdicts may lag the third's cap; keep polling until they settle.
+	servertest.WaitFor(t, 30*time.Second, "the first two claimed and the third at the cap", func() bool {
 		snap, err := h.Client.Snapshot(ctx)
 		if err != nil {
 			t.Fatalf("snapshot: %v; last pending = %+v", err, last)
 		}
 		last = snap.Pending
-		// A slot is taken a moment before its ticket reads "claimed", so the first
-		// two verdicts may lag the third's cap; keep polling until they settle.
-		if len(snap.Pending) == 3 && snap.Pending[2].Verdict == server.VerdictConcurrencyCap &&
-			snap.Pending[0].Verdict == "claimed" && snap.Pending[1].Verdict == "claimed" {
-			break
-		}
-		if ctx.Err() != nil {
-			t.Fatalf("pending = %+v, want the first two claimed and the third at the cap", snap.Pending)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return len(snap.Pending) == 3 && snap.Pending[2].Verdict == server.VerdictConcurrencyCap &&
+			snap.Pending[0].Verdict == "claimed" && snap.Pending[1].Verdict == "claimed"
+	})
 	if runs := h.Server.Runs(); len(runs) != 2 {
 		t.Errorf("runs = %+v, want 2 live agents", runs)
 	}

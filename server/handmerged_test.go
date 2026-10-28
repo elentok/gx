@@ -44,11 +44,7 @@ func runGitIn(t *testing.T, repo string, args ...string) {
 
 func waitUntil(t *testing.T, what string, cond func() bool) {
 	t.Helper()
-	for deadline := time.Now().Add(10 * time.Second); !cond(); time.Sleep(20 * time.Millisecond) {
-		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for %s", what)
-		}
-	}
+	servertest.WaitFor(t, 10*time.Second, what, cond)
 }
 
 func TestHandMerged_PlainGitMergeReleasesAnOnMergedDependent(t *testing.T) {

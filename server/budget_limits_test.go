@@ -117,10 +117,10 @@ func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 	if runs := h.Server.Runs(); len(runs) != 1 {
 		t.Fatalf("runs = %+v, want the nudged pane tracked", runs)
 	}
-	for len(h.Server.Runs()) != 0 && ctx.Err() == nil {
+	servertest.WaitFor(t, 10*time.Second, "the hard limit to stop the nudged pane", func() bool {
 		h.Server.PollBudget()
-		time.Sleep(20 * time.Millisecond)
-	}
+		return len(h.Server.Runs()) == 0
+	})
 	if !closed.Load() {
 		t.Error("the hard limit did not close the nudged pane")
 	}
@@ -147,7 +147,7 @@ func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(250 * time.Millisecond) // negative wait: a launch would have come within a few 50ms polls
 	if runs := h.Server.Runs(); len(runs) != 0 {
 		t.Fatalf("runs = %+v, want none past the soft limit", runs)
 	}
@@ -184,7 +184,7 @@ func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(250 * time.Millisecond) // negative wait: a launch would have come within a few 50ms polls
 	if runs := h.Server.Runs(); len(runs) != 0 {
 		t.Fatalf("runs = %+v, want none in either project past the soft limit", runs)
 	}
@@ -253,18 +253,13 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
-	for len(h.Server.Runs()) == 0 && ctx.Err() == nil {
-		time.Sleep(20 * time.Millisecond)
-	}
+	servertest.WaitFor(t, 10*time.Second, "a live run", func() bool { return len(h.Server.Runs()) > 0 })
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	for ctx.Err() == nil {
+	servertest.WaitFor(t, 10*time.Second, "the ticket to be budget-killed", func() bool {
 		h.Server.PollBudget()
 		data, _ := os.ReadFile(path)
-		if strings.Contains(string(data), "budget-killed") {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+		return strings.Contains(string(data), "budget-killed")
+	})
 	data, _ := os.ReadFile(path)
 	if !strings.Contains(string(data), "status: paused") || !strings.Contains(string(data), "budget-killed") {
 		t.Fatalf("ticket not paused budget-killed:\n%s", data)
@@ -354,15 +349,13 @@ func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOp
 	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
-	for len(h.Server.Runs()) == 0 && ctx.Err() == nil {
-		time.Sleep(20 * time.Millisecond)
-	}
+	servertest.WaitFor(t, 10*time.Second, "a live run", func() bool { return len(h.Server.Runs()) > 0 })
 	// Poll until the run has settled, and judge the ticket only then: the
 	// run's own finish is what used to overwrite the budget pause.
-	for len(h.Server.Runs()) != 0 && ctx.Err() == nil {
+	servertest.WaitFor(t, 10*time.Second, "the run to settle", func() bool {
 		h.Server.PollBudget()
-		time.Sleep(20 * time.Millisecond)
-	}
+		return len(h.Server.Runs()) == 0
+	})
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	tk, err := schema.ParseTicket(path)
 	if err != nil {
@@ -415,15 +408,10 @@ func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harn
 			t.Fatal(err)
 		}
 	}
-	for ctx.Err() == nil {
-		if live, _ := fake.List("epic-a"); len(live) >= n {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	if live, _ := fake.List("epic-a"); len(live) < n {
-		t.Fatalf("live sessions = %d, want %d", len(live), n)
-	}
+	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("%d live sessions", n), func() bool {
+		live, _ := fake.List("epic-a")
+		return len(live) >= n
+	})
 	return h, fake, &over, labels
 }
 
@@ -480,11 +468,8 @@ func TestBudget_HardLimitStopsDespiteInterruptError(t *testing.T) {
 // after the stop returns, so the check waits for it.
 func assertNoLiveSessions(t *testing.T, fake *runnerfake.Runner) {
 	t.Helper()
-	var live []agentrunner.Session
-	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
-		if live, _ = fake.List("epic-a"); len(live) == 0 {
-			return
-		}
-	}
-	t.Errorf("sessions still live: %v", live)
+	servertest.WaitFor(t, 5*time.Second, "no live sessions", func() bool {
+		live, _ := fake.List("epic-a")
+		return len(live) == 0
+	})
 }

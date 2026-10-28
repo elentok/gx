@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,15 +16,10 @@ import (
 
 func waitForFile(t *testing.T, path string, present bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	servertest.WaitFor(t, 5*time.Second, fmt.Sprintf("%s: present = %v", path, present), func() bool {
 		_, err := os.Stat(path)
-		if (err == nil) == present {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatalf("%s: present = %v never reached", path, present)
+		return (err == nil) == present
+	})
 }
 
 func startSweep(t *testing.T, store string) *servertest.Harness {

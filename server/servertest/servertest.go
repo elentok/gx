@@ -345,6 +345,25 @@ func (p *Sounds) Played() []sound.Name {
 	return slices.Clone(p.played)
 }
 
+// WaitFor polls cond every few milliseconds until it holds, failing the test
+// with "timed out waiting for <what>" after timeout.
+func WaitFor(t *testing.T, timeout time.Duration, what string, cond func() bool) {
+	t.Helper()
+	if !Poll(timeout, cond) {
+		t.Fatalf("timed out waiting for %s", what)
+	}
+}
+
+// Poll is WaitFor without the failure: it reports whether cond held in time.
+func Poll(timeout time.Duration, cond func() bool) bool {
+	for deadline := time.Now().Add(timeout); !cond(); time.Sleep(5 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			return false
+		}
+	}
+	return true
+}
+
 // WaitForEvent returns the first streamed event of typ for address (any
 // address when empty), failing the test if the stream ends or ctx expires first.
 func WaitForEvent(ctx context.Context, t *testing.T, evs <-chan server.Event, typ, address string) server.Event {
@@ -514,6 +533,12 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// Tests write a transcript right after the server first looked for it, so
 	// a remembered miss would hide it. Negative turns the miss cache off.
 	h.cfg.TranscriptMissTTL = -1
+	// Short polls so a test that waits for a tick gets it in milliseconds. Setting
+	// PollInterval also turns off keepFresh's 15s backstop, so tests no longer
+	// depend on store watch events arriving.
+	h.cfg.PollInterval = 200 * time.Millisecond
+	h.cfg.BudgetPollInterval = 50 * time.Millisecond
+	h.cfg.ChatPollInterval = 50 * time.Millisecond
 	for _, o := range opts {
 		o(&h.cfg)
 	}

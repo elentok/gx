@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -78,8 +79,7 @@ func pauseMessagesOf(sent []string, kind events.Kind) []string {
 // enough for a wrong second one to show.
 func waitPauseMessages(t *testing.T, sent func() []string, kind events.Kind) []string {
 	t.Helper()
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && len(pauseMessagesOf(sent(), kind)) == 0; time.Sleep(50 * time.Millisecond) {
-	}
+	servertest.Poll(10*time.Second, func() bool { return len(pauseMessagesOf(sent(), kind)) > 0 })
 	time.Sleep(1500 * time.Millisecond)
 	return pauseMessagesOf(sent(), kind)
 }
@@ -97,7 +97,7 @@ func resume(t *testing.T, h *servertest.Harness) {
 func waitRecoveryState(t *testing.T, h *servertest.Harness, want string) {
 	t.Helper()
 	var got server.TicketInfo
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("the ticket stuck with recovery %q", want), func() bool {
 		snap, err := h.Client.Snapshot(context.Background())
 		if err != nil {
 			t.Fatal(err)
@@ -107,11 +107,8 @@ func waitRecoveryState(t *testing.T, h *servertest.Harness, want string) {
 				got = ti
 			}
 		}
-		if got.Status == "needs-repair" && got.Recovery == want {
-			return
-		}
-	}
-	t.Fatalf("ticket = %s, recovery %q; want stuck, recovery %q", got.Status, got.Recovery, want)
+		return got.Status == "needs-repair" && got.Recovery == want
+	})
 }
 
 func TestRecoveryNotify_SnapshotShowsTheHold(t *testing.T) {
@@ -333,8 +330,7 @@ func TestRecoveryNotify_EveryEscalationSendsOneMessageNamingTheEntryAndTheReport
 			if err := h.Server.PauseTicket("proj", "epic-a", "01", events.IterationError, "boom"); err != nil {
 				t.Fatal(err)
 			}
-			for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && len(escalationMessages(sent())) == 0; time.Sleep(50 * time.Millisecond) {
-			}
+			servertest.Poll(10*time.Second, func() bool { return len(escalationMessages(sent())) > 0 })
 			time.Sleep(1500 * time.Millisecond) // a wrong second message would show by now
 			got := escalationMessages(sent())
 			if len(got) != 1 || !strings.Contains(got[0], "entry: "+tc.want) || !strings.Contains(got[0], "01-first.md") {
@@ -356,9 +352,10 @@ func TestRecovery_AgentEntryMatchIsRecordedWithItsSignatureBeforeTheInvestigatio
 	appliedAt := func() int {
 		return slices.IndexFunc(log, func(ev ralphloop.Event) bool { return events.Type(ev.Type) == events.RecoveryApplied })
 	}
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && appliedAt() < 0; time.Sleep(20 * time.Millisecond) {
+	servertest.WaitFor(t, 10*time.Second, "recovery-applied", func() bool {
 		log, _, _ = ralphloop.ReadEvents(dir, "epic-a")
-	}
+		return appliedAt() >= 0
+	})
 	matchedAt := slices.IndexFunc(log, func(ev ralphloop.Event) bool { return events.Type(ev.Type) == events.RecoveryMatched })
 	if matchedAt < 0 || matchedAt > appliedAt() {
 		t.Fatalf("log = %+v, want recovery-matched before recovery-applied", log)
@@ -382,9 +379,10 @@ func TestRecoveryNotify_SlowRecoverySendsTheOriginalPauseAfterTheHold(t *testing
 		t.Fatal(err)
 	}
 	var got []string
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && len(got) == 0; time.Sleep(50 * time.Millisecond) {
+	servertest.Poll(10*time.Second, func() bool {
 		got = pauseMessages(sent())
-	}
+		return len(got) > 0
+	})
 	if len(got) != 1 || !strings.Contains(got[0], "boom") {
 		t.Fatalf("sends = %v, want the original pause once the hold expired", got)
 	}

@@ -70,12 +70,7 @@ func startGraceServer(t *testing.T, grace time.Duration, opts ...func(*server.Co
 	waitRuns(ctx, t, h, 1)
 	// A launching run has no session yet, so the stop would skip it and report
 	// zero agents stopped.
-	for h.Server.LaunchingRuns() > 0 {
-		if ctx.Err() != nil {
-			t.Fatalf("runs = %+v, want none launching", h.Server.Runs())
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	servertest.WaitFor(t, 10*time.Second, "no launching runs", func() bool { return h.Server.LaunchingRuns() == 0 })
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -126,27 +121,13 @@ func TestHardLimitGrace_ConfigStatusShowsCountdown(t *testing.T) {
 
 // hasBanner waits briefly for a banner titled title.
 func (f graceFixture) hasBanner(title string) bool {
-	for range 50 {
-		for _, b := range f.h.Banners.Sent() {
-			if b.Title == title {
-				return true
-			}
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	return false
+	return servertest.Poll(2*time.Second, func() bool { return f.countBanners(title) > 0 })
 }
 
 // waitBanners waits briefly for n banners titled title, and returns the count.
 func (f graceFixture) waitBanners(title string, n int) int {
-	got := 0
-	for range 50 {
-		if got = f.countBanners(title); got >= n {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	return got
+	servertest.Poll(2*time.Second, func() bool { return f.countBanners(title) >= n })
+	return f.countBanners(title)
 }
 
 func (f graceFixture) countBanners(title string) int {
@@ -174,7 +155,7 @@ func (f graceFixture) expectHeld(t *testing.T) {
 	if _, err := f.h.Client.QueueAdd(f.ctx, "proj:epic-b/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: a launch would come within a few 50ms polls
 	if runs := f.h.Server.Runs(); len(runs) != 1 {
 		t.Fatalf("runs = %+v, want only the running agent during the grace period", runs)
 	}
@@ -308,11 +289,10 @@ func TestHardLimitGrace_ExpiryDuringPollsSendsNoChatNotice(t *testing.T) {
 	f.lowerBelowSpend(t)
 
 	const done = "gx: 1 agents stopped — hard budget limit reached."
-	time.Sleep(300 * time.Millisecond) // the countdown ends
-	if !f.hasBanner(done) {
+	if !f.hasBanner(done) { // waits out the countdown
 		t.Fatalf("banners = %+v, want the done banner", f.h.Banners.Sent())
 	}
-	time.Sleep(300 * time.Millisecond) // a chat batch would flush by now
+	time.Sleep(100 * time.Millisecond) // negative wait: a chat batch (20ms flush) would flush by now
 	if n := f.countBanners(done); n != 1 {
 		t.Errorf("done banners = %d, want 1", n)
 	}
@@ -361,7 +341,7 @@ func TestHardLimitGrace_SecondLoweringKeepsOneTimer(t *testing.T) {
 
 	servertest.WriteConfig(t, f.path, f.store, budgetLimits(0, 5))
 	reload(t, f.h)
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond) // negative wait: a second start banner would show by now
 	if n := f.countBanners(f.startTitle); n != 1 {
 		t.Errorf("start banners = %d, want 1", n)
 	}

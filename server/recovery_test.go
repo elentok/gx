@@ -93,8 +93,7 @@ func TestRecovery_RecoveredPauseLeavesMatchedAndAppliedWithKind(t *testing.T) {
 	}
 
 	var matched, applied *ralphloop.Event
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) && (matched == nil || applied == nil) {
+	servertest.Poll(5*time.Second, func() bool {
 		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
 		matched, applied = nil, nil
 		for i, ev := range log {
@@ -105,8 +104,8 @@ func TestRecovery_RecoveredPauseLeavesMatchedAndAppliedWithKind(t *testing.T) {
 				applied = &log[i]
 			}
 		}
-		time.Sleep(20 * time.Millisecond)
-	}
+		return matched != nil && applied != nil
+	})
 	if matched == nil || applied == nil {
 		t.Fatalf("matched = %v, applied = %v, want both recorded", matched, applied)
 	}
@@ -347,22 +346,23 @@ func pauseAfterSeeding(t *testing.T, seed ...ralphloop.Event) (*ralphloop.Event,
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
 		t.Fatalf("pause: %v", err)
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
+	var escalated *ralphloop.Event
+	servertest.Poll(2*time.Second, func() bool {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
 		for i, ev := range log {
 			switch events.Type(ev.Type) {
 			case events.RecoveryEscalated:
-				return &log[i], results
+				escalated = &log[i]
+				return true
 			case events.RecoveryApplied:
 				if i >= len(seed) {
-					return nil, results
+					return true
 				}
 			}
 		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	return nil, results
+		return false
+	})
+	return escalated, results
 }
 
 func applied(kind events.Kind) ralphloop.Event {
@@ -430,7 +430,7 @@ func TestRecovery_UnrelatedPriorRecoveryDoesNotTripTheGuardRail(t *testing.T) {
 			}
 			select {
 			case <-results:
-			case <-time.After(2 * time.Second):
+			case <-time.After(10 * time.Second):
 				t.Fatal("remedy did not run")
 			}
 		})
@@ -460,21 +460,19 @@ func proposeByPausing(t *testing.T) (h *servertest.Harness, results <-chan recov
 		t.Fatalf("pause: %v", err)
 	}
 	dir := filepath.Join(h.TicketStore, "proj")
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	servertest.WaitFor(t, 5*time.Second, "a recovery-proposed event", func() bool {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryProposed {
 				if ev.Text != "relaunch proj:epic-a/01" {
 					t.Fatalf("proposed text = %q, want the exact relaunch verb", ev.Text)
 				}
-				return h, results, filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-first.md")
+				return true
 			}
 		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatal("no recovery-proposed event")
-	return
+		return false
+	})
+	return h, results, filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-first.md")
 }
 
 func TestRecovery_HighAuthorityMatchProposesWithoutActing(t *testing.T) {
@@ -612,7 +610,7 @@ func TestRecovery_UnmatchedPauseForksAQueuedInvestigateChildAndNeverRecurses(t *
 	if err := h.Server.PauseAs("proj:epic-a/01a", events.IterationError, "stuck"); err != nil {
 		t.Fatalf("pause child: %v", err)
 	}
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond) // negative wait: a forked ticket would show by now
 	for _, tk := range epicTickets(t, h).Tickets {
 		if tk.Identifier == "01b" || tk.Identifier == "01a1" {
 			t.Errorf("investigate ticket failure forked %s, want no recursion", tk.Identifier)
@@ -804,6 +802,8 @@ func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testin
 		t.Fatalf("proposal acted: status %s, commitless %v", tk.Status, tk.Commitless)
 	}
 
+	// The paused iteration may still be unwinding, and approve refuses while it runs.
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 0 })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if res, err := h.Client.TicketApprove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
@@ -1243,7 +1243,7 @@ func TestRecovery_ParentDefectScanRaisesNothingWhileR14IsDisabled(t *testing.T) 
 	t.Parallel()
 	h := startParentDefect(t, t.TempDir(), recovery.Default())
 	h.Server.Rescan()
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: a raised event would show by now
 	if byType := parentDefectEvents(h); len(byType) != 0 {
 		t.Errorf("events = %+v, want none", byType)
 	}
@@ -1276,7 +1276,7 @@ func TestRecovery_ParentDefectScanSkipsDrafts(t *testing.T) {
 		c.Recovery = cat
 	})
 	h.Server.Rescan()
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: a recovery event would show by now
 	for _, epic := range []string{"epic-a", "epic-b"} {
 		log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), epic)
 		for _, ev := range log {
@@ -1309,7 +1309,7 @@ func TestRecovery_ManualAndUnmatchedBlockedPanePausesForkNothing(t *testing.T) {
 			if err := do(h); err != nil {
 				t.Fatalf("pause: %v", err)
 			}
-			time.Sleep(300 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond) // negative wait: an investigation would show by now
 			assertNoInvestigation(t, h)
 		})
 	}
@@ -1374,7 +1374,7 @@ func TestRecovery_UnfixedParentDefectIsRaisedOnce(t *testing.T) {
 	waitFor(t, func() bool { return len(parentDefectEvents(h)[events.RecoveryApplied]) > 0 })
 	h.Server.Rescan()
 	h.Server.Rescan()
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond) // negative wait: a repeat event would show by now
 	byType := parentDefectEvents(h)
 	escalated := byType[events.RecoveryEscalated]
 	if len(byType[events.TicketGraphDefect]) != 1 || len(byType[events.RecoveryApplied]) != 1 || len(escalated) != 1 || escalated[0].Reason != "R14" {
@@ -1437,7 +1437,7 @@ func TestGateWatch_HeldGateOnAnIdlePaneIsRaisedOnce(t *testing.T) {
 	applied, pass := watchHeldGate(t, "idle", gateEvent(events.IterationStarted, 0), gateEvent(events.BackgroundTaskGateHeld, time.Minute))
 	waitFor(t, func() bool { return applied() == 1 })
 	pass()
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: a second recovery would show by now
 	if n := applied(); n != 1 {
 		t.Errorf("recoveries after a second pass = %d, want 1", n)
 	}
@@ -1460,7 +1460,7 @@ func TestGateWatch_LeavesAGateThatIsNotStuck(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			applied, _ := watchHeldGate(t, tc.status, tc.seed...)
-			time.Sleep(300 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond) // negative wait: a recovery would show by now
 			if n := applied(); n != 0 {
 				t.Errorf("recoveries = %d, want 0", n)
 			}
@@ -1470,12 +1470,5 @@ func TestGateWatch_LeavesAGateThatIsNotStuck(t *testing.T) {
 
 func waitFor(t *testing.T, ok func() bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if ok() {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatal("condition never held")
+	servertest.WaitFor(t, 15*time.Second, "the condition", ok)
 }

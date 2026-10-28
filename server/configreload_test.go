@@ -78,7 +78,7 @@ func TestConfigReload_MaxAgentsAppliesWithoutKillingAgents(t *testing.T) {
 	if res := reload(t, h); res.Refused {
 		t.Fatalf("lower = %+v", res)
 	}
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond) // negative wait: a kill would show by now
 	if runs := h.Server.Runs(); len(runs) != 2 {
 		t.Errorf("runs after lowering = %+v, want both agents still running", runs)
 	}
@@ -97,12 +97,8 @@ func TestConfigReload_ReportsMaxOneOffAgentsChange(t *testing.T) {
 
 func waitRuns(ctx context.Context, t *testing.T, h *servertest.Harness, n int) {
 	t.Helper()
-	for len(h.Server.Runs()) != n {
-		if ctx.Err() != nil {
-			t.Fatalf("runs = %+v, want %d", h.Server.Runs(), n)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	deadline, _ := ctx.Deadline()
+	servertest.WaitFor(t, time.Until(deadline), fmt.Sprintf("%d runs", n), func() bool { return len(h.Server.Runs()) == n })
 }
 
 // Seam A: an invalid or missing file is refused and leaves the live settings
@@ -248,7 +244,7 @@ func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
 			t.Errorf("%s: banner = %+v, want %+v", tc.name, got, tc.banner)
 		}
 	}
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond) // negative wait: an extra banner would show by now
 	if n := len(h.Banners.Sent()); n != len(cases)+1 {
 		t.Errorf("banners = %d, want one per reload (%d)", n, len(cases)+1)
 	}
@@ -264,15 +260,9 @@ func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
 
 func waitBanners(ctx context.Context, t *testing.T, h *servertest.Harness, n int) []osnotify.Notification {
 	t.Helper()
-	for {
-		if got := h.Banners.Sent(); len(got) >= n {
-			return got
-		}
-		if ctx.Err() != nil {
-			t.Fatalf("banners = %+v, want %d", h.Banners.Sent(), n)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	deadline, _ := ctx.Deadline()
+	servertest.WaitFor(t, time.Until(deadline), fmt.Sprintf("%d banners", n), func() bool { return len(h.Banners.Sent()) >= n })
+	return h.Banners.Sent()
 }
 
 type failingNotifier struct{}

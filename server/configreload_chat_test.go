@@ -51,7 +51,9 @@ func (h *chatHook) sent() []string {
 // waitFor returns the bodies once one contains want, or fails after a while.
 func (h *chatHook) waitFor(t *testing.T, want string) []string {
 	t.Helper()
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+	// This file is package server, which servertest imports, so it cannot use
+	// servertest.WaitFor.
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
 		if got := h.sent(); slices.ContainsFunc(got, func(b string) bool { return strings.Contains(b, want) }) {
 			return got
 		}
@@ -130,7 +132,7 @@ func TestConfigReloadChat_RemovedCredentialsStopMessages(t *testing.T) {
 	writeChatConfig(t, s, path, "", 3)
 	s.reloadConfig(reloadTriggerCommand)
 	notice(s, "after-reload")
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: a send would come within a few 50ms chat polls
 	if got := hook.sent(); len(got) != 0 || s.chat.Enabled() {
 		t.Errorf("sent %v (enabled %v), want nothing", got, s.chat.Enabled())
 	}
