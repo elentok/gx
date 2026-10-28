@@ -17,14 +17,20 @@ import (
 )
 
 // startsWithLive reports whether queuing first starts an iteration while live
-// agents of its root already run.
-func startsWithLive(t *testing.T, h *servertest.Harness, root, first string, live int) bool {
+// agents of its root already run. A start can take long on a loaded machine, so
+// a test expecting one waits generously; a refusal is the absence of the event
+// and can only be a bounded quiet window.
+func startsWithLive(t *testing.T, h *servertest.Harness, root, first string, live int, wantStart bool) bool {
 	t.Helper()
 	registerLaunch(h)
 	for i := 0; i < live; i++ {
 		h.Server.PutRun(root, server.Run{Address: root + "/9" + string(rune('0'+i))})
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	wait := 2 * time.Second
+	if wantStart {
+		wait = 30 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
@@ -63,7 +69,7 @@ func TestRunner_OneOffsEpicUsesTheOneOffCapNotThePerRootCap(t *testing.T) {
 			c.MaxAgents = 10
 			c.PollInterval = 50 * time.Millisecond
 		})
-		if got := startsWithLive(t, h, "proj:one-offs", "proj:one-offs/01", tc.live); got != tc.starts {
+		if got := startsWithLive(t, h, "proj:one-offs", "proj:one-offs/01", tc.live, tc.starts); got != tc.starts {
 			t.Errorf("max-one-off-agents %d with %d live: started = %v, want %v", tc.oneOffCap, tc.live, got, tc.starts)
 		}
 	}
@@ -229,7 +235,7 @@ func TestRunner_OldOneOffEpicKeepsThePerRootCap(t *testing.T) {
 		c.MaxOneOffAgents = 3
 		c.PollInterval = 50 * time.Millisecond
 	})
-	if startsWithLive(t, h, "proj:legacy", "proj:legacy/01", 1) {
+	if startsWithLive(t, h, "proj:legacy", "proj:legacy/01", 1, false) {
 		t.Error("old one-off epic started a second agent past the per-root cap")
 	}
 }

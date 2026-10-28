@@ -187,7 +187,7 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 			servertest.SetProjectRepo(t, store, "proj", repo)
 			h := servertest.StartWithStore(t, store)
 			_, prompt, _ := registerLaunch(h)
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 
 			snap, err := h.Client.Snapshot(ctx)

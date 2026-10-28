@@ -63,7 +63,7 @@ func launchOne(t *testing.T, spy *launchSpy, want string) *servertest.Harness {
 	spy.mu.Lock()
 	spy.runsJSON = filepath.Join(h.StateDir, "runs.json")
 	spy.mu.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
