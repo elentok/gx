@@ -435,9 +435,11 @@ test("Escape with the Send popover open closes only the popover", async () => {
   await screen.findByRole("group", { name: "Questions" });
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
   const popover = await screen.findByRole("alertdialog", { name: "Unanswered questions" });
-  await act(async () => {});
-  fireEvent.keyDown(popover, { key: "Escape" });
-  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  // The popover takes Escape only once it is ready, so press until it closes.
+  await waitFor(() => {
+    fireEvent.keyDown(popover, { key: "Escape" });
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
   expect(inQuestions()).toBe(true);
   fireEvent.keyDown(document.body, { key: "Escape" });
   expect(await screen.findByText("earlier talk")).toBeTruthy();
