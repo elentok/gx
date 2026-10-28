@@ -278,6 +278,8 @@ func TestEpicMerge_RecreatesARemovedFeatureWorktree(t *testing.T) {
 		t.Fatalf("no feature worktree to remove: %v", err)
 	}
 	f.git(t, "worktree", "remove", "--force", wt)
+	// The merge's background removal would delete the recreated worktree.
+	holdWorktreeLock(t)
 
 	res, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic)
 	if err != nil || !res.Merged {

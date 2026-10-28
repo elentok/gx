@@ -51,7 +51,8 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 		}
 		reportIteration(t, f.ticketFile(t, "01"), report)
 	})
-	gitOut(t, f.repo, "branch", schedEpic)
+	// One commit of its own, so the epic completes unmerged and keeps its worktree.
+	commitOnBranch(t, f.repo, schedEpic)
 	// Merging the epic is not this ticket's concern.
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
 	return f, func() []mergeTurn {
