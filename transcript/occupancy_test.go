@@ -160,26 +160,3 @@ func TestReadOccupancy_BoundaryAndTurnFarBeforeInitialTailWindow_StillFound(t *t
 		t.Error("Stale = false, want true — the boundary is still newer than the assistant turn")
 	}
 }
-
-func TestReadSessionOccupancy_ReadsThroughPath(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	cwd := "/repo/worktree"
-	slugDir := filepath.Join(dir, ".claude", "projects", Slugify(cwd))
-	if err := os.MkdirAll(slugDir, 0755); err != nil {
-		t.Fatalf("MkdirAll: %v", err)
-	}
-	sessionPath := filepath.Join(slugDir, "sess-1.jsonl")
-	body := strings.Join([]string{preCompactAssistantLine, compactBoundaryLine}, "\n") + "\n"
-	if err := os.WriteFile(sessionPath, []byte(body), 0644); err != nil {
-		t.Fatalf("WriteFile: %v", err)
-	}
-
-	reading, err := ReadSessionOccupancy(cwd, "sess-1")
-	if err != nil {
-		t.Fatalf("ReadSessionOccupancy() error = %v", err)
-	}
-	if !reading.Found || reading.Usage.Occupancy() != 132603 || !reading.Stale {
-		t.Errorf("reading = %+v, want Found=true Occupancy=132603 Stale=true", reading)
-	}
-}

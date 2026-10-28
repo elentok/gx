@@ -22,10 +22,8 @@ func startKeyAgent(t *testing.T, kind string) (*State, herdr.CLI, string) {
 	t.Helper()
 	state := NewState(t)
 	if kind == "codex" {
-		t.Setenv("HOME", t.TempDir())
-		t.Setenv("CODEX_HOME", t.TempDir())
 		RegisterCodexRollout(t, state, CodexRolloutOptions{
-			Cwd: t.TempDir(), PaneID: "p1", AgentID: "a1", AgentName: "agent",
+			CodexHome: t.TempDir(), Cwd: t.TempDir(), PaneID: "p1", AgentID: "a1", AgentName: "agent",
 		})
 		_, env := StartStateEnv(t, state)
 		cli := herdr.CLI{Env: append(os.Environ(), env...)}

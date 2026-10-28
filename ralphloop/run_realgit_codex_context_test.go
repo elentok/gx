@@ -46,15 +46,8 @@ func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.
 		"01-context.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# Context recovery\n",
 	})
 
-	// RegisterCodexRollout below reads CODEX_HOME from the real process env
-	// directly (no override hook of its own), so this test keeps HOME/
-	// CODEX_HOME pointed at fixtures via setProcessEnv rather than
-	// DepsOverrides — that way deps' default resolution and the rollout
-	// writer agree on the same directory.
 	home := t.TempDir()
-	setProcessEnv(t, "HOME", home)
 	codexHome := t.TempDir()
-	setProcessEnv(t, "CODEX_HOME", codexHome)
 
 	cwd := iterationWorktreePath(wtDir, epicName, "01")
 
@@ -89,7 +82,8 @@ func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.
 	})
 
 	rollout := herdrfake.RegisterCodexRollout(t, s, herdrfake.CodexRolloutOptions{
-		Cwd: cwd, WorkspaceID: "ws1", TabID: "tab-01", PaneID: "pane-01",
+		CodexHome: codexHome,
+		Cwd:       cwd, WorkspaceID: "ws1", TabID: "tab-01", PaneID: "pane-01",
 		AgentID: "agent-01", AgentName: iterLabel(epicName, "01"),
 		InitialUsage:   herdrfake.CodexUsage{ContextTokens: smartZone + 1, TotalTokens: smartZone + 5_000},
 		CompactedUsage: herdrfake.CodexUsage{ContextTokens: smartZone / 2, TotalTokens: smartZone + 20_000},
@@ -123,14 +117,14 @@ func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.
 
 	// Acceptance criterion: the session rollout and Herdr identity match the
 	// real iteration cwd — verified through the same production reader
-	// (codexsession.VerifyIdentity) reattachment uses, not just by
+	// (codexsession.VerifyIdentityIn) reattachment uses, not just by
 	// construction of CodexRolloutOptions.
-	if ok, err := codexsession.VerifyIdentity(cwd, rollout.SessionID()); err != nil || !ok {
-		t.Errorf("VerifyIdentity(%s, %s) = %v, %v; want the rollout's cwd to match the real iteration worktree", cwd, rollout.SessionID(), ok, err)
+	if ok, err := codexsession.VerifyIdentityIn(codexHome, cwd, rollout.SessionID()); err != nil || !ok {
+		t.Errorf("VerifyIdentityIn(%s, %s) = %v, %v; want the rollout's cwd to match the real iteration worktree", cwd, rollout.SessionID(), ok, err)
 	}
-	stats, ok, err := codexsession.ReadStats(cwd, rollout.SessionID())
+	stats, ok, err := codexsession.ReadStatsIn(codexHome, cwd, rollout.SessionID())
 	if err != nil || !ok || stats.PeakContext != smartZone+1 || stats.TotalTokens != smartZone+25_000 {
-		t.Errorf("ReadStats = %+v, %v, %v; want peak context %d and final total %d read back through the real cwd", stats, ok, err, smartZone+1, smartZone+25_000)
+		t.Errorf("ReadStatsIn =%+v, %v, %v; want peak context %d and final total %d read back through the real cwd", stats, ok, err, smartZone+1, smartZone+25_000)
 	}
 
 	// Acceptance criterion: one high-context event causes exactly one Ctrl-C

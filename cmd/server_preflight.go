@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/sessionlookup"
 )
 
 // liveProbe asks the real machine. herdr.Ping has no timeout of its own, so it
@@ -76,7 +77,7 @@ func serverRunner(c agentrunner.Choice, dirs config.Dirs, stateDir string, n tim
 		var r agentrunner.Runner
 		switch agentrunner.Choice(runner) {
 		case agentrunner.ChoiceHerdr:
-			h := herdrrunner.NewIn(herdr.CLI{}, home)
+			h := herdrrunner.NewIn(herdr.CLI{}, home, sessionlookup.RootsFrom(dirs.Environ()).CodexHome)
 			h.N = n
 			r = h
 		case agentrunner.ChoiceHeadless:

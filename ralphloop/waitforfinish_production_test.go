@@ -80,15 +80,11 @@ func parseUntil(args []string) []string {
 }
 
 // writeOccupancyTranscript writes a minimal single-assistant-turn Claude Code
-// transcript at the real path transcript.Path resolves for cwd/sessionID
-// (under $HOME, which the caller must have redirected via setHomeEnv), reading
-// back occupancy inputTokens.
-func writeOccupancyTranscript(t *testing.T, cwd, sessionID string, inputTokens int) {
+// transcript at the path transcript.PathIn resolves under home for
+// cwd/sessionID, reading back occupancy inputTokens.
+func writeOccupancyTranscript(t *testing.T, home, cwd, sessionID string, inputTokens int) {
 	t.Helper()
-	path, err := transcript.Path(cwd, sessionID)
-	if err != nil {
-		t.Fatalf("transcript.Path: %v", err)
-	}
+	path := transcript.PathIn(home, cwd, sessionID)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatalf("MkdirAll: %v", err)
 	}
@@ -120,6 +116,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	const smartZone = 100
 	cwd := "/repo/iter-05"
 	sessionID := "sess-05"
+	home := t.TempDir()
 
 	s := herdrfake.NewState(t)
 
@@ -143,7 +140,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 			// transcript corroborates that idle report with a real compaction
 			// boundary, which is what the completion gate requires before the
 			// finish-up prompt may be sent.
-			appendCompactBoundaryLine(t, cwd, sessionID)
+			appendCompactBoundaryLine(t, home, cwd, sessionID)
 			respond = "working"
 			status = "idle"
 		case strings.Contains(text, "please finish up quickly"):
@@ -193,9 +190,8 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 
 	hf, fakeEnv := herdrfake.StartStateEnv(t, s)
 
-	home := t.TempDir()
 	setHomeEnv(t, home)
-	writeOccupancyTranscript(t, cwd, sessionID, smartZone+100)
+	writeOccupancyTranscript(t, home, cwd, sessionID, smartZone+100)
 
 	// Models the whole scenario's ~3 real minutes of compaction without
 	// sleeping for them.
@@ -298,7 +294,8 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	cwd := "/repo/iter-07"
 	sessionID := "sess-07"
 
-	setHomeEnv(t, t.TempDir())
+	home := t.TempDir()
+	setHomeEnv(t, home)
 
 	s := herdrfake.NewState(t)
 
@@ -307,7 +304,7 @@ func TestWaitForFinish_ProductionPrematureIdlePaneRecovery(t *testing.T) {
 	// State's mutex for the whole handler, so reading or advancing its clock from
 	// inside one deadlocks.
 	var virtualTime time.Duration
-	compact := herdrfake.NewClaudeCompact(t, cwd, sessionID, func() time.Duration {
+	compact := herdrfake.NewClaudeCompact(t, home, cwd, sessionID, func() time.Duration {
 		mu.Lock()
 		defer mu.Unlock()
 		return virtualTime
@@ -523,12 +520,13 @@ func TestWaitForFinish_ProductionPrematureIdlePaneNeverConfirms(t *testing.T) {
 	cwd := "/repo/iter-08"
 	sessionID := "sess-08"
 
-	setHomeEnv(t, t.TempDir())
+	home := t.TempDir()
+	setHomeEnv(t, home)
 
 	s := herdrfake.NewState(t)
 
 	var mu sync.Mutex
-	compact := herdrfake.NewClaudeCompact(t, cwd, sessionID, func() time.Duration {
+	compact := herdrfake.NewClaudeCompact(t, home, cwd, sessionID, func() time.Duration {
 		// Frozen: this scenario's compaction never completes, so no poll of
 		// either kind may ever move the clock past CompactDurationMs.
 		return 0
@@ -790,12 +788,9 @@ const compactBoundaryConfirmTick = 16
 // appendCompactBoundaryLine appends a minimal Claude Code compact_boundary
 // system line to the transcript at cwd/sessionID, indistinguishable from a
 // real compaction's completion marker to transcript.Compactions.
-func appendCompactBoundaryLine(t *testing.T, cwd, sessionID string) {
+func appendCompactBoundaryLine(t *testing.T, home, cwd, sessionID string) {
 	t.Helper()
-	path, err := transcript.Path(cwd, sessionID)
-	if err != nil {
-		t.Fatalf("transcript.Path: %v", err)
-	}
+	path := transcript.PathIn(home, cwd, sessionID)
 	line := map[string]any{
 		"type":            "system",
 		"subtype":         "compact_boundary",
@@ -839,6 +834,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 	const smartZone = 100
 	cwd := "/repo/iter-06"
 	sessionID := "sess-06"
+	home := t.TempDir()
 
 	s := herdrfake.NewState(t)
 
@@ -902,7 +898,7 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 				compacting = false
 				status = "idle" // the pane settles once the compaction is over
 				mu.Unlock()
-				appendCompactBoundaryLine(t, cwd, sessionID)
+				appendCompactBoundaryLine(t, home, cwd, sessionID)
 				mu.Lock()
 			}
 			return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
@@ -938,8 +934,8 @@ func TestWaitForFinish_ProductionSlowButSuccessfulCompactRegression(t *testing.T
 
 	hf, fakeEnv := herdrfake.StartStateEnv(t, s)
 
-	setHomeEnv(t, t.TempDir())
-	writeOccupancyTranscript(t, cwd, sessionID, smartZone+100)
+	setHomeEnv(t, home)
+	writeOccupancyTranscript(t, home, cwd, sessionID, smartZone+100)
 
 	// Models the whole scenario's ~8 real minutes of compaction without
 	// sleeping for them.

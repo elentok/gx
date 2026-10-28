@@ -25,20 +25,7 @@ func TestSlugify_DotDirectory(t *testing.T) {
 	}
 }
 
-func TestPath_JoinsHomeSlugAndSessionID(t *testing.T) {
-	t.Setenv("HOME", "/home/fake")
-	got, err := Path("/repo/worktree", "session-123")
-	if err != nil {
-		t.Fatalf("Path() error = %v", err)
-	}
-	want := filepath.Join("/home/fake", ".claude", "projects", "-repo-worktree", "session-123.jsonl")
-	if got != want {
-		t.Errorf("Path() = %q, want %q", got, want)
-	}
-}
-
-func TestPathIn_UsesExplicitHomeInsteadOfProcessEnv(t *testing.T) {
-	// Deliberately never t.Setenv HOME here — PathIn must not need it.
+func TestPathIn_JoinsHomeSlugAndSessionID(t *testing.T) {
 	got := PathIn("/home/fake", "/repo/worktree", "session-123")
 	want := filepath.Join("/home/fake", ".claude", "projects", "-repo-worktree", "session-123.jsonl")
 	if got != want {
@@ -298,7 +285,6 @@ func TestCountCompactionsAfter_UndatedBoundaryCounts(t *testing.T) {
 
 func TestCompactionsAfter_ReadsThroughPath(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", dir)
 	cwd := "/repo/worktree"
 	slugDir := filepath.Join(dir, ".claude", "projects", Slugify(cwd))
 	if err := os.MkdirAll(slugDir, 0755); err != nil {
@@ -312,7 +298,7 @@ func TestCompactionsAfter_ReadsThroughPath(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	count, ok, err := CompactionsAfter(cwd, "sess-1", time.Date(2026, 1, 1, 0, 0, 1, 0, time.UTC))
+	count, ok, err := CompactionsAfter(dir, cwd, "sess-1", time.Date(2026, 1, 1, 0, 0, 1, 0, time.UTC))
 	if err != nil || !ok {
 		t.Fatalf("CompactionsAfter() = (ok %v, err %v), want (true, nil)", ok, err)
 	}
@@ -320,7 +306,7 @@ func TestCompactionsAfter_ReadsThroughPath(t *testing.T) {
 		t.Errorf("CompactionsAfter() = %d, want 1", count)
 	}
 
-	count, ok, err = CompactionsAfter("/repo/worktree", "missing-session", time.Time{})
+	count, ok, err = CompactionsAfter(dir, "/repo/worktree", "missing-session", time.Time{})
 	if err != nil {
 		t.Fatalf("CompactionsAfter() error = %v, want nil for a missing file", err)
 	}
@@ -331,7 +317,6 @@ func TestCompactionsAfter_ReadsThroughPath(t *testing.T) {
 
 func TestCompactions_ReadsThroughPath(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", dir)
 	cwd := "/repo/worktree"
 	slugDir := filepath.Join(dir, ".claude", "projects", Slugify(cwd))
 	if err := os.MkdirAll(slugDir, 0755); err != nil {
@@ -346,7 +331,7 @@ func TestCompactions_ReadsThroughPath(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	count, ok, err := Compactions(cwd, "sess-1")
+	count, ok, err := Compactions(dir, cwd, "sess-1")
 	if err != nil {
 		t.Fatalf("Compactions() error = %v", err)
 	}
@@ -359,8 +344,7 @@ func TestCompactions_ReadsThroughPath(t *testing.T) {
 }
 
 func TestCompactions_MissingFile_NotOKNoError(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	count, ok, err := Compactions("/repo/worktree", "missing-session")
+	count, ok, err := Compactions(t.TempDir(), "/repo/worktree", "missing-session")
 	if err != nil {
 		t.Fatalf("Compactions() error = %v, want nil for a missing file", err)
 	}
@@ -427,7 +411,6 @@ func TestFirstLineTimestamp_MissingFile_NotOKNoError(t *testing.T) {
 
 func TestElapsed_ComputesNowMinusFirstLineTimestamp(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", dir)
 	cwd := "/repo/worktree"
 	slugDir := filepath.Join(dir, ".claude", "projects", Slugify(cwd))
 	if err := os.MkdirAll(slugDir, 0755); err != nil {
@@ -440,7 +423,7 @@ func TestElapsed_ComputesNowMinusFirstLineTimestamp(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	elapsed, ok, err := Elapsed(cwd, "sess-1")
+	elapsed, ok, err := Elapsed(dir, cwd, "sess-1")
 	if err != nil {
 		t.Fatalf("Elapsed() error = %v", err)
 	}
@@ -453,19 +436,18 @@ func TestElapsed_ComputesNowMinusFirstLineTimestamp(t *testing.T) {
 }
 
 func TestElapsed_EmptyCwdOrSessionID_NotOKNoError(t *testing.T) {
-	elapsed, ok, err := Elapsed("", "sess-1")
+	elapsed, ok, err := Elapsed(t.TempDir(), "", "sess-1")
 	if err != nil || ok || elapsed != 0 {
 		t.Errorf("Elapsed(\"\", ...) = (%v, %v, %v), want (0, false, nil)", elapsed, ok, err)
 	}
-	elapsed, ok, err = Elapsed("/repo/worktree", "")
+	elapsed, ok, err = Elapsed(t.TempDir(), "/repo/worktree", "")
 	if err != nil || ok || elapsed != 0 {
 		t.Errorf("Elapsed(..., \"\") = (%v, %v, %v), want (0, false, nil)", elapsed, ok, err)
 	}
 }
 
-func TestLastAssistantOccupancy_ReadsThroughPath(t *testing.T) {
+func TestLastAssistantOccupancyIn_ReadsThroughPath(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", dir)
 	cwd := "/repo/worktree"
 	slugDir := filepath.Join(dir, ".claude", "projects", Slugify(cwd))
 	if err := os.MkdirAll(slugDir, 0755); err != nil {
@@ -476,7 +458,7 @@ func TestLastAssistantOccupancy_ReadsThroughPath(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	occ, ok, err := LastAssistantOccupancy(cwd, "sess-1")
+	occ, ok, err := LastAssistantOccupancyIn(dir, cwd, "sess-1")
 	if err != nil {
 		t.Fatalf("LastAssistantOccupancy() error = %v", err)
 	}
@@ -488,9 +470,8 @@ func TestLastAssistantOccupancy_ReadsThroughPath(t *testing.T) {
 	}
 }
 
-func TestLastAssistantOccupancy_FindsTranscriptUnderAnotherProjectFolder(t *testing.T) {
+func TestLastAssistantOccupancyIn_FindsTranscriptUnderAnotherProjectFolder(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", dir)
 	projects := filepath.Join(dir, ".claude", "projects")
 	line := func(input int) []byte {
 		return []byte(`{"type":"assistant","message":{"usage":{"input_tokens":` + strconv.Itoa(input) + `}}}` + "\n")
@@ -512,7 +493,7 @@ func TestLastAssistantOccupancy_FindsTranscriptUnderAnotherProjectFolder(t *test
 	write("-old-start-dir", 11, now.Add(-time.Hour))
 	write("-newer-start-dir", 22, now)
 
-	occ, ok, err := LastAssistantOccupancy("/repo/checkout", "sess-1")
+	occ, ok, err := LastAssistantOccupancyIn(dir, "/repo/checkout", "sess-1")
 	if err != nil || !ok {
 		t.Fatalf("LastAssistantOccupancy() = (%d, %v, %v), want ok", occ, ok, err)
 	}

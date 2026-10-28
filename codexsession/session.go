@@ -26,19 +26,10 @@ type Stats struct {
 	TotalTokens int
 }
 
-// ReadStats returns duration endpoints, peak per-turn context, and the latest
-// cumulative token usage for sessionID launched in cwd. Missing, partial, and
-// malformed session data return ok=false.
-func ReadStats(cwd, sessionID string) (stats Stats, ok bool, err error) {
-	home, err := codexHome()
-	if err != nil {
-		return Stats{}, false, err
-	}
-	return ReadStatsIn(home, cwd, sessionID)
-}
-
-// ReadStatsIn is ReadStats with an explicit Codex home directory — see
-// LastContextTokensIn.
+// ReadStatsIn returns duration endpoints, peak per-turn context, and the
+// latest cumulative token usage for sessionID launched in cwd, read from the
+// Codex home directory. Missing, partial, and malformed session data return
+// ok=false.
 func ReadStatsIn(home, cwd, sessionID string) (stats Stats, ok bool, err error) {
 	if cwd == "" || sessionID == "" {
 		return Stats{}, false, nil
@@ -60,22 +51,11 @@ func ReadStatsIn(home, cwd, sessionID string) (stats Stats, ok bool, err error) 
 	return stats, ok, nil
 }
 
-// LastContextTokens returns the latest Codex context-token count for sessionID
-// launched in cwd. It verifies the session metadata before accepting token data
-// so a same-named rollout from another worktree cannot pause this iteration.
-// Missing, partial, and malformed session files return ok=false.
-func LastContextTokens(cwd, sessionID string) (tokens int, ok bool, err error) {
-	home, err := codexHome()
-	if err != nil {
-		return 0, false, err
-	}
-	return LastContextTokensIn(home, cwd, sessionID)
-}
-
-// LastContextTokensIn is LastContextTokens with an explicit Codex home
-// directory in place of codexHome()'s CODEX_HOME/UserHomeDir resolution — the
-// seam Deps.ReadCodexContext uses when a per-run home override is set, so a
-// caller can point this at a fixture home without mutating process env.
+// LastContextTokensIn returns the latest Codex context-token count for
+// sessionID launched in cwd, read from the Codex home directory. It verifies
+// the session metadata before accepting token data so a same-named rollout from
+// another worktree cannot pause this iteration. Missing, partial, and malformed
+// session files return ok=false.
 func LastContextTokensIn(home, cwd, sessionID string) (tokens int, ok bool, err error) {
 	if cwd == "" || sessionID == "" {
 		return 0, false, nil
@@ -98,19 +78,9 @@ func LastContextTokensIn(home, cwd, sessionID string) (tokens int, ok bool, err 
 	return tokens, found, nil
 }
 
-// VerifyIdentity reports whether Codex has rollout metadata for sessionID
-// launched in cwd. Token events are not required because a live session may
-// not have produced its first response yet.
-func VerifyIdentity(cwd, sessionID string) (ok bool, err error) {
-	home, err := codexHome()
-	if err != nil {
-		return false, err
-	}
-	return VerifyIdentityIn(home, cwd, sessionID)
-}
-
-// VerifyIdentityIn is VerifyIdentity with an explicit Codex home directory —
-// see LastContextTokensIn.
+// VerifyIdentityIn reports whether the Codex home has rollout metadata for
+// sessionID launched in cwd. Token events are not required because a live
+// session may not have produced its first response yet.
 func VerifyIdentityIn(home, cwd, sessionID string) (ok bool, err error) {
 	if cwd == "" || sessionID == "" {
 		return false, nil
@@ -129,19 +99,9 @@ func VerifyIdentityIn(home, cwd, sessionID string) (ok bool, err error) {
 	return ok, nil
 }
 
-// LastRateLimit returns the latest exhausted primary or secondary quota for
-// sessionID launched in cwd. Missing, partial, malformed, and non-exhausted
-// session data return ok=false.
-func LastRateLimit(cwd, sessionID string) (limit RateLimit, ok bool, err error) {
-	home, err := codexHome()
-	if err != nil {
-		return RateLimit{}, false, err
-	}
-	return LastRateLimitIn(home, cwd, sessionID)
-}
-
-// LastRateLimitIn is LastRateLimit with an explicit Codex home directory —
-// see LastContextTokensIn.
+// LastRateLimitIn returns the latest exhausted primary or secondary quota for
+// sessionID launched in cwd, read from the Codex home directory. Missing,
+// partial, malformed, and non-exhausted session data return ok=false.
 func LastRateLimitIn(home, cwd, sessionID string) (limit RateLimit, ok bool, err error) {
 	if cwd == "" || sessionID == "" {
 		return RateLimit{}, false, nil
@@ -161,17 +121,6 @@ func LastRateLimitIn(home, cwd, sessionID string) (limit RateLimit, ok bool, err
 		return RateLimit{}, false, err
 	}
 	return limit, ok, nil
-}
-
-func codexHome() (string, error) {
-	if home := os.Getenv("CODEX_HOME"); home != "" {
-		return home, nil
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".codex"), nil
 }
 
 func walkSessionFiles(home, sessionID string, visit func(path string) error) error {

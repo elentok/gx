@@ -58,13 +58,3 @@ func ReadOccupancy(path string) (OccupancyReading, error) {
 	}
 	return reading, nil
 }
-
-// ReadSessionOccupancy is a convenience wrapper combining Path and
-// ReadOccupancy: it reads the transcript of the session launched in cwd.
-func ReadSessionOccupancy(cwd, sessionID string) (OccupancyReading, error) {
-	path, err := Path(cwd, sessionID)
-	if err != nil {
-		return OccupancyReading{}, err
-	}
-	return ReadOccupancy(path)
-}

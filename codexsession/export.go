@@ -28,15 +28,6 @@ func ExportMarkdownIn(home, sessionID string) (md string, ok bool, err error) {
 	return md, ok, nil
 }
 
-// LastAssistantText is LastAssistantTextIn under the user's Codex home.
-func LastAssistantText(sessionID string) (text string, ok bool, err error) {
-	home, err := codexHome()
-	if err != nil {
-		return "", false, err
-	}
-	return LastAssistantTextIn(home, sessionID)
-}
-
 // LastAssistantTextIn returns the text of the last assistant message in the
 // rollout of sessionID under the Codex home. ok is false when no rollout
 // exists or it holds no assistant text.

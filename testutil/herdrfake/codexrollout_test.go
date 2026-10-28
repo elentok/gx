@@ -17,12 +17,11 @@ func TestCodexRolloutStartCreatesStableProductionReadableSession(t *testing.T) {
 	home := t.TempDir()
 	codexHome := t.TempDir()
 	cwd := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("CODEX_HOME", codexHome)
 
 	state := NewState(t)
 	resetAt := time.Date(2026, 8, 5, 12, 0, 0, 0, time.UTC)
 	rollout := RegisterCodexRollout(t, state, CodexRolloutOptions{
+		CodexHome: codexHome,
 		Cwd:       cwd,
 		PaneID:    "pane-codex",
 		AgentID:   "agent-codex",
@@ -55,22 +54,22 @@ func TestCodexRolloutStartCreatesStableProductionReadableSession(t *testing.T) {
 		t.Fatalf("started agent = %+v, want idle agent in configured pane", first)
 	}
 
-	contextTokens, ok, err := codexsession.LastContextTokens(cwd, first.AgentSession)
+	contextTokens, ok, err := codexsession.LastContextTokensIn(codexHome, cwd, first.AgentSession)
 	if err != nil || !ok || contextTokens != 180_001 {
 		t.Fatalf("LastContextTokens = %d, %v, %v; want production-readable initial usage", contextTokens, ok, err)
 	}
-	stats, ok, err := codexsession.ReadStats(cwd, first.AgentSession)
+	stats, ok, err := codexsession.ReadStatsIn(codexHome, cwd, first.AgentSession)
 	if err != nil || !ok || stats.TotalTokens != 240_000 || stats.PeakContext != 180_001 {
 		t.Fatalf("ReadStats = %+v, %v, %v; want authentic total and context usage", stats, ok, err)
 	}
-	limit, ok, err := codexsession.LastRateLimit(cwd, first.AgentSession)
+	limit, ok, err := codexsession.LastRateLimitIn(codexHome, cwd, first.AgentSession)
 	if err != nil || !ok || limit.Quota != "primary" || !limit.ResetAt.Equal(resetAt) {
 		t.Fatalf("LastRateLimit = %+v, %v, %v; want exhausted primary quota", limit, ok, err)
 	}
 
 	rel, err := filepath.Rel(codexHome, rollout.Path())
 	if err != nil || rel == ".." || filepath.IsAbs(rel) {
-		t.Fatalf("rollout path %q is not beneath CODEX_HOME %q", rollout.Path(), codexHome)
+		t.Fatalf("rollout path %q is not beneath the Codex home %q", rollout.Path(), codexHome)
 	}
 	if _, err := os.Stat(filepath.Join(home, ".codex")); !os.IsNotExist(err) {
 		t.Fatalf("default Codex home was touched: %v", err)
@@ -78,13 +77,12 @@ func TestCodexRolloutStartCreatesStableProductionReadableSession(t *testing.T) {
 }
 
 func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("CODEX_HOME", t.TempDir())
+	codexHome := t.TempDir()
 	cwd := t.TempDir()
 	state := NewState(t)
 	resetAt := codexRolloutEpoch.Add(48 * time.Hour)
 	rollout := RegisterCodexRollout(t, state, CodexRolloutOptions{
-		Cwd: cwd, PaneID: "pane-codex", AgentID: "agent-codex", AgentName: "codex",
+		CodexHome: codexHome, Cwd: cwd, PaneID: "pane-codex", AgentID: "agent-codex", AgentName: "codex",
 		InitialUsage:   CodexUsage{ContextTokens: 180_001, TotalTokens: 240_000},
 		CompactedUsage: CodexUsage{ContextTokens: 70_000, TotalTokens: 250_000},
 		FinalUsage: CodexUsage{
@@ -132,7 +130,7 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 	if agent, err := wait("idle", 0); err != nil || agent.AgentStatus != "idle" {
 		t.Fatalf("compact final wait = %+v, %v; want idle", agent, err)
 	}
-	if tokens, ok, err := codexsession.LastContextTokens(cwd, rollout.SessionID()); err != nil || !ok || tokens != 70_000 {
+	if tokens, ok, err := codexsession.LastContextTokensIn(codexHome, cwd, rollout.SessionID()); err != nil || !ok || tokens != 70_000 {
 		t.Fatalf("post-compact LastContextTokens = %d, %v, %v; want compacted usage", tokens, ok, err)
 	}
 	if agent := prompt("please finish up quickly"); agent.AgentStatus != "working" {
@@ -144,7 +142,7 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 	if agent, err := wait("idle", 0); err != nil || agent.AgentStatus != "idle" {
 		t.Fatalf("final wait = %+v, %v; want idle", agent, err)
 	}
-	if limit, ok, err := codexsession.LastRateLimit(cwd, rollout.SessionID()); err != nil || !ok || limit.Quota != "secondary" || !limit.ResetAt.Equal(resetAt) {
+	if limit, ok, err := codexsession.LastRateLimitIn(codexHome, cwd, rollout.SessionID()); err != nil || !ok || limit.Quota != "secondary" || !limit.ResetAt.Equal(resetAt) {
 		t.Fatalf("final LastRateLimit = %+v, %v, %v; want secondary quota transition", limit, ok, err)
 	}
 
@@ -176,7 +174,7 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 	if !strings.Contains(trace[3].After, "Status:done") || !strings.Contains(trace[6].After, "Status:working") || !strings.Contains(trace[10].After, "Status:idle") {
 		t.Fatalf("trace snapshots do not expose post-interrupt idle, continuation, and final states: %+v", trace)
 	}
-	stats, ok, err := codexsession.ReadStats(cwd, rollout.SessionID())
+	stats, ok, err := codexsession.ReadStatsIn(codexHome, cwd, rollout.SessionID())
 	if err != nil || !ok || stats.TotalTokens != 260_000 || stats.PeakContext != 180_001 || !stats.Start.Equal(codexRolloutEpoch) || !stats.End.Equal(codexRolloutEpoch.Add(3*time.Millisecond)) {
 		t.Fatalf("final ReadStats = %+v, %v, %v; want deterministic complete rollout", stats, ok, err)
 	}
@@ -189,11 +187,9 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 // as landing in a blocked phase no real Codex pane produces, which made this
 // path look like it needed a blocked-pane bypass it never actually needed.
 func TestCodexRolloutCtrlCInterruptLeavesPaneIdleNotBlocked(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("CODEX_HOME", t.TempDir())
 	state := NewState(t)
 	RegisterCodexRollout(t, state, CodexRolloutOptions{
-		Cwd: t.TempDir(), PaneID: "pane-codex", AgentID: "agent-codex", AgentName: "codex",
+		CodexHome: t.TempDir(), Cwd: t.TempDir(), PaneID: "pane-codex", AgentID: "agent-codex", AgentName: "codex",
 		RejectPromptWhenBlocked: true,
 	})
 	cli := startStateCLI(t, state)
@@ -226,11 +222,9 @@ func TestCodexRolloutCtrlCInterruptLeavesPaneIdleNotBlocked(t *testing.T) {
 // confirmation after "/compact" was submitted (see the prior test). That is
 // where the agent_blocked guard actually applies.
 func TestCodexRolloutRejectPromptWhenBlocked_SwitchOnRejectsWithAgentBlockedError(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("CODEX_HOME", t.TempDir())
 	state := NewState(t)
 	RegisterCodexRollout(t, state, CodexRolloutOptions{
-		Cwd: t.TempDir(), PaneID: "pane-codex", AgentID: "agent-codex", AgentName: "codex",
+		CodexHome: t.TempDir(), Cwd: t.TempDir(), PaneID: "pane-codex", AgentID: "agent-codex", AgentName: "codex",
 		RejectPromptWhenBlocked: true,
 	})
 	cli := startStateCLI(t, state)

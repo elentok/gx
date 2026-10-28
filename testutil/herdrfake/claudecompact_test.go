@@ -10,34 +10,33 @@ import (
 
 const compactTestSmartZone = 100
 
-// newTestClaudeCompact wires a ClaudeCompact against a fresh $HOME and a
+// newTestClaudeCompact wires a ClaudeCompact against a fresh home and a
 // virtual clock the test advances explicitly (never a real sleep). Options are
 // threaded through rather than set inside, so a test that wants non-default
 // pane behavior asks for it and every other test keeps the defaults.
-func newTestClaudeCompact(t *testing.T, opts ...ClaudeCompactOption) (*ClaudeCompact, *time.Duration) {
+func newTestClaudeCompact(t *testing.T, opts ...ClaudeCompactOption) (*ClaudeCompact, *time.Duration, string) {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
+	home := t.TempDir()
 
 	var virtualTime time.Duration
-	c := NewClaudeCompact(t, "/repo/iter-c", "sess-c", func() time.Duration { return virtualTime }, compactTestSmartZone, opts...)
-	return c, &virtualTime
+	c := NewClaudeCompact(t, home, "/repo/iter-c", "sess-c", func() time.Duration { return virtualTime }, compactTestSmartZone, opts...)
+	return c, &virtualTime, home
 }
 
 func TestClaudeCompact_InitialTranscriptStartsAboveSmartZone(t *testing.T) {
-	c, _ := newTestClaudeCompact(t)
+	_, _, home := newTestClaudeCompact(t)
 
-	occupancy, ok, err := transcript.LastAssistantOccupancy("/repo/iter-c", "sess-c")
+	occupancy, ok, err := transcript.LastAssistantOccupancyIn(home, "/repo/iter-c", "sess-c")
 	if err != nil || !ok {
-		t.Fatalf("LastAssistantOccupancy: ok=%v err=%v", ok, err)
+		t.Fatalf("LastAssistantOccupancyIn: ok=%v err=%v", ok, err)
 	}
 	if occupancy <= compactTestSmartZone {
 		t.Errorf("initial occupancy = %d, want > smartZone (%d)", occupancy, compactTestSmartZone)
 	}
-	_ = c
 }
 
 func TestClaudeCompact_StatusStaysWorkingUntilExactlyCompactDuration(t *testing.T) {
-	c, virtualTime := newTestClaudeCompact(t)
+	c, virtualTime, _ := newTestClaudeCompact(t)
 
 	if err := c.StartCompact(); err != nil {
 		t.Fatalf("StartCompact: %v", err)
@@ -59,7 +58,7 @@ func TestClaudeCompact_StatusStaysWorkingUntilExactlyCompactDuration(t *testing.
 }
 
 func TestClaudeCompact_CompletionAppendsOneBoundaryAndLowOccupancyTurn(t *testing.T) {
-	c, virtualTime := newTestClaudeCompact(t, WithPairedPostCompactionTurn())
+	c, virtualTime, home := newTestClaudeCompact(t, WithPairedPostCompactionTurn())
 
 	if err := c.StartCompact(); err != nil {
 		t.Fatalf("StartCompact: %v", err)
@@ -81,9 +80,9 @@ func TestClaudeCompact_CompletionAppendsOneBoundaryAndLowOccupancyTurn(t *testin
 		t.Errorf("CountCompactions = %d, want exactly 1", got)
 	}
 
-	occupancy, ok, err := transcript.LastAssistantOccupancy("/repo/iter-c", "sess-c")
+	occupancy, ok, err := transcript.LastAssistantOccupancyIn(home, "/repo/iter-c", "sess-c")
 	if err != nil || !ok {
-		t.Fatalf("LastAssistantOccupancy: ok=%v err=%v", ok, err)
+		t.Fatalf("LastAssistantOccupancyIn: ok=%v err=%v", ok, err)
 	}
 	if occupancy >= compactTestSmartZone {
 		t.Errorf("post-compact occupancy = %d, want < smartZone (%d)", occupancy, compactTestSmartZone)
@@ -91,7 +90,7 @@ func TestClaudeCompact_CompletionAppendsOneBoundaryAndLowOccupancyTurn(t *testin
 }
 
 func TestClaudeCompact_CompletionAppendsOnlyABoundaryByDefault(t *testing.T) {
-	c, virtualTime := newTestClaudeCompact(t)
+	c, virtualTime, home := newTestClaudeCompact(t)
 
 	if err := c.StartCompact(); err != nil {
 		t.Fatalf("StartCompact: %v", err)
@@ -117,9 +116,9 @@ func TestClaudeCompact_CompletionAppendsOnlyABoundaryByDefault(t *testing.T) {
 
 	// No assistant turn follows the boundary, so the newest occupancy in the
 	// transcript is still the pre-compaction one — the real Claude Code shape.
-	occupancy, ok, err := transcript.LastAssistantOccupancy("/repo/iter-c", "sess-c")
+	occupancy, ok, err := transcript.LastAssistantOccupancyIn(home, "/repo/iter-c", "sess-c")
 	if err != nil || !ok {
-		t.Fatalf("LastAssistantOccupancy: ok=%v err=%v", ok, err)
+		t.Fatalf("LastAssistantOccupancyIn: ok=%v err=%v", ok, err)
 	}
 	if occupancy <= compactTestSmartZone {
 		t.Errorf("post-compact occupancy = %d, want the stale above-smartZone (%d) value", occupancy, compactTestSmartZone)
@@ -127,7 +126,7 @@ func TestClaudeCompact_CompletionAppendsOnlyABoundaryByDefault(t *testing.T) {
 }
 
 func TestClaudeCompact_PrematureIdlePaneReportsIdleWhileCompactionRuns(t *testing.T) {
-	c, virtualTime := newTestClaudeCompact(t, WithPrematureIdlePane())
+	c, virtualTime, _ := newTestClaudeCompact(t, WithPrematureIdlePane())
 
 	if err := c.StartCompact(); err != nil {
 		t.Fatalf("StartCompact: %v", err)
@@ -168,7 +167,7 @@ func TestClaudeCompact_PrematureIdlePaneReportsIdleWhileCompactionRuns(t *testin
 }
 
 func TestClaudeCompact_PrematureIdlePaneStillWritesPairedTurnAtTheDeadline(t *testing.T) {
-	c, virtualTime := newTestClaudeCompact(t, WithPrematureIdlePane(), WithPairedPostCompactionTurn())
+	c, virtualTime, _ := newTestClaudeCompact(t, WithPrematureIdlePane(), WithPairedPostCompactionTurn())
 
 	if err := c.StartCompact(); err != nil {
 		t.Fatalf("StartCompact: %v", err)
@@ -197,7 +196,7 @@ func TestClaudeCompact_PrematureIdlePaneStillWritesPairedTurnAtTheDeadline(t *te
 }
 
 func TestClaudeCompact_FinishUpRejectedBeforeBoundaryExists(t *testing.T) {
-	c, virtualTime := newTestClaudeCompact(t)
+	c, virtualTime, _ := newTestClaudeCompact(t)
 
 	if err := c.AcceptFinishUp(); err == nil {
 		t.Error("AcceptFinishUp() before any compaction = nil, want error")
@@ -224,7 +223,7 @@ func TestClaudeCompact_FinishUpRejectedBeforeBoundaryExists(t *testing.T) {
 }
 
 func TestClaudeCompact_SecondCtrlCOrEnterDuringActiveCompactionFailsImmediately(t *testing.T) {
-	c, virtualTime := newTestClaudeCompact(t)
+	c, virtualTime, _ := newTestClaudeCompact(t)
 
 	// The first Ctrl-C (interrupting the agent before "/compact" is
 	// submitted) must still be accepted.
@@ -254,7 +253,7 @@ func TestClaudeCompact_SecondCtrlCOrEnterDuringActiveCompactionFailsImmediately(
 }
 
 func TestClaudeCompact_AcceptPrompt_SwitchOffAcceptsEvenWhenBlocked(t *testing.T) {
-	c, _ := newTestClaudeCompact(t)
+	c, _, _ := newTestClaudeCompact(t)
 	c.SetBlocked(true)
 	if err := c.AcceptPrompt("iter-c"); err != nil {
 		t.Errorf("AcceptPrompt() = %v, want nil (switch is off)", err)
@@ -262,14 +261,14 @@ func TestClaudeCompact_AcceptPrompt_SwitchOffAcceptsEvenWhenBlocked(t *testing.T
 }
 
 func TestClaudeCompact_AcceptPrompt_SwitchOnAcceptsWhenNotBlocked(t *testing.T) {
-	c, _ := newTestClaudeCompact(t, WithAgentBlockedRejection())
+	c, _, _ := newTestClaudeCompact(t, WithAgentBlockedRejection())
 	if err := c.AcceptPrompt("iter-c"); err != nil {
 		t.Errorf("AcceptPrompt() = %v, want nil (pane not blocked)", err)
 	}
 }
 
 func TestClaudeCompact_AcceptPrompt_SwitchOnRejectsWhenBlocked(t *testing.T) {
-	c, _ := newTestClaudeCompact(t, WithAgentBlockedRejection())
+	c, _, _ := newTestClaudeCompact(t, WithAgentBlockedRejection())
 	c.SetBlocked(true)
 
 	err := c.AcceptPrompt("iter-c")
@@ -293,7 +292,7 @@ func TestClaudeCompact_AcceptPrompt_SwitchOnRejectsWhenBlocked(t *testing.T) {
 
 func TestClaudeCompact_TranscriptTimestampsAndUsageAreDeterministic(t *testing.T) {
 	run := func() []transcript.Line {
-		c, virtualTime := newTestClaudeCompact(t)
+		c, virtualTime, _ := newTestClaudeCompact(t)
 		if err := c.StartCompact(); err != nil {
 			t.Fatalf("StartCompact: %v", err)
 		}

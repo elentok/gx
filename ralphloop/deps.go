@@ -210,7 +210,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 	if pathEnv == "" {
 		pathEnv = envPath(overrides.Env)
 	}
-	runner := herdrrunner.NewIn(herdr.CLI{Env: overrides.Env}, overrides.Home)
+	runner := herdrrunner.NewIn(herdr.CLI{Env: overrides.Env}, overrides.Home, overrides.CodexHome)
 	runner.N = overrides.RunnerWait
 	runner.CodexQuota = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 		if overrides.CodexHome == "" {

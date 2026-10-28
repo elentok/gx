@@ -41,21 +41,10 @@ func Slugify(cwd string) string {
 	return strings.NewReplacer("/", "-", ".", "-").Replace(cwd)
 }
 
-// Path returns the transcript file path for a Claude Code session launched
-// in cwd with the given session id (herdr's agent_session.value, which is
-// the same UUID as the transcript's sessionId field and filename).
-func Path(cwd, sessionID string) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return PathIn(home, cwd, sessionID), nil
-}
-
-// PathIn is Path with an explicit home directory in place of
-// os.UserHomeDir() — the seam Deps.ReadOccupancy/ReadCompactions/etc. use
-// when a per-run home override is set, and that a test's own fixture-writing
-// helper can call directly instead of relying on process HOME.
+// PathIn returns the transcript file path under home for a Claude Code
+// session launched in cwd with the given session id (herdr's
+// agent_session.value, which is the same UUID as the transcript's sessionId
+// field and filename).
 func PathIn(home, cwd, sessionID string) string {
 	return filepath.Join(home, ".claude", "projects", Slugify(cwd), sessionID+".jsonl")
 }
@@ -240,20 +229,9 @@ func usageFromLine(line transcriptLine) Usage {
 	}
 }
 
-// LastAssistantOccupancy is a convenience wrapper combining Path and
-// LastAssistantUsage: it returns the current context occupancy for the
-// session launched in cwd, or ok=false if no assistant turn has landed in
-// its transcript yet.
-func LastAssistantOccupancy(cwd, sessionID string) (occupancy int, ok bool, err error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return 0, false, err
-	}
-	return LastAssistantOccupancyIn(home, cwd, sessionID)
-}
-
-// LastAssistantOccupancyIn is LastAssistantOccupancy with an explicit home
-// directory in place of os.UserHomeDir().
+// LastAssistantOccupancyIn combines PathIn and LastAssistantUsage: it returns
+// the current context occupancy for the session launched in cwd, or ok=false
+// if no assistant turn has landed in its transcript yet.
 func LastAssistantOccupancyIn(home, cwd, sessionID string) (occupancy int, ok bool, err error) {
 	path := PathIn(home, cwd, sessionID)
 	// A session that started in another directory (the bare repo) and moved
@@ -310,15 +288,11 @@ func FirstLineTimestamp(path string) (time.Time, bool, error) {
 // survives a UI restart mid-iteration (a plain time.Now()-at-start capture
 // has no way to recover the iteration's true age after a reattach). ok is
 // false if cwd/sessionID is empty or the transcript can't be read yet.
-func Elapsed(cwd, sessionID string) (time.Duration, bool, error) {
+func Elapsed(home, cwd, sessionID string) (time.Duration, bool, error) {
 	if cwd == "" || sessionID == "" {
 		return 0, false, nil
 	}
-	path, err := Path(cwd, sessionID)
-	if err != nil {
-		return 0, false, err
-	}
-	start, ok, err := FirstLineTimestamp(path)
+	start, ok, err := FirstLineTimestamp(PathIn(home, cwd, sessionID))
 	if err != nil || !ok {
 		return 0, ok, err
 	}
@@ -430,24 +404,20 @@ func CountCompactionsAfter(lines []Line, since time.Time) int {
 	return n
 }
 
-// Compactions is a convenience wrapper combining Path, ReadAll, and
+// Compactions is a convenience wrapper combining PathIn, ReadAll, and
 // CountCompactions: it returns how many compaction boundaries the session
 // launched in cwd hit, or ok=false if its transcript can't be found yet.
-func Compactions(cwd, sessionID string) (count int, ok bool, err error) {
-	return compactions(cwd, sessionID, func(lines []Line) int { return CountCompactions(lines) })
+func Compactions(home, cwd, sessionID string) (count int, ok bool, err error) {
+	return compactions(home, cwd, sessionID, func(lines []Line) int { return CountCompactions(lines) })
 }
 
 // CompactionsAfter is CountCompactionsAfter's equivalent of Compactions.
-func CompactionsAfter(cwd, sessionID string, since time.Time) (count int, ok bool, err error) {
-	return compactions(cwd, sessionID, func(lines []Line) int { return CountCompactionsAfter(lines, since) })
+func CompactionsAfter(home, cwd, sessionID string, since time.Time) (count int, ok bool, err error) {
+	return compactions(home, cwd, sessionID, func(lines []Line) int { return CountCompactionsAfter(lines, since) })
 }
 
-func compactions(cwd, sessionID string, count func([]Line) int) (int, bool, error) {
-	path, err := Path(cwd, sessionID)
-	if err != nil {
-		return 0, false, err
-	}
-	lines, ok, err := ReadAll(path)
+func compactions(home, cwd, sessionID string, count func([]Line) int) (int, bool, error) {
+	lines, ok, err := ReadAll(PathIn(home, cwd, sessionID))
 	if err != nil || !ok {
 		return 0, ok, err
 	}

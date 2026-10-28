@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets/schema"
@@ -133,7 +134,7 @@ func TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr(t *testing.T) 
 	others := map[string]agentrunner.Runner{}
 	// The runner reaches the fake herdr through the server's own env.
 	_, ticketPath := restartUnder(t, "", headless, others, func(c *server.Config) {
-		others["herdr"] = herdrrunner.NewIn(herdr.CLI{Env: c.Env}, harness.LookupEnv(c.Env, "HOME"))
+		others["herdr"] = herdrrunner.NewIn(herdr.CLI{Env: c.Env}, harness.LookupEnv(c.Env, "HOME"), sessionlookup.RootsFrom(c.Env).CodexHome)
 	})
 	waitStatus(t, ticketPath, schema.StatusDone)
 }

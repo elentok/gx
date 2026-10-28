@@ -123,17 +123,14 @@ func WithAgentBlockedRejection() ClaudeCompactOption {
 	return func(c *ClaudeCompact) { c.rejectWhenBlocked = true }
 }
 
-// NewClaudeCompact creates the transcript file for a session launched in cwd
-// with sessionID, seeded with one assistant turn whose occupancy is above
-// smartZone — the "over-budget transcript" precondition smart-zone recovery
-// reacts to.
-func NewClaudeCompact(t testing.TB, cwd, sessionID string, virtualTime func() time.Duration, smartZone int, opts ...ClaudeCompactOption) *ClaudeCompact {
+// NewClaudeCompact creates the transcript file under home for a session
+// launched in cwd with sessionID, seeded with one assistant turn whose
+// occupancy is above smartZone — the "over-budget transcript" precondition
+// smart-zone recovery reacts to.
+func NewClaudeCompact(t testing.TB, home, cwd, sessionID string, virtualTime func() time.Duration, smartZone int, opts ...ClaudeCompactOption) *ClaudeCompact {
 	t.Helper()
 
-	path, err := transcript.Path(cwd, sessionID)
-	if err != nil {
-		t.Fatalf("herdrfake: resolve transcript path: %v", err)
-	}
+	path := transcript.PathIn(home, cwd, sessionID)
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		t.Fatalf("herdrfake: create transcript dir: %v", err)
 	}

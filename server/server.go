@@ -29,6 +29,7 @@ import (
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
+	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/storecommit"
@@ -454,7 +455,7 @@ func New(cfg Config) (*Server, error) {
 		cfg.Env = os.Environ()
 	}
 	if cfg.Runner == nil {
-		h := herdrrunner.NewIn(herdr.CLI{Env: cfg.Env}, harness.LookupEnv(cfg.Env, "HOME"))
+		h := herdrrunner.NewIn(herdr.CLI{Env: cfg.Env}, harness.LookupEnv(cfg.Env, "HOME"), sessionlookup.RootsFrom(cfg.Env).CodexHome)
 		h.N = cfg.RunnerWait
 		if h.N == 0 {
 			h.N = config.LoadRunnerWait()

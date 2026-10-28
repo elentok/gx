@@ -59,9 +59,8 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		"06-f.md": "---\nid: \"06\"\nstatus: open\ntype: implement\nblocked_by: [\"04\", \"05\"]\n---\n# F\n",
 	})
 
-	// NewClaudeCompact below always writes its transcript via the real $HOME
-	// (transcript.Path has no override hook), so this test points $HOME at the
-	// fixture via setHomeEnv and passes the same dir as DepsOverrides.Home.
+	// setHomeEnv points the deps' default home at the fixture; the transcripts
+	// are written under the same dir.
 	home := t.TempDir()
 	setHomeEnv(t, home)
 	const smartZone = 100
@@ -72,12 +71,12 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		if id == "03" {
 			continue
 		}
-		writeFakeTranscript(t, "", iterationWorktreePath(wtDir, epicName, id), "sess-"+iterLabel(epicName, id), transcriptStart,
+		writeFakeTranscript(t, home, iterationWorktreePath(wtDir, epicName, id), "sess-"+iterLabel(epicName, id), transcriptStart,
 			[3]any{"claude-sonnet-5", contract.tokens - 200, 0},
 			[3]any{"claude-sonnet-5", contract.tokens - 100, 100},
 		)
 	}
-	cCompact := herdrfake.NewClaudeCompact(t, iterationWorktreePath(wtDir, epicName, "03"), "sess-"+iterLabel(epicName, "03"), func() time.Duration {
+	cCompact := herdrfake.NewClaudeCompact(t, home, iterationWorktreePath(wtDir, epicName, "03"), "sess-"+iterLabel(epicName, "03"), func() time.Duration {
 		mu.Lock()
 		defer mu.Unlock()
 		return virtualTime

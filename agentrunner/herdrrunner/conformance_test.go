@@ -41,7 +41,7 @@ func testEnv(fakeEnv []string) []string {
 
 // newTestRunner is a runner under testEnv, without background-task gating.
 func newTestRunner(fakeEnv []string) *herdrrunner.Runner {
-	return herdrrunner.NewIn(herdr.CLI{Env: testEnv(fakeEnv)}, "")
+	return herdrrunner.NewIn(herdr.CLI{Env: testEnv(fakeEnv)}, "", "")
 }
 
 func TestConformance(t *testing.T) {

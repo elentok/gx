@@ -56,9 +56,13 @@ var _ agentrunner.HealthChecker = (*Runner)(nil)
 var _ agentrunner.Nudger = (*Runner)(nil)
 
 // NewIn runs herdr under cli, gating background tasks on the Claude
-// transcripts under home. An empty home skips the gating.
-func NewIn(cli herdr.CLI, home string) *Runner {
-	r := &Runner{CLI: cli, started: map[string]agentrunner.StartOptions{}, CodexQuota: codexsession.LastRateLimit}
+// transcripts under home and reading Codex quotas from codexHome. An empty home
+// skips the gating.
+func NewIn(cli herdr.CLI, home, codexHome string) *Runner {
+	r := &Runner{CLI: cli, started: map[string]agentrunner.StartOptions{}}
+	r.CodexQuota = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+		return codexsession.LastRateLimitIn(codexHome, cwd, sessionID)
+	}
 	if home != "" {
 		r.BackgroundTasks = claudeui.BackgroundTasks(home, time.Now)
 	}

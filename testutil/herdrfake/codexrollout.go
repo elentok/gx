@@ -25,6 +25,8 @@ type CodexUsage struct {
 }
 
 type CodexRolloutOptions struct {
+	// CodexHome is the Codex home the rollout is written under. Required.
+	CodexHome      string
 	Cwd            string
 	WorkspaceID    string
 	TabID          string
@@ -71,9 +73,9 @@ func RegisterCodexRollout(t testing.TB, state *State, opts CodexRolloutOptions) 
 	if opts.Cwd == "" || opts.PaneID == "" || opts.AgentID == "" || opts.AgentName == "" {
 		t.Fatal("RegisterCodexRollout requires cwd, pane, agent id, and agent name")
 	}
-	codexHome := os.Getenv("CODEX_HOME")
+	codexHome := opts.CodexHome
 	if codexHome == "" {
-		t.Fatal("RegisterCodexRollout requires CODEX_HOME")
+		t.Fatal("RegisterCodexRollout requires CodexHome")
 	}
 	if opts.SessionID == "" {
 		opts.SessionID = stableCodexSessionID(opts.Cwd, opts.PaneID, opts.AgentID)
