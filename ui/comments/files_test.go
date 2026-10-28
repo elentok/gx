@@ -2,6 +2,7 @@ package comments
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -41,8 +42,7 @@ func TestSanitizeFilename(t *testing.T) {
 
 func TestWrite_CreatesFile(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	filePath, err := Write("src/main.go", "L10", []string{"-old", "+new"})
+	filePath, err := Write(dir, "src/main.go", "L10", []string{"-old", "+new"})
 	if err != nil {
 		t.Fatalf("Write() error: %v", err)
 	}
@@ -53,12 +53,14 @@ func TestWrite_CreatesFile(t *testing.T) {
 	if !strings.Contains(string(data), "@src/main.go L10") {
 		t.Errorf("file content missing expected header: %s", data)
 	}
+	if !strings.HasPrefix(filePath, filepath.Join(dir, ".local", "share", "gx", "comments")) {
+		t.Errorf("comment file %q not under the given home %q", filePath, dir)
+	}
 }
 
 func TestWrite_EmptyPathUsesDefault(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("HOME", dir)
-	filePath, err := Write("", "", []string{"line"})
+	filePath, err := Write(dir, "", "", []string{"line"})
 	if err != nil {
 		t.Fatalf("Write() error: %v", err)
 	}

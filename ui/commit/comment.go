@@ -44,7 +44,7 @@ func (m *Model) cmdCreateCommentFromDiff() tea.Cmd {
 	if !cl.ok {
 		return notify.Warning(cl.errMsg)
 	}
-	cmd, msg := comments.CmdOpenEditor(path, cl.loc, cl.body, m.worktreeRoot, ui.DetectTerminal(), func(err error, splitApp string) tea.Msg {
+	cmd, msg := comments.CmdOpenEditor(m.settings.Home(), path, cl.loc, cl.body, m.worktreeRoot, ui.DetectTerminal(), func(err error, splitApp string) tea.Msg {
 		return editCommentFinishedMsg{err: err, splitApp: splitApp}
 	})
 	if cmd == nil {

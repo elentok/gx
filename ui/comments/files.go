@@ -1,6 +1,7 @@
 package comments
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,10 +12,10 @@ import (
 
 var invalidFilenameChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
-func Write(path, loc string, body []string) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
+// Write saves a comment file under home's gx data dir and returns its path.
+func Write(home, path, loc string, body []string) (string, error) {
+	if home == "" {
+		return "", errors.New("unknown home dir")
 	}
 	commentsDir := filepath.Join(home, ".local", "share", "gx", "comments")
 	if err := os.MkdirAll(commentsDir, 0o755); err != nil {

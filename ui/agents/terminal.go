@@ -84,7 +84,7 @@ func (m Model) terminalRightTitle(s server.SessionInfo, width int) string {
 		afk = " AFK ·"
 	}
 	// The leading space keeps a gap once the title is truncated against it.
-	right := " " + s.Project + "  " + shortDir(s.Dir)
+	right := " " + s.Project + "  " + shortDir(m.settings.Home(), s.Dir)
 	if !s.StatusChangedAt.IsZero() {
 		right += "  for " + ui.DurationCompact(m.now().Sub(s.StatusChangedAt))
 	}
@@ -233,9 +233,8 @@ func statusDetail(s server.SessionInfo) string {
 	return strings.Join(parts, ": ")
 }
 
-func shortDir(dir string) string {
-	home, err := os.UserHomeDir()
-	if err != nil || home == "" {
+func shortDir(home, dir string) string {
+	if home == "" {
 		return dir
 	}
 	if dir == home {

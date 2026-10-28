@@ -14,13 +14,13 @@ import (
 // (error description on failure, empty on success — the editor takeover is its
 // own feedback, so no toast is shown).
 func CmdOpenEditor(
-	path, loc string,
+	home, path, loc string,
 	body []string,
 	worktreeRoot string,
 	terminal ui.Terminal,
 	makeMsg func(err error, splitApp string) tea.Msg,
 ) (tea.Cmd, string) {
-	commentPath, err := Write(path, loc, body)
+	commentPath, err := Write(home, path, loc, body)
 	if err != nil {
 		return nil, "comment write failed: " + err.Error()
 	}

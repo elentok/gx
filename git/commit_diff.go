@@ -76,7 +76,7 @@ func CommitFileDiffForRef(repoRoot, ref, path string, contextLines int) (string,
 	return strings.TrimSpace(out), nil
 }
 
-func CommitFileDiffWithDeltaForRef(repoRoot, ref, path string, contextLines, renderWidth int, sideBySide bool) (string, error) {
+func CommitFileDiffWithDeltaForRef(repoRoot, home, ref, path string, contextLines, renderWidth int, sideBySide bool) (string, error) {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
 		ref = "HEAD"
@@ -93,7 +93,7 @@ func CommitFileDiffWithDeltaForRef(repoRoot, ref, path string, contextLines, ren
 	if raw == "" {
 		return "", nil
 	}
-	if out, deltaErr := colorizeWithDelta(repoRoot, raw, sideBySide, renderWidth); deltaErr == nil {
+	if out, deltaErr := colorizeWithDelta(repoRoot, home, raw, sideBySide, renderWidth); deltaErr == nil {
 		return out, nil
 	}
 	colorArgs, err := singleFileDiffArgs(repoRoot, ref, path, contextLines, true)

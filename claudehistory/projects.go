@@ -6,6 +6,7 @@ package claudehistory
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -28,14 +29,10 @@ type Project struct {
 }
 
 // ListProjects enumerates projects under root, sorted by newest .jsonl mtime
-// (most recent first). Root defaults to ~/.claude/projects when empty.
-func ListProjects(root string) ([]Project, error) {
+// (most recent first). home is only used to collapse paths to ~ in subtitles.
+func ListProjects(root, home string) ([]Project, error) {
 	if root == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-		root = filepath.Join(home, ".claude", "projects")
+		return nil, errors.New("claudehistory: no projects root")
 	}
 
 	entries, err := os.ReadDir(root)
@@ -45,8 +42,6 @@ func ListProjects(root string) ([]Project, error) {
 		}
 		return nil, err
 	}
-
-	home, _ := os.UserHomeDir()
 
 	var projects []Project
 	for _, e := range entries {

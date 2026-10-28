@@ -18,7 +18,9 @@ func DeltaAvailable() bool {
 
 // DiffPathWithDelta returns a unified diff rendered by git diff with delta as
 // pager. If delta is unavailable, it falls back to git's own color output.
-func DiffPathWithDelta(worktreeRoot, path string, cached bool, sideBySide bool, renderWidth int, contextLines int) (string, error) {
+// home is the user's home, whose .gitconfig delta's config includes; empty
+// skips it.
+func DiffPathWithDelta(worktreeRoot, home, path string, cached bool, sideBySide bool, renderWidth int, contextLines int) (string, error) {
 	rawArgs := []string{"diff", "--no-color", diffContextArg(contextLines)}
 	if cached {
 		rawArgs = append(rawArgs, "--cached")
@@ -31,7 +33,7 @@ func DiffPathWithDelta(worktreeRoot, path string, cached bool, sideBySide bool, 
 	if strings.TrimSpace(raw) == "" {
 		return "", nil
 	}
-	if out, deltaErr := colorizeWithDelta(worktreeRoot, raw, sideBySide, renderWidth); deltaErr == nil {
+	if out, deltaErr := colorizeWithDelta(worktreeRoot, home, raw, sideBySide, renderWidth); deltaErr == nil {
 		return out, nil
 	}
 
@@ -50,7 +52,7 @@ func DiffPathWithDelta(worktreeRoot, path string, cached bool, sideBySide bool, 
 // DiffUntrackedPath returns a /dev/null -> file patch for an untracked path.
 // Plain output is returned when color is false; otherwise output is rendered by
 // git diff with delta as pager where possible.
-func DiffUntrackedPath(worktreeRoot, path string, color bool, sideBySide bool, renderWidth int, contextLines int) (string, error) {
+func DiffUntrackedPath(worktreeRoot, home, path string, color bool, sideBySide bool, renderWidth int, contextLines int) (string, error) {
 	diffPath := path
 
 	if !color {
@@ -72,7 +74,7 @@ func DiffUntrackedPath(worktreeRoot, path string, color bool, sideBySide bool, r
 	if strings.TrimSpace(raw) == "" {
 		return "", nil
 	}
-	if out, deltaErr := colorizeWithDelta(worktreeRoot, raw, sideBySide, renderWidth); deltaErr == nil {
+	if out, deltaErr := colorizeWithDelta(worktreeRoot, home, raw, sideBySide, renderWidth); deltaErr == nil {
 		return out, nil
 	}
 
@@ -89,11 +91,11 @@ func DiffUntrackedPath(worktreeRoot, path string, color bool, sideBySide bool, r
 
 // ColorizeDiff colorizes a raw unified diff using delta if available, falling
 // back to git diff --color=always.
-func ColorizeDiff(worktreeRoot, path, rawDiff string, cached, sideBySide bool, renderWidth, contextLines int) (string, error) {
+func ColorizeDiff(worktreeRoot, home, path, rawDiff string, cached, sideBySide bool, renderWidth, contextLines int) (string, error) {
 	if strings.TrimSpace(rawDiff) == "" {
 		return "", nil
 	}
-	if out, err := colorizeWithDelta(worktreeRoot, rawDiff, sideBySide, renderWidth); err == nil {
+	if out, err := colorizeWithDelta(worktreeRoot, home, rawDiff, sideBySide, renderWidth); err == nil {
 		return out, nil
 	}
 	args := []string{"diff", "--color=always", diffContextArg(contextLines)}
@@ -107,18 +109,18 @@ func ColorizeDiff(worktreeRoot, path, rawDiff string, cached, sideBySide bool, r
 
 // ColorizeUntrackedDiff colorizes a raw untracked diff using delta if
 // available, falling back to git diff --no-index --color=always.
-func ColorizeUntrackedDiff(worktreeRoot, path, rawDiff string, sideBySide bool, renderWidth, contextLines int) (string, error) {
+func ColorizeUntrackedDiff(worktreeRoot, home, path, rawDiff string, sideBySide bool, renderWidth, contextLines int) (string, error) {
 	if strings.TrimSpace(rawDiff) == "" {
 		return "", nil
 	}
-	if out, err := colorizeWithDelta(worktreeRoot, rawDiff, sideBySide, renderWidth); err == nil {
+	if out, err := colorizeWithDelta(worktreeRoot, home, rawDiff, sideBySide, renderWidth); err == nil {
 		return out, nil
 	}
 	return runGitAllowExitCodes(worktreeRoot, nil, map[int]bool{0: true, 1: true},
 		"diff", "--no-index", "--color=always", diffContextArg(contextLines), "--", "/dev/null", path)
 }
 
-func colorizeWithDelta(worktreeRoot, raw string, sideBySide bool, renderWidth int) (string, error) {
+func colorizeWithDelta(worktreeRoot, home, raw string, sideBySide bool, renderWidth int) (string, error) {
 	args := []string{"--paging=never"}
 	if !sideBySide {
 		args = append(args, "--color-only")
@@ -128,7 +130,7 @@ func colorizeWithDelta(worktreeRoot, raw string, sideBySide bool, renderWidth in
 			args = append(args, "--width", strconv.Itoa(renderWidth))
 		}
 	}
-	configPath, cleanup, err := tempDeltaConfig(worktreeRoot, sideBySide)
+	configPath, cleanup, err := tempDeltaConfig(worktreeRoot, home, sideBySide)
 	if err == nil && configPath != "" {
 		defer cleanup()
 		args = append(args, "--config", configPath)
@@ -137,6 +139,7 @@ func colorizeWithDelta(worktreeRoot, raw string, sideBySide bool, renderWidth in
 	}
 
 	cmd := exec.Command("delta", args...)
+	cmd.Env = os.Environ()
 	cmd.Stdin = strings.NewReader(raw)
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
@@ -159,25 +162,24 @@ type deltaConfigCacheEntry struct {
 
 var deltaConfigCache sync.Map
 
-func tempDeltaConfig(worktreeRoot string, sideBySide bool) (path string, cleanup func(), err error) {
+func tempDeltaConfig(worktreeRoot, home string, sideBySide bool) (path string, cleanup func(), err error) {
 	cacheKey := worktreeRoot
 	if cacheKey == "" {
 		cacheKey = "."
 	}
-	cacheKey = fmt.Sprintf("%s|sbs=%t", cacheKey, sideBySide)
+	cacheKey = fmt.Sprintf("%s|home=%s|sbs=%t", cacheKey, home, sideBySide)
 	entryAny, _ := deltaConfigCache.LoadOrStore(cacheKey, &deltaConfigCacheEntry{})
 	entry := entryAny.(*deltaConfigCacheEntry)
 	entry.once.Do(func() {
-		entry.path, entry.err = createTempDeltaConfig(worktreeRoot, sideBySide)
+		entry.path, entry.err = createTempDeltaConfig(worktreeRoot, home, sideBySide)
 	})
 	return entry.path, func() {}, entry.err
 }
 
-func createTempDeltaConfig(worktreeRoot string, sideBySide bool) (path string, err error) {
+func createTempDeltaConfig(worktreeRoot, home string, sideBySide bool) (path string, err error) {
 	includes := make([]string, 0, 2)
 
-	home, err := os.UserHomeDir()
-	if err == nil && home != "" {
+	if home != "" {
 		userConfig := filepath.Join(home, ".gitconfig")
 		if _, statErr := os.Stat(userConfig); statErr == nil {
 			includes = append(includes, userConfig)

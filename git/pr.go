@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -244,6 +245,7 @@ func IsCommitMergedToTrunk(dir, trunk, hash string) (bool, error) {
 // runGH executes a gh command in dir and returns trimmed stdout.
 func runGH(dir string, args []string) (string, error) {
 	cmd := exec.Command("gh", args...)
+	cmd.Env = os.Environ()
 	cmd.Dir = dir
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf

@@ -18,13 +18,17 @@ func newClaudeCmd(d deps) *cobra.Command {
 	return cmd
 }
 
-func newClaudeHistoryCmd(_ deps) *cobra.Command {
+func newClaudeHistoryCmd(d deps) *cobra.Command {
 	return &cobra.Command{
 		Use:   "history",
 		Short: "browse Claude Code session history across all projects",
 		Args:  cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return history.Run()
+			home, err := d.dirs().Home()
+			if err != nil {
+				return err
+			}
+			return history.Run(home)
 		},
 	}
 }

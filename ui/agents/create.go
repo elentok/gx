@@ -85,6 +85,7 @@ const (
 // lists the focused project first. matches is the entries query keeps; sel
 // indexes it and offset is the first picker row shown.
 type createForm struct {
+	home     string // collapses to ~ in entry labels
 	prefill  CreatePrefill
 	projects []formProject
 	loadErr  string
@@ -164,7 +165,7 @@ func (m Model) OpenCreateForm(p CreatePrefill) (Model, tea.Cmd) {
 	if p.Dir != "" {
 		field = fieldName
 	}
-	m.create = &createForm{prefill: p, name: p.Name, prompt: p.Prompt, field: field}
+	m.create = &createForm{home: m.settings.Home(), prefill: p, name: p.Name, prompt: p.Prompt, field: field}
 	list := m.listProjects
 	return m, func() tea.Msg {
 		projects, err := list()
@@ -263,7 +264,7 @@ func boolCmp(a, b bool) int {
 // positions that fall in the label.
 func (f *createForm) match(e *formEntry) bool {
 	name := f.projects[e.project].Name
-	score, pos, ok := ui.FuzzyScore(f.query, name+" "+entryLabel(*e))
+	score, pos, ok := ui.FuzzyScore(f.query, name+" "+entryLabel(f.home, *e))
 	if !ok {
 		return false
 	}
@@ -278,11 +279,11 @@ func (f *createForm) match(e *formEntry) bool {
 }
 
 // entryLabel is how the picker shows e.
-func entryLabel(e formEntry) string {
+func entryLabel(home string, e formEntry) string {
 	if e.newWorktree() {
 		return newWorktreeLabel
 	}
-	return shortDir(e.dir)
+	return shortDir(home, e.dir)
 }
 
 // selected is the chosen entry; false when nothing matches.
@@ -577,7 +578,7 @@ func (m Model) renderPicker(innerW int) []string {
 			continue
 		}
 		e := f.matches[r.entry]
-		text := "    " + ui.HighlightMatches(entryLabel(e), e.pos)
+		text := "    " + ui.HighlightMatches(entryLabel(f.home, e), e.pos)
 		if !e.newWorktree() {
 			if n := m.dirSessions(e.dir); n > 0 {
 				text += ui.StyleMuted.Render("  " + plural(n, "session"))

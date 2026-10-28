@@ -1,6 +1,9 @@
 package git
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/testutil"
@@ -11,10 +14,43 @@ func TestDeltaAvailable(t *testing.T) {
 	_ = DeltaAvailable()
 }
 
+func TestCreateTempDeltaConfig_IncludesUserGitconfigFromHome(t *testing.T) {
+	t.Parallel()
+	dir := testutil.TempRepo(t)
+	home := t.TempDir()
+	testutil.WriteFile(t, home, ".gitconfig", "[user]\n\tname = x\n")
+
+	withHome, err := createTempDeltaConfig(dir, home, false)
+	if err != nil {
+		t.Fatalf("createTempDeltaConfig: %v", err)
+	}
+	defer os.Remove(withHome)
+	body, err := os.ReadFile(withHome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), filepath.Join(home, ".gitconfig")) {
+		t.Errorf("config should include the home's .gitconfig:\n%s", body)
+	}
+
+	noHome, err := createTempDeltaConfig(dir, "", false)
+	if err != nil {
+		t.Fatalf("createTempDeltaConfig: %v", err)
+	}
+	defer os.Remove(noHome)
+	body, err = os.ReadFile(noHome)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), ".gitconfig") {
+		t.Errorf("empty home must not include a .gitconfig:\n%s", body)
+	}
+}
+
 func TestColorizeDiff_EmptyRaw(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
-	out, err := ColorizeDiff(dir, "file.go", "   ", false, false, 80, 3)
+	out, err := ColorizeDiff(dir, "", "file.go", "   ", false, false, 80, 3)
 	if err != nil {
 		t.Errorf("ColorizeDiff with empty raw: %v", err)
 	}
@@ -26,7 +62,7 @@ func TestColorizeDiff_EmptyRaw(t *testing.T) {
 func TestColorizeUntrackedDiff_EmptyRaw(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
-	out, err := ColorizeUntrackedDiff(dir, "file.go", "  ", false, 80, 3)
+	out, err := ColorizeUntrackedDiff(dir, "", "file.go", "  ", false, 80, 3)
 	if err != nil {
 		t.Errorf("ColorizeUntrackedDiff with empty raw: %v", err)
 	}
@@ -51,7 +87,7 @@ func TestColorizeDiff_FallbackWithoutDelta(t *testing.T) {
 	}
 
 	// ColorizeDiff should either use delta or fall back to git color
-	out, err := ColorizeDiff(dir, "file.txt", raw, true, false, 80, 3)
+	out, err := ColorizeDiff(dir, "", "file.txt", raw, true, false, 80, 3)
 	if err != nil {
 		t.Errorf("ColorizeDiff fallback: %v", err)
 	}
@@ -72,7 +108,7 @@ func TestColorizeDiff_WithContent(t *testing.T) {
 		t.Skip("could not get raw diff")
 	}
 
-	out, err := ColorizeDiff(dir, "col.txt", raw, true, false, 80, 3)
+	out, err := ColorizeDiff(dir, "", "col.txt", raw, true, false, 80, 3)
 	if err != nil {
 		t.Fatalf("ColorizeDiff: %v", err)
 	}
@@ -93,7 +129,7 @@ func TestColorizeUntrackedDiff_WithContent(t *testing.T) {
 		t.Skip("could not get raw diff")
 	}
 
-	out, err := ColorizeUntrackedDiff(dir, path, raw, false, 80, 3)
+	out, err := ColorizeUntrackedDiff(dir, "", path, raw, false, 80, 3)
 	if err != nil {
 		t.Fatalf("ColorizeUntrackedDiff: %v", err)
 	}
@@ -105,7 +141,7 @@ func TestColorizeUntrackedDiff_WithContent(t *testing.T) {
 func TestDiffPathWithDelta_EmptyDiff(t *testing.T) {
 	t.Parallel()
 	dir := testutil.TempRepo(t)
-	out, err := DiffPathWithDelta(dir, "README.md", false, false, 80, 3)
+	out, err := DiffPathWithDelta(dir, "", "README.md", false, false, 80, 3)
 	if err != nil {
 		t.Fatalf("DiffPathWithDelta: %v", err)
 	}
@@ -123,7 +159,7 @@ func TestDiffPathWithDelta_StagedChange(t *testing.T) {
 	testutil.WriteFile(t, dir, "delta.txt", "modified\n")
 	testutil.MustGitExported(t, dir, "add", "delta.txt")
 
-	out, err := DiffPathWithDelta(dir, "delta.txt", true, false, 80, 3)
+	out, err := DiffPathWithDelta(dir, "", "delta.txt", true, false, 80, 3)
 	if err != nil {
 		t.Fatalf("DiffPathWithDelta: %v", err)
 	}

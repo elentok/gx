@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -37,6 +38,7 @@ func (e *RgError) Error() string {
 // Overridden in tests to inject failures without a real rg process.
 var runRg = func(args []string) (stdout []byte, stderr string, exitCode int, err error) {
 	cmd := exec.Command("rg", args...)
+	cmd.Env = os.Environ()
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = &outBuf
 	cmd.Stderr = &errBuf

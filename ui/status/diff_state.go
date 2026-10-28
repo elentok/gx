@@ -13,14 +13,14 @@ import (
 
 func (m *Model) colorizeDiffsSync(filePath, unstagedRaw, stagedRaw string, sideBySide bool, renderWidth int) (unstagedColor, stagedColor string) {
 	contextLines := m.currentDiffContextLines()
-	unstagedColor, _ = git.ColorizeDiff(m.worktreeRoot, filePath, unstagedRaw, false, sideBySide, renderWidth, contextLines)
-	stagedColor, _ = git.ColorizeDiff(m.worktreeRoot, filePath, stagedRaw, true, sideBySide, renderWidth, contextLines)
+	unstagedColor, _ = git.ColorizeDiff(m.worktreeRoot, m.settings.Home(), filePath, unstagedRaw, false, sideBySide, renderWidth, contextLines)
+	stagedColor, _ = git.ColorizeDiff(m.worktreeRoot, m.settings.Home(), filePath, stagedRaw, true, sideBySide, renderWidth, contextLines)
 	return unstagedColor, stagedColor
 }
 
 func (m *Model) colorizeUntrackedSync(filePath, rawDiff string, sideBySide bool, renderWidth int) string {
 	contextLines := m.currentDiffContextLines()
-	color, _ := git.ColorizeUntrackedDiff(m.worktreeRoot, filePath, rawDiff, sideBySide, renderWidth, contextLines)
+	color, _ := git.ColorizeUntrackedDiff(m.worktreeRoot, m.settings.Home(), filePath, rawDiff, sideBySide, renderWidth, contextLines)
 	return color
 }
 
@@ -147,7 +147,7 @@ func (m *Model) reloadDiffsForSelection() tea.Cmd {
 		m.activeFilePath = file.Path
 	}
 	if file.Untracked {
-		raw, err := git.DiffUntrackedPath(m.worktreeRoot, file.Path, false, false, 0, m.currentDiffContextLines())
+		raw, err := git.DiffUntrackedPath(m.worktreeRoot, m.settings.Home(), file.Path, false, false, 0, m.currentDiffContextLines())
 		if err != nil {
 			m.showGitError(err)
 			raw = ""

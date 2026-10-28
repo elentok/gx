@@ -9,11 +9,24 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	ticketsui "github.com/elentok/gx/ui/tickets"
 	"github.com/elentok/gx/viewmodel"
 )
+
+func TestLastViewedFile_FollowsTheDirsStateDir(t *testing.T) {
+	state := t.TempDir()
+	dirs := config.DirsFrom([]string{"HOME=" + t.TempDir(), "XDG_STATE_HOME=" + state})
+
+	if got, want := LastViewedFile(dirs), filepath.Join(state, "gx", "agents-last-viewed"); got != want {
+		t.Fatalf("LastViewedFile = %q, want %q", got, want)
+	}
+	if got := LastViewedFile(config.Dirs{}); got != "" {
+		t.Fatalf("LastViewedFile with no dirs = %q, want empty", got)
+	}
+}
 
 // openedModel opens the tab on sessions, remembering lastViewed (none when
 // empty) in a temp file.

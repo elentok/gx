@@ -50,6 +50,12 @@ type AboutLine struct {
 	Label, Value string
 }
 
+// Home returns the user's home from Dirs, or "" when it is unknown.
+func (s Settings) Home() string {
+	home, _ := s.Dirs.Home()
+	return home
+}
+
 // MaxConcurrentTicketsPerEpic returns the configured per-epic ticket limit.
 func (s Settings) MaxConcurrentTicketsPerEpic() int {
 	if s.ExecutionQueue.MaxConcurrentTicketsPerEpic < 1 {

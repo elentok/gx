@@ -43,7 +43,7 @@ func TestListProjectsRealCwd(t *testing.T) {
 		map[string]any{"type": "user", "message": "hello"},
 	})
 
-	projects, err := ListProjects(root)
+	projects, err := ListProjects(root, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestListProjectsDedashFallback(t *testing.T) {
 		map[string]any{"type": "user", "message": "hi"},
 	})
 
-	projects, err := ListProjects(root)
+	projects, err := ListProjects(root, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestListProjectsWorktreeLabel(t *testing.T) {
 		map[string]any{"cwd": cwd},
 	})
 
-	projects, err := ListProjects(root)
+	projects, err := ListProjects(root, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +134,7 @@ func TestListProjectsMtimeOrdering(t *testing.T) {
 	setMtime(t, olderFile, now.Add(-2*time.Hour))
 	setMtime(t, newerFile, now.Add(-1*time.Hour))
 
-	projects, err := ListProjects(root)
+	projects, err := ListProjects(root, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,14 +151,14 @@ func TestListProjectsMtimeOrdering(t *testing.T) {
 
 func TestListProjectsCollapseTilde(t *testing.T) {
 	root := t.TempDir()
-	home, _ := os.UserHomeDir()
+	home := t.TempDir()
 
 	dir := filepath.Join(root, "my-project")
 	os.Mkdir(dir, 0o755)
 	cwd := filepath.Join(home, "work", "myproject")
 	writeJSONL(t, filepath.Join(dir, "s.jsonl"), []any{map[string]any{"cwd": cwd}})
 
-	projects, err := ListProjects(root)
+	projects, err := ListProjects(root, home)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestListProjectsSkipsEmptyDirs(t *testing.T) {
 	root := t.TempDir()
 	os.Mkdir(filepath.Join(root, "empty-dir"), 0o755)
 
-	projects, err := ListProjects(root)
+	projects, err := ListProjects(root, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestListProjectsSkipsEmptyDirs(t *testing.T) {
 }
 
 func TestListProjectsNonExistentRoot(t *testing.T) {
-	projects, err := ListProjects("/nonexistent/path/that/does/not/exist")
+	projects, err := ListProjects("/nonexistent/path/that/does/not/exist", "")
 	if err != nil {
 		t.Fatal(err)
 	}

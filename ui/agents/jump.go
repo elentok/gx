@@ -156,7 +156,7 @@ func (m Model) jumpRow(s server.SessionInfo, w int) string {
 	row := fit(m.statusIcon(s, icons), 2) + " " + marks(s, icons) +
 		fit(style.Render(displayName(s)), 18) + " " +
 		fit(styleProjectHeader.Render(s.Project), 12) + " " +
-		fit(ui.StyleMuted.Render(shortDir(s.Dir)), 20) + " " +
+		fit(ui.StyleMuted.Render(shortDir(m.settings.Home(), s.Dir)), 20) + " " +
 		fit(ui.StyleMuted.Render(since), 5) + " " +
 		statusLabel(s)
 	if s.Actionable.Reason != "" {

@@ -51,7 +51,7 @@ func TestDiffUntrackedPath(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	testutil.WriteFile(t, repo, "new.txt", "hello\n")
 
-	raw, err := DiffUntrackedPath(repo, "new.txt", false, false, 0, 1)
+	raw, err := DiffUntrackedPath(repo, "", "new.txt", false, false, 0, 1)
 	if err != nil {
 		t.Fatalf("DiffUntrackedPath raw: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestDiffUntrackedPath(t *testing.T) {
 		t.Fatalf("unexpected untracked diff:\n%s", raw)
 	}
 
-	color, err := DiffUntrackedPath(repo, "new.txt", true, false, 0, 1)
+	color, err := DiffUntrackedPath(repo, "", "new.txt", true, false, 0, 1)
 	if err != nil {
 		t.Fatalf("DiffUntrackedPath color: %v", err)
 	}

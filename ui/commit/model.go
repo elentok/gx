@@ -221,7 +221,7 @@ func (m *Model) refreshDiff() {
 		return
 	}
 	sideBySide := m.diffModel.RenderMode() == diffview.RenderModeSideBySide
-	colorDiff, err := git.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.ref, file.Path, m.currentDiffContextLines(), m.currentDiffRenderWidth(), sideBySide)
+	colorDiff, err := git.CommitFileDiffWithDeltaForRef(m.worktreeRoot, m.settings.Home(), m.ref, file.Path, m.currentDiffContextLines(), m.currentDiffRenderWidth(), sideBySide)
 	if err != nil {
 		colorDiff = rawDiff
 	}

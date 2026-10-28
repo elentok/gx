@@ -113,6 +113,7 @@ func TestExecute_TicketsRoot_NotAGitRepo(t *testing.T) {
 		stdout: &stdout,
 		stderr: &stderr,
 		getwd:  func() (string, error) { return dir, nil },
+		env:    envFor(t),
 	}
 
 	err := execute([]string{"tickets", "root"}, d)
