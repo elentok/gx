@@ -78,6 +78,9 @@ type trackedRun struct {
 	Workspace  string `json:"workspace"`
 	Base       string `json:"base"`
 	TicketPath string `json:"ticket_path"`
+	// Cwd is the directory the agent started in. Empty for a run an older
+	// server saved, which worktree removal then treats as inside its epic.
+	Cwd string `json:"cwd,omitempty"`
 	// StartedAt is when the claim launched; it survives a restart with the
 	// registry file. Zero for a run an older server recorded.
 	StartedAt time.Time `json:"started_at,omitzero"`

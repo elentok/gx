@@ -479,7 +479,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	}
 	s.registry.put(entry)
 	run, wt, err := s.prepareAndLaunch(deps, &one, ticket, mode, func(wt ralphloop.IterationWorktree) {
-		entry.Workspace, entry.Base = one.WorkspaceID, wt.Base()
+		entry.Workspace, entry.Base, entry.Cwd = one.WorkspaceID, wt.Base(), wt.Path
 		s.registry.put(entry)
 	})
 	if err != nil {
@@ -497,7 +497,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		return false, fmt.Errorf("launch %s: %w", ticketAddr, err)
 	}
 	s.registry.put(trackedRun{
-		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), TicketPath: t.Path, StartedAt: entry.StartedAt,
+		Run: run, Root: root.String(), Repo: repo, Workspace: one.WorkspaceID, Base: wt.Base(), Cwd: wt.Path, TicketPath: t.Path, StartedAt: entry.StartedAt,
 	})
 	s.events.publish(EventIterationStarted, ticketAddr)
 	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, run, ticketAddr}) })

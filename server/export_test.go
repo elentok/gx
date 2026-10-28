@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
@@ -235,6 +236,17 @@ func (s *Server) CompleteRootIfDone(address string) error {
 func (s *Server) RemoveMergedWorktree(project, epic string) {
 	root := rootRef{Project: project, Epic: epic}
 	s.goSettle(func() { s.removeMergedWorktree(root) })
+}
+
+// PutRunIn registers a run of address in root, started in cwd, whose herdr
+// session does not exist (a stopped agent whose entry settleRun has not yet
+// deleted). launching marks it as one whose agent may not have started.
+func (s *Server) PutRunIn(address, root, cwd string, launching bool) {
+	t := trackedRun{Run: Run{Address: address, Runner: runnerHerdr, Session: agentrunner.Session{Label: "gone", ID: "gone"}}, Root: root, Cwd: cwd}
+	if launching {
+		t.State = runLaunching
+	}
+	s.registry.put(t)
 }
 
 // LockedTrunks lists the trunks any merge has locked so far, in any repo.

@@ -114,7 +114,7 @@ const (
 func (s *Server) watchNudgedPane(ref ticketRef, it liveIter) {
 	t := trackedRun{
 		Run:  Run{Address: ref.addr.String(), Runner: it.runner.Name(), Session: it.session},
-		Root: ref.root().String(), TicketPath: ref.ticket.Path, StartedAt: time.Now(), Watched: true,
+		Root: ref.root().String(), TicketPath: ref.ticket.Path, Cwd: it.info.Worktree, StartedAt: time.Now(), Watched: true,
 	}
 	r := it.runner
 	s.registry.put(t)
