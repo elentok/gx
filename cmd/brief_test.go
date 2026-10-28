@@ -280,6 +280,24 @@ func failingModule(t *testing.T, withBuildError bool) string {
 	return dir
 }
 
+func TestResolveRelativeC(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	web := filepath.Join(root, "webui")
+	if err := os.Mkdir(web, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got := resolveRelativeC(root, "webui"); got != web {
+		t.Errorf("from the root: %q, want %q", got, web)
+	}
+	if got := resolveRelativeC(web, "webui"); got != web {
+		t.Errorf("from inside webui: %q, want %q", got, web)
+	}
+	if got := resolveRelativeC(web, "other"); got != filepath.Join(web, "other") {
+		t.Errorf("unrelated missing dir: %q", got)
+	}
+}
+
 func TestBrief_GoTestFailures(t *testing.T) {
 	t.Parallel()
 	data := envValue(envFor(t), "XDG_DATA_HOME")

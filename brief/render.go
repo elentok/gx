@@ -3,6 +3,8 @@ package brief
 import (
 	"fmt"
 	"io"
+	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -101,9 +103,29 @@ func limitText(text string) []string {
 	return out
 }
 
-// rawHead prints the first maxUnitLines lines of output nobody could parse.
+var (
+	ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
+	// buildNoise matches vite output that buries the error: asset sizes,
+	// chunk-size warnings and their hints.
+	buildNoise = regexp.MustCompile(`^(dist/|\(!\)|- |\s*$)`)
+	errorLine  = regexp.MustCompile(`(?i)\berror\b|\bfailed\b|\bFAIL\b|✘|×|Expected|Received|Test timeout`)
+)
+
+// rawHead prints the part of unparsed output that matters: from the first
+// error line on, or the last lines when none looks like an error. ANSI codes
+// and build noise are dropped first.
 func rawHead(w io.Writer, out []byte) {
-	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	var lines []string
+	for l := range strings.SplitSeq(ansiEscape.ReplaceAllString(string(out), ""), "\n") {
+		if !buildNoise.MatchString(strings.TrimRight(l, "\r")) {
+			lines = append(lines, l)
+		}
+	}
+	if i := slices.IndexFunc(lines, errorLine.MatchString); i >= 0 {
+		lines = lines[i:]
+	} else if len(lines) > maxUnitLines {
+		lines = lines[len(lines)-maxUnitLines:]
+	}
 	for _, l := range limitText(strings.Join(lines, "\n")) {
 		fmt.Fprintln(w, l)
 	}

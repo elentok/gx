@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -53,6 +55,17 @@ func briefUsageError(c *cobra.Command, msg string) error {
 	return &ExitError{Code: brief.ExitCantRun}
 }
 
+// resolveRelativeC joins a relative -C value onto cwd. When that directory is
+// missing and cwd is already the directory named (`-C webui` from inside
+// webui), it returns cwd.
+func resolveRelativeC(cwd, dir string) string {
+	joined := filepath.Join(cwd, dir)
+	if _, err := os.Stat(joined); err != nil && filepath.Base(cwd) == filepath.Clean(dir) {
+		return cwd
+	}
+	return joined
+}
+
 func runBrief(c *cobra.Command, d deps, args []string) error {
 	dir := ""
 	if len(args) >= 2 && args[0] == "-C" {
@@ -72,12 +85,14 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 		// conflicts is not a brief.Tool: it runs no child tool and keeps no log.
 		return briefUsageError(c, fmt.Sprintf("unknown tool %q", args[0]))
 	}
+	cwd, err := d.getwd()
+	if err != nil {
+		return err
+	}
 	if dir == "" {
-		cwd, err := d.getwd()
-		if err != nil {
-			return err
-		}
 		dir = cwd
+	} else if !filepath.IsAbs(dir) {
+		dir = resolveRelativeC(cwd, dir)
 	}
 	if args[0] == "conflicts" {
 		if code := brief.Conflicts(dir, c.OutOrStdout()); code != brief.ExitPass {

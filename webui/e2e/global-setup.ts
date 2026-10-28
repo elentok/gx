@@ -1,9 +1,26 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+
+// What a vite build reads. A change under any of these makes dist stale.
+const buildInputs = ["src", "public", "index.html", "gallery.html", "package.json", "pnpm-lock.yaml", "vite.config.ts", "tsconfig.json"];
+
+function newestMtime(path: string): number {
+  if (!existsSync(path)) return 0;
+  const st = statSync(path);
+  if (!st.isDirectory()) return st.mtimeMs;
+  return readdirSync(path).reduce((max, name) => Math.max(max, newestMtime(join(path, name))), st.mtimeMs);
+}
+
+function distIsCurrent(webuiDir: string): boolean {
+  const built = join(webuiDir, "dist", "index.html");
+  if (!existsSync(built)) return false;
+  const newestInput = Math.max(...buildInputs.map((p) => newestMtime(join(webuiDir, p))));
+  return statSync(built).mtimeMs >= newestInput;
+}
 
 // Builds the web UI and the binaries once so each flow's gxfixture starts
 // without compiling. The workers inherit the paths through the environment.
@@ -11,7 +28,7 @@ export default function globalSetup() {
   // The gx binary embeds webui/dist, so a stale or empty dist only shows up as
   // a locator timeout. Vite empties dist, which removes the committed .gitkeep.
   const webuiDir = resolve(repoRoot, "webui");
-  execFileSync("pnpm", ["build"], { cwd: webuiDir, stdio: "inherit" });
+  if (!distIsCurrent(webuiDir)) execFileSync("pnpm", ["build"], { cwd: webuiDir, stdio: "inherit" });
   const keep = join(webuiDir, "dist", ".gitkeep");
   if (!existsSync(keep)) writeFileSync(keep, "");
 

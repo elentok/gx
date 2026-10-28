@@ -33,8 +33,8 @@ func (Playwright) Name() string { return "playwright" }
 
 // Plan finds the binary, adds the e2e config unless the caller gave one, and
 // runs the line reporter. The gx binary embeds webui/dist, so a missing
-// dist/index.html triggers `make web-build`; the global setup rebuilds it
-// anyway, which is the only reason to build it here.
+// dist/index.html triggers `make web-build`; the global setup rebuilds a
+// stale dist, so building here only covers a missing one.
 func (Playwright) Plan(env []string, dir string, args []string) (Invocation, error) {
 	bin, err := findNodeBin(dir, "playwright")
 	if err != nil {
