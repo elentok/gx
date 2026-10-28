@@ -120,6 +120,15 @@ func TestParseLstart(t *testing.T) {
 	}
 }
 
+func TestSelectProcessBackend(t *testing.T) {
+	for goos, want := range map[string]string{"linux": "linux", "darwin": "darwin", "plan9": "none"} {
+		name, r := selectProcessBackend(goos)
+		if name != want || (want == "none") != (r == nil) {
+			t.Errorf("selectProcessBackend(%q) = %q, %v; want %q", goos, name, r, want)
+		}
+	}
+}
+
 func TestLinuxProcessReaderReal(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("needs /proc")
