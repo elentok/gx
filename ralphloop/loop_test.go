@@ -95,6 +95,12 @@ func testDepsWithOverrides(overrides DepsOverrides) Deps {
 	return d
 }
 
+// withProcessEnv is the process environment with a fake herdr's entries
+// layered over it, for DepsOverrides.Env.
+func withProcessEnv(fakeEnv []string) []string {
+	return append(os.Environ(), fakeEnv...)
+}
+
 // setProcessEnv points the real process env var key at value for the rest of
 // the test, restored on cleanup via a manual os.Setenv/os.Unsetenv pair
 // rather than t.Setenv (which panics once a test has called t.Parallel()).

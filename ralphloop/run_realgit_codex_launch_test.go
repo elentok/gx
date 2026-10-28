@@ -32,10 +32,6 @@ exit 1
 // asserts ticket 32's shared launch-failure outcomes via assertNoLaunchTrace
 // on top of its own distinct, actionable error message.
 func TestRun_ProductionRealGit_CodexLaunchPreflightFailures(t *testing.T) {
-	// not parallel-safe: the "incompatible herdr integration" case's subtest
-	// calls herdrfake.Start, which calls t.Setenv — and Setenv panics if the
-	// parent test has called t.Parallel, so this outer test must stay
-	// sequential too.
 	for _, tc := range []struct {
 		name          string
 		codexScript   string // "" leaves `codex` absent from PATH entirely
@@ -85,25 +81,23 @@ exit 1
 			}
 
 			herdrCalls := 0
+			var env []string
 			if tc.withHerdrFake {
-				// herdrfake.Start prepends its fake herdr's bin dir to the real
-				// process PATH via its own t.Setenv (outside this ticket's
-				// scope to change) — recover that bin dir from the PATH delta
-				// so it can be folded into pathEnv, which is what deps below
-				// actually resolves lookups against.
-				origPath := os.Getenv("PATH")
-				herdrfake.Start(t, func(argv []string) ([]byte, int) {
+				_, fakeEnv := herdrfake.StartEnv(t, func(argv []string) ([]byte, int) {
 					herdrCalls++
 					if len(argv) == 3 && argv[0] == "agent" && argv[1] == "start" && argv[2] == "--help" {
 						return []byte(tc.herdrHelp), 0
 					}
 					return herdrfake.CommandError("unexpected herdr command in launch-preflight test: " + strings.Join(argv, " "))
 				})
-				herdrDir := strings.TrimSuffix(os.Getenv("PATH"), string(os.PathListSeparator)+origPath)
+				env = withProcessEnv(fakeEnv)
+				// The fake's bin dir leads its PATH; fold it into pathEnv, which
+				// is what deps below resolves lookups against.
+				herdrDir := filepath.SplitList(envPath(fakeEnv))[0]
 				pathEnv = herdrDir + string(os.PathListSeparator) + pathEnv
 			}
 
-			deps := testDepsWithOverrides(DepsOverrides{Home: home, Path: pathEnv})
+			deps := testDepsWithOverrides(DepsOverrides{Home: home, Path: pathEnv, Env: env})
 			deps.Sleep = func(time.Duration) {}
 
 			sink := newRecordingEventSink()

@@ -182,15 +182,15 @@ func (s *State) rawHandler(h Handler) Handler {
 	}
 }
 
-// StartAgentHost registers the agent host commands on s and starts it like
-// StartState.
-func StartAgentHost(t *testing.T, s *State) *Coordinator {
+// StartAgentHostEnv registers the agent host commands on s and starts it like
+// StartStateEnv, returning the env entries a child needs to reach it.
+func StartAgentHostEnv(t *testing.T, s *State) (*Coordinator, []string) {
 	t.Helper()
 	RegisterAgentHost(s)
 	stop := make(chan struct{})
 	t.Cleanup(func() { close(stop) })
 	go s.runWatchdog(stop)
-	return Start(t, s.rawHandler(s.Handler()))
+	return StartEnv(t, s.rawHandler(s.Handler()))
 }
 
 // SetAgentStatus sets the status of the agent named name, as the agent

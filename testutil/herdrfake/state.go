@@ -216,7 +216,7 @@ func (s *State) Trace() []TraceEntry {
 }
 
 // Handler returns a herdrfake.Handler backed by State's registered commands,
-// suitable for passing to herdrfake.Start.
+// suitable for passing to herdrfake.StartEnv.
 func (s *State) Handler() Handler {
 	return s.dispatch
 }
@@ -299,26 +299,12 @@ func (s *State) beat() {
 	s.lastBeat.Store(time.Now().UnixNano())
 }
 
-// StartState wires State up like Start: it puts a fake herdr executable
-// first in PATH for the duration of the test, backed by State's registered
-// commands, and starts a short real-time watchdog alongside it. If a single
-// command doesn't complete within watchdogDeadlockBudget, or the test has
-// already failed an assertion, the watchdog dumps State's full trace via
+// StartStateEnv wires State up like StartEnv: a fake herdr backed by State's
+// registered commands, plus a short real-time watchdog alongside it. If a
+// single command doesn't complete within watchdogDeadlockBudget, or the test
+// has already failed an assertion, the watchdog dumps State's full trace via
 // t.Log so a hung or failed scenario is diagnosable without waiting out its
-// own timeout.
-func StartState(t *testing.T, s *State) *Coordinator {
-	t.Helper()
-	c, env := StartStateEnv(t, s)
-	for _, kv := range env {
-		k, v, _ := strings.Cut(kv, "=")
-		t.Setenv(k, v)
-	}
-	return c
-}
-
-// StartStateEnv is StartState without the process environment change: it
-// returns the KEY=VALUE entries as StartEnv does, so tests using it may run in
-// parallel.
+// own timeout. It returns the KEY=VALUE entries as StartEnv does.
 func StartStateEnv(t *testing.T, s *State) (*Coordinator, []string) {
 	t.Helper()
 

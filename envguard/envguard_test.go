@@ -53,7 +53,6 @@ var allowed = map[site]entry{
 	{"harness/claudepid.go", ruleChildEnv}:                {1, reasonRemove},
 	{"harness/claudepid.go", ruleHomeDir}:                 {1, reasonRemove},
 	{"osnotify/osnotify.go", ruleChildEnv}:                {1, reasonRemove},
-	{"ralphloop/deps.go", ruleChildEnv}:                   {1, reasonRemove},
 	{"server/servertest/servertest.go", ruleEnvRead}:      {2, reasonRemove},
 	{"sound/sound.go", ruleChildEnv}:                      {1, reasonRemove},
 	{"subscription/check.go", ruleHomeDir}:                {1, reasonRemove},

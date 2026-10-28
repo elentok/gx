@@ -25,14 +25,13 @@ import (
 // — proving Gate.claimIfRunning's "any label paused blocks every new claim"
 // contract holds even when a slot is free, and that recovery converges on
 // stale-but-clearing evidence instead of hanging. Uses a raw
-// herdrfake.Start(t, handler) (not NewState/RegisterCodexRollout, whose
+// herdrfake.StartEnv(t, handler) (not NewState/RegisterCodexRollout, whose
 // phase machine is hardcoded for the compact flow, not quota) in the same
 // style as TestRun_ProductionRealGit_AThenBAndCConcurrently, with all three
 // tickets driven by the Codex agent so quota detection is exercised for
 // real via Deps.ReadCodexRateLimit.
 func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
-	// not parallel-safe: herdrfake.Start calls t.Setenv for the helper socket
-	// path and PATH.
+	t.Parallel()
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
@@ -186,11 +185,11 @@ func TestRun_ProductionRealGit_CodexQuotaBackfillRecovers(t *testing.T) {
 		}
 	}
 
-	hf := herdrfake.Start(t, handler)
+	hf, fakeEnv := herdrfake.StartEnv(t, handler)
 
 	var rateLimitMu sync.Mutex
 	rateLimitCalls := 0
-	deps := testDepsWithOverrides(DepsOverrides{Home: home})
+	deps := testDepsWithOverrides(DepsOverrides{Home: home, Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
@@ -347,14 +346,12 @@ func waitForPausedRateLimitEvent(t *testing.T, scratchDir, epicName, ticketID st
 // Combines TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp's
 // smart-zone flow with TestRun_ProductionRealGit_CodexQuotaBackfillRecovers'
 // quota/backfill flow inside a single Run() call, on one raw
-// herdrfake.Start(t, handler) that dispatches per-pane: 01 runs a hand-rolled
+// herdrfake.StartEnv(t, handler) that dispatches per-pane: 01 runs a hand-rolled
 // phase machine mirroring herdrfake.CodexRollout's (ctrl-c -> /compact ->
 // finish-up -> idle) with a real synthetic rollout JSONL so context detection
 // goes through the actual codexsession reader; 02 and 03 reuse the quota
 // test's generic pane bookkeeping.
 func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testing.T) {
-	// not parallel-safe: herdrfake.Start calls t.Setenv for the helper socket
-	// path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
@@ -573,11 +570,11 @@ func TestRun_ProductionRealGit_CodexContextAndQuotaConcurrentlyResolve(t *testin
 		}
 	}
 
-	hf := herdrfake.Start(t, handler)
+	hf, fakeEnv := herdrfake.StartEnv(t, handler)
 
 	var rateLimitMu sync.Mutex
 	rateLimitCalls := 0
-	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
+	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome, Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }

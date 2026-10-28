@@ -194,6 +194,9 @@ type DepsOverrides struct {
 	// Path, when non-empty, overrides os.Getenv("PATH") for codex/herdr/
 	// package-manager executable lookups (PreflightAgent, InstallDeps).
 	Path string
+	// Env, when non-nil, is the environment the herdr CLI runs under, and its
+	// PATH entry (unless Path is set) is where executables are looked up.
+	Env []string
 	// StateDir is the gx state dir merge locks live under.
 	StateDir string
 	// RunnerWait is the runner's N; zero means agentrunner.DefaultN.
@@ -203,7 +206,11 @@ type DepsOverrides struct {
 // DefaultDepsWithOverrides is DefaultDeps with overrides applied to the
 // in-process env reads described on DepsOverrides.
 func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
-	runner := herdrrunner.NewIn(herdr.CLI{}, overrides.Home)
+	pathEnv := overrides.Path
+	if pathEnv == "" {
+		pathEnv = envPath(overrides.Env)
+	}
+	runner := herdrrunner.NewIn(herdr.CLI{Env: overrides.Env}, overrides.Home)
 	runner.N = overrides.RunnerWait
 	runner.CodexQuota = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 		if overrides.CodexHome == "" {
@@ -213,7 +220,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 	}
 	return Deps{
 		PreflightAgent: func(agent AgentKind) error {
-			return preflightAgentWith(agent, lookPathFor(overrides.Path), commandOutput)
+			return preflightAgentWith(agent, lookPathFor(pathEnv), commandOutputIn(overrides.Env))
 		},
 		VerifySkill: func(agent AgentKind, skill string) error {
 			return verifySkillWith(agent, skill, userHomeDirFor(overrides.Home), os.Stat)
@@ -328,6 +335,16 @@ func transcriptPath(home, cwd, sessionID string) (path string, found bool) {
 	return transcript.PathIn(home, cwd, sessionID), true
 }
 
+// envPath is the last PATH entry of env, or "" when it has none.
+func envPath(env []string) string {
+	for i := len(env) - 1; i >= 0; i-- {
+		if path, ok := strings.CutPrefix(env[i], "PATH="); ok {
+			return path
+		}
+	}
+	return ""
+}
+
 // lookPathFor returns exec.LookPath when pathEnv is empty (real process
 // PATH), or a lookup against the explicit pathEnv string otherwise.
 func lookPathFor(pathEnv string) func(string) (string, error) {
@@ -369,8 +386,13 @@ func lookPathIn(file, pathEnv string) (string, error) {
 	return "", &exec.Error{Name: file, Err: exec.ErrNotFound}
 }
 
-func commandOutput(name string, args ...string) ([]byte, error) {
-	return exec.Command(name, args...).CombinedOutput()
+// commandOutputIn runs name under env; nil env is the process environment.
+func commandOutputIn(env []string) func(string, ...string) ([]byte, error) {
+	return func(name string, args ...string) ([]byte, error) {
+		cmd := exec.Command(name, args...)
+		cmd.Env = env
+		return cmd.CombinedOutput()
+	}
 }
 
 func preflightAgentWith(

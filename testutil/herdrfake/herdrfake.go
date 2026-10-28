@@ -94,29 +94,15 @@ func (c *Coordinator) elapseTimedOutWaits(h Handler) Handler {
 	}
 }
 
-// Start puts a fake `herdr` executable first in PATH for the duration of the
-// test, backed by handler. It calls t.Setenv to publish the socket path and
-// mutate PATH, which panics if the test has already called t.Parallel —
-// process-wide environment changes and parallel subtests don't mix, so tests
-// using Start must stay non-parallel.
+// StartEnv serves a fake `herdr` executable backed by handler and returns the
+// KEY=VALUE entries a child needs to reach it: the fake herdr dir first in
+// PATH, the helper socket and the GORACE tweak. It leaves the process
+// environment alone. Layer the entries over a base environment (later entries
+// win) and hand the result to the code under test, so tests using it may run in
+// parallel.
 //
 // handler's agent responses are completed the way real herdr's are (see
 // trackAgents), so a handler only has to model the states it cares about.
-func Start(t *testing.T, handler Handler) *Coordinator {
-	t.Helper()
-	c, env := StartEnv(t, handler)
-	for _, kv := range env {
-		k, v, _ := strings.Cut(kv, "=")
-		t.Setenv(k, v)
-	}
-	return c
-}
-
-// StartEnv serves the same fake as Start but leaves the process environment
-// alone. It returns the KEY=VALUE entries a child needs to reach the fake:
-// the fake herdr dir first in PATH, the helper socket and the GORACE tweak.
-// Layer them over a base environment (later entries win) and hand the result
-// to the code under test, so tests using it may run in parallel.
 func StartEnv(t *testing.T, handler Handler) (*Coordinator, []string) {
 	t.Helper()
 

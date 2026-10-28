@@ -2,7 +2,6 @@ package herdrfake
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -49,13 +48,13 @@ func registerCounter(s *State) *int {
 func TestState_SerializesConcurrentHelperRequests(t *testing.T) {
 	s := NewState(t)
 	count := registerCounter(s)
-	StartState(t, s)
+	_, env := StartStateEnv(t, s)
 
 	const n = 20
 	var wg sync.WaitGroup
 	for range n {
 		wg.Go(func() {
-			if out, err := exec.Command("herdr", "counter", "inc").CombinedOutput(); err != nil {
+			if out, err := herdrIn(env, "counter", "inc").CombinedOutput(); err != nil {
 				t.Errorf("herdr counter inc: %v\n%s", err, out)
 			}
 		})
@@ -82,11 +81,11 @@ func TestState_TraceRecordsSequenceArgvVirtualTimeIdentitiesAndSnapshots(t *test
 		s.Workspaces[ws.ID] = ws
 		return map[string]string{"workspace_id": ws.ID}, Identities{WorkspaceID: ws.ID}, nil
 	})
-	StartState(t, s)
+	_, env := StartStateEnv(t, s)
 
 	s.AdvanceVirtualTime(3 * time.Second)
 
-	if out, err := exec.Command("herdr", "workspace", "create", "mylabel").CombinedOutput(); err != nil {
+	if out, err := herdrIn(env, "workspace", "create", "mylabel").CombinedOutput(); err != nil {
 		t.Fatalf("herdr workspace create: %v\n%s", err, out)
 	}
 
@@ -120,7 +119,7 @@ func TestState_TraceRecordsSequenceArgvVirtualTimeIdentitiesAndSnapshots(t *test
 	}
 
 	// A second dispatch gets the next sequence number.
-	if _, err := exec.Command("herdr", "workspace", "create", "other").CombinedOutput(); err != nil {
+	if _, err := herdrIn(env, "workspace", "create", "other").CombinedOutput(); err != nil {
 		t.Fatalf("herdr workspace create: %v", err)
 	}
 	trace = s.Trace()
@@ -134,9 +133,9 @@ func TestState_TraceRecordsSequenceArgvVirtualTimeIdentitiesAndSnapshots(t *test
 // unregistered "tab list" must not succeed with an empty tab list.
 func TestState_UnimplementedCommandFails(t *testing.T) {
 	s := NewState(t)
-	StartState(t, s)
+	_, env := StartStateEnv(t, s)
 
-	out, err := exec.Command("herdr", "tab", "list").CombinedOutput()
+	out, err := herdrIn(env, "tab", "list").CombinedOutput()
 	if err == nil {
 		t.Fatalf("herdr tab list: want non-zero exit, got success with output %s", out)
 	}
@@ -149,9 +148,9 @@ func TestState_UnimplementedCommandFails(t *testing.T) {
 // a verb+noun also fails fast rather than panicking or defaulting.
 func TestState_ShortArgvFails(t *testing.T) {
 	s := NewState(t)
-	StartState(t, s)
+	_, env := StartStateEnv(t, s)
 
-	out, err := exec.Command("herdr", "workspace").CombinedOutput()
+	out, err := herdrIn(env, "workspace").CombinedOutput()
 	if err == nil {
 		t.Fatalf("herdr workspace: want non-zero exit, got success with output %s", out)
 	}

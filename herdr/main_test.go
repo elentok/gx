@@ -8,7 +8,7 @@ import (
 )
 
 // TestMain lets `go test` binaries in this package double as the fake herdr
-// helper executable when re-invoked by herdrfake.Start (see smoke_test.go).
+// helper executable when re-invoked by herdrfake.StartEnv (see smoke_test.go).
 func TestMain(m *testing.M) {
 	herdrfake.RunHelperProcess()
 	os.Exit(m.Run())

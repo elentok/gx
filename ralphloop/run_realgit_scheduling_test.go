@@ -28,8 +28,6 @@ import (
 // left to the scheduler alone: it only becomes frontier once both D and E are
 // done, so no extra fake-agent blocking is needed to prove F starts last.
 func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
-	// not parallel-safe: herdrfake.Start calls t.Setenv for the helper socket
-	// path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
@@ -290,9 +288,9 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 		}
 	}
 
-	hf := herdrfake.Start(t, handler)
+	hf, fakeEnv := herdrfake.StartEnv(t, handler)
 
-	deps := testDepsWithOverrides(DepsOverrides{Home: home})
+	deps := testDepsWithOverrides(DepsOverrides{Home: home, Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
@@ -535,8 +533,6 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 }
 
 func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
-	// not parallel-safe: herdrfake.StartState calls t.Setenv for the helper
-	// socket path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const (
 		epicName  = "epic"
@@ -702,9 +698,9 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	s.Register("agent", "read", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return "", herdrfake.Identities{}, nil
 	})
-	hf := herdrfake.StartState(t, s)
+	hf, fakeEnv := herdrfake.StartStateEnv(t, s)
 
-	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
+	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome, Env: withProcessEnv(fakeEnv)})
 	useFakeClock(deps, hf)
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }

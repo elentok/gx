@@ -74,8 +74,6 @@ func fakeValidatingTelegramServer(t *testing.T) (*httptest.Server, func() []tele
 // dropped every ticket-completion message on a real bugs-07 run before
 // notification_text.go's counts/detail strings were escaped.
 func TestRun_FullEpicRealGit_TelegramNotifications_AllValidMarkdownV2(t *testing.T) {
-	// not parallel-safe: herdrfake.Start calls t.Setenv for the helper socket
-	// path and PATH.
 	realGitTimeoutWatchdog(t, realGitTestTimeout)
 	const epicName = "epic"
 	repoDir := testutil.TempRepo(t)
@@ -166,9 +164,9 @@ func TestRun_FullEpicRealGit_TelegramNotifications_AllValidMarkdownV2(t *testing
 		}
 	}
 
-	herdrfake.Start(t, handler)
+	_, fakeEnv := herdrfake.StartEnv(t, handler)
 
-	deps := testDepsWithOverrides(DepsOverrides{Home: home})
+	deps := testDepsWithOverrides(DepsOverrides{Home: home, Env: withProcessEnv(fakeEnv)})
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }
 

@@ -3,6 +3,7 @@ package herdrfake
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -12,14 +13,28 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestStart_HelperReceivesArgvAndReturnsResult(t *testing.T) {
+// herdrIn is a `herdr` invocation under the env StartEnv returned. exec.Command
+// resolves a bare name on the process PATH, so the fake is found on env's.
+func herdrIn(env []string, args ...string) *exec.Cmd {
+	var dir string
+	for _, kv := range env {
+		if path, ok := strings.CutPrefix(kv, "PATH="); ok {
+			dir = filepath.SplitList(path)[0]
+		}
+	}
+	cmd := exec.Command(filepath.Join(dir, "herdr"), args...)
+	cmd.Env = append(os.Environ(), env...)
+	return cmd
+}
+
+func TestStartEnv_HelperReceivesArgvAndReturnsResult(t *testing.T) {
 	var gotArgv []string
-	Start(t, func(argv []string) ([]byte, int) {
+	_, env := StartEnv(t, func(argv []string) ([]byte, int) {
 		gotArgv = argv
 		return Result(map[string]string{"ok": "yes"})
 	})
 
-	out, err := exec.Command("herdr", "workspace", "list").CombinedOutput()
+	out, err := herdrIn(env, "workspace", "list").CombinedOutput()
 	if err != nil {
 		t.Fatalf("herdr workspace list: %v\n%s", err, out)
 	}
@@ -31,12 +46,12 @@ func TestStart_HelperReceivesArgvAndReturnsResult(t *testing.T) {
 	}
 }
 
-func TestStart_CommandErrorNonZeroExit(t *testing.T) {
-	Start(t, func(argv []string) ([]byte, int) {
+func TestStartEnv_CommandErrorNonZeroExit(t *testing.T) {
+	_, env := StartEnv(t, func(argv []string) ([]byte, int) {
 		return CommandError("boom")
 	})
 
-	out, err := exec.Command("herdr", "x").CombinedOutput()
+	out, err := herdrIn(env, "x").CombinedOutput()
 	if err == nil {
 		t.Fatal("expected non-zero exit, got nil error")
 	}
@@ -45,14 +60,10 @@ func TestStart_CommandErrorNonZeroExit(t *testing.T) {
 	}
 }
 
-func TestStart_PanicsAfterParallel(t *testing.T) {
-	t.Run("sub", func(t *testing.T) {
-		t.Parallel()
-		defer func() {
-			if recover() == nil {
-				t.Error("Start() after t.Parallel() did not panic")
-			}
-		}()
-		Start(t, func(argv []string) ([]byte, int) { return nil, 0 })
-	})
+func TestStartEnv_LeavesProcessEnvAlone(t *testing.T) {
+	StartEnv(t, func(argv []string) ([]byte, int) { return nil, 0 })
+
+	if got := os.Getenv(helperSocketEnv); got != "" {
+		t.Errorf("%s = %q in the process env, want it unset", helperSocketEnv, got)
+	}
 }

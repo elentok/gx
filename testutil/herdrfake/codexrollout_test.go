@@ -34,11 +34,11 @@ func TestCodexRolloutStartCreatesStableProductionReadableSession(t *testing.T) {
 			Secondary:     CodexQuota{UsedPercent: 45, ResetsAt: resetAt.Add(24 * time.Hour)},
 		},
 	})
-	StartState(t, state)
+	cli := startStateCLI(t, state)
 
 	start := func() herdr.Agent {
 		t.Helper()
-		agent, err := herdr.AgentStart(herdr.AgentStartOptions{
+		agent, err := cli.AgentStart(herdr.AgentStartOptions{
 			Name: "codex", Kind: "codex", Pane: "pane-codex",
 		})
 		if err != nil {
@@ -92,15 +92,15 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 			Secondary: CodexQuota{UsedPercent: 100, ResetsAt: resetAt},
 		},
 	})
-	StartState(t, state)
+	cli := startStateCLI(t, state)
 
-	started, err := herdr.AgentStart(herdr.AgentStartOptions{Name: "codex", Kind: "codex", Pane: "pane-codex"})
+	started, err := cli.AgentStart(herdr.AgentStartOptions{Name: "codex", Kind: "codex", Pane: "pane-codex"})
 	if err != nil {
 		t.Fatalf("AgentStart: %v", err)
 	}
 	prompt := func(text string) herdr.Agent {
 		t.Helper()
-		agent, err := herdr.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: text})
+		agent, err := cli.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: text})
 		if err != nil {
 			t.Fatalf("AgentPrompt(%q): %v", text, err)
 		}
@@ -108,7 +108,7 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 	}
 	wait := func(until string, timeout int) (herdr.Agent, error) {
 		t.Helper()
-		return herdr.AgentWait(herdr.AgentWaitOptions{Target: started.PaneID, Until: []string{until}, TimeoutMs: timeout})
+		return cli.AgentWait(herdr.AgentWaitOptions{Target: started.PaneID, Until: []string{until}, TimeoutMs: timeout})
 	}
 
 	if agent := prompt("$implement ticket.md"); agent.AgentStatus != "working" {
@@ -117,7 +117,7 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 	if _, err := wait("idle", 1); err == nil {
 		t.Fatal("running wait succeeded, want modeled timeout")
 	}
-	if err := herdr.AgentSendKeys(started.PaneID, "ctrl+c"); err != nil {
+	if err := cli.AgentSendKeys(started.PaneID, "ctrl+c"); err != nil {
 		t.Fatalf("AgentSendKeys: %v", err)
 	}
 	if agent, err := wait("idle", 0); err != nil || agent.AgentStatus != "done" {
@@ -196,23 +196,23 @@ func TestCodexRolloutCtrlCInterruptLeavesPaneIdleNotBlocked(t *testing.T) {
 		Cwd: t.TempDir(), PaneID: "pane-codex", AgentID: "agent-codex", AgentName: "codex",
 		RejectPromptWhenBlocked: true,
 	})
-	StartState(t, state)
+	cli := startStateCLI(t, state)
 
-	started, err := herdr.AgentStart(herdr.AgentStartOptions{Name: "codex", Kind: "codex", Pane: "pane-codex"})
+	started, err := cli.AgentStart(herdr.AgentStartOptions{Name: "codex", Kind: "codex", Pane: "pane-codex"})
 	if err != nil {
 		t.Fatalf("AgentStart: %v", err)
 	}
-	if _, err := herdr.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: "$implement ticket.md"}); err != nil {
+	if _, err := cli.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: "$implement ticket.md"}); err != nil {
 		t.Fatalf("AgentPrompt: %v", err)
 	}
-	if err := herdr.AgentSendKeys(started.PaneID, "ctrl+c"); err != nil {
+	if err := cli.AgentSendKeys(started.PaneID, "ctrl+c"); err != nil {
 		t.Fatalf("AgentSendKeys: %v", err)
 	}
-	if agent, err := herdr.AgentWait(herdr.AgentWaitOptions{Target: started.PaneID, Until: []string{"idle"}}); err != nil || agent.AgentStatus != "done" {
+	if agent, err := cli.AgentWait(herdr.AgentWaitOptions{Target: started.PaneID, Until: []string{"idle"}}); err != nil || agent.AgentStatus != "done" {
 		t.Fatalf("post-interrupt wait = %+v, %v; want done", agent, err)
 	}
 
-	agent, err := herdr.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: "/compact"})
+	agent, err := cli.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: "/compact"})
 	if err != nil {
 		t.Fatalf("AgentPrompt(/compact) into post-interrupt pane = %v, want accepted", err)
 	}
@@ -233,17 +233,17 @@ func TestCodexRolloutRejectPromptWhenBlocked_SwitchOnRejectsWithAgentBlockedErro
 		Cwd: t.TempDir(), PaneID: "pane-codex", AgentID: "agent-codex", AgentName: "codex",
 		RejectPromptWhenBlocked: true,
 	})
-	StartState(t, state)
+	cli := startStateCLI(t, state)
 
-	started, err := herdr.AgentStart(herdr.AgentStartOptions{Name: "codex", Kind: "codex", Pane: "pane-codex"})
+	started, err := cli.AgentStart(herdr.AgentStartOptions{Name: "codex", Kind: "codex", Pane: "pane-codex"})
 	if err != nil {
 		t.Fatalf("AgentStart: %v", err)
 	}
-	if _, err := herdr.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: "/compact"}); err != nil {
+	if _, err := cli.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: "/compact"}); err != nil {
 		t.Fatalf("AgentPrompt(/compact): %v", err)
 	}
 
-	_, err = herdr.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: "hello"})
+	_, err = cli.AgentPrompt(herdr.AgentPromptOptions{Target: started.PaneID, Text: "hello"})
 	if err == nil {
 		t.Fatal("AgentPrompt into a blocked pane succeeded, want an AgentBlockedError")
 	}

@@ -25,8 +25,7 @@ import (
 // is enough to observe the flags without driving a full iteration to
 // completion.
 func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
-	// not parallel-safe: herdrfake.StartState calls t.Setenv for the helper
-	// socket path and PATH.
+	t.Parallel()
 	const epicName = "epic"
 	for _, tc := range []struct {
 		name          string
@@ -92,9 +91,9 @@ func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
 				startArgv = argv
 				return nil, herdrfake.Identities{}, fmt.Errorf("herdrfake: agent start rejected for argv capture")
 			})
-			herdrfake.StartState(t, s)
+			_, fakeEnv := herdrfake.StartStateEnv(t, s)
 
-			deps := testDepsWithOverrides(DepsOverrides{Home: home})
+			deps := testDepsWithOverrides(DepsOverrides{Home: home, Env: withProcessEnv(fakeEnv)})
 			deps.PreflightAgent = func(AgentKind) error { return nil }
 			deps.VerifySkill = func(AgentKind, string) error { return nil }
 			deps.Sleep = func(time.Duration) {}
