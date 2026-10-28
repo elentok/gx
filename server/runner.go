@@ -414,6 +414,7 @@ func (s *Server) chatOverride(project string) *ralphloop.ServerChatConfig {
 		TelegramBotToken: n.Telegram.BotToken,
 		TelegramChatID:   n.Telegram.ChatID,
 		SlackWebhookURL:  n.Slack.WebhookURL,
+		GateStatePath:    s.cfg.Chat.GateStatePath,
 	}
 }
 

@@ -146,7 +146,11 @@ func TestExecute_Notify_PerDestinationMutes(t *testing.T) {
 	}
 
 	// A state file from before destinations existed: transport-keyed.
-	if err := ralphloop.UpdateNotificationState(func(s *ralphloop.NotificationState) {
+	statePath, err := notificationStatePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ralphloop.UpdateNotificationState(statePath, func(s *ralphloop.NotificationState) {
 		s.Transports["slack"] = ralphloop.TransportState{Muted: true, Reason: "manual-disable"}
 	}); err != nil {
 		t.Fatal(err)

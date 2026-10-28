@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/transcript"
 	"github.com/elentok/gx/ui/nav"
@@ -136,6 +137,9 @@ func defaultSkillsStatusPath() (string, error) {
 // Execute runs gx with the provided arguments.
 func Execute(args []string) error {
 	config.WarnOnMigrateFailure(os.Stderr)
+	if dir, err := config.StateDir(); err == nil {
+		logger.SetDir(dir)
+	}
 	return execute(args, defaultDeps())
 }
 

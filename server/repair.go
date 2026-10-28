@@ -570,6 +570,9 @@ func (s *Server) repairVerify(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
+	if run.MergeLockStateDir, err = s.lockStateDir(); err != nil {
+		return repairRefusal(err), nil
+	}
 	run.ID = id
 	res, err := repair.Verify(run)
 	if err != nil {

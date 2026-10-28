@@ -63,6 +63,9 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 	if err != nil {
 		return err
 	}
+	if run.MergeLockStateDir, err = s.lockStateDir(); err != nil {
+		return err
+	}
 	run.ID = owner.Ticket
 	res, err := repair.Verify(run)
 	if err != nil {

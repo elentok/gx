@@ -28,11 +28,8 @@ type EpicFailureReporter struct {
 	scratchDir string
 	targets    []epicFailureTarget
 
-	// gateStatePath overrides NotificationGate's real per-user state-file
-	// path (see notificationStateFilePath) with a test-only fixed path,
-	// mirroring chatEventSink.gateStatePath - so tests never touch the real
-	// ~/.local/state/gx/notifications-state.json. Empty (the production
-	// default from NewEpicFailureReporter) means "use the real path".
+	// gateStatePath is the notification state file the gate reads and writes,
+	// mirroring chatEventSink.gateStatePath.
 	gateStatePath string
 }
 
@@ -66,14 +63,10 @@ func (r *EpicFailureReporter) AddSlack(webhookURL string) {
 	})
 }
 
-// gate runs source through NotificationGate (or, under test, an injected
-// fixed state-file path — see gateStatePath), mirroring
+// gate runs source through notificationGateAt on gateStatePath, mirroring
 // chatEventSink.gate.
 func (r *EpicFailureReporter) gate(transport, source string) (GateResult, error) {
-	if r.gateStatePath != "" {
-		return notificationGateAt(r.gateStatePath, transport, notifyKindEpicFailed, source, time.Now(), true, nil)
-	}
-	return NotificationGate(transport, notifyKindEpicFailed, source, time.Now(), true, nil)
+	return notificationGateAt(r.gateStatePath, transport, notifyKindEpicFailed, source, time.Now(), true, nil)
 }
 
 // EpicFailed sends the "epic failed" message to every configured target,

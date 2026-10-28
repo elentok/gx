@@ -33,7 +33,7 @@ func TestMergeOne_TrailerOnly_PausesAmbiguousMerge(t *testing.T) {
 	testutil.WriteFile(t, repo, "other.txt", "something else\n")
 	testutil.CommitAll(t, repo, "something else\n\n"+ticketTrailerKey+": "+ticketTrailerValue("epic", "01"))
 
-	d := DefaultDeps()
+	d := testDeps()
 	d.Runner = runnerfake.NewRunner()
 	lp := mergeQueueParams{
 		RepoDir: repo, FeatureWorktree: repo, FeatureBranch: "epic", ScratchDir: scratchDir,

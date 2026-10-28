@@ -17,12 +17,8 @@ import (
 // it deferred; a var so tests can shorten it.
 var mergeDeferRetryInterval = 2 * time.Second
 
-// mergeLockDir is where an epic's merge lock and marker live.
-func mergeLockDir(scratchDir, epic string) (string, error) {
-	return MergeLockDir(filepath.Join(scratchDir, epic))
-}
-
-// mergeLockDir is the package-level one under d's lock state dir.
+// mergeLockDir is where an epic's merge lock and marker live, under d's lock
+// state dir.
 func (d Deps) mergeLockDir(scratchDir, epic string) (string, error) {
 	return MergeLockDirIn(d.MergeLockStateDir, filepath.Join(scratchDir, epic))
 }

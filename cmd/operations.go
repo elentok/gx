@@ -442,7 +442,11 @@ func sendNotify(text string, d deps) error {
 		return err
 	}
 
-	sent, err := ralphloop.SendMessage(cfg.Notifications, text)
+	statePath, err := notificationStatePath()
+	if err != nil {
+		return err
+	}
+	sent, err := ralphloop.SendMessage(cfg.Notifications, statePath, text)
 	if len(sent) == 0 {
 		if err == nil {
 			fmt.Fprintf(d.stdout, "no notification service configured (see `gx config edit`)\n")
@@ -496,7 +500,11 @@ func runNotifySetMute(transport, project string, muted bool, d deps) error {
 		return fmt.Errorf("project %q has no %s destination", project, transport)
 	}
 
-	err = ralphloop.UpdateNotificationState(func(state *ralphloop.NotificationState) {
+	statePath, err := notificationStatePath()
+	if err != nil {
+		return err
+	}
+	err = ralphloop.UpdateNotificationState(statePath, func(state *ralphloop.NotificationState) {
 		for _, dest := range targets {
 			ts := state.Transports[dest.Key]
 			ts.Muted = muted
@@ -524,10 +532,24 @@ func runNotifySetMute(transport, project string, muted bool, d deps) error {
 	return nil
 }
 
+// notificationStatePath is the real notification state file, under gx's state
+// dir.
+func notificationStatePath() (string, error) {
+	dir, err := config.StateDir()
+	if err != nil {
+		return "", err
+	}
+	return ralphloop.NotificationStatePath(dir), nil
+}
+
 // runNotifyStatus reports every destination's mute state and projects, plus
 // every ticket under the current repo's tracker root carrying a non-empty Mutes.
 func runNotifyStatus(d deps) error {
-	state, err := ralphloop.LoadNotificationState()
+	statePath, err := notificationStatePath()
+	if err != nil {
+		return err
+	}
+	state, err := ralphloop.LoadNotificationState(statePath)
 	if err != nil {
 		return err
 	}

@@ -17,18 +17,18 @@ const notifyKindCLI = "cli-notify"
 // test-notifications` uses. It returns the names of the services it actually
 // sent to ("telegram", "slack") and an error joining any per-service
 // failures, so a Slack success is still visible even if Telegram fails.
-func SendMessage(cfg config.NotificationsConfig, text string) ([]string, error) {
-	return sendMessage(cfg, text, telegramAPIBaseURL)
+func SendMessage(cfg config.NotificationsConfig, statePath, text string) ([]string, error) {
+	return sendMessage(cfg, statePath, text, telegramAPIBaseURL)
 }
 
 // sendMessage is SendMessage with the Telegram API base URL injectable, so
 // tests can point it at a fake server instead of the real Telegram API.
-func sendMessage(cfg config.NotificationsConfig, text, telegramBaseURL string) ([]string, error) {
+func sendMessage(cfg config.NotificationsConfig, statePath, text, telegramBaseURL string) ([]string, error) {
 	var sent []string
 	var errs []error
 
 	if cfg.Telegram.BotToken != "" {
-		allowed, err := gateCLISend("telegram")
+		allowed, err := gateCLISend(statePath, "telegram")
 		if err != nil {
 			errs = append(errs, fmt.Errorf("telegram: %w", err))
 		} else if allowed {
@@ -41,7 +41,7 @@ func sendMessage(cfg config.NotificationsConfig, text, telegramBaseURL string) (
 	}
 
 	if cfg.Slack.WebhookURL != "" {
-		allowed, err := gateCLISend("slack")
+		allowed, err := gateCLISend(statePath, "slack")
 		if err != nil {
 			errs = append(errs, fmt.Errorf("slack: %w", err))
 		} else if allowed {
@@ -102,8 +102,8 @@ func SendTestBatch(cfg config.NotificationsConfig) ([]string, error) {
 // gateCLISend runs transport's send through the notification gate with
 // source "cli" — there's no ticket to pause a trip against, so pauseTicket is
 // nil. A trip still writes its bookkeeping; the caller just skips sending.
-func gateCLISend(transport string) (bool, error) {
-	result, err := NotificationGate(transport, notifyKindCLI, "cli", time.Now(), true, nil)
+func gateCLISend(statePath, transport string) (bool, error) {
+	result, err := notificationGateAt(statePath, transport, notifyKindCLI, "cli", time.Now(), true, nil)
 	if err != nil {
 		return false, err
 	}

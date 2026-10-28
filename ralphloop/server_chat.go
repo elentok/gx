@@ -19,8 +19,8 @@ type ServerChatConfig struct {
 	// TelegramBaseURL replaces the Bot API host; empty means the real one.
 	TelegramBaseURL string
 	SlackWebhookURL string
-	// GateStatePath replaces the per-user notification gate state file; empty
-	// means the real one.
+	// GateStatePath is the notification gate state file; the server fills it
+	// from its state dir.
 	GateStatePath string
 	// FlushInterval replaces batchFlushInterval; zero means the real one.
 	FlushInterval time.Duration

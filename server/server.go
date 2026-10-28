@@ -470,6 +470,9 @@ func New(cfg Config) (*Server, error) {
 	if cfg.ChatPollInterval == 0 {
 		cfg.ChatPollInterval = defaultChatPollInterval
 	}
+	if cfg.Chat.GateStatePath == "" {
+		cfg.Chat.GateStatePath = ralphloop.NotificationStatePath(cfg.StateDir)
+	}
 	if cfg.StallThreshold == 0 {
 		cfg.StallThreshold = defaultStallThreshold
 	}

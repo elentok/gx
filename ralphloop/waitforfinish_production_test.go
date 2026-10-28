@@ -28,12 +28,11 @@ import (
 // unrelated multi-minute package hang.
 func TestMain(m *testing.M) {
 	herdrfake.RunHelperProcess()
-	// Merge locks live in the state dir; keep tests off the machine's real one.
 	state, err := os.MkdirTemp("", "gx-ralphloop-state")
 	if err != nil {
 		panic(err)
 	}
-	mergeLockStateDir = func() (string, error) { return state, nil }
+	testStateDir = state
 	cleanup := claudeenv.Isolate()
 	code := m.Run()
 	cleanup()
@@ -195,7 +194,8 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 
 	hf := herdrfake.StartState(t, s)
 
-	setHomeEnv(t, t.TempDir())
+	home := t.TempDir()
+	setHomeEnv(t, home)
 	writeOccupancyTranscript(t, cwd, sessionID, smartZone+100)
 
 	// Models the whole scenario's ~3 real minutes of compaction without
@@ -203,7 +203,7 @@ func TestWaitForFinish_ProductionSlowCompactRegression(t *testing.T) {
 	s.AdvanceVirtualTime(3 * time.Minute)
 
 	scratchDir := epicScratchDir(t, "epic")
-	deps := testDeps()
+	deps := testDepsWithOverrides(DepsOverrides{Home: home})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.Now = func() time.Time { return time.Unix(0, 0) }

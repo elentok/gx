@@ -176,6 +176,48 @@ func TestDefaultDepsWithOverrides_HomeOverridesVerifySkillLookup(t *testing.T) {
 	}
 }
 
+func TestDefaultDepsWithOverrides_NoHomeReadsNoTranscript(t *testing.T) {
+	t.Parallel()
+	const cwd, session = "/work/tree", "sess-1"
+	home := t.TempDir()
+	writeFakeTranscript(t, home, cwd, session, time.Now(), [3]any{"claude-sonnet-5", 1000, 0})
+
+	if _, ok, err := DefaultDepsWithOverrides(DepsOverrides{Home: home}).ReadOccupancy(cwd, session); err != nil || !ok {
+		t.Fatalf("ReadOccupancy() with the home = ok %v, err %v; want the transcript found", ok, err)
+	}
+	if _, ok, err := DefaultDepsWithOverrides(DepsOverrides{}).ReadOccupancy(cwd, session); err != nil || ok {
+		t.Errorf("ReadOccupancy() with no home = ok %v, err %v; want not found", ok, err)
+	}
+	if err := DefaultDepsWithOverrides(DepsOverrides{}).VerifySkill(AgentClaude, "implement"); err == nil {
+		t.Error("VerifySkill() with no home = nil, want an error")
+	}
+	if ok, err := DefaultDepsWithOverrides(DepsOverrides{}).VerifyCodexSession(cwd, session); err != nil || ok {
+		t.Errorf("VerifyCodexSession() with no codex home = ok %v, err %v; want not found", ok, err)
+	}
+}
+
+func TestDefaultDepsWithOverrides_RunnerWaitReachesRunner(t *testing.T) {
+	t.Parallel()
+	runner := DefaultDepsWithOverrides(DepsOverrides{RunnerWait: 7 * time.Second}).Runner.(*herdrrunner.Runner)
+	if got := runner.WaitN(); got != 7*time.Second {
+		t.Errorf("WaitN() = %v, want 7s", got)
+	}
+}
+
+func TestDefaultDepsWithOverrides_NoStateDirFailsMergeLockDir(t *testing.T) {
+	t.Parallel()
+	d := DefaultDepsWithOverrides(DepsOverrides{})
+	if _, err := d.mergeLockDir("/tickets/proj", "epic"); err == nil {
+		t.Error("mergeLockDir() with no state dir = nil error, want one")
+	}
+	state := t.TempDir()
+	d = DefaultDepsWithOverrides(DepsOverrides{StateDir: state})
+	dir, err := d.mergeLockDir("/tickets/proj", "epic")
+	if err != nil || !strings.HasPrefix(dir, state) {
+		t.Errorf("mergeLockDir() = %q, %v; want a dir under %s", dir, err, state)
+	}
+}
+
 func TestDefaultDepsWithOverrides_PathOverridesPreflightLookup(t *testing.T) {
 	t.Parallel()
 	binDir := t.TempDir()

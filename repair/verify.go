@@ -26,7 +26,9 @@ type VerifyRun struct {
 	FeatureWorktree string
 	WorktreeDir     string
 	WorkspaceID     string
-	Deps            ralphloop.VerifyDeps
+	// MergeLockStateDir is the state dir the epic's merge lock lives under.
+	MergeLockStateDir string
+	Deps              ralphloop.VerifyDeps
 }
 
 // Verify is write-free and takes no land lock: reading owns nothing, so it
@@ -80,7 +82,7 @@ func Verify(run VerifyRun) (VerifyResult, error) {
 		verifications = []ralphloop.TicketVerification{}
 	}
 
-	lockDir, err := ralphloop.MergeLockDir(epicPath)
+	lockDir, err := ralphloop.MergeLockDirIn(run.MergeLockStateDir, epicPath)
 	if err != nil {
 		return VerifyResult{}, err
 	}

@@ -54,25 +54,20 @@ const (
 	seriesRetention = 5 * time.Minute
 )
 
-// NotificationGate is the pure decision function every notification send path will
-// eventually call through. It always records this call in the transport's
-// trailing event series; recordSend additionally records one send-series
-// entry (a caller's responsibility per send, whether that's one immediate
-// send or one batched flush covering many events).
+// notificationGateAt is the pure decision function every notification send
+// path calls through, against the state file at path. It always records this
+// call in the transport's trailing event series; recordSend additionally
+// records one send-series entry (a caller's responsibility per send, whether
+// that's one immediate send or one batched flush covering many events).
 //
 // source is either a ticket's file path (so a per-source mute can be written
 // onto it) or a ticket-less sentinel ("cli", "epic:<name>") — a ticket-less
 // source is counted toward both series but can never itself be
 // per-source-muted.
-func NotificationGate(transport, eventType, source string, now time.Time, recordSend bool, pauseTicket PauseFunc) (GateResult, error) {
-	path, err := notificationStateFilePathFn()
-	if err != nil {
-		return GateResult{}, err
-	}
-	return notificationGateAt(path, transport, eventType, source, now, recordSend, pauseTicket)
-}
-
 func notificationGateAt(path, transport, eventType, source string, now time.Time, recordSend bool, pauseTicket PauseFunc) (GateResult, error) {
+	if path == "" {
+		return GateResult{}, errNoNotificationStatePath
+	}
 	var result GateResult
 	var opErr error
 

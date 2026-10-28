@@ -10,7 +10,7 @@ import (
 
 func TestSendMessage_NoneConfigured_NoOpsAndReturnsNoSent(t *testing.T) {
 	t.Parallel()
-	sent, err := sendMessage(config.NotificationsConfig{}, "hi", telegramAPIBaseURL)
+	sent, err := sendMessage(config.NotificationsConfig{}, testStatePath(t), "hi", telegramAPIBaseURL)
 	if err != nil {
 		t.Fatalf("sendMessage: %v", err)
 	}
@@ -19,8 +19,13 @@ func TestSendMessage_NoneConfigured_NoOpsAndReturnsNoSent(t *testing.T) {
 	}
 }
 
+func testStatePath(t *testing.T) string {
+	t.Helper()
+	return NotificationStatePath(t.TempDir())
+}
+
 func TestSendMessage_BothConfigured_SendsToBothAndReportsBoth(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Parallel()
 	telegramServer, getTelegramRequests := fakeTelegramServer(t, http.StatusOK)
 	slackServer, getSlackRequests := fakeSlackServer(t, http.StatusOK)
 
@@ -29,7 +34,7 @@ func TestSendMessage_BothConfigured_SendsToBothAndReportsBoth(t *testing.T) {
 		Slack:    config.SlackConfig{WebhookURL: slackServer.URL},
 	}
 
-	sent, err := sendMessage(cfg, "hello", telegramServer.URL)
+	sent, err := sendMessage(cfg, testStatePath(t), "hello", telegramServer.URL)
 	if err != nil {
 		t.Fatalf("sendMessage: %v", err)
 	}
@@ -55,13 +60,13 @@ func TestSendMessage_BothConfigured_SendsToBothAndReportsBoth(t *testing.T) {
 }
 
 func TestSendMessage_TelegramOnlyConfigured_SendsOnlyTelegram(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Parallel()
 	telegramServer, getTelegramRequests := fakeTelegramServer(t, http.StatusOK)
 	cfg := config.NotificationsConfig{
 		Telegram: config.TelegramConfig{BotToken: "tok", ChatID: "chat-1"},
 	}
 
-	sent, err := sendMessage(cfg, "hello", telegramServer.URL)
+	sent, err := sendMessage(cfg, testStatePath(t), "hello", telegramServer.URL)
 	if err != nil {
 		t.Fatalf("sendMessage: %v", err)
 	}
@@ -74,11 +79,11 @@ func TestSendMessage_TelegramOnlyConfigured_SendsOnlyTelegram(t *testing.T) {
 }
 
 func TestSendMessage_SlackFailure_ReturnsErrorMentioningSlack(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Parallel()
 	server, _ := fakeSlackServer(t, http.StatusInternalServerError)
 	cfg := config.NotificationsConfig{Slack: config.SlackConfig{WebhookURL: server.URL}}
 
-	sent, err := sendMessage(cfg, "hi", telegramAPIBaseURL)
+	sent, err := sendMessage(cfg, testStatePath(t), "hi", telegramAPIBaseURL)
 	if err == nil {
 		t.Fatal("sendMessage: want error, got nil")
 	}
@@ -91,7 +96,7 @@ func TestSendMessage_SlackFailure_ReturnsErrorMentioningSlack(t *testing.T) {
 }
 
 func TestSendMessage_TelegramFailsSlackSucceeds_ReportsSlackAndErrorsOnTelegram(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Parallel()
 	failingTelegram, _ := fakeTelegramServer(t, http.StatusInternalServerError)
 	slackServer, _ := fakeSlackServer(t, http.StatusOK)
 	cfg := config.NotificationsConfig{
@@ -99,7 +104,7 @@ func TestSendMessage_TelegramFailsSlackSucceeds_ReportsSlackAndErrorsOnTelegram(
 		Slack:    config.SlackConfig{WebhookURL: slackServer.URL},
 	}
 
-	sent, err := sendMessage(cfg, "hi", failingTelegram.URL)
+	sent, err := sendMessage(cfg, testStatePath(t), "hi", failingTelegram.URL)
 	if err == nil {
 		t.Fatal("sendMessage: want error, got nil")
 	}
@@ -112,14 +117,15 @@ func TestSendMessage_TelegramFailsSlackSucceeds_ReportsSlackAndErrorsOnTelegram(
 }
 
 func TestSendMessage_GlobalBreakerTrips_SuppressesFurtherSends(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	t.Parallel()
+	statePath := testStatePath(t)
 	telegramServer, getTelegramRequests := fakeTelegramServer(t, http.StatusOK)
 	cfg := config.NotificationsConfig{
 		Telegram: config.TelegramConfig{BotToken: "tok", ChatID: "chat-1"},
 	}
 
 	for range globalThreshold + 5 {
-		if _, err := sendMessage(cfg, "hi", telegramServer.URL); err != nil {
+		if _, err := sendMessage(cfg, statePath, "hi", telegramServer.URL); err != nil {
 			t.Fatalf("sendMessage: %v", err)
 		}
 	}

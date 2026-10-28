@@ -25,6 +25,7 @@ import (
 // non-parallel with any other test that also touches $HOME.
 func setHomeEnv(t *testing.T, dir string) {
 	t.Helper()
+	setTestDepsHome(t, dir)
 	prev, had := os.LookupEnv("HOME")
 	if err := os.Setenv("HOME", dir); err != nil {
 		t.Fatalf("Setenv HOME: %v", err)
@@ -347,6 +348,7 @@ func TestRun_IterationFinishedAndEpicComplete_ReceiveRealMetrics(t *testing.T) {
 	clockTimes := []time.Time{start, start.Add(90 * time.Second)}
 	var clockMu sync.Mutex
 	call := 0
+	d.MergeLockStateDir = testStateDir
 	d.Now = func() time.Time {
 		clockMu.Lock()
 		defer clockMu.Unlock()

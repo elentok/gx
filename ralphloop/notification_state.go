@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
-
-	"github.com/elentok/gx/config"
 )
 
 // maxTripsPerTransport bounds NotificationState's Trips history so the state
@@ -79,30 +77,18 @@ func emptyNotificationState() NotificationState {
 	return NotificationState{Transports: map[string]TransportState{}}
 }
 
-// notificationStateFilePathFn resolves notifications-state.json's real
-// on-disk path, overridden by TestMain (see waitforfinish_production_test.go)
-// so this package's whole test suite never touches the real machine's state
-// file even if an individual test forgets its own gateStatePath override.
-var notificationStateFilePathFn = notificationStateFilePath
+var errNoNotificationStatePath = errors.New("no notification state path configured")
 
-// notificationStateFilePath returns notifications-state.json's path, under
-// config.UserStateDir's ~/.local/state/gx/ layout.
-func notificationStateFilePath() (string, error) {
-	base, err := config.UserStateDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(base, "gx", "notifications-state.json"), nil
+// NotificationStatePath is notifications-state.json's path under stateDir
+// (gx's state dir).
+func NotificationStatePath(stateDir string) string {
+	return filepath.Join(stateDir, "notifications-state.json")
 }
 
-// LoadNotificationState reads notifications-state.json, returning an empty
+// LoadNotificationState reads the state file at path, returning an empty
 // state (Telegram/Slack both unmuted, empty series/history) if the file
 // doesn't exist yet or fails to parse.
-func LoadNotificationState() (NotificationState, error) {
-	path, err := notificationStateFilePath()
-	if err != nil {
-		return emptyNotificationState(), err
-	}
+func LoadNotificationState(path string) (NotificationState, error) {
 	return loadNotificationStateAt(path)
 }
 
@@ -124,18 +110,14 @@ func loadNotificationStateAt(path string) (NotificationState, error) {
 	return state, nil
 }
 
-// UpdateNotificationState locks notifications-state.json, loads the current
+// UpdateNotificationState locks the state file at path, loads the current
 // state, applies mutate, trims every transport's Trips to the most recent
 // maxTripsPerTransport entries, and writes the result back atomically.
 //
 // If the lock isn't acquired within lockTimeout, it returns
 // ErrNotificationStateLocked without calling mutate or writing anything —
 // the fail-open signal callers check for instead of blocking indefinitely.
-func UpdateNotificationState(mutate func(*NotificationState)) error {
-	path, err := notificationStateFilePath()
-	if err != nil {
-		return err
-	}
+func UpdateNotificationState(path string, mutate func(*NotificationState)) error {
 	return updateNotificationStateAt(path, mutate)
 }
 

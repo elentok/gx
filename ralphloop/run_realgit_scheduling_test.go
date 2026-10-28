@@ -62,10 +62,8 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 	})
 
 	// NewClaudeCompact below always writes its transcript via the real $HOME
-	// (transcript.Path has no override hook), so this test keeps $HOME itself
-	// pointed at the fixture via setHomeEnv rather than DepsOverrides.Home —
-	// that way deps' default HOME resolution and NewClaudeCompact's agree on
-	// the same directory.
+	// (transcript.Path has no override hook), so this test points $HOME at the
+	// fixture via setHomeEnv and passes the same dir as DepsOverrides.Home.
 	home := t.TempDir()
 	setHomeEnv(t, home)
 	const smartZone = 100
@@ -294,8 +292,7 @@ func TestRun_ProductionRealGit_DiamondThroughFullEpic(t *testing.T) {
 
 	hf := herdrfake.Start(t, handler)
 
-	deps := testDeps()
-	deps.SessionHomes = SessionHomes{Claude: home}
+	deps := testDepsWithOverrides(DepsOverrides{Home: home})
 	useFakeClock(deps, hf)
 	deps.Sleep = func(time.Duration) {}
 	deps.VerifySkill = func(AgentKind, string) error { return nil }

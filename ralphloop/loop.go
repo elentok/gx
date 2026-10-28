@@ -142,18 +142,13 @@ func ticketAddress(t tickets.Ticket) string {
 	return a.String()
 }
 
-// resolveScratchDir is the absolute ticket root for opts: ScratchDir, or the
-// repo's project directory in the ticket store when unset.
+// resolveScratchDir is the absolute ticket root for opts: ScratchDir, which
+// the caller must set.
 func resolveScratchDir(opts RunOptions) (string, error) {
-	scratchDir := opts.ScratchDir
-	if scratchDir == "" {
-		root, err := tickets.RootFor(cmp.Or(opts.RepoDir, "."))
-		if err != nil {
-			return "", fmt.Errorf("resolving ticket root: %w", err)
-		}
-		scratchDir = root
+	if opts.ScratchDir == "" {
+		return "", errors.New("ralphloop: RunOptions.ScratchDir is required")
 	}
-	scratchDir, err := filepath.Abs(scratchDir)
+	scratchDir, err := filepath.Abs(opts.ScratchDir)
 	if err != nil {
 		return "", fmt.Errorf("resolving scratch directory: %w", err)
 	}
@@ -263,12 +258,15 @@ type RunOptions struct {
 	// (e.g. from config.Load), ralphloop never loads config itself. The zero
 	// value (both fields empty for both agents) reproduces today's launch
 	// argv unchanged.
-	Agents      config.AgentsConfig
-	Skill       string // skill each iteration invokes; defaults to defaultWorkerSkill ("gx-implement") when unset
-	ScratchDir  string // defaults to the repo's ticket-store project dir
-	RepoDir     string // repo root passed as the herdr workspace/worktree cwd
-	MaxParallel int    // defaults to defaultMaxParallel; how many iterations run concurrently
-	SmartZone   int    // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
+	Agents config.AgentsConfig
+	// RetryStormLaunches is how many consecutive failed launches pause a
+	// ticket as retry-exhausted; zero means the default cap.
+	RetryStormLaunches int
+	Skill              string // skill each iteration invokes; defaults to defaultWorkerSkill ("gx-implement") when unset
+	ScratchDir         string // defaults to the repo's ticket-store project dir
+	RepoDir            string // repo root passed as the herdr workspace/worktree cwd
+	MaxParallel        int    // defaults to defaultMaxParallel; how many iterations run concurrently
+	SmartZone          int    // defaults to defaultSmartZone; context-token ceiling before pausing an iteration
 	// StoreDir, if set, is the ticket store git repo Run commits while it runs
 	// (S1: the in-process loop owns store commits), debounced by
 	// StoreCommitDebounce. Unset means no commits, so callers with no store
@@ -881,7 +879,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 			reason := r.err.Error()
 			var lf *launchFailure
 			if errors.As(r.err, &lf) {
-				kind, reason = retryStormKind(scratchDir, opts.EpicName, r.ticket.Identifier, lf.Kind, reason)
+				kind, reason = retryStormKind(scratchDir, opts.EpicName, r.ticket.Identifier, opts.RetryStormLaunches, lf.Kind, reason)
 			}
 			pause(sink, pauseRequest{
 				ScratchDir: scratchDir,

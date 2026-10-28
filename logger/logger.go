@@ -4,26 +4,33 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	tea "charm.land/bubbletea/v2"
-
-	"github.com/elentok/gx/config"
 )
 
-// logFile puts gx.log in the state dir, never inside the ticket store where
-// it would get committed. Falls back to a cwd-relative path if the state dir
-// can't be resolved.
-func logFile() string {
-	dir, err := config.StateDir()
-	if err != nil {
-		return "gx.log"
-	}
-	return filepath.Join(dir, "gx.log")
+var (
+	dirMu sync.RWMutex
+	dir   string
+)
+
+// SetDir sets the directory gx.log is written to (the state dir, never the
+// ticket store where it would get committed). Until it is called, Debug drops
+// its lines.
+func SetDir(d string) {
+	dirMu.Lock()
+	defer dirMu.Unlock()
+	dir = d
 }
 
 func Debug(format string, args ...any) {
-	// if len(os.Getenv("DEBUG")) > 0 {
-	logFile := logFile()
+	dirMu.RLock()
+	d := dir
+	dirMu.RUnlock()
+	if d == "" {
+		return
+	}
+	logFile := filepath.Join(d, "gx.log")
 	if err := os.MkdirAll(filepath.Dir(logFile), 0755); err != nil {
 		fmt.Println("fatal (can't create log dir):", err)
 		os.Exit(1)

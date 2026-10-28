@@ -57,15 +57,39 @@ func ticketAddr(scratchDir, epicName, id string) string {
 // pause polls at full speed rather than on the wall clock, so a test that pauses
 // unexpectedly surfaces as its own failure instead of a multi-minute wait.
 func testDeps() Deps {
-	d := DefaultDeps()
-	d.PauseTimer = readyTimer
-	return d
+	return testDepsWithOverrides(DepsOverrides{})
+}
+
+// testStateDir is the state dir merge locks live under for this package's
+// tests; TestMain sets it.
+var testStateDir string
+
+// testDepsHome is the Home testDepsWithOverrides gives deps that name none,
+// for the tests that still point the process HOME at a fixture with
+// setHomeEnv. Those tests are not parallel, so no parallel test sees it.
+var testDepsHome string
+
+func setTestDepsHome(t *testing.T, dir string) {
+	t.Helper()
+	testDepsHome = dir
+	t.Cleanup(func() { testDepsHome = "" })
+}
+
+// mergeLockDir is where an epic's merge lock lives under testStateDir.
+func mergeLockDir(scratchDir, epic string) (string, error) {
+	return testDeps().mergeLockDir(scratchDir, epic)
 }
 
 // testDepsWithOverrides is testDeps with DepsOverrides applied, for tests
 // that need to isolate HOME/CODEX_HOME/PATH without mutating process env via
 // t.Setenv.
 func testDepsWithOverrides(overrides DepsOverrides) Deps {
+	if overrides.StateDir == "" {
+		overrides.StateDir = testStateDir
+	}
+	if overrides.Home == "" {
+		overrides.Home = testDepsHome
+	}
 	d := DefaultDepsWithOverrides(overrides)
 	d.PauseTimer = readyTimer
 	return d
@@ -159,7 +183,8 @@ func fakeDeps() (d Deps, prompts *[]string, removedBranches *[]string) {
 	// Agents finish their turn right away.
 	runner.PromptState = agentrunner.StateDone
 	d = Deps{
-		Runner: recordingRunner{Runner: runner, record: record, hooks: &runnerHooks{}},
+		MergeLockStateDir: testStateDir,
+		Runner:            recordingRunner{Runner: runner, record: record, hooks: &runnerHooks{}},
 		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
 			return true, nil
 		},

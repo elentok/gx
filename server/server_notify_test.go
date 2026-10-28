@@ -456,6 +456,37 @@ func TestCompleteRootIfDone_UnresolvedCrossEpicBlockerKeepsTheEpicOpen(t *testin
 	}
 }
 
+// With no GateStatePath configured, the gate state lands under the server's
+// state dir, not the real one.
+func TestServerChat_EmptyGateStatePathUsesTheStateDir(t *testing.T) {
+	t.Parallel()
+	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	t.Cleanup(hook.Close)
+	fake := herdrfake.NewState(t)
+	fake.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
+	})
+	_, herdrEnv := herdrfake.StartStateEnv(t, fake)
+	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(stateDir) })
+	s, err := New(Config{Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(),
+		Settings:        Settings{Chat: ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL}},
+		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.notifyPause(tickets.Address{Project: "p", Epic: "epic", ID: "01"}, "", events.BudgetKilled, "why")
+	s.chat.Close()
+
+	if _, err := os.Stat(ralphloop.NotificationStatePath(stateDir)); err != nil {
+		t.Errorf("gate state not under the server's state dir: %v", err)
+	}
+}
+
 // The read path (index scan, then projectEpics) resolves a cross-epic blocker:
 // a done ticket stays done instead of failing closed to error.
 func TestProjectEpics_CrossEpicBlockerReadsAsDone(t *testing.T) {

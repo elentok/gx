@@ -92,11 +92,8 @@ type chatEventSink struct {
 	transport  chatTransport
 	scratchDir string
 	epicName   string
-	// gateStatePath overrides NotificationGate's real per-user state-file
-	// path (see notificationStateFilePath) with a test-only fixed path, so
-	// tests never touch the real ~/.config/gx/notifications-state.json.
-	// Empty (the production default from newChatEventSink) means "use the
-	// real path".
+	// gateStatePath is the notification state file the gate reads and writes;
+	// empty makes every gate call fail.
 	gateStatePath string
 	// gateKey is the destination's key in the notification state; empty means
 	// the transport name, i.e. the global destination.
@@ -529,19 +526,16 @@ func (s *chatEventSink) pauseTicket(source, reason string) error {
 	return err
 }
 
-// gate runs source through NotificationGate (or, under test, an injected
-// fixed state-file path — see gateStatePath), recording this call in the
-// persisted event series and applying the budget/per-source-mute/
-// global-mute rules. recordSend additionally records a send-series entry —
-// callers pass true only at the point a batch actually goes out on the wire
-// (see flush/closeFlush), never at enqueue time (see send), so the global
-// budget tracks actual sends rather than raw event volume.
+// gate runs source through notificationGateAt on gateStatePath, recording
+// this call in the persisted event series and applying the
+// budget/per-source-mute/global-mute rules. recordSend additionally records a
+// send-series entry — callers pass true only at the point a batch actually
+// goes out on the wire (see flush/closeFlush), never at enqueue time (see
+// send), so the global budget tracks actual sends rather than raw event
+// volume.
 func (s *chatEventSink) gate(eventType, source string, recordSend bool) (GateResult, error) {
 	key := firstNonEmptyStr(s.gateKey, s.transport.name())
-	if s.gateStatePath != "" {
-		return notificationGateAt(s.gateStatePath, key, eventType, source, time.Now(), recordSend, s.pauseTicket)
-	}
-	return NotificationGate(key, eventType, source, time.Now(), recordSend, s.pauseTicket)
+	return notificationGateAt(s.gateStatePath, key, eventType, source, time.Now(), recordSend, s.pauseTicket)
 }
 
 func (s *chatEventSink) EpicStarted(epicName string, done, total int) {

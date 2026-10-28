@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -20,29 +19,16 @@ const (
 	mergeMarkerFile = "land.marker.json"
 )
 
-// mergeLockStateDir is a var so this package's tests can keep locks off the
-// machine's real state dir without moving HOME-relative state other tests use.
-var mergeLockStateDir = config.StateDir
-
-// MergeLockDir is where an epic's merge lock and marker live: the state dir,
-// keyed by the epic's project and name, so every process merging onto the
-// epic's feature branch (CLI or server) contends for the same lock whichever
-// path it reached the epic by.
-func MergeLockDir(epicPath string) (string, error) {
-	return MergeLockDirIn("", epicPath)
-}
-
-// MergeLockDirIn is MergeLockDir under stateDir; empty means the process's.
+// MergeLockDirIn is where an epic's merge lock and marker live: under
+// stateDir, keyed by the epic's project and name, so every process merging
+// onto the epic's feature branch (CLI or server) contends for the same lock
+// whichever path it reached the epic by. An empty stateDir is an error.
 func MergeLockDirIn(stateDir, epicPath string) (string, error) {
-	state := stateDir
-	if state == "" {
-		var err error
-		if state, err = mergeLockStateDir(); err != nil {
-			return "", fmt.Errorf("resolving merge lock dir: %w", err)
-		}
+	if stateDir == "" {
+		return "", errors.New("resolving merge lock dir: no state dir configured")
 	}
 	epicPath = filepath.Clean(epicPath)
-	return filepath.Join(state, "land-locks", tickets.ProjectName(filepath.Dir(epicPath)), filepath.Base(epicPath)), nil
+	return filepath.Join(stateDir, "land-locks", tickets.ProjectName(filepath.Dir(epicPath)), filepath.Base(epicPath)), nil
 }
 
 // ErrMergeLocked is returned when the merge lock is already held. Its reason code

@@ -63,6 +63,33 @@ func TestNotificationState_ReadWriteRoundTrip(t *testing.T) {
 	}
 }
 
+func TestNotificationState_PublicFormsUseTheGivenPath(t *testing.T) {
+	t.Parallel()
+	path := NotificationStatePath(t.TempDir())
+	if err := UpdateNotificationState(path, func(s *NotificationState) {
+		s.Transports["slack"] = TransportState{Muted: true, Reason: "manual-disable"}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("state file not written at the given path: %v", err)
+	}
+	state, err := LoadNotificationState(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !state.Transports["slack"].Muted {
+		t.Errorf("loaded state = %+v, want slack muted", state)
+	}
+}
+
+func TestNotificationGate_NoPathFails(t *testing.T) {
+	t.Parallel()
+	if _, err := notificationGateAt("", "telegram", "ev", "src", time.Now(), true, nil); err == nil {
+		t.Error("notificationGateAt with no path = nil error, want one")
+	}
+}
+
 func TestNotificationState_LoadMissingFileReturnsEmptyState(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "notifications-state.json")
 

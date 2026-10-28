@@ -105,8 +105,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.
 	})
 	hf := herdrfake.StartState(t, s)
 
-	deps := testDeps()
-	deps.SessionHomes = SessionHomes{Claude: home, Codex: codexHome}
+	deps := testDepsWithOverrides(DepsOverrides{Home: home, CodexHome: codexHome})
 	useFakeClock(deps, hf)
 	deps.PreflightAgent = func(AgentKind) error { return nil }
 	deps.VerifySkill = func(AgentKind, string) error { return nil }

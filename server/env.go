@@ -51,7 +51,7 @@ func (s *Server) transcriptPath(cwd, sessionID string) (string, error) {
 
 // defaultDeps is ralphloop's default deps reading Config.Env's home dirs.
 func (s *Server) defaultDeps() ralphloop.Deps {
-	var o ralphloop.DepsOverrides
+	o := ralphloop.DepsOverrides{RunnerWait: s.cfg.RunnerWait}
 	o.Home, _ = s.envHome()
 	o.CodexHome, _ = s.codexHome()
 	o.StateDir, _ = s.lockStateDir()

@@ -12,7 +12,6 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/codexsession"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/transcript"
@@ -58,7 +57,7 @@ type Deps struct {
 	// aside under an attic name.
 	RenameBranch func(repoDir, oldName, newName string) error
 	// MergeLockStateDir is the state dir the merge locks live under; empty
-	// means the process's.
+	// is an error when a lock dir is resolved.
 	MergeLockStateDir string
 	// SessionHomes are where the report metrics read session transcripts from;
 	// an empty one reports its sessions as not found.
@@ -180,42 +179,38 @@ func DefaultDeps() Deps {
 	return DefaultDepsWithOverrides(DepsOverrides{})
 }
 
-// DepsOverrides substitutes the home directory(ies) and PATH the in-process
-// reads below resolve against, in place of the process's real HOME/
-// CODEX_HOME/PATH. Those reads — codexsession.codexHome, transcript.Path,
-// verifySkill's os.UserHomeDir, and preflightAgent/InstallDependencies's
-// exec.LookPath — happen inside this Go process rather than a spawned
-// subprocess, so exec.Cmd.Env can't influence them; the only prior way to
-// steer them per-test was t.Setenv, which mutates process env and so can't
-// be used safely across parallel tests. A zero field keeps that field's real
-// env resolution exactly as before.
+// DepsOverrides is what the in-process reads below resolve against: the
+// caller's home directories, PATH, state dir and runner wait. Home and
+// CodexHome never fall back to the process env: empty means "none" (no
+// transcript is found, VerifySkill fails). Path still falls back to the
+// process PATH when empty.
 type DepsOverrides struct {
-	// Home, when non-empty, overrides os.UserHomeDir() for verifySkill's
-	// skill-file lookup and transcript.Path's transcript-file lookup.
+	// Home is the home for verifySkill's skill-file lookup and the transcript
+	// lookup.
 	Home string
-	// CodexHome, when non-empty, overrides codexsession's CODEX_HOME/
-	// UserHomeDir resolution directly (the resolved ~/.codex-equivalent
-	// directory, not $HOME) for Deps.ReadCodexContext/ReadCodexRateLimit.
+	// CodexHome is the resolved ~/.codex-equivalent directory (not $HOME) for
+	// Deps.ReadCodexContext/ReadCodexRateLimit.
 	CodexHome string
 	// Path, when non-empty, overrides os.Getenv("PATH") for codex/herdr/
 	// package-manager executable lookups (PreflightAgent, InstallDeps).
 	Path string
-	// StateDir, when non-empty, is the gx state dir merge locks live under.
+	// StateDir is the gx state dir merge locks live under.
 	StateDir string
+	// RunnerWait is the runner's N; zero means agentrunner.DefaultN.
+	RunnerWait time.Duration
 }
 
 // DefaultDepsWithOverrides is DefaultDeps with overrides applied to the
 // in-process env reads described on DepsOverrides.
 func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
-	home, _ := userHomeDirFor(overrides.Home)()
-	runner := herdrrunner.NewIn(herdr.CLI{}, home)
-	runner.N = config.LoadRunnerWait()
-	runner.CodexQuota = codexHomeFn(overrides.CodexHome,
-		codexsession.LastRateLimit,
-		func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
-			return codexsession.LastRateLimitIn(overrides.CodexHome, cwd, sessionID)
-		},
-	)
+	runner := herdrrunner.NewIn(herdr.CLI{}, overrides.Home)
+	runner.N = overrides.RunnerWait
+	runner.CodexQuota = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
+		if overrides.CodexHome == "" {
+			return codexsession.RateLimit{}, false, nil
+		}
+		return codexsession.LastRateLimitIn(overrides.CodexHome, cwd, sessionID)
+	}
 	return Deps{
 		PreflightAgent: func(agent AgentKind) error {
 			return preflightAgentWith(agent, lookPathFor(overrides.Path), commandOutput)
@@ -223,12 +218,12 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 		VerifySkill: func(agent AgentKind, skill string) error {
 			return verifySkillWith(agent, skill, userHomeDirFor(overrides.Home), os.Stat)
 		},
-		VerifyCodexSession: codexHomeFn(overrides.CodexHome,
-			codexsession.VerifyIdentity,
-			func(cwd, sessionID string) (bool, error) {
-				return codexsession.VerifyIdentityIn(overrides.CodexHome, cwd, sessionID)
-			},
-		),
+		VerifyCodexSession: func(cwd, sessionID string) (bool, error) {
+			if overrides.CodexHome == "" {
+				return false, nil
+			}
+			return codexsession.VerifyIdentityIn(overrides.CodexHome, cwd, sessionID)
+		},
 		WorktreeDir:          worktreeDir,
 		AddWorktree:          addWorktree,
 		AddDetachedWorktree:  addDetachedWorktree,
@@ -258,9 +253,9 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			return installDependenciesWithin(path, overrides.Path, logDir, installTimeout)
 		},
 		ReadOccupancy: func(cwd, sessionID string) (int, bool, error) {
-			path, err := transcriptPath(overrides.Home, cwd, sessionID)
-			if err != nil {
-				return 0, false, err
+			path, found := transcriptPath(overrides.Home, cwd, sessionID)
+			if !found {
+				return 0, false, nil
 			}
 			usage, ok, err := transcript.LastAssistantUsage(path)
 			if err != nil || !ok {
@@ -269,16 +264,16 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			return usage.Occupancy(), true, nil
 		},
 		ReadOccupancyReading: func(cwd, sessionID string) (transcript.OccupancyReading, error) {
-			path, err := transcriptPath(overrides.Home, cwd, sessionID)
-			if err != nil {
-				return transcript.OccupancyReading{}, err
+			path, found := transcriptPath(overrides.Home, cwd, sessionID)
+			if !found {
+				return transcript.OccupancyReading{}, nil
 			}
 			return transcript.ReadOccupancy(path)
 		},
 		ReadCompactions: func(cwd, sessionID string) (int, bool, error) {
-			path, err := transcriptPath(overrides.Home, cwd, sessionID)
-			if err != nil {
-				return 0, false, err
+			path, found := transcriptPath(overrides.Home, cwd, sessionID)
+			if !found {
+				return 0, false, nil
 			}
 			lines, ok, err := transcript.ReadAll(path)
 			if err != nil || !ok {
@@ -287,9 +282,9 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			return transcript.CountCompactions(lines), true, nil
 		},
 		ReadCompactionsAfter: func(cwd, sessionID string, since time.Time) (int, bool, error) {
-			path, err := transcriptPath(overrides.Home, cwd, sessionID)
-			if err != nil {
-				return 0, false, err
+			path, found := transcriptPath(overrides.Home, cwd, sessionID)
+			if !found {
+				return 0, false, nil
 			}
 			lines, ok, err := transcript.ReadAll(path)
 			if err != nil || !ok {
@@ -298,52 +293,39 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 			return transcript.CountCompactionsAfter(lines, since), true, nil
 		},
 		ReadBackgroundTasks: func(cwd, sessionID string) (transcript.BackgroundTaskReading, error) {
-			path, err := transcriptPath(overrides.Home, cwd, sessionID)
-			if err != nil {
-				return transcript.BackgroundTaskReading{}, err
+			path, found := transcriptPath(overrides.Home, cwd, sessionID)
+			if !found {
+				return transcript.BackgroundTaskReading{}, nil
 			}
 			return transcript.ReadBackgroundTasks(path, transcript.BackgroundTaskAgedOutCap, time.Now())
 		},
 		ReadUnexecutedToolCall: func(cwd, sessionID string) (bool, error) {
-			path, err := transcriptPath(overrides.Home, cwd, sessionID)
-			if err != nil {
-				return false, err
+			path, found := transcriptPath(overrides.Home, cwd, sessionID)
+			if !found {
+				return false, nil
 			}
 			return transcript.ReadUnexecutedToolCall(path)
 		},
-		ReadCodexContext: codexHomeFn(overrides.CodexHome,
-			codexsession.LastContextTokens,
-			func(cwd, sessionID string) (int, bool, error) {
-				return codexsession.LastContextTokensIn(overrides.CodexHome, cwd, sessionID)
-			},
-		),
+		ReadCodexContext: func(cwd, sessionID string) (int, bool, error) {
+			if overrides.CodexHome == "" {
+				return 0, false, nil
+			}
+			return codexsession.LastContextTokensIn(overrides.CodexHome, cwd, sessionID)
+		},
 		Sleep:      time.Sleep,
 		Now:        time.Now,
 		PauseTimer: time.After,
 	}
 }
 
-// transcriptPath resolves cwd/sessionID's transcript file path — home when
-// set, real os.UserHomeDir() otherwise (transcript.Path's own behavior) — so
-// ReadOccupancy/ReadOccupancyReading/ReadCompactions/ReadCompactionsAfter
-// share one home-resolution branch instead of repeating it four times.
-func transcriptPath(home, cwd, sessionID string) (string, error) {
-	if home != "" {
-		return transcript.PathIn(home, cwd, sessionID), nil
+// transcriptPath resolves cwd/sessionID's transcript file path under home.
+// With no home there is no transcript to read: found is false, never the
+// process's home.
+func transcriptPath(home, cwd, sessionID string) (path string, found bool) {
+	if home == "" {
+		return "", false
 	}
-	return transcript.Path(cwd, sessionID)
-}
-
-// codexHomeFn returns real when codexHome is empty (codexsession's own
-// CODEX_HOME/UserHomeDir resolution) or override otherwise (codexHome pinned
-// explicitly), mirroring transcriptPath's home-resolution branch for
-// VerifyCodexSession/ReadCodexContext/ReadCodexRateLimit's CodexHome
-// override, each of which pairs a differently-shaped real/In function.
-func codexHomeFn[F any](codexHome string, real, override F) F {
-	if codexHome == "" {
-		return real
-	}
-	return override
+	return transcript.PathIn(home, cwd, sessionID), true
 }
 
 // lookPathFor returns exec.LookPath when pathEnv is empty (real process
@@ -355,13 +337,14 @@ func lookPathFor(pathEnv string) func(string) (string, error) {
 	return func(file string) (string, error) { return lookPathIn(file, pathEnv) }
 }
 
-// userHomeDirFor returns os.UserHomeDir when home is empty (real process
-// HOME), or a constant home otherwise.
+// userHomeDirFor returns a constant home, or an error when home is empty.
 func userHomeDirFor(home string) func() (string, error) {
-	if home == "" {
-		return os.UserHomeDir
+	return func() (string, error) {
+		if home == "" {
+			return "", errors.New("no home directory configured")
+		}
+		return home, nil
 	}
-	return func() (string, error) { return home, nil }
 }
 
 // lookPathIn resolves file against the PATH-style list pathEnv, the same
