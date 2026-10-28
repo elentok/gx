@@ -182,6 +182,16 @@ export const galleryEntries: GalleryEntry[] = [
   { name: "Spinner", cases: perTone((tone) => <Spinner label={`Loading ${tone}`} tone={tone} />) },
   { name: "Arc", cases: perTone((tone) => <Arc tone={tone} label={tone} />) },
   {
+    name: "Modal",
+    cases: perTone((tone) => (
+      <ModalFrame>
+        <Modal label={tone} onClose={() => {}}>
+          {tone}
+        </Modal>
+      </ModalFrame>
+    )),
+  },
+  {
     name: "ProgressRing",
     cases: [
       ...perTone((tone) => <ProgressRing progress={0.6} tone={tone} kind="design" label="60%" />),

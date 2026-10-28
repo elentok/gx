@@ -1,6 +1,9 @@
-.PHONY: build web-build web-dev web-dev-proxy web-test web-e2e web-types install test test-race test-short test-server e2e test-docker-ubuntu run demos demo-seed
+.PHONY: build web-build web-dev web-dev-proxy web-test web-e2e web-types install test e2e test-docker-ubuntu run demos demo-seed
 
 GO_VERSION := 1.25.0
+
+# Runs `gx brief`. CI has no installed gx, and an installed one can be older than the checkout.
+GX ?= go run .
 
 # A commit's detached auto maintenance can outlive a test and break its
 # t.TempDir cleanup. Repos made by testutil carry the setting in their config;
@@ -30,11 +33,14 @@ web-dev-proxy:
 	cd webui && pnpm install --frozen-lockfile && GX_WEBUI_PROXY=1 pnpm dev
 
 web-test:
-	cd webui && pnpm install --frozen-lockfile && pnpm exec tsc --noEmit && pnpm test
+	cd webui && pnpm install --frozen-lockfile
+	$(GX) brief -C webui tsc
+	$(GX) brief -C webui vitest
 
 # Browser flows against fixture servers (webui/e2e/CATALOG.md); the gx binary embeds the built UI.
 web-e2e: web-build
-	cd webui && pnpm exec playwright install chromium && pnpm e2e
+	cd webui && pnpm exec playwright install chromium
+	$(GX) brief -C webui playwright
 
 # Regenerates webui/src/generated/server.ts from the server's wire types.
 web-types:
@@ -43,32 +49,10 @@ web-types:
 install: web-build
 	go install -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" .
 
-# -timeout=10m (per package; the server package alone sums to ~100s): legitimate tests (incl. real-git/production-style) finish in a few seconds each
-# locally, but CI runners' lower core counts give concurrency-sensitive tests (e.g. pause/resume
-# against a permit cap) more room to legitimately run long; 2m proved too tight there.
-# The real-herdr e2e tests skip here even inside herdr: they need GX_E2E=1 (see e2e).
-# The PTY-runner packages also run under -race: they share a vt emulator with
-# a background goroutine, and data races there only surface under the detector.
-# herdrrunner runs under it too, for its concurrent use of the herdr fake.
-RACE_PKGS := ./agentrunner/screen ./agentrunner/claudeui ./nativerunner ./claudedoctor ./agentrunner/herdrrunner ./testutil/herdrfake
-
-# The server package alone is most of the runtime and can't use t.Parallel (its
-# harness mutates PATH/HOME), so it runs sharded across processes instead; see
-# scripts/test-shards.sh. Everything else runs as a normal `go test`.
-test: test-race
-	go test $$(go list ./... | grep -Fvx github.com/elentok/gx/server) -timeout=10m
-	scripts/test-shards.sh ./server
-
-# test-server runs only the sharded server package (TEST_SHARDS=N, default 5).
-test-server:
-	scripts/test-shards.sh ./server
-
-# test-short skips the slow server package for the inner loop.
-test-short:
-	go test -short $$(go list ./... | grep -Fvx github.com/elentok/gx/server) -timeout=10m
-
-test-race:
-	go test -race $(RACE_PKGS) -timeout=10m
+# Every non-e2e test step side by side; see scripts/test.sh. The real-herdr e2e
+# tests skip here even inside herdr: they need GX_E2E=1 (see e2e).
+test:
+	scripts/test.sh
 
 # e2e runs the herdr e2e suite against a real, already-running herdr daemon
 # (herdr must be on PATH). Tests skip themselves if either isn't available.
