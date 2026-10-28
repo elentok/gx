@@ -30,14 +30,14 @@ $TMPDIR/gx-ui/gxfixture --gx $TMPDIR/gx-ui/gx --fakeclaude $TMPDIR/gx-ui/claude 
 
 - Run it with `run_in_background`. It prints one JSON line, then keeps running until SIGTERM.
 - The scenario names are in the catalog (`empty`, `ready`, `mixed`, `finishing`, `paused`, `united`,
-  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`). An unknown name makes the command list
+  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`, `disk-low`). An unknown name makes the command list
   the known ones.
 - Pass `--hold` only for a flow that says so (flow 7, and the Stash flow on `dirty-trunk`). It
   freezes the workers until you delete the file named by `hold_file`.
 - Each run is its own isolated server and state. Start one per flow.
 - To run `gx` against the fixture from the shell, pass `--env` and source the output. It prints
   `export` lines instead of the JSON: the `env` entries, plus `GXF_WEB_URL`, `GXF_GX`,
-  `GXF_HOLD_FILE`, `GXF_STATE_DIR` and `GXF_SOCKET`. Redirect the background run's stdout to a file,
+  `GXF_DISK_DIR`, `GXF_HOLD_FILE`, `GXF_STATE_DIR` and `GXF_SOCKET`. Redirect the background run's stdout to a file,
   wait for it to fill, then `source` it in the same shell as your `gx` calls. Do not retype the
   `HOME`/`XDG_*` exports.
 
@@ -48,6 +48,7 @@ The JSON line has these fields:
 - `env`: `KEY=value` entries. Set them for every `gx` call, so the call reaches this fixture's server
   and no other.
 - `hold_file`: the file that holds the workers when you passed `--hold`.
+- `disk_dir`: the directory of the fake disk's control files (see "How the fixture behaves").
 
 ## 2. Open the page and run a flow
 
@@ -66,6 +67,14 @@ agents and removes its state. Stop it even when the flow failed.
 ## How the fixture behaves
 
 Read this before you guess; each wrong guess costs a rebuild.
+
+- **Fake disk.** Every scenario reads free space from `<disk_dir>/free`, one fake disk named
+  `fixture disk`. It starts at `100G`, so no scenario shows a disk strip or holds dispatch unless a
+  flow lowers it. The server rereads it about every 250ms. Write a size string (`15G`) to change it.
+  The `disk-low` scenario also sets the project's cleanup command to a script that reads
+  `<disk_dir>/clean`: a size string is written to `free` (the cleanup "frees" up to that value),
+  `fail` prints a message and exits 1, and an empty or missing file does nothing. Set `clean` first,
+  then `free`. Write each file to a temp file and `mv` it over, so the server never reads half a file.
 
 - **Fake worker outcome → ticket status.** The worker's behaviour is per ticket
   (`agentfake.Behaviour*`, set by a scenario's `behaviour`):

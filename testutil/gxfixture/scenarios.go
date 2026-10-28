@@ -70,6 +70,8 @@ type scenario struct {
 	recommend map[string]recommendation
 	// gitSetup shapes the project repo (branches, a dirty checkout) after its first commit.
 	gitSetup func(f *fixture, repo string) error
+	// diskLow gives each project a cleanup command that follows the disk's clean file.
+	diskLow bool
 }
 
 type recommendation struct{ verb, diagnosis string }
@@ -83,6 +85,14 @@ var scenarios = map[string]scenario{
 			{"01", "first", servertest.TicketOpts{}},
 			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
 		}}},
+	},
+	// disk-low: an unqueued epic whose project cleans through the disk control files.
+	"disk-low": {
+		epics: []epic{{project, "disk-epic", []ticket{
+			{"01", "first", servertest.TicketOpts{}},
+			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
+		}}},
+		diskLow: true,
 	},
 	// mixed: tickets in several states, and a worker that asks and fails.
 	"mixed": {

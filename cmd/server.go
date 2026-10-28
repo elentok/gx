@@ -176,9 +176,21 @@ func runServer(ctx context.Context) error {
 			return fmt.Errorf("GX_AUTO_ADVANCE_DELAY: %w", err)
 		}
 	}
+	// Test hook: gxfixture reads free space from a file and shortens the watcher
+	// interval, so a flow can steer the disk watcher from outside the process.
+	var freeSpace func(string) (server.DiskReading, error)
+	if v := os.Getenv("GX_DISK_FREE_FILE"); v != "" {
+		freeSpace = server.FileFreeSpace(v)
+	}
+	var diskPollInterval time.Duration
+	if v := os.Getenv("GX_DISK_WATCH_INTERVAL"); v != "" {
+		if diskPollInterval, err = time.ParseDuration(v); err != nil {
+			return fmt.Errorf("GX_DISK_WATCH_INTERVAL: %w", err)
+		}
+	}
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
-		AutoAdvanceDelay: autoAdvanceDelay})
+		AutoAdvanceDelay: autoAdvanceDelay, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval})
 	if err != nil {
 		return err
 	}

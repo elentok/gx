@@ -46,6 +46,8 @@ type Output struct {
 	Env []string `json:"env"`
 	// Gx is the gx binary the server runs.
 	Gx string `json:"gx"`
+	// DiskDir holds the fake disk's control files: free and clean.
+	DiskDir string `json:"disk_dir"`
 }
 
 // ShellEnv is the output as `export` lines a shell can source: the CLI env, then
@@ -59,6 +61,7 @@ func (o Output) ShellEnv() string {
 	}
 	export("GXF_WEB_URL", o.WebURL)
 	export("GXF_GX", o.Gx)
+	export("GXF_DISK_DIR", o.DiskDir)
 	export("GXF_HOLD_FILE", o.HoldFile)
 	export("GXF_STATE_DIR", o.StateDir)
 	export("GXF_SOCKET", o.Socket)
@@ -159,6 +162,9 @@ func run(args []string) (err error) {
 		}
 		f.env = append(f.env, "GX_AUTO_ADVANCE_DELAY="+autoAdvance)
 	}
+	if err := f.setupDisk(); err != nil {
+		return err
+	}
 	if err := f.writeConfig(port, sc.recentlyFinished, configs); err != nil {
 		return err
 	}
@@ -219,7 +225,7 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
-	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin}
+	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir()}
 	if shellEnv {
 		fmt.Print(o.ShellEnv())
 	} else {
@@ -388,6 +394,13 @@ func (f *fixture) seed(sc scenario) error {
 			}
 		}
 		extra := sc.projectExtra[e.project]
+		if sc.diskLow {
+			argv, err := json.Marshal([]string{f.cleanScript()})
+			if err != nil {
+				return err
+			}
+			extra += `,"disk-space":{"cleanup-command":` + string(argv) + `}`
+		}
 		if !slices.Contains(sc.manualMerge, e.project) {
 			extra += `,"auto-ff-merge":true`
 		}
