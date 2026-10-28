@@ -119,8 +119,9 @@ the disk-space epic built them. The same Tray sits in the same place at phone wi
     the banner's "Clean now", so that I know where the fix is without a second button.
 31. As a person, I want the popover's values to refresh every 5 seconds while it is open and to
     stop when it closes, so that I watch live numbers without a cost when I am not looking.
-32. As a person, I want the footer to say how long ago the values were read, counting each second,
-    so that I know how fresh they are.
+32. As a person, I want the footer to say how long ago CPU and memory were read, counting each
+    second, and each disk entry older than 10 seconds to show its own age, so that I know how fresh
+    every value is.
 33. As a person, I want the age worked out from the server's clock, so that a wrong browser clock
     does not give a wrong age.
 34. As a person, I want a meter with no reading to have its popover row say why (waiting for a
@@ -249,7 +250,8 @@ the disk-space epic built them. The same Tray sits in the same place at phone wi
   `TestWeb_EverythingElseIs404` allowlist.
 - Its CLI verb is `gx server health`, with `--json`, a thin client of the route (ADR 0028). It goes
   in `routeVerbs`. Without `--json` it prints the same values and lists as plain text; the
-  implementer picks the layout.
+  implementer picks the layout. The CLI always calls the route with `wait` (see "Reading
+  processes"), so it prints the CPU list even after a quiet spell.
 - The response holds:
   - the host name (`os.Hostname`) and the server's current time;
   - CPU: latest percent busy, one-minute average, state, level, thresholds, reading time;
@@ -261,8 +263,11 @@ the disk-space epic built them. The same Tray sits in the same place at phone wi
     process, other users), its label, the busiest process name for agent rows, the ticket address
     when there is one, the CPU share and memory bytes; or a marker that processes are unavailable,
     or that the CPU list is still reading.
-- The process read runs only on this route. The server reads at most once per 5 seconds and shares
-  the result across concurrent callers, so two open tabs cost one read. The implementer picks the
+- The process read runs only on this route. A call reuses a process read taken less than 1 second
+  ago, measured from the read's own time, not from the last call. So two tabs that poll together
+  cost one read, and calls spaced 0.9 seconds apart still cause a new read every second. A `wait`
+  call never gets a cached answer that carries the reading marker. A poll every 5 seconds always
+  gets a fresh read. Two tabs out of step cost two reads, about 0.2% of a core. The implementer picks the
   cache shape.
 
 **Reading processes (server)**
@@ -280,19 +285,43 @@ the disk-space epic built them. The same Tray sits in the same place at phone wi
 - Never run `ps`.
 - CPU per process needs two readings. The server keeps the last CPU time per (pid, start time). A
   pid reused with a new start time starts fresh.
-- First read after a quiet spell: when there is no previous reading, or it is too old to give a
-  current number (the implementer picks the cutoff), the route answers at once with the memory list
-  and system values and marks the CPU list as reading. The server takes the second reading about
-  1 second later, and the web fetches once more after about 1 second, outside its 5-second rhythm.
+- First read after a quiet spell: when there is no previous reading, or it is older than the
+  cutoff, the route answers at once with the memory list and system values and marks the CPU list
+  as reading. The server takes the second reading about 1 second later.
+- Three `Config` fields set the timing so tests run in milliseconds: the second-read delay, the
+  share window and the cutoff. Zero means 1 second, 1 second and 15 seconds. The cutoff must be
+  longer than the popover's 5-second poll, or every poll would show "reading…".
+- The route takes a `wait` option. With `wait`, a call that would get the reading marker blocks
+  until the second reading is done, then answers with the full CPU list. A call that does not need
+  to wait answers at once. The web's first call on open has no `wait`, so values and "reading…"
+  show at once; its next call uses `wait` and gets the list as soon as it exists. The CLI always
+  uses `wait`. No caller guesses a timer, so no fetch can land before the second reading.
+- A `wait` call returns as soon as the second reading ends, whether it worked or not. A failed
+  read gives the "processes unavailable" marker. The call stops when the request context ends.
+  The server caps the wait at 5 seconds, then answers with the reading marker.
 - Process names: `comm` is cut at 16 bytes on macOS, and claude shows as its version. For the rows
   that make a list, the server reads the full argv (`KERN_PROCARGS2` on macOS, same user only;
-  `/proc/<pid>/cmdline` on Linux) and builds a short display name such as "go test". The
-  implementer picks the naming rule; `comm` is the fallback.
+  `/proc/<pid>/cmdline` on Linux) and builds a short display name, using the first rule that
+  matches:
+  - a process the claude rule (see "Owners") matches: "claude";
+  - tools with subcommands (go, npm, pnpm, yarn, bun, git, cargo, make): the base name of argv[0]
+    plus the first argument that is not a flag, such as "go test" or "npm run";
+  - interpreters (node, sh, bash, zsh, and any base name starting with `python`, such as
+    `python3.12`): the base name of the script argument. With `-c`, `-e` or no script argument,
+    the interpreter's own name;
+  - anything else: the base name of argv[0];
+  - with no argv (another user's process, or a failed read): `comm`.
 - Scale: process and agent CPU is a share of the whole machine, the same scale as the CPU row. A
-  process using one full core on a 10-core machine reads 10%. The rows add up to at most the busy
+  process's share is its CPU time delta divided by the machine's total CPU time in the same window
+  (the tick total delta, turned into seconds with the tick rate). So the rows and the busy total
+  use one denominator, with no wall-clock time. A process using one full core on a 10-core machine
+  reads 10%. The rows add up to at most the busy
   percent.
-- "Other users" (CPU list only): the machine's busy percent minus the summed CPU of every process
-  gx could read, floored at zero. It is listed only when it would make the top 3. On a machine
+- The process read takes its own CPU tick reading at the same moments as the process table. The
+  CPU list's busy total and "other users" use that window, not the watcher's 5-second tick, so the
+  rows and the busy total cover the same time.
+- "Other users" (CPU list only): the busy percent of the process read's window minus the summed
+  CPU of every process gx could read, floored at zero. It is listed only when it would make the top 3. On a machine
   where gx read every process, the row never shows.
 - The memory list has no "other users" row. It ranks the processes gx could read.
 - Memory per row: footprint on macOS, RSS on Linux. An agent row adds up its tree.
@@ -309,14 +338,23 @@ the disk-space epic built them. The same Tray sits in the same place at phone wi
   - the gx server: its own pid.
 - Each process read builds one pid-to-owner map. For each process, walk up the parent pids from the
   same read (no extra calls) until a known pid. Check start times so a reused pid never matches.
+- Start times use one type everywhere in the owner walk: Unix seconds.
+  - The macOS reader uses `pbi_start_tvsec`.
+  - The Linux reader adds field 22 of `/proc/<pid>/stat`, divided by the tick rate, to `btime`
+    from `/proc/stat`.
+  - `meta.json` stores `pid_start` and `holder_pid_start` as `ps -o lstart` text
+    (`nativerunner/procs.go`). `ProcessOwner` parses that text in the C locale and local time.
+  - The compare allows 1 second of rounding.
   A process reparented to pid 1 has lost its link and shows under its own name.
 - An owner maps to its label through the server's runs (`runs.json`: ticket address to runner and
   session) and session metadata (`Ticket`, `Name`). Never parse the iteration label.
   - A run or session with a ticket: the ticket address, linked to `/t/<address>`, with the busiest
     process of the tree in grey.
   - A run or session with no ticket: its session name.
-  - A claude process with no gx owner: "claude (not gx)". Detect claude by its argv; the
-    implementer picks the rule.
+  - A claude process with no gx owner: "claude (not gx)". A process is claude when argv[0]'s
+    base name is `claude`, or its executable is under a `claude/versions/` folder (the native
+    installer, where `comm` shows the version), or it is a node process running
+    `@anthropic-ai/claude-code/cli.js`.
   - The gx server's own process: its own row, labelled "gx server". Its non-agent children (git,
     cleanup commands) are other processes and get their own rows.
   - Anything else: its display name.
@@ -345,7 +383,8 @@ the disk-space epic built them. The same Tray sits in the same place at phone wi
 - Opens on click or tap, never on hover. Esc or a click outside closes it. It uses a Chakra
   popover anchored bottom-end, like the menu, at most 320px wide, and fits 390px.
 - On open it calls `GET /v1/health`, then every 5 seconds, and stops when it closes. A "reading"
-  marker on the CPU list triggers one extra fetch after about 1 second.
+  marker on the CPU list triggers one extra call at once with `wait`, which returns when the list
+  is ready.
 - Rows: the header ("gx server" and the host name), CPU, memory, disk, footer. Each row has an
   icon, a name, a state tag when not normal, the value, a bar and a sub line, as in the mock.
   - CPU: "81% busy", sub line "1-minute average 76% · high at 70%, critical at 90%". Then its
@@ -360,8 +399,11 @@ the disk-space epic built them. The same Tray sits in the same place at phone wi
 - Cause rows: label on the left, cut with "…" when long; numbers right-aligned. An agent row's
   label is a link to its ticket page, then " · " and the busiest process in grey. CPU rows show a
   percent; memory rows show bytes. "processes unavailable" and "reading…" replace a list's rows.
-- Footer: "Updated 2s ago", from the reading time and the server's current time in the response,
-  counted up once a second in the browser.
+- Footer: "Updated 2s ago", from the CPU and memory reading time and the server's current time in
+  the response, counted up once a second in the browser.
+- A disk entry shows its own age ("read 45s ago") when its reading is more than 10 seconds older
+  than the server's current time, since the disk watcher reads less often than the CPU and memory
+  watcher.
 - Offline: the popover keeps its last fetched values and the footer reads "Offline. Values from 3m
   ago.", counting up. Polling stops while offline and starts again on reconnect.
 - The last `/v1/health` response goes into the page cache (`pageCache.ts`), so a reload offline
@@ -387,8 +429,10 @@ Seams:
 1. **Server, through servertest.** Two new sources on the server `Config`: the system-reading source
    (CPU ticks, memory values, pressure) and the process-reading source (a process table). Each has a
    fake that returns set values and can change them between readings. A `Config` field sets the
-   read interval so tests run in milliseconds. Disk tests reuse the free-space fake from
-   disk-space, with total bytes added. Tests use `servertest.StartWithStore`, a temp store and
+   read interval, and three more set the process read timing, so tests run in milliseconds. The
+   fake system source also returns a core count and a tick rate. Disk tests reuse the free-space fake from
+   disk-space, with total bytes added; the file-backed source takes an optional total (`8G/500G`)
+   and uses a fixed default total of 500G without one. Tests use `servertest.StartWithStore`, a temp store and
    `testutil.TempRepo`. They read the snapshot, follow the event stream and call `/v1/health`.
    Prior art: the disk watcher tests on `disk-space-impl` (`server/diskwatch_test.go` and its
    neighbours) and the budget snapshot tests.
@@ -396,7 +440,11 @@ Seams:
    over byte inputs, run on every OS (ADR 0035), including a `comm` with spaces and `)`. Table
    tests for the state and level rules (thresholds, one-minute average, 5-point hysteresis, step
    edges) and for the owner walk and ranking over a fake process table (agent sum, busiest
-   process, pid reuse, reparented process, "other users", "claude (not gx)").
+   process, pid reuse, reparented process, "other users", "claude (not gx)"). Table tests for the
+   display-name rule (each subcommand tool, each interpreter, `python3.12`, `sh -c`, `node -e`, an
+   interpreter with no script, a claude match named "claude", no argv) and the claude rule (each
+   of the three matches, and a non-claude node process). A test that a `meta.json` `lstart` value
+   parses to the reader's start time for the same process.
 3. **CLI.** `cmd` tests for `gx server health` against a fake server, plus
    `TestRouteTableHasCLIVerbs` and `TestWeb_EverythingElseIs404`.
 4. **Web.** Vitest for the Tray and the popover: every state of each meter, unknown, offline fade,
@@ -406,12 +454,17 @@ Seams:
    disk banner tests on `disk-space-impl`.
 5. **Fixture.** A new `gxfixture` scenario, `health`, whose server reads system values and a
    process table from control files the flow can change at runtime, the way `disk-low` uses
-   `GX_DISK_FREE_FILE`. It runs on the `disk-low` free-space file for its disk. The scenario starts
-   one fake agent on a ticket, so the process table can name it. The implementer picks the file
-   format and env var names.
+   `GX_DISK_FREE_FILE`. It runs on the `disk-low` free-space file for its disk, with the optional
+   total (`8G/500G`); `disk-low` keeps working on the default total. The scenario starts one fake
+   agent on a ticket. After it starts the agent, the fixture writes the agent's known pids and start
+   times into the process table file, with child rows under them, so the owner walk names the
+   agent. It writes start times in the readers' Unix-seconds format, not the `meta.json` text. The implementer picks the file format and env var names.
 6. **Real readers.** One test per real backend that runs on its own OS (cgo on macOS, `/proc` on
-   Linux) and checks only that a read returns sane values (CPU ticks rise, 0 to 100 percent, more
-   than one process, the test's own pid present).
+   Linux) and checks that a read returns sane values (CPU ticks rise, 0 to 100 percent, more than
+   one process, the test's own pid present). It also compares its own pid's memory with
+   `proc_pid_rusage` footprint on macOS and with `VmRSS` from `/proc/self/status` on Linux, within a
+   small margin, and checks that its own start time matches its `ps -o lstart` text parsed the
+   `ProcessOwner` way.
 
 ## Verification
 
@@ -479,7 +532,8 @@ Entries:
     lists, with total bytes.
 30. Flow D. Vitest (seam 4): a held disk entry shows the held note and no button.
 31. Flow B (value changes within 5 seconds). Vitest (seam 4): polling stops on close.
-32. Flow B (footer counts up). Vitest (seam 4).
+32. Flow B (footer counts up). Vitest (seam 4): the footer uses the CPU and memory reading time; a
+    disk entry 45 seconds old shows "read 45s ago", one 5 seconds old shows no age.
 33. Vitest (seam 4): a browser clock 1 hour off still shows "Updated 2s ago" from the server times.
 34. Go test (seam 1): unknown reasons for the first interval and an unavailable source. Vitest
     (seam 4): the row says why.
@@ -488,29 +542,37 @@ Entries:
 37. Go test (seam 2): an agent's tree adds up to one row.
 38. Flow B (agent row link). Vitest (seam 4): label "gx:foo/03 · go test" links to the ticket page.
 39. Go test (seam 2): a session without a ticket gives its session name.
-40. Go test (seam 2): a claude with no owner gives "claude (not gx)".
-41. Go test (seam 2): an unowned process gives its own row; the gx server gives "gx server".
+40. Go test (seam 2): a claude with no owner gives "claude (not gx)", for each of the three claude
+    rules.
+41. Go test (seam 2): an unowned process gives its own row under the display-name rule; the gx
+    server gives "gx server".
 42. Go test (seam 2): a process at one full core on a 10-core fake reads 10%; the rows add up to at
-    most the busy percent.
+    most the busy percent of the process read's own window. The test uses fake ticks, a fake core
+    count and a fake tick rate, with no wall-clock time.
 43. Go test (seam 2): unreadable processes give "other users" as busy minus the sum, shown only when
     it makes the top 3. Flow B (other users row).
 44. Go test (seam 2): a vanished or hidden pid counts as unreadable, like EPERM.
 45. Go test (seam 2): the memory list never has an "other users" row.
-46. Go test (seam 6): the macOS memory is footprint and the Linux one is RSS.
+46. Go test (seam 6): the test's own row matches `proc_pid_rusage` footprint on macOS and `VmRSS`
+    on Linux, within a small margin.
 47. Flow B (projects on each disk).
 48. Go test (seam 1): a failing process source gives the unavailable marker and the meters still
     read. Vitest (seam 4): "processes unavailable".
-49. Go test (seam 1): the first call marks CPU as reading; a call after the second reading has the
-    CPU list. Vitest (seam 4): "reading…" and the extra fetch.
+49. Go test (seam 1): the first call marks CPU as reading; a `wait` call made at once blocks until
+    the second reading and has the CPU list; when the fake source fails the second read, the
+    `wait` call returns the unavailable marker; a second read that never ends returns the reading
+    marker after the cap. Vitest (seam 4): "reading…" and the extra `wait` call.
 50. Flow B at 390px.
 51. Go test (seam 1): with no `/v1/health` call, the fake process source records no reads; two
-    callers within 5 seconds cause one read.
+    callers within 1 second cause one read; calls spaced 0.9 seconds apart cause a second read;
+    a poll every 5 seconds gets a fresh read each time.
 52. Flow C (Tray fades, keeps levels). Mock state offline.
 53. Flow C (popover offline footer). Vitest (seam 4): offline after a reload uses the cached
     response.
 54. Flow C (Offline dot and strip unchanged). Mock states offline and offline-phone.
-55. CLI check: `gx server health --json` on the fixture prints CPU, memory, disks and both lists;
-    without `--json` it prints them as text. `TestRouteTableHasCLIVerbs` and
+55. CLI check: `gx server health --json` on the fixture, run after a quiet spell, prints CPU,
+    memory, disks and both lists; without `--json` it prints them as text. Go test (seam 3): the
+    CLI calls the route with `wait`. `TestRouteTableHasCLIVerbs` and
     `TestWeb_EverythingElseIs404` pass.
 
 **Mock states** (fixture scenario `health` for every line; the scenario does not exist yet and is
