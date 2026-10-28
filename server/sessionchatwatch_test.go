@@ -2,7 +2,9 @@ package server_test
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -29,16 +31,10 @@ func appendTranscript(t *testing.T, path string) {
 
 func waitSessionState(ctx context.Context, t *testing.T, h *servertest.Harness, id, state string) {
 	t.Helper()
-	for ctx.Err() == nil {
+	servertest.WaitFor(t, 20*time.Second, fmt.Sprintf("session %s to reach %s", id, state), func() bool {
 		list, _ := h.Client.Sessions(ctx)
-		for _, s := range list {
-			if s.ID == id && s.Status.State == state {
-				return
-			}
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("session %s never reached %s", id, state)
+		return slices.ContainsFunc(list, func(s server.SessionInfo) bool { return s.ID == id && s.Status.State == state })
+	})
 }
 
 // chatEventWithin reports whether a session-chat-changed event for id arrives
@@ -126,6 +122,7 @@ func TestSessionChatChanged_TurnWrittenAfterIdlePublishes(t *testing.T) {
 	waitSessionState(ctx, t, h, id, server.SessionWorking)
 	report(t, conv, agentfake.Control{State: "done"})
 	waitSessionState(ctx, t, h, id, server.SessionIdle)
+	// The meta shows Idle a moment before the watch stops its poll.
 	time.Sleep(2 * chatPollTestInterval)
 	appendLines(t, path, chatLine, turnDurationLine)
 	if !chatEventWithin(evs, t, path, id, time.Second, false) {

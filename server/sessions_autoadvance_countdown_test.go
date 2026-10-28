@@ -96,7 +96,7 @@ func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
 			writeAssistantMessage(t, f.path, tc.text)
 			endTurn(t, f)
 			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
-			time.Sleep(2 * countdownDelay)
+			time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
 			if screenHas(t, c, "/clear") {
 				t.Error("an ending that never advances sent /clear")
 			}
@@ -117,7 +117,7 @@ func TestAutoAdvance_SwitchOffStartsNoCountdown(t *testing.T) {
 	writeAssistantMessage(t, f.path, runEndText)
 	endTurn(t, f)
 	got := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
-	time.Sleep(2 * countdownDelay)
+	time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
 	if got.AutoAdvanceAt != nil || screenHas(t, c, "/clear") {
 		t.Errorf("session = %+v, want no countdown and nothing sent", got)
 	}
@@ -138,7 +138,7 @@ func startCountdown(t *testing.T) (*grillingFixture, *nativerunner.HolderClient)
 // and exactly one banner told the person.
 func wantStopped(t *testing.T, f *grillingFixture, c *nativerunner.HolderClient) {
 	t.Helper()
-	time.Sleep(2 * countdownDelay)
+	time.Sleep(2 * countdownDelay) // negative wait: a countdown still running would end within this window
 	if screenHas(t, c, "/clear") {
 		t.Error("a stopped countdown still sent /clear")
 	}
@@ -216,11 +216,8 @@ func TestAutoAdvance_RunEndingWithTheSwitchOffPlaysOneBanner(t *testing.T) {
 	writeAssistantMessage(t, f.path, runEndText)
 	endTurn(t, f)
 	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
-	deadline := time.Now().Add(5 * time.Second)
-	for len(f.h.Banners.Sent()) == 0 && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
-	time.Sleep(countdownDelay)
+	servertest.WaitFor(t, 5*time.Second, "the banner", func() bool { return len(f.h.Banners.Sent()) > 0 })
+	time.Sleep(countdownDelay) // negative wait: a countdown would end within this window and add a second banner
 	if b := f.h.Banners.Sent(); len(b) != 1 {
 		t.Errorf("banners = %v, want one", b)
 	}
@@ -236,14 +233,10 @@ func TestAutoAdvance_TurnSeenOnlyMidFlightStartsNoCountdown(t *testing.T) {
 
 	f.h.Restart(t)
 	report(t, f.conv, agentfake.Control{State: "idle"})
-	deadline := time.Now().Add(10 * time.Second)
-	for sessionSnapshot(t, f).Status.State != server.SessionIdle {
-		if time.Now().After(deadline) {
-			t.Fatal("session never went idle after the restart")
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	time.Sleep(2 * countdownDelay)
+	servertest.WaitFor(t, 10*time.Second, "the session to go idle after the restart", func() bool {
+		return sessionSnapshot(t, f).Status.State == server.SessionIdle
+	})
+	time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
 	if s := sessionSnapshot(t, f); s.AutoAdvanceAt != nil {
 		t.Errorf("countdown = %v for a turn first seen mid-flight, want none", s.AutoAdvanceAt)
 	}
@@ -261,7 +254,7 @@ func TestAutoAdvance_RestartDropsTheCountdownAndNeverStartsOne(t *testing.T) {
 	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt != nil })
 
 	f.h.Restart(t)
-	time.Sleep(2 * countdownDelay)
+	time.Sleep(2 * countdownDelay) // negative wait: a revived countdown would end within this window
 	if s := sessionSnapshot(t, f); s.AutoAdvanceAt != nil || s.Actionable.Reason == "" || len(s.Actionable.Action) == 0 {
 		t.Errorf("session after restart = %+v, want no countdown and Continue raised", s)
 	}

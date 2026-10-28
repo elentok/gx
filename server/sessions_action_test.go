@@ -48,6 +48,8 @@ func TestRunAction_SendsEachPromptAfterWorkingThenIdle(t *testing.T) {
 	waitForScreen(t, c, "first-step")
 	report(t, conv, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	// Negative wait: the Action's own watch samples on a ticker, so give it
+	// time to wrongly send the second prompt.
 	time.Sleep(actionWatchSettle)
 	if screenHas(t, c, "second-step") {
 		t.Fatal("second prompt sent while the first was working")
@@ -78,6 +80,7 @@ func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
 	report(t, conv, agentfake.Control{State: "done"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	// Negative wait: a few step timeouts for a wrong send to show up.
 	time.Sleep(3 * timeout)
 	if screenHas(t, c, "second-step") {
 		t.Error("second prompt sent after the first never went working")
@@ -115,12 +118,8 @@ func submitted(t *testing.T, conv string) string {
 
 func waitForSubmitted(t *testing.T, conv, want string) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for submitted(t, conv) != want {
-		if time.Now().After(deadline) {
-			t.Fatalf("submitted = %q, want %q", submitted(t, conv), want)
-		}
-		time.Sleep(20 * time.Millisecond)
+	if !servertest.Poll(10*time.Second, func() bool { return submitted(t, conv) == want }) {
+		t.Fatalf("submitted = %q, want %q", submitted(t, conv), want)
 	}
 }
 
@@ -162,6 +161,7 @@ func TestRunAction_SwallowedEnterOnSlashStepGetsOneEnter(t *testing.T) {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	waitForSubmitted(t, conv, "\"/local\"\n")
+	// Negative wait: a second Enter would come within a few settle windows.
 	time.Sleep(3 * settle)
 	if got := submitted(t, conv); got != "\"/local\"\n" {
 		t.Errorf("submitted = %q, want exactly one submission", got)
@@ -178,12 +178,13 @@ func TestRunAction_RealPromptStepStillNeedsATurn(t *testing.T) {
 		t.Fatalf("run action = %+v, %v", res, err)
 	}
 	waitForSubmitted(t, conv, "\"real-prompt\"\n")
+	// Negative wait: the next step must stay held well past the settle window.
 	time.Sleep(5 * settle)
 	if got := submitted(t, conv); got != "\"real-prompt\"\n" {
 		t.Errorf("submitted = %q, want the next step held until a turn", got)
 	}
 	report(t, conv, agentfake.Control{State: "working"})
-	time.Sleep(actionWatchSettle)
+	time.Sleep(actionWatchSettle) // the Action's watch only samples on a ticker; no event shows it saw Working
 	report(t, conv, agentfake.Control{State: "done"})
 	waitForSubmitted(t, conv, "\"real-prompt\"\n\"next-step\"\n")
 }
@@ -203,9 +204,10 @@ func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
 	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
-	time.Sleep(actionWatchSettle)
+	time.Sleep(actionWatchSettle) // the Action's watch only samples on a ticker; no event shows it saw Blocked
 	report(t, conv, agentfake.Control{State: "done"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	// Negative wait: a few step timeouts for a wrong send to show up.
 	time.Sleep(3 * timeout)
 	if screenHas(t, c, "second-step") {
 		t.Error("second prompt sent after the first went blocked")

@@ -58,7 +58,7 @@ func TestFirstPrompt_TypedOnReadyReportAndSubmittedOnce(t *testing.T) {
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSubmitted(t, conv, "\"fix the bug\"\n")
 	report(t, conv, agentfake.Control{State: "working"})
-	time.Sleep(2 * firstPromptGrace)
+	time.Sleep(2 * firstPromptGrace) // negative wait: a repeat would come within the grace window
 	if got := submitted(t, conv); got != "\"fix the bug\"\n" {
 		t.Errorf("submitted = %q, want exactly one submission", got)
 	}
@@ -98,7 +98,7 @@ func TestFirstPrompt_SlashPromptIsTypedOnceAndGetsOneEnter(t *testing.T) {
 	}
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSubmitted(t, conv, "\"/local\"\n")
-	time.Sleep(3 * firstPromptGrace)
+	time.Sleep(3 * firstPromptGrace) // negative wait: a second Enter would come within a few grace windows
 	if got := submitted(t, conv); got != "\"/local\"\n" {
 		t.Errorf("submitted = %q, want one submission", got)
 	}
@@ -136,7 +136,7 @@ func TestFirstPrompt_PersonInputAfterTypingStopsTheNudge(t *testing.T) {
 			if err := a.Paste(" "); err != nil {
 				t.Fatal(err)
 			}
-			time.Sleep(3 * firstPromptGrace)
+			time.Sleep(3 * firstPromptGrace) // negative wait: a nudge would come within a few grace windows
 			if got := submitted(t, conv); got != "" {
 				t.Errorf("submitted = %q after person input, want nothing", got)
 			}

@@ -33,7 +33,7 @@ func TestAutoAdvance_StopsAfterFiveSendsWithNoInput(t *testing.T) {
 	}
 	endTurn(t, f)
 	waitUntil(t, "the guard's banner", func() bool { return len(f.h.Banners.Sent()) > 0 })
-	time.Sleep(2 * countdownDelay)
+	time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
 
 	got := sessionSnapshot(t, f)
 	if got.AutoAdvanceAt != nil || got.Actionable.Reason == "" || len(got.Actionable.Action) == 0 {
@@ -84,7 +84,7 @@ func TestAutoAdvance_SwitchingOnOverARaisedContinueStartsTheCountdown(t *testing
 	writeAssistantMessage(t, f.path, runEndText)
 	endTurn(t, f)
 	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Actionable.Reason != "" })
-	time.Sleep(2 * countdownDelay)
+	time.Sleep(2 * countdownDelay) // negative wait: a countdown would start and end within this window
 	if screenHas(t, c, "/clear") || sessionSnapshot(t, f).AutoAdvanceAt != nil {
 		t.Fatal("a countdown ran with the switch off")
 	}

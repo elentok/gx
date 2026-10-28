@@ -89,20 +89,13 @@ func TestUnread_FocusedTUIViewingSuppressesAndClears(t *testing.T) {
 	}
 
 	dropTUI()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	servertest.WaitFor(t, 5*time.Second, "the focus report to be refused after its stream closed", func() bool {
 		res, err := h.Client.ReportFocus(ctx, server.FocusReport{Client: "tui-1", Focused: true})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if res.Refused && res.Reason == server.ReasonFocusNotConnected {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("focus report still accepted after its stream closed")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+		return res.Refused && res.Reason == server.ReasonFocusNotConnected
+	})
 	if got := turn(); !got.Unread.Unread {
 		t.Error("a dropped TUI's report still suppressed unread")
 	}

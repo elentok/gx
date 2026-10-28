@@ -57,6 +57,7 @@ func TestFirstPromptFailure_StillStartingRaisesActionable(t *testing.T) {
 func TestFirstPromptFailure_BlockedTimeDoesNotCountAsStarting(t *testing.T) {
 	t.Parallel()
 	f := startFailingFirstPrompt(t, "fix the bug", agentfake.ProgramTrustEnv+"=1")
+	// Negative wait: a failure would be raised within a few start timeouts.
 	time.Sleep(3 * firstPromptStartTimeout)
 	snap, err := f.h.Client.Snapshot(f.ctx)
 	if err != nil {

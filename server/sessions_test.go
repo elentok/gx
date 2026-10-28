@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -301,10 +302,10 @@ func TestStopSession_StopsAHolderStillStarting(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, nativerunner.ExitCodeFile)); err != nil {
 		t.Errorf("holder saved no exit by the time stop returned: %v", err)
 	}
-	time.Sleep(200 * time.Millisecond)
-	if _, err := nativerunner.DialHolder(dir); err == nil {
-		t.Error("holder still serves after stop")
-	}
+	servertest.WaitFor(t, 5*time.Second, "the holder to stop serving", func() bool {
+		_, err := nativerunner.DialHolder(dir)
+		return err != nil
+	})
 }
 
 // A test killed before its cleanup runs must not leave its holders running:
@@ -321,15 +322,10 @@ func TestTestHolder_ExitsWithItsTestProcess(t *testing.T) {
 
 	_ = test.Process.Kill()
 	_ = test.Wait()
-	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(50 * time.Millisecond) {
-		// The holder and its program both carry the conversation id.
-		if exec.Command("pgrep", "-f", conv).Run() != nil {
-			return
-		}
-		if time.Now().After(deadline) {
-			_ = exec.Command("pkill", "-f", conv).Run()
-			t.Fatal("the session's holder outlived its test")
-		}
+	// The holder and its program both carry the conversation id.
+	if !servertest.Poll(5*time.Second, func() bool { return exec.Command("pgrep", "-f", conv).Run() != nil }) {
+		_ = exec.Command("pkill", "-f", conv).Run()
+		t.Fatal("the session's holder outlived its test")
 	}
 }
 
@@ -476,17 +472,10 @@ func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
 
 	sessionDir := filepath.Join(h.SessionsDir, id)
 	holder := waitForHolder(t, sessionDir)
-	deadline := time.Now().Add(10 * time.Second)
-	for {
+	servertest.WaitFor(t, 10*time.Second, "the trust dialog to be shown and answered", func() bool {
 		raw, _ := os.ReadFile(filepath.Join(sessionDir, nativerunner.RawLogFile))
-		if strings.Contains(string(raw), agentfake.ProgramTrustPrompt) && !screenHas(t, holder, agentfake.ProgramTrustPrompt) {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("trust dialog never shown and answered")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+		return strings.Contains(string(raw), agentfake.ProgramTrustPrompt) && !screenHas(t, holder, agentfake.ProgramTrustPrompt)
+	})
 
 	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {
 		t.Fatalf("stop = %+v, %v", res, err)
@@ -575,13 +564,7 @@ func screenHas(t *testing.T, c *nativerunner.HolderClient, text string) bool {
 
 func waitForScreen(t *testing.T, c *nativerunner.HolderClient, text string) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for !screenHas(t, c, text) {
-		if time.Now().After(deadline) {
-			t.Fatalf("screen never showed %q", text)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("the screen to show %q", text), func() bool { return screenHas(t, c, text) })
 }
 
 // startFakeSession creates a fake-harness session and waits for its first
@@ -663,15 +646,13 @@ func killHolder(t *testing.T, h *servertest.Harness, id string) int {
 
 func waitForHolder(t *testing.T, dir string) *nativerunner.HolderClient {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		c, err := nativerunner.DialHolder(dir)
-		if err == nil {
-			return c
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("no holder in %s: %v", dir, err)
-		}
-		time.Sleep(20 * time.Millisecond)
+	var c *nativerunner.HolderClient
+	var err error
+	if !servertest.Poll(10*time.Second, func() bool {
+		c, err = nativerunner.DialHolder(dir)
+		return err == nil
+	}) {
+		t.Fatalf("no holder in %s: %v", dir, err)
 	}
+	return c
 }

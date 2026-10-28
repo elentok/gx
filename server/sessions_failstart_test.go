@@ -57,8 +57,8 @@ func assertFailedStartEnded(ctx context.Context, t *testing.T, h *servertest.Har
 
 	holder.fix(t)
 	h.Restart(t)
-	// Auto-resume runs after the restart returns; give it the time it would
-	// take to bump the run.
+	// Negative wait: auto-resume runs after the restart returns; give it the
+	// time it would take to bump the run.
 	time.Sleep(3 * resumeSpacing)
 	got = waitForSnapshot(ctx, t, h, id, func(server.SessionInfo) bool { return true })
 	if got.Status.State != server.SessionExited {

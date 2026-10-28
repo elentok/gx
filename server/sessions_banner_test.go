@@ -36,12 +36,11 @@ func reach(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan 
 
 // waitAlerts waits past the banner delay and returns what was sent.
 func waitAlerts(h *servertest.Harness, want int) ([]osnotify.Notification, []sound.Name) {
-	deadline := time.Now().Add(3 * servertest.SessionBannerDelay)
-	for time.Now().Before(deadline) && (len(h.Banners.Sent()) < want || len(h.Sounds.Played()) < want) {
-		time.Sleep(10 * time.Millisecond)
-	}
+	servertest.Poll(3*servertest.SessionBannerDelay, func() bool {
+		return len(h.Banners.Sent()) >= want && len(h.Sounds.Played()) >= want
+	})
 	if want == 0 {
-		time.Sleep(2 * servertest.SessionBannerDelay)
+		time.Sleep(2 * servertest.SessionBannerDelay) // negative wait: an alert would fire within the banner delay
 	}
 	return h.Banners.Sent(), h.Sounds.Played()
 }
@@ -148,7 +147,7 @@ func TestSessionBanner_SwitchesOff(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			h, ctx, evs, id, conv := startBannerSession(t, withAlerts(tc.banners, tc.sounds))
 			reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "done"}, server.SessionIdle)
-			time.Sleep(2 * servertest.SessionBannerDelay)
+			time.Sleep(2 * servertest.SessionBannerDelay) // negative wait: a switched-off alert would fire within the banner delay
 			if got := len(h.Banners.Sent()) == 1; got != tc.banners {
 				t.Errorf("banner sent = %v, want %v", got, tc.banners)
 			}

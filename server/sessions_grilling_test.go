@@ -212,12 +212,8 @@ func TestRunEnd_NoContinueAtBranchAndDone(t *testing.T) {
 			if got.Reason != line || (len(got.Action) > 0) != tc.wantAction {
 				t.Errorf("actionable = %+v, want reason %q, action present = %v", got, line, tc.wantAction)
 			}
-			deadline := time.Now().Add(5 * time.Second)
-			for len(h.Banners.Sent()) == 0 || len(h.Sounds.Played()) == 0 {
-				if time.Now().After(deadline) {
-					t.Fatalf("banners = %v, sounds = %v, want both", h.Banners.Sent(), h.Sounds.Played())
-				}
-				time.Sleep(20 * time.Millisecond)
+			if !servertest.Poll(5*time.Second, func() bool { return len(h.Banners.Sent()) > 0 && len(h.Sounds.Played()) > 0 }) {
+				t.Fatalf("banners = %v, sounds = %v, want both", h.Banners.Sent(), h.Sounds.Played())
 			}
 		})
 	}
@@ -254,19 +250,14 @@ func TestSessionChat_StepChangeAloneRefreshesNext(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\ndesign_step: branch\n---\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(10 * time.Second)
-	for {
+	if !servertest.Poll(10*time.Second, func() bool {
 		got, err = h.Client.SessionChat(ctx, id)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got.Next != nil && len(got.Next.Action.Action) == 0 {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("next = %+v after the map moved to branch, want no action", got.Next)
-		}
-		time.Sleep(50 * time.Millisecond)
+		return got.Next != nil && len(got.Next.Action.Action) == 0
+	}) {
+		t.Fatalf("next = %+v after the map moved to branch, want no action", got.Next)
 	}
 }
 

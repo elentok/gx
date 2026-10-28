@@ -36,7 +36,7 @@ func startAFKSession(t *testing.T, afk bool) (*servertest.Harness, *slackHook, i
 // postsAfterAlert waits for the banner and a chat flush, then returns the posts after from.
 func (h *slackHook) postsAfterAlert(hs *servertest.Harness, from int) []string {
 	waitAlerts(hs, 1)
-	time.Sleep(5 * testFlushInterval)
+	time.Sleep(5 * testFlushInterval) // negative wait: no event marks the chat flush, so give it a few intervals
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return append([]string(nil), h.posts[from:]...)

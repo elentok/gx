@@ -115,7 +115,7 @@ func TestFailureBanner_AFailureThatClearsAndReturnsSendsAgain(t *testing.T) {
 	waitAlerts(f.h, 1)
 	writeTranscript(t, f.path, reply, reply)
 	waitForFailure(f.ctx, t, f.h, f.id, "")
-	time.Sleep(100 * time.Millisecond) // several polls, so one sees it clear
+	time.Sleep(100 * time.Millisecond) // negative wait: several polls, so one sees it clear
 	f.stall(t)
 	if banners, _ := waitAlerts(f.h, 2); len(banners) != 2 {
 		t.Errorf("banners = %+v, want a second for the second stall", banners)

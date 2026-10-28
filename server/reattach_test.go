@@ -1,7 +1,6 @@
 package server_test
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -119,23 +118,16 @@ func startHeadlessRestart(t *testing.T, verdict nativerunner.Verdict, retention 
 func TestReattach_DiedPausesStuckAndKeepsTheDir(t *testing.T) {
 	t.Parallel()
 	fake, ticketPath := startHeadlessRestart(t, nativerunner.VerdictDied, 0)
-	deadline := time.Now().Add(20 * time.Second)
-	for {
+	servertest.WaitFor(t, 20*time.Second, "the ticket to pause for repair", func() bool {
 		tk, err := schema.ParseTicket(ticketPath)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tk.Status == schema.StatusPaused && tk.PausedClass() == schema.PauseClassRepair {
-			body, _ := os.ReadFile(ticketPath)
-			if !strings.Contains(string(body), nativerunner.ReasonAgentDied) {
-				t.Errorf("ticket lacks %q:\n%s", nativerunner.ReasonAgentDied, body)
-			}
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("status = %q, want stuck", tk.Status)
-		}
-		time.Sleep(50 * time.Millisecond)
+		return tk.Status == schema.StatusPaused && tk.PausedClass() == schema.PauseClassRepair
+	})
+	body, _ := os.ReadFile(ticketPath)
+	if !strings.Contains(string(body), nativerunner.ReasonAgentDied) {
+		t.Errorf("ticket lacks %q:\n%s", nativerunner.ReasonAgentDied, body)
 	}
 	fake.mu.Lock()
 	defer fake.mu.Unlock()
@@ -147,33 +139,23 @@ func TestReattach_DiedPausesStuckAndKeepsTheDir(t *testing.T) {
 func TestReattach_FinishedMergesAndCleansUp(t *testing.T) {
 	t.Parallel()
 	fake, ticketPath := startHeadlessRestart(t, nativerunner.VerdictFinished, 0)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	for ctx.Err() == nil {
+	servertest.WaitFor(t, 30*time.Second, "the ticket to merge", func() bool {
 		tk, err := schema.ParseTicket(ticketPath)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tk.Status == schema.StatusDone {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	if ctx.Err() != nil {
-		t.Fatal("ticket never merged")
-	}
-	for ; ctx.Err() == nil; time.Sleep(50 * time.Millisecond) {
+		return tk.Status == schema.StatusDone
+	})
+	var cleaned []string
+	servertest.WaitFor(t, 30*time.Second, "the agent to be cleaned up", func() bool {
 		fake.mu.Lock()
-		cleaned := slices.Clone(fake.cleaned)
-		fake.mu.Unlock()
-		if len(cleaned) > 0 {
-			if cleaned[0] != "epic-a-iter-01" {
-				t.Errorf("cleaned = %v, want epic-a-iter-01", cleaned)
-			}
-			return
-		}
+		defer fake.mu.Unlock()
+		cleaned = slices.Clone(fake.cleaned)
+		return len(cleaned) > 0
+	})
+	if cleaned[0] != "epic-a-iter-01" {
+		t.Errorf("cleaned = %v, want epic-a-iter-01", cleaned)
 	}
-	t.Error("the agent was never cleaned up")
 }
 
 func TestPrune_RunsAtStartWithConfiguredRetentionAndSkipsPaused(t *testing.T) {
@@ -194,23 +176,18 @@ func TestPrune_RunsAtStartWithConfiguredRetentionAndSkipsPaused(t *testing.T) {
 		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
 		c.LogRetention = 36 * time.Hour
 	})
-	deadline := time.Now().Add(10 * time.Second)
-	for {
+	var paused map[string]bool
+	var retention time.Duration
+	servertest.WaitFor(t, 10*time.Second, "Prune to run", func() bool {
 		fake.mu.Lock()
-		paused, retention := fake.paused, fake.retention
-		fake.mu.Unlock()
-		if paused != nil {
-			if retention != 36*time.Hour {
-				t.Errorf("retention = %v, want 36h", retention)
-			}
-			if !paused["epic-a-iter-01"] || paused["epic-a-iter-02"] {
-				t.Errorf("paused = %v, want only epic-a-iter-01", paused)
-			}
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("Prune never ran")
-		}
-		time.Sleep(50 * time.Millisecond)
+		defer fake.mu.Unlock()
+		paused, retention = fake.paused, fake.retention
+		return paused != nil
+	})
+	if retention != 36*time.Hour {
+		t.Errorf("retention = %v, want 36h", retention)
+	}
+	if !paused["epic-a-iter-01"] || paused["epic-a-iter-02"] {
+		t.Errorf("paused = %v, want only epic-a-iter-01", paused)
 	}
 }
