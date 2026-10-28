@@ -66,6 +66,7 @@ func webSessionWrite(t *testing.T, base string, cookie *http.Cookie, verb, id, s
 }
 
 func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T) {
+	t.Parallel()
 	h, base, cookie, ctx, evs, design, plain := startWebDesign(t)
 	waitForHolder(t, filepath.Join(h.SessionsDir, design))
 	waitForHolder(t, filepath.Join(h.SessionsDir, plain))
@@ -99,6 +100,7 @@ func TestWebSessions_StopAndRestoreNeedAFreshTokenOnADesignSession(t *testing.T)
 }
 
 func TestWebSessions_WriteChecksStillApply(t *testing.T) {
+	t.Parallel()
 	h, base, cookie, ctx, _, design, _ := startWebDesign(t)
 	body := fmt.Sprintf(`{"id":%q,"state":%q}`, design, sessionToken(ctx, t, h, design))
 	for _, path := range []string{"/v1/sessions/stop", "/v1/sessions/resume"} {
@@ -115,6 +117,7 @@ func TestWebSessions_WriteChecksStillApply(t *testing.T) {
 }
 
 func TestSessions_NonWebStopAndRestoreTakeNoToken(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t)
 	waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	if res, err := h.Client.StopSession(ctx, id); err != nil || res.Refused {

@@ -17,6 +17,7 @@ import (
 )
 
 func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *testing.T) {
+	t.Parallel()
 	const other = "other"
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p servertest.Prompt, id string) {
 		epic, _, _ := strings.Cut(strings.TrimPrefix(p.Address, "proj:"), "/")
@@ -76,6 +77,7 @@ func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *t
 }
 
 func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
+	t.Parallel()
 	chat, count := chatRecorder(t)
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
@@ -109,6 +111,7 @@ func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
 }
 
 func TestTrunkLock_TrunkMovedBeforeTheFFPausesNeedsRebaseNotMergeFailed(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 	})

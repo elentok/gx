@@ -64,6 +64,7 @@ func readFile(t *testing.T, path string) string {
 }
 
 func TestStampRetro_DoneStampsEvolvedAtAndTicketKeepingOtherKeys(t *testing.T) {
+	t.Parallel()
 	store, addr, path, epicTicket := retroFixture(t, "")
 	retroServer(store).stampRetro(addr, path, false)
 
@@ -79,6 +80,7 @@ func TestStampRetro_DoneStampsEvolvedAtAndTicketKeepingOtherKeys(t *testing.T) {
 }
 
 func TestStampRetro_ForcedRerunOverwritesEvolveTicket(t *testing.T) {
+	t.Parallel()
 	store, addr, path, epicTicket := retroFixture(t, "evolved_at: 2026-01-02T03:04:05Z\nevolve_ticket: proj:old/01\n")
 	retroServer(store).stampRetro(addr, path, false)
 
@@ -92,6 +94,7 @@ func TestStampRetro_ForcedRerunOverwritesEvolveTicket(t *testing.T) {
 }
 
 func TestStampRetro_CancelledStampsEvolvedAtAndSkipped(t *testing.T) {
+	t.Parallel()
 	store, addr, path, epicTicket := retroFixture(t, "")
 	retroServer(store).stampRetro(addr, path, true)
 
@@ -107,6 +110,7 @@ func TestStampRetro_CancelledStampsEvolvedAtAndSkipped(t *testing.T) {
 }
 
 func TestStampRetro_NonRetroTicketLeavesTheEpicAlone(t *testing.T) {
+	t.Parallel()
 	store, addr, path, epicTicket := retroFixture(t, "")
 	out, err := schema.MarshalTicket(schema.Ticket{ID: "01", Status: schema.StatusOpen, Type: schema.TypeEvolve}, "# not a retro\n")
 	if err != nil {

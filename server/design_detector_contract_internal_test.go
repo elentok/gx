@@ -67,6 +67,7 @@ func continues(text string) bool {
 }
 
 func TestGxDesignRunEndTemplate_IsContinue(t *testing.T) {
+	t.Parallel()
 	template, _ := afterEveryRun(t)
 	if !runEndShape.MatchString(template) {
 		t.Fatalf("template %q does not have the ✅ <label>: ... Next: ... shape", template)
@@ -77,6 +78,7 @@ func TestGxDesignRunEndTemplate_IsContinue(t *testing.T) {
 }
 
 func TestGxDesignRunEndExamples_AreContinue(t *testing.T) {
+	t.Parallel()
 	_, examples := afterEveryRun(t)
 	if len(examples) < 2 {
 		t.Fatalf("got %d examples, want at least 2", len(examples))
@@ -89,6 +91,7 @@ func TestGxDesignRunEndExamples_AreContinue(t *testing.T) {
 }
 
 func TestGxDesignRunEndTemplate_WithoutNextFails(t *testing.T) {
+	t.Parallel()
 	template, _ := afterEveryRun(t)
 	mutated := strings.ReplaceAll(template, "Next:", "")
 	if continues(mutated) {
@@ -100,6 +103,7 @@ func TestGxDesignRunEndTemplate_WithoutNextFails(t *testing.T) {
 }
 
 func TestAgentfakeDesignRunEnd_HasTemplateShape(t *testing.T) {
+	t.Parallel()
 	if !runEndShape.MatchString(agentfake.DesignRunEnd) {
 		t.Errorf("agentfake.DesignRunEnd %q does not have the template shape", agentfake.DesignRunEnd)
 	}
@@ -109,6 +113,7 @@ func TestAgentfakeDesignRunEnd_HasTemplateShape(t *testing.T) {
 }
 
 func TestGxGrillingRoundTemplate_IsGrilling(t *testing.T) {
+	t.Parallel()
 	blocks := fencedBlocks(skillText(t, "gx-grilling"), "````")
 	if len(blocks) == 0 {
 		t.Fatal("gx-grilling has no question-round template")
@@ -120,6 +125,7 @@ func TestGxGrillingRoundTemplate_IsGrilling(t *testing.T) {
 }
 
 func TestAgentfakeDefaultedRounds_UseTheRealFormat(t *testing.T) {
+	t.Parallel()
 	for turn, wantCards := range map[string]int{
 		agentfake.DesignTurnDefaulted: 1,
 		agentfake.DesignTurnMixed:     1,
@@ -141,6 +147,7 @@ func TestAgentfakeDefaultedRounds_UseTheRealFormat(t *testing.T) {
 }
 
 func TestGxGrillingAllDefaultedTemplate_IsGrilling(t *testing.T) {
+	t.Parallel()
 	var found string
 	for _, b := range fencedBlocks(skillText(t, "gx-grilling"), "````") {
 		if strings.Contains(b, "Accept these defaults?") {

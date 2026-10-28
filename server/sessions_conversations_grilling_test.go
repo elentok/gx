@@ -52,6 +52,7 @@ func designMapStore(t *testing.T) string {
 
 // HOME is set only on the server.
 func TestSessionConversations_DesignCountsSavedWhenAConversationEnds(t *testing.T) {
+	t.Parallel()
 	home := t.TempDir()
 	h := servertest.StartWithStore(t, designMapStore(t), servertest.WithTestHolder(), servertest.WithEnv("HOME="+home))
 	checkDesignCountsSaved(t, h, func(dir, conv string, at ...time.Time) {
@@ -99,6 +100,7 @@ func checkDesignCountsSaved(t *testing.T, h *servertest.Harness, writeGrillingRo
 }
 
 func TestSessionConversations_NonDesignSessionLeavesNoCounts(t *testing.T) {
+	t.Parallel()
 	home := t.TempDir()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"}, servertest.WithEnv("HOME="+home))
 	dir, _ := readMeta(t, h, id)["dir"].(string)

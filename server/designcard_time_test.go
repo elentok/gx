@@ -10,6 +10,7 @@ import (
 )
 
 func TestEpicList_DesignAndJoinedCardsCarryTheTimePair(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	mapFront := func(extra string) string {

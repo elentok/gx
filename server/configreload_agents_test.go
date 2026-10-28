@@ -11,6 +11,7 @@ import (
 )
 
 func TestSettingsFromConfig_CarriesAgentsSessionKeys(t *testing.T) {
+	t.Parallel()
 	cfg := config.Default()
 	cfg.Agents.ResumeOnStart = false
 	cfg.Agents.Banners.Enabled = false
@@ -26,6 +27,7 @@ func TestSettingsFromConfig_CarriesAgentsSessionKeys(t *testing.T) {
 
 // A reload reports each changed agents key, so the live settings took it.
 func TestConfigReload_AgentsSessionKeysApply(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))

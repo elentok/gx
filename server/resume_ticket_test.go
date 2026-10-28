@@ -28,6 +28,7 @@ func resumeEvents(t *testing.T, ticketPath string) (closed []tickets.LogEvent, a
 }
 
 func TestResume_LiveWaitingAgentRefusesAndIsUntouched(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, optionsBlock)
@@ -51,6 +52,7 @@ func TestResume_LiveWaitingAgentRefusesAndIsUntouched(t *testing.T) {
 }
 
 func TestResume_GoneAgentClosesTheQuestionAndReopens(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, optionsBlock)

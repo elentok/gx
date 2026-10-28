@@ -78,6 +78,7 @@ func kindOf(f *server.SessionFailure) string {
 }
 
 func TestSessionFailure_Kinds(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		drive func(t *testing.T, conv string)
@@ -114,6 +115,7 @@ func exitFake(t *testing.T, conv string, code int) {
 }
 
 func TestSessionFailure_ClearsWhenTheStatusChangesBack(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, conv, _ := startFailureSession(t, true, time.Hour)
 	report(t, conv, agentfake.Control{State: "ratelimited"})
 	waitForFailure(ctx, t, h, id, "rate-limit")
@@ -122,6 +124,7 @@ func TestSessionFailure_ClearsWhenTheStatusChangesBack(t *testing.T) {
 }
 
 func TestSessionFailure_AuthFromTheLastAPIErrorWhileIdle(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, conv, path := startFailureSession(t, true, time.Hour)
 	writeTranscript(t, path, apiError401)
 	report(t, conv, agentfake.Control{State: "done"})
@@ -135,6 +138,7 @@ func TestSessionFailure_AuthFromTheLastAPIErrorWhileIdle(t *testing.T) {
 }
 
 func TestSessionFailure_StalledWhenTheTranscriptIsOldWhileWorking(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv, path := startFailureSession(t, true, time.Minute)
 	writeTranscript(t, path, reply)
 	report(t, conv, agentfake.Control{State: "working"})
@@ -155,6 +159,7 @@ func TestSessionFailure_StalledWhenTheTranscriptIsOldWhileWorking(t *testing.T) 
 }
 
 func TestSessionFailure_ARestoreCrashingWithinAMinuteIsReported(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, conv, _ := startFailureSession(t, true, time.Hour)
 	exitFake(t, conv, 1)
 	if got := waitForFailure(ctx, t, h, id, "crashed"); got.Recrashed {
@@ -172,6 +177,7 @@ func TestSessionFailure_ARestoreCrashingWithinAMinuteIsReported(t *testing.T) {
 }
 
 func TestSessionFailure_NonChatHarnessNeverGetsAuthOrStalled(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv, path := startFailureSession(t, false, time.Minute)
 	writeTranscript(t, path, apiError401)
 	report(t, conv, agentfake.Control{State: "done"})

@@ -28,6 +28,7 @@ func trunkDeletedMidRun(t *testing.T, autoMerge bool) (f *schedFixture, develop 
 }
 
 func TestTrunkMissingAtMerging_TicketMergesOnItsRootAndTheRootPauses(t *testing.T) {
+	t.Parallel()
 	f, develop, chatCount := trunkDeletedMidRun(t, true)
 	f.runEpic(t, server.EventRootPaused)
 
@@ -49,6 +50,7 @@ func TestTrunkMissingAtMerging_TicketMergesOnItsRootAndTheRootPauses(t *testing.
 }
 
 func TestTrunkMissingAtMerging_AutoMergeOffIsNotPaused(t *testing.T) {
+	t.Parallel()
 	f, _, _ := trunkDeletedMidRun(t, false)
 	f.runEpic(t, server.EventRootCompleted)
 

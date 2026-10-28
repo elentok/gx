@@ -32,6 +32,7 @@ type graceFixture struct {
 
 // Seam: the start banner title shows the configured grace duration.
 func TestHardLimitGrace_StartTitleShowsGrace(t *testing.T) {
+	t.Parallel()
 	for grace, want := range map[time.Duration]string{
 		60 * time.Second:       "gx: agents stop in 60s",
 		90 * time.Second:       "gx: agents stop in 90s",
@@ -111,6 +112,7 @@ func (f graceFixture) lowerBelowSpend(t *testing.T) {
 }
 
 func TestHardLimitGrace_ConfigStatusShowsCountdown(t *testing.T) {
+	t.Parallel()
 	f := startGraceServer(t, time.Hour)
 	f.lowerBelowSpend(t)
 	st, err := f.h.Client.ConfigStatus(f.ctx)
@@ -201,6 +203,7 @@ func (f graceFixture) expectCancelled(t *testing.T) {
 // Seam: when the grace period ends with spend still at the limit, the agents
 // stop through the budget-kill path and the done banner reports how many.
 func TestHardLimitGrace_ExpiryStopsAgents(t *testing.T) {
+	t.Parallel()
 	f := startGraceServer(t, 600*time.Millisecond)
 	f.lowerBelowSpend(t)
 	if kind := f.pauseKind(t); kind != "" {
@@ -229,6 +232,7 @@ func TestHardLimitGrace_ExpiryStopsAgents(t *testing.T) {
 
 // Seam: a reload raising the hard limit above spend cancels the countdown.
 func TestHardLimitGrace_ReloadRaiseCancels(t *testing.T) {
+	t.Parallel()
 	f := startGraceServer(t, time.Hour)
 	f.lowerBelowSpend(t)
 	f.expectHeld(t)
@@ -240,6 +244,7 @@ func TestHardLimitGrace_ReloadRaiseCancels(t *testing.T) {
 
 // Seam: `gx budget increase` above spend cancels the countdown too.
 func TestHardLimitGrace_BudgetIncreaseCancels(t *testing.T) {
+	t.Parallel()
 	f := startGraceServer(t, time.Hour)
 	f.lowerBelowSpend(t)
 	f.expectHeld(t)
@@ -254,6 +259,7 @@ func TestHardLimitGrace_BudgetIncreaseCancels(t *testing.T) {
 // Seam: `gx budget override` cancels the countdown, so a later lowering reload
 // starts a fresh one instead of inheriting the old deadline.
 func TestHardLimitGrace_OverrideCancels(t *testing.T) {
+	t.Parallel()
 	f := startGraceServer(t, time.Hour)
 	f.lowerBelowSpend(t)
 	stopAt := f.h.Server.HardStopAt()
@@ -283,6 +289,7 @@ func TestHardLimitGrace_OverrideCancels(t *testing.T) {
 // Seam: grace expiry racing frequent budget polls sends no hard-limit chat
 // notice, and stops the agents once.
 func TestHardLimitGrace_ExpiryDuringPollsSendsNoChatNotice(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var bodies []string
 	hook := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
@@ -324,6 +331,7 @@ func TestHardLimitGrace_ExpiryDuringPollsSendsNoChatNotice(t *testing.T) {
 // Seam: a watcher reload still in flight at shutdown cannot leave a countdown
 // running after Serve returns.
 func TestHardLimitGrace_ShutdownStopsCountdownAfterWatcher(t *testing.T) {
+	t.Parallel()
 	f := startGraceServer(t, time.Hour, func(c *server.Config) {
 		c.WatchConfig = true
 		c.ConfigWatchDebounce = 10 * time.Millisecond
@@ -346,6 +354,7 @@ func TestHardLimitGrace_ShutdownStopsCountdownAfterWatcher(t *testing.T) {
 // Seam: a second lowering reload during the countdown neither restarts it nor
 // announces it again.
 func TestHardLimitGrace_SecondLoweringKeepsOneTimer(t *testing.T) {
+	t.Parallel()
 	f := startGraceServer(t, time.Hour)
 	f.lowerBelowSpend(t)
 	stopAt := f.h.Server.HardStopAt()
@@ -363,6 +372,7 @@ func TestHardLimitGrace_SecondLoweringKeepsOneTimer(t *testing.T) {
 
 // Seam: spend crossing the hard limit in normal work still stops agents at once.
 func TestHardLimitGrace_SpendCrossingStillLatchesAtOnce(t *testing.T) {
+	t.Parallel()
 	f := startGraceServer(t, time.Hour)
 	f.h.Server.RecordSpend("more", 15)
 	if st := f.h.Server.BudgetStatusAt(time.Now()); !st.HardLatched || !f.h.Server.HardStopAt().IsZero() {

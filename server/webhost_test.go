@@ -50,6 +50,7 @@ func startWebHosts(t *testing.T, hosts ...string) (*servertest.Harness, string, 
 }
 
 func TestWebHost_Table(t *testing.T) {
+	t.Parallel()
 	h, base, port := startWebHosts(t, "gx.tail1234.ts.net")
 	cookie := login(t, h.StateDir, base)
 	tests := []struct {
@@ -82,6 +83,7 @@ func TestWebHost_Table(t *testing.T) {
 }
 
 func TestWebHost_AllRoutesRefuseUnlistedName(t *testing.T) {
+	t.Parallel()
 	h, base, _ := startWebHosts(t)
 	cookie := login(t, h.StateDir, base)
 	for _, path := range []string{"/", "/index.html", "/some/client/route", "/v1/snapshot", "/v1/events", "/v1/nope"} {
@@ -100,6 +102,7 @@ func TestWebHost_AllRoutesRefuseUnlistedName(t *testing.T) {
 }
 
 func TestWebHost_RefusalIsShortPlainText(t *testing.T) {
+	t.Parallel()
 	_, base, _ := startWebHosts(t)
 	req, _ := http.NewRequest(http.MethodGet, base+"/", nil)
 	req.Host = "evil.example"
@@ -119,6 +122,7 @@ func TestWebHost_RefusalIsShortPlainText(t *testing.T) {
 }
 
 func TestWebHost_WrongHostWithoutCookieIs403Not401(t *testing.T) {
+	t.Parallel()
 	_, base, port := startWebHosts(t, "gx.tail1234.ts.net")
 	if code, _ := hostStatus(t, base, "evil.example:"+port, nil); code != http.StatusForbidden {
 		t.Errorf("unlisted host, no cookie = %d, want 403", code)
@@ -129,6 +133,7 @@ func TestWebHost_WrongHostWithoutCookieIs403Not401(t *testing.T) {
 }
 
 func TestWebHost_MissingHostIs403(t *testing.T) {
+	t.Parallel()
 	_, base, _ := startWebHosts(t)
 	conn, err := net.Dial("tcp", strings.TrimPrefix(base, "http://"))
 	if err != nil {
@@ -149,6 +154,7 @@ func TestWebHost_MissingHostIs403(t *testing.T) {
 }
 
 func TestWebHost_AnyHostIPLiteralPassesOnAllInterfacesBind(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "0.0.0.0:0" })
 	hs, err := h.Client.Handshake(t.Context())
 	if err != nil || hs.WebURL == "" {
@@ -169,6 +175,7 @@ func TestWebHost_AnyHostIPLiteralPassesOnAllInterfacesBind(t *testing.T) {
 
 // Seam 2 + reload: the list is swapped in place, so the same listener answers.
 func TestWebHost_ReloadAppliesAllowedHostsWithoutRestart(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) {

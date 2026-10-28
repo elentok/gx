@@ -22,6 +22,7 @@ func enqueuedAt(t *testing.T, items []server.QueueItem, addr string) time.Time {
 }
 
 func TestQueue_EnqueuedAt_AddRemoveMoveReplace(t *testing.T) {
+	t.Parallel()
 	h := startReplaceHarness(t)
 	ctx := context.Background()
 	if _, err := h.Client.QueuePause(ctx); err != nil {
@@ -80,6 +81,7 @@ func TestQueue_EnqueuedAt_AddRemoveMoveReplace(t *testing.T) {
 }
 
 func TestQueue_OldStateFileLoadsWithZeroTime(t *testing.T) {
+	t.Parallel()
 	h := startReplaceHarness(t)
 	old := `[{"address":"proj:epic-a/01","agent":"claude"}]`
 	if err := os.WriteFile(filepath.Join(h.StateDir, "queue.json"), []byte(old), 0o644); err != nil {

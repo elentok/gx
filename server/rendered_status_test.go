@@ -8,6 +8,7 @@ import (
 )
 
 func TestSnapshot_TicketsCarryRenderedStatus(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "epic", "01", "parent", servertest.TicketOpts{Status: "done"})
 	servertest.WriteTicketWith(t, store, "proj", "epic", "02", "fork-child", servertest.TicketOpts{Parent: "01"})

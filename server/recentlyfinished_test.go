@@ -35,6 +35,7 @@ func finishedNames(t *testing.T, h *servertest.Harness) []server.FinishedEpic {
 }
 
 func TestSnapshot_RecentlyFinishedIsCappedOrderedAndSkipsMaps(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	base := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	for i, name := range []string{"e1", "e2", "e3", "e4"} {
@@ -92,6 +93,7 @@ func writeOneOff(t *testing.T, store, epic, id, status string, at time.Time, sta
 }
 
 func TestSnapshot_RecentlyFinishedMixesOneOffsWithEpics(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	base := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	writeFinishedEpic(t, store, "e1", base.Add(1*time.Hour))
@@ -126,6 +128,7 @@ func TestSnapshot_RecentlyFinishedMixesOneOffsWithEpics(t *testing.T) {
 }
 
 func TestSnapshot_RecentlyFinishedZeroListsNone(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	writeFinishedEpic(t, store, "e1", time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC))
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.RecentlyFinished = 0 })
@@ -135,6 +138,7 @@ func TestSnapshot_RecentlyFinishedZeroListsNone(t *testing.T) {
 }
 
 func TestSnapshot_RecentlyFinishedDefaultsToFive(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	base := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	for i := range 7 {

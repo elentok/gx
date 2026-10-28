@@ -14,6 +14,7 @@ import (
 )
 
 func TestMergeDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	commitOnBranch(t, repo, "landed")
 	writeCompleteEpic(t, store, "landed")
@@ -55,6 +56,7 @@ func TestMergeDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *
 }
 
 func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
+	t.Parallel()
 	chat, count := chatRecorder(t)
 	f := retroFixture(t, withEvolve(config.EvolveContributor), chat)
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
@@ -81,6 +83,7 @@ func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 }
 
 func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
+	t.Parallel()
 	chat, count := chatRecorder(t)
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {

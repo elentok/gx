@@ -41,6 +41,7 @@ func recordsByID(t *testing.T, root string) map[string]conversations.Record {
 }
 
 func TestSessionConversations_LinkedSessionKeepsEveryConversation(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
 	newer := conv + "-cleared"
 	clearFakeSession(ctx, t, h, evs, id, conv, newer)
@@ -61,6 +62,7 @@ func TestSessionConversations_LinkedSessionKeepsEveryConversation(t *testing.T) 
 }
 
 func TestSessionConversations_ReLinkMovesTheRunningConversation(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
 	newer := conv + "-cleared"
 	clearFakeSession(ctx, t, h, evs, id, conv, newer)
@@ -78,6 +80,7 @@ func TestSessionConversations_ReLinkMovesTheRunningConversation(t *testing.T) {
 }
 
 func TestSessionConversations_SurviveRemoveAndSkipUnlinked(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
 	stopFakeSession(ctx, t, h, evs, id)
 	if res, err := h.Client.RemoveSession(ctx, id); err != nil || res.Refused {
@@ -118,6 +121,7 @@ func writeTranscriptTurns(t *testing.T, dir, conv string, inputs ...int) {
 }
 
 func TestSessionConversations_TotalsSavedWhenAConversationEnds(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
 	dir, _ := readMeta(t, h, id)["dir"].(string)
 	newer := conv + "-cleared"
@@ -142,6 +146,7 @@ func TestSessionConversations_TotalsSavedWhenAConversationEnds(t *testing.T) {
 }
 
 func TestSessionConversations_NoTranscriptLeavesNoTotals(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Ticket: "proj:epic/01"})
 	stopFakeSession(ctx, t, h, evs, id)
 	if r := recordsByID(t, h.ConversationsDir)[conv]; r.Totals != nil {

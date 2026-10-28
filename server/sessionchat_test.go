@@ -47,6 +47,7 @@ func writeTranscript(t *testing.T, path string, lines ...string) {
 }
 
 func TestSessionChat_ShowsVisibleMessagesInOrder(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path,
 		`{"type":"user","uuid":"u1","timestamp":"2026-01-01T10:00:00Z","message":{"content":"<command-name>/gx-design</command-name><command-args>proj:map</command-args>"}}`,
@@ -75,6 +76,7 @@ func TestSessionChat_ShowsVisibleMessagesInOrder(t *testing.T) {
 }
 
 func TestSessionChat_FoldsToolRunsAndMarksCompaction(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, _, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path,
 		`{"type":"assistant","uuid":"a1","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"Looking"}]}}`,
@@ -103,6 +105,7 @@ func TestSessionChat_FoldsToolRunsAndMarksCompaction(t *testing.T) {
 }
 
 func TestSessionChat_CapsAtTheLast300Messages(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, _, path := startChatSession(t, string(agentfake.HarnessKind))
 	var lines []string
 	for i := 0; i < 310; i++ {
@@ -126,6 +129,7 @@ func TestSessionChat_CapsAtTheLast300Messages(t *testing.T) {
 }
 
 func TestSessionChat_OnlyTheNewestConversation(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, _, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path, `{"type":"assistant","uuid":"old","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"before clear"}]}}`)
 	if err := agentfake.SendProgramControl(readMeta(t, h, id)["conversation_id"].(string), agentfake.Control{Action: agentfake.ActionConversation, ConversationID: "conv-2"}); err != nil {
@@ -144,6 +148,7 @@ func TestSessionChat_OnlyTheNewestConversation(t *testing.T) {
 }
 
 func TestSessionChat_NonChatHarnessIsUnsupported(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, _, _ := startChatSession(t, string(agentfake.NoResumeHarnessKind))
 	got, err := h.Client.SessionChat(ctx, id)
 	if err != nil {

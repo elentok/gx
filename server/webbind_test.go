@@ -7,6 +7,7 @@ import (
 )
 
 func TestBindWeb_WarnsOnlyWhenBoundToAllInterfaces(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		addr string
 		warn bool

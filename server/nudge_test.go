@@ -30,6 +30,7 @@ func claimTicket(t *testing.T, store, epic, id, file string) {
 }
 
 func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	claimTicket(t, store, "epic-a", "01", "01-first.md")
@@ -86,6 +87,7 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 }
 
 func TestNudge_NotReadyRefuses(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	claimTicket(t, store, "epic-a", "01", "01-first.md")
@@ -112,6 +114,7 @@ func TestNudge_NotReadyRefuses(t *testing.T) {
 }
 
 func TestNudge_Refusals(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())

@@ -13,6 +13,7 @@ import (
 )
 
 func TestFinish_ZeroCommitPauseRecordsRun(t *testing.T) {
+	t.Parallel()
 	t.Run("herdr", func(t *testing.T) {
 		store, repo := t.TempDir(), testutil.TempRepo(t)
 		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")

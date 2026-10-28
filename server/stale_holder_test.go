@@ -51,6 +51,7 @@ func ofType(logged []ralphloop.Event, typ events.Type) []ralphloop.Event {
 }
 
 func TestLaunch_StaleHolderIsClosedAndTheLaunchRetried(t *testing.T) {
+	t.Parallel()
 	for _, state := range []agentrunner.State{agentrunner.StateIdle, agentrunner.StateDone} {
 		t.Run(string(state), func(t *testing.T) {
 			spy, holder := spyWithHolder(t, state)
@@ -98,6 +99,7 @@ func assertPausedNameTaken(t *testing.T, h *servertest.Harness, want ...string) 
 }
 
 func TestLaunch_WorkingHolderPausesNameTakenAndKeepsThePane(t *testing.T) {
+	t.Parallel()
 	spy, holder := spyWithHolder(t, agentrunner.StateWorking)
 	h := launchOne(t, spy, server.EventIterationLaunchFailed)
 	assertPausedNameTaken(t, h, holder.ID, "working")
@@ -110,6 +112,7 @@ func TestLaunch_WorkingHolderPausesNameTakenAndKeepsThePane(t *testing.T) {
 }
 
 func TestLaunch_SecondNameTakenAfterClosingPauses(t *testing.T) {
+	t.Parallel()
 	spy, _ := spyWithHolder(t, agentrunner.StateIdle)
 	spy.SetStartErr(holderLabel, fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, holderLabel))
 	h := launchOne(t, spy, server.EventIterationLaunchFailed)

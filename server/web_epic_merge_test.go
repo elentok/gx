@@ -12,6 +12,7 @@ import (
 )
 
 func TestWeb_EpicMergeChecksTheShownState(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	// A done commitless epic is awaiting merge and has no branch to merge.
 	servertest.WriteTicketWith(t, store, "proj", "research", "01", "t", servertest.TicketOpts{Status: "done", Type: "research"})

@@ -56,6 +56,7 @@ func sessionSnapshot(t *testing.T, f *grillingFixture) server.SessionInfo {
 }
 
 func TestAutoAdvance_RunEndSendsContinueAfterTheCountdown(t *testing.T) {
+	t.Parallel()
 	for name, text := range map[string]string{
 		"run-end line":       runEndText,
 		"error then run-end": "Error: the command failed\n" + runEndText,
@@ -80,6 +81,7 @@ func TestAutoAdvance_RunEndSendsContinueAfterTheCountdown(t *testing.T) {
 }
 
 func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		step, text string
 	}{
@@ -106,6 +108,7 @@ func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
 }
 
 func TestAutoAdvance_SwitchOffStartsNoCountdown(t *testing.T) {
+	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
 	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
 	if res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, false); err != nil || res.Refused {
@@ -149,6 +152,7 @@ func wantStopped(t *testing.T, f *grillingFixture, c *nativerunner.HolderClient)
 }
 
 func TestAutoAdvance_CancelStopsTheSend(t *testing.T) {
+	t.Parallel()
 	f, c := startCountdown(t)
 	if res, err := f.h.Client.CancelAutoAdvance(f.ctx, f.id); err != nil || res.Refused {
 		t.Fatalf("cancel = %+v, %v", res, err)
@@ -157,12 +161,14 @@ func TestAutoAdvance_CancelStopsTheSend(t *testing.T) {
 }
 
 func TestAutoAdvance_PaneInputStopsTheSendAndKeepsContinue(t *testing.T) {
+	t.Parallel()
 	f, c := startCountdown(t)
 	clearByInput(t, f.h, f.id)
 	wantStopped(t, f, c)
 }
 
 func TestAutoAdvance_PageNoteStopsTheSendAndKeepsContinue(t *testing.T) {
+	t.Parallel()
 	f, c := startCountdown(t)
 	if res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Text: "a note"}); err != nil || res.Refused {
 		t.Fatalf("prompt = %+v, %v", res, err)
@@ -171,6 +177,7 @@ func TestAutoAdvance_PageNoteStopsTheSendAndKeepsContinue(t *testing.T) {
 }
 
 func TestAutoAdvance_ManualContinueStopsTheCountdown(t *testing.T) {
+	t.Parallel()
 	f, _ := startCountdown(t)
 	if res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Continue: true}); err != nil || res.Refused {
 		t.Fatalf("continue = %+v, %v", res, err)
@@ -181,6 +188,7 @@ func TestAutoAdvance_ManualContinueStopsTheCountdown(t *testing.T) {
 }
 
 func TestAutoAdvance_RunActionStopsTheCountdown(t *testing.T) {
+	t.Parallel()
 	f, _ := startCountdown(t)
 	if res, err := f.h.Client.RunSessionAction(f.ctx, f.id); err != nil || res.Refused {
 		t.Fatalf("run action = %+v, %v", res, err)
@@ -191,6 +199,7 @@ func TestAutoAdvance_RunActionStopsTheCountdown(t *testing.T) {
 }
 
 func TestAutoAdvance_SwitchOffDuringTheCountdownStopsTheSend(t *testing.T) {
+	t.Parallel()
 	f, c := startCountdown(t)
 	if res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, false); err != nil || res.Refused {
 		t.Fatalf("switch off = %+v, %v", res, err)
@@ -199,6 +208,7 @@ func TestAutoAdvance_SwitchOffDuringTheCountdownStopsTheSend(t *testing.T) {
 }
 
 func TestAutoAdvance_RunEndingWithTheSwitchOffPlaysOneBanner(t *testing.T) {
+	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
 	if res, err := f.h.Client.SetAutoAdvance(f.ctx, f.id, false); err != nil || res.Refused {
 		t.Fatalf("switch off = %+v, %v", res, err)
@@ -217,6 +227,7 @@ func TestAutoAdvance_RunEndingWithTheSwitchOffPlaysOneBanner(t *testing.T) {
 }
 
 func TestAutoAdvance_TurnSeenOnlyMidFlightStartsNoCountdown(t *testing.T) {
+	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
 	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
 	writeAssistantMessage(t, f.path, runEndText)
@@ -242,6 +253,7 @@ func TestAutoAdvance_TurnSeenOnlyMidFlightStartsNoCountdown(t *testing.T) {
 }
 
 func TestAutoAdvance_RestartDropsTheCountdownAndNeverStartsOne(t *testing.T) {
+	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
 	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
 	writeAssistantMessage(t, f.path, runEndText)

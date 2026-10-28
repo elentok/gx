@@ -11,6 +11,7 @@ import (
 )
 
 func TestTranscriptPaths_FoundPathIsGlobbedOnce(t *testing.T) {
+	t.Parallel()
 	var c transcriptPaths
 	finds := 0
 	find := func() (string, bool) { finds++; return "/p/c.jsonl", true }
@@ -26,6 +27,7 @@ func TestTranscriptPaths_FoundPathIsGlobbedOnce(t *testing.T) {
 }
 
 func TestTranscriptPaths_ForgetMissGlobsAgain(t *testing.T) {
+	t.Parallel()
 	var c transcriptPaths
 	finds := 0
 	found := false
@@ -40,6 +42,7 @@ func TestTranscriptPaths_ForgetMissGlobsAgain(t *testing.T) {
 }
 
 func TestTranscriptPaths_MissIsRememberedForTheTTL(t *testing.T) {
+	t.Parallel()
 	var c transcriptPaths
 	finds := 0
 	found := false
@@ -56,6 +59,7 @@ func TestTranscriptPaths_MissIsRememberedForTheTTL(t *testing.T) {
 }
 
 func TestTranscriptPaths_RepeatedMissesBackOff(t *testing.T) {
+	t.Parallel()
 	var c transcriptPaths
 	finds := 0
 	find := func() (string, bool) { finds++; return "", false }
@@ -88,6 +92,7 @@ func TestTranscriptPaths_RepeatedMissesBackOff(t *testing.T) {
 }
 
 func TestTranscriptPaths_StatusChangeEndsABackedOffMiss(t *testing.T) {
+	t.Parallel()
 	var c transcriptPaths
 	finds := 0
 	find := func() (string, bool) { finds++; return "", false }
@@ -106,6 +111,7 @@ func TestTranscriptPaths_StatusChangeEndsABackedOffMiss(t *testing.T) {
 // A copy of the transcript under another project dir makes a glob ambiguous
 // and so a miss: finding the expected one proves the glob was never run.
 func TestClaudeTranscript_StatsTheExpectedSlugDirBeforeGlobbing(t *testing.T) {
+	t.Parallel()
 	config := t.TempDir()
 	cwd := "/work/proj"
 	want := filepath.Join(config, "projects", transcript.Slugify(cwd), "conv.jsonl")
@@ -126,6 +132,7 @@ func TestClaudeTranscript_StatsTheExpectedSlugDirBeforeGlobbing(t *testing.T) {
 }
 
 func TestClaudeTranscript_ReadsTheConfigDirFromTheServerEnv(t *testing.T) {
+	t.Parallel()
 	config := t.TempDir()
 	cwd := "/work/proj"
 	want := filepath.Join(config, "projects", transcript.Slugify(cwd), "conv.jsonl")
@@ -143,6 +150,7 @@ func TestClaudeTranscript_ReadsTheConfigDirFromTheServerEnv(t *testing.T) {
 }
 
 func TestAuthFailures_RechecksOnlyWhenTheFileChanged(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "c.jsonl")
 	if err := os.WriteFile(path, []byte("a\n"), 0o644); err != nil {
 		t.Fatal(err)

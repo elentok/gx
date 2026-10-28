@@ -43,6 +43,7 @@ func epicStateValues(t *testing.T) []EpicState {
 }
 
 func TestEpicListState_EveryEpicStateHasItsOwn(t *testing.T) {
+	t.Parallel()
 	states := epicStateValues(t)
 	if len(states) == 0 {
 		t.Fatal("found no EpicState constants")

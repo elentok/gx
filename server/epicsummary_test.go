@@ -27,6 +27,7 @@ func repairPausedTicket(n string) tickets.Ticket { return pausedTicket(n, schema
 func answerPausedTicket(n string) tickets.Ticket { return pausedTicket(n, schema.PauseZeroCommit) }
 
 func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
+	t.Parallel()
 	root := rootRef{Project: "proj", Epic: "epic"}
 	claimTime := time.Unix(100, 0)
 	claimed := func(addr string) (time.Time, bool) {
@@ -170,6 +171,7 @@ func TestSummarizeEpic_StateOrderAndDetails(t *testing.T) {
 }
 
 func TestSummarizeEpic_MergeBlockActionsFollowTheVerbTable(t *testing.T) {
+	t.Parallel()
 	root := rootRef{Project: "proj", Epic: "epic"}
 	want := map[string][]string{
 		"dirty-trunk":   {"stash-merge", "merge"},
@@ -187,6 +189,7 @@ func TestSummarizeEpic_MergeBlockActionsFollowTheVerbTable(t *testing.T) {
 }
 
 func TestSummarizeEpic_PausedDetails(t *testing.T) {
+	t.Parallel()
 	root := rootRef{Project: "proj", Epic: "epic"}
 	repair := repairPausedTicket("03")
 	repair.Body = "## Needs Repair\n\n**the `really` long reason**\n\nmore\n"
@@ -216,6 +219,7 @@ func TestSummarizeEpic_PausedDetails(t *testing.T) {
 func noLog(tickets.Ticket) []tickets.LogEvent { return nil }
 
 func TestSummarizeEpic_PausedEntriesCarrySummaryAnswerableAnswered(t *testing.T) {
+	t.Parallel()
 	root := rootRef{Project: "proj", Epic: "epic"}
 	asked := answerPausedTicket("01")
 	asked.Body = "## Needs Answer\n\nfallback line\n"
@@ -249,6 +253,7 @@ func TestSummarizeEpic_PausedEntriesCarrySummaryAnswerableAnswered(t *testing.T)
 }
 
 func TestSummarizeEpic_OneOffsRootNeverAwaitsMergeAndCountsNothing(t *testing.T) {
+	t.Parallel()
 	none := func(string) (time.Time, bool) { return time.Time{}, false }
 	noRecovery := func(string) string { return "" }
 	root := rootRef{Project: "proj", Epic: OneOffsEpic}
@@ -275,6 +280,7 @@ func mergeSummaryTicket(n, status string) tickets.Ticket {
 }
 
 func TestSummarizeEpic_MergingState(t *testing.T) {
+	t.Parallel()
 	noRecovery := func(string) string { return "" }
 	claimedAll := func(string) (time.Time, bool) { return time.Unix(100, 0), true }
 	pausedBody := "# t\n\n## Paused\n\n**why**\n"
@@ -320,6 +326,7 @@ func TestSummarizeEpic_MergingState(t *testing.T) {
 
 // The Deadlocked state is deadlockKind's blocked cycle, nothing more.
 func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
+	t.Parallel()
 	root := rootRef{Project: "proj", Epic: "epic"}
 	none := func(string) (time.Time, bool) { return time.Time{}, false }
 	noRecovery := func(string) string { return "" }
@@ -344,6 +351,7 @@ func TestSummarizeEpic_DeadlockedAgreesWithDeadlockKind(t *testing.T) {
 }
 
 func TestDeadlockReason_PausedAndCycle(t *testing.T) {
+	t.Parallel()
 	root := rootRef{Project: "proj", Epic: "epic"}
 	paused := tickets.Epic{Name: "epic", Tickets: []tickets.Ticket{answerPausedTicket("01"), summaryTicket("02", "draft")}}
 	if got, want := deadlockReason(root, paused, events.AllPaused), "every remaining ticket is paused: proj:epic/01, proj:epic/02"; got != want {

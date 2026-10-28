@@ -13,6 +13,7 @@ import (
 )
 
 func TestScratchProject_AutoCreatedAndUnremovable(t *testing.T) {
+	t.Parallel()
 	h := servertest.Start(t)
 	ctx := context.Background()
 

@@ -62,6 +62,7 @@ func (f *schedFixture) webStashMerge(t *testing.T, state string) (int, string) {
 }
 
 func TestStashMerge_WebRefusesAStaleTokenAndTouchesNothing(t *testing.T) {
+	t.Parallel()
 	f := stashMergeFixture(t)
 	main := f.git(t, "rev-parse", "main")
 
@@ -84,6 +85,7 @@ func TestStashMerge_WebRefusesAStaleTokenAndTouchesNothing(t *testing.T) {
 // The Epics card sends the list state, which names a merge-blocked epic "merge-blocked"
 // where the Epic page's EpicState says paused.
 func TestStashMerge_AcceptsTheCardsMergeBlockedState(t *testing.T) {
+	t.Parallel()
 	f := stashMergeFixture(t)
 
 	code, body := f.webStashMerge(t, string(server.EpicListMergeBlocked))
@@ -94,6 +96,7 @@ func TestStashMerge_AcceptsTheCardsMergeBlockedState(t *testing.T) {
 }
 
 func TestStashMerge_LeavesMarkersUncommittedAndBacksUpAFileThatClashesAtClickTime(t *testing.T) {
+	t.Parallel()
 	f := stashMergeFixture(t)
 	// Dirty only now: the pause did not list it.
 	testutil.WriteFile(t, f.repo, "late.txt", "local late")
@@ -143,6 +146,7 @@ func TestStashMerge_LeavesMarkersUncommittedAndBacksUpAFileThatClashesAtClickTim
 }
 
 func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged(t *testing.T) {
+	t.Parallel()
 	f := stashMergeFixture(t)
 
 	res, err := f.h.Client.EpicStashMerge(context.Background(), "proj:"+schedEpic)
@@ -188,6 +192,7 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 }
 
 func TestStashMerge_RefusesAnEpicThatIsNotPausedOnADirtyTrunk(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, _ string) {
 		commitFiles(t, p, "a.txt")
 	})

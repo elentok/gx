@@ -38,6 +38,7 @@ func startReplaceHarness(t *testing.T) *servertest.Harness {
 }
 
 func TestQueueReplace_SwapsOnlyOneProjectsEntries(t *testing.T) {
+	t.Parallel()
 	h := startReplaceHarness(t)
 	ctx := context.Background()
 	if _, err := h.Client.QueuePause(ctx); err != nil {
@@ -65,6 +66,7 @@ func TestQueueReplace_SwapsOnlyOneProjectsEntries(t *testing.T) {
 }
 
 func TestQueueRemove_CascadesToDescendants(t *testing.T) {
+	t.Parallel()
 	h := startReplaceHarness(t)
 	ctx := context.Background()
 	if _, err := h.Client.QueuePause(ctx); err != nil {
@@ -85,6 +87,7 @@ func TestQueueRemove_CascadesToDescendants(t *testing.T) {
 }
 
 func TestQueue_ReplaceAndRemoveRefuseWhileAnIterationIsLive(t *testing.T) {
+	t.Parallel()
 	h := startReplaceHarness(t)
 	ctx := context.Background()
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {

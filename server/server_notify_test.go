@@ -48,13 +48,13 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 	fake.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
 	})
-	herdrfake.StartState(t, fake)
+	_, herdrEnv := herdrfake.StartStateEnv(t, fake)
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
-	s, err := New(Config{StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: soft, BudgetHardLimit: hard,
+	s, err := New(Config{Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: soft, BudgetHardLimit: hard,
 		Chat: ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush}},
 		// Not the real ~/.claude.json, which could add an extra-usage notice.
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
@@ -84,6 +84,7 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 }
 
 func TestServerNotices_RestartSendsOneServerLevelMessage(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServerFlushing(t, 0, 0, 100*time.Millisecond)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -98,6 +99,7 @@ func TestServerNotices_RestartSendsOneServerLevelMessage(t *testing.T) {
 }
 
 func TestServerNotices_BudgetLimitLatchesOncePerDay(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 10, 20)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
 	s.seedBudgetNotes(now)
@@ -120,6 +122,7 @@ func TestServerNotices_BudgetLimitLatchesOncePerDay(t *testing.T) {
 }
 
 func TestServerNotices_BudgetAlreadyOverAtStartIsNotAnnounced(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 10, 0)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
 	s.ledger.record("", "a", 11, now)
@@ -133,6 +136,7 @@ func TestServerNotices_BudgetAlreadyOverAtStartIsNotAnnounced(t *testing.T) {
 }
 
 func TestServerNotices_BudgetLimitsCountSpendBeyondOverride(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 20, 50)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
 	s.seedBudgetNotes(now)
@@ -165,6 +169,7 @@ func TestServerNotices_BudgetLimitsCountSpendBeyondOverride(t *testing.T) {
 }
 
 func TestServerNotices_RestartAfterOverrideSeedsFromSpendBeyondIt(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 20, 0)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
 	s.ledger.record("", "a", 30, now)
@@ -185,6 +190,7 @@ func TestServerNotices_RestartAfterOverrideSeedsFromSpendBeyondIt(t *testing.T) 
 }
 
 func TestServerNotices_IncreaseRearmsAgainstSpendBeyondOverride(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 20, 0)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
 	s.seedBudgetNotes(now)
@@ -209,6 +215,7 @@ func TestServerNotices_IncreaseRearmsAgainstSpendBeyondOverride(t *testing.T) {
 }
 
 func TestServerNotices_DayRolloverSendsTheSummary(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	now := time.Date(2026, 10, 6, 23, 59, 0, 0, time.Local)
 	s.seedBudgetNotes(now)
@@ -224,6 +231,7 @@ func TestServerNotices_DayRolloverSendsTheSummary(t *testing.T) {
 }
 
 func TestNotifyPause_ShowsRealStatusKindAndReason(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	addr := tickets.Address{Project: "p", Epic: "epic", ID: "01"}
 
@@ -243,6 +251,7 @@ func TestNotifyPause_ShowsRealStatusKindAndReason(t *testing.T) {
 }
 
 func TestNotifyPause_SelfReportedShowsQuestionSummary(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	path := filepath.Join(t.TempDir(), "01-x.md")
 	if err := os.WriteFile(path, []byte("---\nid: \"01\"\n---\n"), 0o644); err != nil {
@@ -268,6 +277,7 @@ func TestNotifyPause_SelfReportedShowsQuestionSummary(t *testing.T) {
 }
 
 func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	s.herdr.unavailable = true
 	pause := func(project, id string, kind events.Kind) {
@@ -295,6 +305,7 @@ func TestPauseFold_HerdrOutagePausesBecomeOneDigest(t *testing.T) {
 }
 
 func TestNotifyResult_OnlyWhenTheSubmitAskedForIt(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	dir := filepath.Join(s.cfg.TicketStore, "scratch", "e", "issues")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -331,6 +342,7 @@ func TestNotifyResult_OnlyWhenTheSubmitAskedForIt(t *testing.T) {
 }
 
 func TestNotifyDone_EpicTicketSendsOneOffStaysSilent(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	proj := filepath.Join(s.cfg.TicketStore, "p")
 	if err := os.MkdirAll(proj, 0o755); err != nil {
@@ -406,6 +418,7 @@ func crossEpicFixture(t *testing.T, s *Server, ref string) {
 }
 
 func TestCompleteRootIfDone_ResolvedCrossEpicBlockersCompleteTheEpic(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/01")
 
@@ -418,6 +431,7 @@ func TestCompleteRootIfDone_ResolvedCrossEpicBlockersCompleteTheEpic(t *testing.
 }
 
 func TestNotifyDone_CrossEpicBlockersDoNotUndercountDoneTickets(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/01")
 
@@ -431,6 +445,7 @@ func TestNotifyDone_CrossEpicBlockersDoNotUndercountDoneTickets(t *testing.T) {
 
 // A ref that names no ticket stays an error, which is never terminal.
 func TestCompleteRootIfDone_UnresolvedCrossEpicBlockerKeepsTheEpicOpen(t *testing.T) {
+	t.Parallel()
 	s, wait := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/99")
 
@@ -444,6 +459,7 @@ func TestCompleteRootIfDone_UnresolvedCrossEpicBlockerKeepsTheEpicOpen(t *testin
 // The read path (index scan, then projectEpics) resolves a cross-epic blocker:
 // a done ticket stays done instead of failing closed to error.
 func TestProjectEpics_CrossEpicBlockerReadsAsDone(t *testing.T) {
+	t.Parallel()
 	s, _ := chatServer(t, 0, 0)
 	crossEpicFixture(t, s, "other/01")
 	if err := s.idx.refresh(s.cfg.TicketStore); err != nil {

@@ -9,6 +9,7 @@ import (
 )
 
 func TestSessionAutoAdvance_FlipsTheSwitchOnADesignSession(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	snapshotSwitch := func() bool {
 		snap, err := f.h.Client.Snapshot(f.ctx)
@@ -41,6 +42,7 @@ func TestSessionAutoAdvance_FlipsTheSwitchOnADesignSession(t *testing.T) {
 }
 
 func TestSessionAutoAdvance_RefusesAPlainAndAnUnknownSession(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	plain, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || plain.Session == nil {
@@ -58,6 +60,7 @@ func TestSessionAutoAdvance_RefusesAPlainAndAnUnknownSession(t *testing.T) {
 }
 
 func TestWebSessions_AutoAdvanceNeedsAFreshTokenOnADesignSession(t *testing.T) {
+	t.Parallel()
 	h, base, cookie, ctx, _, design, plain := startWebDesign(t)
 	waitForHolder(t, h.SessionsDir+"/"+design)
 	for _, tc := range []struct{ name, id, state, want string }{

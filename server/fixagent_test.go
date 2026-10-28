@@ -37,6 +37,7 @@ func (f designsFixture) fix(t *testing.T, address string) server.FixAgentResult 
 }
 
 func TestFixAgent_StartsInTheTrunkCheckout(t *testing.T) {
+	t.Parallel()
 	f := startFixAgent(t, nil)
 	res := f.fix(t, "proj:loop/01")
 	if res.Refused || res.Session == nil {
@@ -62,6 +63,7 @@ func TestFixAgent_StartsInTheTrunkCheckout(t *testing.T) {
 }
 
 func TestFixAgent_Refusals(t *testing.T) {
+	t.Parallel()
 	f := startFixAgent(t, func(store string) {
 		servertest.WriteTicketWith(t, store, "proj", "loop", "03", "paused", servertest.TicketOpts{PauseReason: "manual"})
 		servertest.WriteTicketWith(t, store, "proj", "loop", "04", "probe", servertest.TicketOpts{Type: "investigate", Parent: "03"})
@@ -82,6 +84,7 @@ func TestFixAgent_Refusals(t *testing.T) {
 }
 
 func TestFixAgent_NoTrunkCheckout(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "loop", "01", "broken", servertest.TicketOpts{PauseReason: "merge-conflict"})
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", t.TempDir()) // not a git repo, so no trunk
@@ -96,6 +99,7 @@ func TestFixAgent_NoTrunkCheckout(t *testing.T) {
 }
 
 func TestFixAgent_DuplicateStartIsRefused(t *testing.T) {
+	t.Parallel()
 	f := startFixAgent(t, nil)
 	if res := f.fix(t, "proj:loop/01"); res.Refused {
 		t.Fatalf("first fix = %+v", res)
@@ -107,6 +111,7 @@ func TestFixAgent_DuplicateStartIsRefused(t *testing.T) {
 }
 
 func TestFixAgent_ConcurrentStartsCreateOneSession(t *testing.T) {
+	t.Parallel()
 	f := startFixAgent(t, nil)
 	var wg sync.WaitGroup
 	results := make([]server.FixAgentResult, 4)
@@ -130,6 +135,7 @@ func TestFixAgent_ConcurrentStartsCreateOneSession(t *testing.T) {
 }
 
 func TestFixAgent_WebNeedsTheStateToken(t *testing.T) {
+	t.Parallel()
 	f := startFixAgent(t, nil)
 	post := func(state string) (int, string) {
 		body, _ := json.Marshal(server.FixAgentRequest{Address: "proj:loop/01", State: state})

@@ -19,18 +19,21 @@ func startDraftSession(t *testing.T, req server.CreateSessionRequest, draft stri
 }
 
 func TestDraft_FirstPromptClearsTheDraftAndTypes(t *testing.T) {
+	t.Parallel()
 	_, _, _, _, conv := startDraftSession(t, server.CreateSessionRequest{Prompt: "fix the bug"}, "my draft")
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSubmitted(t, conv, "\"fix the bug\"\n")
 }
 
 func TestDraft_MultiLineDraftIsCleared(t *testing.T) {
+	t.Parallel()
 	_, _, _, _, conv := startDraftSession(t, server.CreateSessionRequest{Prompt: "fix the bug"}, "one\ntwo\nthree\nfour\nfive")
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSubmitted(t, conv, "\"fix the bug\"\n")
 }
 
 func TestDraft_ActionClearsTheDraftAndTypes(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startDraftSession(t, server.CreateSessionRequest{}, "my draft")
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step")
 
@@ -41,6 +44,7 @@ func TestDraft_ActionClearsTheDraftAndTypes(t *testing.T) {
 }
 
 func TestDraft_ActionDraftBeforeLaterStepIsCleared(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, withAlerts(true, true), servertest.WithEnv(agentfake.ProgramInputEnv+"=1"))
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
 

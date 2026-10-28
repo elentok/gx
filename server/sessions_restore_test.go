@@ -50,6 +50,7 @@ func waitForSnapshot(ctx context.Context, t *testing.T, h *servertest.Harness, i
 }
 
 func TestRestart_ReattachesLiveHolderAndRaisesMissedDone(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	report(t, conv, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
@@ -71,6 +72,7 @@ func TestRestart_ReattachesLiveHolderAndRaisesMissedDone(t *testing.T) {
 }
 
 func TestRestart_AutoResumesDeadWorkingHolderOnce(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, resumeOnStart)
 	report(t, conv, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
@@ -93,6 +95,7 @@ func TestRestart_AutoResumesDeadWorkingHolderOnce(t *testing.T) {
 }
 
 func TestRestart_ResumedChildExitingAtOnceStaysCrashed(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, resumeOnStart)
 	killWhileDown(t, h, id)
 
@@ -111,6 +114,7 @@ func TestRestart_ResumedChildExitingAtOnceStaysCrashed(t *testing.T) {
 }
 
 func TestRestart_DeadHolderWithoutAutoResumeIsCrashed(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		harness string
 		opts    []func(*server.Config)
@@ -135,6 +139,7 @@ func TestRestart_DeadHolderWithoutAutoResumeIsCrashed(t *testing.T) {
 }
 
 func TestRestart_StoppedAndExitedSessionsStay(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, stopped, _ := startFakeSessionWith(t, server.CreateSessionRequest{}, resumeOnStart)
 	stopFakeSession(ctx, t, h, evs, stopped)
 	exited := createFakeSession(ctx, t, h)

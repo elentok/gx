@@ -24,6 +24,7 @@ import (
 // A failed launch pauses the ticket stuck with one chat message, and the
 // next ticks do not claim it again.
 func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -83,6 +84,7 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 // A server that restarts mid-iteration reattaches to the live agent instead of
 // prompting a fresh one, and the iteration merges exactly once.
 func TestLaunchPort_RestartReattachesAndMergesOnce(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)

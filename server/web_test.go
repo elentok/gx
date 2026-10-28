@@ -94,6 +94,7 @@ func webSend(t *testing.T, h *servertest.Harness, method, url string, headers ma
 }
 
 func TestWeb_WriteRequestOriginAndJSONCheck(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	host := strings.TrimPrefix(base, "http://")
 	hostname, port, _ := net.SplitHostPort(host)
@@ -129,6 +130,7 @@ func TestWeb_WriteRequestOriginAndJSONCheck(t *testing.T) {
 }
 
 func TestWeb_GetNeedsNoOrigin(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/snapshot"); code != http.StatusOK {
 		t.Errorf("GET without Origin = %d, want 200", code)
@@ -138,6 +140,7 @@ func TestWeb_GetNeedsNoOrigin(t *testing.T) {
 // The token check runs before the Origin check, so an unauthenticated write is
 // 401 even with a bad Origin.
 func TestWeb_WriteTokenCheckComesFirst(t *testing.T) {
+	t.Parallel()
 	_, base := startWeb(t)
 	if code, _ := webDoCookie(t, http.MethodPost, base+"/nope", nil); code != http.StatusUnauthorized {
 		t.Errorf("unauthenticated POST = %d, want 401", code)
@@ -145,6 +148,7 @@ func TestWeb_WriteTokenCheckComesFirst(t *testing.T) {
 }
 
 func TestWeb_OffByDefault(t *testing.T) {
+	t.Parallel()
 	hs, err := servertest.Start(t).Client.Handshake(context.Background())
 	if err != nil || hs.WebURL != "" || hs.WebError != "" {
 		t.Errorf("handshake web fields = %q %q (err %v), want empty", hs.WebURL, hs.WebError, err)
@@ -154,6 +158,7 @@ func TestWeb_OffByDefault(t *testing.T) {
 // The embed is the placeholder or a built dist, depending on whether make
 // web-build ran, so the test only checks that an HTML page is served.
 func TestWeb_ServesIndexAtRootAndFallback(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	for _, path := range []string{"/", "/index.html", "/some/client/route"} {
 		code, body := webDo(t, h, http.MethodGet, base+path)
@@ -164,6 +169,7 @@ func TestWeb_ServesIndexAtRootAndFallback(t *testing.T) {
 }
 
 func TestWeb_SnapshotIsServed(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/snapshot"); code != http.StatusOK {
 		t.Errorf("GET /v1/snapshot = %d", code)
@@ -171,6 +177,7 @@ func TestWeb_SnapshotIsServed(t *testing.T) {
 }
 
 func TestWeb_SessionReadsAreServed(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/sessions"); code != http.StatusOK {
 		t.Errorf("GET /v1/sessions = %d", code)
@@ -185,6 +192,7 @@ func TestWeb_SessionReadsAreServed(t *testing.T) {
 }
 
 func TestWeb_EverythingElseIs404(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	validWrite := map[string]string{"Origin": base, "Content-Type": "application/json"}
 	for _, pattern := range server.RoutePatterns() {
@@ -214,6 +222,7 @@ func TestWeb_EverythingElseIs404(t *testing.T) {
 // Vite appends ?t=<timestamp> to modules it reloaded; that is not a login
 // attempt, so a signed-in browser still gets the module.
 func TestWeb_ViteTimestampParamIsNotATokenAttempt(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
 	if code, _ := webDoCookie(t, http.MethodGet, base+"/src/main.tsx?t=1792556497813", cookie); code == http.StatusUnauthorized {
@@ -232,6 +241,7 @@ func TestWeb_ViteTimestampParamIsNotATokenAttempt(t *testing.T) {
 }
 
 func TestWeb_ValidTokenSetsCookieAndRedirects(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	token, err := server.ReadWebToken(h.StateDir)
 	if err != nil {
@@ -259,6 +269,7 @@ func TestWeb_ValidTokenSetsCookieAndRedirects(t *testing.T) {
 }
 
 func TestWeb_BadOrMissingTokenIs401(t *testing.T) {
+	t.Parallel()
 	_, base := startWeb(t)
 	for _, path := range []string{"/", "/?gx_token=nope", "/v1/snapshot", "/v1/events", "/v1/snapshot?gx_token=nope"} {
 		code, body := webDoCookie(t, http.MethodGet, base+path, nil)
@@ -273,6 +284,7 @@ func TestWeb_BadOrMissingTokenIs401(t *testing.T) {
 }
 
 func TestWeb_CookieAuthenticatesEventStream(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	req, err := http.NewRequest(http.MethodGet, base+"/v1/events", nil)
 	if err != nil {
@@ -290,6 +302,7 @@ func TestWeb_CookieAuthenticatesEventStream(t *testing.T) {
 }
 
 func TestWeb_TokenChangeInvalidatesOldCookies(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	old := login(t, h.StateDir, base)
 	if err := os.WriteFile(server.WebTokenPath(h.StateDir), []byte("a-new-token\n"), 0o600); err != nil {
@@ -309,6 +322,7 @@ func TestWeb_TokenChangeInvalidatesOldCookies(t *testing.T) {
 }
 
 func TestWeb_RotateInvalidatesCookiesOfRunningServer(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	old := login(t, h.StateDir, base)
 	before, _ := server.ReadWebToken(h.StateDir)
@@ -335,6 +349,7 @@ func TestWeb_RotateInvalidatesCookiesOfRunningServer(t *testing.T) {
 }
 
 func TestWeb_TokenFileIs0600AndSurvivesRestart(t *testing.T) {
+	t.Parallel()
 	h, _ := startWeb(t)
 	info, err := os.Stat(server.WebTokenPath(h.StateDir))
 	if err != nil {
@@ -351,6 +366,7 @@ func TestWeb_TokenFileIs0600AndSurvivesRestart(t *testing.T) {
 }
 
 func TestWeb_BindFailureIsReportedAndServerKeepsRunning(t *testing.T) {
+	t.Parallel()
 	taken, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)

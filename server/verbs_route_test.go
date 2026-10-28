@@ -45,6 +45,7 @@ func liveUnder(t *testing.T, own renamedFake, opts ...func(*server.Config)) (*se
 }
 
 func TestAgentVerbs_ReachARunOnAnotherRunner(t *testing.T) {
+	t.Parallel()
 	h, own, _ := liveUnderOther(t)
 	ctx := context.Background()
 
@@ -65,6 +66,7 @@ func TestAgentVerbs_ReachARunOnAnotherRunner(t *testing.T) {
 }
 
 func TestBudget_KillStopsTheSessionThroughTheRunsRunner(t *testing.T) {
+	t.Parallel()
 	h, own, ticketPath := liveUnderOther(t, func(c *server.Config) {
 		c.BudgetHardLimit = 5
 		c.BudgetKillGrace = time.Millisecond

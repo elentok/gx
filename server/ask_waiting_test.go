@@ -27,6 +27,7 @@ func (codexNamed) Name() string { return "headless" }
 // An ask from a herdr-hosted Claude or a Codex run cannot be answered live:
 // the ticket pauses, the session closes and the run leaves the registry.
 func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, agent string
 		wrap        func(*turnRunner) agentrunner.Runner
@@ -64,6 +65,7 @@ func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 // A native Claude agent that asks and goes idle stays alive: the ticket pauses
 // self-reported, but the worktree, session and run remain, flagged waiting.
 func TestAsk_NativeAgentStaysAliveWaiting(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)

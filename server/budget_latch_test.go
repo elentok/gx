@@ -18,6 +18,7 @@ func startLatchServer(t *testing.T) *servertest.Harness {
 }
 
 func TestBudgetLatch_SurvivesRestartAndOverrideLiftsIt(t *testing.T) {
+	t.Parallel()
 	h := startLatchServer(t)
 	h.Server.RecordSpend("spent", 6)
 	h.Server.PollBudget()
@@ -50,6 +51,7 @@ func TestBudgetLatch_SurvivesRestartAndOverrideLiftsIt(t *testing.T) {
 }
 
 func TestBudgetLatch_ResetsAtMidnight(t *testing.T) {
+	t.Parallel()
 	h := startLatchServer(t)
 	h.Server.RecordSpend("spent", 6)
 	now := time.Now()
@@ -62,6 +64,7 @@ func TestBudgetLatch_ResetsAtMidnight(t *testing.T) {
 }
 
 func TestBudgetOverride_RefusesWhenNothingLatched(t *testing.T) {
+	t.Parallel()
 	h := startLatchServer(t)
 	res, err := h.Client.BudgetOverride(context.Background())
 	if err != nil || !res.Refused || res.Reason != server.ReasonNothingLatched {
@@ -70,6 +73,7 @@ func TestBudgetOverride_RefusesWhenNothingLatched(t *testing.T) {
 }
 
 func TestBudgetLatch_IsIndependentOfUserPause(t *testing.T) {
+	t.Parallel()
 	h := startLatchServer(t)
 	ctx := context.Background()
 	if _, err := h.Client.QueuePause(ctx); err != nil {
@@ -86,6 +90,7 @@ func TestBudgetLatch_IsIndependentOfUserPause(t *testing.T) {
 }
 
 func TestBudgetStatus_ReportsOverridePoint(t *testing.T) {
+	t.Parallel()
 	h := startLatchServer(t)
 	h.Server.RecordSpend("spent", 6)
 	if got := h.Server.BudgetStatusAt(time.Now()).Override; got != 0 {
@@ -101,6 +106,7 @@ func TestBudgetStatus_ReportsOverridePoint(t *testing.T) {
 }
 
 func TestBudgetIncrease_LiftsLatchWithoutMovingOverride(t *testing.T) {
+	t.Parallel()
 	h := startLatchServer(t)
 	h.Server.RecordSpend("spent", 6)
 	if !h.Server.BudgetStatusAt(time.Now()).BudgetPaused {
@@ -122,6 +128,7 @@ func TestBudgetIncrease_LiftsLatchWithoutMovingOverride(t *testing.T) {
 }
 
 func TestBudgetIncrease_KeepsLatchWhenStillReached(t *testing.T) {
+	t.Parallel()
 	h := startLatchServer(t)
 	h.Server.RecordSpend("spent", 9)
 	soft := 8.0
@@ -135,6 +142,7 @@ func TestBudgetIncrease_KeepsLatchWhenStillReached(t *testing.T) {
 }
 
 func TestBudgetIncrease_SoftPastHardRaisesHard(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) {
 		c.BudgetSoftLimit, c.BudgetHardLimit = 5, 7
 		c.BudgetPollInterval = time.Hour
@@ -150,6 +158,7 @@ func TestBudgetIncrease_SoftPastHardRaisesHard(t *testing.T) {
 }
 
 func TestBudgetIncrease_RefusesLowerOrOffLimit(t *testing.T) {
+	t.Parallel()
 	h := startLatchServer(t)
 	ctx := context.Background()
 	lower, some := 4.0, 100.0

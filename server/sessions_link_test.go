@@ -12,6 +12,7 @@ import (
 )
 
 func TestLinkSession_MarksMapTicketsDesign(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
@@ -47,6 +48,7 @@ func TestLinkSession_MarksMapTicketsDesign(t *testing.T) {
 }
 
 func TestLinkSession_Refusals(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
 	for name, tc := range map[string]struct {

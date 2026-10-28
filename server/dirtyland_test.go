@@ -71,6 +71,7 @@ func (f *schedFixture) landedEvents(t *testing.T) []ralphloop.Event {
 }
 
 func TestDirtyLand_CleanRestoreLandsWithoutAPauseAndKeepsTheLocalContent(t *testing.T) {
+	t.Parallel()
 	f := dirtyLandFixture(t, false, nil)
 
 	f.runEpic(t, server.EventRootCompleted)
@@ -92,6 +93,7 @@ func TestDirtyLand_CleanRestoreLandsWithoutAPauseAndKeepsTheLocalContent(t *test
 }
 
 func TestDirtyLand_BackupRefHoldsTheFilesAndRefsStashIsUntouched(t *testing.T) {
+	t.Parallel()
 	f := dirtyLandFixture(t, false, nil)
 
 	f.runEpic(t, server.EventRootCompleted)
@@ -115,6 +117,7 @@ func TestDirtyLand_BackupRefHoldsTheFilesAndRefsStashIsUntouched(t *testing.T) {
 }
 
 func TestDirtyLand_RunLogNamesTheFilesAndTheBackupRef(t *testing.T) {
+	t.Parallel()
 	f := dirtyLandFixture(t, false, nil)
 
 	f.runEpic(t, server.EventRootCompleted)
@@ -130,6 +133,7 @@ func TestDirtyLand_RunLogNamesTheFilesAndTheBackupRef(t *testing.T) {
 }
 
 func TestDirtyLand_PruneDropsAnOldBackupAndKeepsAFreshOne(t *testing.T) {
+	t.Parallel()
 	f := dirtyLandFixture(t, false, func(f *schedFixture) {
 		tree := strings.TrimSpace(f.git(t, "rev-parse", "HEAD^{tree}"))
 		backup := func(ref string, at time.Time) {
@@ -156,6 +160,7 @@ func TestDirtyLand_PruneDropsAnOldBackupAndKeepsAFreshOne(t *testing.T) {
 }
 
 func TestDirtyLand_CheckedOutTargetOtherThanTrunkLandsToo(t *testing.T) {
+	t.Parallel()
 	f := dirtyLandFixture(t, false, func(f *schedFixture) {
 		f.git(t, "branch", "develop")
 		servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop")
@@ -176,6 +181,7 @@ func TestDirtyLand_CheckedOutTargetOtherThanTrunkLandsToo(t *testing.T) {
 }
 
 func TestDirtyLand_ConflictingRestoreStillPausesAndTouchesNothing(t *testing.T) {
+	t.Parallel()
 	f := dirtyLandFixture(t, true, nil)
 	main := f.git(t, "rev-parse", "main")
 

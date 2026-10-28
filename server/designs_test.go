@@ -86,6 +86,7 @@ func (f designsFixture) live(t *testing.T) []server.SessionInfo {
 }
 
 func TestDesignsOpen_CreatesWithTheTuiPrefill(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	res := f.open(t, "proj:map", false)
 	if res.Refused || res.Session == nil {
@@ -124,6 +125,7 @@ func startDesignsAt(t *testing.T, step string) designsFixture {
 }
 
 func TestDesignsOpen_AfterBranchStartsInTheTrunkCheckout(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct{ name, step, implBranch string }{
 		{"step branch", "branch", ""},
 		{"step done", "done", ""},
@@ -153,6 +155,7 @@ func TestDesignsOpen_AfterBranchStartsInTheTrunkCheckout(t *testing.T) {
 }
 
 func TestDesignsOpen_ImplEpicWithoutBranchStillUsesTheDesignWorktree(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	res := f.open(t, "proj:map", false)
 	if res.Refused || res.Session == nil {
@@ -187,6 +190,7 @@ func (f designsFixture) reopenAfterTrunkCommit(t *testing.T, file, content strin
 }
 
 func TestDesignsOpen_RebasesTheDesignBranchOntoTrunk(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	res, dir := f.reopenAfterTrunkCommit(t, "t.txt", "trunk\n", func(string) {})
 	trunk := gitOut(t, f.repo, "rev-parse", "HEAD")
@@ -199,6 +203,7 @@ func TestDesignsOpen_RebasesTheDesignBranchOntoTrunk(t *testing.T) {
 }
 
 func TestDesignsOpen_ConflictSkipsTheRebaseAndSetsANote(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	var tip string
 	res, dir := f.reopenAfterTrunkCommit(t, "c.txt", "trunk\n", func(dir string) {
@@ -224,6 +229,7 @@ func TestDesignsOpen_ConflictSkipsTheRebaseAndSetsANote(t *testing.T) {
 }
 
 func TestLinkSession_CarriesTheRebaseNote(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	res, _ := f.reopenAfterTrunkCommit(t, "c.txt", "trunk\n", func(dir string) {
 		if err := os.WriteFile(filepath.Join(dir, "c.txt"), []byte("design\n"), 0o644); err != nil {
@@ -239,6 +245,7 @@ func TestLinkSession_CarriesTheRebaseNote(t *testing.T) {
 }
 
 func TestDesignsOpen_UncommittedEditsSkipTheRebaseAndSetANote(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	var before string
 	res, dir := f.reopenAfterTrunkCommit(t, "t.txt", "trunk\n", func(dir string) {
@@ -256,6 +263,7 @@ func TestDesignsOpen_UncommittedEditsSkipTheRebaseAndSetANote(t *testing.T) {
 }
 
 func TestDesignLiveCheck_LeavesOutTheCallerAndRebaseSkipsForAnother(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	first := f.open(t, "proj:map", false)
 	id := first.Session.ID
@@ -276,6 +284,7 @@ func TestDesignLiveCheck_LeavesOutTheCallerAndRebaseSkipsForAnother(t *testing.T
 }
 
 func TestDesignsOpen_ReAddsARemovedWorktreeOnTheSameBranch(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	first := f.open(t, "proj:map", false)
 	dir, _ := readMeta(t, f.h, first.Session.ID)["dir"].(string)
@@ -297,6 +306,7 @@ func TestDesignsOpen_ReAddsARemovedWorktreeOnTheSameBranch(t *testing.T) {
 }
 
 func TestDesignsOpen_ClashRefusalKeepsTheLiveSession(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
 	if err := os.WriteFile(filepath.Join(store, "proj", "map", "ticket.md"), []byte("---\nkind: map\n---\n"), 0o644); err != nil {
@@ -320,6 +330,7 @@ func TestDesignsOpen_ClashRefusalKeepsTheLiveSession(t *testing.T) {
 }
 
 func TestDesignsOpen_RefusesAnEpicNamedLikeTheDesignBranch(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "map-design", "01", "first", "")
@@ -356,6 +367,7 @@ func (f designsFixture) commitOnTrunk(t *testing.T, file, content string) {
 }
 
 func TestDesignsWorktree_ReturnsTheOpenPathAndRebasesOnAMovedTrunk(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	first := f.worktree(t, "proj:map", "")
 	if first.Refused || first.Note != "" || first.AfterBranch {
@@ -379,6 +391,7 @@ func TestDesignsWorktree_ReturnsTheOpenPathAndRebasesOnAMovedTrunk(t *testing.T)
 }
 
 func TestDesignsWorktree_ConflictReturnsTheNote(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	dir := f.worktree(t, "proj:map", "").Path
 	if err := os.WriteFile(filepath.Join(dir, "c.txt"), []byte("design\n"), 0o644); err != nil {
@@ -394,6 +407,7 @@ func TestDesignsWorktree_ConflictReturnsTheNote(t *testing.T) {
 }
 
 func TestDesignsWorktree_AfterBranchReturnsTheTrunkCheckoutAndMakesNothing(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "branch")
 	res := f.worktree(t, "proj:map", "")
 	if res.Refused || res.Path != f.repo || !res.AfterBranch || res.Note != "" {
@@ -405,6 +419,7 @@ func TestDesignsWorktree_AfterBranchReturnsTheTrunkCheckoutAndMakesNothing(t *te
 }
 
 func TestDesignsWorktree_Refusals(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "map", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "map-design", "01", "first", "")
@@ -429,6 +444,7 @@ func TestDesignsWorktree_Refusals(t *testing.T) {
 }
 
 func TestDesignsWorktree_LeavesOutTheCallersSessionFromTheLiveCheck(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	id := f.open(t, "proj:map", false).Session.ID
 	f.commitOnTrunk(t, "t.txt", "trunk\n")
@@ -441,6 +457,7 @@ func TestDesignsWorktree_LeavesOutTheCallersSessionFromTheLiveCheck(t *testing.T
 }
 
 func TestDesignsOpen_ReturnsTheNewestLiveSession(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	mk := func() string {
 		res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
@@ -457,6 +474,7 @@ func TestDesignsOpen_ReturnsTheNewestLiveSession(t *testing.T) {
 }
 
 func TestDesignsOpen_ARestoredSessionCountsFromItsRestore(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	mk := func() string {
 		res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
@@ -483,6 +501,7 @@ func TestDesignsOpen_ARestoredSessionCountsFromItsRestore(t *testing.T) {
 }
 
 func TestDesignsOpen_ConcurrentCallsMakeOneSession(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	ids := make([]string, 4)
 	var wg sync.WaitGroup
@@ -507,6 +526,7 @@ func TestDesignsOpen_ConcurrentCallsMakeOneSession(t *testing.T) {
 }
 
 func TestDesignsOpen_NewStopsTheOldAndCreatesAnother(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	old := f.open(t, "proj:map", false).Session
 	waitForHolder(t, filepath.Join(f.h.SessionsDir, old.ID))
@@ -526,6 +546,7 @@ func TestDesignsOpen_NewStopsTheOldAndCreatesAnother(t *testing.T) {
 }
 
 func TestDesignsOpen_TicketAddressPromptsOnCreateAndSendsNothingToALiveSession(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	res := f.open(t, "proj:map/01", false)
 	if res.Refused || res.Session == nil {
@@ -544,6 +565,7 @@ func TestDesignsOpen_TicketAddressPromptsOnCreateAndSendsNothingToALiveSession(t
 }
 
 func TestDesignsOpen_Refusals(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	for epic, want := range map[string]string{
 		"proj:plain":   server.ReasonDesignNotMapEpic,
@@ -559,6 +581,7 @@ func TestDesignsOpen_Refusals(t *testing.T) {
 }
 
 func TestWebDesigns_NewNeedsAFreshToken(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	live := f.open(t, "proj:map", false).Session
 	waitForHolder(t, filepath.Join(f.h.SessionsDir, live.ID))

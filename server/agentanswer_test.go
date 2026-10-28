@@ -74,6 +74,7 @@ func bashPending(id string) *agentrunner.Pending {
 }
 
 func TestAgentAnswer_RequestIDRefusalsLogNothing(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		setup  func(e answerEnv)
@@ -115,6 +116,7 @@ func TestAgentAnswer_RequestIDRefusalsLogNothing(t *testing.T) {
 }
 
 func TestAgentAnswer_AgentGoneWhenNoSessionLives(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	if err := e.fake.Stop(mustFind(t, e.fake)); err != nil {
 		t.Fatal(err)
@@ -135,6 +137,7 @@ func mustFind(t *testing.T, r *runnerfake.Runner) agentrunner.Session {
 }
 
 func TestAgentAnswer_DeliveredAllowLogsShownAndIgnoresNote(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	e.fake.SetPending(answerLabel, bashPending("req-1"))
 
@@ -159,6 +162,7 @@ func TestAgentAnswer_DeliveredAllowLogsShownAndIgnoresNote(t *testing.T) {
 }
 
 func TestAgentAnswer_DenyNoteIsSentAndCapped(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	e.fake.SetPending(answerLabel, &agentrunner.Pending{
 		ID: "req-1", Tool: "Bash", Input: json.RawMessage(strings.Repeat("x", tickets.MaxLogTextChars+1)),
@@ -182,6 +186,7 @@ func TestAgentAnswer_DenyNoteIsSentAndCapped(t *testing.T) {
 }
 
 func TestAgentAnswer_WithoutRequestIDAnswersWhateverIsOpen(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	e.fake.SetPending(answerLabel, bashPending("req-9"))
 

@@ -17,6 +17,7 @@ import (
 // period, as released once the grace passed, and as held when the release cap
 // keeps its slot.
 func TestExplain_WaitingRunVerdicts(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		waitedFor time.Duration

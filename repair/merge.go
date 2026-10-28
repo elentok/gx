@@ -79,7 +79,7 @@ func Merge(in MergeInput, d ralphloop.Deps) (MergeResult, string, error) {
 		return MergeResult{}, "", err
 	}
 
-	lockDir, err := ralphloop.MergeLockDir(in.EpicPath)
+	lockDir, err := ralphloop.MergeLockDirIn(d.MergeLockStateDir, in.EpicPath)
 	if err != nil {
 		return MergeResult{}, "", err
 	}
@@ -199,7 +199,7 @@ func resolveMerge(in MergeInput, d ralphloop.Deps) (MergeResult, string, error) 
 		return MergeResult{}, "", err
 	}
 	epic := filepath.Base(filepath.Clean(in.EpicPath))
-	lockDir, err := ralphloop.MergeLockDir(in.EpicPath)
+	lockDir, err := ralphloop.MergeLockDirIn(d.MergeLockStateDir, in.EpicPath)
 	if err != nil {
 		return MergeResult{}, "", err
 	}

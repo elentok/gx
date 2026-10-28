@@ -19,6 +19,7 @@ func continueMeta(edit func(*sessionMeta)) sessionMeta {
 }
 
 func TestCanAutoAdvance(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		edit func(*sessionMeta)
@@ -42,6 +43,7 @@ func TestCanAutoAdvance(t *testing.T) {
 }
 
 func TestDecideActionable(t *testing.T) {
+	t.Parallel()
 	cont := SessionActionable{Reason: "next", Action: []string{"/clear", "/gx-design x"}, Derived: true}
 	policy := actionablePolicy{Live: true, MaxAutoSends: 5}
 	tests := []struct {

@@ -10,6 +10,7 @@ import (
 )
 
 func TestEpicList_CardTimePair(t *testing.T) {
+	t.Parallel()
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 	paused := map[string]string{"01-a.md": issueMD("01", "paused", "pause_reason: self-reported\nclaimed_at: 2026-01-05T08:00:00Z\n", "A")}

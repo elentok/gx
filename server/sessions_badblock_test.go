@@ -61,6 +61,7 @@ func seedGxProject(t *testing.T) string {
 }
 
 func TestBadRoundBlock_FilesOneAggregatedFollowUp(t *testing.T) {
+	t.Parallel()
 	store := seedGxProject(t)
 	h, ctx, evs, id, conv, path := startGrillingSessionIn(t, "proj:map", store)
 	settle(t, h, ctx, evs, id, conv)
@@ -88,6 +89,7 @@ func TestBadRoundBlock_FilesOneAggregatedFollowUp(t *testing.T) {
 }
 
 func TestBadRoundBlock_BlockPastTranscriptCapIsSeen(t *testing.T) {
+	t.Parallel()
 	store := seedGxProject(t)
 	h, ctx, evs, id, conv, path := startGrillingSessionIn(t, "proj:map", store)
 	settle(t, h, ctx, evs, id, conv)
@@ -102,6 +104,7 @@ func TestBadRoundBlock_BlockPastTranscriptCapIsSeen(t *testing.T) {
 }
 
 func TestBadRoundBlock_NoGxProjectWritesNothing(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	h, ctx, evs, id, conv, path := startGrillingSessionIn(t, "proj:map", store)
 	settle(t, h, ctx, evs, id, conv)

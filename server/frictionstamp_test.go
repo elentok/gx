@@ -29,6 +29,7 @@ func appendPauseRound(t *testing.T, ticketPath string, close bool) {
 
 // A ticket that paused once and then merged carries a friction summary with that pause.
 func TestFrictionStamp_MergedTicketCarriesItsPause(t *testing.T) {
+	t.Parallel()
 	f, tk := runMergeTicket(t, func(f *schedFixture, cwd string) string {
 		appendPauseRound(t, f.ticketFile(t, "01"), true)
 		testutil.WriteFile(t, cwd, "fix.txt", "fix")
@@ -54,6 +55,7 @@ func TestFrictionStamp_MergedTicketCarriesItsPause(t *testing.T) {
 
 // A cancelled paused ticket carries the pause and a cli ending.
 func TestFrictionStamp_CancelledPausedTicketEndsWithCli(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "work", "")
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-work.md")

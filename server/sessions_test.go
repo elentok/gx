@@ -23,6 +23,7 @@ import (
 )
 
 func TestCreateSession_StartsHolderAndListsSession(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -101,6 +102,7 @@ func uniqueNameReq(name string, t *testing.T) server.CreateSessionRequest {
 }
 
 func TestCreateSession_ConcurrentUniqueNamesMakeOneSession(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, _, _ := startFakeSession(t)
 	results := make([]server.SessionResult, 4)
 	var wg sync.WaitGroup
@@ -132,6 +134,7 @@ func TestCreateSession_ConcurrentUniqueNamesMakeOneSession(t *testing.T) {
 }
 
 func TestCreateSession_UniqueNameIgnoresAnExitedSession(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, _, _ := startFakeSession(t)
 	first, err := h.Client.CreateSession(ctx, uniqueNameReq("fixer", t))
 	if err != nil || first.Session == nil {
@@ -151,6 +154,7 @@ func TestCreateSession_UniqueNameIgnoresAnExitedSession(t *testing.T) {
 }
 
 func TestCreateSession_TypedNameStaysNonUniqueWithoutTheOption(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, _, _ := startFakeSession(t)
 	for range 2 {
 		req := uniqueNameReq("twin", t)
@@ -162,6 +166,7 @@ func TestCreateSession_TypedNameStaysNonUniqueWithoutTheOption(t *testing.T) {
 }
 
 func TestCreateSession_RefusesBadRequests(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
 	for name, tc := range map[string]struct {
@@ -186,6 +191,7 @@ func TestCreateSession_RefusesBadRequests(t *testing.T) {
 }
 
 func TestSessionStatus_FollowsHolderWatch(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 
 	var last time.Time
@@ -222,6 +228,7 @@ func TestSessionStatus_FollowsHolderWatch(t *testing.T) {
 }
 
 func TestSessionStatus_ExitedCleanOrCrashed(t *testing.T) {
+	t.Parallel()
 	for name, code := range map[string]int{server.SessionExitClean: 0, server.SessionExitCrashed: 1} {
 		t.Run(name, func(t *testing.T) {
 			h, ctx, evs, id, conv := startFakeSession(t)
@@ -240,6 +247,7 @@ func TestSessionStatus_ExitedCleanOrCrashed(t *testing.T) {
 }
 
 func TestSessionStatus_HolderDeathIsCrashed(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t)
 	child := killHolder(t, h, id)
 	t.Cleanup(func() { _ = syscall.Kill(-child, syscall.SIGKILL) })
@@ -250,6 +258,7 @@ func TestSessionStatus_HolderDeathIsCrashed(t *testing.T) {
 }
 
 func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t)
 	dir := filepath.Join(h.SessionsDir, id)
 	waitForHolder(t, dir)
@@ -281,6 +290,7 @@ func TestStopSession_ExitsCleanAndStopped(t *testing.T) {
 // A stop right after create comes before the holder opens its socket; the
 // holder must still be stopped, not left running.
 func TestStopSession_StopsAHolderStillStarting(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, _ := startFakeSession(t)
 	dir := filepath.Join(h.SessionsDir, id)
 
@@ -300,6 +310,7 @@ func TestStopSession_StopsAHolderStillStarting(t *testing.T) {
 // A test killed before its cleanup runs must not leave its holders running:
 // a test holder exits once the test process is gone.
 func TestTestHolder_ExitsWithItsTestProcess(t *testing.T) {
+	t.Parallel()
 	test := exec.Command("sleep", "60")
 	if err := test.Start(); err != nil {
 		t.Fatal(err)
@@ -323,6 +334,7 @@ func TestTestHolder_ExitsWithItsTestProcess(t *testing.T) {
 }
 
 func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t)
 	dir := filepath.Join(h.SessionsDir, id)
 
@@ -360,6 +372,7 @@ func TestRemoveSession_RefusedWhileLiveThenDeletesDir(t *testing.T) {
 }
 
 func TestFirstPrompt_WaitsOutBlockedThenTypedAtIdle(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"})
 	holder := waitForHolder(t, filepath.Join(h.SessionsDir, id))
 
@@ -377,6 +390,7 @@ func TestFirstPrompt_WaitsOutBlockedThenTypedAtIdle(t *testing.T) {
 }
 
 func TestFirstPrompt_DroppedOnExit(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"})
 	if readMeta(t, h, id)["first_prompt"] != "fix the bug" {
 		t.Fatal("first prompt not saved")
@@ -391,6 +405,7 @@ func TestFirstPrompt_DroppedOnExit(t *testing.T) {
 }
 
 func TestSessionName_FallsBackToDisplayNameThenProjectN(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{})
 	got := waitForSession(ctx, t, h, evs, id, func(server.SessionInfo) bool { return true })
 	if got.Name != "proj-1" {
@@ -421,6 +436,7 @@ func TestSessionName_FallsBackToDisplayNameThenProjectN(t *testing.T) {
 }
 
 func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic", "01", "a", "")
 	repo := testutil.TempRepo(t)
@@ -485,6 +501,7 @@ func TestCreateSession_NewWorktreeFromTrunkAnswersTrust(t *testing.T) {
 }
 
 func TestCreateSession_RequestCarriesMadeWorktreeAndRebaseNote(t *testing.T) {
+	t.Parallel()
 	h, _, _, id, _ := startFakeSessionWith(t, server.CreateSessionRequest{MadeWorktree: true, RebaseNote: "not rebased: dirty"})
 	meta := readMeta(t, h, id)
 	if meta["made_worktree"] != true || meta["rebase_note"] != "not rebased: dirty" {
@@ -493,6 +510,7 @@ func TestCreateSession_RequestCarriesMadeWorktreeAndRebaseNote(t *testing.T) {
 }
 
 func TestCreateSession_ExistingDirLeavesTrustDialog(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t, servertest.WithEnv(agentfake.ProgramTrustEnv+"=1"))
 	want := server.SessionStatus{State: server.SessionBlocked, Kind: "dialog"}
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status == want })
@@ -504,6 +522,7 @@ func TestCreateSession_ExistingDirLeavesTrustDialog(t *testing.T) {
 }
 
 func TestCreateSession_RefusesBadWorktrees(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic", "01", "a", "")
 	repo := testutil.TempRepo(t)

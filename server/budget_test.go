@@ -18,6 +18,7 @@ func near(t *testing.T, got, want float64) {
 }
 
 func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
+	t.Parallel()
 	// A short path: the test name would push the unix socket path past its limit.
 	stateDir, err := os.MkdirTemp("", "gx")
 	if err != nil {
@@ -52,6 +53,7 @@ func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
 }
 
 func TestLedger_PollsAddDeltasToToday(t *testing.T) {
+	t.Parallel()
 	l, err := openLedger(t.TempDir(), 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -64,6 +66,7 @@ func TestLedger_PollsAddDeltasToToday(t *testing.T) {
 }
 
 func TestLedger_SplitsTodayPerRoot(t *testing.T) {
+	t.Parallel()
 	l, err := openLedger(t.TempDir(), 0, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -79,6 +82,7 @@ func TestLedger_SplitsTodayPerRoot(t *testing.T) {
 }
 
 func TestLedger_RestartKeepsTotalAndDoesNotRecount(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	l, _ := openLedger(dir, 0, 0)
 	now := time.Date(2026, 10, 6, 12, 0, 0, 0, time.Local)
@@ -97,6 +101,7 @@ func TestLedger_RestartKeepsTotalAndDoesNotRecount(t *testing.T) {
 }
 
 func TestLedger_DeltaSpanningMidnightSplits(t *testing.T) {
+	t.Parallel()
 	l, _ := openLedger(t.TempDir(), 0, 0)
 	before := time.Date(2026, 10, 6, 23, 59, 30, 0, time.Local)
 	l.record("", "a", 1.0, before)

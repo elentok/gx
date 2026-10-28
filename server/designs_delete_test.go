@@ -44,6 +44,7 @@ func (f designsFixture) del(t *testing.T, epic string) server.SessionResult {
 }
 
 func TestDesignsDelete_DeletesAnUnchartedDesign(t *testing.T) {
+	t.Parallel()
 	f := startDeletable(t)
 	if res := f.del(t, "proj:bare"); res.Refused {
 		t.Fatalf("delete = %+v", res)
@@ -54,6 +55,7 @@ func TestDesignsDelete_DeletesAnUnchartedDesign(t *testing.T) {
 }
 
 func TestDesignsDelete_RemovesTheDesignWorktreeAndBranch(t *testing.T) {
+	t.Parallel()
 	f := startDeletable(t)
 	res := f.open(t, "proj:bare", false)
 	if res.Refused || res.Session == nil {
@@ -86,6 +88,7 @@ func TestDesignsDelete_RemovesTheDesignWorktreeAndBranch(t *testing.T) {
 }
 
 func TestDesignsDelete_Refusals(t *testing.T) {
+	t.Parallel()
 	f := startDeletable(t)
 	if res := f.open(t, "proj:live", false); res.Session == nil {
 		t.Fatalf("open = %+v", res)
@@ -107,6 +110,7 @@ func TestDesignsDelete_Refusals(t *testing.T) {
 }
 
 func TestDesignsDelete_EpicDetailDeletableMatchesTheRule(t *testing.T) {
+	t.Parallel()
 	f := startDeletable(t)
 	f.open(t, "proj:live", false)
 	for epic, want := range map[string]bool{"proj:bare": true, "proj:charted": false, "proj:ticketed": false, "proj:live": false} {
@@ -121,6 +125,7 @@ func TestDesignsDelete_EpicDetailDeletableMatchesTheRule(t *testing.T) {
 }
 
 func TestDesignsDelete_EpicDetailLogsADeletableCheckError(t *testing.T) {
+	t.Parallel()
 	f := startDeletable(t)
 	// A file where the sessions dir should be makes listing sessions fail.
 	if err := os.RemoveAll(f.h.SessionsDir); err != nil {
@@ -146,6 +151,7 @@ func TestDesignsDelete_EpicDetailLogsADeletableCheckError(t *testing.T) {
 }
 
 func TestDesignsDelete_SlugIsFreeAgain(t *testing.T) {
+	t.Parallel()
 	f := startDeletable(t)
 	if res := f.del(t, "proj:bare"); res.Refused {
 		t.Fatalf("delete = %+v", res)

@@ -27,6 +27,7 @@ func (f designsFixture) mapPath(slug string) string {
 }
 
 func TestDesignsOpenNew_WritesTheMapThenStartsTheSession(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	res := f.openNew(t, "fresh-idea", "a thing\nwith lines")
 	if res.Refused || res.Session == nil || res.EpicCreated {
@@ -74,6 +75,7 @@ func designStartedAt(t *testing.T, path string) string {
 }
 
 func TestDesignsOpen_StampsTheDesignStartOnceAcrossSessions(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	path := filepath.Join(f.h.TicketStore, "proj", "map", "ticket.md")
 	if got := designStartedAt(t, path); got != "" {
@@ -94,6 +96,7 @@ func TestDesignsOpen_StampsTheDesignStartOnceAcrossSessions(t *testing.T) {
 }
 
 func TestDesignsOpenNew_StampsTheDesignStart(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	if res := f.openNew(t, "fresh-idea", "an idea"); res.Refused || res.Session == nil {
 		t.Fatalf("open = %+v", res)
@@ -104,6 +107,7 @@ func TestDesignsOpenNew_StampsTheDesignStart(t *testing.T) {
 }
 
 func TestCreateSession_RefusedNameLeavesNoDesignStamp(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	req := func(ticket string) server.CreateSessionRequest {
 		return server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Name: "taken", UniqueName: true, Ticket: ticket, Harness: string(agentfake.HarnessKind)}
@@ -121,6 +125,7 @@ func TestCreateSession_RefusedNameLeavesNoDesignStamp(t *testing.T) {
 }
 
 func TestDesignsOpenNew_StartFailureIsOneResultWithStartError(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	repo := testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
@@ -139,6 +144,7 @@ func TestDesignsOpenNew_StartFailureIsOneResultWithStartError(t *testing.T) {
 }
 
 func TestDesignsOpenNew_LinkingToItsOwnAddressKeepsDesign(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	res := f.openNew(t, "fresh-idea", "a thing")
 	linked, err := f.h.Client.LinkSession(f.ctx, server.LinkSessionRequest{ID: res.Session.ID, Ticket: "fresh-idea"})
@@ -148,6 +154,7 @@ func TestDesignsOpenNew_LinkingToItsOwnAddressKeepsDesign(t *testing.T) {
 }
 
 func TestDesignsOpenNew_SecondCallIsRefusedAsEpicExists(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	f.openNew(t, "fresh-idea", "one")
 	if second := f.openNew(t, "fresh-idea", "two"); !second.Refused || second.Reason != server.ReasonDesignEpicExists || second.EpicCreated {
@@ -159,6 +166,7 @@ func TestDesignsOpenNew_SecondCallIsRefusedAsEpicExists(t *testing.T) {
 }
 
 func TestDesignsOpenNew_BranchClashLeavesNothingBehind(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "fresh-idea-design", "01", "first", "")
 	f := startDesignsIn(t, store)
@@ -175,6 +183,7 @@ func TestDesignsOpenNew_BranchClashLeavesNothingBehind(t *testing.T) {
 }
 
 func TestDesignsOpenNew_Refusals(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	for name, tc := range map[string]struct{ slug, idea, want string }{
 		"bad slug":     {"Bad Slug", "idea", server.ReasonSessionBadRequest},

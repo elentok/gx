@@ -9,6 +9,7 @@ import (
 )
 
 func TestRecoveryPlan_DecideMapsEachCaseToOneAction(t *testing.T) {
+	t.Parallel()
 	noop := func(recovery.Failure, recovery.Verbs) error { return nil }
 	rule := recovery.Entry{ID: "R9", Executor: recovery.ExecutorRule, Authority: recovery.AuthorityLow, Remedy: noop}
 	high := recovery.Entry{ID: "R9", Executor: recovery.ExecutorRule, Authority: recovery.AuthorityHigh, Remedy: noop}

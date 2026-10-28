@@ -71,6 +71,7 @@ func startCrashedMerge(t *testing.T) (h *servertest.Harness, store, repo, lockDi
 }
 
 func TestMergeRecovery_OrphanLockForAMergedTicketFinishesIt(t *testing.T) {
+	t.Parallel()
 	h, store, repo, lockDir := startCrashedMerge(t)
 	wt, ticketPath := leaveIteration(t, h, store, repo)
 	_ = os.Remove(filepath.Join(h.StateDir, "runs.json"))
@@ -92,6 +93,7 @@ func TestMergeRecovery_OrphanLockForAMergedTicketFinishesIt(t *testing.T) {
 }
 
 func TestMergeRecovery_OrphanLockForAnUnmergedTicketRollsBackTheHalfPick(t *testing.T) {
+	t.Parallel()
 	h, store, repo, lockDir := startCrashedMerge(t)
 	wt, ticketPath := leaveIteration(t, h, store, repo)
 	_ = os.Remove(filepath.Join(h.StateDir, "runs.json"))
@@ -115,6 +117,7 @@ func TestMergeRecovery_OrphanLockForAnUnmergedTicketRollsBackTheHalfPick(t *test
 }
 
 func TestMergeRecovery_OrphanLockWithNoEvidencePausesAmbiguousMerge(t *testing.T) {
+	t.Parallel()
 	h, store, _, lockDir := startCrashedMerge(t)
 	ticketPath := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	if err := ralphloop.Claim(ticketPath); err != nil {

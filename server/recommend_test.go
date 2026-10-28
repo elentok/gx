@@ -24,6 +24,7 @@ func recommendAs(t *testing.T, h *servertest.Harness, investigator, address, ver
 }
 
 func TestRecommend_StoredRecommendationShowsInDetail(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	if res := recommendAs(t, h, investigateAddr, "proj:epic-a/01", server.ActionRetry); res.Refused {
 		t.Fatalf("recommend refused: %+v", res)
@@ -38,6 +39,7 @@ func TestRecommend_StoredRecommendationShowsInDetail(t *testing.T) {
 }
 
 func TestRecommend_VerbOutsideActionsIsRefused(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	if res := recommendAs(t, h, investigateAddr, "proj:epic-a/01", server.ActionApprove); !res.Refused || res.Reason != server.ReasonVerbNotOffered {
 		t.Errorf("recommend = %+v, want %s refusal", res, server.ReasonVerbNotOffered)
@@ -52,6 +54,7 @@ func TestRecommend_VerbOutsideActionsIsRefused(t *testing.T) {
 }
 
 func TestRecommend_NewPauseRoundClearsIt(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	if res := recommendAs(t, h, investigateAddr, "proj:epic-a/01", server.ActionRetry); res.Refused {
 		t.Fatalf("recommend refused: %+v", res)
@@ -69,6 +72,7 @@ func TestRecommend_NewPauseRoundClearsIt(t *testing.T) {
 }
 
 func TestRecommend_DeadlockInvestigationWritesNone(t *testing.T) {
+	t.Parallel()
 	h := startDeadlock(t, recovery.Catalog{Enabled: true})
 	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "every remaining ticket is paused"})
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.RecoveryApplied)) > 0 })

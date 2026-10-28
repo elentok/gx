@@ -24,6 +24,7 @@ func autoSendOnce(t *testing.T, f *grillingFixture) {
 }
 
 func TestAutoAdvance_StopsAfterFiveSendsWithNoInput(t *testing.T) {
+	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
 	waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
 	writeAssistantMessage(t, f.path, runEndText)
@@ -47,6 +48,7 @@ func TestAutoAdvance_StopsAfterFiveSendsWithNoInput(t *testing.T) {
 }
 
 func TestAutoAdvance_InputAndSwitchFlipResetTheCount(t *testing.T) {
+	t.Parallel()
 	for name, input := range map[string]func(t *testing.T, f *grillingFixture){
 		"pane input":  func(t *testing.T, f *grillingFixture) { clearByInput(t, f.h, f.id) },
 		"switch flip": func(t *testing.T, f *grillingFixture) { setSwitch(t, f, false) },
@@ -75,6 +77,7 @@ func setSwitch(t *testing.T, f *grillingFixture, on bool) {
 }
 
 func TestAutoAdvance_SwitchingOnOverARaisedContinueStartsTheCountdown(t *testing.T) {
+	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
 	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
 	setSwitch(t, f, false)

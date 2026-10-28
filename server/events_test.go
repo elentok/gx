@@ -3,6 +3,7 @@ package server
 import "testing"
 
 func TestBroker_SlowSubscriberIsDroppedOthersKeepContiguousSeq(t *testing.T) {
+	t.Parallel()
 	b := newBroker(2)
 	slow, _, err := b.subscribe(0)
 	if err != nil {
@@ -35,6 +36,7 @@ func TestBroker_SlowSubscriberIsDroppedOthersKeepContiguousSeq(t *testing.T) {
 }
 
 func TestBroker_SubscribeReplaysFromSeqAndRefusesUnknownSeq(t *testing.T) {
+	t.Parallel()
 	b := newBroker(0)
 	for range 3 {
 		b.publish(EventTicketChanged, "p:e/01")

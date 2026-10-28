@@ -6,6 +6,7 @@ import (
 )
 
 func TestRetargetIfMerged(t *testing.T) {
+	t.Parallel()
 	tests := map[string]struct {
 		merged bool
 		err    error

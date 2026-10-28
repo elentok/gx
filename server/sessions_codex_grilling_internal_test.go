@@ -12,6 +12,7 @@ import (
 )
 
 func TestSaveConversationTotals_CodexDesignLeavesNoGrillingCounts(t *testing.T) {
+	t.Parallel()
 	home := t.TempDir()
 	root := t.TempDir()
 	m := sessionMeta{ID: "s1", Dir: "/work/dir", Harness: string(ralphloop.AgentCodex), Ticket: "p:map", ConversationID: "c1", Design: true}

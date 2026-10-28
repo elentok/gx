@@ -6,6 +6,7 @@ import (
 )
 
 func TestLaunchArgs(t *testing.T) {
+	t.Parallel()
 	claudeArgs := []string{"--verbose"}
 	for _, tc := range []struct {
 		name string

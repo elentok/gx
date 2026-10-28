@@ -19,6 +19,7 @@ import (
 )
 
 func TestUnavailable_MissingPathExplainsNotifiesOnceAndSetPathRecovers(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)

@@ -7,6 +7,7 @@ import (
 )
 
 func TestPruneScratchWorkspace_DeletesOnlyArchivedTicketsSubdirs(t *testing.T) {
+	t.Parallel()
 	store := filepath.Join(t.TempDir(), "tickets")
 	workspace := ScratchWorkspace(store)
 	for _, d := range []string{filepath.Join(store, ScratchProject, "live"), filepath.Join(workspace, "live"), filepath.Join(workspace, "archived")} {

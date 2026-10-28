@@ -35,6 +35,7 @@ func startSweep(t *testing.T, store string) *servertest.Harness {
 }
 
 func TestSweep_ArchivesDoneAndCancelledOneOffsAndKeepsBrokenOnes(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	proj := filepath.Join(store, "proj")
 	for id, status := range map[string]string{"01": "done", "02": "cancelled", "03": "paused", "04": "open"} {
@@ -72,6 +73,7 @@ func TestSweep_ArchivesDoneAndCancelledOneOffsAndKeepsBrokenOnes(t *testing.T) {
 }
 
 func TestSweep_CrashBetweenArchiveWriteAndRemovalLeavesOneCopy(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	proj := filepath.Join(store, "proj")
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
@@ -94,6 +96,7 @@ func TestSweep_CrashBetweenArchiveWriteAndRemovalLeavesOneCopy(t *testing.T) {
 }
 
 func TestSweep_DependentOfAnArchivedOneOffIsUnblockedLikeAnyTerminalBlocker(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	proj := filepath.Join(store, "proj")
 	for id, status := range map[string]string{"01": "done", "02": "cancelled", "03": "open"} {
@@ -146,6 +149,7 @@ func waitOneOffsQueued(t *testing.T, h *servertest.Harness, want bool) {
 }
 
 func TestSweep_LastArchiveDequeuesTheRootAndASubmitRestoresIt(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
 	h := startSweep(t, store)
@@ -174,6 +178,7 @@ func TestSweep_LastArchiveDequeuesTheRootAndASubmitRestoresIt(t *testing.T) {
 }
 
 func TestSweep_BrokenOneOffsKeepTheRootQueued(t *testing.T) {
+	t.Parallel()
 	for _, status := range []string{"paused", "failed"} {
 		t.Run(status, func(t *testing.T) {
 			store := t.TempDir()
@@ -204,6 +209,7 @@ func TestSweep_BrokenOneOffsKeepTheRootQueued(t *testing.T) {
 }
 
 func TestSweep_RacingSubmitsNeverLoseTheQueueItem(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
 	h := startSweep(t, store)
@@ -231,6 +237,7 @@ func TestSweep_RacingSubmitsNeverLoseTheQueueItem(t *testing.T) {
 }
 
 func TestSweep_CancelArchivesTheOneOff(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	proj := filepath.Join(store, "proj")
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt"})

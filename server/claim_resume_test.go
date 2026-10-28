@@ -88,6 +88,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered bool, fake *r
 }
 
 func TestClaim_ResumesOrColdStarts(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name      string
 		runner    string

@@ -110,6 +110,7 @@ func (f *schedFixture) rootQueued(t *testing.T) bool {
 }
 
 func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) {
+	t.Parallel()
 	f := newForkFixture(t, func(f *forkFixture, _ int) {
 		if !f.rootQueued(t) {
 			t.Error("root dequeued while its merge ticket runs")
@@ -166,6 +167,7 @@ func TestMergeFork_NonFFForksAMergeTicketWhoseFinishMergesTheEpic(t *testing.T) 
 }
 
 func TestMergeFork_TrunkMovingTwiceForksAThirdThenPausesAtTheCap(t *testing.T) {
+	t.Parallel()
 	f := newForkFixture(t, nil)
 	// Trunk moves between each merge ticket's finish and its merge: moving it
 	// inside the agent's turn would fail the finish check instead.
@@ -199,6 +201,7 @@ func TestMergeFork_TrunkMovingTwiceForksAThirdThenPausesAtTheCap(t *testing.T) {
 }
 
 func TestMergeFork_DirtyTrunkAfterAMergeTicketPausesWithoutAnother(t *testing.T) {
+	t.Parallel()
 	f := newForkFixture(t, func(f *forkFixture, _ int) {
 		// An untracked file in main's checkout that the merge would overwrite.
 		testutil.WriteFile(t, f.repo, "01.txt", "local")

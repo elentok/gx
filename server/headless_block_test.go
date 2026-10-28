@@ -47,6 +47,7 @@ func startBlockable(t *testing.T, runnerName string, opts ...func(*server.Config
 }
 
 func TestHeadlessBlock_PausesAtOnce(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name  string
 		block func(*turnRunner)
@@ -99,6 +100,7 @@ func (ptyNamed) Name() string { return "pty" }
 
 // A herdr or pty hosted agent that blocks keeps the dwell path: the ticket stays claimed.
 func TestHeadlessBlock_NonHeadlessStaysClaimed(t *testing.T) {
+	t.Parallel()
 	for _, runner := range []string{"herdr", "pty"} {
 		t.Run(runner, func(t *testing.T) {
 			_, ticketPath, turn := startBlockable(t, runner)
@@ -117,6 +119,7 @@ func TestHeadlessBlock_NonHeadlessStaysClaimed(t *testing.T) {
 
 // The pause raises the chat notification, not only the paused run-log event.
 func TestHeadlessBlock_PauseRaisesNotification(t *testing.T) {
+	t.Parallel()
 	chat, count := chatRecorder(t)
 	_, ticketPath, turn := startBlockable(t, "headless", chat)
 	turn.SetPending("epic-a-iter-01", &agentrunner.Pending{ID: "r1", Tool: "Bash", Input: []byte(`{"command":"ls"}`)})
@@ -128,6 +131,7 @@ func TestHeadlessBlock_PauseRaisesNotification(t *testing.T) {
 
 // answer on a ticket that is not paused blocked-pane leaves its status alone.
 func TestHeadlessBlock_AnswerOnClaimedLeavesStatus(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, _ := startBlockable(t, "headless")
 	// The agent is working and the ticket claimed; the answer may be refused, but must not move it.
 	_, _ = h.Client.AgentAnswerRequest(context.Background(), server.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
@@ -157,6 +161,7 @@ func runsJSONHas(h *servertest.Harness, s string) bool {
 }
 
 func TestHeadlessBlock_AnswerReturnsToClaimed(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, turn := pauseBlocked(t)
 	res, err := h.Client.AgentAnswerRequest(context.Background(), server.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"})
 	if err != nil || res.Refused {
@@ -172,6 +177,7 @@ func TestHeadlessBlock_AnswerReturnsToClaimed(t *testing.T) {
 
 // A new block after the answer pauses again.
 func TestHeadlessBlock_PausesAgainAfterAnswer(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, turn := pauseBlocked(t)
 	if res, err := h.Client.AgentAnswerRequest(context.Background(), server.QueueRequest{Address: answerAddr, Decision: "allow", RequestID: "r1"}); err != nil || res.Refused {
 		t.Fatalf("answer = %+v, %v", res, err)
@@ -183,6 +189,7 @@ func TestHeadlessBlock_PausesAgainAfterAnswer(t *testing.T) {
 
 // Every way out of blocked clears the pause the same way.
 func TestHeadlessBlock_AnyExitReturnsToClaimed(t *testing.T) {
+	t.Parallel()
 	exits := map[string]func(*servertest.Harness, *turnRunner){
 		"interrupt": func(h *servertest.Harness, _ *turnRunner) {
 			if res, err := h.Client.AgentInterrupt(context.Background(), answerAddr); err != nil || res.Refused {
@@ -208,6 +215,7 @@ func TestHeadlessBlock_AnyExitReturnsToClaimed(t *testing.T) {
 }
 
 func TestHeadlessBlock_ResumeRefusedWhileLiveAllowedOnceGone(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, turn := pauseBlocked(t)
 	req := server.RepairRequest{Address: answerAddr}
 	res, err := h.Server.ResumeAs(req, server.OriginCLI)

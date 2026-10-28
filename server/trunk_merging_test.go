@@ -34,6 +34,7 @@ func (f *schedFixture) runEpic(t *testing.T, wait string) {
 }
 
 func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {
+	t.Parallel()
 	f := trunkFixture(t, servertest.TicketOpts{}, func(_ *schedFixture, p servertest.Prompt, id string) { commitWork(t, p, id) })
 	main := f.rev(t, "main")
 	develop := f.rev(t, "develop")
@@ -52,6 +53,7 @@ func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {
 }
 
 func TestTrunk_ExplicitBaseMovesOnlyTheStart(t *testing.T) {
+	t.Parallel()
 	f := trunkFixture(t, servertest.TicketOpts{Base: "release-1.2"}, func(_ *schedFixture, p servertest.Prompt, id string) { commitWork(t, p, id) })
 	f.git(t, "branch", "release-1.2")
 	release := f.rev(t, "release-1.2")
@@ -70,6 +72,7 @@ func TestTrunk_ExplicitBaseMovesOnlyTheStart(t *testing.T) {
 }
 
 func TestTrunk_EditedBetweenClaimAndMergingMergesOnTheNewTrunk(t *testing.T) {
+	t.Parallel()
 	f := trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		f.git(t, "branch", "next", "develop")
@@ -88,6 +91,7 @@ func TestTrunk_EditedBetweenClaimAndMergingMergesOnTheNewTrunk(t *testing.T) {
 }
 
 func TestTrunk_DivergedNewTrunkNeedsRebase(t *testing.T) {
+	t.Parallel()
 	f := trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		// Past the cap, the non-ff pauses the root rather than forking a merge ticket.

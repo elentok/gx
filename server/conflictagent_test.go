@@ -125,6 +125,7 @@ func hasFlag(args []string, flag, value string) bool {
 }
 
 func TestConflictAgent_InheritsTheParentRunsModelAndEffort(t *testing.T) {
+	t.Parallel()
 	iter, conflict := runToConflict(t, `,"agents":{"claude":{"model":"opus","effort":"high"}}`, func(store, repo string) {
 		writeProjectAgents(t, store, repo, `,"agents":{"claude":{"model":"haiku","effort":"low"}}`)
 	})
@@ -136,6 +137,7 @@ func TestConflictAgent_InheritsTheParentRunsModelAndEffort(t *testing.T) {
 }
 
 func TestConflictAgent_UsesTheProjectDefaultWhenTheParentRunHasNone(t *testing.T) {
+	t.Parallel()
 	iter, conflict := runToConflict(t, "", func(store, repo string) {
 		writeProjectAgents(t, store, repo, `,"agents":{"claude":{"model":"opus","effort":"high"}}`)
 	})

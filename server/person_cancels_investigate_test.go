@@ -33,6 +33,7 @@ func wantChildStatus(t *testing.T, childPath string, want schema.Status) {
 }
 
 func TestPersonVerb_MergeCancelsTheOpenInvestigateChild(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
 	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
@@ -43,6 +44,7 @@ func TestPersonVerb_MergeCancelsTheOpenInvestigateChild(t *testing.T) {
 }
 
 func TestPersonVerb_StartOverCancelsTheOpenInvestigateChild(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
 	res, err := h.Client.Repair(context.Background(), "start-over", server.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
@@ -53,6 +55,7 @@ func TestPersonVerb_StartOverCancelsTheOpenInvestigateChild(t *testing.T) {
 }
 
 func TestInvestigateVerb_MergeLeavesItsOwnTicket(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
 	res, err := h.Client.AsInvestigator("proj:epic-a/01a").Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
@@ -63,6 +66,7 @@ func TestInvestigateVerb_MergeLeavesItsOwnTicket(t *testing.T) {
 }
 
 func TestInvestigateVerb_StartOverLeavesItsOwnTicket(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
 	res, err := h.Client.AsInvestigator("proj:epic-a/01a").Repair(context.Background(), "start-over", server.RepairRequest{Address: "proj:epic-a/01", Reason: "retry"})
@@ -73,6 +77,7 @@ func TestInvestigateVerb_StartOverLeavesItsOwnTicket(t *testing.T) {
 }
 
 func TestWebStartOver_EmptyReasonRefusalNamesNoCLIFlag(t *testing.T) {
+	t.Parallel()
 	h, _ := pausedIteration(t, string(events.ZeroCommit), true)
 	res, err := h.Server.StartOverAsWeb(server.RepairRequest{Address: "proj:epic-a/01", State: "tok"})
 	if err != nil || !res.Refused || res.Reason != repair.ReasonReasonRequired {
@@ -84,6 +89,7 @@ func TestWebStartOver_EmptyReasonRefusalNamesNoCLIFlag(t *testing.T) {
 }
 
 func TestPersonVerb_RefusedMergeLeavesTheInvestigateChild(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.SelfReported), true)
 	child := writeInvestigateChild(t, ticketPath, "open")
 	res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01"})
@@ -94,6 +100,7 @@ func TestPersonVerb_RefusedMergeLeavesTheInvestigateChild(t *testing.T) {
 }
 
 func TestPersonVerb_AnswerCancelsTheOpenInvestigateChild(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	child := writeInvestigateChild(t, ticketPath, "open")
@@ -106,6 +113,7 @@ func TestPersonVerb_AnswerCancelsTheOpenInvestigateChild(t *testing.T) {
 }
 
 func TestPersonVerb_RetryCancelsTheOpenInvestigateChild(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	if res := retryAs(t, h, ""); res.Refused {
 		t.Fatalf("retry refused: %+v", res)
@@ -114,6 +122,7 @@ func TestPersonVerb_RetryCancelsTheOpenInvestigateChild(t *testing.T) {
 }
 
 func TestInvestigateRetry_LeavesItsOwnTicketRunning(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	if res := retryAs(t, h, investigateAddr); res.Refused {
 		t.Fatalf("retry refused: %+v", res)
@@ -122,6 +131,7 @@ func TestInvestigateRetry_LeavesItsOwnTicketRunning(t *testing.T) {
 }
 
 func TestPersonVerb_RetryLeavesADoneInvestigateChild(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	child := filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "02-probe.md")
 	if err := schema.UpdateTicket(child, func(tk *schema.Ticket) { tk.Status = schema.StatusDone }); err != nil {

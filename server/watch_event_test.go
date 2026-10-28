@@ -7,6 +7,7 @@ import (
 )
 
 func TestStoreEventKind(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	tests := []struct {
 		name         string

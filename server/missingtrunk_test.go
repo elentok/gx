@@ -18,12 +18,14 @@ import (
 )
 
 func TestMissingTrunk_UnknownBranchStopsClaimsUntilCreated(t *testing.T) {
+	t.Parallel()
 	missingTrunkCase(t, `trunk "develop" from project.json is not a local branch`,
 		func(f *schedFixture) { servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop") },
 		func(f *schedFixture) { f.git(t, "branch", "develop") })
 }
 
 func TestMissingTrunk_UnreadableProjectFileStopsClaimsUntilFixed(t *testing.T) {
+	t.Parallel()
 	projectFile := func(f *schedFixture) string { return filepath.Join(f.store, "proj", "project.json") }
 	missingTrunkCase(t, "unreadable project.json",
 		func(f *schedFixture) {
@@ -120,6 +122,7 @@ func countUntil(ctx context.Context, t *testing.T, evs <-chan server.Event, coun
 }
 
 func TestMissingTrunk_EmptiedQueueForgetsTheStateSilently(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}},
 		func(_ *schedFixture, p servertest.Prompt, id string) { commitWork(t, p, id) })
 	servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop")

@@ -48,6 +48,7 @@ func startsWithLive(t *testing.T, h *servertest.Harness, root, first string, liv
 // per-root cap says; a ticket's agent field (known, unknown) does not matter
 // to the cap.
 func TestRunner_OneOffsEpicUsesTheOneOffCapNotThePerRootCap(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		oneOffCap, live int
 		starts          bool
@@ -107,6 +108,7 @@ func startOneOffsHarness(t *testing.T, store string) *servertest.Harness {
 // A claude one-off and a codex one-off run side by side under one cap, each
 // under its own ticket's agent, whatever agent the queue items name.
 func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Agent: "claude"})
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "codex"})
@@ -128,6 +130,7 @@ func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 // A one-off with no agent field, or an unknown one, launches with the agent of
 // its queue item.
 func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt"})
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "nonsense"})
@@ -148,6 +151,7 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 }
 
 func TestTicketAgent(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct{ field, fallback, want string }{
 		{"", "claude", "claude"},
 		{"nonsense", "codex", "codex"},
@@ -164,6 +168,7 @@ func TestTicketAgent(t *testing.T) {
 // The one-offs epic is a standing inbox: with every ticket done it is not
 // stamped, merged or retro'd.
 func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
 	h := startOneOffsHarness(t, store)
@@ -197,6 +202,7 @@ func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 }
 
 func TestIsOneOffEpic_ByNameAndLegacyFile(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		path string
 		want bool
@@ -218,6 +224,7 @@ func TestIsOneOffEpic_ByNameAndLegacyFile(t *testing.T) {
 // An old single-ticket epic keeps the per-root cap; the one-off cap is for the
 // one-offs epic only.
 func TestRunner_OldOneOffEpicKeepsThePerRootCap(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicketWith(t, store, "proj", "legacy", "01", "one-off", servertest.TicketOpts{Type: "prompt"})
 	servertest.SetProjectRepo(t, store, "proj", repo)

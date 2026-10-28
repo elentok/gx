@@ -25,6 +25,7 @@ func writeDetailEpic(t *testing.T, store string, issues map[string]string) {
 }
 
 func TestDetailWeb_BrokenFileGivesSmallPayload(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeDetailEpic(t, store, map[string]string{
 			"01-a.md": "---\nid: [unclosed\n---\n\n# A\n",
@@ -50,6 +51,7 @@ func TestDetailWeb_BrokenFileGivesSmallPayload(t *testing.T) {
 }
 
 func TestDetailWeb_GraphErrorKeepsFullPayload(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeDetailEpic(t, store, map[string]string{
 			"01-a.md": issueMD("01", "open", "blocked_by: [\"nope\"]\n", "A"),
@@ -72,6 +74,7 @@ func TestDetailWeb_GraphErrorKeepsFullPayload(t *testing.T) {
 }
 
 func TestDetailWeb_UnknownAndMalformedAddressAre404(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeDetailEpic(t, store, map[string]string{
 			"01-a.md": issueMD("01", "open", "", "A"),

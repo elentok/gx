@@ -85,6 +85,7 @@ func (f *webFocus) reportOnceConnected(t *testing.T, client string, focused bool
 }
 
 func TestWebFocus_VisibleTabSilencesBannerAndAFKChat(t *testing.T) {
+	t.Parallel()
 	f := startWebFocus(t)
 	f.openTab(t, "web-1")
 	f.reportOnceConnected(t, "web-1", true, f.id)
@@ -98,6 +99,7 @@ func TestWebFocus_VisibleTabSilencesBannerAndAFKChat(t *testing.T) {
 }
 
 func TestWebFocus_HiddenTabSilencesNothing(t *testing.T) {
+	t.Parallel()
 	f := startWebFocus(t)
 	f.openTab(t, "web-1")
 	f.reportOnceConnected(t, "web-1", false, f.id)
@@ -111,6 +113,7 @@ func TestWebFocus_HiddenTabSilencesNothing(t *testing.T) {
 }
 
 func TestWebFocus_TUIStillSilencesBannerOnly(t *testing.T) {
+	t.Parallel()
 	f := startWebFocus(t)
 	ctx := t.Context()
 	openTUI(ctx, t, f.h, "tui-1")
@@ -125,6 +128,7 @@ func TestWebFocus_TUIStillSilencesBannerOnly(t *testing.T) {
 }
 
 func TestWebFocus_ClickTargetStaysOnLastFocusedTUI(t *testing.T) {
+	t.Parallel()
 	f := startWebFocus(t)
 	ctx := t.Context()
 	openTUI(ctx, t, f.h, "tui-1")
@@ -144,6 +148,7 @@ func TestWebFocus_ClickTargetStaysOnLastFocusedTUI(t *testing.T) {
 }
 
 func TestWebFocus_RefusedWithoutAnOpenStream(t *testing.T) {
+	t.Parallel()
 	f := startWebFocus(t)
 	if res := f.report(t, "web-1", true, f.id); !strings.Contains(res, server.ReasonFocusNotConnected) {
 		t.Errorf("result = %s, want %s", res, server.ReasonFocusNotConnected)
@@ -151,6 +156,7 @@ func TestWebFocus_RefusedWithoutAnOpenStream(t *testing.T) {
 }
 
 func TestWebFocus_FocusedReportMarksSessionRead(t *testing.T) {
+	t.Parallel()
 	f := startWebFocus(t)
 	ctx := t.Context()
 	f.step(agentfake.Control{State: "done"}, server.SessionIdle)

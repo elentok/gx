@@ -41,6 +41,7 @@ func startWithLeftover(t *testing.T, state agentrunner.State) (*servertest.Harne
 }
 
 func TestRetryAndCancel_WorkingLeftoverRefuses(t *testing.T) {
+	t.Parallel()
 	h, fake, _, path := startWithLeftover(t, agentrunner.StateWorking)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -62,6 +63,7 @@ func TestRetryAndCancel_WorkingLeftoverRefuses(t *testing.T) {
 }
 
 func TestCancel_StopClosesALeftoverThroughTheRunner(t *testing.T) {
+	t.Parallel()
 	h, fake, _, path := startWithLeftover(t, agentrunner.StateWorking)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -78,6 +80,7 @@ func TestCancel_StopClosesALeftoverThroughTheRunner(t *testing.T) {
 }
 
 func TestRetry_StopClosesAWorkingLeftover(t *testing.T) {
+	t.Parallel()
 	h, fake, leftover, _ := startWithLeftover(t, agentrunner.StateWorking)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -93,6 +96,7 @@ func TestRetry_StopClosesAWorkingLeftover(t *testing.T) {
 // Retry on a repair pause reopens the ticket on the same branch: the head and
 // its commits survive.
 func TestRetry_RepairPauseKeepsTheBranchHead(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -130,6 +134,7 @@ func TestRetry_RepairPauseKeepsTheBranchHead(t *testing.T) {
 }
 
 func TestRelaunch_IdleLeftoverIsLeftToTheLaunch(t *testing.T) {
+	t.Parallel()
 	h, _, _, _ := startWithLeftover(t, agentrunner.StateIdle)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -142,6 +147,7 @@ func TestRelaunch_IdleLeftoverIsLeftToTheLaunch(t *testing.T) {
 // A relaunch ends the ticket's open question with pause.closed{relaunch}; with no
 // open question it writes nothing.
 func TestRelaunch_ClosesTheOpenQuestion(t *testing.T) {
+	t.Parallel()
 	h, _, _, path := startWithLeftover(t, agentrunner.StateIdle)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -162,6 +168,7 @@ func TestRelaunch_ClosesTheOpenQuestion(t *testing.T) {
 }
 
 func TestRelaunch_RecoveryEndsTheRoundWithSourceGx(t *testing.T) {
+	t.Parallel()
 	h, _, _, path := startWithLeftover(t, agentrunner.StateDone)
 	if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseRepair, Summary: "stuck"}); err != nil {
 		t.Fatal(err)
@@ -177,6 +184,7 @@ func TestRelaunch_RecoveryEndsTheRoundWithSourceGx(t *testing.T) {
 }
 
 func TestRelaunch_WithoutQuestionWritesNoLog(t *testing.T) {
+	t.Parallel()
 	h, _, _, path := startWithLeftover(t, agentrunner.StateIdle)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -190,6 +198,7 @@ func TestRelaunch_WithoutQuestionWritesNoLog(t *testing.T) {
 }
 
 func TestRelaunch_OnlyAHumanRelaunchIsLogged(t *testing.T) {
+	t.Parallel()
 	h, _, _, _ := startWithLeftover(t, agentrunner.StateDone)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -210,6 +219,7 @@ func TestRelaunch_OnlyAHumanRelaunchIsLogged(t *testing.T) {
 }
 
 func TestGuardRail_AHumanRelaunchResetsTheBudget(t *testing.T) {
+	t.Parallel()
 	applied := func(kind string) ralphloop.Event {
 		return ralphloop.Event{Type: string(events.RecoveryApplied), Ticket: "01", Kind: kind, Reason: "relaunch"}
 	}

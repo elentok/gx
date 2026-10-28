@@ -15,6 +15,7 @@ import (
 )
 
 func TestTrunkConflict_MarkersLeftPauseTheTicketAndKeepTheBackup(t *testing.T) {
+	t.Parallel()
 	var f *schedFixture
 	f = stashMergeFixtureWith(t, func(_ *schedFixture, _ servertest.Prompt) {
 		reportIteration(t, f.ticketFile(t, "02"), "finished") // the markers are still there
@@ -41,6 +42,7 @@ func TestTrunkConflict_MarkersLeftPauseTheTicketAndKeepTheBackup(t *testing.T) {
 }
 
 func TestTrunkConflict_NoMarkersLeftMakesTheTicketDoneDeletesTheBackupAndLandsTheEpic(t *testing.T) {
+	t.Parallel()
 	var f *schedFixture
 	f = stashMergeFixtureWith(t, func(_ *schedFixture, p servertest.Prompt) {
 		testutil.WriteFile(t, p.Cwd, "same.txt", "resolved")
@@ -67,6 +69,7 @@ func TestTrunkConflict_NoMarkersLeftMakesTheTicketDoneDeletesTheBackupAndLandsTh
 }
 
 func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *testing.T) {
+	t.Parallel()
 	// The agent reports nothing, so the ticket stays open on its pause.
 	f := stashMergeFixtureWith(t, func(*schedFixture, servertest.Prompt) {})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -101,6 +104,7 @@ func TestTrunkConflict_StartOverRestoresTheBackupMarksDoneAndLandsTheEpic(t *tes
 }
 
 func TestTrunkConflict_PruneKeepsAnOldRefOfAnOpenTicket(t *testing.T) {
+	t.Parallel()
 	// The agent reports nothing, so the ticket stays open.
 	f := stashMergeFixtureWith(t, func(*schedFixture, servertest.Prompt) {})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

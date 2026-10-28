@@ -74,6 +74,7 @@ func startWaitingRestartFake(t *testing.T, hardLimit float64, tweak ...func(*ser
 }
 
 func TestReclaim_WaitingRunStaysWaitingAndUnsettled(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := startWaitingRestart(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	// A settled run would merge (the fake agent is idle with a commit) and leave the registry.
@@ -94,6 +95,7 @@ func TestReclaim_WaitingRunStaysWaitingAndUnsettled(t *testing.T) {
 }
 
 func TestReclaim_BudgetHardLimitStopsAWaitingRun(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := startWaitingRestart(t, 5)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { return 6, true })

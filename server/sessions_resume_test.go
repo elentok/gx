@@ -22,6 +22,7 @@ func stopFakeSession(ctx context.Context, t *testing.T, h *servertest.Harness, e
 }
 
 func TestResumeSession_KeepsSessionOnSavedConversation(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	idleWithAction(ctx, t, h, evs, id, conv, "/review")
 	stopFakeSession(ctx, t, h, evs, id)
@@ -44,6 +45,7 @@ func TestResumeSession_KeepsSessionOnSavedConversation(t *testing.T) {
 }
 
 func TestResumeSession_UsesNewestConversation(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	// Unique, since the fake's control FIFO is named after it.
 	newer := conv + "-cleared"
@@ -62,6 +64,7 @@ func TestResumeSession_UsesNewestConversation(t *testing.T) {
 }
 
 func TestResumeSession_Refusals(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t)
 	if res, err := h.Client.ResumeSession(ctx, id); err != nil || !res.Refused || res.Reason != server.ReasonSessionLive {
 		t.Errorf("resume live = %+v, %v; want refused %s", res, err, server.ReasonSessionLive)

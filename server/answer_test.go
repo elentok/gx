@@ -56,6 +56,7 @@ func answerCount(t *testing.T, ticketPath string) int {
 const optionsBlock = "type: options\noptions:\n  - {id: a, label: A}\n  - {id: b, label: B}\n"
 
 func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
@@ -84,6 +85,7 @@ func TestAnswer_DeliversTheFrameAndClaimsTheTicket(t *testing.T) {
 }
 
 func TestAnswer_NotAnswerable(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	for name, pause := range map[string]func(*schema.Ticket){
@@ -111,6 +113,7 @@ func TestAnswer_NotAnswerable(t *testing.T) {
 }
 
 func TestAnswer_BudgetRefusalLogsAndPromptsNothing(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 5)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
@@ -130,6 +133,7 @@ func TestAnswer_BudgetRefusalLogsAndPromptsNothing(t *testing.T) {
 // A finish that arrived after a zero-commit pause is adopted by the answer
 // verb, as it is by resume: the reply is not delivered.
 func TestAnswer_LateFinishIsAdoptedAndWritesNoAnswer(t *testing.T) {
+	t.Parallel()
 	p := pauseZeroCommit(t, false)
 	commitAgentWork(t, p.wtPath)
 	if err := schema.UpdateTicket(p.ticketPath, p.finishedLate(false)); err != nil {
@@ -145,6 +149,7 @@ func TestAnswer_LateFinishIsAdoptedAndWritesNoAnswer(t *testing.T) {
 }
 
 func TestAnswer_RunSettlesWhenTheAgentFinishes(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
@@ -184,6 +189,7 @@ func requireQueued(t *testing.T, h *servertest.Harness, ticketPath string, fake 
 }
 
 func TestAnswer_GoneAgentQueues(t *testing.T) {
+	t.Parallel()
 	// The hard limit is spent: a queued answer skips the budget refusal.
 	h, ticketPath, fake := startWaitingRestartFake(t, 5)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
@@ -201,6 +207,7 @@ func TestAnswer_GoneAgentQueues(t *testing.T) {
 }
 
 func TestAnswer_DeathAfterPromptQueues(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
@@ -210,6 +217,7 @@ func TestAnswer_DeathAfterPromptQueues(t *testing.T) {
 }
 
 func TestAnswer_Refusals(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	ctx := context.Background()

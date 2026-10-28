@@ -25,6 +25,7 @@ func writeQuestionLog(t *testing.T, store, epic, file, ts, summary string) {
 }
 
 func TestEpicList_DirtyTrunkCardHasBothActions(t *testing.T) {
+	t.Parallel()
 	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "dirty", "---\nstatus: open\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: dirty-trunk\nland_block_reason: uncommitted changes on main clash with a.txt\n---\n", done)
@@ -46,6 +47,7 @@ func TestEpicList_DirtyTrunkCardHasBothActions(t *testing.T) {
 }
 
 func TestEpicList_NeedsYouReasons(t *testing.T) {
+	t.Parallel()
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
 	asking := map[string]string{"01-a.md": issueMD("01", "paused", "pause_reason: self-reported\n", "A")}
 	repair := map[string]string{"01-a.md": issueMD("01", "paused", "pause_reason: zero-commit\n", "A")}
@@ -114,6 +116,7 @@ func TestEpicList_NeedsYouReasons(t *testing.T) {
 }
 
 func TestEpicList_NeedsYouSortsOldestWaitFirst(t *testing.T) {
+	t.Parallel()
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
 	ask := map[string]string{"01-a.md": issueMD("01", "paused", "pause_reason: self-reported\n", "A")}
 	h, base := startEpicDetail(t, func(store string) {
@@ -137,6 +140,7 @@ func TestEpicList_NeedsYouSortsOldestWaitFirst(t *testing.T) {
 }
 
 func TestEpicList_SeveralWaitingTicketsNameTheOldest(t *testing.T) {
+	t.Parallel()
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "many", loop, map[string]string{
@@ -158,6 +162,7 @@ func TestEpicList_SeveralWaitingTicketsNameTheOldest(t *testing.T) {
 }
 
 func TestEpicList_PermissionWaitingIsNeedsYou(t *testing.T) {
+	t.Parallel()
 	h, _ := startBlockedClaimed(t, false, &agentrunner.Pending{
 		ID: "req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"ls"}`), Description: "List files",
 	})

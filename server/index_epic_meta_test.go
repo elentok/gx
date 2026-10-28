@@ -8,6 +8,7 @@ import (
 )
 
 func TestChangedEpicMeta(t *testing.T) {
+	t.Parallel()
 	scan := func(step string, loop tickets.Epic) map[string][]tickets.Epic {
 		loop.Path = "/store/p/loop"
 		return map[string][]tickets.Epic{

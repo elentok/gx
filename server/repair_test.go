@@ -18,6 +18,7 @@ import (
 )
 
 func TestRepair_MergeEndsThePauseRoundAsAManualMerge(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	if err := h.Server.PauseAs("proj:epic-a/01", events.ZeroCommit, "no commits"); err != nil {
 		t.Fatal(err)
@@ -34,6 +35,7 @@ func TestRepair_MergeEndsThePauseRoundAsAManualMerge(t *testing.T) {
 }
 
 func TestRepair_MergeStampsTheFrictionSummary(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	if err := h.Server.PauseAs("proj:epic-a/01", events.ZeroCommit, "no commits"); err != nil {
 		t.Fatal(err)
@@ -53,6 +55,7 @@ func TestRepair_MergeStampsTheFrictionSummary(t *testing.T) {
 }
 
 func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	h := servertest.StartWithStore(t, store)
@@ -83,6 +86,7 @@ func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 }
 
 func TestRepair_ResumeAndUnparkRefusalsNameStatusAndVerb(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "14", "broken", servertest.TicketOpts{PauseReason: string(schema.PauseIterationError)})
 	servertest.WriteTicket(t, store, "proj", "epic-a", "15", "plain", "")
@@ -119,6 +123,7 @@ func pausedIteration(t *testing.T, kind string, commit bool) (*servertest.Harnes
 }
 
 func TestRepair_StartOverIgnoresAnOpenInvestigateChild(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 	epicIssues := filepath.Dir(ticketPath)
 	testutil.WriteFile(t, epicIssues, "01a-investigate.md", "---\nid: \"01a\"\nparent: \"01\"\nstatus: open\ntype: investigate\n---\n\n# 01a\n")
@@ -130,6 +135,7 @@ func TestRepair_StartOverIgnoresAnOpenInvestigateChild(t *testing.T) {
 }
 
 func TestRepair_MergeAcceptsAZeroCommitPauseWithCommits(t *testing.T) {
+	t.Parallel()
 	h, ticketPath := pausedIteration(t, string(events.ZeroCommit), true)
 
 	// A caller outside the repo still merges: the repo comes from the project.
@@ -143,6 +149,7 @@ func TestRepair_MergeAcceptsAZeroCommitPauseWithCommits(t *testing.T) {
 }
 
 func TestRepair_MergeRefusesOtherPauses(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name   string
 		kind   string
@@ -164,6 +171,7 @@ func TestRepair_MergeRefusesOtherPauses(t *testing.T) {
 }
 
 func TestRepair_MergeWithoutTheEpicWorktreeIsAWrongRepo(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	if err := ralphloop.Claim(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")); err != nil {
@@ -179,6 +187,7 @@ func TestRepair_MergeWithoutTheEpicWorktreeIsAWrongRepo(t *testing.T) {
 }
 
 func TestRepair_RalphLoopGuardIsServerSide(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	h := servertest.StartWithStore(t, store)

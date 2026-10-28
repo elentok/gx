@@ -10,6 +10,7 @@ import (
 )
 
 func TestRotatingFile_KeepsAtMostMaxFiles(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "server.log")
 	r, err := openRotatingFile(path, 100, 3)
 	if err != nil {
@@ -39,6 +40,7 @@ func TestRotatingFile_KeepsAtMostMaxFiles(t *testing.T) {
 
 // Seam: Config.LogLevel decides whether s.log.Debug lines reach the server log.
 func TestServer_LogLevelGatesDebugLines(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name  string
 		level slog.Level
@@ -78,6 +80,7 @@ func TestServer_LogLevelGatesDebugLines(t *testing.T) {
 }
 
 func TestServer_WritesJSONLogToStateDir(t *testing.T) {
+	t.Parallel()
 	// Unix socket paths are capped near 100 bytes; t.TempDir() can exceed that.
 	base, err := os.MkdirTemp("", "gxs")
 	if err != nil {

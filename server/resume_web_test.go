@@ -85,6 +85,7 @@ func answerEvents(t *testing.T, ticketPath string) []tickets.LogEvent {
 }
 
 func TestWebResume_MissingOrStaleTokenRefusesBeforeAnyChange(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	pauseEnvZeroCommit(t, e)
 
@@ -106,6 +107,7 @@ func TestWebResume_MissingOrStaleTokenRefusesBeforeAnyChange(t *testing.T) {
 }
 
 func TestWebResume_ZeroCommitWithAGoneAgentReopensAndLogsTheAnswer(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	state := pauseEnvZeroCommit(t, e)
 	if err := e.fake.Stop(mustFind(t, e.fake)); err != nil {
@@ -126,6 +128,7 @@ func TestWebResume_ZeroCommitWithAGoneAgentReopensAndLogsTheAnswer(t *testing.T)
 }
 
 func TestWebResume_SelfReportedWithAGoneAgentEndsTheRoundAsResume(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
@@ -149,6 +152,7 @@ func TestWebResume_SelfReportedWithAGoneAgentEndsTheRoundAsResume(t *testing.T) 
 }
 
 func TestWebResume_ZeroCommitWithALiveAgentPromptsAndKeepsThePause(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	state := pauseEnvZeroCommit(t, e)
 
@@ -167,6 +171,7 @@ func TestWebResume_ZeroCommitWithALiveAgentPromptsAndKeepsThePause(t *testing.T)
 }
 
 func TestWebResume_ZeroCommitPromptKeepsTheRoundOpenAndIsLogged(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	state := pauseEnvZeroCommit(t, e)
 	hs, err := e.h.Client.Handshake(t.Context())
@@ -218,6 +223,7 @@ func TestWebResume_ZeroCommitPromptKeepsTheRoundOpenAndIsLogged(t *testing.T) {
 }
 
 func TestWebResume_ZeroCommitWithALateFinishIsAdopted(t *testing.T) {
+	t.Parallel()
 	p := pauseZeroCommit(t, false)
 	state := stateOf(t, p.ticketPath)
 
@@ -236,6 +242,7 @@ func TestWebResume_ZeroCommitWithALateFinishIsAdopted(t *testing.T) {
 }
 
 func TestWebResume_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
@@ -271,6 +278,7 @@ func TestWebResume_AmbiguousBaseMustBeACompetingBlocker(t *testing.T) {
 }
 
 func TestDetail_AmbiguousBaseListsTheCompetingBlockers(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
@@ -288,6 +296,7 @@ func TestDetail_AmbiguousBaseListsTheCompetingBlockers(t *testing.T) {
 }
 
 func TestResume_CLIWithoutATokenStillWorks(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	pauseEnvZeroCommit(t, e)
 	if err := e.fake.Stop(mustFind(t, e.fake)); err != nil {
@@ -307,6 +316,7 @@ func TestResume_CLIWithoutATokenStillWorks(t *testing.T) {
 }
 
 func TestWebResume_AFailedReopenLeavesNoAnswerAndTheNextResumeWorks(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	state := pauseEnvZeroCommit(t, e)
 	if err := e.fake.Stop(mustFind(t, e.fake)); err != nil {
@@ -346,6 +356,7 @@ func TestWebResume_AFailedReopenLeavesNoAnswerAndTheNextResumeWorks(t *testing.T
 }
 
 func TestWebResume_AnUnreadableLogIsAnErrorNotStale(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	state := pauseEnvZeroCommit(t, e)
 

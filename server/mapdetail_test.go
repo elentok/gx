@@ -10,6 +10,7 @@ import (
 )
 
 func TestEpicDetail_MapProgress(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	mapMD := func(front, body string) string { return "---\nstatus: open\nkind: map\n" + front + "---\n" + body }
 	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
@@ -112,6 +113,7 @@ func TestEpicDetail_MapProgress(t *testing.T) {
 }
 
 func TestEpicDetail_LoopEpicReportsDraft(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "draft-loop", "---\nstatus: draft\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
 		writeEpicFiles(t, store, "open-loop", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})

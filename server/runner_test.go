@@ -82,6 +82,7 @@ func registerLaunch(h *servertest.Harness) (start, prompt *[]string, cwd *string
 }
 
 func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -134,6 +135,7 @@ func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *t
 
 // gx-implement asks for commits, which a code-review ticket never makes.
 func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "review", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -171,6 +173,7 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 }
 
 func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct{ typ, want string }{
 		{"prompt", "$gx-one-off proj:epic-a/01"},
 		{"implement", "$gx-implement proj:epic-a/01"},
@@ -211,6 +214,7 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 }
 
 func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextPass(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -280,6 +284,7 @@ func readFile(t *testing.T, path string) string {
 }
 
 func TestRunner_MergesTheIterationAndClosesTheRoot(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -335,6 +340,7 @@ func TestRunner_MergesTheIterationAndClosesTheRoot(t *testing.T) {
 }
 
 func TestRunner_AFinishThatErrorsPausesTheTicketStuckAndFreesTheRoot(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -380,6 +386,7 @@ func TestRunner_AFinishThatErrorsPausesTheTicketStuckAndFreesTheRoot(t *testing.
 // ticket (it shares the blocking rule with base derivation), so the claim is
 // driven directly.
 func TestRunner_AmbiguousBasePausesWithoutLaunching(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
@@ -405,6 +412,7 @@ func TestRunner_AmbiguousBasePausesWithoutLaunching(t *testing.T) {
 }
 
 func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
@@ -458,6 +466,7 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 }
 
 func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		perRoot int
 		starts  bool
@@ -502,6 +511,7 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 // another project uses the free slots; editing the cap applies at the next
 // decision, with no restart.
 func TestRunner_ProjectCapHoldsItsProjectAndAnEditAppliesLive(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj-a", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj-a", "epic-b", "01", "first", "")
@@ -553,6 +563,7 @@ func TestRunner_ProjectCapHoldsItsProjectAndAnEditAppliesLive(t *testing.T) {
 }
 
 func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsWhenTheSlotFrees(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
@@ -623,6 +634,7 @@ func TestExplain_QueuedTicketBehindAFullLimitExplainsTheCapThenOneChangeStreamsW
 
 // Seam A: a ticket waiting on two full caps explains both, with counts.
 func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
@@ -653,6 +665,7 @@ func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
 // Seam A: the cap is global, so roots of different projects share it, and the
 // queue is plain FIFO across projects.
 func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj-a", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj-b", "epic-b", "01", "first", "")
@@ -764,6 +777,7 @@ func registerLiveAgent(h *servertest.Harness) {
 }
 
 func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -811,6 +825,7 @@ func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
 }
 
 func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -856,6 +871,7 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 }
 
 func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -901,6 +917,7 @@ func TestRunner_APauseSendsOnePrefixedChatMessageNoMatterHowManyClientsWatch(t *
 }
 
 func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -953,6 +970,7 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 }
 
 func TestRunner_CodexEvolveLaunchGetsTheFollowUpsAndGxDirs(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, typ, agent string
 		wantExtra        bool

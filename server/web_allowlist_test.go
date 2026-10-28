@@ -53,6 +53,7 @@ func reasonOf(t *testing.T, body string) string {
 }
 
 func TestWeb_DetailIsServed(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	// The handler answers 404 for a malformed address; the mux's own 404 has another body.
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/tickets/detail?address=nope")
@@ -65,6 +66,7 @@ func TestWeb_DetailIsServed(t *testing.T) {
 }
 
 func TestWeb_EpicDetailIsServed(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	code, _ := webDo(t, h, http.MethodGet, base+"/v1/epics/detail?address=nope:none")
 	if code == http.StatusUnauthorized || code == http.StatusMethodNotAllowed || code == http.StatusForbidden {
@@ -76,6 +78,7 @@ func TestWeb_EpicDetailIsServed(t *testing.T) {
 }
 
 func TestWeb_AnswerAndResumeNeedAStateToken(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
 	for _, path := range []string{"/v1/tickets/answer", "/v1/tickets/resume", "/v1/tickets/unpark"} {
@@ -91,6 +94,7 @@ func TestWeb_AnswerAndResumeNeedAStateToken(t *testing.T) {
 }
 
 func TestWeb_NoWithdrawRoute(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
 	for _, path := range []string{"/v1/tickets/withdraw", "/v1/tickets/undo"} {
@@ -101,6 +105,7 @@ func TestWeb_NoWithdrawRoute(t *testing.T) {
 }
 
 func TestWeb_AnswerWriteChecks(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
 	body := `{"address":"nope/none/01","state":"1:paused"}`

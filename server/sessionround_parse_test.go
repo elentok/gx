@@ -8,6 +8,7 @@ import (
 )
 
 func TestParseRoundSegment_BadBlockAndCleanCardAreExclusive(t *testing.T) {
+	t.Parallel()
 	const fence = "```gx-question\n"
 	cases := []struct {
 		name     string
@@ -37,6 +38,7 @@ func TestParseRoundSegment_BadBlockAndCleanCardAreExclusive(t *testing.T) {
 }
 
 func TestParseRoundSegment_BodyDropsTheHeader(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct{ seg, title, body string }{
 		"strict":     {"Q3** - **Blocking edges**: Should I publish?\n\n➡️ Yes.", "Blocking edges", "Should I publish?\n\n➡️ Yes."},
 		"no colon":   {"Q1** **Store** Which one?", "Store", "Which one?"},
@@ -55,12 +57,14 @@ func TestParseRoundSegment_BodyDropsTheHeader(t *testing.T) {
 }
 
 func TestParseRoundSegment_KeepsTheNumberLetter(t *testing.T) {
+	t.Parallel()
 	if got := parseRoundSegment(1, "Q8b** - **Bedrock proof**: Extend it?").Card; got.Label != "8b" {
 		t.Errorf("label = %q; want %q", got.Label, "8b")
 	}
 }
 
 func TestRoundCards_InlineMarkerStaysInItsQuestion(t *testing.T) {
+	t.Parallel()
 	text := "❓ **Q8** - **Fixture**: Which one?\n\n" +
 		"- a) Replay a round with `❓ **Q1**`, then the next line.\n- b) Fixed reply.\n\n" +
 		"❓ **Q9** - **Packaging**: Where?"

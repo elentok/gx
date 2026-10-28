@@ -77,6 +77,7 @@ func assertFailedStartEnded(ctx context.Context, t *testing.T, h *servertest.Har
 }
 
 func TestCreateSession_FailedHolderStartEndsCrashed(t *testing.T) {
+	t.Parallel()
 	holder := newLinkedHolder(t)
 	h := servertest.StartWithStore(t, t.TempDir(), resumeOnStart, holder.opt)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -94,6 +95,7 @@ func TestCreateSession_FailedHolderStartEndsCrashed(t *testing.T) {
 }
 
 func TestResumeSession_FailedHolderStartEndsCrashed(t *testing.T) {
+	t.Parallel()
 	holder := newLinkedHolder(t)
 	h, ctx, evs, id, _ := startFakeSessionWith(t, server.CreateSessionRequest{}, resumeOnStart, holder.opt)
 	stopFakeSession(ctx, t, h, evs, id)

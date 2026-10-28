@@ -55,6 +55,7 @@ func investigateStore(t *testing.T, projectJSON string) string {
 }
 
 func TestInvestigateLaunch_RunsDetachedAtTheFeatureBranchTipAndNamesTheMatchedEntry(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	gitOut(t, repo, "switch", "-c", "epic-a")
 	gitOut(t, repo, "commit", "--allow-empty", "-m", "feature work")
@@ -75,6 +76,7 @@ func TestInvestigateLaunch_RunsDetachedAtTheFeatureBranchTipAndNamesTheMatchedEn
 }
 
 func TestInvestigateLaunch_WithoutAFeatureBranchRunsAtTheResolvedBase(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	store := investigateStore(t, `{"name":"proj","repo":"`+repo+`"}`)
 
@@ -86,6 +88,7 @@ func TestInvestigateLaunch_WithoutAFeatureBranchRunsAtTheResolvedBase(t *testing
 }
 
 func TestInvestigateLaunch_InAVCSNoneProjectRunsInAScratchSubdir(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	store := investigateStore(t, `{"name":"proj","repo":"`+dir+`","vcs":"none"}`)
 
@@ -97,6 +100,7 @@ func TestInvestigateLaunch_InAVCSNoneProjectRunsInAScratchSubdir(t *testing.T) {
 }
 
 func TestOneOffLaunch_InAVCSNoneProjectRunsInAScratchSubdir(t *testing.T) {
+	t.Parallel()
 	for _, typ := range []string{"prompt", "evolve", "diagnose"} {
 		t.Run(typ, func(t *testing.T) {
 			store := t.TempDir()

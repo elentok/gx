@@ -108,6 +108,7 @@ func cleanedBy(f renamedFake) []string {
 }
 
 func TestReclaim_FinishesThroughTheRunsOwnRunner(t *testing.T) {
+	t.Parallel()
 	own, configured := newRenamedFake("a", nativerunner.VerdictFinished), newRenamedFake("b", nativerunner.VerdictFinished)
 	_, ticketPath := restartUnder(t, "a", configured, map[string]agentrunner.Runner{"a": own})
 	waitStatus(t, ticketPath, schema.StatusDone)
@@ -127,6 +128,7 @@ func TestReclaim_FinishesThroughTheRunsOwnRunner(t *testing.T) {
 // Regression: a herdr run reclaimed under a headless server was waited on and
 // finished through headless, which had no such session, and was left unwatched.
 func TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr(t *testing.T) {
+	t.Parallel()
 	headless := newRenamedFake("headless", nativerunner.VerdictLive)
 	others := map[string]agentrunner.Runner{}
 	// The runner reaches the fake herdr through the server's own env.
@@ -137,6 +139,7 @@ func TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr(t *testing.T) 
 }
 
 func TestReclaim_NonMismatchErrorPausesStuckWithItsReason(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -161,6 +164,7 @@ func TestReclaim_NonMismatchErrorPausesStuckWithItsReason(t *testing.T) {
 }
 
 func TestReclaim_UnavailableRunnerPausesStuckNamingIt(t *testing.T) {
+	t.Parallel()
 	_, ticketPath := restartUnder(t, "pty", newRenamedFake("headless", nativerunner.VerdictLive), nil)
 	waitStatus(t, ticketPath, schema.StatusLegacyRepair)
 	body, _ := os.ReadFile(ticketPath)

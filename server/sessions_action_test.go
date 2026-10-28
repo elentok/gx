@@ -29,6 +29,7 @@ func idleWithAction(ctx context.Context, t *testing.T, h *servertest.Harness, ev
 }
 
 func TestRunAction_SendsEachPromptAfterWorkingThenIdle(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
 
@@ -56,6 +57,7 @@ func TestRunAction_SendsEachPromptAfterWorkingThenIdle(t *testing.T) {
 }
 
 func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
+	t.Parallel()
 	const timeout = 200 * time.Millisecond
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = timeout })
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
@@ -83,6 +85,7 @@ func TestRunAction_StepThatNeverWorksStopsTheRest(t *testing.T) {
 }
 
 func TestRunAction_SlashCommandThatNeverWorksStillSendsTheRest(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = 200 * time.Millisecond })
 	idleWithAction(ctx, t, h, evs, id, conv, "/clear", "/gx-design X")
 
@@ -122,6 +125,7 @@ func waitForSubmitted(t *testing.T, conv, want string) {
 }
 
 func TestRunAction_SlashStepEndsOnNewConversationWithoutWaiting(t *testing.T) {
+	t.Parallel()
 	// A settle window far past the test's own deadline: only the new
 	// conversation id can end the first step in time.
 	h, ctx, evs, id, conv := startInputSession(t, time.Minute)
@@ -134,6 +138,7 @@ func TestRunAction_SlashStepEndsOnNewConversationWithoutWaiting(t *testing.T) {
 }
 
 func TestRunAction_LocalSlashStepEndsOnSettleWithoutAnotherEnter(t *testing.T) {
+	t.Parallel()
 	const settle = 200 * time.Millisecond
 	h, ctx, evs, id, conv := startInputSession(t, settle)
 	idleWithAction(ctx, t, h, evs, id, conv, "/local", "next-step")
@@ -145,6 +150,7 @@ func TestRunAction_LocalSlashStepEndsOnSettleWithoutAnotherEnter(t *testing.T) {
 }
 
 func TestRunAction_SwallowedEnterOnSlashStepGetsOneEnter(t *testing.T) {
+	t.Parallel()
 	const settle = 200 * time.Millisecond
 	h, ctx, evs, id, conv := startInputSession(t, settle)
 	idleWithAction(ctx, t, h, evs, id, conv, "/local")
@@ -163,6 +169,7 @@ func TestRunAction_SwallowedEnterOnSlashStepGetsOneEnter(t *testing.T) {
 }
 
 func TestRunAction_RealPromptStepStillNeedsATurn(t *testing.T) {
+	t.Parallel()
 	const settle = 100 * time.Millisecond
 	h, ctx, evs, id, conv := startInputSession(t, settle)
 	idleWithAction(ctx, t, h, evs, id, conv, "real-prompt", "next-step")
@@ -182,6 +189,7 @@ func TestRunAction_RealPromptStepStillNeedsATurn(t *testing.T) {
 }
 
 func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
+	t.Parallel()
 	const timeout = 200 * time.Millisecond
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, func(c *server.Config) { c.ActionStepStartTimeout = timeout })
 	idleWithAction(ctx, t, h, evs, id, conv, "first-step", "second-step")
@@ -208,6 +216,7 @@ func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
 }
 
 func TestRunAction_RefusedWhileWorkingKeepsActionable(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	idleWithAction(ctx, t, h, evs, id, conv, "/review")
 	report(t, conv, agentfake.Control{State: "working"})
@@ -223,6 +232,7 @@ func TestRunAction_RefusedWhileWorkingKeepsActionable(t *testing.T) {
 }
 
 func TestRunAction_RefusedWithNoAction(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
@@ -244,6 +254,7 @@ func TestRunAction_RefusedWithNoAction(t *testing.T) {
 // A turn that leaves a background task running ends Working with Background,
 // which never turns Idle: the steps must not wait for Idle.
 func TestRunAction_RunsWhileABackgroundTaskRuns(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startInputSession(t, time.Minute)
 	report(t, conv, agentfake.Control{State: "background"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.Background })

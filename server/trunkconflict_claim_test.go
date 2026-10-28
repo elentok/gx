@@ -24,6 +24,7 @@ func samePath(t *testing.T, a, b string) bool {
 }
 
 func TestTrunkConflict_TheAgentRunsInTheTargetCheckoutAndTheEpicLands(t *testing.T) {
+	t.Parallel()
 	cwds := make(chan string, 1)
 	var f *schedFixture
 	f = stashMergeFixtureWith(t, func(_ *schedFixture, p servertest.Prompt) {
@@ -54,6 +55,7 @@ func TestTrunkConflict_TheAgentRunsInTheTargetCheckoutAndTheEpicLands(t *testing
 }
 
 func TestTrunkConflict_AnotherEpicsLandWaitsUnpausedUntilTheTicketIsDone(t *testing.T) {
+	t.Parallel()
 	// The conflict agent reports nothing, so its ticket pauses and stays open.
 	f := stashMergeFixtureWith(t, func(_ *schedFixture, p servertest.Prompt) {
 		if p.Address == "proj:"+schedEpic+"/02" {

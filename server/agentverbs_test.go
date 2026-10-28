@@ -23,6 +23,7 @@ func startAgentVerbs(t *testing.T) (*servertest.Harness, *runnerfake.Runner) {
 }
 
 func TestAgentVerbs_ReachTheLiveIteration(t *testing.T) {
+	t.Parallel()
 	h, fake := startAgentVerbs(t)
 	const label = "epic-a-iter-01"
 	if _, err := fake.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
@@ -60,6 +61,7 @@ func TestAgentVerbs_ReachTheLiveIteration(t *testing.T) {
 }
 
 func TestAgentVerbs_AnswerInvalidDecisionRefuses(t *testing.T) {
+	t.Parallel()
 	h, fake := startAgentVerbs(t)
 	const label = "epic-a-iter-01"
 	if _, err := fake.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
@@ -78,6 +80,7 @@ func TestAgentVerbs_AnswerInvalidDecisionRefuses(t *testing.T) {
 }
 
 func TestAgentVerbs_AnswerReasonNotDeliveredRefuses(t *testing.T) {
+	t.Parallel()
 	h, fake := startAgentVerbs(t)
 	const label = "epic-a-iter-01"
 	if _, err := fake.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
@@ -93,6 +96,7 @@ func TestAgentVerbs_AnswerReasonNotDeliveredRefuses(t *testing.T) {
 }
 
 func TestAgentVerbs_InterruptNotReadyRefuses(t *testing.T) {
+	t.Parallel()
 	h, fake := startAgentVerbs(t)
 	const label = "epic-a-iter-01"
 	if _, err := fake.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
@@ -113,6 +117,7 @@ func TestAgentVerbs_InterruptNotReadyRefuses(t *testing.T) {
 }
 
 func TestAgentVerbs_Refusals(t *testing.T) {
+	t.Parallel()
 	h, _ := startAgentVerbs(t)
 	ctx := context.Background()
 	for _, c := range []struct {

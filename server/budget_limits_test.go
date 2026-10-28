@@ -26,6 +26,7 @@ import (
 // Relaunch and nudge start agent work outside the queue (recovery remedies use
 // them too), so the soft limit refuses them the way it holds claims back.
 func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -55,6 +56,7 @@ func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
 // sets an agent working outside any run; it must be metered and the hard
 // limit must stop it like any other live agent.
 func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
@@ -130,6 +132,7 @@ func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 }
 
 func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -151,6 +154,7 @@ func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
 }
 
 func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
+	t.Parallel()
 	store, repoA, repoB := t.TempDir(), testutil.TempRepo(t), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj-a", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj-b", "epic-b", "01", "first", "")
@@ -187,6 +191,7 @@ func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
 }
 
 func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -275,6 +280,7 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 // An agent that keeps spending after the ctrl+c is closed and paused
 // budget-killed, and its run's own finish must not overwrite that pause.
 func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	cost := 0.0
 	testBudgetKillPausesBudgetKilled(t, func() float64 { mu.Lock(); defer mu.Unlock(); cost += 3; return cost }, servertest.TicketOpts{})
@@ -284,6 +290,7 @@ func TestBudget_HardLimitStopsRunThroughRunner(t *testing.T) {
 // left to its own finish (which would pause it zero-commit, a kind recovery
 // relaunches past the hard limit).
 func TestBudget_HardLimitPausesAQuietRunBudgetKilledToo(t *testing.T) {
+	t.Parallel()
 	testBudgetKillPausesBudgetKilled(t, func() float64 { return 6 }, servertest.TicketOpts{})
 }
 
@@ -295,6 +302,7 @@ func testBudgetKillPausesBudgetKilled(t *testing.T, cost func() float64, ticket 
 // A hard-limit kill closes the run's open question with budget-killed, before
 // the pause status.
 func TestBudget_HardLimitKillClosesTheOpenQuestion(t *testing.T) {
+	t.Parallel()
 	path := runBudgetKill(t, func() float64 { return 6 }, servertest.TicketOpts{}, func(path string) {
 		if _, err := tickets.AppendLog(path, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "q?"}); err != nil {
 			t.Fatal(err)
@@ -315,6 +323,7 @@ func TestBudget_HardLimitKillClosesTheOpenQuestion(t *testing.T) {
 }
 
 func TestBudget_HardLimitKillWithoutQuestionOpensOnlyARepairRound(t *testing.T) {
+	t.Parallel()
 	path := runBudgetKill(t, func() float64 { return 6 }, servertest.TicketOpts{}, nil)
 	if evs, _ := tickets.ReadLog(path); len(evs) != 1 || evs[0].Type != tickets.EventPauseRepair {
 		t.Errorf("log = %+v, want one pause.repair", evs)
@@ -388,6 +397,7 @@ func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harn
 		c.BudgetHardLimit = 5
 		c.BudgetKillGrace = grace
 		c.BudgetPollInterval = time.Hour
+		c.PollInterval = 50 * time.Millisecond
 		c.MaxAgentsPerRoot = n
 		c.MaxAgents = n
 	})
@@ -420,6 +430,7 @@ func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harn
 // The grace counts from the stop decision and the Interrupts run side by side:
 // stopping N slow runs takes about the grace, not the sum of their Interrupts.
 func TestBudget_HardLimitInterruptsRunInParallelInsideGrace(t *testing.T) {
+	t.Parallel()
 	h, fake, over, labels := startBudgetRuns(t, 3, 600*time.Millisecond)
 	for _, l := range labels {
 		fake.SetInterruptDelay(l, 500*time.Millisecond)
@@ -439,6 +450,7 @@ func TestBudget_HardLimitInterruptsRunInParallelInsideGrace(t *testing.T) {
 // A grace shorter than the Interrupts does not cut them off: Stop waits for
 // every Interrupt to return.
 func TestBudget_HardLimitStopWaitsForSlowInterrupts(t *testing.T) {
+	t.Parallel()
 	h, fake, over, labels := startBudgetRuns(t, 2, 20*time.Millisecond)
 	for _, l := range labels {
 		fake.SetInterruptDelay(l, 300*time.Millisecond)
@@ -455,6 +467,7 @@ func TestBudget_HardLimitStopWaitsForSlowInterrupts(t *testing.T) {
 // An Interrupt that fails (here: the agent is not ready) is logged and the run
 // is stopped anyway.
 func TestBudget_HardLimitStopsDespiteInterruptError(t *testing.T) {
+	t.Parallel()
 	h, fake, over, labels := startBudgetRuns(t, 2, 50*time.Millisecond)
 	fake.SetInterruptErr(labels[0], agentrunner.ErrNotReady)
 	fake.SetInterruptErr(labels[1], errors.New("boom"))

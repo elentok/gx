@@ -39,11 +39,13 @@ func handMergeEpic(t *testing.T, blocker, mapName string) func() tickets.Epic {
 }
 
 func TestMapDone_MergingTheImplEpicMarksItsMapDone(t *testing.T) {
+	t.Parallel()
 	load := handMergeEpic(t, "feat-impl", "feat")
 	waitUntil(t, "map done", func() bool { m := load(); return m.Status == "done" && !m.MergedAt.IsZero() })
 }
 
 func TestMapDone_MergingAnotherEpicLeavesTheMapAlone(t *testing.T) {
+	t.Parallel()
 	load := handMergeEpic(t, "feat-other", "feat")
 	time.Sleep(300 * time.Millisecond) // a negative: give a wrong stamp time to land
 	if m := load(); m.Status != "open" || !m.MergedAt.IsZero() {

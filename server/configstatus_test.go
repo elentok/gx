@@ -13,6 +13,7 @@ import (
 )
 
 func TestConfigStatus_FreshServerIsEmpty(t *testing.T) {
+	t.Parallel()
 	h := servertest.Start(t)
 	st, err := h.Client.ConfigStatus(context.Background())
 	if err != nil {
@@ -24,6 +25,7 @@ func TestConfigStatus_FreshServerIsEmpty(t *testing.T) {
 }
 
 func TestConfigStatus_KeepsLastReloadAndPendingKeysUntilRestart(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))

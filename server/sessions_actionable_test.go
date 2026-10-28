@@ -14,6 +14,7 @@ import (
 )
 
 func TestActionable_DerivedFromBlocked(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 
 	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
@@ -35,6 +36,7 @@ func TestActionable_DerivedFromBlocked(t *testing.T) {
 }
 
 func TestActionable_AgentRaisedClearsOnlyOnInput(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
@@ -86,6 +88,7 @@ func TestActionable_AgentRaisedClearsOnlyOnInput(t *testing.T) {
 }
 
 func TestMarkActionable_Refusals(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
 	for name, tc := range map[string]struct {

@@ -86,6 +86,7 @@ func launchOne(t *testing.T, spy *launchSpy, want string) *servertest.Harness {
 }
 
 func TestRunner_LaunchWritesALaunchingEntryBeforeTheAgentStartsAndFlipsIt(t *testing.T) {
+	t.Parallel()
 	spy := &launchSpy{Runner: runnerfake.NewRunner()}
 	h := launchOne(t, spy, server.EventIterationStarted)
 	t.Cleanup(func() { spy.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
@@ -102,6 +103,7 @@ func TestRunner_LaunchWritesALaunchingEntryBeforeTheAgentStartsAndFlipsIt(t *tes
 }
 
 func TestRunner_AFailedLaunchLeavesNoEntry(t *testing.T) {
+	t.Parallel()
 	spy := &launchSpy{Runner: runnerfake.NewRunner()}
 	spy.SetStartErr("epic-a-iter-01", errors.New("boom"))
 	h := launchOne(t, spy, server.EventIterationLaunchFailed)
@@ -156,6 +158,7 @@ func restartLaunching(t *testing.T, fake *headlessFake, herdr func(*servertest.H
 }
 
 func TestReclaim_LaunchingWithNoAgentReopens(t *testing.T) {
+	t.Parallel()
 	runnerShapes(t, func(t *testing.T, headless bool) {
 		var fake *headlessFake
 		if headless {
@@ -167,6 +170,7 @@ func TestReclaim_LaunchingWithNoAgentReopens(t *testing.T) {
 }
 
 func TestReclaim_LaunchingIdleAgentIsStoppedThenReopens(t *testing.T) {
+	t.Parallel()
 	t.Run("herdr", func(t *testing.T) {
 		var mu sync.Mutex
 		closed := 0
@@ -199,6 +203,7 @@ func TestReclaim_LaunchingIdleAgentIsStoppedThenReopens(t *testing.T) {
 }
 
 func TestReclaim_LaunchingWorkingAgentIsALiveRun(t *testing.T) {
+	t.Parallel()
 	t.Run("herdr", func(t *testing.T) {
 		var finished atomic.Bool
 		h, ticketPath := restartLaunching(t, nil, func(h *servertest.Harness) {

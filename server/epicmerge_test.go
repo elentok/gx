@@ -37,6 +37,7 @@ func ticketFiles(t *testing.T, store string) map[string]string {
 }
 
 func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Status: "done"}}, func(*schedFixture, servertest.Prompt, string) {
 		t.Error("a refused merge launched an agent")
 	})
@@ -90,6 +91,7 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 }
 
 func TestEpicMerge_CommitlessEpicWithNoBranchIsStampedMerged(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Status: "done"}}, func(*schedFixture, servertest.Prompt, string) {})
 	servertest.WriteTicketWith(t, f.store, "proj", "research", "01", "t", servertest.TicketOpts{Status: "done", Type: "research"})
 	f.h.Server.Rescan()
@@ -129,6 +131,7 @@ func newFFFixture(t *testing.T) *schedFixture {
 }
 
 func TestEpicMerge_FastForwardMergesDirectlyWithAutoFFMergeOff(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -151,6 +154,7 @@ func TestEpicMerge_FastForwardMergesDirectlyWithAutoFFMergeOff(t *testing.T) {
 }
 
 func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, _ string) {
 		// README.md is one line on trunk: this adds three and removes one.
 		testutil.WriteFile(t, p.Cwd, "README.md", "a\nb\nc\n")
@@ -197,6 +201,7 @@ func stampTicket(t *testing.T, f *schedFixture, mutate func(*schema.Ticket)) {
 }
 
 func TestEpicMerge_StampsSummedTotalsWhenEveryDoneTicketIsStamped(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -220,6 +225,7 @@ func TestEpicMerge_StampsSummedTotalsWhenEveryDoneTicketIsStamped(t *testing.T) 
 }
 
 func TestEpicMerge_FrictionIncludesACancelledTicket(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -247,6 +253,7 @@ func TestEpicMerge_FrictionIncludesACancelledTicket(t *testing.T) {
 }
 
 func TestEpicMerge_UnstampedDoneTicketLeavesTokensAndCostOffButKeepsFriction(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -269,6 +276,7 @@ func TestEpicMerge_UnstampedDoneTicketLeavesTokensAndCostOffButKeepsFriction(t *
 }
 
 func TestEpicMerge_RecreatesARemovedFeatureWorktree(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -291,6 +299,7 @@ func TestEpicMerge_RecreatesARemovedFeatureWorktree(t *testing.T) {
 }
 
 func TestEpicMerge_DirtyTrunkPausesTheRootAndLeavesItQueued(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -315,6 +324,7 @@ func TestEpicMerge_DirtyTrunkPausesTheRootAndLeavesItQueued(t *testing.T) {
 }
 
 func TestEpicMerge_MergeErrorReturnsAMergeErrorPause(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -357,6 +367,7 @@ func raceTrunk(t *testing.T, f *forkFixture) {
 }
 
 func TestEpicMerge_TrunkMovingDuringTheMergeForksANormalTicket(t *testing.T) {
+	t.Parallel()
 	f := newForkFixture(t, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -374,6 +385,7 @@ func TestEpicMerge_TrunkMovingDuringTheMergeForksANormalTicket(t *testing.T) {
 }
 
 func TestEpicMerge_TrunkMovingDuringTheMergeAtTheCapPauses(t *testing.T) {
+	t.Parallel()
 	f := newForkFixtureWith(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -403,6 +415,7 @@ func (f *schedFixture) assertManualTicket(t *testing.T, res server.QueueResult, 
 }
 
 func TestEpicMerge_NonFFForksAManualTicketWhoseFinishMergesTheEpic(t *testing.T) {
+	t.Parallel()
 	f := newForkFixture(t, func(f *forkFixture, _ int) {
 		if !f.rootQueued(t) {
 			t.Error("root not re-queued while the manual ticket runs")
@@ -432,6 +445,7 @@ func TestEpicMerge_NonFFForksAManualTicketWhoseFinishMergesTheEpic(t *testing.T)
 }
 
 func TestEpicMerge_ForkingAManualTicketClearsTheStoredBlock(t *testing.T) {
+	t.Parallel()
 	f := newForkFixture(t, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -452,6 +466,7 @@ func TestEpicMerge_ForkingAManualTicketClearsTheStoredBlock(t *testing.T) {
 }
 
 func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testing.T) {
+	t.Parallel()
 	f := newForkFixture(t, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -485,6 +500,7 @@ func TestEpicMerge_RetryTicketFinishingLastAfterTheManualOneStillMerges(t *testi
 }
 
 func TestEpicMerge_ManualTicketResetsTheCapAndResumesTheRoot(t *testing.T) {
+	t.Parallel()
 	f := newForkFixtureWith(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), nil)
 	ev := f.pauseRoot(t)
 	if ev.Kind != string(events.NeedsRebase) {

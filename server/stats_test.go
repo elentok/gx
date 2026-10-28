@@ -85,6 +85,7 @@ func statsStore(t *testing.T, setup func(store string)) (get func(query string) 
 }
 
 func TestStats_TicketsMergedFollowTheCountingRules(t *testing.T) {
+	t.Parallel()
 	get := statsFixture(t)
 	s := get("")
 	// day 1: loop 01+02 and other/loop 01; the map ticket, the unstamped done
@@ -106,6 +107,7 @@ func TestStats_TicketsMergedFollowTheCountingRules(t *testing.T) {
 }
 
 func TestStats_EpicsMergedIncludeArchives(t *testing.T) {
+	t.Parallel()
 	s := statsFixture(t)("")
 	if got := statsAt(t, s, s.Throughput.EpicsMerged, 2); got != 2 {
 		t.Errorf("epics merged on day 2 = %d, want 2 (live and archived)", got)
@@ -116,6 +118,7 @@ func TestStats_EpicsMergedIncludeArchives(t *testing.T) {
 }
 
 func TestStats_MapsCountAsDesignsCompletedNotEpicsMerged(t *testing.T) {
+	t.Parallel()
 	s := statsStore(t, func(store string) {
 		// A done map carries the merged_at copied from its impl epic.
 		writeProjectEpic(t, store, "proj", "feat", "---\nkind: map\nstatus: done\ncompleted_at: "+statsStamp(3)+"\nmerged_at: "+statsStamp(1)+"\n---\n", nil)
@@ -140,6 +143,7 @@ func TestStats_MapsCountAsDesignsCompletedNotEpicsMerged(t *testing.T) {
 }
 
 func TestStats_ProjectFilter(t *testing.T) {
+	t.Parallel()
 	get := statsFixture(t)
 	s := get("?project=other")
 	if got := statsAt(t, s, s.Throughput.TicketsMerged, 1); got != 1 {
@@ -151,6 +155,7 @@ func TestStats_ProjectFilter(t *testing.T) {
 }
 
 func TestStats_Ranges(t *testing.T) {
+	t.Parallel()
 	get := statsFixture(t)
 	for query, want := range map[string]int{"": 30, "?range=7": 7, "?range=30": 30, "?range=90": 90} {
 		s := get(query)
@@ -161,6 +166,7 @@ func TestStats_Ranges(t *testing.T) {
 }
 
 func TestStats_BadRangeIs400(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/stats?range=14"); code != http.StatusBadRequest {
 		t.Errorf("range=14 = %d, want 400", code)
@@ -168,6 +174,7 @@ func TestStats_BadRangeIs400(t *testing.T) {
 }
 
 func TestStats_NeedsTheWebCookie(t *testing.T) {
+	t.Parallel()
 	_, base := startWeb(t)
 	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/stats", nil); code != http.StatusUnauthorized {
 		t.Errorf("GET /v1/stats without cookie = %d, want 401", code)
@@ -175,6 +182,7 @@ func TestStats_NeedsTheWebCookie(t *testing.T) {
 }
 
 func TestStats_LinesOfCodeLandOnTheMergeDay(t *testing.T) {
+	t.Parallel()
 	s := statsStore(t, func(store string) {
 		writeProjectEpic(t, store, "proj", "a", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\nlines_added: 120\nlines_removed: 30\n---\n", nil)
 		writeProjectEpic(t, store, "proj", "b", "---\nstatus: done\nmerged_at: "+statsStamp(2)+"\nlines_added: 5\nlines_removed: 1\n---\n", nil)
@@ -192,6 +200,7 @@ func TestStats_LinesOfCodeLandOnTheMergeDay(t *testing.T) {
 }
 
 func TestStats_FollowUpsCountByOriginalAddress(t *testing.T) {
+	t.Parallel()
 	s := statsStore(t, func(store string) {
 		created := func(n int) string { return "created_at: " + statsStamp(n) + "\n" }
 		writeProjectEpic(t, store, "proj", "follow-ups", "---\nstatus: open\n---\n", map[string]string{
@@ -229,6 +238,7 @@ func TestStats_FollowUpsCountByOriginalAddress(t *testing.T) {
 }
 
 func TestStats_WaitingForDesignCountsOpenMapDays(t *testing.T) {
+	t.Parallel()
 	mapMD := func(status string, created int, completed int) string {
 		md := "---\nkind: map\nstatus: " + status + "\ncreated_at: " + statsStamp(created) + "\n"
 		if completed >= 0 {
@@ -261,6 +271,7 @@ func statsAmountAt(t *testing.T, s server.Stats, series []server.StatsAmount, n 
 }
 
 func TestStats_TokensAndSpendSplitDesignAndImplementation(t *testing.T) {
+	t.Parallel()
 	stamp := func(tokens int, cost string) string {
 		return "total_tokens: " + strconv.Itoa(tokens) + "\nactual_cost: " + cost + "\n"
 	}
@@ -310,6 +321,7 @@ func TestStats_TokensAndSpendSplitDesignAndImplementation(t *testing.T) {
 func frictionYAML(body string) string { return "friction:\n" + body }
 
 func TestStats_FrictionLandsOnTheStampDayAndSplitsReasons(t *testing.T) {
+	t.Parallel()
 	done := func(day int) string { return "done_at: " + statsStamp(day) + "\n" }
 	reasons := []string{"a", "b", "c", "d", "e", "f"}
 	s := statsStore(t, func(store string) {
@@ -353,6 +365,7 @@ func TestStats_FrictionLandsOnTheStampDayAndSplitsReasons(t *testing.T) {
 }
 
 func TestStats_FrictionWithoutPersonEndingsHasNoHeadlines(t *testing.T) {
+	t.Parallel()
 	s := statsStore(t, func(store string) {
 		writeProjectEpic(t, store, "proj", "loop", "---\nstatus: open\n---\n", map[string]string{
 			"01-a.md": issueMD("01", "done", "done_at: "+statsStamp(1)+"\n"+

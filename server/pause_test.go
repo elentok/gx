@@ -45,6 +45,7 @@ func expectRun(t *testing.T, h *servertest.Harness) {
 }
 
 func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {
+	t.Parallel()
 	h := startPauseHarness(t)
 	ctx := context.Background()
 
@@ -67,6 +68,7 @@ func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {
 }
 
 func TestFlush_IsFinishAndPause(t *testing.T) {
+	t.Parallel()
 	h := startPauseHarness(t)
 	ctx := context.Background()
 
@@ -89,6 +91,7 @@ func TestFlush_IsFinishAndPause(t *testing.T) {
 }
 
 func TestSnapshot_ReportsQueueMode(t *testing.T) {
+	t.Parallel()
 	h := startPauseHarness(t)
 	ctx := context.Background()
 	steps := []struct {
@@ -115,6 +118,7 @@ func TestSnapshot_ReportsQueueMode(t *testing.T) {
 }
 
 func TestQueuePaused(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if paused, err := server.QueuePaused(dir); err != nil || paused {
 		t.Fatalf("no file: paused = %v, err = %v; want false, nil", paused, err)

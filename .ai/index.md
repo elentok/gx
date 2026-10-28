@@ -34,8 +34,9 @@ Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/d
 - Once a targeted run passes, stop. Don't rerun the full suite to double-check.
 - Verify with `gx check` in the foreground, unpiped. Iterate with `gx brief`. Never pipe, `tail` or
   background either.
-- `server/` is the slowest package by far. Run it only when you touched `server/` or
-  `server/servertest/`, and scope it with `-run` while iterating.
+- `server/` is the slowest package. Run it only when you touched `server/` or
+  `server/servertest/`, and scope it with `-run` while iterating. A plain `go test ./server` runs
+  the tests in parallel and takes about 2 minutes.
 - Tests must never read the developer's real Claude config (their `editorMode: vim` changes
   outcomes). Call `claudeenv.Isolate()` (`testutil/claudeenv`) from every package's `TestMain`. It
   points `HOME` and a clean `CLAUDE_CONFIG_DIR` at a temp dir, unsets `XDG_*`, and leaves a vim-mode

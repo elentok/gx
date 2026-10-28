@@ -11,6 +11,7 @@ import (
 )
 
 func TestStartupSweep_CountsUncountedClaudeDesignRecords(t *testing.T) {
+	t.Parallel()
 	home, dir := t.TempDir(), t.TempDir()
 	at := time.Now()
 	seed := []conversations.Record{

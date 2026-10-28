@@ -18,6 +18,7 @@ import (
 )
 
 func TestStop_WaitsForAMergeInFlightAndFlushesTheStoreCommit(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -79,6 +80,7 @@ func TestStop_WaitsForAMergeInFlightAndFlushesTheStoreCommit(t *testing.T) {
 }
 
 func TestStop_LeavesALiveAgentRunningAndUnmerged(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)

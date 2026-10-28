@@ -9,6 +9,7 @@ import (
 )
 
 func TestRetry_ZeroCommitWithALiveAgentPromptsAndKeepsThePause(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	pauseEnvZeroCommit(t, e)
 
@@ -25,6 +26,7 @@ func TestRetry_ZeroCommitWithALiveAgentPromptsAndKeepsThePause(t *testing.T) {
 }
 
 func TestRetry_BlockedPaneWithALiveAgentPrompts(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	if err := e.h.Server.PauseAs(answerAddr, events.BlockedPane, "stuck"); err != nil {
 		t.Fatal(err)
@@ -39,6 +41,7 @@ func TestRetry_BlockedPaneWithALiveAgentPrompts(t *testing.T) {
 }
 
 func TestRetry_BudgetKilledDoesNotPromptTheAgent(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	if err := e.h.Server.PauseAs(answerAddr, events.BudgetKilled, "over budget"); err != nil {
 		t.Fatal(err)

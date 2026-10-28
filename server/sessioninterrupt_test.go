@@ -10,6 +10,7 @@ import (
 )
 
 func TestSessionInterrupt_SendsCtrlCToAWorkingSession(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	report(t, f.conv, agentfake.Control{State: "working"})
 	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
@@ -21,6 +22,7 @@ func TestSessionInterrupt_SendsCtrlCToAWorkingSession(t *testing.T) {
 }
 
 func TestSessionInterrupt_RefusesAnIdleSession(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	res, err := f.h.Client.InterruptSession(f.ctx, f.id)
 	if err != nil || !res.Refused || res.Reason != server.ReasonSessionNotWorking {
@@ -32,6 +34,7 @@ func TestSessionInterrupt_RefusesAnIdleSession(t *testing.T) {
 }
 
 func TestWebSessions_InterruptNeedsAFreshTokenOnADesignSession(t *testing.T) {
+	t.Parallel()
 	h, base, cookie, ctx, _, design, plain := startWebDesign(t)
 	waitForHolder(t, h.SessionsDir+"/"+design)
 	for _, tc := range []struct{ name, id, state, want string }{

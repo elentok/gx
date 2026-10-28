@@ -29,6 +29,7 @@ func startBudgetReloadServer(t *testing.T, soft, hard float64) (*servertest.Harn
 // Seam: a raised limit shows in the budget status and lifts a latch spend no
 // longer reaches.
 func TestConfigReload_RaisedBudgetLimitsLiftLatches(t *testing.T) {
+	t.Parallel()
 	h, path, store := startBudgetReloadServer(t, 5, 7)
 	h.Server.RecordSpend("spent", 8)
 	if st := h.Server.BudgetStatusAt(time.Now()); !st.HardLatched {
@@ -55,6 +56,7 @@ func TestConfigReload_RaisedBudgetLimitsLiftLatches(t *testing.T) {
 // Seam: a reload editing only hard-limit keeps a soft limit raised by
 // `gx budget increase`.
 func TestConfigReload_KeepsIncreaseOnUneditedField(t *testing.T) {
+	t.Parallel()
 	h, path, store := startBudgetReloadServer(t, 5, 20)
 	soft := 10.0
 	if res, err := h.Client.BudgetIncrease(context.Background(), server.BudgetIncreaseRequest{Soft: &soft}); err != nil || res.Refused {
@@ -70,6 +72,7 @@ func TestConfigReload_KeepsIncreaseOnUneditedField(t *testing.T) {
 
 // Seam: a lowered soft limit already exceeded latches at the next check.
 func TestConfigReload_LoweredSoftLimitLatchesAtNextCheck(t *testing.T) {
+	t.Parallel()
 	h, path, store := startBudgetReloadServer(t, 10, 0)
 	h.Server.RecordSpend("spent", 6)
 	if h.Server.BudgetStatusAt(time.Now()).BudgetPaused {
@@ -86,6 +89,7 @@ func TestConfigReload_LoweredSoftLimitLatchesAtNextCheck(t *testing.T) {
 // Seam: a hard limit lowered to or below spend reloads without warnings and
 // never latches hard, so it stops no agent.
 func TestConfigReload_LoweredHardLimitBelowSpendDoesNotLatch(t *testing.T) {
+	t.Parallel()
 	h, path, store := startBudgetReloadServer(t, 5, 20)
 	h.Server.RecordSpend("spent", 8)
 

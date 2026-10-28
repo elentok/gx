@@ -47,6 +47,7 @@ func actionKinds(r server.EpicListRow) []server.CardActionKind {
 }
 
 func TestEpicList_DesignCards(t *testing.T) {
+	t.Parallel()
 	cfg := t.TempDir()
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	four := map[string]string{
@@ -122,6 +123,7 @@ func TestEpicList_DesignCards(t *testing.T) {
 }
 
 func TestEpicList_DesignCountdownCarriesItsDeadline(t *testing.T) {
+	t.Parallel()
 	f := startAdvancing(t, storeWithMapStep(t, "spec"))
 	writeAssistantMessage(t, f.path, runEndText)
 	endTurn(t, f)
@@ -143,6 +145,7 @@ func TestEpicList_DesignCountdownCarriesItsDeadline(t *testing.T) {
 }
 
 func TestEpicList_NewDesignLifecycle(t *testing.T) {
+	t.Parallel()
 	cfg := t.TempDir()
 	f := startDesigns(t, servertest.WithEnv("CLAUDE_CONFIG_DIR="+cfg))
 	res := f.openNew(t, "fresh-idea", "an idea")
@@ -169,6 +172,7 @@ func TestEpicList_NewDesignLifecycle(t *testing.T) {
 }
 
 func TestEpicList_NewDesignGoesToReadyToDesignWhenItsSessionEndsUncharted(t *testing.T) {
+	t.Parallel()
 	f := startDesigns(t)
 	res := f.openNew(t, "fresh-idea", "an idea")
 	if res.Refused || res.Session == nil {

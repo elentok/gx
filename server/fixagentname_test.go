@@ -3,6 +3,7 @@ package server
 import "testing"
 
 func TestFixAgentName(t *testing.T) {
+	t.Parallel()
 	if got := fixAgentName("proj:loop/01"); got != "fix-proj_cloop_s01" {
 		t.Errorf("ordinary address = %q", got)
 	}

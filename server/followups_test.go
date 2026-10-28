@@ -46,6 +46,7 @@ func mergedInvestigation(t *testing.T, body string, followUps string) (*Server, 
 }
 
 func TestFileFollowUp_CatalogEntryFilesADraftResearchTicketAndCreatesTheEpicDraft(t *testing.T) {
+	t.Parallel()
 	for _, class := range []string{proposalCatalogEntry, proposalOrchestratorFix} {
 		t.Run(class, func(t *testing.T) {
 			s, store, addr, path := mergedInvestigation(t, investigateReport(class), "proj:follow-ups")
@@ -80,6 +81,7 @@ func TestFileFollowUp_CatalogEntryFilesADraftResearchTicketAndCreatesTheEpicDraf
 }
 
 func TestEnsureDraftEpic_ExistingDirWithoutTicketMDBecomesValid(t *testing.T) {
+	t.Parallel()
 	projectDir := t.TempDir()
 	epicPath := filepath.Join(projectDir, "follow-ups")
 	testutil.Mkdir(t, epicPath)
@@ -112,6 +114,7 @@ func followUpTickets(t *testing.T, store string) []tickets.Ticket {
 }
 
 func TestFileFollowUp_SecondIdenticalReportAddsAnOccurrenceLine(t *testing.T) {
+	t.Parallel()
 	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
 	s.fileFollowUp(addr, path)
 	s.fileFollowUp(addr, path)
@@ -142,6 +145,7 @@ func TestFileFollowUp_SecondIdenticalReportAddsAnOccurrenceLine(t *testing.T) {
 }
 
 func TestFileFollowUp_DifferentClassIsNotADuplicate(t *testing.T) {
+	t.Parallel()
 	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "proj:follow-ups")
 	s.fileFollowUp(addr, path)
 	_, _, _, other := mergedInvestigation(t, investigateReport(proposalOrchestratorFix), "proj:follow-ups")
@@ -160,6 +164,7 @@ func TestFileFollowUp_DifferentClassIsNotADuplicate(t *testing.T) {
 }
 
 func TestFileFollowUp_MissingProjectFilesNothingAndDoesNotFail(t *testing.T) {
+	t.Parallel()
 	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalCatalogEntry), "nowhere:follow-ups")
 	s.fileFollowUp(addr, path)
 	if got := followUpTickets(t, store); got != nil {
@@ -168,6 +173,7 @@ func TestFileFollowUp_MissingProjectFilesNothingAndDoesNotFail(t *testing.T) {
 }
 
 func TestFileFollowUp_HumanOnlyFilesNothing(t *testing.T) {
+	t.Parallel()
 	s, store, addr, path := mergedInvestigation(t, investigateReport(proposalHumanOnly), "proj:follow-ups")
 	s.fileFollowUp(addr, path)
 	if _, err := os.Stat(filepath.Join(store, "proj", "follow-ups")); !os.IsNotExist(err) {
@@ -176,6 +182,7 @@ func TestFileFollowUp_HumanOnlyFilesNothing(t *testing.T) {
 }
 
 func TestProposalClass_AmbiguousOrMissingFilesNothing(t *testing.T) {
+	t.Parallel()
 	for name, result := range map[string]string{
 		"no proposal":  "Observed: it spun",
 		"two classes":  "Proposal: catalog-entry or orchestrator-fix",

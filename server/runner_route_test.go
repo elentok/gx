@@ -35,6 +35,7 @@ func routingServer() (*Server, *namedRunner) {
 }
 
 func TestRunnerForRun_PicksTheRunsOwnRunner(t *testing.T) {
+	t.Parallel()
 	s, _ := routingServer()
 	for _, tc := range []struct{ saved, want string }{
 		{"herdr", "herdr"},
@@ -50,6 +51,7 @@ func TestRunnerForRun_PicksTheRunsOwnRunner(t *testing.T) {
 }
 
 func TestRunnerForRun_UnbuildableRunnerIsNil(t *testing.T) {
+	t.Parallel()
 	s, _ := routingServer()
 	if r := s.runnerForRun(Run{Address: "proj:epic-a/01", Runner: "tmux"}); r != nil {
 		t.Errorf("got %v, want nil", r)
@@ -57,6 +59,7 @@ func TestRunnerForRun_UnbuildableRunnerIsNil(t *testing.T) {
 }
 
 func TestRunnerFor_LaunchesStillUseTheConfiguredRunner(t *testing.T) {
+	t.Parallel()
 	s, _ := routingServer()
 	r, ok := s.runnerFor("proj").(*namedRunner)
 	if !ok || r.name != "headless" || r.project != "proj" {
@@ -68,6 +71,7 @@ func TestRunnerFor_LaunchesStillUseTheConfiguredRunner(t *testing.T) {
 }
 
 func TestRunnerForRun_FallsBackToTheConfiguredRunnerByName(t *testing.T) {
+	t.Parallel()
 	s, configured := routingServer()
 	s.cfg.RunnerFor = nil
 	if r := s.runnerForRun(Run{Address: "proj:epic-a/01", Runner: "headless"}); r != agentrunner.Runner(configured) {

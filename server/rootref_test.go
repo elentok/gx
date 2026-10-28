@@ -3,6 +3,7 @@ package server
 import "testing"
 
 func TestRootRef_ParseAndStringRoundTrip(t *testing.T) {
+	t.Parallel()
 	root, err := parseRootRef("proj:epic-a")
 	if err != nil {
 		t.Fatal(err)
@@ -13,6 +14,7 @@ func TestRootRef_ParseAndStringRoundTrip(t *testing.T) {
 }
 
 func TestRootRef_RefusesInvalidInput(t *testing.T) {
+	t.Parallel()
 	for _, in := range []string{"", "proj", ":epic", "proj:"} {
 		if _, err := parseRootRef(in); err == nil {
 			t.Errorf("parseRootRef(%q) accepted", in)

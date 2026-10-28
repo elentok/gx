@@ -42,6 +42,7 @@ func (f firstPromptFixture) gxActionable(t *testing.T) server.SessionActionable 
 }
 
 func TestFirstPromptFailure_StillStartingRaisesActionable(t *testing.T) {
+	t.Parallel()
 	f := startFailingFirstPrompt(t, "fix the bug")
 	got := f.gxActionable(t)
 	if !slices.Equal(got.Action, []string{"fix the bug"}) || !strings.Contains(got.Reason, "still starting") {
@@ -54,6 +55,7 @@ func TestFirstPromptFailure_StillStartingRaisesActionable(t *testing.T) {
 }
 
 func TestFirstPromptFailure_BlockedTimeDoesNotCountAsStarting(t *testing.T) {
+	t.Parallel()
 	f := startFailingFirstPrompt(t, "fix the bug", agentfake.ProgramTrustEnv+"=1")
 	time.Sleep(3 * firstPromptStartTimeout)
 	snap, err := f.h.Client.Snapshot(f.ctx)
@@ -68,6 +70,7 @@ func TestFirstPromptFailure_BlockedTimeDoesNotCountAsStarting(t *testing.T) {
 }
 
 func TestFirstPromptFailure_NeverStartedClearsLeftoverText(t *testing.T) {
+	t.Parallel()
 	f := startFailingFirstPrompt(t, "fix the bug")
 	stop := make(chan struct{})
 	defer close(stop)
@@ -96,6 +99,7 @@ func TestFirstPromptFailure_NeverStartedClearsLeftoverText(t *testing.T) {
 }
 
 func TestFirstPromptFailure_GxRaisedSurvivesInputAndAgentRaisedDoesNot(t *testing.T) {
+	t.Parallel()
 	f := startFailingFirstPrompt(t, "fix the bug")
 	f.gxActionable(t)
 

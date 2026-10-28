@@ -54,6 +54,7 @@ func assertPausedOnInstallFailure(t *testing.T, f *schedFixture, starts *atomic.
 }
 
 func TestInstallFailure_PausesAndDiscardsTheIterationWorktree(t *testing.T) {
+	t.Parallel()
 	f, starts := runFailingInstall(t, "implement")
 
 	assertPausedOnInstallFailure(t, f, starts)
@@ -67,6 +68,7 @@ func TestInstallFailure_PausesAndDiscardsTheIterationWorktree(t *testing.T) {
 }
 
 func TestInstallFailure_MergeTicketKeepsTheFeatureWorktree(t *testing.T) {
+	t.Parallel()
 	f, starts := runFailingInstall(t, "merge")
 
 	assertPausedOnInstallFailure(t, f, starts)

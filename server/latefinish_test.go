@@ -168,6 +168,7 @@ func (p zeroCommitPaused) staysPaused(t *testing.T) {
 func pausedAt(p zeroCommitPaused) string { return p.pause.Time.UTC().Format(time.RFC3339) }
 
 func TestLateFinish_MergesLateCommit(t *testing.T) {
+	t.Parallel()
 	runnerShapes(t, func(t *testing.T, headless bool) {
 		p := pauseZeroCommit(t, headless)
 		commitAgentWork(t, p.wtPath)
@@ -184,6 +185,7 @@ func TestLateFinish_MergesLateCommit(t *testing.T) {
 }
 
 func TestLateFinish_ClosesQuestionAsAdopted(t *testing.T) {
+	t.Parallel()
 	p := pauseZeroCommit(t, true)
 	evs, err := tickets.ReadLog(p.ticketPath)
 	if err != nil {
@@ -206,6 +208,7 @@ func TestLateFinish_ClosesQuestionAsAdopted(t *testing.T) {
 }
 
 func TestLateFinish_ClosesCommitless(t *testing.T) {
+	t.Parallel()
 	runnerShapes(t, func(t *testing.T, headless bool) {
 		p := pauseZeroCommit(t, headless)
 		p.report(t, p.finishedLate(true))
@@ -223,6 +226,7 @@ func TestLateFinish_ClosesCommitless(t *testing.T) {
 
 // With the agent gone the adoption neither waits on nor stops it.
 func TestLateFinish_AgentGoneStillAdopts(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name       string
 		commit     bool
@@ -254,6 +258,7 @@ func TestLateFinish_AgentGoneStillAdopts(t *testing.T) {
 // resume and relaunch adopt a late finish before acting, launch nothing, and
 // cancel only the investigation that has not started.
 func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
+	t.Parallel()
 	for _, verb := range []string{"resume", "relaunch"} {
 		t.Run(verb, func(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {
@@ -301,6 +306,7 @@ func TestLateFinish_ResumeAndRelaunchAdoptFirst(t *testing.T) {
 }
 
 func TestLateFinish_FailedConditionStaysPaused(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name   string
 		commit bool

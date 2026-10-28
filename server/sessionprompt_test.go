@@ -49,6 +49,7 @@ func (f promptFixture) prompt(t *testing.T, text string) server.SessionResult {
 }
 
 func TestSessionPrompt_TypesMultiLineTextAsOnePrompt(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	if res := f.prompt(t, "line one\r\nline two\n\nline four"); res.Refused {
 		t.Fatalf("prompt = %+v", res)
@@ -57,6 +58,7 @@ func TestSessionPrompt_TypesMultiLineTextAsOnePrompt(t *testing.T) {
 }
 
 func TestSessionPrompt_SwallowedEnterIsNudged(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	if err := agentfake.SendProgramControl(f.conv, agentfake.Control{Action: agentfake.ActionSwallowEnter}); err != nil {
 		t.Fatal(err)
@@ -73,6 +75,7 @@ func TestSessionPrompt_SwallowedEnterIsNudged(t *testing.T) {
 }
 
 func TestSessionPrompt_Refusals(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	for name, tc := range map[string]struct{ text, want string }{
 		"empty":    {"  \n", server.ReasonEmptyPrompt},
@@ -87,6 +90,7 @@ func TestSessionPrompt_Refusals(t *testing.T) {
 }
 
 func TestSessionPrompt_NotIdle(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	report(t, f.conv, agentfake.Control{State: "working"})
 	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
@@ -96,6 +100,7 @@ func TestSessionPrompt_NotIdle(t *testing.T) {
 }
 
 func TestSessionPrompt_NotADesignSession(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
@@ -108,6 +113,7 @@ func TestSessionPrompt_NotADesignSession(t *testing.T) {
 }
 
 func TestSessionPrompt_HarnessWithoutChat(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.NoResumeHarnessKind), Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
@@ -120,6 +126,7 @@ func TestSessionPrompt_HarnessWithoutChat(t *testing.T) {
 }
 
 func TestSessionPrompt_LogsOneEventWithoutTheText(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	const text = "secret plan\nsecond line"
 	if res := f.prompt(t, text); res.Refused {
@@ -143,6 +150,7 @@ func TestSessionPrompt_LogsOneEventWithoutTheText(t *testing.T) {
 }
 
 func TestWebSessionPrompt_StaleWhenTheTranscriptMoved(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	writeTranscript(t, f.transcript,
 		`{"type":"assistant","uuid":"a1","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"Which store?"}]}}`,
@@ -171,6 +179,7 @@ func (f promptFixture) cont(t *testing.T) server.SessionResult {
 }
 
 func TestSessionPrompt_ContinueTypesClearThenGxDesign(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	if res := f.cont(t); res.Refused {
 		t.Fatalf("continue = %+v", res)
@@ -183,6 +192,7 @@ func TestSessionPrompt_ContinueTypesClearThenGxDesign(t *testing.T) {
 }
 
 func TestSessionPrompt_ContinueRefusedOnANonDesignSession(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
@@ -195,6 +205,7 @@ func TestSessionPrompt_ContinueRefusedOnANonDesignSession(t *testing.T) {
 }
 
 func TestWebSessionPrompt_StaleContinueIsRefused(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	writeTranscript(t, f.transcript,
 		`{"type":"assistant","uuid":"a1","timestamp":"2026-01-01T10:00:00Z","message":{"content":[{"type":"text","text":"Which store?"}]}}`,
@@ -217,6 +228,7 @@ func TestWebSessionPrompt_StaleContinueIsRefused(t *testing.T) {
 }
 
 func TestWebSessionPrompt_KeepsTheWriteChecks(t *testing.T) {
+	t.Parallel()
 	f := startPromptSession(t)
 	url := f.base + "/v1/sessions/prompt"
 	body := fmt.Sprintf(`{"id":%q,"text":"hi"}`, f.id)

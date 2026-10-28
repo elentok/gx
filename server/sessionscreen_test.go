@@ -11,6 +11,7 @@ import (
 )
 
 func TestSessionScreen_LiveReturnsHolderRows(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, _ := startFakeSession(t)
 	holder := waitForHolder(t, filepath.Join(h.SessionsDir, id))
 	if err := holder.SendKeys("typed-on-screen"); err != nil {
@@ -28,6 +29,7 @@ func TestSessionScreen_LiveReturnsHolderRows(t *testing.T) {
 }
 
 func TestSessionScreen_ExitedReturnsSavedScreen(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t)
 	dir := filepath.Join(h.SessionsDir, id)
 	waitForHolder(t, dir)
@@ -49,6 +51,7 @@ func TestSessionScreen_ExitedReturnsSavedScreen(t *testing.T) {
 }
 
 func TestSessionScreen_UnknownSessionIsRefused(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, _, _ := startFakeSession(t)
 	if _, err := h.Client.SessionScreen(ctx, "no-such-session"); err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("unknown session err = %v, want a 404", err)

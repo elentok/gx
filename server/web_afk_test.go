@@ -7,6 +7,7 @@ import (
 )
 
 func TestWebAFK_PostSetsModeAndSnapshotShowsIt(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
 	for _, tc := range []struct {

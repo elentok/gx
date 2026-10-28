@@ -13,6 +13,7 @@ import (
 )
 
 func TestUnread_RaisedByDoneBlockedAndCrashNotCancel(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	step := func(c agentfake.Control, state string, want bool) {
 		t.Helper()
@@ -48,6 +49,7 @@ func TestUnread_RaisedByDoneBlockedAndCrashNotCancel(t *testing.T) {
 }
 
 func TestUnread_FocusedTUIViewingSuppressesAndClears(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	tuiCtx, dropTUI := context.WithCancel(ctx)
 	defer dropTUI()
@@ -107,6 +109,7 @@ func TestUnread_FocusedTUIViewingSuppressesAndClears(t *testing.T) {
 }
 
 func TestReportFocus_RefusesUnknownClientOrSession(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -132,6 +135,7 @@ func TestReportFocus_RefusesUnknownClientOrSession(t *testing.T) {
 }
 
 func TestMarkRead_FailedSaveIsAnError(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	report(t, conv, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })

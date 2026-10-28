@@ -37,6 +37,7 @@ const goodRound = "Intro\n\n" +
 	"❓ **Q2** - **Keep going?**: Ok?\n\n➡️ Yes\n\n```gx-question\ntype: yes-no\nrecommended: yes\n```"
 
 func TestSessionChat_RoundParsesCardsAndStripsFences(t *testing.T) {
+	t.Parallel()
 	got := chatOf(t, assistantText("a1", goodRound))
 	if len(got.Round) != 2 {
 		t.Fatalf("round = %+v, want 2 cards", got.Round)
@@ -57,6 +58,7 @@ func TestSessionChat_RoundParsesCardsAndStripsFences(t *testing.T) {
 }
 
 func TestSessionChat_RoundDefaultsAreNotCards(t *testing.T) {
+	t.Parallel()
 	defaults := "\n\n**Decided unless you object**\n\n- Naming: use camelCase\n- Order: alphabetical"
 	for name, sep := range map[string]string{"with rule": "\n\n---", "without rule": ""} {
 		t.Run(name, func(t *testing.T) {
@@ -73,6 +75,7 @@ func TestSessionChat_RoundDefaultsAreNotCards(t *testing.T) {
 }
 
 func TestSessionChat_RoundReadsDriftedHeadersLeniently(t *testing.T) {
+	t.Parallel()
 	yesNo := "\n\n```gx-question\ntype: yes-no\n```"
 	got := chatOf(t, assistantText("a1",
 		"❓ **Q1 - Plain title**: body"+yesNo+"\n\n"+
@@ -88,6 +91,7 @@ func TestSessionChat_RoundReadsDriftedHeadersLeniently(t *testing.T) {
 }
 
 func TestSessionChat_RoundBadOrMissingBlockGivesFreeTextCard(t *testing.T) {
+	t.Parallel()
 	good := "\n\n```gx-question\ntype: yes-no\nrecommended: yes\n```"
 	got := chatOf(t, assistantText("a1",
 		"❓ **Q1** - **Bad**: x\n\n```gx-question\ntype: options\n```\n\n---\n\n"+
@@ -108,6 +112,7 @@ func TestSessionChat_RoundBadOrMissingBlockGivesFreeTextCard(t *testing.T) {
 }
 
 func TestSessionChat_RoundIsNullOnceThePersonAnswers(t *testing.T) {
+	t.Parallel()
 	got := chatOf(t, assistantText("a1", goodRound), personPrompt("u1", "yes to both"))
 	if got.Round != nil {
 		t.Errorf("round = %+v, want null after a person prompt", got.Round)
@@ -120,6 +125,7 @@ func TestSessionChat_RoundIsNullOnceThePersonAnswers(t *testing.T) {
 }
 
 func TestSessionChat_NextReadsTheRunEndLine(t *testing.T) {
+	t.Parallel()
 	for _, next := range []string{"map — go on", "anything the agent picks", "implement"} {
 		got := chatOf(t, assistantText("a1", fmt.Sprintf("Done.\n\n✅ Design: all good. Next: %s", next)))
 		if got.Next == nil || got.Next.Action.Reason == "" || len(got.Next.Action.Action) == 0 {
@@ -132,6 +138,7 @@ func TestSessionChat_NextReadsTheRunEndLine(t *testing.T) {
 }
 
 func TestSessionChat_RoundWinsOverTheRunEndLine(t *testing.T) {
+	t.Parallel()
 	got := chatOf(t, assistantText("a1", "✅ Design: halfway. Next: design detector"), assistantText("a2", goodRound))
 	if len(got.Round) != 2 || got.Next != nil {
 		t.Errorf("round = %d cards, next = %+v, want the round and no Continue", len(got.Round), got.Next)
@@ -139,6 +146,7 @@ func TestSessionChat_RoundWinsOverTheRunEndLine(t *testing.T) {
 }
 
 func TestSessionChat_BackgroundListsLiveTasksAndDropsAgedOutOnes(t *testing.T) {
+	t.Parallel()
 	now := time.Now().UTC()
 	ts := func(ago time.Duration) string { return now.Add(-ago).Format(time.RFC3339Nano) }
 	launch := func(use, input, result, ago string) []string {

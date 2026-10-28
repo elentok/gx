@@ -12,6 +12,7 @@ import (
 )
 
 func TestWeb_QueueAddEpicAddress(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicketWith(t, store, "proj", "epic-done", "01", "finished", servertest.TicketOpts{Status: "done"})
@@ -86,6 +87,7 @@ func TestWeb_QueueAddEpicAddress(t *testing.T) {
 }
 
 func TestQueue_MoveAndRemoveAcceptAnEpicAddress(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "second", "")
@@ -112,6 +114,7 @@ func TestQueue_MoveAndRemoveAcceptAnEpicAddress(t *testing.T) {
 }
 
 func TestQueue_AddEpicAddressQueuesOneEntry(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")

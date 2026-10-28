@@ -60,6 +60,7 @@ func checkKind(t *testing.T, p server.ProjectChecks, kind string) server.KindChe
 }
 
 func TestChecksStatus_RanksSourcesAndRunsNothing(t *testing.T) {
+	t.Parallel()
 	h, repo := checksFixture(t, "")
 	testutil.WriteFile(t, repo, "Makefile", "test:\n\ttouch ran.txt\n")
 	testutil.WriteFile(t, repo, "justfile", "test:\n    touch ran.txt\n")
@@ -84,6 +85,7 @@ func TestChecksStatus_RanksSourcesAndRunsNothing(t *testing.T) {
 }
 
 func TestChecksStatus_BuildScriptIsNeverOffered(t *testing.T) {
+	t.Parallel()
 	h, repo := checksFixture(t, "")
 	testutil.WriteFile(t, repo, "package.json", `{"scripts":{"build":"x"}}`)
 	testutil.CommitAll(t, repo, "add package")
@@ -95,6 +97,7 @@ func TestChecksStatus_BuildScriptIsNeverOffered(t *testing.T) {
 }
 
 func TestChecksStatus_FindsWorkspaceScriptAndMiseTask(t *testing.T) {
+	t.Parallel()
 	h, repo := checksFixture(t, "")
 	testutil.WriteFile(t, repo, "package.json", `{"workspaces":["webui"]}`)
 	testutil.WriteFile(t, repo, "pnpm-lock.yaml", "")
@@ -115,6 +118,7 @@ func TestChecksStatus_FindsWorkspaceScriptAndMiseTask(t *testing.T) {
 }
 
 func TestChecksStatus_MissingState(t *testing.T) {
+	t.Parallel()
 	t.Run("no config is missing", func(t *testing.T) {
 		h, _ := checksFixture(t, "")
 		if p := demoChecks(t, h); !p.Missing || p.Trunk != "main" {
@@ -153,6 +157,7 @@ func TestChecksStatus_MissingState(t *testing.T) {
 }
 
 func TestChecksStatus_CurrentState(t *testing.T) {
+	t.Parallel()
 	h, _ := checksFixture(t, `,"checks":{"lint":false}`)
 	if got := checkKind(t, demoChecks(t, h), "lint").State; got != "off" {
 		t.Errorf("lint state = %q", got)
@@ -168,6 +173,7 @@ func TestChecksStatus_CurrentState(t *testing.T) {
 }
 
 func TestChecksStatus_VCSNoneSavesOnlyToProjectJSON(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir())
 	if err := servertest.WriteEpic(h.TicketStore, "notes", ""); err != nil {
 		t.Fatal(err)
@@ -186,6 +192,7 @@ func TestChecksStatus_VCSNoneSavesOnlyToProjectJSON(t *testing.T) {
 }
 
 func TestChecksStatus_NoProjectListsEveryProject(t *testing.T) {
+	t.Parallel()
 	h, _ := checksFixture(t, "")
 	st, err := h.Client.ChecksStatus(context.Background(), "")
 	if err != nil {
@@ -201,6 +208,7 @@ func TestChecksStatus_NoProjectListsEveryProject(t *testing.T) {
 }
 
 func TestWeb_ChecksStatusIsServed(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/checks/status"); code != http.StatusOK {
 		t.Errorf("GET /v1/checks/status = %d", code)

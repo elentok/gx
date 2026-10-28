@@ -14,6 +14,7 @@ import (
 
 // A retro paused stuck and then cancelled still stamps its epic skipped.
 func TestCancel_PausedRetroStampsItsEpicSkipped(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "work", "")
 	epicTicket := filepath.Join(store, "proj", "epic-a", "ticket.md")

@@ -141,7 +141,7 @@ func SendTUIControl(home, sessionID string, c Control) error {
 // sendControlWhenReady writes c to the side-channel FIFO at path, waiting for
 // the fake to create it.
 func sendControlWhenReady(path string, c Control) error {
-	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+	for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		if _, err := os.Stat(path); err == nil {
 			break
 		} else if time.Now().After(deadline) {

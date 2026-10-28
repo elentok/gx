@@ -15,6 +15,7 @@ import (
 )
 
 func TestEventsStream_IdleStreamGetsHeartbeatComment(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.SSEHeartbeat = 20 * time.Millisecond })
 	sock := server.SocketPath(h.StateDir)
 	hc := &http.Client{Transport: &http.Transport{
@@ -48,6 +49,7 @@ func TestEventsStream_IdleStreamGetsHeartbeatComment(t *testing.T) {
 }
 
 func TestFollow_IgnoresHeartbeatComments(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.SSEHeartbeat = 10 * time.Millisecond })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

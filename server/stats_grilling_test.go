@@ -63,6 +63,7 @@ func amountAt(t *testing.T, s server.Stats, series []server.StatsAmount, n int) 
 }
 
 func TestStats_GrillingCountsLandOnTheirLocalDays(t *testing.T) {
+	t.Parallel()
 	fixedZone(t)
 	late := statsNoon(3).Add(11*time.Hour + 59*time.Minute) // 23:59 local
 	early := late.Add(2 * time.Minute)                      // 00:01 next local day
@@ -84,6 +85,7 @@ func TestStats_GrillingCountsLandOnTheirLocalDays(t *testing.T) {
 }
 
 func TestStats_GrillingHatchesBeforeTheFirstItemAndZeroesAfter(t *testing.T) {
+	t.Parallel()
 	fixedZone(t)
 	get := grillingStats(t, []conversations.Record{
 		{ID: "a", Ticket: "proj:design/01", Design: true, Grilling: []conversations.GrillingItem{grillItem("m1", statsNoon(5), 1, 9)}},
@@ -101,6 +103,7 @@ func TestStats_GrillingHatchesBeforeTheFirstItemAndZeroesAfter(t *testing.T) {
 }
 
 func TestStats_GrillingNothingCountedIsAllNoData(t *testing.T) {
+	t.Parallel()
 	fixedZone(t)
 	get := grillingStats(t, []conversations.Record{
 		{ID: "uncounted", Ticket: "proj:design/01", Design: true},
@@ -120,6 +123,7 @@ func TestStats_GrillingNothingCountedIsAllNoData(t *testing.T) {
 }
 
 func TestStats_GrillingCountsAMessageOnce(t *testing.T) {
+	t.Parallel()
 	fixedZone(t)
 	item := grillItem("same", statsNoon(2), 1, 7)
 	get := grillingStats(t, []conversations.Record{
@@ -133,6 +137,7 @@ func TestStats_GrillingCountsAMessageOnce(t *testing.T) {
 }
 
 func TestStats_GrillingProjectFilterKeepsTheGlobalBoundary(t *testing.T) {
+	t.Parallel()
 	fixedZone(t)
 	get := grillingStats(t, []conversations.Record{
 		{ID: "a", Ticket: "proj:design/01", Design: true, Grilling: []conversations.GrillingItem{grillItem("m1", statsNoon(2), 1, 7)}},

@@ -44,6 +44,7 @@ func agentDir(t *testing.T, root, label string, touched time.Time) string {
 }
 
 func TestPrune_HeadlessDirsArePrunedUnderAHerdrConfig(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)

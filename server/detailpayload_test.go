@@ -39,6 +39,7 @@ func issueWithBody(id, status, extra, title, body string) string {
 }
 
 func TestTicketDetail_LoopTicketPayload(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
 			"01-a.md": issueMD("01", "done", "", "Own blocker"),
@@ -76,6 +77,7 @@ func TestTicketDetail_LoopTicketPayload(t *testing.T) {
 }
 
 func TestTicketDetail_PausedTicketCarriesReason(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
 			"01-a.md": issueWithBody("01", "paused", "pause_reason: merge-conflict\n", "A", "## Paused\n\nConflict in main.go.\n"),
@@ -89,6 +91,7 @@ func TestTicketDetail_PausedTicketCarriesReason(t *testing.T) {
 }
 
 func TestTicketDetail_MapTicketHasNoStats(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\n---\n", map[string]string{
 			"01-q.md": issueWithBody("01", "done", "", "Which way?", "## Resolution\n\nWest.\n\n## Question\n\nWhere to?\n"),
@@ -105,6 +108,7 @@ func TestTicketDetail_MapTicketHasNoStats(t *testing.T) {
 }
 
 func TestTicketDetail_CostAndContextAppearOnceMerged(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
 			"01-a.md": issueMD("01", "done", "elapsed_time: 60\nactual_cost: 1.5\nactual_context_window: 90000\n", "Merged"),

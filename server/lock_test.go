@@ -27,6 +27,7 @@ func holdLock(t *testing.T, path, pid string) *os.File {
 }
 
 func TestAcquireLock_SamePidRetriesUntilFree(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), lockFileName)
 	held := holdLock(t, path, strconv.Itoa(os.Getpid()))
 	time.AfterFunc(200*time.Millisecond, func() { held.Close() })
@@ -39,6 +40,7 @@ func TestAcquireLock_SamePidRetriesUntilFree(t *testing.T) {
 }
 
 func TestAcquireLock_OtherPidFailsAtOnce(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), lockFileName)
 	held := holdLock(t, path, "999999")
 	defer held.Close()
@@ -54,6 +56,7 @@ func TestAcquireLock_OtherPidFailsAtOnce(t *testing.T) {
 }
 
 func TestLockHeldBy(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if _, held := LockHeldBy(dir); held {
 		t.Fatal("no lock file: should not be held")

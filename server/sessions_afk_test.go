@@ -43,6 +43,7 @@ func (h *slackHook) postsAfterAlert(hs *servertest.Harness, from int) []string {
 }
 
 func TestSessionAFK_DoneSendsBannerTextToChatEvenOnScreen(t *testing.T) {
+	t.Parallel()
 	h, chat, started, _, id, step := startAFKSession(t, true)
 	ctx := t.Context()
 	openTUI(ctx, t, h, "tui-1")
@@ -59,6 +60,7 @@ func TestSessionAFK_DoneSendsBannerTextToChatEvenOnScreen(t *testing.T) {
 }
 
 func TestSessionAFK_OffSendsNoChat(t *testing.T) {
+	t.Parallel()
 	h, chat, started, _, _, step := startAFKSession(t, false)
 	step(agentfake.Control{State: "done"}, server.SessionIdle)
 	if posts := chat.postsAfterAlert(h, started); len(posts) != 0 {
@@ -70,6 +72,7 @@ func TestSessionAFK_OffSendsNoChat(t *testing.T) {
 }
 
 func TestSessionAFK_NotificationsDisabledSuppressesChat(t *testing.T) {
+	t.Parallel()
 	h, chat, started, gate, _, step := startAFKSession(t, true)
 	muted, _ := json.Marshal(ralphloop.NotificationState{Transports: map[string]ralphloop.TransportState{"slack": {Muted: true, Reason: "manual-disable"}}})
 	if err := os.WriteFile(gate, muted, 0o600); err != nil {
@@ -85,6 +88,7 @@ func TestSessionAFK_NotificationsDisabledSuppressesChat(t *testing.T) {
 }
 
 func TestAFK_ToggleSnapshotEventAndRestart(t *testing.T) {
+	t.Parallel()
 	h := servertest.Start(t)
 	ctx := t.Context()
 	evs, err := h.Client.Events(ctx, 0)

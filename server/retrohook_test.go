@@ -46,6 +46,7 @@ func retroFixture(t *testing.T, opts ...func(*server.Config)) *schedFixture {
 }
 
 func TestRetroHook_SubmitsAfterTheEpicMerges(t *testing.T) {
+	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveContributor))
 	if got := f.completeEpic(t); len(got) != 1 {
 		t.Errorf("retros = %v, want one", got)
@@ -53,6 +54,7 @@ func TestRetroHook_SubmitsAfterTheEpicMerges(t *testing.T) {
 }
 
 func TestRetroHook_NothingWhenEvolveIsOff(t *testing.T) {
+	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveOff))
 	if got := f.completeEpic(t); len(got) != 0 {
 		t.Errorf("retros = %v, want none", got)
@@ -60,6 +62,7 @@ func TestRetroHook_NothingWhenEvolveIsOff(t *testing.T) {
 }
 
 func TestRetroHook_NothingWhenTheProjectOptedOut(t *testing.T) {
+	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveContributor))
 	dir := filepath.Join(f.store, "proj")
 	pf, err := config.ReadProjectFile(dir)
@@ -77,6 +80,7 @@ func TestRetroHook_NothingWhenTheProjectOptedOut(t *testing.T) {
 }
 
 func TestRetroHook_NothingWhenTheEpicWasAlreadyEvolved(t *testing.T) {
+	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveContributor))
 	if err := tickets.StampEpicFields(filepath.Join(f.store, "proj", schedEpic), map[string]any{"evolved_at": time.Now().UTC()}); err != nil {
 		t.Fatal(err)
@@ -87,6 +91,7 @@ func TestRetroHook_NothingWhenTheEpicWasAlreadyEvolved(t *testing.T) {
 }
 
 func TestRetroHook_MaintainerWithoutAGxProjectSubmitsNothing(t *testing.T) {
+	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveMaintainer))
 	if got := f.completeEpic(t); len(got) != 0 {
 		t.Errorf("retros = %v, want none", got)
@@ -94,6 +99,7 @@ func TestRetroHook_MaintainerWithoutAGxProjectSubmitsNothing(t *testing.T) {
 }
 
 func TestRetroHook_ContributorCreatesTheOutboxProject(t *testing.T) {
+	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveContributor))
 	if got := f.completeEpic(t); len(got) != 1 {
 		t.Fatalf("retros = %v, want one", got)
@@ -108,6 +114,7 @@ func TestRetroHook_ContributorCreatesTheOutboxProject(t *testing.T) {
 }
 
 func TestRetroHook_MaintainerWithAGxProjectSubmits(t *testing.T) {
+	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveMaintainer))
 	if err := os.MkdirAll(filepath.Join(f.store, "gx"), 0o755); err != nil {
 		t.Fatal(err)
@@ -139,6 +146,7 @@ func (f *schedFixture) retrosAfter(t *testing.T) []string {
 }
 
 func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {
 			return
@@ -158,6 +166,7 @@ func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 }
 
 func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
+	t.Parallel()
 	f := retroFixture(t, withEvolve(config.EvolveContributor))
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -172,6 +181,7 @@ func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 
 // A merge error pauses the root, and that pause is the epic's final outcome.
 func TestRetroHook_SubmitsWhenTheMergeErrors(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {
 			return

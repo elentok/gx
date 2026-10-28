@@ -11,6 +11,7 @@ import (
 )
 
 func TestOneOff_RemovedFileKeysAreRefusedAndNothingIsWritten(t *testing.T) {
+	t.Parallel()
 	for _, key := range []string{"commits", "base"} {
 		t.Run(key, func(t *testing.T) {
 			h, repo := startOneOffHarness(t)

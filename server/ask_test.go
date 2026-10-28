@@ -34,6 +34,7 @@ func askLog(t *testing.T, path string) []tickets.LogEvent {
 }
 
 func TestAsk_AppendsQuestionAndSetsIterationStatus(t *testing.T) {
+	t.Parallel()
 	for _, typ := range []string{"implement", "code-review", "prompt"} {
 		t.Run(typ, func(t *testing.T) {
 			h, path := askFixture(t, typ)
@@ -70,6 +71,7 @@ func TestAsk_AppendsQuestionAndSetsIterationStatus(t *testing.T) {
 }
 
 func TestAsk_Refusals(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name, body, address, reason string
 	}{
@@ -101,6 +103,7 @@ func TestAsk_Refusals(t *testing.T) {
 }
 
 func TestAsk_SecondAskRefusesWhileQuestionOpen(t *testing.T) {
+	t.Parallel()
 	h, path := askFixture(t, "implement")
 	ctx := context.Background()
 	if res, err := h.Client.TicketAsk(ctx, "proj:epic-a/01", askBody); err != nil || res.Refused {

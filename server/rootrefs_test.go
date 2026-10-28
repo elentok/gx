@@ -46,6 +46,7 @@ func runGit(t *testing.T, dir string, args ...string) {
 }
 
 func TestRootRefs(t *testing.T) {
+	t.Parallel()
 	stacked := func(base string) []tickets.Epic {
 		return []tickets.Epic{
 			{Name: "a", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}},
@@ -82,6 +83,7 @@ func TestRootRefs(t *testing.T) {
 }
 
 func TestRootRefs_MergedBlockerWithDeletedBranchTargetsTrunk(t *testing.T) {
+	t.Parallel()
 	s, repo := rootRefsFixture(t)
 	runGit(t, repo, "branch", "-m", "a", "c")
 	blocker := tickets.Epic{Name: "a", MergedAt: time.Now(), Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}
@@ -120,6 +122,7 @@ func rootLowestEpics() []tickets.Epic {
 }
 
 func TestEpicRefs_EveryCallerUsesTheLowestTicket(t *testing.T) {
+	t.Parallel()
 	s, repo := rootRefsFixture(t)
 	epics := rootLowestEpics()
 	finished, claimed := epics[1].Tickets[0], epics[1].Tickets[2]
@@ -140,6 +143,7 @@ func TestEpicRefs_EveryCallerUsesTheLowestTicket(t *testing.T) {
 }
 
 func TestResolveBase_ExistingFeatureBranchKeepsItsBase(t *testing.T) {
+	t.Parallel()
 	s, repo := rootRefsFixture(t)
 	runGit(t, repo, "branch", "b", "main")
 	epics := rootLowestEpics()
@@ -159,6 +163,7 @@ func revParse(t *testing.T, repo, ref string) string {
 }
 
 func TestRootRefs_MissingTrunkFailsOnlyARootTargetingTrunk(t *testing.T) {
+	t.Parallel()
 	s, repo := rootRefsFixture(t)
 	runGit(t, repo, "branch", "-D", "develop")
 	blocker := tickets.Epic{Name: "a", Tickets: []tickets.Ticket{{Number: 1, Identifier: "01", Status: "done"}}}

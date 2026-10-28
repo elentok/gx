@@ -19,6 +19,7 @@ func joinedMapMD(step string) string {
 }
 
 func TestEpicList_JoinedCardPhases(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	mapTickets := map[string]string{"01-a.md": issueMD("01", "done", "", "A"), "02-b.md": issueMD("02", "open", "", "B")}
 	implTickets := map[string]string{"01-a.md": issueMD("01", "done", "", "A"), "02-b.md": issueMD("02", "open", "", "B"), "03-c.md": issueMD("03", "open", "", "C")}
@@ -83,6 +84,7 @@ func TestEpicList_JoinedCardPhases(t *testing.T) {
 }
 
 func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
+	t.Parallel()
 	cfg := t.TempDir()
 	store := t.TempDir()
 	tix := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
@@ -157,6 +159,7 @@ func TestEpicList_JoinedCardDesignQuestionWinsNeedsYou(t *testing.T) {
 }
 
 func TestEpicList_DoneJoinedCardWithQueuedImplSitsInProgress(t *testing.T) {
+	t.Parallel()
 	tix := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "m", joinedMapMD("done"), tix)
@@ -181,6 +184,7 @@ func TestEpicList_DoneJoinedCardWithQueuedImplSitsInProgress(t *testing.T) {
 }
 
 func TestEpicList_JoinedCardCarriesImplQueueSlot(t *testing.T) {
+	t.Parallel()
 	tix := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "other", "---\nstatus: open\n---\n", tix)

@@ -8,6 +8,7 @@ import (
 )
 
 func TestCheckoutDirFor_ReturnsTheCheckoutOfTheTargetAndErrorsWhenThereIsNone(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	if out, err := exec.Command("git", "-C", repo, "branch", "unchecked").CombinedOutput(); err != nil {
 		t.Fatalf("git branch: %v: %s", err, out)

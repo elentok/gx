@@ -38,6 +38,7 @@ func restartHeadlessClaimed(t *testing.T, verdict nativerunner.Verdict, prepare 
 }
 
 func TestHeadlessBlockReclaim_OpenRequestRepausesStuckClaimed(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, _ := restartHeadlessClaimed(t, nativerunner.VerdictLive, func(_ *servertest.Harness, f *headlessFake) {
 		f.SetPending("epic-a-iter-01", openRequest)
 	})
@@ -52,6 +53,7 @@ func TestHeadlessBlockReclaim_OpenRequestRepausesStuckClaimed(t *testing.T) {
 }
 
 func TestHeadlessBlockReclaim_AnsweredRequestStaysClaimed(t *testing.T) {
+	t.Parallel()
 	// recordAnswered leaves no open request for the replay to find.
 	_, ticketPath, _ := restartHeadlessClaimed(t, nativerunner.VerdictLive, func(_ *servertest.Harness, f *headlessFake) {
 		f.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
@@ -67,6 +69,7 @@ func TestHeadlessBlockReclaim_AnsweredRequestStaysClaimed(t *testing.T) {
 }
 
 func TestHeadlessBlockReclaim_DeadAgentUsesDeadRunHandling(t *testing.T) {
+	t.Parallel()
 	_, ticketPath, _ := restartHeadlessClaimed(t, nativerunner.VerdictDied, func(_ *servertest.Harness, f *headlessFake) {
 		f.SetPending("epic-a-iter-01", openRequest)
 	})
@@ -85,6 +88,7 @@ func TestHeadlessBlockReclaim_DeadAgentUsesDeadRunHandling(t *testing.T) {
 
 // A run already waiting for an answer is not paused a second time, open request or not.
 func TestHeadlessBlockReclaim_WaitingRunWithOpenRequestIsUntouched(t *testing.T) {
+	t.Parallel()
 	_, ticketPath, _ := restartHeadlessClaimed(t, nativerunner.VerdictLive, func(h *servertest.Harness, f *headlessFake) {
 		f.SetPending("epic-a-iter-01", openRequest)
 		markWaiting(t, h, time.Now().Add(-time.Hour))

@@ -29,6 +29,7 @@ func assertGxQuestion(t *testing.T, ticketPath string, kind events.Kind, summary
 }
 
 func TestPause_ZeroCommitLogsGxQuestion(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -41,6 +42,7 @@ func TestPause_ZeroCommitLogsGxQuestion(t *testing.T) {
 }
 
 func TestPause_AmbiguousBaseLogsGxQuestion(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")

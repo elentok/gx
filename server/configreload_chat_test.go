@@ -68,7 +68,7 @@ func reloadChatServer(t *testing.T, global string, flush time.Duration) (*Server
 	fake.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
 	})
-	herdrfake.StartState(t, fake)
+	_, herdrEnv := herdrfake.StartStateEnv(t, fake)
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +76,7 @@ func reloadChatServer(t *testing.T, global string, flush time.Duration) (*Server
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
-	s, err := New(Config{StateDir: stateDir, TicketStore: store, ConfigPath: path, Settings: Settings{
+	s, err := New(Config{Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: store, ConfigPath: path, Settings: Settings{
 		Chat: ralphloop.ServerChatConfig{SlackWebhookURL: global, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush},
 	}})
 	if err != nil {
@@ -105,6 +105,7 @@ func notice(s *Server, kind string) {
 }
 
 func TestConfigReloadChat_ChangedDestinationTakesLaterMessages(t *testing.T) {
+	t.Parallel()
 	oldHook, newHook := newChatHook(t, nil), newChatHook(t, nil)
 	s, path := reloadChatServer(t, oldHook.URL, 20*time.Millisecond)
 	defer s.chat.Close()
@@ -121,6 +122,7 @@ func TestConfigReloadChat_ChangedDestinationTakesLaterMessages(t *testing.T) {
 }
 
 func TestConfigReloadChat_RemovedCredentialsStopMessages(t *testing.T) {
+	t.Parallel()
 	hook := newChatHook(t, nil)
 	s, path := reloadChatServer(t, hook.URL, 20*time.Millisecond)
 	defer s.chat.Close()
@@ -137,6 +139,7 @@ func TestConfigReloadChat_RemovedCredentialsStopMessages(t *testing.T) {
 // One batch per destination: messages queued before and after a reload that
 // keeps the destination's sink arrive together on Close.
 func TestConfigReloadChat_UnchangedChatKeepsTheBatch(t *testing.T) {
+	t.Parallel()
 	hook := newChatHook(t, nil)
 	s, path := reloadChatServer(t, hook.URL, time.Hour)
 
@@ -153,6 +156,7 @@ func TestConfigReloadChat_UnchangedChatKeepsTheBatch(t *testing.T) {
 }
 
 func TestConfigReloadChat_ProjectSinkKeepsItsBatch(t *testing.T) {
+	t.Parallel()
 	oldHook, newHook, projectHook := newChatHook(t, nil), newChatHook(t, nil), newChatHook(t, nil)
 	s, path := reloadChatServer(t, oldHook.URL, time.Hour)
 	override := &ralphloop.ServerChatConfig{SlackWebhookURL: projectHook.URL}
@@ -168,6 +172,7 @@ func TestConfigReloadChat_ProjectSinkKeepsItsBatch(t *testing.T) {
 }
 
 func TestConfigReloadChat_ReturnsBeforeOldSinkCloses(t *testing.T) {
+	t.Parallel()
 	gate := make(chan struct{})
 	oldHook, newHook := newChatHook(t, gate), newChatHook(t, nil)
 	s, path := reloadChatServer(t, oldHook.URL, time.Hour)

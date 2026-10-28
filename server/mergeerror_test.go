@@ -65,6 +65,7 @@ func commitFiles(t *testing.T, p servertest.Prompt, names ...string) {
 }
 
 func TestMergeError_DirtyTrunkPausesTheRootWithACappedFileList(t *testing.T) {
+	t.Parallel()
 	chat, count := chatRecorder(t)
 	files := []string{"a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt", "g.txt"}
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
@@ -100,6 +101,7 @@ func TestMergeError_DirtyTrunkPausesTheRootWithACappedFileList(t *testing.T) {
 }
 
 func TestMergeError_DirtyTrunkNamesOnlyTheClashingFiles(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
 		commitFiles(t, p, "clash.txt")
 		testutil.WriteFile(t, f.repo, "clash.txt", "local")
@@ -115,6 +117,7 @@ func TestMergeError_DirtyTrunkNamesOnlyTheClashingFiles(t *testing.T) {
 }
 
 func TestMergeError_DirtyTrunkListsNewDirectoryFilesAndBothRenamePaths(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
 		testutil.WriteFile(t, p.Cwd, "old.txt", "old")
 		testutil.CommitAll(t, p.Cwd, "add old")
@@ -157,6 +160,7 @@ func dirtyTrunkFixture(t *testing.T) (f *schedFixture, clean func()) {
 }
 
 func TestMergeError_PauseStoresKindAndReasonUntilALaterMergeClearsThem(t *testing.T) {
+	t.Parallel()
 	f, clean := dirtyTrunkFixture(t)
 	ev := f.pauseRoot(t)
 
@@ -179,6 +183,7 @@ func TestMergeError_PauseStoresKindAndReasonUntilALaterMergeClearsThem(t *testin
 }
 
 func TestMergeError_DirtyTrunkStoresTheFullFileListAndForksNoInvestigation(t *testing.T) {
+	t.Parallel()
 	files := []string{"a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt", "g.txt"}
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
 		commitFiles(t, p, files...)
@@ -206,6 +211,7 @@ func TestMergeError_DirtyTrunkStoresTheFullFileListAndForksNoInvestigation(t *te
 }
 
 func TestMergeError_MergeAgainPausesWithAFreshListThenLandsOnceClean(t *testing.T) {
+	t.Parallel()
 	f, clean := dirtyTrunkFixture(t)
 	f.pauseRoot(t)
 
@@ -228,6 +234,7 @@ func TestMergeError_MergeAgainPausesWithAFreshListThenLandsOnceClean(t *testing.
 }
 
 func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
+	t.Parallel()
 	f, _ := dirtyTrunkFixture(t)
 	f.pauseRoot(t)
 
@@ -250,6 +257,7 @@ func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 }
 
 func TestMergeError_NonOverlappingLocalChangeDoesNotBlockTheMerge(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "unrelated.txt", "local")
@@ -262,6 +270,7 @@ func TestMergeError_NonOverlappingLocalChangeDoesNotBlockTheMerge(t *testing.T) 
 }
 
 func TestMergeError_OtherGitFailurePausesMergeFailed(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
 		// A stale index lock fails the merge without any local change.

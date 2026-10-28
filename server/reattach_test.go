@@ -117,6 +117,7 @@ func startHeadlessRestart(t *testing.T, verdict nativerunner.Verdict, retention 
 }
 
 func TestReattach_DiedPausesStuckAndKeepsTheDir(t *testing.T) {
+	t.Parallel()
 	fake, ticketPath := startHeadlessRestart(t, nativerunner.VerdictDied, 0)
 	deadline := time.Now().Add(20 * time.Second)
 	for {
@@ -144,6 +145,7 @@ func TestReattach_DiedPausesStuckAndKeepsTheDir(t *testing.T) {
 }
 
 func TestReattach_FinishedMergesAndCleansUp(t *testing.T) {
+	t.Parallel()
 	fake, ticketPath := startHeadlessRestart(t, nativerunner.VerdictFinished, 0)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -175,6 +177,7 @@ func TestReattach_FinishedMergesAndCleansUp(t *testing.T) {
 }
 
 func TestPrune_RunsAtStartWithConfiguredRetentionAndSkipsPaused(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")

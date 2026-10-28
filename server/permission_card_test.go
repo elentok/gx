@@ -94,6 +94,7 @@ func activeNeedsApproval(t *testing.T, h *servertest.Harness) bool {
 }
 
 func TestPermissionCard_AppearsForBlockedAgentAndVanishesAfterAnswer(t *testing.T) {
+	t.Parallel()
 	h, fake := startBlockedClaimed(t, false, &agentrunner.Pending{
 		ID: "req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"ls"}`), Description: "List files",
 	})
@@ -148,6 +149,7 @@ func awaitTicketChanged(t *testing.T, ctx context.Context, evs <-chan server.Eve
 // "needs approval" row are read when a page fetches, and nothing else makes it
 // fetch.
 func TestPermissionCard_BlockAndClearPublishTicketChanged(t *testing.T) {
+	t.Parallel()
 	h, fake := startBlockedClaimed(t, false, nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -169,6 +171,7 @@ func TestPermissionCard_BlockAndClearPublishTicketChanged(t *testing.T) {
 }
 
 func TestPermissionCard_NotApprovablePromptShowsTheHint(t *testing.T) {
+	t.Parallel()
 	h, _ := startBlockedClaimed(t, false, &agentrunner.Pending{ID: "req-2", Tool: "ExitPlanMode", NotApprovable: true})
 	d, err := h.Client.Detail(context.Background(), answerAddr)
 	if err != nil {
@@ -186,6 +189,7 @@ func TestPermissionCard_NotApprovablePromptShowsTheHint(t *testing.T) {
 }
 
 func TestPermissionCard_HerdrHostedShowsTheHint(t *testing.T) {
+	t.Parallel()
 	h, _ := startBlockedClaimed(t, true, &agentrunner.Pending{ID: "req-3", Tool: "Bash"})
 	d, err := h.Client.Detail(context.Background(), answerAddr)
 	if err != nil {
@@ -200,6 +204,7 @@ func TestPermissionCard_HerdrHostedShowsTheHint(t *testing.T) {
 }
 
 func TestPermissionCard_NoCardWhenNotBlocked(t *testing.T) {
+	t.Parallel()
 	h, _ := startBlockedClaimed(t, false, nil)
 	d, err := h.Client.Detail(context.Background(), answerAddr)
 	if err != nil || d.Permission != nil {
@@ -211,6 +216,7 @@ func TestPermissionCard_NoCardWhenNotBlocked(t *testing.T) {
 }
 
 func TestWeb_AgentAnswerNeedsRequestIDAndOrigin(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	js := map[string]string{"Origin": base, "Content-Type": "application/json"}
 	post := func(headers map[string]string, body string) (int, string) {

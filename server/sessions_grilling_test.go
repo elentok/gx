@@ -93,6 +93,7 @@ func writeAssistantMessage(t *testing.T, path, text string) {
 }
 
 func TestGrilling_DetectedOnIdleForDesignSessions(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		ticket, text string
 		raised       bool
@@ -130,6 +131,7 @@ func TestGrilling_DetectedOnIdleForDesignSessions(t *testing.T) {
 // Claude reports idle before it writes the turn's last lines, so the idle
 // edge's own read sees the previous message.
 func TestGrilling_DetectedWhenTheTurnLandsAfterIdle(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv, path := startGrillingSession(t, "proj:map")
 	writeAssistantMessage(t, path, "Reading the code.")
 	report(t, conv, agentfake.Control{State: "working"})
@@ -151,6 +153,7 @@ func TestGrilling_DetectedWhenTheTurnLandsAfterIdle(t *testing.T) {
 }
 
 func TestRunEnd_DetectedOnIdleForDesignSessions(t *testing.T) {
+	t.Parallel()
 	const grill = "❓ **Q1** Which store?\n"
 	for name, tc := range map[string]struct {
 		text       string
@@ -188,6 +191,7 @@ func TestRunEnd_DetectedOnIdleForDesignSessions(t *testing.T) {
 }
 
 func TestRunEnd_NoContinueAtBranchAndDone(t *testing.T) {
+	t.Parallel()
 	const line = "✅ Map: branch cut. Next: implement"
 	for name, tc := range map[string]struct {
 		step       string
@@ -220,6 +224,7 @@ func TestRunEnd_NoContinueAtBranchAndDone(t *testing.T) {
 }
 
 func TestSessionChat_NextHasNoActionAtBranch(t *testing.T) {
+	t.Parallel()
 	store := storeWithMapStep(t, "branch")
 	h, ctx, _, id, _, path := startGrillingSessionIn(t, "proj:map", store)
 	writeAssistantMessage(t, path, "✅ Map: branch cut. Next: implement")
@@ -235,6 +240,7 @@ func TestSessionChat_NextHasNoActionAtBranch(t *testing.T) {
 // A design_step change alone, with the transcript untouched, must reach the
 // chat's next.
 func TestSessionChat_StepChangeAloneRefreshesNext(t *testing.T) {
+	t.Parallel()
 	store := storeWithMapStep(t, "spec")
 	h, ctx, _, id, _, path := startGrillingSessionIn(t, "proj:map", store)
 	writeAssistantMessage(t, path, "✅ Map: spec drafted. Next: review")

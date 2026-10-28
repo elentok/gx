@@ -44,6 +44,7 @@ func exitDesign(t *testing.T, frontmatter string, code int) int {
 }
 
 func TestSessionBanner_DesignExit(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		frontmatter string

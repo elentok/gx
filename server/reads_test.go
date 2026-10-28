@@ -18,6 +18,7 @@ import (
 )
 
 func TestReads_HistoryLocksAndProjects(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
@@ -62,6 +63,7 @@ func TestReads_HistoryLocksAndProjects(t *testing.T) {
 }
 
 func TestExplain_StoreDerivableVerdicts(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
@@ -100,6 +102,7 @@ func TestExplain_StoreDerivableVerdicts(t *testing.T) {
 }
 
 func TestExplain_ForkChildNamesItsUndoneParent(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "blocker", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "parent", "")
@@ -120,6 +123,7 @@ func TestExplain_ForkChildNamesItsUndoneParent(t *testing.T) {
 }
 
 func TestReads_IterationsAndQueue(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
@@ -167,6 +171,7 @@ func TestReads_IterationsAndQueue(t *testing.T) {
 }
 
 func TestSnapshot_CarriesTheMergingMetrics(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
@@ -190,6 +195,7 @@ func TestSnapshot_CarriesTheMergingMetrics(t *testing.T) {
 }
 
 func TestSnapshot_CarriesCategoryAndExportedAt(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
@@ -214,6 +220,7 @@ func TestSnapshot_CarriesCategoryAndExportedAt(t *testing.T) {
 }
 
 func TestSnapshot_CarriesMutes(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
@@ -239,6 +246,7 @@ func TestSnapshot_CarriesMutes(t *testing.T) {
 }
 
 func TestSnapshot_CarriesTheServerBuild(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir())
 
 	snap, err := h.Client.Snapshot(context.Background())
@@ -251,6 +259,7 @@ func TestSnapshot_CarriesTheServerBuild(t *testing.T) {
 }
 
 func TestSnapshot_CarriesTheEpicsMergedAt(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
@@ -271,6 +280,7 @@ func TestSnapshot_CarriesTheEpicsMergedAt(t *testing.T) {
 }
 
 func TestSnapshot_CarriesTheEpicsMapKind(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
@@ -290,6 +300,7 @@ func TestSnapshot_CarriesTheEpicsMapKind(t *testing.T) {
 }
 
 func TestSnapshot_CarriesTheEpicsMergeTargetAndStatus(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	done := servertest.TicketOpts{Status: "done"}
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", done)
@@ -318,6 +329,7 @@ func TestSnapshot_CarriesTheEpicsMergeTargetAndStatus(t *testing.T) {
 // The target only labels a Merge that can run, and each one costs git calls,
 // so an epic with open tickets or already merged gets none.
 func TestSnapshot_LeavesTheMergeTargetOffEpicsThatCantMerge(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	done := servertest.TicketOpts{Status: "done"}
 	servertest.WriteTicketWith(t, store, "proj", "open-epic", "01", "first", done)

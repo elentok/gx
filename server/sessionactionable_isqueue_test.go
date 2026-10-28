@@ -7,6 +7,7 @@ import (
 )
 
 func TestSessionActionable_IsQueue(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name string
 		a    server.SessionActionable

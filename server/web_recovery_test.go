@@ -75,6 +75,7 @@ func detailState(t *testing.T, h *servertest.Harness, base string) string {
 }
 
 func TestWebDetail_RepairPauseCarriesAStateToken(t *testing.T) {
+	t.Parallel()
 	h, _, base, _ := startRecoveryWeb(t)
 	if state := detailState(t, h, base); state == "" {
 		t.Error("repair pause detail has no state token")
@@ -82,6 +83,7 @@ func TestWebDetail_RepairPauseCarriesAStateToken(t *testing.T) {
 }
 
 func TestWebRecoveryVerbs_OldTokenIsStaleCurrentRuns(t *testing.T) {
+	t.Parallel()
 	for _, path := range []string{"/v1/tickets/retry", "/v1/tickets/merge", "/v1/tickets/start-over"} {
 		t.Run(path, func(t *testing.T) {
 			h, _, base, cookie := startRecoveryWeb(t)
@@ -105,6 +107,7 @@ func TestWebRecoveryVerbs_OldTokenIsStaleCurrentRuns(t *testing.T) {
 }
 
 func TestWebStartOver_DeleteFlagKeepsTheBranch(t *testing.T) {
+	t.Parallel()
 	h, repo, base, cookie := startRecoveryWeb(t)
 	body := `{"address":"` + recoveryAddr + `","state":"` + detailState(t, h, base) + `","reason":"stuck","delete_branch":true}`
 	code, out := webPostJSON(t, base+"/v1/tickets/start-over", body, cookie, "", jsonPost(base))

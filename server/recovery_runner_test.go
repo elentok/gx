@@ -39,6 +39,7 @@ func startOnRunner(t *testing.T, name string, opts ...func(*server.Config)) (*se
 }
 
 func TestRecoveryRunner_HeadlessRunListsWithoutPaneOrTab(t *testing.T) {
+	t.Parallel()
 	h, _, sess := startOnRunner(t, "headless")
 	its, err := h.Client.Iterations(context.Background())
 	if err != nil {
@@ -54,6 +55,7 @@ func TestRecoveryRunner_HeadlessRunListsWithoutPaneOrTab(t *testing.T) {
 }
 
 func TestRecoveryRunner_LiveCheckAgreesAcrossShapes(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		runner string
 		state  agentrunner.State
@@ -95,6 +97,7 @@ func TestRecoveryRunner_LiveCheckAgreesAcrossShapes(t *testing.T) {
 }
 
 func TestRecoveryRunner_ClosePaneStopsAndCleansUpThroughTheRunner(t *testing.T) {
+	t.Parallel()
 	h, fake, _ := startOnRunner(t, "headless")
 	res, err := h.Server.RecoveryDo(recovery.Call{Verb: recovery.VerbClosePane, Address: "proj:epic-a/01"})
 	if err != nil || res.Refused {
@@ -109,6 +112,7 @@ func TestRecoveryRunner_ClosePaneStopsAndCleansUpThroughTheRunner(t *testing.T) 
 }
 
 func TestRecoveryRunner_WaitWaitsForTheRunnerToSettle(t *testing.T) {
+	t.Parallel()
 	h, fake, _ := startOnRunner(t, "headless")
 	fake.SetState(iterLabel, agentrunner.StateWorking, "")
 	done := make(chan error, 1)
@@ -131,6 +135,7 @@ func TestRecoveryRunner_WaitWaitsForTheRunnerToSettle(t *testing.T) {
 }
 
 func TestRecoveryRunner_WaitTimesOutAtTheConfiguredBound(t *testing.T) {
+	t.Parallel()
 	h, fake, _ := startOnRunner(t, "headless", func(c *server.Config) { c.CompactRewaitTimeout = 50 * time.Millisecond })
 	fake.SetState(iterLabel, agentrunner.StateWorking, "")
 	if _, err := h.Server.RecoveryDo(recovery.Call{Verb: recovery.VerbWait, Address: "proj:epic-a/01"}); !strings.Contains(err.Error(), agentrunner.ErrTimeout.Error()) {
@@ -139,6 +144,7 @@ func TestRecoveryRunner_WaitTimesOutAtTheConfiguredBound(t *testing.T) {
 }
 
 func TestRecoveryRunner_NudgePromptsThroughTheRunnerAndWatchesItsKind(t *testing.T) {
+	t.Parallel()
 	h, fake, sess := startOnRunner(t, "headless")
 	if res, err := h.Client.TicketNudge(context.Background(), "proj:epic-a/01", "go on"); err != nil || res.Refused {
 		t.Fatalf("nudge = %+v, %v", res, err)

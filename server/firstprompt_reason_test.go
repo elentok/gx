@@ -9,6 +9,7 @@ import (
 )
 
 func TestFailureReason(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		err         error
@@ -33,6 +34,7 @@ func TestFailureReason(t *testing.T) {
 }
 
 func TestWithClearHint(t *testing.T) {
+	t.Parallel()
 	if got := withClearHint("x"); !strings.HasPrefix(got, "x.") || !strings.HasSuffix(got, clearInputHint) {
 		t.Errorf("withClearHint() = %q", got)
 	}

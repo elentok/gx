@@ -48,6 +48,7 @@ func runLogOf(t *testing.T, h *servertest.Harness, typ events.Type) []ralphloop.
 // An epic whose only unblocked ticket is paused logs deadlocked once, however
 // many claim passes see it.
 func TestDeadlock_AllPausedEpicLogsDeadlockedOncePerEntry(t *testing.T) {
+	t.Parallel()
 	h := startDeadlock(t, recovery.Catalog{})
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "broken"); err != nil {
 		t.Fatalf("pause: %v", err)
@@ -69,6 +70,7 @@ func TestDeadlock_AllPausedEpicLogsDeadlockedOncePerEntry(t *testing.T) {
 // An epic holding an error ticket is Paused: a person can fix it, so it is not
 // a dependency deadlock.
 func TestDeadlock_ErrorTicketPausesTheEpic(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Status: "bogus"})
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
@@ -88,6 +90,7 @@ func TestDeadlock_ErrorTicketPausesTheEpic(t *testing.T) {
 // A blocked (or waiting) ticket next to a paused one makes the epic Paused, not
 // a blocked cycle, whichever of the two is listed first.
 func TestDeadlock_BlockedOrWaitingNextToPausedIsAllPaused(t *testing.T) {
+	t.Parallel()
 	type tk struct {
 		id   string
 		opts servertest.TicketOpts
@@ -136,6 +139,7 @@ func TestDeadlock_BlockedOrWaitingNextToPausedIsAllPaused(t *testing.T) {
 
 // A map epic holds notes, not work, so it is never Deadlocked.
 func TestDeadlock_MapEpicIsNeverDeadlocked(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Status: "bogus"})
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
@@ -156,6 +160,7 @@ func TestDeadlock_MapEpicIsNeverDeadlocked(t *testing.T) {
 
 // A blocked deadlock's record names the tickets that wait and what they wait on.
 func TestDeadlock_BlockedRecordNamesTheBlockers(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Status: "cancelled"})
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "second", servertest.TicketOpts{Parent: "01"})
@@ -174,6 +179,7 @@ func TestDeadlock_BlockedRecordNamesTheBlockers(t *testing.T) {
 // A deadlock has no ticket to act on, so recovery forks a top-level
 // investigation of the epic and queues it at the front.
 func TestDeadlock_RecoveryInvestigatesTheEpic(t *testing.T) {
+	t.Parallel()
 	h := startDeadlock(t, recovery.Catalog{Enabled: true})
 	h.Server.RecoverAsync(recovery.Failure{Address: "proj:epic-a", Type: events.Deadlocked, Kind: events.AllPaused, Reason: "every remaining ticket is paused"})
 	waitFor(t, func() bool { return len(runLogOf(t, h, events.RecoveryApplied)) > 0 })

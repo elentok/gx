@@ -34,6 +34,7 @@ func queuedAtLine(md string) string {
 }
 
 func TestQueueAdd_StampsQueuedAtOnceAndKeepsIt(t *testing.T) {
+	t.Parallel()
 	open := map[string]string{queuedAtOpenMD: issueMD("01", "open", "", "A")}
 	var storeDir string
 	h, _ := startEpicDetail(t, func(store string) {
@@ -62,6 +63,7 @@ func TestQueueAdd_StampsQueuedAtOnceAndKeepsIt(t *testing.T) {
 }
 
 func TestEpicList_QueuedAtFallsBackToStartedThenMerged(t *testing.T) {
+	t.Parallel()
 	open := map[string]string{queuedAtOpenMD: issueMD("01", "open", "", "A")}
 	done := map[string]string{queuedAtOpenMD: issueMD("01", "done", "", "A")}
 	h, base := startEpicDetail(t, func(store string) {
@@ -87,6 +89,7 @@ func TestEpicList_QueuedAtFallsBackToStartedThenMerged(t *testing.T) {
 }
 
 func TestQueueAdd_DraftImplEpicRefusesEpicDraftAndWritesNothing(t *testing.T) {
+	t.Parallel()
 	open := map[string]string{queuedAtOpenMD: issueMD("01", "open", "", "A")}
 	var storeDir string
 	h, _ := startEpicDetail(t, func(store string) {

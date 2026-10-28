@@ -71,6 +71,7 @@ func noReloadEvent(t *testing.T, evs <-chan server.Event, why string) {
 // Seam: rename-style and in-place saves each reload once; identical bytes
 // and a temp file of another name do not.
 func TestConfigWatch_SavesReloadOnceEach(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_, path, store, evs := watchHarness(t, ctx)
@@ -97,6 +98,7 @@ func TestConfigWatch_SavesReloadOnceEach(t *testing.T) {
 
 // Seam: a delete reports config-missing once, and a re-created file reloads.
 func TestConfigWatch_MissingFileReportedOnce(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_, path, store, evs := watchHarness(t, ctx)
@@ -125,6 +127,7 @@ func TestConfigWatch_MissingFileReportedOnce(t *testing.T) {
 // Seam: a watcher-triggered reload that turns the watcher off returns, and
 // later saves no longer reload; a command reload turning it on re-arms it.
 func TestConfigWatch_TurnsItselfOffWithoutDeadlock(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	h, path, store, evs := watchHarness(t, ctx)
@@ -149,6 +152,7 @@ func TestConfigWatch_TurnsItselfOffWithoutDeadlock(t *testing.T) {
 
 // Seam: a config.json symlink reloads when its target is saved.
 func TestConfigWatch_FollowsSymlinkTarget(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	store := t.TempDir()

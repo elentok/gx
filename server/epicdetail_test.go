@@ -76,6 +76,7 @@ func rowOf(t *testing.T, d server.EpicDetail, address string) server.EpicDetailR
 }
 
 func TestEpicDetail_LoopEpic(t *testing.T) {
+	t.Parallel()
 	var question string
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work",
@@ -156,6 +157,7 @@ func rowAddresses(d server.EpicDetail) []string {
 }
 
 func TestEpicDetail_FinishedVersusAwaitingMerge(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 		writeEpicFiles(t, store, "unmerged", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\n---\n", done)
@@ -170,6 +172,7 @@ func TestEpicDetail_FinishedVersusAwaitingMerge(t *testing.T) {
 }
 
 func TestEpicDetail_MergeBlockedCarriesKindAndReason(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 		writeEpicFiles(t, store, "blocked", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_kind: self-reported\nland_block_reason: conflict in main.go\n---\n", done)
@@ -187,6 +190,7 @@ func TestEpicDetail_MergeBlockedCarriesKindAndReason(t *testing.T) {
 }
 
 func TestEpicDetail_MergeBlockedActionsFollowTheVerbTable(t *testing.T) {
+	t.Parallel()
 	want := map[string][]string{
 		"dirty-trunk":   {"stash-merge", "merge"},
 		"merge-error":   {"merge"},
@@ -219,6 +223,7 @@ func TestEpicDetail_MergeBlockedActionsFollowTheVerbTable(t *testing.T) {
 }
 
 func TestEpicDetail_StoredReasonWithoutKindReadsAsNeedsRebase(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 		writeEpicFiles(t, store, "legacy", "---\nstatus: done\ncompleted_at: 2026-01-01T11:00:00Z\nland_block_reason: needs rebase of legacy onto main\n---\n", done)
@@ -230,6 +235,7 @@ func TestEpicDetail_StoredReasonWithoutKindReadsAsNeedsRebase(t *testing.T) {
 }
 
 func TestEpicDetail_Queueable(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 		done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
@@ -261,6 +267,7 @@ func TestEpicDetail_Queueable(t *testing.T) {
 }
 
 func TestEpicDetail_MapEpic(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\nstarted_at: 2026-01-01T10:00:00Z\n---\n\n## Destination\n\nReach the sea.\n",
 			map[string]string{
@@ -297,6 +304,7 @@ func TestEpicDetail_MapEpic(t *testing.T) {
 }
 
 func TestEpicDetail_MapRowsCarryRedesignFields(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "atlas", "---\nstatus: open\nkind: map\n---\n\n## Destination\n\nReach the sea.\n",
 			map[string]string{
@@ -328,6 +336,7 @@ func TestEpicDetail_MapRowsCarryRedesignFields(t *testing.T) {
 }
 
 func TestEpicDetail_LoopRowsCarryCloseTime(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
 			"01-a.md": issueMD("01", "done", "done_at: 2026-01-01T10:05:00Z\n", "A"),
@@ -348,6 +357,7 @@ func TestEpicDetail_LoopRowsCarryCloseTime(t *testing.T) {
 }
 
 func TestEpicDetail_MapRingProgress(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, epic string
 		check      func(t *testing.T, ring int)
@@ -381,6 +391,7 @@ func TestEpicDetail_MapRingProgress(t *testing.T) {
 }
 
 func TestEpicDetail_LoopEpicWithoutCostKeepsZeroTotals(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
 	})
@@ -414,6 +425,7 @@ friction:
 `
 
 func TestEpicDetail_MergedLoopEpicCarriesEveryStamp(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\n"+stampedEpicFrontmatter+"---\n", map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
 	})
@@ -441,6 +453,7 @@ func TestEpicDetail_MergedLoopEpicCarriesEveryStamp(t *testing.T) {
 }
 
 func TestEpicDetail_WebShareCountsPersonEndingsOnly(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name    string
 		endings string
@@ -476,6 +489,7 @@ func TestEpicDetail_WebShareCountsPersonEndingsOnly(t *testing.T) {
 }
 
 func TestEpicDetail_UnmergedLoopEpicShowsOnlyLeadTimeSoFar(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\ncreated_at: 2026-01-01T00:00:00Z\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
 	})
@@ -490,6 +504,7 @@ func TestEpicDetail_UnmergedLoopEpicShowsOnlyLeadTimeSoFar(t *testing.T) {
 }
 
 func TestEpicDetail_CodexDropsCost(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\n"+stampedEpicFrontmatter+"had_codex: true\n---\n", map[string]string{"01-a.md": issueMD("01", "done", "", "A")})
 	})
@@ -500,6 +515,7 @@ func TestEpicDetail_CodexDropsCost(t *testing.T) {
 }
 
 func TestEpicDetail_MapEpicStats(t *testing.T) {
+	t.Parallel()
 	stamped := "---\nstatus: open\nkind: map\ncreated_at: 2026-01-01T00:00:00Z\ncompleted_at: 2026-01-01T02:00:00Z\ntotal_tokens: 900\nactual_cost: 0.5\n---\n"
 	unstamped := "---\nstatus: open\nkind: map\ncreated_at: 2026-01-01T00:00:00Z\n---\n"
 	h, base := startEpicDetail(t, func(store string) {
@@ -522,6 +538,7 @@ func TestEpicDetail_MapEpicStats(t *testing.T) {
 }
 
 func TestEpicDetail_UnknownAddress(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{"01-a.md": issueMD("01", "open", "", "A")})
 	})
@@ -533,6 +550,7 @@ func TestEpicDetail_UnknownAddress(t *testing.T) {
 }
 
 func TestEpicDetail_RepairRowCarriesTheStateToken(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		servertest.WriteTicketWith(t, store, "proj", "work", "01", "broken", servertest.TicketOpts{PauseReason: "merge-conflict"})
 		servertest.WriteTicketWith(t, store, "proj", "work", "02", "fine", servertest.TicketOpts{})

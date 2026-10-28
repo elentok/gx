@@ -131,6 +131,7 @@ func (f *schedFixture) assertMerged(t *testing.T, ids ...string) {
 }
 
 func TestSchedulingPort_TicketCreatesSubticketsAndTheRootWaitsForThem(t *testing.T) {
+	t.Parallel()
 	var once sync.Once
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
 		commitWork(t, p, id)
@@ -156,6 +157,7 @@ func TestSchedulingPort_TicketCreatesSubticketsAndTheRootWaitsForThem(t *testing
 }
 
 func TestSchedulingPort_CodeReviewTicketCreatesSubtickets(t *testing.T) {
+	t.Parallel()
 	var once sync.Once
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{
 		"01": {},
@@ -185,6 +187,7 @@ func TestSchedulingPort_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 
 // The per-root cap is pinned to 1 here, so this pins the sequential order and the single merging per ticket.
 func TestSchedulingPort_ABlocksBAndCAndTheyMergeInOrder(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{
 		"01": {},
 		"02": {BlockedBy: []string{"01"}},
@@ -205,6 +208,7 @@ func TestSchedulingPort_ABlocksBAndCAndTheyMergeInOrder(t *testing.T) {
 }
 
 func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	turn := 0
 	var ticketPath string

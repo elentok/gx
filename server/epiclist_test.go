@@ -27,6 +27,7 @@ func getEpicList(t *testing.T, code int, body string) server.EpicList {
 }
 
 func TestEpicList_SectionRules(t *testing.T) {
+	t.Parallel()
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 	claimed := map[string]string{"01-a.md": issueMD("01", "claimed", "", "A")}
@@ -110,6 +111,7 @@ func TestEpicList_SectionRules(t *testing.T) {
 }
 
 func TestEpicList_RowFields(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "ready", "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n", map[string]string{
 			"01-a.md": issueMD("01", "done", "", "A"),
@@ -134,6 +136,7 @@ func TestEpicList_RowFields(t *testing.T) {
 }
 
 func TestEpicList_BlockedByEpicsIgnoresMerged(t *testing.T) {
+	t.Parallel()
 	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	h, base := startEpicDetail(t, func(store string) {
@@ -156,6 +159,7 @@ func TestEpicList_BlockedByEpicsIgnoresMerged(t *testing.T) {
 }
 
 func TestEpicList_LastActivityIsTheNewestStamp(t *testing.T) {
+	t.Parallel()
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "busy", "---\nstatus: open\nkind: map\n---\n", map[string]string{
 			"01-a.md": issueMD("01", "done", "claimed_at: 2026-01-01T10:00:00Z\ndone_at: 2026-01-03T10:00:00Z\n", "A"),
@@ -177,6 +181,7 @@ func TestEpicList_LastActivityIsTheNewestStamp(t *testing.T) {
 }
 
 func TestEpicList_FollowUpCounts(t *testing.T) {
+	t.Parallel()
 	loop := "---\nstatus: open\n---\n"
 	followUps := map[string]string{
 		"01-a.md": issueMD("01", "draft", "", "A"),
@@ -209,6 +214,7 @@ func TestEpicList_FollowUpCounts(t *testing.T) {
 }
 
 func TestEpicList_FollowUpsCardCountsByCategoryAndComesFirst(t *testing.T) {
+	t.Parallel()
 	loop := "---\nstatus: open\n---\n"
 	h, base := startEpicDetail(t, func(store string) {
 		writeEpicFiles(t, store, "follow-ups", loop, map[string]string{
@@ -246,6 +252,7 @@ func TestEpicList_FollowUpsCardCountsByCategoryAndComesFirst(t *testing.T) {
 }
 
 func TestEpicList_OneOffCardsAndTheFinishedCap(t *testing.T) {
+	t.Parallel()
 	loop := "---\nstatus: open\n---\n"
 	archived := func(id, at string) string {
 		return issueMD(id, "done", "completed_at: "+at+"\n", "Old "+id)
@@ -318,6 +325,7 @@ func writeProjectEpic(t *testing.T, store, project, epic, ticketMD string, issue
 }
 
 func TestEpicList_NeedsTheWebCookie(t *testing.T) {
+	t.Parallel()
 	_, base := startWeb(t)
 	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/epics", nil); code != http.StatusUnauthorized {
 		t.Errorf("GET /v1/epics without cookie = %d, want 401", code)

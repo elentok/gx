@@ -26,6 +26,7 @@ func queueAddresses(t *testing.T, h *servertest.Harness) []string {
 }
 
 func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	for _, id := range []string{"01", "02", "03"} {
 		servertest.WriteTicket(t, store, "proj", "epic-a", id, "t"+id, "")
@@ -81,6 +82,7 @@ func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
 }
 
 func TestQueue_Refusals(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
@@ -122,6 +124,7 @@ func TestQueue_Refusals(t *testing.T) {
 // The server is the only scheduler: no config selects it, so a queue write on
 // a default server is never refused for that.
 func TestQueue_AddAcceptedWithoutConfig(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	h := servertest.StartWithStore(t, store)

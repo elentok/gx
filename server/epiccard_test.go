@@ -10,6 +10,7 @@ import (
 )
 
 func TestEpicList_LoopCardFields(t *testing.T) {
+	t.Parallel()
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	done := map[string]string{"01-a.md": issueMD("01", "done", "", "A")}
 	half := map[string]string{
@@ -75,6 +76,7 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 }
 
 func TestEpicList_QueuedOneOffSortsBySlotAndReadsQueuedN(t *testing.T) {
+	t.Parallel()
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	loop := "---\nstatus: open\ncreated_at: 2026-01-01T10:00:00Z\n---\n"
 	h, base := startEpicDetail(t, func(store string) {
@@ -106,6 +108,7 @@ func TestEpicList_QueuedOneOffSortsBySlotAndReadsQueuedN(t *testing.T) {
 }
 
 func TestEpicList_SectionSortOrders(t *testing.T) {
+	t.Parallel()
 	open := map[string]string{"01-a.md": issueMD("01", "open", "", "A")}
 	loop := func(created string) string {
 		return "---\nstatus: open\ncreated_at: " + created + "\n---\n"

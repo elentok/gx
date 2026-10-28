@@ -7,6 +7,7 @@ import (
 )
 
 func TestHasManualMergeTicket_OnlyAManualMergeTicketCounts(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		ticket tickets.Ticket
 		want   bool
@@ -25,6 +26,7 @@ func TestHasManualMergeTicket_OnlyAManualMergeTicketCounts(t *testing.T) {
 }
 
 func TestMergeTicketsThisRun_CountsFromTheLatestManualOneByID(t *testing.T) {
+	t.Parallel()
 	merge := func(n int, manual bool) tickets.Ticket {
 		return tickets.Ticket{Number: n, Type: "merge", Manual: manual}
 	}

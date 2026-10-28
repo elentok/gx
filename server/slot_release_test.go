@@ -19,6 +19,7 @@ import (
 // Seam: once a restarted server sees the agent waited past the grace period it
 // frees the only slot, so a queued root claims; the flag is in runs.json.
 func TestSlotRelease_QueuedRootClaimsAfterGrace(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "second", "")

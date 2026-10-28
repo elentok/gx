@@ -43,6 +43,7 @@ func ticketAgentDir(t *testing.T, stateDir, runner, screen string) {
 }
 
 func TestTicketScreen_PtyAgentReturnsItsSavedScreen(t *testing.T) {
+	t.Parallel()
 	h := startTicketScreen(t)
 	ticketAgentDir(t, h.StateDir, "pty", "saved one\nsaved two\n")
 	ctx := context.Background()
@@ -108,6 +109,7 @@ func ticketAgentPath(stateDir string) string {
 }
 
 func TestTicketScreen_LiveHolderReturnsItsRows(t *testing.T) {
+	t.Parallel()
 	h := startTicketScreenShortPath(t)
 	ticketAgentDir(t, h.StateDir, "pty", "saved\n")
 	fakeHolder(t, ticketAgentPath(h.StateDir), []string{"live one", "live two"})
@@ -122,6 +124,7 @@ func TestTicketScreen_LiveHolderReturnsItsRows(t *testing.T) {
 }
 
 func TestTicketScreen_HolderGoneAfterPingReturnsSavedRows(t *testing.T) {
+	t.Parallel()
 	h := startTicketScreenShortPath(t)
 	ticketAgentDir(t, h.StateDir, "pty", "saved one\nsaved two\n")
 	fakeHolder(t, ticketAgentPath(h.StateDir), nil)
@@ -136,6 +139,7 @@ func TestTicketScreen_HolderGoneAfterPingReturnsSavedRows(t *testing.T) {
 }
 
 func TestTicketScreen_AgentWithoutPtyHasNoScreen(t *testing.T) {
+	t.Parallel()
 	h := startTicketScreen(t)
 	ticketAgentDir(t, h.StateDir, "headless", "")
 	ctx := context.Background()
@@ -153,6 +157,7 @@ func TestTicketScreen_AgentWithoutPtyHasNoScreen(t *testing.T) {
 }
 
 func TestTicketScreen_TicketWithoutAgentIsRefused(t *testing.T) {
+	t.Parallel()
 	h := startTicketScreen(t)
 
 	if _, err := h.Client.TicketScreen(context.Background(), "proj:epic-a/01"); err == nil || !strings.Contains(err.Error(), "404") {

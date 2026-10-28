@@ -68,6 +68,7 @@ func (f designsFixture) designKept(t *testing.T, dir string) bool {
 }
 
 func TestDesignCleanup_SessionExitAfterBranchRemovesWorktreeAndBranch(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	dir, id := f.openDesignWorktree(t, true)
 	gitOut(t, f.repo, "branch", "map-impl", "map-design")
@@ -76,6 +77,7 @@ func TestDesignCleanup_SessionExitAfterBranchRemovesWorktreeAndBranch(t *testing
 }
 
 func TestDesignCleanup_RebasedImplBranchCountsAsMerged(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	dir, id := f.openDesignWorktree(t, true)
 	if err := os.WriteFile(filepath.Join(f.repo, "t.txt"), []byte("trunk\n"), 0o644); err != nil {
@@ -92,6 +94,7 @@ func TestDesignCleanup_RebasedImplBranchCountsAsMerged(t *testing.T) {
 }
 
 func TestDesignCleanup_DirtyWorktreeKeepsBothAndWarns(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	dir, id := f.openDesignWorktree(t, true)
 	gitOut(t, f.repo, "branch", "map-impl", "map-design")
@@ -106,6 +109,7 @@ func TestDesignCleanup_DirtyWorktreeKeepsBothAndWarns(t *testing.T) {
 }
 
 func TestDesignCleanup_UnmergedDesignCommitKeepsBothAndWarns(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	dir, id := f.openDesignWorktree(t, false)
 	gitOut(t, f.repo, "branch", "map-impl", "map-design")
@@ -122,6 +126,7 @@ func TestDesignCleanup_UnmergedDesignCommitKeepsBothAndWarns(t *testing.T) {
 }
 
 func TestDesignCleanup_GitErrorKeepsBothAndWarns(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	dir, id := f.openDesignWorktree(t, true)
 	ticketMD := filepath.Join(f.h.TicketStore, "proj", "map", "ticket.md")
@@ -136,6 +141,7 @@ func TestDesignCleanup_GitErrorKeepsBothAndWarns(t *testing.T) {
 }
 
 func TestDesignCleanup_DesignOpenAfterBranchRunsTheCheck(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	dir, id := f.openDesignWorktree(t, true)
 	f.stop(t, id)
@@ -164,6 +170,7 @@ func (f designsFixture) setDesignStepBranch(t *testing.T) {
 }
 
 func TestDesignCleanup_StepMovingToBranchRemovesWithoutSessionExit(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	dir, id := f.openDesignWorktree(t, true)
 	f.stop(t, id)
@@ -176,6 +183,7 @@ func TestDesignCleanup_StepMovingToBranchRemovesWithoutSessionExit(t *testing.T)
 }
 
 func TestDesignCleanup_StepMovingToBranchWithDirtyWorktreeKeepsBothAndWarns(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	dir, id := f.openDesignWorktree(t, true)
 	f.stop(t, id)
@@ -191,6 +199,7 @@ func TestDesignCleanup_StepMovingToBranchWithDirtyWorktreeKeepsBothAndWarns(t *t
 }
 
 func TestDesignCleanup_RescanWithoutStepChangeDoesNotCheckAgain(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	dir, id := f.openDesignWorktree(t, true)
 	f.stop(t, id)
@@ -215,6 +224,7 @@ func TestDesignCleanup_RescanWithoutStepChangeDoesNotCheckAgain(t *testing.T) {
 }
 
 func TestDesignCleanup_LiveSessionKeepsTheWorktree(t *testing.T) {
+	t.Parallel()
 	f := startDesignsAt(t, "create-tickets")
 	dir, _ := f.openDesignWorktree(t, true)
 	gitOut(t, f.repo, "branch", "map-impl", "map-design")

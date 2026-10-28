@@ -13,6 +13,7 @@ import (
 // Two harnesses side by side each launch an agent through their own fake
 // herdr: Start changes no process env, so the fakes do not collide.
 func TestServertest_ParallelHarnessesEachDriveAHerdrLaunch(t *testing.T) {
+	t.Parallel()
 	for i := range 2 {
 		t.Run("harness"+strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()

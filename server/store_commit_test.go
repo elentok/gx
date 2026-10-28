@@ -17,6 +17,7 @@ func storeLog(t *testing.T, store string) string {
 }
 
 func TestStoreCommits_ServerCommitsEditsMadeWhileDownOnStart(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic", "01", "first", "")
 	servertest.StartWithStore(t, store, func(c *server.Config) {

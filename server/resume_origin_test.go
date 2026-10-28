@@ -21,6 +21,7 @@ func endedRounds(t *testing.T, ticketPath string) []tickets.PauseRound {
 }
 
 func TestResume_ZeroCommitEndsTheRoundWithTheClientsSource(t *testing.T) {
+	t.Parallel()
 	for name, origin := range map[string]string{"cli": server.OriginCLI, "tui": server.OriginTUI} {
 		t.Run(name, func(t *testing.T) {
 			e := startAnswerEnv(t, nil)
@@ -43,6 +44,7 @@ func TestResume_ZeroCommitEndsTheRoundWithTheClientsSource(t *testing.T) {
 }
 
 func TestResume_ZeroCommitPromptedLiveAgentKeepsTheRoundOpen(t *testing.T) {
+	t.Parallel()
 	e := startAnswerEnv(t, nil)
 	pauseEnvZeroCommit(t, e)
 
@@ -60,6 +62,7 @@ func TestResume_ZeroCommitPromptedLiveAgentKeepsTheRoundOpen(t *testing.T) {
 }
 
 func TestUnmute_EndsTheRepairPausesRound(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	writeMuted(t, path, "open", "Body text.\n")
 	if err := h.Server.PauseAs("proj:epic-a/01", events.MergeConflict, "stuck"); err != nil {

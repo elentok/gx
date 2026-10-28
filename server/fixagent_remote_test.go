@@ -34,6 +34,7 @@ func startRemoteFix(t *testing.T, on bool) (*servertest.Harness, string, func(bo
 }
 
 func TestFixAgent_RemoteControlKeyOn(t *testing.T) {
+	t.Parallel()
 	h, addr, _ := startRemoteFix(t, true)
 	res, err := h.Client.FixAgent(context.Background(), server.FixAgentRequest{Address: addr})
 	if err != nil || res.Refused || res.Session == nil {
@@ -48,6 +49,7 @@ func TestFixAgent_RemoteControlKeyOn(t *testing.T) {
 }
 
 func TestFixAgent_RemoteControlKeyOff(t *testing.T) {
+	t.Parallel()
 	h, addr, _ := startRemoteFix(t, false)
 	res, err := h.Client.FixAgent(context.Background(), server.FixAgentRequest{Address: addr})
 	if err != nil || res.Refused || res.Session == nil {
@@ -63,6 +65,7 @@ func TestFixAgent_RemoteControlKeyOff(t *testing.T) {
 
 // The name lives in the meta, so a resume keeps it after the key is turned off.
 func TestFixAgent_ResumeKeepsRemoteControlAfterKeyOff(t *testing.T) {
+	t.Parallel()
 	h, addr, set := startRemoteFix(t, true)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

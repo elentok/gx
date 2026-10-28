@@ -92,6 +92,7 @@ func (f *schedFixture) assertFeatureKept(t *testing.T, when string) {
 }
 
 func TestMergeTicket_RunsInTheFeatureWorktreeAndKeepsItWhenDone(t *testing.T) {
+	t.Parallel()
 	f, turns := newMergeFixture(t, func(int) string { return "finished" })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -121,6 +122,7 @@ func TestMergeTicket_RunsInTheFeatureWorktreeAndKeepsItWhenDone(t *testing.T) {
 }
 
 func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T) {
+	t.Parallel()
 	f, turns := newMergeFixture(t, func(n int) string {
 		if n == 1 {
 			return "asking"
@@ -149,6 +151,7 @@ func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T
 }
 
 func TestMergeTicket_FailedLaunchKeepsTheFeatureWorktree(t *testing.T) {
+	t.Parallel()
 	f, _ := newMergeFixture(t, func(int) string { return "finished" })
 	f.h.Herdr.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return nil, herdrfake.Identities{}, errors.New("start refused")

@@ -13,6 +13,7 @@ import (
 )
 
 func TestStart_LogsRunsStillOnANonConfiguredRunner(t *testing.T) {
+	t.Parallel()
 	h, _, _ := liveUnderOther(t)
 	deadline := time.Now().Add(10 * time.Second)
 	for {
@@ -31,6 +32,7 @@ func TestStart_LogsRunsStillOnANonConfiguredRunner(t *testing.T) {
 }
 
 func TestHerdr_RunOnANonConfiguredHerdrIsNotProbed(t *testing.T) {
+	t.Parallel()
 	h, own, _ := liveUnder(t, newRenamedFake("herdr", nativerunner.VerdictLive), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
 	own.SetHealthErr(errors.New("herdr down"))
 	time.Sleep(100 * time.Millisecond)

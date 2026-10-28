@@ -52,6 +52,7 @@ func waitUntil(t *testing.T, what string, cond func() bool) {
 }
 
 func TestHandMerged_PlainGitMergeReleasesAnOnMergedDependent(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	commitOnBranch(t, repo, "blocker")
 	writeCompleteEpic(t, store, "blocker")
@@ -88,6 +89,7 @@ func TestHandMerged_PlainGitMergeReleasesAnOnMergedDependent(t *testing.T) {
 }
 
 func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T) {
+	t.Parallel()
 	chat, count := chatRecorder(t)
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
 		commitFiles(t, p, "a.txt")
@@ -111,6 +113,7 @@ func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T)
 }
 
 func TestHandMerged_StampsLinesFromTheEpicsTrailerCommits(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	runGitIn(t, repo, "checkout", "-q", "-b", "blocker")
 	testutil.WriteFile(t, repo, "a.txt", "1\n2\n3\n4\n5\n")
@@ -134,6 +137,7 @@ func TestHandMerged_StampsLinesFromTheEpicsTrailerCommits(t *testing.T) {
 }
 
 func TestHandMerged_StampsSummedTotalsFromTheEpicsTickets(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	commitOnBranch(t, repo, "blocker")
 	writeCompleteEpic(t, store, "blocker")
@@ -158,6 +162,7 @@ func TestHandMerged_StampsSummedTotalsFromTheEpicsTickets(t *testing.T) {
 }
 
 func TestHandMerged_FrictionIncludesACancelledTicket(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	commitOnBranch(t, repo, "blocker")
 	writeCompleteEpic(t, store, "blocker")
@@ -184,6 +189,7 @@ func TestHandMerged_FrictionIncludesACancelledTicket(t *testing.T) {
 }
 
 func TestHandMerged_EpicWithNoQueuedRootAndNoDependentIsNotChecked(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	writeCompleteEpic(t, store, "idle")
 	writeCompleteEpic(t, store, "waited")

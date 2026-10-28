@@ -7,6 +7,7 @@ import (
 )
 
 func TestChatCache_RereadsOnlyWhenTheFileChanged(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "c.jsonl")
 	if err := os.WriteFile(path, []byte("a\n"), 0o644); err != nil {
 		t.Fatal(err)

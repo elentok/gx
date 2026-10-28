@@ -47,6 +47,7 @@ func waitAlerts(h *servertest.Harness, want int) ([]osnotify.Notification, []sou
 }
 
 func TestSessionBanner_DoneSendsOneAfterDelay(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startBannerSession(t)
 	start := time.Now()
 	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "done"}, server.SessionIdle)
@@ -64,6 +65,7 @@ func TestSessionBanner_DoneSendsOneAfterDelay(t *testing.T) {
 }
 
 func TestSessionBanner_BlockedBodyAndAttention(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startBannerSession(t)
 	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "Bash(rm -rf build)"}, server.SessionBlocked)
 	banners, sounds := waitAlerts(h, 1)
@@ -76,6 +78,7 @@ func TestSessionBanner_BlockedBodyAndAttention(t *testing.T) {
 }
 
 func TestSessionBanner_DoneThenActionableMerges(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startBannerSession(t)
 	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "done"}, server.SessionIdle)
 	res, err := h.Client.MarkSessionActionable(ctx, server.MarkActionableRequest{ID: id, Reason: "review the plan"})
@@ -92,6 +95,7 @@ func TestSessionBanner_DoneThenActionableMerges(t *testing.T) {
 }
 
 func TestSessionBanner_BlockedThenWorkingDrops(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startBannerSession(t)
 	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "blocked", Kind: "permission"}, server.SessionBlocked)
 	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "working"}, server.SessionWorking)
@@ -101,6 +105,7 @@ func TestSessionBanner_BlockedThenWorkingDrops(t *testing.T) {
 }
 
 func TestSessionBanner_OnScreenInFocusedTUISkips(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startBannerSession(t)
 	openTUI(ctx, t, h, "tui-1")
 	reportFocus(ctx, t, h, server.FocusReport{Client: "tui-1", Focused: true, Session: id, TermProgram: "ghostty"})
@@ -111,6 +116,7 @@ func TestSessionBanner_OnScreenInFocusedTUISkips(t *testing.T) {
 }
 
 func TestSessionBanner_ClickFocusesThroughReportedTerminal(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startBannerSession(t)
 	dropTUI := openTUI(ctx, t, h, "tui-1")
 	reportFocus(ctx, t, h, server.FocusReport{Client: "tui-1", Focused: true, TermProgram: "iTerm.app"})
@@ -134,6 +140,7 @@ func TestSessionBanner_ClickFocusesThroughReportedTerminal(t *testing.T) {
 }
 
 func TestSessionBanner_SwitchesOff(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name            string
 		banners, sounds bool
@@ -161,6 +168,7 @@ func (p blockingPlayer) Play(context.Context, config.AgentsSoundsConfig, sound.N
 }
 
 func TestSessionBanner_StopWaitsForSound(t *testing.T) {
+	t.Parallel()
 	p := blockingPlayer{playing: make(chan struct{}), release: make(chan struct{})}
 	h, ctx, evs, id, conv := startBannerSession(t, func(c *server.Config) { c.Player = p })
 	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "done"}, server.SessionIdle)
@@ -181,6 +189,7 @@ func TestSessionBanner_StopWaitsForSound(t *testing.T) {
 }
 
 func TestSessionBanner_StopDropsPending(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startBannerSession(t)
 	reach(ctx, t, h, evs, id, conv, agentfake.Control{State: "done"}, server.SessionIdle)
 	if err := h.Stop(); err != nil {

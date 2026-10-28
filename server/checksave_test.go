@@ -26,6 +26,7 @@ func saveChecks(t *testing.T, h interface {
 }
 
 func TestSaveChecks_RepoMakesOneCommitOfTheFileAlone(t *testing.T) {
+	t.Parallel()
 	h, repo := checksFixture(t, "")
 	testutil.WriteFile(t, repo, "other.txt", "wip")
 	gitIn(t, repo, "add", "other.txt")
@@ -61,6 +62,7 @@ func TestSaveChecks_RepoMakesOneCommitOfTheFileAlone(t *testing.T) {
 }
 
 func TestSaveChecks_WritesConfigAsSent(t *testing.T) {
+	t.Parallel()
 	for _, cfg := range []string{`{}`, `{"test":false}`, `{"test":{"full":"make test"}}`} {
 		h, repo := checksFixture(t, "")
 		if res := saveChecks(t, h.Client, "repo", cfg); res.Refused {
@@ -87,6 +89,7 @@ func TestSaveChecks_WritesConfigAsSent(t *testing.T) {
 }
 
 func TestSaveChecks_ProjectJSONKeepsOtherKeys(t *testing.T) {
+	t.Parallel()
 	h, repo := checksFixture(t, `,"trunk":"main"`)
 	res := saveChecks(t, h.Client, "project.json", `{"lint":false}`)
 	if res.Refused || res.Path != filepath.Join(h.TicketStore, "demo", "project.json") {
@@ -111,6 +114,7 @@ func TestSaveChecks_ProjectJSONKeepsOtherKeys(t *testing.T) {
 }
 
 func TestSaveChecks_VCSNoneOnlyProjectJSON(t *testing.T) {
+	t.Parallel()
 	h, _ := checksFixture(t, `,"vcs":"none"`)
 	res := saveChecks(t, h.Client, "repo", `{}`)
 	if !res.Refused || res.Reason != server.ReasonVCSNone || res.Message == "" {
@@ -122,6 +126,7 @@ func TestSaveChecks_VCSNoneOnlyProjectJSON(t *testing.T) {
 }
 
 func TestSaveChecks_RefusedCommitChangesNothing(t *testing.T) {
+	t.Parallel()
 	t.Run("uncommitted checks file", func(t *testing.T) {
 		h, repo := checksFixture(t, "")
 		writeNested(t, repo, check.RepoConfigPath, `{"lint":false}`)
@@ -185,6 +190,7 @@ func TestSaveChecks_RefusedCommitChangesNothing(t *testing.T) {
 }
 
 func TestSaveChecks_InvalidConfigIsRefused(t *testing.T) {
+	t.Parallel()
 	h, repo := checksFixture(t, "")
 	before := gitIn(t, repo, "rev-parse", "HEAD")
 	for _, target := range []string{"repo", "project.json"} {
@@ -202,6 +208,7 @@ func TestSaveChecks_InvalidConfigIsRefused(t *testing.T) {
 }
 
 func TestWeb_ChecksSaveIsAWrite(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	headers := map[string]string{"Content-Type": "application/json", "Origin": base}
 	if code := webSend(t, h, "POST", base+"/v1/checks/save", headers); code != 200 {

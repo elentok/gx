@@ -7,6 +7,7 @@ import (
 )
 
 func TestSessionStatus_Promptable(t *testing.T) {
+	t.Parallel()
 	for name, c := range map[string]struct {
 		st   server.SessionStatus
 		want bool

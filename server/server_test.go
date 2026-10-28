@@ -33,6 +33,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestHandshake_ReturnsAPIVersionAndBuild(t *testing.T) {
+	t.Parallel()
 	h := servertest.Start(t)
 
 	got, err := h.Client.Handshake(context.Background())
@@ -45,6 +46,7 @@ func TestHandshake_ReturnsAPIVersionAndBuild(t *testing.T) {
 }
 
 func TestSnapshot_ListsStoreTicketsByAddressWithSequence(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "01")
@@ -79,6 +81,7 @@ func TestSnapshot_ListsStoreTicketsByAddressWithSequence(t *testing.T) {
 }
 
 func TestEvents_SnapshotThenSubscribeSeesTicketEditAsOneEventWithNextSeq(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic", "02", "second", "")
@@ -122,6 +125,7 @@ func TestEvents_SnapshotThenSubscribeSeesTicketEditAsOneEventWithNextSeq(t *test
 // Seam A: with the watch off and a slow poll, only the ping can make a direct
 // write's event arrive in time.
 func TestEvents_TicketChangedPingPublishesAtOnce(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic", "01", "first", "")
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
@@ -164,6 +168,7 @@ func TestEvents_TicketChangedPingPublishesAtOnce(t *testing.T) {
 }
 
 func TestServer_StopReleasesLockSoNewServerCanStart(t *testing.T) {
+	t.Parallel()
 	h := servertest.Start(t)
 
 	if err := h.Stop(); err != nil {
@@ -184,6 +189,7 @@ func TestServer_StopReleasesLockSoNewServerCanStart(t *testing.T) {
 }
 
 func TestServer_StateDirAndSocketArePrivate(t *testing.T) {
+	t.Parallel()
 	h := servertest.Start(t)
 
 	dir, err := os.Stat(h.StateDir)
@@ -203,6 +209,7 @@ func TestServer_StateDirAndSocketArePrivate(t *testing.T) {
 }
 
 func TestServer_SecondServerOnSameStateDirIsRefused(t *testing.T) {
+	t.Parallel()
 	h := servertest.Start(t)
 
 	_, err := server.New(server.Config{StateDir: h.StateDir})
@@ -218,6 +225,7 @@ func TestServer_SecondServerOnSameStateDirIsRefused(t *testing.T) {
 }
 
 func TestSnapshot_HandEditShowsUpWithWatchAndWithPollOnly(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name         string
 		disableWatch bool
@@ -266,6 +274,7 @@ func TestSnapshot_HandEditShowsUpWithWatchAndWithPollOnly(t *testing.T) {
 }
 
 func TestTCP_SameRoutesAnswerOverLoopback(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithTCP(t)
 
 	resp, err := http.Get("http://" + h.TCPAddr + "/v1/snapshot")
@@ -283,6 +292,7 @@ func TestTCP_SameRoutesAnswerOverLoopback(t *testing.T) {
 }
 
 func TestTCP_OffByDefault(t *testing.T) {
+	t.Parallel()
 	got, err := servertest.Start(t).Client.Handshake(context.Background())
 	if err != nil || got.TCPAddr != "" {
 		t.Errorf("handshake TCPAddr = %q (err %v), want empty", got.TCPAddr, err)
@@ -290,6 +300,7 @@ func TestTCP_OffByDefault(t *testing.T) {
 }
 
 func TestTCP_RefusesNonLoopbackAddr(t *testing.T) {
+	t.Parallel()
 	_, err := server.New(server.Config{StateDir: t.TempDir(), TicketStore: t.TempDir(), TCPAddr: "0.0.0.0:0"})
 	if err == nil {
 		t.Fatal("expected error for non-loopback address")
@@ -297,6 +308,7 @@ func TestTCP_RefusesNonLoopbackAddr(t *testing.T) {
 }
 
 func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartHerdrDown(t, func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -341,6 +353,7 @@ func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T)
 }
 
 func TestHerdr_NotProbedForRunnerWithoutHost(t *testing.T) {
+	t.Parallel()
 	// Embedding only the interface hides runnerfake's Healthy, like a native runner.
 	native := struct{ agentrunner.Runner }{runnerfake.NewRunner()}
 	h := servertest.StartHerdrDown(t, func(c *server.Config) {
@@ -368,6 +381,7 @@ func TestHerdr_NotProbedForRunnerWithoutHost(t *testing.T) {
 }
 
 func TestHerdr_ProbedThroughConfiguredRunner(t *testing.T) {
+	t.Parallel()
 	fake := runnerfake.NewRunner()
 	fake.SetHealthErr(errors.New("down"))
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.Runner = fake })
@@ -378,6 +392,7 @@ func TestHerdr_ProbedThroughConfiguredRunner(t *testing.T) {
 }
 
 func TestHandshake_ReportsHerdrUnavailable(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartHerdrDown(t, func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
 	got, err := h.Client.Handshake(context.Background())
 	if err != nil || !got.HerdrUnavailable {

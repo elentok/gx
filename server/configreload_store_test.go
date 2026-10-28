@@ -14,6 +14,7 @@ import (
 // A changed commit-debounce is reported and applied to the running store
 // commit loop: an edit is committed after the new, short debounce.
 func TestConfigReload_StoreCommitDebounceApplies(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	if err := os.WriteFile(filepath.Join(store, "seed.md"), []byte("x"), 0o644); err != nil {
 		t.Fatal(err)

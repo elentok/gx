@@ -68,6 +68,7 @@ func runnerShapes(t *testing.T, test func(t *testing.T, headless bool)) {
 }
 
 func TestReclaim_DeadEmptyClaimReopens(t *testing.T) {
+	t.Parallel()
 	runnerShapes(t, func(t *testing.T, headless bool) {
 		store, repo, wtPath, ticketPath := restartDead(t, headless, noWork)
 		waitStatus(t, ticketPath, schema.StatusOpen)
@@ -86,6 +87,7 @@ func TestReclaim_DeadEmptyClaimReopens(t *testing.T) {
 }
 
 func TestReclaim_HerdrLookupErrorNeverReopens(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
@@ -133,6 +135,7 @@ func assertPauseRecordsRun(t *testing.T, store string, pause events.Type, runner
 }
 
 func TestReclaim_DeadClaimWithWorkPauses(t *testing.T) {
+	t.Parallel()
 	for name, work := range map[string]func(*testing.T, string){"commit": commitAgentWork, "edit": editAgentWork} {
 		t.Run(name, func(t *testing.T) {
 			runnerShapes(t, func(t *testing.T, headless bool) {

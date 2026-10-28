@@ -8,6 +8,7 @@ import (
 )
 
 func TestFocusSession_TargetsLastFocusedTUI(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, _ := startFakeSession(t)
 	openTUI(ctx, t, h, "tui-1")
 	openTUI(ctx, t, h, "tui-2")
@@ -25,6 +26,7 @@ func TestFocusSession_TargetsLastFocusedTUI(t *testing.T) {
 }
 
 func TestFocusSession_NoTUISucceedsWithNoTarget(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, _ := startFakeSession(t)
 	drop := openTUI(ctx, t, h, "tui-1")
 	reportFocus(ctx, t, h, server.FocusReport{Client: "tui-1", Focused: true})
@@ -41,6 +43,7 @@ func TestFocusSession_NoTUISucceedsWithNoTarget(t *testing.T) {
 }
 
 func TestFocusSession_RefusesUnknownID(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, _, _ := startFakeSession(t)
 	res, err := h.Client.FocusSession(ctx, "nope")
 	if err != nil || res.Reason != server.ReasonSessionUnknown {

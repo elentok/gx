@@ -21,6 +21,7 @@ import (
 )
 
 func TestCancel_EndsThePausedTicketsRoundWithTheRequestsSource(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	if err := h.Server.PauseAs("proj:epic-a/01", events.MergeConflict, "stuck"); err != nil {
 		t.Fatal(err)
@@ -38,6 +39,7 @@ func TestCancel_EndsThePausedTicketsRoundWithTheRequestsSource(t *testing.T) {
 }
 
 func TestCancel_WithoutAnOpenRoundWritesNoEnd(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -60,6 +62,7 @@ func startTicketWrites(t *testing.T) (*servertest.Harness, string) {
 }
 
 func TestPause_RefusesWithoutReasonAndWritesNothing(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -75,6 +78,7 @@ func TestPause_RefusesWithoutReasonAndWritesNothing(t *testing.T) {
 }
 
 func TestPause_WritesStatusSectionAndOneEvent(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -99,6 +103,7 @@ func TestPause_WritesStatusSectionAndOneEvent(t *testing.T) {
 }
 
 func TestPause_RefusesUnknownTicket(t *testing.T) {
+	t.Parallel()
 	h, _ := startTicketWrites(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -110,6 +115,7 @@ func TestPause_RefusesUnknownTicket(t *testing.T) {
 }
 
 func TestPause_RefusesARunningDoneAlreadyPausedOrMapEpicTicket(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	store := h.TicketStore
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "finished", servertest.TicketOpts{Status: "done"})
@@ -137,6 +143,7 @@ func TestPause_RefusesARunningDoneAlreadyPausedOrMapEpicTicket(t *testing.T) {
 }
 
 func TestPause_RefusesAnAlreadyPausedTicket(t *testing.T) {
+	t.Parallel()
 	h, _ := startTicketWrites(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -161,6 +168,7 @@ func writeMuted(t *testing.T, path, status, body string) {
 }
 
 func TestUnmute_ReopensAStuckTicketAndDemotesItsSection(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	writeMuted(t, path, "paused\npause_reason: merge-conflict", "## Needs Repair\n\nnotification storm tripped a mute\n")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -185,6 +193,7 @@ func TestUnmute_ReopensAStuckTicketAndDemotesItsSection(t *testing.T) {
 }
 
 func TestUnmute_LeavesANonPausedTicketsStatusAlone(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	writeMuted(t, path, "open", "Body text.\n")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -200,6 +209,7 @@ func TestUnmute_LeavesANonPausedTicketsStatusAlone(t *testing.T) {
 }
 
 func TestUnmute_RefusesATicketWithNoMutes(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	before, _ := os.ReadFile(path)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -215,6 +225,7 @@ func TestUnmute_RefusesATicketWithNoMutes(t *testing.T) {
 }
 
 func TestUnmute_RefusesUnknownTicket(t *testing.T) {
+	t.Parallel()
 	h, _ := startTicketWrites(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -226,6 +237,7 @@ func TestUnmute_RefusesUnknownTicket(t *testing.T) {
 }
 
 func TestRelaunch_StartsAFreshIterationOfAPausedTicket(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	start, prompt, _ := registerLaunch(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -248,6 +260,7 @@ func TestRelaunch_StartsAFreshIterationOfAPausedTicket(t *testing.T) {
 }
 
 func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	var closed atomic.Int32
 	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
@@ -280,6 +293,7 @@ func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 }
 
 func TestCancel_OldOneOffAddressResolvesTheArchivedTicket(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsArchivedEpic, "01", "a", servertest.TicketOpts{Status: "cancelled"})
 	path := filepath.Join(store, "proj", server.OneOffsArchivedEpic, "issues", "01-a.md")
@@ -303,6 +317,7 @@ func TestCancel_OldOneOffAddressResolvesTheArchivedTicket(t *testing.T) {
 }
 
 func TestCancel_CascadesToNonTerminalDescendants(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	issues := filepath.Dir(path)
 	child := func(id, status string) string {
@@ -332,6 +347,7 @@ func TestCancel_CascadesToNonTerminalDescendants(t *testing.T) {
 }
 
 func TestSnapshot_ClaimedTicketCarriesLaunchTime(t *testing.T) {
+	t.Parallel()
 	h, path := startTicketWrites(t)
 	if err := ralphloop.Claim(path); err != nil {
 		t.Fatal(err)

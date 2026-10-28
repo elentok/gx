@@ -6,6 +6,7 @@ import (
 )
 
 func TestSetLoopCardTime_QueuedFallsBackToQueuedAt(t *testing.T) {
+	t.Parallel()
 	queuedAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	row := &EpicListRow{Section: SectionInProgress, State: EpicListQueued, QueuedAt: queuedAt}
 	setLoopCardTime(row, time.Time{}, time.Time{})

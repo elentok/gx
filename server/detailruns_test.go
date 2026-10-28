@@ -60,6 +60,7 @@ func runsWith(t *testing.T, status, extra string, answerMins []int, prep func(ti
 func runsAt(min int) time.Time { return runsT0.Add(time.Duration(min) * time.Minute) }
 
 func TestTicketDetail_RunsWithNoNormalEnd(t *testing.T) {
+	t.Parallel()
 	cold := func(ev *ralphloop.Event) { ev.Path = "cold-start" }
 	got := runsOf(t, "open",
 		runEv(events.IterationStarted, 0, cold),
@@ -83,6 +84,7 @@ func TestTicketDetail_RunsWithNoNormalEnd(t *testing.T) {
 }
 
 func TestTicketDetail_CancelledRunEndsAtStatusWrite(t *testing.T) {
+	t.Parallel()
 	prep := func(path string) {
 		if err := os.Chtimes(path, runsAt(50), runsAt(50)); err != nil {
 			t.Fatal(err)
@@ -96,6 +98,7 @@ func TestTicketDetail_CancelledRunEndsAtStatusWrite(t *testing.T) {
 }
 
 func TestTicketDetail_AnswerToLiveAgentStartsSameSessionRun(t *testing.T) {
+	t.Parallel()
 	paused := func(ev *ralphloop.Event) { ev.Kind = "merge-conflict" }
 	got := runsWith(t, "open", "", []int{5},
 		nil,
@@ -113,6 +116,7 @@ func TestTicketDetail_AnswerToLiveAgentStartsSameSessionRun(t *testing.T) {
 }
 
 func TestTicketDetail_AnswerThenFreshStartAddsNoExtraRun(t *testing.T) {
+	t.Parallel()
 	paused := func(ev *ralphloop.Event) { ev.Kind = "merge-conflict" }
 	got := runsWith(t, "open", "", []int{5}, nil,
 		runEv(events.IterationStarted, 0, nil),
@@ -126,6 +130,7 @@ func TestTicketDetail_AnswerThenFreshStartAddsNoExtraRun(t *testing.T) {
 }
 
 func TestTicketDetail_AnswerToLiveAgentStillRunning(t *testing.T) {
+	t.Parallel()
 	paused := func(ev *ralphloop.Event) { ev.Kind = "merge-conflict" }
 	extra := "claimed_at: " + runsAt(5).Format(time.RFC3339) + "\n"
 	got := runsWith(t, "claimed", extra, []int{5}, nil,
@@ -138,6 +143,7 @@ func TestTicketDetail_AnswerToLiveAgentStillRunning(t *testing.T) {
 }
 
 func TestTicketDetail_LateFinishAdoptionStartsRunUntilMerge(t *testing.T) {
+	t.Parallel()
 	paused := func(ev *ralphloop.Event) { ev.Kind = "merge-conflict" }
 	got := runsOf(t, "done",
 		runEv(events.IterationStarted, 0, nil),
@@ -155,6 +161,7 @@ func TestTicketDetail_LateFinishAdoptionStartsRunUntilMerge(t *testing.T) {
 }
 
 func TestTicketDetail_RunsWithNormalEnds(t *testing.T) {
+	t.Parallel()
 	resumed := func(ev *ralphloop.Event) { ev.Path = "resumed" }
 	paused := func(ev *ralphloop.Event) { ev.Kind = "merge-conflict" }
 	got := runsOf(t, "open",
@@ -184,6 +191,7 @@ func TestTicketDetail_RunsWithNormalEnds(t *testing.T) {
 }
 
 func TestTicketDetail_OpenLastRun(t *testing.T) {
+	t.Parallel()
 	start := runEv(events.IterationStarted, 0, nil)
 	for status, want := range map[string]string{"claimed": server.RunRunning, "open": server.RunAgentLost} {
 		got := runsOf(t, status, start)
@@ -194,6 +202,7 @@ func TestTicketDetail_OpenLastRun(t *testing.T) {
 }
 
 func TestTicketDetail_NeverClaimedHasNoRuns(t *testing.T) {
+	t.Parallel()
 	if got := runsOf(t, "open"); len(got) != 0 {
 		t.Fatalf("runs = %+v", got)
 	}

@@ -25,6 +25,7 @@ func waitingRegistry(t *testing.T, waits ...time.Duration) (*runRegistry, time.T
 
 // Seam: after the grace period a waiting run stops counting; the 6th keeps its slot.
 func TestReleaseWaiting_StopsCountingAfterGraceUpToCap(t *testing.T) {
+	t.Parallel()
 	r, now := waitingRegistry(t, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour, time.Hour, time.Minute)
 	if got := r.releaseWaiting(now, 10*time.Minute, 5); got != 5 {
 		t.Fatalf("released = %d, want 5", got)
@@ -46,6 +47,7 @@ func TestReleaseWaiting_StopsCountingAfterGraceUpToCap(t *testing.T) {
 
 // Seam: an answer re-takes the slot at once; the flag survives a restart.
 func TestReleaseWaiting_AnswerRetakesSlotAndFlagSurvivesRestart(t *testing.T) {
+	t.Parallel()
 	r, now := waitingRegistry(t, time.Hour, time.Hour)
 	if r.releaseWaiting(now, 10*time.Minute, 1) != 1 {
 		t.Fatal("want one run released")

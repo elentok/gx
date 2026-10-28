@@ -10,6 +10,7 @@ import (
 )
 
 func TestOpenRuns_OldFileLoadsAsHerdrSession(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	old := `[{"address":"proj:epic-a/01","agent":"claude","pane":"p1","tab":"t1","root":"proj:epic-a"}]`
 	if err := os.WriteFile(filepath.Join(dir, runsFileName), []byte(old), 0o600); err != nil {
@@ -29,6 +30,7 @@ func TestOpenRuns_OldFileLoadsAsHerdrSession(t *testing.T) {
 }
 
 func TestOpenRuns_RoundTrips(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	r, _, err := openRuns(dir, nil)
 	if err != nil {

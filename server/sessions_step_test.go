@@ -8,6 +8,7 @@ import (
 )
 
 func TestReportSessionStep_StoredWhileBusyAndClearedOnIdle(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv := startFakeSession(t)
 	report(t, conv, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
@@ -31,6 +32,7 @@ func TestReportSessionStep_StoredWhileBusyAndClearedOnIdle(t *testing.T) {
 }
 
 func TestReportSessionStep_Refusals(t *testing.T) {
+	t.Parallel()
 	h, ctx, _, id, _ := startFakeSession(t)
 	for name, tc := range map[string]struct {
 		req    server.ReportStepRequest

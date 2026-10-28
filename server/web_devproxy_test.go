@@ -29,6 +29,7 @@ func startWebDev(t *testing.T, devURL string) (string, *servertest.Harness) {
 }
 
 func TestWebDevProxy_ServesAssetsFromDevFrontend(t *testing.T) {
+	t.Parallel()
 	dev := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("dev:" + r.URL.Path))
 	}))
@@ -43,6 +44,7 @@ func TestWebDevProxy_ServesAssetsFromDevFrontend(t *testing.T) {
 }
 
 func TestWebDevProxy_SnapshotStaysLocal(t *testing.T) {
+	t.Parallel()
 	dev := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Errorf("dev frontend got %s", r.URL.Path)
 	}))
@@ -56,6 +58,7 @@ func TestWebDevProxy_SnapshotStaysLocal(t *testing.T) {
 }
 
 func TestWebDevProxy_RejectsNonLoopbackTarget(t *testing.T) {
+	t.Parallel()
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) {
 		c.WebAddr = "127.0.0.1:0"
 		c.WebDevURL = "http://example.com:5173"

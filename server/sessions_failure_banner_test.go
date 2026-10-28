@@ -82,6 +82,7 @@ func (f failureBannerFixture) stall(t *testing.T) {
 }
 
 func TestFailureBanner_AuthSendsOneBanner(t *testing.T) {
+	t.Parallel()
 	f := startFailureBannerSession(t, false)
 	writeTranscript(t, f.path, apiError401)
 	f.reach(t, agentfake.Control{State: "done"}, server.SessionIdle)
@@ -95,6 +96,7 @@ func TestFailureBanner_AuthSendsOneBanner(t *testing.T) {
 }
 
 func TestFailureBanner_StalledSendsOneBannerWhileWorking(t *testing.T) {
+	t.Parallel()
 	f := startFailureBannerSession(t, false)
 	f.stall(t)
 	banners, _ := waitAlerts(f.h, 1)
@@ -107,6 +109,7 @@ func TestFailureBanner_StalledSendsOneBannerWhileWorking(t *testing.T) {
 }
 
 func TestFailureBanner_AFailureThatClearsAndReturnsSendsAgain(t *testing.T) {
+	t.Parallel()
 	f := startFailureBannerSession(t, false)
 	f.stall(t)
 	waitAlerts(f.h, 1)
@@ -120,6 +123,7 @@ func TestFailureBanner_AFailureThatClearsAndReturnsSendsAgain(t *testing.T) {
 }
 
 func TestFailureBanner_CarriesTheDesignLinkOnlyWithTheWebListener(t *testing.T) {
+	t.Parallel()
 	for _, web := range []bool{true, false} {
 		f := startFailureBannerSession(t, web)
 		f.stall(t)
@@ -138,6 +142,7 @@ func TestFailureBanner_CarriesTheDesignLinkOnlyWithTheWebListener(t *testing.T) 
 }
 
 func TestFailureBanner_ClickFocusesTheTUIOrCarriesTheLink(t *testing.T) {
+	t.Parallel()
 	f := startFailureBannerSession(t, true)
 	openTUI(f.ctx, t, f.h, "tui-1")
 	reportFocus(f.ctx, t, f.h, server.FocusReport{Client: "tui-1", Focused: true, TermProgram: "ghostty"})
@@ -156,6 +161,7 @@ func TestFailureBanner_ClickFocusesTheTUIOrCarriesTheLink(t *testing.T) {
 }
 
 func TestFailureBanner_AFKChatCarriesTheLink(t *testing.T) {
+	t.Parallel()
 	chat := newSlackHook(t)
 	f := startFailureBannerSession(t, true, func(c *server.Config) {
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}

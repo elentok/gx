@@ -58,6 +58,7 @@ func claimFirstChild(t *testing.T, repo string) string {
 }
 
 func TestFeatureBranch_FirstClaimCreatesItAtTheResolvedBase(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	base := gitOut(t, repo, "rev-parse", "main")
 
@@ -72,6 +73,7 @@ func TestFeatureBranch_FirstClaimCreatesItAtTheResolvedBase(t *testing.T) {
 }
 
 func TestFeatureBranch_AnExistingBranchIsAdoptedAndItsMergeBaseRecorded(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	base := gitOut(t, repo, "rev-parse", "main")
 	gitOut(t, repo, "branch", "epic-a")

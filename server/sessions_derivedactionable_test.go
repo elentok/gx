@@ -44,6 +44,7 @@ func settled(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-cha
 }
 
 func TestDerivedActionable_PageAnswerClearsGrilling(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv, path := designPromptSession(t)
 	idleWith(ctx, t, h, evs, id, conv, path, grillTurn)
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Grilling })
@@ -55,6 +56,7 @@ func TestDerivedActionable_PageAnswerClearsGrilling(t *testing.T) {
 }
 
 func TestDerivedActionable_RunEndAfterGrilling(t *testing.T) {
+	t.Parallel()
 	for name, answer := range map[string]func(*testing.T, *servertest.Harness, context.Context, string){
 		"pane input": func(t *testing.T, h *servertest.Harness, _ context.Context, id string) { clearByInput(t, h, id) },
 		"page prompt": func(t *testing.T, h *servertest.Harness, ctx context.Context, id string) {
@@ -79,6 +81,7 @@ func TestDerivedActionable_RunEndAfterGrilling(t *testing.T) {
 }
 
 func TestDerivedActionable_PlainTurnAfterGrillingClears(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv, path := designPromptSession(t)
 	idleWith(ctx, t, h, evs, id, conv, path, grillTurn)
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Actionable.Grilling })
@@ -89,6 +92,7 @@ func TestDerivedActionable_PlainTurnAfterGrillingClears(t *testing.T) {
 }
 
 func TestDerivedActionable_AgentRaised(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		text   string
 		reason string

@@ -14,6 +14,7 @@ import (
 )
 
 func TestProgressStepsMatchTickets(t *testing.T) {
+	t.Parallel()
 	got := []server.ProgressStep{
 		server.ProgressChart, server.ProgressResolveTickets, server.ProgressSpec, server.ProgressReview,
 		server.ProgressGrillFindings, server.ProgressCreateTickets, server.ProgressBranch, server.ProgressDone,
@@ -24,6 +25,7 @@ func TestProgressStepsMatchTickets(t *testing.T) {
 }
 
 func TestEpicList_MapProgress(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	mapMD := func(front string) string { return "---\nstatus: open\nkind: map\n" + front + "---\n" }
 	stepMD := func(step string) string { return mapMD("design_step: " + step + "\n") }

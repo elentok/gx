@@ -39,6 +39,7 @@ func maxAgents(n int) map[string]any {
 // Seam A: a raised cap starts a queued root without waiting for the poll
 // tick; a lowered one kills no running agent.
 func TestConfigReload_MaxAgentsAppliesWithoutKillingAgents(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
@@ -84,6 +85,7 @@ func TestConfigReload_MaxAgentsAppliesWithoutKillingAgents(t *testing.T) {
 }
 
 func TestConfigReload_ReportsMaxOneOffAgentsChange(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
@@ -106,6 +108,7 @@ func waitRuns(ctx context.Context, t *testing.T, h *servertest.Harness, n int) {
 // Seam A: an invalid or missing file is refused and leaves the live settings
 // as they were.
 func TestConfigReload_RefusesInvalidAndMissingFiles(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
@@ -140,6 +143,7 @@ func TestConfigReload_RefusesInvalidAndMissingFiles(t *testing.T) {
 // Seam A: a startup-only key warns on every reload until restart, and the
 // rest of the file still applies.
 func TestConfigReload_StartupOnlyKeyWarnsUntilRestart(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) { c.MaxAgents = 3 })
@@ -159,6 +163,7 @@ func TestConfigReload_StartupOnlyKeyWarnsUntilRestart(t *testing.T) {
 
 // Seam A: a server.web change warns and leaves the running listener alone.
 func TestConfigReload_WebChangeWarnsAndKeepsListener(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
@@ -177,6 +182,7 @@ func TestConfigReload_WebChangeWarnsAndKeepsListener(t *testing.T) {
 // Seam A: every outcome is one banner and one config-reloaded event, and
 // never a chat message.
 func TestConfigReload_ReportsBannerAndEventNotChat(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	var chat []string
 	hook := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
@@ -277,6 +283,7 @@ func (failingNotifier) Notify(context.Context, osnotify.Notification) error {
 
 // Seam A: a banner that fails to send does not fail the reload.
 func TestConfigReload_NotifierFailureDoesNotFailReload(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) { c.Notifier = failingNotifier{} })
@@ -287,6 +294,7 @@ func TestConfigReload_NotifierFailureDoesNotFailReload(t *testing.T) {
 }
 
 func TestConfigReload_UnavailableWithoutConfigPath(t *testing.T) {
+	t.Parallel()
 	h := servertest.Start(t)
 	if res := reload(t, h); res.Reason != server.ReasonReloadUnavailable {
 		t.Errorf("reload = %+v, want %s", res, server.ReasonReloadUnavailable)

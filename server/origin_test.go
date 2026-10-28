@@ -27,6 +27,7 @@ func answerSource(t *testing.T, ticketPath string) string {
 }
 
 func TestOrigin_WebAnswerLogsWeb(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, _ := startWaitingRestartFake(t, 0, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
@@ -45,6 +46,7 @@ func TestOrigin_WebAnswerLogsWeb(t *testing.T) {
 }
 
 func TestOrigin_SocketAnswerLogsTUIOrCLI(t *testing.T) {
+	t.Parallel()
 	for name, tc := range map[string]struct {
 		mark func(*testing.T, *servertest.Harness)
 		want string

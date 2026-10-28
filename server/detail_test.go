@@ -11,6 +11,7 @@ import (
 )
 
 func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	state := pauseWithQuestion(t, ticketPath, optionsBlock)
@@ -44,6 +45,7 @@ func TestDetail_OpenSelfReportedQuestion(t *testing.T) {
 }
 
 func TestDetail_ZeroCommitOffersRetryOnly(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
@@ -64,6 +66,7 @@ func TestDetail_ZeroCommitOffersRetryOnly(t *testing.T) {
 }
 
 func TestDetail_ActionsFollowTheTable(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	if _, err := tickets.AppendLog(ticketPath, tickets.LogEvent{Type: tickets.EventPauseQuestion, By: "gx", Summary: "paused"}); err != nil {
@@ -97,6 +100,7 @@ func TestDetail_ActionsFollowTheTable(t *testing.T) {
 }
 
 func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, optionsBlock)
@@ -135,6 +139,7 @@ func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 }
 
 func TestDetail_StuckHasNoAnswerAction(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, optionsBlock)
@@ -148,6 +153,7 @@ func TestDetail_StuckHasNoAnswerAction(t *testing.T) {
 }
 
 func TestDetail_BadBlockReadsAsText(t *testing.T) {
+	t.Parallel()
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	pauseWithQuestion(t, ticketPath, "type: nonsense\n")
@@ -158,6 +164,7 @@ func TestDetail_BadBlockReadsAsText(t *testing.T) {
 }
 
 func TestDetail_UnknownAddressIs404(t *testing.T) {
+	t.Parallel()
 	h, _, _ := startWaitingRestartFake(t, 0)
 	if _, err := h.Client.Detail(context.Background(), "proj:epic-a/99"); err == nil {
 		t.Error("unknown ticket returned no error")

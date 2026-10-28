@@ -44,6 +44,7 @@ func retryAs(t *testing.T, h *servertest.Harness, investigator string) server.Qu
 }
 
 func TestInvestigateRetry_LogsRecoveryAppliedNotHumanRelaunch(t *testing.T) {
+	t.Parallel()
 	for _, kind := range []events.Kind{events.IterationError, events.ZeroCommit} {
 		t.Run(string(kind), func(t *testing.T) {
 			h := startInvestigateEnv(t, kind)
@@ -63,6 +64,7 @@ func TestInvestigateRetry_LogsRecoveryAppliedNotHumanRelaunch(t *testing.T) {
 }
 
 func TestInvestigateRetry_BlockedPaneIsRefused(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.BlockedPane)
 	if res := retryAs(t, h, investigateAddr); !res.Refused || res.Reason != server.ReasonInvestigateStop {
 		t.Errorf("retry = %+v, want %s refusal", res, server.ReasonInvestigateStop)
@@ -70,6 +72,7 @@ func TestInvestigateRetry_BlockedPaneIsRefused(t *testing.T) {
 }
 
 func TestInvestigateRetry_NotAnInvestigateTicketIsRefused(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	if res := retryAs(t, h, "proj:epic-a/01"); !res.Refused || res.Reason != server.ReasonInvestigateStop {
 		t.Errorf("retry = %+v, want %s refusal", res, server.ReasonInvestigateStop)
@@ -77,6 +80,7 @@ func TestInvestigateRetry_NotAnInvestigateTicketIsRefused(t *testing.T) {
 }
 
 func TestInvestigateRetry_PastTheGuardRailIsRefused(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	prior := ralphloop.Event{Type: string(events.RecoveryApplied), Ticket: "01", Kind: string(events.IterationError), Reason: "relaunch", Outcome: "ok"}
 	if err := ralphloop.AppendEvent(filepath.Join(h.TicketStore, "proj"), "epic-a", prior); err != nil {
@@ -91,6 +95,7 @@ func TestInvestigateRetry_PastTheGuardRailIsRefused(t *testing.T) {
 }
 
 func TestInvestigateRetry_SecondRetryOfTheKindIsRefused(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	if res := retryAs(t, h, investigateAddr); res.Refused {
 		t.Fatalf("first retry refused: %+v", res)
@@ -105,6 +110,7 @@ func TestInvestigateRetry_SecondRetryOfTheKindIsRefused(t *testing.T) {
 }
 
 func TestInvestigateRetry_TheForksOwnEventDoesNotSpendTheKindsCap(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	fork := ralphloop.Event{Type: string(events.RecoveryApplied), Ticket: "01", Kind: string(events.IterationError), Reason: "investigate", Outcome: investigateAddr}
 	if err := ralphloop.AppendEvent(filepath.Join(h.TicketStore, "proj"), "epic-a", fork); err != nil {
@@ -116,6 +122,7 @@ func TestInvestigateRetry_TheForksOwnEventDoesNotSpendTheKindsCap(t *testing.T) 
 }
 
 func TestRetry_APersonStillLogsHumanRelaunch(t *testing.T) {
+	t.Parallel()
 	h := startInvestigateEnv(t, events.IterationError)
 	if res := retryAs(t, h, ""); res.Refused {
 		t.Fatalf("retry refused: %+v", res)

@@ -65,6 +65,7 @@ func chatEventWithin(evs <-chan server.Event, t *testing.T, path, id string, d t
 }
 
 func TestSessionChatChanged_WorkingSessionPublishesOnGrowth(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path, chatLine)
 	report(t, conv, agentfake.Control{State: "working"})
@@ -75,6 +76,7 @@ func TestSessionChatChanged_WorkingSessionPublishesOnGrowth(t *testing.T) {
 }
 
 func TestSessionChatChanged_UnchangedTranscriptPublishesNothing(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path, chatLine)
 	report(t, conv, agentfake.Control{State: "working"})
@@ -85,6 +87,7 @@ func TestSessionChatChanged_UnchangedTranscriptPublishesNothing(t *testing.T) {
 }
 
 func TestSessionChatChanged_IdleSessionPublishesNothing(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path, chatLine)
 	report(t, conv, agentfake.Control{State: "done"})
@@ -116,6 +119,7 @@ func appendLines(t *testing.T, path string, lines ...string) {
 // Claude reports idle before it writes the turn's last lines, so the final
 // message lands after the poll stopped.
 func TestSessionChatChanged_TurnWrittenAfterIdlePublishes(t *testing.T) {
+	t.Parallel()
 	h, ctx, evs, id, conv, path := startChatSession(t, string(agentfake.HarnessKind))
 	writeTranscript(t, path, chatLine)
 	report(t, conv, agentfake.Control{State: "working"})

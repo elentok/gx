@@ -60,6 +60,7 @@ func assertFixturePaused(t *testing.T, f *schedFixture, tk schema.Ticket, status
 }
 
 func TestMergeFinish_FixerCommitOnTheEpicStillFinishesDone(t *testing.T) {
+	t.Parallel()
 	_, tk := runMergeTicket(t, func(_ *schedFixture, cwd string) string {
 		testutil.WriteFile(t, cwd, "fix.txt", "fix")
 		testutil.CommitAll(t, cwd, "epic: Fix typecheck/lint after rebase onto main")
@@ -79,6 +80,7 @@ func dropClaimTip(t *testing.T, cwd string) {
 }
 
 func TestMergeFinish_TrunkMovedPastTheClaimTipStillFinishesDone(t *testing.T) {
+	t.Parallel()
 	_, tk := runMergeTicket(t, func(f *schedFixture, _ string) string {
 		advanceTrunk(t, f, "trunk.txt", "moved on")
 		return "finished"
@@ -89,6 +91,7 @@ func TestMergeFinish_TrunkMovedPastTheClaimTipStillFinishesDone(t *testing.T) {
 }
 
 func TestMergeFinish_EpicLackingTheClaimTipPausesStuck(t *testing.T) {
+	t.Parallel()
 	f, tk := runMergeTicket(t, func(_ *schedFixture, cwd string) string {
 		dropClaimTip(t, cwd)
 		return "finished"
@@ -97,6 +100,7 @@ func TestMergeFinish_EpicLackingTheClaimTipPausesStuck(t *testing.T) {
 }
 
 func TestMergeFinish_RebaseInProgressPausesStuck(t *testing.T) {
+	t.Parallel()
 	f, tk := runMergeTicket(t, func(f *schedFixture, cwd string) string {
 		testutil.WriteFile(t, cwd, "x.txt", "epic")
 		testutil.CommitAll(t, cwd, "epic x")
@@ -111,11 +115,13 @@ func TestMergeFinish_RebaseInProgressPausesStuck(t *testing.T) {
 }
 
 func TestMergeFinish_SelfReportedAskingPausesAsking(t *testing.T) {
+	t.Parallel()
 	f, tk := runMergeTicket(t, func(*schedFixture, string) string { return "asking" })
 	assertFixturePaused(t, f, tk, schema.StatusLegacyAnswer, events.SelfReported, "")
 }
 
 func TestMergeFinish_AgentStoppingWithoutAReportPausesStuck(t *testing.T) {
+	t.Parallel()
 	f, tk := runMergeTicket(t, func(*schedFixture, string) string { return "" })
 	assertFixturePaused(t, f, tk, schema.StatusLegacyRepair, events.MergeUnreported, "without reporting")
 }
@@ -156,6 +162,7 @@ func lateFinishReason(t *testing.T, f *schedFixture) (string, bool) {
 }
 
 func TestLateFinish_MergeUnreportedClosesDoneOnceChecksPass(t *testing.T) {
+	t.Parallel()
 	f, _ := runMergeTicket(t, func(*schedFixture, string) string { return "" })
 	reportMergeFinishedLate(t, f)
 	waitStatus(t, f.ticketFile(t, "01"), schema.StatusDone)
@@ -172,6 +179,7 @@ func TestLateFinish_MergeUnreportedClosesDoneOnceChecksPass(t *testing.T) {
 }
 
 func TestLateFinish_TrunkMovedPastTheClaimTipStillClosesDone(t *testing.T) {
+	t.Parallel()
 	f, _ := runMergeTicket(t, func(f *schedFixture, _ string) string {
 		advanceTrunk(t, f, "trunk.txt", "moved on")
 		return ""
@@ -181,6 +189,7 @@ func TestLateFinish_TrunkMovedPastTheClaimTipStillClosesDone(t *testing.T) {
 }
 
 func TestLateFinish_MergeUnreportedStaysPausedWhileChecksFail(t *testing.T) {
+	t.Parallel()
 	f, _ := runMergeTicket(t, func(_ *schedFixture, cwd string) string {
 		dropClaimTip(t, cwd)
 		return ""
@@ -198,5 +207,6 @@ func TestLateFinish_MergeUnreportedStaysPausedWhileChecksFail(t *testing.T) {
 }
 
 func TestMergeFinish_BudgetKillPausesBudgetKilled(t *testing.T) {
+	t.Parallel()
 	testBudgetKillPausesBudgetKilled(t, func() float64 { return 6 }, servertest.TicketOpts{Type: "merge"})
 }
