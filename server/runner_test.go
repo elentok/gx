@@ -224,10 +224,14 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 		c.BudgetPollInterval = time.Hour // a budget poll also rescans, which would catch the index up
 	})
 	registerLaunch(h)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	// Each call gets its own deadline: one shared context ran out under heavy load.
+	call := func() (context.Context, context.CancelFunc) {
+		return context.WithTimeout(context.Background(), 30*time.Second)
+	}
 	// A pass that finds herdr unprobed claims nothing, which would hide the refusal.
-	servertest.WaitFor(t, 10*time.Second, "herdr to be probed", func() bool {
+	servertest.WaitFor(t, 30*time.Second, "herdr to be probed", func() bool {
+		ctx, cancel := call()
+		defer cancel()
 		snap, err := h.Client.Snapshot(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -247,10 +251,14 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 	if err := os.WriteFile(path, append(data, "\nedited after the index saw it\n"...), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+	addCtx, addCancel := call()
+	defer addCancel()
+	if res, err := h.Client.QueueAdd(addCtx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	servertest.WaitFor(t, 10*time.Second, "the claim-reread-mismatch verdict", func() bool {
+	servertest.WaitFor(t, 30*time.Second, "the claim-reread-mismatch verdict", func() bool {
+		ctx, cancel := call()
+		defer cancel()
 		ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
 		if err != nil {
 			t.Fatal(err)
@@ -263,7 +271,7 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 
 	// A restart is the next pass over a fresh index: it sees the edit and claims.
 	h.Restart(t)
-	servertest.WaitFor(t, 10*time.Second, "the ticket to be claimed after the index caught up", func() bool {
+	servertest.WaitFor(t, 30*time.Second, "the ticket to be claimed after the index caught up", func() bool {
 		got := readFile(t, path)
 		return strings.Contains(got, "status: claimed") || strings.Contains(got, "status: done")
 	})
