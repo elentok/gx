@@ -284,6 +284,29 @@ func Cleanup(r Runner, label string) error {
 	return nil
 }
 
+// OwnerPID is a process gx knows belongs to an agent session. Start is its
+// start time in Unix seconds; a pid is never reported without one, so the
+// owner walk can't match a recycled pid.
+type OwnerPID struct {
+	PID   int
+	Start int64
+}
+
+// ProcessOwner is implemented by runners that know which pids run an agent
+// session. A session whose agent already ended returns no pids and no error.
+type ProcessOwner interface {
+	OwnerPIDs(s Session) ([]OwnerPID, error)
+}
+
+// OwnerPIDs returns the pids r knows for s; runners without ProcessOwner
+// know none.
+func OwnerPIDs(r Runner, s Session) ([]OwnerPID, error) {
+	if o, ok := r.(ProcessOwner); ok {
+		return o.OwnerPIDs(s)
+	}
+	return nil, nil
+}
+
 // Healthy reports r's host health; runners without a separate host are
 // always healthy.
 func Healthy(r Runner) error {
