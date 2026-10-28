@@ -3,10 +3,10 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/elentok/gx/check"
 	"github.com/elentok/gx/config"
@@ -119,10 +119,14 @@ func (s *Server) saveChecksToRepo(dir string, req SaveChecksRequest) (SaveChecks
 	}
 	defer s.trunkLocks.lock(repo, trunk)()
 
-	if branch, err := git.CurrentBranch(root); err != nil || branch != trunk {
+	branch, err := git.CurrentBranch(root)
+	if err != nil {
+		return refuseSave(ReasonWrongBranch, "cannot read the branch of "+root+": "+err.Error())
+	}
+	if branch != trunk {
 		return refuseSave(ReasonWrongBranch, root+" is on "+branch+", not "+trunk)
 	}
-	status, err := gitOut(root, "status", "--porcelain", "--", check.RepoConfigPath)
+	status, _, err := git.Run(root, git.NonInteractiveEnv(), "status", "--porcelain", "--", check.RepoConfigPath)
 	if err != nil {
 		return refuseSave(ReasonCommitFailed, err.Error())
 	}
@@ -135,56 +139,54 @@ func (s *Server) saveChecksToRepo(dir string, req SaveChecksRequest) (SaveChecks
 		return refuseSave(ReasonInvalidChecks, err.Error())
 	}
 	pretty.WriteByte('\n')
-	file := filepath.Join(root, check.RepoConfigPath)
-	prev, readErr := os.ReadFile(file)
-	if readErr == nil && bytes.Equal(prev, pretty.Bytes()) {
-		return SaveChecksResult{Project: req.Project, Target: req.Target, Trunk: trunk}, nil
-	}
-	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
-		return SaveChecksResult{}, err
-	}
-	if err := os.WriteFile(file, pretty.Bytes(), 0o644); err != nil {
-		return SaveChecksResult{}, err
-	}
-	rollback := func() {
-		_, _ = gitOut(root, "reset", "-q", "--", check.RepoConfigPath)
-		if readErr == nil {
-			_ = os.WriteFile(file, prev, 0o644)
-		} else {
-			_ = os.Remove(file)
-		}
-	}
-	if _, err := gitOut(root, "add", "--", check.RepoConfigPath); err != nil {
-		rollback()
-		return refuseSave(ReasonCommitFailed, err.Error())
-	}
-	if _, err := gitOut(root, "commit", "-q", "--only", "-m", "Save gx check config", "--", check.RepoConfigPath); err != nil {
-		rollback()
-		return refuseSave(ReasonCommitFailed, err.Error())
-	}
-	sha, err := gitOut(root, "rev-parse", "--short", "HEAD")
-	if err != nil {
+	sha, err := commitChecksFile(root, pretty.Bytes())
+	var ce *commitError
+	switch {
+	case errors.As(err, &ce):
+		return refuseSave(ReasonCommitFailed, ce.Error())
+	case err != nil:
 		return SaveChecksResult{}, err
 	}
 	return SaveChecksResult{Project: req.Project, Target: req.Target, Trunk: trunk, Commit: sha}, nil
 }
 
-// gitOut runs git in dir; the error carries git's output.
-func gitOut(dir string, args ...string) (string, error) {
-	stdout, stderr, err := git.Run(dir, git.NonInteractiveEnv(), args...)
-	text := strings.TrimSpace(stdout + "\n" + stderr)
-	if err != nil {
-		return text, &gitError{args: args, out: text, err: err}
+// commitError is a git failure while committing the checks file, which the
+// save reports as a refusal rather than a server error.
+type commitError struct{ err error }
+
+func (e *commitError) Error() string { return e.err.Error() }
+func (e *commitError) Unwrap() error { return e.err }
+
+// commitChecksFile writes body to the repo checks file in root and commits it.
+// It returns an empty sha when the file already holds body. A failed add or
+// commit restores the file and the index and returns a *commitError.
+func commitChecksFile(root string, body []byte) (sha string, err error) {
+	file := filepath.Join(root, check.RepoConfigPath)
+	prev, readErr := os.ReadFile(file)
+	if readErr == nil && bytes.Equal(prev, body) {
+		return "", nil
 	}
-	return text, nil
-}
-
-type gitError struct {
-	args []string
-	out  string
-	err  error
-}
-
-func (e *gitError) Error() string {
-	return "git " + strings.Join(e.args, " ") + ": " + e.out + " (" + e.err.Error() + ")"
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(file, body, 0o644); err != nil {
+		return "", err
+	}
+	env := git.NonInteractiveEnv()
+	for _, args := range [][]string{
+		{"add", "--", check.RepoConfigPath},
+		{"commit", "-q", "--only", "-m", "Save gx check config", "--", check.RepoConfigPath},
+	} {
+		if _, _, err := git.Run(root, env, args...); err != nil {
+			_, _, _ = git.Run(root, env, "reset", "-q", "--", check.RepoConfigPath)
+			if readErr == nil {
+				_ = os.WriteFile(file, prev, 0o644)
+			} else {
+				_ = os.Remove(file)
+			}
+			return "", &commitError{err}
+		}
+	}
+	sha, _, err = git.Run(root, env, "rev-parse", "--short", "HEAD")
+	return sha, err
 }

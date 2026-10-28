@@ -88,7 +88,7 @@ func missingChecks(ctx context.Context, cl *apiclient.Client, project string) (*
 func missingKinds(pc server.ProjectChecks) []string {
 	kinds := []string{}
 	for _, k := range pc.Kinds {
-		if k.State != "configured" {
+		if k.State != server.KindStateConfigured {
 			kinds = append(kinds, k.Kind)
 		}
 	}

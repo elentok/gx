@@ -30,6 +30,13 @@ type ProjectChecks struct {
 	Kinds []KindCheck `json:"kinds"`
 }
 
+// States of a check kind.
+const (
+	KindStateConfigured = "configured"
+	KindStateDefault    = "gx-default"
+	KindStateOff        = "off"
+)
+
 // KindCheck is one kind's state and detection result.
 type KindCheck struct {
 	Kind string `json:"kind"`
@@ -80,13 +87,13 @@ func (s *Server) checksStatus(project string) (ChecksStatus, error) {
 func (s *Server) projectChecks(dir string) ProjectChecks {
 	name := tickets.ProjectName(dir)
 	pf, err := config.ReadProjectFile(dir)
-	pc := ProjectChecks{Project: name, SaveTargets: []string{"repo", "project.json"}, Kinds: []KindCheck{}}
+	pc := ProjectChecks{Project: name, SaveTargets: []string{SaveTargetRepo, SaveTargetProjectJSON}, Kinds: []KindCheck{}}
 	if err != nil {
 		pc.Error = err.Error()
 	}
 	vcsNone := pf.VCS != nil && *pf.VCS == config.VCSNone
 	if vcsNone {
-		pc.SaveTargets = []string{"project.json"}
+		pc.SaveTargets = []string{SaveTargetProjectJSON}
 	}
 	root := tickets.TrunkCheckout(s.cfg.TicketStore, name)
 	if repo := tickets.ProjectRepoRoot(s.cfg.TicketStore, name); repo != "" {
@@ -107,11 +114,11 @@ func (s *Server) projectChecks(dir string) ProjectChecks {
 		found = check.Detect(root)
 	}
 	for _, kind := range check.Kinds {
-		kc := KindCheck{Kind: kind, State: "gx-default", Default: check.DefaultLine[kind], Candidates: []check.Candidate{}}
+		kc := KindCheck{Kind: kind, State: KindStateDefault, Default: check.DefaultLine[kind], Candidates: []check.Candidate{}}
 		if c, ok := cfg[kind]; ok {
-			kc.State = "configured"
+			kc.State = KindStateConfigured
 			if c.Off {
-				kc.State = "off"
+				kc.State = KindStateOff
 			}
 		}
 		if cands := found[kind]; len(cands) > 0 {
