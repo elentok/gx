@@ -116,7 +116,7 @@ func Run(opts Options) (Result, error) {
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return Result{}, err
 	}
-	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit, env: opts.Env, ticketStore: opts.TicketStore}
+	r := &runner{root: root, runDir: runDir, runID: runID, dataDir: opts.DataDir, files: files, mode: opts.Mode, cfg: cfg, limit: opts.ArgLimit, env: opts.Env, ticketStore: opts.TicketStore, installs: map[string]*installEntry{}}
 	if r.limit <= 0 {
 		r.limit = DefaultArgLimit
 	}
@@ -200,8 +200,8 @@ type runner struct {
 	groupsOnce sync.Once
 	grp        *groups
 
-	installMu sync.Mutex
-	installs  map[string]installDone
+	installMu sync.Mutex // guards the installs map only, never an install itself
+	installs  map[string]*installEntry
 }
 
 func (r *runner) runKind(kind string) KindResult {

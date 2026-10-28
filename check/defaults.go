@@ -13,6 +13,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/git"
@@ -371,26 +372,30 @@ func (r *runner) runStep(kind string, s step, log io.Writer) stepResult {
 // caller gets the first result.
 func (r *runner) ensureInstalled(n installNeed) (string, error) {
 	r.installMu.Lock()
-	defer r.installMu.Unlock()
-	if done, ok := r.installs[n.dir]; ok {
-		return done.out, done.err
+	e, ok := r.installs[n.dir]
+	if !ok {
+		e = &installEntry{}
+		r.installs[n.dir] = e
 	}
-	var buf bytes.Buffer
-	cmd := exec.Command("sh", "-c", n.cmd)
-	cmd.Dir = n.dir
-	cmd.Env = r.childEnv("")
-	cmd.Stdout, cmd.Stderr = &buf, &buf
-	err := cmd.Run()
-	if r.installs == nil {
-		r.installs = map[string]installDone{}
-	}
-	r.installs[n.dir] = installDone{buf.String(), err}
-	return buf.String(), err
+	r.installMu.Unlock()
+	e.once.Do(func() {
+		var buf bytes.Buffer
+		cmd := exec.Command("sh", "-c", n.cmd)
+		cmd.Dir = n.dir
+		cmd.Env = r.childEnv("")
+		cmd.Stdout, cmd.Stderr = &buf, &buf
+		e.err = cmd.Run()
+		e.out = buf.String()
+	})
+	return e.out, e.err
 }
 
-type installDone struct {
-	out string
-	err error
+// installEntry is one directory's install: the Once makes concurrent callers
+// for that directory wait for a single run while other directories proceed.
+type installEntry struct {
+	once sync.Once
+	out  string
+	err  error
 }
 
 // hashFiles maps each file to the hash of its content; a missing file maps to "".
