@@ -17,8 +17,14 @@ import (
 // needs the whole project to resolve, so it is left to ValidateProject. Every
 // bad ref is reported at once.
 func (e Epic) CheckBlockedBy(t Ticket) error {
+	return e.checkBlockedByIn(newProjectGraph("", []Epic{e}, nil), t)
+}
+
+// checkBlockedByIn is CheckBlockedBy against g, the graph of e alone, so a
+// caller checking every ticket builds it once.
+func (e Epic) checkBlockedByIn(g *projectGraph, t Ticket) error {
 	t.BlockedBy = slices.DeleteFunc(slices.Clone(t.BlockedBy), crossEpicRef)
-	return errors.Join(newProjectGraph("", []Epic{e}, nil).checkBlockedBy(e.Name, t)...)
+	return errors.Join(g.checkBlockedBy(e.Name, t)...)
 }
 
 // flagDanglingBlockers records CheckBlockedBy's verdict on each ticket that
@@ -31,9 +37,10 @@ func (e Epic) CheckBlockedBy(t Ticket) error {
 // that. This is what an in-process loop (no server) falls back on.
 func (e *Epic) flagDanglingBlockers() {
 	epicQualified := qualifiedRefs(e.BlockedBy)
+	g := newProjectGraph("", []Epic{*e}, nil)
 	for i := range e.Tickets {
 		t := &e.Tickets[i]
-		if err := e.CheckBlockedBy(*t); err != nil {
+		if err := e.checkBlockedByIn(g, *t); err != nil {
 			t.BlockedByErr = err.Error()
 			continue
 		}
