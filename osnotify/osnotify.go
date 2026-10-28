@@ -5,6 +5,7 @@ package osnotify
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -35,11 +36,17 @@ type Runner func(ctx context.Context, name string, args ...string) error
 
 const sendTimeout = 5 * time.Second
 
+// OffEnv set to "off" turns banners off for a process that runs the real
+// binary, such as a gxfixture server whose fake agents would otherwise post
+// real banners.
+const OffEnv = "GX_NOTIFY"
+
 // NewSystemNotifier picks the backend for this machine, looking up
-// terminal-notifier once. Inside a test binary it returns a no-op, so tests
-// that start a server without injecting a Notifier never show a real banner.
+// terminal-notifier once. Inside a test binary, or with OffEnv set to "off",
+// it returns a no-op, so tests that start a server without injecting a
+// Notifier never show a real banner.
 func NewSystemNotifier() Notifier {
-	if testing.Testing() {
+	if testing.Testing() || os.Getenv(OffEnv) == "off" {
 		return noop{}
 	}
 	return Select(runtime.GOOS, exec.LookPath, execRunner)

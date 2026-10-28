@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -286,6 +287,49 @@ func TestShellEnv_ExportsTheCLIEnvAndTheFixtureVariablesQuoted(t *testing.T) {
 		"export GXF_SOCKET='/tmp/s.sock'\n"
 	if got := o.ShellEnv(); got != want {
 		t.Errorf("ShellEnv() =\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestIsolatedEnv_TurnsNotificationsOffEvenWhenTheCallerSetsThemOn(t *testing.T) {
+	t.Setenv("GX_NOTIFY", "on")
+	env, cliEnv := isolatedEnv("/tmp/r", "/tmp/r/bin")
+	var got []string
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "GX_NOTIFY=") {
+			got = append(got, kv)
+		}
+	}
+	if want := []string{"GX_NOTIFY=off"}; !slices.Equal(got, want) {
+		t.Errorf("server env GX_NOTIFY = %v, want %v", got, want)
+	}
+	for _, kv := range cliEnv {
+		if strings.HasPrefix(kv, "GX_NOTIFY=") {
+			t.Errorf("cliEnv carries %s; it should name only what reaches the server", kv)
+		}
+	}
+}
+
+func TestWatchLifetime_EndsWhenTheParentDiesOrTheTTLPasses(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		ppid   int
+		ttl    time.Duration
+		reason string
+	}{
+		{"parent died", 1, time.Hour, "parent"},
+		{"ttl passed", 42, time.Millisecond, "ttl"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			got := watchLifetime(ctx, 42, func() int { return tc.ppid }, tc.ttl, time.Millisecond)
+			if got != tc.reason {
+				t.Errorf("watchLifetime() = %q, want %q", got, tc.reason)
+			}
+		})
 	}
 }
 

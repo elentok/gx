@@ -1,6 +1,7 @@
 // Command gxfixture starts one fresh, isolated gx server for a named scenario
 // and prints, as one line of JSON, how to reach it. It stops on SIGTERM and
-// removes everything it made. It never reads or writes the real HOME, config
+// removes everything it made. It also stops when its parent process dies or
+// after two hours, and it runs the server with OS notifications off. It never reads or writes the real HOME, config
 // or state: the server and every CLI verb run in a temp HOME and temp XDG dirs.
 //
 //	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] [--auto-advance-delay <duration>] <scenario>
@@ -30,6 +31,7 @@ import (
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -237,11 +239,48 @@ func run(args []string) (err error) {
 		fmt.Println(string(out))
 	}
 
+	lifeCtx, cancelLife := context.WithCancel(ctx)
+	defer cancelLife()
+	ended := make(chan string, 1)
+	go func() { ended <- watchLifetime(lifeCtx, os.Getppid(), os.Getppid, lifetimeTTL, parentPoll) }()
+
 	select {
 	case <-ctx.Done():
 		return nil
+	case <-ended:
+		return nil
 	case err := <-exited:
 		return fmt.Errorf("server exited: %v\n%s", err, f.serverOutput())
+	}
+}
+
+const (
+	// lifetimeTTL caps a fixture a caller forgot to stop.
+	lifetimeTTL = 2 * time.Hour
+	parentPoll  = time.Second
+)
+
+// watchLifetime blocks until the fixture should stop: "parent" when the
+// process that started it is gone (its pid changes, as the kernel reparents an
+// orphan), "ttl" after ttl, or "" when ctx ends first. A fixture started with
+// nohup or & outlives the shell that started it, so the parent check is what
+// stops a leaked one.
+func watchLifetime(ctx context.Context, parent int, getppid func() int, ttl, poll time.Duration) string {
+	timer := time.NewTimer(ttl)
+	defer timer.Stop()
+	tick := time.NewTicker(poll)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ""
+		case <-timer.C:
+			return "ttl"
+		case <-tick.C:
+			if getppid() != parent {
+				return "parent"
+			}
+		}
 	}
 }
 
@@ -274,6 +313,7 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 	env = append(env,
 		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
 		"GIT_CONFIG_GLOBAL="+os.DevNull,
+		osnotify.OffEnv+"=off",
 		"GIT_AUTHOR_NAME=gxfixture", "GIT_AUTHOR_EMAIL=gxfixture@example.com",
 		"GIT_COMMITTER_NAME=gxfixture", "GIT_COMMITTER_EMAIL=gxfixture@example.com",
 	)

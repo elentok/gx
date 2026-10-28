@@ -29,6 +29,9 @@ $TMPDIR/gx-ui/gxfixture --gx $TMPDIR/gx-ui/gx --fakeclaude $TMPDIR/gx-ui/claude 
 ```
 
 - Run it with `run_in_background`. It prints one JSON line, then keeps running until SIGTERM.
+- Never start it with `nohup` or `&`. Only `run_in_background` lets the harness track and stop it; a
+  fixture started any other way keeps running after you finish, with its `gx server` and fake agents.
+  As a backstop it exits when its parent process dies or after 2 hours.
 - The scenario names are in the catalog (`empty`, `ready`, `mixed`, `finishing`, `paused`, `united`,
   `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`, `disk-low`). An unknown name makes the command list
   the known ones.
