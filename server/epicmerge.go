@@ -313,7 +313,8 @@ func pendingMerge(e tickets.Epic, t tickets.Ticket) bool {
 }
 
 // ensureFeatureWorktree recreates the epic's feature worktree from its branch
-// when a person removed it. The server never removes it again.
+// when a person removed it. The post-merge removal (removeMergedWorktree) is the
+// one place the server removes it again.
 func (s *Server) ensureFeatureWorktree(project, epic, repo string) error {
 	path := filepath.Join(s.worktreeDir(project), epic)
 	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {

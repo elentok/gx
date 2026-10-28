@@ -44,7 +44,8 @@ func ResumeFeature(d Deps, o OneIteration) (IterationWorktree, error) {
 // fast-forward onto target: no rebase in progress in the feature worktree, and
 // target an ancestor of the epic. Commits on the epic (a fixer's) are not
 // counted; they merge with the epic's fast-forward. Anything else pauses
-// paused (repair). The feature worktree always stays.
+// paused (repair). The feature worktree stays: the post-merge removal, once the
+// epic is merged, is the one place gx removes it.
 func FinishMerge(d Deps, o OneIteration, w IterationWorktree, pane, target string) (FinishOutcome, error) {
 	p := iterationParams{
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Runner: runnerName(d), Label: w.Label,

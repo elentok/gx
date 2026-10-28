@@ -116,6 +116,11 @@ func withWorktreeLock(fn func() error) error {
 	return fn()
 }
 
+// WithWorktreeLock runs fn holding the lock that PrepareFeature and
+// PrepareIteration take around creating or reusing a feature worktree, so fn
+// sees a worktree no claim is setting up.
+func WithWorktreeLock(fn func() error) error { return withWorktreeLock(fn) }
+
 // PrepareIteration creates the epic's feature worktree and the ticket's
 // iteration worktree off the feature tip, and installs dependencies in the
 // iteration worktree.

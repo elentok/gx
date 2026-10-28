@@ -224,6 +224,13 @@ func (s *Server) CompleteRootIfDone(address string) error {
 	return nil
 }
 
+// RemoveMergedWorktree starts the post-merge worktree removal the way stampEpic
+// does, on the settle group.
+func (s *Server) RemoveMergedWorktree(project, epic string) {
+	root := rootRef{Project: project, Epic: epic}
+	s.goSettle(func() { s.removeMergedWorktree(root) })
+}
+
 // LockedTrunks lists the trunks any merge has locked so far, in any repo.
 func (s *Server) LockedTrunks() []string {
 	s.trunkLocks.mu.Lock()

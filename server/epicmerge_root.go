@@ -56,19 +56,28 @@ func (s *Server) completeRootIfDone(root rootRef, one ralphloop.OneIteration) {
 // pauses it the way mergeRoot does, and two finishes still can't both stamp.
 func (s *Server) completeEpic(root rootRef, one ralphloop.OneIteration, dir, repo string, epics []tickets.Epic, e tickets.Epic) {
 	_, _, target, err := s.epicRefs(root.Project, epics, one.Epic, repo)
-	lockKey := target
-	if err != nil {
-		lockKey = "epic:" + root.String()
-	} else if holder := s.trunkConflictHolder(root.Project, epics, repo, target, one.Epic); holder != "" {
-		// Not a pause: the root stays queued and claimRoot retries once the ticket is done.
-		s.heldMerges.set(root.String(), true)
-		s.log.Info("land waits for a trunk-conflict ticket", "root", root, "holder", holder, "target", target)
-		return
+	lockKey := mergeLockKey(root, target, err)
+	if err == nil {
+		if holder := s.trunkConflictHolder(root.Project, epics, repo, target, one.Epic); holder != "" {
+			// Not a pause: the root stays queued and claimRoot retries once the ticket is done.
+			s.heldMerges.set(root.String(), true)
+			s.log.Info("land waits for a trunk-conflict ticket", "root", root, "holder", holder, "target", target)
+			return
+		}
 	}
 	unlock := s.trunkLocks.lock(repo, lockKey)
 	d := s.mergeEpic(root, one, repo, epics, e, target, false)
 	unlock()
 	s.actOnMerge(root, one, dir, e, d)
+}
+
+// mergeLockKey is the trunk-lock key of root's merge: its target, or the epic
+// itself when epicRefs failed (refsErr), so two finishes still can't both stamp.
+func mergeLockKey(root rootRef, target string, refsErr error) string {
+	if refsErr != nil {
+		return "epic:" + root.String()
+	}
+	return target
 }
 
 // trunkConflictHolder is the epic, other than self, whose open trunk-conflict
@@ -335,6 +344,7 @@ func (s *Server) stampEpic(root rootRef, epicPath string, keys ...string) {
 		if _, err := tickets.MarkMapDone(epicPath, false); err != nil {
 			s.log.Warn("mark map done", "root", root, "err", err)
 		}
+		s.goSettle(func() { s.removeMergedWorktree(root) })
 	}
 }
 
