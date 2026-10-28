@@ -49,6 +49,10 @@ type Pty struct {
 	BackgroundTasks func(s agentrunner.Session) bool
 	// N is the configured runner wait; zero means agentrunner.DefaultN.
 	N time.Duration
+	// Env (KEY=VALUE) is appended to each holder child's env and is where
+	// the typing check reads claude's config dir and home. Empty means no
+	// config, never the process env.
+	Env []string
 
 	mu       sync.Mutex
 	sessions map[string]*ptySession
@@ -364,7 +368,7 @@ func (p *Pty) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec
 		}
 		holder = []string{exe, "agent-holder"}
 	}
-	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: ptyLaunchArgs(opts.Args), Env: opts.Env}
+	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: ptyLaunchArgs(opts.Args), Env: slices.Concat(p.Env, opts.Env)}
 	var launch harness.Command
 	if opts.ResumeSessionID != "" {
 		// --resume and --session-id fail together, so claude gets only --resume.
@@ -736,7 +740,7 @@ func (pr *ptyPrompter) Submit(text string) error {
 
 // Clear presses the harness clear key once.
 func (pr *ptyPrompter) Clear() error {
-	return pr.p.died(pr.ss, pr.ss.holder.SendKeys(claudeTyping.ClearKey()))
+	return pr.p.died(pr.ss, pr.ss.holder.SendKeys(pr.p.typing().ClearKey()))
 }
 
 // InputEmpty runs the harness empty check when the holder serves styled rows.
@@ -748,7 +752,7 @@ func (pr *ptyPrompter) InputEmpty() (bool, bool, error) {
 	if err != nil {
 		return false, false, pr.p.died(pr.ss, err)
 	}
-	switch claudeTyping.InputIsEmpty(rows) {
+	switch pr.p.typing().InputIsEmpty(rows) {
 	case harness.InputEmpty:
 		return true, true, nil
 	case harness.InputNotEmpty:
@@ -759,7 +763,7 @@ func (pr *ptyPrompter) InputEmpty() (bool, bool, error) {
 
 // ReadyToType runs claude's ready-to-type step over the holder.
 func (pr *ptyPrompter) ReadyToType() bool {
-	return claudeTyping.ReadyToType(HolderTypingIO(pr.ss.holder))
+	return pr.p.typing().ReadyToType(HolderTypingIO(pr.ss.holder))
 }
 
 // HolderTypingIO reads styled rows when the holder serves them, plain rows
@@ -777,8 +781,19 @@ func HolderTypingIO(h *HolderClient) harness.TypingIO {
 	}
 }
 
-// claudeTyping is the only harness the PTY runner drives.
+// claudeTyping is the holder child's typing rules; it reads the env the
+// parent gave that child.
 var claudeTyping = harness.ClaudeTyping()
+
+// typing is claude's typing rules reading its config from p.Env. A nil Env
+// becomes an empty one, which harness would read as the process env.
+func (p *Pty) typing() harness.Typing {
+	env := p.Env
+	if env == nil {
+		env = []string{}
+	}
+	return harness.ClaudeTypingIn(env)
+}
 
 func (pr *ptyPrompter) SendEnter() error { return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\r")) }
 
