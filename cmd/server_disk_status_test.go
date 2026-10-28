@@ -119,7 +119,7 @@ func TestDiskClean_PrintsFreedAndFreeAfterAndRefusalFails(t *testing.T) {
 	if err := runDiskClean(context.Background(), h.Client, &out, "d-low", false); err != nil {
 		t.Fatal(err)
 	}
-	if want := "freed 0, 5G free now, dispatch held\n"; out.String() != want {
+	if want := "no cleanup command set, 5G free now, dispatch held\n"; out.String() != want || strings.Contains(out.String(), "freed") {
 		t.Errorf("output = %q, want %q", out.String(), want)
 	}
 

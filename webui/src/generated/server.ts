@@ -85,6 +85,13 @@ export interface ProjectChecks {
   error: string;
   kinds: KindCheck[];
 }
+export const KindStateConfigured = "configured";
+export const KindStateDefault = "gx-default";
+export const KindStateOff = "off";
+/**
+ * States of a check kind.
+ */
+export type KindState = typeof KindStateConfigured | typeof KindStateDefault | typeof KindStateOff;
 /**
  * KindCheck is one kind's state and detection result.
  */
@@ -475,6 +482,10 @@ export interface CleanNowResult {
   free_bytes: number /* uint64 */;
   held: boolean;
   failure?: string;
+  /**
+   * NoCleanupCommand says no project on the disk had cleanup work to run.
+   */
+  no_cleanup_command?: boolean;
   refused?: boolean;
   reason?: string;
   message?: string;

@@ -86,8 +86,12 @@ func runDiskClean(ctx context.Context, cl *apiclient.Client, w io.Writer, disk s
 		if res.Held {
 			held = "held"
 		}
-		if _, err := fmt.Fprintf(w, "freed %s, %s free now, dispatch %s\n",
-			config.ByteSize(res.FreedBytes).String(), config.ByteSize(res.FreeBytes).String(), held); err != nil {
+		lead := "freed " + config.ByteSize(res.FreedBytes).String()
+		if res.NoCleanupCommand {
+			lead = server.NoCleanCommand
+		}
+		if _, err := fmt.Fprintf(w, "%s, %s free now, dispatch %s\n",
+			lead, config.ByteSize(res.FreeBytes).String(), held); err != nil {
 			return err
 		}
 	}

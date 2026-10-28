@@ -24,9 +24,11 @@ type CleanNowResult struct {
 	FreeBytes  uint64 `json:"free_bytes"`
 	Held       bool   `json:"held"`
 	Failure    string `json:"failure,omitempty"`
-	Refused    bool   `json:"refused,omitempty"`
-	Reason     string `json:"reason,omitempty"`
-	Message    string `json:"message,omitempty"`
+	// NoCleanupCommand says no project on the disk had cleanup work to run.
+	NoCleanupCommand bool   `json:"no_cleanup_command,omitempty"`
+	Refused          bool   `json:"refused,omitempty"`
+	Reason           string `json:"reason,omitempty"`
+	Message          string `json:"message,omitempty"`
 }
 
 // cleanNow runs the disk's cleanup work in the caller and ends it through the
@@ -62,7 +64,7 @@ func (s *Server) cleanNow(id string) CleanNowResult {
 	work := s.cleanWork(projects)
 	end := cleanEnd{failed: s.runCleanWork(work), noWork: len(work) == 0}
 	r, held := s.endClean(id, probe, end)
-	return CleanNowResult{FreedBytes: max(r.Free, before) - before, FreeBytes: r.Free, Held: held, Failure: end.failed}
+	return CleanNowResult{FreedBytes: max(r.Free, before) - before, FreeBytes: r.Free, Held: held, Failure: end.failed, NoCleanupCommand: end.noWork}
 }
 
 func (s *Server) diskCleanWrite(w http.ResponseWriter, r *http.Request) {

@@ -59,7 +59,7 @@ func TestDiskCleanNow_RunsTheSameWorkAndStaysArmed(t *testing.T) {
 	r := startCleanRig(t, map[string]string{"plain": "", "custom": overrideCmd}, 0, 10*gb)
 	r.known(t)
 	res := r.cleanNow(t)
-	if res.Refused || res.Held {
+	if res.Refused || res.Held || res.NoCleanupCommand {
 		t.Fatalf("result = %+v", res)
 	}
 	want := []string{"go clean -cache @ " + r.repos["plain"], "make tidy @ " + r.repos["custom"]}
@@ -126,7 +126,7 @@ func TestDiskCleanNow_NoCleanupWorkOnlyReadsAgain(t *testing.T) {
 	r.waitClean(t, 1)
 	r.setFree(50 * gb)
 	res := r.cleanNow(t)
-	if res.Refused || res.Held || res.FreeBytes != 50*gb {
+	if res.Refused || res.Held || res.FreeBytes != 50*gb || !res.NoCleanupCommand {
 		t.Fatalf("result = %+v", res)
 	}
 	r.wantCalls(t, 0)
