@@ -116,9 +116,7 @@ func TestStop_LeavesALiveAgentRunningAndUnmerged(t *testing.T) {
 	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
-	for len(h.Server.Runs()) == 0 && ctx.Err() == nil {
-		time.Sleep(20 * time.Millisecond)
-	}
+	servertest.WaitFor(t, 20*time.Second, "a run to start", func() bool { return len(h.Server.Runs()) > 0 })
 	if err := h.Stop(); err != nil {
 		t.Fatalf("stop: %v", err)
 	}

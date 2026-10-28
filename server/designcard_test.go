@@ -28,13 +28,13 @@ func epicRows(t *testing.T, h *servertest.Harness, f designsFixture) map[string]
 func waitForEpicRow(t *testing.T, f designsFixture, name string, ok func(server.EpicListRow) bool) server.EpicListRow {
 	t.Helper()
 	var r server.EpicListRow
-	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+	if !servertest.Poll(5*time.Second, func() bool {
 		var found bool
-		if r, found = epicRows(t, f.h, f)[name]; found && ok(r) {
-			return r
-		}
+		r, found = epicRows(t, f.h, f)[name]
+		return found && ok(r)
+	}) {
+		t.Fatalf("row %q = %+v, never matched", name, r)
 	}
-	t.Fatalf("row %q = %+v, never matched", name, r)
 	return r
 }
 

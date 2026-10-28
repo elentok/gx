@@ -59,21 +59,18 @@ func TestUnavailable_MissingPathExplainsNotifiesOnceAndSetPathRecovers(t *testin
 	}
 
 	var ex server.Explanation
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+	servertest.Poll(10*time.Second, func() bool {
 		var err error
 		if ex, err = h.Client.Explain(ctx, "proj:epic-a/01"); err != nil {
 			t.Fatal(err)
 		}
-		if ex.Verdict == server.VerdictProjectUnavailable {
-			break
-		}
-	}
+		return ex.Verdict == server.VerdictProjectUnavailable
+	})
 	if ex.Verdict != server.VerdictProjectUnavailable || !strings.Contains(ex.Reason, repo) {
 		t.Fatalf("explain = %+v, want project unavailable naming %s", ex, repo)
 	}
-	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline) && unavailableSends() == 0; time.Sleep(50 * time.Millisecond) {
-	}
-	time.Sleep(time.Second) // many polls pass; the notification must stay single
+	servertest.Poll(15*time.Second, func() bool { return unavailableSends() > 0 })
+	time.Sleep(300 * time.Millisecond) // many 50ms polls pass; the notification must stay single
 	if n := unavailableSends(); n != 1 {
 		t.Fatalf("unavailable notifications = %d, want 1", n)
 	}

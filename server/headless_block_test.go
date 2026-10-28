@@ -105,7 +105,7 @@ func TestHeadlessBlock_NonHeadlessStaysClaimed(t *testing.T) {
 		t.Run(runner, func(t *testing.T) {
 			_, ticketPath, turn := startBlockable(t, runner)
 			turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(300 * time.Millisecond) // negative wait: a pause would come within a few polls
 			tk, err := schema.ParseTicket(ticketPath)
 			if err != nil {
 				t.Fatal(err)

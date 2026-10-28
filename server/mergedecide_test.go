@@ -46,7 +46,7 @@ func TestMergeDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *
 		release()
 		t.Fatal("no claim while the trunk lock was held")
 	}
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: a stamp would land within a few polls
 	md := filepath.Join(store, "proj", "landed", "ticket.md")
 	if strings.Contains(readFile(t, md), "merged_at:") {
 		t.Error("merged_at stamped while the trunk lock was held")
@@ -72,7 +72,7 @@ func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 		t.Fatal(err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
-	time.Sleep(10 * testFlushInterval)
+	time.Sleep(3 * testFlushInterval) // negative wait: a repeat notice would flush within a few intervals
 
 	if got := count(epicNotMergedText); got != 1 {
 		t.Errorf("%q sent %d times, want once", epicNotMergedText, got)
@@ -106,7 +106,7 @@ func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
 		t.Fatal(err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootPaused, "")
-	time.Sleep(10 * testFlushInterval)
+	time.Sleep(3 * testFlushInterval) // negative wait: a repeat notice would flush within a few intervals
 
 	if pauses != 1 {
 		t.Errorf("first pause notice sent %d times, want once", pauses)

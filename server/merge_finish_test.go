@@ -195,7 +195,7 @@ func TestLateFinish_MergeUnreportedStaysPausedWhileChecksFail(t *testing.T) {
 		return ""
 	})
 	reportMergeFinishedLate(t, f)
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond) // negative wait: a done status would land within a few polls
 	tk, err := schema.ParseTicket(f.ticketFile(t, "01"))
 	if err != nil {
 		t.Fatal(err)

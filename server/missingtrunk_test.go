@@ -68,9 +68,8 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 	counts := map[string]int{}
 	next := func(want string) { t.Helper(); countUntil(ctx, t, evs, counts, want) }
 	next(server.EventTrunkMissing)
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && chatCount("proj: trunk missing") == 0; time.Sleep(50 * time.Millisecond) {
-	}
-	time.Sleep(time.Second) // many polls pass; the state must stay announced once
+	servertest.Poll(10*time.Second, func() bool { return chatCount("proj: trunk missing") > 0 })
+	time.Sleep(300 * time.Millisecond) // many polls pass; the state must stay announced once
 
 	snap, err := f.h.Client.Snapshot(ctx)
 	if err != nil {
@@ -92,8 +91,7 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 	if counts[server.EventTrunkMissing] != 1 || counts[server.EventTrunkFound] != 1 {
 		t.Fatalf("events = %v, want one trunk-missing and one trunk-found", counts)
 	}
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && chatCount("proj: trunk found") == 0; time.Sleep(50 * time.Millisecond) {
-	}
+	servertest.Poll(10*time.Second, func() bool { return chatCount("proj: trunk found") > 0 })
 	if n := chatCount("proj: trunk found"); n != 1 {
 		t.Fatalf("trunk-found chat notices = %d, want 1", n)
 	}
@@ -135,7 +133,7 @@ func TestMissingTrunk_EmptiedQueueForgetsTheStateSilently(t *testing.T) {
 	if res, err := f.h.Client.QueueRemove(ctx, "proj:"+schedEpic+"/01"); err != nil || res.Refused {
 		t.Fatalf("remove: %+v, %v", res, err)
 	}
-	time.Sleep(500 * time.Millisecond) // many polls pass with nothing queued
+	time.Sleep(300 * time.Millisecond) // many polls pass with nothing queued
 
 	f.git(t, "branch", "develop")
 	if res, err := f.h.Client.QueueAdd(ctx, "proj:"+schedEpic+"/01", "claude"); err != nil || res.Refused {

@@ -58,7 +58,7 @@ func TestHeadlessBlockReclaim_AnsweredRequestStaysClaimed(t *testing.T) {
 	_, ticketPath, _ := restartHeadlessClaimed(t, nativerunner.VerdictLive, func(_ *servertest.Harness, f *headlessFake) {
 		f.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
 	})
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond) // negative wait: a pause would come within a few polls
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil {
 		t.Fatal(err)
@@ -93,7 +93,7 @@ func TestHeadlessBlockReclaim_WaitingRunWithOpenRequestIsUntouched(t *testing.T)
 		f.SetPending("epic-a-iter-01", openRequest)
 		markWaiting(t, h, time.Now().Add(-time.Hour))
 	})
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond) // negative wait: a pause would come within a few polls
 	tk, err := schema.ParseTicket(ticketPath)
 	if err != nil {
 		t.Fatal(err)

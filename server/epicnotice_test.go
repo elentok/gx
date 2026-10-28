@@ -47,8 +47,7 @@ func chatRecorder(t *testing.T) (opt func(*server.Config), count func(s string) 
 
 // waitForChat polls until s was sent, and reports how often.
 func waitForChat(count func(string) int, s string) int {
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline) && count(s) == 0; time.Sleep(50 * time.Millisecond) {
-	}
+	servertest.Poll(10*time.Second, func() bool { return count(s) > 0 })
 	return count(s)
 }
 

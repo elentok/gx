@@ -35,11 +35,16 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 	t.Helper()
 	var mu sync.Mutex
 	var bodies []string
+	arrived := make(chan struct{}, 1) // a wake-up for wait; one pending signal is enough
 	hook := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
 		mu.Lock()
 		bodies = append(bodies, string(b))
 		mu.Unlock()
+		select {
+		case arrived <- struct{}{}:
+		default:
+		}
 	}))
 	t.Cleanup(hook.Close)
 	// New probes herdr; answer it so a runner without herdr doesn't leak a
@@ -66,15 +71,22 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 	// called s.chat.Close(), which sends what is queued and waits for it.
 	wait := func(n int) []string {
 		if n >= 0 {
-			for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+			timeout := time.After(10 * time.Second)
+		arrive:
+			for {
 				mu.Lock()
 				got := len(bodies)
 				mu.Unlock()
 				if got >= n {
 					break
 				}
+				select {
+				case <-arrived:
+				case <-timeout:
+					break arrive
+				}
 			}
-			time.Sleep(500 * time.Millisecond) // anything extra would show up now
+			time.Sleep(300 * time.Millisecond) // negative wait: anything extra would show up now
 		}
 		mu.Lock()
 		defer mu.Unlock()

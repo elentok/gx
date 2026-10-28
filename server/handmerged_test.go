@@ -208,7 +208,7 @@ func TestHandMerged_EpicWithNoQueuedRootAndNoDependentIsNotChecked(t *testing.T)
 		return slices.Contains(probed, ref)
 	}
 	waitUntil(t, "the waited-on epic to be checked", func() bool { return has("refs/heads/waited") })
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: an out-of-scope probe would come within a few polls
 	if has("refs/heads/idle") {
 		t.Errorf("out-of-scope epic was checked: %v", probed)
 	}

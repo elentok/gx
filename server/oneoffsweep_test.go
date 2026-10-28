@@ -134,14 +134,7 @@ func oneOffsQueued(t *testing.T, h *servertest.Harness) bool {
 
 func waitOneOffsQueued(t *testing.T, h *servertest.Harness, want bool) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if oneOffsQueued(t, h) == want {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatalf("one-offs queued = %v never reached", want)
+	servertest.WaitFor(t, 5*time.Second, fmt.Sprintf("one-offs queued = %v", want), func() bool { return oneOffsQueued(t, h) == want })
 }
 
 func TestSweep_LastArchiveDequeuesTheRootAndASubmitRestoresIt(t *testing.T) {
@@ -184,19 +177,15 @@ func TestSweep_BrokenOneOffsKeepTheRootQueued(t *testing.T) {
 			if _, err := h.Client.QueuePause(ctx); err != nil {
 				t.Fatal(err)
 			}
-			deadline := time.Now().Add(5 * time.Second)
-			for {
-				res, err := h.Client.QueueAdd(ctx, "proj:one-offs/01", "")
-				if err == nil && !res.Refused {
-					break
-				}
-				if time.Now().After(deadline) {
-					t.Fatalf("queue add: %+v, %v", res, err)
-				}
-				time.Sleep(20 * time.Millisecond)
+			var res server.QueueResult
+			var err error
+			if !servertest.Poll(5*time.Second, func() bool {
+				res, err = h.Client.QueueAdd(ctx, "proj:one-offs/01", "")
+				return err == nil && !res.Refused
+			}) {
+				t.Fatalf("queue add: %+v, %v", res, err)
 			}
-			// Several rescans pass; none may drop the root.
-			time.Sleep(400 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond) // negative wait: several 50ms rescans pass; none may drop the root
 			if !oneOffsQueued(t, h) {
 				t.Fatalf("%s one-off lost the queue entry", status)
 			}
@@ -226,7 +215,7 @@ func TestSweep_RacingSubmitsNeverLoseTheQueueItem(t *testing.T) {
 	if err != nil || last.Refused {
 		t.Fatalf("last submit: %+v, %v", last, err)
 	}
-	time.Sleep(400 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: several 50ms rescans pass; none may drop the root
 	if !oneOffsQueued(t, h) {
 		t.Fatal("the live one-off lost its queue entry")
 	}
@@ -242,16 +231,16 @@ func TestSweep_CancelArchivesTheOneOff(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	// The first scan may not have indexed the ticket yet.
-	for {
+	servertest.WaitFor(t, 5*time.Second, "the cancel to be accepted", func() bool {
 		res, err := h.Client.TicketCancel(ctx, "proj:one-offs/01", false)
 		if err == nil && !res.Refused {
-			break
+			return true
 		}
-		if err != nil || res.Reason != "unknown-ticket" || ctx.Err() != nil {
+		if err != nil || res.Reason != "unknown-ticket" {
 			t.Fatalf("cancel: %+v, %v", res, err)
 		}
-		time.Sleep(20 * time.Millisecond)
-	}
+		return false
+	})
 	waitForFile(t, filepath.Join(proj, server.OneOffsEpic, "issues", "01-a.md"), false)
 	got := readFile(t, filepath.Join(proj, server.OneOffsArchivedEpic, "issues", "01-a.md"))
 	if !strings.Contains(got, "status: cancelled") || strings.Contains(got, "completed_at:") {

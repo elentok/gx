@@ -248,22 +248,16 @@ func TestSnapshot_HandEditShowsUpWithWatchAndWithPollOnly(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			deadline := time.Now().Add(5 * time.Second)
-			for {
-				snap, err := h.Client.Snapshot(context.Background())
-				if err != nil {
+			var snap server.Snapshot
+			servertest.WaitFor(t, 5*time.Second, "the edit to reach the snapshot", func() bool {
+				var err error
+				if snap, err = h.Client.Snapshot(context.Background()); err != nil {
 					t.Fatal(err)
 				}
-				if snap.Tickets[0].Status == "done" {
-					if snap.Seq == 0 {
-						t.Error("seq did not advance on change")
-					}
-					return
-				}
-				if time.Now().After(deadline) {
-					t.Fatalf("edit never reached the snapshot: %+v", snap.Tickets[0])
-				}
-				time.Sleep(20 * time.Millisecond)
+				return snap.Tickets[0].Status == "done"
+			})
+			if snap.Seq == 0 {
+				t.Error("seq did not advance on change")
 			}
 		})
 	}
@@ -334,7 +328,7 @@ func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T)
 	}
 
 	// Several failed retries must not repeat the event.
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond) // negative wait: a repeat event would show within a few retries
 	h.SetHerdrDown(false)
 	if ev := next(); ev.Type != server.EventHerdrAvailable {
 		t.Fatalf("second event = %+v, want herdr-available", ev)

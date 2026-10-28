@@ -99,22 +99,17 @@ func runToConflict(t *testing.T, agents string, midRun func(store, repo string))
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	ticketPath := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
-	deadline := time.Now().Add(20 * time.Second)
 	var label string
-	for ok := false; !ok; {
-		if time.Now().After(deadline) {
-			t.Fatal("no conflict agent started")
-		}
-		time.Sleep(20 * time.Millisecond)
+	servertest.WaitFor(t, 20*time.Second, "a conflict agent to start", func() bool {
+		var ok bool
 		label, ok = fake.started("conflict-")
-	}
+		return ok
+	})
 	// Let the merge settle before teardown.
-	for time.Now().Before(deadline) {
-		if tk, err := schema.ParseTicket(ticketPath); err == nil && tk.Status != schema.StatusClaimed {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	servertest.Poll(20*time.Second, func() bool {
+		tk, err := schema.ParseTicket(ticketPath)
+		return err == nil && tk.Status != schema.StatusClaimed
+	})
 	iterLabel, _ := fake.started("epic-a-iter-")
 	return fake.Args(iterLabel), fake.Args(label)
 }

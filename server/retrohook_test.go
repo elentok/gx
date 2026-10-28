@@ -130,18 +130,14 @@ func TestRetroHook_MaintainerWithAGxProjectSubmits(t *testing.T) {
 func (f *schedFixture) retrosAfter(t *testing.T) []string {
 	t.Helper()
 	var retros []string
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
+	servertest.Poll(10*time.Second, func() bool {
 		var err error
 		retros, err = filepath.Glob(filepath.Join(f.store, "proj", server.OneOffsEpic, "issues", "*-evolve-"+schedEpic+"-*.md"))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(retros) > 0 {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+		return len(retros) > 0
+	})
 	return retros
 }
 

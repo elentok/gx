@@ -30,10 +30,7 @@ func TestStoreCommits_GitChildrenGetTheConfigEnvWithoutAutoMaintenance(t *testin
 	servertest.StartWithStore(t, store, servertest.WithEnv("GIT_TRACE2_EVENT="+trace), func(c *server.Config) {
 		c.StoreCommitDebounce = time.Hour
 	})
-	deadline := time.Now().Add(5 * time.Second)
-	for storeLog(t, store) == "" && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
+	servertest.Poll(5*time.Second, func() bool { return storeLog(t, store) != "" })
 	raw, err := os.ReadFile(trace)
 	if err != nil || len(raw) == 0 {
 		t.Fatalf("trace file %q, %v: the config env did not reach the store's git", raw, err)
@@ -59,10 +56,7 @@ func TestStoreCommits_ServerCommitsEditsMadeWhileDownOnStart(t *testing.T) {
 	servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.StoreCommitDebounce = time.Hour
 	})
-	deadline := time.Now().Add(5 * time.Second)
-	for storeLog(t, store) == "" && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
-	}
+	servertest.Poll(5*time.Second, func() bool { return storeLog(t, store) != "" })
 	if got := storeLog(t, store); !strings.HasPrefix(got, "sync: ") {
 		t.Errorf("log = %q, want a sync commit of the down-time edit", got)
 	}

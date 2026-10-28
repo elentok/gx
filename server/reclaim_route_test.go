@@ -1,7 +1,6 @@
 package server_test
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"slices"
@@ -80,25 +79,20 @@ func setSavedRunner(t *testing.T, h *servertest.Harness, name string) {
 
 func waitStatus(t *testing.T, ticketPath string, want schema.Status) {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
-	for {
-		tk, err := schema.ParseTicket(ticketPath)
-		if err != nil {
+	var tk schema.Ticket
+	if !servertest.Poll(30*time.Second, func() bool {
+		var err error
+		if tk, err = schema.ParseTicket(ticketPath); err != nil {
 			t.Fatal(err)
 		}
 		// A legacy asking / stuck want means paused in that class.
 		if class := legacyClass(want); class != "" {
-			if tk.Status == schema.StatusPaused && tk.PausedClass() == class {
-				return
-			}
-		} else if tk.Status == want {
-			return
+			return tk.Status == schema.StatusPaused && tk.PausedClass() == class
 		}
-		if time.Now().After(deadline) {
-			body, _ := os.ReadFile(ticketPath)
-			t.Fatalf("status = %q, want %q:\n%s", tk.Status, want, body)
-		}
-		time.Sleep(50 * time.Millisecond)
+		return tk.Status == want
+	}) {
+		body, _ := os.ReadFile(ticketPath)
+		t.Fatalf("status = %q, want %q:\n%s", tk.Status, want, body)
 	}
 }
 
@@ -113,11 +107,7 @@ func TestReclaim_FinishesThroughTheRunsOwnRunner(t *testing.T) {
 	own, configured := newRenamedFake("a", nativerunner.VerdictFinished), newRenamedFake("b", nativerunner.VerdictFinished)
 	_, ticketPath := restartUnder(t, "a", configured, map[string]agentrunner.Runner{"a": own})
 	waitStatus(t, ticketPath, schema.StatusDone)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	for ctx.Err() == nil && len(cleanedBy(own)) == 0 {
-		time.Sleep(50 * time.Millisecond)
-	}
+	servertest.Poll(10*time.Second, func() bool { return len(cleanedBy(own)) > 0 })
 	if got := cleanedBy(own); !slices.Equal(got, []string{"epic-a-iter-01"}) {
 		t.Errorf("run's runner cleaned %v, want epic-a-iter-01", got)
 	}

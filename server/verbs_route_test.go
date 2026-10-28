@@ -34,12 +34,10 @@ func liveUnder(t *testing.T, own renamedFake, opts ...func(*server.Config)) (*se
 	}
 	own.SetState(routedLabel, agentrunner.StateWorking, "")
 	h, ticketPath := restartUnder(t, own.name, newRenamedFake("b", nativerunner.VerdictLive), map[string]agentrunner.Runner{own.name: own}, opts...)
-	deadline := time.Now().Add(10 * time.Second)
-	for !slices.ContainsFunc(h.Server.Runs(), func(r server.Run) bool { return r.Runner == own.name }) {
-		if time.Now().After(deadline) {
-			t.Fatalf("run not reclaimed under %s: %+v", own.name, h.Server.Runs())
-		}
-		time.Sleep(20 * time.Millisecond)
+	if !servertest.Poll(10*time.Second, func() bool {
+		return slices.ContainsFunc(h.Server.Runs(), func(r server.Run) bool { return r.Runner == own.name })
+	}) {
+		t.Fatalf("run not reclaimed under %s: %+v", own.name, h.Server.Runs())
 	}
 	return h, own, ticketPath
 }
@@ -73,17 +71,13 @@ func TestBudget_KillStopsTheSessionThroughTheRunsRunner(t *testing.T) {
 		c.BudgetPollInterval = time.Hour
 	})
 	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { return 6, true })
-	deadline := time.Now().Add(10 * time.Second)
-	for {
+	if !servertest.Poll(10*time.Second, func() bool {
 		h.Server.PollBudget()
-		if tk, err := schema.ParseTicket(ticketPath); err == nil && tk.PausedClass() == schema.PauseClassRepair {
-			break
-		}
-		if time.Now().After(deadline) {
-			body, _ := os.ReadFile(ticketPath)
-			t.Fatalf("not budget-killed:\n%s", body)
-		}
-		time.Sleep(50 * time.Millisecond)
+		tk, err := schema.ParseTicket(ticketPath)
+		return err == nil && tk.PausedClass() == schema.PauseClassRepair
+	}) {
+		body, _ := os.ReadFile(ticketPath)
+		t.Fatalf("not budget-killed:\n%s", body)
 	}
 	if _, live, _ := own.Find(routedLabel); live {
 		t.Error("run's runner still hosts the session after the budget kill")

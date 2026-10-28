@@ -77,16 +77,10 @@ func TestPrune_HeadlessDirsArePrunedUnderAHerdrConfig(t *testing.T) {
 		c.LogRetention = retention
 	})
 
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		if _, err := os.Stat(filepath.Join(old, nativerunner.OutFile)); errors.Is(err, os.ErrNotExist) {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("the expired headless dir was never pruned")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	servertest.WaitFor(t, 10*time.Second, "the expired headless dir to be pruned", func() bool {
+		_, err := os.Stat(filepath.Join(old, nativerunner.OutFile))
+		return errors.Is(err, os.ErrNotExist)
+	})
 	for _, kept := range []string{paused, fresh} {
 		if _, err := os.Stat(filepath.Join(kept, nativerunner.OutFile)); err != nil {
 			t.Errorf("%s was pruned: %v", filepath.Base(kept), err)

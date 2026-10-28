@@ -40,14 +40,13 @@ func TestFrictionStamp_MergedTicketCarriesItsPause(t *testing.T) {
 		t.Fatalf("status = %s, want done", tk.Status)
 	}
 	// The stamp lands just after the done event, so wait for it.
-	deadline := time.Now().Add(5 * time.Second)
-	for tk.Friction == nil && time.Now().Before(deadline) {
-		time.Sleep(20 * time.Millisecond)
+	servertest.Poll(5*time.Second, func() bool {
 		var err error
 		if tk, err = schema.ParseTicket(f.ticketFile(t, "01")); err != nil {
 			t.Fatal(err)
 		}
-	}
+		return tk.Friction != nil
+	})
 	if tk.Friction == nil || tk.Friction.PausesByReason["zero-commit"] != 1 || tk.Friction.PauseEndings["cli"] != 1 {
 		t.Errorf("friction = %+v, want one zero-commit pause ended by cli", tk.Friction)
 	}

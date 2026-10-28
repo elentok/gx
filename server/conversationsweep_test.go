@@ -33,17 +33,10 @@ func TestStartupSweep_CountsUncountedClaudeDesignRecords(t *testing.T) {
 		}
 	})
 
-	deadline := time.Now().Add(10 * time.Second)
-	for {
+	servertest.WaitFor(t, 10*time.Second, "one grilling round on design and old-no-flag", func() bool {
 		recs := recordsByID(t, h.ConversationsDir)
-		if len(recs["design"].Grilling) == 1 && len(recs["old-no-flag"].Grilling) == 1 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("design = %+v, old-no-flag = %+v; want one round each", recs["design"].Grilling, recs["old-no-flag"].Grilling)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+		return len(recs["design"].Grilling) == 1 && len(recs["old-no-flag"].Grilling) == 1
+	})
 	recs := recordsByID(t, h.ConversationsDir)
 	if recs["codex"].Grilling != nil || recs["plain"].Grilling != nil {
 		t.Errorf("codex = %+v, plain = %+v; want both uncounted", recs["codex"].Grilling, recs["plain"].Grilling)

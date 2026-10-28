@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -72,9 +73,9 @@ func TestRunner_OneOffsEpicUsesTheOneOffCapNotThePerRootCap(t *testing.T) {
 // name herdr was given (one-offs-iter-<id>), once want agents have started.
 func waitForAgentStarts(t *testing.T, h *servertest.Harness, want int) map[string]string {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		kinds := map[string]string{}
+	var kinds map[string]string
+	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("%d agent starts", want), func() bool {
+		kinds = map[string]string{}
 		for _, e := range h.Herdr.Trace() {
 			if len(e.Argv) > 3 && e.Argv[0] == "agent" && e.Argv[1] == "start" {
 				for i, a := range e.Argv {
@@ -84,14 +85,9 @@ func waitForAgentStarts(t *testing.T, h *servertest.Harness, want int) map[strin
 				}
 			}
 		}
-		if len(kinds) >= want {
-			return kinds
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("agent starts = %v, want %d", kinds, want)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+		return len(kinds) >= want
+	})
+	return kinds
 }
 
 func startOneOffsHarness(t *testing.T, store string) *servertest.Harness {

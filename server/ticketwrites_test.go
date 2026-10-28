@@ -357,23 +357,21 @@ func TestSnapshot_ClaimedTicketCarriesLaunchTime(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	var claimed server.TicketInfo
+	servertest.WaitFor(t, 5*time.Second, "the ticket to show as claimed", func() bool {
 		snap, err := h.Client.Snapshot(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, tk := range snap.Tickets {
 			if tk.Address == "proj:epic-a/01" && tk.Status == "claimed" {
-				if !tk.ClaimedAt.Equal(launched) {
-					t.Fatalf("ClaimedAt = %v, want %v", tk.ClaimedAt, launched)
-				}
-				return
+				claimed = tk
+				return true
 			}
 		}
-		if time.Now().After(deadline) {
-			t.Fatalf("ticket never showed as claimed: %+v", snap.Tickets)
-		}
-		time.Sleep(20 * time.Millisecond)
+		return false
+	})
+	if !claimed.ClaimedAt.Equal(launched) {
+		t.Fatalf("ClaimedAt = %v, want %v", claimed.ClaimedAt, launched)
 	}
 }

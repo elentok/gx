@@ -181,20 +181,13 @@ func stampTicket(t *testing.T, f *schedFixture, mutate func(*schema.Ticket)) {
 	if err != nil || len(paths) != 1 {
 		t.Fatalf("ticket 01 files = %v, %v", paths, err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	servertest.WaitFor(t, 5*time.Second, "ticket 01's friction stamp", func() bool {
 		tk, err := schema.ParseTicket(paths[0])
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tk.Friction != nil {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("ticket 01 never got its friction stamp")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+		return tk.Friction != nil
+	})
 	if err := schema.UpdateTicket(paths[0], mutate); err != nil {
 		t.Fatal(err)
 	}

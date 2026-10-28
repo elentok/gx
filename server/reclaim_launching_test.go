@@ -238,15 +238,10 @@ func TestReclaim_LaunchingWorkingAgentIsALiveRun(t *testing.T) {
 func waitReclaimedLive(t *testing.T, h *servertest.Harness) {
 	t.Helper()
 	path := filepath.Join(h.StateDir, "runs.json")
-	deadline := time.Now().Add(10 * time.Second)
-	for {
+	if !servertest.Poll(10*time.Second, func() bool {
 		runs := readRuns(t, path)
-		if len(runs) == 1 && runs[0]["state"] == nil {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("runs.json = %v, want the reclaimed entry no longer launching", runs)
-		}
-		time.Sleep(20 * time.Millisecond)
+		return len(runs) == 1 && runs[0]["state"] == nil
+	}) {
+		t.Fatalf("runs.json = %v, want the reclaimed entry no longer launching", readRuns(t, path))
 	}
 }

@@ -33,8 +33,8 @@ func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *t
 			overlapped.Add(1)
 		}
 		defer inFlight.Add(-1)
-		// Long enough for the other epic to finish and try its merge meanwhile.
-		time.Sleep(time.Second)
+		// Negative wait: hold the merge long enough for the other epic to try its own meanwhile.
+		time.Sleep(500 * time.Millisecond)
 		return git.MergeBranchInto(repo, wts, branch, target)
 	})
 

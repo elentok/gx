@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/server/servertest"
 )
 
 // slackHook is a Slack webhook that records every post. The chat batches what
@@ -38,30 +40,25 @@ func newSlackHook(t *testing.T) *slackHook {
 // arrived up to it, to pass to postsSince.
 func (h *slackHook) waitStarted(t *testing.T) int {
 	t.Helper()
-	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+	var i int
+	servertest.WaitFor(t, 15*time.Second, "the server started notice in chat", func() bool {
 		h.mu.Lock()
-		i := slices.IndexFunc(h.posts, func(p string) bool { return strings.Contains(p, "server started") })
-		h.mu.Unlock()
-		if i >= 0 {
-			return i + 1
-		}
-	}
-	t.Fatal("no server started notice in chat")
-	return 0
+		defer h.mu.Unlock()
+		i = slices.IndexFunc(h.posts, func(p string) bool { return strings.Contains(p, "server started") })
+		return i >= 0
+	})
+	return i + 1
 }
 
 // postsSince waits until more than from posts have arrived, then a grace
 // period for any extra one to show, and returns the posts after from.
 func (h *slackHook) postsSince(from int) []string {
-	for deadline := time.Now().Add(15 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
+	servertest.Poll(15*time.Second, func() bool {
 		h.mu.Lock()
-		got := len(h.posts)
-		h.mu.Unlock()
-		if got > from {
-			break
-		}
-	}
-	time.Sleep(time.Second)
+		defer h.mu.Unlock()
+		return len(h.posts) > from
+	})
+	time.Sleep(500 * time.Millisecond) // negative wait: an extra post would land within a few flush windows
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	return slices.Clone(h.posts[from:])

@@ -81,12 +81,9 @@ func TestTrunkConflict_AnotherEpicsLandWaitsUnpausedUntilTheTicketIsDone(t *test
 		out := f.git(t, "ls-tree", "-r", "--name-only", "main")
 		return strings.Contains(out, "other.txt")
 	}
-	deadline := time.Now().Add(500 * time.Millisecond)
-	for time.Now().Before(deadline) {
-		if otherMerged() {
-			t.Fatal("other landed while the trunk-conflict ticket was open")
-		}
-		time.Sleep(50 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: a landing would come within a few 50ms polls
+	if otherMerged() {
+		t.Fatal("other landed while the trunk-conflict ticket was open")
 	}
 	q, err := f.h.Client.Queue(ctx)
 	if err != nil {

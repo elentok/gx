@@ -26,7 +26,7 @@ func startPauseHarness(t *testing.T) *servertest.Harness {
 
 func expectNoRun(t *testing.T, h *servertest.Harness) {
 	t.Helper()
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond) // negative wait: a launch would come within a few 50ms polls
 	if runs := h.Server.Runs(); len(runs) != 0 {
 		t.Fatalf("runs = %+v, want none while the queue is held", runs)
 	}
@@ -34,14 +34,7 @@ func expectNoRun(t *testing.T, h *servertest.Harness) {
 
 func expectRun(t *testing.T, h *servertest.Harness) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		if len(h.Server.Runs()) == 1 {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatal("no run started")
+	servertest.WaitFor(t, 10*time.Second, "a run to start", func() bool { return len(h.Server.Runs()) == 1 })
 }
 
 func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {

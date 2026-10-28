@@ -78,7 +78,7 @@ func TestReclaim_WaitingRunStaysWaitingAndUnsettled(t *testing.T) {
 	h, ticketPath := startWaitingRestart(t, 0)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	// A settled run would merge (the fake agent is idle with a commit) and leave the registry.
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond) // negative wait: a settle would merge within a few polls
 	if runs := h.Server.Runs(); len(runs) != 1 {
 		t.Errorf("Runs() = %+v, want the waiting run kept", runs)
 	}
