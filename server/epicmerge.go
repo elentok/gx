@@ -188,7 +188,7 @@ func (s *Server) epicMergeTarget(a tickets.Address) string {
 	if i < 0 || epics[i].IsMap || !epics[i].AllDone() || !epics[i].MergedAt.IsZero() {
 		return ""
 	}
-	repoPtr := s.mergeTargets.repoOf(dir)
+	repoPtr := s.projectRepos.repoOf(dir)
 	if repoPtr == nil {
 		return ""
 	}
@@ -218,12 +218,17 @@ var gitIsAncestor = git.IsAncestor
 // mergeTargetCache holds each epic's last merge target. Errors aren't stored,
 // so a failing resolve retries on the next snapshot.
 type mergeTargetCache struct {
-	mu    sync.Mutex
-	m     map[tickets.Address]mergeTargetEntry
-	repos map[string]projectRepoEntry
+	mu sync.Mutex
+	m  map[tickets.Address]mergeTargetEntry
 }
 
 type mergeTargetEntry struct{ stamp, target string }
+
+// projectRepoCache holds each project's parsed repo.
+type projectRepoCache struct {
+	mu    sync.Mutex
+	repos map[string]projectRepoEntry
+}
 
 // projectRepoEntry is a project's parsed repo, valid while project.json keeps
 // its size and mtime. repo is nil when the file is unreadable or sets none.
@@ -238,7 +243,7 @@ var readProjectFile = config.ReadProjectFile
 // repoOf is the repo project.json in dir names, nil when there is none. It
 // reads the file only when its size or mtime moved, since every snapshot asks.
 // Errors aren't stored, so a failing read retries on the next snapshot.
-func (c *mergeTargetCache) repoOf(dir string) *string {
+func (c *projectRepoCache) repoOf(dir string) *string {
 	fi, err := os.Stat(filepath.Join(dir, config.ProjectFileName))
 	if err != nil {
 		return nil

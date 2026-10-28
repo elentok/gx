@@ -436,6 +436,7 @@ type Server struct {
 	adoptMu        sync.Mutex // a late-finish adoption holds it from its finish to the cancel of unstarted investigations; the runner claims under it
 	trunkLocks     trunkLocks
 	mergeTargets   mergeTargetCache
+	projectRepos   projectRepoCache
 	mergeInto      func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) // swapped in tests
 	mergedProbe    func(repo, ancestor, descendant string) (bool, error)                    // the poll-time ancestry check; swapped in tests
 	verdicts       verdictLog
