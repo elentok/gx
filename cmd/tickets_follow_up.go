@@ -59,10 +59,14 @@ func runTicketsFollowUpAdd(d deps, epicPath, body, category string, jsonOut bool
 	if fm.Category == string(schema.CategoryBug) {
 		required = append(required, "Evidence")
 	}
+	var missing []string
 	for _, h := range required {
 		if schema.Section(text, h) == "" {
-			return &tickets.AddressError{Code: tickets.CodeSectionRequired, Msg: "a follow-up needs a non-empty ## " + h + " section"}
+			missing = append(missing, "## "+h)
 		}
+	}
+	if len(missing) > 0 {
+		return &tickets.AddressError{Code: tickets.CodeSectionRequired, Msg: "a follow-up needs a non-empty " + strings.Join(missing, ", ") + " section"}
 	}
 
 	fm.Status = string(schema.StatusDraft)

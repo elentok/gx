@@ -381,7 +381,11 @@ log shows no open question on the web. A second run changes nothing.`,
 	followUpAddCmd := &cobra.Command{
 		Use:   "add <project:epic>",
 		Short: "file one follow-up (draft, research) into a follow-ups epic, enforcing the follow-up format",
-		Args:  cobra.ExactArgs(1),
+		Long: "File one follow-up (draft, research) into a follow-ups epic, enforcing the follow-up format.\n\n" +
+			"The body needs a category (bug or idea) and these non-empty ## sections:\n" +
+			"  Source, Problem, Suggested fix\n" +
+			"  Evidence (bug only)",
+		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			epicPath, _, err := resolveAddTarget(d, args[0], "")
 			if err != nil {

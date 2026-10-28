@@ -118,6 +118,36 @@ func TestExecute_TicketsFollowUpAdd_Refusals(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsFollowUpAdd_ReportsEveryMissingSection(t *testing.T) {
+	repo, _ := setupShowProject(t)
+	_, err := runIn(t, repo, "tickets", "follow-up", "add", "mine:follow-ups", "--body", "---\ncategory: bug\n---\n\n## Problem\n\np\n")
+	var ae *tickets.AddressError
+	if !errors.As(err, &ae) || ae.Code != tickets.CodeSectionRequired {
+		t.Fatalf("err = %v, want code %s", err, tickets.CodeSectionRequired)
+	}
+	for _, h := range []string{"## Source", "## Suggested fix", "## Evidence"} {
+		if !strings.Contains(ae.Msg, h) {
+			t.Errorf("message %q does not name %q", ae.Msg, h)
+		}
+	}
+	if strings.Contains(ae.Msg, "## Problem") {
+		t.Errorf("message %q names the present ## Problem section", ae.Msg)
+	}
+}
+
+func TestExecute_TicketsFollowUpAdd_HelpListsRequiredSections(t *testing.T) {
+	repo, _ := setupShowProject(t)
+	out, err := runIn(t, repo, "tickets", "follow-up", "add", "--help")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range []string{"Source", "Problem", "Suggested fix", "Evidence"} {
+		if !strings.Contains(out, h) {
+			t.Errorf("--help does not list %q:\n%s", h, out)
+		}
+	}
+}
+
 func dirEntries(t *testing.T, dir string) string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)
