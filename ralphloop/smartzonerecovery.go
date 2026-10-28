@@ -116,6 +116,10 @@ func (r *smartZoneRecovery) checkAndRecover(d Deps, p launchAndPromptParams, ses
 	recovered, recErr := recoverSmartZoneBreach(d, p, sessionID, reason, r.zone)
 	switch {
 	case errors.Is(recErr, errCompactNeverConfirmed):
+		// A gated give-up (the pane claimed completion the transcript never
+		// corroborated) is a failed recovery, not a failed iteration: the agent
+		// is still alive and may well compact on its own, so keep polling and
+		// let the next breach try again. Every other error still aborts.
 		r.pending = &baseline
 		if r.recordGatedGiveUp() {
 			return true, gatedGiveUpsExhausted(p.Label, r.gatedGiveUps, recErr)

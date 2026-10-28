@@ -15,38 +15,34 @@ const verifyCapMargin = 20_000
 // never compacts: the session wraps up by gx-verify-epic's cap-stop step.
 type verifyCap struct {
 	limit int
-	// fired is shared through launchAndPromptParams.verifyCapFired, so a later
-	// wait in the same iteration (the corrective retry) does not stop the
-	// session a second time.
-	fired *bool
+	state *verifyCapState
+}
+
+// verifyCapState is the iteration-wide "cap already fired" state, shared by
+// every wait of one iteration so a later wait (the corrective retry) does not
+// stop the session a second time.
+type verifyCapState struct {
+	fired bool
 }
 
 // newVerifyCap returns nil when p's pane gets no cap: a pane the launch did not
-// opt in (only the main iteration launch does; the conflict-resolution pane
-// shares the ticket's params but is not the verify session), a non-verify
-// ticket, or a smart zone of verifyCapMargin or less.
+// opt in by giving it a state (only the main iteration launch does; the
+// conflict-resolution pane shares the ticket's params but is not the verify
+// session), a non-verify ticket, or a smart zone of verifyCapMargin or less.
 func newVerifyCap(p launchAndPromptParams, smartZone int) *verifyCap {
-	if !p.verifyCap || !p.TicketData.IsVerify() || smartZone <= verifyCapMargin {
+	if p.verifyCap == nil || !p.TicketData.IsVerify() || smartZone <= verifyCapMargin {
 		return nil
 	}
-	fired := p.verifyCapFired
-	if fired == nil {
-		fired = new(bool)
-	}
-	return &verifyCap{limit: smartZone - verifyCapMargin, fired: fired}
+	return &verifyCap{limit: smartZone - verifyCapMargin, state: p.verifyCap}
 }
 
-// tick looks up p's session and, the first time its occupancy passes the cap,
+// tick, the first time the occupancy of the session sessionID passes the cap,
 // interrupts the pane and sends the finish-up prompt. stopped reports whether
 // it did, so the caller can reset its elapsed-poll-time counter. A nil receiver
 // never stops anything.
-func (c *verifyCap) tick(d Deps, p launchAndPromptParams) (stopped bool, err error) {
-	if c == nil || *c.fired {
+func (c *verifyCap) tick(d Deps, p launchAndPromptParams, sessionID string) (stopped bool, err error) {
+	if c == nil || c.state.fired {
 		return false, nil
-	}
-	sessionID := ""
-	if status, err := d.Runner.Status(p.session()); err == nil {
-		sessionID = status.SessionID
 	}
 	occupancy, _, decidable, occErr := smartZoneOccupancy(d, p.Agent, p.SessionCwd, sessionID)
 	if occErr != nil || !decidable || occupancy <= c.limit {
@@ -56,7 +52,7 @@ func (c *verifyCap) tick(d Deps, p launchAndPromptParams) (stopped bool, err err
 		return false, err
 	}
 	// Set before the prompt is sent on purpose: a failed send is logged, not retried.
-	*c.fired = true
+	c.state.fired = true
 
 	reason := fmt.Sprintf("context occupancy %d exceeds the verify cap %d", occupancy, c.limit)
 	p.logAgentEvent(string(events.VerifyCapStopped), sessionID, reason)

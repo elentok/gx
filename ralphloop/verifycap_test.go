@@ -40,7 +40,7 @@ func runVerifyCapWait(t *testing.T, ticketType string, agent AgentKind, smartZon
 	p.Agent = agent
 	p.SmartZone = smartZone
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: ticketType}
-	p.verifyCap = true
+	p.verifyCap = new(verifyCapState)
 	p.ScratchDir = scratchDir
 	p.EpicName = "epic"
 	err := waitForFinish(d, p, "sess-19")
@@ -102,8 +102,7 @@ func TestWaitForFinish_VerifyCap_FiredStateSurvivesASecondWait(t *testing.T) {
 	p.TicketData = tickets.Ticket{Identifier: "19", Type: "verify"}
 	p.ScratchDir = epicScratchDir(t, "epic")
 	p.EpicName = "epic"
-	p.verifyCap = true
-	p.verifyCapFired = new(bool)
+	p.verifyCap = new(verifyCapState)
 	for i := range 2 {
 		if err := waitForFinish(d, p, "sess-19"); err != nil {
 			t.Fatalf("wait %d: %v", i, err)
@@ -235,7 +234,8 @@ func TestVerifyCap_OptInOnly(t *testing.T) {
 	if newVerifyCap(p, verifyCapTestZone) != nil {
 		t.Error("a pane that did not opt in got a cap")
 	}
-	if newVerifyCap(p.withVerifyCap(), verifyCapTestZone) == nil {
+	p.verifyCap = new(verifyCapState)
+	if newVerifyCap(p, verifyCapTestZone) == nil {
 		t.Error("an opted-in verify pane got no cap")
 	}
 }

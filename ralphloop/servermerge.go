@@ -334,7 +334,7 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 	p := launchAndPromptParams{
 		Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink(),
 		ScratchDir: o.ScratchDir, EpicName: o.Epic, Ticket: o.Ticket.Identifier, TicketPath: o.Ticket.Path,
-		TicketData: o.Ticket, SmartZone: o.smartZone(), verifyCap: true,
+		TicketData: o.Ticket, SmartZone: o.smartZone(), verifyCap: new(verifyCapState),
 	}
 	vcap := newVerifyCap(p, p.SmartZone)
 	elapsedMs := 0
@@ -343,7 +343,11 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 		st, err := d.Runner.Wait(s, waitStates, smartZonePollMs*time.Millisecond)
 		if err != nil {
 			if errors.Is(err, agentrunner.ErrTimeout) {
-				if _, err := vcap.tick(d, p); err != nil {
+				sessionID := ""
+				if status, err := d.Runner.Status(s); err == nil {
+					sessionID = status.SessionID
+				}
+				if _, err := vcap.tick(d, p, sessionID); err != nil {
 					return err
 				}
 				continue

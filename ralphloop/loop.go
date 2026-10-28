@@ -626,7 +626,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				SmartZone:       smartZone,
 				Gate:            gate,
 				Sink:            sink,
-				verifyCapFired:  new(bool),
+				verifyCap:       new(verifyCapState),
 			}
 			var err error
 			if reattach {

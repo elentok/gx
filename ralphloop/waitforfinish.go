@@ -232,13 +232,9 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 // stop goes first and takes the whole tick: if occupancy is also past the smart
 // zone, the next poll runs its recovery.
 func guardTick(d Deps, p launchAndPromptParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery) (acted bool, err error) {
-	if stopped, err := vcap.tick(d, p); err != nil || stopped {
+	if stopped, err := vcap.tick(d, p, sessionID); err != nil || stopped {
 		return stopped, err
 	}
-	// A gated give-up (the pane claimed completion the transcript never
-	// corroborated) is a failed recovery, not a failed iteration: the agent
-	// is still alive and may well compact on its own, so keep polling and
-	// let the next breach try again. Every other error still aborts.
 	return recovery.checkAndRecover(d, p, sessionID)
 }
 

@@ -56,9 +56,9 @@ type iterationParams struct {
 	// SmartZone is the context-token ceiling before an iteration (or its
 	// conflict-resolution agent) gets paused.
 	SmartZone int
-	// verifyCapFired is shared by every wait of this iteration; see
-	// launchAndPromptParams.verifyCapFired.
-	verifyCapFired *bool
+	// verifyCap is shared by every wait of this iteration; see
+	// launchAndPromptParams.verifyCap. Always non-nil.
+	verifyCap *verifyCapState
 	// Gate is the pause/resume coordinator shared by every iteration in this
 	// Run call.
 	Gate *Gate
@@ -98,8 +98,6 @@ func (p iterationParams) launchAndPromptParams(label, pane, prompt, sessionCwd, 
 		EpicName:    p.FeatureBranch,
 		StartEvent:  startEvent,
 		FinishEvent: finishEvent,
-
-		verifyCapFired: p.verifyCapFired,
 	}
 }
 
@@ -148,12 +146,6 @@ func (p launchAndPromptParams) session() agentrunner.Session {
 		return p.Session
 	}
 	return agentrunner.Session{Label: p.Label, ID: p.Pane}
-}
-
-// withVerifyCap returns p opted into the verify token cap.
-func (p launchAndPromptParams) withVerifyCap() launchAndPromptParams {
-	p.verifyCap = true
-	return p
 }
 
 // launchAndPromptParams are the per-call inputs to launchAndPrompt.
@@ -207,11 +199,9 @@ type launchAndPromptParams struct {
 	// without re-reading TicketPath itself.
 	TicketData tickets.Ticket
 	// verifyCap opts this pane into the verify token cap when TicketData is a
-	// verify ticket. Only the main iteration launch sets it.
-	verifyCap bool
-	// verifyCapFired is the iteration-wide "cap already fired" flag, so every
-	// wait of one iteration shares it; nil gives each wait its own.
-	verifyCapFired *bool
+	// verify ticket, and holds the iteration-wide state every wait of it shares.
+	// Only the main iteration launch sets it; nil means no cap.
+	verifyCap *verifyCapState
 	// StartEvent/FinishEvent are the run-log event types logged when the
 	// agent starts/finishes; "" skips logging that transition.
 	StartEvent  string

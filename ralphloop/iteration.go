@@ -92,7 +92,8 @@ func runIteration(d Deps, p iterationParams) error {
 	if errors.As(err, &launchFail) {
 		return err
 	}
-	launchParams := p.launchAndPromptParams(label, l.ID, prompt, path, string(events.IterationStarted), string(events.IterationFinished)).withVerifyCap()
+	launchParams := p.launchAndPromptParams(label, l.ID, prompt, path, string(events.IterationStarted), string(events.IterationFinished))
+	launchParams.verifyCap = p.verifyCap
 	launchParams.Session = l.Session
 	var sessionID string
 	if errors.Is(err, agentrunner.ErrNotReady) {
@@ -214,7 +215,8 @@ func reattachIteration(d Deps, p iterationParams) error {
 
 	// StartEvent remains empty because reattachment must not imply a fresh
 	// launch; all later events use the recovered native session identity.
-	launchParams := p.launchAndPromptParams(label, session.ID, "", path, "", string(events.IterationFinished)).withVerifyCap()
+	launchParams := p.launchAndPromptParams(label, session.ID, "", path, "", string(events.IterationFinished))
+	launchParams.verifyCap = p.verifyCap
 	finished := false
 	if alreadyFinished(string(agent.State)) {
 		// An idle pane at reattach gets the same debounce and background-task
@@ -517,7 +519,8 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, base, br
 	}
 
 	retrySessionID := cmp.Or(status.SessionID, sessionID)
-	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "").withVerifyCap()
+	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "")
+	launchParams.verifyCap = p.verifyCap
 	launchParams.Session = s
 	if err := promptIdle(d, launchParams, retrySessionID, unexecutedToolCallCorrection); err != nil {
 		if errors.Is(err, errBlockedPanePaused) {
