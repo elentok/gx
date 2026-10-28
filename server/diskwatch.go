@@ -83,15 +83,88 @@ type diskWatch struct {
 	goCachePath string
 }
 
-// observe applies one reading to the state machine. projects is who watches
-// the disk now; nil keeps the last list. probe is a path on the disk, read
-// again when a clean ends. end is set only by the end of a clean. It reports
-// whether the disk is held after this reading.
-func (s *Server) observe(r DiskReading, probe string, projects []string, now time.Time, end *cleanEnd) (held bool) {
+// diskChange is what one reading did to a disk's state, for the effects that
+// run after the lock is released.
+type diskChange struct {
+	changed, warnSet, holdSet, resumed, startClean bool
+	held                                           bool
+	projects                                       []string
+	lastClean                                      string
+}
+
+// beginClean marks a clean as running; freeBefore is what "freed" is measured from.
+func (st *diskState) beginClean(freeBefore uint64) {
+	st.cleaning, st.cleanFree = true, freeBefore
+}
+
+// updateWarn sets or clears the warn mark and reports whether it was set now.
+func (st *diskState) updateWarn(free, warn uint64) (set, changed bool) {
+	switch {
+	case !st.warned && warn > 0 && free < warn:
+		st.warned = true
+		return true, true
+	case st.warned && (warn == 0 || free > warn+diskWarnMargin):
+		st.warned = false
+		return false, true
+	}
+	return false, false
+}
+
+// readTransition applies an ordinary reading: the hold, the re-arm and the
+// start of the automatic clean.
+func (st *diskState) readTransition(free, warn, clean uint64) diskChange {
+	var c diskChange
+	c.warnSet, c.changed = st.updateWarn(free, warn)
+	if st.spent && free > max(warn, clean+diskWarnMargin) {
+		st.spent = false
+	}
+	low := clean > 0 && free < clean
+	switch {
+	case !st.held && low:
+		st.held, c.changed, c.holdSet = true, true, true
+	case st.held && !low && !st.cleaning:
+		st.held, c.changed, c.resumed = false, true, true
+	}
+	if low && !st.spent && !st.cleaning {
+		st.spent = true
+		st.beginClean(free)
+		c.changed, c.startClean = true, true
+	}
+	return c
+}
+
+// endTransition applies the reading that ends a clean. One rule ends every
+// clean: the fresh reading decides the hold. It never re-arms; a later reading does.
+func (st *diskState) endTransition(free, warn, clean uint64, end cleanEnd) diskChange {
+	var c diskChange
+	c.warnSet, _ = st.updateWarn(free, warn)
+	c.changed = true
+	st.cleaning = false
+	switch {
+	case end.failed != "":
+		st.lastClean = "failed: " + end.failed
+	case end.noWork:
+		st.lastClean = noCleanCommand
+	default:
+		st.lastClean = "freed " + humanize.Bytes(max(free, st.cleanFree)-st.cleanFree)
+	}
+	low := clean > 0 && free < clean
+	if st.held != low {
+		st.held, c.resumed = low, !low
+	}
+	return c
+}
+
+// transition records the reading under the lock, applies fn and returns the
+// change with a snapshot of what the effects need. projects is who watches the
+// disk now; nil keeps the last list. probe is a path on the disk, read again
+// when a clean ends.
+func (s *Server) transition(r DiskReading, probe string, projects []string, now time.Time,
+	fn func(st *diskState, warn, clean uint64) diskChange) diskChange {
 	ds := s.settings.Load().DiskSpace
-	warn, clean := uint64(ds.WarnBelow), uint64(ds.CleanBelow)
 	d := &s.disks
 	d.mu.Lock()
+	defer d.mu.Unlock()
 	st := d.disks[r.ID]
 	if st == nil {
 		if d.disks == nil {
@@ -107,72 +180,76 @@ func (s *Server) observe(r DiskReading, probe string, projects []string, now tim
 	if projects != nil {
 		st.projects = projects
 	}
-	var changed, warnSet, holdSet, resumed, startClean bool
-	switch {
-	case !st.warned && warn > 0 && r.Free < warn:
-		st.warned, changed, warnSet = true, true, true
-	case st.warned && (warn == 0 || r.Free > warn+diskWarnMargin):
-		st.warned, changed = false, true
+	c := fn(st, uint64(ds.WarnBelow), uint64(ds.CleanBelow))
+	c.held, c.projects, c.lastClean = st.held, slices.Clone(st.projects), st.lastClean
+	return c
+}
+
+// observe applies one ordinary reading to the state machine and reports
+// whether the disk is held after it.
+func (s *Server) observe(r DiskReading, probe string, projects []string, now time.Time) (held bool) {
+	c := s.transition(r, probe, projects, now, func(st *diskState, warn, clean uint64) diskChange {
+		return st.readTransition(r.Free, warn, clean)
+	})
+	if !c.changed {
+		return c.held
 	}
-	// The end-of-clean reading never re-arms; a later one does.
-	if end == nil && st.spent && r.Free > max(warn, clean+diskWarnMargin) {
-		st.spent = false
-	}
-	low := clean > 0 && r.Free < clean
-	switch {
-	case end != nil:
-		// One rule ends every clean: the fresh reading decides the hold.
-		st.cleaning = false
-		st.lastClean = "freed " + humanize.Bytes(max(r.Free, st.cleanFree)-st.cleanFree)
-		if end.noWork {
-			st.lastClean = noCleanCommand
-		}
-		if end.failed != "" {
-			st.lastClean = "failed: " + end.failed
-		}
-		changed = true
-		if st.held != low {
-			st.held, resumed = low, !low
-		}
-	case !st.held && low:
-		st.held, changed, holdSet = true, true, true
-	case st.held && !low && !st.cleaning:
-		st.held, changed, resumed = false, true, true
-	}
-	if end == nil && low && !st.spent && !st.cleaning {
-		st.spent, st.cleaning, st.cleanFree = true, true, r.Free
-		changed, startClean = true, true
-	}
-	held = st.held
-	disk, projectList, lastClean := r.Name, slices.Clone(st.projects), st.lastClean
-	d.mu.Unlock()
-	if !changed {
-		return held
-	}
-	s.events.publish(EventDiskWarnChanged, "")
-	if warnSet {
-		s.log.Warn("disk low on space", "disk", r.Name, "free", r.Free, "warn_below", warn)
-		s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskWarn, Emoji: "💾", Title: "low disk space on " + r.Name,
-			Detail: humanize.Bytes(r.Free) + " free, under the warn threshold of " + humanize.Bytes(warn)})
-	}
-	if holdSet {
-		s.log.Warn("disk low, holding dispatch", "disk", r.Name, "free", r.Free, "clean_below", clean)
-	}
-	if resumed {
-		s.log.Info("disk recovered, resuming dispatch", "disk", r.Name, "free", r.Free)
-		if end == nil {
-			s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
-				Detail: humanize.Bytes(r.Free) + " free; queued tickets start again"})
-		}
+	s.publishChange(r, c)
+	if c.resumed {
+		s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskResume, Emoji: "💾", Title: "dispatch resumed on " + r.Name,
+			Detail: humanize.Bytes(r.Free) + " free; queued tickets start again"})
 		s.kickRunner()
 	}
-	if end != nil {
-		s.sendCleanNotice(disk, lastClean, r.Free, held)
+	if c.startClean {
+		s.startClean(r.ID, probe, c.projects)
 	}
-	if startClean {
-		s.startClean(r.ID, probe, projectList)
+	return c.held
+}
+
+// observeCleanEnd applies the reading that ends a clean and reports whether
+// the disk is held after it.
+func (s *Server) observeCleanEnd(r DiskReading, probe string, end cleanEnd) (held bool) {
+	c := s.transition(r, probe, nil, time.Now(), func(st *diskState, warn, clean uint64) diskChange {
+		return st.endTransition(r.Free, warn, clean, end)
+	})
+	s.publishChange(r, c)
+	if c.resumed {
+		s.kickRunner()
 	}
-	return held
+	s.sendCleanNotice(r.Name, c.lastClean, r.Free, c.held)
+	return c.held
+}
+
+// publishChange announces a changed disk: the event, the warn and hold logs and
+// the warn notice.
+func (s *Server) publishChange(r DiskReading, c diskChange) {
+	ds := s.settings.Load().DiskSpace
+	s.events.publish(EventDiskWarnChanged, "")
+	if c.warnSet {
+		s.log.Warn("disk low on space", "disk", r.Name, "free", r.Free, "warn_below", uint64(ds.WarnBelow))
+		s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskWarn, Emoji: "💾", Title: "low disk space on " + r.Name,
+			Detail: humanize.Bytes(r.Free) + " free, under the warn threshold of " + humanize.Bytes(uint64(ds.WarnBelow))})
+	}
+	if c.holdSet {
+		s.log.Warn("disk low, holding dispatch", "disk", r.Name, "free", r.Free, "clean_below", uint64(ds.CleanBelow))
+	}
+	if c.resumed {
+		s.log.Info("disk recovered, resuming dispatch", "disk", r.Name, "free", r.Free)
+	}
+}
+
+// watchedPaths is a project's repo path and the Go cache path: the paths whose
+// disks the project depends on. A project with no repo path has none.
+func (s *Server) watchedPaths(projectDir string) []string {
+	pf, err := config.ReadProjectFile(projectDir)
+	if err != nil || pf.Repo == nil {
+		return nil
+	}
+	paths := []string{*pf.Repo}
+	if gc := s.goCache(); gc != "" {
+		paths = append(paths, gc)
+	}
+	return paths
 }
 
 // heldDiskOf returns the first held disk project watches, from the watcher's
@@ -194,31 +271,30 @@ func (s *Server) freshHeldDisk(project string) (DiskStatus, bool) {
 	if err != nil {
 		return DiskStatus{}, false
 	}
-	pf, err := config.ReadProjectFile(dir)
-	if err != nil || pf.Repo == nil {
-		return DiskStatus{}, false
-	}
-	paths := []string{*pf.Repo}
-	if gc := s.goCache(); gc != "" {
-		paths = append(paths, gc)
-	}
-	var held *DiskStatus
+	var heldID string
 	now := time.Now()
-	for _, p := range paths {
+	for _, p := range s.watchedPaths(dir) {
 		r, err := s.freeSpace(p)
 		if err != nil {
 			s.log.Warn("read free space", "path", p, "err", err)
 			continue
 		}
-		if s.observe(r, p, nil, now, nil) && held == nil {
-			d := DiskStatus{ID: r.ID, Name: r.Name, FreeBytes: r.Free}
-			held = &d
+		if s.observe(r, p, nil, now) && heldID == "" {
+			heldID = r.ID
 		}
 	}
-	if held == nil {
+	if heldID == "" {
 		return DiskStatus{}, false
 	}
-	return *held, true
+	return s.diskStatus(heldID), true
+}
+
+// diskStatus is one known disk's status.
+func (s *Server) diskStatus(id string) DiskStatus {
+	d := &s.disks
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.disks[id].status(id)
 }
 
 // diskLowReason says which disk holds dispatch and how much is free on it.
@@ -299,7 +375,6 @@ func (s *Server) lookupGoCache() string {
 
 // checkDisks reads every project's repo disk and the Go cache disk once.
 func (s *Server) checkDisks() {
-	goCache := s.goCache()
 	dirs, err := tickets.ProjectDirs(s.cfg.TicketStore)
 	if err != nil {
 		return
@@ -326,20 +401,15 @@ func (s *Server) checkDisks() {
 		}
 	}
 	for _, dir := range dirs {
-		pf, err := config.ReadProjectFile(dir)
-		if err != nil || pf.Repo == nil {
-			continue
-		}
 		name := tickets.ProjectName(dir)
-		add(*pf.Repo, name)
-		if goCache != "" {
-			add(goCache, name)
+		for _, p := range s.watchedPaths(dir) {
+			add(p, name)
 		}
 	}
 	now := time.Now()
 	for _, w := range byDisk {
 		slices.Sort(w.projects)
-		s.observe(w.reading, w.probe, w.projects, now, nil)
+		s.observe(w.reading, w.probe, w.projects, now)
 	}
 }
 

@@ -33,7 +33,7 @@ type cleanCmd struct {
 
 func (c cleanCmd) String() string { return strings.Join(c.argv, " ") }
 
-// cleanEnd marks an observe call as the end of a clean. failed names the first
+// cleanEnd describes how a clean ended. failed names the first
 // failed command; empty means every command succeeded. noWork means there was
 // no command to run.
 type cleanEnd struct {
@@ -79,26 +79,12 @@ func (s *Server) cleanWork(projects []string) []cleanCmd {
 func (s *Server) startClean(id, probe string, projects []string) {
 	work := s.cleanWork(projects)
 	if len(work) == 0 {
-		s.noCleanWork(id)
+		s.endClean(id, probe, cleanEnd{noWork: true})
 		return
 	}
-	s.events.publish(EventDiskWarnChanged, "")
 	s.goSettle(func() {
 		s.endClean(id, probe, cleanEnd{failed: s.runCleanWork(work)})
 	})
-}
-
-// noCleanWork ends a clean that has nothing to run: no run, no running flag.
-func (s *Server) noCleanWork(id string) {
-	d := &s.disks
-	d.mu.Lock()
-	st := d.disks[id]
-	st.cleaning = false
-	st.lastClean = noCleanCommand
-	name, free, held := st.reading.Name, st.reading.Free, st.held
-	d.mu.Unlock()
-	s.events.publish(EventDiskWarnChanged, "")
-	s.sendCleanNotice(name, noCleanCommand, free, held)
 }
 
 // runCleanWork runs every command, each under its own time limit, and returns
@@ -158,7 +144,7 @@ func (s *Server) endClean(id, probe string, end cleanEnd) (DiskReading, bool) {
 		r = d.disks[id].reading
 		d.mu.Unlock()
 	}
-	return r, s.observe(r, probe, nil, time.Now(), &end)
+	return r, s.observeCleanEnd(r, probe, end)
 }
 
 // sendCleanNotice sends the one notice of a clean.

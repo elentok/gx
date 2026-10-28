@@ -44,19 +44,20 @@ func (s *Server) cleanNow(id string) CleanNowResult {
 		d.mu.Unlock()
 		return CleanNowResult{Refused: true, Reason: ReasonCleanRunning, Message: "clean already running"}
 	}
-	st.cleaning = true
 	probe, projects, before := st.probe, st.projects, st.reading.Free
+	st.beginClean(before)
 	d.mu.Unlock()
 	s.events.publish(EventDiskWarnChanged, "")
 
+	// The fresh read, not the last poll, is what "freed" is measured from.
 	if r, err := s.freeSpace(probe); err != nil {
 		s.log.Warn("read free space", "path", probe, "err", err)
 	} else {
 		before = r.Free
+		d.mu.Lock()
+		st.cleanFree = before
+		d.mu.Unlock()
 	}
-	d.mu.Lock()
-	st.cleanFree = before
-	d.mu.Unlock()
 
 	work := s.cleanWork(projects)
 	end := cleanEnd{failed: s.runCleanWork(work), noWork: len(work) == 0}
