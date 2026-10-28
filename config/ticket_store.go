@@ -26,9 +26,11 @@ const DefaultCommitDebounceSeconds = 60
 
 // DefaultTicketStoreConfig puts the store at <data dir>/tickets. If the data
 // dir can't be resolved the path is left empty and callers must refuse.
-func DefaultTicketStoreConfig() TicketStoreConfig {
+func DefaultTicketStoreConfig() TicketStoreConfig { return ticketStoreConfigWith(DataDir) }
+
+func ticketStoreConfigWith(dataDir func() (string, error)) TicketStoreConfig {
 	cfg := TicketStoreConfig{CommitDebounce: DefaultCommitDebounceSeconds}
-	if dir, err := DataDir(); err == nil {
+	if dir, err := dataDir(); err == nil {
 		cfg.Path = filepath.Join(dir, "tickets")
 	}
 	return cfg

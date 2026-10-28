@@ -21,9 +21,10 @@ import (
 
 // Rules the scan counts.
 const (
-	ruleEnvRead   = "env-read"  // os.Getenv or os.LookupEnv of a path variable
-	ruleHomeDir   = "home-dir"  // os.UserHomeDir()
-	ruleChildEnv  = "child-env" // exec.Command whose result never gets a .Env assignment
+	ruleEnvRead   = "env-read"   // os.Getenv or os.LookupEnv of a path variable
+	ruleHomeDir   = "home-dir"   // os.UserHomeDir()
+	ruleChildEnv  = "child-env"  // exec.Command whose result never gets a .Env assignment
+	ruleConfigEnv = "config-env" // a use of a config function that reads the process env
 	selfFile      = "envguard/envguard_test.go"
 	reasonConfig  = "config"
 	reasonStartup = "startup"
@@ -58,8 +59,36 @@ var allowed = map[site]entry{
 	{"cmd/tickets_migrate_grilling.go", ruleHomeDir}:      {1, reasonStartup},
 	{"codexsession/session.go", ruleEnvRead}:              {1, reasonRemove},
 	{"codexsession/session.go", ruleHomeDir}:              {1, reasonRemove},
-	{"config/config.go", ruleHomeDir}:                     {2, reasonConfig},
-	{"config/dirs.go", ruleHomeDir}:                       {1, reasonConfig},
+	{"cmd/brief.go", ruleConfigEnv}:                       {1, reasonRemove},
+	{"cmd/check.go", ruleConfigEnv}:                       {1, reasonRemove},
+	{"cmd/cmd.go", ruleConfigEnv}:                         {4, reasonRemove},
+	{"cmd/commands.go", ruleConfigEnv}:                    {1, reasonRemove},
+	{"cmd/evolve.go", ruleConfigEnv}:                      {2, reasonRemove},
+	{"cmd/merge.go", ruleConfigEnv}:                       {1, reasonRemove},
+	{"cmd/operations.go", ruleConfigEnv}:                  {4, reasonRemove},
+	{"cmd/recovery.go", ruleConfigEnv}:                    {1, reasonRemove},
+	{"cmd/server.go", ruleConfigEnv}:                      {13, reasonRemove},
+	{"cmd/server_agents.go", ruleConfigEnv}:               {1, reasonRemove},
+	{"cmd/server_repair.go", ruleConfigEnv}:               {1, reasonRemove},
+	{"cmd/server_web.go", ruleConfigEnv}:                  {2, reasonRemove},
+	{"cmd/stashify.go", ruleConfigEnv}:                    {1, reasonRemove},
+	{"cmd/ticket_ref.go", ruleConfigEnv}:                  {1, reasonRemove},
+	{"cmd/tickets_epic_add.go", ruleConfigEnv}:            {1, reasonRemove},
+	{"cmd/tickets_finish_guard.go", ruleConfigEnv}:        {1, reasonRemove},
+	{"cmd/tickets_migrate.go", ruleConfigEnv}:             {1, reasonRemove},
+	{"cmd/tickets_move.go", ruleConfigEnv}:                {1, reasonRemove},
+	{"cmd/ui.go", ruleConfigEnv}:                          {8, reasonRemove},
+	{"conversations/conversations.go", ruleConfigEnv}:     {1, reasonRemove},
+	{"server/server.go", ruleConfigEnv}:                   {2, reasonStartup},
+	{"skills/manifest.go", ruleConfigEnv}:                 {1, reasonRemove},
+	{"sound/sound.go", ruleConfigEnv}:                     {2, reasonStartup},
+	{"tickets/store.go", ruleConfigEnv}:                   {1, reasonRemove},
+	{"ui/agents/create.go", ruleConfigEnv}:                {1, reasonRemove},
+	{"ui/agents/focus.go", ruleConfigEnv}:                 {1, reasonRemove},
+	{"ui/agents/model.go", ruleConfigEnv}:                 {1, reasonRemove},
+	{"ui/notifyhistory/export.go", ruleConfigEnv}:         {1, reasonRemove},
+	{"ui/tickets/transcript.go", ruleConfigEnv}:           {1, reasonRemove},
+	{"ui/tickets/watch_agent.go", ruleConfigEnv}:          {1, reasonRemove},
 	{"git/delta.go", ruleChildEnv}:                        {1, reasonRemove},
 	{"git/delta.go", ruleHomeDir}:                         {1, reasonRemove},
 	{"git/pr.go", ruleChildEnv}:                           {1, reasonRemove},
@@ -117,21 +146,34 @@ func selector(e ast.Expr, pkg string, names ...string) bool {
 	return slices.Contains(names, sel.Sel.Name)
 }
 
+// configEnvFuncs are config's package functions that resolve their dirs from
+// the process env. Code outside config/ calls config.DirsFrom(env) instead.
+var configEnvFuncs = []string{
+	"DataDir", "StateDir", "UserStateDir", "UserConfigDir", "UserCacheDir",
+	"FilePath", "Load", "LoadRunnerWait", "Init",
+}
+
 func isCommand(e ast.Expr) bool {
 	call, ok := e.(*ast.CallExpr)
 	return ok && selector(call.Fun, "exec", "Command", "CommandContext")
 }
 
-// scan counts the banned reads in one source file, keyed by rule.
-func scan(src string) (map[string]int, error) {
+// scan counts the banned reads in one source file, keyed by rule. path is the
+// file's repo path: config/ itself may use its own functions.
+func scan(path, src string) (map[string]int, error) {
 	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, "x.go", src, 0)
+	f, err := parser.ParseFile(fset, path, src, 0)
 	if err != nil {
 		return nil, err
 	}
+	inConfig := strings.HasPrefix(path, "config/")
 	counts := map[string]int{}
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch fn := n.(type) {
+		case *ast.SelectorExpr:
+			if !inConfig && selector(fn, "config", configEnvFuncs...) {
+				counts[ruleConfigEnv]++
+			}
 		case *ast.FuncDecl:
 			if fn.Body != nil {
 				countChildren(fn.Body, counts)
@@ -218,7 +260,7 @@ func scanTree(t *testing.T) map[site]int {
 		if err != nil {
 			t.Fatal(err)
 		}
-		counts, err := scan(string(src))
+		counts, err := scan(path, string(src))
 		if err != nil {
 			t.Fatalf("%s: %v", path, err)
 		}
@@ -277,11 +319,20 @@ func TestScan(t *testing.T) {
 		{"context command without env", "cmd := exec.CommandContext(ctx, \"x\")\n\t_ = cmd.Run()", ruleChildEnv, 1},
 		{"inline", `exec.Command("x").Output()`, ruleChildEnv, 1},
 		{"var decl with env", "var cmd = exec.Command(\"x\")\n\tcmd.Env = env", ruleChildEnv, 0},
+		{"config call", `config.Load()`, ruleConfigEnv, 1},
+		{"config function value", `x := config.StateDir; _ = x`, ruleConfigEnv, 1},
+		{"method on Dirs", `cfg.Load()`, ruleConfigEnv, 0},
+		{"Dirs from env", `config.DirsFrom(env).Load()`, ruleConfigEnv, 0},
+		{"inside config", `config.Load()`, ruleConfigEnv, 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			src := "package x\nfunc f() {\n\t" + c.body + "\n}\n"
-			got, err := scan(src)
+			path := "x.go"
+			if c.name == "inside config" {
+				path = "config/x.go"
+			}
+			got, err := scan(path, src)
 			if err != nil {
 				t.Fatal(err)
 			}

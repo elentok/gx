@@ -16,32 +16,13 @@ import (
 // (e.g. ~/Library/Application Support on macOS, or $XDG_CONFIG_HOME when
 // set). It's the single source of truth other gx packages call into for
 // this decision.
-func UserConfigDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".config"), nil
-}
+func UserConfigDir() (string, error) { return DirsFrom(os.Environ()).UserConfigDir() }
 
-// UserCacheDir hardcodes ~/.cache as gx's cache base directory on every
-// platform, mirroring UserConfigDir's deliberate bypass of per-OS/XDG
-// resolution.
-func UserCacheDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".cache"), nil
-}
+// UserCacheDir is DirsFrom(os.Environ()).UserCacheDir.
+func UserCacheDir() (string, error) { return DirsFrom(os.Environ()).UserCacheDir() }
 
-// UserStateDir is the runtime-state base directory: ~/.local/state on every
-// platform, or XDG_STATE_HOME when set. Runtime state (notifications-state.json)
-// lives here rather than under UserConfigDir,
-// which is reserved for user-edited config (config.json).
-func UserStateDir() (string, error) {
-	return xdgBase("XDG_STATE_HOME", ".local", "state")
-}
+// UserStateDir is DirsFrom(os.Environ()).UserStateDir.
+func UserStateDir() (string, error) { return DirsFrom(os.Environ()).UserStateDir() }
 
 var userConfigDirFn = UserConfigDir
 var userStateDirFn = UserStateDir
@@ -146,7 +127,9 @@ const DefaultRecentlyFinished = 5
 const DefaultWebDevURL = "http://127.0.0.1:5173"
 
 // Default returns the default configuration.
-func Default() Config {
+func Default() Config { return defaultWith(DataDir) }
+
+func defaultWith(dataDir func() (string, error)) Config {
 	return Config{
 		UseNerdFontIcons:      true,
 		ImageDiffs:            true,
@@ -159,7 +142,7 @@ func Default() Config {
 		Skills:                DefaultSkillsConfig(),
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
-		TicketStore:           DefaultTicketStoreConfig(),
+		TicketStore:           ticketStoreConfigWith(dataDir),
 		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished, Web: WebConfig{DevURL: DefaultWebDevURL}},
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		CPUWatchdog:           DefaultCPUWatchdogConfig(),
@@ -181,19 +164,23 @@ func LoadRunnerWait() time.Duration {
 	return cfg.RunnerWait
 }
 
-// FilePath returns the config file path, typically ~/.config/gx/config.json.
-func FilePath() (string, error) {
-	base, err := userConfigDirFn()
+func configFilePath(userConfigDir func() (string, error)) (string, error) {
+	base, err := userConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve user config dir: %w", err)
 	}
 	return filepath.Join(base, "gx", "config.json"), nil
 }
 
+// FilePath returns the config file path, typically ~/.config/gx/config.json.
+func FilePath() (string, error) { return configFilePath(userConfigDirFn) }
+
 // Load reads user config from disk. Missing file returns defaults.
-func Load() (Config, error) {
-	cfg := Default()
-	path, err := FilePath()
+func Load() (Config, error) { return loadFrom(FilePath, DataDir) }
+
+func loadFrom(filePath, dataDir func() (string, error)) (Config, error) {
+	cfg := defaultWith(dataDir)
+	path, err := filePath()
 	if err != nil {
 		return cfg, err
 	}
@@ -205,7 +192,7 @@ func Load() (Config, error) {
 		}
 		return cfg, fmt.Errorf("read config %s: %w", path, err)
 	}
-	cfg, err = Parse(data)
+	cfg, err = parseWith(data, dataDir)
 	if err != nil {
 		return cfg, fmt.Errorf("config %s: %w", path, err)
 	}
@@ -213,8 +200,10 @@ func Load() (Config, error) {
 }
 
 // Parse decodes config file bytes over the defaults and validates them.
-func Parse(data []byte) (Config, error) {
-	cfg := Default()
+func Parse(data []byte) (Config, error) { return parseWith(data, DataDir) }
+
+func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
+	cfg := defaultWith(dataDir)
 	var raw struct {
 		UseNerdFontIcons      *bool             `json:"use-nerdfont-icons"`
 		ImageDiffs            *bool             `json:"image-diffs"`
@@ -585,8 +574,10 @@ func clampStageDiffContext(n int) int {
 
 // Init writes the default config file and returns its path.
 // It returns an error if the file already exists.
-func Init() (string, error) {
-	path, err := FilePath()
+func Init() (string, error) { return initAt(FilePath) }
+
+func initAt(filePath func() (string, error)) (string, error) {
+	path, err := filePath()
 	if err != nil {
 		return "", err
 	}
