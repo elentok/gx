@@ -80,10 +80,12 @@ func setSavedRunner(t *testing.T, h *servertest.Harness, name string) {
 func waitStatus(t *testing.T, ticketPath string, want schema.Status) {
 	t.Helper()
 	var tk schema.Ticket
+	var parseErr error
 	if !servertest.Poll(30*time.Second, func() bool {
-		var err error
-		if tk, err = schema.ParseTicket(ticketPath); err != nil {
-			t.Fatal(err)
+		// A read can land between a rewrite's truncate and its content under load:
+		// a ticket that does not parse yet is not at the wanted status yet.
+		if tk, parseErr = schema.ParseTicket(ticketPath); parseErr != nil {
+			return false
 		}
 		// A legacy asking / stuck want means paused in that class.
 		if class := legacyClass(want); class != "" {
@@ -92,7 +94,7 @@ func waitStatus(t *testing.T, ticketPath string, want schema.Status) {
 		return tk.Status == want
 	}) {
 		body, _ := os.ReadFile(ticketPath)
-		t.Fatalf("status = %q, want %q:\n%s", tk.Status, want, body)
+		t.Fatalf("status = %q, want %q (last parse error: %v):\n%s", tk.Status, want, parseErr, body)
 	}
 }
 

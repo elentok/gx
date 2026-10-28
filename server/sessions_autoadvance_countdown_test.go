@@ -14,7 +14,7 @@ import (
 
 const (
 	runEndText     = "Done.\n✅ Map: drafted. Next: start a fresh session"
-	countdownDelay = 500 * time.Millisecond
+	countdownDelay = time.Second
 )
 
 // endTurn runs a working-then-idle turn on the session.
