@@ -79,7 +79,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
       <Box display="flex" alignItems="center" gap="2">
         {queueChip && <Chip tone="waiting">{queueChip}</Chip>}
         {!connected && <LiveDot tone="muted" label="Offline" />}
-        {health && <Tray health={health} />}
+        {health && <Tray health={health} connected={connected} />}
         {(onToggleAfk || build) && (
           <Menu.Root closeOnSelect={false} lazyMount unmountOnExit positioning={{ placement: "bottom-end" }}>
             <Menu.Trigger asChild>

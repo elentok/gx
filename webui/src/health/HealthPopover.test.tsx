@@ -1,4 +1,5 @@
 import { act, fireEvent, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Health, HealthDisk, HealthReport } from "../generated/server";
 import { renderThemed } from "../ui/render";
@@ -181,5 +182,66 @@ describe("Tray popover", () => {
     expect(getByText("Updated 2s ago")).toBeTruthy();
     await act(() => vi.advanceTimersByTimeAsync(3000));
     expect(getByText("Updated 5s ago")).toBeTruthy();
+  });
+});
+
+describe("Tray offline", () => {
+  beforeEach(() => sessionStorage.clear());
+
+  const openWith = async (connected: boolean) => {
+    const view = renderThemed(<Tray health={trayHealth} connected={connected} />);
+    fireEvent.click(view.getByRole("button", { name: /^System health/ }));
+    return view;
+  };
+
+  it("fades the Tray while offline and keeps its levels, with no offline text of its own", () => {
+    const { getByRole } = renderThemed(<Tray health={trayHealth} connected={false} />);
+    const tray = getByRole("button", { name: /^System health/ });
+    expect(tray.hasAttribute("data-stale")).toBe(true);
+    expect(tray.querySelector("[data-meter=C]")!.getAttribute("data-state")).toBe("high");
+    expect(tray.textContent).toBe("CMD");
+  });
+
+  it("is not faded while connected", () => {
+    const { getByRole } = renderThemed(<Tray health={trayHealth} />);
+    expect(getByRole("button", { name: /^System health/ }).hasAttribute("data-stale")).toBe(false);
+  });
+
+  it("keeps the last values offline, counts the age up, stops polling and fetches on reconnect", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let setConnected: (c: boolean) => void = () => {};
+    const Harness = () => {
+      const [connected, set] = useState(true);
+      setConnected = set;
+      return <Tray health={trayHealth} connected={connected} />;
+    };
+    const view = renderThemed(<Harness />);
+    fireEvent.click(view.getByRole("button", { name: /^System health/ }));
+    await view.findByText("gx server");
+    act(() => setConnected(false));
+    fetchMock.mockClear();
+    await act(() => vi.advanceTimersByTimeAsync(3 * 60 * 1000));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(view.getByText("81% busy")).toBeTruthy();
+    expect(view.getByText("Offline. Values from 3m ago.")).toBeTruthy();
+    act(() => setConnected(true));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/v1/health"));
+  });
+
+  it("uses the cached response after a reload while offline", async () => {
+    const first = await openTray();
+    first.unmount();
+    fetchMock.mockClear();
+    const { findByText } = await openWith(false);
+    expect(await findByText("81% busy")).toBeTruthy();
+    expect(await findByText(/^Offline\. Values from/)).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("shows the snapshot states and says no values were fetched with no cache", async () => {
+    const { findByText } = await openWith(false);
+    expect(await findByText("Offline. No values were fetched.")).toBeTruthy();
+    expect(document.querySelector("[data-part=cpu]")!.getAttribute("data-state")).toBe("high");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

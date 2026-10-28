@@ -1,6 +1,7 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useEffect, useState, type ReactNode } from "react";
-import type { DisksReport, HealthDisk, HealthReason, HealthReport, HealthState, HealthThresholds } from "../generated/server";
+import type { DisksReport, Health, HealthDisk, HealthReason, HealthReport, HealthState, HealthThresholds } from "../generated/server";
+import { readPageCache, writePageCache } from "../pageCache";
 import { fetchJson } from "../ticket/detail";
 import { STATE_COLOR } from "../ui/tray/stateColor";
 
@@ -59,27 +60,46 @@ const diskGB = (bytes: number) => {
 
 const thresholdText = (t: HealthThresholds) => `high at ${t.high}%, critical at ${t.critical}%`;
 
-export function HealthPopover() {
-  const [received, setReceived] = useState<Received | null>(null);
+const CACHE_KEY = "health";
+
+const METER_NAMES = [
+  { key: "cpu", name: "CPU", icon: CPU_ICON },
+  { key: "memory", name: "Memory", icon: MEMORY_ICON },
+  { key: "disk", name: "Disk", icon: DISK_ICON },
+] as const;
+
+export function HealthPopover({ health, connected = true }: { health: Health; connected?: boolean }) {
+  // The cache survives a reload, so an offline reload still has values.
+  const [received, setReceived] = useState<Received | null>(() => readPageCache<Received>(CACHE_KEY));
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, []);
+
+  // Offline stops the polling; reconnecting runs this again, which fetches at once.
+  useEffect(() => {
+    if (!connected) return;
     let live = true;
     const load = () =>
       fetchJson<HealthReport>("/v1/health", "health")
-        .then((res) => live && res.kind === "ok" && setReceived({ report: res.detail, at: Date.now() }))
+        .then((res) => {
+          if (!live || res.kind !== "ok") return;
+          const next = { report: res.detail, at: Date.now() };
+          writePageCache(CACHE_KEY, next);
+          setReceived(next);
+        })
         .catch(() => {});
     load();
     const poll = setInterval(load, POLL_MS);
-    const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => {
       live = false;
       clearInterval(poll);
-      clearInterval(tick);
     };
-  }, []);
+  }, [connected]);
 
-  if (!received) return null;
+  if (!received) return connected ? null : <SnapshotRows health={health} />;
   const { report, at } = received;
   const { cpu, memory } = report;
   const pressure = memory.pressure ? ` · macOS pressure: ${memory.pressure}` : "";
@@ -121,7 +141,27 @@ export function HealthPopover() {
       />
       <DiskRow disks={report.disks} serverTime={report.time} />
       <Text px="14px" pt="2" pb="6px" borderTopWidth="1px" borderColor="hairline" fontSize="xs" color="text.faint" data-part="footer">
-        {footer(report, at, now)}
+        {connected ? footer(report, at, now) : offlineFooter(at, now)}
+      </Text>
+    </Box>
+  );
+}
+
+// The values are as old as the server's last response, plus the browser time since it arrived.
+function offlineFooter(receivedAt: number, now: number): string {
+  const seconds = Math.max(0, Math.floor((now - receivedAt) / 1000));
+  return `Offline. Values from ${seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`} ago.`;
+}
+
+// Offline with nothing cached: the Tray's snapshot states are all there is.
+function SnapshotRows({ health }: { health: Health }) {
+  return (
+    <Box py="1">
+      {METER_NAMES.map(({ key, name, icon }) => (
+        <Row key={key} part={key} icon={icon} name={name} state={health[key].state} value="—" sub={`State: ${health[key].state}`} />
+      ))}
+      <Text px="14px" pt="2" pb="6px" borderTopWidth="1px" borderColor="hairline" fontSize="xs" color="text.faint" data-part="footer">
+        Offline. No values were fetched.
       </Text>
     </Box>
   );

@@ -16,7 +16,7 @@ export function trayLabel(health: Health): string {
   return `System health: ${METERS.map(({ key, name }) => `${name} ${health[key].state}`).join("; ")}`;
 }
 
-export function Tray({ health }: { health: Health }) {
+export function Tray({ health, connected = true }: { health: Health; connected?: boolean }) {
   // The body mounts only while open, so its polling starts and stops with the popover.
   return (
     <Popover.Root positioning={{ placement: "bottom-end" }} lazyMount unmountOnExit>
@@ -34,6 +34,8 @@ export function Tray({ health }: { health: Health }) {
           borderColor="transparent"
           borderRadius="md"
           cursor="pointer"
+          opacity={connected ? 1 : 0.45}
+          data-stale={connected ? undefined : ""}
           _hover={{ bg: "tone.muted.bg", borderColor: "border" }}
         >
           {METERS.map(({ key, letter }) => (
@@ -54,7 +56,7 @@ export function Tray({ health }: { health: Health }) {
             color="text"
             w="min(320px, calc(100vw - 32px))"
           >
-            <HealthPopover />
+            <HealthPopover health={health} connected={connected} />
           </Popover.Content>
         </Popover.Positioner>
       </Portal>
