@@ -109,7 +109,8 @@ func newServerAgentsCmd(d deps) *cobra.Command {
 			}
 			ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			loc := agentlog.Locator{StateDir: stateDir, Herdr: herdrIteration(d.dial())}
+			home, _ := d.dirs().Home()
+			loc := agentlog.Locator{StateDir: stateDir, Home: home, Herdr: herdrIteration(d.dial())}
 			log, err := loc.AgentLog(ctx, a)
 			if err != nil {
 				return err

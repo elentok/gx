@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -258,7 +259,7 @@ func newTicketMenuInput(epic tickets.Epic, ticket tickets.Ticket, herdrDown bool
 
 // cmdTicketMenu resolves liveness in a Cmd (it shells out to ps), so the menu
 // opens once the result comes back.
-func cmdTicketMenu(api ServerAPI, in ticketMenuInput) tea.Cmd {
+func cmdTicketMenu(api ServerAPI, dirs config.Dirs, in ticketMenuInput) tea.Cmd {
 	address := in.ticket.Path
 	// A row's Path is its address and its epic is "project:epic"; the herdr
 	// launches want the bare epic.
@@ -269,7 +270,7 @@ func cmdTicketMenu(api ServerAPI, in ticketMenuInput) tea.Cmd {
 		api := snapshotIterations(api)
 		it, live := serverIteration(api, address)
 		in.paneLive = live && it.Tab != ""
-		in.watchReason = watchReason(api, agentAddress(address, target.ticketID))
+		in.watchReason = watchReason(api, dirs, agentAddress(address, target.ticketID))
 		var err error
 		in.detail, err = ticketDetail(api, address)
 		return ticketMenuReadyMsg{target: target, prompt: prompt, items: ticketMenuItems(in), detailErr: err}
@@ -307,7 +308,7 @@ func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket, archived
 	in.archived = archived
 	in.session = ticketSession(m.vm.Sessions, epic.Path, ticket)
 	m.ticketMenuPending = ticket.Path
-	return m, cmdTicketMenu(m.serverAPI, in)
+	return m, cmdTicketMenu(m.serverAPI, m.settings.Dirs, in)
 }
 
 // menuAnchor is the selected sidebar row on screen, under the panel's

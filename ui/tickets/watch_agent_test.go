@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/agentlog"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 )
@@ -20,10 +21,10 @@ const watchLogLine = `{"type":"assistant","message":{"role":"assistant","content
 
 func fakeNativeLog(t *testing.T, log agentlog.Log, err error) {
 	t.Helper()
-	fakeAgentLog(t, func(context.Context, string, herdrLookup) (agentlog.Log, error) { return log, err })
+	fakeAgentLog(t, func(context.Context, config.Dirs, string, herdrLookup) (agentlog.Log, error) { return log, err })
 }
 
-func fakeAgentLog(t *testing.T, f func(context.Context, string, herdrLookup) (agentlog.Log, error)) {
+func fakeAgentLog(t *testing.T, f func(context.Context, config.Dirs, string, herdrLookup) (agentlog.Log, error)) {
 	t.Helper()
 	prev := agentLog
 	t.Cleanup(func() { agentLog = prev })
@@ -37,7 +38,7 @@ func TestWatchAgent_RendersLogInModal(t *testing.T) {
 	}
 	fakeNativeLog(t, agentlog.Log{Path: path}, nil)
 
-	loaded, ok := cmdWatchAgent(nil, "gx:epic/01")().(watchLoadedMsg)
+	loaded, ok := cmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")().(watchLoadedMsg)
 	if !ok {
 		t.Fatal("expected watchLoadedMsg")
 	}
@@ -75,7 +76,7 @@ func openLiveWatch(t *testing.T, texts ...string) (m Model, path string, ended *
 	fakeNativeLog(t, agentlog.Log{Path: path, Ended: func() bool { return *ended }}, nil)
 	m = newServerModel(t)
 	next, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
-	next, tick = next.(Model).Update(cmdWatchAgent(nil, "gx:epic/01")())
+	next, tick = next.(Model).Update(cmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")())
 	t.Cleanup(func() {
 		if m.watch.tail != nil {
 			m.watch.tail.Close()
@@ -217,7 +218,7 @@ func TestWatchAgent_PtyShowsConversation(t *testing.T) {
 	appendWatchLog(t, path, "pty conversation")
 	fakeNativeLog(t, agentlog.Log{Path: path, PtyDir: "/pty/dir"}, nil)
 
-	loaded := cmdWatchAgent(nil, "gx:epic/01")().(watchLoadedMsg)
+	loaded := cmdWatchAgent(nil, config.Dirs{}, "gx:epic/01")().(watchLoadedMsg)
 	t.Cleanup(func() { loaded.tail.Close() })
 	if view := (watchModal{}).Open(loaded, 120, 40).View(); !strings.Contains(view, "pty conversation") {
 		t.Errorf("modal missing the pty agent's conversation:\n%s", view)
@@ -229,7 +230,7 @@ func TestWatchAgent_PtyShowsConversation(t *testing.T) {
 func failOnNativeLog(t *testing.T) (undo func()) {
 	t.Helper()
 	prev := agentLog
-	agentLog = func(context.Context, string, herdrLookup) (agentlog.Log, error) {
+	agentLog = func(context.Context, config.Dirs, string, herdrLookup) (agentlog.Log, error) {
 		t.Error("native liveness resolved on the Update goroutine")
 		return agentlog.Log{}, agentlog.ErrNoAgent
 	}
@@ -239,7 +240,7 @@ func failOnNativeLog(t *testing.T) (undo func()) {
 func TestWatch_ResolvesLivenessInCmd(t *testing.T) {
 	fakeNativeLog(t, agentlog.Log{}, agentlog.ErrNoAgent)
 	undo := failOnNativeLog(t)
-	cmd := cmdWatchAgent(fakeServerAPI{}, "gx:epic/01")
+	cmd := cmdWatchAgent(fakeServerAPI{}, config.Dirs{}, "gx:epic/01")
 	undo()
 	cmd()
 }
@@ -385,7 +386,7 @@ func TestWatch_NoServerOpensHeadlessAndPty(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			log.Path = watchLogFile(t)
-			fakeAgentLog(t, func(_ context.Context, address string, _ herdrLookup) (agentlog.Log, error) {
+			fakeAgentLog(t, func(_ context.Context, _ config.Dirs, address string, _ herdrLookup) (agentlog.Log, error) {
 				if !strings.HasSuffix(address, ":my-epic/01") {
 					return agentlog.Log{}, agentlog.ErrNoAgent
 				}
@@ -441,7 +442,7 @@ func TestWatchReason_NativeLog(t *testing.T) {
 	}
 	for _, c := range cases {
 		fakeNativeLog(t, c.log, c.err)
-		if got := watchReason(fakeServerAPI{}, "gx:epic/01"); got != c.want {
+		if got := watchReason(fakeServerAPI{}, config.Dirs{}, "gx:epic/01"); got != c.want {
 			t.Errorf("%s: watchReason = %q, want %q", c.name, got, c.want)
 		}
 	}
@@ -452,7 +453,7 @@ func TestWatchReason_NativeLog(t *testing.T) {
 func fakeHerdrOnlyLog(t *testing.T) {
 	t.Helper()
 	stateDir := t.TempDir()
-	fakeAgentLog(t, func(ctx context.Context, address string, herdr herdrLookup) (agentlog.Log, error) {
+	fakeAgentLog(t, func(ctx context.Context, _ config.Dirs, address string, herdr herdrLookup) (agentlog.Log, error) {
 		a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 		if err != nil {
 			return agentlog.Log{}, err

@@ -36,16 +36,17 @@ const maxWatchLines = 2000
 type herdrLookup = func(ctx context.Context, address string) (agentlog.HerdrIteration, bool, error)
 
 // agentLog is a package-level seam so tests can fake the agent log.
-var agentLog = func(ctx context.Context, address string, herdr herdrLookup) (agentlog.Log, error) {
+var agentLog = func(ctx context.Context, dirs config.Dirs, address string, herdr herdrLookup) (agentlog.Log, error) {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		return agentlog.Log{}, err
 	}
-	stateDir, err := config.StateDir()
+	stateDir, err := dirs.StateDir()
 	if err != nil {
 		return agentlog.Log{}, err
 	}
-	return agentlog.Locator{StateDir: stateDir, Herdr: herdr}.AgentLog(ctx, a)
+	home, _ := dirs.Home()
+	return agentlog.Locator{StateDir: stateDir, Home: home, Herdr: herdr}.AgentLog(ctx, a)
 }
 
 // errServerDown marks a herdr lookup whose server didn't answer.
@@ -85,8 +86,8 @@ const notForCodex = "not supported for codex"
 
 // watchReason is why Watch can't open address's agent log, empty when it
 // can, whether the agent still runs or has ended.
-func watchReason(api ServerAPI, address string) string {
-	log, err := agentLog(context.Background(), address, serverHerdrLookup(api))
+func watchReason(api ServerAPI, dirs config.Dirs, address string) string {
+	log, err := agentLog(context.Background(), dirs, address, serverHerdrLookup(api))
 	switch {
 	case err == nil && !log.Pruned:
 		return ""
@@ -280,9 +281,9 @@ func (w watchModal) View() string {
 // renderer and tail stepper as `gx server agents watch`. A pty or herdr
 // agent's log is its conversation transcript, not its terminal screen. The
 // tail stays on this run's log, so a later resumed run is not followed.
-func cmdWatchAgent(api ServerAPI, address string) tea.Cmd {
+func cmdWatchAgent(api ServerAPI, dirs config.Dirs, address string) tea.Cmd {
 	return func() tea.Msg {
-		log, err := agentLog(context.Background(), address, serverHerdrLookup(api))
+		log, err := agentLog(context.Background(), dirs, address, serverHerdrLookup(api))
 		if err != nil {
 			return notify.Error("watch: " + err.Error())()
 		}

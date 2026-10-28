@@ -28,7 +28,7 @@ func (m QueueModel) handleQueueTicketMenuKey() (tea.Model, tea.Cmd) {
 	in := newTicketMenuInput(r.epic, r.ticket, m.settings.HerdrUnavailable, serverReason(m.serverAPI, m.link))
 	in.onQueue, in.hasProposal = true, hasPendingProposal(r.ticket.Body)
 	m.ticketMenuPending = r.ticket.Path
-	return m, cmdTicketMenu(m.serverAPI, in)
+	return m, cmdTicketMenu(m.serverAPI, m.settings.Dirs, in)
 }
 
 // selectedQueuePath is the selected ticket row's path, or "" off a ticket.

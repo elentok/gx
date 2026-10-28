@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/agentlog"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -405,7 +406,7 @@ func TestCmdTicketMenu_FetchesIterationsOnce(t *testing.T) {
 	api := countingIterationsAPI{fakeServerAPI: fakeServerAPI{}, calls: &calls}
 	in := newTicketMenuInput(gxtickets.Epic{}, gxtickets.Ticket{Path: "gx:alpha/01", Title: "First"}, false, "")
 
-	cmdTicketMenu(api, in)()
+	cmdTicketMenu(api, config.Dirs{}, in)()
 
 	if calls != 1 {
 		t.Errorf("Iterations calls = %d, want 1", calls)

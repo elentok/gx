@@ -4,7 +4,6 @@ package sessionlookup
 
 import (
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -31,22 +30,9 @@ type Roots struct {
 	CodexHome string
 }
 
-// DefaultRoots are the user's own roots: $HOME, and $CODEX_HOME falling back
-// to ~/.codex. An unknown home leaves its roots empty.
-func DefaultRoots() Roots {
-	var r Roots
-	if home, err := os.UserHomeDir(); err == nil {
-		r.Home = home
-		r.CodexHome = filepath.Join(home, ".codex")
-	}
-	if v := os.Getenv("CODEX_HOME"); v != "" {
-		r.CodexHome = v
-	}
-	return r
-}
-
-// RootsFrom is DefaultRoots over env (KEY=VALUE entries) instead of the process
-// env. An env with no HOME leaves the home roots empty.
+// RootsFrom are the user's own roots over env (KEY=VALUE entries): the home,
+// and $CODEX_HOME falling back to ~/.codex. An unknown home leaves its roots
+// empty. env is the caller's, never the process env.
 func RootsFrom(env []string) Roots {
 	dirs := config.DirsFrom(env)
 	var r Roots

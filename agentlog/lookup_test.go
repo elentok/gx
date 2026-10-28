@@ -99,10 +99,9 @@ func TestAgentLog_FinishedNative(t *testing.T) {
 
 func TestAgentLog_Pruned(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 	stateDir := t.TempDir()
 	writeAgentDir(t, stateDir, false)
-	l, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,14 +112,13 @@ func TestAgentLog_Pruned(t *testing.T) {
 
 func TestAgentLog_PtyReadsTheTranscript(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 	stateDir := t.TempDir()
 	dir := writeRunnerDir(t, stateDir, "pty", nativerunner.RawLogFile)
 	procs := fakeProcs{
 		41: {Start: "t0", Cmdline: "gx agent-holder --session-id " + session},
 		42: liveProcs[42],
 	}
-	l, err := agentlog.Locator{StateDir: stateDir, Procs: procs, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: procs, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +136,6 @@ func TestAgentLog_PtyReadsTheTranscript(t *testing.T) {
 
 func TestAgentLog_TranscriptUnderAnotherProjectDir(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 	stateDir := t.TempDir()
 	writeRunnerDir(t, stateDir, "pty", nativerunner.RawLogFile)
 	// The launcher wrote the transcript under the epic's dir, not the worktree's.
@@ -149,7 +146,7 @@ func TestAgentLog_TranscriptUnderAnotherProjectDir(t *testing.T) {
 	if err := os.WriteFile(want, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	l, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,10 +177,9 @@ func TestAgentLog_HerdrTranscriptUnderAnotherProjectDir(t *testing.T) {
 
 func TestAgentLog_PtyPruned(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
 	stateDir := t.TempDir()
 	dir := writeRunnerDir(t, stateDir, "pty", "")
-	l, err := agentlog.Locator{StateDir: stateDir, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	l, err := agentlog.Locator{StateDir: stateDir, Home: home, Procs: fakeProcs{}, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
 	if err != nil {
 		t.Fatal(err)
 	}

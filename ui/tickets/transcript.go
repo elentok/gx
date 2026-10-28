@@ -22,20 +22,20 @@ import (
 const actionTranscript = "transcript"
 
 // lookupSession is a package-level seam so tests can fake the session lookup.
-var lookupSession = func(agentDir, id string) (sessionlookup.Session, error) {
-	return sessionlookup.Lookup(sessionlookup.DefaultRoots(), agentDir, id)
+var lookupSession = func(dirs config.Dirs, agentDir, id string) (sessionlookup.Session, error) {
+	return sessionlookup.Lookup(sessionlookup.RootsFrom(dirs.Environ()), agentDir, id)
 }
 
 // cmdTranscript renders the latest of file's session_ids as markdown.
 // address ("" or unparseable skips it) locates the native agent dir.
-func cmdTranscript(file, address string, width int) tea.Cmd {
-	return cmdTranscriptAt(file, address, width, -1)
+func cmdTranscript(dirs config.Dirs, file, address string, width int) tea.Cmd {
+	return cmdTranscriptAt(dirs, file, address, width, -1)
 }
 
 // cmdTranscriptAt renders file's session_ids[index], the latest when index is
 // out of range. The ticket is re-read on every step so a session claimed
 // since the last refresh shows.
-func cmdTranscriptAt(file, address string, width, index int) tea.Cmd {
+func cmdTranscriptAt(dirs config.Dirs, file, address string, width, index int) tea.Cmd {
 	return func() tea.Msg {
 		t, err := schema.ParseTicket(file)
 		if err != nil {
@@ -49,7 +49,7 @@ func cmdTranscriptAt(file, address string, width, index int) tea.Cmd {
 			index = n - 1
 		}
 		id := t.SessionIDs[index]
-		s, err := lookupSession(nativeAgentDir(address), id)
+		s, err := lookupSession(dirs, nativeAgentDir(dirs, address), id)
 		if err != nil {
 			return notify.Error("transcript: " + err.Error())()
 		}
@@ -62,7 +62,7 @@ func cmdTranscriptAt(file, address string, width, index int) tea.Cmd {
 			if next < 0 || next >= n {
 				return nil
 			}
-			return cmdTranscriptAt(file, address, width, next)
+			return cmdTranscriptAt(dirs, file, address, width, next)
 		}
 		title := fmt.Sprintf("Transcript %s · session %d/%d", id, index+1, n)
 		return watchLoadedMsg{title: title, lines: strings.Split(md, "\n"), step: step}
@@ -71,12 +71,12 @@ func cmdTranscriptAt(file, address string, width, index int) tea.Cmd {
 
 // nativeAgentDir is the native runner's agent dir for address, "" when it
 // can't be located.
-func nativeAgentDir(address string) string {
+func nativeAgentDir(dirs config.Dirs, address string) string {
 	a, err := tickets.ParseAddress(address, tickets.AddressContext{})
 	if err != nil {
 		return ""
 	}
-	stateDir, err := config.StateDir()
+	stateDir, err := dirs.StateDir()
 	if err != nil {
 		return ""
 	}

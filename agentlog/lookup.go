@@ -20,7 +20,18 @@ var (
 	// ErrUnsupported: herdr Codex agents have no log gx can read, and watch
 	// never scrapes panes.
 	ErrUnsupported = errors.New("watch is not supported for herdr codex agents")
+
+	errNoHome = errors.New("home directory unknown")
 )
+
+// transcriptPath is where claude keeps the transcript of the session started
+// in cwd, "" when the home is unknown.
+func (l Locator) transcriptPath(cwd, sessionID string) string {
+	if l.Home == "" {
+		return ""
+	}
+	return transcript.PathIn(l.Home, cwd, sessionID)
+}
 
 // Log is where one agent's log lives.
 type Log struct {
@@ -49,6 +60,9 @@ type HerdrIteration struct {
 // live herdr iteration.
 type Locator struct {
 	StateDir string
+	// Home is the user's home, where claude keeps its transcripts. Empty means
+	// unknown: a native claude agent then has no transcript path.
+	Home string
 	// Procs overrides the process table native liveness checks use.
 	Procs nativerunner.ProcessTable
 	// Herdr looks up a live herdr iteration by full ticket address. Nil
@@ -68,8 +82,7 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 			ptyDir = path
 		}
 		if d.Pruned() {
-			p, _ := transcript.Path(d.Meta.Cwd, d.Meta.SessionID)
-			return Log{Pruned: true, Transcript: p, PtyDir: ptyDir}, nil
+			return Log{Pruned: true, Transcript: l.transcriptPath(d.Meta.Cwd, d.Meta.SessionID), PtyDir: ptyDir}, nil
 		}
 		ended := func() bool {
 			d, err := nativerunner.OpenDir(path)
@@ -80,10 +93,10 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 			return err == nil && !live
 		}
 		if d.ReadsTranscript() {
-			p, err := transcript.Path(d.Meta.Cwd, d.Meta.SessionID)
-			if err != nil {
-				return Log{}, err
+			if l.Home == "" {
+				return Log{}, errNoHome
 			}
+			p := l.transcriptPath(d.Meta.Cwd, d.Meta.SessionID)
 			return Log{Path: transcript.Resolve(p), Ended: ended, PtyDir: ptyDir}, nil
 		}
 		return Log{Path: d.Log(), Offset: d.Meta.Offset, Ended: ended}, nil

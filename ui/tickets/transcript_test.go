@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/ui/notify"
 )
@@ -17,7 +18,7 @@ func fakeSessionLookup(t *testing.T, sessions map[string]string) {
 	t.Helper()
 	prev := lookupSession
 	t.Cleanup(func() { lookupSession = prev })
-	lookupSession = func(_, id string) (sessionlookup.Session, error) {
+	lookupSession = func(_ config.Dirs, _, id string) (sessionlookup.Session, error) {
 		md, ok := sessions[id]
 		if !ok {
 			return sessionlookup.Session{Source: sessionlookup.Missing}, nil
@@ -40,7 +41,7 @@ func TestTranscript_RendersLatestSessionInModal(t *testing.T) {
 	fakeSessionLookup(t, map[string]string{"old": "# old run", "new": "# latest run\n\nhello from the agent"})
 	path := writeTranscriptTicket(t, "session_ids:\n  - old\n  - new\n")
 
-	loaded, ok := cmdTranscript(path, "gx:epic/01", 120)().(watchLoadedMsg)
+	loaded, ok := cmdTranscript(config.Dirs{}, path, "gx:epic/01", 120)().(watchLoadedMsg)
 	if !ok {
 		t.Fatal("expected watchLoadedMsg")
 	}
@@ -77,7 +78,7 @@ func TestTranscript_StepsBetweenSessions(t *testing.T) {
 		}
 	}
 
-	m := open(cmdTranscript(path, "gx:epic/01", 120))
+	m := open(cmdTranscript(config.Dirs{}, path, "gx:epic/01", 120))
 	assertShows(m, "third run", "session 3/3")
 	if _, cmd := press(m, "]"); cmd != nil {
 		t.Error("] on the newest session stepped, want a no-op")
@@ -102,7 +103,7 @@ func TestTranscript_NoSessionsToast(t *testing.T) {
 	fakeSessionLookup(t, nil)
 	path := writeTranscriptTicket(t, "")
 
-	msg, ok := cmdTranscript(path, "gx:epic/01", 120)().(notify.NotifyMsg)
+	msg, ok := cmdTranscript(config.Dirs{}, path, "gx:epic/01", 120)().(notify.NotifyMsg)
 	if !ok || !strings.Contains(msg.Message, "no sessions") {
 		t.Errorf("msg = %#v, want a \"no sessions\" toast", msg)
 	}

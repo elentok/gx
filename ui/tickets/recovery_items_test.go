@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -143,7 +144,7 @@ func TestRecoveryItems_NoDetailOffersNone(t *testing.T) {
 func TestCmdTicketMenu_ReportsAFailedDetailRead(t *testing.T) {
 	api := fakeServerAPI{detailErr: errors.New("boom")}
 	ticket := tickets.Ticket{Path: "gx:alpha/02", Status: string(schema.StatusPaused), PauseReason: schema.PauseIterationError}
-	msg, ok := cmdTicketMenu(api, ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket})().(ticketMenuReadyMsg)
+	msg, ok := cmdTicketMenu(api, config.Dirs{}, ticketMenuInput{rendered: ticket.RawStatus(), ticket: ticket})().(ticketMenuReadyMsg)
 	if !ok {
 		t.Fatal("no ticketMenuReadyMsg")
 	}

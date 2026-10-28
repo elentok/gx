@@ -36,9 +36,9 @@ func dispatchMenuAction(api ServerAPI, worktreeRoot string, settings ui.Settings
 		return cmdLaunchInvestigate(worktreeRoot, result.EpicName, result.TicketID)
 	case actionTranscript:
 		file, address := resolveTicketPath(settings.TicketStore, result.Path)
-		return cmdTranscript(file, address, width)
+		return cmdTranscript(settings.Dirs, file, address, width)
 	case actionWatch:
-		return cmdWatchAgent(api, agentAddress(result.Path, result.TicketID))
+		return cmdWatchAgent(api, settings.Dirs, agentAddress(result.Path, result.TicketID))
 	case actionGoToPane:
 		return cmdServerFocusPane(api, result.Path)
 	}
