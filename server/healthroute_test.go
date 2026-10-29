@@ -19,8 +19,6 @@ const routeGB = 1_000_000_000
 // startHealthRoute starts a server with one watched disk and a steerable system source.
 func startHealthRoute(t *testing.T, fake *servertest.FakeSystem) *servertest.Harness {
 	t.Helper()
-	t.Setenv("HOME", t.TempDir())
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	store, repo := t.TempDir(), t.TempDir()
 	if err := os.MkdirAll(filepath.Join(store, "p"), 0o755); err != nil {
 		t.Fatal(err)
@@ -65,6 +63,7 @@ func healthRouteWhen(t *testing.T, h *servertest.Harness, what string, pred func
 }
 
 func TestHealthRoute_HostTimeCPUMemoryAndDisks(t *testing.T) {
+	t.Parallel()
 	fake := servertest.NewFakeSystem()
 	fake.SetBusy(30)
 	fake.SetMem(50)
@@ -94,6 +93,7 @@ func TestHealthRoute_HostTimeCPUMemoryAndDisks(t *testing.T) {
 }
 
 func TestHealthRoute_PressureOnlyWhenTheSourceSetsIt(t *testing.T) {
+	t.Parallel()
 	fake := servertest.NewFakeSystem()
 	h := startHealthRoute(t, fake)
 	rep := healthRouteWhen(t, h, "a memory reading", func(r server.HealthReport) bool { return r.Memory.TotalBytes > 0 })
@@ -105,6 +105,7 @@ func TestHealthRoute_PressureOnlyWhenTheSourceSetsIt(t *testing.T) {
 }
 
 func TestHealthRoute_UnknownCarriesItsReason(t *testing.T) {
+	t.Parallel()
 	fake := servertest.NewFakeSystem()
 	fake.Fail(syshealth.ErrUnavailable)
 	h := startHealthRoute(t, fake)
@@ -117,6 +118,7 @@ func TestHealthRoute_UnknownCarriesItsReason(t *testing.T) {
 // Seam: the Disks report names the disk the D bar follows, the warned one, even
 // when another disk has less free space.
 func TestHealthRoute_DisksReportNamesTheWorstDisk(t *testing.T) {
+	t.Parallel()
 	repo, goCache := t.TempDir(), t.TempDir()
 	r := startDiskRig(t, map[string]string{"proj": repo}, 20*routeGB, func(c *server.Config) {
 		c.GoCacheDir = func() (string, error) { return goCache, nil }
@@ -134,6 +136,7 @@ func TestHealthRoute_DisksReportNamesTheWorstDisk(t *testing.T) {
 }
 
 func TestHealthRoute_NoDisksMeterIsUnknownWithAReason(t *testing.T) {
+	t.Parallel()
 	r := startDiskRig(t, nil, 20*routeGB, func(c *server.Config) {
 		c.FreeSpace = func(string) (server.DiskReading, error) { return server.DiskReading{}, errors.New("no disk") }
 	})

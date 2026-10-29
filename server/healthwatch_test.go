@@ -72,6 +72,7 @@ func healthEvents(ch <-chan server.Event) int {
 // Seam: no client asks while the watcher reads; the first snapshot already
 // holds the one-minute average (story 22) and the state follows it (story 10).
 func TestHealth_AverageIsReadyInTheFirstSnapshotAfterTwelveReadings(t *testing.T) {
+	t.Parallel()
 	fake := servertest.NewFakeSystem()
 	fake.SetBusy(75)
 	h := startHealth(t, fake, healthInterval)
@@ -85,6 +86,7 @@ func TestHealth_AverageIsReadyInTheFirstSnapshotAfterTwelveReadings(t *testing.T
 
 // Seam: one high reading among a minute of low ones keeps the state normal (story 12).
 func TestHealth_SingleSpikeKeepsStateNormal(t *testing.T) {
+	t.Parallel()
 	fake := servertest.NewFakeSystem()
 	fake.SetBusy(5)
 	h := startHealth(t, fake, healthInterval)
@@ -98,6 +100,7 @@ func TestHealth_SingleSpikeKeepsStateNormal(t *testing.T) {
 
 // Seam: a level change publishes exactly one event (story 19).
 func TestHealth_LevelChangePublishesOneEvent(t *testing.T) {
+	t.Parallel()
 	fake := servertest.NewFakeSystem()
 	fake.SetMem(10)
 	h := startHealth(t, fake, healthInterval)
@@ -119,6 +122,7 @@ func TestHealth_LevelChangePublishesOneEvent(t *testing.T) {
 
 // Seam: readings that move within one step publish nothing (story 20).
 func TestHealth_MovementWithinAStepPublishesNoEvent(t *testing.T) {
+	t.Parallel()
 	fake := servertest.NewFakeSystem()
 	fake.SetMem(10)
 	h := startHealth(t, fake, healthInterval)
@@ -130,10 +134,10 @@ func TestHealth_MovementWithinAStepPublishesNoEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A negative wait: flap memory for 40 intervals, then prove no event went out.
+	// A negative wait: flap memory across 40 readings, then prove no event went out.
 	for i := range 40 {
 		fake.SetMem(float64(10 + 4*(i%2)))
-		time.Sleep(healthInterval)
+		waitReads(t, fake, fake.Reads()+1)
 	}
 	if n := healthEvents(ch); n != 0 {
 		t.Fatalf("health events = %d, want 0", n)
@@ -167,6 +171,7 @@ func TestHealth_ReadErrorClearsTheOneMinuteWindows(t *testing.T) {
 
 // Seam: unknown reasons (story 34).
 func TestHealth_UnknownReasons(t *testing.T) {
+	t.Parallel()
 	t.Run("first interval is waiting", func(t *testing.T) {
 		fake := servertest.NewFakeSystem()
 		h := startHealth(t, fake, time.Hour)

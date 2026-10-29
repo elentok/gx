@@ -18,6 +18,7 @@ func writeProcFile(t *testing.T, body string) string {
 }
 
 func TestFileProcesses_RowsAccumulateAndArgvIsLookedUp(t *testing.T) {
+	t.Parallel()
 	path := writeProcFile(t, "busy 3000\nproc 10 1 1700000000 2500 200M go go test ./...\nhidden 11\n")
 	r := FileProcesses(path)
 
@@ -57,6 +58,7 @@ func TestFileProcesses_RowsAccumulateAndArgvIsLookedUp(t *testing.T) {
 }
 
 func TestFileProcesses_BusyDefaultsToTheRowsSum(t *testing.T) {
+	t.Parallel()
 	path := writeProcFile(t, "proc 10 1 1 100 1M a\nproc 11 1 1 200 1M b\n")
 	r := FileProcesses(path)
 	first, _ := r.Read()
@@ -70,6 +72,7 @@ func TestFileProcesses_BusyDefaultsToTheRowsSum(t *testing.T) {
 }
 
 func TestFileProcesses_BadFilesFailTheRead(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"empty":         "",
 		"no rows":       "busy 100\n",

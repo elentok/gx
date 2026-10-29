@@ -29,6 +29,7 @@ func writeSession(t *testing.T, root, id string, meta sessionMeta) {
 // the ticket, and a holder that sends no start times gives no owner. Pings are
 // cached per session run (stories 37 to 39).
 func TestSessionOwners(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	writeSession(t, root, "a", sessionMeta{ID: "a", Name: "scratch"})
 	writeSession(t, root, "b", sessionMeta{ID: "b", Name: "other", Ticket: "gx:foo/03"})

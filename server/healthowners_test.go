@@ -70,6 +70,7 @@ func settledCauses(t *testing.T, h *servertest.Harness) server.HealthCauses {
 // Seam 1: a tracked run's agent tree shows as its ticket address with the
 // busiest process (stories 37, 38).
 func TestHealthOwners_RunShowsAddressWithBusiestProcess(t *testing.T) {
+	t.Parallel()
 	h := startOwnedRun(t, &pidRunner{Runner: runnerfake.NewRunner(), pids: []agentrunner.OwnerPID{{PID: 100, Start: 1000}}})
 	rows := settledCauses(t, h).CPU.Rows
 	if len(rows) != 1 {
@@ -82,6 +83,7 @@ func TestHealthOwners_RunShowsAddressWithBusiestProcess(t *testing.T) {
 
 // Seam 1: a run whose owner call fails is skipped and the lists still come back.
 func TestHealthOwners_FailedOwnerCallStillReturnsLists(t *testing.T) {
+	t.Parallel()
 	h := startOwnedRun(t, &pidRunner{Runner: runnerfake.NewRunner(), err: errors.New("boom")})
 	got := labels(settledCauses(t, h).CPU)
 	if !sameLabels(got, "go test", "claude") {

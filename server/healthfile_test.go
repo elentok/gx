@@ -11,6 +11,7 @@ import (
 )
 
 func TestFileSystemHealth(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "system")
 	read := FileSystemHealth(path)
 	write := func(s string) {

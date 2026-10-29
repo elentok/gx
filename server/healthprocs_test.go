@@ -71,6 +71,7 @@ var slowSecondRead = procTiming{delay: 5 * time.Second, window: 100 * time.Milli
 
 // Seam: nobody calls the route, so the process table is never read (story 51).
 func TestHealthProcs_NoCallNoReads(t *testing.T) {
+	t.Parallel()
 	h := startProcs(t, slowSecondRead, proc(10, "a", 100, 1))
 	// A negative wait: give a stray read time to happen, then prove there was none.
 	time.Sleep(150 * time.Millisecond)
@@ -81,6 +82,7 @@ func TestHealthProcs_NoCallNoReads(t *testing.T) {
 
 // Seam: two callers inside the share window cost one read (story 51).
 func TestHealthProcs_CallsInsideTheWindowShareOneRead(t *testing.T) {
+	t.Parallel()
 	tm := slowSecondRead
 	tm.window = time.Minute
 	h := startProcs(t, tm, proc(10, "a", 100, 1))
@@ -94,6 +96,7 @@ func TestHealthProcs_CallsInsideTheWindowShareOneRead(t *testing.T) {
 // Seam: the window runs from the read's own time, so calls 0.9 of a window apart
 // still read once per window (story 51).
 func TestHealthProcs_WindowRunsFromTheReadNotTheLastCall(t *testing.T) {
+	t.Parallel()
 	tm := slowSecondRead
 	tm.window = 500 * time.Millisecond
 	h := startProcs(t, tm, proc(10, "a", 100, 1))
@@ -114,6 +117,7 @@ func TestHealthProcs_WindowRunsFromTheReadNotTheLastCall(t *testing.T) {
 
 // Seam: a poll much slower than the window always gets a fresh read (story 51).
 func TestHealthProcs_SlowPollGetsAFreshReadEachTime(t *testing.T) {
+	t.Parallel()
 	h := startProcs(t, slowSecondRead, proc(10, "a", 100, 1))
 	for i := 1; i <= 3; i++ {
 		health(t, h, false)
@@ -127,6 +131,7 @@ func TestHealthProcs_SlowPollGetsAFreshReadEachTime(t *testing.T) {
 
 // Seam: top 3 by CPU and by memory, with every meter normal (stories 35, 36).
 func TestHealthProcs_TopThreeByCPUAndMemory(t *testing.T) {
+	t.Parallel()
 	h := startProcs(t, procTiming{delay: 5 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10), proc(11, "b", 200, 50), proc(12, "c", 100, 30),
 		proc(13, "d", 50, 70), proc(14, "e", 10, 60))
@@ -152,6 +157,7 @@ func TestHealthProcs_TopThreeByCPUAndMemory(t *testing.T) {
 // Seam: a failing process source shows the unavailable marker on both lists
 // while the meters still read (story 48).
 func TestHealthProcs_FailingSourceGivesUnavailableAndMetersStillRead(t *testing.T) {
+	t.Parallel()
 	h := startProcs(t, procTiming{delay: 5 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second})
 	h.Processes.Fail(syshealth.ErrUnavailable)
 	var rep server.HealthReport
@@ -170,6 +176,7 @@ func TestHealthProcs_FailingSourceGivesUnavailableAndMetersStillRead(t *testing.
 // Seam: the first call answers at once with the reading marker and the memory
 // list; a wait call blocks for the second read and gets the CPU list (story 49).
 func TestHealthProcs_FirstCallIsReadingAndWaitGetsTheList(t *testing.T) {
+	t.Parallel()
 	h := startProcs(t, procTiming{delay: 150 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10))
 	start := time.Now()
@@ -191,6 +198,7 @@ func TestHealthProcs_FirstCallIsReadingAndWaitGetsTheList(t *testing.T) {
 
 // Seam: a wait call made at once on a quiet server gets the full list.
 func TestHealthProcs_WaitOnAQuietServerBlocksForTheSecondRead(t *testing.T) {
+	t.Parallel()
 	h := startProcs(t, procTiming{delay: 20 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10))
 	rep := health(t, h, true)
@@ -204,6 +212,7 @@ func TestHealthProcs_WaitOnAQuietServerBlocksForTheSecondRead(t *testing.T) {
 
 // Seam: a second read that fails ends the wait with the unavailable marker (story 49).
 func TestHealthProcs_WaitReturnsUnavailableWhenTheSecondReadFails(t *testing.T) {
+	t.Parallel()
 	h := startProcs(t, procTiming{delay: 100 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10))
 	health(t, h, false)
@@ -216,6 +225,7 @@ func TestHealthProcs_WaitReturnsUnavailableWhenTheSecondReadFails(t *testing.T) 
 
 // Seam: a second read that never ends gives the reading marker after the cap (story 49).
 func TestHealthProcs_WaitCapsAndAnswersReading(t *testing.T) {
+	t.Parallel()
 	waitCap := 150 * time.Millisecond
 	h := startProcs(t, procTiming{delay: 5 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second, waitCap: waitCap},
 		proc(10, "a", 400, 10))
@@ -233,6 +243,7 @@ func TestHealthProcs_WaitCapsAndAnswersReading(t *testing.T) {
 
 // Seam: a wait call stops when its request context ends.
 func TestHealthProcs_WaitStopsWithTheRequestContext(t *testing.T) {
+	t.Parallel()
 	h := startProcs(t, procTiming{delay: 5 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10))
 	health(t, h, false)
