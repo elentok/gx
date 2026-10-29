@@ -43,3 +43,23 @@ test("only a live snapshot deletes the drafts of sessions it does not list", asy
   await waitFor(() => expect(readRoundDraft("b", "r")).toBeNull());
   expect(readRoundDraft("a", "r")).toEqual({ n: 1 });
 });
+
+test("a live snapshot with a null session list renders and deletes no drafts", async () => {
+  writeRoundDraft("a", "r", { n: 1 });
+
+  const unreadable = { ...snapshotListing(), sessions: null } as unknown as Snapshot;
+  let release: (s: Snapshot) => void = () => {};
+  const live = new Promise<Snapshot>((resolve) => (release = resolve));
+  renderThemed(
+    <App
+      deps={{
+        cache: { load: () => snapshotListing("a"), save: () => {} },
+        fetchSnapshot: () => live,
+        openStream: () => new Promise(() => {}),
+      }}
+    />,
+  );
+
+  await act(async () => release(unreadable));
+  expect(readRoundDraft("a", "r")).toEqual({ n: 1 });
+});

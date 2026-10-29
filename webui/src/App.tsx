@@ -18,7 +18,8 @@ import type { FetchDetail } from "./ticket/detail";
 function usePruneDraftsOnLiveSnapshot(conn: Connection) {
   const { snapshot, liveSnapshot } = useConnectionState(conn);
   useEffect(() => {
-    if (liveSnapshot && snapshot) pruneDrafts(snapshot.sessions.map((s) => s.id));
+    // A null list means the server could not read the sessions folder, not that there are none.
+    if (liveSnapshot && snapshot?.sessions) pruneDrafts(snapshot.sessions.map((s) => s.id));
   }, [snapshot, liveSnapshot]);
 }
 
