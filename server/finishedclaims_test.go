@@ -28,7 +28,7 @@ func TestReclaim_FinishedReportSettlesAWorkingPane(t *testing.T) {
 			return working, herdrfake.Identities{}, nil
 		})
 	}
-	_, ticketPath := leaveIteration(t, h, store, repo)
+	_, ticketPath := leaveIteration(t, h, store, repo, "herdr")
 	if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
 		tk.IterationStatus = schema.IterationStatusFinished
 		tk.IterationFinishedAt = time.Now()
