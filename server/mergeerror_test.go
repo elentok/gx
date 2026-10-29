@@ -56,7 +56,7 @@ func (f *schedFixture) assertRootQueued(t *testing.T) {
 }
 
 // commitFiles is the agent's turn committing every name as a file.
-func commitFiles(t *testing.T, p servertest.Prompt, names ...string) {
+func commitFiles(t *testing.T, p *servertest.Turn, names ...string) {
 	t.Helper()
 	for _, n := range names {
 		testutil.WriteFile(t, p.Cwd, n, n)
@@ -68,7 +68,7 @@ func TestMergeError_DirtyTrunkPausesTheRootWithACappedFileList(t *testing.T) {
 	t.Parallel()
 	chat, count := chatRecorder(t)
 	files := []string{"a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt", "g.txt"}
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		commitFiles(t, p, files...)
 		// Untracked files in main's checkout that the merge would overwrite.
 		for _, n := range files {
@@ -102,7 +102,7 @@ func TestMergeError_DirtyTrunkPausesTheRootWithACappedFileList(t *testing.T) {
 
 func TestMergeError_DirtyTrunkNamesOnlyTheClashingFiles(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		commitFiles(t, p, "clash.txt")
 		testutil.WriteFile(t, f.repo, "clash.txt", "local")
 		testutil.WriteFile(t, f.repo, "unrelated.txt", "local")
@@ -118,7 +118,7 @@ func TestMergeError_DirtyTrunkNamesOnlyTheClashingFiles(t *testing.T) {
 
 func TestMergeError_DirtyTrunkListsNewDirectoryFilesAndBothRenamePaths(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		testutil.WriteFile(t, p.Cwd, "old.txt", "old")
 		testutil.CommitAll(t, p.Cwd, "add old")
 		for _, root := range []string{p.Cwd, f.repo} {
@@ -147,7 +147,7 @@ func TestMergeError_DirtyTrunkListsNewDirectoryFilesAndBothRenamePaths(t *testin
 func dirtyTrunkFixture(t *testing.T) (f *schedFixture, clean func()) {
 	t.Helper()
 	turns := 0
-	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		turns++
 		commitFiles(t, p, fmt.Sprintf("a%d.txt", turns), "a.txt")
 		testutil.WriteFile(t, f.repo, "a.txt", "local")
@@ -185,7 +185,7 @@ func TestMergeError_PauseStoresKindAndReasonUntilALaterMergeClearsThem(t *testin
 func TestMergeError_DirtyTrunkStoresTheFullFileListAndForksNoInvestigation(t *testing.T) {
 	t.Parallel()
 	files := []string{"a.txt", "b.txt", "c.txt", "d.txt", "e.txt", "f.txt", "g.txt"}
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		commitFiles(t, p, files...)
 		for _, n := range files {
 			testutil.WriteFile(t, f.repo, n, "local "+n)
@@ -258,7 +258,7 @@ func TestMergeError_DefaultPathFinishClearsTheStoredBlock(t *testing.T) {
 
 func TestMergeError_NonOverlappingLocalChangeDoesNotBlockTheMerge(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "unrelated.txt", "local")
 	})
@@ -271,7 +271,7 @@ func TestMergeError_NonOverlappingLocalChangeDoesNotBlockTheMerge(t *testing.T) 
 
 func TestMergeError_OtherGitFailurePausesMergeFailed(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		// A stale index lock fails the merge without any local change.
 		if err := os.WriteFile(filepath.Join(f.repo, ".git", "index.lock"), nil, 0o644); err != nil {

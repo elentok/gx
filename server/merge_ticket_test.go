@@ -18,7 +18,7 @@ import (
 
 // mergeTurn is what a merge agent saw on one turn.
 type mergeTurn struct {
-	prompt          servertest.Prompt
+	prompt          *servertest.Turn
 	branch          string
 	iterationBranch string
 }
@@ -36,7 +36,7 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 	t.Helper()
 	var mu sync.Mutex
 	var seen []mergeTurn
-	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: "merge"}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: "merge"}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		mu.Lock()
 		seen = append(seen, mergeTurn{
 			prompt:          p,

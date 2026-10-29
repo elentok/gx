@@ -55,8 +55,8 @@ func TestHandMerged_PlainGitMergeReleasesAnOnMergedDependent(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", "dep", "01", "d", servertest.TicketOpts{BlockedBy: []string{"blocker"}})
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
-	launched := make(chan servertest.Prompt, 1)
-	h.RegisterLaunch(func(p servertest.Prompt) {
+	launched := make(chan *servertest.Turn, 1)
+	h.OnTurn(func(p *servertest.Turn) {
 		commitWork(t, p, "dep")
 		launched <- p
 	})
@@ -87,7 +87,7 @@ func TestHandMerged_PlainGitMergeReleasesAnOnMergedDependent(t *testing.T) {
 func TestHandMerged_PausedRootMergedByHandIsDequeuedWithEpicMerged(t *testing.T) {
 	t.Parallel()
 	chat, count := chatRecorder(t)
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		commitFiles(t, p, "a.txt")
 		testutil.WriteFile(t, f.repo, "a.txt", "local")
 	}, chat)

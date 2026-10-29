@@ -118,7 +118,7 @@ func startCleanRig(t *testing.T, projects map[string]string, warn, cleanBelow co
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	}}, opts...)
 	r.h = servertest.StartWithStore(t, store, all...)
-	r.start, _, _ = registerLaunch(r.h)
+	r.start, _, _ = registerTurn(r.h)
 	return r
 }
 
@@ -416,7 +416,7 @@ func TestDiskClean_RestartWithAQueuedTicketRunsTheRealCommandOnce(t *testing.T) 
 	r.clean.release()
 	r.waitClean(t, 1)
 	r.h.Restart(t)
-	r.start, _, _ = registerLaunch(r.h)
+	r.start, _, _ = registerTurn(r.h)
 	r.waitClean(t, 2)
 	r.wantCalls(t, 2)
 	for _, b := range r.bodies() {
@@ -438,7 +438,7 @@ func TestDiskClean_RestartOnALowDiskWarnsHoldsAndCleansAgain(t *testing.T) {
 		t.Fatalf("warn notices = %d, want 1", n)
 	}
 	r.h.Restart(t)
-	r.start, _, _ = registerLaunch(r.h)
+	r.start, _, _ = registerTurn(r.h)
 	r.queue(t, "proj:epic-a/01")
 	r.waitClean(t, 2)
 	waitFor(t, func() bool { return r.countBodies("low disk space") == 2 })

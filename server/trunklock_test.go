@@ -19,7 +19,7 @@ import (
 func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *testing.T) {
 	t.Parallel()
 	const other = "other"
-	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p *servertest.Turn, id string) {
 		epic, _, _ := strings.Cut(strings.TrimPrefix(p.Address, "proj:"), "/")
 		commitWork(t, p, epic+"-"+id)
 	})
@@ -79,7 +79,7 @@ func TestTrunkLock_TwoEpicsFinishingTogetherMergeOneAndPauseTheOtherAsNonFF(t *t
 func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
 	t.Parallel()
 	chat, count := chatRecorder(t)
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		// A person merged the epic while its last ticket ran.
 		if err := tickets.StampEpicFields(filepath.Join(f.store, "proj", schedEpic), map[string]any{"merged_at": time.Now().UTC()}); err != nil {
@@ -112,7 +112,7 @@ func TestTrunkLock_AlreadyMergedEpicDoesNoGitWorkAndNotifiesOnce(t *testing.T) {
 
 func TestTrunkLock_TrunkMovedBeforeTheFFPausesNeedsRebaseNotMergeFailed(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	})
 	f.h.Server.SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {

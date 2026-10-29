@@ -23,7 +23,7 @@ func TestMergeDecide_HeldTrunkLockBlocksNeitherClaimNorPollButDefersTheStamp(t *
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
 	launched := make(chan string, 4)
-	h.RegisterLaunch(func(p servertest.Prompt) {
+	h.OnTurn(func(p *servertest.Turn) {
 		epic, _, _ := strings.Cut(strings.TrimPrefix(p.Address, "proj:"), "/")
 		commitWork(t, p, epic)
 		launched <- p.Address
@@ -85,7 +85,7 @@ func TestMergeDecide_SecondCompleteSendsNoSecondNoticeOrRetro(t *testing.T) {
 func TestMergeDecide_RepeatNeedsRebasePauseIsQuiet(t *testing.T) {
 	t.Parallel()
 	chat, count := chatRecorder(t)
-	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p *servertest.Turn, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {
 			return
 		}

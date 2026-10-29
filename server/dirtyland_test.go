@@ -26,7 +26,7 @@ func dirtyLandFixture(t *testing.T, conflict bool, setup func(f *schedFixture)) 
 	if conflict {
 		local = "different"
 	}
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		testutil.WriteFile(t, p.Cwd, "shared.txt", "A\nb\nc\n")
 		testutil.WriteFile(t, p.Cwd, "same.txt", "same")
 		testutil.CommitAll(t, p.Cwd, "work")

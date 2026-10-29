@@ -20,7 +20,7 @@ func startPauseHarness(t *testing.T) *servertest.Harness {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
 	})
-	registerLaunch(h)
+	registerTurn(h)
 	return h
 }
 
@@ -51,7 +51,7 @@ func TestPause_HoldsTheQueueUntilResumeAndSurvivesRestart(t *testing.T) {
 	expectNoRun(t, h)
 
 	h.Restart(t)
-	registerLaunch(h)
+	registerTurn(h)
 	expectNoRun(t, h)
 
 	if res, err := h.Client.QueueResume(ctx); err != nil || res.Refused || res.Mode != server.QueueModeRunning {
@@ -74,7 +74,7 @@ func TestFlush_IsFinishAndPause(t *testing.T) {
 	expectNoRun(t, h)
 
 	h.Restart(t)
-	registerLaunch(h)
+	registerTurn(h)
 	expectNoRun(t, h)
 
 	if res, err := h.Client.QueueResume(ctx); err != nil || res.Refused {

@@ -25,7 +25,7 @@ func startInvestigateEnv(t *testing.T, kind events.Kind) *servertest.Harness {
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "02", "probe", servertest.TicketOpts{Type: "investigate", Parent: "01"})
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, func(*server.Config) {})
-	registerLaunch(h)
+	registerTurn(h)
 	if err := h.Server.PauseAs("proj:epic-a/01", kind, "boom"); err != nil {
 		t.Fatal(err)
 	}

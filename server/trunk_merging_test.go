@@ -13,7 +13,7 @@ import (
 
 // trunkFixture is a sched fixture whose project's trunk is develop, a branch
 // at main that nothing has checked out.
-func trunkFixture(t *testing.T, opts servertest.TicketOpts, agentTurn func(f *schedFixture, p servertest.Prompt, id string)) *schedFixture {
+func trunkFixture(t *testing.T, opts servertest.TicketOpts, agentTurn func(f *schedFixture, p *servertest.Turn, id string)) *schedFixture {
 	t.Helper()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": opts}, agentTurn)
 	f.git(t, "branch", "develop")
@@ -35,7 +35,7 @@ func (f *schedFixture) runEpic(t *testing.T, wait string) {
 
 func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {
 	t.Parallel()
-	f := trunkFixture(t, servertest.TicketOpts{}, func(_ *schedFixture, p servertest.Prompt, id string) { commitWork(t, p, id) })
+	f := trunkFixture(t, servertest.TicketOpts{}, func(_ *schedFixture, p *servertest.Turn, id string) { commitWork(t, p, id) })
 	main := f.rev(t, "main")
 	develop := f.rev(t, "develop")
 
@@ -54,7 +54,7 @@ func TestTrunk_TopLevelWorkStartsFromAndMergesOnTrunk(t *testing.T) {
 
 func TestTrunk_ExplicitBaseMovesOnlyTheStart(t *testing.T) {
 	t.Parallel()
-	f := trunkFixture(t, servertest.TicketOpts{Base: "release-1.2"}, func(_ *schedFixture, p servertest.Prompt, id string) { commitWork(t, p, id) })
+	f := trunkFixture(t, servertest.TicketOpts{Base: "release-1.2"}, func(_ *schedFixture, p *servertest.Turn, id string) { commitWork(t, p, id) })
 	f.git(t, "branch", "release-1.2")
 	release := f.rev(t, "release-1.2")
 
@@ -73,7 +73,7 @@ func TestTrunk_ExplicitBaseMovesOnlyTheStart(t *testing.T) {
 
 func TestTrunk_EditedBetweenClaimAndMergingMergesOnTheNewTrunk(t *testing.T) {
 	t.Parallel()
-	f := trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		f.git(t, "branch", "next", "develop")
 		servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "next")
@@ -92,7 +92,7 @@ func TestTrunk_EditedBetweenClaimAndMergingMergesOnTheNewTrunk(t *testing.T) {
 
 func TestTrunk_DivergedNewTrunkNeedsRebase(t *testing.T) {
 	t.Parallel()
-	f := trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := trunkFixture(t, servertest.TicketOpts{}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		// Past the cap, the non-ff pauses the root rather than forking a merge ticket.
 		for _, mid := range []string{"02", "03", "04"} {

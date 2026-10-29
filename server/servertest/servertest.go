@@ -199,17 +199,17 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 	return os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644)
 }
 
-// Prompt is one `agent prompt` the server sent to a launched agent.
-type Prompt struct {
+// Turn is one agent turn: the `agent prompt` the server sent to a launched agent.
+type Turn struct {
 	Address string // the ticket the skill prompt names
 	Cwd     string // the worktree the agent's tab was opened in
 	Text    string // the whole prompt, notes included
 }
 
-// RegisterLaunch answers the herdr commands a launch makes, giving each tab its
-// own pane and cwd, and runs agent for every prompt (the agent's turn, e.g. a
-// commit in p.Cwd). The agent is idle again when the prompt returns.
-func (h *Harness) RegisterLaunch(agent func(p Prompt)) {
+// OnTurn answers the herdr commands a launch makes, giving each tab its own
+// pane and cwd, and runs agent for every turn (e.g. a commit in t.Cwd). The
+// agent is idle again when the hook returns.
+func (h *Harness) OnTurn(agent func(t *Turn)) {
 	var mu sync.Mutex
 	cwds := map[string]string{}  // pane -> cwd
 	named := map[string]string{} // agent name -> pane
@@ -287,7 +287,7 @@ func (h *Harness) RegisterLaunch(agent func(p Prompt)) {
 		_, rest, _ := strings.Cut(text, " ")
 		addr, _, _ := strings.Cut(rest, "\n")
 		addr = strings.TrimPrefix(addr, "--ticket ") // gx-merge's form
-		agent(Prompt{Address: addr, Cwd: cwd, Text: text})
+		agent(&Turn{Address: addr, Cwd: cwd, Text: text})
 		return reply(pane), herdrfake.Identities{}, nil
 	})
 }

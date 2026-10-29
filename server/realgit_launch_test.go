@@ -34,7 +34,7 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	})
 	var prompts atomic.Int32
-	h.RegisterLaunch(func(servertest.Prompt) { prompts.Add(1) })
+	h.OnTurn(func(*servertest.Turn) { prompts.Add(1) })
 	var starts atomic.Int32
 	h.Herdr.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		starts.Add(1)

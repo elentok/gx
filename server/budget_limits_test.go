@@ -33,7 +33,7 @@ func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.BudgetSoftLimit = 5
 	})
-	start, _, _ := registerLaunch(h)
+	start, _, _ := registerTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if res, err := h.Client.TicketPause(ctx, "proj:epic-a/01", "broken"); err != nil || res.Refused {
@@ -139,7 +139,7 @@ func TestBudget_SoftLimitStopsNewStarts(t *testing.T) {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.BudgetSoftLimit = 5
 	})
-	registerLaunch(h)
+	registerTurn(h)
 	h.Server.RecordSpend("spent", 6)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -163,7 +163,7 @@ func TestBudget_SpendInTwoProjectsSumsTowardOneLimit(t *testing.T) {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.BudgetSoftLimit = 5
 	})
-	registerLaunch(h)
+	registerTurn(h)
 	h.Server.RecordProjectSpend("proj-a", "a", 3)
 	h.Server.RecordProjectSpend("proj-b", "b", 3)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -200,7 +200,7 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 		c.BudgetKillGrace = time.Millisecond
 		c.BudgetPollInterval = time.Hour
 	})
-	registerLaunch(h)
+	registerTurn(h)
 	// The pane never goes quiet, so the run's finish wait would poll herdr
 	// until the package ends; take the agent away so the run settles first.
 	t.Cleanup(func() {

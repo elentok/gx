@@ -38,7 +38,7 @@ func startRecoveryWeb(t *testing.T) (h *servertest.Harness, repo, base string, c
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
 	h = servertest.StartWithStore(t, store, func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
-	registerLaunch(h)
+	registerTurn(h)
 	gitIn(t, repo, "branch", "epic-a")
 	gitIn(t, repo, "branch", recoveryBranch)
 	wt := filepath.Join(t.TempDir(), "wt")

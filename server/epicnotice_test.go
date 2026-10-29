@@ -54,7 +54,7 @@ func waitForChat(count func(string) int, s string) int {
 func TestEpicNotice_MergeSendsEpicMerged(t *testing.T) {
 	t.Parallel()
 	chat, count := chatRecorder(t)
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	}, chat)
 	f.runEpic(t, server.EventRootCompleted)
@@ -70,7 +70,7 @@ func TestEpicNotice_MergeSendsEpicMerged(t *testing.T) {
 func TestEpicNotice_AutoFFMergeOffSendsNotMerged(t *testing.T) {
 	t.Parallel()
 	chat, count := chatRecorder(t)
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	}, chat)
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
@@ -87,7 +87,7 @@ func TestEpicNotice_AutoFFMergeOffSendsNotMerged(t *testing.T) {
 func TestEpicNotice_NeedsRebasePauseSendsNotMerged(t *testing.T) {
 	t.Parallel()
 	chat, count := chatRecorder(t)
-	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.repo, "main moves on")

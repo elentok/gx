@@ -114,7 +114,7 @@ func TestWorktreeRemoval_FastForwardMergeRemovesTheWorktreeAndKeepsTheBranch(t *
 }
 
 func TestWorktreeRemoval_NothingToMergeRemovesTheWorktree(t *testing.T) {
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, _ servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, _ *servertest.Turn, id string) {
 		f.finishCommitless(t, id)
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -181,7 +181,7 @@ func TestWorktreeRemoval_UntrackedFileKeepsTheWorktreeAndLogsWhy(t *testing.T) {
 }
 
 func TestWorktreeRemoval_QueuedRootKeepsTheWorktree(t *testing.T) {
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, id+".txt", "local")
 	})

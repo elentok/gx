@@ -33,7 +33,7 @@ type schedFixture struct {
 	order       []string
 }
 
-func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, agentTurn func(f *schedFixture, p servertest.Prompt, id string), cfgOpts ...func(*server.Config)) *schedFixture {
+func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, agentTurn func(f *schedFixture, p *servertest.Turn, id string), cfgOpts ...func(*server.Config)) *schedFixture {
 	t.Helper()
 	f := &schedFixture{store: t.TempDir(), repo: testutil.TempRepo(t)}
 	for id, opts := range tickets {
@@ -48,7 +48,7 @@ func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, age
 			o(c)
 		}
 	})
-	f.h.RegisterLaunch(func(p servertest.Prompt) {
+	f.h.OnTurn(func(p *servertest.Turn) {
 		_, id, _ := strings.Cut(p.Address, "/")
 		f.mu.Lock()
 		f.order = append(f.order, id)
@@ -59,7 +59,7 @@ func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, age
 }
 
 // commitWork is the agent's turn: one commit named after the ticket, in its worktree.
-func commitWork(t *testing.T, p servertest.Prompt, name string) {
+func commitWork(t *testing.T, p *servertest.Turn, name string) {
 	t.Helper()
 	testutil.WriteFile(t, p.Cwd, name+".txt", name)
 	testutil.CommitAll(t, p.Cwd, "work "+name)
@@ -133,7 +133,7 @@ func (f *schedFixture) assertMerged(t *testing.T, ids ...string) {
 func TestSchedulingPort_TicketCreatesSubticketsAndTheRootWaitsForThem(t *testing.T) {
 	t.Parallel()
 	var once sync.Once
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		if id != "01" {
 			return
@@ -162,7 +162,7 @@ func TestSchedulingPort_CodeReviewTicketCreatesSubtickets(t *testing.T) {
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{
 		"01": {},
 		"02": {Type: "code-review"},
-	}, func(f *schedFixture, p servertest.Prompt, id string) {
+	}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		if id != "02" {
 			return
@@ -192,7 +192,7 @@ func TestSchedulingPort_ABlocksBAndCAndTheyMergeInOrder(t *testing.T) {
 		"01": {},
 		"02": {BlockedBy: []string{"01"}},
 		"03": {BlockedBy: []string{"01"}},
-	}, func(_ *schedFixture, p servertest.Prompt, id string) { commitWork(t, p, id) })
+	}, func(_ *schedFixture, p *servertest.Turn, id string) { commitWork(t, p, id) })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
@@ -212,7 +212,7 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 	var mu sync.Mutex
 	turn := 0
 	var ticketPath string
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		mu.Lock()
 		turn++
 		cur := turn

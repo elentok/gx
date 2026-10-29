@@ -65,7 +65,7 @@ func startHoldRig(t *testing.T, repos map[string]string, clean config.ByteSize, 
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 	}}, opts...)
 	rig.h = servertest.StartWithStore(t, store, all...)
-	rig.start, _, _ = registerLaunch(rig.h)
+	rig.start, _, _ = registerTurn(rig.h)
 	return rig
 }
 
@@ -169,7 +169,7 @@ func TestDiskHold_RunningAgentFinishesDuringHold(t *testing.T) {
 		c.DiskSpace = config.DiskSpaceConfig{CleanBelow: 10 * gb}
 	})
 	launched, release := make(chan struct{}), make(chan struct{})
-	h.RegisterLaunch(func(p servertest.Prompt) {
+	h.OnTurn(func(p *servertest.Turn) {
 		close(launched)
 		<-release
 		commitWork(t, p, "epic-a")

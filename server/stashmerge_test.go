@@ -22,15 +22,15 @@ import (
 // dirty yet, so the pause does not name it.
 func stashMergeFixture(t *testing.T) *schedFixture {
 	t.Helper()
-	return stashMergeFixtureWith(t, func(*schedFixture, servertest.Prompt) {})
+	return stashMergeFixtureWith(t, func(*schedFixture, *servertest.Turn) {})
 }
 
 // stashMergeFixtureWith is stashMergeFixture whose agent also runs conflictTurn
 // for every prompt except the epic's first ticket, such as the trunk-conflict
 // ticket a stash-merge opens.
-func stashMergeFixtureWith(t *testing.T, conflictTurn func(f *schedFixture, p servertest.Prompt)) *schedFixture {
+func stashMergeFixtureWith(t *testing.T, conflictTurn func(f *schedFixture, p *servertest.Turn)) *schedFixture {
 	t.Helper()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, _ string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, _ string) {
 		if p.Address != "proj:"+schedEpic+"/01" {
 			// The trunk-conflict ticket a stash-merge opens may be picked up too; it has nothing to commit by default.
 			conflictTurn(f, p)
@@ -193,7 +193,7 @@ func TestStashMerge_RecordsTheBackupOnTheRootAndTheRunLogAndKeepsTheRootUnmerged
 
 func TestStashMerge_RefusesAnEpicThatIsNotPausedOnADirtyTrunk(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, _ string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, _ string) {
 		commitFiles(t, p, "a.txt")
 	})
 	f.runEpic(t, server.EventRootCompleted)

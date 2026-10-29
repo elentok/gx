@@ -29,7 +29,7 @@ func startCapHeldEpics(t *testing.T) (*servertest.Harness, string) {
 		c.PollInterval = 50 * time.Millisecond
 		c.MaxAgents = 1
 	})
-	registerLaunch(h)
+	registerTurn(h)
 	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00"})
 	return h, repo
 }

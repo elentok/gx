@@ -27,7 +27,7 @@ func TestTrunkConflict_TheAgentRunsInTheTargetCheckoutAndTheEpicLands(t *testing
 	t.Parallel()
 	cwds := make(chan string, 1)
 	var f *schedFixture
-	f = stashMergeFixtureWith(t, func(_ *schedFixture, p servertest.Prompt) {
+	f = stashMergeFixtureWith(t, func(_ *schedFixture, p *servertest.Turn) {
 		cwds <- p.Cwd
 		testutil.WriteFile(t, p.Cwd, "same.txt", "resolved")
 		reportIteration(t, f.ticketFile(t, "02"), "finished")
@@ -57,7 +57,7 @@ func TestTrunkConflict_TheAgentRunsInTheTargetCheckoutAndTheEpicLands(t *testing
 func TestTrunkConflict_AnotherEpicsLandWaitsUnpausedUntilTheTicketIsDone(t *testing.T) {
 	t.Parallel()
 	// The conflict agent reports nothing, so its ticket pauses and stays open.
-	f := stashMergeFixtureWith(t, func(_ *schedFixture, p servertest.Prompt) {
+	f := stashMergeFixtureWith(t, func(_ *schedFixture, p *servertest.Turn) {
 		if p.Address == "proj:"+schedEpic+"/02" {
 			return
 		}

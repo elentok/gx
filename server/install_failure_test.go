@@ -23,7 +23,7 @@ func installFailure(path, _ string) ([]string, error) {
 func runFailingInstall(t *testing.T, typ string) (f *schedFixture, starts *atomic.Int32) {
 	t.Helper()
 	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: typ}},
-		func(*schedFixture, servertest.Prompt, string) {},
+		func(*schedFixture, *servertest.Turn, string) {},
 		func(c *server.Config) { c.InstallDeps = installFailure })
 	gitOut(t, f.repo, "branch", schedEpic)
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)

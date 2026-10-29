@@ -33,7 +33,7 @@ func startReplaceHarness(t *testing.T) *servertest.Harness {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
 	})
-	registerLaunch(h)
+	registerTurn(h)
 	return h
 }
 

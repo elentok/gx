@@ -14,7 +14,7 @@ import (
 func trunkDeletedMidRun(t *testing.T, autoMerge bool) (f *schedFixture, develop string, chatCount func(string) int) {
 	t.Helper()
 	chatCfg, chatCount := chatRecorder(t)
-	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		f.git(t, "branch", "-D", "develop")
 	}, chatCfg)

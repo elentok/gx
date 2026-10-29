@@ -16,7 +16,7 @@ import (
 
 func TestMergeRoot_FastForwardMergesOntoTheTarget(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -34,7 +34,7 @@ func TestMergeRoot_FastForwardMergesOntoTheTarget(t *testing.T) {
 
 func TestMergeRoot_AutoFFMergeOffLeavesTheBranchAndDequeuesTheRoot(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	})
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo) // read live, so after Start is fine
@@ -55,7 +55,7 @@ func TestMergeRoot_OpenCodeReviewTicketHoldsTheMergeUntilItIsDone(t *testing.T) 
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{
 		"01": {},
 		"02": {Type: "code-review", BlockedBy: []string{"01"}},
-	}, func(f *schedFixture, p servertest.Prompt, id string) {
+	}, func(f *schedFixture, p *servertest.Turn, id string) {
 		if id == "02" {
 			// 01 has merged on the feature branch; 02 is still open and running.
 			out := f.git(t, "branch", "--contains", schedEpic, "--list", "main")
@@ -79,7 +79,7 @@ func TestMergeRoot_OpenCodeReviewTicketHoldsTheMergeUntilItIsDone(t *testing.T) 
 
 func TestMergeRoot_NeedsRebasePausesTheRootWithoutRebasing(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.repo, "main moves on")
@@ -125,7 +125,7 @@ func (f *schedFixture) assertStamps(t *testing.T, wantMerged bool) {
 
 func TestMergeRoot_StampsCompletedAtWhenAutoMergeIsOff(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	})
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
@@ -139,7 +139,7 @@ func TestMergeRoot_StampsCompletedAtWhenAutoMergeIsOff(t *testing.T) {
 
 func TestMergeRoot_StampsMergedAtAndCompletedAtWhenTheEpicMerges(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -162,7 +162,7 @@ func TestMergeRoot_NothingToMergeStampsBothRegardlessOfAutoFFMerge(t *testing.T)
 	t.Parallel()
 	for name, autoMerge := range map[string]bool{"on": true, "off": false} {
 		t.Run(name, func(t *testing.T) {
-			f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, _ servertest.Prompt, id string) {
+			f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, _ *servertest.Turn, id string) {
 				f.finishCommitless(t, id)
 			})
 			if !autoMerge {
@@ -184,7 +184,7 @@ func TestMergeRoot_NothingToMergeStampsBothRegardlessOfAutoFFMerge(t *testing.T)
 
 func TestMergeRoot_StampsOnlyCompletedAtWhenTheMergePauses(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, "moved.txt", "moved")
 		testutil.CommitAll(t, f.repo, "main moves on")

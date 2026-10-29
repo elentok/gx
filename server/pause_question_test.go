@@ -49,7 +49,7 @@ func TestPause_AmbiguousBaseLogsGxQuestion(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", "epic-a", "03", "third", servertest.TicketOpts{BlockedBy: []string{"01", "02"}})
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	registerLaunch(h)
+	registerTurn(h)
 	if _, err := h.Server.ClaimTicket("proj:epic-a/03", "claude"); err != nil {
 		t.Fatal(err)
 	}

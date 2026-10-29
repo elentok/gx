@@ -17,14 +17,14 @@ import (
 
 // pauseAndCatchInvestigation pauses ticket 01 so recovery forks an investigate
 // ticket, and returns the prompt that ticket's agent received.
-func pauseAndCatchInvestigation(t *testing.T, store string) servertest.Prompt {
+func pauseAndCatchInvestigation(t *testing.T, store string) *servertest.Turn {
 	t.Helper()
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
 		c.Recovery = recovery.Catalog{Enabled: true}
 	})
-	got := make(chan servertest.Prompt, 1)
-	h.RegisterLaunch(func(p servertest.Prompt) {
+	got := make(chan *servertest.Turn, 1)
+	h.OnTurn(func(p *servertest.Turn) {
 		select {
 		case got <- p:
 		default:
@@ -40,7 +40,7 @@ func pauseAndCatchInvestigation(t *testing.T, store string) servertest.Prompt {
 		return p
 	case <-ctx.Done():
 		t.Fatal("investigate ticket never launched")
-		return servertest.Prompt{}
+		return nil
 	}
 }
 
@@ -112,8 +112,8 @@ func TestOneOffLaunch_InAVCSNoneProjectRunsInAScratchSubdir(t *testing.T) {
 				t.Fatal(err)
 			}
 			h := servertest.StartWithStore(t, store, func(c *server.Config) { c.PollInterval = 50 * time.Millisecond })
-			got := make(chan servertest.Prompt, 1)
-			h.RegisterLaunch(func(p servertest.Prompt) {
+			got := make(chan *servertest.Turn, 1)
+			h.OnTurn(func(p *servertest.Turn) {
 				select {
 				case got <- p:
 				default:

@@ -34,11 +34,11 @@ func moveMain(t *testing.T, repo, name string) {
 	testutil.CommitAll(t, repo, "main moves on "+name)
 }
 
-func isMergeTurn(p servertest.Prompt) bool { return strings.HasPrefix(p.Text, "/gx-merge ") }
+func isMergeTurn(p *servertest.Turn) bool { return strings.HasPrefix(p.Text, "/gx-merge ") }
 
 // rebaseAndFinish is a merge ticket's turn: rebase the epic, checked out in
 // p.Cwd, onto main and report finished.
-func rebaseAndFinish(t *testing.T, store string, p servertest.Prompt) {
+func rebaseAndFinish(t *testing.T, store string, p *servertest.Turn) {
 	t.Helper()
 	gitOut(t, p.Cwd, "rebase", "-q", "main")
 	a, err := tickets.ParseAddress(p.Address, tickets.AddressContext{})
@@ -71,7 +71,7 @@ func newForkFixture(t *testing.T, merged func(f *forkFixture, n int)) *forkFixtu
 func newForkFixtureWith(t *testing.T, opts map[string]servertest.TicketOpts, merged func(f *forkFixture, n int)) *forkFixture {
 	t.Helper()
 	ff := &forkFixture{}
-	ff.schedFixture = newSchedFixture(t, opts, func(f *schedFixture, p servertest.Prompt, id string) {
+	ff.schedFixture = newSchedFixture(t, opts, func(f *schedFixture, p *servertest.Turn, id string) {
 		switch {
 		case !strings.HasPrefix(p.Address, "proj:"+schedEpic+"/"):
 			ff.others.Add(1)

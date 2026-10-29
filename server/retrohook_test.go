@@ -36,7 +36,7 @@ func (f *schedFixture) completeEpic(t *testing.T) []string {
 
 func retroFixture(t *testing.T, opts ...func(*server.Config)) *schedFixture {
 	t.Helper()
-	return newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	return newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		// A submitted retro launches too; it is commitless, so it commits nothing.
 		if strings.Contains(p.Address, ":one-offs/") {
 			return
@@ -143,7 +143,7 @@ func (f *schedFixture) retrosAfter(t *testing.T) []string {
 
 func TestRetroHook_SubmitsWhenTheMergeNeedsARebase(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, atMergeCap(map[string]servertest.TicketOpts{"01": {}}), func(f *schedFixture, p *servertest.Turn, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {
 			return
 		}
@@ -178,7 +178,7 @@ func TestRetroHook_SubmitsWhenAutoFFMergeIsOff(t *testing.T) {
 // A merge error pauses the root, and that pause is the epic's final outcome.
 func TestRetroHook_SubmitsWhenTheMergeErrors(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p servertest.Prompt, id string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		if strings.Contains(p.Address, ":one-offs/") {
 			return
 		}

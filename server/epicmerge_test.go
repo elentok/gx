@@ -38,7 +38,7 @@ func ticketFiles(t *testing.T, store string) map[string]string {
 
 func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Status: "done"}}, func(*schedFixture, servertest.Prompt, string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Status: "done"}}, func(*schedFixture, *servertest.Turn, string) {
 		t.Error("a refused merge launched an agent")
 	})
 	done := servertest.TicketOpts{Status: "done"}
@@ -92,7 +92,7 @@ func TestEpicMerge_RefusalsWriteNothing(t *testing.T) {
 
 func TestEpicMerge_CommitlessEpicWithNoBranchIsStampedMerged(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Status: "done"}}, func(*schedFixture, servertest.Prompt, string) {})
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Status: "done"}}, func(*schedFixture, *servertest.Turn, string) {})
 	servertest.WriteTicketWith(t, f.store, "proj", "research", "01", "t", servertest.TicketOpts{Status: "done", Type: "research"})
 	f.h.Server.Rescan()
 
@@ -125,7 +125,7 @@ func completedUnmerged(ctx context.Context, t *testing.T, f *schedFixture) <-cha
 
 func newFFFixture(t *testing.T) *schedFixture {
 	t.Helper()
-	return newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	return newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	})
 }
@@ -155,7 +155,7 @@ func TestEpicMerge_FastForwardMergesDirectlyWithAutoFFMergeOff(t *testing.T) {
 
 func TestEpicMerge_StampsLinesAddedAndRemovedFromTrunkBeforeToAfter(t *testing.T) {
 	t.Parallel()
-	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, _ string) {
+	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, _ string) {
 		// README.md is one line on trunk: this adds three and removes one.
 		testutil.WriteFile(t, p.Cwd, "README.md", "a\nb\nc\n")
 		testutil.CommitAll(t, p.Cwd, "rewrite readme")

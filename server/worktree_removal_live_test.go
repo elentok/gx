@@ -15,7 +15,7 @@ import (
 // newLiveWorkFixture is newFFFixture with session holders enabled.
 func newLiveWorkFixture(t *testing.T) *schedFixture {
 	t.Helper()
-	return newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p servertest.Prompt, id string) {
+	return newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(_ *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 	}, servertest.WithTestHolder())
 }

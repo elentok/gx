@@ -50,7 +50,7 @@ func TestConfigReload_MaxAgentsAppliesWithoutKillingAgents(t *testing.T) {
 		c.PollInterval = time.Hour
 		c.Sleep = time.Sleep
 	})
-	registerLaunch(h)
+	registerTurn(h)
 	// Started agents keep their slot: an iteration's finish wait never returns.
 	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}
 	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {

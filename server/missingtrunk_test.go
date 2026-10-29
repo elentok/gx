@@ -56,7 +56,7 @@ func missingTrunkCase(t *testing.T, wantReason string, breakTrunk, fixTrunk func
 		return strings.Count(sent.String(), s)
 	}
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}},
-		func(_ *schedFixture, p servertest.Prompt, id string) { commitWork(t, p, id) },
+		func(_ *schedFixture, p *servertest.Turn, id string) { commitWork(t, p, id) },
 		func(c *server.Config) {
 			c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
 		})
@@ -122,7 +122,7 @@ func countUntil(ctx context.Context, t *testing.T, evs <-chan server.Event, coun
 func TestMissingTrunk_EmptiedQueueForgetsTheStateSilently(t *testing.T) {
 	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}},
-		func(_ *schedFixture, p servertest.Prompt, id string) { commitWork(t, p, id) })
+		func(_ *schedFixture, p *servertest.Turn, id string) { commitWork(t, p, id) })
 	servertest.SetProjectTrunk(t, f.store, "proj", f.repo, "develop")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

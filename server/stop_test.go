@@ -25,7 +25,7 @@ func TestStop_WaitsForAMergeInFlightAndFlushesTheStoreCommit(t *testing.T) {
 	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.StoreCommitDebounce = time.Hour // only the stop's flush can commit
 	})
-	_, _, cwd := registerLaunch(h)
+	_, _, cwd := registerTurn(h)
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
 		testutil.WriteFile(t, *cwd, "agent.txt", "work")
 		testutil.CommitAll(t, *cwd, "agent work")
@@ -85,7 +85,7 @@ func TestStop_LeavesALiveAgentRunningAndUnmerged(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	registerLaunch(h)
+	registerTurn(h)
 	closed := make(chan struct{}, 4)
 	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		closed <- struct{}{}

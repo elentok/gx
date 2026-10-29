@@ -31,7 +31,7 @@ func claimFirstChild(t *testing.T, repo string) string {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	registerLaunch(h)
+	registerTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)

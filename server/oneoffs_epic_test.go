@@ -22,7 +22,7 @@ import (
 // and can only be a bounded quiet window.
 func startsWithLive(t *testing.T, h *servertest.Harness, root, first string, live int, wantStart bool) bool {
 	t.Helper()
-	registerLaunch(h)
+	registerTurn(h)
 	for i := 0; i < live; i++ {
 		h.Server.PutRun(root, server.Run{Address: root + "/9" + string(rune('0'+i))})
 	}
@@ -115,7 +115,7 @@ func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Agent: "claude"})
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "codex"})
 	h := startOneOffsHarness(t, store)
-	h.RegisterLaunch(func(servertest.Prompt) {})
+	h.OnTurn(func(*servertest.Turn) {})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:one-offs/01", "proj:one-offs/02"} {
@@ -137,7 +137,7 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt"})
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "nonsense"})
 	h := startOneOffsHarness(t, store)
-	h.RegisterLaunch(func(servertest.Prompt) {})
+	h.OnTurn(func(*servertest.Turn) {})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:one-offs/01", "proj:one-offs/02"} {
@@ -174,7 +174,7 @@ func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Status: "done"})
 	h := startOneOffsHarness(t, store)
-	start, _, _ := registerLaunch(h)
+	start, _, _ := registerTurn(h)
 	merged := false
 	h.Server.SetMergeInto(func(git.Repo, []git.Worktree, string, string) (git.MergeOutcome, error) {
 		merged = true

@@ -21,8 +21,8 @@ func TestServertest_ParallelHarnessesEachDriveAHerdrLaunch(t *testing.T) {
 			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 			servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 			h := servertest.StartWithStore(t, store)
-			prompted := make(chan servertest.Prompt, 1)
-			h.RegisterLaunch(func(p servertest.Prompt) {
+			prompted := make(chan *servertest.Turn, 1)
+			h.OnTurn(func(p *servertest.Turn) {
 				select {
 				case prompted <- p:
 				default:
