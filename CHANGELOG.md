@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.42.0 - 2026-10-29
+
+- Added the Agents page to the web UI. It has a new Agents tab and a session sidebar with a toggle for design sessions. You can read a session's chat, switch between sessions, and send messages with Cmd/Ctrl+Enter. Drafts are saved per session in the browser and shared with the Design composer. Plain Claude sessions accept typed prompts. Sessions without chat, design sessions and non-Claude sessions show a notice, and failures show a banner with Retry. The page also works on a phone, with a full-screen switcher and a New session sheet.
+- Added a New session form, reachable from every entry point. The web server validates the first prompt before it creates the session.
+- Added `GET /v1/projects/worktrees` and a `worktrees` verb for projects.
+- Added browser tab titles for each web page. The Ticket page title comes from the loaded ticket.
+- Changed the Epics page to split "In progress" into "Implementing" and "Designing".
+- Added a warning when `node` is not on the server's PATH.
+- Changed the web session cookie name to use the listener port, so servers on different ports no longer clash.
+- Fixed a down dev frontend showing an empty 502. The server now explains what is wrong.
+
 ## v0.41.0 - 2026-10-29
 
 - Added disk space protection. The gx server checks free space on each project's repo disk and Go build cache disk. Two settings in `config.json` set the limits: warn (default `"20G"`) and clean (default `"10G"`). Zero turns a limit off. Under the warn limit, every web page shows a banner with a "Clean now" button, and gx sends a chat notice. Under the clean limit, gx holds dispatch for the projects on that disk and runs their cleanup command, `go clean -cache` by default. A project can replace that command in `project.json`, or set it empty to turn cleanup off. Held tickets show a "disk low" verdict on the web, and dispatch resumes once free space is back. Also added `gx server disk status`, `gx server disk clean` and their routes.
