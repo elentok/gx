@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,35 +21,27 @@ func TestStop_WaitsForAMergeInFlightAndFlushesTheStoreCommit(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture), func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.StoreCommitDebounce = time.Hour // only the stop's flush can commit
 	})
-	_, _, cwd := registerTurn(h)
-	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
-		testutil.WriteFile(t, cwd(), "agent.txt", "work")
-		testutil.CommitAll(t, cwd(), "agent work")
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
+	h.OnTurn(func(turn *servertest.Turn) {
+		testutil.WriteFile(t, turn.Cwd, "agent.txt", "work")
+		testutil.CommitAll(t, turn.Cwd, "agent work")
 	})
-	// The merge closes the iteration's tab; hold it there.
-	merging, release := make(chan struct{}), make(chan struct{})
-	var releaseOnce sync.Once
-	releaseMerge := func() { releaseOnce.Do(func() { close(release) }) }
-	t.Cleanup(releaseMerge) // a failure before the release must not hold herdrfake forever
-	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		close(merging)
-		<-release
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
+	// The merge stops the iteration's agent; hold it there.
+	releaseMerge := h.BlockStops()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
-	select {
-	case <-merging:
-	case <-ctx.Done():
-		t.Fatal("merge never started")
+	for h.Stops() == 0 {
+		select {
+		case <-ctx.Done():
+			t.Fatal("merge never started")
+		case <-time.After(10 * time.Millisecond):
+		}
 	}
 
 	stopped := make(chan error, 1)

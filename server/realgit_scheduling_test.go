@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -228,7 +227,7 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 			return
 		}
 		commitWork(t, p, "post")
-	}, servertest.WithHerdr(servertest.UntilPtyFixture))
+	})
 	ticketPath = f.ticketFile(t, "01")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -251,8 +250,11 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 	}
 
 	// A person answers and the ticket is picked back up.
-	if err := ralphloop.ResumeTicket(ticketPath, time.Now()); err != nil {
-		t.Fatal(err)
+	// The PTY agent waits idle for the answer, so the answer is what resumes it.
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
+	res, err := f.h.Client.TicketAnswer(ctx, server.QueueRequest{Address: "proj:" + schedEpic + "/01", State: state, Choice: "a"})
+	if err != nil || res.Refused {
+		t.Fatalf("answer = %+v, %v", res, err)
 	}
 	servertest.WaitForEvent(ctx, t, evs, server.EventRootCompleted, "")
 
