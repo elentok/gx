@@ -531,3 +531,183 @@ test("89. Session not found", async ({ page, start }) => {
   await page.getByRole("link", { name: "Back to sessions" }).click();
   await expect(page).toHaveURL(/#\/agents$/);
 });
+
+const switcher = (page: Page) => page.getByRole("dialog", { name: "Switch session" });
+const switcherFilter = (page: Page) => switcher(page).getByRole("combobox");
+const switcherRows = (page: Page) => switcher(page).getByRole("option");
+
+/** The switcher's order: Actionable, then Unread, then the rest, each in list order. */
+const switcherOrder = (list: SessionInfo[]) => {
+  const bucket = (s: SessionInfo) => (isActionable(s) ? 0 : s.unread.unread ? 1 : 2);
+  return [0, 1, 2].flatMap((b) => list.filter((s) => bucket(s) === b));
+};
+const titleButton = (page: Page) => page.getByRole("heading", { level: 1 }).getByRole("button");
+
+test("84. Session switcher", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const list = await sessions(fixture);
+  const idle = list[0];
+  const design = list.find((s) => s.design)!;
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await go(page, `#/agents/${idle.id}`);
+
+  // The title button and Cmd-K both open it, on the filter.
+  await titleButton(page).click();
+  await expect(switcherFilter(page)).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(switcher(page)).toHaveCount(0);
+  await page.keyboard.press("Control+k");
+  await expect(switcherFilter(page)).toBeFocused();
+
+  // Sections, the current tag, and design sessions listed while the sidebar hides them.
+  for (const title of ["Actionable", "Unread", "Other"]) await expect(switcher(page).getByRole("group", { name: title })).toBeVisible();
+  const order = switcherOrder(list);
+  await expect(switcherRows(page)).toHaveCount(list.length + 1);
+  const at = order.indexOf(idle);
+  await expect(switcherRows(page).nth(at)).toHaveAttribute("aria-current", "true");
+  await expect(switcherRows(page).nth(at).getByText("current")).toBeVisible();
+  await expect(switcherRows(page).filter({ has: page.getByText("current", { exact: true }) })).toHaveCount(1);
+  await expect(row(page, design)).toHaveCount(0);
+  await expect(switcherRows(page).nth(order.indexOf(design)).getByRole("img", { name: "Design" })).toBeVisible();
+
+  // The filter matches the ticket and the dir; the New session row stays.
+  const withTicket = list.find((s) => s.ticket)!;
+  const ticketCount = list.filter((s) => s.ticket === withTicket.ticket).length;
+  await switcherFilter(page).fill(withTicket.ticket!);
+  await expect(switcherRows(page)).toHaveCount(ticketCount + 1);
+  await expect(switcherRows(page).last()).toContainText("+ New session");
+  const other = switcherOrder(list.filter((s) => s.project === "other"))[0];
+  await switcherFilter(page).fill(other.dir);
+  await expect(switcherRows(page)).toHaveCount(list.filter((s) => s.dir === other.dir).length + 1);
+
+  // Picking a row opens the session and closes the switcher.
+  await switcherRows(page).first().click();
+  await expect(switcher(page)).toHaveCount(0);
+  await expect(page).toHaveURL(new RegExp(`#/agents/${other.id}$`));
+  await expect(row(page, other)).toHaveAttribute("aria-current", "page");
+
+  // Escape closes it.
+  await page.keyboard.press("Control+k");
+  await expect(switcher(page)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(switcher(page)).toHaveCount(0);
+
+  // An epic's Design page keeps its own jump menu on the same key.
+  await go(page, "#/d/demo:design-epic");
+  await page.keyboard.press("Control+k");
+  await expect(page.getByRole("dialog", nav("Jump to epic"))).toBeVisible();
+  await expect(switcher(page)).toHaveCount(0);
+});
+
+const newForm = (page: Page) => page.getByRole("dialog", { name: "New session" });
+const projectSelect = (page: Page) => newForm(page).getByRole("combobox", { name: "Project" });
+const worktreeBox = (page: Page) => newForm(page).getByRole("combobox", { name: "Worktree" });
+const promptBox = (page: Page) => newForm(page).getByRole("textbox", { name: "First prompt" });
+const createButton = (page: Page) => newForm(page).getByRole("button", { name: "Create session" });
+
+const created = async (fixture: Fixture, before: SessionInfo[]) => {
+  const known = new Set(before.map((s) => s.id));
+  await expect.poll(async () => (await sessions(fixture)).filter((s) => !known.has(s.id)).length).toBe(1);
+  return (await sessions(fixture)).find((s) => !known.has(s.id))!;
+};
+
+test("85. Create session", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const before = await sessions(fixture);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await go(page, "#/agents");
+
+  await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
+  await expect(projectSelect(page)).toHaveValue("demo");
+  await expect(worktreeBox(page)).toHaveValue("Project root");
+  await promptBox(page).fill("first words");
+  await createButton(page).click();
+
+  const made = await created(fixture, before);
+  expect(made.project).toBe("demo");
+  await expect(page).toHaveURL(new RegExp(`#/agents/${made.id}$`));
+  await expect(newForm(page)).toHaveCount(0);
+  await expect(row(page, made)).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("first words", { exact: true })).toBeVisible();
+  expect(await fixture.cli("agents", "list")).toContain(made.id);
+});
+
+test("86. Create in a new worktree", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const before = await sessions(fixture);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await go(page, "#/agents");
+
+  await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
+  await expect(newForm(page)).toBeVisible();
+
+  // A bad name shows the refusal in the form and keeps the input.
+  await worktreeBox(page).fill("bad name");
+  await page.getByRole("option", { name: /Create worktree/ }).click();
+  await createButton(page).click();
+  await expect(newForm(page).getByRole("alert")).toBeVisible();
+  await expect(worktreeBox(page)).toHaveValue("bad name");
+  expect(await sessions(fixture)).toHaveLength(before.length);
+
+  // A first prompt that starts with / is refused too.
+  await worktreeBox(page).fill("fresh-tree");
+  await page.getByRole("option", { name: /Create worktree/ }).click();
+  await promptBox(page).fill("/clear");
+  await createButton(page).click();
+  await expect(newForm(page).getByRole("alert")).toBeVisible();
+  await expect(promptBox(page)).toHaveValue("/clear");
+  await expect(worktreeBox(page)).toHaveValue("fresh-tree");
+  expect(await sessions(fixture)).toHaveLength(before.length);
+
+  // A good one creates the worktree and runs the session in it.
+  await promptBox(page).fill("hello");
+  await createButton(page).click();
+  const made = await created(fixture, before);
+  expect(made.dir).toMatch(/fresh-tree$/);
+  await expect(page).toHaveURL(new RegExp(`#/agents/${made.id}$`));
+  await expect(newForm(page)).toHaveCount(0);
+});
+
+test("87. Create entry points", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const list = await sessions(fixture);
+  const inSite = list.find((s) => s.project === "site" && !s.design)!;
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const closeForm = async () => {
+    await newForm(page).getByRole("button", { name: "Close" }).click();
+    await expect(newForm(page)).toHaveCount(0);
+  };
+
+  // No session selected: a group's "+" prefills its project.
+  await go(page, "#/agents");
+  await sidebar(page).getByRole("button", { name: "New session in other" }).click();
+  await expect(projectSelect(page)).toHaveValue("other");
+  await closeForm();
+
+  // With a session selected, the sidebar button and the switcher row prefill its project.
+  await go(page, `#/agents/${inSite.id}`);
+  await sidebar(page).getByRole("button", { name: "+ New session" }).click();
+  await expect(projectSelect(page)).toHaveValue("site");
+  await closeForm();
+  await titleButton(page).click();
+  await switcher(page).getByRole("option", { name: /\+ New session/ }).click();
+  await expect(switcher(page)).toHaveCount(0);
+  await expect(projectSelect(page)).toHaveValue("site");
+  await closeForm();
+
+  // Cmd-K, then the keyboard to the last row.
+  await page.keyboard.press("Control+k");
+  await switcherFilter(page).press("ArrowUp");
+  await switcherFilter(page).press("Enter");
+  await expect(projectSelect(page)).toHaveValue("site");
+
+  // The draft survives closing and a fresh page of the same browser.
+  await promptBox(page).fill("a draft to keep");
+  await closeForm();
+  const second = await freshVisit(page, "/#/agents");
+  await second.getByRole("button", { name: "+ New session" }).click();
+  await expect(promptBox(second)).toHaveValue("a draft to keep");
+  await expect(second.getByRole("dialog", { name: "New session" }).getByRole("combobox", { name: "Project" })).toHaveValue("site");
+  await second.close();
+  expect(await sessions(fixture)).toHaveLength(list.length);
+});

@@ -1053,3 +1053,48 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   2. Open the Exited session, then remove it with `gx agents remove`.
   3. At 390px click "Back to sessions".
 - **Pass:** the panel reads "Session not found" and "<label> no longer exists." and the sidebar keeps its rows. At 1280px there is no "Back to sessions" link. After the removal the panel replaces the view, the row leaves, the other rows stay and the URL still names the removed session. At 390px "Back to sessions" opens `#/agents`.
+
+## 84. Session switcher
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. At 1280px open an idle session. Click the title button, press Esc, then press Ctrl+K.
+  2. Filter by a ticket, then by a project dir. Pick the first row.
+  3. Press Ctrl+K, then Esc.
+  4. Open `#/d/demo:design-epic` and press Ctrl+K.
+- **Pass:**
+  - Both open the switcher on the filter. The sections are Actionable, Unread and Other, and every session is listed, Design sessions included while the sidebar hides them.
+  - The open session carries the "current" tag, and only that one.
+  - Filtering by ticket or dir keeps only the matching rows and the "+ New session" row.
+  - A pick closes the switcher and opens that session. Esc closes it.
+  - On the Design page Ctrl+K opens the "Jump to epic" menu, not the switcher.
+
+## 85. Create session
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. At 1280px open `#/agents` and press "New session in demo".
+  2. Leave the worktree on Project root, type a first prompt and press Create session.
+- **Pass:** the form opens with Project `demo` and Worktree "Project root". After Create the form closes, the page opens the new session and its row is selected. The chat shows the prompt and `gx agents list` lists the session in `demo`.
+
+## 86. Create in a new worktree
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. At 1280px press "New session in demo". Type `bad name` in Worktree, pick "+ Create worktree", press Create session.
+  2. Type `fresh-tree`, pick "+ Create worktree", type `/clear` as the first prompt and press Create session.
+  3. Replace the prompt with `hello` and press Create session.
+- **Pass:** the bad name and the `/` prompt each show a refusal in the form and keep the input. No session is created for either. The last create makes one session whose dir ends in `fresh-tree`, opens it and closes the form.
+
+## 87. Create entry points
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. At 1280px on `#/agents` press "New session in other".
+  2. Open a `site` session. Press "+ New session" in the sidebar, then the same row in the switcher.
+  3. Press Ctrl+K, ArrowUp, Enter.
+  4. Type a first prompt, close the form with ×, then open `#/agents` in a new tab of the same browser and press "+ New session".
+- **Pass:**
+  - The group's "+" prefills Project `other`.
+  - The sidebar button, the switcher row and the Ctrl+K path each prefill `site`, the selected session's project.
+  - Closing keeps the draft: the new tab's form has the prompt and Project `site`. No session is created.
