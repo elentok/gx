@@ -87,18 +87,19 @@ describe("Tray popover", () => {
     expect(getByText("macbook-pro.local")).toBeTruthy();
   });
 
-  it("shows the CPU and memory rows with averages and thresholds", async () => {
-    const { getByText } = await openTray();
+  it("shows the CPU and memory rows with averages, without thresholds", async () => {
+    const { getByText, queryByText } = await openTray();
     expect(getByText("81% busy")).toBeTruthy();
-    expect(getByText("1-minute average 76% · high at 70%, critical at 90%")).toBeTruthy();
+    expect(getByText("1-minute average 76%")).toBeTruthy();
     expect(getByText("71% used")).toBeTruthy();
-    expect(getByText("22.7 of 32 GB · macOS pressure: normal · high at 80%, critical at 90%")).toBeTruthy();
+    expect(getByText("22.7 of 32 GB · macOS pressure: normal")).toBeTruthy();
+    expect(queryByText(/high at|critical at/)).toBeNull();
   });
 
   it("leaves the pressure out when the response has none", async () => {
     respondWith(report({ pressure: undefined }));
     const { getByText } = await openTray();
-    expect(getByText("22.7 of 32 GB · high at 80%, critical at 90%")).toBeTruthy();
+    expect(getByText("22.7 of 32 GB")).toBeTruthy();
   });
 
   it("polls every 5 seconds while open and stops when closed", async () => {
@@ -261,13 +262,13 @@ describe("Tray popover", () => {
     it("says why the disk meter has no reading", async () => {
       withDisks([], { state: "unknown", reason: "waiting", worst_id: undefined });
       const { getByText } = await openTray();
-      expect(getByText("No disk reading yet · warns under 20G, cleans under 10G")).toBeTruthy();
+      expect(getByText("No disk reading yet")).toBeTruthy();
     });
 
-    it("lists every disk with free space, bar, state and projects, plus thresholds", async () => {
+    it("lists every disk with free space, bar, state and projects, without thresholds", async () => {
       withDisks([disk(), disk({ id: "d2", name: "work", free_bytes: 8 * GB, state: "high", projects: ["site"], held: false })]);
-      const { getByText, getAllByText, container } = await openTray();
-      expect(getByText("warns under 20G, cleans under 10G")).toBeTruthy();
+      const { getAllByText, getByText, queryByText, container } = await openTray();
+      expect(queryByText(/warns under|cleans under/)).toBeNull();
       // The row's value is the worst disk's free space, repeated in that disk's entry.
       expect(getAllByText("8G free")).toHaveLength(2);
       expect(getByText("15G free")).toBeTruthy();
@@ -277,6 +278,13 @@ describe("Tray popover", () => {
       expect(entries).toHaveLength(2);
       expect(entries[1].getAttribute("data-state")).toBe("high");
       expect(entries[0].querySelector("[data-part='disk-bar']")?.getAttribute("data-percent")).toBe("85");
+    });
+
+    it("leaves out the project list when every project is on one disk", async () => {
+      withDisks([disk(), disk({ id: "d2", name: "empty", projects: [] })]);
+      const { queryByText, container } = await openTray();
+      expect(queryByText("gx, dotfiles")).toBeNull();
+      expect(container.ownerDocument.querySelectorAll("[data-part='disk-projects']")).toHaveLength(0);
     });
 
     it("tells a held disk to use the banner and has no button", async () => {

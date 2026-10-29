@@ -1,6 +1,6 @@
 import { Box, Link, Text } from "@chakra-ui/react";
 import { useEffect, useState, type ReactNode } from "react";
-import type { CauseList as CauseListData, CauseRow, DisksReport, Health, HealthDisk, HealthReason, HealthReport, HealthState, HealthThresholds } from "../generated/server";
+import type { CauseList as CauseListData, CauseRow, DisksReport, Health, HealthDisk, HealthReason, HealthReport, HealthState } from "../generated/server";
 import { ticketHref } from "../hrefs";
 import { readPageCache, writePageCache } from "../pageCache";
 import { fetchJson } from "../ticket/detail";
@@ -60,8 +60,6 @@ const diskGB = (bytes: number) => {
   const n = bytes / 1e9;
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 };
-
-const thresholdText = (t: HealthThresholds) => `high at ${t.high}%, critical at ${t.critical}%`;
 
 const CACHE_KEY = "health";
 
@@ -128,7 +126,7 @@ export function HealthPopover({ health, connected = true }: { health: Health; co
         sub={
           cpu.state === "unknown"
             ? unknownText(cpu.reason)
-            : `1-minute average ${Math.round(cpu.average)}% · ${thresholdText(cpu.thresholds)}`
+            : `1-minute average ${Math.round(cpu.average)}%`
         }
       />
       <CauseList part="cpu-causes" list={report.causes.cpu} value={(r) => `${Math.round(r.cpu)}%`} />
@@ -142,7 +140,7 @@ export function HealthPopover({ health, connected = true }: { health: Health; co
         sub={
           memory.state === "unknown"
             ? unknownText(memory.reason)
-            : `${gb(memory.used_bytes)} of ${gb(memory.total_bytes)} GB${pressure} · ${thresholdText(memory.thresholds)}`
+            : `${gb(memory.used_bytes)} of ${gb(memory.total_bytes)} GB${pressure}`
         }
       />
       <CauseList part="memory-causes" list={report.causes.memory} value={(r) => bytesText(r.mem_bytes)} />
@@ -199,7 +197,8 @@ function Row({
   value: string;
   /** Omitted when the row's bars are in its children. */
   percent?: number;
-  sub: string;
+  /** Omitted when the row has no note under it. */
+  sub?: string;
   /** Replaces the state's default tag wording. */
   tagText?: Partial<Record<HealthState, string>>;
   children?: ReactNode;
@@ -239,9 +238,11 @@ function Row({
       </Text>
       {percent !== undefined && <Bar percent={percent} color={color} />}
       {children}
-      <Text as="span" gridColumn="2 / 4" fontSize="xs" lineHeight="1.45" color="text.dim">
-        {sub}
-      </Text>
+      {sub && (
+        <Text as="span" gridColumn="2 / 4" fontSize="xs" lineHeight="1.45" color="text.dim">
+          {sub}
+        </Text>
+      )}
     </Box>
   );
 }
@@ -290,7 +291,8 @@ function CauseList({ part, list, value }: { part: string; list: CauseListData; v
 function DiskRow({ disks, serverTime }: { disks: DisksReport; serverTime: string }) {
   const list = disks.disks;
   const worst = list.find((d) => d.id === disks.worst_id);
-  const thresholds = `warns under ${disks.warn_below}, cleans under ${disks.clean_below}`;
+  // With every project on one disk, its project list names them all and says nothing.
+  const showProjects = list.filter((d) => d.projects.length > 0).length > 1;
   return (
     <Row
       part="disk"
@@ -298,19 +300,19 @@ function DiskRow({ disks, serverTime }: { disks: DisksReport; serverTime: string
       name="Disk"
       state={disks.state}
       value={worst && disks.state !== "unknown" ? `${diskGB(worst.free_bytes)}G free` : "—"}
-      sub={disks.state === "unknown" ? `${diskUnknownText(disks.reason)} · ${thresholds}` : thresholds}
+      sub={disks.state === "unknown" ? diskUnknownText(disks.reason) : undefined}
       tagText={{ high: "Under warn", critical: "Under clean" }}
     >
       <Box gridColumn="2 / 4" display="flex" flexDirection="column" gap="6px" mt="4px">
         {list.map((d) => (
-          <DiskEntry key={d.id} disk={d} serverTime={serverTime} />
+          <DiskEntry key={d.id} disk={d} serverTime={serverTime} showProjects={showProjects} />
         ))}
       </Box>
     </Row>
   );
 }
 
-function DiskEntry({ disk, serverTime }: { disk: HealthDisk; serverTime: string }) {
+function DiskEntry({ disk, serverTime, showProjects }: { disk: HealthDisk; serverTime: string; showProjects: boolean }) {
   const color = STATE_COLOR[disk.state];
   const unknown = disk.state === "unknown";
   const ageSeconds = Math.floor((Date.parse(serverTime) - Date.parse(disk.read_at)) / 1000);
@@ -327,9 +329,11 @@ function DiskEntry({ disk, serverTime }: { disk: HealthDisk; serverTime: string 
         </Text>
       </Box>
       {!unknown && <Bar part="disk-bar" percent={usedPercent} color={color} />}
-      <Text fontSize="xs" lineHeight="1.45" color="text.dim">
-        {unknown ? "No reading for this disk" : projects}
-      </Text>
+      {(unknown || showProjects) && (
+        <Text fontSize="xs" lineHeight="1.45" color="text.dim" data-part="disk-projects">
+          {unknown ? "No reading for this disk" : projects}
+        </Text>
+      )}
       {disk.held && (
         <Text fontSize="xs" lineHeight="1.45" color={color}>
           {`Dispatch held for ${projects}. Clean now is in the banner.`}
