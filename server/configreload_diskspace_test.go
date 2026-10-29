@@ -11,6 +11,7 @@ import (
 )
 
 func TestSettingsFromConfig_CarriesDiskSpace(t *testing.T) {
+	t.Parallel()
 	cfg := config.Default()
 	cfg.DiskSpace = config.DiskSpaceConfig{WarnBelow: 30e9, CleanBelow: 5e9, CleanupCommand: []string{"make", "clean"}}
 
@@ -22,6 +23,7 @@ func TestSettingsFromConfig_CarriesDiskSpace(t *testing.T) {
 
 // A reload reports each changed disk-space key, and the live settings carry it.
 func TestConfigReload_DiskSpaceKeysApply(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
@@ -48,6 +50,7 @@ func TestConfigReload_DiskSpaceKeysApply(t *testing.T) {
 }
 
 func TestConfigReload_BadDiskSizeRefuses(t *testing.T) {
+	t.Parallel()
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))

@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -89,12 +90,10 @@ func (r *holdRig) explain(t *testing.T, addr string) server.Explanation {
 func (r *holdRig) explainWhen(t *testing.T, addr, want string) server.Explanation {
 	t.Helper()
 	var ex server.Explanation
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
-		if ex = r.explain(t, addr); ex.Verdict == want {
-			return ex
-		}
-	}
-	t.Fatalf("explain %s = %+v, want verdict %q", addr, ex, want)
+	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("explain %s verdict %q", addr, want), func() bool {
+		ex = r.explain(t, addr)
+		return ex.Verdict == want
+	})
 	return ex
 }
 
@@ -102,7 +101,7 @@ func (r *holdRig) started(n int) func() bool { return func() bool { return len(r
 
 func (r *holdRig) neverStarts(t *testing.T) {
 	t.Helper()
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(quiet) // negative wait: the hold means no positive event follows
 	if len(r.start()) != 0 || len(r.h.Server.Runs()) != 0 {
 		t.Errorf("an agent started on a held disk: %v, runs %d", r.start(), len(r.h.Server.Runs()))
 	}
@@ -117,6 +116,7 @@ func assertLowReason(t *testing.T, ex server.Explanation, disk, free string) {
 
 // Seam: claim gate (story 29).
 func TestDiskHold_LowDiskStopsClaimAndExplains(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb)
 	r.disks.SetFree(repo, 3*gb)
@@ -128,6 +128,7 @@ func TestDiskHold_LowDiskStopsClaimAndExplains(t *testing.T) {
 // Seam: pre-claim reading (story 11): the timer never fires, so only the
 // claim path can notice the drop. It holds the disk and starts the clean.
 func TestDiskHold_PreClaimReadingHoldsBeforeTheTimer(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	cleaner := &fakeCleaner{}
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb, func(c *server.Config) {
@@ -147,6 +148,7 @@ func TestDiskHold_PreClaimReadingHoldsBeforeTheTimer(t *testing.T) {
 
 // Seam: the Go cache disk alone holds the project (story 10 part, story 29).
 func TestDiskHold_GoCacheDiskAloneHolds(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb)
 	r.disks.Put("/gocache", "disk-cache", "/vol-cache", 2*gb)
@@ -157,6 +159,7 @@ func TestDiskHold_GoCacheDiskAloneHolds(t *testing.T) {
 
 // Seam: running work keeps running (story 30).
 func TestDiskHold_RunningAgentFinishesDuringHold(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
@@ -183,7 +186,13 @@ func TestDiskHold_RunningAgentFinishesDuringHold(t *testing.T) {
 		t.Fatal("agent never launched")
 	}
 	disks.SetFree(repo, gb)
-	letWatcherRead()
+	servertest.WaitFor(t, 10*time.Second, "the disk held", func() bool {
+		rep, err := h.Client.DiskStatus(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return slices.ContainsFunc(rep.Disks, func(d server.DiskStatus) bool { return d.Held })
+	})
 	if len(h.Server.Runs()) != 1 {
 		t.Fatalf("runs during hold = %d, want the agent still running", len(h.Server.Runs()))
 	}
@@ -196,6 +205,7 @@ func TestDiskHold_RunningAgentFinishesDuringHold(t *testing.T) {
 
 // Seam: other disks dispatch (story 31).
 func TestDiskHold_OtherDiskStillDispatches(t *testing.T) {
+	t.Parallel()
 	low, fine := testutil.TempRepo(t), testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"low": low, "fine": fine}, 10*gb)
 	r.disks.SetFree(low, gb)
@@ -219,6 +229,7 @@ func TestDiskHold_OtherDiskStillDispatches(t *testing.T) {
 
 // Seam: one-offs are held (story 32).
 func TestDiskHold_OneOffOnHeldDiskWaits(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb)
 	r.disks.SetFree(repo, gb)
@@ -233,6 +244,7 @@ func TestDiskHold_OneOffOnHeldDiskWaits(t *testing.T) {
 // Seam: resume (stories 34, 35): the ticket starts alone and the chat hears
 // one notice, however many readings follow.
 func TestDiskHold_ResumeStartsTicketAndNotifiesOnce(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb)
 	r.disks.SetFree(repo, 3*gb)
@@ -241,8 +253,7 @@ func TestDiskHold_ResumeStartsTicketAndNotifiesOnce(t *testing.T) {
 	r.disks.SetFree(repo, 10*gb)
 	waitFor(t, r.started(1))
 	waitFor(t, func() bool { return r.resume() >= 1 })
-	letWatcherRead()
-	time.Sleep(2 * testFlushInterval)
+	time.Sleep(quiet) // negative wait: no second resume notice
 	if n := r.resume(); n != 1 {
 		t.Errorf("resume notices = %d, want 1", n)
 	}
@@ -250,6 +261,7 @@ func TestDiskHold_ResumeStartsTicketAndNotifiesOnce(t *testing.T) {
 
 // Seam: one disk, one resume (story 12, resume part).
 func TestDiskHold_TwoProjectsOnOneDiskGiveOneEntryAndOneNotice(t *testing.T) {
+	t.Parallel()
 	a, b := testutil.TempRepo(t), testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"a": a, "b": b}, 10*gb)
 	r.disks.Put(a, "shared", "/shared", 3*gb)
@@ -261,8 +273,7 @@ func TestDiskHold_TwoProjectsOnOneDiskGiveOneEntryAndOneNotice(t *testing.T) {
 	r.disks.SetFree(a, 50*gb)
 	r.disks.SetFree(b, 50*gb)
 	waitFor(t, func() bool { return r.resume() >= 1 })
-	letWatcherRead()
-	time.Sleep(2 * testFlushInterval)
+	time.Sleep(quiet) // negative wait: no second resume notice
 	if n := r.resume(); n != 1 {
 		t.Errorf("resume notices = %d, want 1", n)
 	}
@@ -271,21 +282,20 @@ func TestDiskHold_TwoProjectsOnOneDiskGiveOneEntryAndOneNotice(t *testing.T) {
 func waitDisks(t *testing.T, r *holdRig, pred func([]server.DiskStatus) bool) []server.DiskStatus {
 	t.Helper()
 	var last []server.DiskStatus
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+	servertest.WaitFor(t, 10*time.Second, "the expected snapshot disks", func() bool {
 		snap, err := r.h.Client.Snapshot(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if last = snap.Disks; pred(last) {
-			return last
-		}
-	}
-	t.Fatalf("snapshot disks = %+v", last)
-	return nil
+		last = snap.Disks
+		return pred(last)
+	})
+	return last
 }
 
 // Seam: a held disk is listed with the warn threshold off (story 16).
 func TestDiskHold_HeldDiskListedWithWarnOff(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb)
 	r.disks.SetFree(repo, 3*gb)
@@ -299,6 +309,7 @@ func TestDiskHold_HeldDiskListedWithWarnOff(t *testing.T) {
 
 // Seam: clean threshold off never holds (story 3, hold part).
 func TestDiskHold_CleanThresholdOffNeverHolds(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"proj": repo}, 0)
 	r.disks.SetFree(repo, 1)
@@ -308,6 +319,7 @@ func TestDiskHold_CleanThresholdOffNeverHolds(t *testing.T) {
 
 // Seam: retry and relaunch are refused on a held disk and pass on a free one.
 func TestDiskHold_RelaunchAndRetryRefused(t *testing.T) {
+	t.Parallel()
 	repo := testutil.TempRepo(t)
 	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb, func(c *server.Config) { c.DiskPollInterval = time.Hour })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

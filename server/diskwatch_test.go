@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -82,37 +83,47 @@ func startDiskRig(t *testing.T, projects map[string]string, warn config.ByteSize
 func (r *diskRig) disksWhen(t *testing.T, what string, pred func([]server.DiskStatus) bool) []server.DiskStatus {
 	t.Helper()
 	var last []server.DiskStatus
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+	servertest.WaitFor(t, 10*time.Second, "snapshot disks "+what, func() bool {
 		snap, err := r.h.Client.Snapshot(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if last = snap.Disks; pred(last) {
-			return last
-		}
-	}
-	t.Fatalf("snapshot disks = %+v, want %s", last, what)
-	return nil
+		last = snap.Disks
+		return pred(last)
+	})
+	return last
 }
 
 func (r *diskRig) waitNotices(t *testing.T, n int) {
 	t.Helper()
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		if r.notice() >= n {
-			return
-		}
-	}
-	t.Fatalf("warn notices = %d, want %d", r.notice(), n)
+	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("%d warn notices", n), func() bool { return r.notice() >= n })
 }
 
-// letWatcherRead lets the watcher take several readings.
-func letWatcherRead() { time.Sleep(15 * diskInterval) }
+// waitReading waits until the watcher has read the disk id with free bytes, so
+// a later check sees the effect of a SetFree. The status route lists every
+// disk, warned or not.
+func (r *diskRig) waitReading(t *testing.T, id string, free uint64) {
+	t.Helper()
+	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("a reading of %s at %d bytes", id, free), func() bool {
+		rep, err := r.h.Client.DiskStatus(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return diskByID(rep, id).FreeBytes == free
+	})
+}
+
+// quiet is how long a negative check waits for something that must not
+// happen: several watcher readings and a chat flush. Only for checks with no
+// later positive event to wait on.
+const quiet = 15*diskInterval + 2*testFlushInterval
 
 func oneDisk(d []server.DiskStatus) bool { return len(d) == 1 }
 func noDisks(d []server.DiskStatus) bool { return len(d) == 0 }
 
 // Seam: the watcher reads with no queued root.
 func TestDiskWatch_LowDiskShowsInSnapshotWithNoQueue(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	r := startDiskRig(t, map[string]string{"proj": repo}, 20*gb)
 	r.disks.Put(repo, "d1", "/vol1", 5*gb)
@@ -124,6 +135,7 @@ func TestDiskWatch_LowDiskShowsInSnapshotWithNoQueue(t *testing.T) {
 
 // Seam: the Go cache disk is watched for every project.
 func TestDiskWatch_GoCacheDiskAloneNamesTheProject(t *testing.T) {
+	t.Parallel()
 	repo, goCache := t.TempDir(), t.TempDir()
 	r := startDiskRig(t, map[string]string{"proj": repo}, 20*gb, func(c *server.Config) {
 		c.GoCacheDir = func() (string, error) { return goCache, nil }
@@ -138,6 +150,7 @@ func TestDiskWatch_GoCacheDiskAloneNamesTheProject(t *testing.T) {
 
 // Seam: projects on one disk share one entry and one notice.
 func TestDiskWatch_TwoProjectsOnOneDiskShareEntryAndNotice(t *testing.T) {
+	t.Parallel()
 	a, b := t.TempDir(), t.TempDir()
 	r := startDiskRig(t, map[string]string{"a": a, "b": b}, 20*gb)
 	r.disks.Put(a, "d1", "/vol1", 5*gb)
@@ -149,7 +162,7 @@ func TestDiskWatch_TwoProjectsOnOneDiskShareEntryAndNotice(t *testing.T) {
 		t.Errorf("projects = %v", got.Projects)
 	}
 	r.waitNotices(t, 1)
-	letWatcherRead()
+	time.Sleep(quiet) // negative wait: no second notice follows
 	if n := r.notice(); n != 1 {
 		t.Errorf("warn notices = %d, want 1", n)
 	}
@@ -157,6 +170,7 @@ func TestDiskWatch_TwoProjectsOnOneDiskShareEntryAndNotice(t *testing.T) {
 
 // Seam: a crossing sends one notice naming the disk, its free space and the threshold.
 func TestDiskWatch_CrossingSendsNoticeWithDiskAndFreeSpace(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	r := startDiskRig(t, map[string]string{"proj": repo}, 20*gb)
 	r.disks.Put(repo, "d1", "/vol1", 5*gb)
@@ -174,16 +188,18 @@ func TestDiskWatch_CrossingSendsNoticeWithDiskAndFreeSpace(t *testing.T) {
 
 // Seam: hovering at the threshold sends one notice; a 2G climb re-arms it.
 func TestDiskWatch_HysteresisSendsOneNoticePerDrop(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	r := startDiskRig(t, map[string]string{"proj": repo}, 20*gb)
 	r.disks.Put(repo, "d1", "/vol1", 19*gb)
 	r.disksWhen(t, "warned", oneDisk)
 	for range 3 {
 		r.disks.SetFree(repo, 21*gb)
-		letWatcherRead()
+		r.waitReading(t, "d1", 21*gb)
 		r.disks.SetFree(repo, 19*gb)
-		letWatcherRead()
+		r.waitReading(t, "d1", 19*gb)
 	}
+	time.Sleep(quiet) // negative wait: a re-armed notice would arrive within a flush
 	if n := r.notice(); n != 1 {
 		t.Fatalf("warn notices after hovering = %d, want 1", n)
 	}
@@ -196,10 +212,11 @@ func TestDiskWatch_HysteresisSendsOneNoticePerDrop(t *testing.T) {
 
 // Seam: a zero warn threshold never marks a disk.
 func TestDiskWatch_ZeroWarnThresholdSendsNothing(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	r := startDiskRig(t, map[string]string{"proj": repo}, 0, func(c *server.Config) { c.DiskSpace.CleanBelow = 0 })
 	r.disks.Put(repo, "d1", "/vol1", 1)
-	letWatcherRead()
+	time.Sleep(quiet) // negative wait: no disk is ever marked
 	if d := r.disksWhen(t, "no disks", noDisks); len(d) != 0 || r.notice() != 0 {
 		t.Errorf("disks = %+v, notices = %d, want none", d, r.notice())
 	}
@@ -207,11 +224,12 @@ func TestDiskWatch_ZeroWarnThresholdSendsNothing(t *testing.T) {
 
 // Seam: a reload applies the new threshold at the next reading.
 func TestDiskWatch_ReloadAppliesAtNextReading(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	cfgPath := filepath.Join(t.TempDir(), "config.json")
 	r := startDiskRig(t, map[string]string{"proj": repo}, 20*gb, servertest.WithConfigFile(cfgPath))
 	r.disks.Put(repo, "d1", "/vol1", 30*gb)
-	letWatcherRead()
+	r.waitReading(t, "d1", 30*gb)
 	r.disksWhen(t, "no disks under 20G", noDisks)
 
 	servertest.WriteConfig(t, cfgPath, r.store, map[string]any{"disk-space": map[string]any{"warn-below": "50G", "clean-below": "10G"}})

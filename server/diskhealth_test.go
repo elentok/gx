@@ -45,6 +45,7 @@ func diskIs(state server.HealthState, level int) func(server.MeterHealth) bool {
 // Seam: the meter's state follows the disk watcher's flags (stories 4 and 15),
 // and the level is the percent used.
 func TestDiskHealth_StateAgreesWithTheDiskStatusFlags(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	r := startDiskRig(t, map[string]string{"proj": repo}, 20*gb)
 	r.disks.PutSized(repo, "d1", "/vol1", 30*gb, 100*gb)
@@ -74,6 +75,7 @@ func TestDiskHealth_StateAgreesWithTheDiskStatusFlags(t *testing.T) {
 
 // Seam: with two disks, one warned, the meter reads high (story 16).
 func TestDiskHealth_WorstDiskWins(t *testing.T) {
+	t.Parallel()
 	repo, goCache := t.TempDir(), t.TempDir()
 	r := startDiskRig(t, map[string]string{"proj": repo}, 20*gb, func(c *server.Config) {
 		c.GoCacheDir = func() (string, error) { return goCache, nil }
@@ -87,10 +89,11 @@ func TestDiskHealth_WorstDiskWins(t *testing.T) {
 
 // Seam: no disk read yet is unknown and waiting.
 func TestDiskHealth_NoDiskIsWaiting(t *testing.T) {
+	t.Parallel()
 	r := startDiskRig(t, nil, 20*gb, func(c *server.Config) {
 		c.FreeSpace = func(string) (server.DiskReading, error) { return server.DiskReading{}, errors.New("no disk") }
 	})
-	letWatcherRead()
+	time.Sleep(quiet) // negative wait: failed readings never leave the waiting state
 	got := r.diskMeterWhen(t, "waiting", func(m server.MeterHealth) bool { return true })
 	if got.State != server.HealthStateUnknown || got.Reason != server.HealthReasonWaiting {
 		t.Fatalf("disk = %+v, want unknown, waiting", got)
@@ -99,6 +102,7 @@ func TestDiskHealth_NoDiskIsWaiting(t *testing.T) {
 
 // Seam: the disk status route lists total bytes for each disk.
 func TestDiskStatus_ListsTotalBytes(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	r := startDiskRig(t, map[string]string{"proj": repo}, 20*gb)
 	r.disks.PutSized(repo, "d1", "/vol1", 30*gb, 100*gb)
@@ -114,11 +118,11 @@ func TestDiskStatus_ListsTotalBytes(t *testing.T) {
 
 // Seam: the health event fires only on a disk level or state change.
 func TestDiskHealth_EventOnlyOnLevelOrStateChange(t *testing.T) {
+	t.Parallel()
 	repo := t.TempDir()
 	r := startDiskRig(t, map[string]string{"proj": repo}, 20*gb)
 	r.disks.PutSized(repo, "d1", "/vol1", 30*gb, 100*gb)
 	r.diskMeterWhen(t, "normal at level 3", diskIs(server.HealthStateNormal, 3))
-	letWatcherRead()
 	snap, err := r.h.Client.Snapshot(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +134,7 @@ func TestDiskHealth_EventOnlyOnLevelOrStateChange(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.disks.SetFree(repo, 28*gb) // 72% used: same level, still normal
-	letWatcherRead()
+	r.waitReading(t, "d1", 28*gb)
 	r.disks.SetFree(repo, 15*gb) // 85% used and warned
 	r.diskMeterWhen(t, "high at level 4", diskIs(server.HealthStateHigh, 4))
 	if n := healthEvents(ch); n != 1 {

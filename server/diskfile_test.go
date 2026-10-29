@@ -7,6 +7,7 @@ import (
 )
 
 func TestFileFreeSpace(t *testing.T) {
+	t.Parallel()
 	free := filepath.Join(t.TempDir(), "free")
 	read := FileFreeSpace(free)
 

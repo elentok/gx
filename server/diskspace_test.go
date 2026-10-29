@@ -8,6 +8,7 @@ import (
 
 // Seam: the real source reads a non-zero free count and a stable disk id.
 func TestReadFreeSpace_ReturnsFreeBytesAndStableID(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	sub := filepath.Join(dir, "sub")
 	if err := os.Mkdir(sub, 0o755); err != nil {
