@@ -66,14 +66,34 @@ and the two paths tried for each, and end your turn.
 
 ## 3. Run both axes as independent parallel subagents
 
-Send **one message** carrying every `Agent` tool call — one per configured skill name, plus the one
-Spec call below (`general-purpose` subagents, run in the foreground since the next step needs every
-result back before it can start). Running them in the same message is what makes the passes
-independent instead of serialized, and it is what puts the Spec axis alongside the quality passes
-rather than after them.
+### Size gate
 
-Every subagent gets the fixed point, the diff command, and the commit list from step 1 — each one has
-read/git access to the worktree, so it runs the diff itself.
+Count the changed lines (`git diff <fixed-point>...HEAD --shortstat`: insertions plus deletions). At
+or under about 50 changed lines, skip the Quality subagents: a configured review skill costs far more
+than it finds on a diff that small. The Spec subagent still runs. Note the skip in the ticket body at
+step 7.
+
+### Shared review file
+
+Reviewers must not each re-run the diff and the same searches. Write one file in your scratchpad
+directory (with `Write`) holding the fixed point, the commit list, the changed-file list, the full
+diff, and the output of any search you already ran (say, a `rg` for a symbol the diff changes). Pass
+its path to every subagent; they read that file instead of running `git diff` themselves. They may
+Read a changed file for more context, but not re-run the diff or a search the file already holds.
+
+Every subagent prompt also says: "You must verify a suspicion before you report it: read the file or
+run the check yourself. Do not flag something as possible or unverified. Drop it if you cannot
+confirm it."
+
+### Launch
+
+Send **one message** carrying every `Agent` tool call — one per configured skill name (none when the
+size gate tripped), plus the one Spec call below (`general-purpose` subagents, run in the foreground
+since the next step needs every result back before it can start). Running them in the same message
+is what makes the passes independent instead of serialized, and it is what puts the Spec axis
+alongside the quality passes rather than after them.
+
+Every subagent gets the shared review file's path from above.
 
 **Quality subagents** (one per configured skill) also get:
 
