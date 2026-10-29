@@ -73,7 +73,8 @@ export function AgentsPage({
       {!sessions ? (
         <Spinner label="Loading agents" />
       ) : (
-        <Box flex="1" minH="0" display="grid" gridTemplateRows="minmax(0, 1fr)" gridTemplateColumns={wide ? "300px 1fr" : "1fr"}>
+        // The negative margins cancel PageContainer's padding so the sidebar fills the column edge to edge.
+        <Box flex="1" minH="0" display="grid" gridTemplateRows="minmax(0, 1fr)" gridTemplateColumns={wide ? "300px 1fr" : "1fr"} mx="-4" mb="-4" borderTopWidth="1px" borderColor="border">
           {(wide || !selected) && <AgentSidebar sessions={sessions} selected={selected} onNew={openNew} />}
           {(wide || selected) && (
             <Box as="main" p={wide ? "4" : "3"} minW="0">

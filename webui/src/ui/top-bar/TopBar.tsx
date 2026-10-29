@@ -74,7 +74,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
           >
             {label}
             {count > 0 && (
-              <Text as="span" aria-hidden ml="2" color="tone.waiting.fg">
+              <Text as="span" aria-hidden ml="2" px="2" borderRadius="full" bg="tone.waiting.fg" color="surface" fontFamily="text" fontSize="xs" fontWeight="600" verticalAlign="middle">
                 {count}
               </Text>
             )}

@@ -13,7 +13,7 @@ import { AGENTS_HREF, designHref } from "../hrefs";
 import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
-import { statusMark } from "./AgentSidebar";
+import { StatusMark, statusMark } from "./AgentSidebar";
 import { SessionSwitcher } from "./SessionSwitcher";
 
 // No question sheet, no step names, no "gx stopped", no Done state, and no Restore or New session.
@@ -22,7 +22,7 @@ const AGENT_OPTIONS: ChatOptions = { sheet: false, steps: false, gxStopped: fals
 const noop = () => {};
 
 function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; sessions: SessionInfo[]; onNew: () => void }) {
-  const { glyph, tone } = statusMark(s);
+  const { tone } = statusMark(s);
   const map = designOf(s);
   const wide = useWide();
   if (!wide) {
@@ -32,9 +32,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
         <Link href={AGENTS_HREF} aria-label="All sessions" fontSize="2xl" lineHeight="1" px="2" color="text.muted">
           ‹
         </Link>
-        <Text as="span" role="img" aria-label="status" color={`tone.${tone}.fg`}>
-          {glyph}
-        </Text>
+        <StatusMark session={s} />
         <Box display="flex" flexDirection="column" minW="0">
           <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} />
           <Text as="span" fontSize="sm" color="text.dim">
@@ -45,10 +43,8 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
     );
   }
   return (
-    <Box as="header" display="flex" alignItems="center" flexWrap="wrap" gap="2" mb="3">
-      <Text as="span" role="img" aria-label="status" color={`tone.${tone}.fg`}>
-        {glyph}
-      </Text>
+    <Box as="header" display="flex" alignItems="center" flexWrap="wrap" gap="2" mb="3" pb="2.5" borderBottomWidth="1px" borderColor="border">
+      <StatusMark session={s} />
       <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} />
       <Chip tone={tone}>{s.status.state}</Chip>
       {s.harness !== "claude" && <Chip>{s.harness}</Chip>}
