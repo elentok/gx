@@ -20,7 +20,6 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 func reload(t *testing.T, h *servertest.Harness) server.ReloadResult {
@@ -45,20 +44,13 @@ func TestConfigReload_MaxAgentsAppliesWithoutKillingAgents(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	path := filepath.Join(t.TempDir(), "config.json")
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture), servertest.WithConfigFile(path), func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) {
 		c.MaxAgents = 1
 		c.PollInterval = time.Hour
 		c.Sleep = time.Sleep
 	})
-	registerTurn(h)
-	// Started agents keep their slot: an iteration's finish wait never returns.
-	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}
-	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if slices.Contains(argv, "blocked") {
-			return nil, herdrfake.Identities{}, fmt.Errorf("timed out waiting for agent status")
-		}
-		return idle, herdrfake.Identities{}, nil
-	})
+	// Started agents keep their slot: no turn ends.
+	h.OnTurn(func(turn *servertest.Turn) { turn.Stall() })
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:epic-a/01", "proj:epic-b/01"} {

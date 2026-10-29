@@ -2,14 +2,12 @@ package server_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -21,10 +19,8 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
-	"github.com/elentok/gx/transcript"
 )
 
 // startRecovery starts a server whose catalog has one test-only low-authority
@@ -677,54 +673,6 @@ func startR3(t *testing.T, opts ...func(*server.Config)) *servertest.Harness {
 func runToZeroCommitPause(t *testing.T, h *servertest.Harness, last string) {
 	t.Helper()
 	h.OnTurn(func(turn *servertest.Turn) { turn.Transcript(last) })
-	queueToZeroCommitPause(t, h)
-}
-
-// runToZeroCommitPauseOnHerdr is runToZeroCommitPause for the tests still on
-// herdr handlers.
-func runToZeroCommitPauseOnHerdr(t *testing.T, h *servertest.Harness, last string) {
-	t.Helper()
-	home := h.Env("HOME")
-	registerTurn(h)
-	var cwd atomic.Value // the tab's cwd: the overridden agent start records no AgentStart
-	h.Herdr.Register("tab", "create", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		for i, a := range argv {
-			if a == "--cwd" && i+1 < len(argv) {
-				cwd.Store(argv[i+1])
-			}
-		}
-		return map[string]any{"tab": map[string]any{"tab_id": "t1"}, "root_pane": map[string]any{"pane_id": "p1"}}, herdrfake.Identities{}, nil
-	})
-	var started atomic.Bool
-	var turns atomic.Int32
-	agentAt := func(turn int32) map[string]any {
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "state_change_seq": turn, "agent_session": map[string]any{"value": "s1"}}}
-	}
-	agent := agentAt(0)
-	turn := func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		agent := agentAt(turns.Add(1))
-		line, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{"content": []map[string]any{{"type": "text", "text": last}}}})
-		path := transcript.PathIn(home, cwd.Load().(string), "s1")
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return nil, herdrfake.Identities{}, err
-		}
-		return agent, herdrfake.Identities{}, os.WriteFile(path, append(line, '\n'), 0o644)
-	}
-	reply := func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return agentAt(turns.Load()), herdrfake.Identities{}, nil
-	}
-	h.Herdr.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		started.Store(true)
-		return agent, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if !started.Load() {
-			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
-		}
-		return agentAt(turns.Load()), herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("agent", "wait", reply)
-	h.Herdr.Register("agent", "prompt", turn)
 	queueToZeroCommitPause(t, h)
 }
 

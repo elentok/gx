@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 // A failed launch pauses the ticket stuck with one chat message, and the
@@ -29,16 +30,12 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	chat := newSlackHook(t)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyAsDefault), func(c *server.Config) {
+	const label = "epic-a-iter-01"
+	fake := runnerfake.NewRunner()
+	fake.SetStartErr(label, errors.New("Herdr rejected Codex integration"))
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond // several ticks pass while the test waits
 		c.Chat = ralphloop.ServerChatConfig{SlackWebhookURL: chat.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: testFlushInterval}
-	})
-	var prompts atomic.Int32
-	h.OnTurn(func(*servertest.Turn) { prompts.Add(1) })
-	var starts atomic.Int32
-	h.Herdr.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		starts.Add(1)
-		return nil, herdrfake.Identities{}, errors.New("Herdr rejected Codex integration")
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -60,11 +57,11 @@ func TestLaunchPort_FailureAfterClaimPausesStuck(t *testing.T) {
 	if posts := chat.postsSince(started); len(posts) != 1 || !strings.Contains(posts[0], "Herdr rejected Codex integration") {
 		t.Errorf("chat sends = %v, want exactly 1 carrying the launch error", posts)
 	}
-	if got := starts.Load(); got != 1 {
+	if got := len(fake.ResumeIDs(label)); got != 1 {
 		t.Errorf("agent start calls = %d, want exactly 1", got)
 	}
-	if got := prompts.Load(); got != 0 {
-		t.Errorf("prompts = %d, want none after a failed launch", got)
+	if got := fake.Prompts(label); len(got) != 0 {
+		t.Errorf("prompts = %v, want none after a failed launch", got)
 	}
 	matches, _ := filepath.Glob(filepath.Join(store, "proj", "epic-a", "issues", "01-*.md"))
 	if len(matches) != 1 {

@@ -12,8 +12,7 @@
 //   - PTY (the default): the test needs a real agent turn.
 //   - runnerfake (WithRunner, WithRunnerFor): the test sets a runner state
 //     directly, or checks only what the server passed to Start.
-//   - herdr (WithHerdr): herdr is the subject, or the test is marked
-//     UntilPtyAsDefault.
+//   - herdr (WithHerdr): herdr is the subject.
 //
 // The fake herdr executable is first in PATH of every server's Config.Env but
 // fails any call unless the test asked for WithHerdr, so a stray herdr call
@@ -640,12 +639,6 @@ const (
 	// HerdrIsTheSubject is for a test of herdr itself: the herdr runner, its
 	// failures, or herdr-only behaviour.
 	HerdrIsTheSubject HerdrReason = iota + 1
-	// UntilPtyAsDefault is for a test that only needs herdr because herdr is
-	// still the default runner. gx:pty-as-default deletes it.
-	UntilPtyAsDefault
-	// UntilPtyFixture is for a test that waits on the PTY turn fixture's turn
-	// controls or leftover-run helper. It is deleted before this epic's verify.
-	UntilPtyFixture
 )
 
 // runnerChoice is what the runner options recorded; startWith resolves it once

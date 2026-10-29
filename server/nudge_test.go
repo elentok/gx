@@ -6,14 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
@@ -35,32 +33,21 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	claimTicket(t, store, "epic-a", "01", "01-first.md")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyAsDefault))
-	var mu sync.Mutex
-	var typed []string
-	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if argv[2] != "epic-a-iter-01" && argv[2] != "pane-1" {
-			return nil, herdrfake.Identities{}, errors.New("agent not found")
-		}
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		mu.Lock()
-		defer mu.Unlock()
-		typed = append(typed, argv[2]+": "+argv[3])
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "agent_status": "working", "state_change_seq": 2}}, herdrfake.Identities{}, nil
-	})
+	fake := runnerfake.NewRunner()
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
+	const label = "epic-a-iter-01"
+	if _, err := fake.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
+		t.Fatal(err)
+	}
 	ctx := context.Background()
 
 	res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "please continue")
 	if err != nil || res.Refused {
 		t.Fatalf("nudge = %+v, %v", res, err)
 	}
-	mu.Lock()
-	if len(typed) != 1 || typed[0] != "pane-1: please continue" {
+	if typed := fake.Prompts(label); len(typed) != 1 || typed[0] != "please continue" {
 		t.Errorf("typed = %v", typed)
 	}
-	mu.Unlock()
 
 	evs, err := os.ReadFile(filepath.Join(store, "proj", "epic-a", "run-log.jsonl"))
 	if err != nil {
@@ -79,11 +66,9 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 	if err != nil || !res.Refused || res.Reason != server.ReasonRateLimited {
 		t.Errorf("over the limit = %+v, %v; want refusal %s", res, err, server.ReasonRateLimited)
 	}
-	mu.Lock()
-	if len(typed) != 3 {
+	if typed := fake.Prompts(label); len(typed) != 3 {
 		t.Errorf("a refused nudge must not reach the pane, typed = %v", typed)
 	}
-	mu.Unlock()
 }
 
 func TestNudge_NotReadyRefuses(t *testing.T) {

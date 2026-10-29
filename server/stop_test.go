@@ -4,16 +4,13 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 func TestStop_WaitsForAMergeInFlightAndFlushesTheStoreCommit(t *testing.T) {
@@ -75,33 +72,8 @@ func TestStop_LeavesALiveAgentRunningAndUnmerged(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture))
-	registerTurn(h)
-	closed := make(chan struct{}, 4)
-	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		closed <- struct{}{}
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
-	// The agent keeps working: its finish wait, the first wait after the launch
-	// prompt's wait for "working", blocks until the test ends. Counting waits
-	// instead would also catch the start's own wait, which can repeat, and hang
-	// Stop on the launch. A cleanup, not a defer, so the release merges before
-	// the harness waits for the run to settle; the timeout turns a miss into a
-	// failure, not a hang.
-	block := make(chan struct{})
-	t.Cleanup(func() { close(block) })
-	var prompted atomic.Bool
-	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if slices.Contains(argv, "working") {
-			prompted.Store(true)
-		} else if prompted.Load() {
-			select {
-			case <-block:
-			case <-time.After(30 * time.Second):
-			}
-		}
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
-	})
+	h := servertest.StartWithStore(t, store)
+	h.OnTurn(func(turn *servertest.Turn) { turn.Stall() }) // the agent keeps working
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
@@ -111,9 +83,7 @@ func TestStop_LeavesALiveAgentRunningAndUnmerged(t *testing.T) {
 	if err := h.Stop(); err != nil {
 		t.Fatalf("stop: %v", err)
 	}
-	select {
-	case <-closed:
-		t.Errorf("stop closed a live agent's tab")
-	default:
+	if n := h.Stops(); n != 0 {
+		t.Errorf("stop stopped %d live agents, want none", n)
 	}
 }

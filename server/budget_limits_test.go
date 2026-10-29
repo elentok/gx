@@ -60,7 +60,8 @@ func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyAsDefault), func(c *server.Config) {
+	fake := runnerfake.NewRunner()
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.BudgetHardLimit = 5
 		c.BudgetKillGrace = 50 * time.Millisecond
 		c.BudgetPollInterval = time.Hour
@@ -68,43 +69,11 @@ func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "compaction timed out"); err != nil {
 		t.Fatal(err)
 	}
-	var gone, closed atomic.Bool
-	t.Cleanup(func() { gone.Store(true) }) // lets the pane's watch end
-	working := map[string]any{"agent": map[string]any{
-		"pane_id": "p1", "tab_id": "t1", "agent_status": "working",
-		"agent_session": map[string]any{"value": "sess"},
-	}}
-	idle := map[string]any{"agent": map[string]any{
-		"pane_id": "p1", "tab_id": "t1", "agent_status": "idle",
-		"agent_session": map[string]any{"value": "sess"},
-	}}
-	var nudged atomic.Bool
-	live := func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if gone.Load() {
-			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
-		}
-		return working, herdrfake.Identities{}, nil
+	// The pane idles until nudged, like the one recovery leaves open.
+	const label = "epic-a-iter-01"
+	if _, err := fake.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
+		t.Fatal(err)
 	}
-	// The pane idles until nudged: a prompt to a working pane is refused.
-	h.Herdr.Register("agent", "get", func(s *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if !nudged.Load() && !gone.Load() {
-			return idle, herdrfake.Identities{}, nil
-		}
-		return live(s, argv)
-	})
-	h.Herdr.Register("agent", "wait", live)
-	h.Herdr.Register("agent", "prompt", func(s *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		nudged.Store(true)
-		return live(s, argv)
-	})
-	h.Herdr.Register("agent", "send-keys", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		closed.Store(true)
-		gone.Store(true)
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
 	var mu sync.Mutex
 	cost := 0.0
 	h.Server.SetCostOf(func(server.IterationInfo) (float64, bool) { mu.Lock(); defer mu.Unlock(); cost += 3; return cost, true })
@@ -121,8 +90,8 @@ func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 		h.Server.PollBudget()
 		return len(h.Server.Runs()) == 0
 	})
-	if !closed.Load() {
-		t.Error("the hard limit did not close the nudged pane")
+	if _, found, err := fake.Find(label); err != nil || found {
+		t.Errorf("the hard limit did not stop the nudged pane: found=%v, err=%v", found, err)
 	}
 	tk, err := schema.ParseTicket(filepath.Join(store, "proj", "epic-a", "issues", "01-first.md"))
 	if err != nil {

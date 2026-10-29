@@ -116,7 +116,7 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Replace(string(raw), "type: implement", "type: code-review", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyAsDefault))
+	h := servertest.StartWithStore(t, store)
 	_, prompt, _ := registerTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -128,7 +128,7 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
@@ -136,7 +136,7 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 			break
 		}
 	}
-	if got := strings.Join(prompt(), " "); !strings.Contains(got, "$gx-code-review proj:epic-a/01") {
+	if got := strings.Join(prompt(), " "); !strings.Contains(got, "/gx-code-review proj:epic-a/01") {
 		t.Errorf("agent prompt = %v, want the gx-code-review skill", got)
 	}
 }
@@ -144,17 +144,17 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct{ typ, want string }{
-		{"prompt", "$gx-one-off proj:epic-a/01"},
-		{"implement", "$gx-implement proj:epic-a/01"},
-		{"evolve", "$gx-evolve proj:epic-a/01"},
-		{"diagnose", "$gx-investigate proj:epic-a/01"},
-		{"investigate", "$gx-investigate proj:epic-a/01"},
+		{"prompt", "/gx-one-off proj:epic-a/01"},
+		{"implement", "/gx-implement proj:epic-a/01"},
+		{"evolve", "/gx-evolve proj:epic-a/01"},
+		{"diagnose", "/gx-investigate proj:epic-a/01"},
+		{"investigate", "/gx-investigate proj:epic-a/01"},
 	} {
 		t.Run(tc.typ, func(t *testing.T) {
 			store, repo := t.TempDir(), testutil.TempRepo(t)
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: tc.typ})
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyAsDefault))
+			h := servertest.StartWithStore(t, store)
 			_, prompt, _ := registerTurn(h)
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
@@ -167,7 +167,7 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
 			for ev := range evs {

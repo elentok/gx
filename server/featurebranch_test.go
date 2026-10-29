@@ -30,7 +30,7 @@ func claimFirstChild(t *testing.T, repo string) string {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyAsDefault))
+	h := servertest.StartWithStore(t, store)
 	registerTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -42,7 +42,7 @@ func claimFirstChild(t *testing.T, repo string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	for ev := range evs {
