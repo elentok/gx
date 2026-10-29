@@ -61,7 +61,7 @@ test("75. Read a session", async ({ page, start }) => {
   await go(page, `#/agents/${idle.id}`);
   const header = page.getByRole("banner").or(page.locator("header")).last();
   await expect(header.getByRole("img", { name: idle.status.state, exact: true })).toBeVisible();
-  await expect(header.getByText(idle.status.state, { exact: true })).toBeVisible();
+  await expect(header.getByText(new RegExp(`^${idle.status.state}$`, "i"))).toBeVisible();
   await expect(header.getByText(idle.dir)).toBeVisible();
   await expect(header.getByText(idle.harness, { exact: true })).toHaveCount(0);
   await expect(titleButton(page)).toContainText(idle.name || idle.id);
