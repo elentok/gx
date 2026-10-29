@@ -5,6 +5,7 @@ import { formatTitle, type PageTitle } from "./title";
 test.each<[PageTitle, string]>([
   [{ kind: "Epics" }, "Epics · gx"],
   [{ kind: "Stats" }, "Stats · gx"],
+  [{ kind: "Agents" }, "Agents · gx"],
   [{ kind: "Epic", name: "my-epic" }, "my-epic · Epic · gx"],
   [{ kind: "Design", name: "my-epic" }, "my-epic · Design · gx"],
   [{ kind: "Ticket", name: "demo:mixed-epic/02" }, "demo:mixed-epic/02 · Ticket · gx"],

@@ -69,7 +69,7 @@ export function AgentsPage({
     }
   }, [sessions, liveSnapshot, listed, selected, wide, navigate]);
   return (
-    <DetailPage active="agents" fill mode="wide">
+    <DetailPage title={{ kind: "Agents" }} active="agents" fill mode="wide">
       {!sessions ? (
         <Spinner label="Loading agents" />
       ) : (

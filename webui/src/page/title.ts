@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 // The only place that writes `document.title`. Pages pass a `PageTitle` to the page frame, never call the hook.
-export type PageTitle = { kind: "Epics" | "Stats" } | { kind: "Epic" | "Design" | "Ticket"; name: string };
+export type PageTitle = { kind: "Epics" | "Stats" | "Agents" } | { kind: "Epic" | "Design" | "Ticket"; name: string };
 
 const SEPARATOR = " · ";
 
