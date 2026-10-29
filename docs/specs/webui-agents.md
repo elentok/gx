@@ -103,7 +103,7 @@ Reading a session
 
 Failure notices
 
-29. As the person running gx, I want a failed session (crashed, ended, auth, stalled, blocked) to
+29. As the person running gx, I want a failed session (crashed, ended, auth, rate-limit, stalled, blocked) to
     show the failure label and text above the composer, so that I know why it stopped.
 30. As the person running gx, I want a Screen button on a stalled or blocked session's notice, so
     that I can see what it waits on.
@@ -154,8 +154,8 @@ Design sessions
     that I can answer its question cards and see Progress.
 50. As the person running gx, I want a design session's draft to be the same on the Agents page and
     the design page, so that text I typed in one shows in the other.
-51. As the person running gx, I want the design page's round answers, question index, scroll and
-    round note to survive a closed tab, so that a half-answered round is never lost.
+51. As the person running gx, I want the design page's round answers, question index and scroll to
+    survive a closed tab, so that a half-answered round is never lost.
 52. As the person running gx, I want Cmd/Ctrl+Enter to work in the design page's composer too, so
     that both pages send the same way.
 
@@ -278,7 +278,9 @@ implementer's choice. The split:
 - Failure notice on the Agents page: label and text, read-only. Buttons: Screen for stalled and
   blocked, Retry for auth (a send of "continue" with the stale guard, as today). For crashed and
   ended the chat stays, and the composer stays visible but disabled with the reason line "Exited.
-  Restore it in gx, Agents tab."
+  Restore it in gx, Agents tab." Rate-limit shows the label "Rate limited" and the server's text
+  (for example "resets at 5pm"), no buttons, and the not-promptable reason line "Rate limited. Send
+  turns on when the session is idle."
 
 Shared composer
 
@@ -287,7 +289,9 @@ Shared composer
   the text box is always open with Send beside it, as in the mock.
 - Send rule, both pages: enabled only while connected, `promptable(session)` holds, the text is not
   empty, and no send is pending. Cmd/Ctrl+Enter runs the same send under the same rule on both
-  pages. Enter adds a newline. A phone (narrow layout) has no key send.
+  pages. On the design page the key runs the main button's action only when that action is Send or
+  Send answers (the gaps popover included, when questions are unanswered). It never runs Continue
+  or Interrupt, and does nothing while the Note toggle hides the text box. Enter adds a newline. A phone (narrow layout) has no key send.
 - Reason line, Agents page: one line under the composer, in this order of precedence: offline
   ("Offline. Send turns on when gx reconnects."), non-Claude ("Sending works for Claude sessions
   only"), Exited ("Exited. Restore it in gx, Agents tab."), not promptable ("<State>. Send turns on
@@ -297,16 +301,28 @@ Shared composer
 - Draft: the composer owns one draft per session in localStorage, keyed by the session id, used by
   both pages. It clears when the server accepts the send. It stays on a refusal or a network error.
   On `stale` the page refetches the chat and keeps the draft.
-- The design page's round draft (round answers, question index, scroll, round note) moves from
-  sessionStorage to localStorage, keyed as today by session and round. The round note stays in the
-  round draft, because it goes out as part of the round answer.
-- Draft cleanup: once a live snapshot (after the first one of the connection) no longer lists a
-  session, the page deletes that session's message draft and round drafts from localStorage.
+- The design page's text box always reads and writes the one per-session composer draft, also while
+  a round is open. A round send uses the box text as the round note ("Note: …") and clears the
+  composer draft once the server accepts it. On the Agents page the same text goes out as a plain
+  message. So text never jumps or disappears when a round opens or closes.
+- The design page opens its Note box whenever the session's composer draft is not empty, on load
+  and whenever the draft changes, so shared text is never hidden.
+- Each composer listens for the browser `storage` event on its session's draft key and updates its
+  box, so a clear or an edit in one tab shows at once in another open tab.
+- The round draft keeps only what the question cards own (answers, question index, scroll). It
+  loses its `notes` field and moves from sessionStorage to localStorage, keyed as today by session
+  and round. The new code ignores old round drafts in sessionStorage and does not migrate them; they
+  only lived as long as the tab.
+- Draft cleanup: on each live snapshot after the first one of a connection, the app-level connection
+  (not one page) scans every stored message draft and round draft key and deletes the ones whose
+  session the snapshot does not list. This also catches sessions removed while no tab was open.
 - No queue in the browser or on the server.
 
 Prompt route
 
-- `POST /v1/sessions/prompt` drops only the `session-not-design` refusal. It keeps the harness check
+- `POST /v1/sessions/prompt` drops the `session-not-design` refusal for text sends only. A request
+  with `continue: true` stays refused for a non-design session, because Continue types `/clear` and
+  `/gx-design <ticket>` (`designContinueAction`), which the prefix rule exists to block. It keeps the harness check
   (`harness-not-supported`), the empty-text check, the `/` and `!` prefix block, the 32 KiB cap, the
   web stale check on `last_message`, and the Promptable check. One rule for design and plain
   sessions. The CLI verb follows the same handler.
@@ -327,8 +343,11 @@ Session switcher
 Create session
 
 - The web mux serves the existing `POST /v1/sessions/create` through a web variant. The web variant
-  forces the claude harness, refuses a ticket, and refuses a first prompt starting with `/` or `!`
-  with the prompt route's `prefix-not-allowed` reason. The checks live in the server, not only in
+  has its own small request type: project, `dir` or `worktree`, name and first prompt. It never
+  takes `made_worktree`, `rebase_note`, `unique_name`, `cols`, `rows`, a harness or a ticket. It
+  forces the claude harness, and refuses a first prompt starting with `/` or `!` with the prompt
+  route's `prefix-not-allowed` reason. It refuses a project that is not configured, and a `dir` that
+  is not the project root or one of the worktrees the worktree read lists. The checks live in the server, not only in
   the form. The CLI route stays as it is.
 - No unique-name check, as in the TUI. The label is the session id, so names may repeat.
 - A new server read gives each project's root dir and its worktree dirs, because the browser cannot
@@ -375,7 +394,8 @@ Live updates and errors
 - Existing web tests to keep green: `ChatLog.test.tsx`, `Composer.test.tsx`, `DesignPage.test.tsx`,
   `JumpMenu.test.tsx`, `focus.test.tsx`. Round draft tests change from sessionStorage to localStorage.
 - Server tests: prompt to a plain Claude session is accepted; `/` and `!` and non-Claude stay
-  refused; the web create refuses a ticket, a non-claude harness, and a `/` or `!` first prompt; the
+  refused; `continue: true` to a plain session is refused with `session-not-design`; the web create refuses a ticket, a non-claude harness, a `/` or `!` first prompt, a project that is
+  not configured, and a `dir` outside the project root and its listed worktrees; the
   worktree read lists the root and worktrees of a `testutil.TempRepo`; the route parity tests pass.
 - Prior art: `server/web_test.go` for web mux writes, `cmd/server_parity_test.go` for route verbs,
   `webui/e2e/design.e2e.ts` and `design-page.e2e.ts` for chat and composer flows, `jump.e2e.ts` for
@@ -386,19 +406,28 @@ Live updates and errors
 
 New scenarios to write (each becomes an implementation ticket):
 
-- `agents`: two projects (`demo` and `other`) with interactive sessions made by `gx agents create`
-  and replayed by fakeclaude:
+- `agents`: three projects (`demo`, `other` and `site`) with interactive sessions made by
+  `gx agents create` and replayed by fakeclaude. The groups match the mock: four sessions in the first project, two in the second and
+  two in the third, with a design session in the first and third projects (rows a3 and c1). The
+  sessions below are spread over these rows:
   - an Idle Claude session with a chat in `demo`;
   - a Working Claude session (a long busy turn) in `demo`;
   - an Unread session and an Actionable session in `other`;
   - an Exited session that crashed;
-  - a design session linked to a map (as `design-two-live` links one);
+  - two design sessions linked to maps (as `design-two-live` links one), in the first and third
+    projects;
   - a Claude session with no messages yet;
-  - a non-Claude session. The real gx binary registers only claude, so how the fixture makes this
-    session (for example seeding a session meta with harness `codex`) is that ticket's choice;
+  - a live non-Claude session. A build tag that only `gxfixture` uses registers a fake harness with
+    no chat, backed by agentfake. The scenario creates the session with `gx agents create --harness
+    <fake>`, so it runs, has a screen and goes through the real create path. A faked session meta
+    does not work: on server start gx cannot find its harness and marks it Exited;
   - one existing worktree in `demo` besides the root.
-- `agents-failures`: sessions with a stalled, an auth and a blocked failure, for the failure notice
-  flow. If `agents` can hold them without breaking other flows, fold them into `agents` instead.
+- `agents-failures`: sessions with a stalled, an auth, a rate-limit and a blocked failure, for the
+  failure notice flow. Rate-limit needs a new `fakeclaude` control that appends a rate-limit API
+  error (`isApiErrorMessage`, `error: "rate_limit"`, a "resets at ..." message) to its transcript,
+  as real claude does, so the real claude watcher reports Rate-limited. Stalled needs a stall threshold shorter than the 15-minute default: add a
+  hidden `gx server` flag for it, passed by a new `gxfixture --stall-threshold` option, as
+  `--auto-advance-delay` works today. If `agents` can hold them without breaking other flows, fold them into `agents` instead.
 - `empty` already exists (a project, no sessions) and backs "No sessions yet".
 
 New flows to write, numbered after flow 71 (file name is the implementer's choice):
@@ -415,8 +444,11 @@ New flows to write, numbered after flow 71 (file name is the implementer's choic
 - 78 "Send refused": move the chat with `gx agents prompt` from the CLI, then Send; the red stale
   reason, the chat reloads, the draft stays. A `/clear` send shows the prefix refusal.
 - 79 "Keyboard send": Cmd/Ctrl+Enter sends on the Agents page and the design page; Enter adds a
-  newline; at 390px only the button sends.
-- 80 "Failure notices": crashed (Exited line, no Restore), stalled and blocked (Screen), auth (Retry).
+  newline; at 390px only the button sends. On the design page: the key runs Send, runs Send answers
+  (and opens the gaps popover with unanswered questions), and does nothing when the main button is
+  Continue (empty box) or Interrupt.
+- 80 "Failure notices": crashed (Exited line, no Restore), stalled and blocked (Screen), auth (Retry),
+  rate-limit (label, text, no buttons, the "Rate limited" reason line).
 - 81 "Session without chat": the notice, Show screen opens the screen modal, the composer reason.
 - 82 "No messages yet".
 - 83 "Design session on the Agents page": plain chat, no question sheet, "Open design page →" opens
@@ -435,12 +467,15 @@ New flows to write, numbered after flow 71 (file name is the implementer's choic
   `gx agents remove`; the panel, sidebar kept, selection unchanged, "Back to sessions" at 390px.
 - 90 "Agents offline": stop the fixture's server; the strip, last data kept, Send and create submit
   disabled with the offline line, the draft kept.
-- 91 "Removed session draft": draft on an Exited session, remove it, the draft key is gone (a new
-  session with the same label starts empty).
+- 91 "Removed session draft": draft on an Exited session, close the tab, remove the session with
+  `gx agents remove`, open the Epics page; the draft key is gone (a new session with the same label
+  starts empty).
 - 92 "Last viewed session": `#/agents` on desktop reopens the last session; with none, "Pick a
   session".
-- 93 "Shared draft": text typed on the Agents page for a design session shows in the design page's
-  composer; a half-answered round survives opening the design page in a new tab.
+- 93 "Shared draft": with both pages open in two tabs and a round open on a design session, text
+  typed on the Agents page shows live in the design page's composer with the Note box open, and the
+  reverse; Send answers sends it as the note and both pages'
+  boxes are empty after; a half-answered round survives opening the design page in a new tab.
 
 Existing flows to rerun because the shared chat view, composer, round draft or JumpMenu changed:
 4, 5, 9, 10, 11, 13, 14, 20, 21, 22, 24, 44, 47, 48, 49, 64, 65, 66, 67, 68.
