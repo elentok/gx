@@ -344,6 +344,19 @@ test("a design session is listed while the sidebar hides it, and the current one
   expect(dialog().getByText("current")).toBeTruthy();
 });
 
+test("switcher rows use the sidebar marks: purple design diamond and unread dot, ? for blocked", () => {
+  const blocked = session("s-5", "beta", { name: "stuck" });
+  blocked.status = { state: "blocked" } as SessionInfo["status"];
+  render([...switcherSessions(), blocked], "/agents/s-1");
+  openSwitcher();
+  const option = (text: string) => dialog().getAllByRole("option").find((o) => o.textContent?.includes(text))!;
+  expect(within(option("the design")).getByRole("img", { name: "Design" }).textContent).toBe("◆");
+  expect(within(option("unread one")).getByRole("img", { name: "Unread" }).className).toBe(
+    within(rows().find((r) => r.textContent?.includes("unread one"))!).getByRole("img", { name: "Unread" }).className,
+  );
+  expect(within(option("stuck")).getByRole("img", { name: "blocked" }).textContent).toBe("?");
+});
+
 test("Enter on a row navigates to it, and Escape closes", () => {
   const { router } = render(switcherSessions(), "/agents/s-1");
   openSwitcher();

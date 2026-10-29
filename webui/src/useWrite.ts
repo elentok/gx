@@ -24,7 +24,7 @@ export interface RunOptions<R> {
  * spinner, an error or refusal toast, and a success toast when the caller asks for one. The
  * refusal and the failure text are also returned so a caller can show them inline.
  */
-export function useWrite() {
+export function useWrite({ toastRefusal = true }: { toastRefusal?: boolean } = {}) {
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
   const [refusal, setRefusal] = useState<Refusable>();
@@ -40,7 +40,7 @@ export function useWrite() {
       const res = await call();
       if (res.refused) {
         setRefusal(res);
-        showToast({ type: "error", title: refusalText(res) });
+        if (toastRefusal) showToast({ type: "error", title: refusalText(res) });
         return;
       }
       const toast = success?.(res);

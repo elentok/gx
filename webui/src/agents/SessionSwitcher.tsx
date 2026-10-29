@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import type { SessionInfo } from "../generated/server";
 import { agentHref } from "../hrefs";
 import { RowList, type ListRowData, type ListSection } from "../nav/JumpMenu";
-import { statusMark } from "./AgentSidebar";
+import { StatusMark } from "./AgentSidebar";
 import { isActionable } from "./rules";
 
 // Port of ui/agents/jump.go: attention order, and the search fields plus the session ticket.
@@ -12,7 +12,6 @@ const SECTIONS = ["Actionable", "Unread", "Other"];
 const bucket = (s: SessionInfo) => (isActionable(s) ? 0 : s.unread.unread ? 1 : 2);
 
 function sessionRow(s: SessionInfo, current: boolean): ListRowData {
-  const { glyph, tone, faded } = statusMark(s);
   const name = s.name || s.id;
   return {
     key: s.id,
@@ -23,12 +22,10 @@ function sessionRow(s: SessionInfo, current: boolean): ListRowData {
     current,
     lead: (
       <>
-        <Text as="span" role="img" aria-label={s.status.state} color={`tone.${tone}.fg`} opacity={faded ? 0.5 : 1}>
-          {glyph}
-        </Text>
+        <StatusMark session={s} />
         {s.design && (
-          <Text as="span" role="img" aria-label="Design" color="tone.paused.fg">
-            ✎
+          <Text as="span" role="img" aria-label="Design" fontSize="xs" color="kind.design.fg">
+            ◆
           </Text>
         )}
       </>
@@ -36,7 +33,7 @@ function sessionRow(s: SessionInfo, current: boolean): ListRowData {
     trailing: (
       <>
         {s.unread.unread && (
-          <Text as="span" role="img" aria-label="Unread" color="tone.running.fg">
+          <Text as="span" role="img" aria-label="Unread" color="kind.design.fg">
             ●
           </Text>
         )}

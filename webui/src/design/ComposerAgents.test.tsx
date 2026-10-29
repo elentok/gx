@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { SessionInfo } from "../generated/server";
 import { renderThemed } from "../ui/render";
+import { toaster } from "../ui/toaster";
 import { Composer } from "./Composer";
 import type { PostPrompt } from "./prompt";
 
@@ -69,6 +70,18 @@ test("Send is off when the session is not promptable, but the box stays editable
   fireEvent.change(box(), { target: { value: "hi" } });
   expect((box() as HTMLTextAreaElement).value).toBe("hi");
   expect((send() as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("a refused send shows its reason inline only, no toast, and keeps the draft", async () => {
+  const toast = vi.spyOn(toaster, "create");
+  const post = vi.fn(async () => ({ refused: true, message: "text may not start with / or !" })) as unknown as PostPrompt;
+  render({ post });
+  fireEvent.change(box(), { target: { value: "/x" } });
+  fireEvent.click(send());
+  expect(await screen.findByText("text may not start with / or !")).toBeTruthy();
+  expect(toast).not.toHaveBeenCalled();
+  expect((box() as HTMLTextAreaElement).value).toBe("/x");
+  toast.mockRestore();
 });
 
 test("Send is off while a send is pending, then clears the box", async () => {

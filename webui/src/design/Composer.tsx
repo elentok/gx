@@ -87,7 +87,8 @@ export function Composer({
   useEffect(() => {
     if (text !== "") setOpen(true);
   }, [text]);
-  const { run: write, pending, refusal, error } = useWrite();
+  // The Agents page shows a refusal inline only, as in the mock.
+  const { run: write, pending, refusal, error } = useWrite({ toastRefusal: design });
   const enabled = connected && promptable(session) && !pending;
 
   const send = (body: Partial<SessionPromptRequest>, onSent?: () => void) => {
