@@ -56,11 +56,13 @@ export function SessionSwitcher({
   sessions,
   current,
   onNew,
+  fontSize,
 }: {
   name: string;
   sessions: SessionInfo[];
   current?: string;
   onNew: () => void;
+  fontSize?: string;
 }) {
   const sections = useMemo<ListSection[]>(
     () =>
@@ -75,5 +77,5 @@ export function SessionSwitcher({
     () => ({ key: "new", title: "+ New session", subtitle: "", href: "#/agents", searchText: "", onSelect: onNew }),
     [onNew],
   );
-  return <RowList name={name} label="Switch session" placeholder="Filter sessions" sections={sections} footer={footer} />;
+  return <RowList name={name} label="Switch session" placeholder="Filter sessions" sections={sections} footer={footer} fontSize={fontSize} />;
 }

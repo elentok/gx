@@ -104,7 +104,7 @@ export function AgentsPage({
                   <Heading as="h3" fontFamily="condensed" textTransform="uppercase" fontSize="2xl">
                     {sessions.length === 0 ? "No sessions yet" : "Pick a session"}
                   </Heading>
-                  <Text color="text.muted">
+                  <Text color="text.muted" maxW="42ch">
                     {sessions.length === 0 ? (
                       "Sessions you start here or in the gx Agents tab show up in this list."
                     ) : wide ? (

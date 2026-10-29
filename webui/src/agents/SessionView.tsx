@@ -21,12 +21,13 @@ const AGENT_OPTIONS: ChatOptions = { sheet: false, steps: false, gxStopped: fals
 
 const noop = () => {};
 
+const stateLabel = (s: SessionInfo) => s.status.state.charAt(0).toUpperCase() + s.status.state.slice(1).replace("-", " ");
+
 function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; sessions: SessionInfo[]; onNew: () => void }) {
   const { tone } = statusMark(s);
   const map = designOf(s);
   const wide = useWide();
   if (!wide) {
-    const state = s.status.state;
     return (
       <Box as="header" display="flex" alignItems="center" gap="2" mb="3" pb="2" borderBottomWidth="1px" borderColor="border">
         <Link href={AGENTS_HREF} aria-label="All sessions" fontSize="2xl" lineHeight="1" px="2" color="text.muted">
@@ -36,7 +37,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
         <Box display="flex" flexDirection="column" minW="0">
           <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} />
           <Text as="span" fontSize="sm" color="text.dim">
-            {s.project} · {state.charAt(0).toUpperCase() + state.slice(1).replace("-", " ")}
+            {s.project} · {stateLabel(s)}
           </Text>
         </Box>
       </Box>
@@ -45,8 +46,10 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
   return (
     <Box as="header" display="flex" alignItems="center" flexWrap="wrap" gap="2" mb="3" pb="2.5" borderBottomWidth="1px" borderColor="border">
       <StatusMark session={s} />
-      <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} />
-      <Chip tone={tone}>{s.status.state}</Chip>
+      <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} fontSize="26px" />
+      <Chip tone={tone} fontSize="12.5px">
+        {stateLabel(s)}
+      </Chip>
       {s.harness !== "claude" && <Chip>{s.harness}</Chip>}
       <Text as="span" fontSize="sm" color="text.dim">
         {s.dir}

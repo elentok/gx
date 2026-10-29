@@ -111,7 +111,7 @@ test("shows every mark and counts non-Exited sessions as live", () => {
   expect(getComputedStyle(within(row("unread")).getByText("unread")).fontWeight).toBe("700");
   expect(getComputedStyle(within(row("plain")).getByText("plain")).fontWeight).toBe("400");
   expect(within(row("plain")).queryByRole("img", { name: "Actionable" })).toBeNull();
-  expect(within(row("asks")).getByRole("img", { name: "Actionable" }).getAttribute("title")).toBe("Review the spec");
+  expect(within(row("asks")).getByRole("tooltip", { hidden: true }).textContent).toBe("★ Actionable: Review the spec");
   expect(within(row("blocked")).getByRole("img", { name: "Actionable" })).toBeTruthy();
 });
 
@@ -234,7 +234,7 @@ const chatOf = (c: SessionChatResponse) => ({ chat: async () => ({ kind: "ok" as
 test("the header names the session, status, dir and ticket, with a harness chip only for non-Claude", async () => {
   render([session("s-1", "p", { name: "one", dir: "/work/one", ticket: "gx:m/01" })], "/agents/s-1", true, chatOf(chat()));
   const header = within((await screen.findByRole("heading", { name: /one/ })).closest("header")!);
-  expect(header.getByText("idle")).toBeTruthy();
+  expect(header.getByText("Idle")).toBeTruthy();
   expect(header.getByText("/work/one")).toBeTruthy();
   expect(header.getByText("gx:m/01")).toBeTruthy();
   expect(header.queryByText("codex")).toBeNull();

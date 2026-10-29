@@ -250,6 +250,7 @@ export function RowList({
   sections,
   footer,
   hotkey = true,
+  fontSize,
 }: {
   name: string;
   label: string;
@@ -257,6 +258,8 @@ export function RowList({
   sections: ListSection[];
   footer?: ListRowData;
   hotkey?: boolean;
+  /** Overrides the shared page-title size, for a title that sits in a header row. */
+  fontSize?: string;
 }) {
   const phone = !useWide();
   const [open, setOpen] = useState(false);
@@ -282,7 +285,7 @@ export function RowList({
 
   return (
     <Box ref={root} position="relative" minW="0">
-      <Heading as="h1" fontFamily="condensed" {...titleSize(!phone)}>
+      <Heading as="h1" fontFamily="condensed" {...titleSize(!phone)} fontSize={fontSize ?? titleSize(!phone).fontSize}>
         <chakra.button
           type="button"
           aria-haspopup="dialog"

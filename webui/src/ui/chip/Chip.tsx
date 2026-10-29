@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import type { Tone } from "../tone";
 
 // Pill for queue-level states such as Paused.
-export function Chip({ tone = "muted", children }: { tone?: Tone; children: ReactNode }) {
+export function Chip({ tone = "muted", fontSize = "sm", children }: { tone?: Tone; fontSize?: string; children: ReactNode }) {
   return (
     <Box
       as="span"
@@ -15,7 +15,7 @@ export function Chip({ tone = "muted", children }: { tone?: Tone; children: Reac
       borderWidth="1px"
       borderColor={`tone.${tone}.fg`}
       fontFamily="condensed"
-      fontSize="sm"
+      fontSize={fontSize}
       fontWeight="600"
       color={`tone.${tone}.fg`}
       bg={`tone.${tone}.bg`}

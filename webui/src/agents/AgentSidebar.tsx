@@ -45,6 +45,7 @@ const actionableReason =(s: SessionInfo) => s.actionable.reason || s.status.mess
 
 function Row({ session: s, current }: { session: SessionInfo; current: boolean }) {
   const navigate = useNavigate();
+  const wide = useWide();
   return (
     <chakra.a
       href={agentHref(s.id)}
@@ -56,9 +57,11 @@ function Row({ session: s, current }: { session: SessionInfo; current: boolean }
       display="flex"
       alignItems="center"
       gap="2"
-      py="1.5"
+      py={wide ? "1.5" : "2.5"}
       px="2"
       borderRadius="sm"
+      borderBottomWidth={wide ? undefined : "1px"}
+      borderBottomColor="border"
       borderLeftWidth="2px"
       borderLeftColor={current ? "tone.running.fg" : "transparent"}
       cursor="pointer"
@@ -90,9 +93,34 @@ function Row({ session: s, current }: { session: SessionInfo; current: boolean }
         </Text>
       )}
       {isActionable(s) && (
-        <Text as="span" role="img" aria-label="Actionable" title={actionableReason(s)} color="tone.waiting.fg">
-          ★
-        </Text>
+        <Box as="span" role="group" position="relative" color="tone.waiting.fg">
+          <Text as="span" role="img" aria-label="Actionable">
+            ★
+          </Text>
+          <Box
+            as="span"
+            role="tooltip"
+            display="none"
+            _groupHover={{ display: "block" }}
+            position="absolute"
+            zIndex="5"
+            top="100%"
+            right="0"
+            mt="1"
+            px="2.5"
+            py="1.5"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="md"
+            bg="surface.raised"
+            boxShadow="0 6px 20px rgba(0,0,0,.5)"
+            fontSize="xs"
+            color="text"
+            whiteSpace="nowrap"
+          >
+            <b>★ Actionable:</b> {actionableReason(s)}
+          </Box>
+        </Box>
       )}
     </chakra.a>
   );
@@ -167,7 +195,7 @@ export function AgentSidebar({
           <NewButton onNew={onNew} full />
         </Box>
       )}
-      <Box flex="1" minH="0" overflowY="auto" px="1.5">
+      <Box flex={wide ? "1" : undefined} minH="0" overflowY="auto" px="1.5">
         {groupSessions(visible).map(({ project, sessions: group }) => (
           <Box key={project} mb="3">
             <Box display="flex" alignItems="center" justifyContent="space-between" px="2">
@@ -195,7 +223,8 @@ export function AgentSidebar({
           </Box>
         ))}
       </Box>
-      <chakra.label display="flex" alignItems="center" gap="2" px="3.5" py="2.5" borderTopWidth="1px" borderColor="border" fontSize="sm" color="text.muted" cursor="pointer" position="relative">
+      {sessions.length > 0 && (
+      <chakra.label display="flex" alignItems="center" gap="2" px="3.5" py="2.5" borderTopWidth={wide ? "1px" : undefined} borderColor="border" fontSize="sm" color="text.muted" cursor="pointer" position="relative">
         <chakra.input type="checkbox" checked={showDesign} onChange={(e) => change(e.target.checked)} position="absolute" opacity={0} w="0" h="0" />
         <Box aria-hidden w="7" h="4" borderRadius="full" bg={showDesign ? "kind.design.fg" : "border"} position="relative" flex="none">
           <Box position="absolute" top="2px" left={showDesign ? "14px" : "2px"} w="3" h="3" borderRadius="full" bg={showDesign ? "surface" : "text.muted"} />
@@ -203,6 +232,7 @@ export function AgentSidebar({
         Design sessions
         {hidden > 0 && <Text as="span" color="text.dim">· {hidden} hidden</Text>}
       </chakra.label>
+      )}
     </Box>
   );
 }
