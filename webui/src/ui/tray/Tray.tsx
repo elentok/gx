@@ -1,13 +1,8 @@
 import { Box, chakra, Popover, Portal } from "@chakra-ui/react";
 import type { Health, MeterHealth } from "../../generated/server";
 import { HealthPopover } from "../../health/HealthPopover";
+import { METERS } from "./meters";
 import { STATE_COLOR } from "./stateColor";
-
-const METERS = [
-  { key: "cpu", letter: "C", name: "CPU" },
-  { key: "memory", letter: "M", name: "memory" },
-  { key: "disk", letter: "D", name: "disk" },
-] as const;
 
 // Levels 0 to 4 fill a fifth more each, so level 0 still shows a sliver and level 4 fills the bar.
 const fillPercent = (level: number) => (Math.min(Math.max(level, 0), 4) + 1) * 20;
@@ -77,7 +72,7 @@ export function Tray({ health, connected = true }: { health: Health; connected?:
 }
 
 function Meter({ letter, meter }: { letter: string; meter: MeterHealth }) {
-  const color = STATE_COLOR[meter.state];
+  const color = STATE_COLOR[meter.state].fg;
   const unknown = meter.state === "unknown";
   return (
     <Box aria-hidden display="flex" flexDirection="column" alignItems="center" gap="1px" data-meter={letter} data-state={meter.state}>

@@ -1,106 +1,22 @@
-import { Box, Link, Text } from "@chakra-ui/react";
-import { useEffect, useState, type ReactNode } from "react";
-import type { CauseList as CauseListData, CauseRow, DisksReport, Health, HealthDisk, HealthReason, HealthReport, HealthState } from "../generated/server";
-import { ticketHref } from "../hrefs";
-import { readPageCache, writePageCache } from "../pageCache";
-import { fetchJson } from "../ticket/detail";
-import { STATE_COLOR } from "../ui/tray/stateColor";
+import { Box, Text } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
+import type { Health, HealthReport } from "../generated/server";
+import { METERS } from "../ui/tray/meters";
+import { formatBytes, memoryBytesText } from "./formatBytes";
+import { CauseList, CPU_ICON, DISK_ICON, DiskRow, MEMORY_ICON, Row, unknownText } from "./HealthRows";
+import { useHealthReport } from "./useHealthReport";
 
-const POLL_MS = 5000;
-const GIB = 1024 ** 3;
-
-const TAG: Partial<Record<HealthState, string>> = { high: "High", critical: "Critical" };
-
-const CPU_ICON = (
-  <>
-    <rect x="4.5" y="4.5" width="9" height="9" rx="1.5" />
-    <rect x="7.2" y="7.2" width="3.6" height="3.6" rx=".5" />
-    <path d="M7 2v2.5M11 2v2.5M7 13.5V16M11 13.5V16M2 7h2.5M2 11h2.5M13.5 7H16M13.5 11H16" />
-  </>
-);
-const MEMORY_ICON = (
-  <>
-    <rect x="2" y="5" width="14" height="7" rx="1.2" />
-    <path d="M5 8v1.5M8 8v1.5M11 8v1.5M14 8v1.5M4 12v2M7 12v2M11 12v2M14 12v2" />
-  </>
-);
-
-// A report with the browser's clock at arrival, so the footer counts up without trusting that clock.
-interface Received {
-  report: HealthReport;
-  at: number;
-}
-
-const gb = (bytes: number) => {
-  const n = bytes / GIB;
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
-};
-
-// A disk entry shows its own age once its reading is this much older than the server's clock.
-const STALE_SECONDS = 10;
-
-const DISK_ICON = (
-  <>
-    <rect x="2" y="3.5" width="14" height="11" rx="2" />
-    <path d="M2 10.5h14M12.5 12.5h.01" />
-  </>
-);
-
-const UNKNOWN_TEXT: Record<string, string> = {
-  waiting: "Waiting for a second reading",
-  unavailable: "Not available in this build",
-  error: "The last read failed",
-};
-const unknownText = (reason?: HealthReason) => UNKNOWN_TEXT[reason ?? ""] ?? "No reading yet";
-// The disk meter has no second reading to wait for.
-const diskUnknownText = (reason?: HealthReason) => (reason === "waiting" ? "No disk reading yet" : unknownText(reason));
-
-// A bare "G" in the disk thresholds is decimal, so free space uses it too.
-const diskGB = (bytes: number) => {
-  const n = bytes / 1e9;
-  return Number.isInteger(n) ? String(n) : n.toFixed(1);
-};
-
-const CACHE_KEY = "health";
-
-const METER_NAMES = [
-  { key: "cpu", name: "CPU", icon: CPU_ICON },
-  { key: "memory", name: "Memory", icon: MEMORY_ICON },
-  { key: "disk", name: "Disk", icon: DISK_ICON },
-] as const;
+const ICONS = { cpu: CPU_ICON, memory: MEMORY_ICON, disk: DISK_ICON };
+const title = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
 export function HealthPopover({ health, connected = true }: { health: Health; connected?: boolean }) {
-  // The cache survives a reload, so an offline reload still has values.
-  const [received, setReceived] = useState<Received | null>(() => readPageCache<Received>(CACHE_KEY));
+  const received = useHealthReport(connected);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const tick = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(tick);
   }, []);
-
-  // Offline stops the polling; reconnecting runs this again, which fetches at once.
-  useEffect(() => {
-    if (!connected) return;
-    let live = true;
-    // A "reading" CPU list gets one `wait` call, which the server answers when the list exists.
-    const load = (wait = false): Promise<void> =>
-      fetchJson<HealthReport>(wait ? "/v1/health?wait" : "/v1/health", "health")
-        .then((res) => {
-          if (!live || res.kind !== "ok") return;
-          const next = { report: res.detail, at: Date.now() };
-          writePageCache(CACHE_KEY, next);
-          setReceived(next);
-          if (!wait && res.detail.causes.cpu.marker === "reading") return load(true);
-        })
-        .catch(() => {});
-    void load();
-    const poll = setInterval(() => void load(), POLL_MS);
-    return () => {
-      live = false;
-      clearInterval(poll);
-    };
-  }, [connected]);
 
   if (!received) return connected ? null : <SnapshotRows health={health} />;
   const { report, at } = received;
@@ -140,10 +56,10 @@ export function HealthPopover({ health, connected = true }: { health: Health; co
         sub={
           memory.state === "unknown"
             ? unknownText(memory.reason)
-            : `${gb(memory.used_bytes)} of ${gb(memory.total_bytes)} GB${pressure}`
+            : `${formatBytes(memory.used_bytes, "binary")} of ${formatBytes(memory.total_bytes, "binary")} GB${pressure}`
         }
       />
-      <CauseList part="memory-causes" list={report.causes.memory} value={(r) => bytesText(r.mem_bytes)} />
+      <CauseList part="memory-causes" list={report.causes.memory} value={(r) => memoryBytesText(r.mem_bytes)} />
       <DiskRow disks={report.disks} serverTime={report.time} />
       <Text px="14px" pt="2" pb="6px" borderTopWidth="1px" borderColor="hairline" fontSize="xs" color="text.faint" data-part="footer">
         {connected ? footer(report, at, now) : offlineFooter(at, now)}
@@ -162,8 +78,8 @@ function offlineFooter(receivedAt: number, now: number): string {
 function SnapshotRows({ health }: { health: Health }) {
   return (
     <Box py="1">
-      {METER_NAMES.map(({ key, name, icon }) => (
-        <Row key={key} part={key} icon={icon} name={name} state={health[key].state} value="—" sub={`State: ${health[key].state}`} />
+      {METERS.map(({ key, name }) => (
+        <Row key={key} part={key} icon={ICONS[key]} name={title(name)} state={health[key].state} value="—" sub={`State: ${health[key].state}`} />
       ))}
       <Text px="14px" pt="2" pb="6px" borderTopWidth="1px" borderColor="hairline" fontSize="xs" color="text.faint" data-part="footer">
         Offline. No values were fetched.
@@ -177,173 +93,4 @@ function footer(report: HealthReport, receivedAt: number, now: number): string {
   const readAt = Math.min(Date.parse(report.cpu.read_at), Date.parse(report.memory.read_at));
   const age = Date.parse(report.time) - readAt + (now - receivedAt);
   return `Updated ${Math.max(0, Math.floor(age / 1000))}s ago`;
-}
-
-function Row({
-  part,
-  icon,
-  name,
-  state,
-  value,
-  percent,
-  sub,
-  tagText,
-  children,
-}: {
-  part: string;
-  icon: ReactNode;
-  name: string;
-  state: HealthState;
-  value: string;
-  /** Omitted when the row's bars are in its children. */
-  percent?: number;
-  /** Omitted when the row has no note under it. */
-  sub?: string;
-  /** Replaces the state's default tag wording. */
-  tagText?: Partial<Record<HealthState, string>>;
-  children?: ReactNode;
-}) {
-  const color = STATE_COLOR[state];
-  const tag = (tagText ?? TAG)[state];
-  // Only high and critical tint the icon and value; normal keeps the mock's neutral text.
-  const raised = tag !== undefined;
-  return (
-    <Box
-      px="14px"
-      py="2"
-      borderTopWidth="1px"
-      borderColor="hairline"
-      display="grid"
-      gridTemplateColumns="18px 1fr auto"
-      gap="2px 10px"
-      alignItems="center"
-      data-part={part}
-      data-state={state}
-    >
-      <Box aria-hidden color={raised ? color : "text.dim"} display="flex">
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-          {icon}
-        </svg>
-      </Box>
-      <Text as="span" fontWeight="500">
-        {name}
-        {tag && (
-          <Text as="span" ml="6px" px="6px" fontSize="11px" borderRadius="full" bg={color.replace(".fg", ".bg")} color={color}>
-            {tag}
-          </Text>
-        )}
-      </Text>
-      <Text as="span" textAlign="right" fontWeight="500" fontVariantNumeric="tabular-nums" color={raised ? color : undefined}>
-        {value}
-      </Text>
-      {percent !== undefined && <Bar percent={percent} color={color} />}
-      {children}
-      {sub && (
-        <Text as="span" gridColumn="2 / 4" fontSize="xs" lineHeight="1.45" color="text.dim">
-          {sub}
-        </Text>
-      )}
-    </Box>
-  );
-}
-
-function Bar({ percent, color, part }: { percent: number; color: string; part?: string }) {
-  const clamped = Math.min(Math.max(percent, 0), 100);
-  return (
-    <Box gridColumn="2 / 4" h="4px" borderRadius="2px" bg="hairline" overflow="hidden" mt="3px" mb="1px" data-part={part} data-percent={Math.round(clamped)}>
-      <Box h="100%" w={`${clamped}%`} bg={color} />
-    </Box>
-  );
-}
-
-const bytesText = (bytes: number) => (bytes >= GIB ? `${gb(bytes)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`);
-
-const CAUSE_MARKER_TEXT: Record<string, string> = { unavailable: "processes unavailable", reading: "reading…" };
-
-function CauseList({ part, list, value }: { part: string; list: CauseListData; value: (row: CauseRow) => string }) {
-  const marker = list.marker ? CAUSE_MARKER_TEXT[list.marker] : undefined;
-  return (
-    <Box px="14px" pb="2" fontSize="xs" lineHeight="1.45" color="text.dim" data-part={part}>
-      {marker ??
-        list.rows.map((row, i) => (
-          <Box key={i} display="flex" gap="2" data-part="cause-row">
-            <Text as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" data-part="cause-label">
-              {row.ticket ? <Link href={ticketHref(row.ticket)} color="text.dim">{row.label}</Link> : row.label}
-              {row.ticket && row.busiest && (
-                <>
-                  {" · "}
-                  <Text as="span" color="text.faint" data-part="cause-busiest">
-                    {row.busiest}
-                  </Text>
-                </>
-              )}
-            </Text>
-            <Text as="span" textAlign="right" fontVariantNumeric="tabular-nums" data-part="cause-value">
-              {value(row)}
-            </Text>
-          </Box>
-        ))}
-    </Box>
-  );
-}
-
-// The server picks the worst disk, so the row and the Tray's D bar agree.
-function DiskRow({ disks, serverTime }: { disks: DisksReport; serverTime: string }) {
-  const list = disks.disks;
-  const worst = list.find((d) => d.id === disks.worst_id);
-  // With every project on one disk, its project list names them all and says nothing.
-  const showProjects = list.filter((d) => d.projects.length > 0).length > 1;
-  return (
-    <Row
-      part="disk"
-      icon={DISK_ICON}
-      name="Disk"
-      state={disks.state}
-      value={worst && disks.state !== "unknown" ? `${diskGB(worst.free_bytes)}G free` : "—"}
-      sub={disks.state === "unknown" ? diskUnknownText(disks.reason) : undefined}
-      tagText={{ high: "Under warn", critical: "Under clean" }}
-    >
-      <Box gridColumn="2 / 4" display="flex" flexDirection="column" gap="6px" mt="4px">
-        {list.map((d) => (
-          <DiskEntry key={d.id} disk={d} serverTime={serverTime} showProjects={showProjects} />
-        ))}
-      </Box>
-    </Row>
-  );
-}
-
-function DiskEntry({ disk, serverTime, showProjects }: { disk: HealthDisk; serverTime: string; showProjects: boolean }) {
-  const color = STATE_COLOR[disk.state];
-  const unknown = disk.state === "unknown";
-  const ageSeconds = Math.floor((Date.parse(serverTime) - Date.parse(disk.read_at)) / 1000);
-  const projects = disk.projects.join(", ");
-  const usedPercent = disk.total_bytes > 0 ? (1 - disk.free_bytes / disk.total_bytes) * 100 : 0;
-  return (
-    <Box data-part="disk-entry" data-state={disk.state}>
-      <Box display="flex" justifyContent="space-between" gap="2" fontSize="13px">
-        <Text as="span" fontSize="12px" color="text.muted" overflowWrap="anywhere">
-          {disk.name}
-        </Text>
-        <Text as="span" fontVariantNumeric="tabular-nums" color={color}>
-          {unknown ? "—" : `${diskGB(disk.free_bytes)}G free`}
-        </Text>
-      </Box>
-      {!unknown && <Bar part="disk-bar" percent={usedPercent} color={color} />}
-      {(unknown || showProjects) && (
-        <Text fontSize="xs" lineHeight="1.45" color="text.dim" data-part="disk-projects">
-          {unknown ? "No reading for this disk" : projects}
-        </Text>
-      )}
-      {disk.held && (
-        <Text fontSize="xs" lineHeight="1.45" color={color}>
-          {`Dispatch held for ${projects}. Clean now is in the banner.`}
-        </Text>
-      )}
-      {ageSeconds > STALE_SECONDS && (
-        <Text fontSize="xs" color="text.faint">
-          {`read ${ageSeconds}s ago`}
-        </Text>
-      )}
-    </Box>
-  );
 }
