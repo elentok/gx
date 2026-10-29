@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -149,6 +150,10 @@ type Settings struct {
 	// literals and localhost, that the web listener accepts in Host.
 	WebAllowedHosts []string
 
+	// WebInterfaceIPs lists the local interface IPs the web URL may fall back
+	// to; nil reads the machine's interfaces. Tests inject it.
+	WebInterfaceIPs func() []net.IP
+
 	// ChatHarness names the harness whose transcripts the session chat reads;
 	// empty means claude. Not a config key: servertest points it at the fake
 	// harness.
@@ -262,6 +267,8 @@ type Server struct {
 	webDev      http.Handler // nil unless Config.WebDevURL is set and valid
 	webHTTP     *http.Server
 	webErr      string // why the web bind failed
+	webRoot     *x509.Certificate
+	webListenIP net.IP // nil when the listener binds every interface
 	clientErrs  ipLimiter
 	logf        *rotatingFile
 	log         *slog.Logger

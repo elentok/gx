@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"net"
 	"net/http"
@@ -19,25 +20,25 @@ const webSniffTimeout = 10 * time.Second
 // webServerCertificate loads the saved leaf, or issues one when it is missing or
 // no longer fits the root, the allowed hosts and the listen address. It issues
 // at start only.
-func webServerCertificate(stateDir string, hosts []string, listenIP net.IP, now time.Time) (tls.Certificate, error) {
+func webServerCertificate(stateDir string, hosts []string, listenIP net.IP, ifaceIPs []net.IP, now time.Time) (tls.Certificate, *x509.Certificate, error) {
 	root, err := loadOrMakeWebRoot(stateDir, hosts, now)
 	if err != nil {
-		return tls.Certificate{}, err
+		return tls.Certificate{}, nil, err
 	}
 	leaf, err := loadWebLeaf(stateDir)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return tls.Certificate{}, err
+		return tls.Certificate{}, nil, err
 	}
 	if leaf == nil || webLeafNeedsReissue(leaf.Cert, root.Cert, hosts, listenIP, now) {
-		leaf, _, err = newWebLeaf(root, hosts, interfaceIPs(), listenIP, now)
+		leaf, _, err = newWebLeaf(root, hosts, ifaceIPs, listenIP, now)
 		if err != nil {
-			return tls.Certificate{}, err
+			return tls.Certificate{}, nil, err
 		}
 		if err := saveWebLeaf(stateDir, leaf); err != nil {
-			return tls.Certificate{}, err
+			return tls.Certificate{}, nil, err
 		}
 	}
-	return tls.Certificate{Certificate: [][]byte{leaf.DER}, PrivateKey: leaf.Key}, nil
+	return tls.Certificate{Certificate: [][]byte{leaf.DER}, PrivateKey: leaf.Key}, root.Cert, nil
 }
 
 func interfaceIPs() []net.IP {

@@ -45,8 +45,9 @@ func startWebHosts(t *testing.T, hosts ...string) (*servertest.Harness, string, 
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
+	// The advertised URL may name an allowed host that does not resolve here, so dial loopback.
 	_, port, _ := net.SplitHostPort(webHostPort(hs.WebURL))
-	return h, hs.WebURL, port
+	return h, "https://127.0.0.1:" + port, port
 }
 
 func TestWebHost_Table(t *testing.T) {

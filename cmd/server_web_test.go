@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -124,6 +125,51 @@ func TestWebURL_QRFlagPrintsAQRForTheTokenedURL(t *testing.T) {
 	// A version-4 code is 33 modules tall plus a quiet zone; two modules fit in one text row.
 	if len(lines) < 17 || !strings.ContainsAny(qr.String(), "▀▄█") {
 		t.Errorf("web-url --qr printed %d rows without block characters:\n%s", len(lines), qr.String())
+	}
+}
+
+func TestWebURL_UsesAnAllowedHostSetBeforeTheRootIsMade(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) {
+		c.WebAddr = "127.0.0.1:0"
+		c.WebAllowedHosts = []string{"gx.example.com"}
+	})
+	token, err := server.ReadWebToken(h.StateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, qr := range []bool{false, true} {
+		var out bytes.Buffer
+		if err := runWebURL(context.Background(), h.Client, h.StateDir, qr, &out); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.String(), "https://gx.example.com:") || !strings.Contains(out.String(), "/?gx_token="+token) {
+			t.Errorf("web-url (qr=%v) = %q, want the allowed host", qr, out.String())
+		}
+	}
+}
+
+func TestWebURL_AllInterfacesBindNeverPrintsTheUnspecifiedAddress(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		ifaces []net.IP
+		want   string
+	}{
+		{"private interface", []net.IP{net.ParseIP("192.168.1.7")}, "https://192.168.1.7:"},
+		{"no private interface", []net.IP{net.ParseIP("8.8.8.8")}, "https://localhost:"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) {
+				c.WebAddr = "0.0.0.0:0"
+				c.WebInterfaceIPs = func() []net.IP { return tc.ifaces }
+			})
+			hs, err := h.Client.Handshake(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.HasPrefix(hs.WebURL, tc.want) || strings.Contains(hs.WebURL, "0.0.0.0") {
+				t.Errorf("web url = %q, want prefix %q and no 0.0.0.0", hs.WebURL, tc.want)
+			}
+		})
 	}
 }
 

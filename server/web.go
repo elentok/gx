@@ -51,7 +51,7 @@ func (s *Server) bindWeb() {
 	if a, ok := rawLn.Addr().(*net.TCPAddr); ok && !a.IP.IsUnspecified() {
 		listenIP = a.IP
 	}
-	cert, err := webServerCertificate(s.cfg.StateDir, s.cfg.WebAllowedHosts, listenIP, time.Now())
+	cert, root, err := webServerCertificate(s.cfg.StateDir, s.cfg.WebAllowedHosts, listenIP, s.interfaceIPs(), time.Now())
 	if err != nil {
 		rawLn.Close()
 		s.webErr = "web tls: " + err.Error()
@@ -59,7 +59,7 @@ func (s *Server) bindWeb() {
 		return
 	}
 	ln := newSniffListener(rawLn, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})
-	s.web = ln
+	s.web, s.webRoot, s.webListenIP = ln, root, listenIP
 	mux := s.webHandler()
 	protected := requireToken(s.cfg.StateDir, webCookieName(ln), mux)
 	allowed := func() []string { return s.settings.Load().WebAllowedHosts }
@@ -71,7 +71,16 @@ func (s *Server) WebURL() string {
 	if s.web == nil {
 		return ""
 	}
-	return "https://" + s.web.Addr().String()
+	_, port, _ := net.SplitHostPort(s.web.Addr().String())
+	return webBaseURL(s.settings.Load().WebAllowedHosts, s.webRoot, s.webListenIP, port, s.interfaceIPs())
+}
+
+// interfaceIPs is the one place the machine's interfaces are read.
+func (s *Server) interfaceIPs() []net.IP {
+	if s.cfg.WebInterfaceIPs != nil {
+		return s.cfg.WebInterfaceIPs()
+	}
+	return interfaceIPs()
 }
 
 // webHandler is the web mux: the snapshot, the event stream and the embedded

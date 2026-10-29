@@ -43,10 +43,13 @@ func TestWebTLS_OnePortServesHTTPSAndRedirectsPlainHTTP(t *testing.T) {
 	if !strings.HasPrefix(hs.WebURL, "https://") {
 		t.Fatalf("web_url = %q, want https", hs.WebURL)
 	}
-	host := webHostPort(hs.WebURL)
-	port := host[strings.LastIndex(host, ":"):]
+	// The advertised URL names the allowed host, which does not resolve here, so dial loopback.
+	advertised := webHostPort(hs.WebURL)
+	port := advertised[strings.LastIndex(advertised, ":"):]
+	host := "127.0.0.1" + port
+	webURL := "https://" + host
 
-	if code, _ := webDo(t, h, http.MethodGet, hs.WebURL+"/v1/snapshot"); code != http.StatusOK {
+	if code, _ := webDo(t, h, http.MethodGet, webURL+"/v1/snapshot"); code != http.StatusOK {
 		t.Errorf("https snapshot = %d, want 200", code)
 	}
 
@@ -73,9 +76,9 @@ func TestWebTLS_OnePortServesHTTPSAndRedirectsPlainHTTP(t *testing.T) {
 	}
 
 	// Each name works on its own over HTTPS, with no redirect between hosts.
-	cookie := login(t, h.StateDir, hs.WebURL)
+	cookie := login(t, h.StateDir, webURL)
 	for _, name := range []string{"gx.example.org" + port, "localhost" + port, host} {
-		if code, _ := hostStatus(t, hs.WebURL, name, cookie); code != http.StatusOK {
+		if code, _ := hostStatus(t, webURL, name, cookie); code != http.StatusOK {
 			t.Errorf("https Host %q = %d, want 200", name, code)
 		}
 	}
