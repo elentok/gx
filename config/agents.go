@@ -8,16 +8,33 @@ import (
 const (
 	defaultClaudeModel  = "sonnet"
 	defaultClaudeEffort = "medium"
-	defaultCodexModel   = "gpt-5.6-sol"
+	defaultCodexModel   = "gpt-6.1-sol"
 	defaultCodexEffort  = "medium"
+
+	defaultClaudeLightModel      = "haiku"
+	defaultClaudeStrongestModel  = "opus"
+	defaultClaudeStrongestEffort = "high"
+	defaultCodexLightModel       = "gpt-6-luna"
+	defaultCodexLightEffort      = "medium"
+	defaultCodexStrongestModel   = "gpt-6-astra"
+	defaultCodexStrongestEffort  = "high"
 )
 
-// AgentConfig controls which model and effort level a coding agent runs
-// under. An empty field means "inherit the agent CLI's own setting" — gx
-// passes no flag for that knob.
-type AgentConfig struct {
+// TierConfig is the model and effort of one tier. An empty field means
+// "inherit the agent CLI's own setting": gx passes no flag for that knob.
+type TierConfig struct {
 	Model  string `json:"model"`
 	Effort string `json:"effort"`
+}
+
+// AgentConfig controls which models and effort levels a coding agent runs
+// under. Model and Effort are the worker tier; Light and Strongest are the
+// other two.
+type AgentConfig struct {
+	Model     string     `json:"model"`
+	Effort    string     `json:"effort"`
+	Light     TierConfig `json:"light"`
+	Strongest TierConfig `json:"strongest"`
 }
 
 // AgentsConfig holds per-agent model/effort settings, keyed by agent name,
@@ -64,8 +81,16 @@ const DefaultFocusSidebarKey = "ctrl+q"
 // DefaultAgentsConfig returns the agents defaults.
 func DefaultAgentsConfig() AgentsConfig {
 	return AgentsConfig{
-		Claude:          AgentConfig{Model: defaultClaudeModel, Effort: defaultClaudeEffort},
-		Codex:           AgentConfig{Model: defaultCodexModel, Effort: defaultCodexEffort},
+		Claude: AgentConfig{
+			Model: defaultClaudeModel, Effort: defaultClaudeEffort,
+			Light:     TierConfig{Model: defaultClaudeLightModel},
+			Strongest: TierConfig{Model: defaultClaudeStrongestModel, Effort: defaultClaudeStrongestEffort},
+		},
+		Codex: AgentConfig{
+			Model: defaultCodexModel, Effort: defaultCodexEffort,
+			Light:     TierConfig{Model: defaultCodexLightModel, Effort: defaultCodexLightEffort},
+			Strongest: TierConfig{Model: defaultCodexStrongestModel, Effort: defaultCodexStrongestEffort},
+		},
 		LeaderKey:       []string{DefaultLeaderKey},
 		FocusSidebarKey: []string{DefaultFocusSidebarKey},
 		ResumeOnStart:   true,

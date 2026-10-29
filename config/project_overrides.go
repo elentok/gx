@@ -98,6 +98,14 @@ func (c Config) WithProject(pf ProjectFile) Config {
 func overlayAgent(base, over AgentConfig) AgentConfig {
 	base.Model = firstNonEmpty(over.Model, base.Model)
 	base.Effort = firstNonEmpty(over.Effort, base.Effort)
+	base.Light = overlayTier(base.Light, over.Light)
+	base.Strongest = overlayTier(base.Strongest, over.Strongest)
+	return base
+}
+
+func overlayTier(base, over TierConfig) TierConfig {
+	base.Model = firstNonEmpty(over.Model, base.Model)
+	base.Effort = firstNonEmpty(over.Effort, base.Effort)
 	return base
 }
 

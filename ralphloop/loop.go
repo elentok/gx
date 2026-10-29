@@ -239,14 +239,29 @@ func agentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []st
 	return args
 }
 
-// resolvedAgentConfig picks agents' Claude or Codex sub-config for agent —
-// the single AgentConfig relevant to this Run call, since RunOptions.Agent is
-// fixed for the whole run.
-func resolvedAgentConfig(agents config.AgentsConfig, agent AgentKind) config.AgentConfig {
+// Tier names one of the three model/effort pairs configured per agent.
+type Tier string
+
+const (
+	TierLight     Tier = "light"
+	TierWorker    Tier = "worker"
+	TierStrongest Tier = "strongest"
+)
+
+// ResolveTier is the one place that turns (agent, tier) into the model and
+// effort to pass. An empty result means "pass no flag".
+func ResolveTier(agents config.AgentsConfig, agent AgentKind, tier Tier) (model, effort string) {
+	ac := agents.Claude
 	if agent == AgentCodex {
-		return agents.Codex
+		ac = agents.Codex
 	}
-	return agents.Claude
+	switch tier {
+	case TierLight:
+		return ac.Light.Model, ac.Light.Effort
+	case TierStrongest:
+		return ac.Strongest.Model, ac.Strongest.Effort
+	}
+	return ac.Model, ac.Effort
 }
 
 // RunOptions configures a single `gx ralph-loop {epic-name}` invocation.
@@ -369,7 +384,7 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	if err := ValidateAgentKind(agent); err != nil {
 		return err
 	}
-	agentConfig := resolvedAgentConfig(opts.Agents, agent)
+	workerModel, workerEffort := ResolveTier(opts.Agents, agent, TierWorker)
 	runStart := d.Now()
 
 	scratchDir, err := resolveScratchDir(opts)
@@ -617,8 +632,8 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 				FeatureWorktree: featurePath,
 				FeatureBranch:   opts.EpicName,
 				Agent:           agent,
-				Model:           agentConfig.Model,
-				Effort:          agentConfig.Effort,
+				Model:           workerModel,
+				Effort:          workerEffort,
 				Skill:           skill,
 				Ticket:          ticket,
 				ScratchDir:      scratchDir,
@@ -678,8 +693,8 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 	reattached, err := reconcile(d, reconcileParams{
 		Paths:        reconcilePaths{ScratchDir: scratchDir, FeatureWorktree: featurePath, WorktreeDir: wtDir, RepoDir: opts.RepoDir},
 		Agent:        agent,
-		Model:        agentConfig.Model,
-		Effort:       agentConfig.Effort,
+		Model:        workerModel,
+		Effort:       workerEffort,
 		Skill:        skill,
 		SmartZone:    smartZone,
 		Gate:         gate,
@@ -714,8 +729,8 @@ func Run(opts RunOptions, d Deps, sink EventSink) error {
 		FeatureWorktree: featurePath,
 		FeatureBranch:   opts.EpicName,
 		Agent:           agent,
-		Model:           agentConfig.Model,
-		Effort:          agentConfig.Effort,
+		Model:           workerModel,
+		Effort:          workerEffort,
 		Skill:           skill,
 		ScratchDir:      scratchDir,
 		WorktreeLock:    &worktreeMu,

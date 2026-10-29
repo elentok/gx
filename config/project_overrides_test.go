@@ -126,6 +126,21 @@ func TestWithProject_MaxOneOffAgents(t *testing.T) {
 	}
 }
 
+func TestWithProject_TierOverlayMergesPerField(t *testing.T) {
+	global := Config{Agents: DefaultAgentsConfig()}
+	pf, err := ReadProjectFile(writeProjectJSON(t, `{"agents": {"claude": {"strongest": {"effort": "max"}}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := global.WithProject(pf).Agents.Claude
+	if want := (TierConfig{Model: "opus", Effort: "max"}); got.Strongest != want {
+		t.Errorf("Strongest = %+v, want %+v", got.Strongest, want)
+	}
+	if got.Light != global.Agents.Claude.Light || got.Model != "sonnet" {
+		t.Errorf("other tiers changed: %+v", got)
+	}
+}
+
 func TestWithProject_OverridesOnlyThatCopy(t *testing.T) {
 	global := Config{
 		ExecutionQueue: DefaultExecutionQueueConfig(),

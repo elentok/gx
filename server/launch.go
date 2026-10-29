@@ -73,9 +73,9 @@ func (s *Server) evolveDirs(ticket tickets.Address) []string {
 	return dirs
 }
 
-// agentConfig is agent's model and effort for project: config agents.* with
-// the project's overrides on top.
-func (s *Server) agentConfig(project string, agent ralphloop.AgentKind) config.AgentConfig {
+// agentsConfig is config agents.* for project, with the project's overrides on
+// top.
+func (s *Server) agentsConfig(project string) config.AgentsConfig {
 	set := s.settings.Load()
 	cfg := config.Config{Agents: config.AgentsConfig{Claude: set.AgentsClaude, Codex: set.AgentsCodex}}
 	if dir, err := s.projectDir(project); err == nil {
@@ -83,18 +83,15 @@ func (s *Server) agentConfig(project string, agent ralphloop.AgentKind) config.A
 			cfg = cfg.WithProject(pf)
 		}
 	}
-	if agent == ralphloop.AgentCodex {
-		return cfg.Agents.Codex
-	}
-	return cfg.Agents.Claude
+	return cfg.Agents
 }
 
 // runAgentConfig is the model and effort run's agent launched under, else
 // the project's agents.* config. Every launch, finish and adoption resolves
 // them here.
 func (s *Server) runAgentConfig(project string, agent ralphloop.AgentKind, run Run) (model, effort string) {
-	ac := s.agentConfig(project, agent)
-	return cmp.Or(run.Model, ac.Model), cmp.Or(run.Effort, ac.Effort)
+	model, effort = ralphloop.ResolveTier(s.agentsConfig(project), agent, ralphloop.TierWorker)
+	return cmp.Or(run.Model, model), cmp.Or(run.Effort, effort)
 }
 
 // agentEnv is the tab env, plus the investigate ticket's address for an

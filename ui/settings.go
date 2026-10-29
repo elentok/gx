@@ -112,7 +112,7 @@ func (s Settings) AgentConfig(agent ralphloop.AgentKind) config.AgentConfig {
 
 // ResolvedAgents returns s.Agents with each agent kind's AgentConfig run
 // through AgentConfig's zero-value fallback — the shape ralph-loop's
-// RunOptions.Agents expects (see ralphloop.resolvedAgentConfig, which applies
+// RunOptions.Agents expects (see ralphloop.ResolveTier, which applies
 // no fallback of its own).
 func (s Settings) ResolvedAgents() config.AgentsConfig {
 	return config.AgentsConfig{

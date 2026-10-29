@@ -47,13 +47,13 @@ func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
 			name:  "codex",
 			agent: AgentCodex,
 			agents: config.AgentsConfig{
-				Codex: config.AgentConfig{Model: "gpt-5.6-sol", Effort: "medium"},
+				Codex: config.AgentConfig{Model: "gpt-6.1-sol", Effort: "medium"},
 			},
 			wantAgentArgs: func(scratchDir string) []string {
 				return []string{
 					"--sandbox", "workspace-write", "--ask-for-approval", "on-request",
 					"--add-dir", filepath.Join(scratchDir, epicName),
-					"--model", "gpt-5.6-sol",
+					"--model", "gpt-6.1-sol",
 					"-c", `model_reasoning_effort="medium"`,
 				}
 			},

@@ -241,14 +241,8 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 			CodeReview []string `json:"code-review"`
 		} `json:"skills"`
 		Agents *struct {
-			Claude *struct {
-				Model  *string `json:"model"`
-				Effort *string `json:"effort"`
-			} `json:"claude"`
-			Codex *struct {
-				Model  *string `json:"model"`
-				Effort *string `json:"effort"`
-			} `json:"codex"`
+			Claude          *rawAgentConfig `json:"claude"`
+			Codex           *rawAgentConfig `json:"codex"`
 			LeaderKey       json.RawMessage `json:"leader-key"`
 			FocusSidebarKey json.RawMessage `json:"focus-sidebar-key"`
 			ResumeOnStart   *bool           `json:"restore-sessions-on-start"`
@@ -409,10 +403,10 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 	}
 	if raw.Agents != nil {
 		if raw.Agents.Claude != nil {
-			applyAgentConfig(&cfg.Agents.Claude, raw.Agents.Claude.Model, raw.Agents.Claude.Effort)
+			applyAgentConfig(&cfg.Agents.Claude, raw.Agents.Claude)
 		}
 		if raw.Agents.Codex != nil {
-			applyAgentConfig(&cfg.Agents.Codex, raw.Agents.Codex.Model, raw.Agents.Codex.Effort)
+			applyAgentConfig(&cfg.Agents.Codex, raw.Agents.Codex)
 		}
 		if keys, ok := parseKeys(raw.Agents.LeaderKey); ok {
 			cfg.Agents.LeaderKey = keys
@@ -549,16 +543,38 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 	return cfg, nil
 }
 
+// rawTierConfig is a tier as written in the file: a nil field is an absent key.
+type rawTierConfig struct {
+	Model  *string `json:"model"`
+	Effort *string `json:"effort"`
+}
+
+type rawAgentConfig struct {
+	rawTierConfig
+	Light     *rawTierConfig `json:"light"`
+	Strongest *rawTierConfig `json:"strongest"`
+}
+
 // applyAgentConfig overlays explicitly-set model/effort values onto an
-// AgentConfig, trimming whitespace and leaving unset keys at the built-in
-// default. A trimmed-empty value survives as empty (meaning "inherit"),
-// distinct from an absent key (meaning "use the default").
-func applyAgentConfig(cfg *AgentConfig, model, effort *string) {
-	if model != nil {
-		cfg.Model = strings.TrimSpace(*model)
+// AgentConfig and its tiers, trimming whitespace and leaving unset keys at the
+// built-in default. A trimmed-empty value survives as empty (meaning
+// "inherit"), distinct from an absent key (meaning "use the default").
+func applyAgentConfig(cfg *AgentConfig, raw *rawAgentConfig) {
+	applyTierConfig(&cfg.Model, &cfg.Effort, raw.rawTierConfig)
+	if raw.Light != nil {
+		applyTierConfig(&cfg.Light.Model, &cfg.Light.Effort, *raw.Light)
 	}
-	if effort != nil {
-		cfg.Effort = strings.TrimSpace(*effort)
+	if raw.Strongest != nil {
+		applyTierConfig(&cfg.Strongest.Model, &cfg.Strongest.Effort, *raw.Strongest)
+	}
+}
+
+func applyTierConfig(model, effort *string, raw rawTierConfig) {
+	if raw.Model != nil {
+		*model = strings.TrimSpace(*raw.Model)
+	}
+	if raw.Effort != nil {
+		*effort = strings.TrimSpace(*raw.Effort)
 	}
 }
 

@@ -827,11 +827,55 @@ func TestLoadSlackNotificationsMissingUsesDefaults(t *testing.T) {
 
 func TestDefaultAgentsConfig(t *testing.T) {
 	cfg := DefaultAgentsConfig()
-	if cfg.Claude.Model != "sonnet" || cfg.Claude.Effort != "medium" {
-		t.Fatalf("Claude = %+v, want sonnet/medium", cfg.Claude)
+	want := map[string]struct {
+		got  AgentConfig
+		want AgentConfig
+	}{
+		"claude": {cfg.Claude, AgentConfig{
+			Model: "sonnet", Effort: "medium",
+			Light:     TierConfig{Model: "haiku"},
+			Strongest: TierConfig{Model: "opus", Effort: "high"},
+		}},
+		"codex": {cfg.Codex, AgentConfig{
+			Model: "gpt-6.1-sol", Effort: "medium",
+			Light:     TierConfig{Model: "gpt-6-luna", Effort: "medium"},
+			Strongest: TierConfig{Model: "gpt-6-astra", Effort: "high"},
+		}},
 	}
-	if cfg.Codex.Model != "gpt-5.6-sol" || cfg.Codex.Effort != "medium" {
-		t.Fatalf("Codex = %+v, want gpt-5.6-sol/medium", cfg.Codex)
+	for name, c := range want {
+		if c.got != c.want {
+			t.Errorf("%s = %+v, want %+v", name, c.got, c.want)
+		}
+	}
+}
+
+func TestLoadAgentsConfigTiers(t *testing.T) {
+	tmp := t.TempDir()
+	prev := userConfigDirFn
+	userConfigDirFn = func() (string, error) { return tmp, nil }
+	t.Cleanup(func() { userConfigDirFn = prev })
+
+	dir := filepath.Join(tmp, "gx")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	body := `{"agents":{"claude":{"strongest":{"model":" fable ","effort":"max"},"light":{"effort":""}}}}`
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(body), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got, want := cfg.Agents.Claude.Strongest, (TierConfig{Model: "fable", Effort: "max"}); got != want {
+		t.Errorf("Strongest = %+v, want %+v", got, want)
+	}
+	if got, want := cfg.Agents.Claude.Light, (TierConfig{Model: "haiku"}); got != want {
+		t.Errorf("Light = %+v, want untouched default %+v", got, want)
+	}
+	if cfg.Agents.Claude.Model != "sonnet" {
+		t.Errorf("worker Model = %q, want default sonnet", cfg.Agents.Claude.Model)
 	}
 }
 
@@ -848,8 +892,8 @@ func TestLoadAgentsConfigDefaultsWhenBlockAbsent(t *testing.T) {
 	if cfg.Agents.Claude.Model != "sonnet" || cfg.Agents.Claude.Effort != "medium" {
 		t.Fatalf("Agents.Claude = %+v, want sonnet/medium", cfg.Agents.Claude)
 	}
-	if cfg.Agents.Codex.Model != "gpt-5.6-sol" || cfg.Agents.Codex.Effort != "medium" {
-		t.Fatalf("Agents.Codex = %+v, want gpt-5.6-sol/medium", cfg.Agents.Codex)
+	if cfg.Agents.Codex.Model != "gpt-6.1-sol" || cfg.Agents.Codex.Effort != "medium" {
+		t.Fatalf("Agents.Codex = %+v, want gpt-6.1-sol/medium", cfg.Agents.Codex)
 	}
 }
 
@@ -879,7 +923,7 @@ func TestLoadAgentsConfigPartialFillsMissingKeysFromDefaults(t *testing.T) {
 	if cfg.Agents.Claude.Effort != "medium" {
 		t.Fatalf("Agents.Claude.Effort = %q, want default medium", cfg.Agents.Claude.Effort)
 	}
-	if cfg.Agents.Codex.Model != "gpt-5.6-sol" || cfg.Agents.Codex.Effort != "medium" {
+	if cfg.Agents.Codex.Model != "gpt-6.1-sol" || cfg.Agents.Codex.Effort != "medium" {
 		t.Fatalf("Agents.Codex = %+v, want untouched defaults", cfg.Agents.Codex)
 	}
 }
