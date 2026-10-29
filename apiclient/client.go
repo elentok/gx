@@ -121,6 +121,14 @@ func (c *Client) Handshake(ctx context.Context) (server.Handshake, error) {
 	return h, err
 }
 
+// WebInfo returns the web listener's base URL, root fingerprint and the names
+// its leaf leaves out; a refusal when the listener is off.
+func (c *Client) WebInfo(ctx context.Context) (server.WebInfo, error) {
+	var info server.WebInfo
+	err := c.get(ctx, "/v1/web/info", &info)
+	return info, err
+}
+
 // Snapshot returns every indexed ticket plus the server-wide sequence number.
 func (c *Client) Snapshot(ctx context.Context) (server.Snapshot, error) {
 	var s server.Snapshot

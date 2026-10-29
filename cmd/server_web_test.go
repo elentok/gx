@@ -3,11 +3,16 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
@@ -107,7 +112,7 @@ func TestWebURL_QRFlagPrintsAQRForTheTokenedURL(t *testing.T) {
 	wantURL := hs.WebURL + "/?gx_token=" + token
 
 	var plain bytes.Buffer
-	if err := runWebURL(context.Background(), h.Client, h.StateDir, false, &plain); err != nil {
+	if err := runWebURL(context.Background(), h.Client, h.StateDir, false, false, &plain); err != nil {
 		t.Fatal(err)
 	}
 	if plain.String() != wantURL+"\n" {
@@ -115,7 +120,7 @@ func TestWebURL_QRFlagPrintsAQRForTheTokenedURL(t *testing.T) {
 	}
 
 	var qr bytes.Buffer
-	if err := runWebURL(context.Background(), h.Client, h.StateDir, true, &qr); err != nil {
+	if err := runWebURL(context.Background(), h.Client, h.StateDir, true, false, &qr); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.HasSuffix(qr.String(), wantURL+"\n") {
@@ -139,7 +144,7 @@ func TestWebURL_UsesAnAllowedHostSetBeforeTheRootIsMade(t *testing.T) {
 	}
 	for _, qr := range []bool{false, true} {
 		var out bytes.Buffer
-		if err := runWebURL(context.Background(), h.Client, h.StateDir, qr, &out); err != nil {
+		if err := runWebURL(context.Background(), h.Client, h.StateDir, qr, false, &out); err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(out.String(), "https://gx.example.com:") || !strings.Contains(out.String(), "/?gx_token="+token) {
@@ -175,8 +180,44 @@ func TestWebURL_AllInterfacesBindNeverPrintsTheUnspecifiedAddress(t *testing.T) 
 
 func TestWebURL_WebListenerOffIsAnError(t *testing.T) {
 	h := servertest.Start(t)
-	err := runWebURL(context.Background(), h.Client, h.StateDir, false, &bytes.Buffer{})
+	err := runWebURL(context.Background(), h.Client, h.StateDir, false, false, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "web UI is off") {
 		t.Errorf("err = %v, want a web UI is off error", err)
+	}
+}
+
+func TestWebURL_NoServerIsServerNotRunning(t *testing.T) {
+	// A short path: t.TempDir() can exceed the unix socket path limit.
+	dir, err := os.MkdirTemp("/tmp", "gxn")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	cl := apiclient.New(filepath.Join(dir, "none.sock"))
+	err = runWebURL(context.Background(), cl, t.TempDir(), false, false, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) {
+		t.Errorf("err = %v, want %s", err, server.ReasonServerNotRunning)
+	}
+}
+
+func TestWebURL_JSONCarriesBaseURLAndFingerprint(t *testing.T) {
+	h := startWebServer(t)
+	var out bytes.Buffer
+	if err := runWebURL(context.Background(), h.Client, h.StateDir, false, true, &out); err != nil {
+		t.Fatal(err)
+	}
+	var got webURLResult
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("json: %v\n%s", err, out.String())
+	}
+	hs, err := h.Client.Handshake(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.BaseURL != hs.WebURL || !strings.HasPrefix(got.URL, hs.WebURL+"/?gx_token=") {
+		t.Errorf("json = %+v, want base url %q and a tokened url", got, hs.WebURL)
+	}
+	if !regexp.MustCompile(`^([0-9a-f]{8} ){7}[0-9a-f]{8}$`).MatchString(got.Fingerprint) {
+		t.Errorf("fingerprint = %q, want 8 groups of 8", got.Fingerprint)
 	}
 }

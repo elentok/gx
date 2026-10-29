@@ -12,6 +12,7 @@ import (
 // missing here fails TestRouteTableHasCLIVerbs: add the verb, then the entry.
 var routeVerbs = map[string]string{
 	"GET /v1/handshake":                     "server status",
+	"GET /v1/web/info":                      "server web-url",
 	"GET /v1/snapshot":                      "server snapshot",
 	"GET /v1/events":                        "server tickets follow",
 	"GET /v1/projects":                      "project list",

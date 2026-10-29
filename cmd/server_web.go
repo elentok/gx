@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -36,7 +36,7 @@ func newServerWebTokenCmd(d deps) *cobra.Command {
 }
 
 func newServerWebURLCmd(d deps) *cobra.Command {
-	var showQR bool
+	var showQR, jsonOut bool
 	c := &cobra.Command{
 		Use:   "web-url",
 		Short: "Print the web UI link with its token",
@@ -54,9 +54,10 @@ func newServerWebURLCmd(d deps) *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			return runWebURL(ctx, cl, stateDir, showQR, c.OutOrStdout())
+			return runWebURL(ctx, cl, stateDir, showQR, jsonOut, c.OutOrStdout())
 		},
 	}
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
 	c.Flags().BoolVar(&showQR, "qr", false, "print a QR code of the link above it, to open it on a phone")
 	return c
 }
@@ -76,19 +77,51 @@ func runWebToken(stateDir string, rotate bool, w io.Writer) error {
 	return err
 }
 
-func runWebURL(ctx context.Context, c *apiclient.Client, stateDir string, showQR bool, w io.Writer) error {
-	hs, err := c.Handshake(ctx)
-	if err != nil {
-		return fmt.Errorf("server read failed: %w", err)
+// webInfoOrRefusal reads the web info route; a server that is not running comes
+// back as a refusal, like the other socket reads.
+func webInfoOrRefusal(ctx context.Context, c *apiclient.Client) (server.WebInfo, error) {
+	info, err := c.WebInfo(ctx)
+	switch {
+	case apiclient.IsNotRunning(err):
+		return server.WebInfo{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, nil
+	case err != nil:
+		return info, fmt.Errorf("server read failed: %w", err)
 	}
-	if hs.WebURL == "" {
-		return errors.New("the web UI is off: set server.web.listen in the config and restart the server")
-	}
-	token, err := server.ReadWebToken(stateDir)
+	return info, nil
+}
+
+// webURLResult is the `gx server web-url --json` payload.
+type webURLResult struct {
+	server.WebInfo
+	// URL is the base URL with the token appended.
+	URL string `json:"url,omitempty"`
+}
+
+func runWebURL(ctx context.Context, c *apiclient.Client, stateDir string, showQR, jsonOut bool, w io.Writer) error {
+	info, err := webInfoOrRefusal(ctx, c)
 	if err != nil {
 		return err
 	}
-	url := hs.WebURL + "/?gx_token=" + token
+	res := webURLResult{WebInfo: info}
+	if !info.Refused {
+		token, err := server.ReadWebToken(stateDir)
+		if err != nil {
+			return err
+		}
+		res.URL = info.BaseURL + "/?gx_token=" + token
+	}
+	if jsonOut {
+		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
+			return err
+		}
+	}
+	if info.Refused {
+		return fmt.Errorf("refused (%s): %s", info.Reason, info.Message)
+	}
+	if jsonOut {
+		return nil
+	}
+	url := res.URL
 	if showQR {
 		art, err := renderQR(url)
 		if err != nil {

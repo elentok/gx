@@ -518,6 +518,7 @@ var routeTable = []struct {
 	handler func(*Server, http.ResponseWriter, *http.Request)
 }{
 	{"GET /v1/handshake", (*Server).handshake},
+	{"GET /v1/web/info", (*Server).webInfo},
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/projects", (*Server).projects},

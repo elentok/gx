@@ -250,6 +250,8 @@ type StatusInfo struct {
 	Paused  bool   `json:"paused,omitempty"`
 	// WebURL is the web UI link with its token; empty when the web listener is off.
 	WebURL string `json:"web_url,omitempty"`
+	// WebFingerprint is the web root certificate's SHA-256 in 8 groups of 8.
+	WebFingerprint string `json:"web_fingerprint,omitempty"`
 	// Starting: a server holds the lock but does not answer yet. It builds the
 	// ticket index before it opens its socket.
 	Starting bool     `json:"starting,omitempty"`
@@ -296,6 +298,12 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 				return terr
 			}
 			info.WebURL = n.WebURL + "/?gx_token=" + token
+			if wi, werr := c.WebInfo(ctx); werr == nil && !wi.Refused {
+				info.WebFingerprint = wi.Fingerprint
+				for _, host := range wi.LeftOutHosts {
+					info.Warnings = append(info.Warnings, "web certificate leaves out allowed host "+host+": the root does not permit it")
+				}
+			}
 		}
 		if b, berr := c.Budget(ctx); berr == nil {
 			info.Budget = &b
@@ -339,6 +347,11 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 	}
 	if info.WebURL != "" {
 		if _, err = fmt.Fprintln(w, "web: "+info.WebURL); err != nil {
+			return err
+		}
+	}
+	if info.WebFingerprint != "" {
+		if _, err = fmt.Fprintln(w, "fingerprint: "+info.WebFingerprint); err != nil {
 			return err
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -87,6 +88,51 @@ func TestServerStatus_BrokenConfigStillReportsTheError(t *testing.T) {
 	}
 	if !strings.HasPrefix(out.String(), "config error: config ") || !strings.Contains(out.String(), "\nrunning\n") {
 		t.Errorf("status = %q, want the config error on top", out.String())
+	}
+}
+
+func TestServerStatus_PrintsFingerprintAndAWarningPerLeftOutHost(t *testing.T) {
+	dirs := config.DirsFrom(tempEnv(t))
+	store := t.TempDir()
+	path := filepath.Join(t.TempDir(), "config.json")
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) {
+		c.WebAddr = "127.0.0.1:0"
+		c.WebAllowedHosts = []string{"a.example.org"}
+	})
+	servertest.WriteConfig(t, path, store, map[string]any{
+		"server": map[string]any{"web": map[string]any{"allowed-hosts": []string{"a.example.org", "outside.example.net"}}},
+	})
+	if res, err := h.Client.ReloadConfig(context.Background()); err != nil || res.Refused {
+		t.Fatalf("reload: %+v, %v", res, err)
+	}
+	// Status reads the token from the user's state dir, which the harness does not use.
+	token, err := server.ReadWebToken(h.StateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir, err := dirs.StateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(server.WebTokenPath(stateDir), []byte(token+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := runServerStatusWith(context.Background(), dirs, h.Client, false, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`(?m)^fingerprint: ([0-9a-f]{8} ){7}[0-9a-f]{8}$`).MatchString(out.String()) {
+		t.Errorf("status = %q, want a fingerprint line in 8 groups of 8", out.String())
+	}
+	if !strings.Contains(out.String(), "warning: web certificate leaves out allowed host outside.example.net") {
+		t.Errorf("status = %q, want a warning for outside.example.net", out.String())
+	}
+	if strings.Contains(out.String(), "allowed host a.example.org") {
+		t.Errorf("status = %q, want no warning for the permitted host", out.String())
 	}
 }
 
