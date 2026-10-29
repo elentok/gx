@@ -431,3 +431,103 @@ test("92. Last viewed session", async ({ page, start }) => {
   await expect(second).toHaveURL(new RegExp(`#/agents/${viewed.id}$`));
   await expect(second.getByRole("heading", { name: "Pick a session" })).toHaveCount(0);
 });
+
+const failure = (page: Page) => page.getByRole("region", { name: "Session failure" });
+
+test("80. Failure notices", async ({ page, start }) => {
+  const fixture = await start("agents-failures");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const byKind = async (kind: string) => (await sessions(fixture)).find((s) => s.failure?.kind === kind)!;
+  const open = async (kind: string) => {
+    const s = await byKind(kind);
+    await go(page, `#/agents/${s.id}`);
+    return s;
+  };
+  const buttons = (kind: string) => failure(page).getByRole("button").evaluateAll((els) => els.map((el) => el.textContent));
+
+  // Stalled: the fixture's threshold is 3s.
+  await open("stalled");
+  await expect(failure(page).getByText("No progress for 15 min")).toBeVisible();
+  expect(await buttons("stalled")).toEqual(["Screen"]);
+  await failure(page).getByRole("button", { name: "Screen" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  // Blocked: Screen only.
+  await open("blocked");
+  await expect(failure(page).getByText("Waiting at a prompt in the terminal")).toBeVisible();
+  expect(await buttons("blocked")).toEqual(["Screen"]);
+
+  // Auth: Retry, and Send stays on.
+  await open("auth");
+  await expect(failure(page).getByText("Claude login needed")).toBeVisible();
+  expect(await buttons("auth")).toEqual(["Retry"]);
+  await messageBox(page).fill("hi");
+  await expect(sendButton(page)).toBeEnabled();
+
+  // Rate limit: label and text, no buttons, and the reason Send is off.
+  const limited = await open("rate-limit");
+  await expect(failure(page).getByText("Rate limited", { exact: true })).toBeVisible();
+  await expect(failure(page).getByText(limited.failure!.text!)).toBeVisible();
+  expect(await buttons("rate-limit")).toEqual([]);
+  await expect(composer(page).getByText("Rate limited. Send turns on when the session is idle.")).toBeVisible();
+  await expect(sendButton(page)).toBeDisabled();
+});
+
+test("80. Failure notices, crashed", async ({ page, start }) => {
+  const fixture = await start("agents");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const crashed = (await sessions(fixture)).find((s) => s.exit === "crashed")!;
+  await go(page, `#/agents/${crashed.id}`);
+
+  await expect(failure(page).getByText("Agent crashed")).toBeVisible();
+  await expect(composer(page).getByText("Exited. Restore it in gx, Agents tab.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Restore" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "New session", exact: true })).toHaveCount(0);
+  await expect(sendButton(page)).toBeDisabled();
+});
+
+test("83. Design session on the Agents page", async ({ page, start }) => {
+  const fixture = await start("agents");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const design = (await sessions(fixture)).find((s) => s.design)!;
+  await go(page, `#/agents/${design.id}`);
+
+  await expect(page.getByText(REPLY)).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(page.getByText("Unanswered questions")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Continue" })).toHaveCount(0);
+  await expect(messageBox(page)).toBeVisible();
+
+  await page.getByRole("link", { name: "Open design page →" }).click();
+  await expect(page).toHaveURL(/#\/d\/demo:design-epic$/);
+});
+
+test("89. Session not found", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const list = await sessions(fixture);
+  const exited = list.find((s) => s.status.state === "exited")!;
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // A made-up label: the panel names it and the sidebar stays.
+  await go(page, "#/agents/no-such-session");
+  await expect(page.getByText("Session not found")).toBeVisible();
+  await expect(page.getByText("no-such-session no longer exists.")).toBeVisible();
+  await expect(row(page, list[0])).toBeVisible();
+  await expect(page.getByRole("link", { name: "Back to sessions" })).toHaveCount(0);
+
+  // A viewed session removed under the reader: the selection stays and the panel replaces the view.
+  await go(page, `#/agents/${exited.id}`);
+  await expect(row(page, exited)).toHaveAttribute("aria-current", "page");
+  await fixture.cli("agents", "remove", exited.id);
+  await expect(page.getByText("Session not found")).toBeVisible();
+  await expect(page.getByText(`${exited.id} no longer exists.`)).toBeVisible();
+  await expect(row(page, exited)).toHaveCount(0);
+  await expect(row(page, list[0])).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`#/agents/${exited.id}$`));
+
+  // At 390px the panel offers the way back.
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.getByRole("link", { name: "Back to sessions" }).click();
+  await expect(page).toHaveURL(/#\/agents$/);
+});

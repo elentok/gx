@@ -1018,3 +1018,38 @@ Run with `-g "79\. Keyboard send"`: it matches three tests, and the number 79 is
 - **Scenario:** `agents`
 - **Steps:** open a Claude session whose chat is empty (`gx agents chat`).
 - **Pass:** the chat reads "No messages yet" and the Message box shows.
+
+## 80. Failure notices
+
+Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also used by the tray flow. The second is the crashed half.
+
+- **Scenarios:** `agents-failures`; `agents` for crashed.
+- **Steps:**
+  1. At 1280px open the stalled session (the fixture's stall threshold is 3s), click Screen, press Esc.
+  2. Open the blocked session.
+  3. Open the auth session and type a draft.
+  4. Open the rate-limited session.
+  5. On `agents`, open the crashed session.
+- **Pass:**
+  - Stalled shows "No progress for 15 min" with only Screen, which opens the screen dialog.
+  - Blocked shows "Waiting at a prompt in the terminal" with only Screen.
+  - Auth shows "Claude login needed" with only Retry, and Send is on once there is a draft.
+  - Rate limit shows "Rate limited" and the reset text, no buttons, and the composer reads "Rate limited. Send turns on when the session is idle." with Send off.
+  - Crashed shows "Agent crashed" and the composer reads "Exited. Restore it in gx, Agents tab." There is no Restore or New session button, and Send is off.
+
+## 83. Design session on the Agents page
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. At 1280px open the design session.
+  2. Click "Open design page →".
+- **Pass:** the page shows the plain chat and the Message box, with no question sheet, no "Unanswered questions" popover and no Continue button. The link opens `#/d/demo:design-epic`.
+
+## 89. Session not found
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. At 1280px open `#/agents/no-such-session`.
+  2. Open the Exited session, then remove it with `gx agents remove`.
+  3. At 390px click "Back to sessions".
+- **Pass:** the panel reads "Session not found" and "<label> no longer exists." and the sidebar keeps its rows. At 1280px there is no "Back to sessions" link. After the removal the panel replaces the view, the row leaves, the other rows stay and the URL still names the removed session. At 390px "Back to sessions" opens `#/agents`.
