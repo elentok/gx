@@ -13,7 +13,7 @@ import (
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 // mergeTurn is what a merge agent saw on one turn.
@@ -25,14 +25,14 @@ type mergeTurn struct {
 
 // newMergeFixture runs a hand-placed merge ticket 01 in an epic whose feature
 // branch exists. report is the iteration status the agent writes on turn n.
-func newMergeFixture(t *testing.T, report func(n int) string) (f *schedFixture, turns func() []mergeTurn) {
+func newMergeFixture(t *testing.T, report func(n int) string, cfgOpts ...func(*server.Config)) (f *schedFixture, turns func() []mergeTurn) {
 	t.Helper()
-	return newMergeFixtureWith(t, func(_ *schedFixture, _ string, n int) string { return report(n) })
+	return newMergeFixtureWith(t, func(_ *schedFixture, _ string, n int) string { return report(n) }, cfgOpts...)
 }
 
 // newMergeFixtureWith is newMergeFixture whose agent also works in its cwd on
 // turn n before reporting; an empty report writes none.
-func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n int) string) (f *schedFixture, turns func() []mergeTurn) {
+func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n int) string, cfgOpts ...func(*server.Config)) (f *schedFixture, turns func() []mergeTurn) {
 	t.Helper()
 	var mu sync.Mutex
 	var seen []mergeTurn
@@ -50,7 +50,7 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 			return
 		}
 		reportIteration(t, f.ticketFile(t, "01"), report)
-	})
+	}, cfgOpts...)
 	// One commit of its own, so the epic completes unmerged and keeps its worktree.
 	commitOnBranch(t, f.repo, schedEpic)
 	// Merging the epic is not this ticket's concern.
@@ -152,10 +152,9 @@ func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T
 
 func TestMergeTicket_FailedLaunchKeepsTheFeatureWorktree(t *testing.T) {
 	t.Parallel()
-	f, _ := newMergeFixture(t, func(int) string { return "finished" })
-	f.h.Herdr.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return nil, herdrfake.Identities{}, errors.New("start refused")
-	})
+	fake := runnerfake.NewRunner()
+	fake.SetStartErr(schedEpic+"-iter-01", errors.New("start refused"))
+	f, _ := newMergeFixture(t, func(int) string { return "finished" }, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")

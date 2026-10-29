@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -31,6 +32,16 @@ func (r renamedFake) Name() string { return r.name }
 
 func newRenamedFake(name string, verdict nativerunner.Verdict) renamedFake {
 	return renamedFake{&headlessFake{Runner: runnerfake.NewRunner(), verdict: verdict}, name}
+}
+
+// findErrFake fails every label lookup, which runnerfake cannot inject.
+type findErrFake struct {
+	renamedFake
+	err error
+}
+
+func (r findErrFake) Find(string) (agentrunner.Session, bool, error) {
+	return agentrunner.Session{}, false, r.err
 }
 
 // restartUnder leaves an iteration whose handle names savedRunner ("" keeps
@@ -130,25 +141,12 @@ func TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr(t *testing.T) 
 
 func TestReclaim_NonMismatchErrorPausesStuckWithItsReason(t *testing.T) {
 	t.Parallel()
-	store, repo := t.TempDir(), testutil.TempRepo(t)
-	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
-	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
-	registerLiveAgent(h)
-	_, ticketPath := leaveIteration(t, h, store, repo)
-	path := filepath.Join(h.StateDir, "runs.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data = []byte(strings.Replace(string(data), `"root":"proj:epic-a"`, `"root":"corrupt"`, 1))
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	h.Restart(t)
+	// The handle names herdr, so reclaim looks the agent up by label on this runner.
+	lookup := findErrFake{newRenamedFake("herdr", nativerunner.VerdictLive), errors.New("lookup refused")}
+	_, ticketPath := restartUnder(t, "", lookup, nil)
 	waitStatus(t, ticketPath, schema.StatusLegacyRepair)
 	body, _ := os.ReadFile(ticketPath)
-	if !strings.Contains(string(body), `invalid root "corrupt"`) {
+	if !strings.Contains(string(body), "lookup refused") {
 		t.Errorf("ticket lacks the reclaim error in its reason:\n%s", body)
 	}
 }
