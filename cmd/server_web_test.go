@@ -45,6 +45,9 @@ func TestServerWebURL_NoHomeInEnvIsAnError(t *testing.T) {
 	}
 }
 
+// protectedProbe is a /v1/ path: signed-out requests get 401, signed-in ones reach the mux.
+const protectedProbe = "/v1/probe"
+
 func webGet(t *testing.T, url string, cookies ...*http.Cookie) *http.Response {
 	t.Helper()
 	client := &http.Client{Transport: servertest.WebTransport(), CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -78,8 +81,8 @@ func TestWebToken_PrintsTheCurrentTokenAndRotateReplacesIt(t *testing.T) {
 		t.Fatalf("sign-in set %d cookies, want 1", len(signIn.Cookies()))
 	}
 	cookie := signIn.Cookies()[0]
-	if got := webGet(t, hs.WebURL+"/", cookie).StatusCode; got != http.StatusOK {
-		t.Fatalf("cookie before rotate = %d, want 200", got)
+	if got := webGet(t, hs.WebURL+protectedProbe, cookie).StatusCode; got == http.StatusUnauthorized {
+		t.Fatalf("cookie before rotate = %d, want it let through", got)
 	}
 
 	var out bytes.Buffer
@@ -98,7 +101,8 @@ func TestWebToken_PrintsTheCurrentTokenAndRotateReplacesIt(t *testing.T) {
 	if fresh == old || out.String() != fresh+"\n" {
 		t.Errorf("rotate printed %q, file holds %q, old was %q", out.String(), fresh, old)
 	}
-	if got := webGet(t, hs.WebURL+"/", cookie).StatusCode; got != http.StatusUnauthorized {
+	// "/" is public (the login page), so probe a protected path.
+	if got := webGet(t, hs.WebURL+protectedProbe, cookie).StatusCode; got != http.StatusUnauthorized {
 		t.Errorf("old cookie after rotate = %d, want 401", got)
 	}
 }
