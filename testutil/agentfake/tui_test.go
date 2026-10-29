@@ -14,6 +14,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/transcript"
 )
 
 // The test binary doubles as the TUI fake, so tests drive it as the PTY
@@ -193,6 +194,90 @@ func TestTUIClaude_PidFileFollowsControls(t *testing.T) {
 	}
 	if _, err := os.Stat(PidFilePath(f.home, f.cmd.Process.Pid)); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("pid file after clean exit: %v", err)
+	}
+}
+
+func (f *tuiFake) transcriptPath() string {
+	f.t.Helper()
+	f.waitStatus(StatusIdle, "")
+	return transcript.PathIn(f.home, f.pidFile()["cwd"].(string), "sess-1")
+}
+
+func (f *tuiFake) writeWorkerConfig(cfg WorkerConfig) {
+	f.t.Helper()
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		f.t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(f.cmd.Dir, WorkerConfigFile), raw, 0o644); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+func TestTUIClaude_ChatKnobMakesAPlainPromptAChatTurn(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	path := f.transcriptPath()
+	f.writeWorkerConfig(WorkerConfig{Chat: true})
+
+	f.typeLine("hello there")
+	f.waitStatus(StatusBusy, "")
+	f.waitStatus(StatusIdle, "")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(raw)), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], `"type":"user"`) || !strings.Contains(lines[0], "hello there") ||
+		!strings.Contains(lines[1], `"type":"assistant"`) || !strings.Contains(lines[1], chatReply) {
+		t.Fatalf("transcript = %q", raw)
+	}
+}
+
+func TestTUIClaude_ChatSlowMarkerStaysBusyUntilFinished(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.transcriptPath()
+	f.writeWorkerConfig(WorkerConfig{Chat: true})
+
+	f.typeLine("take your time " + ChatSlowMarker)
+	f.waitStatus(StatusBusy, "")
+	time.Sleep(designTurnTime + 300*time.Millisecond)
+	if m := f.pidFile(); m["status"] != StatusBusy {
+		t.Fatalf("status = %v, want busy", m["status"])
+	}
+	f.control(Control{Action: ActionFinish})
+	f.waitStatus(StatusIdle, "")
+}
+
+func TestTUIClaude_PlainPromptWithoutTheKnobWritesNoTranscript(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	path := f.transcriptPath()
+
+	f.typeLine("hello")
+	f.waitStatus(StatusBusy, "")
+	f.control(Control{Action: ActionFinish})
+	f.waitStatus(StatusIdle, "")
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("transcript after a plain prompt: %v", err)
+	}
+}
+
+func TestTUIClaude_APIErrorControlWritesTheErrorLine(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	path := f.transcriptPath()
+
+	f.control(Control{Action: ActionAPIError, Error: "rate_limit", Message: "You've hit your limit · resets 3pm"})
+	e, ok, err := transcript.LastAPIError(path)
+	if err != nil || !ok {
+		t.Fatalf("LastAPIError = %v, %v", ok, err)
+	}
+	if !e.RateLimited() || e.Message != "You've hit your limit · resets 3pm" || time.Since(e.Timestamp) > time.Minute {
+		t.Errorf("rate-limit error = %+v", e)
+	}
+
+	f.control(Control{Action: ActionAPIError, Error: "authentication_error", Status: 401, Message: "Invalid API key"})
+	e, ok, err = transcript.LastAPIError(path)
+	if err != nil || !ok || e.RateLimited() || e.Error != "authentication_error" || e.Status != 401 {
+		t.Errorf("auth error = %+v, %v, %v", e, ok, err)
 	}
 }
 

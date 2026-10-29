@@ -527,6 +527,9 @@ func (t *tui) submit() error {
 			writeReport(t.out, "done", "", "")
 			return nil
 		}
+		if cfg, err := LoadWorkerConfig(t.pid.Cwd); err == nil && cfg.Chat {
+			return t.chatTurn(text)
+		}
 		return t.setStatus(StatusBusy, "")
 	case StatusWaiting:
 		// Enter picks the dialog's first option, "Yes".
@@ -682,6 +685,8 @@ func (t *tui) handleControl(c Control) error {
 	case ActionConversation:
 		t.pid.SessionID = c.ConversationID
 		return t.writePid()
+	case ActionAPIError:
+		return t.apiError(c)
 	default:
 		return fmt.Errorf("unknown control action %q", c.Action)
 	}

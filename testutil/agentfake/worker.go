@@ -43,6 +43,10 @@ type WorkerConfig struct {
 	// DesignByMap scripts the turns of one map's design session, by the map's
 	// address; it wins over Design for a /gx-design prompt naming that address.
 	DesignByMap map[string][]string `json:"design_by_map,omitempty"`
+	// Chat makes a plain prompt a chat turn: the person message and a scripted
+	// reply land in the transcript and the turn ends. Off, a plain prompt only
+	// sets the fake busy.
+	Chat bool `json:"chat,omitempty"`
 }
 
 // What a worker does with a ticket.

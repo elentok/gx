@@ -37,6 +37,9 @@ const (
 	// ActionDialog makes the TUI fake open a dialog on the next "/" command,
 	// as /help does.
 	ActionDialog = "dialog"
+	// ActionAPIError makes the TUI fake append the transcript line claude
+	// writes for a failed API call: Error, Status and Message say which.
+	ActionAPIError = "apierror"
 )
 
 // Control stands in for what real claude does on its own. It travels on the
@@ -67,6 +70,11 @@ type Control struct {
 	// ConversationID is the id an ActionConversation makes the fake program
 	// report.
 	ConversationID string `json:"conversation_id,omitempty"`
+	// Error and Status are the claude error kind (such as "rate_limit" or
+	// "authentication_error") and HTTP status of an ActionAPIError line; its
+	// text is Message.
+	Error  string `json:"error,omitempty"`
+	Status int    `json:"status,omitempty"`
 }
 
 const controlType = "agentfake_control"

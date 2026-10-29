@@ -164,6 +164,60 @@ func (t *tui) designTurn(text string) error {
 	return nil
 }
 
+// ChatSlowMarker, anywhere in a plain prompt of a chat fake, makes the turn
+// stay busy with no reply until a test ends it with ActionFinish.
+const ChatSlowMarker = "[slow]"
+
+const chatReply = "Sure, here is a short answer."
+
+// chatTurn plays a plain prompt as a chat turn: the person message and a
+// scripted reply land in the transcript, and the turn ends shortly after.
+func (t *tui) chatTurn(text string) error {
+	t.prompt = text
+	if err := t.setStatus(StatusBusy, ""); err != nil {
+		return err
+	}
+	path, err := t.transcriptPath()
+	if err != nil {
+		return err
+	}
+	if err := appendMessage(path, "user", text); err != nil {
+		return err
+	}
+	if strings.Contains(text, ChatSlowMarker) {
+		return nil
+	}
+	if err := appendMessage(path, "assistant", []map[string]any{{"type": "text", "text": chatReply}}); err != nil {
+		return err
+	}
+	go func() {
+		time.Sleep(designTurnTime)
+		_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
+	}()
+	return nil
+}
+
+// apiError appends the assistant line claude writes when an API call fails.
+func (t *tui) apiError(c Control) error {
+	path, err := t.transcriptPath()
+	if err != nil {
+		return err
+	}
+	return appendEntry(path, "assistant", []map[string]any{{"type": "text", "text": c.Message}}, map[string]any{
+		"isApiErrorMessage": true,
+		"error":             c.Error,
+		"apiErrorStatus":    c.Status,
+	})
+}
+
+func (t *tui) transcriptPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return transcript.PathIn(home, t.pid.Cwd, t.pid.SessionID), nil
+}
+
 // designTurnTime is how long a scripted turn stays busy; designSlowTime is how
 // long a DesignTurnSlow turn does, enough for a test to report steps meanwhile.
 const (
@@ -173,14 +227,23 @@ const (
 
 // appendMessage appends a transcript line of the given role to the file at path.
 func appendMessage(path, role string, content any) error {
+	return appendEntry(path, role, content, nil)
+}
+
+// appendEntry is appendMessage with extra top-level fields on the line.
+func appendEntry(path, role string, content any, extra map[string]any) error {
 	now := time.Now().UTC()
-	line, err := json.Marshal(map[string]any{
+	entry := map[string]any{
 		"type": role,
 		// Grilling counts dedupe on the line's uuid, so each line needs its own.
 		"uuid":      fmt.Sprintf("fake-%d", now.UnixNano()),
 		"timestamp": now.Format(time.RFC3339Nano),
 		"message":   map[string]any{"role": role, "content": content},
-	})
+	}
+	for k, v := range extra {
+		entry[k] = v
+	}
+	line, err := json.Marshal(entry)
 	if err != nil {
 		return err
 	}
