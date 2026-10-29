@@ -142,11 +142,10 @@ func (t *tui) designTurn(text string) error {
 	if err := t.setStatus(StatusBusy, ""); err != nil {
 		return err
 	}
-	home, err := os.UserHomeDir()
+	path, err := t.transcriptPath()
 	if err != nil {
 		return err
 	}
-	path := transcript.PathIn(home, t.pid.Cwd, t.pid.SessionID)
 	// An answer is a person message in the transcript, as in claude: it ends
 	// the round the answer is for.
 	if !isDesignPrompt(text) {
