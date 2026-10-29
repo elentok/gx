@@ -60,6 +60,12 @@ type Harness struct {
 	herdrDown atomic.Bool
 
 	extraRunners []agentrunner.Runner
+	// SPIKE: ptyDefault is set when no option chose a runner; pty is the
+	// runner the current serve built, launch the RegisterLaunch agent.
+	ptyDefault bool
+	pty        *ptyRunner
+	launch     func(p Prompt)
+	ptyRoot    string
 	// Stop does what SIGTERM does to the real server: shut down, release the
 	// lock, and return Serve's result. Safe to call more than once.
 	Stop func() error
@@ -210,6 +216,12 @@ type Prompt struct {
 // own pane and cwd, and runs agent for every prompt (the agent's turn, e.g. a
 // commit in p.Cwd). The agent is idle again when the prompt returns.
 func (h *Harness) RegisterLaunch(agent func(p Prompt)) {
+	h.launch = agent
+	if h.pty != nil {
+		h.pty.mu.Lock()
+		h.pty.launch = agent
+		h.pty.mu.Unlock()
+	}
 	var mu sync.Mutex
 	cwds := map[string]string{}  // pane -> cwd
 	named := map[string]string{} // agent name -> pane
@@ -582,6 +594,11 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	if h.cfg.CleanupRunner == nil {
 		h.cfg.CleanupRunner = func(context.Context, []string, string) ([]byte, error) { return nil, nil }
 	}
+	if h.cfg.Runner == nil && os.Getenv("GX_SPIKE_HERDR") == "" {
+		h.ptyDefault = true
+		h.ptyRoot = stateDir
+		t.Cleanup(func() { stopSessionHolders(filepath.Join(stateDir, "agents")) })
+	}
 	if h.cfg.GoCacheDir == nil {
 		goCache := t.TempDir()
 		h.cfg.GoCacheDir = func() (string, error) { return goCache, nil }
@@ -613,6 +630,9 @@ func (h *Harness) DropAgentsAtCleanup(rs ...agentrunner.Runner) {
 // empty names, which the test doubles that set it ignore.
 func (h *Harness) runners() []agentrunner.Runner {
 	rs := append([]agentrunner.Runner{h.cfg.Runner}, h.extraRunners...)
+	if h.pty != nil {
+		rs = append(rs, h.pty)
+	}
 	if h.cfg.RunnerFor != nil {
 		rs = append(rs, h.cfg.RunnerFor("", ""))
 	}
@@ -621,7 +641,15 @@ func (h *Harness) runners() []agentrunner.Runner {
 
 func (h *Harness) serve(t *testing.T) {
 	t.Helper()
-	srv, err := server.New(h.cfg)
+	cfg := h.cfg
+	if h.ptyDefault {
+		// A fresh runner per serve, as a restarted server builds one and
+		// reattaches.
+		h.pty = newPtyRunner(h.ptyRoot, h.cfg.Env, h.cfg.RunnerWait)
+		h.pty.launch = h.launch
+		cfg.Runner = h.pty
+	}
+	srv, err := server.New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

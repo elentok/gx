@@ -501,6 +501,15 @@ func (t *tui) submit() error {
 	}
 	switch t.pid.Status {
 	case StatusIdle:
+		// SPIKE: a fast turn armed by the harness covers slash prompts too, so
+		// a RegisterLaunch agent's skill prompt starts and ends a turn.
+		if t.fast {
+			t.fast = false
+			t.prompt = text
+			writeReport(t.out, "working", "", "")
+			writeReport(t.out, "done", "", "")
+			return nil
+		}
 		kind, address, cfg := t.classify(text)
 		switch kind {
 		case promptDesign:

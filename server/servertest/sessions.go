@@ -84,6 +84,11 @@ func RunSessionProcesses() {
 		}
 		os.Exit(0)
 	}
+	// SPIKE: the pty runner's claude is the TUI fake.
+	if os.Getenv(agentfake.TUIEnv) == "1" {
+		spikecount.Record("agent-tui")
+		agentfake.TUIClaude()
+	}
 	// After the holder check: the holder's env carries the program's marker.
 	if os.Getenv(agentfake.ProgramEnv) == "1" {
 		spikecount.Record("agent-program")
