@@ -44,10 +44,10 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
     );
   }
   return (
-    <Box as="header" display="flex" alignItems="center" flexWrap="wrap" gap="2" mb="3" pb="2.5" borderBottomWidth="1px" borderColor="border">
+    <Box as="header" display="flex" alignItems="center" flexWrap="wrap" gap="2" mb="3">
       <StatusMark session={s} />
       <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} fontSize="26px" />
-      <Chip tone={tone} fontSize="12.5px">
+      <Chip tone={tone} fontSize="12.5px" outlined={false}>
         {stateLabel(s)}
       </Chip>
       {s.harness !== "claude" && <Chip>{s.harness}</Chip>}
