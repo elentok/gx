@@ -91,9 +91,9 @@ func TestEpicList_DesignCards(t *testing.T) {
 		actions []server.CardActionKind
 	}{
 		{"d-idle", server.SectionReadyToDesign, "Not started", "", []server.CardActionKind{server.CardActionDesign}},
-		{"d-live", server.SectionInProgress, "Designing", "", []server.CardActionKind{server.CardActionOpen}},
+		{"d-live", server.SectionDesigning, "Designing", "", []server.CardActionKind{server.CardActionOpen}},
 		{"d-wait", server.SectionNeedsYou, "Designing", server.PillQuestion, []server.CardActionKind{server.CardActionAnswer}},
-		{"d-stopped", server.SectionInProgress, "Designing", "", []server.CardActionKind{server.CardActionContinue}},
+		{"d-stopped", server.SectionDesigning, "Designing", "", []server.CardActionKind{server.CardActionContinue}},
 		{"d-done", server.SectionFinished, "Designed", "", nil},
 	} {
 		r := got[w.name]
@@ -136,8 +136,8 @@ func TestEpicList_DesignCountdownCarriesItsDeadline(t *testing.T) {
 		if r.Name != "map" {
 			continue
 		}
-		if r.Section != server.SectionInProgress || len(r.Actions) != 0 || r.CountdownEndsAt.IsZero() {
-			t.Errorf("map row = section %q actions %v countdown %v, want In progress, no button, a deadline", r.Section, r.Actions, r.CountdownEndsAt)
+		if r.Section != server.SectionDesigning || len(r.Actions) != 0 || r.CountdownEndsAt.IsZero() {
+			t.Errorf("map row = section %q actions %v countdown %v, want Designing, no button, a deadline", r.Section, r.Actions, r.CountdownEndsAt)
 		}
 		return
 	}
@@ -154,9 +154,9 @@ func TestEpicList_NewDesignLifecycle(t *testing.T) {
 	}
 	id := res.Session.ID
 
-	r := waitForEpicRow(t, f, "fresh-idea", func(r server.EpicListRow) bool { return r.Section == server.SectionInProgress })
+	r := waitForEpicRow(t, f, "fresh-idea", func(r server.EpicListRow) bool { return r.Section == server.SectionDesigning })
 	if r.Address != "proj:fresh-idea" || r.StatusWords != "Designing" {
-		t.Fatalf("running row = %+v, want an In progress Designing card", r)
+		t.Fatalf("running row = %+v, want a Designing card", r)
 	}
 
 	conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)

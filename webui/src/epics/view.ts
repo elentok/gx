@@ -1,6 +1,7 @@
 import {
   SectionFinished,
-  SectionInProgress,
+  SectionDesigning,
+  SectionImplementing,
   SectionNeedsYou,
   SectionReadyToDesign,
   SectionReadyToQueue,
@@ -18,8 +19,9 @@ export interface Section {
 
 const SECTIONS: Omit<Section, "rows">[] = [
   { key: SectionNeedsYou, title: "Needs you", tone: "waiting", collapsedByDefault: false },
+  { key: SectionImplementing, title: "Implementing", tone: "running", collapsedByDefault: false },
   { key: SectionReadyToQueue, title: "Ready to queue", tone: "running", collapsedByDefault: false },
-  { key: SectionInProgress, title: "In progress", tone: "running", collapsedByDefault: false },
+  { key: SectionDesigning, title: "Designing", tone: "running", collapsedByDefault: false },
   { key: SectionReadyToDesign, title: "Ready to design", tone: "muted", collapsedByDefault: true },
   { key: SectionFinished, title: "Finished", tone: "done", collapsedByDefault: true },
 ];

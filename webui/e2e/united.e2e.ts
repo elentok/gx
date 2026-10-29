@@ -29,12 +29,13 @@ test("15. Redirects", async ({ page, start }) => {
 
 test("16. Needs you", async ({ page, start }) => {
   await start("united");
-  await expect(page.getByRole("heading", { level: 2 })).toHaveCount(5);
+  await expect(page.getByRole("heading", { level: 2 })).toHaveCount(6);
   const titles = await page.getByRole("heading", { level: 2 }).allTextContents();
   expect(titles.map((t) => t.replace(/[▾▸\d]/g, "").trim())).toEqual([
     "Needs you",
+    "Implementing",
     "Ready to queue",
-    "In progress",
+    "Designing",
     "Ready to design",
     "Finished",
   ]);
@@ -60,13 +61,13 @@ test("16. Needs you", async ({ page, start }) => {
   await expect(fin.getByRole("button", { name: new RegExp(`${shown}$`) })).toBeVisible();
 
   // Every Needs-you reason sits in Needs you; pills and reasons show only there.
-  // A stopped Design waits on no one, so it sits in In progress with Continue.
+  // A stopped Design waits on no one, so it sits in Designing with Continue.
   for (const name of NEEDS_YOU) {
     await expect(needs.getByRole("link", { name, exact: true })).toBeVisible();
     await expect(card(page, name).getByTestId("pill")).toBeVisible();
   }
   await expect(page.getByTestId("pill")).toHaveCount(NEEDS_YOU.length);
-  const progress = await section(page, "In progress");
+  const progress = await section(page, "Designing");
   await expect(progress.getByTestId("pill")).toHaveCount(0);
   await expect(progress.getByRole("link", { name: "design-stopped", exact: true })).toBeVisible();
   await expect(card(page, "design-stopped").getByRole("button")).toHaveText(["Continue"]);

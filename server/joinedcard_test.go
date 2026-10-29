@@ -178,8 +178,8 @@ func TestEpicList_DoneJoinedCardWithQueuedImplSitsInProgress(t *testing.T) {
 	if row == nil {
 		t.Fatal("no row for the joined card")
 	}
-	if row.Section != server.SectionInProgress || row.QueueSlot != 1 {
-		t.Errorf("section = %q, slot = %d, want in-progress and slot 1", row.Section, row.QueueSlot)
+	if row.Section != server.SectionImplementing || row.QueueSlot != 1 {
+		t.Errorf("section = %q, slot = %d, want implementing and slot 1", row.Section, row.QueueSlot)
 	}
 }
 

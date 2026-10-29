@@ -16,7 +16,8 @@ type CardSection string
 // Spelled as literals for tygo; see the comment on EpicListState.
 const (
 	SectionNeedsYou      CardSection = "needs-you"
-	SectionInProgress    CardSection = "in-progress"
+	SectionImplementing  CardSection = "implementing"
+	SectionDesigning     CardSection = "designing"
 	SectionReadyToQueue  CardSection = "ready-to-queue"
 	SectionReadyToDesign CardSection = "ready-to-design"
 	SectionFinished      CardSection = "finished"
@@ -24,7 +25,7 @@ const (
 
 // cardSectionOrder is the order the page lists the sections in.
 var cardSectionOrder = []CardSection{
-	SectionNeedsYou, SectionInProgress, SectionReadyToQueue, SectionReadyToDesign, SectionFinished,
+	SectionNeedsYou, SectionImplementing, SectionReadyToQueue, SectionDesigning, SectionReadyToDesign, SectionFinished,
 }
 
 // CardKind is the kind of an Epics page card.
@@ -74,7 +75,7 @@ func loopCardSection(state EpicListState) CardSection {
 	case EpicListPaused, EpicListMergeBlocked:
 		return SectionNeedsYou
 	case EpicListRunning, EpicListQueued, EpicListMerging, EpicListAwaitingMerge:
-		return SectionInProgress
+		return SectionImplementing
 	case EpicListReady:
 		return SectionReadyToQueue
 	case EpicListFinished:
@@ -191,7 +192,7 @@ func cardTimeFor(row EpicListRow, src cardTimeSources) (CardTimeKind, time.Time)
 	switch row.Section {
 	case SectionNeedsYou:
 		kind, start = CardTimeWaiting, row.WaitingSince
-	case SectionInProgress:
+	case SectionImplementing, SectionDesigning:
 		kind, start = CardTimeElapsed, src.startedAt
 		if row.State == EpicListQueued {
 			start = cmp.Or(src.enqueuedAt, row.QueuedAt)
@@ -212,18 +213,23 @@ func (r *EpicListRow) setCardTime(src cardTimeSources) {
 	r.TimeKind, r.TimeStart = cardTimeFor(*r, src)
 }
 
-// inProgressRank orders In progress: running, then queued, then the rest, then
-// stopped Designs.
-func inProgressRank(r EpicListRow) int {
-	switch {
-	case r.State == EpicListRunning:
+// implementingRank orders Implementing: running, then queued, then the rest.
+func implementingRank(r EpicListRow) int {
+	switch r.State {
+	case EpicListRunning:
 		return 0
-	case r.State == EpicListQueued:
+	case EpicListQueued:
 		return 1
-	case r.CardKind == CardKindDesign && slices.ContainsFunc(r.Actions, isContinue):
-		return 3
 	}
 	return 2
+}
+
+// designingRank orders Designing: live Designs first, then stopped ones.
+func designingRank(r EpicListRow) int {
+	if slices.ContainsFunc(r.Actions, isContinue) {
+		return 1
+	}
+	return 0
 }
 
 func isContinue(a CardAction) bool { return a.Kind == CardActionContinue }
@@ -255,16 +261,21 @@ func sortCards(rows []EpicListRow, queuePosition func(EpicListRow) int) {
 		switch a.Section {
 		case SectionNeedsYou:
 			return a.WaitingSince.Compare(b.WaitingSince)
-		case SectionInProgress:
-			if c := cmp.Compare(inProgressRank(a), inProgressRank(b)); c != 0 {
+		case SectionImplementing:
+			if c := cmp.Compare(implementingRank(a), implementingRank(b)); c != 0 {
 				return c
 			}
 			if a.State == EpicListQueued {
 				return cmp.Compare(queuePosition(a), queuePosition(b))
 			}
-			if inProgressRank(a) >= 2 {
+			if implementingRank(a) >= 2 {
 				return b.LastActivityAt.Compare(a.LastActivityAt)
 			}
+		case SectionDesigning:
+			if c := cmp.Compare(designingRank(a), designingRank(b)); c != 0 {
+				return c
+			}
+			return b.LastActivityAt.Compare(a.LastActivityAt)
 		case SectionReadyToQueue:
 			return b.CreatedAt.Compare(a.CreatedAt)
 		case SectionReadyToDesign:

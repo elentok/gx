@@ -567,7 +567,11 @@ export const SectionNeedsYou: CardSection = "needs-you";
 /**
  * Spelled as literals for tygo; see the comment on EpicListState.
  */
-export const SectionInProgress: CardSection = "in-progress";
+export const SectionImplementing: CardSection = "implementing";
+/**
+ * Spelled as literals for tygo; see the comment on EpicListState.
+ */
+export const SectionDesigning: CardSection = "designing";
 /**
  * Spelled as literals for tygo; see the comment on EpicListState.
  */

@@ -80,8 +80,9 @@ const loaded = async (list: EpicList) => {
 const mixed = () =>
   listOf([
     row("need", { section: "needs-you" }),
-    row("busy", { section: "in-progress" }),
+    row("busy", { section: "implementing" }),
     row("rdy", { section: "ready-to-queue" }),
+    row("drafting", { kind: "map", card_kind: "design", section: "designing" }),
     row("idea", { kind: "map", card_kind: "design", section: "ready-to-design" }),
     row("done-a", { state: "finished", section: "finished" }),
     row("done-b", { state: "finished", section: "finished" }),
@@ -92,12 +93,13 @@ const sectionRegions = () => screen.queryAllByRole("region").filter((r) => r.has
 const regionNames = () => sectionRegions().map((r) => r.getAttribute("aria-labelledby"));
 const toggle = (title: string) => screen.getByRole("button", { name: new RegExp(`^.?\\s*${title}`) });
 
-test("five sections show in order with counts, Ready to design and Finished start collapsed", async () => {
+test("six sections show in order with counts, Ready to design and Finished start collapsed", async () => {
   await loaded(mixed());
   expect(regionNames()).toEqual([
     "epics-needs-you",
+    "epics-implementing",
     "epics-ready-to-queue",
-    "epics-in-progress",
+    "epics-designing",
     "epics-ready-to-design",
     "epics-finished",
   ]);
@@ -149,7 +151,7 @@ test("the filter opens a matching collapsed section, hides the others, and reach
   expect(screen.getByRole("link", { name: "done-b" })).toBeTruthy();
   expect(toggle("Finished").textContent).toContain("1");
   fireEvent.change(await filterBox(), { target: { value: "" } });
-  expect(regionNames()).toHaveLength(5);
+  expect(regionNames()).toHaveLength(6);
   expect(screen.queryByRole("link", { name: "done-b" })).toBeNull();
 });
 
@@ -354,7 +356,7 @@ test("a failed first fetch is retried when the connection comes back", async () 
 });
 
 const T0 = Date.parse("2026-01-01T10:00:00Z");
-const timed = () => listOf([row("busy", { section: "in-progress", time_kind: "elapsed", time_start: new Date(T0).toISOString() })]);
+const timed = () => listOf([row("busy", { section: "implementing", time_kind: "elapsed", time_start: new Date(T0).toISOString() })]);
 const timeText = () => screen.getByTestId("time").textContent;
 const fakeClock = (at: number) => {
   vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"] });
@@ -384,6 +386,6 @@ test("a repaint of the same payload at a later time shows the later label", asyn
 
 test("cards without a time start no clock", async () => {
   fakeClock(T0);
-  await loaded(listOf([row("busy", { section: "in-progress" })]));
+  await loaded(listOf([row("busy", { section: "implementing" })]));
   expect(vi.getTimerCount()).toBe(0);
 });

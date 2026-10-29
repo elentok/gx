@@ -23,11 +23,12 @@ const finished = (name: string, project: string) => row(name, { project, state: 
 const names = (sections: ReturnType<typeof sectionsOf>, key: string) =>
   sections.find((s) => s.key === key)!.rows.map((r) => r.name);
 
-test("sections run Needs you, Ready to queue, In progress, Ready to design, Finished", () => {
+test("sections run Needs you, Implementing, Ready to queue, Designing, Ready to design, Finished", () => {
   expect(sectionsOf([], "").map((s) => s.title)).toEqual([
     "Needs you",
+    "Implementing",
     "Ready to queue",
-    "In progress",
+    "Designing",
     "Ready to design",
     "Finished",
   ]);

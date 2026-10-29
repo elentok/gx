@@ -24,7 +24,7 @@ const row = (over: Partial<EpicListRow> = {}): EpicListRow => ({
   blocked_by_epics: [],
   addresses: ["gx:blog"],
   card_kind: "implementation",
-  section: "in-progress",
+  section: "implementing",
   status_words: "Implementing...",
   ring_progress: 40,
   actions: [],

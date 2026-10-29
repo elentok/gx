@@ -10,7 +10,7 @@ test("waitingCount leaves out the epic on screen", () => {
     row("question", "needs-you"),
     row("other-question", "needs-you"),
     row("current", "needs-you"),
-    row("loop-epic", "in-progress"),
+    row("loop-epic", "implementing"),
   ];
   expect(waitingCount(rows, "demo:current")).toBe(2);
   expect(waitingCount(rows, "demo:loop-epic")).toBe(3);

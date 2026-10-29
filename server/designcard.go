@@ -131,11 +131,11 @@ func placeDesign(address string, act designActivity, notStarted bool, fallback t
 		p.actions = []CardAction{{Kind: CardActionDesign, Label: "Design", Target: address}}
 	case !act.running:
 		// Nothing waits on the person: the Design is only paused until they continue it.
-		p.section = SectionInProgress
+		p.section = SectionDesigning
 		p.reason = "No design session is running"
 		p.actions = []CardAction{{Kind: CardActionContinue, Label: "Continue", Target: address}}
 	case !act.countdownAt.IsZero():
-		p.section = SectionInProgress
+		p.section = SectionDesigning
 		p.countdownEndsAt = act.countdownAt
 	case act.asking:
 		p.section = SectionNeedsYou
@@ -144,7 +144,7 @@ func placeDesign(address string, act designActivity, notStarted bool, fallback t
 		p.waitingSince = cmp.Or(act.askedAt, fallback)
 		p.actions = []CardAction{{Kind: CardActionAnswer, Label: "Answer", Target: address, Link: "#/d/" + address}}
 	default:
-		p.section = SectionInProgress
+		p.section = SectionDesigning
 		p.actions = []CardAction{{Kind: CardActionOpen, Label: "Open", Target: address}}
 	}
 	return p

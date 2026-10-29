@@ -21,7 +21,7 @@ const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
   blocked_by_epics: [],
   addresses: [`demo:${name}`],
   card_kind: "implementation",
-  section: "in-progress",
+  section: "implementing",
   status_words: "Implementing...",
   ring_progress: 25,
   ...over,
@@ -30,10 +30,10 @@ const row = (name: string, over: Partial<EpicListRow> = {}): EpicListRow => ({
 const ROWS = [
   row("question", { section: "needs-you", state_pill: "Question", status_words: "Waiting" }),
   row("other-question", { section: "needs-you", state_pill: "Question" }),
-  row("current", { section: "in-progress" }),
-  row("loop-epic", { section: "in-progress" }),
-  row("blog", { card_kind: "design", section: "in-progress" }),
-  row("fix-it", { card_kind: "one-off", section: "in-progress", address: "demo:one/01", addresses: ["demo:one/01"] }),
+  row("current", { section: "implementing" }),
+  row("loop-epic", { section: "implementing" }),
+  row("blog", { card_kind: "design", section: "designing" }),
+  row("fix-it", { card_kind: "one-off", section: "implementing", address: "demo:one/01", addresses: ["demo:one/01"] }),
   row("unstarted", { card_kind: "design", section: "ready-to-design", status_words: "Not started" }),
   row("old-epic", { section: "finished", state: "finished", status_words: "Merged" }),
 ];

@@ -36,9 +36,9 @@ func (s *Server) oneOffCards(project string, e tickets.Epic, queue queueIndex) [
 			row.StatePill, row.Reason, row.Actions = n.Pill, n.Reason, []CardAction{n.Action}
 			row.WaitingSince = cmp.Or(n.Since, t.ClaimedAt, lastActivity(e))
 		} else if e.RenderedStatus(t) == tickets.StatusClaimed {
-			row.State, row.Section = EpicListRunning, SectionInProgress
+			row.State, row.Section = EpicListRunning, SectionImplementing
 		} else if slot := queue.slot(addr.String()); slot > 0 {
-			row.State, row.Section = EpicListQueued, SectionInProgress
+			row.State, row.Section = EpicListQueued, SectionImplementing
 			row.QueueSlot, row.StatusWords = slot, fmt.Sprintf("Queued #%d", slot)
 		} else {
 			continue

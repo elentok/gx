@@ -287,8 +287,8 @@ func TestEpicList_OneOffCardsAndTheFinishedCap(t *testing.T) {
 		addrs = append(addrs, r.Address)
 		bySection[r.Section] = append(bySection[r.Section], r)
 	}
-	if q := bySection[server.SectionInProgress]; len(q) != 1 || q[0].Address != "proj:one-offs/01" || q[0].CardKind != server.CardKindOneOff || q[0].State != server.EpicListQueued {
-		t.Errorf("In progress = %+v, want the queued one-off", q)
+	if q := bySection[server.SectionImplementing]; len(q) != 1 || q[0].Address != "proj:one-offs/01" || q[0].CardKind != server.CardKindOneOff || q[0].State != server.EpicListQueued {
+		t.Errorf("Implementing = %+v, want the queued one-off", q)
 	}
 	if n := bySection[server.SectionNeedsYou]; len(n) != 1 || n[0].Address != "proj:one-offs/02" || n[0].StatePill != server.PillPaused || len(n[0].Actions) != 1 || n[0].Actions[0].Kind != server.CardActionOpenTicket {
 		t.Errorf("Needs you = %+v, want the paused one-off with its pill and action", n)

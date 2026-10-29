@@ -53,11 +53,11 @@ func TestEpicList_LoopCardFields(t *testing.T) {
 		actions []server.CardAction
 	}{
 		"proj:ready":    {server.SectionReadyToQueue, "Not started", 50, queue},
-		"proj:queued":   {server.SectionInProgress, "Queued #1", 0, nil},
+		"proj:queued":   {server.SectionImplementing, "Queued #1", 0, nil},
 		"proj:awaiting": {server.SectionNeedsYou, "Implemented", 100, merge("proj:awaiting")},
 		"proj:paused":   {server.SectionNeedsYou, "Implementing...", 0, []server.CardAction{{Kind: server.CardActionOpenTicket, Label: "Open ticket", Target: "proj:paused/01"}}},
 		"proj:blocked":  {server.SectionNeedsYou, "Implemented", 100, merge("proj:blocked")},
-		"proj:merging":  {server.SectionInProgress, "Merging...", 50, nil},
+		"proj:merging":  {server.SectionImplementing, "Merging...", 50, nil},
 		"proj:draft":    {server.SectionReadyToDesign, "Draft", 0, nil},
 		"proj:noopen":   {server.SectionReadyToDesign, "No open tickets", 0, nil},
 		"proj:merged":   {server.SectionFinished, "Merged", 100, nil},
@@ -95,12 +95,12 @@ func TestEpicList_QueuedOneOffSortsBySlotAndReadsQueuedN(t *testing.T) {
 	code, body := webDo(t, h, http.MethodGet, base+"/v1/epics")
 	var names, words []string
 	for _, r := range getEpicList(t, code, body).Epics {
-		if r.Section == server.SectionInProgress {
+		if r.Section == server.SectionImplementing {
 			names, words = append(names, r.Name), append(words, r.StatusWords)
 		}
 	}
 	if want := []string{"q-first", "Queued one", "q-last"}; !slices.Equal(names, want) {
-		t.Errorf("In progress = %v, want %v", names, want)
+		t.Errorf("Implementing = %v, want %v", names, want)
 	}
 	if want := []string{"Queued #1", "Queued #2", "Queued #3"}; !slices.Equal(words, want) {
 		t.Errorf("status words = %v, want %v", words, want)
@@ -132,7 +132,7 @@ func TestEpicList_SectionSortOrders(t *testing.T) {
 		bySection[r.Section] = append(bySection[r.Section], r.Name)
 	}
 	for section, want := range map[server.CardSection][]string{
-		server.SectionInProgress:    {"q-first", "q-second"},
+		server.SectionImplementing:  {"q-first", "q-second"},
 		server.SectionReadyToQueue:  {"new", "old"},
 		server.SectionReadyToDesign: {"alpha", "zeta"},
 	} {

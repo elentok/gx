@@ -408,7 +408,7 @@ func unitedEpics() []epic {
 		{project, "dirty-trunk-epic", done},
 		{project, "design-question", nil},
 		{project, "design-stopped", nil},
-		// In progress.
+		// Implementing and Designing.
 		{project, "running-epic", open},
 		{project, "queued-epic", open},
 		{"auto", "awaiting-auto-epic", done},

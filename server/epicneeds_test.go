@@ -91,7 +91,7 @@ func TestEpicList_NeedsYouReasons(t *testing.T) {
 			server.CardAction{Kind: server.CardActionMerge, Label: "Merge", Target: "proj:blocked"}},
 		"proj:awaiting": {server.SectionNeedsYou, "Awaiting merge", "Auto-merge is off for proj",
 			server.CardAction{Kind: server.CardActionMerge, Label: "Merge", Target: "proj:awaiting"}},
-		"auto:awaiting": {server.SectionInProgress, "", "", server.CardAction{}},
+		"auto:awaiting": {server.SectionImplementing, "", "", server.CardAction{}},
 		"proj:ready":    {server.SectionReadyToQueue, "", "", server.CardAction{}},
 	}
 	for addr, w := range want {

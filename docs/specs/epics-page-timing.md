@@ -2,6 +2,12 @@
 
 Epic: `gx:epics-page-timing`
 
+> **Update 2026-10-29:** the "In progress" section was split in two. **Implementing** (running, queued,
+> merging and awaiting-merge epics, and one-offs) now sits below "Needs you". **Designing** (live,
+> counting-down and stopped Designs) sits between "Ready to queue" and "Ready to design". The section
+> keys are `implementing` and `designing`; `in-progress` is gone. Read "In progress" below as one of
+> these two, by card kind.
+
 ## Problem Statement
 
 The Epics page shows what each card is doing, but not for how long. A person who looks at the page

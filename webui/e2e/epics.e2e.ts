@@ -11,7 +11,7 @@ test("1. Queue an epic", async ({ page, start }) => {
   release();
 
   await expect(ready.getByRole("link", { name: "ready-epic" })).toHaveCount(0);
-  const progress = await section(page, "In progress");
+  const progress = await section(page, "Implementing");
   await expect(progress.getByRole("link", { name: "ready-epic" })).toBeVisible();
   // The card moving is the feedback: no success toast.
   await expect(toasts(page)).toHaveCount(0);
@@ -70,7 +70,7 @@ test("2. Epic looks right", async ({ page, start }) => {
 
 test("7. Epic completion", async ({ page, start }) => {
   const fixture = await start("finishing", { hold: true });
-  const progress = await section(page, "In progress");
+  const progress = await section(page, "Implementing");
   await expect(progress.getByRole("link", { name: "finishing-epic" })).toBeVisible();
   await expect(card(page, "finishing-epic").getByText("1/2")).toBeVisible();
 
@@ -81,7 +81,7 @@ test("7. Epic completion", async ({ page, start }) => {
 
   await fixture.release();
 
-  // The last ticket merges; the epic leaves In progress for Finished.
+  // The last ticket merges; the epic leaves Implementing for Finished.
   await expect(progress.getByRole("link", { name: "finishing-epic" })).toHaveCount(0);
   const finished = await section(page, "Finished");
   await expect(finished.getByRole("link", { name: "finishing-epic" })).toBeVisible();
@@ -106,8 +106,8 @@ test("7. Epic completion", async ({ page, start }) => {
 test("8. Edge states", async ({ page, start }) => {
   await start("edge");
 
-  // An empty epic counts as implemented, so the server files it under In progress.
-  const progress = await section(page, "In progress");
+  // An empty epic counts as implemented, so the server files it under Implementing.
+  const progress = await section(page, "Implementing");
   await expect(progress.getByRole("link", { name: "empty-epic" })).toBeVisible();
   await expect(card(page, "empty-epic").getByText("Implemented")).toBeVisible();
 
@@ -153,7 +153,7 @@ test("6. Outside changes show up", async ({ page, start }) => {
 
   await fixture.cli("server", "queue", "add", "demo:ready-epic");
 
-  const progress = await section(page, "In progress");
+  const progress = await section(page, "Implementing");
   await expect(progress.getByRole("link", { name: "ready-epic" })).toBeVisible();
   await expect(ready.getByRole("link", { name: "ready-epic" })).toHaveCount(0);
 });

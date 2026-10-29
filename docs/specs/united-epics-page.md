@@ -4,6 +4,12 @@ Source: map epic `gx:united-epics-page` (decisions in its tickets 01 to 12). Pro
 branch `prototype/united-epics-page` (throwaway, never merged). Research:
 `docs/research/united-epics-page-data.md` on branch `research/united-epics-page-data`.
 
+> **Update 2026-10-29:** the "In progress" section was split in two. **Implementing** (running, queued,
+> merging and awaiting-merge epics, and one-offs) now sits below "Needs you". **Designing** (live,
+> counting-down and stopped Designs) sits between "Ready to queue" and "Ready to design". The section
+> keys are `implementing` and `designing`; `in-progress` is gone. Read "In progress" below as one of
+> these two, by card kind.
+
 ## Problem Statement
 
 The web UI looks cluttered. Epic work is split over three tabs. The Queue tab shows what runs, the

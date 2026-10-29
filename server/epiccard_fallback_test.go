@@ -8,7 +8,7 @@ import (
 func TestCardTimeFor_QueuedFallsBackToQueuedAt(t *testing.T) {
 	t.Parallel()
 	queuedAt := time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
-	row := EpicListRow{Section: SectionInProgress, State: EpicListQueued, QueuedAt: queuedAt}
+	row := EpicListRow{Section: SectionImplementing, State: EpicListQueued, QueuedAt: queuedAt}
 	kind, start := cardTimeFor(row, cardTimeSources{})
 	if kind != CardTimeElapsed || !start.Equal(queuedAt) {
 		t.Errorf("time = %q %v, want elapsed from queued_at", kind, start)
@@ -30,7 +30,7 @@ func TestCardTimeFor_SectionMapsToKind(t *testing.T) {
 		kind CardTimeKind
 	}{
 		{"needs you", EpicListRow{Section: SectionNeedsYou, WaitingSince: at}, cardTimeSources{}, CardTimeWaiting},
-		{"running", EpicListRow{Section: SectionInProgress, State: EpicListRunning}, cardTimeSources{startedAt: at}, CardTimeElapsed},
+		{"running", EpicListRow{Section: SectionImplementing, State: EpicListRunning}, cardTimeSources{startedAt: at}, CardTimeElapsed},
 		{"ready to queue", EpicListRow{Section: SectionReadyToQueue, CreatedAt: at}, cardTimeSources{}, CardTimeCreated},
 		{"ready to design", EpicListRow{Section: SectionReadyToDesign, CreatedAt: at}, cardTimeSources{}, CardTimeCreated},
 		{"finished", EpicListRow{Section: SectionFinished, CompletedAt: at}, cardTimeSources{}, CardTimeFinished},

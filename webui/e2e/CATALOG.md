@@ -21,7 +21,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
   1. Open the Epics page; `ready-epic` is in Ready to queue.
   2. Click the card's Queue button, with the `/v1/queue/add` call held.
 - **Pass:** the card's button is disabled while the call runs. After it, the card leaves Ready to
-  queue and shows in In progress, with no navigation and no toast.
+  queue and shows in Implementing, with no navigation and no toast.
 
 ## 2. Epic looks right
 
@@ -111,14 +111,14 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Steps:**
   1. Open the Epics page; `ready-epic` is in Ready to queue.
   2. Run `gx server queue add demo:ready-epic` through the CLI against the fixture's server.
-- **Pass:** without any action in the page, the card moves to In progress.
+- **Pass:** without any action in the page, the card moves to Implementing.
 
 ## 7. Epic completion
 
 - **Scenario:** `finishing`, started with `--hold` so the last ticket stays running until the flow
   releases it (`fixture.release()`).
 - **Steps:**
-  1. Open the Epics page; the `finishing-epic` card is in In progress and shows `1/2`.
+  1. Open the Epics page; the `finishing-epic` card is in Implementing and shows `1/2`.
   2. Release the hold; the last ticket finishes and merges.
 - **Pass:** before the release, the running ticket `02`'s card meta starts with "running · ". After it
   the card is in the Finished section (collapsed until opened) as `2/2`; its epic page reads
@@ -130,7 +130,7 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Scenario:** `edge` (project `bare` with no epics, `empty-epic` with no tickets, `blocked-epic`
   with ticket 02 blocked by the unmerged 01)
 - **Steps:**
-  1. Open the Epics page; the `empty-epic` card is in In progress, reading "Implemented".
+  1. Open the Epics page; the `empty-epic` card is in Implementing, reading "Implemented".
   2. Open `empty-epic`.
   3. Click the top bar's "Epics" link and open `blocked-epic`.
 - **Pass:**
@@ -210,13 +210,13 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Scenario:** `united` (two projects, one card per section and per Needs-you reason, workers held)
 - **Steps:** open the Epics page; open and close Ready to design; click around a card; filter.
 - **Pass:**
-  - Sections read Needs you, Ready to queue, In progress, Ready to design, Finished. Ready to design
+  - Sections read Needs you, Implementing, Ready to queue, Designing, Ready to design, Finished. Ready to design
     and Finished start collapsed, and the header toggles Ready to design.
   - Each title shows its card count: nine in Needs you (paused, question, permission, deadlock,
     merge-blocked, dirty-trunk, awaiting-merge, Design question, paused one-off), and Finished counts the cards
     on screen.
-  - Every Needs-you card has a pill; no other section has one. The stopped Design sits in In
-    progress with Continue.
+  - Every Needs-you card has a pill; no other section has one. The stopped Design sits in
+    Designing with Continue.
   - A click on a card's project text stays on `#/epics`; its title opens `#/e/demo:paused-epic`.
   - Merge is the only button on the merge-blocked and awaiting-merge cards. The dirty-trunk card
     shows "Stash, merge and restore" and "Merge again", the pill "Merge blocked" and the reason
