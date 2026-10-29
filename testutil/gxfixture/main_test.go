@@ -41,7 +41,7 @@ func TestMain(m *testing.M) {
 			fixtureBin: "github.com/elentok/gx/testutil/gxfixture",
 			fakeBin:    "github.com/elentok/gx/testutil/agentfake/cmd/fakeclaude",
 		} {
-			if b, err := exec.Command("go", "build", "-o", out, pkg).CombinedOutput(); err != nil {
+			if b, err := exec.Command("go", "build", "-tags", "gxfixture", "-o", out, pkg).CombinedOutput(); err != nil {
 				fmt.Fprintf(os.Stderr, "go build %s: %v\n%s", pkg, err, b)
 				return 1
 			}

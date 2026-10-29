@@ -622,7 +622,8 @@ func binary(given, out, pkg string) (string, error) {
 	if given != "" {
 		return filepath.Abs(given)
 	}
-	if b, err := exec.Command("go", "build", "-o", out, pkg).CombinedOutput(); err != nil {
+	// The gxfixture tag adds the fake non-Claude harness to the gx binary.
+	if b, err := exec.Command("go", "build", "-tags", "gxfixture", "-o", out, pkg).CombinedOutput(); err != nil {
 		return "", fmt.Errorf("go build %s: %w\n%s", pkg, err, b)
 	}
 	return out, nil

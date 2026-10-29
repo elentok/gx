@@ -22,7 +22,7 @@ Build once from the repo root, then start the scenario in the background. The `g
 
 ```
 [ -f webui/dist/index.html ] || make web-build
-go build -o $TMPDIR/gx-ui/gx .
+go build -tags gxfixture -o $TMPDIR/gx-ui/gx .
 go build -o $TMPDIR/gx-ui/claude ./testutil/agentfake/cmd/fakeclaude
 go build -o $TMPDIR/gx-ui/gxfixture ./testutil/gxfixture
 $TMPDIR/gx-ui/gxfixture --gx $TMPDIR/gx-ui/gx --fakeclaude $TMPDIR/gx-ui/claude [--hold] <scenario>

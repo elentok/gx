@@ -29,6 +29,10 @@ const ProgramTrustEnv = "GX_AGENTFAKE_PROGRAM_TRUST"
 // ProgramTrustPrompt is the fake program's trust dialog.
 const ProgramTrustPrompt = "Do you trust the files in this folder?"
 
+// ProgramIdleEnv, set to "1", makes the fake program report idle once it is
+// up, for a harness whose sessions nothing else drives to a status.
+const ProgramIdleEnv = "GX_AGENTFAKE_PROGRAM_IDLE"
+
 // Actions only the fake program takes.
 const (
 	// ActionReport writes an OSC 7501 report of Control.State, Kind and
@@ -278,6 +282,9 @@ func (p *program) event(ev tuiEvent) (code int, done bool, err error) {
 
 func (p *program) start() {
 	fmt.Fprint(p.out, "\x1b[2J\x1b[H"+harness.ProgramStatusProbe)
+	if os.Getenv(ProgramIdleEnv) == "1" {
+		p.report("idle", "", "")
+	}
 	switch {
 	case p.box == nil:
 	case p.readyDelay > 0:

@@ -35,13 +35,13 @@ export default function globalSetup() {
   // One fixed dir per worktree, overwritten each run, so nothing leaks into $TMPDIR.
   const dir = join(webuiDir, ".e2e-bin");
   mkdirSync(dir, { recursive: true });
-  const build = (out: string, pkg: string) => {
+  const build = (out: string, pkg: string, tags: string[] = []) => {
     const path = join(dir, out);
     // Without cgo fsnotify watches with kqueue: the cgo FSEvents watcher misses events on some test machines.
-    execFileSync("go", ["build", "-o", path, pkg], { cwd: repoRoot, stdio: "inherit", env: { ...process.env, CGO_ENABLED: "0" } });
+    execFileSync("go", ["build", ...tags, "-o", path, pkg], { cwd: repoRoot, stdio: "inherit", env: { ...process.env, CGO_ENABLED: "0" } });
     return path;
   };
-  process.env.GX_E2E_GX = build("gx", "github.com/elentok/gx");
+  process.env.GX_E2E_GX = build("gx", "github.com/elentok/gx", ["-tags", "gxfixture"]);
   process.env.GX_E2E_FAKECLAUDE = build("claude", "github.com/elentok/gx/testutil/agentfake/cmd/fakeclaude");
   process.env.GX_E2E_GXFIXTURE = build("gxfixture", "github.com/elentok/gx/testutil/gxfixture");
 }

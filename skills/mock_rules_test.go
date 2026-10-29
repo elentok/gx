@@ -41,6 +41,9 @@ func TestMockRulesAnchors(t *testing.T) {
 			"empty result means the state is unchecked",
 			"`pass`, `fail`",
 		}},
+		{"ui check build", "gx-ui-check/SKILL.md", []string{
+			"go build -tags gxfixture -o $TMPDIR/gx-ui/gx .",
+		}},
 		{"implement", "gx-implement/SKILL.md", []string{
 			"## Mock check",
 			"](../gx-ui-check/MOCK-CHECK.md)",
