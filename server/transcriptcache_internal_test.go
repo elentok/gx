@@ -149,6 +149,27 @@ func TestClaudeTranscript_ReadsTheConfigDirFromTheServerEnv(t *testing.T) {
 	}
 }
 
+// The cache is shared by the auth check and the reported-model read; this one
+// covers the non-bool value type.
+func TestFileCache_ReusesAStringUntilTheFileChanges(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "c.jsonl")
+	if err := os.WriteFile(path, []byte("a\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	computes := 0
+	compute := func(string) (string, error) { computes++; return "m", nil }
+	var c fileCache[string]
+	for range 2 {
+		if got, err := c.read(path, compute); err != nil || got != "m" {
+			t.Fatalf("read = %q, %v", got, err)
+		}
+	}
+	if computes != 1 {
+		t.Errorf("computes = %d after two reads of an unchanged file, want 1", computes)
+	}
+}
+
 func TestAuthFailures_RechecksOnlyWhenTheFileChanged(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "c.jsonl")

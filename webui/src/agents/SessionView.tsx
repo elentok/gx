@@ -31,14 +31,14 @@ function modelLabel(s: SessionInfo): { text: string; tier: string } | undefined 
   const tier = TIERS.find((t) => t.id === (s.tier || "worker"))?.label ?? "";
   if (!s.model && !s.effort && !s.tier) return undefined;
   const model = s.model || `${tier} · CLI default`;
-  return { text: s.effort ? `${model} · ${s.effort}` : model, tier };
+  return { text: s.effort ? `${model} · ${s.effort}` : model, tier: s.tier ? tier : "" };
 }
 
 function ModelLabel({ session }: { session: SessionInfo }) {
   const label = modelLabel(session);
   if (!label) return null;
   return (
-    <Text as="span" fontSize="sm" color="text.dim" title={`${label.tier} tier`}>
+    <Text as="span" fontSize="sm" color="text.dim" title={label.tier ? `${label.tier} tier` : undefined}>
       {label.text}
     </Text>
   );

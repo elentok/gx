@@ -76,36 +76,40 @@ func (c *transcriptPaths) forgetMiss(conversationID string) {
 	delete(c.missed, conversationID)
 }
 
-// authFailures keeps whether each transcript ends in an auth error until its
-// size or mtime changes, so listing a quiet session never rereads the file.
-type authFailures struct {
+// fileCache keeps what read computed from each file until its size or mtime
+// changes, so listing a quiet session never rereads its transcript.
+type fileCache[T any] struct {
 	mu      sync.Mutex
-	entries map[string]authFailureEntry
+	entries map[string]fileCacheEntry[T]
 }
 
-type authFailureEntry struct {
+type fileCacheEntry[T any] struct {
 	size  int64
 	mtime time.Time
-	auth  bool
+	value T
 }
 
-func (c *authFailures) read(path string, check func(string) (bool, error)) (bool, error) {
+func (c *fileCache[T]) read(path string, compute func(string) (T, error)) (T, error) {
+	var zero T
 	info, err := os.Stat(path)
 	if err != nil {
-		return false, err
+		return zero, err
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if e, ok := c.entries[path]; ok && e.size == info.Size() && e.mtime.Equal(info.ModTime()) {
-		return e.auth, nil
+		return e.value, nil
 	}
-	auth, err := check(path)
+	value, err := compute(path)
 	if err != nil {
-		return false, err
+		return zero, err
 	}
 	if c.entries == nil {
-		c.entries = map[string]authFailureEntry{}
+		c.entries = map[string]fileCacheEntry[T]{}
 	}
-	c.entries[path] = authFailureEntry{size: info.Size(), mtime: info.ModTime(), auth: auth}
-	return auth, nil
+	c.entries[path] = fileCacheEntry[T]{size: info.Size(), mtime: info.ModTime(), value: value}
+	return value, nil
 }
+
+// authFailures caches whether each transcript ends in an auth error.
+type authFailures = fileCache[bool]

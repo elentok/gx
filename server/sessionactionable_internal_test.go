@@ -95,12 +95,42 @@ func TestSessionInfoModel_TierAloneUntilFirstReply(t *testing.T) {
 	}
 }
 
-func TestSessionInfoModel_OldMetaGivesEmptyFields(t *testing.T) {
+func TestSessionInfoModel_OldMetaShowsTheReportedModelOnceItReplies(t *testing.T) {
 	t.Parallel()
-	s := modelTestServer(t, "/work/proj", replyWithModel("claude-sonnet-5-5"))
-	info := s.sessionInfo(sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"})
-	if info.Tier != "" || info.Model != "" || info.Effort != "" {
-		t.Errorf("tier/model/effort = %q/%q/%q, want all empty", info.Tier, info.Model, info.Effort)
+	meta := sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
+	replied := modelTestServer(t, "/work/proj", replyWithModel("claude-sonnet-5-5")).sessionInfo(meta)
+	if replied.Model != "claude-sonnet-5-5" || replied.Tier != "" || replied.Effort != "" {
+		t.Errorf("tier/model/effort = %q/%q/%q, want no tier or effort and claude-sonnet-5-5", replied.Tier, replied.Model, replied.Effort)
+	}
+	quiet := modelTestServer(t, "/work/proj", `{"type":"user","message":{"content":"hi"}}`).sessionInfo(meta)
+	if quiet.Model != "" {
+		t.Errorf("model = %q before the first reply, want empty", quiet.Model)
+	}
+}
+
+func TestSessionInfoModel_AppendedReplyChangesTheCachedModel(t *testing.T) {
+	t.Parallel()
+	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"))
+	meta := sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"}
+	if got := s.sessionInfo(meta).Model; got != "claude-opus-5-5" {
+		t.Fatalf("model = %q, want claude-opus-5-5", got)
+	}
+	path, ok := s.claudeTranscript("s1", meta)
+	if !ok {
+		t.Fatal("no transcript")
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(replyWithModel("claude-sonnet-5-5") + "\n"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := s.sessionInfo(meta).Model; got != "claude-sonnet-5-5" {
+		t.Errorf("model = %q after an appended reply, want claude-sonnet-5-5", got)
 	}
 }
 

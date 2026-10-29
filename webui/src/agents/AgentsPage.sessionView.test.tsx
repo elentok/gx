@@ -57,6 +57,12 @@ test("the header shows model and effort with a tier tooltip, and CLI default unt
   expect(await screen.findByText("Worker · CLI default")).toBeTruthy();
 });
 
+test("a session with a model and no tier has a tooltip that names no tier", async () => {
+  render([session("s-1", "p", { name: "one", model: "claude-sonnet-5-5" })], "/agents/s-1", true, chatOf(chat()));
+  const label = await screen.findByText("claude-sonnet-5-5");
+  expect(label.getAttribute("title")).toBeNull();
+});
+
 test("the header shows no model label when tier, model and effort are all empty", async () => {
   render([session("s-1", "p", { name: "one" })], "/agents/s-1", true, chatOf(chat()));
   const header = within((await screen.findByRole("heading", { name: /one/ })).closest("header")!);

@@ -68,23 +68,21 @@ func (s *Server) reportedModel(m sessionMeta) string {
 	if !ok {
 		return m.Model
 	}
-	usage, ok, err := transcript.LastAssistantUsage(path)
+	model, err := s.reportedModels.read(path, func(p string) (string, error) {
+		usage, _, err := transcript.LastAssistantUsage(p)
+		return usage.Model, err
+	})
 	if err != nil {
 		s.log.Warn("read reported model", "session", m.ID, "err", err)
 	}
-	if !ok || err != nil {
-		return m.Model
-	}
-	return cmp.Or(usage.Model, m.Model)
+	return cmp.Or(model, m.Model)
 }
 
 // sessionInfo is m.info() plus the failure that needs a transcript read, the
 // reported model and the running countdown.
 func (s *Server) sessionInfo(m sessionMeta) SessionInfo {
 	info := m.info()
-	if m.Tier != "" || m.Model != "" {
-		info.Model = s.reportedModel(m)
-	}
+	info.Model = s.reportedModel(m)
 	if at := s.autoAdvances.deadline(m.ID); !at.IsZero() {
 		info.AutoAdvanceAt = &at
 	}

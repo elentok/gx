@@ -242,6 +242,8 @@ type Server struct {
 	autoAdvances autoAdvances
 	// authFailures caches whether each transcript ends in an auth error.
 	authFailures authFailures
+	// reportedModels caches the model ID on each transcript's newest reply.
+	reportedModels fileCache[string]
 	// filedRounds holds the round markers already in the follow-ups epic, so an
 	// Idle detection never rescans its tickets.
 	filedRounds sync.Map
