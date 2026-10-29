@@ -37,7 +37,7 @@ func restartDead(t *testing.T, headless bool, work func(t *testing.T, wtPath str
 		stampRun(t, h, runnerOf(headless), deadSession(headless))
 	} else {
 		h = servertest.StartWithStore(t, store)
-		wtPath, ticketPath = h.LeavePtyRun(t, store, repo, false, func(p string) { work(t, p) })
+		wtPath, ticketPath = h.LeavePtyRun(t, store, repo, epicA01, false, func(p string) { work(t, p) })
 	}
 	h.Restart(t)
 	return store, repo, wtPath, ticketPath

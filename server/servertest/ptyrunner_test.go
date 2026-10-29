@@ -422,7 +422,7 @@ func TestPty_LeavePtyRunLiveReattachesAfterRestart(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	h := startPty(t, store, repo)
-	h.LeavePtyRun(t, store, repo, true, commitWork(t))
+	h.LeavePtyRun(t, store, repo, Target{"proj", "epic-a", "01"}, true, commitWork(t))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -445,7 +445,7 @@ func TestPty_LeavePtyRunDeadReclaimsAsDead(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	h := startPty(t, store, repo)
-	_, ticketPath := h.LeavePtyRun(t, store, repo, false, commitWork(t))
+	_, ticketPath := h.LeavePtyRun(t, store, repo, Target{"proj", "epic-a", "01"}, false, commitWork(t))
 
 	h.Restart(t)
 	WaitFor(t, 30*time.Second, "the dead run to pause the ticket for repair", func() bool {

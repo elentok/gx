@@ -263,7 +263,7 @@ func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	_, path := h.LeavePtyRun(t, store, repo, true, nil)
+	_, path := h.LeavePtyRun(t, store, repo, epicA01, true, nil)
 	h.Restart(t)
 	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -159,7 +159,7 @@ func restartLaunchingPty(t *testing.T, live bool, work func(wtPath string)) (*se
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	_, ticketPath := h.LeavePtyRun(t, store, repo, live, work)
+	_, ticketPath := h.LeavePtyRun(t, store, repo, epicA01, live, work)
 	markLaunching(t, h)
 	h.Restart(t)
 	return h, ticketPath

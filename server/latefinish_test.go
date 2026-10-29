@@ -71,7 +71,7 @@ func pauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) 
 			t.Fatalf("add: %+v, %v", res, err)
 		}
 		waitStatus(t, p.ticketPath, schema.StatusLegacyAnswer)
-		p.agentGone = func() { p.h.KillAgents(t) }
+		p.agentGone = func() { p.h.KillAgents(t, epicA01) }
 		base := p.h.Stops()
 		p.stops = func() int32 { return int32(p.h.Stops() - base) }
 	}

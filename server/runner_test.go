@@ -2,7 +2,6 @@ package server_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -21,7 +20,6 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
-	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -713,33 +711,11 @@ func leaveIteration(t *testing.T, h *servertest.Harness, store, repo, runner str
 // leaveIterationWith is leaveIteration with work as what the agent did in its worktree.
 func leaveIterationWith(t *testing.T, h *servertest.Harness, store, repo, runner string, work func(wtPath string)) (string, string) {
 	t.Helper()
-	epics, err := tickets.Load(filepath.Join(store, "proj"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	tk := epics[0].Tickets[0]
-	if err := ralphloop.Claim(tk.Path); err != nil {
-		t.Fatal(err)
-	}
-	wt, err := ralphloop.PrepareIteration(ralphloop.DefaultDeps(), ralphloop.OneIteration{
-		RepoDir: repo, Epic: "epic-a", ScratchDir: store, Agent: ralphloop.AgentClaude, Ticket: tk,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	work(wt.Path)
-	handle, err := json.Marshal([]map[string]string{{
-		"address": "proj:epic-a/01", "agent": "claude", "runner": runner, "pane": "p1", "tab": "t1", "root": "proj:epic-a",
-		"repo": repo, "workspace": "w1", "base": wt.Base(), "ticket_path": tk.Path,
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(h.StateDir, "runs.json"), handle, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return wt.Path, tk.Path
+	return h.LeaveHerdrRun(t, store, repo, epicA01, runner, work)
 }
+
+// epicA01 is the ticket WriteTicket(t, store, "proj", "epic-a", "01", ...) makes.
+var epicA01 = servertest.Target{Project: "proj", Epic: "epic-a", Ticket: "01"}
 
 func registerLiveAgent(h *servertest.Harness) {
 	idle := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "idle", "state_change_seq": 1}}

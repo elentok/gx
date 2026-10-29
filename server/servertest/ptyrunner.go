@@ -126,15 +126,15 @@ func (h *Harness) buildPty() {
 	h.cfg.RunnerFor = func(name, project string) agentrunner.Runner { return wrap(runnerFor(name, project)) }
 }
 
-// KillAgents ends every live agent of proj:epic-a without counting a Stop, so
+// KillAgents ends every live agent of tg's epic without counting a Stop, so
 // the runner no longer finds them. PTY only.
-func (h *Harness) KillAgents(t *testing.T) {
+func (h *Harness) KillAgents(t *testing.T, tg Target) {
 	t.Helper()
 	if !h.ptyOnly("KillAgents") {
 		return
 	}
-	p := h.cfg.RunnerFor("pty", "proj").(*ptyRunner).Pty
-	live, err := p.List("epic-a")
+	p := h.cfg.RunnerFor("pty", tg.Project).(*ptyRunner).Pty
+	live, err := p.List(tg.Epic)
 	if err != nil {
 		t.Fatal(err)
 	}
