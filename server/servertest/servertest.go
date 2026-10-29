@@ -440,9 +440,9 @@ func StartHerdrDown(t *testing.T, opts ...func(*server.Config)) *Harness {
 // Start runs a server until the test ends. Tickets already written to
 // TicketStore are indexed at startup; since the harness creates TicketStore
 // itself, use StartWithStore to seed it first.
-func Start(t *testing.T) *Harness {
+func Start(t *testing.T, opts ...func(*server.Config)) *Harness {
 	t.Helper()
-	return StartWithStore(t, t.TempDir())
+	return StartWithStore(t, t.TempDir(), opts...)
 }
 
 // StartWithStore is Start over a caller-seeded ticket store.
@@ -454,9 +454,73 @@ func StartWithStore(t *testing.T, store string, opts ...func(*server.Config)) *H
 
 // StartWithTCP is Start with the loopback TCP listener on a free port;
 // Harness.TCPAddr is where it bound.
-func StartWithTCP(t *testing.T) *Harness {
+func StartWithTCP(t *testing.T, opts ...func(*server.Config)) *Harness {
 	t.Helper()
-	return startWith(t, t.TempDir(), "127.0.0.1:0", false)
+	return startWith(t, t.TempDir(), "127.0.0.1:0", false, opts...)
+}
+
+// HerdrReason says why a test turns the fake herdr on.
+type HerdrReason int
+
+const (
+	// HerdrIsTheSubject is for a test of herdr itself: the herdr runner, its
+	// failures, or herdr-only behaviour.
+	HerdrIsTheSubject HerdrReason = iota + 1
+	// UntilPtyAsDefault is for a test that only needs herdr because herdr is
+	// still the default runner. gx:pty-as-default deletes it.
+	UntilPtyAsDefault
+)
+
+// runnerChoice is what the runner options recorded; startWith resolves it once
+// every option has run, so the order of the options never matters.
+type runnerChoice struct {
+	runner    agentrunner.Runner
+	runnerFor func(name, dir string) agentrunner.Runner
+	herdr     bool
+}
+
+// choices maps a config under construction to its runnerChoice. Options are
+// plain func(*server.Config), so this is how they reach the harness.
+var choices sync.Map
+
+func choiceOf(c *server.Config) *runnerChoice {
+	v, _ := choices.Load(c)
+	return v.(*runnerChoice)
+}
+
+// WithRunner makes r the configured runner and the runner for every pair.
+func WithRunner(r agentrunner.Runner) func(*server.Config) {
+	return func(c *server.Config) {
+		ch := choiceOf(c)
+		ch.runner = r
+		ch.runnerFor = func(string, string) agentrunner.Runner { return r }
+	}
+}
+
+// WithRunnerFor makes configured the configured runner and fn the runner for
+// each pair.
+func WithRunnerFor(configured agentrunner.Runner, fn func(name, dir string) agentrunner.Runner) func(*server.Config) {
+	return func(c *server.Config) {
+		ch := choiceOf(c)
+		ch.runner = configured
+		ch.runnerFor = fn
+	}
+}
+
+// WithHerdr turns the fake herdr on. It makes herdr the configured runner only
+// when no WithRunner or WithRunnerFor is given.
+func WithHerdr(HerdrReason) func(*server.Config) {
+	return func(c *server.Config) { choiceOf(c).herdr = true }
+}
+
+// resolveRunner applies the recorded choice: WithRunner / WithRunnerFor first;
+// otherwise the default, which is still herdr (server.New builds it when
+// cfg.Runner is nil), so WithHerdr changes nothing yet.
+func resolveRunner(cfg *server.Config, ch *runnerChoice) {
+	if ch.runner != nil {
+		cfg.Runner = ch.runner
+		cfg.RunnerFor = ch.runnerFor
+	}
 }
 
 // shortTempRoot is the temp root of a harness's state dir, short enough for the
@@ -543,9 +607,13 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h.cfg.PollInterval = 200 * time.Millisecond
 	h.cfg.BudgetPollInterval = 100 * time.Millisecond
 	h.cfg.ChatPollInterval = 100 * time.Millisecond
+	choice := &runnerChoice{herdr: herdrDown}
+	choices.Store(&h.cfg, choice)
+	t.Cleanup(func() { choices.Delete(&h.cfg) })
 	for _, o := range opts {
 		o(&h.cfg)
 	}
+	resolveRunner(&h.cfg, choice)
 	if h.cfg.Notifier == nil {
 		h.Banners = &Banners{}
 		h.cfg.Notifier = h.Banners
