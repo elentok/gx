@@ -1,15 +1,12 @@
-import { Box, Spinner, Text, Textarea } from "@chakra-ui/react";
+import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { useComposerDraft } from "../drafts";
 import type {
   SessionInfo,
   SessionNext,
-  SessionPromptRequest,
   SessionRoundCard,
 } from "../generated/server";
-import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
-import { refusalText, useWrite } from "../useWrite";
 import { AutoAdvanceBar, type RunCall } from "./AutoAdvanceBar";
 import type { AutoMenuState } from "./AutoMenu";
 import {
@@ -23,9 +20,10 @@ import {
 } from "./open";
 import { InterruptPopover } from "./InterruptPopover";
 import { NoteBox, submitOnCmdEnter } from "./NoteBox";
-import { postPrompt, type PostPrompt } from "./prompt";
+import type { PostPrompt } from "./prompt";
 import { roundPrompt, unansweredOf, type Answers } from "./round";
 import { SendPopover } from "./SendPopover";
+import { usePromptSend } from "./usePromptSend";
 import { useWide } from "../useWide";
 import { promptable } from "./view";
 
@@ -36,7 +34,7 @@ export function Composer({
   next,
   nextTitle,
   connected,
-  post = postPrompt,
+  post,
   interrupt = postInterruptSession,
   setAutoAdvance = postAutoAdvance,
   cancelAutoAdvance = postCancelAutoAdvance,
@@ -46,8 +44,6 @@ export function Composer({
   onRoundSent,
   onReview,
   autoMenu,
-  design = true,
-  reason,
 }: {
   session: SessionInfo;
   /** The id of the last chat message the page saw. */
@@ -71,10 +67,6 @@ export function Composer({
   onReview?: (index: number) => void;
   /** The Auto popover's open state, kept by the caller so a remount of the composer does not close it. */
   autoMenu?: AutoMenuState;
-  /** The design-only parts: Auto menu, Continue, Send answers, Interrupt and the Note toggle. Off, the box is always open with Send beside it. */
-  design?: boolean;
-  /** The line under the box when `design` is off; the caller decides the text. */
-  reason?: string;
 }) {
   const wide = useWide();
   const [gapsOpen, setGapsOpen] = useState(false);
@@ -87,26 +79,14 @@ export function Composer({
   useEffect(() => {
     if (text !== "") setOpen(true);
   }, [text]);
-  // The Agents page shows a refusal inline only, as in the mock.
-  const { run: write, pending, refusal, error } = useWrite({ toastRefusal: design });
-  const enabled = connected && promptable(session) && !pending;
-
-  const send = (body: Partial<SessionPromptRequest>, onSent?: () => void) => {
-    if (!enabled) return;
-    return write(
-      async () => {
-        const res = await post({
-          id: session.id,
-          text: "",
-          last_message: lastMessage,
-          ...body,
-        });
-        if (res.refused && res.reason === ReasonStale) onStale?.();
-        return res;
-      },
-      { onDone: onSent },
-    );
-  };
+  const { send, write, enabled, pending } = usePromptSend({
+    session,
+    lastMessage,
+    connected,
+    post,
+    onStale,
+    toastRefusal: true,
+  });
 
   // A Working session takes no prompt: Interrupt ends its turn and keeps the session.
   const working = session.status.state === "working" && !promptable(session);
@@ -198,59 +178,6 @@ export function Composer({
       Send
     </Button>
   );
-
-  // The caller's reason comes first, then the last refusal in red, else the draft note.
-  const failure = refusal ? refusalText(refusal) : error;
-  const line = reason
-    ? { text: reason, red: false }
-    : failure
-      ? { text: failure, red: true }
-      : text !== ""
-        ? { text: "Draft saved in this browser", red: false }
-        : undefined;
-
-  if (!design) {
-    return (
-      <Box
-        position="sticky"
-        bottom="0"
-        bg="surface"
-        py="3"
-        display="flex"
-        flexDirection="column"
-        gap="2"
-        role="form"
-        aria-label="Composer"
-      >
-        <Box display="flex" gap="2" alignItems="flex-end">
-          <Textarea
-            flex="1"
-            fontSize="16px"
-            color="text"
-            bg="surface"
-            borderColor="border"
-            borderRadius="12px"
-            rows={3}
-            resize="none"
-            aria-label="Message"
-            placeholder={`Message ${session.name || session.id}`}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={onSubmit && ((e) => submitOnCmdEnter(e, onSubmit))}
-          />
-          <Button disabled={!enabled || text.trim() === ""} onClick={sendText}>
-            {pending && <Spinner size="sm" />}
-            Send
-          </Button>
-        </Box>
-        {line && (
-          <Text fontSize="xs" color={line.red ? "tone.deadlocked.fg" : "text.dim"}>
-            {line.text}
-          </Text>
-        )}
-      </Box>
-    );
-  }
 
   const autoAdvanceBar = autoMenu && (
     <AutoAdvanceBar

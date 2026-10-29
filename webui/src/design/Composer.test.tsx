@@ -22,7 +22,6 @@ import type {
 } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
-import { WideContext } from "../useWide";
 import { WriteError } from "../useWrite";
 import type { FetchChat } from "./chat";
 import { Composer } from "./Composer";
@@ -933,81 +932,6 @@ test("a round's composer has no Focus button", async () => {
 
 const cmdEnter = (box: HTMLElement, mod: "metaKey" | "ctrlKey" = "metaKey") =>
   fireEvent.keyDown(box, { key: "Enter", [mod]: true });
-
-// The Agents page's composer: no design parts, the box always open.
-function renderAgents(opts: {
-  post: PostPrompt;
-  connected?: boolean;
-  wide?: boolean;
-  state?: string;
-}) {
-  renderThemed(
-    <WideContext.Provider value={opts.wide ?? true}>
-      <Composer
-        design={false}
-        session={session(opts.state ?? "idle")}
-        connected={opts.connected ?? true}
-        post={opts.post}
-      />
-    </WideContext.Provider>,
-  );
-  return screen.getByLabelText("Message") as HTMLTextAreaElement;
-}
-
-test("Agents page: the placeholder names the session and no hairline tops the composer", () => {
-  const box = renderAgents({ post: vi.fn<PostPrompt>(async () => ok) });
-  expect(box.placeholder).toBe(`Message ${session("idle").name || session("idle").id}`);
-  expect(getComputedStyle(screen.getByRole("form", { name: "Composer" })).borderTopWidth).not.toBe("1px");
-});
-
-test("Agents page: Cmd or Ctrl+Enter sends like the Send button", async () => {
-  for (const mod of ["metaKey", "ctrlKey"] as const) {
-    const post = vi.fn<PostPrompt>(async () => ok);
-    const box = renderAgents({ post });
-    fireEvent.change(box, { target: { value: "hello" } });
-    cmdEnter(box, mod);
-    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
-    expect(post).toHaveBeenCalledWith({ id: "s-a", text: "hello" });
-    await waitFor(() => expect(box.value).toBe(""));
-    cleanup();
-    localStorage.clear();
-  }
-});
-
-test("Agents page: the key does nothing while Send is disabled", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  const box = renderAgents({ post });
-  cmdEnter(box);
-  fireEvent.change(box, { target: { value: "  " } });
-  cmdEnter(box);
-  cleanup();
-  const offline = vi.fn<PostPrompt>(async () => ok);
-  const b2 = renderAgents({ post: offline, connected: false });
-  fireEvent.change(b2, { target: { value: "hello" } });
-  cmdEnter(b2);
-  await new Promise((r) => setTimeout(r, 20));
-  expect(post).not.toHaveBeenCalled();
-  expect(offline).not.toHaveBeenCalled();
-});
-
-test("Agents page: plain Enter adds a newline and does not send", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  const box = renderAgents({ post });
-  fireEvent.change(box, { target: { value: "hello" } });
-  const notPrevented = fireEvent.keyDown(box, { key: "Enter" });
-  expect(notPrevented).toBe(true);
-  await new Promise((r) => setTimeout(r, 20));
-  expect(post).not.toHaveBeenCalled();
-});
-
-test("Agents page: the narrow layout ignores the key", async () => {
-  const post = vi.fn<PostPrompt>(async () => ok);
-  const box = renderAgents({ post, wide: false });
-  fireEvent.change(box, { target: { value: "hello" } });
-  cmdEnter(box);
-  await new Promise((r) => setTimeout(r, 20));
-  expect(post).not.toHaveBeenCalled();
-});
 
 test("design page: the key runs Send", async () => {
   const post = vi.fn<PostPrompt>(async () => ok);

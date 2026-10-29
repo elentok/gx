@@ -1,20 +1,9 @@
-import { Box, chakra, Spinner as ChakraSpinner, Text } from "@chakra-ui/react";
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { Box, chakra, Text } from "@chakra-ui/react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
-import type {
-  SessionBackgroundTask,
-  SessionChatMessage,
-  SessionChatResponse,
-  SessionInfo,
-} from "../generated/server";
-import { Markdown } from "../markdown/Markdown";
+import type { SessionChatResponse, SessionInfo } from "../generated/server";
 import { roundKeyOf } from "./chat";
+import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore";
 import type { AutoMenuState } from "./AutoMenu";
 import { Composer } from "./Composer";
 import {
@@ -30,136 +19,6 @@ import { QuestionSheet } from "./QuestionSheet";
 import { isAnswered } from "./round";
 import { type RoundDraft, useRoundDraft } from "./roundDraft";
 
-const KIND_NAMES: Record<string, string> = {
-  shell: "shell",
-  monitor: "Monitor",
-  agent: "subagent",
-};
-
-function Entry({ m }: { m: SessionChatMessage }) {
-  if (m.kind === "compacted") {
-    return (
-      <Text
-        role="separator"
-        textAlign="center"
-        fontSize="xs"
-        color="text.dim"
-        borderBlockStart="1px solid"
-        borderColor="border"
-        pt="1"
-      >
-        Context compacted
-      </Text>
-    );
-  }
-  if (m.kind === "tools") return null;
-  if (m.kind === "prompt") {
-    return (
-      <Box
-        alignSelf="flex-end"
-        maxW="85%"
-        bg="surface.raised"
-        borderRadius="lg"
-        px="3"
-        py="2"
-        fontSize="base"
-        whiteSpace="pre-wrap"
-      >
-        {m.text}
-      </Box>
-    );
-  }
-  if (m.kind === "command") {
-    return (
-      <Text
-        as="span"
-        alignSelf="flex-end"
-        fontSize="xs"
-        color="text.muted"
-        border="1px solid"
-        borderColor="border"
-        borderRadius="full"
-        px="2"
-      >
-        {m.text}
-      </Text>
-    );
-  }
-  return <Markdown fontSize="base">{m.text}</Markdown>;
-}
-
-function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {
-  return (
-    <Box
-      role="list"
-      aria-label="Running in background"
-      display="flex"
-      flexWrap="wrap"
-      gap="2"
-      fontSize="xs"
-      color="text.muted"
-    >
-      {tasks.map((t, i) => (
-        <Box
-          key={i}
-          role="listitem"
-          border="1px solid"
-          borderColor="border"
-          borderRadius="md"
-          px="2"
-          py="0.5"
-        >
-          {KIND_NAMES[t.kind] ?? t.kind}: {t.label}
-        </Box>
-      ))}
-    </Box>
-  );
-}
-
-export interface WorkingStep {
-  step?: string;
-  title?: string;
-}
-
-/** The design-only parts of the chat. The Design page keeps them all on; the Agents page turns them off. */
-export interface ChatOptions {
-  /** The question sheet and the Questions/Chat toggle. */
-  sheet: boolean;
-  /** The busy row names the step. Off: a plain "Working" row. */
-  steps: boolean;
-  /** The "gx stopped" notice for a gx-raised Actionable. */
-  gxStopped: boolean;
-  /** The Done state: no composer, no `ended` banner. */
-  done: boolean;
-  /** The failure notice's Restore and New session buttons. */
-  restore: boolean;
-  /** The design Composer under the chat. Off: the caller renders its own. */
-  composer: boolean;
-}
-
-export const ALL_OPTIONS: ChatOptions = { sheet: true, steps: true, gxStopped: true, done: true, restore: true, composer: true };
-
-// Inline, not the page-centered Spinner: this one sits at the bottom of the chat.
-function WorkingRow({ step, title }: WorkingStep) {
-  return (
-    <Box
-      role="status"
-      display="flex"
-      alignItems="center"
-      gap="2"
-      fontSize="sm"
-      color="text.muted"
-    >
-      <ChakraSpinner size="sm" />
-      <Text as="span">
-        Working
-        {step && `: ${step}`}
-        {title && ` · ${title}`}
-      </Text>
-    </Box>
-  );
-}
-
 // The sheet and the composer share the round's answers (see useRoundDraft: they survive a reload).
 function ChatTail({
   session,
@@ -174,7 +33,6 @@ function ChatTail({
   onQuestions,
   roundDraft,
   autoMenu,
-  options,
 }: {
   session: SessionInfo;
   chat: SessionChatResponse;
@@ -186,7 +44,6 @@ function ChatTail({
   actions: FailureActions;
   questions: boolean;
   onQuestions: (on: boolean) => void;
-  options: ChatOptions;
   roundDraft: RoundDraft;
   autoMenu: AutoMenuState;
 }) {
@@ -224,17 +81,15 @@ function ChatTail({
           lastMessage={chat.messages.at(-1)?.id}
           post={post}
           onStale={onStale}
-          restore={options.restore}
           {...actions}
         />
       )}
-      {options.gxStopped &&
-        !failure &&
+      {!failure &&
         session.actionable.gx_raised &&
         session.actionable.reason && (
           <GxStopped reason={session.actionable.reason} />
         )}
-      {options.composer && !done && !replacesComposer(failure) && (
+      {!done && !replacesComposer(failure) && (
         <Composer
           session={session}
           lastMessage={chat.messages.at(-1)?.id}
@@ -259,42 +114,6 @@ function ChatTail({
 
 // Every dialog and popover (Send, jump menu, screen, steps) is one of these; Escape closes the top one first.
 const LAYERS = '[role="dialog"],[role="alertdialog"],[role="menu"]';
-
-// The messages scroll alone. They open at the newest one and follow new ones until the reader scrolls up.
-function ChatScroller({
-  children,
-  signal,
-}: {
-  children: ReactNode;
-  /** Changes whenever the content grows. */
-  signal: unknown;
-}) {
-  const el = useRef<HTMLDivElement>(null);
-  const stuck = useRef(true);
-  useLayoutEffect(() => {
-    if (el.current && stuck.current)
-      el.current.scrollTop = el.current.scrollHeight;
-  }, [signal]);
-  return (
-    <Box
-      ref={el}
-      flex="1"
-      minH="0"
-      overflowY="auto"
-      display="flex"
-      flexDirection="column"
-      gap="3"
-      onScroll={(e) => {
-        const t = e.currentTarget;
-        stuck.current = t.scrollHeight - t.scrollTop - t.clientHeight < 80;
-      }}
-    >
-      {/* A short chat sits at the bottom, next to the composer; the spacer shrinks away once the chat scrolls. */}
-      <Box flex="1" aria-hidden />
-      {children}
-    </Box>
-  );
-}
 
 function ViewToggle({
   answered,
@@ -375,7 +194,6 @@ function ChatBody({
   questions,
   onQuestions,
   autoMenu,
-  options,
 }: {
   session: SessionInfo;
   roundKey: string;
@@ -390,7 +208,6 @@ function ChatBody({
   questions: boolean;
   onQuestions: (on: boolean) => void;
   autoMenu: AutoMenuState;
-  options: ChatOptions;
 }) {
   const roundDraft = useRoundDraft(session.id, roundKey);
   const round = chat.round ?? [];
@@ -420,22 +237,11 @@ function ChatBody({
         />
       )}
       {!questions && (
-        <ChatScroller
-          signal={`${chat.messages.length}|${chat.background.length}|${busy}`}
-        >
-          {chat.truncated && (
-            <Text fontSize="xs" color="text.dim" textAlign="center">
-              Earlier messages hidden
-            </Text>
-          )}
-          {chat.messages.map((m, i) => (
-            <Entry key={m.id || i} m={m} />
-          ))}
-          {chat.background.length > 0 && (
-            <BackgroundStrip tasks={chat.background} />
-          )}
-          {busy && (options.steps ? step && <WorkingRow {...step} /> : <WorkingRow />)}
-        </ChatScroller>
+        <ChatMessages
+          chat={chat}
+          busy={busy}
+          working={step && <WorkingRow {...step} />}
+        />
       )}
       <ChatTail
         session={session}
@@ -450,7 +256,6 @@ function ChatBody({
         onQuestions={onQuestions}
         roundDraft={roundDraft}
         autoMenu={autoMenu}
-        options={options}
       />
     </Box>
   );
@@ -461,9 +266,6 @@ function ChatLog({
   session,
   chat,
   refetch,
-  options,
-  working,
-  questions,
   ...rest
 }: {
   session: SessionInfo;
@@ -476,7 +278,6 @@ function ChatLog({
   actions: FailureActions;
   questions: boolean;
   onQuestions: (on: boolean) => void;
-  options: ChatOptions;
 }) {
   const conn = useConnectionContext();
   const connected = useConnectionState(conn).connected;
@@ -489,14 +290,9 @@ function ChatLog({
       autoMenu={{ open: autoMenuOpen, setOpen: setAutoMenuOpen }}
       session={session}
       roundKey={roundKey}
-      // Without the sheet the round is ignored: no sheet, no toggle, and the composer sends a plain prompt.
-      chat={options.sheet ? chat : { ...chat, round: null }}
+      chat={chat}
       connected={connected}
       onStale={refetch}
-      // An empty step makes a plain "Working" row.
-      working={options.steps ? working : {}}
-      questions={options.sheet && questions}
-      options={options}
       {...rest}
     />
   );
@@ -514,7 +310,6 @@ export function DesignChat({
   actions,
   questions,
   onQuestions,
-  options = ALL_OPTIONS,
 }: {
   session?: SessionInfo;
   /** The Claude session's chat, fetched by the page; null while it loads. */
@@ -531,17 +326,14 @@ export function DesignChat({
   /** The Questions view: only the questions sheet, the failure notices and the composer. The page derives it. */
   questions: boolean;
   onQuestions: (on: boolean) => void;
-  /** The design-only parts; the Design page leaves them all on. */
-  options?: ChatOptions;
 }) {
   if (!session) return null;
-  if (!options.done) done = undefined;
   if (session.harness !== "claude") {
     const failure = visibleFailure(session.failure, done);
     return (
       <>
         {failure && !needsTranscript(failure) && (
-          <FailureBanner failure={failure} session={session} restore={options.restore} {...actions} />
+          <FailureBanner failure={failure} session={session} {...actions} />
         )}
         <Text color="text.muted" fontSize="sm">
           Chat works for Claude sessions only. Open it in gx, Agents tab.
@@ -563,7 +355,6 @@ export function DesignChat({
       actions={actions}
       questions={questions}
       onQuestions={onQuestions}
-      options={options}
     />
   );
 }

@@ -1,10 +1,11 @@
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import type { PostPrompt } from "../design/prompt";
 import type { SessionInfo } from "../generated/server";
 import { renderThemed } from "../ui/render";
 import { toaster } from "../ui/toaster";
-import { Composer } from "./Composer";
-import type { PostPrompt } from "./prompt";
+import { WideContext } from "../useWide";
+import { AgentComposer } from "./AgentComposer";
 
 afterEach(() => {
   cleanup();
@@ -25,15 +26,16 @@ const session = (state = "idle"): SessionInfo => ({
   auto_advance: true,
 });
 
-function render(over: { s?: SessionInfo; connected?: boolean; post?: PostPrompt; reason?: string } = {}) {
+function render(over: { s?: SessionInfo; connected?: boolean; post?: PostPrompt; reason?: string; wide?: boolean } = {}) {
   return renderThemed(
-    <Composer
-      design={false}
-      session={over.s ?? session()}
-      connected={over.connected ?? true}
-      post={over.post}
-      reason={over.reason}
-    />,
+    <WideContext.Provider value={over.wide ?? true}>
+      <AgentComposer
+        session={over.s ?? session()}
+        connected={over.connected ?? true}
+        post={over.post}
+        reason={over.reason}
+      />
+    </WideContext.Provider>,
   );
 }
 
@@ -94,4 +96,62 @@ test("Send is off while a send is pending, then clears the box", async () => {
   expect(post).toHaveBeenCalledWith(expect.objectContaining({ id: "s-a", text: "hi" }));
   release({ refused: false });
   await waitFor(() => expect((box() as HTMLTextAreaElement).value).toBe(""));
+});
+
+const ok = { refused: false } as Awaited<ReturnType<PostPrompt>>;
+const cmdEnter = (el: HTMLElement, mod: "metaKey" | "ctrlKey" = "metaKey") =>
+  fireEvent.keyDown(el, { key: "Enter", [mod]: true });
+
+test("the placeholder names the session and no hairline tops the composer", () => {
+  render();
+  expect((box() as HTMLTextAreaElement).placeholder).toBe(`Message ${session().name || session().id}`);
+  expect(getComputedStyle(screen.getByRole("form", { name: "Composer" })).borderTopWidth).not.toBe("1px");
+});
+
+test("Cmd or Ctrl+Enter sends like the Send button", async () => {
+  for (const mod of ["metaKey", "ctrlKey"] as const) {
+    const post = vi.fn<PostPrompt>(async () => ok);
+    render({ post });
+    fireEvent.change(box(), { target: { value: "hello" } });
+    cmdEnter(box(), mod);
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(post).toHaveBeenCalledWith({ id: "s-a", text: "hello" });
+    await waitFor(() => expect((box() as HTMLTextAreaElement).value).toBe(""));
+    cleanup();
+    localStorage.clear();
+  }
+});
+
+test("the key does nothing while Send is disabled", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  cmdEnter(box());
+  fireEvent.change(box(), { target: { value: "  " } });
+  cmdEnter(box());
+  cleanup();
+  const offline = vi.fn<PostPrompt>(async () => ok);
+  render({ post: offline, connected: false });
+  fireEvent.change(box(), { target: { value: "hello" } });
+  cmdEnter(box());
+  await new Promise((r) => setTimeout(r, 20));
+  expect(post).not.toHaveBeenCalled();
+  expect(offline).not.toHaveBeenCalled();
+});
+
+test("plain Enter adds a newline and does not send", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  fireEvent.change(box(), { target: { value: "hello" } });
+  expect(fireEvent.keyDown(box(), { key: "Enter" })).toBe(true);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(post).not.toHaveBeenCalled();
+});
+
+test("the narrow layout ignores the key", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, wide: false });
+  fireEvent.change(box(), { target: { value: "hello" } });
+  cmdEnter(box());
+  await new Promise((r) => setTimeout(r, 20));
+  expect(post).not.toHaveBeenCalled();
 });

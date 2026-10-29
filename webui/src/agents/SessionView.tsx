@@ -2,8 +2,6 @@ import { Box, Link, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useSessionChat, type FetchChat } from "../design/chat";
-import { DesignChat, type ChatOptions } from "../design/ChatLog";
-import { Composer } from "../design/Composer";
 import { FailureBanner, needsTranscript, visibleFailure } from "../design/FailureBanner";
 import { ScreenModal } from "../design/ScreenModal";
 import type { FetchScreen } from "../design/screen";
@@ -13,14 +11,11 @@ import { AGENTS_HREF, designHref } from "../hrefs";
 import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
+import { AgentChat } from "./AgentChat";
+import { AgentComposer } from "./AgentComposer";
 import { stateLabel, statusMark } from "./rules";
 import { StatusMark } from "./SessionGlyphs";
 import { SessionSwitcher } from "./SessionSwitcher";
-
-// No question sheet, no step names, no "gx stopped", no Done state, and no Restore or New session.
-const AGENT_OPTIONS: ChatOptions = { sheet: false, steps: false, gxStopped: false, done: false, restore: false, composer: false };
-
-const noop = () => {};
 
 function DesignLink({ map, ml }: { map: string; ml?: string }) {
   return (
@@ -132,23 +127,14 @@ export function SessionView({
         </Text>
       )}
       {claude ? (
-        <DesignChat
-          session={session}
-          chat={chat}
-          refetch={refetch}
-          actions={{ address: "" }}
-          questions={false}
-          onQuestions={noop}
-          options={AGENT_OPTIONS}
-        />
+        chat && <AgentChat session={session} chat={chat} refetch={refetch} />
       ) : (
         <>
           <NoChat session={session} fetchScreen={fetchScreen} />
           <Box flex="1" />
         </>
       )}
-      <Composer
-        design={false}
+      <AgentComposer
         session={session}
         connected={connected && claude}
         lastMessage={chat?.messages.at(-1)?.id}
