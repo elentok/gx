@@ -2,7 +2,7 @@
 
 Map epic: `gx:webui-security`. Decisions come from its tickets 01 to 08. Research:
 `docs/research/webui-security-ios-cookie-loss.md` and `docs/research/webui-security-ios-root-trust.md`.
-Approved mock: `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`. The
+Approved mock: `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`. The
 prototype is on the local branch `prototype/webui-security-login-ui`.
 
 ## Problem Statement
@@ -832,63 +832,63 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
 
 **Mock states** (each line: mock path, state, width, fixture scenario, parts):
 
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   login-default-phone, 390px, `web-login`, parts: header, card, heading, password, code, submit,
   reset-hint, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   login-default-desktop, 1280px, `web-login`, parts: header, card, heading, password, code, submit,
   reset-hint, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   login-error-phone, 390px, `web-login` after one wrong code, parts: header, card, heading, error,
   password, code, submit, reset-hint, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   login-limited-phone, 390px, `web-login` after 5 wrong codes, parts: header, card, heading, error,
   password, code, submit, reset-hint, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   login-trust-open-phone, 390px, `web-login` with the help unfolded, parts: header, card, heading,
   password, code, submit, reset-hint, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   setup-code-phone, 390px, `web-setup`, parts: header, card, step-header, heading, intro,
   setup-code, submit, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   setup-code-desktop, 1280px, `web-setup`, parts: header, card, step-header, heading, intro,
   setup-code, submit, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   setup-code-expired-phone, 390px, `web-setup` after a wrong code, parts: header, card, step-header,
   heading, intro, error, setup-code, submit, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   setup-password-phone, 390px, `web-setup` at step 2, parts: header, card, step-header, heading,
   password, password-again, submit, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   setup-totp-phone, 390px, `web-setup` at step 3, parts: header, card, step-header, heading,
   totp-qr, totp-key, code, submit, save-note, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   setup-totp-error-phone, 390px, `web-setup` at step 3 after a wrong code, parts: header, card,
   step-header, heading, totp-qr, totp-key, error, code, submit, save-note, trust-help.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   settings-home-phone, 390px, `web-logins`, parts: title, security, sign-out.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   settings-home-desktop, 1280px, `web-logins`, parts: title, security, sign-out.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   settings-logins-phone, 390px, `web-logins`, parts: back, title, lead, login-list.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   settings-logins-desktop, 1280px, `web-logins`, parts: back, title, lead, login-list.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   settings-login-phone, 390px, `web-logins` on another device's web login, parts: back, title,
   login-facts, name, sign-out.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   settings-login-revoke-phone, 390px, `web-logins` after "Sign out this device", parts: back,
   title, login-facts, name, sign-out, confirm, note.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   settings-password-phone, 390px, `web-logins`, parts: back, title, current-password, code,
   new-password, new-password-again, note, submit.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   settings-totp-phone, 390px, `web-logins`, parts: back, title, current-password, code, note,
   submit.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   settings-totp-new-phone, 390px, `web-logins` after the password and code check, parts: back,
   title, totp-qr, totp-key, code, submit, keep-note.
-- `$(gx tickets root)/gx/webui-security/mocks/06-login-setup-and-settings-ui.html`,
+- `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`,
   settings-cert-phone, 390px, `web-logins`, parts: back, title, downloads, fingerprint.
 
 The three fixture scenarios do not exist yet; they are listed under the new scenarios above.
