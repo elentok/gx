@@ -6,6 +6,7 @@ import type { SessionInfo } from "../generated/server";
 import type { SessionChatResponse } from "../generated/server";
 import { appRoutes, type RouteFetchers } from "../routes";
 import { renderThemed } from "../ui/render";
+import { WideContext } from "../useWide";
 
 afterEach(cleanup);
 
@@ -37,7 +38,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function render(sessions: SessionInfo[] | undefined, path = "/agents", live = !!sessions, fetchers: RouteFetchers = {}) {
+function render(sessions: SessionInfo[] | undefined, path = "/agents", live = !!sessions, fetchers: RouteFetchers = {}, wide?: boolean) {
   let state = { snapshot: sessions && { sessions }, connected: true, loadedOnce: !!sessions, liveSnapshot: live, streams: 1, tick: 0 } as unknown as ConnectionState;
   const listeners = new Set<() => void>();
   const handlers = new Set<(a?: string) => void>();
@@ -56,9 +57,11 @@ function render(sessions: SessionInfo[] | undefined, path = "/agents", live = !!
   } as unknown as Connection;
   const router = createMemoryRouter(appRoutes(fetchers), { initialEntries: [path] });
   renderThemed(
-    <ConnectionContext.Provider value={conn}>
-      <RouterProvider router={router} />
-    </ConnectionContext.Provider>,
+    <WideContext.Provider value={wide}>
+      <ConnectionContext.Provider value={conn}>
+        <RouterProvider router={router} />
+      </ConnectionContext.Provider>
+    </WideContext.Provider>,
   );
   const update = (patch: Partial<ConnectionState>) => {
     state = { ...state, ...patch } as unknown as ConnectionState;
@@ -583,4 +586,24 @@ test("the switcher's New session row stays while the filter matches nothing", ()
   fireEvent.keyDown(window, { key: "k", metaKey: true });
   fireEvent.change(dialog().getByRole("combobox"), { target: { value: "zzz" } });
   expect(optionNames()).toEqual(["+ New session"]);
+});
+
+test("phone: #/agents is the list and never redirects to the last session", () => {
+  localStorage.setItem("gx.agents.last", "s-1");
+  const r = render([session("s-1", "p")], "/agents", true, {}, false);
+  expect(r.router.state.location.pathname).toBe("/agents");
+  expect(rows()).toHaveLength(1);
+});
+
+test("phone: a session shows ‹, the title button and project · status, and ‹ returns to the list", () => {
+  render([session("s-1", "gx", { name: "plain" })], "/agents/s-1", true, {}, false);
+  expect(screen.getByRole("button", { name: /plain/ })).toBeTruthy();
+  expect(screen.getByText("gx · Idle")).toBeTruthy();
+  expect(rows()).toHaveLength(0);
+  expect(screen.getByRole("link", { name: "All sessions" }).getAttribute("href")).toBe("#/agents");
+});
+
+test("phone: the gone panel links back to the sessions", () => {
+  render([session("s-1", "p")], "/agents/nope", true, {}, false);
+  expect(screen.getByRole("link", { name: "Back to sessions" }).getAttribute("href")).toBe("#/agents");
 });

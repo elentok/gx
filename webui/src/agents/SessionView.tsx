@@ -8,7 +8,8 @@ import { ScreenModal } from "../design/ScreenModal";
 import type { FetchScreen } from "../design/screen";
 import { designOf, promptable } from "../design/view";
 import type { SessionInfo } from "../generated/server";
-import { designHref } from "../hrefs";
+import { AGENTS_HREF, designHref } from "../hrefs";
+import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { statusMark } from "./AgentSidebar";
@@ -22,6 +23,26 @@ const noop = () => {};
 function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; sessions: SessionInfo[]; onNew: () => void }) {
   const { glyph, tone } = statusMark(s);
   const map = designOf(s);
+  const wide = useWide();
+  if (!wide) {
+    const state = s.status.state;
+    return (
+      <Box as="header" display="flex" alignItems="center" gap="2" mb="3" pb="2" borderBottomWidth="1px" borderColor="border">
+        <Link href={AGENTS_HREF} aria-label="All sessions" fontSize="2xl" lineHeight="1" px="2" color="text.muted">
+          ‹
+        </Link>
+        <Text as="span" role="img" aria-label="status" color={`tone.${tone}.fg`}>
+          {glyph}
+        </Text>
+        <Box display="flex" flexDirection="column" minW="0">
+          <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} />
+          <Text as="span" fontSize="sm" color="text.dim">
+            {s.project} · {state.charAt(0).toUpperCase() + state.slice(1).replace("-", " ")}
+          </Text>
+        </Box>
+      </Box>
+    );
+  }
   return (
     <Box as="header" display="flex" alignItems="center" flexWrap="wrap" gap="2" mb="3">
       <Text as="span" role="img" aria-label="status" color={`tone.${tone}.fg`}>

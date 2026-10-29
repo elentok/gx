@@ -1,10 +1,11 @@
-import { Box, Heading, Kbd, Text } from "@chakra-ui/react";
+import { Box, Heading, Kbd, Link, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { FetchChat } from "../design/chat";
 import { useFocusReport } from "../design/focus";
 import type { FetchScreen } from "../design/screen";
+import { AGENTS_HREF } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
 import { Button } from "../ui/button/Button";
 import { Spinner } from "../ui/spinner/Spinner";
@@ -75,12 +76,17 @@ export function AgentsPage({
         <Box flex="1" minH="0" display="grid" gridTemplateColumns={wide ? "300px 1fr" : "1fr"}>
           {(wide || !selected) && <AgentSidebar sessions={sessions} selected={selected} onNew={openNew} />}
           {(wide || selected) && (
-            <Box as="main" p="4" minW="0">
+            <Box as="main" p={wide ? "4" : "3"} minW="0">
               {!listed && <SessionSwitcher name="Switch session" sessions={sessions} onNew={() => openNew()} />}
               {gone ? (
                 <>
                   <Text fontWeight="600">Session not found</Text>
                   <Text color="text.muted">{selected} no longer exists.</Text>
+                  {!wide && (
+                    <Link href={AGENTS_HREF} color="tone.running.fg">
+                      Back to sessions
+                    </Link>
+                  )}
                 </>
               ) : selected ? (
                 listed && (
