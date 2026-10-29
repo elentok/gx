@@ -1796,6 +1796,13 @@ export interface SessionInfo {
    * trunk; empty when it did.
    */
   rebase_note?: string;
+  /**
+   * Tier, Model and Effort are what the session launched under. For a Claude
+   * session Model is the one its newest reply reports, once there is a reply.
+   */
+  tier?: any /* ralphloop.Tier */;
+  model?: string;
+  effort?: string;
 }
 /**
  * SessionStatus is a Session status.

@@ -46,6 +46,11 @@ type SessionInfo struct {
 	// RebaseNote says why a Design open did not rebase the design branch onto
 	// trunk; empty when it did.
 	RebaseNote string `json:"rebase_note,omitempty"`
+	// Tier, Model and Effort are what the session launched under. For a Claude
+	// session Model is the one its newest reply reports, once there is a reply.
+	Tier   ralphloop.Tier `json:"tier,omitempty"`
+	Model  string         `json:"model,omitempty"`
+	Effort string         `json:"effort,omitempty"`
 }
 
 // SessionStatus is a Session status.
@@ -262,6 +267,9 @@ func (m sessionMeta) info() SessionInfo {
 		ReportedStep:    m.ReportedStep,
 		ReportedTitle:   m.ReportedTitle,
 		RebaseNote:      m.RebaseNote,
+		Tier:            m.Tier,
+		Model:           m.Model,
+		Effort:          m.Effort,
 	}
 	if st := m.Status; st.State == SessionBlocked {
 		info.Actionable = SessionActionable{Kind: st.Kind, Reason: cmp.Or(st.Message, st.Kind, SessionBlocked)}

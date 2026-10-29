@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/transcript"
 )
 
 // The fake agent and the server agree on the run-end text and the design
@@ -55,6 +56,60 @@ func TestLastAssistantText_ReadsACodexRollout(t *testing.T) {
 	a, matched := designActionable(text, "gx:epic/03", meta.Harness, false)
 	if !matched || len(a.Action) != 2 || a.Action[0] != "/new" {
 		t.Errorf("actionable = %+v, matched %v, want a Continue starting with /new", a, matched)
+	}
+}
+
+func modelTestServer(t *testing.T, cwd string, lines ...string) *Server {
+	t.Helper()
+	config := t.TempDir()
+	path := filepath.Join(config, "projects", transcript.Slugify(cwd), "conv.jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CLAUDE_CONFIG_DIR=" + config}}}
+}
+
+func replyWithModel(model string) string {
+	return `{"type":"assistant","message":{"model":"` + model + `","content":[{"type":"text","text":"hi"}]}}`
+}
+
+func TestSessionInfoModel_ReportedBeatsSavedAndNewestReplyWins(t *testing.T) {
+	t.Parallel()
+	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"), replyWithModel("claude-sonnet-5-5"))
+	meta := sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: "sonnet", Effort: "high"}
+	info := s.sessionInfo(meta)
+	if info.Model != "claude-sonnet-5-5" || info.Tier != "worker" || info.Effort != "high" {
+		t.Errorf("tier/model/effort = %q/%q/%q, want worker/claude-sonnet-5-5/high", info.Tier, info.Model, info.Effort)
+	}
+}
+
+func TestSessionInfoModel_TierAloneUntilFirstReply(t *testing.T) {
+	t.Parallel()
+	s := modelTestServer(t, "/work/proj", `{"type":"user","message":{"content":"hi"}}`)
+	info := s.sessionInfo(sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "light"})
+	if info.Tier != "light" || info.Model != "" {
+		t.Errorf("tier/model = %q/%q, want light and no model", info.Tier, info.Model)
+	}
+}
+
+func TestSessionInfoModel_OldMetaGivesEmptyFields(t *testing.T) {
+	t.Parallel()
+	s := modelTestServer(t, "/work/proj", replyWithModel("claude-sonnet-5-5"))
+	info := s.sessionInfo(sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv"})
+	if info.Tier != "" || info.Model != "" || info.Effort != "" {
+		t.Errorf("tier/model/effort = %q/%q/%q, want all empty", info.Tier, info.Model, info.Effort)
+	}
+}
+
+func TestSessionInfoModel_CodexKeepsSavedValues(t *testing.T) {
+	t.Parallel()
+	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"))
+	info := s.sessionInfo(sessionMeta{Harness: "codex", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: "gpt-5", Effort: "low"})
+	if info.Model != "gpt-5" || info.Effort != "low" {
+		t.Errorf("model/effort = %q/%q, want gpt-5/low", info.Model, info.Effort)
 	}
 }
 

@@ -1,9 +1,11 @@
 package server
 
 import (
+	"cmp"
 	"os"
 	"time"
 
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -55,10 +57,34 @@ func (m sessionMeta) statusFailure() *SessionFailure {
 	return nil
 }
 
-// sessionInfo is m.info() plus the failure that needs a transcript read and the
-// running countdown.
+// reportedModel is the model ID on the newest assistant message of a Claude
+// session's transcript, or the saved one before a reply. Codex keeps the saved
+// one.
+func (s *Server) reportedModel(m sessionMeta) string {
+	if m.Harness != string(harness.Claude) {
+		return m.Model
+	}
+	path, ok := s.claudeTranscript(m.ID, m)
+	if !ok {
+		return m.Model
+	}
+	usage, ok, err := transcript.LastAssistantUsage(path)
+	if err != nil {
+		s.log.Warn("read reported model", "session", m.ID, "err", err)
+	}
+	if !ok || err != nil {
+		return m.Model
+	}
+	return cmp.Or(usage.Model, m.Model)
+}
+
+// sessionInfo is m.info() plus the failure that needs a transcript read, the
+// reported model and the running countdown.
 func (s *Server) sessionInfo(m sessionMeta) SessionInfo {
 	info := m.info()
+	if m.Tier != "" || m.Model != "" {
+		info.Model = s.reportedModel(m)
+	}
 	if at := s.autoAdvances.deadline(m.ID); !at.IsZero() {
 		info.AutoAdvanceAt = &at
 	}
