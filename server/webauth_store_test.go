@@ -262,6 +262,197 @@ func TestWebAuthStoreLoginRefusesReusedTOTPCode(t *testing.T) {
 	}
 }
 
+// nextCode moves the clock one TOTP step and returns a fresh code for secret.
+func nextCode(clock *storeClock, secret string) string {
+	clock.t = clock.t.Add(totpPeriod)
+	code, _ := TOTPCode(secret, totpStepAt(clock.Now()))
+	return code
+}
+
+// twoLogins finishes setup and adds a second web login. It returns both ids.
+func twoLogins(t *testing.T, w *WebAuth, clock *storeClock) (firstID, secondID, firstCookie, secret string) {
+	t.Helper()
+	firstCookie, secret = finishStoreSetup(t, w, clock)
+	if _, err := w.Login(storeTestPassword, nextCode(clock, secret), "4.4.4.4", "Mozilla/5.0 Firefox/120.0"); err != nil {
+		t.Fatal(err)
+	}
+	logins := w.List()
+	return logins[0].ID, logins[1].ID, firstCookie, secret
+}
+
+func TestWebAuthStoreRenameIsStored(t *testing.T) {
+	w, clock, dir := newStoreForTest(t)
+	first, _, _, _ := twoLogins(t, w, clock)
+	if err := w.RenameLogin(first, "Kitchen tablet"); err != nil {
+		t.Fatal(err)
+	}
+	if got := openStoreForTest(t, dir, clock).List()[0].Name; got != "Kitchen tablet" {
+		t.Fatalf("name = %q", got)
+	}
+	if err := w.RenameLogin(first, strings.Repeat("x", deviceNameMaxLen+1)); !errors.Is(err, ErrWebLoginNameInvalid) {
+		t.Fatalf("long name err = %v", err)
+	}
+	if err := w.RenameLogin("nope", "x"); !errors.Is(err, ErrWebLoginNotFound) {
+		t.Fatalf("unknown id err = %v", err)
+	}
+}
+
+func TestWebAuthStoreRevokeRemovesOneAndReturnsItsID(t *testing.T) {
+	w, clock, dir := newStoreForTest(t)
+	first, second, _, _ := twoLogins(t, w, clock)
+	got, err := w.RevokeLogin(second)
+	if err != nil || len(got) != 1 || got[0] != second {
+		t.Fatalf("got %v, %v", got, err)
+	}
+	if list := openStoreForTest(t, dir, clock).List(); len(list) != 1 || list[0].ID != first {
+		t.Fatalf("list = %+v", list)
+	}
+	if _, err := w.RevokeLogin(second); !errors.Is(err, ErrWebLoginNotFound) {
+		t.Fatalf("unknown id err = %v", err)
+	}
+}
+
+func TestWebAuthStoreChangePasswordRefusalsAreCounted(t *testing.T) {
+	w, clock, _ := newStoreForTest(t)
+	_, _, _, secret := twoLogins(t, w, clock)
+	good := nextCode(clock, secret)
+	for i := 0; i < authIPFreeFailures; i++ {
+		if _, err := w.ChangePassword("wrong password here", good, "new password 123", "", "8.8.8.8"); !errors.Is(err, ErrWebAuthRefused) {
+			t.Fatalf("attempt %d: err = %v", i, err)
+		}
+	}
+	// The wrong checks also locked the IP out of login.
+	_, err := w.Login(storeTestPassword, good, "8.8.8.8", storeTestUA)
+	var wait *WebAuthWaitError
+	if !errors.As(err, &wait) {
+		t.Fatalf("err = %v, want a wait error", err)
+	}
+}
+
+func TestWebAuthStoreChangePasswordRejectsShortPassword(t *testing.T) {
+	w, clock, _ := newStoreForTest(t)
+	_, _, _, secret := twoLogins(t, w, clock)
+	code := nextCode(clock, secret)
+	if _, err := w.ChangePassword(storeTestPassword, code, "short", "", "8.8.8.8"); !errors.Is(err, ErrPasswordTooShort) {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := w.SetPassword("short"); !errors.Is(err, ErrPasswordTooShort) {
+		t.Fatalf("set err = %v", err)
+	}
+}
+
+func TestWebAuthStoreChangePasswordKeepsOnlyCurrentLogin(t *testing.T) {
+	w, clock, _ := newStoreForTest(t)
+	first, second, cookie, secret := twoLogins(t, w, clock)
+	removed, err := w.ChangePassword(storeTestPassword, nextCode(clock, secret), "brand new password", first, "8.8.8.8")
+	if err != nil || len(removed) != 1 || removed[0] != second {
+		t.Fatalf("removed %v, err %v", removed, err)
+	}
+	if _, ok := w.Lookup(cookie, "1.1.1.1"); !ok {
+		t.Fatal("current login was signed out")
+	}
+	if _, err := w.Login("brand new password", nextCode(clock, secret), "9.9.9.9", storeTestUA); err != nil {
+		t.Fatalf("new password refused: %v", err)
+	}
+}
+
+func TestWebAuthStoreSetPasswordSignsOutEveryLogin(t *testing.T) {
+	w, clock, _ := newStoreForTest(t)
+	first, second, cookie, secret := twoLogins(t, w, clock)
+	removed, err := w.SetPassword("brand new password")
+	if err != nil || len(removed) != 2 || removed[0] != first || removed[1] != second {
+		t.Fatalf("removed %v, err %v", removed, err)
+	}
+	if _, ok := w.Lookup(cookie, "1.1.1.1"); ok {
+		t.Fatal("login survived")
+	}
+	if _, err := w.Login("brand new password", nextCode(clock, secret), "9.9.9.9", storeTestUA); err != nil {
+		t.Fatalf("new password refused: %v", err)
+	}
+}
+
+func TestWebAuthStoreAbandonedAuthenticatorResetKeepsOldSecret(t *testing.T) {
+	w, clock, dir := newStoreForTest(t)
+	_, _, _, secret := twoLogins(t, w, clock)
+	if _, err := w.AuthenticatorResetBegin(storeTestPassword, nextCode(clock, secret), "8.8.8.8"); err != nil {
+		t.Fatal(err)
+	}
+	again := openStoreForTest(t, dir, clock)
+	if _, err := again.Login(storeTestPassword, nextCode(clock, secret), "9.9.9.9", storeTestUA); err != nil {
+		t.Fatalf("old secret refused: %v", err)
+	}
+}
+
+func TestWebAuthStoreFinishedAuthenticatorResetReplacesSecret(t *testing.T) {
+	w, clock, _ := newStoreForTest(t)
+	first, second, _, secret := twoLogins(t, w, clock)
+	newSecret, err := w.AuthenticatorResetBegin(storeTestPassword, nextCode(clock, secret), "8.8.8.8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	removed, err := w.AuthenticatorResetFinish(nextCode(clock, newSecret), first, "8.8.8.8")
+	if err != nil || len(removed) != 1 || removed[0] != second {
+		t.Fatalf("removed %v, err %v", removed, err)
+	}
+	if _, err := w.Login(storeTestPassword, nextCode(clock, secret), "9.9.9.9", storeTestUA); !errors.Is(err, ErrWebAuthRefused) {
+		t.Fatalf("old secret err = %v, want refused", err)
+	}
+	// The first code of the new secret is not a replay.
+	code, _ := TOTPCode(newSecret, totpStepAt(clock.Now()))
+	if _, err := w.Login(storeTestPassword, code, "9.9.9.9", storeTestUA); err != nil {
+		t.Fatalf("new secret refused: %v", err)
+	}
+}
+
+func TestWebAuthStoreAuthenticatorResetBeginNeedsGoodChecks(t *testing.T) {
+	w, clock, _ := newStoreForTest(t)
+	_, _, _, secret := twoLogins(t, w, clock)
+	if _, err := w.AuthenticatorResetBegin("wrong password here", nextCode(clock, secret), "8.8.8.8"); !errors.Is(err, ErrWebAuthRefused) {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := w.AuthenticatorResetFinish("123456", "", "8.8.8.8"); !errors.Is(err, ErrWebAuthRefused) {
+		t.Fatalf("finish without begin err = %v", err)
+	}
+}
+
+func TestWebAuthStoreWebResetReturnsToSetupPending(t *testing.T) {
+	w, clock, dir := newStoreForTest(t)
+	first, second, cookie, _ := twoLogins(t, w, clock)
+	_, oldCode, _ := w.SetupState()
+	removed, err := w.WebReset()
+	if err != nil || len(removed) != 2 || removed[0] != first || removed[1] != second {
+		t.Fatalf("removed %v, err %v", removed, err)
+	}
+	pending, code, _ := w.SetupState()
+	if !pending || code == "" {
+		t.Fatalf("pending = %v, code = %q", pending, code)
+	}
+	if code == oldCode {
+		t.Fatal("Setup code did not change")
+	}
+	if _, ok := w.Lookup(cookie, "1.1.1.1"); ok || len(w.List()) != 0 {
+		t.Fatal("web logins survived")
+	}
+	if pending, _, _ := openStoreForTest(t, dir, clock).SetupState(); !pending {
+		t.Fatal("reset not saved")
+	}
+}
+
+func TestWebAuthStoreWebResetClearsRateLimits(t *testing.T) {
+	w, clock, _ := newStoreForTest(t)
+	finishStoreSetup(t, w, clock)
+	for i := 0; i < authIPFreeFailures; i++ {
+		w.Login("wrong password here", "000000", "6.6.6.6", storeTestUA)
+	}
+	if _, err := w.WebReset(); err != nil {
+		t.Fatal(err)
+	}
+	_, code, _ := w.SetupState()
+	if _, err := w.SetupStart(code, "6.6.6.6"); err != nil {
+		t.Fatalf("limit survived reset: %v", err)
+	}
+}
+
 func TestWebAuthStoreSeededWebLoginShowsInList(t *testing.T) {
 	dir := t.TempDir()
 	clock := &storeClock{t: time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)}

@@ -39,6 +39,10 @@ var (
 	ErrSetupNotPending = errors.New("web auth setup is not pending")
 	// ErrPasswordTooShort means the password breaks the length rule.
 	ErrPasswordTooShort = errors.New("password is too short")
+	// ErrWebLoginNotFound means no web login has the given id.
+	ErrWebLoginNotFound = errors.New("web login not found")
+	// ErrWebLoginNameInvalid means the name is empty or too long.
+	ErrWebLoginNameInvalid = errors.New("web login name is empty or too long")
 )
 
 // WebAuthWaitError means the caller is rate limited.
@@ -93,6 +97,8 @@ type WebAuth struct {
 	// pendingSecret is the TOTP secret handed out by SetupStart, tied to pendingCode.
 	pendingSecret string
 	pendingCode   string
+	// resetSecret is the new TOTP secret from AuthenticatorResetBegin, not saved until finish.
+	resetSecret string
 }
 
 // OpenWebAuth loads the store in stateDir, or starts empty when it has no file.
@@ -197,18 +203,9 @@ func (w *WebAuth) SetupFinish(code, password, totpCode, ip, userAgent string) (s
 func (w *WebAuth) Login(password, totpCode, ip, userAgent string) (string, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if wait := w.limiter.Wait(ip); wait > 0 {
-		return "", &WebAuthWaitError{Seconds: wait}
-	}
-	if w.file.Password == nil {
-		return "", ErrWebAuthRefused
-	}
-	// Both checks always run so a refusal does not show which part was wrong.
-	passOK := checkWebPassword(password) == nil && verifyWebPassword(w.file.Password, password)
-	step, totpOK := verifyTOTP(w.file.TOTPSecret, totpCode, w.now(), w.file.LastTOTPStep)
-	if !passOK || !totpOK {
-		w.limiter.Fail(ip)
-		return "", ErrWebAuthRefused
+	step, err := w.checkCredentialsLocked(password, totpCode, ip)
+	if err != nil {
+		return "", err
 	}
 	cookie, rec, err := newWebLoginRecord(userAgent, ip, w.now())
 	if err != nil {
@@ -223,6 +220,206 @@ func (w *WebAuth) Login(password, totpCode, ip, userAgent string) (string, error
 	w.file = next
 	w.limiter.Success(ip)
 	return cookie, nil
+}
+
+// checkCredentialsLocked applies the rate limit, then checks the password and a
+// TOTP code from the current secret. It returns the code's step. A wrong check
+// counts as a failure.
+func (w *WebAuth) checkCredentialsLocked(password, totpCode, ip string) (int64, error) {
+	if wait := w.limiter.Wait(ip); wait > 0 {
+		return 0, &WebAuthWaitError{Seconds: wait}
+	}
+	if w.file.Password == nil {
+		return 0, ErrWebAuthRefused
+	}
+	// Both checks always run so a refusal does not show which part was wrong.
+	passOK := checkWebPassword(password) == nil && verifyWebPassword(w.file.Password, password)
+	step, totpOK := verifyTOTP(w.file.TOTPSecret, totpCode, w.now(), w.file.LastTOTPStep)
+	if !passOK || !totpOK {
+		w.limiter.Fail(ip)
+		return 0, ErrWebAuthRefused
+	}
+	return step, nil
+}
+
+// RenameLogin sets the name of one web login.
+func (w *WebAuth) RenameLogin(id, name string) error {
+	if n := utf8.RuneCountInString(name); n == 0 || n > deviceNameMaxLen {
+		return ErrWebLoginNameInvalid
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	next := w.file
+	next.Logins = make([]*webLoginRecord, len(w.file.Logins))
+	found := false
+	for i, rec := range w.file.Logins {
+		next.Logins[i] = rec
+		if rec.ID == id {
+			renamed := *rec
+			renamed.Name = name
+			next.Logins[i] = &renamed
+			found = true
+		}
+	}
+	if !found {
+		return ErrWebLoginNotFound
+	}
+	return w.commitLocked(next)
+}
+
+// RevokeLogin signs out one web login and returns its id.
+func (w *WebAuth) RevokeLogin(id string) ([]string, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	next, removed := signOutExcept(w.file, func(rec *webLoginRecord) bool { return rec.ID != id })
+	if len(removed) == 0 {
+		return nil, ErrWebLoginNotFound
+	}
+	if err := w.commitLocked(next); err != nil {
+		return nil, err
+	}
+	return removed, nil
+}
+
+// ChangePassword checks the current password and a TOTP code, saves the new
+// password and signs out every web login except keepID. It returns the ids
+// signed out.
+func (w *WebAuth) ChangePassword(current, totpCode, newPassword, keepID, ip string) ([]string, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err := checkWebPassword(newPassword); err != nil {
+		return nil, err
+	}
+	step, err := w.checkCredentialsLocked(current, totpCode, ip)
+	if err != nil {
+		return nil, err
+	}
+	hash, err := hashWebPassword(newPassword)
+	if err != nil {
+		return nil, err
+	}
+	next, removed := signOutExcept(w.file, func(rec *webLoginRecord) bool { return rec.ID == keepID })
+	next.Password, next.LastTOTPStep = hash, step
+	if err := w.commitLocked(next); err != nil {
+		return nil, err
+	}
+	w.limiter.Success(ip)
+	return removed, nil
+}
+
+// SetPassword is the CLI path: it saves the new password without checks and
+// signs out every web login. It returns the ids signed out.
+func (w *WebAuth) SetPassword(newPassword string) ([]string, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err := checkWebPassword(newPassword); err != nil {
+		return nil, err
+	}
+	hash, err := hashWebPassword(newPassword)
+	if err != nil {
+		return nil, err
+	}
+	next, removed := signOutExcept(w.file, func(*webLoginRecord) bool { return false })
+	next.Password = hash
+	if err := w.commitLocked(next); err != nil {
+		return nil, err
+	}
+	return removed, nil
+}
+
+// AuthenticatorResetBegin checks the password and a TOTP code from the current
+// secret and returns a new pending secret. The old secret keeps working until
+// AuthenticatorResetFinish succeeds.
+func (w *WebAuth) AuthenticatorResetBegin(password, totpCode, ip string) (string, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	step, err := w.checkCredentialsLocked(password, totpCode, ip)
+	if err != nil {
+		return "", err
+	}
+	secret, err := newTOTPSecret()
+	if err != nil {
+		return "", err
+	}
+	next := w.file
+	next.LastTOTPStep = step
+	if err := w.commitLocked(next); err != nil {
+		return "", err
+	}
+	w.resetSecret = secret
+	w.limiter.Success(ip)
+	return secret, nil
+}
+
+// AuthenticatorResetFinish checks a code from the pending secret, saves the
+// secret and signs out every web login except keepID. It returns the ids
+// signed out.
+func (w *WebAuth) AuthenticatorResetFinish(totpCode, keepID, ip string) ([]string, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if wait := w.limiter.Wait(ip); wait > 0 {
+		return nil, &WebAuthWaitError{Seconds: wait}
+	}
+	if w.resetSecret == "" {
+		return nil, ErrWebAuthRefused
+	}
+	if _, ok := verifyTOTP(w.resetSecret, totpCode, w.now(), 0); !ok {
+		w.limiter.Fail(ip)
+		return nil, ErrWebAuthRefused
+	}
+	next, removed := signOutExcept(w.file, func(rec *webLoginRecord) bool { return rec.ID == keepID })
+	next.TOTPSecret, next.LastTOTPStep = w.resetSecret, 0
+	if err := w.commitLocked(next); err != nil {
+		return nil, err
+	}
+	w.resetSecret = ""
+	w.limiter.Success(ip)
+	return removed, nil
+}
+
+// WebReset clears the password, TOTP secret, web logins and rate limits, and
+// makes a new Setup code. It returns the ids signed out.
+func (w *WebAuth) WebReset() ([]string, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	removed := make([]string, 0, len(w.file.Logins))
+	for _, rec := range w.file.Logins {
+		removed = append(removed, rec.ID)
+	}
+	if err := w.commitLocked(webAuthFile{}); err != nil {
+		return nil, err
+	}
+	w.limiter.Reset()
+	w.setupCode, w.pendingSecret, w.pendingCode, w.resetSecret = "", "", "", ""
+	if _, err := w.currentSetupCodeLocked(); err != nil {
+		return nil, err
+	}
+	return removed, nil
+}
+
+// commitLocked saves next and makes it the current state.
+func (w *WebAuth) commitLocked(next webAuthFile) error {
+	if err := saveWebAuthFile(w.dir, next); err != nil {
+		return err
+	}
+	w.file = next
+	return nil
+}
+
+// signOutExcept returns a copy of f that keeps only the logins keep accepts,
+// and the ids of the others.
+func signOutExcept(f webAuthFile, keep func(*webLoginRecord) bool) (webAuthFile, []string) {
+	kept := make([]*webLoginRecord, 0, len(f.Logins))
+	removed := []string{}
+	for _, rec := range f.Logins {
+		if keep(rec) {
+			kept = append(kept, rec)
+		} else {
+			removed = append(removed, rec.ID)
+		}
+	}
+	f.Logins = kept
+	return f, removed
 }
 
 // Lookup finds the web login for a cookie and renews its last used time. A web
