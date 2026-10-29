@@ -118,6 +118,10 @@ test("74. Tray popover", async ({ page, start }) => {
     )
     .toBe(true);
   await expect(cpuCauses.locator('[data-part="cause-label"]').first()).toHaveCSS("text-overflow", "ellipsis");
+  // The mock's busy-phone popover spans x 42 to 388 of 390.
+  await expect
+    .poll(() => dialog.evaluate((el) => [el.getBoundingClientRect().left, el.getBoundingClientRect().right].map(Math.round)))
+    .toEqual([42, 388]);
 });
 
 test("75. Tray offline", async ({ page, start }) => {

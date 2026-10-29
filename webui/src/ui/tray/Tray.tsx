@@ -16,10 +16,21 @@ export function trayLabel(health: Health): string {
   return `System health: ${METERS.map(({ key, name }) => `${name} ${health[key].state}`).join("; ")}`;
 }
 
+// Chakra's `sm` breakpoint. Below it the popover ends 2px from the screen edge, as in the mock.
+const PHONE_QUERY = "(max-width: 39.99em)";
+const PHONE_EDGE_GAP = 2;
+
+// Stretches the anchor's right edge to the screen edge, so "bottom-end" ends the popover there.
+const phoneAnchorRect: NonNullable<NonNullable<Popover.RootProps["positioning"]>["getAnchorRect"]> = (el) => {
+  if (!el || typeof window.matchMedia !== "function" || !window.matchMedia(PHONE_QUERY).matches) return null;
+  const { x, y, width, height } = el.getBoundingClientRect();
+  return { x, y, width: window.innerWidth - PHONE_EDGE_GAP - x, height };
+};
+
 export function Tray({ health, connected = true }: { health: Health; connected?: boolean }) {
   // The body mounts only while open, so its polling starts and stops with the popover.
   return (
-    <Popover.Root positioning={{ placement: "bottom-end" }} lazyMount unmountOnExit>
+    <Popover.Root positioning={{ placement: "bottom-end", getAnchorRect: phoneAnchorRect, overflowPadding: PHONE_EDGE_GAP }} lazyMount unmountOnExit>
       <Popover.Trigger asChild>
         <chakra.button
           type="button"
@@ -54,7 +65,8 @@ export function Tray({ health, connected = true }: { health: Health; connected?:
             borderRadius="8px"
             boxShadow="lg"
             color="text"
-            w="min(320px, calc(100vw - 32px))"
+            w={{ base: "346px", sm: "min(320px, calc(100vw - 32px))" }}
+            maxW="calc(100vw - 4px)"
           >
             <HealthPopover health={health} connected={connected} />
           </Popover.Content>
