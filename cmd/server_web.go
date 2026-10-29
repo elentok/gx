@@ -219,6 +219,114 @@ func runWebReset(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Wr
 	return err
 }
 
+func newServerWebLoginsCmd(d deps) *cobra.Command {
+	var jsonOut bool
+	c := &cobra.Command{
+		Use:   "web-logins",
+		Short: "List the web logins with their name, created time, last use and last IP",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			cl, err := d.dial()()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runWebLogins(ctx, cl, jsonOut, c.OutOrStdout())
+		},
+	}
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return c
+}
+
+// webLoginsOrRefusal turns a server that is not running into a refusal.
+func webLoginsOrRefusal(res server.WebLoginsResult, err error) (server.WebLoginsResult, error) {
+	switch {
+	case apiclient.IsNotRunning(err):
+		return server.WebLoginsResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, nil
+	case err != nil:
+		return res, fmt.Errorf("server request failed: %w", err)
+	}
+	return res, nil
+}
+
+func runWebLogins(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
+	res, err := c.WebLogins(ctx)
+	if res, err = webLoginsOrRefusal(res, err); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
+			return err
+		}
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	if jsonOut {
+		return nil
+	}
+	if len(res.Logins) == 0 {
+		_, err = fmt.Fprintln(w, "no web logins")
+		return err
+	}
+	for _, l := range res.Logins {
+		last := "never"
+		if !l.LastUsed.IsZero() {
+			last = l.LastUsed.Local().Format("2006-01-02 15:04")
+		}
+		if _, err := fmt.Fprintf(w, "%s  %s  created %s  last used %s  from %s\n",
+			l.ID, l.Name, l.Created.Local().Format("2006-01-02 15:04"), last, l.LastIP); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func newServerWebRevokeCmd(d deps) *cobra.Command {
+	var jsonOut bool
+	c := &cobra.Command{
+		Use:   "web-revoke <id>",
+		Short: "Sign one web login out by id and close its event streams",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cl, err := d.dial()()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runWebRevoke(ctx, cl, args[0], jsonOut, c.OutOrStdout())
+		},
+	}
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return c
+}
+
+func runWebRevoke(ctx context.Context, c *apiclient.Client, id string, jsonOut bool, w io.Writer) error {
+	res, err := c.WebRevokeLogin(ctx, id)
+	if res, err = webLoginsOrRefusal(res, err); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
+			return err
+		}
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	if jsonOut {
+		return nil
+	}
+	_, err = fmt.Fprintln(w, "revoked web login "+id)
+	return err
+}
+
 // renderQR draws the code with half-block characters, so two modules share one
 // text row and the code stays roughly square.
 func renderQR(text string) (string, error) {

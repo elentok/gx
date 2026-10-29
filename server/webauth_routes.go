@@ -376,15 +376,24 @@ func (s *Server) webLoginRevoke(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	name := s.webLoginName(body.ID)
-	removed, err := s.webAuth.RevokeLogin(body.ID)
-	if err != nil {
+	if err := s.revokeWebLogin(body.ID, remoteIP(r)); err != nil {
 		s.refuseWebLogin(w, r, "web login revoke refused", err)
 		return
 	}
-	s.logWebAuth("web login revoked", remoteIP(r), name, "")
-	s.webStreams.closeLogins(removed...)
 	writeJSON(w, webAuthResult{})
+}
+
+// revokeWebLogin signs one web login out, ends its event streams and logs the
+// revoke under ip. The web route and the CLI both go through it.
+func (s *Server) revokeWebLogin(id, ip string) error {
+	name := s.webLoginName(id)
+	removed, err := s.webAuth.RevokeLogin(id)
+	if err != nil {
+		return err
+	}
+	s.logWebAuth("web login revoked", ip, name, "")
+	s.webStreams.closeLogins(removed...)
+	return nil
 }
 
 // webChangePassword saves a new password and signs out every other web login.

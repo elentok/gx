@@ -15,6 +15,8 @@ var routeVerbs = map[string]string{
 	"GET /v1/web/info":                      "server web-url",
 	"POST /v1/web/new-root":                 "server web-new-root",
 	"POST /v1/web/reset":                    "server web-reset",
+	"GET /v1/web/login-list":                "server web-logins",
+	"POST /v1/web/login-revoke":             "server web-revoke",
 	"GET /v1/snapshot":                      "server snapshot",
 	"GET /v1/events":                        "server tickets follow",
 	"GET /v1/projects":                      "project list",

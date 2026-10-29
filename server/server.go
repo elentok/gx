@@ -532,6 +532,8 @@ var routeTable = []struct {
 	{"GET /v1/web/info", (*Server).webInfo},
 	{"POST /v1/web/new-root", (*Server).webNewRoot},
 	{"POST /v1/web/reset", (*Server).webReset},
+	{"GET /v1/web/login-list", (*Server).webLoginListCLI},
+	{"POST /v1/web/login-revoke", (*Server).webLoginRevokeCLI},
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/projects", (*Server).projects},

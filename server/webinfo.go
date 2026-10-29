@@ -1,9 +1,14 @@
 package server
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 )
+
+// ReasonWebRevokeFailed refuses a CLI revoke when the web logins could not be saved.
+const ReasonWebRevokeFailed = "web-revoke-failed"
 
 // ReasonWebOff refuses a web read when the web listener is off or failed to bind.
 const ReasonWebOff = "web-off"
@@ -69,6 +74,54 @@ func (s *Server) webReset(w http.ResponseWriter, _ *http.Request) {
 	s.webStreams.closeLogins(removed...)
 	s.logWebAuth("web reset", "cli", "", "")
 	writeJSON(w, s.webInfoNow())
+}
+
+// WebLoginsResult is the payload of the web login list and revoke routes behind
+// `gx server web-logins` and `web-revoke`. A revoke answers with no Logins.
+type WebLoginsResult struct {
+	Logins  []WebLogin `json:"logins,omitempty"`
+	Refused bool       `json:"refused,omitempty"`
+	Reason  string     `json:"reason,omitempty"`
+	Message string     `json:"message,omitempty"`
+}
+
+func webOffLogins() WebLoginsResult {
+	off := webOffInfo()
+	return WebLoginsResult{Refused: true, Reason: off.Reason, Message: off.Message}
+}
+
+// webLoginListCLI answers the CLI with every web login.
+func (s *Server) webLoginListCLI(w http.ResponseWriter, _ *http.Request) {
+	if s.web == nil {
+		writeJSON(w, webOffLogins())
+		return
+	}
+	writeJSON(w, WebLoginsResult{Logins: s.webAuth.List()})
+}
+
+// webLoginRevokeCLI revokes one web login by id. An unknown id is a refusal.
+func (s *Server) webLoginRevokeCLI(w http.ResponseWriter, r *http.Request) {
+	if s.web == nil {
+		writeJSON(w, webOffLogins())
+		return
+	}
+	var body struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad JSON", http.StatusBadRequest)
+		return
+	}
+	switch err := s.revokeWebLogin(body.ID, "cli"); {
+	case errors.Is(err, ErrWebLoginNotFound):
+		s.logWebAuth("web login revoke refused", "cli", "", ReasonLoginNotFound)
+		writeJSON(w, WebLoginsResult{Refused: true, Reason: ReasonLoginNotFound, Message: "no web login has that id"})
+	case err != nil:
+		s.log.Error("web revoke failed", "err", err)
+		writeJSON(w, WebLoginsResult{Refused: true, Reason: ReasonWebRevokeFailed, Message: "could not revoke the web login: " + err.Error()})
+	default:
+		writeJSON(w, WebLoginsResult{})
+	}
 }
 
 func webOffInfo() WebInfo {
