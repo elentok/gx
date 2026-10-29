@@ -7,6 +7,7 @@ import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { WideContext } from "../useWide";
 import { EpicPage } from "../epic/EpicPage";
+import { ErrorCard } from "../ErrorBoundary";
 import { EpicCard } from "../epics/EpicCard";
 import type { EpicDetail, EpicDetailRow, EpicListRow, FixAgentResult, SessionInfo } from "../generated/server";
 import { JumpRow } from "../nav/JumpMenu";
@@ -764,6 +765,10 @@ export const galleryEntries: GalleryEntry[] = [
         ),
       },
     ],
+  },
+  {
+    name: "ErrorCard",
+    cases: [{ label: "render error", node: <ErrorCard /> }],
   },
   {
     name: "NewDesignForm",
