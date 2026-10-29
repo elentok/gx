@@ -6,15 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
-	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/herdr"
-	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/sessionlookup"
 )
 
 // liveProbe asks the real machine. herdr.Ping has no timeout of its own, so it
@@ -52,43 +47,4 @@ func preflightAgentRunner(setting string, p agentrunner.Probe, logPath string) (
 		return "", fmt.Errorf("gx server: %w", err)
 	}
 	return choice, nil
-}
-
-const fallbackProject = "_default"
-
-// serverRunner is the runner the server launches through, plus runnerFor, which
-// builds any runner by name for a project. Each (runner, project) pair is built
-// once and kept, because a native runner's live sessions are in memory and
-// its agent dirs are per project; runnerFor is nil for a runner it cannot build.
-// The returned runner answers host health and projects runnerFor never sees, so
-// it is built for a fallback project.
-func serverRunner(c agentrunner.Choice, dirs config.Dirs, stateDir string, n time.Duration) (r agentrunner.Runner, runnerFor func(runner, project string) agentrunner.Runner) {
-	type pair struct{ runner, project string }
-	home, _ := dirs.Home()
-	var mu sync.Mutex
-	built := map[pair]agentrunner.Runner{}
-	runnerFor = func(runner, project string) agentrunner.Runner {
-		mu.Lock()
-		defer mu.Unlock()
-		key := pair{runner, project}
-		if r, ok := built[key]; ok {
-			return r
-		}
-		var r agentrunner.Runner
-		switch agentrunner.Choice(runner) {
-		case agentrunner.ChoiceHerdr:
-			h := herdrrunner.NewIn(herdr.CLI{}, home, sessionlookup.RootsFrom(dirs.Environ()).CodexHome)
-			h.N = n
-			r = h
-		case agentrunner.ChoiceHeadless:
-			r = &nativerunner.Headless{Root: nativerunner.AgentsRoot(stateDir, project), N: n}
-		case agentrunner.ChoicePTY:
-			r = &nativerunner.Pty{Root: nativerunner.AgentsRoot(stateDir, project), N: n, Env: dirs.Environ()}
-		default:
-			return nil
-		}
-		built[key] = r
-		return r
-	}
-	return runnerFor(string(c), fallbackProject), runnerFor
 }

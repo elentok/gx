@@ -10,9 +10,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/agentrunner/herdrrunner"
-	"github.com/elentok/gx/config"
-	"github.com/elentok/gx/nativerunner"
 )
 
 func TestPreflightAgentRunner(t *testing.T) {
@@ -64,100 +61,5 @@ func TestPreflightAgentRunner(t *testing.T) {
 				t.Errorf("log err = %v, want containing %q", rec["err"], tt.wantErr)
 			}
 		})
-	}
-}
-
-func TestServerRunner_HeadlessAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
-	state := t.TempDir()
-	_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, config.DirsFrom(envFor(t)), state, 0)
-	h, ok := runnerFor("headless", "proj").(*nativerunner.Headless)
-	if !ok {
-		t.Fatalf("runnerFor(headless, proj) = %T, want *Headless", runnerFor("headless", "proj"))
-	}
-	if want := nativerunner.AgentsRoot(state, "proj"); h.Root != want {
-		t.Errorf("Root = %q, want %q", h.Root, want)
-	}
-	if runnerFor("headless", "proj") != agentrunner.Runner(h) {
-		t.Error("a project must keep one Headless: its live sessions are in memory")
-	}
-}
-
-func TestServerRunner_EveryRunnerCarriesN(t *testing.T) {
-	for _, tc := range []struct {
-		n    time.Duration
-		want time.Duration
-	}{{9 * time.Second, 9 * time.Second}, {0, agentrunner.DefaultN}} {
-		_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, config.DirsFrom(envFor(t)), t.TempDir(), tc.n)
-		got := map[string]time.Duration{
-			"herdr":    runnerFor("herdr", "p").(*herdrrunner.Runner).WaitN(),
-			"headless": runnerFor("headless", "p").(*nativerunner.Headless).WaitN(),
-			"pty":      runnerFor("pty", "p").(*nativerunner.Pty).WaitN(),
-		}
-		for name, n := range got {
-			if n != tc.want {
-				t.Errorf("n=%s: %s WaitN = %s, want %s", tc.n, name, n, tc.want)
-			}
-		}
-	}
-}
-
-func TestServerRunner_PtyAgentDirsLiveUnderTheProjectsAgentsRoot(t *testing.T) {
-	state := t.TempDir()
-	r, runnerFor := serverRunner(agentrunner.ChoicePTY, config.DirsFrom(envFor(t)), state, 0)
-	if r.Name() != "pty" {
-		t.Errorf("default runner Name = %q, want pty", r.Name())
-	}
-	p, ok := runnerFor("pty", "proj").(*nativerunner.Pty)
-	if !ok {
-		t.Fatalf("runnerFor(pty, proj) = %T, want *Pty", runnerFor("pty", "proj"))
-	}
-	if want := nativerunner.AgentsRoot(state, "proj"); p.Root != want {
-		t.Errorf("Root = %q, want %q", p.Root, want)
-	}
-	if runnerFor("pty", "proj") != agentrunner.Runner(p) {
-		t.Error("a project must keep one Pty: its live sessions are in memory")
-	}
-}
-
-func TestServerRunner_BuildsAnyRunnerPerPairLazily(t *testing.T) {
-	_, runnerFor := serverRunner(agentrunner.ChoiceHeadless, config.DirsFrom(envFor(t)), t.TempDir(), 0)
-	herdrA := runnerFor("herdr", "a")
-	if herdrA == nil || herdrA.Name() != "herdr" {
-		t.Fatalf("runnerFor(herdr, a) = %v, want a herdr runner", herdrA)
-	}
-	if runnerFor("herdr", "a") != herdrA {
-		t.Error("a (runner, project) pair must be built once and kept")
-	}
-	if runnerFor("herdr", "b") == herdrA {
-		t.Error("each project gets its own runner")
-	}
-	if runnerFor("headless", "a") == herdrA {
-		t.Error("each runner name gets its own runner")
-	}
-	if r := runnerFor("tmux", "a"); r != nil {
-		t.Errorf("unknown runner = %v, want nil", r)
-	}
-}
-
-func TestServerRunner_HeadlessDefaultRunnerHasARoot(t *testing.T) {
-	r, _ := serverRunner(agentrunner.ChoiceHeadless, config.DirsFrom(envFor(t)), t.TempDir(), 0)
-	if h, ok := r.(*nativerunner.Headless); !ok || h.Root == "" {
-		t.Errorf("default runner = %#v, want a *Headless with a Root", r)
-	}
-}
-
-func TestServerRunner_NamesComeFromTheRunners(t *testing.T) {
-	if r, _ := serverRunner(agentrunner.ChoiceHerdr, config.DirsFrom(envFor(t)), t.TempDir(), 0); r.Name() != "herdr" {
-		t.Errorf("herdr Name = %q", r.Name())
-	}
-	if r, _ := serverRunner(agentrunner.ChoiceHeadless, config.DirsFrom(envFor(t)), t.TempDir(), 0); r.Name() != "headless" {
-		t.Errorf("headless Name = %q", r.Name())
-	}
-}
-
-func TestServerRunner_HerdrServerCanBuildHeadless(t *testing.T) {
-	_, runnerFor := serverRunner(agentrunner.ChoiceHerdr, config.DirsFrom(envFor(t)), t.TempDir(), 0)
-	if _, ok := runnerFor("headless", "proj").(*nativerunner.Headless); !ok {
-		t.Error("a herdr server must still reach a headless run's runner")
 	}
 }

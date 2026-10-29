@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/tickets"
@@ -156,7 +157,7 @@ func runServer(ctx context.Context, d deps) error {
 	if err != nil {
 		return err
 	}
-	runner, runnerFor := serverRunner(choice, dirs, stateDir, cfg.RunnerWait)
+	runner, runnerFor := runnerbuild.New(choice, dirs.Environ(), stateDir, cfg.RunnerWait, nil)
 	var tcpAddr string
 	if cfg.Server.TCPListen {
 		tcpAddr = server.DefaultTCPAddr
