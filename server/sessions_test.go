@@ -503,7 +503,7 @@ func TestCreateSession_ExistingDirLeavesTrustDialog(t *testing.T) {
 	h, ctx, evs, id, _ := startFakeSession(t, servertest.WithEnv(agentfake.ProgramTrustEnv+"=1"))
 	want := server.SessionStatus{State: server.SessionBlocked, Kind: "dialog"}
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status == want })
-	// Outlasts the holder's trust key repeat.
+	// Negative wait: outlasts the holder's trust key repeat, which is the only way the dialog would be answered.
 	time.Sleep(time.Second)
 	if !screenHas(t, waitForHolder(t, filepath.Join(h.SessionsDir, id)), agentfake.ProgramTrustPrompt) {
 		t.Error("trust dialog answered for a dir gx did not make")

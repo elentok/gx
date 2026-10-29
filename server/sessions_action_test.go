@@ -184,7 +184,7 @@ func TestRunAction_RealPromptStepStillNeedsATurn(t *testing.T) {
 		t.Errorf("submitted = %q, want the next step held until a turn", got)
 	}
 	report(t, conv, agentfake.Control{State: "working"})
-	time.Sleep(actionWatchSettle) // the Action's watch only samples on a ticker; no event shows it saw Working
+	time.Sleep(actionWatchSettle) // negative wait: the Action's watch only samples on a ticker; no event shows it saw Working
 	report(t, conv, agentfake.Control{State: "done"})
 	waitForSubmitted(t, conv, "\"real-prompt\"\n\"next-step\"\n")
 }
@@ -204,7 +204,7 @@ func TestRunAction_BlockedStepStopsTheRest(t *testing.T) {
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
 	report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
-	time.Sleep(actionWatchSettle) // the Action's watch only samples on a ticker; no event shows it saw Blocked
+	time.Sleep(actionWatchSettle) // negative wait: the Action's watch only samples on a ticker; no event shows it saw Blocked
 	report(t, conv, agentfake.Control{State: "done"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
 	// Negative wait: a few step timeouts for a wrong send to show up.

@@ -88,7 +88,7 @@ func TestSessionChatChanged_IdleSessionPublishesNothing(t *testing.T) {
 	writeTranscript(t, path, chatLine)
 	report(t, conv, agentfake.Control{State: "done"})
 	waitSessionState(ctx, t, h, id, server.SessionIdle)
-	// The meta shows Idle a moment before the watch stops its poll.
+	// Negative wait: the meta shows Idle a moment before the watch stops its poll, and no event marks the stop.
 	time.Sleep(2 * chatPollTestInterval)
 	if chatEventWithin(evs, t, path, id, 10*chatPollTestInterval, true) {
 		t.Fatal("session-chat-changed fired for an idle session")
@@ -122,7 +122,7 @@ func TestSessionChatChanged_TurnWrittenAfterIdlePublishes(t *testing.T) {
 	waitSessionState(ctx, t, h, id, server.SessionWorking)
 	report(t, conv, agentfake.Control{State: "done"})
 	waitSessionState(ctx, t, h, id, server.SessionIdle)
-	// The meta shows Idle a moment before the watch stops its poll.
+	// Negative wait: the meta shows Idle a moment before the watch stops its poll, and no event marks the stop.
 	time.Sleep(2 * chatPollTestInterval)
 	appendLines(t, path, chatLine, turnDurationLine)
 	if !chatEventWithin(evs, t, path, id, time.Second, false) {

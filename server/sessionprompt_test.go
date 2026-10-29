@@ -68,7 +68,7 @@ func TestSessionPrompt_SwallowedEnterIsNudged(t *testing.T) {
 	}
 	waitForSubmitted(t, f.conv, strconv.Quote("yes to both")+"\n")
 	report(t, f.conv, agentfake.Control{State: "working"})
-	time.Sleep(2 * firstPromptGrace)
+	time.Sleep(2 * firstPromptGrace) // negative wait: a repeat Enter would come within the grace window
 	if got := submitted(t, f.conv); got != strconv.Quote("yes to both")+"\n" {
 		t.Errorf("submitted = %q, want exactly one submission", got)
 	}
