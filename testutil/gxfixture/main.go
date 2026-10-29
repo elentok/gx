@@ -12,8 +12,9 @@
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 // --mock-dir <path> serves that directory over loopback HTTP and reports its base URL as mock_url.
 //
-// A binary left out is built with `go build`, which needs the module as the
-// working directory.
+// A binary left out is built with `go build -tags gxfixture` into the fixture's own temp dir, which
+// needs the module as the working directory. So `go run ./testutil/gxfixture <scenario>` is the
+// one-step build-and-start; nothing is shared with a sibling worktree's run.
 package main
 
 import (
@@ -60,6 +61,10 @@ type Output struct {
 	HealthDir string `json:"health_dir"`
 	// MockURL is the base URL serving --mock-dir; empty without the flag.
 	MockURL string `json:"mock_url,omitempty"`
+	// BrowserSession names this worktree's playwright-cli session (`-s=<name>`): the
+	// worktree directory is unique per sibling session and stable across calls, so
+	// concurrent sessions never share a browser.
+	BrowserSession string `json:"browser_session,omitempty"`
 }
 
 // ShellEnv is the output as `export` lines a shell can source: the CLI env, then
@@ -80,6 +85,9 @@ func (o Output) ShellEnv() string {
 	export("GXF_SOCKET", o.Socket)
 	if o.MockURL != "" {
 		export("GXF_MOCK_URL", o.MockURL)
+	}
+	if o.BrowserSession != "" {
+		export("GXF_BROWSER_SESSION", o.BrowserSession)
 	}
 	return b.String()
 }
@@ -272,6 +280,9 @@ func run(args []string) (err error) {
 		}
 	}
 	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir()}
+	if cwd, err := os.Getwd(); err == nil {
+		o.BrowserSession = filepath.Base(cwd)
+	}
 	if mockDir != "" {
 		stopMock, mockURL, err := serveMock(mockDir)
 		if err != nil {

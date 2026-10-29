@@ -1095,6 +1095,25 @@ func TestStart_NoMockDirLeavesMockURLOut(t *testing.T) {
 	}
 }
 
+func TestStart_BrowserSessionIsTheWorktreeDirectoryName(t *testing.T) {
+	t.Parallel()
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := start(t, "empty")
+	if want := filepath.Base(cwd); r.BrowserSession != want {
+		t.Errorf("browser_session = %q, want %q", r.BrowserSession, want)
+	}
+}
+
+func TestShellEnv_ExportsBrowserSessionWhenSet(t *testing.T) {
+	got := Output{BrowserSession: "wt-1"}.ShellEnv()
+	if want := "export GXF_BROWSER_SESSION='wt-1'\n"; !strings.Contains(got, want) {
+		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
+	}
+}
+
 func TestShellEnv_ExportsMockURLWhenSet(t *testing.T) {
 	got := Output{MockURL: "http://127.0.0.1:2/"}.ShellEnv()
 	if want := "export GXF_MOCK_URL='http://127.0.0.1:2/'\n"; !strings.Contains(got, want) {

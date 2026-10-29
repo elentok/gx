@@ -46,7 +46,9 @@ func TestMockRulesAnchors(t *testing.T) {
 			"`pass`, `fail`",
 		}},
 		{"ui check build", "gx-ui-check/SKILL.md", []string{
-			"go build -tags gxfixture -o $TMPDIR/gx-ui/gx .",
+			"go run ./testutil/gxfixture [--hold] <scenario>",
+			"`-tags gxfixture`",
+			"`playwright-cli -s=<browser_session>",
 			"`--mock-dir <path>`",
 			"`PLAYWRIGHT_BROWSERS_PATH`",
 			"Resolve `gx tickets root` before any `cd`",

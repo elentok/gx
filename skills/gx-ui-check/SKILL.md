@@ -16,18 +16,18 @@ file. Use the `playwright-cli` skill for the browser commands.
 
 ## 1. Build and start a scenario
 
-Build once from the repo root, then start the scenario in the background. The `gx` binary embeds
+One command builds and starts the scenario, from the repo root. The `gx` binary embeds
 `webui/dist`; without it the page shows "This build has no web UI". Build the UI first when
 `webui/dist/index.html` is missing:
 
 ```
 [ -f webui/dist/index.html ] || make web-build
-go build -tags gxfixture -o $TMPDIR/gx-ui/gx .
-go build -o $TMPDIR/gx-ui/claude ./testutil/agentfake/cmd/fakeclaude
-go build -o $TMPDIR/gx-ui/gxfixture ./testutil/gxfixture
-$TMPDIR/gx-ui/gxfixture --gx $TMPDIR/gx-ui/gx --fakeclaude $TMPDIR/gx-ui/claude [--hold] <scenario>
+go run ./testutil/gxfixture [--hold] <scenario>
 ```
 
+- Do not run `go build` by hand. The fixture builds `gx` with `-tags gxfixture` (the `agents`
+  scenario needs it for `fakecodex`) and `fakeclaude` into its own temp dir, so sibling worktree
+  sessions never overwrite each other's binaries or kill each other's fixtures.
 - Run it with `run_in_background`. It prints one JSON line, then keeps running until SIGTERM.
 - Never start it with `nohup` or `&`. Only `run_in_background` lets the harness track and stop it; a
   fixture started any other way keeps running after you finish, with its `gx server` and fake agents.
@@ -56,6 +56,9 @@ The JSON line has these fields:
 - `mock_url`: only with `--mock-dir <path>`. The fixture serves that directory over loopback http at
   this base URL (`file:` is blocked in the browser) and stops it with itself. `--env` exports it as
   `GXF_MOCK_URL`.
+- `browser_session`: the worktree directory name. Pass it to every browser command as
+  `playwright-cli -s=<browser_session> ...`. The default session is shared by concurrent sessions,
+  so another session's tabs would interfere. `--env` exports it as `GXF_BROWSER_SESSION`.
 - `hold_file`: the file that holds the workers when you passed `--hold`.
 - `disk_dir`: the directory of the fake disk's control files (see "How the fixture behaves").
 - `health_dir`: the directory of the fake CPU and memory control file (see "How the fixture behaves").

@@ -16,7 +16,8 @@ steps. The browser commands come from the `playwright-cli` skill.
    (its fonts and images may never settle).
 3. Run every `playwright-cli` call from inside the repo worktree. Outside a git repo it fails with
    "not inside a git repo". Never `cd $TMPDIR &&` before a call. Give `--filename` an absolute path in
-   your scratchpad directory, and `Read` the PNG from that same path.
+   your scratchpad directory, and `Read` the PNG from that same path. Pass the fixture's
+   `browser_session` as `-s=<browser_session>` on every call.
 4. Pick the state and the part you compare. The mock marks them:
    - Part selector: `[data-mock-state=<s>] [data-mock-part=<p>]`
    - State selector: `[data-mock-state=<s>]`
