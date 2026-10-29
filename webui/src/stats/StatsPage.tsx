@@ -185,7 +185,7 @@ export function StatsPage({ fetchStats, fetchEpics }: { fetchStats?: FetchStats;
     });
 
   return (
-    <DetailPage active="stats" mode="wide">
+    <DetailPage active="stats" mode="wide" title={{ kind: "Stats" }}>
       <Box display="flex" alignItems="center" gap="4" mt="4">
         <chakra.select aria-label="Project" value={project} onChange={(e) => set("project", e.target.value)} {...selectProps}>
           <option value="">All projects</option>

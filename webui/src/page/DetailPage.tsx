@@ -7,6 +7,7 @@ import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
 import type { TopBarTab } from "../ui/top-bar/TopBar";
 import { DiskStrips } from "./DiskStrips";
+import { type PageTitle, usePageTitle } from "./title";
 
 // The frame every page shares: offline strip, page container and the connected top bar.
 // `fill` makes the page exactly the window tall; its children then share the space below the top bar.
@@ -16,8 +17,10 @@ export function DetailPage({
   waiting,
   fill,
   mode,
+  title,
   children,
 }: {
+  title: PageTitle;
   active?: TopBarTab;
   /** Other epics in Needs you, counted on the Epics tab. */
   waiting?: number;
@@ -25,6 +28,7 @@ export function DetailPage({
   mode: PageMode;
   children: ReactNode;
 }) {
+  usePageTitle(title);
   const conn = useConnectionContext();
   const { connected } = useConnectionState(conn);
   return (

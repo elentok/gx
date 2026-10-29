@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConnectionContext, createConnection, TICK_MS, type Connection, type ConnectionState } from "./connection";
-import { appRoutes } from "./routes";
+import { appRoutes, type RouteFetchers } from "./routes";
 import type { EpicDetail, EpicDetailRow, FetchEpicDetail } from "./epic/detail";
 import type { DiskStatus } from "./generated/server";
 import type { Snapshot } from "./snapshot";
@@ -58,14 +58,60 @@ function renderAt(
   fetchDetail: FetchDetail,
   conn: Connection = fakeConnection(true),
   fetchEpic?: FetchEpicDetail,
+  extra: RouteFetchers = {},
 ) {
-  const router = createMemoryRouter(appRoutes({ ticket: fetchDetail, epic: fetchEpic }), { initialEntries: [path] });
-  return renderThemed(
+  const router = createMemoryRouter(appRoutes({ ticket: fetchDetail, epic: fetchEpic, ...extra }), { initialEntries: [path] });
+  const rendered = renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   );
+  return { ...rendered, router };
 }
+
+const pending = <T,>() => new Promise<T>(() => {});
+const title = () => document.title;
+
+test.each([
+  ["/epics", "Epics · gx"],
+  ["/stats", "Stats · gx"],
+  ["/stats?range=7d&project=demo", "Stats · gx"],
+  ["/nonsense/here", "Epics · gx"],
+])("%s sets the tab title %s", async (path, expected) => {
+  renderAt(path, okFor, undefined, undefined, { stats: pending });
+  await waitFor(() => expect(title()).toBe(expected));
+});
+
+test("the epic page titles the tab by its slug, loading or not found", async () => {
+  renderAt("/e/gx:e", okFor, undefined, () => pending());
+  await waitFor(() => expect(title()).toBe("e · Epic · gx"));
+  cleanup();
+  renderAt("/e/gx:nope", okFor, undefined, async () => ({ kind: "not-found" }));
+  await screen.findByText("Epic not found");
+  expect(title()).toBe("nope · Epic · gx");
+});
+
+test("the design page titles the tab before the epic list resolves and after", async () => {
+  let resolve!: (l: { epics: []; follow_ups: [] }) => void;
+  renderAt("/d/gx:e", okFor, undefined, undefined, { epicList: () => new Promise((r) => (resolve = r)) });
+  await waitFor(() => expect(title()).toBe("e · Design · gx"));
+  await act(async () => resolve({ epics: [], follow_ups: [] }));
+  expect(title()).toBe("e · Design · gx");
+});
+
+test("the ticket page titles the tab by its address while the fetch is pending", async () => {
+  renderAt("/t/gx:e/01", () => pending());
+  await waitFor(() => expect(title()).toBe("gx:e/01 · Ticket · gx"));
+});
+
+test("navigating between routes changes the tab title", async () => {
+  const { router } = renderAt("/epics", okFor, undefined, epicFetch());
+  await waitFor(() => expect(title()).toBe("Epics · gx"));
+  await act(async () => {
+    await router.navigate("/e/gx:e");
+  });
+  await waitFor(() => expect(title()).toBe("e · Epic · gx"));
+});
 
 const currentTab = () => screen.getByRole("link", { current: "page" }).textContent;
 

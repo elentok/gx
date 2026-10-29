@@ -260,7 +260,11 @@ type EpicPageProps = {
 export function EpicPage(props: EpicPageProps) {
   const { list } = useEpicList(props.fetchList, useConnectionContext());
   return (
-    <DetailPage mode="narrow" waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}>
+    <DetailPage
+      mode="narrow"
+      title={{ kind: "Epic", name: props.address.slice(props.address.indexOf(":") + 1) }}
+      waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}
+    >
       <EpicPageBody {...props} list={list} />
     </DetailPage>
   );

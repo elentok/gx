@@ -248,7 +248,13 @@ type DesignPageProps = {
 export function DesignPage(props: DesignPageProps) {
   const { list, failed } = useEpicList(props.fetchList, useConnectionContext());
   return (
-    <DetailPage active="epics" fill mode="wide" waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}>
+    <DetailPage
+      active="epics"
+      fill
+      mode="wide"
+      title={{ kind: "Design", name: props.address.slice(props.address.indexOf(":") + 1) }}
+      waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}
+    >
       <DesignPageBody {...props} list={list} failed={failed} />
     </DetailPage>
   );

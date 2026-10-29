@@ -144,7 +144,7 @@ export function EpicsPage({
   );
 
   return (
-    <DetailPage active="epics" mode="wide">
+    <DetailPage active="epics" mode="wide" title={{ kind: "Epics" }}>
       <Box display="flex" alignItems="center" gap="4" mt="4">
         <Input
           type="search"
