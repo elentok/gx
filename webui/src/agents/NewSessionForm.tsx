@@ -43,21 +43,26 @@ const field = {
   color: "text",
   bg: "surface",
   borderWidth: "1px",
-  borderColor: "transparent",
-  borderRadius: "8px",
+  borderColor: "border",
+  borderRadius: "6px",
   px: "3",
   _placeholder: { color: "text.dim" },
   _focusVisible: { outline: "none", ...focusRing },
 } as const;
 
-function Field({ label, optional, children }: { label: string; optional?: boolean; children: React.ReactNode }) {
+function Field({ label, optional, caret, children }: { label: string; optional?: boolean; caret?: boolean; children: React.ReactNode }) {
   return (
-    <chakra.label display="flex" flexDirection="column" gap="1" position="relative">
-      <Text as="span" fontSize="sm" color="text.muted">
+    <chakra.label display="flex" flexDirection="column" gap="1.5" position="relative">
+      <Text as="span" fontSize="13px" color="text.muted">
         {label}
         {optional && <i> · optional</i>}
       </Text>
       {children}
+      {caret && (
+        <Box aria-hidden position="absolute" right="3" bottom="0" h="40px" display="flex" alignItems="center" color="text.dim" pointerEvents="none">
+          ▾
+        </Box>
+      )}
     </chakra.label>
   );
 }
@@ -182,21 +187,21 @@ export function NewSessionForm({
   const failure = refusal ? refusalText(refusal) : error;
   return (
     <BottomSheet label="New session" onClose={onClose} fillViewport desktop={{ borderRadius: "lg", w: "460px" }} as="form" onSubmit={submit} bg="surface.raised" p="0" gap="0" overflow="hidden">
-      <Box display="flex" alignItems="center" p="3" borderBottomWidth="1px" borderColor="border" flexShrink="0">
-        <Text as="h3" flex="1" fontFamily="condensed" fontWeight="600" textTransform="uppercase">
+      <Box display="flex" alignItems="center" px="5" pt="4.5" pb="1.5" flexShrink="0">
+        <Text as="h3" flex="1" fontFamily="condensed" fontSize="24px" fontWeight="600" textTransform="uppercase" letterSpacing="0.02em">
           New session
         </Text>
         <chakra.button type="button" aria-label="Close" title="Close (keeps the draft)" onClick={onClose} color="text.dim" fontSize="xl" lineHeight="1" w="36px" h="36px" borderRadius="8px" _hover={{ bg: "surface", color: "text" }}>
           ×
         </chakra.button>
       </Box>
-      <Box flex="1" minH="0" overflowY="auto" p="3" display="flex" flexDirection="column" gap="3">
+      <Box flex="1" minH="0" overflowY="auto" px="5" pt="2.5" pb="3" display="flex" flexDirection="column" gap="4.5">
         {!trees ? (
           <Text color="text.muted">{loadError ? "Could not load the projects." : "Loading projects…"}</Text>
         ) : (
           <>
-            <Field label="Project">
-              <chakra.select aria-label="Project" value={project} onChange={(e) => patch({ project: e.target.value, dir: "", create: "" })} {...field} h="40px">
+            <Field label="Project" caret>
+              <chakra.select aria-label="Project" value={project} onChange={(e) => patch({ project: e.target.value, dir: "", create: "" })} {...field} h="40px" appearance="none" pr="8">
                 {projects.map((p) => (
                   <option key={p} value={p}>
                     {p}
@@ -204,7 +209,7 @@ export function NewSessionForm({
                 ))}
               </chakra.select>
             </Field>
-            <Field label="Worktree">
+            <Field label="Worktree" caret>
               <chakra.input
                 role="combobox"
                 aria-label="Worktree"
@@ -216,6 +221,7 @@ export function NewSessionForm({
                 spellCheck={false}
                 {...field}
                 h="40px"
+                pr="8"
                 value={query ?? (draft.create || picked?.label || "")}
                 onFocus={() => setQuery((q) => q ?? "")}
                 onBlur={() => setQuery(null)}
@@ -281,7 +287,7 @@ export function NewSessionForm({
           </Text>
         )}
       </Box>
-      <Box display="flex" alignItems="center" justifyContent="flex-end" gap="2" p="3" borderTopWidth="1px" borderColor="border" bg="surface" flexShrink="0">
+      <Box display="flex" alignItems="center" justifyContent="flex-end" gap="2.5" px="5" pt="1" pb="5" flexShrink="0">
         <Button type="button" emphasis="ghost" tone="muted" onClick={discard}>
           Cancel
         </Button>
