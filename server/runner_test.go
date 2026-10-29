@@ -86,8 +86,8 @@ func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *t
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
-	start, prompt, _ := registerTurn(h)
+	fake := runnerfake.NewRunner()
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -122,11 +122,12 @@ func TestRunner_ClaimsWriteTheFileBeforeTheEventAndLaunchWithTheChosenAgent(t *t
 	if !claimedOnDisk {
 		t.Error("ticket file did not say claimed when the claim event streamed")
 	}
-	if !strings.Contains(strings.Join(*start, " "), "--kind codex") {
-		t.Errorf("agent start = %v, want kind codex", *start)
+	const label = "epic-a-iter-01"
+	if got := fake.Kind(label); got != "codex" {
+		t.Errorf("agent kind = %q, want codex", got)
 	}
-	if !strings.Contains(strings.Join(*prompt, " "), "$gx-implement proj:epic-a/01") {
-		t.Errorf("agent prompt = %v, want the codex skill prompt", *prompt)
+	if got := strings.Join(fake.Prompts(label), " "); !strings.Contains(got, "$gx-implement proj:epic-a/01") {
+		t.Errorf("agent prompts = %v, want the codex skill prompt", got)
 	}
 	if runs := h.Server.Runs(); len(runs) != 1 || runs[0].Address != "proj:epic-a/01" || runs[0].Agent != "codex" {
 		t.Errorf("runs = %+v", runs)
@@ -347,15 +348,13 @@ func TestRunner_AFinishThatErrorsPausesTheTicketStuckAndFreesTheRoot(t *testing.
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
-	_, _, cwd := registerTurn(h)
 	// The agent's turn wrecks its own worktree, so the finish cannot read it.
-	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
-		if err := os.RemoveAll(*cwd); err != nil {
+	fake := newTurnRunner(func(_, cwd string) {
+		if err := os.RemoveAll(cwd); err != nil {
 			t.Error(err)
 		}
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -1016,8 +1015,8 @@ func TestRunner_CodexEvolveLaunchGetsTheFollowUpsAndGxDirs(t *testing.T) {
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: tc.typ})
 			servertest.WriteTicket(t, store, "gx", "other", "01", "unrelated", "")
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			h := servertest.StartWithStore(t, store)
-			start, _, _ := registerTurn(h)
+			fake := runnerfake.NewRunner()
+			h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
@@ -1037,7 +1036,7 @@ func TestRunner_CodexEvolveLaunchGetsTheFollowUpsAndGxDirs(t *testing.T) {
 					break
 				}
 			}
-			got := strings.Join(*start, " ")
+			got := strings.Join(fake.Args("epic-a-iter-01"), " ")
 			epicDir := "--add-dir " + filepath.Join(store, "proj", "epic-a")
 			if has := strings.Contains(got, epicDir); has != (tc.agent == "codex") {
 				t.Errorf("%s present = %v in %q", epicDir, has, got)

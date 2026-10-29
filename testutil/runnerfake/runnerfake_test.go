@@ -44,6 +44,19 @@ func TestStart_IdleAndLabelTaken(t *testing.T) {
 	}
 }
 
+func TestKind_ReadsTheKindTheLatestStartAsked(t *testing.T) {
+	r := NewRunner()
+	if _, err := r.Start(agentrunner.StartOptions{Label: "a", Kind: "codex"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Kind("a"); got != "codex" {
+		t.Errorf("Kind(a) = %q, want codex", got)
+	}
+	if got := r.Kind("missing"); got != "" {
+		t.Errorf("Kind(missing) = %q, want empty", got)
+	}
+}
+
 func TestStartAndStopErrs(t *testing.T) {
 	r := NewRunner()
 	r.SetStartErr("a", agentrunner.ErrLabelTaken)

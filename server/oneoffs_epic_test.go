@@ -8,11 +8,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -75,36 +77,33 @@ func TestRunner_OneOffsEpicUsesTheOneOffCapNotThePerRootCap(t *testing.T) {
 	}
 }
 
-// waitForAgentStarts returns the --kind of each started agent, by the agent
-// name herdr was given (one-offs-iter-<id>), once want agents have started.
-func waitForAgentStarts(t *testing.T, h *servertest.Harness, want int) map[string]string {
+// waitForAgentKinds returns the kind of each of the one-off agents (labelled
+// one-offs-iter-<id>) once all of them have started.
+func waitForAgentKinds(t *testing.T, fake *runnerfake.Runner, ids ...string) map[string]agentrunner.Kind {
 	t.Helper()
-	var kinds map[string]string
-	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("%d agent starts", want), func() bool {
-		kinds = map[string]string{}
-		for _, e := range h.Herdr.Trace() {
-			if len(e.Argv) > 3 && e.Argv[0] == "agent" && e.Argv[1] == "start" {
-				for i, a := range e.Argv {
-					if a == "--kind" && i+1 < len(e.Argv) {
-						kinds[e.Argv[2]] = e.Argv[i+1]
-					}
-				}
+	var kinds map[string]agentrunner.Kind
+	servertest.WaitFor(t, 10*time.Second, fmt.Sprintf("%d agent starts", len(ids)), func() bool {
+		kinds = map[string]agentrunner.Kind{}
+		for _, id := range ids {
+			label := "one-offs-iter-" + id
+			if k := fake.Kind(label); k != "" {
+				kinds[label] = k
 			}
 		}
-		return len(kinds) >= want
+		return len(kinds) == len(ids)
 	})
 	return kinds
 }
 
-func startOneOffsHarness(t *testing.T, store string) *servertest.Harness {
+func startOneOffsHarness(t *testing.T, store string, opts ...func(*server.Config)) *servertest.Harness {
 	t.Helper()
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
-	return servertest.StartWithStore(t, store, func(c *server.Config) {
+	return servertest.StartWithStore(t, store, append(opts, func(c *server.Config) {
 		c.MaxAgentsPerRoot = 1
 		c.MaxOneOffAgents = 2
 		c.MaxAgents = 10
 		c.PollInterval = 50 * time.Millisecond
-	})
+	})...)
 }
 
 // A claude one-off and a codex one-off run side by side under one cap, each
@@ -114,8 +113,8 @@ func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt", Agent: "claude"})
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "codex"})
-	h := startOneOffsHarness(t, store)
-	h.OnTurn(func(*servertest.Turn) {})
+	fake := runnerfake.NewRunner()
+	h := startOneOffsHarness(t, store, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:one-offs/01", "proj:one-offs/02"} {
@@ -123,7 +122,7 @@ func TestRunner_OneOffsRunClaudeAndCodexUnderOneCap(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
-	got := waitForAgentStarts(t, h, 2)
+	got := waitForAgentKinds(t, fake, "01", "02")
 	if got["one-offs-iter-01"] != "claude" || got["one-offs-iter-02"] != "codex" {
 		t.Errorf("agent kinds = %v, want 01 claude and 02 codex", got)
 	}
@@ -136,8 +135,8 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "01", "a", servertest.TicketOpts{Type: "prompt"})
 	servertest.WriteTicketWith(t, store, "proj", server.OneOffsEpic, "02", "b", servertest.TicketOpts{Type: "prompt", Agent: "nonsense"})
-	h := startOneOffsHarness(t, store)
-	h.OnTurn(func(*servertest.Turn) {})
+	fake := runnerfake.NewRunner()
+	h := startOneOffsHarness(t, store, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	for _, addr := range []string{"proj:one-offs/01", "proj:one-offs/02"} {
@@ -145,7 +144,7 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 			t.Fatalf("add %s: %+v, %v", addr, res, err)
 		}
 	}
-	for name, kind := range waitForAgentStarts(t, h, 2) {
+	for name, kind := range waitForAgentKinds(t, fake, "01", "02") {
 		if kind != "codex" {
 			t.Errorf("%s started as %q, want the queue item's codex", name, kind)
 		}

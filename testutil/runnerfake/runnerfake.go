@@ -17,6 +17,7 @@ type session struct {
 	epic           string
 	cwd            string
 	args           []string
+	kind           agentrunner.Kind
 	resumeID       string
 	status         agentrunner.Status
 	promptErr      error
@@ -139,6 +140,7 @@ func (r *Runner) Start(opts agentrunner.StartOptions) (agentrunner.Session, erro
 		epic:     opts.Epic,
 		cwd:      opts.Cwd,
 		args:     slices.Clone(opts.Args),
+		kind:     opts.Kind,
 		resumeID: opts.ResumeSessionID,
 	}
 	ss.status = agentrunner.Status{State: agentrunner.StateIdle, SessionID: ss.SessionID}
@@ -480,6 +482,17 @@ func (r *Runner) Args(label string) []string {
 		return slices.Clone(ss.args)
 	}
 	return nil
+}
+
+// Kind returns the agent kind the latest session started with label was asked
+// for, including a stopped one.
+func (r *Runner) Kind(label string) agentrunner.Kind {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if ss := r.history[label]; ss != nil {
+		return ss.kind
+	}
+	return ""
 }
 
 // ResumeSessionID returns the ResumeSessionID the latest session started with
