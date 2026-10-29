@@ -9,7 +9,7 @@ import type {
 } from "../generated/server";
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
-import { useWrite } from "../useWrite";
+import { refusalText, useWrite } from "../useWrite";
 import { AutoAdvanceBar, type RunCall } from "./AutoAdvanceBar";
 import type { AutoMenuState } from "./AutoMenu";
 import {
@@ -87,7 +87,7 @@ export function Composer({
   useEffect(() => {
     if (text !== "") setOpen(true);
   }, [text]);
-  const { run: write, pending } = useWrite();
+  const { run: write, pending, refusal, error } = useWrite();
   const enabled = connected && promptable(session) && !pending;
 
   const send = (body: Partial<SessionPromptRequest>, onSent?: () => void) => {
@@ -191,6 +191,16 @@ export function Composer({
     </Button>
   );
 
+  // The caller's reason comes first, then the last refusal in red, else the draft note.
+  const failure = refusal ? refusalText(refusal) : error;
+  const line = reason
+    ? { text: reason, red: false }
+    : failure
+      ? { text: failure, red: true }
+      : text !== ""
+        ? { text: "Draft saved in this browser", red: false }
+        : undefined;
+
   if (!design) {
     return (
       <Box
@@ -228,9 +238,9 @@ export function Composer({
             Send
           </Button>
         </Box>
-        {reason && (
-          <Text fontSize="xs" color="text.dim">
-            {reason}
+        {line && (
+          <Text fontSize="xs" color={line.red ? "tone.deadlocked.fg" : "text.dim"}>
+            {line.text}
           </Text>
         )}
       </Box>

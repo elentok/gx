@@ -67,7 +67,7 @@ function render(sessions: SessionInfo[] | undefined, path = "/agents", live = !!
   const setSessions = (next: SessionInfo[]) => update({ snapshot: { sessions: next } } as Partial<ConnectionState>);
   const goLive = () => update({ liveSnapshot: true });
   const emit = (address: string) => act(() => handlers.forEach((fn) => fn(address)));
-  return { router, setSessions, goLive, emit };
+  return { router, setSessions, goLive, emit, update };
 }
 
 const rows = () => screen.getAllByRole("link").filter((l) => l.getAttribute("href")?.startsWith("#/agents/"));
@@ -349,4 +349,101 @@ test("Enter on a row navigates to it, and Escape closes", () => {
   fireEvent.click(screen.getByRole("button", { name: /needs you/ }));
   fireEvent.keyDown(window, { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+// Answers the prompt POST with `answer`; everything else (focus reports) gets an empty object.
+const prompts: { id: string; text: string }[] = [];
+const stubPrompt = (answer: () => Response) =>
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init: { body: string }) => {
+      if (url !== "/v1/sessions/prompt") return new Response("{}");
+      prompts.push(JSON.parse(init.body));
+      return answer();
+    }),
+  );
+const accepted = () => new Response(JSON.stringify({ refused: false }));
+const refused = (reason: string, message?: string) => () => new Response(JSON.stringify({ refused: true, reason, message }));
+
+const composerBox = () => screen.findByRole("textbox", { name: "Message" }) as Promise<HTMLTextAreaElement>;
+const sendButton = () => screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+const type = async (text: string) => fireEvent.change(await composerBox(), { target: { value: text } });
+
+test("Send is off while Working, with the Working reason, and the box stays editable", async () => {
+  render([session("s-1", "p", { status: { state: "working" } })], "/agents/s-1", true, chatOf(chat()));
+  await type("hi");
+  expect(sendButton().disabled).toBe(true);
+  expect((await composerBox()).value).toBe("hi");
+  expect(screen.getByText("Working. Send turns on when the session is idle.")).toBeTruthy();
+});
+
+test("the reason line names each state in order", async () => {
+  const { update } = render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
+  await composerBox();
+  update({ connected: false });
+  expect(screen.getByText("Offline. Send turns on when gx reconnects.")).toBeTruthy();
+  expect(sendButton().disabled).toBe(true);
+  cleanup();
+  render([session("s-2", "p", { harness: "codex" })], "/agents/s-2", true, chatOf(chat()));
+  expect(await screen.findByText("Sending works for Claude sessions only")).toBeTruthy();
+  cleanup();
+  render([session("s-3", "p", { status: { state: "exited" } })], "/agents/s-3", true, chatOf(chat()));
+  expect(await screen.findByText("Exited. Restore it in gx, Agents tab.")).toBeTruthy();
+  cleanup();
+  render([session("s-4", "p", { status: { state: "rate-limited" } })], "/agents/s-4", true, chatOf(chat()));
+  expect(await screen.findByText("Rate limited. Send turns on when the session is idle.")).toBeTruthy();
+});
+
+test("Idle with text enables Send; accept clears the draft and the box", async () => {
+  prompts.length = 0;
+  stubPrompt(accepted);
+  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
+  expect(sendButton().disabled).toBe(true);
+  await type("hello");
+  expect(screen.getByText("Draft saved in this browser")).toBeTruthy();
+  expect(localStorage.getItem("gx.draft.composer.s-1")).toBe("hello");
+  fireEvent.click(sendButton());
+  await vi.waitFor(() => expect(localStorage.getItem("gx.draft.composer.s-1")).toBeNull());
+  expect(prompts).toEqual([expect.objectContaining({ id: "s-1", text: "hello" })]);
+  expect((await composerBox()).value).toBe("");
+  expect(screen.queryByText("Draft saved in this browser")).toBeNull();
+});
+
+test("a refusal keeps the draft and shows its reason in red, inline", async () => {
+  stubPrompt(refused("prefix-not-allowed", "Messages starting with / or ! are not sent."));
+  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
+  await type("/clear");
+  fireEvent.click(sendButton());
+  const line = await screen.findAllByText("Messages starting with / or ! are not sent.");
+  expect(getComputedStyle(line[0]).color).not.toBe(getComputedStyle(screen.getByText("hello there")).color);
+  expect((await composerBox()).value).toBe("/clear");
+  expect(localStorage.getItem("gx.draft.composer.s-1")).toBe("/clear");
+});
+
+test("stale refetches the chat and keeps the draft", async () => {
+  stubPrompt(refused("stale"));
+  let calls = 0;
+  render([session("s-1", "p")], "/agents/s-1", true, {
+    chat: async () => {
+      calls++;
+      return { kind: "ok", detail: chat() };
+    },
+  });
+  await type("keep me");
+  await vi.waitFor(() => expect(calls).toBe(1));
+  fireEvent.click(sendButton());
+  await vi.waitFor(() => expect(calls).toBe(2));
+  expect((await composerBox()).value).toBe("keep me");
+});
+
+test("the draft is back after a remount, and one written through the store shows in the box", async () => {
+  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
+  await type("draft");
+  cleanup();
+  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
+  expect((await composerBox()).value).toBe("draft");
+  cleanup();
+  localStorage.setItem("gx.draft.composer.s-2", "from the design page");
+  render([session("s-2", "p")], "/agents/s-2", true, chatOf(chat()));
+  expect((await composerBox()).value).toBe("from the design page");
 });

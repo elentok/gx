@@ -11,7 +11,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-const OFF: ChatOptions = { sheet: false, steps: false, gxStopped: false, done: false, restore: false };
+const OFF: ChatOptions = { sheet: false, steps: false, gxStopped: false, done: false, restore: false, composer: true };
 
 const session = (over: Partial<SessionInfo> = {}): SessionInfo => ({
   id: "s-a",

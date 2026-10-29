@@ -133,9 +133,11 @@ export interface ChatOptions {
   done: boolean;
   /** The failure notice's Restore and New session buttons. */
   restore: boolean;
+  /** The design Composer under the chat. Off: the caller renders its own. */
+  composer: boolean;
 }
 
-export const ALL_OPTIONS: ChatOptions = { sheet: true, steps: true, gxStopped: true, done: true, restore: true };
+export const ALL_OPTIONS: ChatOptions = { sheet: true, steps: true, gxStopped: true, done: true, restore: true, composer: true };
 
 // Inline, not the page-centered Spinner: this one sits at the bottom of the chat.
 function WorkingRow({ step, title }: WorkingStep) {
@@ -232,7 +234,7 @@ function ChatTail({
         session.actionable.reason && (
           <GxStopped reason={session.actionable.reason} />
         )}
-      {!done && !replacesComposer(failure) && (
+      {options.composer && !done && !replacesComposer(failure) && (
         <Composer
           session={session}
           lastMessage={chat.messages.at(-1)?.id}
