@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -238,7 +236,7 @@ func TestUnmute_RefusesUnknownTicket(t *testing.T) {
 
 func TestRelaunch_StartsAFreshIterationOfAPausedTicket(t *testing.T) {
 	t.Parallel()
-	h, path := startTicketWrites(t, servertest.WithHerdr(servertest.UntilPtyFixture))
+	h, path := startTicketWrites(t)
 	start, prompt, _ := registerTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -261,16 +259,13 @@ func TestRelaunch_StartsAFreshIterationOfAPausedTicket(t *testing.T) {
 
 func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 	t.Parallel()
-	h, path := startTicketWrites(t, servertest.WithHerdr(servertest.UntilPtyFixture))
-	var closed atomic.Int32
-	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1"}}, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		closed.Add(1)
-		return map[string]any{}, herdrfake.Identities{}, nil
-	})
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr", Session: agentrunner.Session{ID: "p1"}})
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store)
+	_, path := h.LeavePtyRun(t, store, repo, true, nil)
+	h.Restart(t)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -278,8 +273,8 @@ func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 	if err != nil || !res.Refused || res.Reason != server.ReasonTicketLive {
 		t.Fatalf("cancel = %+v, %v; want %s refusal", res, err, server.ReasonTicketLive)
 	}
-	if data, _ := os.ReadFile(path); strings.Contains(string(data), "status: cancelled") || closed.Load() != 0 {
-		t.Fatalf("refused cancel changed things (closed=%d):\n%s", closed.Load(), data)
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), "status: cancelled") || h.Stops() != 0 {
+		t.Fatalf("refused cancel changed things (stops=%d):\n%s", h.Stops(), data)
 	}
 	if res, err := h.Client.TicketCancel(ctx, "proj:epic-a/01", true); err != nil || res.Refused {
 		t.Fatalf("cancel --stop = %+v, %v", res, err)
@@ -287,8 +282,8 @@ func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 	if data, _ := os.ReadFile(path); !strings.Contains(string(data), "status: cancelled") {
 		t.Errorf("ticket not cancelled:\n%s", data)
 	}
-	if closed.Load() != 1 {
-		t.Errorf("tab close calls = %d, want 1", closed.Load())
+	if h.Stops() != 1 {
+		t.Errorf("agent stops = %d, want 1", h.Stops())
 	}
 }
 

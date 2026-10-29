@@ -163,7 +163,8 @@ func assertPauseRecordsRun(t *testing.T, store string, pause events.Type, runner
 		return i >= 0
 	})
 	got := logged[i]
-	if got.Runner != runner || got.Label != session.Label || got.AgentSession != session.SessionID {
+	sessionOK := got.AgentSession == session.SessionID || (session.SessionID == "" && got.AgentSession != "")
+	if got.Runner != runner || got.Label != session.Label || !sessionOK {
 		t.Errorf("pause event runner/label/session = %q/%q/%q, want %q/%q/%q",
 			got.Runner, got.Label, got.AgentSession, runner, session.Label, session.SessionID)
 	}

@@ -13,13 +13,14 @@ import (
 
 func TestFinish_ZeroCommitPauseRecordsRun(t *testing.T) {
 	t.Parallel()
-	t.Run("herdr", func(t *testing.T) {
+	t.Run("pty", func(t *testing.T) {
 		store, repo := t.TempDir(), testutil.TempRepo(t)
 		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 		servertest.SetProjectRepo(t, store, "proj", repo)
-		h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture))
-		runToZeroCommitPauseOnHerdr(t, h, "done")
-		assertPauseRecordsRun(t, store, events.Paused, "herdr", agentrunner.Session{Label: "epic-a-iter-01", SessionID: "s1"})
+		h := servertest.StartWithStore(t, store)
+		runToZeroCommitPause(t, h, "done")
+		// The PTY agent's session id is generated, so any non-empty one will do.
+		assertPauseRecordsRun(t, store, events.Paused, "pty", agentrunner.Session{Label: "epic-a-iter-01"})
 	})
 	t.Run("headless", func(t *testing.T) {
 		store, repo := t.TempDir(), testutil.TempRepo(t)

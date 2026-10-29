@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"slices"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -152,18 +151,18 @@ func restartLaunching(t *testing.T, fake *headlessFake, herdr func(*servertest.H
 	return h, ticketPath
 }
 
-// restartLaunchingPty leaves a launching pty run with no work whose agent is
-// dead, then restarts.
-func restartLaunchingPty(t *testing.T) string {
+// restartLaunchingPty leaves a launching pty run, live or with its agent dead,
+// with work as the agent's, then restarts.
+func restartLaunchingPty(t *testing.T, live bool, work func(wtPath string)) (*servertest.Harness, string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	_, ticketPath := h.LeavePtyRun(t, store, repo, false, nil)
+	_, ticketPath := h.LeavePtyRun(t, store, repo, live, work)
 	markLaunching(t, h)
 	h.Restart(t)
-	return ticketPath
+	return h, ticketPath
 }
 
 func TestReclaim_LaunchingWithNoAgentReopens(t *testing.T) {
@@ -174,7 +173,7 @@ func TestReclaim_LaunchingWithNoAgentReopens(t *testing.T) {
 			fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictDied}
 			_, ticketPath = restartLaunching(t, fake, nil, noWork)
 		} else {
-			ticketPath = restartLaunchingPty(t)
+			_, ticketPath = restartLaunchingPty(t, false, nil)
 		}
 		waitStatus(t, ticketPath, schema.StatusOpen)
 	})
@@ -217,20 +216,9 @@ func TestReclaim_LaunchingIdleAgentIsStoppedThenReopens(t *testing.T) {
 
 func TestReclaim_LaunchingWorkingAgentIsALiveRun(t *testing.T) {
 	t.Parallel()
-	t.Run("herdr", func(t *testing.T) {
-		var finished atomic.Bool
-		h, ticketPath := restartLaunching(t, nil, func(h *servertest.Harness) {
-			registerLiveAgent(h)
-			h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-				status := "working"
-				if finished.Load() {
-					status = "idle"
-				}
-				return map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": status, "state_change_seq": 1}}, herdrfake.Identities{}, nil
-			})
-		}, commitAgentWork, servertest.WithHerdr(servertest.UntilPtyFixture))
+	t.Run("pty", func(t *testing.T) {
+		h, ticketPath := restartLaunchingPty(t, true, func(p string) { commitAgentWork(t, p) })
 		waitReclaimedLive(t, h)
-		finished.Store(true)
 		waitStatus(t, ticketPath, schema.StatusDone)
 	})
 	t.Run("headless", func(t *testing.T) {
