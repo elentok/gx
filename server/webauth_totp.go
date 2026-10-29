@@ -36,6 +36,9 @@ func totpStepAt(t time.Time) int64 {
 	return t.Unix() / int64(totpPeriod/time.Second)
 }
 
+// TOTPStepAt is totpStepAt, exported for gxfixture.
+func TOTPStepAt(t time.Time) int64 { return totpStepAt(t) }
+
 // TOTPCode computes the 6-digit code for a step. It is exported for gxfixture and tests.
 func TOTPCode(secret string, step int64) (string, error) {
 	key, err := totpEncoding.DecodeString(strings.ToUpper(strings.TrimRight(secret, "=")))

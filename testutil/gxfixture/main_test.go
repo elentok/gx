@@ -220,9 +220,9 @@ func (r *running) ticketStatus(t *testing.T, address string) string {
 	return ""
 }
 
-// webClient trusts the root the fixture's server wrote to its state dir. The
-// token URL redirects after setting a cookie, so it keeps cookies.
-func (r *running) webClient(t *testing.T) *http.Client {
+// webClient trusts the root the fixture's server wrote to its state dir. It
+// carries the fixture's login cookie when signedIn.
+func (r *running) webClient(t *testing.T, signedIn bool) *http.Client {
 	t.Helper()
 	pemBytes, err := os.ReadFile(filepath.Join(r.StateDir, "web-tls", "root.pem"))
 	if err != nil {
@@ -236,12 +236,19 @@ func (r *running) webClient(t *testing.T) *http.Client {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if signedIn {
+		u, err := url.Parse(r.WebURL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		jar.SetCookies(u, []*http.Cookie{{Name: r.CookieName, Value: r.Cookie, Path: "/", Secure: true}})
+	}
 	return &http.Client{Jar: jar, Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots}}}
 }
 
-func (r *running) get(t *testing.T, url string) int {
+func (r *running) get(t *testing.T, url string, signedIn bool) int {
 	t.Helper()
-	resp, err := r.webClient(t).Get(url)
+	resp, err := r.webClient(t, signedIn).Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,15 +266,18 @@ func TestScenarios_StartAnswerAndStop(t *testing.T) {
 			if r.StateDir == "" || r.HoldFile == "" || r.Socket == "" {
 				t.Fatalf("output = %+v, want state dir, socket and hold file", r.Output)
 			}
-			if !strings.Contains(r.WebURL, "127.0.0.1") || !strings.Contains(r.WebURL, "token=") {
-				t.Fatalf("web_url = %q, want a loopback URL with the token", r.WebURL)
+			if !strings.Contains(r.WebURL, "127.0.0.1") || strings.Contains(r.WebURL, "?") {
+				t.Fatalf("web_url = %q, want a plain loopback URL", r.WebURL)
 			}
-			if code := r.get(t, r.WebURL); code != http.StatusOK {
-				t.Errorf("GET web_url = %d, want 200", code)
+			if r.Cookie == "" || r.TOTPSecret == "" || r.TOTPStep == 0 {
+				t.Fatalf("output = %+v, want a cookie, a TOTP secret and the last step", r.Output)
 			}
-			bare, _, _ := strings.Cut(r.WebURL, "?")
-			if code := r.get(t, bare); code == http.StatusOK {
-				t.Errorf("GET without the token = %d, want it refused", code)
+			snapshot := r.WebURL + "/v1/snapshot"
+			if code := r.get(t, snapshot, true); code != http.StatusOK {
+				t.Errorf("GET /v1/snapshot with the cookie = %d, want 200", code)
+			}
+			if code := r.get(t, snapshot, false); code == http.StatusOK {
+				t.Errorf("GET /v1/snapshot without the cookie = %d, want it refused", code)
 			}
 			var st struct {
 				Running bool `json:"running"`
@@ -290,14 +300,30 @@ func TestScenarios_StartAnswerAndStop(t *testing.T) {
 	}
 }
 
+func TestFixture_TOTPOffSignsInWithoutASecret(t *testing.T) {
+	t.Parallel()
+	r := startWith(t, "ready", nil, "--config", "server.web.totp=false")
+	if r.Cookie == "" {
+		t.Fatalf("output = %+v, want a cookie", r.Output)
+	}
+	if r.TOTPSecret != "" || r.TOTPStep != 0 {
+		t.Errorf("TOTP secret = %q, step = %d; want none with server.web.totp=false", r.TOTPSecret, r.TOTPStep)
+	}
+	if code := r.get(t, r.WebURL+"/v1/snapshot", true); code != http.StatusOK {
+		t.Errorf("GET /v1/snapshot with the cookie = %d, want 200", code)
+	}
+	r.stop(t)
+}
+
 func TestShellEnv_ExportsTheCLIEnvAndTheFixtureVariablesQuoted(t *testing.T) {
 	o := Output{
-		WebURL: "http://127.0.0.1:1/?token=a b", StateDir: "/tmp/s", Socket: "/tmp/s.sock", HoldFile: "/tmp/h",
+		WebURL: "https://127.0.0.1:1/a b", CookieName: "__Host-gx_login_1", Cookie: "c", StateDir: "/tmp/s", Socket: "/tmp/s.sock", HoldFile: "/tmp/h",
 		Gx: "/bin/gx", DiskDir: "/tmp/disk", HealthDir: "/tmp/health", Env: []string{"HOME=/tmp/it's/home", "XDG_DATA_HOME=/tmp/d"},
 	}
 	want := "export HOME='/tmp/it'\\''s/home'\n" +
 		"export XDG_DATA_HOME='/tmp/d'\n" +
-		"export GXF_WEB_URL='http://127.0.0.1:1/?token=a b'\n" +
+		"export GXF_WEB_URL='https://127.0.0.1:1/a b'\n" +
+		"export GXF_WEB_COOKIE='__Host-gx_login_1=c'\n" +
 		"export GXF_GX='/bin/gx'\n" +
 		"export GXF_DISK_DIR='/tmp/disk'\n" +
 		"export GXF_HEALTH_DIR='/tmp/health'\n" +
@@ -402,7 +428,7 @@ func TestRefusedAskScenario_RefusedFinishThenAskPausesSelfReported(t *testing.T)
 	r.stop(t)
 }
 
-// web is a client of the fixture's web server, with the cookie the token URL sets.
+// web is a client of the fixture's web server, signed in with the fixture's cookie.
 type web struct {
 	client *http.Client
 	origin string
@@ -410,12 +436,7 @@ type web struct {
 
 func (r *running) web(t *testing.T) *web {
 	t.Helper()
-	c := r.webClient(t)
-	resp, err := c.Get(r.WebURL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
+	c := r.webClient(t, true)
 	u, _ := url.Parse(r.WebURL)
 	return &web{client: c, origin: u.Scheme + "://" + u.Host}
 }

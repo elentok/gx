@@ -1,4 +1,5 @@
 import { execFile, spawn } from "node:child_process";
+import { createHmac } from "node:crypto";
 import { readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,8 +11,29 @@ const run = promisify(execFile);
 // A reload drops this window property, so a flow that reloads fails its test.
 const NO_RELOAD = "__gxE2eNoReload";
 
+const TOTP_PERIOD_S = 30;
+const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+
+/** The RFC 6238 six-digit code for `secret` (unpadded base32) at `step`. */
+function totpCode(secret: string, step: number): string {
+  let bits = "";
+  for (const ch of secret.toUpperCase()) bits += B32.indexOf(ch).toString(2).padStart(5, "0");
+  const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
+  const msg = Buffer.alloc(8);
+  msg.writeBigUInt64BE(BigInt(step));
+  const sum = createHmac("sha1", key).update(msg).digest();
+  const offset = sum[sum.length - 1] & 0x0f;
+  return String(sum.readUInt32BE(offset) & 0x7fffffff).slice(-6).padStart(6, "0");
+}
+
 interface FixtureOutput {
   web_url: string;
+  cookie_name: string;
+  cookie: string;
+  /** Absent when the server runs with `server.web.totp=false`. */
+  totp_secret?: string;
+  /** The last TOTP step the fixture used. */
+  totp_step?: number;
   env: string[];
   gx: string;
   hold_file: string;
@@ -38,6 +60,11 @@ export interface Fixture {
   stopServer(): Promise<void>;
   /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
   launches(): Promise<string[][]>;
+  /**
+   * A TOTP code for the fixture's secret, returned only once a step later than the last one used has
+   * begun (up to 30 seconds), since the server takes each step once. Every flow that needs a code uses it.
+   */
+  nextTotpCode(): Promise<string>;
 }
 
 /** The value after `--name` in an argv, or undefined. */
@@ -96,6 +123,7 @@ async function startFixture(
     proc.once("exit", (code) => reject(new Error(`gxfixture exited with ${code} before it printed its output`)));
   });
   const env = { ...process.env, ...Object.fromEntries(out.env.map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)])) };
+  let lastStep = out.totp_step ?? 0;
   const fixture: Fixture = {
     async cli(...args) {
       const { stdout } = await run(out.gx, args, { env, cwd: tmpdir() });
@@ -120,8 +148,22 @@ async function startFixture(
       const ordered = stamped.sort((a, b) => a.at - b.at);
       return Promise.all(ordered.map(async ({ n }) => JSON.parse(await readFile(join(dir, n), "utf8")) as string[]));
     },
+    async nextTotpCode() {
+      if (!out.totp_secret) throw new Error("this fixture runs without TOTP");
+      const deadline = Date.now() + (TOTP_PERIOD_S + 1) * 1000;
+      for (;;) {
+        const step = Math.floor(Date.now() / 1000 / TOTP_PERIOD_S);
+        if (step > lastStep) {
+          lastStep = step;
+          return totpCode(out.totp_secret, step);
+        }
+        if (Date.now() > deadline) throw new Error("no new TOTP step began in time");
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    },
   };
-  // The first visit trades the token in web_url for the web cookie.
+  // The cookie is `__Host-`: set with the URL (secure, no domain), never a domain.
+  await page.context().addCookies([{ name: out.cookie_name, value: out.cookie, url: out.web_url, secure: true }]);
   await page.goto(out.web_url);
   await page.evaluate((key) => ((window as unknown as Record<string, unknown>)[key] = true), NO_RELOAD);
   return { fixture, stop };

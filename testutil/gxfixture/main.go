@@ -48,10 +48,18 @@ import (
 
 // Output is the JSON gxfixture prints once the server answers.
 type Output struct {
-	WebURL   string `json:"web_url"`
-	StateDir string `json:"state_dir"`
-	Socket   string `json:"socket"`
-	HoldFile string `json:"hold_file"`
+	// WebURL is the plain URL: it signs nobody in. Cookie is the web login's
+	// cookie value under CookieName, from the setup the fixture finished.
+	WebURL     string `json:"web_url"`
+	CookieName string `json:"cookie_name"`
+	Cookie     string `json:"cookie"`
+	// TOTPSecret and TOTPStep (the last step used) are left out when the server
+	// runs with server.web.totp=false.
+	TOTPSecret string `json:"totp_secret,omitempty"`
+	TOTPStep   int64  `json:"totp_step,omitempty"`
+	StateDir   string `json:"state_dir"`
+	Socket     string `json:"socket"`
+	HoldFile   string `json:"hold_file"`
 	// Env is what a CLI verb needs to reach this server and no other.
 	Env []string `json:"env"`
 	// Gx is the gx binary the server runs.
@@ -81,6 +89,7 @@ func (o Output) ShellEnv() string {
 		export(k, v)
 	}
 	export("GXF_WEB_URL", o.WebURL)
+	export("GXF_WEB_COOKIE", o.CookieName+"="+o.Cookie)
 	export("GXF_GX", o.Gx)
 	export("GXF_DISK_DIR", o.DiskDir)
 	export("GXF_HEALTH_DIR", o.HealthDir)
@@ -243,9 +252,13 @@ func run(args []string) (err error) {
 	go func() { exited <- srv.Wait() }()
 	defer f.shutdown(srv, exited)
 
-	webURL, err := f.waitReady(ctx, exited)
+	webURL, setupCode, err := f.waitReady(ctx, exited)
 	if err != nil {
 		return fmt.Errorf("%w\n%s", err, f.serverOutput())
+	}
+	in, err := webSetup(f.stateD, webURL, setupCode)
+	if err != nil {
+		return fmt.Errorf("web setup: %w\n%s", err, f.serverOutput())
 	}
 	// --hold freezes every worker as running until the caller removes the hold file.
 	if hold || sc.hold {
@@ -303,7 +316,7 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
-	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath}
+	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath}
 	if cwd, err := os.Getwd(); err == nil {
 		o.BrowserSession = filepath.Base(cwd)
 	}
@@ -678,15 +691,15 @@ func (f *fixture) linkSession(id, addr string) error {
 	return nil
 }
 
-// waitReady polls until the server answers with its web URL.
-func (f *fixture) waitReady(ctx context.Context, exited <-chan error) (string, error) {
+// waitReady polls until the server answers with its web URL and Setup code.
+func (f *fixture) waitReady(ctx context.Context, exited <-chan error) (webURL, setupCode string, err error) {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		select {
 		case err := <-exited:
-			return "", fmt.Errorf("server exited before it answered: %v", err)
+			return "", "", fmt.Errorf("server exited before it answered: %v", err)
 		case <-ctx.Done():
-			return "", ctx.Err()
+			return "", "", ctx.Err()
 		case <-time.After(200 * time.Millisecond):
 		}
 		out, err := f.cli("server", "status", "--json")
@@ -694,14 +707,16 @@ func (f *fixture) waitReady(ctx context.Context, exited <-chan error) (string, e
 			continue
 		}
 		var st struct {
-			Running bool   `json:"running"`
-			WebURL  string `json:"web_url"`
+			Running      bool   `json:"running"`
+			WebURL       string `json:"web_url"`
+			WebSetupCode string `json:"web_setup_code"`
 		}
-		if json.Unmarshal(out, &st) == nil && st.Running && st.WebURL != "" {
-			return st.WebURL, nil
+		if json.Unmarshal(out, &st) == nil && st.Running && st.WebURL != "" && st.WebSetupCode != "" {
+			plain, _, _ := strings.Cut(st.WebURL, "?")
+			return strings.TrimSuffix(plain, "/"), st.WebSetupCode, nil
 		}
 	}
-	return "", errors.New("server did not answer within 30s")
+	return "", "", errors.New("server did not answer within 30s")
 }
 
 func (f *fixture) serverOutput() string {
