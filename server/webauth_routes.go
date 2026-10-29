@@ -19,6 +19,8 @@ const (
 	ReasonTOTPMismatch       = "totp-mismatch"
 	ReasonPasswordTooShort   = "password-too-short"
 	ReasonTOTPOff            = "totp-off"
+	ReasonLoginNotFound      = "login-not-found"
+	ReasonLoginNameInvalid   = "login-name-invalid"
 	webLoginCookiePrefix     = "__Host-gx_login"
 	webLoginCookieMaxAge     = int(webLoginIdleLimit / time.Second)
 	webAuthBodyMax           = 4 << 10
@@ -28,6 +30,9 @@ const (
 	webAuthPathLogin         = "/v1/web/auth/login"
 	webAuthPathAddAuth       = "/v1/web/auth/add-authenticator"
 	webAuthPathSignOut       = "/v1/web/auth/sign-out"
+	webAuthPathLogins        = "/v1/web/logins"
+	webAuthPathLoginRename   = "/v1/web/logins/rename"
+	webAuthPathLoginRevoke   = "/v1/web/logins/revoke"
 	webAuthStateSetup        = "setup"
 	webAuthStateSignedOut    = "signed-out"
 	webAuthStateSignedIn     = "signed-in"
@@ -65,6 +70,18 @@ type webAuthBody struct {
 	PendingID string `json:"pending_id"`
 	// SetupCode is the Setup code a login needs after the CLI reset.
 	SetupCode string `json:"setup_code"`
+	// ID and Name pick a web login and give it a new name (the logins routes).
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type webLoginEntry struct {
+	WebLogin
+	ThisDevice bool `json:"this_device"`
+}
+
+type webLoginList struct {
+	Logins []webLoginEntry `json:"logins"`
 }
 
 type webLoginKey struct{}
@@ -305,6 +322,63 @@ func (s *Server) webAddAuthenticator(w http.ResponseWriter, r *http.Request) {
 	}
 	s.logWebLogin("web login", ip, cookie)
 	s.setLoginCookie(w, cookie, webLoginCookieMaxAge)
+	writeJSON(w, webAuthResult{})
+}
+
+// webLoginsList lists the web logins and marks the one the request came in with.
+func (s *Server) webLoginsList(w http.ResponseWriter, r *http.Request) {
+	this := webLoginIDFrom(r.Context())
+	out := webLoginList{Logins: []webLoginEntry{}}
+	for _, l := range s.webAuth.List() {
+		out.Logins = append(out.Logins, webLoginEntry{WebLogin: l, ThisDevice: l.ID == this})
+	}
+	writeJSON(w, out)
+}
+
+// refuseWebLogin answers a rename or revoke error with its refusal and logs it.
+func (s *Server) refuseWebLogin(w http.ResponseWriter, r *http.Request, event string, err error) {
+	reason := ""
+	switch {
+	case errors.Is(err, ErrWebLoginNotFound):
+		reason = ReasonLoginNotFound
+	case errors.Is(err, ErrWebLoginNameInvalid):
+		reason = ReasonLoginNameInvalid
+	default:
+		s.log.Error("web auth failed", "event", event, "ip", remoteIP(r), "err", err)
+		http.Error(w, "web auth unavailable", http.StatusInternalServerError)
+		return
+	}
+	s.logWebAuth(event, remoteIP(r), "", reason)
+	writeJSON(w, webAuthResult{Refused: true, Reason: reason})
+}
+
+func (s *Server) webLoginRename(w http.ResponseWriter, r *http.Request) {
+	body, ok := readWebAuthBody(w, r)
+	if !ok {
+		return
+	}
+	if err := s.webAuth.RenameLogin(body.ID, body.Name); err != nil {
+		s.refuseWebLogin(w, r, "web login rename refused", err)
+		return
+	}
+	s.logWebAuth("web login renamed", remoteIP(r), body.Name, "")
+	writeJSON(w, webAuthResult{})
+}
+
+// webLoginRevoke signs one web login out and ends its event streams.
+func (s *Server) webLoginRevoke(w http.ResponseWriter, r *http.Request) {
+	body, ok := readWebAuthBody(w, r)
+	if !ok {
+		return
+	}
+	name := s.webLoginName(body.ID)
+	removed, err := s.webAuth.RevokeLogin(body.ID)
+	if err != nil {
+		s.refuseWebLogin(w, r, "web login revoke refused", err)
+		return
+	}
+	s.logWebAuth("web login revoked", remoteIP(r), name, "")
+	s.webStreams.closeLogins(removed...)
 	writeJSON(w, webAuthResult{})
 }
 
