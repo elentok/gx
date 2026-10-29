@@ -311,7 +311,8 @@ func TestLateFinish_FailedConditionStaysPaused(t *testing.T) {
 		mutate func(p zeroCommitPaused) func(*schema.Ticket)
 	}{
 		{"status changed", true, func(p zeroCommitPaused) func(*schema.Ticket) {
-			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.Status = schema.StatusOpen }
+			// Not open: an open ticket is a launch candidate, and the loop would run it to done.
+			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.Status = schema.StatusCancelled }
 		}},
 		{"reclaimed", true, func(p zeroCommitPaused) func(*schema.Ticket) {
 			return func(tk *schema.Ticket) { p.finishedLate(false)(tk); tk.Status = schema.StatusClaimed }

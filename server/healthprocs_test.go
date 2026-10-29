@@ -223,11 +223,16 @@ func TestHealthProcs_WaitReturnsUnavailableWhenTheSecondReadFails(t *testing.T) 
 	}
 }
 
+// blockedReadDelay is the second-read delay of the tests that block it: the
+// first report schedules that read, and it must not start before Block runs.
+// No test waits for the delay.
+const blockedReadDelay = 5 * time.Second
+
 // Seam: a second read that never ends gives the reading marker after the cap (story 49).
 func TestHealthProcs_WaitCapsAndAnswersReading(t *testing.T) {
 	t.Parallel()
 	waitCap := 150 * time.Millisecond
-	h := startProcs(t, procTiming{delay: 5 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second, waitCap: waitCap},
+	h := startProcs(t, procTiming{delay: blockedReadDelay, window: 50 * time.Millisecond, cutoff: 10 * time.Second, waitCap: waitCap},
 		proc(10, "a", 400, 10))
 	health(t, h, false)
 	h.Processes.Block()
@@ -244,7 +249,7 @@ func TestHealthProcs_WaitCapsAndAnswersReading(t *testing.T) {
 // Seam: a wait call stops when its request context ends.
 func TestHealthProcs_WaitStopsWithTheRequestContext(t *testing.T) {
 	t.Parallel()
-	h := startProcs(t, procTiming{delay: 5 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
+	h := startProcs(t, procTiming{delay: blockedReadDelay, window: 50 * time.Millisecond, cutoff: 10 * time.Second},
 		proc(10, "a", 400, 10))
 	health(t, h, false)
 	h.Processes.Block()

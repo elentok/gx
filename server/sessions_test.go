@@ -594,12 +594,12 @@ func startFakeSessionWith(t *testing.T, req server.CreateSessionRequest, opts ..
 	return h, ctx, evs, id, conv
 }
 
-// waitForSession waits for a session-changed event after which the
-// snapshot's session id satisfies ok.
+// waitForSession waits until the snapshot's session id satisfies ok. It reads
+// the snapshot before each wait: a change that landed together with the one
+// the caller just waited for sends no further event.
 func waitForSession(ctx context.Context, t *testing.T, h *servertest.Harness, evs <-chan server.Event, id string, ok func(server.SessionInfo) bool) server.SessionInfo {
 	t.Helper()
 	for {
-		servertest.WaitForEvent(ctx, t, evs, server.EventSessionChanged, id)
 		snap, err := h.Client.Snapshot(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -609,6 +609,7 @@ func waitForSession(ctx context.Context, t *testing.T, h *servertest.Harness, ev
 				return s
 			}
 		}
+		servertest.WaitForEvent(ctx, t, evs, server.EventSessionChanged, id)
 	}
 }
 
