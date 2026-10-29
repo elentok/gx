@@ -17,6 +17,7 @@ const state: ConnectionState = {
   snapshot: undefined as unknown as ConnectionState["snapshot"],
   connected: true,
   loadedOnce: true,
+  liveSnapshot: true,
   tick: 0,
   streams: 0,
 };

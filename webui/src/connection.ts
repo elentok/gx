@@ -13,6 +13,8 @@ export interface ConnectionState {
   /** False once the link has been down for OFFLINE_DELAY_MS; drives the Offline strip. */
   connected: boolean;
   loadedOnce: boolean;
+  /** False until the current connection's first server snapshot lands; a cached copy does not count. */
+  liveSnapshot: boolean;
   /** Bumps every TICK_MS while the tab is visible so relative times re-render. */
   tick: number;
   /** Counts event streams opened so far; a focus report counts only while a stream is open. */
@@ -69,7 +71,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
   const clientId = deps.clientId ?? `web-${randomId()}`;
 
   const cached = deps.cache?.load() ?? null;
-  let state: ConnectionState = { snapshot: cached, connected: true, loadedOnce: cached !== null, tick: 0, streams: 0 };
+  let state: ConnectionState = { snapshot: cached, connected: true, loadedOnce: cached !== null, liveSnapshot: false, tick: 0, streams: 0 };
   const listeners = new Set<() => void>();
   const eventListeners = new Set<EventListener>();
   let gen = 0;
@@ -116,6 +118,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
 
   function fail() {
     teardown();
+    if (state.liveSnapshot) set({ liveSnapshot: false });
     markDown();
     retry = setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
@@ -182,6 +185,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
 
   async function connect() {
     teardown();
+    if (state.liveSnapshot) set({ liveSnapshot: false });
     const g = gen;
     let snap: Snapshot;
     try {
@@ -192,7 +196,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
     }
     if (g !== gen) return;
     backoff = BACKOFF_MIN_MS;
-    set({ snapshot: snap, loadedOnce: true });
+    set({ snapshot: snap, loadedOnce: true, liveSnapshot: true });
     void consume(g, snap.seq);
   }
 

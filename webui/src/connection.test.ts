@@ -307,6 +307,40 @@ test("the last snapshot stays on drop", async () => {
   conn.stop();
 });
 
+test("liveSnapshot is false for a cached copy, true after the first fetch, false until a reconnect's snapshot lands", async () => {
+  let failing = false;
+  const streams: { end(): void }[] = [];
+  const conn = createConnection({
+    cache: { load: () => emptySnapshot(7), save: () => {} },
+    fetchSnapshot: async () => {
+      if (failing) throw new Error("down");
+      return emptySnapshot(8);
+    },
+    openStream: async () => {
+      let end!: () => void;
+      const done = new Promise<void>((r) => (end = r));
+      streams.push({ end });
+      return (async function* () {
+        await done;
+      })();
+    },
+  });
+  expect(conn.getState()).toMatchObject({ loadedOnce: true, liveSnapshot: false });
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(conn.getState().liveSnapshot).toBe(true);
+
+  failing = true;
+  streams[0].end();
+  await vi.advanceTimersByTimeAsync(1000);
+  expect(conn.getState().liveSnapshot).toBe(false);
+
+  failing = false;
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(conn.getState().liveSnapshot).toBe(true);
+  conn.stop();
+});
+
 test("a cached snapshot is the first state and each fresh one is saved", async () => {
   let saved: Snapshot | null = emptySnapshot(7);
   const conn = createConnection({
