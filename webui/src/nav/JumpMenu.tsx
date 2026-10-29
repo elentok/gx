@@ -209,7 +209,7 @@ function Menu({
           onKeyDown={onKeyDown}
         />
         {phone && (
-          <Button emphasis="ghost" onClick={onClose}>
+          <Button emphasis="ghost" tone="muted" onClick={onClose}>
             Close
           </Button>
         )}

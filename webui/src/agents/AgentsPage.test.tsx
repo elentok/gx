@@ -603,6 +603,23 @@ test("phone: a session shows ‹, the title button and project · status, and �
   expect(screen.getByRole("link", { name: "All sessions" }).getAttribute("href")).toBe("#/agents");
 });
 
+test("phone: the title button opens a full-screen switcher with Close, and Close dismisses it", () => {
+  render([session("s-1", "gx", { name: "plain" })], "/agents/s-1", true, {}, false);
+  fireEvent.click(screen.getByRole("button", { name: /plain/ }));
+  const d = dialog();
+  expect(getComputedStyle(d.getByRole("combobox").closest("[role=dialog]")!).position).toBe("fixed");
+  fireEvent.click(d.getByRole("button", { name: "Close" }));
+  expect(screen.queryByRole("dialog", { name: "Switch session" })).toBeNull();
+});
+
+test("phone: the switcher's New session row opens the form as a sheet", async () => {
+  render([session("s-1", "gx", { name: "plain" })], "/agents/s-1", true, entryOptions, false);
+  fireEvent.click(screen.getByRole("button", { name: /plain/ }));
+  fireEvent.click(dialog().getByText("+ New session"));
+  const form = await screen.findByRole("dialog", { name: "New session" });
+  expect(within(form).getByTestId("grab-handle")).toBeTruthy();
+});
+
 test("phone: the gone panel links back to the sessions", () => {
   render([session("s-1", "p")], "/agents/nope", true, {}, false);
   expect(screen.getByRole("link", { name: "Back to sessions" }).getAttribute("href")).toBe("#/agents");
