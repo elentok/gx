@@ -22,6 +22,22 @@ const (
 // maxSessionPromptBytes caps the text one send types.
 const maxSessionPromptBytes = 32 * 1024
 
+// validatePromptText normalizes text typed into a session and refuses a
+// slash or bang prefix and an oversized text. Empty text passes: each route
+// decides whether that is allowed. what names the text in refusal messages.
+func validatePromptText(text, what string) (string, *SessionResult) {
+	text = strings.TrimSpace(normalizeAnswer(text))
+	switch {
+	case strings.HasPrefix(text, "/") || strings.HasPrefix(text, "!"):
+		res := sessionRefusal(ReasonPromptPrefixNotAllowed, what+" may not start with / or !")
+		return text, &res
+	case len(text) > maxSessionPromptBytes:
+		res := sessionRefusal(ReasonPromptTextTooLong, fmt.Sprintf("%s is over %d bytes", what, maxSessionPromptBytes))
+		return text, &res
+	}
+	return text, nil
+}
+
 // Sources of a session prompt, as the event's source.
 const (
 	promptSourceWeb = "web"
@@ -79,15 +95,13 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 	if meta.Harness != s.settings.Load().chatHarness() {
 		return sessionRefusal(ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
 	}
-	text := strings.TrimSpace(normalizeAnswer(req.Text))
+	text, refusal := validatePromptText(req.Text, "text")
 	if !req.Continue {
-		switch {
-		case text == "":
+		if refusal != nil {
+			return *refusal, nil
+		}
+		if text == "" {
 			return sessionRefusal(ReasonEmptyPrompt, "text to type is required"), nil
-		case strings.HasPrefix(text, "/") || strings.HasPrefix(text, "!"):
-			return sessionRefusal(ReasonPromptPrefixNotAllowed, "text may not start with / or !"), nil
-		case len(text) > maxSessionPromptBytes:
-			return sessionRefusal(ReasonPromptTextTooLong, fmt.Sprintf("text is over %d bytes", maxSessionPromptBytes)), nil
 		}
 	}
 	if source == promptSourceWeb {

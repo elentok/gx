@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"path/filepath"
 	"slices"
-	"strings"
 )
 
 // WebCreateSessionRequest is the body of POST /v1/sessions/create on the web
@@ -42,8 +41,9 @@ func (s *Server) sessionCreateWeb(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) createWebSession(req WebCreateSessionRequest) (SessionResult, error) {
-	if p := strings.TrimSpace(req.Prompt); strings.HasPrefix(p, "/") || strings.HasPrefix(p, "!") {
-		return sessionRefusal(ReasonPromptPrefixNotAllowed, "the first prompt may not start with / or !"), nil
+	prompt, refusal := validatePromptText(req.Prompt, "the first prompt")
+	if refusal != nil {
+		return *refusal, nil
 	}
 	list, err := s.listProjectWorktrees()
 	if err != nil {
@@ -65,7 +65,7 @@ func (s *Server) createWebSession(req WebCreateSessionRequest) (SessionResult, e
 		Dir:      req.Dir,
 		Worktree: req.Worktree,
 		Name:     req.Name,
-		Prompt:   req.Prompt,
+		Prompt:   prompt,
 		Harness:  s.settings.Load().chatHarness(),
 	})
 }

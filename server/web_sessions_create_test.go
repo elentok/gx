@@ -62,6 +62,7 @@ func TestWebSessionCreate_Refusals(t *testing.T) {
 		"not json":        {`nope`, server.ReasonSessionBadRequest},
 		"slash prompt":    {`{"project":"proj","dir":"` + root + `","prompt":"/clear"}`, server.ReasonPromptPrefixNotAllowed},
 		"bang prompt":     {`{"project":"proj","dir":"` + root + `","prompt":" !ls"}`, server.ReasonPromptPrefixNotAllowed},
+		"long prompt":     {`{"project":"proj","dir":"` + root + `","prompt":"` + strings.Repeat("a", 32*1024+1) + `"}`, server.ReasonPromptTextTooLong},
 		"unknown project": {`{"project":"nope","dir":"` + root + `"}`, server.ReasonSessionBadRequest},
 		"foreign dir":     {`{"project":"proj","dir":"` + t.TempDir() + `"}`, server.ReasonSessionBadRequest},
 		"bad worktree":    {`{"project":"proj","worktree":"../escape"}`, server.ReasonSessionBadRequest},
