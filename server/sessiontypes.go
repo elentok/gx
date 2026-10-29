@@ -3,6 +3,8 @@ package server
 import (
 	"cmp"
 	"time"
+
+	"github.com/elentok/gx/ralphloop"
 )
 
 // SessionInfo is an interactive session on the wire: everything the Agents
@@ -150,6 +152,8 @@ type CreateSessionRequest struct {
 	// remoteControl is the --remote-control name, saved in the meta so resumes
 	// keep it whatever the setting says by then.
 	remoteControl string
+	// tier is the model tier; empty means worker.
+	tier ralphloop.Tier
 }
 
 // SessionResult is a session write's outcome: the session, or a refusal.
@@ -184,6 +188,12 @@ type sessionMeta struct {
 	// RemoteControl is the name a Claude fix-agent session was started with
 	// --remote-control under; empty means the flag was never applied.
 	RemoteControl string `json:"remote_control,omitempty"`
+	// Tier, Model and Effort are what the session launched under, saved so a
+	// resume keeps them whatever the settings say by then. A session from before
+	// tiers has none, and its resume passes no model or effort flag.
+	Tier   ralphloop.Tier `json:"tier,omitempty"`
+	Model  string         `json:"model,omitempty"`
+	Effort string         `json:"effort,omitempty"`
 	// FirstPrompt waits for the ready report or the first Idle; it is cleared
 	// once typed or on exit.
 	FirstPrompt string `json:"first_prompt,omitempty"`

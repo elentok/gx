@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -154,7 +155,16 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 			req.Name = req.Worktree
 		}
 	}
+	tier := cmp.Or(req.tier, ralphloop.TierWorker)
+	agent := ralphloop.AgentClaude
+	if req.Harness == string(harness.Codex) {
+		agent = ralphloop.AgentCodex
+	}
+	model, effort := ralphloop.ResolveTier(s.agentsConfig(req.Project), agent, tier)
 	meta := sessionMeta{
+		Tier:           tier,
+		Model:          model,
+		Effort:         effort,
 		Harness:        req.Harness,
 		Project:        req.Project,
 		Dir:            req.Dir,
@@ -405,19 +415,46 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 	return nil
 }
 
-// launchArgs is the extra harness args of a launch or resume. Only Claude gets
-// any; the remote-control name comes from the meta, never the settings.
+// launchArgs is the extra harness args of a launch or resume. Only Claude and
+// Codex get any. The model, effort and remote-control name come from the meta,
+// never the settings, so a resume keeps what the launch used.
 func launchArgs(meta *sessionMeta, claudeArgs []string) []string {
-	if meta.Harness != string(harness.Claude) {
+	switch meta.Harness {
+	case string(harness.Codex):
+		var args []string
+		if meta.Model != "" {
+			args = append(args, "--model", meta.Model)
+		}
+		if meta.Effort != "" {
+			args = append(args, "-c", fmt.Sprintf("model_reasoning_effort=%q", meta.Effort))
+		}
+		return args
+	case string(harness.Claude):
+	default:
 		return nil
 	}
+	args := slices.Clone(claudeArgs)
 	if meta.Design {
-		claudeArgs = agentrunner.WithDesignDisallowedTools(claudeArgs)
+		args = agentrunner.WithDesignDisallowedTools(args)
 	}
-	if meta.RemoteControl == "" {
-		return claudeArgs
+	// A configured flag wins over the tier for its knob.
+	if meta.Model != "" && !hasFlag(claudeArgs, "--model") {
+		args = append(args, "--model", meta.Model)
 	}
-	return append(slices.Clone(claudeArgs), "--remote-control", meta.RemoteControl)
+	if meta.Effort != "" && !hasFlag(claudeArgs, "--effort") {
+		args = append(args, "--effort", meta.Effort)
+	}
+	if meta.RemoteControl != "" {
+		args = append(args, "--remote-control", meta.RemoteControl)
+	}
+	return args
+}
+
+// hasFlag reports whether args hold flag, bare or as flag=value.
+func hasFlag(args []string, flag string) bool {
+	return slices.ContainsFunc(args, func(a string) bool {
+		return a == flag || strings.HasPrefix(a, flag+"=")
+	})
 }
 
 // endFailedStart saves a session whose holder did not start as Exited

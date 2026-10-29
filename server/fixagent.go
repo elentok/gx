@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -127,6 +128,7 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 		UniqueName: true,
 		Prompt:     fixAgentPrompt(addr, t),
 		Harness:    settings.chatHarness(),
+		tier:       ralphloop.TierStrongest,
 	}
 	remote := settings.AgentsFixAgentRemoteControl && cs.Harness == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
 	if remote {
