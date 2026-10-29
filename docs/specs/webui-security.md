@@ -395,9 +395,10 @@ from an authenticator app.
 ### Routes
 
 Web-only routes are served on the web mux only. They are not in `routeTable` and have no CLI verb.
-The spec amends ADR 0028: "A route is web-only when it needs the web login cookie, or when a browser
-needs it before login. Web-only routes are listed in one place in `server`, and a test checks that
-list against the web mux. A CLI action with the same effect is a separate socket route with its own
+The spec amends ADR 0028: "A route is web-only when it exists only on the web mux: the web auth and
+account routes and the public files a browser needs before login. A route the socket also serves is
+not web-only, even when the web mux asks it for the web login cookie. Web-only routes are listed in
+one place in `server`, and a test checks that list against the web mux. A CLI action with the same effect is a separate socket route with its own
 verb, because a local shell skips the browser's checks (cookie, password, TOTP code)." The
 implementer picks the paths. The list:
 
@@ -430,9 +431,14 @@ The opt-in loopback TCP listener (`server.tcp-listen`) serves the same handler a
 auth, so any web page in a browser on the machine can reach it. It gains one browser check in front
 of every route: a request with an `Origin` or a `Sec-Fetch-Site` header, or with a Host that is not
 `localhost` or a loopback IP (with or without a port), is refused with 403 and logged at most once a
-minute. The CLI and other local clients send none of these headers, so they keep working. Every
-route, the account routes included, is then served the same on the socket and the TCP listener;
-there is no per-route split.
+minute. Scripts and other local HTTP clients send none of these headers, so they keep working (the
+CLI always uses the unix socket). Every route, the account routes included, is then served the same
+on the socket and the TCP listener; there is no per-route split.
+
+`make web-dev-proxy` and `GX_WEBUI_PROXY` go away: the browser behind that Vite proxy sends `Origin`
+and `Sec-Fetch-Site`, so the check would refuse it. `server.web.dev-url` (story 103) is the only way
+to run the dev UI against a real server. The Makefile, `webui/vite.config.ts` and any docs that name
+the proxy mode change with it.
 
 ### CLI commands
 
@@ -502,9 +508,10 @@ gets a 401 on reconnect and shows login.
   gets the 403. The implementer picks the redirect status.
 - `WebURL()` returns `https://<host>:<port>`, with the listen port and the first match of:
   1. the first entry of `server.web.allowed-hosts` that the root's constraints permit;
-  2. the listen IP, when it is not unspecified;
-  3. for a `0.0.0.0`, `::` or empty listen host, the first local interface IP in the private,
-     tailnet or ULA ranges, else `localhost`.
+  2. the listen IP, when it is not unspecified and is inside the root's IP ranges;
+  3. otherwise, the first local interface IP in the private, tailnet or ULA ranges, else
+     `localhost`.
+  The URL is built with `net.JoinHostPort`, so an IPv6 address gets brackets.
   `gx server status`, `gx server web-url`, the QR code and the design links in session banners all
   use it.
 - The dev frontend proxy keeps working behind TLS. Vite modules are public, like the built assets.
@@ -588,15 +595,17 @@ Seams:
    Certificate tests parse the root and leaf with `crypto/x509` and check every field listed under
    TLS, verify the leaf against the root, and check that a name outside the constraints fails
    `Verify`. A plist test parses the `.mobileconfig`. A table for the base URL rule covers an
-   allowed host inside the constraints, one outside, a specific listen IP, and an unspecified
-   listen IP with and without a private interface IP.
+   allowed host inside the constraints, one outside, a private listen IP, a public listen IP (falls
+   to rule 3), an IPv6 listen IP (bracketed), and an unspecified listen IP with and without a
+   private interface IP.
 3. **CLI.** `cmd` tests against the servertest harness, as `cmd/server_web_test.go` does today: status
    text and `--json`, `web-url` with and without `--qr`, `web-reset` with `--yes` and without a
    terminal, list, revoke, change password from stdin, reset authenticator with a code computed in
    the test, `server-not-running`, "the web UI is off", and the base URL `status` and `web-url` print
-   for an allowed host and for a `0.0.0.0` listen address. Plus `TestRouteTableHasCLIVerbs`, the
-   TCP listener's browser check (a CLI call passes; `Origin`, `Sec-Fetch-Site` and a non-loopback
-   Host each get 403), and the new web-only route list test next to `TestWeb_EverythingElseIs404`.
+   for an allowed host set before the root is made and for a `0.0.0.0` listen address. Plus
+   `TestRouteTableHasCLIVerbs`, the TCP listener's browser check through
+   `servertest.StartWithTCP` (a plain `net/http` request with a loopback Host passes; `Origin`,
+   `Sec-Fetch-Site` and a non-loopback Host each get 403), and the new web-only route list test next to `TestWeb_EverythingElseIs404`.
 4. **Web.** Vitest for the auth gate, the fetch helper's 401 path and cache clearing, the login,
    setup and Settings pages in every mock state, the error boundary, and the error reporter. A
    gallery entry per mock state. Prior art: `webui/src/connection.test.ts`,
@@ -606,8 +615,9 @@ Seams:
    returned secret, and puts the cookie in its JSON. `fixture.ts` adds the cookie to the browser
    context, and Playwright ignores the self-made certificate. The running server has no test clock
    and refuses a TOTP code from a step it already accepted, so `fixture.ts` gets one helper that
-   returns a code for a secret only after waiting for a step later than the last code it handed out
-   for that secret (up to 30 seconds). `gxfixture` does the same for its setup code. Every flow
+   returns a code for a secret only after waiting for a step later than the last step used for that
+   secret (up to 30 seconds). The fixture JSON carries the last TOTP step `gxfixture` used to finish
+   setup, and the helper starts from it. Every flow
    gets TOTP codes through this helper, never by computing them itself. New scenarios:
    - `web-setup`: setup pending, page not signed in.
    - `web-login`: setup done, page not signed in. The fixture JSON carries the password and the
@@ -812,13 +822,13 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
      without the list. Shell check: ADR 0028 has the amendment.
 103. Go test (seam 1): with `server.web.dev-url` set to a stub on loopback, a module request is
      proxied over HTTPS without a cookie and an API request still needs one.
-104. Server check: with `server.tcp-listen` on, `curl http://127.0.0.1:7421/v1/snapshot` answers
-     200, and the same call with `-H 'Origin: http://evil.example'`, with
-     `-H 'Sec-Fetch-Site: cross-site'`, or with `-H 'Host: evil.example'` answers 403. A CLI command
-     over the TCP listener works. Go test (seam 3).
-105. CLI check: in a fixture with an allowed host, `gx server web-url` and `gx server web-url --qr`
-     use that host. Go test (seam 2): the base URL table. Go test (seam 3): with a `0.0.0.0` listen
-     address, `gx server status` prints a private interface IP or `localhost`, never `0.0.0.0`.
+104. Go test (seam 3, `servertest.StartWithTCP`): a plain request to `/v1/snapshot` answers 200;
+     the same request with `Origin: http://evil.example`, with `Sec-Fetch-Site: cross-site`, or
+     with `Host: evil.example` answers 403. Shell check: `rg` finds no `GX_WEBUI_PROXY` or
+     `web-dev-proxy` outside `CHANGELOG.md`.
+105. Go test (seam 2): the base URL table. Go test (seam 3): with an allowed host set before the
+     root is made, `gx server web-url` and `--qr` use that host; with a `0.0.0.0` listen address,
+     `gx server status` prints a private interface IP or `localhost`, never `0.0.0.0`.
 
 **Mock states** (each line: mock path, state, width, fixture scenario, parts):
 
