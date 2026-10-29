@@ -1,5 +1,5 @@
 import { Box, chakra, Heading, Input, Text } from "@chakra-ui/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { CardActionAnswer, CardKindDesign,SectionNeedsYou, SectionReadyToDesign, SectionFinished, type EpicListRow } from "../generated/server";
 import { designHref } from "../hrefs";
@@ -7,7 +7,7 @@ import { useWide } from "../useWide";
 import { titleHref } from "../epics/cardLinks";
 import { isCurrent } from "../epics/list";
 import { isLive, RING_KIND, ringProgress, ringTone } from "../epics/ring";
-import { sectionsOf, type Section } from "../epics/view";
+import { sectionsOf } from "../epics/view";
 import { Button } from "../ui/button/Button";
 import { titleSize } from "./titleSize";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
@@ -21,30 +21,47 @@ export const jumpHref = (row: EpicListRow): string =>
     ? designHref(row.address)
     : (row.actions?.find((a) => a.kind === CardActionAnswer)?.link ?? titleHref(row));
 
-/** Ready to design and Finished show only while the filter has text. */
-function visibleSections(epics: EpicListRow[], query: string): Section[] {
-  const searching = query.trim() !== "";
-  return sectionsOf(epics, query).filter(
-    (s) => s.rows.length > 0 && (searching || (s.key !== SectionReadyToDesign && s.key !== SectionFinished)),
-  );
+/** One row of a row list. `href` is a hash link, such as `#/e/demo:blog`. */
+export type ListRowData = {
+  key: string;
+  title: string;
+  subtitle: string;
+  href: string;
+  /** The filter matches this text, case-insensitively. */
+  searchText: string;
+  lead?: ReactNode;
+  trailing?: ReactNode;
+  current?: boolean;
+};
+
+export type ListSection = {
+  key: string;
+  title: string;
+  rows: ListRowData[];
+  /** Hidden while the filter is empty. */
+  hiddenUntilSearch?: boolean;
+};
+
+function visibleSections(sections: ListSection[], query: string): ListSection[] {
+  const q = query.trim().toLowerCase();
+  return sections
+    .map((s) => (q ? { ...s, rows: s.rows.filter((r) => r.searchText.toLowerCase().includes(q)) } : s))
+    .filter((s) => s.rows.length > 0 && (q !== "" || !s.hiddenUntilSearch));
 }
 
-export function JumpRow({
+export function ListRow({
   row,
-  current = false,
   active = false,
   onPick,
   id,
 }: {
-  row: EpicListRow;
-  current?: boolean;
+  row: ListRowData;
   /** The keyboard cursor is on this row. */
   active?: boolean;
   onPick?: () => void;
   id?: string;
 }) {
-  const kind = RING_KIND[row.card_kind ?? "implementation"];
-  const needsYou = row.section === SectionNeedsYou;
+  const current = row.current ?? false;
   return (
     <Box
       id={id}
@@ -62,10 +79,10 @@ export function JumpRow({
       _hover={{ bg: "surface" }}
       onClick={onPick}
     >
-      <ProgressRing progress={ringProgress(row)} tone={ringTone(row)} kind={kind} size="compact" live={isLive(row)} />
+      {row.lead}
       <Box minW="0" flex="1">
         <Text fontFamily="condensed" fontSize="16px" fontWeight="600" lineClamp="1">
-          {row.name}
+          {row.title}
           {current && (
             <Text as="span" ml="2" fontSize="13px" color="text.dim" fontWeight="400">
               current
@@ -73,32 +90,66 @@ export function JumpRow({
           )}
         </Text>
         <Text fontSize="13px" color="text.dim" lineClamp="1">
-          {row.project} · {needsYou ? row.state_pill : row.status_words}
+          {row.subtitle}
         </Text>
       </Box>
+      {row.trailing}
     </Box>
   );
 }
 
+function epicRow(row: EpicListRow, current: boolean): ListRowData {
+  const kind = RING_KIND[row.card_kind ?? "implementation"];
+  const needsYou = row.section === SectionNeedsYou;
+  return {
+    key: row.address,
+    title: row.name,
+    subtitle: `${row.project} · ${needsYou ? row.state_pill : row.status_words}`,
+    href: jumpHref(row),
+    searchText: row.name,
+    current,
+    lead: <ProgressRing progress={ringProgress(row)} tone={ringTone(row)} kind={kind} size="compact" live={isLive(row)} />,
+  };
+}
+
+/** An epic as a row; gallery cases render it on its own. */
+export function JumpRow({
+  row,
+  current = false,
+  active = false,
+  onPick,
+  id,
+}: {
+  row: EpicListRow;
+  current?: boolean;
+  active?: boolean;
+  onPick?: () => void;
+  id?: string;
+}) {
+  return <ListRow row={epicRow(row, current)} active={active} onPick={onPick} id={id} />;
+}
+
 function Menu({
-  epics,
-  current,
+  sections: all,
+  label,
+  placeholder,
   phone,
   onClose,
 }: {
-  epics: EpicListRow[];
-  current: string;
+  sections: ListSection[];
+  label: string;
+  placeholder: string;
   phone: boolean;
   onClose: () => void;
 }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
-  const sections = useMemo(() => visibleSections(epics, query), [epics, query]);
+  const sections = useMemo(() => visibleSections(all, query), [all, query]);
   const flat = sections.flatMap((s) => s.rows);
-  const pick = (row: EpicListRow) => {
+  const pick = (row: ListRowData) => {
     onClose();
-    navigate(jumpHref(row).slice(1));
+    navigate(row.href.slice(1));
   };
   const activeId = flat[cursor] ? `jump-row-${cursor}` : undefined;
 
@@ -121,7 +172,7 @@ function Menu({
   return (
     <Box
       role="dialog"
-      aria-label="Jump to epic"
+      aria-label={label}
       bg="surface.raised"
       borderWidth="1px"
       borderColor="border"
@@ -137,8 +188,8 @@ function Menu({
         <Input
           autoFocus
           type="search"
-          aria-label="Jump to epic"
-          placeholder="Filter epics"
+          aria-label={label}
+          placeholder={placeholder}
           h="40px"
           fontSize="16px"
           value={query}
@@ -171,16 +222,7 @@ function Menu({
             </Text>
             {s.rows.map((row) => {
               const i = index++;
-              return (
-                <JumpRow
-                  key={row.address}
-                  id={`jump-row-${i}`}
-                  row={row}
-                  current={isCurrent(row, current)}
-                  active={i === cursor}
-                  onPick={() => pick(row)}
-                />
-              );
+              return <ListRow key={row.key} id={`jump-row-${i}`} row={row} active={i === cursor} onPick={() => pick(row)} />;
             })}
           </Box>
         ))}
@@ -190,17 +232,29 @@ function Menu({
 }
 
 /**
- * The page title as a button that opens a list of epics to switch to. `current` is the address
- * of the epic on screen; `epics` is the list the page already loaded.
+ * The page title as a button that opens a filterable list of rows. The caller gives the sections
+ * and their order. `hotkey` turns the built-in Cmd/Ctrl+K toggle off when false.
  */
-export function JumpMenu({ name, current, epics }: { name: string; current: string; epics: EpicListRow[] }) {
+export function RowList({
+  name,
+  label,
+  placeholder,
+  sections,
+  hotkey = true,
+}: {
+  name: string;
+  label: string;
+  placeholder: string;
+  sections: ListSection[];
+  hotkey?: boolean;
+}) {
   const phone = !useWide();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      if (hotkey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setOpen((o) => !o);
       } else if (e.key === "Escape") setOpen(false);
@@ -214,7 +268,7 @@ export function JumpMenu({ name, current, epics }: { name: string; current: stri
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onDown);
     };
-  }, [phone]);
+  }, [phone, hotkey]);
 
   return (
     <Box ref={root} position="relative" minW="0">
@@ -236,14 +290,33 @@ export function JumpMenu({ name, current, epics }: { name: string; current: stri
           <Text as="span" aria-hidden fontSize="16px" color="text.dim">
             ▾
           </Text>
-          {!phone && (
+          {!phone && hotkey && (
             <Text as="span" aria-hidden fontSize="13px" color="text.dim" fontFamily="text" fontWeight="400">
               ⌘K
             </Text>
           )}
         </chakra.button>
       </Heading>
-      {open && <Menu epics={epics} current={current} phone={phone} onClose={() => setOpen(false)} />}
+      {open && <Menu sections={sections} label={label} placeholder={placeholder} phone={phone} onClose={() => setOpen(false)} />}
     </Box>
   );
+}
+
+/**
+ * The epic jump menu: the page title opens a list of epics to switch to. `current` is the address
+ * of the epic on screen; `epics` is the list the page already loaded. Ready to design and Finished
+ * show only while the filter has text.
+ */
+export function JumpMenu({ name, current, epics }: { name: string; current: string; epics: EpicListRow[] }) {
+  const sections = useMemo(
+    () =>
+      sectionsOf(epics, "").map((s) => ({
+        key: s.key,
+        title: s.title,
+        hiddenUntilSearch: s.key === SectionReadyToDesign || s.key === SectionFinished,
+        rows: s.rows.map((r) => epicRow(r, isCurrent(r, current))),
+      })),
+    [epics, current],
+  );
+  return <RowList name={name} label="Jump to epic" placeholder="Filter epics" sections={sections} />;
 }
