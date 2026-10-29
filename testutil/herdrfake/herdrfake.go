@@ -20,6 +20,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/testutil/spikecount"
 )
 
 // helperSocketEnv names the environment variable a helper invocation reads to
@@ -191,6 +193,11 @@ func RunHelperProcess() {
 	if sockPath == "" {
 		return
 	}
+	kind := "herdr"
+	for _, a := range os.Args[1:min(len(os.Args), 3)] {
+		kind += " " + a
+	}
+	spikecount.Record(kind)
 
 	conn, err := net.Dial("unix", sockPath)
 	if err != nil {

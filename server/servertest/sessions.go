@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/testutil/spikecount"
 )
 
 // holderArg is the first argument that runs the test binary as a holder. An
@@ -73,6 +74,7 @@ func WithAutoAdvanceDelay(d time.Duration) func(*server.Config) {
 func RunSessionProcesses() {
 	agentfake.RegisterHarness()
 	if len(os.Args) > 1 && os.Args[1] == holderArg {
+		spikecount.Record("holder")
 		if pid, err := strconv.Atoi(os.Getenv(TestPidEnv)); err == nil {
 			go exitWithTest(pid)
 		}
@@ -84,6 +86,7 @@ func RunSessionProcesses() {
 	}
 	// After the holder check: the holder's env carries the program's marker.
 	if os.Getenv(agentfake.ProgramEnv) == "1" {
+		spikecount.Record("agent-program")
 		agentfake.Program()
 	}
 }

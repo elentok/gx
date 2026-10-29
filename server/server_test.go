@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"errors"
+	"github.com/elentok/gx/testutil/spikecount"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,6 +26,7 @@ const testFlushInterval = 100 * time.Millisecond
 func TestMain(m *testing.M) {
 	servertest.RunSessionProcesses()
 	herdrfake.RunHelperProcess()
+	spikecount.Record("test-main")
 	// One zone away from UTC for every test: a test that swapped it mid-run
 	// moved the budget day under its parallel neighbours.
 	time.Local = time.FixedZone("test", 5*3600)
