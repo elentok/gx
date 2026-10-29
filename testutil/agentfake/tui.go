@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/elentok/gx/testutil/spikecount"
 	"io"
 	"os"
 	"path/filepath"
@@ -171,6 +172,7 @@ func sendControlWhenReady(ready func() (path string, ok bool), c Control) error 
 // exits with the code an exit control asked for.
 func TUIClaude() {
 	code, err := runTUIClaude()
+	spikecount.RecordUsage("agent-tui")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

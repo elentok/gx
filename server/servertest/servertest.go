@@ -683,8 +683,12 @@ func (h *Harness) serve(t *testing.T) {
 				sa.StopAll()
 			}
 		}
+		spikeT0 := time.Now()
 		if !srv.WaitSettled(10 * time.Second) {
 			t.Logf("servertest: a run was still settling 10s after stop")
+		}
+		if d := time.Since(spikeT0); d > time.Second {
+			t.Logf("SPIKE settle took %v", d)
 		}
 	})
 

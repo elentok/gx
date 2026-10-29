@@ -218,5 +218,6 @@ func RunHelperProcess() {
 	}
 
 	os.Stdout.Write(resp.Output)
+	spikecount.RecordUsage("herdr")
 	os.Exit(resp.ExitCode)
 }

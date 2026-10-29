@@ -78,7 +78,9 @@ func RunSessionProcesses() {
 		if pid, err := strconv.Atoi(os.Getenv(TestPidEnv)); err == nil {
 			go exitWithTest(pid)
 		}
-		if err := runTestHolder(os.Args[2:]); err != nil {
+		err := runTestHolder(os.Args[2:])
+		spikecount.RecordUsage("holder")
+		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
@@ -101,6 +103,7 @@ func RunSessionProcesses() {
 func exitWithTest(pid int) {
 	for range time.Tick(200 * time.Millisecond) {
 		if errors.Is(syscall.Kill(pid, 0), syscall.ESRCH) {
+			spikecount.RecordUsage("holder")
 			os.Exit(1)
 		}
 	}

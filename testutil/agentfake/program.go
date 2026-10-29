@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/elentok/gx/testutil/spikecount"
 	"io"
 	"os"
 	"path/filepath"
@@ -137,6 +138,7 @@ func SendProgramControl(conversationID string, c Control) error {
 // code an exit control asked for.
 func Program() {
 	code, err := runProgram()
+	spikecount.RecordUsage("agent-program")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
