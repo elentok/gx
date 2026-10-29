@@ -17,7 +17,7 @@ func TestFinish_ZeroCommitPauseRecordsRun(t *testing.T) {
 		store, repo := t.TempDir(), testutil.TempRepo(t)
 		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 		servertest.SetProjectRepo(t, store, "proj", repo)
-		h := servertest.StartWithStore(t, store)
+		h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture))
 		runToZeroCommitPause(t, h, "done")
 		assertPauseRecordsRun(t, store, events.Paused, "herdr", agentrunner.Session{Label: "epic-a-iter-01", SessionID: "s1"})
 	})

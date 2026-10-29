@@ -226,7 +226,7 @@ func TestDiskClean_ZeroThresholdNeverCleansOrHolds(t *testing.T) {
 
 // Story 21 and the resume rule: a reading while a clean runs never clears the hold.
 func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T) {
-	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
+	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb, servertest.WithHerdr(servertest.UntilPtyFixture))
 	r.clean.blockUntilCleanup(t)
 	r.setFree(3 * gb)
 	r.waitCalls(t, 1)
@@ -315,7 +315,7 @@ func TestDiskClean_ReArmsOnlyWellAboveTheLine(t *testing.T) {
 
 // Story 24.
 func TestDiskClean_NoCleanInNormalUse(t *testing.T) {
-	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
+	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb, servertest.WithHerdr(servertest.UntilPtyFixture))
 	r.queue(t, "proj:epic-a/01")
 	waitFor(t, func() bool { return len(*r.start) >= 1 })
 	r.wantCalls(t, 0)

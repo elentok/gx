@@ -477,6 +477,9 @@ const (
 	// UntilPtyAsDefault is for a test that only needs herdr because herdr is
 	// still the default runner. gx:pty-as-default deletes it.
 	UntilPtyAsDefault
+	// UntilPtyFixture is for a test that waits on the PTY turn fixture's turn
+	// controls or leftover-run helper. It is deleted before this epic's verify.
+	UntilPtyFixture
 )
 
 // runnerChoice is what the runner options recorded; startWith resolves it once

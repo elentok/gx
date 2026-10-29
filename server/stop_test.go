@@ -22,7 +22,7 @@ func TestStop_WaitsForAMergeInFlightAndFlushesTheStoreCommit(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture), func(c *server.Config) {
 		c.StoreCommitDebounce = time.Hour // only the stop's flush can commit
 	})
 	_, _, cwd := registerTurn(h)

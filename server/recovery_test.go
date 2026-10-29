@@ -221,7 +221,7 @@ func pauseTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Eve
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture), func(c *server.Config) {
 		c.Recovery = recovery.Default()
 		// herdrrunner re-polls a timed-out wait until its deadline; one poll
 		// has to outlast this.
@@ -665,17 +665,17 @@ func TestRecovery_EnabledR3MatchForksAnInvestigateTicketNamingR3(t *testing.T) {
 }
 
 // startR3 starts a server with the default catalog fully enabled.
-func startR3(t *testing.T) *servertest.Harness {
+func startR3(t *testing.T, opts ...func(*server.Config)) *servertest.Harness {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, append([]func(*server.Config){func(c *server.Config) {
 		c.Recovery = recovery.Default()
 		for i := range c.Recovery.Entries {
 			c.Recovery.Entries[i].Enabled = true
 		}
-	})
+	}}, opts...)...)
 	registerTurn(h)
 	return h
 }
@@ -744,7 +744,7 @@ func TestRecovery_ZeroCommitPauseMatchesOnItsTranscriptText(t *testing.T) {
 		{"R3", "The feature is already implemented on the feature branch.", "R3"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := startR3(t)
+			h := startR3(t, servertest.WithHerdr(servertest.UntilPtyFixture))
 			runToZeroCommitPause(t, h, tc.last)
 			waitFor(t, func() bool {
 				for _, tk := range epicTickets(t, h).Tickets {
@@ -761,7 +761,7 @@ func TestRecovery_ZeroCommitPauseMatchesOnItsTranscriptText(t *testing.T) {
 
 func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testing.T) {
 	t.Parallel()
-	h := startR3(t)
+	h := startR3(t, servertest.WithHerdr(servertest.UntilPtyFixture))
 	runToZeroCommitPause(t, h, "Nothing to do: this is already implemented in a sibling ticket.")
 	dir := filepath.Join(h.TicketStore, "proj")
 	waitFor(t, func() bool {

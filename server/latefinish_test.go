@@ -66,7 +66,7 @@ func pauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) 
 		base := fake.stops.Load()
 		p.stops = func() int32 { return fake.stops.Load() - base }
 	} else {
-		p.h = servertest.StartWithStore(t, store, opts...)
+		p.h = servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithHerdr(servertest.UntilPtyFixture)}, opts...)...)
 		runToZeroCommitPause(t, p.h, "done")
 		p.agentGone = func() {
 			p.h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {

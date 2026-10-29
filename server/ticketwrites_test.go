@@ -52,12 +52,12 @@ func TestCancel_WithoutAnOpenRoundWritesNoEnd(t *testing.T) {
 	}
 }
 
-func startTicketWrites(t *testing.T) (*servertest.Harness, string) {
+func startTicketWrites(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, opts...)
 	return h, filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 }
 
@@ -238,7 +238,7 @@ func TestUnmute_RefusesUnknownTicket(t *testing.T) {
 
 func TestRelaunch_StartsAFreshIterationOfAPausedTicket(t *testing.T) {
 	t.Parallel()
-	h, path := startTicketWrites(t)
+	h, path := startTicketWrites(t, servertest.WithHerdr(servertest.UntilPtyFixture))
 	start, prompt, _ := registerTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -261,7 +261,7 @@ func TestRelaunch_StartsAFreshIterationOfAPausedTicket(t *testing.T) {
 
 func TestCancel_LiveTicketRefusesUntilStop(t *testing.T) {
 	t.Parallel()
-	h, path := startTicketWrites(t)
+	h, path := startTicketWrites(t, servertest.WithHerdr(servertest.UntilPtyFixture))
 	var closed atomic.Int32
 	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1"}}, herdrfake.Identities{}, nil

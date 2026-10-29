@@ -139,6 +139,8 @@ func restartLaunching(t *testing.T, fake *headlessFake, herdr func(*servertest.H
 	var opts []func(*server.Config)
 	if fake != nil {
 		opts = append(opts, servertest.WithRunner(fake))
+	} else {
+		opts = append(opts, servertest.WithHerdr(servertest.UntilPtyFixture))
 	}
 	h := servertest.StartWithStore(t, store, opts...)
 	if herdr != nil {

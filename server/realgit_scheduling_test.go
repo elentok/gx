@@ -228,7 +228,7 @@ func TestSchedulingPort_PauseThenResumeReusesBranchAndMergesBothCommitsOnce(t *t
 			return
 		}
 		commitWork(t, p, "post")
-	})
+	}, servertest.WithHerdr(servertest.UntilPtyFixture))
 	ticketPath = f.ticketFile(t, "01")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

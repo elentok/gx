@@ -128,7 +128,7 @@ func TestMergeTicket_PauseKeepsTheFeatureWorktreeAndReclaimReusesIt(t *testing.T
 			return "asking"
 		}
 		return "finished"
-	})
+	}, servertest.WithHerdr(servertest.UntilPtyFixture))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")

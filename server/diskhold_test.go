@@ -234,7 +234,7 @@ func TestDiskHold_OneOffOnHeldDiskWaits(t *testing.T) {
 // one notice, however many readings follow.
 func TestDiskHold_ResumeStartsTicketAndNotifiesOnce(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb)
+	r := startHoldRig(t, map[string]string{"proj": repo}, 10*gb, servertest.WithHerdr(servertest.UntilPtyFixture))
 	r.disks.SetFree(repo, 3*gb)
 	r.queue(t, "proj:epic-a/01")
 	r.explainWhen(t, "proj:epic-a/01", server.VerdictDiskLow)
@@ -300,7 +300,7 @@ func TestDiskHold_HeldDiskListedWithWarnOff(t *testing.T) {
 // Seam: clean threshold off never holds (story 3, hold part).
 func TestDiskHold_CleanThresholdOffNeverHolds(t *testing.T) {
 	repo := testutil.TempRepo(t)
-	r := startHoldRig(t, map[string]string{"proj": repo}, 0)
+	r := startHoldRig(t, map[string]string{"proj": repo}, 0, servertest.WithHerdr(servertest.UntilPtyFixture))
 	r.disks.SetFree(repo, 1)
 	r.queue(t, "proj:epic-a/01")
 	waitFor(t, r.started(1))

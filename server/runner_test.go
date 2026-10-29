@@ -292,7 +292,7 @@ func TestRunner_MergesTheIterationAndClosesTheRoot(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture))
 	_, _, cwd := registerTurn(h)
 	// The agent's turn: commit a file in its own worktree.
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
@@ -419,7 +419,7 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture), func(c *server.Config) {
 		c.MaxAgents = 1
 	})
 	_, _, cwd := registerTurn(h)

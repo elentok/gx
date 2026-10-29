@@ -32,6 +32,8 @@ func restartDead(t *testing.T, headless bool, work func(t *testing.T, wtPath str
 	if headless {
 		fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictDied}
 		opts = append(opts, servertest.WithRunner(fake))
+	} else {
+		opts = append(opts, servertest.WithHerdr(servertest.UntilPtyFixture))
 	}
 	h := servertest.StartWithStore(t, store, opts...)
 	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, runnerOf(headless), func(p string) { work(t, p) })
