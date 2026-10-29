@@ -99,6 +99,35 @@ func TestDetail_ActionsFollowTheTable(t *testing.T) {
 	}
 }
 
+func TestDetail_FinishedCommitlessOffersMergeOnly(t *testing.T) {
+	t.Parallel()
+	h, ticketPath, _ := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	cases := []struct {
+		name       string
+		status     schema.Status
+		iter       schema.IterationStatus
+		commitless bool
+		want       []string
+	}{
+		{"finished commitless", schema.StatusClaimed, schema.IterationStatusFinished, true, []string{server.ActionMerge}},
+		{"finished with commits", schema.StatusClaimed, schema.IterationStatusFinished, false, []string{}},
+		{"unfinished commitless", schema.StatusClaimed, schema.IterationStatusWorking, true, []string{}},
+		{"done commitless", schema.StatusDone, schema.IterationStatusFinished, true, []string{}},
+	}
+	for _, c := range cases {
+		if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
+			tk.Status, tk.IterationStatus, tk.Commitless = c.status, c.iter, c.commitless
+		}); err != nil {
+			t.Fatal(err)
+		}
+		d, err := h.Client.Detail(context.Background(), answerAddr)
+		if err != nil || !slices.Equal(d.Actions, c.want) {
+			t.Errorf("%s: actions = %v, %v; want %v", c.name, d.Actions, err, c.want)
+		}
+	}
+}
+
 func TestDetail_AnsweredAndClosedRounds(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, _ := startWaitingRestartFake(t, 0)

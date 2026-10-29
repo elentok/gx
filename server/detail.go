@@ -340,6 +340,9 @@ func detailActions(t schema.Ticket, latest *tickets.PauseRound, agentGone bool, 
 	if card != nil && card.RequestID != "" {
 		actions = append(actions, ActionApprove)
 	}
+	if t.FinishedCommitless() {
+		actions = append(actions, ActionMerge)
+	}
 	if t.PausedClass() == "" {
 		return actions
 	}

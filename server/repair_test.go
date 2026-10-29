@@ -54,6 +54,47 @@ func TestRepair_MergeStampsTheFrictionSummary(t *testing.T) {
 	}
 }
 
+func TestRepair_MergeClosesAFinishedCommitlessTicketAsDone(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	ticketPath := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
+	h := servertest.StartWithStore(t, store)
+	set := func(status schema.Status, iter schema.IterationStatus, commitless bool) {
+		t.Helper()
+		if err := schema.UpdateTicket(ticketPath, func(tk *schema.Ticket) {
+			tk.Status, tk.IterationStatus, tk.Commitless = status, iter, commitless
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	merge := func() server.RepairResult {
+		t.Helper()
+		res, err := h.Client.Repair(context.Background(), "merge", server.RepairRequest{Address: "proj:epic-a/01", Cwd: t.TempDir()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return res
+	}
+
+	set(schema.StatusClaimed, schema.IterationStatusWorking, true)
+	if res := merge(); !res.Refused || res.Reason != repair.ReasonCommitless {
+		t.Errorf("unfinished commitless merge = %+v; want refusal %s", res, repair.ReasonCommitless)
+	}
+
+	set(schema.StatusClaimed, schema.IterationStatusFinished, true)
+	if res := merge(); res.Refused {
+		t.Fatalf("finished commitless merge = %+v; want closed", res)
+	}
+	tk, err := schema.ParseTicket(ticketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tk.Status != schema.StatusDone {
+		t.Errorf("status = %s, want done", tk.Status)
+	}
+}
+
 func TestRepair_RefusalsCarryTheRepairPackagesCodes(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()

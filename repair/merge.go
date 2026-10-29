@@ -65,6 +65,13 @@ func Merge(in MergeInput, d ralphloop.Deps) (MergeResult, string, error) {
 		return MergeResult{}, "", &RefusalError{Reason: ReasonLiveAgentOnTab, Message: fmt.Sprintf("the agent session for ticket %s exists; stop it or pass --ignore-live-tab", in.ID)}
 	}
 
+	if parsed.FinishedCommitless() {
+		// No commits to land: closing it is only the done write.
+		if err := recordLanded(in.EpicPath, epic, in.Source, t, parsed.Status, ralphloop.MergeResult{}, ralphloop.MergeSession{}); err != nil {
+			return MergeResult{}, "", err
+		}
+		return MergeResult{Outcome: "closed commitless"}, fmt.Sprintf("%s: closed commitless", EpicTicketLabel(in.EpicPath, in.ID)), nil
+	}
 	featurePath, err := featureWorktree(d, in.Cwd, epic)
 	if err != nil {
 		return MergeResult{}, "", err
@@ -304,7 +311,7 @@ func checkLandable(id string, t schema.Ticket) error {
 	default:
 		return &RefusalError{Reason: ReasonStatusRefused, Message: fmt.Sprintf("ticket %s is %s; merge accepts only done, claimed, paused for repair or a zero-commit asking pause", id, describeStatus(t))}
 	}
-	if t.Commitless {
+	if t.Commitless && !t.FinishedCommitless() {
 		return &RefusalError{Reason: ReasonCommitless, Message: fmt.Sprintf("ticket %s is flagged commitless; there is nothing to merge", id)}
 	}
 	return nil

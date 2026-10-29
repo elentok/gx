@@ -378,6 +378,13 @@ func (t Ticket) IsCommitless() bool {
 	return t.Commitless || t.Type == TypeResearch || t.Type == TypeGrilling || t.Type == TypeCodeReview || t.Type == TypeConflictResolution || t.Type == TypePrompt || t.Type == TypeInvestigate || t.Type == TypeEvolve || t.Type == TypeMerge || t.Type == TypeDiagnose || t.Type == TypeVerify || t.Type == TypeTrunkConflict
 }
 
+// FinishedCommitless reports a claimed ticket whose agent reported
+// `finished` with the explicit commitless flag, which nothing has closed yet.
+// Only the flag counts, never the type-derived IsCommitless.
+func (t Ticket) FinishedCommitless() bool {
+	return t.Status == StatusClaimed && t.IterationStatus == IterationStatusFinished && t.Commitless
+}
+
 // Validate checks a populated Ticket for well-formedness: a valid id, a
 // valid status, a valid type, non-negative numeric fields, and no
 // blocked_by/parent entry equal to the ticket's own id. Every failing field
