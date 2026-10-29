@@ -19,13 +19,13 @@ func writeProcFile(t *testing.T, body string) string {
 
 func TestFileProcesses_RowsAccumulateAndArgvIsLookedUp(t *testing.T) {
 	path := writeProcFile(t, "busy 3000\nproc 10 1 1700000000 2500 200M go go test ./...\nhidden 11\n")
-	read, argv := FileProcesses(path)
+	r := FileProcesses(path)
 
-	first, err := read()
+	first, err := r.Read()
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := read()
+	second, err := r.Read()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,19 +48,19 @@ func TestFileProcesses_RowsAccumulateAndArgvIsLookedUp(t *testing.T) {
 	if d := (second.Reading.CPUTotal - second.Reading.CPUIdle) - (first.Reading.CPUTotal - first.Reading.CPUIdle); d != 3000 {
 		t.Errorf("busy advanced by %d, want 3000", d)
 	}
-	if got, want := argv(10), []string{"go", "test", "./..."}; !reflect.DeepEqual(got, want) {
+	if got, want := r.Argv(10), []string{"go", "test", "./..."}; !reflect.DeepEqual(got, want) {
 		t.Errorf("argv = %v, want %v", got, want)
 	}
-	if got := argv(11); got != nil {
+	if got := r.Argv(11); got != nil {
 		t.Errorf("hidden argv = %v, want none", got)
 	}
 }
 
 func TestFileProcesses_BusyDefaultsToTheRowsSum(t *testing.T) {
 	path := writeProcFile(t, "proc 10 1 1 100 1M a\nproc 11 1 1 200 1M b\n")
-	read, _ := FileProcesses(path)
-	first, _ := read()
-	second, err := read()
+	r := FileProcesses(path)
+	first, _ := r.Read()
+	second, err := r.Read()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,14 +82,12 @@ func TestFileProcesses_BadFilesFailTheRead(t *testing.T) {
 	}
 	for name, body := range cases {
 		t.Run(name, func(t *testing.T) {
-			read, _ := FileProcesses(writeProcFile(t, body))
-			if _, err := read(); err == nil {
+			if _, err := FileProcesses(writeProcFile(t, body)).Read(); err == nil {
 				t.Fatal("read succeeded")
 			}
 		})
 	}
-	read, _ := FileProcesses(filepath.Join(t.TempDir(), "missing"))
-	if _, err := read(); err == nil || strings.Contains(err.Error(), "no rows") {
+	if _, err := FileProcesses(filepath.Join(t.TempDir(), "missing")).Read(); err == nil || strings.Contains(err.Error(), "no rows") {
 		t.Errorf("missing file err = %v", err)
 	}
 }

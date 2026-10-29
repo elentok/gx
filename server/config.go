@@ -86,10 +86,8 @@ type Config struct {
 	HealthPollInterval time.Duration
 
 	// ProcessSource takes one process table read for the health route's cause
-	// lists; nil reads the real table.
-	ProcessSource func() (syshealth.ProcessTable, error)
-	// ProcessArgv looks up a row's argv when ProcessSource is set; nil gives none.
-	ProcessArgv func(pid int) []string
+	// lists and looks up a row's argv; nil reads the real table.
+	ProcessSource syshealth.ProcessReader
 	// ProcessSecondReadDelay is the wait between the first and the second
 	// process read after a quiet spell; zero means 1 second.
 	ProcessSecondReadDelay time.Duration

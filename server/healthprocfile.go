@@ -11,7 +11,7 @@ import (
 	"github.com/elentok/gx/syshealth"
 )
 
-// FileProcesses is a Config.ProcessSource and ProcessArgv pair for tests that
+// FileProcesses is a Config.ProcessSource for tests that
 // steer the process table from outside the process. The file at path holds one
 // line per entry, fields separated by spaces:
 //
@@ -24,41 +24,47 @@ import (
 // shares between two reads are cpu over the fixed 10000 machine ticks a read
 // reports. Hidden rows and a busy above the rows' sum give "other users". An
 // empty file is a failed read.
-func FileProcesses(path string) (func() (syshealth.ProcessTable, error), func(int) []string) {
-	var mu sync.Mutex
-	var idle, total uint64
-	cum := map[int]uint64{}
-	argvs := map[int][]string{}
-	read := func() (syshealth.ProcessTable, error) {
-		busy, procs, err := parseProcessFile(path)
-		if err != nil {
-			return syshealth.ProcessTable{}, err
-		}
-		mu.Lock()
-		defer mu.Unlock()
-		clear(argvs)
-		for i, p := range procs {
-			if p.Unreadable {
-				continue
-			}
-			cum[p.PID] += p.CPUTicks
-			procs[i].CPUTicks = cum[p.PID]
-			argvs[p.PID] = p.Argv
-			procs[i].Argv = nil
-		}
-		total += fileTicksPerRead
-		idle += fileTicksPerRead - min(busy, fileTicksPerRead)
-		return syshealth.ProcessTable{
-			Reading:   syshealth.Reading{CPUIdle: idle, CPUTotal: total, TickRate: fileTickRate, Cores: fileCores},
-			Processes: procs,
-		}, nil
+func FileProcesses(path string) syshealth.ProcessReader {
+	return &fileProcesses{path: path, cum: map[int]uint64{}, argvs: map[int][]string{}}
+}
+
+type fileProcesses struct {
+	path        string
+	mu          sync.Mutex
+	idle, total uint64
+	cum         map[int]uint64
+	argvs       map[int][]string
+}
+
+func (f *fileProcesses) Read() (syshealth.ProcessTable, error) {
+	busy, procs, err := parseProcessFile(f.path)
+	if err != nil {
+		return syshealth.ProcessTable{}, err
 	}
-	argv := func(pid int) []string {
-		mu.Lock()
-		defer mu.Unlock()
-		return argvs[pid]
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	clear(f.argvs)
+	for i, p := range procs {
+		if p.Unreadable {
+			continue
+		}
+		f.cum[p.PID] += p.CPUTicks
+		procs[i].CPUTicks = f.cum[p.PID]
+		f.argvs[p.PID] = p.Argv
+		procs[i].Argv = nil
 	}
-	return read, argv
+	f.total += fileTicksPerRead
+	f.idle += fileTicksPerRead - min(busy, fileTicksPerRead)
+	return syshealth.ProcessTable{
+		Reading:   syshealth.Reading{CPUIdle: f.idle, CPUTotal: f.total, TickRate: fileTickRate, Cores: fileCores},
+		Processes: procs,
+	}, nil
+}
+
+func (f *fileProcesses) Argv(pid int) []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.argvs[pid]
 }
 
 // parseProcessFile returns the busy ticks per read (the rows' sum unless a busy

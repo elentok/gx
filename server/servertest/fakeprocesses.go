@@ -62,7 +62,10 @@ func (f *FakeProcesses) Reads() int {
 	return f.reads
 }
 
-// Read is the server.Config ProcessSource.
+// Argv gives no argv for any row.
+func (f *FakeProcesses) Argv(int) []string { return nil }
+
+// Read takes one table read; with Argv it makes the fake a server.Config ProcessSource.
 func (f *FakeProcesses) Read() (syshealth.ProcessTable, error) {
 	f.mu.Lock()
 	f.reads++

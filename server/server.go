@@ -33,6 +33,7 @@ import (
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/storecommit"
+	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -323,6 +324,9 @@ func New(cfg Config) (*Server, error) {
 	}
 	if cfg.Notifier == nil {
 		cfg.Notifier = osnotify.NewSystemNotifier()
+	}
+	if cfg.ProcessSource == nil {
+		cfg.ProcessSource = syshealth.DefaultProcess()
 	}
 	if cfg.SessionBannerDelay == 0 {
 		cfg.SessionBannerDelay = defaultSessionBannerDelay

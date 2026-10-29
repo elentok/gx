@@ -38,18 +38,6 @@ func durationOr(d, def time.Duration) time.Duration {
 	return d
 }
 
-// processSource is the configured table read and the argv lookup for its rows.
-func (s *Server) processSource() (func() (syshealth.ProcessTable, error), func(int) []string) {
-	if s.cfg.ProcessSource != nil {
-		if s.cfg.ProcessArgv != nil {
-			return s.cfg.ProcessSource, s.cfg.ProcessArgv
-		}
-		return s.cfg.ProcessSource, func(int) []string { return nil }
-	}
-	r := syshealth.DefaultProcess()
-	return r.Read, r.Argv
-}
-
 // fetchProcesses takes one read now, sharing it with a caller already reading.
 func (s *Server) fetchProcesses() {
 	p := &s.procs
@@ -63,8 +51,7 @@ func (s *Server) fetchProcesses() {
 	p.inflight = done
 	p.mu.Unlock()
 
-	read, _ := s.processSource()
-	t, err := read()
+	t, err := s.cfg.ProcessSource.Read()
 	now := time.Now()
 
 	p.mu.Lock()
@@ -162,12 +149,11 @@ func (s *Server) healthCauses(ctx context.Context, wait bool) HealthCauses {
 		}
 		return HealthCauses{CPU: CauseList{Marker: marker}, Memory: CauseList{Marker: marker}}
 	}
-	_, argv := s.processSource()
 	first := prev
 	if first == nil {
 		first = cur
 	}
-	lists := syshealth.TopCauses(*first, *cur, s.healthOwners(*cur), argv)
+	lists := syshealth.TopCauses(*first, *cur, s.healthOwners(*cur), s.cfg.ProcessSource.Argv)
 	out := HealthCauses{CPU: causeList(lists.CPU), Memory: causeList(lists.Memory)}
 	if prev == nil {
 		out.CPU = CauseList{Marker: CauseMarkerReading}

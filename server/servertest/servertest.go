@@ -576,7 +576,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// The real source reads the test machine's process table.
 	h.Processes = NewFakeProcesses()
 	if h.cfg.ProcessSource == nil {
-		h.cfg.ProcessSource = h.Processes.Read
+		h.cfg.ProcessSource = h.Processes
 	}
 	// The real runner would empty the developer's Go cache on a low-disk machine.
 	if h.cfg.CleanupRunner == nil {

@@ -204,11 +204,10 @@ func runServer(ctx context.Context, d deps) error {
 		systemHealth = server.FileSystemHealth(v)
 	}
 	// Test hook: the process table for the cause lists comes from a control file too.
-	var processSource func() (syshealth.ProcessTable, error)
-	var processArgv func(int) []string
+	var processSource syshealth.ProcessReader
 	if v := os.Getenv("GX_HEALTH_PROCESSES"); v != "" {
-		processSource, processArgv = server.FileProcesses(v)
-		if _, err := processSource(); err != nil {
+		processSource = server.FileProcesses(v)
+		if _, err := processSource.Read(); err != nil {
 			return fmt.Errorf("GX_HEALTH_PROCESSES: %w", err)
 		}
 	}
@@ -222,7 +221,7 @@ func runServer(ctx context.Context, d deps) error {
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval,
-		ProcessSource: processSource, ProcessArgv: processArgv})
+		ProcessSource: processSource})
 	if err != nil {
 		return err
 	}
