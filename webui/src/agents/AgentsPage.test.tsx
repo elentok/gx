@@ -521,3 +521,23 @@ test("Retry on an auth failure posts continue with the last message id", async (
   fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
   await vi.waitFor(() => expect(prompts).toEqual([expect.objectContaining({ id: "s-1", text: "continue", last_message: "m1" })]));
 });
+
+test("+ New session opens the form prefilled with the selected session's project, and a create opens the new session", async () => {
+  const trees = [
+    { project: "p", root: "/dev/p", worktrees: [] },
+    { project: "q", root: "/dev/q", worktrees: [] },
+  ];
+  const posts: unknown[] = [];
+  const { router } = render([session("s-1", "q")], "/agents/s-1", true, {
+    worktrees: async () => trees,
+    createSession: async (body) => (posts.push(body), { session: session("q-9", "q") }),
+    chat: async () => ({ kind: "not-found" }),
+  });
+  fireEvent.click(screen.getByRole("button", { name: "+ New session" }));
+  const project = (await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement;
+  expect(project.value).toBe("q");
+  fireEvent.click(screen.getByRole("button", { name: "Create session" }));
+  await vi.waitFor(() => expect(router.state.location.pathname).toBe("/agents/q-9"));
+  expect(posts).toEqual([expect.objectContaining({ project: "q", dir: "/dev/q" })]);
+  expect(screen.queryByRole("dialog", { name: "New session" })).toBeNull();
+});

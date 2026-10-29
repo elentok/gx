@@ -540,7 +540,7 @@ export const galleryEntries: GalleryEntry[] = [
         label: "one row per state",
         node: (
           <MemoryRouter>
-            <AgentSidebar selected="s-2" sessions={AGENT_SESSIONS} />
+            <AgentSidebar selected="s-2" sessions={AGENT_SESSIONS} onNew={() => {}} />
           </MemoryRouter>
         ),
       },

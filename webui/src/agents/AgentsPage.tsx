@@ -1,5 +1,5 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { FetchChat } from "../design/chat";
@@ -9,6 +9,8 @@ import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
 import { useWide } from "../useWide";
 import { AgentSidebar } from "./AgentSidebar";
+import type { CreateSession, FetchWorktrees } from "./newSession";
+import { NewSessionForm } from "./NewSessionForm";
 import { SessionSwitcher } from "./SessionSwitcher";
 import { SessionView } from "./SessionView";
 
@@ -32,8 +34,19 @@ function writeLast(id: string) {
 
 // The snapshot is cached by snapshotCache, so a reload repaints from it before the stream lands.
 // The cache may predate the session list, so only a live snapshot may redirect or call a label gone.
-export function AgentsPage({ fetchChat, fetchScreen }: { fetchChat?: FetchChat; fetchScreen?: FetchScreen }) {
+export function AgentsPage({
+  fetchChat,
+  fetchScreen,
+  fetchTrees,
+  createSession,
+}: {
+  fetchChat?: FetchChat;
+  fetchScreen?: FetchScreen;
+  fetchTrees?: FetchWorktrees;
+  createSession?: CreateSession;
+}) {
   const selected = useParams()["*"] || undefined;
+  const [creating, setCreating] = useState(false);
   const wide = useWide();
   const navigate = useNavigate();
   const conn = useConnectionContext();
@@ -56,7 +69,7 @@ export function AgentsPage({ fetchChat, fetchScreen }: { fetchChat?: FetchChat; 
         <Spinner label="Loading agents" />
       ) : (
         <Box flex="1" minH="0" display="grid" gridTemplateColumns={wide ? "300px 1fr" : "1fr"}>
-          {(wide || !selected) && <AgentSidebar sessions={sessions} selected={selected} />}
+          {(wide || !selected) && <AgentSidebar sessions={sessions} selected={selected} onNew={() => setCreating(true)} />}
           {(wide || selected) && (
             <Box as="main" p="4" minW="0">
               {!listed && <SessionSwitcher name="Switch session" sessions={sessions} />}
@@ -73,6 +86,18 @@ export function AgentsPage({ fetchChat, fetchScreen }: { fetchChat?: FetchChat; 
             </Box>
           )}
         </Box>
+      )}
+      {creating && (
+        <NewSessionForm
+          prefillProject={sessions?.find((s) => s.id === selected)?.project}
+          fetchTrees={fetchTrees}
+          create={createSession}
+          onClose={() => setCreating(false)}
+          onCreated={(id) => {
+            setCreating(false);
+            navigate(`/agents/${id}`);
+          }}
+        />
       )}
     </DetailPage>
   );

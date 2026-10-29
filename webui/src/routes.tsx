@@ -1,5 +1,6 @@
 import { createHashRouter, Navigate, redirect, useLocation, useParams, type RouteObject } from "react-router";
 import { AgentsPage } from "./agents/AgentsPage";
+import type { CreateSession, FetchWorktrees } from "./agents/newSession";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
 import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./design/open";
@@ -88,13 +89,15 @@ export interface RouteFetchers {
   prompt?: PostPrompt;
   focus?: PostFocus;
   fixAgent?: FixAgent;
+  worktrees?: FetchWorktrees;
+  createSession?: CreateSession;
 }
 
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
   return [
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} fetchChecks={fetchers.checksStatus} openDesign={fetchers.openDesign} saveChecks={fetchers.saveChecks} /> },
     // "/agents/*" also matches "/agents"; the splat is the session label.
-    { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} /> },
+    { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} fetchTrees={fetchers.worktrees} createSession={fetchers.createSession} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },
