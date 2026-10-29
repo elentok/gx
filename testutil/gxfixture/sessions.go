@@ -246,7 +246,7 @@ func agentsScenario() scenario {
 			{project: "other", prompt: "hello"},
 			{project: "other", actionable: "needs a decision"},
 			{project: "site", prompt: "hello", link: "site:" + mapAddr, read: true},
-			{project: "site", crash: true, read: true},
+			{project: "site", prompt: "hello", crash: true, read: true},
 		},
 	}
 }

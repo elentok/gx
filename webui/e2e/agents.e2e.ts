@@ -64,6 +64,11 @@ test("75. Read a session", async ({ page, start }) => {
   await expect(header.getByText(idle.status.state, { exact: true })).toBeVisible();
   await expect(header.getByText(idle.dir)).toBeVisible();
   await expect(header.getByText(idle.harness, { exact: true })).toHaveCount(0);
+  await expect(titleButton(page)).toContainText(idle.name || idle.id);
+  const ticketed = list.find((s) => s.ticket && s.harness === "claude")!;
+  await go(page, `#/agents/${ticketed.id}`);
+  await expect(header.getByText(ticketed.ticket!, { exact: true })).toBeVisible();
+  await go(page, `#/agents/${idle.id}`);
   await expect(page.getByText("hello", { exact: true })).toBeVisible();
   await expect(page.getByText(REPLY)).toBeVisible();
   await go(page, `#/agents/${design.id}`);
@@ -369,7 +374,13 @@ test("73. Agents sidebar", async ({ page, start }) => {
   const live = list.filter((s) => s.status.state !== "exited").length;
   await expect(side.getByText(`${live} live`)).toBeVisible();
 
-  // Live updates: a removed Exited session leaves, a new one arrives.
+  // Live updates: a stopped idle session changes its mark and the count with no reload.
+  const idle = visible.find((s) => s.status.state === "idle" && s.harness === "claude")!;
+  await fixture.cli("agents", "stop", idle.id);
+  await expect(row(page, idle).getByRole("img", { name: "exited", exact: true })).toBeVisible();
+  await expect(side.getByText(`${live - 1} live`)).toBeVisible();
+
+  // A removed Exited session leaves, a new one arrives.
   const exited = list.find((s) => s.status.state === "exited")!;
   await fixture.cli("agents", "remove", exited.id);
   await expect(row(page, exited)).toHaveCount(0);
@@ -378,7 +389,7 @@ test("73. Agents sidebar", async ({ page, start }) => {
   await expect.poll(async () => (await sessions(fixture)).filter((s) => !before.has(s.id)).length).toBe(1);
   const added = (await sessions(fixture)).find((s) => !before.has(s.id))!;
   await expect(row(page, added)).toBeVisible();
-  await expect(side.getByText(`${live + 1} live`)).toBeVisible();
+  await expect(side.getByText(`${live} live`)).toBeVisible();
 });
 
 test("74. Design sessions toggle", async ({ page, start }) => {
@@ -464,6 +475,11 @@ test("80. Failure notices", async ({ page, start }) => {
   expect(await buttons("auth")).toEqual(["Retry"]);
   await messageBox(page).fill("hi");
   await expect(sendButton(page)).toBeEnabled();
+  const auth = await byKind("auth");
+  const texts = async () => (await chatOf(fixture, auth.id)).messages.map((m) => (m as { text: string }).text);
+  expect(await texts()).not.toContain("continue");
+  await failure(page).getByRole("button", { name: "Retry" }).click();
+  await expect.poll(texts).toContain("continue");
 
   // Rate limit: label and text, no buttons, and the reason Send is off.
   const limited = await open("rate-limit");
@@ -481,6 +497,7 @@ test("80. Failure notices, crashed", async ({ page, start }) => {
   await go(page, `#/agents/${crashed.id}`);
 
   await expect(failure(page).getByText("Agent crashed")).toBeVisible();
+  await expect(page.getByText("hello", { exact: true })).toBeVisible();
   await expect(composer(page).getByText("Exited. Restore it in gx, Agents tab.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Restore" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "New session", exact: true })).toHaveCount(0);
@@ -509,6 +526,21 @@ test("89. Session not found", async ({ page, start }) => {
   const exited = list.find((s) => s.status.state === "exited")!;
   await page.setViewportSize({ width: 1280, height: 800 });
 
+  // A deep link to a live session never flashes the panel while the list loads.
+  const live = list.find((s) => s.status.state === "idle" && s.harness === "claude")!;
+  const deep = await page.context().newPage();
+  await deep.addInitScript(() => {
+    const w = window as unknown as { flashed: boolean };
+    w.flashed = false;
+    new MutationObserver(() => {
+      if (document.body?.textContent?.includes("Session not found")) w.flashed = true;
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+  });
+  await deep.goto(new URL(page.url()).origin + `#/agents/${live.id}`);
+  await expect(deep.getByText("hello", { exact: true })).toBeVisible();
+  expect(await deep.evaluate(() => (window as unknown as { flashed: boolean }).flashed)).toBe(false);
+  await deep.close();
+
   // A made-up label: the panel names it and the sidebar stays.
   await go(page, "#/agents/no-such-session");
   await expect(page.getByText("Session not found")).toBeVisible();
@@ -525,6 +557,12 @@ test("89. Session not found", async ({ page, start }) => {
   await expect(row(page, exited)).toHaveCount(0);
   await expect(row(page, list[0])).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`#/agents/${exited.id}$`));
+
+  // No other session's turns were read by any of this.
+  const unreadBefore = list.filter((s) => s.unread.unread && s.id !== exited.id).map((s) => s.id);
+  expect(unreadBefore.length).toBeGreaterThan(0);
+  const unreadNow = (await sessions(fixture)).filter((s) => s.unread.unread).map((s) => s.id);
+  expect(unreadNow.sort()).toEqual(unreadBefore.sort());
 
   // At 390px the panel offers the way back.
   await page.setViewportSize({ width: 390, height: 800 });
@@ -594,8 +632,11 @@ test("84. Session switcher", async ({ page, start }) => {
 
   // An epic's Design page keeps its own jump menu on the same key.
   await go(page, "#/d/demo:design-epic");
-  await page.keyboard.press("Control+k");
-  await expect(page.getByRole("dialog", nav("Jump to epic"))).toBeVisible();
+  // The jump menu's key listener mounts after the route changes, so press again until it opens.
+  await expect(async () => {
+    await page.keyboard.press("Control+k");
+    await expect(page.getByRole("dialog", nav("Jump to epic"))).toBeVisible({ timeout: 500 });
+  }).toPass();
   await expect(switcher(page)).toHaveCount(0);
 });
 
