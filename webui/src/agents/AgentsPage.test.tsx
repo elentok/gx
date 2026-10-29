@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { SessionInfo } from "../generated/server";
 import { appRoutes } from "../routes";
@@ -22,10 +22,25 @@ const session = (id: string, project: string, over: Partial<SessionInfo> = {}): 
   ...over,
 });
 
-function render(sessions: SessionInfo[] | undefined, path = "/agents") {
-  let state = { snapshot: sessions && { sessions }, connected: true, loadedOnce: !!sessions, tick: 0 } as unknown as ConnectionState;
+const focusPosts: { session: string }[] = [];
+beforeEach(() => {
+  localStorage.clear();
+  focusPosts.length = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init: { body: string }) => {
+      focusPosts.push(JSON.parse(init.body));
+      return new Response("{}");
+    }),
+  );
+});
+afterEach(() => vi.unstubAllGlobals());
+
+function render(sessions: SessionInfo[] | undefined, path = "/agents", live = !!sessions) {
+  let state = { snapshot: sessions && { sessions }, connected: true, loadedOnce: !!sessions, liveSnapshot: live, streams: 1, tick: 0 } as unknown as ConnectionState;
   const listeners = new Set<() => void>();
   const conn = {
+    clientId: "c1",
     getState: () => state,
     subscribe: (fn: () => void) => {
       listeners.add(fn);
@@ -40,11 +55,13 @@ function render(sessions: SessionInfo[] | undefined, path = "/agents") {
       <RouterProvider router={router} />
     </ConnectionContext.Provider>,
   );
-  const setSessions = (next: SessionInfo[]) => {
-    state = { ...state, snapshot: { sessions: next } } as unknown as ConnectionState;
+  const update = (patch: Partial<ConnectionState>) => {
+    state = { ...state, ...patch } as unknown as ConnectionState;
     act(() => listeners.forEach((fn) => fn()));
   };
-  return { router, setSessions };
+  const setSessions = (next: SessionInfo[]) => update({ snapshot: { sessions: next } } as Partial<ConnectionState>);
+  const goLive = () => update({ liveSnapshot: true });
+  return { router, setSessions, goLive };
 }
 
 const rows = () => screen.getAllByRole("link").filter((l) => l.getAttribute("href")?.startsWith("#/agents/"));
@@ -123,6 +140,66 @@ test("the main column says what to do, or that there is nothing yet", () => {
   cleanup();
   render([]);
   expect(screen.getByText("No sessions yet")).toBeTruthy();
+});
+
+test("reopens the last viewed session when it is listed, else asks to pick one", () => {
+  localStorage.setItem("gx.agents.last", "s-2");
+  const { router } = render([session("s-1", "p"), session("s-2", "p")]);
+  expect(router.state.location.pathname).toBe("/agents/s-2");
+  cleanup();
+  localStorage.setItem("gx.agents.last", "gone");
+  const second = render([session("s-1", "p")]);
+  expect(second.router.state.location.pathname).toBe("/agents");
+  expect(screen.getByText("Pick a session")).toBeTruthy();
+  cleanup();
+  localStorage.clear();
+  const third = render([session("s-1", "p")]);
+  expect(third.router.state.location.pathname).toBe("/agents");
+});
+
+test("viewing a session remembers it as the last viewed", () => {
+  const { router } = render([session("s-1", "p", { name: "one" }), session("s-2", "p", { name: "two" })]);
+  fireEvent.click(row("two"));
+  expect(localStorage.getItem("gx.agents.last")).toBe("s-2");
+  expect(router.state.location.pathname).toBe("/agents/s-2");
+});
+
+test("decides nothing before the first live snapshot", () => {
+  localStorage.setItem("gx.agents.last", "s-1");
+  const { router, goLive } = render([session("s-1", "p")], "/agents", false);
+  expect(router.state.location.pathname).toBe("/agents");
+  goLive();
+  expect(router.state.location.pathname).toBe("/agents/s-1");
+  cleanup();
+  const gone = render([session("s-1", "p")], "/agents/nope", false);
+  expect(screen.queryByText(/no longer exists/)).toBeNull();
+  gone.goLive();
+  expect(screen.getByText("Session not found")).toBeTruthy();
+});
+
+test("an unknown label shows the not-found panel with the sidebar", () => {
+  const { router } = render([session("s-1", "p", { name: "one" })], "/agents/nope");
+  expect(screen.getByText("Session not found")).toBeTruthy();
+  expect(screen.getByText("nope no longer exists.")).toBeTruthy();
+  expect(rows()).toHaveLength(1);
+  expect(router.state.location.pathname).toBe("/agents/nope");
+});
+
+test("a session removed while viewed shows the panel and the URL stays", () => {
+  const { router, setSessions } = render([session("s-1", "p"), session("s-2", "p")], "/agents/s-2");
+  expect(screen.queryByText("Session not found")).toBeNull();
+  setSessions([session("s-1", "p")]);
+  expect(screen.getByText("Session not found")).toBeTruthy();
+  expect(router.state.location.pathname).toBe("/agents/s-2");
+});
+
+test("the focus report names the selected session, and none for a gone label", async () => {
+  render([session("s-1", "p")], "/agents/s-1");
+  await vi.waitFor(() => expect(focusPosts.at(-1)?.session).toBe("s-1"));
+  cleanup();
+  focusPosts.length = 0;
+  render([session("s-1", "p")], "/agents/nope");
+  await vi.waitFor(() => expect(focusPosts.at(-1)?.session).toBe(""));
 });
 
 test("shows the spinner until the snapshot lands, then follows it", () => {
