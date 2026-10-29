@@ -41,7 +41,7 @@ go run ./testutil/gxfixture [--hold] <scenario>
 - Resolve `gx tickets root` before any `cd`. It fails with "not inside a git repo" from `$TMPDIR`.
 - To run `gx` against the fixture from the shell, pass `--env` and source the output. It prints
   `export` lines instead of the JSON: the `env` entries, plus `GXF_WEB_URL`, `GXF_GX`,
-  `GXF_DISK_DIR`, `GXF_HEALTH_DIR`, `GXF_HOLD_FILE`, `GXF_STATE_DIR` and `GXF_SOCKET`. Redirect the background run's stdout to a file,
+  `GXF_DISK_DIR`, `GXF_HEALTH_DIR`, `GXF_HOLD_FILE`, `GXF_STATE_DIR`, `GXF_SOCKET` and `GXF_LOG_FILE`. Redirect the background run's stdout to a file,
   wait for it to fill, then `source` it in the same shell as your `gx` calls. Do not retype the
   `HOME`/`XDG_*` exports.
 
@@ -59,6 +59,9 @@ The JSON line has these fields:
 - `browser_session`: the worktree directory name. Pass it to every browser command as
   `playwright-cli -s=<browser_session> ...`. The default session is shared by concurrent sessions,
   so another session's tabs would interfere. `--env` exports it as `GXF_BROWSER_SESSION`.
+- `log_file`: the server's combined stdout and stderr. A failed cleanup command shows up there as
+  `disk cleanup command failed`, with the command's exit code and output tail. Read it when the UI
+  shows a failure you cannot explain. `--env` exports it as `GXF_LOG_FILE`.
 - `hold_file`: the file that holds the workers when you passed `--hold`.
 - `disk_dir`: the directory of the fake disk's control files (see "How the fixture behaves").
 - `health_dir`: the directory of the fake CPU and memory control file (see "How the fixture behaves").

@@ -110,7 +110,8 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   `testutil/runnerfake`, `testutil/herdrctl`, `testutil/teatestv2`, `testutil/claudeenv`
 - `testutil/gxfixture` — e2e fixture program: `gxfixture <ready|mixed|finishing|edge>` starts an
   isolated real `gx server` (pty runner, `fakeclaude` as `claude`) and prints JSON with `web_url`,
-  socket, state dir and hold file; SIGTERM stops it. Per-ticket worker behaviour
+  socket, state dir, hold file and `log_file` (the server's stdout+stderr, which holds the cleanup
+  command's output tail); SIGTERM stops it. Per-ticket worker behaviour
   (finish/ask/fail) lives in `.agentfake-worker.json`, see `scenarios.go`.
 
 Run `go list ./...` for the full list.

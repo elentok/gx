@@ -1114,6 +1114,23 @@ func TestShellEnv_ExportsBrowserSessionWhenSet(t *testing.T) {
 	}
 }
 
+func TestStart_LogFileIsTheServerLogAndExists(t *testing.T) {
+	r := start(t, "empty")
+	if r.LogFile == "" {
+		t.Fatal("log_file is empty")
+	}
+	if _, err := os.Stat(r.LogFile); err != nil {
+		t.Errorf("log_file %q: %v", r.LogFile, err)
+	}
+}
+
+func TestShellEnv_ExportsLogFileWhenSet(t *testing.T) {
+	got := Output{LogFile: "/tmp/r/server.out"}.ShellEnv()
+	if want := "export GXF_LOG_FILE='/tmp/r/server.out'\n"; !strings.Contains(got, want) {
+		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
+	}
+}
+
 func TestShellEnv_ExportsMockURLWhenSet(t *testing.T) {
 	got := Output{MockURL: "http://127.0.0.1:2/"}.ShellEnv()
 	if want := "export GXF_MOCK_URL='http://127.0.0.1:2/'\n"; !strings.Contains(got, want) {

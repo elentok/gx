@@ -59,6 +59,9 @@ type Output struct {
 	DiskDir string `json:"disk_dir"`
 	// HealthDir holds the fake CPU and memory control file: system.
 	HealthDir string `json:"health_dir"`
+	// LogFile is the server's combined stdout and stderr, which carries the cleanup
+	// command's output tail ("disk cleanup command failed") and every server warning.
+	LogFile string `json:"log_file"`
 	// MockURL is the base URL serving --mock-dir; empty without the flag.
 	MockURL string `json:"mock_url,omitempty"`
 	// BrowserSession names this worktree's playwright-cli session (`-s=<name>`): the
@@ -83,6 +86,9 @@ func (o Output) ShellEnv() string {
 	export("GXF_HOLD_FILE", o.HoldFile)
 	export("GXF_STATE_DIR", o.StateDir)
 	export("GXF_SOCKET", o.Socket)
+	if o.LogFile != "" {
+		export("GXF_LOG_FILE", o.LogFile)
+	}
 	if o.MockURL != "" {
 		export("GXF_MOCK_URL", o.MockURL)
 	}
@@ -222,7 +228,8 @@ func run(args []string) (err error) {
 	defer stop()
 	srv := exec.Command(gxBin, "server")
 	srv.Env = f.env
-	logFile, err := os.Create(filepath.Join(root, "server.out"))
+	logPath := filepath.Join(root, "server.out")
+	logFile, err := os.Create(logPath)
 	if err != nil {
 		return err
 	}
@@ -279,7 +286,7 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
-	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir()}
+	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath}
 	if cwd, err := os.Getwd(); err == nil {
 		o.BrowserSession = filepath.Base(cwd)
 	}
