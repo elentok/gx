@@ -20,7 +20,7 @@ func TestReclaim_FinishedReportSettlesAWorkingPane(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
 	registerLiveAgent(h)
 	working := map[string]any{"agent": map[string]any{"pane_id": "p1", "tab_id": "t1", "agent_status": "working", "state_change_seq": 1}}
 	for _, verb := range []string{"get", "wait"} {
