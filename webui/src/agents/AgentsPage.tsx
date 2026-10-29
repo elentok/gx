@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Heading, Kbd, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
@@ -6,6 +6,7 @@ import type { FetchChat } from "../design/chat";
 import { useFocusReport } from "../design/focus";
 import type { FetchScreen } from "../design/screen";
 import { DetailPage } from "../page/DetailPage";
+import { Button } from "../ui/button/Button";
 import { Spinner } from "../ui/spinner/Spinner";
 import { useWide } from "../useWide";
 import { AgentSidebar } from "./AgentSidebar";
@@ -46,7 +47,8 @@ export function AgentsPage({
   createSession?: CreateSession;
 }) {
   const selected = useParams()["*"] || undefined;
-  const [creating, setCreating] = useState(false);
+  // The form is open while this is set; `project` is its prefill.
+  const [creating, setCreating] = useState<{ project?: string } | null>(null);
   const wide = useWide();
   const navigate = useNavigate();
   const conn = useConnectionContext();
@@ -55,6 +57,8 @@ export function AgentsPage({
   const listed = !!selected && !!sessions?.some((s) => s.id === selected);
   const gone = !!selected && !!sessions && liveSnapshot && !listed;
   useFocusReport(conn, listed ? selected : undefined, streams);
+  const selectedProject = sessions?.find((s) => s.id === selected)?.project;
+  const openNew = (project = selectedProject) => setCreating({ project });
   useEffect(() => {
     if (!sessions || !liveSnapshot) return;
     if (listed) writeLast(selected!);
@@ -69,19 +73,45 @@ export function AgentsPage({
         <Spinner label="Loading agents" />
       ) : (
         <Box flex="1" minH="0" display="grid" gridTemplateColumns={wide ? "300px 1fr" : "1fr"}>
-          {(wide || !selected) && <AgentSidebar sessions={sessions} selected={selected} onNew={() => setCreating(true)} />}
+          {(wide || !selected) && <AgentSidebar sessions={sessions} selected={selected} onNew={openNew} />}
           {(wide || selected) && (
             <Box as="main" p="4" minW="0">
-              {!listed && <SessionSwitcher name="Switch session" sessions={sessions} />}
+              {!listed && <SessionSwitcher name="Switch session" sessions={sessions} onNew={() => openNew()} />}
               {gone ? (
                 <>
                   <Text fontWeight="600">Session not found</Text>
                   <Text color="text.muted">{selected} no longer exists.</Text>
                 </>
               ) : selected ? (
-                listed && <SessionView session={sessions.find((s) => s.id === selected)!} sessions={sessions} fetchChat={fetchChat} fetchScreen={fetchScreen} />
+                listed && (
+                  <SessionView
+                    session={sessions.find((s) => s.id === selected)!}
+                    sessions={sessions}
+                    onNew={() => openNew()}
+                    fetchChat={fetchChat}
+                    fetchScreen={fetchScreen}
+                  />
+                )
               ) : (
-                <Text color="text.muted">{sessions.length === 0 ? "No sessions yet" : "Pick a session"}</Text>
+                <Box h="100%" display="flex" flexDirection="column" alignItems="center" justifyContent="center" gap="3" textAlign="center">
+                  <Heading as="h3" fontFamily="condensed" textTransform="uppercase" fontSize="2xl">
+                    {sessions.length === 0 ? "No sessions yet" : "Pick a session"}
+                  </Heading>
+                  <Text color="text.muted">
+                    {sessions.length === 0 ? (
+                      "Sessions you start here or in the gx Agents tab show up in this list."
+                    ) : wide ? (
+                      <>
+                        Choose a session on the left, or press <Kbd bg="surface" color="text.muted" borderWidth="1px" borderColor="border">⌘K</Kbd> to search.
+                      </>
+                    ) : (
+                      "Choose a session from the list."
+                    )}
+                  </Text>
+                  <Button type="button" emphasis="secondary" size="sm" onClick={() => openNew()}>
+                    New session
+                  </Button>
+                </Box>
               )}
             </Box>
           )}
@@ -89,12 +119,12 @@ export function AgentsPage({
       )}
       {creating && (
         <NewSessionForm
-          prefillProject={sessions?.find((s) => s.id === selected)?.project}
+          prefillProject={creating.project}
           fetchTrees={fetchTrees}
           create={createSession}
-          onClose={() => setCreating(false)}
+          onClose={() => setCreating(null)}
           onCreated={(id) => {
-            setCreating(false);
+            setCreating(null);
             navigate(`/agents/${id}`);
           }}
         />

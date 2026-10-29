@@ -54,7 +54,17 @@ function sessionRow(s: SessionInfo, current: boolean): ListRowData {
  * The Agents page title as a button that opens every session, Design sessions included, even
  * while the sidebar hides them.
  */
-export function SessionSwitcher({ name, sessions, current }: { name: string; sessions: SessionInfo[]; current?: string }) {
+export function SessionSwitcher({
+  name,
+  sessions,
+  current,
+  onNew,
+}: {
+  name: string;
+  sessions: SessionInfo[];
+  current?: string;
+  onNew: () => void;
+}) {
   const sections = useMemo<ListSection[]>(
     () =>
       SECTIONS.map((title, i) => ({
@@ -64,5 +74,9 @@ export function SessionSwitcher({ name, sessions, current }: { name: string; ses
       })),
     [sessions, current],
   );
-  return <RowList name={name} label="Switch session" placeholder="Filter sessions" sections={sections} />;
+  const footer = useMemo<ListRowData>(
+    () => ({ key: "new", title: "+ New session", subtitle: "", href: "#/agents", searchText: "", onSelect: onNew }),
+    [onNew],
+  );
+  return <RowList name={name} label="Switch session" placeholder="Filter sessions" sections={sections} footer={footer} />;
 }

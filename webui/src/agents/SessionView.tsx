@@ -19,7 +19,7 @@ const AGENT_OPTIONS: ChatOptions = { sheet: false, steps: false, gxStopped: fals
 
 const noop = () => {};
 
-function SessionHeader({ session: s, sessions }: { session: SessionInfo; sessions: SessionInfo[] }) {
+function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; sessions: SessionInfo[]; onNew: () => void }) {
   const { glyph, tone } = statusMark(s);
   const map = designOf(s);
   return (
@@ -27,7 +27,7 @@ function SessionHeader({ session: s, sessions }: { session: SessionInfo; session
       <Text as="span" role="img" aria-label="status" color={`tone.${tone}.fg`}>
         {glyph}
       </Text>
-      <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} />
+      <SessionSwitcher name={s.name || s.id} sessions={sessions} current={s.id} onNew={onNew} />
       <Chip tone={tone}>{s.status.state}</Chip>
       {s.harness !== "claude" && <Chip>{s.harness}</Chip>}
       <Text as="span" fontSize="sm" color="text.dim">
@@ -81,9 +81,11 @@ export function SessionView({
   sessions,
   fetchChat,
   fetchScreen,
+  onNew,
 }: {
   session: SessionInfo;
   sessions: SessionInfo[];
+  onNew: () => void;
   fetchChat?: FetchChat;
   fetchScreen?: FetchScreen;
 }) {
@@ -93,7 +95,7 @@ export function SessionView({
   const { detail: chat, refetch } = useSessionChat(claude ? session.id : undefined, conn, fetchChat);
   return (
     <Box display="flex" flexDirection="column" height="100%" minH="0">
-      <SessionHeader session={session} sessions={sessions} />
+      <SessionHeader session={session} sessions={sessions} onNew={onNew} />
       {claude && chat && chat.messages.length === 0 && (
         <Text color="text.muted" flex="1" display="flex" alignItems="center" justifyContent="center">
           No messages yet

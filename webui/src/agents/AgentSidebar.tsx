@@ -99,7 +99,16 @@ function readShowDesign(): boolean {
   }
 }
 
-export function AgentSidebar({ sessions, selected, onNew }: { sessions: SessionInfo[]; selected?: string; onNew: () => void }) {
+/** `onNew` gets the project of the group whose "+" was pressed, or nothing from the top button. */
+export function AgentSidebar({
+  sessions,
+  selected,
+  onNew,
+}: {
+  sessions: SessionInfo[];
+  selected?: string;
+  onNew: (project?: string) => void;
+}) {
   const [showDesign, setShowDesign] = useState(readShowDesign);
   const change = (on: boolean) => {
     setShowDesign(on);
@@ -121,15 +130,29 @@ export function AgentSidebar({ sessions, selected, onNew }: { sessions: SessionI
       }
     >
       <Box px="2" mb="3">
-        <Button type="button" emphasis="secondary" size="sm" onClick={onNew}>
+        <Button type="button" emphasis="secondary" size="sm" onClick={() => onNew()}>
           + New session
         </Button>
       </Box>
       {groupSessions(visible).map(({ project, sessions: group }) => (
         <Box key={project} mb="3">
-          <Text px="2" fontSize="xs" textTransform="uppercase" letterSpacing="wide" color="text.dim">
-            {project}
-          </Text>
+          <Box display="flex" alignItems="center" justifyContent="space-between" px="2">
+            <Text fontSize="xs" textTransform="uppercase" letterSpacing="wide" color="text.dim">
+              {project}
+            </Text>
+            <chakra.button
+              type="button"
+              aria-label={`New session in ${project}`}
+              title={`New session in ${project}`}
+              px="1"
+              color="text.dim"
+              cursor="pointer"
+              _hover={{ color: "text" }}
+              onClick={() => onNew(project)}
+            >
+              +
+            </chakra.button>
+          </Box>
           {group.map((s) => (
             <Row key={s.id} session={s} current={s.id === selected} />
           ))}

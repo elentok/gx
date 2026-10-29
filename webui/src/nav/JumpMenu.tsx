@@ -32,6 +32,8 @@ export type ListRowData = {
   lead?: ReactNode;
   trailing?: ReactNode;
   current?: boolean;
+  /** Runs instead of following `href`. */
+  onSelect?: () => void;
 };
 
 export type ListSection = {
@@ -133,12 +135,14 @@ function Menu({
   sections: all,
   label,
   placeholder,
+  footer,
   phone,
   onClose,
 }: {
   sections: ListSection[];
   label: string;
   placeholder: string;
+  footer?: ListRowData;
   phone: boolean;
   onClose: () => void;
 }) {
@@ -146,10 +150,11 @@ function Menu({
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
   const sections = useMemo(() => visibleSections(all, query), [all, query]);
-  const flat = sections.flatMap((s) => s.rows);
+  const flat = [...sections.flatMap((s) => s.rows), ...(footer ? [footer] : [])];
   const pick = (row: ListRowData) => {
     onClose();
-    navigate(row.href.slice(1));
+    if (row.onSelect) row.onSelect();
+    else navigate(row.href.slice(1));
   };
   const activeId = flat[cursor] ? `jump-row-${cursor}` : undefined;
 
@@ -210,7 +215,7 @@ function Menu({
         )}
       </Box>
       <Box id="jump-list" role="listbox" overflowY="auto" maxH={phone ? undefined : "60vh"} flex={phone ? "1" : undefined}>
-        {sections.length === 0 && (
+        {sections.length === 0 && !footer && (
           <Text px="3" py="2" color="text.muted">
             No match
           </Text>
@@ -226,6 +231,7 @@ function Menu({
             })}
           </Box>
         ))}
+        {footer && <ListRow id={`jump-row-${index}`} row={footer} active={index === cursor} onPick={() => pick(footer)} />}
       </Box>
     </Box>
   );
@@ -233,19 +239,22 @@ function Menu({
 
 /**
  * The page title as a button that opens a filterable list of rows. The caller gives the sections
- * and their order. `hotkey` turns the built-in Cmd/Ctrl+K toggle off when false.
+ * and their order. `footer` is a last row outside the sections that the filter never hides.
+ * `hotkey` turns the built-in Cmd/Ctrl+K toggle off when false.
  */
 export function RowList({
   name,
   label,
   placeholder,
   sections,
+  footer,
   hotkey = true,
 }: {
   name: string;
   label: string;
   placeholder: string;
   sections: ListSection[];
+  footer?: ListRowData;
   hotkey?: boolean;
 }) {
   const phone = !useWide();
@@ -297,7 +306,7 @@ export function RowList({
           )}
         </chakra.button>
       </Heading>
-      {open && <Menu sections={sections} label={label} placeholder={placeholder} phone={phone} onClose={() => setOpen(false)} />}
+      {open && <Menu sections={sections} label={label} placeholder={placeholder} footer={footer} phone={phone} onClose={() => setOpen(false)} />}
     </Box>
   );
 }
