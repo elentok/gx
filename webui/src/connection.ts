@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from "react";
-import { fetchSnapshot, type Snapshot } from "./snapshot";
+import { apiFetch } from "./apiFetch";
+import { fetchSnapshot,type Snapshot } from "./snapshot";
 import type { SnapshotCache } from "./snapshotCache";
 
 export const BACKOFF_MIN_MS = 1000;
@@ -33,7 +34,7 @@ export interface ConnectionDeps {
 // The server's heartbeat is an SSE comment line, which EventSource never surfaces, so
 // the stream is read as raw text: any chunk, comment or event, proves the link is alive.
 async function openEventStream(url: string, signal: AbortSignal): Promise<AsyncIterable<string>> {
-  const res = await fetch(url, { signal, headers: { Accept: "text/event-stream" } });
+  const res = await apiFetch(url, { signal, headers: { Accept: "text/event-stream" } });
   if (!res.ok || !res.body) throw new Error(`events: HTTP ${res.status}`);
   const body = res.body;
   return (async function* () {

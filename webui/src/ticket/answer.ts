@@ -1,3 +1,5 @@
+import { apiFetch } from "../apiFetch";
+
 export interface AnswerBody {
   address: string;
   state: string;
@@ -33,7 +35,7 @@ export type PostAnswer = (body: AnswerBody) => Promise<AnswerResult>;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export const postAnswer: PostAnswer = async (body) => {
-  const res = await fetch("/v1/tickets/answer", {
+  const res = await apiFetch("/v1/tickets/answer", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

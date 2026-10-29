@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiFetch";
 import { readWrite } from "../design/open";
 import type { Refusable } from "../useWrite";
 import type { ProjectChecks } from "./status";
@@ -18,7 +19,7 @@ export interface SaveChecksResult extends Refusable {
 export type SaveChecks = (body: SaveChecksBody) => Promise<SaveChecksResult>;
 
 export const postSaveChecks: SaveChecks = async (body) => {
-  const res = await fetch("/v1/checks/save", {
+  const res = await apiFetch("/v1/checks/save", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { apiFetch } from "../apiFetch";
 import type { Connection } from "../connection";
 import type { TicketDetail } from "../generated/server";
 import { readPageCache, writePageCache } from "../pageCache";
@@ -10,7 +11,7 @@ export type DetailResult<T = TicketDetail> = { kind: "ok"; detail: T } | { kind:
 export type FetchDetail = (address: string) => Promise<DetailResult>;
 
 export async function fetchJson<T>(url: string, label: string): Promise<DetailResult<T>> {
-  const res = await fetch(url);
+  const res = await apiFetch(url);
   if (res.status === 404 || res.status === 400) return { kind: "not-found" };
   if (!res.ok) throw new Error(`${label}: HTTP ${res.status}`);
   return { kind: "ok", detail: await res.json() };

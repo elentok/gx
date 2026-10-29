@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiFetch";
 import type { Connection } from "../connection";
 import { StatsDefaultRange, StatsRangeMonth, StatsRangeQuarter, StatsRangeWeek, type Stats } from "../generated/server";
 import { useFetched } from "../useFetched";
@@ -21,7 +22,7 @@ export type FetchStats = (query: StatsQuery) => Promise<Stats>;
 export const fetchStats: FetchStats = async ({ range, project }) => {
   const params = new URLSearchParams({ range: String(range) });
   if (project) params.set("project", project);
-  const res = await fetch(`/v1/stats?${params}`);
+  const res = await apiFetch(`/v1/stats?${params}`);
   if (!res.ok) throw new Error(`stats: HTTP ${res.status}`);
   return res.json();
 };

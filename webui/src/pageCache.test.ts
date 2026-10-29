@@ -2,7 +2,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { expect, test } from "vitest";
 import type { EpicList } from "./epics/list";
 import { useEpicList } from "./epics/list";
-import { readPageCache, writePageCache } from "./pageCache";
+import { clearPageCache, readPageCache, writePageCache } from "./pageCache";
 
 test("an entry is only returned for the id that wrote it", () => {
   writePageCache("epic", { n: 1 }, "gx:a");
@@ -13,6 +13,17 @@ test("an entry is only returned for the id that wrote it", () => {
 test("broken storage reads as empty", () => {
   sessionStorage.setItem("gx.page.epic", "{not json");
   expect(readPageCache("epic")).toBeNull();
+});
+
+test("clearPageCache drops every gx.page key and nothing else", () => {
+  writePageCache("epics", { a: 1 });
+  writePageCache("snapshot", { b: 2 });
+  sessionStorage.setItem("other", "keep");
+  clearPageCache();
+  expect(readPageCache("epics")).toBeNull();
+  expect(readPageCache("snapshot")).toBeNull();
+  expect(sessionStorage.getItem("other")).toBe("keep");
+  sessionStorage.removeItem("other");
 });
 
 test("the epic list repaints from the cache before the fetch returns, then saves the fresh list", async () => {

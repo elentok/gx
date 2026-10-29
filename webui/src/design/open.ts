@@ -6,6 +6,7 @@ import type {
   SessionRequest,
   SessionResult,
 } from "../generated/server";
+import { apiFetch } from "../apiFetch";
 import { WriteError } from "../useWrite";
 
 export type OpenDesign = (body: DesignOpenRequest) => Promise<SessionResult>;
@@ -20,7 +21,7 @@ export type InterruptSession = (body: SessionRequest) => Promise<SessionResult>;
 export const postJson =
   <R extends SessionResult = SessionResult>(path: string) =>
   async (body: unknown): Promise<R> => {
-    const res = await fetch(path, {
+    const res = await apiFetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

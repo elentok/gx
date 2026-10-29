@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { apiFetch } from "../apiFetch";
 import type { Connection } from "../connection";
 import type { FocusReport } from "../generated/server";
 
@@ -6,7 +7,7 @@ export type PostFocus = (report: FocusReport) => Promise<unknown>;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export const postFocus: PostFocus = async (report) => {
-  await fetch("/v1/sessions/focus", {
+  await apiFetch("/v1/sessions/focus", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(report),

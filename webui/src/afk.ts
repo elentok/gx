@@ -1,10 +1,11 @@
+import { apiFetch } from "./apiFetch";
 import { showToast } from "./ui/toaster";
 import { WriteError } from "./useWrite";
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 // The snapshot refetch that the server's afk-changed event triggers repaints the toggle.
 export async function postAfk(on: boolean): Promise<void> {
-  const res = await fetch("/v1/afk", {
+  const res = await apiFetch("/v1/afk", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ on }),

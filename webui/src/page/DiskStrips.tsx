@@ -1,11 +1,12 @@
 import type { CleanNowResult, DiskStatus } from "../generated/server";
+import { apiFetch } from "../apiFetch";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { DiskStrip } from "../ui/disk-strip/DiskStrip";
 import { refusalText, useWrite, WriteError } from "../useWrite";
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export async function postCleanDisk(disk: string): Promise<CleanNowResult> {
-  const res = await fetch("/v1/disk/clean", {
+  const res = await apiFetch("/v1/disk/clean", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ disk }),

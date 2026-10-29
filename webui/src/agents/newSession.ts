@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiFetch";
 import { postJson } from "../design/open";
 import type { CreateSessionRequest, ProjectWorktrees, SessionResult } from "../generated/server";
 
@@ -9,7 +10,7 @@ export type FetchWorktrees = () => Promise<ProjectWorktrees[]>;
 export const postCreateSession: CreateSession = postJson("/v1/sessions/create");
 
 export const fetchWorktrees: FetchWorktrees = async () => {
-  const res = await fetch("/v1/projects/worktrees");
+  const res = await apiFetch("/v1/projects/worktrees");
   if (!res.ok) throw new Error(`worktrees: HTTP ${res.status}`);
   return res.json();
 };

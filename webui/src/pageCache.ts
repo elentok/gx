@@ -12,6 +12,16 @@ export function readPageCache<T>(key: string, id = ""): T | null {
   }
 }
 
+export function clearPageCache(): void {
+  try {
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith("gx.page.")) sessionStorage.removeItem(key);
+    }
+  } catch {
+    // Not worth failing the page over.
+  }
+}
+
 export function writePageCache(key: string, value: unknown, id = ""): void {
   try {
     sessionStorage.setItem(`gx.page.${key}`, JSON.stringify({ id, value }));

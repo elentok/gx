@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { onSignedOut } from "./apiFetch";
 import {
   BACKOFF_MAX_MS,
   createConnection,
@@ -353,4 +354,17 @@ test("a cached snapshot is the first state and each fresh one is saved", async (
   await vi.advanceTimersByTimeAsync(0);
   expect(saved?.seq).toBe(8);
   conn.stop();
+});
+
+test("a 401 on the event stream fires the signed-out signal", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 401 })));
+  const signal = vi.fn();
+  const off = onSignedOut(signal);
+  const conn = createConnection({ fetchSnapshot: async () => emptySnapshot(1) });
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(signal).toHaveBeenCalledTimes(1);
+  conn.stop();
+  off();
+  vi.unstubAllGlobals();
 });

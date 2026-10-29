@@ -7,6 +7,7 @@ import {
   ActionStartOver,
   type Action,
 } from "../generated/server";
+import { apiFetch } from "../apiFetch";
 import { WriteError, type Refusable } from "../useWrite";
 
 export const ReasonAgentWorking = "agent-working";
@@ -43,7 +44,7 @@ export const isRecoverAction = (action: string) => action in ROUTES;
 export const postRecover: PostRecover = async (action, body) => {
   const route = ROUTES[action as Action];
   if (!route) throw new WriteError(`no route for ${action}`);
-  const res = await fetch(route, {
+  const res = await apiFetch(route, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

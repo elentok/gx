@@ -1,3 +1,5 @@
+import { apiFetch } from "../apiFetch";
+
 export type Decision = "allow" | "deny";
 
 export interface DecisionBody {
@@ -15,7 +17,7 @@ export type PostDecision = (body: DecisionBody) => Promise<DecisionResult>;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 export const postDecision: PostDecision = async (body) => {
-  const res = await fetch("/v1/agents/answer", {
+  const res = await apiFetch("/v1/agents/answer", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

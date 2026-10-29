@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiFetch";
 import type { Connection } from "../connection";
 import { SectionNeedsYou, type EpicList, type EpicListRow } from "../generated/server";
 import { useFetched } from "../useFetched";
@@ -7,7 +8,7 @@ export type { EpicList };
 export type FetchEpicList = () => Promise<EpicList>;
 
 export const fetchEpicList: FetchEpicList = async () => {
-  const res = await fetch("/v1/epics");
+  const res = await apiFetch("/v1/epics");
   if (!res.ok) throw new Error(`epics: HTTP ${res.status}`);
   return res.json();
 };

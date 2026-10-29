@@ -1,3 +1,4 @@
+import { apiFetch } from "../apiFetch";
 import { WriteError } from "../useWrite";
 
 export interface EpicWriteBody {
@@ -15,7 +16,7 @@ export type PostEpicWrite = (body: EpicWriteBody) => Promise<EpicWriteResult>;
 
 // Same-origin, so the browser sends the Origin header the server's CSRF guard checks.
 async function postEpicWrite(path: string, body: EpicWriteBody): Promise<EpicWriteResult> {
-  const res = await fetch(path, {
+  const res = await apiFetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
