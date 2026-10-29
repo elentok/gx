@@ -3,14 +3,17 @@ package server_test
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -69,7 +72,10 @@ func TestReads_ProjectWorktrees(t *testing.T) {
 	servertest.WriteTicket(t, store, "norepo", "epic-a", "01", "first", "")
 	repo, wt := testutil.TempRepoWithLinkedWorktree(t, "feature")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+		c.AgentsClaude = config.DefaultAgentsConfig().Claude
+		c.AgentsClaude.Strongest.Model = "fable"
+	})
 
 	list, err := h.Client.ProjectWorktrees(context.Background())
 	if err != nil {
@@ -89,6 +95,10 @@ func TestReads_ProjectWorktrees(t *testing.T) {
 	}
 	if got, _ := filepath.EvalSymlinks(list[0].Worktrees[0]); got != realWt {
 		t.Errorf("worktree = %q, want %q", list[0].Worktrees[0], wt)
+	}
+	want := map[string]string{"light": "haiku", "worker": "sonnet", "strongest": "fable"}
+	if !maps.Equal(list[0].Tiers, want) {
+		t.Errorf("tiers = %v, want %v", list[0].Tiers, want)
 	}
 }
 

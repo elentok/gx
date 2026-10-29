@@ -7,15 +7,18 @@ import (
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
 
 // ProjectWorktrees is one project in the /v1/projects/worktrees payload: its
-// repo root and the dirs of its other worktrees.
+// repo root, the dirs of its other worktrees and the model each tier runs under
+// for the chat harness (empty when that tier inherits the CLI's own setting).
 type ProjectWorktrees struct {
-	Project   string   `json:"project"`
-	Root      string   `json:"root"`
-	Worktrees []string `json:"worktrees"`
+	Project   string            `json:"project"`
+	Root      string            `json:"root"`
+	Worktrees []string          `json:"worktrees"`
+	Tiers     map[string]string `json:"tiers"`
 }
 
 func (s *Server) projectWorktrees(w http.ResponseWriter, _ *http.Request) {
@@ -25,6 +28,18 @@ func (s *Server) projectWorktrees(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, list)
+}
+
+// tierModels resolves each tier's model for the harness a web-created session
+// launches.
+func (s *Server) tierModels(project string) map[string]string {
+	agents := s.agentsConfig(project)
+	agent := ralphloop.AgentKind(s.settings.Load().chatHarness())
+	out := map[string]string{}
+	for _, t := range []ralphloop.Tier{ralphloop.TierLight, ralphloop.TierWorker, ralphloop.TierStrongest} {
+		out[string(t)], _ = ralphloop.ResolveTier(agents, agent, t)
+	}
+	return out
 }
 
 // listProjectWorktrees lists each project that has a repo in project.json.
@@ -43,7 +58,8 @@ func (s *Server) listProjectWorktrees() ([]ProjectWorktrees, error) {
 		if err != nil {
 			continue
 		}
-		p := ProjectWorktrees{Project: tickets.ProjectName(dir), Root: repo.Root, Worktrees: []string{}}
+		name := tickets.ProjectName(dir)
+		p := ProjectWorktrees{Project: name, Root: repo.Root, Worktrees: []string{}, Tiers: s.tierModels(name)}
 		wts, _ := git.ListWorktrees(*repo)
 		for _, wt := range wts {
 			if filepath.Clean(wt.Path) != filepath.Clean(repo.Root) {

@@ -2,7 +2,7 @@ import { postJson } from "../design/open";
 import type { CreateSessionRequest, ProjectWorktrees, SessionResult } from "../generated/server";
 
 /** The web create route takes only these fields of the full create request. */
-export type NewSessionBody = Pick<CreateSessionRequest, "project" | "dir" | "worktree" | "name" | "prompt">;
+export type NewSessionBody = Pick<CreateSessionRequest, "project" | "dir" | "worktree" | "name" | "prompt" | "tier">;
 export type CreateSession = (body: NewSessionBody) => Promise<SessionResult>;
 export type FetchWorktrees = () => Promise<ProjectWorktrees[]>;
 

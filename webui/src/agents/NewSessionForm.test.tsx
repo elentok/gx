@@ -12,8 +12,8 @@ beforeEach(() => localStorage.clear());
 const KEY = "gx.newSession.draft";
 const saved = () => JSON.parse(localStorage.getItem(KEY) ?? "null");
 const trees: ProjectWorktrees[] = [
-  { project: "gx", root: "/dev/gx", worktrees: ["/dev/gx-stats", "/dev/gx-stats-axis-labels"] },
-  { project: "blog", root: "/dev/blog", worktrees: [] },
+  { project: "gx", root: "/dev/gx", worktrees: ["/dev/gx-stats", "/dev/gx-stats-axis-labels"], tiers: { light: "haiku", worker: "sonnet", strongest: "opus" } },
+  { project: "blog", root: "/dev/blog", worktrees: [], tiers: { light: "haiku", worker: "sonnet", strongest: "opus" } },
 ];
 const accepted: SessionResult = { session: { id: "gx-7" } as never };
 
@@ -69,7 +69,7 @@ test("picking a dir posts dir", async () => {
   fireEvent.click(list().getByRole("option", { name: /^gx-stats \/dev\/gx-stats$/ }));
   submit();
   await waitFor(() => expect(onCreated).toHaveBeenCalledWith("gx-7"));
-  expect(posts).toEqual([{ project: "gx", dir: "/dev/gx-stats", name: undefined, prompt: undefined }]);
+  expect(posts).toEqual([{ project: "gx", dir: "/dev/gx-stats", name: undefined, prompt: undefined, tier: "worker" }]);
 });
 
 test("the default root posts its dir, with a typed name and prompt", async () => {
@@ -79,7 +79,7 @@ test("the default root posts its dir, with a typed name and prompt", async () =>
   type("First prompt", "do it");
   submit();
   await waitFor(() => expect(onCreated).toHaveBeenCalled());
-  expect(posts).toEqual([{ project: "gx", dir: "/dev/gx", name: "mine", prompt: "do it" }]);
+  expect(posts).toEqual([{ project: "gx", dir: "/dev/gx", name: "mine", prompt: "do it", tier: "worker" }]);
 });
 
 test("the create row posts worktree", async () => {
@@ -88,7 +88,19 @@ test("the create row posts worktree", async () => {
   fireEvent.click(list().getByRole("option", { name: /Create worktree/ }));
   submit();
   await waitFor(() => expect(onCreated).toHaveBeenCalled());
-  expect(posts).toEqual([{ project: "gx", worktree: "fresh", name: undefined, prompt: undefined }]);
+  expect(posts).toEqual([{ project: "gx", worktree: "fresh", name: undefined, prompt: undefined, tier: "worker" }]);
+});
+
+test("the tier picker lists three tiers with their models, defaults to worker and posts the pick", async () => {
+  const { posts, onCreated } = mount();
+  await ready();
+  const picker = screen.getByRole("combobox", { name: "Tier" }) as HTMLSelectElement;
+  expect([...picker.options].map((o) => o.textContent)).toEqual(["Light (haiku)", "Worker (sonnet)", "Strongest (opus)"]);
+  expect(picker.value).toBe("worker");
+  fireEvent.change(picker, { target: { value: "strongest" } });
+  submit();
+  await waitFor(() => expect(onCreated).toHaveBeenCalled());
+  expect(posts[0].tier).toBe("strongest");
 });
 
 test("the Name placeholder follows the worktree", async () => {

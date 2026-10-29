@@ -10,6 +10,12 @@ import { fetchWorktrees, postCreateSession, type CreateSession, type FetchWorktr
 import { trimmed, useNewSessionDraft, type NewSessionDraft } from "./useNewSessionDraft";
 import { baseName, WorktreePicker, type Option } from "./WorktreePicker";
 
+const TIERS = [
+  { id: "light", label: "Light" },
+  { id: "worker", label: "Worker" },
+  { id: "strongest", label: "Strongest" },
+];
+
 /** The New session form: Project, one Worktree picker, Name and First prompt. The draft lives in localStorage until create or discard. */
 export function NewSessionForm({
   prefillProject,
@@ -29,6 +35,7 @@ export function NewSessionForm({
 }) {
   const [trees, setTrees] = useState<ProjectWorktrees[]>();
   const [loadError, setLoadError] = useState(false);
+  const [tier, setTier] = useState("worker");
   const { draft, update, clear } = useNewSessionDraft(prefillProject);
   const { connected } = useConnectionState(useConnectionContext());
   const { run, pending, refusal, error } = useWrite();
@@ -73,6 +80,7 @@ export function NewSessionForm({
           ...(draft.create ? { worktree: draft.create } : { dir: picked.path }),
           name: trimmed(draft.name),
           prompt: trimmed(draft.prompt),
+          tier,
         }),
       {
         onDone: (res) => {
@@ -111,6 +119,15 @@ export function NewSessionForm({
             <WorktreePicker rows={rows} picked={picked} creating={draft.create} onPick={pick} />
             <Field label="Name" optional>
               <chakra.input aria-label="Name" autoComplete="off" spellCheck={false} {...field} h="40px" placeholder={worktreeName} value={draft.name} onChange={(e) => patch({ name: e.target.value })} />
+            </Field>
+            <Field label="Tier" caret>
+              <chakra.select aria-label="Tier" value={tier} onChange={(e) => setTier(e.target.value)} {...field} h="40px" appearance="none" pr="8">
+                {TIERS.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {current?.tiers[t.id] ? `${t.label} (${current.tiers[t.id]})` : t.label}
+                  </option>
+                ))}
+              </chakra.select>
             </Field>
             <Field label="First prompt" optional>
               <chakra.textarea aria-label="First prompt" {...field} py="2" minH="96px" resize="vertical" value={draft.prompt} onChange={(e) => patch({ prompt: e.target.value })} />

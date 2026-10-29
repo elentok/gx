@@ -6,8 +6,8 @@ useAgentsPageHooks();
 
 test("+ New session opens the form prefilled with the selected session's project, and a create opens the new session", async () => {
   const trees = [
-    { project: "p", root: "/dev/p", worktrees: [] },
-    { project: "q", root: "/dev/q", worktrees: [] },
+    { project: "p", root: "/dev/p", worktrees: [], tiers: {} },
+    { project: "q", root: "/dev/q", worktrees: [], tiers: {} },
   ];
   const posts: unknown[] = [];
   const { router } = render([session("s-1", "q")], "/agents/s-1", true, {

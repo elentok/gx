@@ -119,8 +119,8 @@ export const sendButton = () => screen.getByRole("button", { name: "Send" }) as 
 export const type = async (text: string) => fireEvent.change(await composerBox(), { target: { value: text } });
 
 const entryTrees = [
-  { project: "p", root: "/dev/p", worktrees: [] },
-  { project: "q", root: "/dev/q", worktrees: [] },
+  { project: "p", root: "/dev/p", worktrees: [], tiers: {} },
+  { project: "q", root: "/dev/q", worktrees: [], tiers: {} },
 ];
 export const entryOptions = { worktrees: async () => entryTrees, chat: async () => ({ kind: "not-found" as const }) };
 export const formProject = async () => ((await screen.findByRole("combobox", { name: "Project" })) as HTMLSelectElement).value;
