@@ -1,5 +1,5 @@
 import { Box, chakra, Text, Textarea } from "@chakra-ui/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { BottomSheet } from "../ui/modal/BottomSheet";
 import { useWide } from "../useWide";
@@ -11,6 +11,16 @@ const field = {
   borderColor: "border",
 } as const;
 
+/** Runs `submit` on Cmd/Ctrl+Enter; plain Enter stays a newline. */
+export function submitOnCmdEnter(
+  e: KeyboardEvent<HTMLTextAreaElement>,
+  submit: () => void,
+) {
+  if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey)) return;
+  e.preventDefault();
+  submit();
+}
+
 /** A 5-row note that scrolls itself into view, with an expand button for a large editor. The change handler is the only save. */
 export function NoteBox({
   name,
@@ -21,6 +31,7 @@ export function NoteBox({
   label,
   disabled,
   autoFocus = false,
+  onSubmit,
 }: {
   /** What the note is on, for its labels: "question 2". */
   name: string;
@@ -34,6 +45,8 @@ export function NoteBox({
   disabled?: boolean;
   /** Focus the box when it mounts. */
   autoFocus?: boolean;
+  /** Cmd/Ctrl+Enter in the box. */
+  onSubmit?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -58,6 +71,7 @@ export function NoteBox({
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onSubmit && ((e) => submitOnCmdEnter(e, onSubmit))}
       />
       <chakra.button
         type="button"

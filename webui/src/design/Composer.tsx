@@ -22,7 +22,7 @@ import {
   type SetAutoAdvance,
 } from "./open";
 import { InterruptPopover } from "./InterruptPopover";
-import { NoteBox } from "./NoteBox";
+import { NoteBox, submitOnCmdEnter } from "./NoteBox";
 import { postPrompt, type PostPrompt } from "./prompt";
 import { roundPrompt, unansweredOf, type Answers } from "./round";
 import { SendPopover } from "./SendPopover";
@@ -131,6 +131,16 @@ export function Composer({
     else sendRound();
   };
 
+  const sendText = () => send({ text }, () => setText(""));
+  // Cmd/Ctrl+Enter runs the main button only when that is Send or Send answers; a phone has no key send.
+  const onSubmit = wide
+    ? () => {
+        if (!enabled) return;
+        if (inRound) onSendRound();
+        else if (text.trim() !== "") sendText();
+      }
+    : undefined;
+
   const canContinue = !!next?.action.action?.length;
   // Interrupt while the agent works; Continue after a run-end line unless a note or round is waiting to go.
   const mainButton = working ? (
@@ -182,10 +192,7 @@ export function Composer({
       />
     </>
   ) : (
-    <Button
-      disabled={!enabled || text.trim() === ""}
-      onClick={() => send({ text }, () => setText(""))}
-    >
+    <Button disabled={!enabled || text.trim() === ""} onClick={sendText}>
       {pending && <Spinner size="sm" />}
       Send
     </Button>
@@ -229,11 +236,9 @@ export function Composer({
             placeholder="A message to the agent"
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onKeyDown={onSubmit && ((e) => submitOnCmdEnter(e, onSubmit))}
           />
-          <Button
-            disabled={!enabled || text.trim() === ""}
-            onClick={() => send({ text }, () => setText(""))}
-          >
+          <Button disabled={!enabled || text.trim() === ""} onClick={sendText}>
             {pending && <Spinner size="sm" />}
             Send
           </Button>
@@ -281,6 +286,7 @@ export function Composer({
           disabled={!enabled}
           autoFocus
           onChange={setText}
+          onSubmit={onSubmit}
         />
       )}
       {/* One line: the Auto menu on the left, the main action on the right. */}

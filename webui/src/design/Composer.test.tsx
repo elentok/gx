@@ -22,8 +22,10 @@ import type {
 } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
+import { WideContext } from "../useWide";
 import { WriteError } from "../useWrite";
 import type { FetchChat } from "./chat";
+import { Composer } from "./Composer";
 import type { PostPrompt } from "./prompt";
 
 afterEach(() => {
@@ -927,4 +929,143 @@ test("a round's composer has no Focus button", async () => {
   render({ chat: chatOf({ round: [askCard(1)] }) });
   await sheet();
   expect(screen.queryByRole("button", { name: "Focus" })).toBeNull();
+});
+
+const cmdEnter = (box: HTMLElement, mod: "metaKey" | "ctrlKey" = "metaKey") =>
+  fireEvent.keyDown(box, { key: "Enter", [mod]: true });
+
+// The Agents page's composer: no design parts, the box always open.
+function renderAgents(opts: {
+  post: PostPrompt;
+  connected?: boolean;
+  wide?: boolean;
+  state?: string;
+}) {
+  renderThemed(
+    <WideContext.Provider value={opts.wide ?? true}>
+      <Composer
+        design={false}
+        session={session(opts.state ?? "idle")}
+        connected={opts.connected ?? true}
+        post={opts.post}
+      />
+    </WideContext.Provider>,
+  );
+  return screen.getByLabelText("Message") as HTMLTextAreaElement;
+}
+
+test("Agents page: Cmd or Ctrl+Enter sends like the Send button", async () => {
+  for (const mod of ["metaKey", "ctrlKey"] as const) {
+    const post = vi.fn<PostPrompt>(async () => ok);
+    const box = renderAgents({ post });
+    fireEvent.change(box, { target: { value: "hello" } });
+    cmdEnter(box, mod);
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(post).toHaveBeenCalledWith({ id: "s-a", text: "hello" });
+    await waitFor(() => expect(box.value).toBe(""));
+    cleanup();
+    localStorage.clear();
+  }
+});
+
+test("Agents page: the key does nothing while Send is disabled", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  const box = renderAgents({ post });
+  cmdEnter(box);
+  fireEvent.change(box, { target: { value: "  " } });
+  cmdEnter(box);
+  cleanup();
+  const offline = vi.fn<PostPrompt>(async () => ok);
+  const b2 = renderAgents({ post: offline, connected: false });
+  fireEvent.change(b2, { target: { value: "hello" } });
+  cmdEnter(b2);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(post).not.toHaveBeenCalled();
+  expect(offline).not.toHaveBeenCalled();
+});
+
+test("Agents page: plain Enter adds a newline and does not send", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  const box = renderAgents({ post });
+  fireEvent.change(box, { target: { value: "hello" } });
+  const notPrevented = fireEvent.keyDown(box, { key: "Enter" });
+  expect(notPrevented).toBe(true);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(post).not.toHaveBeenCalled();
+});
+
+test("Agents page: the narrow layout ignores the key", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  const box = renderAgents({ post, wide: false });
+  fireEvent.change(box, { target: { value: "hello" } });
+  cmdEnter(box);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(post).not.toHaveBeenCalled();
+});
+
+test("design page: the key runs Send", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  const box = await openNote();
+  fireEvent.change(box, { target: { value: "hello" } });
+  cmdEnter(box);
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post).toHaveBeenCalledWith({
+    id: "s-a",
+    text: "hello",
+    last_message: "m9",
+  });
+});
+
+test("design page: the key runs Send answers, and with gaps opens the popover", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ round: round() }) });
+  const s = within(await sheet());
+  fireEvent.click(s.getByRole("button", { name: "Beta" }));
+  const box = await openNote();
+  cmdEnter(box);
+  const popover = await screen.findByRole("alertdialog");
+  expect(within(popover).getByText("2 questions are unanswered")).toBeTruthy();
+  expect(post).not.toHaveBeenCalled();
+});
+
+test("design page: the key sends a complete round", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ round: [askCard(1)] }) });
+  const s = within(await sheet());
+  fireEvent.click(s.getByRole("button", { name: "Alpha" }));
+  cmdEnter(await openNote());
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0].text).toBe("Q1 - T1: Alpha");
+});
+
+test("design page: the key does nothing when the main button is Continue", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post, chat: chatOf({ next: runEnd }) });
+  const box = await openNote();
+  expect(screen.getByRole("button", { name: /Continue/ })).toBeTruthy();
+  cmdEnter(box);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(post).not.toHaveBeenCalled();
+});
+
+test("design page: the key does nothing when the main button is Interrupt", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ state: "working", post, chat: chatOf({ next: runEnd }) });
+  const box = await openNote();
+  fireEvent.change(box, { target: { value: "hello" } });
+  cmdEnter(box);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(screen.getByRole("button", { name: "Interrupt" })).toBeTruthy();
+  expect(post).not.toHaveBeenCalled();
+});
+
+test("design page: the key does nothing with the Note box closed", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  await screen.findByRole("button", { name: "Note" });
+  expect(screen.queryByLabelText("Message")).toBeNull();
+  cmdEnter(document.body);
+  await new Promise((r) => setTimeout(r, 20));
+  expect(post).not.toHaveBeenCalled();
 });
