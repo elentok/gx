@@ -1170,6 +1170,29 @@ func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 	t.Errorf("project worktrees = %+v, want demo with its root and one worktree", projects)
 }
 
+func TestAgentsFailuresScenario_OneSessionPerFailureKind(t *testing.T) {
+	t.Parallel()
+	r := start(t, "agents-failures")
+	var list []server.SessionInfo
+	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+		t.Fatal(err)
+	}
+	var kinds []string
+	for _, s := range list {
+		if s.Failure == nil {
+			t.Fatalf("session %s has no failure: %+v", s.ID, s.Status)
+		}
+		kinds = append(kinds, s.Failure.Kind)
+		if s.Failure.Kind == server.FailureKindRateLimit && !strings.Contains(s.Failure.Text, "resets at") {
+			t.Errorf("rate-limit text = %q, want it to say when the limit resets", s.Failure.Text)
+		}
+	}
+	want := []string{server.FailureKindStalled, server.FailureKindAuth, server.FailureKindRateLimit, server.FailureKindBlocked}
+	if !slices.Equal(kinds, want) {
+		t.Fatalf("failure kinds = %v, want %v", kinds, want)
+	}
+}
+
 func TestOtherScenariosReportNoMissingChecks(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{"united", "empty"} {

@@ -83,6 +83,9 @@ type scenario struct {
 	chat bool
 	// sessions are created in order once the server is up, as `gx agents create` makes them.
 	sessions []sessionSpec
+	// stallThreshold is how long a Working session's transcript may stay untouched
+	// before it counts as stalled; the --stall-threshold flag overrides it.
+	stallThreshold string
 }
 
 type recommendation struct{ verb, diagnosis string }
@@ -317,6 +320,9 @@ var scenarios = map[string]scenario{
 	// agents: eight sessions in demo (4), other (2) and site (2), one per row of
 	// the Agents mock, and a worktree in demo. See agentsScenario.
 	"agents": agentsScenario(),
+	// agents-failures: four Claude sessions in demo, one per failure (stalled,
+	// auth, rate-limit, blocked). See agentsFailuresScenario.
+	"agents-failures": agentsFailuresScenario(),
 	// edge: a project with no epics, an epic with no tickets, and a ticket
 	// blocked by a dependency that is not merged.
 	"edge": {

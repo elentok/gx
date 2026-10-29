@@ -35,6 +35,10 @@ type sessionSpec struct {
 	actionable string
 	// crash makes the fake exit with code 1 once the session is idle.
 	crash bool
+	// control is sent to the fake once the session settled; failure is the
+	// Failure.Kind the session must then show.
+	control *agentfake.Control
+	failure string
 }
 
 const sessionWaitTimeout = 20 * time.Second
@@ -87,7 +91,11 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 			return fmt.Errorf("actionable %s: %w\n%s", id, err, out)
 		}
 	}
+	control := s.control
 	if s.crash {
+		control = &agentfake.Control{Action: agentfake.ActionExit, Code: 1}
+	}
+	if control != nil {
 		// The fake's control FIFO is named by Claude's session id, which gx's
 		// session id is not; the one new file is this session's.
 		fresh := slices.DeleteFunc(f.controlFiles(), func(name string) bool { return slices.Contains(before, name) })
@@ -95,11 +103,20 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 			return fmt.Errorf("session %s: want one new control file, got %v", id, fresh)
 		}
 		claudeID := strings.TrimSuffix(fresh[0], ".ctl")
-		if err := agentfake.SendTUIControl(filepath.Join(f.root, "home"), claudeID, agentfake.Control{Action: agentfake.ActionExit, Code: 1}); err != nil {
+		if err := agentfake.SendTUIControl(filepath.Join(f.root, "home"), claudeID, *control); err != nil {
 			return err
 		}
+	}
+	if s.crash {
 		if err := f.waitFor(id, server.SessionExited, func(si server.SessionInfo, _ server.SessionChatResponse) bool {
 			return si.Status.State == server.SessionExited
+		}); err != nil {
+			return err
+		}
+	}
+	if s.failure != "" {
+		if err := f.waitFor(id, "failure "+s.failure, func(si server.SessionInfo, _ server.SessionChatResponse) bool {
+			return si.Failure != nil && si.Failure.Kind == s.failure
 		}); err != nil {
 			return err
 		}
@@ -181,6 +198,25 @@ func (f *fixture) createSession(project, dir, prompt, harness string) (string, e
 		return "", fmt.Errorf("create session in %s: no session id in %s", project, out)
 	}
 	return res.Session.ID, nil
+}
+
+// agentsFailuresScenario is one Claude session per failure the Agents page
+// shows above the composer. It is not part of agentsScenario because the short
+// stall threshold would stall that scenario's Working session too.
+func agentsFailuresScenario() scenario {
+	return scenario{
+		chat:           true,
+		stallThreshold: "3s",
+		sessions: []sessionSpec{
+			{project: project, prompt: agentfake.ChatSlowMarker + " a stuck turn", failure: server.FailureKindStalled},
+			{project: project, prompt: "hello", read: true, failure: server.FailureKindAuth,
+				control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "authentication_error", Status: 401, Message: "Invalid API key"}},
+			{project: project, prompt: "hello", read: true, failure: server.FailureKindRateLimit,
+				control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Status: 429, Message: "You've hit your limit · resets at 3pm"}},
+			{project: project, prompt: "hello", read: true, failure: server.FailureKindBlocked,
+				control: &agentfake.Control{Action: agentfake.ActionBlock}},
+		},
+	}
 }
 
 // agentsScenario is the Agents page fixture: eight sessions in three

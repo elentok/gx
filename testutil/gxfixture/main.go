@@ -175,6 +175,9 @@ func run(args []string) (err error) {
 		}
 		f.env = append(f.env, "GX_AUTO_ADVANCE_DELAY="+autoAdvance)
 	}
+	if stallThreshold == "" {
+		stallThreshold = sc.stallThreshold
+	}
 	if stallThreshold != "" {
 		if _, err := time.ParseDuration(stallThreshold); err != nil {
 			return fmt.Errorf("--stall-threshold: %w", err)
