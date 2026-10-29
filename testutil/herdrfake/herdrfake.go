@@ -197,7 +197,7 @@ func RunHelperProcess() {
 	for _, a := range os.Args[1:min(len(os.Args), 3)] {
 		kind += " " + a
 	}
-	spikecount.Record(kind)
+	spikecount.Record(kind + "\t" + sockPath)
 
 	conn, err := net.Dial("unix", sockPath)
 	if err != nil {

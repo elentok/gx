@@ -32,6 +32,7 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/testutil/spikecount"
 )
 
 // Harness is a running test server.
@@ -511,6 +512,12 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
 	})
 	_, herdrEnv := herdrfake.StartStateEnv(t, h.Herdr)
+	// SPIKE: map this harness's herdr socket to its test, for per-test counts.
+	for _, kv := range herdrEnv {
+		if sock, ok := strings.CutPrefix(kv, "GX_HERDR_FAKE_HELPER_SOCKET="); ok {
+			spikecount.Record("harness\t" + sock + "\t" + t.Name())
+		}
+	}
 
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
