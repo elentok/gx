@@ -183,7 +183,7 @@ func TestPty_TurnStallLeavesTheRunWorkingWithNoTurnEnd(t *testing.T) {
 	queueWithTurn(t, h, func(turn *Turn) { turn.Stall() })
 	WaitFor(t, 30*time.Second, "the live iteration", func() bool { return liveIterations(t, h) == 1 })
 
-	time.Sleep(10 * ptyPollInterval)
+	time.Sleep(10 * ptyPollInterval) // negative wait: a wrong reap would come within a few polls
 
 	if n := liveIterations(t, h); n != 1 {
 		t.Errorf("live iterations = %d, want the stalled run still live", n)
@@ -290,7 +290,7 @@ func TestPty_HoldKeepsTheRunWorkingUntilReleased(t *testing.T) {
 	queueWithTurn(t, h, func(turn *Turn) { release = turn.Hold() })
 	WaitFor(t, 30*time.Second, "the live iteration", func() bool { return liveIterations(t, h) == 1 })
 
-	time.Sleep(10 * ptyPollInterval)
+	time.Sleep(10 * ptyPollInterval) // negative wait: a wrong reap would come within a few polls
 	if n := liveIterations(t, h); n != 1 {
 		t.Fatalf("live iterations = %d, want the held run still live", n)
 	}
@@ -344,7 +344,7 @@ func TestPty_BlockStopsCountsAStopAndHoldsItUntilReleased(t *testing.T) {
 		}
 		return n
 	}
-	time.Sleep(10 * ptyPollInterval)
+	time.Sleep(10 * ptyPollInterval) // negative wait: a wrongly killed agent would be gone within a few polls
 	if n := alive(); n != 1 {
 		t.Fatalf("live agent processes = %d, want the one the blocked stop holds alive", n)
 	}

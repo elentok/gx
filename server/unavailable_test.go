@@ -70,7 +70,7 @@ func TestUnavailable_MissingPathExplainsNotifiesOnceAndSetPathRecovers(t *testin
 		t.Fatalf("explain = %+v, want project unavailable naming %s", ex, repo)
 	}
 	servertest.Poll(15*time.Second, func() bool { return unavailableSends() > 0 })
-	time.Sleep(300 * time.Millisecond) // many 50ms polls pass; the notification must stay single
+	time.Sleep(300 * time.Millisecond) // negative wait: many 50ms polls pass; the notification must stay single
 	if n := unavailableSends(); n != 1 {
 		t.Fatalf("unavailable notifications = %d, want 1", n)
 	}

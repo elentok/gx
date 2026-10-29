@@ -317,10 +317,10 @@ func TestHardLimitGrace_ShutdownStopsCountdownAfterWatcher(t *testing.T) {
 	})
 	unlock := f.h.Server.LockReload()
 	servertest.WriteConfig(t, f.path, f.store, budgetLimits(0, 6))
-	time.Sleep(200 * time.Millisecond) // the watcher's reload now waits on the lock
+	time.Sleep(200 * time.Millisecond) // negative wait: the watcher's reload now waits on the lock; no event marks that
 	stopped := make(chan error, 1)
 	go func() { stopped <- f.h.Stop() }()
-	time.Sleep(200 * time.Millisecond) // shutdown now waits on the watcher
+	time.Sleep(200 * time.Millisecond) // negative wait: shutdown now waits on the watcher; no event marks that
 	unlock()
 	if err := <-stopped; err != nil {
 		t.Fatal(err)
