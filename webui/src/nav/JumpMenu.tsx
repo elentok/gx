@@ -197,6 +197,7 @@ function Menu({
           placeholder={placeholder}
           h="40px"
           fontSize="16px"
+          _focusVisible={{ borderColor: "tone.running.fg", boxShadow: "none" }}
           value={query}
           role="combobox"
           aria-expanded

@@ -140,7 +140,10 @@ export function SessionView({
           options={AGENT_OPTIONS}
         />
       ) : (
-        <NoChat session={session} fetchScreen={fetchScreen} />
+        <>
+          <NoChat session={session} fetchScreen={fetchScreen} />
+          <Box flex="1" />
+        </>
       )}
       <Composer
         design={false}

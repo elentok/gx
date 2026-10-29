@@ -214,7 +214,6 @@ export function Composer({
         position="sticky"
         bottom="0"
         bg="surface"
-        borderTopWidth={wide ? "1px" : "0"}
         py="3"
         display="flex"
         flexDirection="column"
@@ -233,7 +232,7 @@ export function Composer({
             rows={3}
             resize="none"
             aria-label="Message"
-            placeholder="A message to the agent"
+            placeholder={`Message ${session.name || session.id}`}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onSubmit && ((e) => submitOnCmdEnter(e, onSubmit))}

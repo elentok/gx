@@ -954,6 +954,12 @@ function renderAgents(opts: {
   return screen.getByLabelText("Message") as HTMLTextAreaElement;
 }
 
+test("Agents page: the placeholder names the session and no hairline tops the composer", () => {
+  const box = renderAgents({ post: vi.fn<PostPrompt>(async () => ok) });
+  expect(box.placeholder).toBe(`Message ${session("idle").name || session("idle").id}`);
+  expect(getComputedStyle(screen.getByRole("form", { name: "Composer" })).borderTopWidth).not.toBe("1px");
+});
+
 test("Agents page: Cmd or Ctrl+Enter sends like the Send button", async () => {
   for (const mod of ["metaKey", "ctrlKey"] as const) {
     const post = vi.fn<PostPrompt>(async () => ok);
