@@ -51,7 +51,9 @@ func (s *Server) bindWeb() {
 		s.log.Warn("web listener is bound to all interfaces and serves its token over plain HTTP", "addr", ln.Addr().String())
 	}
 	s.web = ln
-	s.webHTTP = &http.Server{Handler: requireHost(func() []string { return s.settings.Load().WebAllowedHosts }, requireToken(s.cfg.StateDir, webCookieName(ln), s.webHandler()))}
+	mux := s.webHandler()
+	protected := requireToken(s.cfg.StateDir, webCookieName(ln), mux)
+	s.webHTTP = &http.Server{Handler: requireHost(func() []string { return s.settings.Load().WebAllowedHosts }, servePublicFirst(mux, protected))}
 }
 
 // WebURL is the web listener's base URL, or "" when it is off or failed to bind.
@@ -146,6 +148,7 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/afk":               func(s *Server) http.HandlerFunc { return s.afkWrite },
 	"POST /v1/checks/save":       func(s *Server) http.HandlerFunc { return s.checksSaveWrite },
 	"POST /v1/disk/clean":        func(s *Server) http.HandlerFunc { return s.diskCleanWrite },
+	"POST /v1/client-errors":     func(s *Server) http.HandlerFunc { return s.clientErrorReport },
 }
 
 // checkWriteRequest returns why a non-GET request is refused, or "". It is the

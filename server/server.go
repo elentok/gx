@@ -262,6 +262,7 @@ type Server struct {
 	webDev      http.Handler // nil unless Config.WebDevURL is set and valid
 	webHTTP     *http.Server
 	webErr      string // why the web bind failed
+	clientErrs  ipLimiter
 	logf        *rotatingFile
 	log         *slog.Logger
 	idx         *index
