@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -214,57 +215,52 @@ func TestRecovery_UndeliverablePromptClosesThePane(t *testing.T) {
 }
 
 // pauseTimedOutCompaction pauses ticket 01 the way an iteration ends after its
-// smart-zone compaction wait timed out, with the pane answering the extended
-// wait with waitErr, and returns R7's applied event plus what was typed.
-func pauseTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Event, waits int, typed []string) {
+// smart-zone compaction wait timed out, with the agent's launch turn held open
+// until finish (if finish) and R7 waiting at most rewait for it. It returns
+// R7's applied event plus every prompt the agent got.
+func pauseTimedOutCompaction(t *testing.T, rewait time.Duration, finish bool) (applied ralphloop.Event, prompts []string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture), func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.Recovery = recovery.Default()
-		// herdrrunner re-polls a timed-out wait until its deadline; one poll
-		// has to outlast this.
-		c.CompactRewaitTimeout = time.Nanosecond
+		c.CompactRewaitTimeout = rewait
 	})
 	var mu sync.Mutex
-	// After the test the pane is gone, so the watch a nudge starts on it ends.
-	var gone atomic.Bool
-	t.Cleanup(func() { gone.Store(true) })
-	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if gone.Load() {
-			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
-		}
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "tab_id": "tab-1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
-	})
-	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-		if gone.Load() {
-			return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
-		}
+	var texts []string
+	var release func()
+	h.OnTurn(func(turn *servertest.Turn) {
 		mu.Lock()
 		defer mu.Unlock()
-		if len(typed) == 0 { // R7's own wait; later ones watch the nudged pane
-			waits++
+		texts = append(texts, turn.Text)
+		if len(texts) == 1 { // the launch turn stays open: the agent is mid-compaction
+			release = turn.Hold()
 		}
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "agent_status": "idle"}}, herdrfake.Identities{}, waitErr
 	})
-	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+	sent := func() []string {
 		mu.Lock()
 		defer mu.Unlock()
-		typed = append(typed, argv[3])
-		return map[string]any{"agent": map[string]any{"pane_id": "pane-1", "agent_status": "working", "state_change_seq": 2}}, herdrfake.Identities{}, nil
-	})
+		return slices.Clone(texts)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	// A launched run has seen its agent start the held turn; before that the agent is idle.
+	waitFor(t, func() bool { return len(sent()) == 1 && len(h.Server.Runs()) == 1 && h.Server.LaunchingRuns() == 0 })
 	dir := filepath.Join(store, "proj")
-	for _, ev := range []ralphloop.Event{
-		{Type: string(events.IterationStarted), Ticket: "01"},
-		{Type: string(events.SmartZoneRecoveryFailed), Ticket: "01", Reason: `compacting epic-a-01 after smart-zone breach: {"code":"timeout"}`},
-	} {
-		if err := ralphloop.AppendEvent(dir, "epic-a", ev); err != nil {
-			t.Fatal(err)
-		}
+	if err := ralphloop.AppendEvent(dir, "epic-a", ralphloop.Event{Type: string(events.SmartZoneRecoveryFailed), Ticket: "01", Reason: `compacting epic-a-01 after smart-zone breach: {"code":"timeout"}`}); err != nil {
+		t.Fatal(err)
 	}
 	if err := h.Server.PauseAs("proj:epic-a/01", events.IterationError, "compact recovery exhausted"); err != nil {
 		t.Fatal(err)
+	}
+	if finish {
+		mu.Lock()
+		release()
+		mu.Unlock()
 	}
 	waitFor(t, func() bool {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
@@ -276,33 +272,28 @@ func pauseTimedOutCompaction(t *testing.T, waitErr error) (applied ralphloop.Eve
 		}
 		return false
 	})
-	mu.Lock()
-	defer mu.Unlock()
-	return applied, waits, typed
+	return applied, sent()
 }
 
 func TestRecovery_TimedOutCompactionIsReWaitedOnceThenFinishedUpByR7(t *testing.T) {
 	t.Parallel()
-	applied, waits, typed := pauseTimedOutCompaction(t, nil)
+	applied, prompts := pauseTimedOutCompaction(t, 30*time.Second, true)
 	if applied.Reason != "R7" || applied.Kind != string(events.IterationError) || applied.Outcome != "ok" {
 		t.Errorf("applied = %+v, want R7 ok", applied)
 	}
-	if waits != 1 {
-		t.Errorf("waits = %d, want one extended wait", waits)
-	}
-	if len(typed) != 1 || typed[0] != recovery.FinishUpPrompt {
-		t.Errorf("typed = %q, want only the finish-up prompt, never /compact", typed)
+	if len(prompts) != 2 || prompts[1] != recovery.FinishUpPrompt {
+		t.Errorf("prompts = %q, want the launch prompt then only the finish-up prompt, never /compact", prompts)
 	}
 }
 
 func TestRecovery_SecondCompactionTimeoutLeavesThePauseToAPerson(t *testing.T) {
 	t.Parallel()
-	applied, waits, typed := pauseTimedOutCompaction(t, errors.New("timed out waiting for agent status"))
+	applied, prompts := pauseTimedOutCompaction(t, 200*time.Millisecond, false)
 	if applied.Reason != "R7" || applied.Outcome == "ok" {
 		t.Errorf("applied = %+v, want a failed R7", applied)
 	}
-	if waits != 1 || len(typed) != 0 {
-		t.Errorf("waits = %d, typed = %q; want one wait and nothing typed", waits, typed)
+	if len(prompts) != 1 {
+		t.Errorf("prompts = %q, want only the launch prompt", prompts)
 	}
 }
 
@@ -685,6 +676,14 @@ func startR3(t *testing.T, opts ...func(*server.Config)) *servertest.Harness {
 // zero-commit the way a real iteration does.
 func runToZeroCommitPause(t *testing.T, h *servertest.Harness, last string) {
 	t.Helper()
+	h.OnTurn(func(turn *servertest.Turn) { turn.Transcript(last) })
+	queueToZeroCommitPause(t, h)
+}
+
+// runToZeroCommitPauseOnHerdr is runToZeroCommitPause for the tests still on
+// herdr handlers.
+func runToZeroCommitPauseOnHerdr(t *testing.T, h *servertest.Harness, last string) {
+	t.Helper()
 	home := h.Env("HOME")
 	registerTurn(h)
 	var cwd atomic.Value // the tab's cwd: the overridden agent start records no AgentStart
@@ -726,7 +725,11 @@ func runToZeroCommitPause(t *testing.T, h *servertest.Harness, last string) {
 	})
 	h.Herdr.Register("agent", "wait", reply)
 	h.Herdr.Register("agent", "prompt", turn)
+	queueToZeroCommitPause(t, h)
+}
 
+func queueToZeroCommitPause(t *testing.T, h *servertest.Harness) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -753,7 +756,7 @@ func TestRecovery_ZeroCommitPauseMatchesOnItsTranscriptText(t *testing.T) {
 		{"R3", "The feature is already implemented on the feature branch.", "R3"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			h := startR3(t, servertest.WithHerdr(servertest.UntilPtyFixture))
+			h := startR3(t)
 			runToZeroCommitPause(t, h, tc.last)
 			waitFor(t, func() bool {
 				for _, tk := range epicTickets(t, h).Tickets {
@@ -770,7 +773,7 @@ func TestRecovery_ZeroCommitPauseMatchesOnItsTranscriptText(t *testing.T) {
 
 func TestRecovery_R3CommitlessDoneIsProposedAndOnlyApprovalMarksItDone(t *testing.T) {
 	t.Parallel()
-	h := startR3(t, servertest.WithHerdr(servertest.UntilPtyFixture))
+	h := startR3(t)
 	runToZeroCommitPause(t, h, "Nothing to do: this is already implemented in a sibling ticket.")
 	dir := filepath.Join(h.TicketStore, "proj")
 	waitFor(t, func() bool {

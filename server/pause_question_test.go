@@ -34,7 +34,7 @@ func TestPause_ZeroCommitLogsGxQuestion(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture))
-	runToZeroCommitPause(t, h, "done")
+	runToZeroCommitPauseOnHerdr(t, h, "done")
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	waitStatus(t, path, schema.StatusLegacyAnswer)
 	assertGxQuestion(t, path, events.ZeroCommit,
