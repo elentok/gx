@@ -10,7 +10,7 @@ import { fetchWorktrees, postCreateSession, type CreateSession, type FetchWorktr
 import { trimmed, useNewSessionDraft, type NewSessionDraft } from "./useNewSessionDraft";
 import { baseName, WorktreePicker, type Option } from "./WorktreePicker";
 
-const TIERS = [
+export const TIERS = [
   { id: "light", label: "Light" },
   { id: "worker", label: "Worker" },
   { id: "strongest", label: "Strongest" },

@@ -45,6 +45,24 @@ test("a round in the chat shows no question sheet", async () => {
   expect(screen.queryByRole("group", { name: "View" })).toBeNull();
 });
 
+test("the header shows model and effort with a tier tooltip, and CLI default until a model is reported", async () => {
+  render([session("s-1", "p", { name: "one", tier: "strongest", model: "claude-opus-5", effort: "high" })], "/agents/s-1", true, chatOf(chat()));
+  const label = await screen.findByText("claude-opus-5 · high");
+  expect(label.getAttribute("title")).toBe("Strongest tier");
+  cleanup();
+  render([session("s-1", "p", { name: "one", tier: "strongest", model: "claude-opus-5" })], "/agents/s-1", true, chatOf(chat()));
+  expect(await screen.findByText("claude-opus-5")).toBeTruthy();
+  cleanup();
+  render([session("s-1", "p", { name: "one", tier: "worker" })], "/agents/s-1", true, chatOf(chat()));
+  expect(await screen.findByText("Worker · CLI default")).toBeTruthy();
+});
+
+test("the header shows no model label when tier, model and effort are all empty", async () => {
+  render([session("s-1", "p", { name: "one" })], "/agents/s-1", true, chatOf(chat()));
+  const header = within((await screen.findByRole("heading", { name: /one/ })).closest("header")!);
+  expect(header.queryByText(/CLI default|·/)).toBeNull();
+});
+
 test("a failed re-read keeps the last chat", async () => {
   let calls = 0;
   const { emit } = render([session("s-1", "p")], "/agents/s-1", true, {
