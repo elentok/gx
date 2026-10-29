@@ -58,7 +58,9 @@ func restartUnder(t *testing.T, savedRunner string, configured agentrunner.Runne
 		}
 		return others[name]
 	})}, opts...)...)
-	registerLiveAgent(h)
+	if h.Herdr != nil {
+		registerLiveAgent(h)
+	}
 	h.DropAgentsAtCleanup(configured)
 	for _, r := range others {
 		h.DropAgentsAtCleanup(r)

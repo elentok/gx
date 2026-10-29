@@ -75,9 +75,11 @@ func TestRecoveryRunner_LiveCheckAgreesAcrossShapes(t *testing.T) {
 				opts = append(opts, servertest.WithHerdr(servertest.HerdrIsTheSubject))
 			}
 			h, fake, sess := startOnRunner(t, c.runner, opts...)
-			h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-				return map[string]any{"agent": map[string]any{"pane_id": sess.ID, "tab_id": "tab-1"}}, herdrfake.Identities{}, nil
-			})
+			if h.Herdr != nil {
+				h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+					return map[string]any{"agent": map[string]any{"pane_id": sess.ID, "tab_id": "tab-1"}}, herdrfake.Identities{}, nil
+				})
+			}
 			fake.SetState(iterLabel, c.state, "")
 			its, err := h.Client.Iterations(context.Background())
 			if err != nil {

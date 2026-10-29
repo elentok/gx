@@ -218,6 +218,10 @@ func (h *Harness) OnTurn(agent func(t *Turn)) {
 		h.turn.Store(&agent)
 		return
 	}
+	// A test on its own runner never launches through herdr: nothing to answer.
+	if h.Herdr == nil {
+		return
+	}
 	var mu sync.Mutex
 	cwds := map[string]string{}  // pane -> cwd
 	named := map[string]string{} // agent name -> pane
@@ -535,6 +539,13 @@ func resolveRunner(cfg *server.Config, ch *runnerChoice) {
 	}
 }
 
+// herdrAllowed is whether the test may reach the fake herdr: it asked with
+// WithHerdr, or it set no runner and falls back to herdr. gx:pty-as-default
+// drops the fallback.
+func herdrAllowed(ch *runnerChoice) bool {
+	return ch.herdr || (ch.runner == nil && !ch.pty)
+}
+
 // shortTempRoot is the temp root of a harness's state dir, short enough for the
 // holder sockets below it.
 const shortTempRoot = "/tmp"
@@ -556,8 +567,10 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		}
 	})
 
+	// The fake herdr is first on PATH in every test; h.Herdr is only set, and the
+	// fake only answers, when the test may use herdr (see herdrAllowed).
+	herdr := herdrfake.NewState(t)
 	h := &Harness{
-		Herdr:       herdrfake.NewState(t),
 		StateDir:    filepath.Join(stateDir, "state"),
 		SessionsDir: filepath.Join(stateDir, "sessions"),
 		TicketStore: store,
@@ -568,13 +581,13 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	t.Cleanup(func() { stopSessionHolders(h.SessionsDir) })
 	h.herdrDown.Store(herdrDown)
 	// The server's herdr probe is `workspace list`; answer it unless told to fail.
-	h.Herdr.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+	herdr.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		if h.herdrDown.Load() {
 			return nil, herdrfake.Identities{}, errors.New("herdr unavailable")
 		}
 		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
 	})
-	_, herdrEnv := herdrfake.StartStateEnv(t, h.Herdr)
+	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
@@ -627,6 +640,11 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	}
 	resolveRunner(&h.cfg, choice)
 	h.pty = choice.pty && choice.runner == nil
+	if herdrAllowed(choice) {
+		h.Herdr = herdr
+	} else {
+		herdr.Forbid()
+	}
 	if h.cfg.Notifier == nil {
 		h.Banners = &Banners{}
 		h.cfg.Notifier = h.Banners

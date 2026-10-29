@@ -148,7 +148,9 @@ type State struct {
 	trace   []TraceEntry
 
 	logf     func(format string, args ...any)
+	errorf   func(format string, args ...any)
 	failed   func() bool
+	forbid   bool
 	inFlight atomic.Bool
 	lastBeat atomic.Int64
 	dumped   atomic.Bool
@@ -165,8 +167,18 @@ func NewState(t testing.TB) *State {
 		Sessions:   map[string]*Session{},
 		commands:   map[string]CommandFunc{},
 		logf:       t.Logf,
+		errorf:     t.Errorf,
 		failed:     t.Failed,
 	}
+}
+
+// Forbid makes every later command fail the test and answer with an error. It
+// is for a test that must never reach herdr. It reports with Errorf, not
+// Fatalf: commands run off the test goroutine.
+func (s *State) Forbid() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.forbid = true
 }
 
 // Register installs fn as the implementation of the herdr subcommand named
@@ -242,7 +254,11 @@ func (s *State) dispatch(argv []string) ([]byte, int) {
 		exitCode int
 		ids      Identities
 	)
-	if len(argv) < 2 {
+	if s.forbid {
+		msg := fmt.Sprintf("herdrfake: unexpected herdr call: herdr %s", strings.Join(argv[:min(len(argv), 2)], " "))
+		s.errorf("%s", msg)
+		output, exitCode = CommandError(msg)
+	} else if len(argv) < 2 {
 		output, exitCode = CommandError(fmt.Sprintf("herdrfake: command too short: %v", argv))
 	} else if fn, ok := s.commands[argv[0]+" "+argv[1]]; !ok {
 		output, exitCode = CommandError(fmt.Sprintf("herdrfake: unimplemented command: %s %s", argv[0], argv[1]))
