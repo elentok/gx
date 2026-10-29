@@ -110,6 +110,8 @@ type WebConfig struct {
 	// AllowedHosts are host names, besides IP literals and localhost, the
 	// listener accepts in the Host header.
 	AllowedHosts []string `json:"allowed-hosts"`
+	// TOTP is whether web login asks for a TOTP code. True when absent.
+	TOTP bool `json:"totp"`
 }
 
 // DevFrontendURL is the dev server URL to proxy to, or "" when dev-frontend is off.
@@ -143,7 +145,7 @@ func defaultWith(dataDir func() (string, error)) Config {
 		Agents:                DefaultAgentsConfig(),
 		Subscription:          DefaultSubscriptionConfig(),
 		TicketStore:           ticketStoreConfigWith(dataDir),
-		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished, Web: WebConfig{DevURL: DefaultWebDevURL}},
+		Server:                ServerConfig{WatchConfig: true, RecentlyFinished: DefaultRecentlyFinished, Web: WebConfig{DevURL: DefaultWebDevURL, TOTP: true}},
 		Recovery:              RecoveryConfig{Enabled: true, NotifyHold: DefaultRecoveryNotifyHold},
 		CPUWatchdog:           DefaultCPUWatchdogConfig(),
 		DiskSpace:             DefaultDiskSpaceConfig(),
@@ -280,6 +282,7 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 				DevURL      *string `json:"dev-url"`
 
 				AllowedHosts []string `json:"allowed-hosts"`
+				TOTP         *bool    `json:"totp"`
 			} `json:"web"`
 		} `json:"server"`
 		AgentRunner       *string `json:"agent-runner"`
@@ -478,6 +481,9 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 	}
 	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.AllowedHosts != nil {
 		cfg.Server.Web.AllowedHosts = raw.Server.Web.AllowedHosts
+	}
+	if raw.Server != nil && raw.Server.Web != nil && raw.Server.Web.TOTP != nil {
+		cfg.Server.Web.TOTP = *raw.Server.Web.TOTP
 	}
 	if raw.Server != nil && raw.Server.TabEnv != nil {
 		cfg.Server.TabEnv = raw.Server.TabEnv

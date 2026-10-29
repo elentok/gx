@@ -194,6 +194,7 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST " + webAuthPathSetupStart:  func(s *Server) http.HandlerFunc { return s.webSetupStart },
 	"POST " + webAuthPathSetupFinish: func(s *Server) http.HandlerFunc { return s.webSetupFinish },
 	"POST " + webAuthPathLogin:       func(s *Server) http.HandlerFunc { return s.webLoginWrite },
+	"POST " + webAuthPathAddAuth:     func(s *Server) http.HandlerFunc { return s.webAddAuthenticator },
 	"POST " + webAuthPathSignOut:     func(s *Server) http.HandlerFunc { return s.webSignOut },
 }
 

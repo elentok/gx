@@ -24,6 +24,7 @@ var webOnlyRoutes = []WebOnlyRoute{
 	{Pattern: "POST " + webAuthPathSetupStart, Public: true},
 	{Pattern: "POST " + webAuthPathSetupFinish, Public: true},
 	{Pattern: "POST " + webAuthPathLogin, Public: true},
+	{Pattern: "POST " + webAuthPathAddAuth, Public: true},
 	{Pattern: "POST " + webAuthPathSignOut},
 }
 

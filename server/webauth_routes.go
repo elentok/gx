@@ -18,6 +18,7 @@ const (
 	ReasonSetupNotPending    = "setup-not-pending"
 	ReasonTOTPMismatch       = "totp-mismatch"
 	ReasonPasswordTooShort   = "password-too-short"
+	ReasonTOTPOff            = "totp-off"
 	webLoginCookiePrefix     = "__Host-gx_login"
 	webLoginCookieMaxAge     = int(webLoginIdleLimit / time.Second)
 	webAuthBodyMax           = 4 << 10
@@ -25,6 +26,7 @@ const (
 	webAuthPathSetupStart    = "/v1/web/auth/setup-start"
 	webAuthPathSetupFinish   = "/v1/web/auth/setup-finish"
 	webAuthPathLogin         = "/v1/web/auth/login"
+	webAuthPathAddAuth       = "/v1/web/auth/add-authenticator"
 	webAuthPathSignOut       = "/v1/web/auth/sign-out"
 	webAuthStateSetup        = "setup"
 	webAuthStateSignedOut    = "signed-out"
@@ -32,8 +34,8 @@ const (
 	webLoginCookieRenewEvery = time.Minute
 )
 
-// webTOTPOn is whether login asks for a TOTP code. The config key comes later.
-const webTOTPOn = true
+// webTOTPOn is whether login asks for a TOTP code (config server.web.totp).
+func (s *Server) webTOTPOn() bool { return !s.settings.Load().WebTOTPOff }
 
 type webAuthResult struct {
 	Refused     bool   `json:"refused,omitempty"`
@@ -49,7 +51,8 @@ type webAuthResult struct {
 type webAuthState struct {
 	State   string `json:"state"`
 	LoginID string `json:"login_id,omitempty"`
-	// TOTPOn and SetupCodeRequired tell the login and setup pages which fields to ask for.
+	// TOTPOn is whether login asks for a code (config server.web.totp); SetupCodeRequired
+	// is whether it also needs the Setup code (after the CLI authenticator reset).
 	TOTPOn            bool `json:"totp_on"`
 	SetupCodeRequired bool `json:"setup_code_required"`
 }
@@ -58,6 +61,8 @@ type webAuthBody struct {
 	Code     string `json:"code"`
 	Password string `json:"password"`
 	TOTPCode string `json:"totp_code"`
+	// PendingID names the secret an "authenticator needed" login handed out.
+	PendingID string `json:"pending_id"`
 	// SetupCode is the Setup code a login needs after the CLI reset.
 	SetupCode string `json:"setup_code"`
 }
@@ -143,7 +148,8 @@ func (s *Server) denyWeb(mux http.Handler) http.Handler {
 }
 
 func (s *Server) webAuthStateRead(w http.ResponseWriter, r *http.Request) {
-	state := webAuthState{TOTPOn: webTOTPOn, SetupCodeRequired: webTOTPOn && s.webAuth.ResetPending()}
+	totp := s.webTOTPOn()
+	state := webAuthState{TOTPOn: totp, SetupCodeRequired: totp && s.webAuth.AuthenticatorResetPending()}
 	if login, _, ok := s.webLoginFor(r); ok {
 		state.State, state.LoginID = webAuthStateSignedIn, login.ID
 		writeJSON(w, state)
@@ -201,7 +207,7 @@ func (s *Server) webSetupStart(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	secret, err := s.webAuth.SetupStart(webTOTPOn, body.Code, remoteIP(r))
+	secret, err := s.webAuth.SetupStart(s.webTOTPOn(), body.Code, remoteIP(r))
 	if err != nil {
 		refuseWebAuth(w, err, ReasonSetupCodeWrong)
 		return
@@ -218,7 +224,7 @@ func (s *Server) webSetupFinish(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	cookie, err := s.webAuth.SetupFinish(webTOTPOn, body.Code, body.Password, body.TOTPCode, remoteIP(r), r.UserAgent())
+	cookie, err := s.webAuth.SetupFinish(s.webTOTPOn(), body.Code, body.Password, body.TOTPCode, remoteIP(r), r.UserAgent())
 	if err != nil {
 		refuseWebAuth(w, err, ReasonSetupCodeWrong)
 		return
@@ -232,7 +238,7 @@ func (s *Server) webLoginWrite(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	cookie, err := s.webAuth.Login(webTOTPOn, body.Password, body.TOTPCode, body.SetupCode, remoteIP(r), r.UserAgent())
+	cookie, err := s.webAuth.Login(s.webTOTPOn(), body.Password, body.TOTPCode, body.SetupCode, remoteIP(r), r.UserAgent())
 	var needed *AuthenticatorNeededError
 	if errors.As(err, &needed) {
 		writeJSON(w, webAuthResult{AuthenticatorNeeded: true, PendingID: needed.PendingID, Secret: needed.Secret, URI: needed.URI})
@@ -242,6 +248,28 @@ func (s *Server) webLoginWrite(w http.ResponseWriter, r *http.Request) {
 		refuseWebAuth(w, err, ReasonWrongCredentials)
 		return
 	}
+	s.setLoginCookie(w, cookie, webLoginCookieMaxAge)
+	writeJSON(w, webAuthResult{})
+}
+
+// webAddAuthenticator saves the secret a login handed out and signs the browser in.
+func (s *Server) webAddAuthenticator(w http.ResponseWriter, r *http.Request) {
+	body, ok := readWebAuthBody(w, r)
+	if !ok {
+		return
+	}
+	if !s.webTOTPOn() {
+		writeJSON(w, webAuthResult{Refused: true, Reason: ReasonTOTPOff})
+		return
+	}
+	ip := remoteIP(r)
+	cookie, err := s.webAuth.AddAuthenticator(body.PendingID, body.TOTPCode, ip, r.UserAgent())
+	if err != nil {
+		refuseWebAuth(w, err, ReasonWrongCredentials)
+		return
+	}
+	login, _ := s.webAuth.Lookup(cookie, ip)
+	s.log.Info("authenticator added", "ip", ip, "name", login.Name)
 	s.setLoginCookie(w, cookie, webLoginCookieMaxAge)
 	writeJSON(w, webAuthResult{})
 }

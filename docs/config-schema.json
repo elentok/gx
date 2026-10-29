@@ -264,6 +264,11 @@
               "default": [],
               "description": "Host names the web listener accepts in the Host header, besides IP literals and localhost (e.g. a MagicDNS name). Matched without the port, case-insensitively. Any other Host gets a 403. Reloads without a restart."
             },
+            "totp": {
+              "type": "boolean",
+              "default": true,
+              "description": "Whether web login asks for a TOTP code besides the password. Reloads without a restart; signed-in web logins stay signed in."
+            },
             "dev-frontend": {
               "type": "boolean",
               "default": false,

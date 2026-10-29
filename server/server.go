@@ -149,6 +149,10 @@ type Settings struct {
 	// literals and localhost, that the web listener accepts in Host.
 	WebAllowedHosts []string
 
+	// WebTOTPOff is config server.web.totp turned off. Inverted so a zero
+	// Settings keeps TOTP on.
+	WebTOTPOff bool
+
 	// WebInterfaceIPs lists the local interface IPs the web URL may fall back
 	// to; nil reads the machine's interfaces. Tests inject it.
 	WebInterfaceIPs func() []net.IP
@@ -201,6 +205,7 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		AgentsClaude:                cfg.Agents.Claude,
 		AgentsCodex:                 cfg.Agents.Codex,
 		WebAllowedHosts:             cfg.Server.Web.AllowedHosts,
+		WebTOTPOff:                  !cfg.Server.Web.TOTP,
 	}
 }
 

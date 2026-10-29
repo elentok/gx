@@ -1121,6 +1121,25 @@ func TestLoadCPUWatchdog(t *testing.T) {
 	}
 }
 
+func TestLoadServerWebTOTP(t *testing.T) {
+	for body, want := range map[string]bool{
+		`{}`:                                true,
+		`{"server":{"web":{}}}`:             true,
+		`{"server":{"web":{"totp":true}}}`:  true,
+		`{"server":{"web":{"totp":false}}}`: false,
+	} {
+		tmp := t.TempDir()
+		prev := userConfigDirFn
+		userConfigDirFn = func() (string, error) { return tmp, nil }
+		t.Cleanup(func() { userConfigDirFn = prev })
+		writeBudgetConfig(t, tmp, body)
+		cfg, err := Load()
+		if err != nil || cfg.Server.Web.TOTP != want {
+			t.Errorf("%s: TOTP = %v (err %v), want %v", body, cfg.Server.Web.TOTP, err, want)
+		}
+	}
+}
+
 func TestLoadServerWebDevFrontend(t *testing.T) {
 	for body, want := range map[string]string{
 		`{}`: "",

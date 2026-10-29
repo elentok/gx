@@ -175,8 +175,9 @@ func (w *WebAuth) SetupStateWithExpiry() (pending bool, code string, expires tim
 	return true, formatSetupCode(code), w.setupCreated.Add(setupCodeLifetime), nil
 }
 
-// ResetPending is whether the authenticator was cleared and login needs the Setup code (TOTP on).
-func (w *WebAuth) ResetPending() bool {
+// AuthenticatorResetPending reports whether the CLI reset cleared the
+// authenticator and no new one was added yet.
+func (w *WebAuth) AuthenticatorResetPending() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.file.AuthenticatorResetPending
