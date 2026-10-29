@@ -8,7 +8,10 @@ import { renderThemed } from "../ui/render";
 import type { FetchChat } from "./chat";
 import type { PostPrompt } from "./prompt";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 const ago = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
@@ -338,8 +341,7 @@ test("a reload keeps the notes box, the open question and the scroll", async () 
   renderChat([session()], roundChat());
   const again = await screen.findByRole("group", { name: "Questions" });
   expect(within(again).getByRole("button", { name: "Question 3" }).getAttribute("aria-current")).toBe("step");
-  fireEvent.click(screen.getByRole("button", { name: "Note" }));
-  expect((screen.getByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value).toBe("for all");
+  expect((await screen.findByRole("textbox", { name: "Message" }) as HTMLTextAreaElement).value).toBe("for all");
   expect(scrollTo).toHaveBeenCalledWith(0, 120);
   scrollTo.mockRestore();
 });
@@ -365,6 +367,18 @@ test("sending the round drops its draft", async () => {
   renderChat([session()], roundChat(), post);
   const again = await screen.findByRole("group", { name: "Questions" });
   expect(within(again).queryByRole("button", { name: "Question 1, answered" })).toBeNull();
+});
+
+test("during a round the box shows the composer draft; Send answers uses it as the note and clears it", async () => {
+  localStorage.setItem("gx.draft.composer.s-a", "shared note");
+  const post = vi.fn<PostPrompt>(async () => ({}));
+  renderChat([session()], roundChat(), post);
+  expect(((await screen.findByRole("textbox", { name: "Message" })) as HTMLTextAreaElement).value).toBe("shared note");
+  fireEvent.click(screen.getByRole("button", { name: "Send answers" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Send anyway" }));
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  expect(post.mock.calls[0][0].text).toMatch(/\n\nNote:\nshared note$/);
+  await waitFor(() => expect(localStorage.getItem("gx.draft.composer.s-a")).toBeNull());
 });
 
 const implDetail = { impl_address: "gx:a-impl", steps: [{ step: "branch", label: "Branch", state: "current" }] };

@@ -1,5 +1,6 @@
 import { Box, Spinner, Text } from "@chakra-ui/react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useComposerDraft } from "../drafts";
 import type {
   SessionInfo,
   SessionNext,
@@ -42,8 +43,6 @@ export function Composer({
   onStale,
   round = [],
   answers = {},
-  initialText = "",
-  onText,
   onRoundSent,
   onReview,
   autoMenu,
@@ -64,9 +63,6 @@ export function Composer({
   /** The open Grilling round: Send answers all of it in one prompt. */
   round?: SessionRoundCard[];
   answers?: Answers;
-  /** The notes box starts with this text, and `onText` hears every change, so the caller can keep a draft. */
-  initialText?: string;
-  onText?: (text: string) => void;
   /** The round went out. */
   onRoundSent?: () => void;
   /** A row of the unanswered popover: open the sheet at that question. */
@@ -75,16 +71,16 @@ export function Composer({
   autoMenu: AutoMenuState;
 }) {
   const wide = useWide();
-  const [open, setOpen] = useState(false);
   const [gapsOpen, setGapsOpen] = useState(false);
   const sendRef = useRef<HTMLButtonElement>(null);
   const [interruptOpen, setInterruptOpen] = useState(false);
   const interruptRef = useRef<HTMLButtonElement>(null);
-  const [text, setTextState] = useState(initialText);
-  const setText = (t: string) => {
-    setTextState(t);
-    onText?.(t);
-  };
+  const [text, setText] = useComposerDraft(session.id);
+  // Shared text is never hidden behind a closed Note: it opens on load and on every change (another tab).
+  const [open, setOpen] = useState(text !== "");
+  useEffect(() => {
+    if (text !== "") setOpen(true);
+  }, [text]);
   const { run: write, pending } = useWrite();
   const enabled = connected && promptable(session) && !pending;
 

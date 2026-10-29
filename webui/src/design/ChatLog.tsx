@@ -170,7 +170,7 @@ function ChatTail({
   roundDraft: RoundDraft;
   autoMenu: AutoMenuState;
 }) {
-  const { draft, setAnswers, setNotes, setIndex, clear } = roundDraft;
+  const { draft, setAnswers, setIndex, clear } = roundDraft;
   const { answers } = draft;
   const [focus, setFocus] = useState<{ index: number }>();
   const failure = visibleFailure(session.failure, done);
@@ -223,8 +223,6 @@ function ChatTail({
           onStale={onStale}
           round={round}
           answers={answers}
-          initialText={draft.notes}
-          onText={setNotes}
           onRoundSent={() => {
             clear();
             onQuestions(false);

@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { readRoundDraft, writeRoundDraft } from "../drafts";
 import type { Answers } from "./round";
 
-type RoundDraftData = { answers: Answers; notes: string; index: number; scroll: number };
+type RoundDraftData = { answers: Answers; index: number; scroll: number };
 
-const EMPTY: RoundDraftData = { answers: {}, notes: "", index: 0, scroll: 0 };
+const EMPTY: RoundDraftData = { answers: {}, index: 0, scroll: 0 };
 
 // Scrolls to `initial` on mount, then reports every scroll position. Pass a stable `onScroll`.
 function useScrollRestore(initial: number, onScroll: (y: number) => void) {
@@ -21,7 +21,7 @@ function useScrollRestore(initial: number, onScroll: (y: number) => void) {
 /** What useRoundDraft returns: the draft and its setters. */
 export type RoundDraft = ReturnType<typeof useRoundDraft>;
 
-// A half-answered round survives a reload: its answers, the notes box, the open question and the page scroll.
+// A half-answered round survives a reload: its answers, the open question and the page scroll.
 // drafts.ts keeps one entry per session, tagged with the round, so a new round never picks up an old draft.
 export function useRoundDraft(sessionId: string, roundKey: string) {
   const [draft, setDraft] = useState<RoundDraftData>(() => ({ ...EMPTY, ...readRoundDraft<RoundDraftData>(sessionId, roundKey) }));
@@ -52,7 +52,6 @@ export function useRoundDraft(sessionId: string, roundKey: string) {
   return {
     draft,
     setAnswers: useCallback((update: (all: Answers) => Answers) => setDraft((d) => ({ ...d, answers: update(d.answers) })), []),
-    setNotes: useCallback((notes: string) => setDraft((d) => ({ ...d, notes })), []),
     setIndex: useCallback((index: number) => setDraft((d) => ({ ...d, index })), []),
     /** The round went out: drop the draft and stop saving until the round changes. */
     clear: useCallback(() => {

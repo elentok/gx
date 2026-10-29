@@ -26,7 +26,10 @@ import { WriteError } from "../useWrite";
 import type { FetchChat } from "./chat";
 import type { PostPrompt } from "./prompt";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
 
 const session = (
   state = "idle",
@@ -189,6 +192,55 @@ test("a plain message posts its text with the last message id", async () => {
     last_message: "m9",
   });
   await waitFor(() => expect(box.value).toBe(""));
+});
+
+const DRAFT = "gx.draft.composer.s-a";
+
+test("a stored draft opens the Note box with its text; typing saves it", async () => {
+  localStorage.setItem(DRAFT, "kept text");
+  render({ post: vi.fn<PostPrompt>(async () => ok) });
+  const box = (await screen.findByLabelText("Message")) as HTMLTextAreaElement;
+  expect(box.value).toBe("kept text");
+  fireEvent.change(box, { target: { value: "more" } });
+  expect(localStorage.getItem(DRAFT)).toBe("more");
+});
+
+test("an accepted Send clears the stored draft", async () => {
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  fireEvent.change(await openNote(), { target: { value: "hello" } });
+  const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+  await waitFor(() => expect(send.disabled).toBe(false));
+  fireEvent.click(send);
+  await waitFor(() => expect(localStorage.getItem(DRAFT)).toBeNull());
+});
+
+test("a refused Send and a stale refusal keep the stored draft", async () => {
+  for (const reason of ["nope", "stale"]) {
+    const post = vi.fn<PostPrompt>(async () => ({ refused: true, reason }));
+    render({ post });
+    fireEvent.change(await openNote(), { target: { value: "hello" } });
+    const send = screen.getByRole("button", { name: "Send" }) as HTMLButtonElement;
+    await waitFor(() => expect(send.disabled).toBe(false));
+    fireEvent.click(send);
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    expect(localStorage.getItem(DRAFT)).toBe("hello");
+    cleanup();
+    localStorage.clear();
+  }
+});
+
+test("a draft from another tab updates the open box and opens a closed one", async () => {
+  render({ post: vi.fn<PostPrompt>(async () => ok) });
+  expect(await screen.findByRole("button", { name: "Note" })).toBeTruthy();
+  expect(screen.queryByLabelText("Message")).toBeNull();
+  localStorage.setItem(DRAFT, "from tab two");
+  window.dispatchEvent(new StorageEvent("storage", { key: DRAFT }));
+  const box = (await screen.findByLabelText("Message")) as HTMLTextAreaElement;
+  expect(box.value).toBe("from tab two");
+  localStorage.setItem(DRAFT, "edited elsewhere");
+  window.dispatchEvent(new StorageEvent("storage", { key: DRAFT }));
+  await waitFor(() => expect(box.value).toBe("edited elsewhere"));
 });
 
 test("opening the composer focuses the Message textarea", async () => {
