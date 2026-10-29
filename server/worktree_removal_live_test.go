@@ -30,6 +30,7 @@ func (f *schedFixture) sessionIn(ctx context.Context, t *testing.T, dir string) 
 }
 
 func TestWorktreeRemoval_LiveSessionKeepsTheWorktreeUntilItStops(t *testing.T) {
+	t.Parallel()
 	f := newLiveWorkFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -57,6 +58,7 @@ func TestWorktreeRemoval_LiveSessionKeepsTheWorktreeUntilItStops(t *testing.T) {
 }
 
 func TestWorktreeRemoval_ExitedSessionDoesNotKeepTheWorktree(t *testing.T) {
+	t.Parallel()
 	f := newLiveWorkFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -79,6 +81,7 @@ func TestWorktreeRemoval_ExitedSessionDoesNotKeepTheWorktree(t *testing.T) {
 }
 
 func TestWorktreeRemoval_LiveRunInTheWorktreeKeepsItAndNamesTheRun(t *testing.T) {
+	t.Parallel()
 	release := make(chan struct{})
 	started := make(chan struct{}, 1)
 	f, _ := newMergeFixtureWith(t, func(_ *schedFixture, _ string, _ int) string {
@@ -109,6 +112,7 @@ func TestWorktreeRemoval_LiveRunInTheWorktreeKeepsItAndNamesTheRun(t *testing.T)
 // A merge ticket's finish triggers the merge before settleRun drops its entry,
 // so the entry alone must not count.
 func TestWorktreeRemoval_StoppedRunStillRegisteredDoesNotKeepTheWorktree(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -123,6 +127,7 @@ func TestWorktreeRemoval_StoppedRunStillRegisteredDoesNotKeepTheWorktree(t *test
 }
 
 func TestWorktreeRemoval_RunWithoutCwdKeepsTheWorktreeOfItsEpic(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -138,6 +143,7 @@ func TestWorktreeRemoval_RunWithoutCwdKeepsTheWorktreeOfItsEpic(t *testing.T) {
 }
 
 func TestWorktreeRemoval_RunInASiblingWorktreeDoesNotKeepTheWorktree(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -157,6 +163,7 @@ func TestWorktreeRemoval_RunInASiblingWorktreeDoesNotKeepTheWorktree(t *testing.
 }
 
 func TestWorktreeRemoval_FinishedMergeTicketDoesNotKeepTheWorktree(t *testing.T) {
+	t.Parallel()
 	f, _ := newMergeFixture(t, func(int) string { return "finished" })
 	servertest.SetProjectRepo(t, f.store, "proj", f.repo)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

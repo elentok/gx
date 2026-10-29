@@ -102,6 +102,7 @@ func (f *schedFixture) stampMergedByHand(t *testing.T) {
 }
 
 func TestWorktreeRemoval_FastForwardMergeRemovesTheWorktreeAndKeepsTheBranch(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -114,6 +115,7 @@ func TestWorktreeRemoval_FastForwardMergeRemovesTheWorktreeAndKeepsTheBranch(t *
 }
 
 func TestWorktreeRemoval_NothingToMergeRemovesTheWorktree(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, _ *servertest.Turn, id string) {
 		f.finishCommitless(t, id)
 	})
@@ -128,6 +130,7 @@ func TestWorktreeRemoval_NothingToMergeRemovesTheWorktree(t *testing.T) {
 }
 
 func TestWorktreeRemoval_HandMergeRemovesTheWorktree(t *testing.T) {
+	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	commitOnBranch(t, repo, "blocker")
 	writeCompleteEpic(t, store, "blocker")
@@ -150,6 +153,7 @@ func TestWorktreeRemoval_HandMergeRemovesTheWorktree(t *testing.T) {
 }
 
 func TestWorktreeRemoval_ManualMergeRouteRemovesTheWorktree(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -165,6 +169,7 @@ func TestWorktreeRemoval_ManualMergeRouteRemovesTheWorktree(t *testing.T) {
 }
 
 func TestWorktreeRemoval_UntrackedFileKeepsTheWorktreeAndLogsWhy(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -181,6 +186,7 @@ func TestWorktreeRemoval_UntrackedFileKeepsTheWorktreeAndLogsWhy(t *testing.T) {
 }
 
 func TestWorktreeRemoval_QueuedRootKeepsTheWorktree(t *testing.T) {
+	t.Parallel()
 	f := newSchedFixture(t, map[string]servertest.TicketOpts{"01": {}}, func(f *schedFixture, p *servertest.Turn, id string) {
 		commitWork(t, p, id)
 		testutil.WriteFile(t, f.repo, id+".txt", "local")
@@ -197,6 +203,7 @@ func TestWorktreeRemoval_QueuedRootKeepsTheWorktree(t *testing.T) {
 }
 
 func TestWorktreeRemoval_OpenTicketKeepsTheWorktree(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -212,6 +219,7 @@ func TestWorktreeRemoval_OpenTicketKeepsTheWorktree(t *testing.T) {
 }
 
 func TestWorktreeRemoval_OneOffsRootKeepsItsWorktree(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	wt := filepath.Join(f.h.Server.WorktreeDir("proj"), server.OneOffsEpic)
 	f.git(t, "branch", "oneoffs-branch")
@@ -226,6 +234,7 @@ func TestWorktreeRemoval_OneOffsRootKeepsItsWorktree(t *testing.T) {
 }
 
 func TestWorktreeRemoval_CompletedUnmergedEpicKeepsItsWorktree(t *testing.T) {
+	t.Parallel()
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -235,6 +244,8 @@ func TestWorktreeRemoval_CompletedUnmergedEpicKeepsItsWorktree(t *testing.T) {
 	f.assertFeatureKept(t, "completion without a merge")
 }
 
+// Serial: holds ralphloop's process-wide worktree lock, which would stall
+// every parallel test that merges or prepares an iteration.
 func TestWorktreeRemoval_WaitsForTheWorktreeLockAfterTheMergeDequeuedTheRoot(t *testing.T) {
 	f := newFFFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

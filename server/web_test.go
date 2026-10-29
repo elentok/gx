@@ -192,6 +192,7 @@ func TestWeb_SessionReadsAreServed(t *testing.T) {
 }
 
 func TestWeb_HealthReadIsServed(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/health"); code != http.StatusOK {
 		t.Errorf("GET /v1/health = %d", code)
@@ -393,6 +394,7 @@ func TestWeb_BindFailureIsReportedAndServerKeepsRunning(t *testing.T) {
 // Browsers share cookies across ports on one host, so two servers must not
 // overwrite each other's session.
 func TestWeb_TwoServersKeepSeparateCookies(t *testing.T) {
+	t.Parallel()
 	h1, base1 := startWeb(t)
 	h2, base2 := startWeb(t)
 	c1, c2 := login(t, h1.StateDir, base1), login(t, h2.StateDir, base2)

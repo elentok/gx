@@ -35,6 +35,7 @@ func startCapHeldEpics(t *testing.T) (*servertest.Harness, string) {
 }
 
 func TestPending_WholeEpicEntryGivesOneRowForItsFrontierTicket(t *testing.T) {
+	t.Parallel()
 	h, _ := startCapHeldEpics(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -70,6 +71,7 @@ func TestPending_WholeEpicEntrySkipsAFrontierTicketThatIsAlreadyRunning(t *testi
 }
 
 func TestPending_TicketQueuedAloneAndItsWholeEpicGiveOneRow(t *testing.T) {
+	t.Parallel()
 	h, _ := startCapHeldEpics(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -88,6 +90,7 @@ func TestPending_TicketQueuedAloneAndItsWholeEpicGiveOneRow(t *testing.T) {
 }
 
 func TestPending_WholeEpicRowStreamsAVerdictChange(t *testing.T) {
+	t.Parallel()
 	h, repo := startCapHeldEpics(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

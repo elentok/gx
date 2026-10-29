@@ -7,6 +7,7 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
+// Serial: swaps the package vars gitIsAncestor and readProjectFile.
 func TestEpicMergeTarget_CachesPerEpicUntilTicketsOrRefsChange(t *testing.T) {
 	s, repo := rootRefsFixture(t)
 	done := func(name string, blockedBy ...string) tickets.Epic {
