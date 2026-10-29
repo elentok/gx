@@ -230,7 +230,7 @@ const chatOf = (c: SessionChatResponse) => ({ chat: async () => ({ kind: "ok" as
 
 test("the header names the session, status, dir and ticket, with a harness chip only for non-Claude", async () => {
   render([session("s-1", "p", { name: "one", dir: "/work/one", ticket: "gx:m/01" })], "/agents/s-1", true, chatOf(chat()));
-  const header = within((await screen.findByRole("heading", { name: "one" })).parentElement!);
+  const header = within((await screen.findByRole("heading", { name: /one/ })).closest("header")!);
   expect(header.getByText("idle")).toBeTruthy();
   expect(header.getByText("/work/one")).toBeTruthy();
   expect(header.getByText("gx:m/01")).toBeTruthy();
@@ -280,4 +280,73 @@ test("a failed re-read keeps the last chat", async () => {
   emit("s-1");
   await vi.waitFor(() => expect(calls).toBe(2));
   expect(screen.getByText("hello there")).toBeTruthy();
+});
+
+const switcherSessions = () => [
+  session("s-1", "alpha", { name: "plain", dir: "/work/plain" }),
+  session("s-2", "alpha", { name: "unread one", unread: { unread: true } }),
+  session("s-3", "beta", { name: "needs you", ticket: "gx:m/07", actionable: { reason: "Pick one" } }),
+  session("s-4", "beta", { name: "the design", design: true, dir: "/work/design" }),
+];
+
+const openSwitcher = () => fireEvent.click(screen.getByRole("button", { name: /plain/ }));
+const dialog = () => within(screen.getByRole("dialog", { name: "Switch session" }));
+const optionNames = () => dialog().getAllByRole("option").map((o) => o.textContent);
+
+test("the title button opens the switcher with Actionable, Unread, Other sections in order", () => {
+  render(switcherSessions(), "/agents/s-1");
+  openSwitcher();
+  expect(dialog().getAllByRole("group").map((g) => g.getAttribute("aria-label"))).toEqual(["Actionable", "Unread", "Other"]);
+  const names = optionNames();
+  expect(names[0]).toContain("needs you");
+  expect(names[0]).toContain("beta · idle · gx:m/07 · Pick one");
+  expect(names[1]).toContain("unread one");
+  expect(names.slice(2).join()).toContain("plain");
+});
+
+test("Cmd-K and Ctrl-K open the switcher", () => {
+  render(switcherSessions(), "/agents/s-1");
+  fireEvent.keyDown(window, { key: "k", metaKey: true });
+  expect(screen.getByRole("dialog", { name: "Switch session" })).toBeTruthy();
+  fireEvent.keyDown(window, { key: "k", metaKey: true });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+  expect(screen.getByRole("dialog", { name: "Switch session" })).toBeTruthy();
+});
+
+test("Cmd-K opens the switcher before a session is picked", () => {
+  render(switcherSessions(), "/agents");
+  fireEvent.keyDown(window, { key: "k", metaKey: true });
+  expect(dialog().getAllByRole("option")).toHaveLength(4);
+});
+
+test("the filter matches the ticket and the dir", () => {
+  render(switcherSessions(), "/agents/s-1");
+  openSwitcher();
+  const input = dialog().getByRole("combobox");
+  fireEvent.change(input, { target: { value: "m/07" } });
+  expect(optionNames()).toHaveLength(1);
+  fireEvent.change(input, { target: { value: "/work/design" } });
+  expect(optionNames()[0]).toContain("the design");
+});
+
+test("a design session is listed while the sidebar hides it, and the current one is tagged", () => {
+  render(switcherSessions(), "/agents/s-1");
+  expect(rows().map((r) => r.textContent).join()).not.toContain("the design");
+  openSwitcher();
+  const design = dialog().getAllByRole("option").find((o) => o.textContent?.includes("the design"))!;
+  expect(within(design).getByRole("img", { name: "Design" })).toBeTruthy();
+  expect(dialog().getAllByRole("option").filter((o) => o.getAttribute("aria-current") === "true")).toHaveLength(1);
+  expect(dialog().getByText("current")).toBeTruthy();
+});
+
+test("Enter on a row navigates to it, and Escape closes", () => {
+  const { router } = render(switcherSessions(), "/agents/s-1");
+  openSwitcher();
+  fireEvent.keyDown(dialog().getByRole("combobox"), { key: "Enter" });
+  expect(router.state.location.pathname).toBe("/agents/s-3");
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: /needs you/ }));
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
 });

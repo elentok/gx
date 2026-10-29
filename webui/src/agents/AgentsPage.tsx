@@ -8,6 +8,7 @@ import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
 import { useWide } from "../useWide";
 import { AgentSidebar } from "./AgentSidebar";
+import { SessionSwitcher } from "./SessionSwitcher";
 import { SessionView } from "./SessionView";
 
 const LAST_KEY = "gx.agents.last";
@@ -57,13 +58,14 @@ export function AgentsPage({ fetchChat }: { fetchChat?: FetchChat }) {
           {(wide || !selected) && <AgentSidebar sessions={sessions} selected={selected} />}
           {(wide || selected) && (
             <Box as="main" p="4" minW="0">
+              {!listed && <SessionSwitcher name="Switch session" sessions={sessions} />}
               {gone ? (
                 <>
                   <Text fontWeight="600">Session not found</Text>
                   <Text color="text.muted">{selected} no longer exists.</Text>
                 </>
               ) : selected ? (
-                listed && <SessionView session={sessions.find((s) => s.id === selected)!} fetchChat={fetchChat} />
+                listed && <SessionView session={sessions.find((s) => s.id === selected)!} sessions={sessions} fetchChat={fetchChat} />
               ) : (
                 <Text color="text.muted">{sessions.length === 0 ? "No sessions yet" : "Pick a session"}</Text>
               )}
