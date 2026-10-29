@@ -149,6 +149,10 @@ type Config struct {
 	// WebDevURL, when set with WebAddr, proxies the web UI's non-API requests to a Vite dev server.
 	WebDevURL string
 
+	// Clock is the web auth clock: the web TLS leaf's expiry checks and the web
+	// auth later read it. Nil means time.Now.
+	Clock func() time.Time
+
 	// ExtraUsageCheck reads the subscription state; nil means subscription.CheckFresh.
 	ExtraUsageCheck func() subscription.State
 

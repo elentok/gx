@@ -51,15 +51,26 @@ func (s *Server) bindWeb() {
 	if a, ok := rawLn.Addr().(*net.TCPAddr); ok && !a.IP.IsUnspecified() {
 		listenIP = a.IP
 	}
-	cert, root, err := webServerCertificate(s.cfg.StateDir, s.cfg.WebAllowedHosts, listenIP, s.interfaceIPs(), time.Now())
+	now := s.cfg.Clock
+	if now == nil {
+		now = time.Now
+	}
+	certs, err := newWebCerts(&webCerts{
+		stateDir: s.cfg.StateDir,
+		listenIP: listenIP,
+		now:      now,
+		hosts:    func() []string { return s.settings.Load().WebAllowedHosts },
+		ifaceIPs: s.interfaceIPs,
+		log:      s.log,
+	})
 	if err != nil {
 		rawLn.Close()
 		s.webErr = "web tls: " + err.Error()
 		s.log.Error("web tls unavailable", "err", err)
 		return
 	}
-	ln := newSniffListener(newSourceIPListener(rawLn, s.log, time.Now), &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})
-	s.web, s.webRoot, s.webListenIP = ln, root, listenIP
+	ln := newSniffListener(newSourceIPListener(rawLn, s.log, time.Now), &tls.Config{GetCertificate: certs.getCertificate, MinVersion: tls.VersionTLS12})
+	s.web, s.webRoot, s.webListenIP, s.webCerts = ln, certs.root.Cert, listenIP, certs
 	mux := s.webHandler()
 	protected := requireToken(s.cfg.StateDir, webCookieName(ln), mux)
 	allowed := func() []string { return s.settings.Load().WebAllowedHosts }

@@ -268,7 +268,8 @@ type Server struct {
 	webHTTP     *http.Server
 	webErr      string // why the web bind failed
 	webRoot     *x509.Certificate
-	webListenIP net.IP // nil when the listener binds every interface
+	webListenIP net.IP    // nil when the listener binds every interface
+	webCerts    *webCerts // nil unless the web listener is bound
 	clientErrs  ipLimiter
 	logf        *rotatingFile
 	log         *slog.Logger

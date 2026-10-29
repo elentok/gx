@@ -96,6 +96,11 @@ func (s *Server) reloadLocked() (ReloadResult, func()) {
 		s.storeCommits.SetSettings(next.storeCommitDebounce(), next.StorePushRemote)
 	}
 	s.settings.Store(&next)
+	if s.webCerts != nil && !reflect.DeepEqual(old.WebAllowedHosts, next.WebAllowedHosts) {
+		if err := s.webCerts.reissue(); err != nil {
+			s.log.Error("web certificate re-issue failed", "err", err)
+		}
+	}
 	if next.WatchConfig != old.WatchConfig {
 		s.setConfigWatchLocked(next.WatchConfig)
 	}

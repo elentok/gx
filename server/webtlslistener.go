@@ -2,12 +2,14 @@ package server
 
 import (
 	"bufio"
+	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -17,28 +19,112 @@ const tlsRecordHandshake = 0x16
 // webSniffTimeout bounds how long a silent connection may hold its first byte back.
 const webSniffTimeout = 10 * time.Second
 
-// webServerCertificate loads the saved leaf, or issues one when it is missing or
-// no longer fits the root, the allowed hosts and the listen address. It issues
-// at start only.
-func webServerCertificate(stateDir string, hosts []string, listenIP net.IP, ifaceIPs []net.IP, now time.Time) (tls.Certificate, *x509.Certificate, error) {
-	root, err := loadOrMakeWebRoot(stateDir, hosts, now)
+// webCerts serves the web leaf and re-issues it from the same root, so no
+// device re-trusts anything. It re-issues at start, on an allowed-hosts reload,
+// and in getCertificate when a connection needs a name the leaf lacks or the
+// leaf is close to expiry. Nothing polls and no timer runs.
+type webCerts struct {
+	stateDir string
+	root     *webTLSKey
+	listenIP net.IP
+	now      func() time.Time
+	hosts    func() []string
+	ifaceIPs func() []net.IP
+	log      *slog.Logger
+
+	mu      sync.Mutex
+	leaf    *webTLSKey
+	cert    *tls.Certificate
+	skipped webLeafSkipped
+}
+
+// newWebCerts loads the saved leaf, or issues one when it is missing or no
+// longer fits the root, the allowed hosts and the listen address.
+func newWebCerts(c *webCerts) (*webCerts, error) {
+	now := c.now()
+	root, err := loadOrMakeWebRoot(c.stateDir, c.hosts(), now)
 	if err != nil {
-		return tls.Certificate{}, nil, err
+		return nil, err
 	}
-	leaf, err := loadWebLeaf(stateDir)
+	c.root = root
+	leaf, err := loadWebLeaf(c.stateDir)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return tls.Certificate{}, nil, err
+		return nil, err
 	}
-	if leaf == nil || webLeafNeedsReissue(leaf.Cert, root.Cert, hosts, listenIP, now) {
-		leaf, _, err = newWebLeaf(root, hosts, ifaceIPs, listenIP, now)
-		if err != nil {
-			return tls.Certificate{}, nil, err
+	if leaf == nil || webLeafNeedsReissue(leaf.Cert, root.Cert, c.hosts(), c.listenIP, now) {
+		return c, c.reissueLocked(nil)
+	}
+	c.setLeaf(leaf)
+	return c, nil
+}
+
+func (c *webCerts) setLeaf(leaf *webTLSKey) {
+	c.leaf = leaf
+	c.cert = &tls.Certificate{Certificate: [][]byte{leaf.DER}, PrivateKey: leaf.Key}
+}
+
+// reissueLocked signs a new leaf for the current hosts and interfaces, plus
+// extraIP (the local IP of the connection that asked). Callers hold c.mu, or
+// own c while it is being built.
+func (c *webCerts) reissueLocked(extraIP net.IP) error {
+	ips := c.ifaceIPs()
+	if extraIP != nil {
+		ips = append(append([]net.IP{}, ips...), extraIP)
+	}
+	leaf, skipped, err := newWebLeaf(c.root, c.hosts(), ips, c.listenIP, c.now())
+	if err != nil {
+		return err
+	}
+	if err := saveWebLeaf(c.stateDir, leaf); err != nil {
+		return err
+	}
+	c.setLeaf(leaf)
+	c.skipped = skipped
+	if len(skipped.Hosts) > 0 || len(skipped.IPs) > 0 {
+		ipStrs := make([]string, len(skipped.IPs))
+		for i, ip := range skipped.IPs {
+			ipStrs[i] = ip.String()
 		}
-		if err := saveWebLeaf(stateDir, leaf); err != nil {
-			return tls.Certificate{}, nil, err
+		level := slog.LevelInfo
+		if len(skipped.Hosts) > 0 {
+			level = slog.LevelWarn
+		}
+		c.log.Log(context.Background(), level, "web certificate left out names the root does not permit", "hosts", skipped.Hosts, "ips", ipStrs)
+	}
+	return nil
+}
+
+// reissue replaces the leaf unconditionally, for an allowed-hosts reload.
+func (c *webCerts) reissue() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.reissueLocked(nil)
+}
+
+// Skipped is what the last leaf left out because the root does not permit it.
+func (c *webCerts) Skipped() webLeafSkipped {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.skipped
+}
+
+// getCertificate is the TLS config's certificate source. A failed re-issue
+// keeps serving the current leaf, which is still valid.
+func (c *webCerts) getCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	var localIP net.IP
+	if hello.Conn != nil {
+		if a, ok := hello.Conn.LocalAddr().(*net.TCPAddr); ok {
+			localIP = a.IP
 		}
 	}
-	return tls.Certificate{Certificate: [][]byte{leaf.DER}, PrivateKey: leaf.Key}, root.Cert, nil
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if webLeafNeedsReissue(c.leaf.Cert, c.root.Cert, c.hosts(), localIP, c.now()) {
+		if err := c.reissueLocked(localIP); err != nil {
+			c.log.Error("web certificate re-issue failed", "err", err)
+		}
+	}
+	return c.cert, nil
 }
 
 func interfaceIPs() []net.IP {

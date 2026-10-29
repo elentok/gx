@@ -16,6 +16,7 @@ func TestBindWeb_NeverWarnsAboutAllInterfaces(t *testing.T) {
 				cfg: Config{WebAddr: addr, StateDir: t.TempDir()},
 				log: slog.New(slog.NewTextHandler(&buf, nil)),
 			}
+			s.settings.Store(&Settings{})
 			s.bindWeb()
 			if s.web == nil {
 				t.Fatalf("listener did not bind: %q", s.webErr)
