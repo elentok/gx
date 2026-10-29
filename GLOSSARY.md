@@ -382,7 +382,12 @@ per project with open follow-ups). _Avoid_: tile, row (a row is the data behind 
 
 **Design session** — an interactive session with a **Session ticket**: where gx-design runs on a
 map. It runs in the map's **Design worktree**, and in the trunk checkout only after Branch. A map
-epic or map ticket can have more than one at a time. _Avoid_: planning session.
+epic or map ticket can have more than one at a time. The Agents tab and page label them
+**Design agents**. _Avoid_: planning session.
+
+**Queue agent** — an agent session the server runs for a Server queue ticket: an implementation
+ticket, a one-off or an investigate ticket. The Agents tab and page list Queue agents in their own
+group, hidden by default, and open them read-only. _Avoid_: loop agent, implementation agent.
 
 **Design branch** — the branch `<map>-design` that holds a map's design work. It is rebased onto
 trunk at each Design session open, merged into `<map>-impl` at Branch, and removed by the server
