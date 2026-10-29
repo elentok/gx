@@ -1098,3 +1098,49 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   - The group's "+" prefills Project `other`.
   - The sidebar button, the switcher row and the Ctrl+K path each prefill `site`, the selected session's project.
   - Closing keeps the draft: the new tab's form has the prompt and Project `site`. No session is created.
+
+## 88. Phone, Agents page
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. At 375px open `#/agents`.
+  2. Press a session row, then "‹".
+  3. Open a session, press its title, then Close.
+  4. Press "‹", then "New session in demo", then ×.
+- **Pass:**
+  - The list shows alone, with no "Pick a session" panel.
+  - A row opens the session without the list; "‹" returns to `#/agents`.
+  - The switcher fills the whole screen. Close closes it.
+  - The New session form is a sheet with a grab handle, as wide as the screen and ending at its bottom edge.
+
+## 90. Agents offline
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. At 1280px open an idle Claude session and type a message. Open "New session in demo" and type a first prompt.
+  2. Stop the fixture server and wait for the Offline strip.
+  3. Close the form.
+- **Pass:** the strip reads "Offline, reconnecting…". Create session is off and the form keeps the prompt. The list and chat stay. The composer reads "Offline. Send turns on when gx reconnects.", Send is off and the message is still in the box.
+
+## 91. Removed session draft
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. Open the Exited session in a second tab, type a message, then close the tab.
+  2. Run `gx agents remove` on the session and open `#/`.
+  3. Run `gx agents create`, open the new session.
+- **Pass:** the stored draft is there after step 1 and gone after step 2. The new session's box is empty, with no "Draft saved in this browser" note. Session ids are random, so the new session cannot reuse the removed label.
+
+## 93. Shared draft
+
+- **Scenario:** `design`, with the auto-advance delay at `1h`.
+- **Steps:**
+  1. Open `#/d/demo:design-epic`, press Start design session and answer the first question.
+  2. Open the same Design page in a new tab.
+  3. Open the design session on `#/agents/<id>` in another tab. On the Design page press Note.
+  4. Type in the Agents page's box, then in the Design page's Note box.
+  5. Answer the other question and press Send answers.
+- **Pass:**
+  - The new tab shows the first question answered.
+  - Text typed on the Agents page shows in the Note box, and the reverse.
+  - Send answers sends the text as the note (`gx agents chat <id>` lists it). Both boxes are empty after.

@@ -711,3 +711,143 @@ test("87. Create entry points", async ({ page, start }) => {
   await second.close();
   expect(await sessions(fixture)).toHaveLength(list.length);
 });
+
+test("88. Phone, Agents page", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const list = await sessions(fixture);
+  const target = list[1];
+  await page.setViewportSize({ width: 375, height: 812 });
+  const { width, height } = page.viewportSize()!;
+
+  // The list alone, with no session panel beside it.
+  await go(page, "#/agents");
+  await expect(row(page, target)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pick a session" })).toHaveCount(0);
+
+  // A row opens the session on its own; "‹" returns to the list.
+  await row(page, target).click();
+  await expect(page).toHaveURL(new RegExp(`#/agents/${target.id}$`));
+  await expect(row(page, target)).toHaveCount(0);
+  await expect(composer(page)).toBeVisible();
+  await page.getByRole("link", { name: "All sessions" }).click();
+  await expect(page).toHaveURL(/#\/agents$/);
+  await expect(row(page, target)).toBeVisible();
+
+  // The switcher covers the screen and Close closes it.
+  await row(page, target).click();
+  await titleButton(page).click();
+  await expect(switcher(page)).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = (await switcher(page).boundingBox())!;
+      return [box.x, box.y, box.width, box.height];
+    })
+    .toEqual([0, 0, width, height]);
+  await switcher(page).getByRole("button", { name: "Close" }).click();
+  await expect(switcher(page)).toHaveCount(0);
+
+  // Create opens as a sheet at the bottom of the screen.
+  await page.getByRole("link", { name: "All sessions" }).click();
+  await page.getByRole("button", { name: "New session in demo" }).click();
+  await expect(newForm(page)).toBeVisible();
+  await expect(page.getByTestId("grab-handle")).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = (await newForm(page).boundingBox())!;
+      return [box.x, Math.round(box.y + box.height), box.width];
+    })
+    .toEqual([0, height, width]);
+  await newForm(page).getByRole("button", { name: "Close" }).click();
+  await expect(newForm(page)).toHaveCount(0);
+});
+
+test("90. Agents offline", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const idle = (await sessions(fixture))[0];
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await go(page, `#/agents/${idle.id}`);
+  await expect(page.getByText(REPLY)).toBeVisible();
+  await messageBox(page).fill("typed before the drop");
+  await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
+  await promptBox(page).fill("a first prompt");
+  await expect(createButton(page)).toBeEnabled();
+
+  await fixture.stopServer();
+  await expect(page.getByText("Offline, reconnecting…")).toBeVisible({ timeout: 15_000 });
+  await expect(createButton(page)).toBeDisabled();
+  await expect(promptBox(page)).toHaveValue("a first prompt");
+  await newForm(page).getByRole("button", { name: "Close" }).click();
+
+  // The last data stays; Send is off with its reason and the draft is kept.
+  await expect(row(page, idle)).toBeVisible();
+  await expect(page.getByText(REPLY)).toBeVisible();
+  await expect(composer(page).getByText("Offline. Send turns on when gx reconnects.")).toBeVisible();
+  await expect(sendButton(page)).toBeDisabled();
+  await expect(messageBox(page)).toHaveValue("typed before the drop");
+});
+
+test("91. Removed session draft", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const exited = (await sessions(fixture)).find((s) => s.status.state === "exited")!;
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const draftKey = `gx.draft.composer.${exited.id}`;
+  const stored = () => page.evaluate((k) => localStorage.getItem(k), draftKey);
+
+  // The draft is written in a tab that is then closed.
+  const tab = await freshVisit(page, `/#/agents/${exited.id}`);
+  await messageBox(tab).fill("a draft for a dead session");
+  await expect(composer(tab).getByText("Exited. Restore it in gx, Agents tab.")).toBeVisible();
+  await expect.poll(stored).toBe("a draft for a dead session");
+  await tab.close();
+
+  // Removing the session and opening the Epics page drops the draft.
+  await fixture.cli("agents", "remove", exited.id);
+  await go(page, "#/");
+  await expect.poll(stored).toBeNull();
+
+  // A new session starts empty. Ids are random, so it cannot reuse the removed one's label.
+  const before = await sessions(fixture);
+  await fixture.cli("agents", "create", "--project", "demo", "--name", exited.id, "--prompt", "hello");
+  const made = await created(fixture, before);
+  await go(page, `#/agents/${made.id}`);
+  await expect(messageBox(page)).toHaveValue("");
+  await expect(composer(page).getByText("Draft saved in this browser")).toHaveCount(0);
+});
+
+test("93. Shared draft", async ({ page, start }) => {
+  const fixture = await start("design", { autoAdvanceDelay: "1h" });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await go(page, "#/d/demo:design-epic");
+  await page.getByRole("button", nav("Start design session")).click();
+  const questions = page.getByRole("group", nav("Questions"));
+  await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
+  const design = (await sessions(fixture)).find((s) => s.design)!;
+
+  // A half-answered round survives opening the design page in a new tab.
+  await questions.getByRole("button", { name: /SQLite/ }).click();
+  const answered = (p: Page) => p.getByRole("button", { name: /^Question .*, answered$/ });
+  await expect(answered(page)).toHaveCount(1);
+  const fresh = await freshVisit(page, "/#/d/demo:design-epic");
+  await expect(fresh.getByRole("group", nav("Questions"))).toBeVisible();
+  await expect(answered(fresh)).toHaveCount(1);
+  await fresh.close();
+
+  // Text typed on either page shows live on the other.
+  const agentsPage = await freshVisit(page, `/#/agents/${design.id}`);
+  await page.getByRole("button", nav("Note")).click();
+  const box = page.getByRole("textbox", { name: "Message" });
+  await expect(box).toBeEnabled();
+  await messageBox(agentsPage).fill("typed on Agents");
+  await expect(box).toHaveValue("typed on Agents");
+  await box.fill("typed on Design");
+  await expect(messageBox(agentsPage)).toHaveValue("typed on Design");
+
+  // Send answers sends it as the note, and both boxes are empty after.
+  await questions.getByRole("button", { name: /Yes/ }).click();
+  await page.getByRole("button", nav("Send answers")).click();
+  await expect.poll(() => fixture.cli("agents", "chat", design.id)).toContain("typed on Design");
+  await expect(messageBox(agentsPage)).toHaveValue("");
+  await page.getByRole("button", nav("Note")).click();
+  await expect(box).toHaveValue("");
+  await agentsPage.close();
+});
