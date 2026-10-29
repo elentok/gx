@@ -28,14 +28,14 @@ gx gets one shared concept: a model tier. There are three tiers: `light`, `worke
 2. As a gx user, I want the chart step (including Destination confirmation) to run on the strongest tier, so that the map is drawn with the best reasoning.
 3. As a gx user, I want a stopped and retried charting session to stay on the strongest tier, so that a retry does not lower the quality of the chart.
 4. As a gx user, I want New Design to count as a charting session, so that a map I just created starts on the strongest tier.
-5. As a gx user, I want a direct `/gx-design <epic> <idea>` run, where no map exists yet, to count as a charting session, so that it starts on the strongest tier.
+5. As a gx user, I want a design session launched on a map with an empty `design_step` to count as a charting session, so that it starts on the strongest tier. To chart directly from an Agents tab session, I pick strongest in the new-session dialog.
 6. As a gx user, I want Continue after charting to move the session to the worker tier, so that the later steps cost less.
 7. As a gx user, I want auto-advance after charting to move the session to the worker tier in the same way, so that hands-free runs also get cheaper.
 8. As a gx user, I want the design skill to end the run right after charting and after Destination confirmation, so that the strongest tier never chains into later steps.
 9. As a gx user, I want the handoff to keep the session's ticket, name, auto-advance setting and web page, so that nothing I set up is lost.
 10. As a gx user, I want the handoff to end the old conversation like an agent exit, so that its totals and grilling count are recorded and the new conversation has its own id.
 11. As a gx user, I want a failed handoff restart to leave the session Exited (crashed), so that I fix the config and press Resume in the web UI.
-12. As a Codex user, I want the Codex handoff and the reported model to take effect once Codex design sessions get Continue, and until then to see the saved `meta.json` values in the header, so that gx shows only what it knows.
+12. As a Codex user, I want a Codex session to show the saved `meta.json` values in its header, so that gx shows only what it knows. The Codex handoff and the reported model wait for Codex design sessions to get Continue.
 13. As a gx user, I want a resumed session to keep the tier it last ran on, so that a restart of gx does not change the model.
 14. As a gx user, I want a resume of a session with no saved tier to pass no model or effort flag, so that old sessions behave as they do today.
 15. As a gx user, I want a Continue on a session that already runs on the worker tier to restart nothing, so that I do not lose the conversation for no reason.
@@ -52,7 +52,7 @@ gx gets one shared concept: a model tier. There are three tiers: `light`, `worke
 26. As a gx user, I want a new Agents tab session to run on the worker tier by default, so that day-to-day sessions cost less.
 27. As a gx user, I want a tier picker in the new-session dialog with all three tiers, so that I can pick a model level for one session.
 28. As a gx user, I want each picker label to show the configured model, for example "Strongest (opus)", so that I know what I pick.
-29. As a gx user, I want the picker to use the project's agent, so that a Codex project shows Codex models.
+29. As a gx user, I want the picker labels to follow the harness the dialog launches (Claude today), so that a label names the model the session will run on.
 30. As a gx user, I want a session I create with a tier to keep it on resume, so that the choice is stable.
 31. As a ralph-loop user, I want evolve and investigate tickets to stay on the worker tier, so that loop tickets behave as they do today.
 32. As a gx user, I want the tiers configured in the `agents.<agent>` block of config, so that I find them next to the model and effort I know.
@@ -66,8 +66,13 @@ gx gets one shared concept: a model tier. There are three tiers: `light`, `worke
 40. As a gx user, I want the model the Claude agent itself reports to win over the launch value, so that a change made inside the session shows up.
 41. As a gx user, I want a session on the CLI default to show "<Tier> · CLI default" until its first reply, so that gx never invents a model name.
 42. As a gx user, I want the header to show nothing when tier, model and effort are all empty, so that old sessions do not show a wrong label.
-43. As a gx user, I want the label for design, fix-agent and interactive sessions on Claude and Codex, so that every session is covered.
+43. As a gx user, I want the label for design, fix-agent and interactive sessions on Claude, and for sessions from `gx agents new --harness codex` (saved values only), so that every session gx launches is covered.
 44. As an API client, I want the new `SessionInfo` fields to be additive, so that existing clients keep working.
+45. As a ralph-loop user, I want a skill that runs in a loop ticket to get the model of that run's agent from `gx agent model <tier>`, so that a Codex run does not get a Claude alias.
+46. As a skill author, I want `gx agent model <tier>` to print nothing and exit 0 when the tier's `model` is empty, and the skill convention to say "leave out the `model` field on empty output", so that a subagent never gets an invalid alias.
+47. As a gx user, I want a map with `destination_unconfirmed: true` to count as `chart`, whatever its `design_step`, so that Destination confirmation always runs on the strongest tier.
+48. As a gx user, I want only sessions launched by a design path (Start design, New Design, Continue or auto-advance restart) to get the step-based tier and the handoff, so that a session I linked to a design later keeps its launch tier and is never restarted.
+49. As a Codex user, I want `gx agents new --harness codex` to start the session with tier launch args and take an optional `--tier` flag, so that Codex sessions get a model choice.
 
 ## Implementation Decisions
 
@@ -90,7 +95,7 @@ gx gets one shared concept: a model tier. There are three tiers: `light`, `worke
 
 - Every launch, resume and handoff restart builds the agent's args from the session's tier: model and effort for that tier and that agent.
 - Claude takes the model and the effort through its own flags. Codex takes the model through its model flag and the effort through a `-c` config override (the loop code already does this for effort).
-- Codex gets launch args for the first time, for the Codex sessions that launch today (Agents tab, fix agent). Claude's existing extra args (design disallowed tools, remote control name, configured Claude args) stay.
+- Codex gets launch args for the first time, for the sessions started by `gx agents new --harness codex` and for ralph-loop tickets. Every server launch path (web create dialog, fix agent, Start design, New Design) uses Claude today, and a Codex harness for them is out of scope. `gx agents new` takes an optional `--tier`, default worker. Claude's existing extra args (design disallowed tools, remote control name, configured Claude args) stay.
 - Configured `agents.claude-args` that already hold `--model` or `--effort` win. gx adds no tier flag for that knob.
 - A resume of a session whose `meta.json` has no saved tier passes no model or effort flag, as today.
 - The implementer picks where the tier-to-args logic lives and its name. It must serve both the session launch and the ralph-loop path, so the worker tier is resolved in one place.
@@ -99,8 +104,9 @@ gx gets one shared concept: a model tier. There are three tiers: `light`, `worke
 
 | Session | Tier |
 | --- | --- |
-| Design session while the map's `design_step` is `chart` (includes Destination confirmation, step 2 of gx-design), or the map is missing or `design_step` is empty | strongest |
-| Design session at any other step | worker |
+| Design session launched by a design path, while the map's `design_step` is `chart` or empty, or the map has `destination_unconfirmed: true` (Destination confirmation, step 2 of gx-design) | strongest |
+| Design session launched by a design path, at any other step | worker |
+| Session linked to a design later (`gx agent link`), for example a direct `/gx-design <epic> <idea>` in an Agents tab or plain CLI session | its launch tier, never restarted |
 | Fix agent (`/gx-investigate` session started by the fix-agent code) | strongest |
 | Agents tab new session | worker, or the tier picked in the dialog |
 | Evolve and investigate tickets run by ralph-loop | worker (unchanged) |
@@ -119,7 +125,9 @@ Per design step, the main session and its subagents run on these tiers:
 | `branch` | worker | none |
 
 - `design_started_at` is not used to find the charting session. The `design_step` of the map is the marker.
-- A missing map or an empty `design_step` (a direct `/gx-design <epic> <idea>`) counts as `chart`, so it runs on strongest.
+- A design session is one launched by a design path: Start design, New Design, or a Continue or auto-advance restart. `meta.json` saves this as the launch kind (the implementer picks the field name). `gx agent link` sets the design flag on any session, but does not set the launch kind. A linked session keeps the tier it was launched with, whatever the step, and is never restarted by the handoff. A direct `/gx-design <epic> <idea>` typed into a running session is such a case: to chart on strongest, the person picks strongest in the new-session dialog.
+- An empty `design_step` counts as `chart`, so it runs on strongest. Every design launch path already has a map.
+- A map with `destination_unconfirmed: true` counts as `chart`, whatever its `design_step` (gx-design checks it before `design_step`). Seeded maps and maps moved back with `--design-step` can have both fields disagree.
 - A charting session that is stopped and retried is launched again while the step is still `chart`, so it stays on strongest.
 - New Design writes the map at `design_step: chart`, so it counts as a charting session with no extra rule.
 - The light tier is used by no design or fix-agent session. Only the picker can choose it.
@@ -128,7 +136,7 @@ Per design step, the main session and its subagents run on these tiers:
 ### Charting handoff
 
 - Continue and auto-advance share one handoff path.
-- When a Continue or auto-advance fires on a design session that runs on the strongest tier, and the map's `design_step` is no longer `chart`, gx:
+- When a Continue or auto-advance fires on a design session (launch kind design) that runs on the strongest tier, and the map's `design_step` is not `chart` and `destination_unconfirmed` is not set, gx:
   1. stops the agent process and ends the old conversation exactly like an agent exit (`saveConversationTotals`, grilling recount, `recordConversation`),
   2. gets a new conversation id and records it,
   3. starts a fresh conversation in the same gx session under the worker tier's launch args,
@@ -136,7 +144,7 @@ Per design step, the main session and its subagents run on these tiers:
 - The chart step never chains. `skills/gx-design/SKILL.md` must end the run with the run-end line after charting and after Destination confirmation, so the next Continue or auto-advance restarts on worker. The skill never moves on to a later step in the strongest session.
 - The gx session is the same, so ticket, name, auto-advance and web page stay. No new session is created.
 - When the session already runs on worker, Continue keeps today's behaviour: it types the reset command and `/gx-design <epic>` into the running agent.
-- The handoff applies to design sessions only. A fix agent or an Agents tab session on the strongest tier is never restarted.
+- The handoff applies to sessions with the design launch kind only. A fix agent, an Agents tab session on the strongest tier, or a session linked to a design later is never restarted.
 - The handoff saves the new tier, model and effort in `meta.json`.
 - If the restart fails (for example a stale slug), the session becomes Exited (crashed), as any failed start does. The person fixes the config and presses Resume in the web UI. There is no new pause kind.
 - The handoff uses launch flags, not an in-session command. This epic builds it for Claude only. Codex has no design Continue today: `sessionPrompt` refuses non-chat harnesses, and the design Actionable reads only the Claude transcript. The Codex handoff takes effect once Codex design sessions get Continue. That work is not in this epic.
@@ -145,15 +153,17 @@ Per design step, the main session and its subagents run on these tiers:
 
 ### Subagent models
 
-- Skills name a tier. `gx agent model light|worker|strongest` prints the model configured for the session's agent. For worker it reads `agents.<agent>.model`. It prints the value as written. A skill passes it as the `model` of its subagent call.
+- Skills name a tier. `gx agent model light|worker|strongest` prints the model configured for the current agent. For worker it reads `agents.<agent>.model`. It prints the value as written. A skill passes it as the `model` of its subagent call.
+- Finding the agent: in a server session the verb uses the session's agent (`GX_AGENT_SESSION`). ralph-loop agents get no `GX_AGENT_SESSION`, so ralph-loop puts the run's agent into the agent's env (for example `GX_AGENT=codex`, next to `GX_INVESTIGATE_TICKET`), and the verb reads it before it falls back to Claude. `gx-evolve` and `gx-code-review` run mostly in loop tickets, so a Codex run must get Codex slugs from the verb.
+- Empty model: when the tier's `model` is empty, the verb prints nothing and exits 0. The skill convention says: on empty output, leave out the `model` field, so the subagent runs on the session model.
 - No validation. A full model ID on Claude is the user's mistake, as with slugs.
 - Tier use:
   - strongest: both design-review subagents.
   - worker: the gx-to-spec and gx-to-tickets subagents, and the gx-research subagents. gx-research is dispatched from `skills/gx-wayfinder/SKILL.md` ("Fire the research subagents"), so gx-wayfinder is the call site that asks `gx agent model worker`.
   - Nothing in the design run uses light.
 - The charting session runs on strongest, but its subagents follow the list above. Research tickets spawned while charting use worker.
-- Outside a gx session the verb prints the configured Claude value for the current directory's project (overlay applied), and falls back to the built-in default. The implementer picks how the verb finds the session's agent and the exact output format.
-- The skill convention in `skills/gx-local-tracker.md` ("Skill conventions") changes from hard-coded aliases to "ask `gx agent model <tier>`". It also lists the `light` tier name. The call sites in `skills/gx-design/SKILL.md` and `skills/gx-wayfinder/SKILL.md` follow it.
+- Outside a gx session and a loop run, with no `GX_AGENT`, the verb prints the configured Claude value for the current directory's project (overlay applied), and falls back to the built-in default. The implementer picks how the verb finds the session's agent and the exact output format.
+- The skill convention in `skills/gx-local-tracker.md` ("Skill conventions") changes from hard-coded aliases to "ask `gx agent model <tier>`". It also lists the `light` tier name. It says: on empty output, leave out the `model` field. The call sites in `skills/gx-design/SKILL.md` and `skills/gx-wayfinder/SKILL.md` follow it.
 - Three other skills hard-code a model today. This epic moves them to the verb, each on its current tier (opus becomes strongest, sonnet becomes worker):
   - `skills/gx-code-review/SKILL.md`: the review subagent, `model: "opus"`, becomes `gx agent model strongest`.
   - `skills/gx-evolve/SKILL.md`: the per-ticket `Agent` calls, `model: "sonnet"`, become `gx agent model worker`. The read-only review subagent, `model: "opus"`, becomes `gx agent model strongest`.
@@ -166,7 +176,7 @@ Per design step, the main session and its subagents run on these tiers:
 
 - The create-session request takes an optional `tier`. Empty means worker.
 - The dialog shows a tier picker with `light`, `worker` and `strongest`. Each label shows the agent's configured model, for example "Strongest (opus)".
-- The picker uses the project's agent.
+- The picker labels follow the harness the dialog launches, which is Claude today.
 - The session's `meta.json` saves the tier, and a resume keeps it.
 
 ### Agents tab: model display
@@ -195,26 +205,27 @@ A Claude-only prototype exists in the worktree `design-sonnet-default`. It passe
 - Launch args: table tests for tier and agent to args, including empty model and empty effort (no flag). Prior art: the existing launch args tests in the server package and the agent flag tests in the ralph-loop package.
 - Handoff: a scenario with a design session at `chart` that moves to a later step, then Continue. Check the process restarted under worker args, the session id and name did not change, the old conversation was recorded, a new conversation id exists and `/gx-design <epic>` was typed. A second scenario makes the restart fail and checks the session is Exited (crashed) and Resume works.
 - Launch args: also a table case for `agents.claude-args` that hold `--model` or `--effort` (no tier flag for that knob) and a resume with no saved tier (no flag).
-- `gx agent model`: CLI test for each tier, an overridden config and a run outside a session (project overlay applied, built-in default as fallback).
+- `gx agent model`: CLI test for each tier, an overridden config, a run outside a session (project overlay applied, built-in default as fallback), a run with `GX_AGENT=codex` (prints the Codex slug), and a tier with an empty model (prints nothing, exit 0).
+- Launch kind: server tests that a linked-later session is never restarted by the handoff, and that a map with `destination_unconfirmed: true` and `design_step: resolve-tickets` launches on strongest.
 - Model display: server tests for the Claude reported model beating the saved one, the CLI-default case and an old session meta. Web unit test for the header label. Prior art: the existing Actionable transcript-reading tests.
-- Skills: a contract check that the skill text calls `gx agent model` and that no gx skill hard-codes a model alias. A second check that `skills/gx-design/SKILL.md` ends the run after charting. Prior art: the existing run-end template contract test.
+- Skills: a contract check that the skill text calls `gx agent model` and that no gx skill hard-codes a model alias. A second check that `skills/gx-design/SKILL.md` ends the run after charting. A third check that the skill convention says to leave out the `model` field on empty output. Prior art: the existing run-end template contract test.
 
 ## Verification
 
 A verify ticket runs these against a temporary gx server (`gxfixture design`) and a temp `CLAUDE_CONFIG_DIR`. The fake agent records the args it was started with, so the checks read them from its log. Catalog flows are in the web e2e flow catalog. There is no stored mock for this map, so there is no Mock states list.
 
 1. Story 1: new scenario "Design model tiers": a design session at a step after `chart`. The fake agent log shows the worker model and effort in its args (Claude `sonnet` / `medium`).
-2. Story 2: same scenario with a map at `design_step: chart`, and again at the Destination confirmation step. The log shows the strongest args (Claude `opus` / `high`). `gx agents list` shows tier strongest.
+2. Story 2: same scenario with a map at `design_step: chart`, and again with a map that has `destination_unconfirmed: true` and `design_step: resolve-tickets` (Destination confirmation). The log shows the strongest args (Claude `opus` / `high`). `gx agents list` shows tier strongest.
 3. Story 3: same scenario. Stop the charting session and resume it. The log shows strongest args again and `gx agents list` shows tier strongest.
 4. Story 4: new flow "New Design": create a design through New Design. The session starts with strongest args.
-5. Story 5: same scenario with no map yet (direct `/gx-design <epic> <idea>`) and with a map whose `design_step` is empty. The log shows strongest args in both cases.
+5. Story 5: same scenario with a map whose `design_step` is empty: the log shows strongest args. Then a new Agents tab session with strongest picked, and `/gx-design <epic> <idea>` typed into it: it keeps strongest and is not restarted.
 6. Story 6: new scenario "Charting handoff": the map moves from `chart` to the next step, then press Continue (flow 9, Design progress to the end, covers the progress). The fake agent restarts with worker args, then receives `/gx-design <epic>`.
 7. Story 7: same scenario with auto-advance on and no press. The restart and the typed command happen after the countdown.
 8. Story 8: skill contract test: `skills/gx-design/SKILL.md` ends the run with the run-end line after charting and after Destination confirmation, and does not continue to a later step in the same run.
 9. Story 9: in the Story 6 scenario, `gx agents list` shows the same session id, ticket and name, auto-advance still on, and the design page still opens.
 10. Story 10: in the Story 6 scenario, the old conversation has its totals saved and is recorded (as after an agent exit), and the restarted session has a new conversation id that is recorded before the launch.
 11. Story 11: in the Story 6 scenario, make the restart fail (a stale slug in the worker tier). The session shows Exited (crashed), no new pause kind appears, and Resume in the web UI works after the config is fixed.
-12. Story 12: Claude and Codex handoff boundary. A Codex design session gets no Continue handoff in this epic, and its header shows the saved `meta.json` tier, model and effort. The fake Codex agent reports a different model and the header does not change.
+12. Story 12: a session started with `gx agents new --harness codex` shows the saved `meta.json` tier, model and effort in its header. The fake Codex agent reports a different model and the header does not change.
 13. Story 13: in the Story 6 scenario, restart the server. The resumed session args match its saved tier.
 14. Story 14: a session whose `meta.json` has no saved tier is resumed. The log shows no model or effort flag.
 15. Story 15: a design session at a later step on the worker tier, press Continue. The fake agent process is not restarted and receives the reset command and `/gx-design <epic>`.
@@ -231,7 +242,7 @@ A verify ticket runs these against a temporary gx server (`gxfixture design`) an
 26. Story 26: new flow "New Agents tab session": create a session without touching the picker. The log shows worker args.
 27. Story 27: same flow. The dialog lists light, worker and strongest. Pick strongest. The log shows strongest args.
 28. Story 28: same flow. The picker labels read "Light (haiku)", "Worker (sonnet)" and "Strongest (opus)". With a config that sets `agents.claude.strongest.model` to another alias, the label follows it.
-29. Story 29: same flow on a Codex project. The labels show the Codex slugs.
+29. Story 29: same flow. The labels show the Claude slugs, the harness the dialog launches. `gx agents new --harness codex --tier strongest` starts with the Codex strongest args.
 30. Story 30: same flow. Create a session on strongest, stop it and resume it. The args stay strongest and `meta.json` holds the tier.
 31. Story 31: the existing ralph-loop e2e for evolve and investigate tickets still shows the worker args. Run `go test ./e2e/...` and the ralph-loop agent flag tests.
 32. Story 32: config unit test: a config file with `agents.claude.strongest.model` and `effort` loads into the tier block.
@@ -245,8 +256,13 @@ A verify ticket runs these against a temporary gx server (`gxfixture design`) an
 40. Story 40: same flow on Claude. The fake agent reports a model different from the launch model. The header shows the reported one. Then the agent reports another model on the next reply and the header follows.
 41. Story 41: same flow. A session on a tier with empty `model` shows `Worker · CLI default` before the first reply and the reported model after it (Claude).
 42. Story 42: a session meta written without the new fields: `gx agents list` shows empty tier, model and effort, and the header shows no label before the first reply.
-43. Story 43: run the Story 38 flow for a design session, a fix agent and an interactive session, on Claude and on Codex. Each shows the label. Codex shows the saved values only.
+43. Story 43: run the Story 38 flow for a design session, a fix agent and an interactive session on Claude, and for a `gx agents new --harness codex` session. Each shows the label. Codex shows the saved values only.
 44. Story 44: an old API client call that reads `SessionInfo` still works, and the server JSON adds only the three new fields. The typed client test (`tygo` output) is regenerated and unchanged except for those fields.
+45. Story 45: CLI test: `gx agent model worker` with `GX_AGENT=codex` set and no `GX_AGENT_SESSION` prints the Codex worker slug. ralph-loop sets the variable for a Codex run (check the loop agent env in the ralph-loop launch test).
+46. Story 46: CLI test: with an empty tier `model`, `gx agent model worker` prints nothing and exits 0. The skill contract test checks that the convention says to leave out the `model` field on empty output.
+47. Story 47: see Story 2, second case.
+48. Story 48: a session launched from the Agents tab on strongest is linked with `gx agent link`, the map moves to a later step, press Continue. The process is not restarted. A session started by Start design restarts as in Story 6.
+49. Story 49: `gx agents new --harness codex` without `--tier` logs worker args, and with `--tier strongest` logs strongest args.
 
 New flows or scenarios to write (each becomes an implementation ticket): "Design model tiers", "Charting handoff" (Claude, plus the failed-restart case), "New Design" (launch args), "New Agents tab session" (tier picker, resume), "Session model label". The fake agent must log its launch args and report a model in its transcript.
 
@@ -261,6 +277,7 @@ New flows or scenarios to write (each becomes an implementation ticket): "Design
 - Agents other than Claude and Codex. gx supports only these two.
 - A tier choice for evolve and investigate tickets in ralph-loop.
 - The Codex design handoff, Codex design Continue and a Codex rollout reader. They wait for Codex design sessions to get Continue.
+- A Codex harness for web-created, fix-agent and design launches. Only `gx agents new --harness codex` and ralph-loop start Codex sessions.
 - A new pause kind for a failed handoff restart.
 
 ## Further Notes
