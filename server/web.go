@@ -58,7 +58,7 @@ func (s *Server) bindWeb() {
 		s.log.Error("web tls unavailable", "err", err)
 		return
 	}
-	ln := newSniffListener(rawLn, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})
+	ln := newSniffListener(newSourceIPListener(rawLn, s.log, time.Now), &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})
 	s.web, s.webRoot, s.webListenIP = ln, root, listenIP
 	mux := s.webHandler()
 	protected := requireToken(s.cfg.StateDir, webCookieName(ln), mux)
