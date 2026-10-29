@@ -2,6 +2,8 @@ package server
 
 import (
 	"errors"
+	"io/fs"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"time"
@@ -21,6 +23,10 @@ var (
 	HardGraceTitle = hardGraceTitle
 	TicketAgent    = ticketAgent
 )
+
+// ServeAsset is serveAsset over a fake build, so a test can name hashed assets
+// the placeholder embed does not have.
+func ServeAsset(assets fs.FS) http.Handler { return serveAsset(assets) }
 
 // LiveDiskSpace is the disk-space settings the server currently runs on.
 func (s *Server) LiveDiskSpace() config.DiskSpaceConfig {

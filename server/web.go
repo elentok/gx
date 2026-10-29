@@ -1,6 +1,9 @@
 package server
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"mime"
@@ -10,6 +13,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/elentok/gx/webui"
 )
@@ -61,8 +65,7 @@ func (s *Server) WebURL() string {
 // webHandler is the web mux: the snapshot, the event stream and the embedded
 // assets, plus the allowlisted writes. Every other request is a 404.
 func (s *Server) webHandler() http.Handler {
-	assets := webui.Assets()
-	static := serveAsset(http.FileServerFS(assets), assets)
+	static := serveAsset(webui.Assets())
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			if reason := checkWriteRequest(r); reason != "" {
@@ -190,16 +193,42 @@ func devFrontendProxy(raw string) (http.Handler, error) {
 	return proxy, nil
 }
 
-// serveAsset serves the file at the request path. A path with no file gets
-// index.html, so the single-page app can own its client-side routes.
-func serveAsset(files http.Handler, assets fs.FS) http.Handler {
+// serveAsset serves index.html at "/" only, and the file at any other path.
+// A path with no file is a 404, so a stale page fails loudly instead of
+// loading HTML as a script. The app uses a hash router, so it needs no fallback.
+func serveAsset(assets fs.FS) http.Handler {
+	files := http.FileServerFS(assets)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			serveIndex(w, r, assets)
+			return
+		}
 		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
-		if info, err := fs.Stat(assets, name); name != "" && (err != nil || info.IsDir()) {
-			r2 := r.Clone(r.Context())
-			r2.URL.Path = "/"
-			r = r2
+		info, err := fs.Stat(assets, name)
+		if err != nil || info.IsDir() || name == "index.html" {
+			http.NotFound(w, r)
+			return
+		}
+		// Vite names files under assets/ by content hash; other root files keep their name.
+		if strings.HasPrefix(name, "assets/") {
+			w.Header().Set("Cache-Control", "max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
 		}
 		files.ServeHTTP(w, r)
 	})
+}
+
+// serveIndex answers with index.html and an ETag from its content, so a
+// matching If-None-Match gets 304.
+func serveIndex(w http.ResponseWriter, r *http.Request, assets fs.FS) {
+	body, err := fs.ReadFile(assets, "index.html")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	sum := sha256.Sum256(body)
+	w.Header().Set("ETag", `"`+hex.EncodeToString(sum[:])+`"`)
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(body))
 }

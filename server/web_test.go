@@ -5,9 +5,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -155,15 +157,81 @@ func TestWeb_OffByDefault(t *testing.T) {
 	}
 }
 
+// webGet sends an authenticated GET with extra headers and returns the response.
+func webGet(t *testing.T, h *servertest.Harness, url string, headers map[string]string) *http.Response {
+	t.Helper()
+	base, _, _ := strings.Cut(url[len("http://"):], "/")
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.AddCookie(login(t, h.StateDir, "http://"+base))
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	return resp
+}
+
 // The embed is the placeholder or a built dist, depending on whether make
-// web-build ran, so the test only checks that an HTML page is served.
-func TestWeb_ServesIndexAtRootAndFallback(t *testing.T) {
+// web-build ran, so this checks the root and the 404s; the asset rules run
+// against a fake build in TestServeAsset_CacheHeaders.
+func TestWeb_ServesIndexOnlyAtRoot(t *testing.T) {
 	t.Parallel()
 	h, base := startWeb(t)
-	for _, path := range []string{"/", "/index.html", "/some/client/route"} {
-		code, body := webDo(t, h, http.MethodGet, base+path)
-		if code != http.StatusOK || !strings.Contains(strings.ToLower(body), "<!doctype html>") {
-			t.Errorf("GET %s = %d %q", path, code, body)
+	resp := webGet(t, h, base+"/", nil)
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK || !strings.Contains(resp.Header.Get("Content-Type"), "text/html") ||
+		!strings.Contains(strings.ToLower(string(body)), "<!doctype html>") {
+		t.Fatalf("GET / = %d %s %q", resp.StatusCode, resp.Header.Get("Content-Type"), body)
+	}
+	if got := resp.Header.Get("Cache-Control"); got != "no-cache" {
+		t.Errorf("GET / Cache-Control = %q, want no-cache", got)
+	}
+	etag := resp.Header.Get("ETag")
+	if etag == "" {
+		t.Fatal("GET / has no ETag")
+	}
+	if got := webGet(t, h, base+"/", map[string]string{"If-None-Match": etag}).StatusCode; got != http.StatusNotModified {
+		t.Errorf("GET / with matching If-None-Match = %d, want 304", got)
+	}
+	for _, path := range []string{"/assets/missing.js", "/stats", "/some/client/route", "/index.html"} {
+		if code, _ := webDo(t, h, http.MethodGet, base+path); code != http.StatusNotFound {
+			t.Errorf("GET %s = %d, want 404", path, code)
+		}
+	}
+}
+
+func TestServeAsset_CacheHeaders(t *testing.T) {
+	t.Parallel()
+	handler := server.ServeAsset(fstest.MapFS{
+		"index.html":              {Data: []byte("<!doctype html>")},
+		"apple-touch-icon.png":    {Data: []byte("png")},
+		"assets/index-AbC123.js":  {Data: []byte("js")},
+		"assets/index-AbC123.css": {Data: []byte("css")},
+	})
+	cases := []struct{ path, cache string }{
+		{"/", "no-cache"},
+		{"/apple-touch-icon.png", "no-cache"},
+		{"/assets/index-AbC123.js", "max-age=31536000, immutable"},
+		{"/assets/index-AbC123.css", "max-age=31536000, immutable"},
+	}
+	for _, tc := range cases {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.path, nil))
+		if rec.Code != http.StatusOK || rec.Header().Get("Cache-Control") != tc.cache {
+			t.Errorf("GET %s = %d Cache-Control %q, want 200 %q", tc.path, rec.Code, rec.Header().Get("Cache-Control"), tc.cache)
+		}
+	}
+	for _, path := range []string{"/assets/missing.js", "/assets/", "/assets", "/stats"} {
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("GET %s = %d, want 404", path, rec.Code)
 		}
 	}
 }
