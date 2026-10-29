@@ -40,7 +40,7 @@ func TestExplain_WaitingRunVerdicts(t *testing.T) {
 				c.WaitingSlotGrace = time.Minute
 				c.MaxReleasedAgents = tc.maxFree
 			})
-			wtPath, _ := leaveIteration(t, h, store, repo)
+			wtPath, _ := leaveIteration(t, h, store, repo, "herdr")
 			if _, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01", Cwd: wtPath}); err != nil {
 				t.Fatal(err)
 			}

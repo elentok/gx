@@ -63,7 +63,7 @@ func restartUnder(t *testing.T, savedRunner string, configured agentrunner.Runne
 	for _, r := range others {
 		h.DropAgentsAtCleanup(r)
 	}
-	_, ticketPath := leaveIteration(t, h, store, repo)
+	_, ticketPath := leaveIteration(t, h, store, repo, "herdr")
 	if savedRunner != "" {
 		asHeadlessRun(t, h)
 		setSavedRunner(t, h, savedRunner)

@@ -482,7 +482,7 @@ func TestRunner_ClaimsAnotherTicketOfARootOnlyBelowThePerRootCap(t *testing.T) {
 		})
 		registerTurn(h)
 		// One agent of the root is already running.
-		h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00"})
+		h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00", Runner: "herdr"})
 		// The no-start case waits out the whole timeout, so it stays short.
 		timeout := time.Second
 		if tc.starts {
@@ -527,7 +527,7 @@ func TestRunner_SkipsAFrontierTicketThatIsAlreadyTracked(t *testing.T) {
 		c.PollInterval = 50 * time.Millisecond
 	})
 	registerTurn(h)
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01"})
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr"})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -573,7 +573,7 @@ func TestRunner_ProjectCapHoldsItsProjectAndAnEditAppliesLive(t *testing.T) {
 		c.PollInterval = 50 * time.Millisecond
 	})
 	registerTurn(h)
-	h.Server.PutRun("proj-a:epic-a", server.Run{Address: "proj-a:epic-a/00"}) // proj-a is at its cap
+	h.Server.PutRun("proj-a:epic-a", server.Run{Address: "proj-a:epic-a/00", Runner: "herdr"}) // proj-a is at its cap
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -686,7 +686,7 @@ func TestExplain_NamesEveryFullCapWithItsCount(t *testing.T) {
 		c.MaxAgents = 1
 	})
 	registerTurn(h)
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00"})
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00", Runner: "herdr"})
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
@@ -758,16 +758,16 @@ func TestRunner_GlobalCapIsSharedAcrossProjectsInFIFOOrder(t *testing.T) {
 // leaveIteration stages what a server that died mid-iteration leaves behind: a
 // claimed ticket, its worktree with the agent's commit, and the persisted
 // handle. It returns the worktree path and the ticket file.
-func leaveIteration(t *testing.T, h *servertest.Harness, store, repo string) (string, string) {
+func leaveIteration(t *testing.T, h *servertest.Harness, store, repo, runner string) (string, string) {
 	t.Helper()
-	return leaveIterationWith(t, h, store, repo, func(wtPath string) {
+	return leaveIterationWith(t, h, store, repo, runner, func(wtPath string) {
 		testutil.WriteFile(t, wtPath, "agent.txt", "work")
 		testutil.CommitAll(t, wtPath, "agent work")
 	})
 }
 
 // leaveIterationWith is leaveIteration with work as what the agent did in its worktree.
-func leaveIterationWith(t *testing.T, h *servertest.Harness, store, repo string, work func(wtPath string)) (string, string) {
+func leaveIterationWith(t *testing.T, h *servertest.Harness, store, repo, runner string, work func(wtPath string)) (string, string) {
 	t.Helper()
 	epics, err := tickets.Load(filepath.Join(store, "proj"))
 	if err != nil {
@@ -785,7 +785,7 @@ func leaveIterationWith(t *testing.T, h *servertest.Harness, store, repo string,
 	}
 	work(wt.Path)
 	handle, err := json.Marshal([]map[string]string{{
-		"address": "proj:epic-a/01", "agent": "claude", "pane": "p1", "tab": "t1", "root": "proj:epic-a",
+		"address": "proj:epic-a/01", "agent": "claude", "runner": runner, "pane": "p1", "tab": "t1", "root": "proj:epic-a",
 		"repo": repo, "workspace": "w1", "base": wt.Base(), "ticket_path": tk.Path,
 	}})
 	if err != nil {
@@ -816,7 +816,7 @@ func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
 	registerLiveAgent(h)
-	wtPath, ticketPath := leaveIteration(t, h, store, repo)
+	wtPath, ticketPath := leaveIteration(t, h, store, repo, "herdr")
 	if err := os.RemoveAll(wtPath); err != nil {
 		t.Fatal(err)
 	}
@@ -864,7 +864,7 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
 	registerLiveAgent(h)
-	leaveIteration(t, h, store, repo)
+	leaveIteration(t, h, store, repo, "herdr")
 
 	h.Restart(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

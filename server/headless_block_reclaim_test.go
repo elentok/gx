@@ -24,7 +24,7 @@ func restartHeadlessClaimed(t *testing.T, verdict nativerunner.Verdict, prepare 
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: verdict}
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
-	wtPath, ticketPath := leaveIteration(t, h, store, repo)
+	wtPath, ticketPath := leaveIteration(t, h, store, repo, string(agentrunner.ChoiceHeadless))
 	if _, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01", Cwd: wtPath}); err != nil {
 		t.Fatal(err)
 	}

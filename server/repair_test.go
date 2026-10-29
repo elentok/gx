@@ -153,7 +153,7 @@ func pausedIteration(t *testing.T, kind string, commit bool) (*servertest.Harnes
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	h := servertest.StartWithStore(t, store)
-	wt, ticketPath := leaveIteration(t, h, store, repo)
+	wt, ticketPath := leaveIteration(t, h, store, repo, "herdr")
 	_ = os.Remove(filepath.Join(h.StateDir, "runs.json"))
 	if !commit {
 		runGitIn(t, wt, "reset", "-q", "--hard", "HEAD~1")

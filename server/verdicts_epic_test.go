@@ -30,7 +30,7 @@ func startCapHeldEpics(t *testing.T) (*servertest.Harness, string) {
 		c.MaxAgents = 1
 	})
 	registerTurn(h)
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00"})
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/00", Runner: "herdr"})
 	return h, repo
 }
 

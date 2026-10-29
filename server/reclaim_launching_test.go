@@ -144,7 +144,7 @@ func restartLaunching(t *testing.T, fake *headlessFake, herdr func(*servertest.H
 	if herdr != nil {
 		herdr(h)
 	}
-	_, ticketPath := leaveIterationWith(t, h, store, repo, func(p string) { work(t, p) })
+	_, ticketPath := leaveIterationWith(t, h, store, repo, "herdr", func(p string) { work(t, p) })
 	if fake != nil {
 		asHeadlessRun(t, h)
 	}

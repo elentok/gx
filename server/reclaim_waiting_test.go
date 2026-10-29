@@ -61,7 +61,7 @@ func startWaitingRestartFake(t *testing.T, hardLimit float64, tweak ...func(*ser
 			f(c)
 		}
 	})
-	wtPath, ticketPath := leaveIteration(t, h, store, repo)
+	wtPath, ticketPath := leaveIteration(t, h, store, repo, "herdr")
 	// The agent is still alive on the runner while the server is down.
 	if _, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01", Cwd: wtPath}); err != nil {
 		t.Fatal(err)

@@ -99,7 +99,7 @@ func TestLaunchPort_RestartReattachesAndMergesOnce(t *testing.T) {
 		starts.Add(1)
 		return map[string]any{}, herdrfake.Identities{}, nil
 	})
-	leaveIteration(t, h, store, repo)
+	leaveIteration(t, h, store, repo, "herdr")
 
 	h.Restart(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

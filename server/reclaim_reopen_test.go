@@ -34,7 +34,7 @@ func restartDead(t *testing.T, headless bool, work func(t *testing.T, wtPath str
 		opts = append(opts, servertest.WithRunner(fake))
 	}
 	h := servertest.StartWithStore(t, store, opts...)
-	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, func(p string) { work(t, p) })
+	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, runnerOf(headless), func(p string) { work(t, p) })
 	stampRun(t, h, runnerOf(headless), deadSession)
 	h.Restart(t)
 	return store, repo, wtPath, ticketPath
@@ -97,7 +97,7 @@ func TestReclaim_HerdrLookupErrorNeverReopens(t *testing.T) {
 	h.Herdr.Register("agent", "get", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		return nil, herdrfake.Identities{}, errors.New(`{"error":{"code":"internal","message":"herdr hiccup"}}`)
 	})
-	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, func(string) {})
+	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, "herdr", func(string) {})
 	stampRun(t, h, "herdr", deadSession)
 	h.Restart(t)
 

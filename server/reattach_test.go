@@ -78,6 +78,9 @@ func asHeadlessRun(t *testing.T, h *servertest.Harness) {
 // stampRun rewrites the staged handle's runner and session.
 func stampRun(t *testing.T, h *servertest.Harness, runner string, session agentrunner.Session) {
 	t.Helper()
+	if runner == "" {
+		t.Fatal("stampRun needs a runner")
+	}
 	path := filepath.Join(h.StateDir, "runs.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -108,7 +111,7 @@ func startHeadlessRestart(t *testing.T, verdict nativerunner.Verdict, retention 
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.LogRetention = retention
 	})
-	_, ticketPath := leaveIteration(t, h, store, repo)
+	_, ticketPath := leaveIteration(t, h, store, repo, "herdr")
 	asHeadlessRun(t, h)
 	h.Restart(t)
 	return fake, ticketPath
