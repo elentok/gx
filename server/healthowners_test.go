@@ -50,25 +50,22 @@ func startOwnedRun(t *testing.T, r *pidRunner) *servertest.Harness {
 	if _, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil {
 		t.Fatal(err)
 	}
-	for ctx.Err() == nil {
-		if live, _ := r.List("epic-a"); len(live) > 0 {
-			return h
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	t.Fatal("run never started")
-	return nil
+	testutil.WaitFor(t, 10*time.Second, "the run to start", func() bool {
+		live, _ := r.List("epic-a")
+		return len(live) > 0
+	})
+	return h
 }
 
 func settledCauses(t *testing.T, h *servertest.Harness) server.HealthCauses {
 	t.Helper()
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		if rep := health(t, h, true); rep.Causes.CPU.Marker == "" {
-			return rep.Causes
-		}
-	}
-	t.Fatal("cause lists never settled")
-	return server.HealthCauses{}
+	var causes server.HealthCauses
+	testutil.WaitFor(t, 10*time.Second, "the cause lists to settle", func() bool {
+		rep := health(t, h, true)
+		causes = rep.Causes
+		return rep.Causes.CPU.Marker == ""
+	})
+	return causes
 }
 
 // Seam 1: a tracked run's agent tree shows as its ticket address with the

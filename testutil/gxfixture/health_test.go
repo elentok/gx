@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil"
 )
 
 // setHealth replaces the system control file through a rename, as a flow does.
@@ -28,17 +29,16 @@ func (r *running) setHealth(t *testing.T, value string) {
 func (r *running) waitHealth(t *testing.T, what string, ok func(server.HealthReport) bool) server.HealthReport {
 	t.Helper()
 	var rep server.HealthReport
-	deadline := time.Now().Add(15 * time.Second)
-	for time.Now().Before(deadline) {
+	// Each check runs a gx subprocess, so it polls slowly.
+	shown := testutil.Poll(15*time.Second, 100*time.Millisecond, func() bool {
 		if err := json.Unmarshal([]byte(r.gx(t, "server", "health", "--json")), &rep); err != nil {
 			t.Fatal(err)
 		}
-		if ok(rep) {
-			return rep
-		}
-		time.Sleep(100 * time.Millisecond)
+		return ok(rep)
+	})
+	if !shown {
+		t.Fatalf("health never showed %s: %+v", what, rep)
 	}
-	t.Fatalf("health never showed %s: %+v", what, rep)
 	return rep
 }
 

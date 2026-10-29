@@ -7,22 +7,24 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil"
 )
 
 // diskMeterWhen polls the snapshot until pred accepts the disk meter.
 func (r *diskRig) diskMeterWhen(t *testing.T, what string, pred func(server.MeterHealth) bool) server.MeterHealth {
 	t.Helper()
 	var last server.MeterHealth
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+	ok := testutil.Poll(10*time.Second, 10*time.Millisecond, func() bool {
 		snap, err := r.h.Client.Snapshot(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if last = snap.Health.Disk; pred(last) {
-			return last
-		}
+		last = snap.Health.Disk
+		return pred(last)
+	})
+	if !ok {
+		t.Fatalf("snapshot disk meter = %+v, want %s", last, what)
 	}
-	t.Fatalf("snapshot disk meter = %+v, want %s", last, what)
 	return last
 }
 

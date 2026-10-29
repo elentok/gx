@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/testutil"
 )
 
 func testInstallRunner() *runner {
@@ -30,13 +32,10 @@ func TestEnsureInstalled_DifferentDirsInstallInParallel(t *testing.T) {
 	var wg sync.WaitGroup
 	var errA error
 	wg.Go(func() { _, errA = r.ensureInstalled(waitForB) })
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if _, err := os.Stat(filepath.Join(a, "started")); err == nil {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	testutil.Poll(5*time.Second, 10*time.Millisecond, func() bool {
+		_, err := os.Stat(filepath.Join(a, "started"))
+		return err == nil
+	})
 	_, errB := r.ensureInstalled(touchDone)
 	wg.Wait()
 	if errA != nil || errB != nil {

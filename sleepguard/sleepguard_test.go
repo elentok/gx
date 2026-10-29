@@ -65,6 +65,8 @@ var allowed = map[string]int{
 	"server/handmerged_test.go":                     1,
 	"server/headless_block_reclaim_test.go":         2,
 	"server/headless_block_test.go":                 1,
+	"server/healthprocs_test.go":                    4,
+	"server/healthwatch_test.go":                    1,
 	"server/latefinish_test.go":                     2,
 	"server/map_done_test.go":                       1,
 	"server/merge_finish_test.go":                   1,

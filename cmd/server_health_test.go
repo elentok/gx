@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/syshealth"
+	"github.com/elentok/gx/testutil"
 )
 
 func TestServerHealth_TextNamesHostCPUMemoryAndEachDisk(t *testing.T) {
@@ -87,14 +88,14 @@ func TestServerHealth_AgentRowShowsAddressAndBusiestProcess(t *testing.T) {
 // waitHealthKnown waits until the watcher has taken a first system reading.
 func waitHealthKnown(t *testing.T, h *servertest.Harness) {
 	t.Helper()
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+	known := testutil.Poll(10*time.Second, 10*time.Millisecond, func() bool {
 		rep, err := h.Client.Health(context.Background())
 		if err != nil {
 			t.Fatal(err)
 		}
-		if rep.Memory.State != server.HealthStateUnknown {
-			return
-		}
+		return rep.Memory.State != server.HealthStateUnknown
+	})
+	if !known {
+		t.Fatal("watcher never read the system")
 	}
-	t.Fatal("watcher never read the system")
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/syshealth"
+	"github.com/elentok/gx/testutil"
 )
 
 const routeGB = 1_000_000_000
@@ -50,16 +51,16 @@ func healthDisk(r server.HealthReport, id string) *server.HealthDisk {
 func healthRouteWhen(t *testing.T, h *servertest.Harness, what string, pred func(server.HealthReport) bool) server.HealthReport {
 	t.Helper()
 	var last server.HealthReport
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+	ok := testutil.Poll(10*time.Second, 5*time.Millisecond, func() bool {
 		var err error
 		if last, err = h.Client.Health(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if pred(last) {
-			return last
-		}
+		return pred(last)
+	})
+	if !ok {
+		t.Fatalf("health = %+v, want %s", last, what)
 	}
-	t.Fatalf("health = %+v, want %s", last, what)
 	return last
 }
 

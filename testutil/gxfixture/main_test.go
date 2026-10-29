@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -372,13 +373,10 @@ func TestRefusedAskScenario_RefusedFinishThenAskPausesSelfReported(t *testing.T)
 	t.Parallel()
 	r := start(t, "refused-ask")
 	const addr = "demo:refused-epic/01"
-	deadline := time.Now().Add(60 * time.Second)
-	for r.ticketStatus(t, addr) != "needs-answer" {
-		if time.Now().After(deadline) {
-			t.Logf("history:\n%s", r.gx(t, "server", "tickets", "history", addr))
-			t.Fatalf("ticket %s is %q, want needs-answer", addr, r.ticketStatus(t, addr))
-		}
-		time.Sleep(time.Second)
+	// Each check runs a gx subprocess, so it polls once a second.
+	if !testutil.Poll(60*time.Second, time.Second, func() bool { return r.ticketStatus(t, addr) == "needs-answer" }) {
+		t.Logf("history:\n%s", r.gx(t, "server", "tickets", "history", addr))
+		t.Fatalf("ticket %s is %q, want needs-answer", addr, r.ticketStatus(t, addr))
 	}
 	d := r.detail(t, addr)
 	if d.PauseReason != "self-reported" || d.Latest == nil {

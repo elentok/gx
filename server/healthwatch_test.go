@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/syshealth"
+	"github.com/elentok/gx/testutil"
 )
 
 const healthInterval = 5 * time.Millisecond
@@ -35,24 +36,22 @@ func snapshotHealth(t *testing.T, h *servertest.Harness) server.Snapshot {
 func healthWhen(t *testing.T, h *servertest.Harness, what string, pred func(server.Health) bool) server.Health {
 	t.Helper()
 	var last server.Health
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
-		if last = snapshotHealth(t, h).Health; pred(last) {
-			return last
-		}
+	ok := testutil.Poll(10*time.Second, 5*time.Millisecond, func() bool {
+		last = snapshotHealth(t, h).Health
+		return pred(last)
+	})
+	if !ok {
+		t.Fatalf("snapshot health = %+v, want %s", last, what)
 	}
-	t.Fatalf("snapshot health = %+v, want %s", last, what)
 	return last
 }
 
 // waitReads waits until the fake has taken n readings, without asking the server.
 func waitReads(t *testing.T, fake *servertest.FakeSystem, n int) {
 	t.Helper()
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(time.Millisecond) {
-		if fake.Reads() >= n {
-			return
-		}
+	if !testutil.Poll(10*time.Second, time.Millisecond, func() bool { return fake.Reads() >= n }) {
+		t.Fatalf("reads = %d, want %d", fake.Reads(), n)
 	}
-	t.Fatalf("reads = %d, want %d", fake.Reads(), n)
 }
 
 // healthEvents counts the health-changed events on stream until it is quiet.
@@ -131,6 +130,7 @@ func TestHealth_MovementWithinAStepPublishesNoEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A negative wait: flap memory for 40 intervals, then prove no event went out.
 	for i := range 40 {
 		fake.SetMem(float64(10 + 4*(i%2)))
 		time.Sleep(healthInterval)

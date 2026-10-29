@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/syshealth"
+	"github.com/elentok/gx/testutil"
 )
 
 // procTiming is a Config option that sets the process timing fields.
@@ -71,6 +72,7 @@ var slowSecondRead = procTiming{delay: 5 * time.Second, window: 100 * time.Milli
 // Seam: nobody calls the route, so the process table is never read (story 51).
 func TestHealthProcs_NoCallNoReads(t *testing.T) {
 	h := startProcs(t, slowSecondRead, proc(10, "a", 100, 1))
+	// A negative wait: give a stray read time to happen, then prove there was none.
 	time.Sleep(150 * time.Millisecond)
 	if n := h.Processes.Reads(); n != 0 {
 		t.Fatalf("reads = %d, want 0", n)
@@ -97,6 +99,7 @@ func TestHealthProcs_WindowRunsFromTheReadNotTheLastCall(t *testing.T) {
 	h := startProcs(t, tm, proc(10, "a", 100, 1))
 	spacing := tm.window * 9 / 10
 	health(t, h, false)
+	// The window is wall-clock time, so these two sleeps space the calls; there is no condition to wait on.
 	time.Sleep(spacing)
 	health(t, h, false)
 	if n := h.Processes.Reads(); n != 1 {
@@ -117,6 +120,7 @@ func TestHealthProcs_SlowPollGetsAFreshReadEachTime(t *testing.T) {
 		if n := h.Processes.Reads(); n != i {
 			t.Fatalf("reads after call %d = %d, want %d", i, n, i)
 		}
+		// Let the share window pass so the next call reads again; wall-clock time, no condition.
 		time.Sleep(5 * slowSecondRead.window)
 	}
 }
@@ -127,11 +131,10 @@ func TestHealthProcs_TopThreeByCPUAndMemory(t *testing.T) {
 		proc(10, "a", 400, 10), proc(11, "b", 200, 50), proc(12, "c", 100, 30),
 		proc(13, "d", 50, 70), proc(14, "e", 10, 60))
 	var rep server.HealthReport
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		if rep = health(t, h, true); rep.CPU.State == server.HealthStateNormal {
-			break
-		}
-	}
+	testutil.Poll(10*time.Second, 10*time.Millisecond, func() bool {
+		rep = health(t, h, true)
+		return rep.CPU.State == server.HealthStateNormal
+	})
 	if rep.CPU.State != server.HealthStateNormal || rep.Memory.State != server.HealthStateNormal {
 		t.Fatalf("meters = %s / %s, want normal", rep.CPU.State, rep.Memory.State)
 	}
@@ -152,11 +155,10 @@ func TestHealthProcs_FailingSourceGivesUnavailableAndMetersStillRead(t *testing.
 	h := startProcs(t, procTiming{delay: 5 * time.Millisecond, window: 50 * time.Millisecond, cutoff: 10 * time.Second})
 	h.Processes.Fail(syshealth.ErrUnavailable)
 	var rep server.HealthReport
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
-		if rep = health(t, h, true); rep.CPU.State == server.HealthStateNormal {
-			break
-		}
-	}
+	testutil.Poll(10*time.Second, 10*time.Millisecond, func() bool {
+		rep = health(t, h, true)
+		return rep.CPU.State == server.HealthStateNormal
+	})
 	if rep.CPU.State != server.HealthStateNormal || rep.Memory.State != server.HealthStateNormal {
 		t.Fatalf("meters = %s / %s, want normal", rep.CPU.State, rep.Memory.State)
 	}

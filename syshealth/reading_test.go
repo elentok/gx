@@ -6,6 +6,8 @@ import (
 	"testing"
 	"testing/fstest"
 	"time"
+
+	"github.com/elentok/gx/testutil"
 )
 
 func TestParseProcStat(t *testing.T) {
@@ -109,17 +111,13 @@ func TestRealReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
 	var second Reading
-	for {
+	testutil.Poll(5*time.Second, 50*time.Millisecond, func() bool {
 		if second, err = read(); err != nil {
 			t.Fatal(err)
 		}
-		if second.CPUTotal > first.CPUTotal || time.Now().After(deadline) {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+		return second.CPUTotal > first.CPUTotal
+	})
 	if second.CPUTotal <= first.CPUTotal {
 		t.Errorf("total ticks did not rise: %d then %d", first.CPUTotal, second.CPUTotal)
 	}
