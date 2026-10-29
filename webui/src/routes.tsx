@@ -94,7 +94,7 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
   return [
     { path: "/epics", element: <EpicsPage fetchList={fetchers.epicList} fetchChecks={fetchers.checksStatus} openDesign={fetchers.openDesign} saveChecks={fetchers.saveChecks} /> },
     // "/agents/*" also matches "/agents"; the splat is the session label.
-    { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} /> },
+    { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },

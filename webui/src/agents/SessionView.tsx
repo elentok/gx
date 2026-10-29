@@ -1,10 +1,15 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Link, Text } from "@chakra-ui/react";
+import { useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useSessionChat, type FetchChat } from "../design/chat";
 import { DesignChat, type ChatOptions } from "../design/ChatLog";
 import { Composer } from "../design/Composer";
-import { promptable } from "../design/view";
+import { ScreenModal } from "../design/ScreenModal";
+import type { FetchScreen } from "../design/screen";
+import { designOf, promptable } from "../design/view";
 import type { SessionInfo } from "../generated/server";
+import { designHref } from "../hrefs";
+import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { statusMark } from "./AgentSidebar";
 import { SessionSwitcher } from "./SessionSwitcher";
@@ -16,6 +21,7 @@ const noop = () => {};
 
 function SessionHeader({ session: s, sessions }: { session: SessionInfo; sessions: SessionInfo[] }) {
   const { glyph, tone } = statusMark(s);
+  const map = designOf(s);
   return (
     <Box as="header" display="flex" alignItems="center" flexWrap="wrap" gap="2" mb="3">
       <Text as="span" role="img" aria-label="status" color={`tone.${tone}.fg`}>
@@ -32,6 +38,27 @@ function SessionHeader({ session: s, sessions }: { session: SessionInfo; session
           {s.ticket}
         </Text>
       )}
+      {map && (
+        <Link fontSize="sm" ml="auto" color="tone.running.fg" href={designHref(map)}>
+          Open design page →
+        </Link>
+      )}
+    </Box>
+  );
+}
+
+/** A non-Claude session has no transcript, so its screen is the only thing to read. */
+function NoChat({ sessionId, fetchScreen }: { sessionId: string; fetchScreen?: FetchScreen }) {
+  const [screen, setScreen] = useState(false);
+  return (
+    <Box display="flex" alignItems="center" justifyContent="space-between" gap="3" flexWrap="wrap" borderWidth="1px" borderRadius="md" px="3" py="2">
+      <Text color="text.muted" fontSize="sm">
+        Chat works for Claude sessions only.
+      </Text>
+      <Button emphasis="secondary" onClick={() => setScreen(true)}>
+        Show screen
+      </Button>
+      {screen && <ScreenModal target={sessionId} fetcher={fetchScreen} onClose={() => setScreen(false)} />}
     </Box>
   );
 }
@@ -53,10 +80,12 @@ export function SessionView({
   session,
   sessions,
   fetchChat,
+  fetchScreen,
 }: {
   session: SessionInfo;
   sessions: SessionInfo[];
   fetchChat?: FetchChat;
+  fetchScreen?: FetchScreen;
 }) {
   const conn = useConnectionContext();
   const { connected } = useConnectionState(conn);
@@ -66,19 +95,23 @@ export function SessionView({
     <Box display="flex" flexDirection="column" height="100%" minH="0">
       <SessionHeader session={session} sessions={sessions} />
       {claude && chat && chat.messages.length === 0 && (
-        <Text color="text.muted" mb="3">
+        <Text color="text.muted" flex="1" display="flex" alignItems="center" justifyContent="center">
           No messages yet
         </Text>
       )}
-      <DesignChat
-        session={session}
-        chat={chat}
-        refetch={refetch}
-        actions={{ address: "" }}
-        questions={false}
-        onQuestions={noop}
-        options={AGENT_OPTIONS}
-      />
+      {claude ? (
+        <DesignChat
+          session={session}
+          chat={chat}
+          refetch={refetch}
+          actions={{ address: "" }}
+          questions={false}
+          onQuestions={noop}
+          options={AGENT_OPTIONS}
+        />
+      ) : (
+        <NoChat sessionId={session.id} fetchScreen={fetchScreen} />
+      )}
       <Composer
         design={false}
         session={session}

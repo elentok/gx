@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { FetchChat } from "../design/chat";
 import { useFocusReport } from "../design/focus";
+import type { FetchScreen } from "../design/screen";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
 import { useWide } from "../useWide";
@@ -31,7 +32,7 @@ function writeLast(id: string) {
 
 // The snapshot is cached by snapshotCache, so a reload repaints from it before the stream lands.
 // The cache may predate the session list, so only a live snapshot may redirect or call a label gone.
-export function AgentsPage({ fetchChat }: { fetchChat?: FetchChat }) {
+export function AgentsPage({ fetchChat, fetchScreen }: { fetchChat?: FetchChat; fetchScreen?: FetchScreen }) {
   const selected = useParams()["*"] || undefined;
   const wide = useWide();
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export function AgentsPage({ fetchChat }: { fetchChat?: FetchChat }) {
                   <Text color="text.muted">{selected} no longer exists.</Text>
                 </>
               ) : selected ? (
-                listed && <SessionView session={sessions.find((s) => s.id === selected)!} sessions={sessions} fetchChat={fetchChat} />
+                listed && <SessionView session={sessions.find((s) => s.id === selected)!} sessions={sessions} fetchChat={fetchChat} fetchScreen={fetchScreen} />
               ) : (
                 <Text color="text.muted">{sessions.length === 0 ? "No sessions yet" : "Pick a session"}</Text>
               )}

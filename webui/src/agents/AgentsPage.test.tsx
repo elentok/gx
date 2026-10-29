@@ -436,6 +436,40 @@ test("stale refetches the chat and keeps the draft", async () => {
   expect((await composerBox()).value).toBe("keep me");
 });
 
+test("a non-Claude session loads no chat, shows the notice, Show screen opens the screen modal and the composer says why it is off", async () => {
+  const chatCalls: unknown[] = [];
+  const screenCalls: string[] = [];
+  render([session("s-2", "p", { harness: "codex" })], "/agents/s-2", true, {
+    chat: async () => {
+      chatCalls.push(1);
+      return { kind: "ok", detail: chat() };
+    },
+    screen: async (target) => {
+      screenCalls.push(target);
+      return { kind: "ok", detail: { rows: ["$ codex"] } } as never;
+    },
+  });
+  expect(await screen.findByText("Chat works for Claude sessions only.")).toBeTruthy();
+  expect(chatCalls).toEqual([]);
+  expect(screen.getByText("Sending works for Claude sessions only")).toBeTruthy();
+  expect(sendButton().disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Show screen" }));
+  expect((await screen.findByLabelText("Screen rows")).textContent).toBe("$ codex");
+  expect(screenCalls).toEqual(["s-2"]);
+});
+
+test("a design session shows its plain chat with no sheet, and links to its map's design page", async () => {
+  const round = [{ id: "q1", header: "Pick", question: "Which one?", options: [] }] as unknown as SessionChatResponse["round"];
+  render([session("s-1", "p", { design: true, ticket: "gx:map/01" })], "/agents/s-1", true, chatOf(chat({ round })));
+  expect(await screen.findByText("hello there")).toBeTruthy();
+  expect(screen.queryByText("Which one?")).toBeNull();
+  expect(screen.getByRole("link", { name: "Open design page →" }).getAttribute("href")).toBe("#/d/gx:map");
+  cleanup();
+  render([session("s-1", "p", { ticket: "gx:map/01" })], "/agents/s-1", true, chatOf(chat()));
+  await screen.findByText("hello there");
+  expect(screen.queryByRole("link", { name: "Open design page →" })).toBeNull();
+});
+
 test("the draft is back after a remount, and one written through the store shows in the box", async () => {
   render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
   await type("draft");

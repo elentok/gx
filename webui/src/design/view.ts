@@ -1,7 +1,7 @@
 import type { SessionInfo } from "../generated/server";
 
 /** A Design's session sits on a ticket of its map epic, or on the epic itself before Chart makes the map. */
-const designOf = (s: SessionInfo) => (s.design && s.ticket ? s.ticket.split("/")[0] : undefined);
+export const designOf =(s: SessionInfo) => (s.design && s.ticket ? s.ticket.split("/")[0] : undefined);
 
 const byNewest = (a: SessionInfo, b: SessionInfo) => Date.parse(b.status_changed_at) - Date.parse(a.status_changed_at);
 
