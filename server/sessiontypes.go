@@ -154,6 +154,9 @@ type CreateSessionRequest struct {
 	remoteControl string
 	// tier is the model tier; empty means worker.
 	tier ralphloop.Tier
+	// launchDesign marks a launch by a design path (Start design, New Design):
+	// the tier follows the map's step, and the meta saves LaunchDesign.
+	launchDesign bool
 }
 
 // SessionResult is a session write's outcome: the session, or a refusal.
@@ -185,6 +188,9 @@ type sessionMeta struct {
 	AutoName bool   `json:"auto_name,omitempty"`
 	Ticket   string `json:"ticket,omitempty"`
 	Design   bool   `json:"design,omitempty"`
+	// LaunchDesign is set only by a design launch path. Design alone (set by
+	// `gx agent link` too) says nothing about how the session was launched.
+	LaunchDesign bool `json:"launch_design,omitempty"`
 	// RemoteControl is the name a Claude fix-agent session was started with
 	// --remote-control under; empty means the flag was never applied.
 	RemoteControl string `json:"remote_control,omitempty"`

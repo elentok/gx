@@ -156,6 +156,9 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		}
 	}
 	tier := cmp.Or(req.tier, ralphloop.TierWorker)
+	if req.launchDesign {
+		tier = s.designLaunchTier(req.Ticket)
+	}
 	agent := ralphloop.AgentClaude
 	if req.Harness == string(harness.Codex) {
 		agent = ralphloop.AgentCodex
@@ -171,6 +174,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		MadeWorktree:   req.Worktree != "" || req.MadeWorktree,
 		Name:           req.Name,
 		Ticket:         req.Ticket,
+		LaunchDesign:   req.launchDesign,
 		Design:         req.design || (req.Ticket != "" && s.onMapEpic(req.Ticket)),
 		FirstPrompt:    req.Prompt,
 		RemoteControl:  req.remoteControl,

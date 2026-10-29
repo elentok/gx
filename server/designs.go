@@ -365,6 +365,7 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		Prompt:       prompt,
 		Harness:      s.settings.Load().chatHarness(),
 		RebaseNote:   d.Note,
+		launchDesign: true,
 	})
 }
 
@@ -515,6 +516,7 @@ func (s *Server) startSession(project, slug, worktree, rebaseNote string) Sessio
 		Prompt:       "/gx-design " + addr,
 		Harness:      s.settings.Load().chatHarness(),
 		RebaseNote:   rebaseNote,
+		launchDesign: true,
 	})
 	switch {
 	case err != nil:
