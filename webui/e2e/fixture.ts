@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { rename, rm, writeFile } from "node:fs/promises";
+import { readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -36,7 +36,15 @@ export interface Fixture {
   setProcesses(lines: string): Promise<void>;
   /** Stops the fixture server mid-flow. Teardown skips a server that is already stopped. */
   stopServer(): Promise<void>;
+  /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
+  launches(): Promise<string[][]>;
 }
+
+/** The value after `--name` in an argv, or undefined. */
+export const flag = (args: string[], name: string) => {
+  const at = args.indexOf(`--${name}`);
+  return at < 0 ? undefined : args[at + 1];
+};
 
 // A rename keeps the server from reading a half-written control file.
 async function writeControl(dir: string, name: string, value: string): Promise<void> {
@@ -105,6 +113,13 @@ async function startFixture(
     setHealth: (values) => writeControl(out.health_dir, "system", values),
     setProcesses: (lines) => writeControl(out.health_dir, "processes", lines),
     stopServer: stop,
+    async launches() {
+      const dir = join(env.HOME!, ".claude", "agentfake");
+      const files = (await readdir(dir).catch(() => [] as string[])).filter((n) => n.endsWith(".args"));
+      const stamped = await Promise.all(files.map(async (n) => ({ n, at: (await stat(join(dir, n))).mtimeMs })));
+      const ordered = stamped.sort((a, b) => a.at - b.at);
+      return Promise.all(ordered.map(async ({ n }) => JSON.parse(await readFile(join(dir, n), "utf8")) as string[]));
+    },
   };
   // The first visit trades the token in web_url for the web cookie.
   await page.goto(out.web_url);

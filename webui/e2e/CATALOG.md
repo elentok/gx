@@ -1135,3 +1135,40 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   - The new tab shows the first question answered.
   - Text typed on the Agents page shows in the Note box, and the reverse.
   - Send answers sends the text as the note (`gx agents chat <id>` lists it). Both boxes are empty after.
+
+## 94. New Design launches at the strongest tier
+
+- **Scenario:** `design-model-tiers` (demo's worker is `sonnet`, its strongest `opus` at effort `max`).
+- **Steps:** open New Design, name it `tier-fresh`, add an idea, Start design.
+- **Pass:** the design session's fake claude is launched with `--model opus --effort max`.
+
+## 95. New Agents tab session tiers
+
+- **Scenario:** `design-model-tiers`
+- **Steps:**
+  1. Open `#/agents`, press + New session.
+  2. Read the Tier options, create with the default tier and a first prompt.
+  3. Create another with Strongest.
+  4. `gx agents stop` the Strongest session, then `gx agents resume` it.
+- **Pass:**
+  - The Tier options read `Light (haiku)`, `Worker (sonnet)` and `Strongest (opus)`; Worker is selected.
+  - The default session launches with `--model sonnet --effort medium`; the Strongest one with `--model opus --effort max`.
+  - The resumed session has tier `strongest` and its header reads `opus · max`.
+
+## 96. Session model label
+
+- **Scenario:** `design-model-tiers`
+- **Steps:** open each of the four design sessions.
+- **Pass:** the header reads `opus · max` (tooltip "Strongest tier") for the sessions at chart, with an unconfirmed destination and with no design step, and `sonnet · medium` (tooltip "Worker tier") for the one at a later step.
+
+## 97. Session model label follows the handoff
+
+- **Scenario:** `charting-handoff`, with the auto-advance delay at `1s`.
+- **Steps:** open the `handoff-auto` design session.
+- **Pass:** once the handoff restarts it on the worker tier, the header reads `sonnet · medium`.
+
+## 98. Session model label on an interactive session
+
+- **Scenario:** `agents`
+- **Steps:** create a session in project `other` from the Agents page, then send it a prompt and wait for the reply.
+- **Pass:** the header reads `sonnet · medium` with the tooltip "Worker tier", before and after the reply.

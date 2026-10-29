@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { card, expect, nav, section, test } from "./fixture";
+import { card, expect, flag, nav, section, test } from "./fixture";
 
 test("25. New Design from an empty page", async ({ page, start }) => {
   await start("empty");
@@ -181,6 +181,21 @@ test("40. gx designs open starts a New Design", async ({ start }) => {
   // With --json a refusal is printed as JSON; the exit code may or may not be non-zero.
   const refused = await open().catch((err: { stdout?: string; stderr?: string }) => `${err.stdout}${err.stderr}`);
   expect(refused).toContain("epic-exists");
+});
+
+test("94. New Design launches at the strongest tier", async ({ page, start }) => {
+  const fixture = await start("design-model-tiers");
+  const before = (await fixture.launches()).length;
+  const dialog = await openDialog(page);
+  await fields(dialog).slug.fill("tier-fresh");
+  await fields(dialog).idea.fill("A rough idea.");
+  await dialog.getByRole("button", nav("Start design")).click();
+  await expect(page).toHaveURL(/#\/d\/demo:tier-fresh$/);
+
+  await expect.poll(async () => (await fixture.launches()).length).toBe(before + 1);
+  const args = (await fixture.launches()).at(-1)!;
+  expect(flag(args, "model")).toBe("opus");
+  expect(flag(args, "effort")).toBe("max");
 });
 
 test("27. Design a not-started Design", async ({ page, start }) => {
