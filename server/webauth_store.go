@@ -19,17 +19,20 @@ import (
 )
 
 const (
-	webAuthFileName       = "web-auth.json"
-	webPasswordMinLen     = 12
-	webLoginIdleLimit     = 90 * 24 * time.Hour
-	webLoginWriteInterval = time.Minute
-	webCookieBytes        = 32
-	webLoginIDBytes       = 16
-	argonTime             = 2
-	argonMemoryKiB        = 19 * 1024
-	argonThreads          = 1
-	argonKeyLen           = 32
-	argonSaltLen          = 16
+	webAuthFileName         = "web-auth.json"
+	webPasswordMinLen       = 12
+	webLoginIdleLimit       = 90 * 24 * time.Hour
+	webLoginWriteInterval   = time.Minute
+	webCookieBytes          = 32
+	webLoginIDBytes         = 16
+	argonTime               = 2
+	argonMemoryKiB          = 19 * 1024
+	argonThreads            = 1
+	argonKeyLen             = 32
+	argonSaltLen            = 16
+	pendingAuthenticatorTTL = 10 * time.Minute
+	pendingIDBytes          = 16
+	totpAccountLabel        = "web"
 )
 
 var (
@@ -43,7 +46,25 @@ var (
 	ErrWebLoginNotFound = errors.New("web login not found")
 	// ErrWebLoginNameInvalid means the name is empty or too long.
 	ErrWebLoginNameInvalid = errors.New("web login name is empty or too long")
+	// ErrSetupCodeRequired means login needs the Setup code because the authenticator was cleared.
+	ErrSetupCodeRequired = errors.New("setup code required")
 )
+
+// AuthenticatorNeededError is Login's answer when the password is right but
+// the account has no saved authenticator. AddAuthenticator takes PendingID and
+// a code for Secret.
+type AuthenticatorNeededError struct {
+	PendingID string
+	Secret    string
+	URI       string
+}
+
+func (e *AuthenticatorNeededError) Error() string { return "authenticator needed" }
+
+type pendingAuthenticator struct {
+	secret  string
+	created time.Time
+}
 
 // WebAuthWaitError means the caller is rate limited.
 type WebAuthWaitError struct{ Seconds int }
@@ -78,10 +99,12 @@ type webPasswordHash struct {
 }
 
 type webAuthFile struct {
-	Password     *webPasswordHash  `json:"password,omitempty"`
-	TOTPSecret   string            `json:"totp_secret,omitempty"`
-	LastTOTPStep int64             `json:"last_totp_step"`
-	Logins       []*webLoginRecord `json:"logins"`
+	Password     *webPasswordHash `json:"password,omitempty"`
+	TOTPSecret   string           `json:"totp_secret,omitempty"`
+	LastTOTPStep int64            `json:"last_totp_step"`
+	// AuthenticatorResetPending is set by ClearAuthenticator and cleared when a new authenticator is added.
+	AuthenticatorResetPending bool              `json:"authenticator_reset_pending,omitempty"`
+	Logins                    []*webLoginRecord `json:"logins"`
 }
 
 // WebAuth is the web auth store. All state lives in one file in the state dir.
@@ -99,6 +122,8 @@ type WebAuth struct {
 	pendingCode   string
 	// resetSecret is the new TOTP secret from AuthenticatorResetBegin, not saved until finish.
 	resetSecret string
+	// pending holds the secrets Login handed out, by pending id.
+	pending map[string]pendingAuthenticator
 }
 
 // OpenWebAuth loads the store in stateDir, or starts empty when it has no file.
@@ -107,7 +132,7 @@ func OpenWebAuth(stateDir string, now func() time.Time) (*WebAuth, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &WebAuth{dir: stateDir, now: now, limiter: newAuthLimiter(now), file: f}, nil
+	return &WebAuth{dir: stateDir, now: now, limiter: newAuthLimiter(now), file: f, pending: map[string]pendingAuthenticator{}}, nil
 }
 
 // SeedWebLogin adds a web login to the store in stateDir before the server
@@ -143,11 +168,15 @@ func (w *WebAuth) SetupState() (pending bool, code string, err error) {
 }
 
 // SetupStart checks the Setup code and returns a new TOTP secret tied to it.
-func (w *WebAuth) SetupStart(code, ip string) (string, error) {
+// With TOTP off it returns no secret.
+func (w *WebAuth) SetupStart(totpOn bool, code, ip string) (string, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err := w.checkSetupCodeLocked(code, ip); err != nil {
 		return "", err
+	}
+	if !totpOn {
+		return "", nil
 	}
 	secret, err := newTOTPSecret()
 	if err != nil {
@@ -157,24 +186,32 @@ func (w *WebAuth) SetupStart(code, ip string) (string, error) {
 	return secret, nil
 }
 
-// SetupFinish checks the Setup code, password and one TOTP code, saves them and
-// returns the first web login's cookie. Nothing is saved when any check fails.
-func (w *WebAuth) SetupFinish(code, password, totpCode, ip, userAgent string) (string, error) {
+// SetupFinish checks the Setup code, password and, with TOTP on, one TOTP code,
+// saves them and returns the first web login's cookie. Nothing is saved when
+// any check fails.
+func (w *WebAuth) SetupFinish(totpOn bool, code, password, totpCode, ip, userAgent string) (string, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err := w.checkSetupCodeLocked(code, ip); err != nil {
 		return "", err
 	}
-	if w.pendingSecret == "" || w.pendingCode != w.setupCode {
-		return "", ErrWebAuthRefused
+	var secret string
+	var step int64
+	if totpOn {
+		if w.pendingSecret == "" || w.pendingCode != w.setupCode {
+			return "", ErrWebAuthRefused
+		}
+		secret = w.pendingSecret
 	}
 	if err := checkWebPassword(password); err != nil {
 		return "", err
 	}
-	step, ok := verifyTOTP(w.pendingSecret, totpCode, w.now(), 0)
-	if !ok {
-		w.limiter.Fail(ip)
-		return "", ErrWebAuthRefused
+	if totpOn {
+		var ok bool
+		if step, ok = verifyTOTP(secret, totpCode, w.now(), 0); !ok {
+			w.limiter.Fail(ip)
+			return "", ErrWebAuthRefused
+		}
 	}
 	hash, err := hashWebPassword(password)
 	if err != nil {
@@ -186,7 +223,7 @@ func (w *WebAuth) SetupFinish(code, password, totpCode, ip, userAgent string) (s
 	}
 	next := webAuthFile{
 		Password:     hash,
-		TOTPSecret:   w.pendingSecret,
+		TOTPSecret:   secret,
 		LastTOTPStep: step,
 		Logins:       append(w.file.Logins[:len(w.file.Logins):len(w.file.Logins)], rec),
 	}
@@ -199,33 +236,142 @@ func (w *WebAuth) SetupFinish(code, password, totpCode, ip, userAgent string) (s
 	return cookie, nil
 }
 
-// Login checks the password and a TOTP code and returns a new web login's cookie.
-func (w *WebAuth) Login(password, totpCode, ip, userAgent string) (string, error) {
+// Login checks the password and, with TOTP on, a TOTP code and returns a new
+// web login's cookie. With TOTP on and no saved secret, a correct password
+// answers with an *AuthenticatorNeededError instead. While the authenticator
+// reset is pending (TOTP on), the Setup code is needed first.
+func (w *WebAuth) Login(totpOn bool, password, totpCode, setupCode, ip, userAgent string) (string, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	step, err := w.checkCredentialsLocked(password, totpCode, ip)
-	if err != nil {
-		return "", err
+	if wait := w.limiter.Wait(ip); wait > 0 {
+		return "", &WebAuthWaitError{Seconds: wait}
 	}
-	cookie, rec, err := newWebLoginRecord(userAgent, ip, w.now())
+	if w.file.Password == nil {
+		return "", ErrWebAuthRefused
+	}
+	gated := totpOn && w.file.AuthenticatorResetPending
+	if gated {
+		if setupCode == "" {
+			return "", ErrSetupCodeRequired
+		}
+		if err := w.compareSetupCodeLocked(setupCode, ip); err != nil {
+			return "", err
+		}
+	}
+	if totpOn && (gated || w.file.TOTPSecret == "") {
+		if !w.passwordOKLocked(password) {
+			w.limiter.Fail(ip)
+			return "", ErrWebAuthRefused
+		}
+		return "", w.newPendingAuthenticatorLocked()
+	}
+	step, err := w.checkCredentialsLocked(totpOn, password, totpCode, ip)
 	if err != nil {
 		return "", err
 	}
 	next := w.file
 	next.LastTOTPStep = step
-	next.Logins = append(w.file.Logins[:len(w.file.Logins):len(w.file.Logins)], rec)
-	if err := saveWebAuthFile(w.dir, next); err != nil {
+	return w.addLoginLocked(next, ip, userAgent)
+}
+
+// AddAuthenticator takes a pending id from Login and one code for its secret,
+// saves the secret and returns a new web login's cookie. A pending id works
+// once and for 10 minutes. A wrong code saves nothing and counts as a failure.
+func (w *WebAuth) AddAuthenticator(pendingID, totpCode, ip, userAgent string) (string, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if wait := w.limiter.Wait(ip); wait > 0 {
+		return "", &WebAuthWaitError{Seconds: wait}
+	}
+	p, ok := w.pending[pendingID]
+	if ok && w.now().Sub(p.created) >= pendingAuthenticatorTTL {
+		delete(w.pending, pendingID)
+		ok = false
+	}
+	if !ok {
+		return "", ErrWebAuthRefused
+	}
+	step, ok := verifyTOTP(p.secret, totpCode, w.now(), 0)
+	if !ok {
+		w.limiter.Fail(ip)
+		return "", ErrWebAuthRefused
+	}
+	next := w.file
+	next.TOTPSecret, next.LastTOTPStep, next.AuthenticatorResetPending = p.secret, step, false
+	cookie, err := w.addLoginLocked(next, ip, userAgent)
+	if err != nil {
 		return "", err
 	}
-	w.file = next
+	delete(w.pending, pendingID)
+	w.setupCode = ""
+	return cookie, nil
+}
+
+// ClearAuthenticator is the CLI reset: it clears the TOTP secret, marks the
+// reset pending, signs out every web login and returns their ids with a new
+// Setup code.
+func (w *WebAuth) ClearAuthenticator() (removed []string, setupCode string, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	next, removed := signOutExcept(w.file, func(*webLoginRecord) bool { return false })
+	next.TOTPSecret, next.LastTOTPStep, next.AuthenticatorResetPending = "", 0, true
+	if err := w.commitLocked(next); err != nil {
+		return nil, "", err
+	}
+	w.pending = map[string]pendingAuthenticator{}
+	w.resetSecret = ""
+	w.setupCode = ""
+	code, err := w.currentSetupCodeLocked()
+	if err != nil {
+		return nil, "", err
+	}
+	return removed, formatSetupCode(code), nil
+}
+
+// addLoginLocked saves next with a new web login and returns its cookie.
+func (w *WebAuth) addLoginLocked(next webAuthFile, ip, userAgent string) (string, error) {
+	cookie, rec, err := newWebLoginRecord(userAgent, ip, w.now())
+	if err != nil {
+		return "", err
+	}
+	next.Logins = append(w.file.Logins[:len(w.file.Logins):len(w.file.Logins)], rec)
+	if err := w.commitLocked(next); err != nil {
+		return "", err
+	}
 	w.limiter.Success(ip)
 	return cookie, nil
 }
 
-// checkCredentialsLocked applies the rate limit, then checks the password and a
-// TOTP code from the current secret. It returns the code's step. A wrong check
-// counts as a failure.
-func (w *WebAuth) checkCredentialsLocked(password, totpCode, ip string) (int64, error) {
+// newPendingAuthenticatorLocked holds a new secret in memory and returns the
+// answer that hands it out.
+func (w *WebAuth) newPendingAuthenticatorLocked() error {
+	now := w.now()
+	for id, p := range w.pending {
+		if now.Sub(p.created) >= pendingAuthenticatorTTL {
+			delete(w.pending, id)
+		}
+	}
+	secret, err := newTOTPSecret()
+	if err != nil {
+		return err
+	}
+	raw := make([]byte, pendingIDBytes)
+	if _, err := rand.Read(raw); err != nil {
+		return err
+	}
+	id := hex.EncodeToString(raw)
+	w.pending[id] = pendingAuthenticator{secret: secret, created: now}
+	return &AuthenticatorNeededError{PendingID: id, Secret: secret, URI: totpURI(secret, totpAccountLabel)}
+}
+
+func (w *WebAuth) passwordOKLocked(password string) bool {
+	return checkWebPassword(password) == nil && verifyWebPassword(w.file.Password, password)
+}
+
+// checkCredentialsLocked applies the rate limit, then checks the password and,
+// with TOTP on, a code from the current secret. It returns the code's step (the
+// last one with TOTP off). A wrong check counts as a failure.
+func (w *WebAuth) checkCredentialsLocked(totpOn bool, password, totpCode, ip string) (int64, error) {
 	if wait := w.limiter.Wait(ip); wait > 0 {
 		return 0, &WebAuthWaitError{Seconds: wait}
 	}
@@ -233,8 +379,11 @@ func (w *WebAuth) checkCredentialsLocked(password, totpCode, ip string) (int64, 
 		return 0, ErrWebAuthRefused
 	}
 	// Both checks always run so a refusal does not show which part was wrong.
-	passOK := checkWebPassword(password) == nil && verifyWebPassword(w.file.Password, password)
-	step, totpOK := verifyTOTP(w.file.TOTPSecret, totpCode, w.now(), w.file.LastTOTPStep)
+	passOK := w.passwordOKLocked(password)
+	step, totpOK := w.file.LastTOTPStep, true
+	if totpOn {
+		step, totpOK = verifyTOTP(w.file.TOTPSecret, totpCode, w.now(), w.file.LastTOTPStep)
+	}
 	if !passOK || !totpOK {
 		w.limiter.Fail(ip)
 		return 0, ErrWebAuthRefused
@@ -284,13 +433,13 @@ func (w *WebAuth) RevokeLogin(id string) ([]string, error) {
 // ChangePassword checks the current password and a TOTP code, saves the new
 // password and signs out every web login except keepID. It returns the ids
 // signed out.
-func (w *WebAuth) ChangePassword(current, totpCode, newPassword, keepID, ip string) ([]string, error) {
+func (w *WebAuth) ChangePassword(totpOn bool, current, totpCode, newPassword, keepID, ip string) ([]string, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if err := checkWebPassword(newPassword); err != nil {
 		return nil, err
 	}
-	step, err := w.checkCredentialsLocked(current, totpCode, ip)
+	step, err := w.checkCredentialsLocked(totpOn, current, totpCode, ip)
 	if err != nil {
 		return nil, err
 	}
@@ -330,10 +479,10 @@ func (w *WebAuth) SetPassword(newPassword string) ([]string, error) {
 // AuthenticatorResetBegin checks the password and a TOTP code from the current
 // secret and returns a new pending secret. The old secret keeps working until
 // AuthenticatorResetFinish succeeds.
-func (w *WebAuth) AuthenticatorResetBegin(password, totpCode, ip string) (string, error) {
+func (w *WebAuth) AuthenticatorResetBegin(totpOn bool, password, totpCode, ip string) (string, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	step, err := w.checkCredentialsLocked(password, totpCode, ip)
+	step, err := w.checkCredentialsLocked(totpOn, password, totpCode, ip)
 	if err != nil {
 		return "", err
 	}
@@ -391,6 +540,7 @@ func (w *WebAuth) WebReset() ([]string, error) {
 	}
 	w.limiter.Reset()
 	w.setupCode, w.pendingSecret, w.pendingCode, w.resetSecret = "", "", "", ""
+	w.pending = map[string]pendingAuthenticator{}
 	if _, err := w.currentSetupCodeLocked(); err != nil {
 		return nil, err
 	}
@@ -502,6 +652,11 @@ func (w *WebAuth) checkSetupCodeLocked(input, ip string) error {
 	if w.file.Password != nil {
 		return ErrSetupNotPending
 	}
+	return w.compareSetupCodeLocked(input, ip)
+}
+
+// compareSetupCodeLocked compares the Setup code. A wrong code counts as a failure.
+func (w *WebAuth) compareSetupCodeLocked(input, ip string) error {
 	current, err := w.currentSetupCodeLocked()
 	if err != nil {
 		return err
