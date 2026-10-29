@@ -12,7 +12,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78).
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 92). The numbers 72 to 74 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -906,3 +906,39 @@ an exited session.
     (the title in the page's h1); `mixed-epic · Epic · gx` again after back. Step 6 shows "Ticket not found" and the title
     `demo:mixed-epic/99 · Ticket · gx`. Step 7 lands on `#/epics` with title `Epics · gx`.
   - Part B: the titles are `design-epic · Design · gx`, `design-epic-impl · Epic · gx` and `design-epic · Epic · gx`.
+
+## 72. Agents tab
+
+- **Scenario:** `agents`, then `empty`
+- **Steps:**
+  1. Read the top bar tabs.
+  2. Click Agents.
+  3. Set the hash to `#/agents/<id>`, then open the same URL in a fresh page of the same context.
+  4. Start `empty` and read the tab.
+- **Pass:** the tabs read Epics, Agents and Stats. Agents shows the Actionable count from `gx agents list` (named "Agents · N needs you"). The deep link marks the session's row as current, in both pages. The count is hidden on `empty`.
+
+## 73. Agents sidebar
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. Open `#/agents` and read the groups, rows, marks and "N live".
+  2. Hover-read the Actionable mark's tooltip.
+  3. Remove the Exited session with `gx agents remove`, then create a session in `demo` with `gx agents create`.
+- **Pass:** the groups are `demo`, `other` and `site`, in creation order, with the two design sessions hidden. Each row shows its state mark, plus Unread or Actionable when `gx agents list` says so. The Actionable tooltip is the reason ("needs a decision"). "N live" counts the sessions that have not exited. The removed row leaves and the new row and "N+1 live" appear, with no reload.
+
+## 74. Design sessions toggle
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. Open `#/agents`; read the toggle and the count.
+  2. Check "Design sessions", then open `#/agents` in a fresh page.
+  3. Uncheck it, then select a design session.
+- **Pass:** the toggle starts off with "· 2 hidden" and no design rows. Checking it shows both, and the fresh page has it still checked. With it off, the selected design session keeps its row and the count reads "· 1 hidden".
+
+## 92. Last viewed session
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. Open `#/agents` with no session viewed.
+  2. Open a session, then open `#/agents` in a fresh page.
+- **Pass:** the first visit shows "Pick a session". The fresh page redirects to the viewed session and marks its row as current.
