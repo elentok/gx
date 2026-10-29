@@ -1461,6 +1461,19 @@ export const QueueModePaused = "paused";
 export type QueueMode = typeof QueueModeRunning | typeof QueueModePaused;
 
 //////////
+// source: projectworktrees.go
+
+/**
+ * ProjectWorktrees is one project in the /v1/projects/worktrees payload: its
+ * repo root and the dirs of its other worktrees.
+ */
+export interface ProjectWorktrees {
+  project: string;
+  root: string;
+  worktrees: string[];
+}
+
+//////////
 // source: recentlyfinished.go
 
 /**

@@ -501,6 +501,7 @@ var routeTable = []struct {
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/projects", (*Server).projects},
+	{"GET /v1/projects/worktrees", (*Server).projectWorktrees},
 	{"POST /v1/projects/add", (*Server).projectAdd},
 	{"POST /v1/projects/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.removeProject)(w, r) }},
 	{"POST /v1/projects/set-path", func(s *Server, w http.ResponseWriter, r *http.Request) { s.projectWrite(s.setProjectPath)(w, r) }},

@@ -20,6 +20,7 @@ packages:
       - healthtypes.go
       - index.go
       - pause.go
+      - projectworktrees.go
       - recentlyfinished.go
       - sessionautoadvance.go
       - sessionchat.go

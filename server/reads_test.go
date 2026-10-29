@@ -62,6 +62,36 @@ func TestReads_HistoryLocksAndProjects(t *testing.T) {
 	}
 }
 
+func TestReads_ProjectWorktrees(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.WriteTicket(t, store, "norepo", "epic-a", "01", "first", "")
+	repo, wt := testutil.TempRepoWithLinkedWorktree(t, "feature")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	h := servertest.StartWithStore(t, store)
+
+	list, err := h.Client.ProjectWorktrees(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].Project != "proj" {
+		t.Fatalf("worktrees = %+v, want only the project with a repo", list)
+	}
+	realRepo, _ := filepath.EvalSymlinks(repo)
+	realWt, _ := filepath.EvalSymlinks(wt)
+	gotRoot, _ := filepath.EvalSymlinks(list[0].Root)
+	if gotRoot != realRepo {
+		t.Errorf("root = %q, want %q", list[0].Root, repo)
+	}
+	if len(list[0].Worktrees) != 1 {
+		t.Fatalf("worktrees = %v, want only the linked one", list[0].Worktrees)
+	}
+	if got, _ := filepath.EvalSymlinks(list[0].Worktrees[0]); got != realWt {
+		t.Errorf("worktree = %q, want %q", list[0].Worktrees[0], wt)
+	}
+}
+
 func TestExplain_StoreDerivableVerdicts(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()

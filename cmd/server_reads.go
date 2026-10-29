@@ -58,6 +58,22 @@ func newProjectCmd(d deps) *cobra.Command {
 	list.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	cmd.AddCommand(list)
 
+	var worktreesJSON bool
+	worktrees := &cobra.Command{
+		Use:   "worktrees",
+		Short: "list each project's repo root and worktrees (asks the server)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return serverRead(d.dial(), c.Context(), worktreesJSON, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) ([]server.ProjectWorktrees, error) {
+					return cl.ProjectWorktrees(ctx)
+				},
+				printProjectWorktrees)
+		},
+	}
+	worktrees.Flags().BoolVar(&worktreesJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(worktrees)
+
 	var addJSON bool
 	var name, vcs string
 	add := &cobra.Command{
@@ -824,6 +840,20 @@ func printProjects(w io.Writer, projects []server.ProjectInfo) error {
 		sort.Strings(counts)
 		if _, err := fmt.Fprintf(w, "%s\t%s\n", p.Name, strings.Join(counts, " ")); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func printProjectWorktrees(w io.Writer, projects []server.ProjectWorktrees) error {
+	for _, p := range projects {
+		if _, err := fmt.Fprintf(w, "%s\t%s\n", p.Project, p.Root); err != nil {
+			return err
+		}
+		for _, wt := range p.Worktrees {
+			if _, err := fmt.Fprintf(w, "%s\t%s\n", p.Project, wt); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

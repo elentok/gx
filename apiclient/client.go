@@ -185,6 +185,13 @@ func (c *Client) Projects(ctx context.Context) ([]server.ProjectInfo, error) {
 	return p, err
 }
 
+// ProjectWorktrees returns each project's repo root and other worktree dirs.
+func (c *Client) ProjectWorktrees(ctx context.Context) ([]server.ProjectWorktrees, error) {
+	var p []server.ProjectWorktrees
+	err := c.get(ctx, "/v1/projects/worktrees", &p)
+	return p, err
+}
+
 // AddProject registers a project. A refusal is a result (Refused set), not an
 // error.
 func (c *Client) AddProject(ctx context.Context, req server.AddProjectRequest) (server.AddProjectResult, error) {
