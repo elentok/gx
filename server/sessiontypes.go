@@ -196,6 +196,10 @@ type sessionMeta struct {
 	// LaunchDesign is set only by a design launch path. Design alone (set by
 	// `gx agent link` too) says nothing about how the session was launched.
 	LaunchDesign bool `json:"launch_design,omitempty"`
+	// HandoffTier is set while the worker model of a charting handoff has not
+	// yet run well. A Resume of a crash resolves it again from the config, so a
+	// fixed slug takes effect; any other Resume keeps the launch's model.
+	HandoffTier bool `json:"handoff_tier,omitempty"`
 	// RemoteControl is the name a Claude fix-agent session was started with
 	// --remote-control under; empty means the flag was never applied.
 	RemoteControl string `json:"remote_control,omitempty"`

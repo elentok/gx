@@ -131,6 +131,7 @@ func TestChartingHandoff_FailedRestartExitsCrashedAndResumeWorks(t *testing.T) {
 	f := startHandoff(t, "chart")
 	dir := readMeta(t, f.h, f.id)["dir"].(string)
 	setMapStep(t, f.store, "resolve-tickets")
+	setWorkerModel(t, f.store, "stale-model")
 	// A session dir that is gone stands in for a stale worker slug: the new
 	// agent cannot start.
 	moved := dir + ".moved"
@@ -144,11 +145,26 @@ func TestChartingHandoff_FailedRestartExitsCrashedAndResumeWorks(t *testing.T) {
 	if err := os.Rename(moved, dir); err != nil {
 		t.Fatal(err)
 	}
+	if model := readMeta(t, f.h, f.id)["model"]; model != "stale-model" {
+		t.Fatalf("model after the failed restart = %v, want stale-model", model)
+	}
+	setWorkerModel(t, f.store, "sonnet")
 	res, err := f.h.Client.ResumeSession(f.ctx, f.id)
 	if err != nil || res.Refused {
 		t.Fatalf("resume = %+v, %v", res, err)
 	}
 	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State != server.SessionExited })
+	if model := readMeta(t, f.h, f.id)["model"]; model != "sonnet" {
+		t.Errorf("model after Resume = %v, want the fixed config's sonnet", model)
+	}
+}
+
+func setWorkerModel(t *testing.T, store, model string) {
+	t.Helper()
+	body := `{"name":"proj","agents":{"claude":{"model":"` + model + `"}}}`
+	if err := os.WriteFile(filepath.Join(store, "proj", "project.json"), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestChartingHandoff_NothingRestartsOutsideAStrongestDesignLaunch(t *testing.T) {

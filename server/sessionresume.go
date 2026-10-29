@@ -37,6 +37,9 @@ func (s *Server) resumeSession(req SessionRequest) (SessionResult, error) {
 		return res, nil
 	}
 	meta.RestoredAt = time.Now()
+	if meta.HandoffTier && meta.Exit == SessionExitCrashed {
+		s.applyTier(&meta, meta.Tier)
+	}
 	if err := s.startResumedHolder(dir, &meta, time.Time{}); err != nil {
 		s.endFailedStart(dir, &meta)
 		return SessionResult{}, err

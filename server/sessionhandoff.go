@@ -89,6 +89,7 @@ func (s *Server) restartOnWorker(dir string, meta *sessionMeta, old string) erro
 	}
 	meta.ConversationID = conv
 	s.applyTier(meta, ralphloop.TierWorker)
+	meta.HandoffTier = true
 	meta.FirstPrompt = "/gx-design " + ticketEpic(meta.Ticket)
 	meta.Actionable = SessionActionable{}
 	s.recordConversation(*meta)
