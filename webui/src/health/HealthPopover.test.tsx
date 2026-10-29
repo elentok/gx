@@ -67,8 +67,11 @@ describe("Tray popover", () => {
   it("opens on click and fetches /v1/health; Esc closes it", async () => {
     const { queryByText } = await openTray();
     expect(fetchMock).toHaveBeenCalledWith("/v1/health");
-    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
-    await waitFor(() => expect(queryByText("gx server")).toBeNull());
+    // Zag arms its Escape listener a frame after the lazily mounted content appears, so a first press may be missed.
+    await waitFor(() => {
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+      expect(queryByText("gx server")).toBeNull();
+    });
   });
 
   it("closes on a click outside", async () => {
