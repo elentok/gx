@@ -1,4 +1,5 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
   SessionBlocked,
@@ -87,7 +88,28 @@ function Row({ session: s, current }: { session: SessionInfo; current: boolean }
   );
 }
 
+const DESIGN_KEY = "gx.agents.design";
+
+function readShowDesign(): boolean {
+  try {
+    return localStorage.getItem(DESIGN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function AgentSidebar({ sessions, selected }: { sessions: SessionInfo[]; selected?: string }) {
+  const [showDesign, setShowDesign] = useState(readShowDesign);
+  const change = (on: boolean) => {
+    setShowDesign(on);
+    try {
+      localStorage.setItem(DESIGN_KEY, on ? "1" : "0");
+    } catch {
+      // Storage is a convenience; the choice still holds for this page.
+    }
+  };
+  const hidden = showDesign ? 0 : sessions.filter((s) => s.design && s.id !== selected).length;
+  const visible = showDesign ? sessions : sessions.filter((s) => !s.design || s.id === selected);
   return (
     <Sidebar
       title="Sessions"
@@ -97,7 +119,7 @@ export function AgentSidebar({ sessions, selected }: { sessions: SessionInfo[]; 
         </Text>
       }
     >
-      {groupSessions(sessions).map(({ project, sessions: group }) => (
+      {groupSessions(visible).map(({ project, sessions: group }) => (
         <Box key={project} mb="3">
           <Text px="2" fontSize="xs" textTransform="uppercase" letterSpacing="wide" color="text.dim">
             {project}
@@ -107,6 +129,11 @@ export function AgentSidebar({ sessions, selected }: { sessions: SessionInfo[]; 
           ))}
         </Box>
       ))}
+      <chakra.label display="flex" alignItems="center" gap="2" px="2" fontSize="xs" color="text.dim" cursor="pointer">
+        <input type="checkbox" checked={showDesign} onChange={(e) => change(e.target.checked)} />
+        Design sessions
+        {hidden > 0 && <span>· {hidden} hidden</span>}
+      </chakra.label>
     </Sidebar>
   );
 }

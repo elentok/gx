@@ -63,6 +63,7 @@ test("groups by project in order of first session, keeping creation order inside
 });
 
 test("shows every mark and counts non-Exited sessions as live", () => {
+  localStorage.setItem("gx.agents.design", "1");
   render([
     session("a", "p", { name: "plain" }),
     session("b", "p", { name: "crashed", status: { state: "exited" }, exit: "crashed" }),
@@ -86,6 +87,26 @@ test("shows every mark and counts non-Exited sessions as live", () => {
   expect(within(row("plain")).queryByRole("img", { name: "Actionable" })).toBeNull();
   expect(within(row("asks")).getByRole("img", { name: "Actionable" }).getAttribute("title")).toBe("Review the spec");
   expect(within(row("blocked")).getByRole("img", { name: "Actionable" })).toBeTruthy();
+});
+
+test("design sessions are hidden with a count until the toggle is on, and the choice is remembered", () => {
+  const sessions = [session("1", "p", { name: "plain" }), session("2", "p", { name: "d1", design: true }), session("3", "p", { name: "d2", design: true })];
+  render(sessions);
+  expect(rows()).toHaveLength(1);
+  expect(screen.getByText("· 2 hidden")).toBeTruthy();
+  fireEvent.click(screen.getByRole("checkbox", { name: /Design sessions/ }));
+  expect(rows()).toHaveLength(3);
+  expect(screen.queryByText(/hidden/)).toBeNull();
+  cleanup();
+  render(sessions);
+  expect(rows()).toHaveLength(3);
+  expect((screen.getByRole("checkbox", { name: /Design sessions/ }) as HTMLInputElement).checked).toBe(true);
+});
+
+test("a selected design session keeps its row and is not counted as hidden", () => {
+  render([session("1", "p", { name: "plain" }), session("2", "p", { name: "d1", design: true }), session("3", "p", { name: "d2", design: true })], "/agents/2");
+  expect(rows().map((r) => r.textContent)).toEqual([expect.stringContaining("plain"), expect.stringContaining("d1")]);
+  expect(screen.getByText("· 1 hidden")).toBeTruthy();
 });
 
 test("a click opens the session and marks its row", () => {
