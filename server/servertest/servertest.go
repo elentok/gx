@@ -897,6 +897,7 @@ func (h *Harness) serve(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.Server = srv
+	trustWebRoot(h.StateDir)
 	h.TCPAddr = srv.TCPAddr()
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)

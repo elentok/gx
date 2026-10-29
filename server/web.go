@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"io/fs"
@@ -40,20 +41,29 @@ func (s *Server) bindWeb() {
 		s.webDev = proxy
 		s.log.Warn("web UI is served from a dev frontend", "url", s.cfg.WebDevURL)
 	}
-	ln, err := net.Listen("tcp", s.cfg.WebAddr)
+	rawLn, err := net.Listen("tcp", s.cfg.WebAddr)
 	if err != nil {
 		s.webErr = err.Error()
 		s.log.Error("web listener failed to bind", "addr", s.cfg.WebAddr, "err", err)
 		return
 	}
-	// An empty host (":8080") binds every interface but parses to a nil IP.
-	if host, _, _ := net.SplitHostPort(s.cfg.WebAddr); host == "" || net.ParseIP(host).IsUnspecified() {
-		s.log.Warn("web listener is bound to all interfaces and serves its token over plain HTTP", "addr", ln.Addr().String())
+	var listenIP net.IP
+	if a, ok := rawLn.Addr().(*net.TCPAddr); ok && !a.IP.IsUnspecified() {
+		listenIP = a.IP
 	}
+	cert, err := webServerCertificate(s.cfg.StateDir, s.cfg.WebAllowedHosts, listenIP, time.Now())
+	if err != nil {
+		rawLn.Close()
+		s.webErr = "web tls: " + err.Error()
+		s.log.Error("web tls unavailable", "err", err)
+		return
+	}
+	ln := newSniffListener(rawLn, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})
 	s.web = ln
 	mux := s.webHandler()
 	protected := requireToken(s.cfg.StateDir, webCookieName(ln), mux)
-	s.webHTTP = &http.Server{Handler: requireHost(func() []string { return s.settings.Load().WebAllowedHosts }, servePublicFirst(mux, protected))}
+	allowed := func() []string { return s.settings.Load().WebAllowedHosts }
+	s.webHTTP = &http.Server{Handler: requireHost(allowed, redirectPlainHTTP(servePublicFirst(mux, protected)))}
 }
 
 // WebURL is the web listener's base URL, or "" when it is off or failed to bind.
@@ -61,7 +71,7 @@ func (s *Server) WebURL() string {
 	if s.web == nil {
 		return ""
 	}
-	return "http://" + s.web.Addr().String()
+	return "https://" + s.web.Addr().String()
 }
 
 // webHandler is the web mux: the snapshot, the event stream and the embedded

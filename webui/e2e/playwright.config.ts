@@ -12,6 +12,7 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter: [["list"]],
-  use: { trace: "retain-on-failure" },
+  use: {
+    ignoreHTTPSErrors: true, trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
 });

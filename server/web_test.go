@@ -30,7 +30,7 @@ func startWeb(t *testing.T) (*servertest.Harness, string) {
 }
 
 // webHTTP is the one client every test uses to reach the web listener.
-var webHTTP = &http.Client{}
+var webHTTP = servertest.WebHTTPClient()
 
 // webClient returns the client for the web listener.
 func webClient() *http.Client { return webHTTP }

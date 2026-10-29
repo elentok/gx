@@ -161,7 +161,7 @@ func TestWebHost_AnyHostIPLiteralPassesOnAllInterfacesBind(t *testing.T) {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
 	_, port, _ := net.SplitHostPort(webHostPort(hs.WebURL))
-	base := "http://127.0.0.1:" + port
+	base := "https://127.0.0.1:" + port
 	cookie := login(t, h.StateDir, base)
 	for _, host := range []string{"0.0.0.0:" + port, "192.168.1.20:" + port, "100.64.0.1:" + port} {
 		if code, _ := hostStatus(t, base, host, cookie); code != http.StatusOK {

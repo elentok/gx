@@ -37,7 +37,7 @@ func TestServerWebURL_NoHomeInEnvIsAnError(t *testing.T) {
 
 func webGet(t *testing.T, url string, cookies ...*http.Cookie) *http.Response {
 	t.Helper()
-	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	client := &http.Client{Transport: servertest.WebTransport(), CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatal(err)

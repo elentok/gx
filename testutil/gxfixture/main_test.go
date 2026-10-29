@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -218,14 +220,28 @@ func (r *running) ticketStatus(t *testing.T, address string) string {
 	return ""
 }
 
-func get(t *testing.T, url string) int {
+// webClient trusts the root the fixture's server wrote to its state dir. The
+// token URL redirects after setting a cookie, so it keeps cookies.
+func (r *running) webClient(t *testing.T) *http.Client {
 	t.Helper()
-	// The token URL redirects after setting a cookie, so the client keeps cookies.
+	pemBytes, err := os.ReadFile(filepath.Join(r.StateDir, "web-tls", "root.pem"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(pemBytes) {
+		t.Fatal("web-tls/root.pem has no certificate")
+	}
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := (&http.Client{Jar: jar}).Get(url)
+	return &http.Client{Jar: jar, Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots}}}
+}
+
+func (r *running) get(t *testing.T, url string) int {
+	t.Helper()
+	resp, err := r.webClient(t).Get(url)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,11 +262,11 @@ func TestScenarios_StartAnswerAndStop(t *testing.T) {
 			if !strings.Contains(r.WebURL, "127.0.0.1") || !strings.Contains(r.WebURL, "token=") {
 				t.Fatalf("web_url = %q, want a loopback URL with the token", r.WebURL)
 			}
-			if code := get(t, r.WebURL); code != http.StatusOK {
+			if code := r.get(t, r.WebURL); code != http.StatusOK {
 				t.Errorf("GET web_url = %d, want 200", code)
 			}
 			bare, _, _ := strings.Cut(r.WebURL, "?")
-			if code := get(t, bare); code == http.StatusOK {
+			if code := r.get(t, bare); code == http.StatusOK {
 				t.Errorf("GET without the token = %d, want it refused", code)
 			}
 			var st struct {
@@ -394,11 +410,7 @@ type web struct {
 
 func (r *running) web(t *testing.T) *web {
 	t.Helper()
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c := &http.Client{Jar: jar}
+	c := r.webClient(t)
 	resp, err := c.Get(r.WebURL)
 	if err != nil {
 		t.Fatal(err)
