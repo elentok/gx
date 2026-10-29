@@ -5,7 +5,6 @@ package server
 
 import (
 	"context"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -266,8 +265,7 @@ type Server struct {
 	web         net.Listener // nil unless Config.WebAddr is set and bound
 	webDev      http.Handler // nil unless Config.WebDevURL is set and valid
 	webHTTP     *http.Server
-	webErr      string // why the web bind failed
-	webRoot     *x509.Certificate
+	webErr      string    // why the web bind failed
 	webListenIP net.IP    // nil when the listener binds every interface
 	webCerts    *webCerts // nil unless the web listener is bound
 	clientErrs  ipLimiter
@@ -519,6 +517,7 @@ var routeTable = []struct {
 }{
 	{"GET /v1/handshake", (*Server).handshake},
 	{"GET /v1/web/info", (*Server).webInfo},
+	{"POST /v1/web/new-root", (*Server).webNewRoot},
 	{"GET /v1/snapshot", (*Server).snapshot},
 	{"GET /v1/events", (*Server).streamEvents},
 	{"GET /v1/projects", (*Server).projects},

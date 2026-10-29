@@ -3,7 +3,10 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -219,5 +222,82 @@ func TestWebURL_JSONCarriesBaseURLAndFingerprint(t *testing.T) {
 	}
 	if !regexp.MustCompile(`^([0-9a-f]{8} ){7}[0-9a-f]{8}$`).MatchString(got.Fingerprint) {
 		t.Errorf("fingerprint = %q, want 8 groups of 8", got.Fingerprint)
+	}
+}
+
+// webClientTrustingServedRoot trusts only the root the server serves at .cer right now.
+func webClientTrustingServedRoot(t *testing.T, baseURL string) *http.Client {
+	t.Helper()
+	bootstrap := &http.Client{Transport: &http.Transport{DisableKeepAlives: true, TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	resp, err := bootstrap.Get(baseURL + "/gx-root.cer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	der, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatalf("the .cer route did not serve a certificate: %v", err)
+	}
+	pool := x509.NewCertPool()
+	pool.AddCert(root)
+	return &http.Client{Transport: &http.Transport{DisableKeepAlives: true, TLSClientConfig: &tls.Config{RootCAs: pool}}}
+}
+
+func TestWebNewRoot_SwapsRootAndLeafLive(t *testing.T) {
+	h := startWebServer(t)
+	hs, err := h.Client.Handshake(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldClient := webClientTrustingServedRoot(t, hs.WebURL)
+	resp, err := oldClient.Get(hs.WebURL + "/gx-root.cer")
+	if err != nil {
+		t.Fatalf("old root before the swap: %v", err)
+	}
+	resp.Body.Close()
+	before, err := h.Client.WebInfo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := runWebNewRoot(context.Background(), h.Client, true, &out); err != nil {
+		t.Fatal(err)
+	}
+	var got server.WebInfo
+	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+		t.Fatalf("json: %v\n%s", err, out.String())
+	}
+	if got.Fingerprint == "" || got.Fingerprint == before.Fingerprint {
+		t.Errorf("fingerprint = %q, want one different from %q", got.Fingerprint, before.Fingerprint)
+	}
+	after, err := h.Client.WebInfo(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Fingerprint != got.Fingerprint {
+		t.Errorf("web-url fingerprint = %q, want the new one %q", after.Fingerprint, got.Fingerprint)
+	}
+
+	if resp, err := oldClient.Get(hs.WebURL + "/gx-root.cer"); err == nil {
+		resp.Body.Close()
+		t.Error("a client trusting only the old root still completes the handshake")
+	}
+	resp, err = webClientTrustingServedRoot(t, hs.WebURL).Get(hs.WebURL + "/gx-root.cer")
+	if err != nil {
+		t.Fatalf("new root after the swap: %v", err)
+	}
+	resp.Body.Close()
+}
+
+func TestWebNewRoot_RefusesWhenTheWebUIIsOff(t *testing.T) {
+	h := servertest.StartWithStore(t, t.TempDir(), func(*server.Config) {})
+	err := runWebNewRoot(context.Background(), h.Client, false, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), "the web UI is off") {
+		t.Errorf("err = %v, want the web UI is off", err)
 	}
 }

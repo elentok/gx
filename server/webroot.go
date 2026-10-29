@@ -71,7 +71,7 @@ func randomUUID() string {
 // webRootProfileRead serves the root as an iOS/macOS profile. No HSTS header:
 // it would block the browser's "visit anyway" step.
 func (s *Server) webRootProfileRead(w http.ResponseWriter, _ *http.Request) {
-	body, err := webRootProfile(s.webRoot.Raw)
+	body, err := webRootProfile(s.webCerts.Root().Raw)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -85,5 +85,5 @@ func (s *Server) webRootProfileRead(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) webRootCerRead(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/pkix-cert")
 	w.Header().Set("Content-Disposition", `attachment; filename="gx-root.cer"`)
-	_, _ = w.Write(s.webRoot.Raw)
+	_, _ = w.Write(s.webCerts.Root().Raw)
 }

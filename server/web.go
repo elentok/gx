@@ -70,7 +70,7 @@ func (s *Server) bindWeb() {
 		return
 	}
 	ln := newSniffListener(newSourceIPListener(rawLn, s.log, time.Now), &tls.Config{GetCertificate: certs.getCertificate, MinVersion: tls.VersionTLS12})
-	s.web, s.webRoot, s.webListenIP, s.webCerts = ln, certs.root.Cert, listenIP, certs
+	s.web, s.webListenIP, s.webCerts = ln, listenIP, certs
 	mux := s.webHandler()
 	protected := requireToken(s.cfg.StateDir, webCookieName(ln), mux)
 	allowed := func() []string { return s.settings.Load().WebAllowedHosts }
@@ -83,7 +83,7 @@ func (s *Server) WebURL() string {
 		return ""
 	}
 	_, port, _ := net.SplitHostPort(s.web.Addr().String())
-	return webBaseURL(s.settings.Load().WebAllowedHosts, s.webRoot, s.webListenIP, port, s.interfaceIPs())
+	return webBaseURL(s.settings.Load().WebAllowedHosts, s.webCerts.Root(), s.webListenIP, port, s.interfaceIPs())
 }
 
 // interfaceIPs is the one place the machine's interfaces are read.

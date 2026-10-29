@@ -135,6 +135,52 @@ func runWebURL(ctx context.Context, c *apiclient.Client, stateDir string, showQR
 	return err
 }
 
+func newServerWebNewRootCmd(d deps) *cobra.Command {
+	var jsonOut bool
+	c := &cobra.Command{
+		Use:   "web-new-root",
+		Short: "Make a new web root certificate and serve it at once",
+		Long:  "Makes a new root from the current allowed hosts and re-issues the leaf from it.\nDevices must trust the new root again; web logins are kept.",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			cl, err := d.dial()()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runWebNewRoot(ctx, cl, jsonOut, c.OutOrStdout())
+		},
+	}
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return c
+}
+
+func runWebNewRoot(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
+	info, err := c.WebNewRoot(ctx)
+	switch {
+	case apiclient.IsNotRunning(err):
+		info = server.WebInfo{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+	case err != nil:
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	if jsonOut {
+		if err := encodeProvenance(w, info, viaServer, callerActor(os.Getwd)); err != nil {
+			return err
+		}
+	}
+	if info.Refused {
+		return fmt.Errorf("refused (%s): %s", info.Reason, info.Message)
+	}
+	if jsonOut {
+		return nil
+	}
+	_, err = fmt.Fprintln(w, "new root fingerprint: "+info.Fingerprint)
+	return err
+}
+
 // renderQR draws the code with half-block characters, so two modules share one
 // text row and the code stays roughly square.
 func renderQR(text string) (string, error) {

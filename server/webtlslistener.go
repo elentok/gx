@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"log/slog"
 	"net"
@@ -99,6 +100,38 @@ func (c *webCerts) reissue() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.reissueLocked(nil)
+}
+
+// newRoot replaces the root with one made from the current allowed hosts and
+// signs a new leaf from it. A failure leaves the old root and leaf serving.
+func (c *webCerts) newRoot() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	root, err := newWebRoot(c.hosts(), c.now())
+	if err != nil {
+		return err
+	}
+	old := c.root
+	dir := webTLSDir(c.stateDir)
+	if err := writeWebTLSKey(dir, "root", root); err != nil {
+		return err
+	}
+	c.root = root
+	if err := c.reissueLocked(nil); err != nil {
+		c.root = old
+		if rerr := writeWebTLSKey(dir, "root", old); rerr != nil {
+			c.log.Error("web root rollback failed", "err", rerr)
+		}
+		return err
+	}
+	return nil
+}
+
+// Root is the certificate the profile and .cer routes serve.
+func (c *webCerts) Root() *x509.Certificate {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.root.Cert
 }
 
 // Skipped is what the last leaf left out because the root does not permit it.
