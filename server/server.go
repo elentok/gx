@@ -474,6 +474,9 @@ func New(cfg Config) (*Server, error) {
 		sessionWatches: newSessionWatches(),
 		focus:          newFocusReports(),
 	}
+	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
+		h.Finished = s.sessionFinished
+	}
 	if s.cfg.Player == nil {
 		s.cfg.Player = sound.NewSystemPlayer(log)
 	}

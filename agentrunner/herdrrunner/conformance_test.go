@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/elentok/gx/agentrunner/runnertest"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
@@ -422,6 +424,73 @@ func TestStop_ReportsAFailedTabLookup(t *testing.T) {
 	})
 	if err := r.Stop(s); err == nil {
 		t.Fatal("Stop = nil, want the lookup error")
+	}
+}
+
+// Stop snapshots the shell's descendants before the close, then TERMs and
+// KILLs the ones still alive. A pid reused since the snapshot (new start
+// time) is never signalled, and neither is a process outside the shell's tree.
+func TestStop_TerminatesLeftoverDescendants(t *testing.T) {
+	r, state, s := startAgent(t, "claude", nil)
+	state.Register("pane", "process-info", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
+		return map[string]any{"process_info": map[string]any{"shell_pid": 555}}, herdrfake.Identities{}, nil
+	})
+	r.PIDStart = func(int) (int64, error) { return 100, nil }
+	proc := func(pid, ppid int, start int64) syshealth.Process {
+		return syshealth.Process{PID: pid, PPID: ppid, StartUnix: start}
+	}
+	tables := [][]syshealth.Process{
+		{proc(555, 1, 100), proc(600, 555, 200), proc(601, 600, 300), proc(700, 1, 400)},
+		{proc(600, 1, 200), proc(601, 1, 999), proc(700, 1, 400)},
+		{proc(600, 1, 200), proc(700, 1, 400)},
+	}
+	reads := 0
+	r.Procs = func() ([]syshealth.Process, error) {
+		table := tables[min(reads, len(tables)-1)]
+		reads++
+		return table, nil
+	}
+	type sent struct {
+		pid int
+		sig syscall.Signal
+	}
+	var got []sent
+	r.Signal = func(pid int, sig syscall.Signal) error {
+		got = append(got, sent{pid, sig})
+		return nil
+	}
+	r.Sleep = func(time.Duration) {}
+
+	if err := r.Stop(s); err != nil {
+		t.Fatal(err)
+	}
+	want := []sent{{600, syscall.SIGTERM}, {600, syscall.SIGKILL}}
+	if !slices.Equal(got, want) {
+		t.Fatalf("signals = %v, want %v", got, want)
+	}
+}
+
+func TestStatus_FinishedAgentIgnoresBackgroundTasks(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		finished bool
+		want     agentrunner.State
+	}{
+		{"finished", true, agentrunner.StateIdle},
+		{"unfinished", false, agentrunner.StateWorking},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r, _, s := startAgent(t, "claude", nil)
+			r.BackgroundTasks = func(agentrunner.Session) bool { return true }
+			r.Finished = func(agentrunner.Session) bool { return tc.finished }
+			st, err := r.Status(s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if st.State != tc.want {
+				t.Fatalf("state = %q, want %q", st.State, tc.want)
+			}
+		})
 	}
 }
 

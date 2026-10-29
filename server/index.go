@@ -233,6 +233,17 @@ func (i *index) epicsOf(dir string) ([]tickets.Epic, bool) {
 	return epics, ok
 }
 
+// allEpics is every project's epics as of the last scan.
+func (i *index) allEpics() [][]tickets.Epic {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	out := make([][]tickets.Epic, 0, len(i.loaded))
+	for _, es := range i.loaded {
+		out = append(out, es)
+	}
+	return out
+}
+
 // projectEpics is the named project's directory and epics as of the last scan,
 // with no store read. ok is false for a project the scan has not seen.
 func (i *index) projectEpics(project string) (dir string, epics []tickets.Epic, ok bool) {

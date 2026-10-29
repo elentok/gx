@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -16,6 +17,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/herdr"
+	"github.com/elentok/gx/syshealth"
 )
 
 // pollInterval spaces AgentWait retries when herdr answers a wait with a
@@ -34,6 +36,10 @@ type Runner struct {
 	// background task running. herdr shows such an agent idle, but the task
 	// will wake it, so the runner reports it working. Nil means no gating.
 	BackgroundTasks func(s agentrunner.Session) bool
+	// Finished reports whether the agent behind s has reported its ticket
+	// finished. A finished agent's background tasks are ignored: nothing it
+	// leaves running should keep the ticket claimed. Nil means never finished.
+	Finished func(s agentrunner.Session) bool
 	// CodexQuota is checked before the pane for Codex sessions. Nil skips it.
 	CodexQuota CodexQuotaReader
 	// Now and Sleep pace Wait's polling. Nil means the wall clock; tests on
@@ -45,6 +51,10 @@ type Runner struct {
 	// PIDStart reads one pid's start time for OwnerPIDs. Nil means
 	// syshealth.ProcessStart.
 	PIDStart func(pid int) (int64, error)
+	// Procs reads the process table and Signal sends a signal, for Stop's
+	// cleanup of a closed pane's leftovers. Nil means the real ones.
+	Procs  func() ([]syshealth.Process, error)
+	Signal func(pid int, sig syscall.Signal) error
 
 	mu sync.Mutex
 	// shells caches each pane's shell pid with its start time, keyed by pane id.
@@ -422,12 +432,18 @@ func (r *Runner) Stop(s agentrunner.Session) error {
 	if err != nil {
 		return err
 	}
+	// Snapshot before the close: it re-parents what the shell left running.
+	var left []leftover
+	if owners, err := r.OwnerPIDs(s); err == nil && len(owners) > 0 {
+		left = r.descendantsOf(owners[0])
+	}
 	if err := r.CLI.TabClose(agent.TabID); err != nil {
 		return err
 	}
 	r.mu.Lock()
 	delete(r.started, s.Label)
 	r.mu.Unlock()
+	r.terminate(left)
 	return nil
 }
 
@@ -621,7 +637,8 @@ func (r *Runner) status(s agentrunner.Session) (agentrunner.Status, error) {
 		if st.SessionID != "" {
 			probed.SessionID = st.SessionID
 		}
-		if r.BackgroundTasks != nil && r.BackgroundTasks(probed) {
+		finished := r.Finished != nil && r.Finished(s)
+		if !finished && r.BackgroundTasks != nil && r.BackgroundTasks(probed) {
 			st.State = agentrunner.StateWorking
 		}
 	}

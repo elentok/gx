@@ -201,6 +201,9 @@ type DepsOverrides struct {
 	StateDir string
 	// RunnerWait is the runner's N; zero means agentrunner.DefaultN.
 	RunnerWait time.Duration
+	// Finished tells the runner which sessions have reported their ticket
+	// finished (see herdrrunner.Runner.Finished). Nil means none.
+	Finished func(agentrunner.Session) bool
 }
 
 // DefaultDepsWithOverrides is DefaultDeps with overrides applied to the
@@ -212,6 +215,7 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 	}
 	runner := herdrrunner.NewIn(herdr.CLI{Env: overrides.Env}, overrides.Home, overrides.CodexHome)
 	runner.N = overrides.RunnerWait
+	runner.Finished = overrides.Finished
 	runner.CodexQuota = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 		if overrides.CodexHome == "" {
 			return codexsession.RateLimit{}, false, nil
