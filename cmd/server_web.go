@@ -18,24 +18,6 @@ import (
 // qrQuietZone is the blank border, in modules, that scanners need around a code.
 const qrQuietZone = 2
 
-func newServerWebTokenCmd(d deps) *cobra.Command {
-	var rotate bool
-	c := &cobra.Command{
-		Use:   "web-token",
-		Short: "Print the web UI token, or replace it with --rotate (signs out every browser)",
-		Args:  cobra.NoArgs,
-		RunE: func(c *cobra.Command, _ []string) error {
-			stateDir, err := d.dirs().StateDir()
-			if err != nil {
-				return err
-			}
-			return runWebToken(stateDir, rotate, c.OutOrStdout())
-		},
-	}
-	c.Flags().BoolVar(&rotate, "rotate", false, "replace the token; the running server drops every old cookie")
-	return c
-}
-
 func newServerWebURLCmd(d deps) *cobra.Command {
 	var showQR, jsonOut bool
 	c := &cobra.Command{
@@ -57,21 +39,6 @@ func newServerWebURLCmd(d deps) *cobra.Command {
 	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
 	c.Flags().BoolVar(&showQR, "qr", false, "print a QR code of the link above it, to open it on a phone")
 	return c
-}
-
-func runWebToken(stateDir string, rotate bool, w io.Writer) error {
-	var token string
-	var err error
-	if rotate {
-		token, err = server.RotateWebToken(stateDir)
-	} else {
-		token, err = server.ReadWebToken(stateDir)
-	}
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(w, token)
-	return err
 }
 
 // webInfoOrRefusal reads the web info route; a server that is not running comes

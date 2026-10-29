@@ -75,8 +75,9 @@ func webLoginIDFrom(ctx context.Context) string {
 	return id
 }
 
-// loginCookieName names the web login cookie after the listener's port, for the
-// reason webCookiePrefix gives.
+// loginCookieName names the web login cookie after the listener's port: browsers
+// share cookies across ports on one host, so servers on 127.0.0.1:A and :B would
+// otherwise overwrite each other's session.
 func loginCookieName(ln net.Listener) string {
 	if _, port, err := net.SplitHostPort(ln.Addr().String()); err == nil && port != "" {
 		return webLoginCookiePrefix + "_" + port
@@ -117,8 +118,7 @@ func (s *Server) webLoginFor(r *http.Request) (WebLogin, string, bool) {
 }
 
 // requireWebLogin lets a request through with a valid web login cookie and
-// renews the cookie at most once a minute. Any other request goes to fallback,
-// which still lets the old token cookie in until the token goes away.
+// renews the cookie at most once a minute. Any other request goes to fallback.
 func (s *Server) requireWebLogin(next, fallback http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		login, value, ok := s.webLoginFor(r)

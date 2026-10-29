@@ -278,12 +278,3 @@ func TestWebLogin_CookieIsRenewedAtMostOncePerMinute(t *testing.T) {
 		t.Error("use after a minute did not renew the cookie")
 	}
 }
-
-func TestWebLogin_OldTokenCookieStillWorks(t *testing.T) {
-	t.Parallel()
-	l := startLoginWeb(t)
-	old := login(t, l.h.StateDir, l.base)
-	if resp, _ := l.get(t, "/v1/snapshot", old); resp.StatusCode != http.StatusOK {
-		t.Errorf("snapshot with the token cookie: status %d, want 200", resp.StatusCode)
-	}
-}

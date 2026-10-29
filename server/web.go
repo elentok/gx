@@ -26,10 +26,8 @@ func (s *Server) bindWeb() {
 	if s.cfg.WebAddr == "" {
 		return
 	}
-	if _, err := loadOrCreateWebToken(s.cfg.StateDir); err != nil {
-		s.webErr = "web token: " + err.Error()
-		s.log.Error("web token unavailable", "err", err)
-		return
+	if err := removeLegacyWebToken(s.cfg.StateDir); err != nil {
+		s.log.Warn("could not delete the old web token file", "err", err)
 	}
 	if s.cfg.WebDevURL != "" {
 		proxy, err := devFrontendProxy(s.cfg.WebDevURL)
@@ -79,7 +77,7 @@ func (s *Server) bindWeb() {
 	s.web, s.webListenIP, s.webCerts = ln, listenIP, certs
 	s.webAuth, s.webLoginCookie = auth, loginCookieName(ln)
 	mux := s.webHandler()
-	protected := s.requireWebLogin(mux, requireToken(s.cfg.StateDir, webCookieName(ln), mux, s.denyWeb(mux)))
+	protected := s.requireWebLogin(mux, s.denyWeb(mux))
 	allowed := func() []string { return s.settings.Load().WebAllowedHosts }
 	s.webHTTP = &http.Server{Handler: requireHost(allowed, redirectPlainHTTP(servePublicFirst(mux, protected)))}
 }

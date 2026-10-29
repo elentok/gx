@@ -68,7 +68,7 @@ func isPublicWebRoute(r *http.Request) bool {
 }
 
 // servePublicFirst sends public web-only routes straight to the mux, ahead of
-// the token check; everything else goes through protected.
+// the login check; everything else goes through protected.
 func servePublicFirst(mux, protected http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isPublicWebRoute(r) {

@@ -138,7 +138,7 @@ a migration fails, the failed store is named and the server stays stopped.`,
 	}
 	kinds.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	eventsCmd.AddCommand(kinds)
-	cmd.AddCommand(eventsCmd, newServerLocksCmd(d), newServerTicketsCmd(d), newServerEpicsCmd(d), newServerStatsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d), newServerQueueCmd(d), newServerOneOffCmd(d), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d), newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDiskCmd(d), newServerHealthCmd(d), newServerCPUSpikeCmd(d), newServerWebTokenCmd(d), newServerWebURLCmd(d), newServerWebNewRootCmd(d))
+	cmd.AddCommand(eventsCmd, newServerLocksCmd(d), newServerTicketsCmd(d), newServerEpicsCmd(d), newServerStatsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d), newServerQueueCmd(d), newServerOneOffCmd(d), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d), newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDiskCmd(d), newServerHealthCmd(d), newServerCPUSpikeCmd(d), newServerWebURLCmd(d), newServerWebNewRootCmd(d))
 	return cmd
 }
 
@@ -248,15 +248,11 @@ type StatusInfo struct {
 	Pid     int    `json:"pid,omitempty"`
 	Build   string `json:"build,omitempty"`
 	Paused  bool   `json:"paused,omitempty"`
-	// WebURL is the web UI link with its token; empty when the web listener is off.
-	// Temporary: it keeps the token because gxfixture still signs the e2e page in
-	// through it; the remove-token ticket makes it the plain URL.
+	// WebURL is the plain web UI URL; empty when the web listener is off.
 	WebURL string `json:"web_url,omitempty"`
 	// WebSetupCode and WebSetupExpires are set only while the web Setup code exists.
 	WebSetupCode    string    `json:"web_setup_code,omitempty"`
 	WebSetupExpires time.Time `json:"web_setup_expires,omitzero"`
-	// webBase is the plain web URL that the text output prints.
-	webBase string
 	// WebFingerprint is the web root certificate's SHA-256 in 8 groups of 8.
 	WebFingerprint string `json:"web_fingerprint,omitempty"`
 	// Starting: a server holds the lock but does not answer yet. It builds the
@@ -300,11 +296,7 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 		}
 		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Paused: paused, Warnings: statusWarnings(n, cfg.TicketStore.Path)}
 		if n.WebURL != "" {
-			token, terr := server.ReadWebToken(stateDir)
-			if terr != nil {
-				return terr
-			}
-			info.WebURL, info.webBase = n.WebURL+"/?gx_token="+token, n.WebURL
+			info.WebURL = n.WebURL
 			if wi, werr := c.WebInfo(ctx); werr == nil && !wi.Refused {
 				info.WebFingerprint = wi.Fingerprint
 				if wi.SetupPending {
@@ -355,8 +347,8 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 	if _, err = fmt.Fprintf(w, "running\npid: %d\nbuild: %s\n", info.Pid, info.Build); err != nil {
 		return err
 	}
-	if info.webBase != "" {
-		if _, err = fmt.Fprintln(w, "web: "+info.webBase); err != nil {
+	if info.WebURL != "" {
+		if _, err = fmt.Fprintln(w, "web: "+info.WebURL); err != nil {
 			return err
 		}
 	}

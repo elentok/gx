@@ -45,65 +45,11 @@ func TestServerWebURL_NoHomeInEnvIsAnError(t *testing.T) {
 	}
 }
 
-// protectedProbe is a /v1/ path: signed-out requests get 401, signed-in ones reach the mux.
-const protectedProbe = "/v1/probe"
-
-func webGet(t *testing.T, url string, cookies ...*http.Cookie) *http.Response {
-	t.Helper()
-	client := &http.Client{Transport: servertest.WebTransport(), CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, c := range cookies {
-		req.AddCookie(c)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	return resp
-}
-
-func TestWebToken_PrintsTheCurrentTokenAndRotateReplacesIt(t *testing.T) {
-	h := startWebServer(t)
-	hs, err := h.Client.Handshake(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	old, err := server.ReadWebToken(h.StateDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signIn := webGet(t, hs.WebURL+"/?gx_token="+old)
-	if len(signIn.Cookies()) != 1 {
-		t.Fatalf("sign-in set %d cookies, want 1", len(signIn.Cookies()))
-	}
-	cookie := signIn.Cookies()[0]
-	if got := webGet(t, hs.WebURL+protectedProbe, cookie).StatusCode; got == http.StatusUnauthorized {
-		t.Fatalf("cookie before rotate = %d, want it let through", got)
-	}
-
-	var out bytes.Buffer
-	if err := runWebToken(h.StateDir, false, &out); err != nil {
-		t.Fatal(err)
-	}
-	if out.String() != old+"\n" {
-		t.Errorf("web-token = %q, want the current token", out.String())
-	}
-
-	out.Reset()
-	if err := runWebToken(h.StateDir, true, &out); err != nil {
-		t.Fatal(err)
-	}
-	fresh, _ := server.ReadWebToken(h.StateDir)
-	if fresh == old || out.String() != fresh+"\n" {
-		t.Errorf("rotate printed %q, file holds %q, old was %q", out.String(), fresh, old)
-	}
-	// "/" is public (the login page), so probe a protected path.
-	if got := webGet(t, hs.WebURL+protectedProbe, cookie).StatusCode; got != http.StatusUnauthorized {
-		t.Errorf("old cookie after rotate = %d, want 401", got)
+func TestWebToken_CommandIsGone(t *testing.T) {
+	d := deps{stdout: &bytes.Buffer{}, stderr: &bytes.Buffer{}, env: tempEnv(t)}
+	err := execute([]string{"server", "web-token"}, d)
+	if err == nil || !strings.Contains(err.Error(), "unknown command") {
+		t.Errorf("err = %v, want unknown command", err)
 	}
 }
 

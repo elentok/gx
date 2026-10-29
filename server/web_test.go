@@ -2,16 +2,21 @@ package server_test
 
 import (
 	"context"
+	"errors"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"testing/fstest"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
@@ -59,23 +64,28 @@ func webHostPort(rawURL string) string {
 	return u.Host
 }
 
-// login follows the token link the way a browser does and returns the cookie.
+type loginEntry struct {
+	once   sync.Once
+	cookie *http.Cookie
+}
+
+// logins holds one signed-in cookie per harness: setup runs once, because a
+// second sign-in in the same TOTP step would be refused as a replay.
+var logins sync.Map
+
+// login signs the harness in through the real setup routes and returns the cookie.
 func login(t *testing.T, stateDir, base string) *http.Cookie {
 	t.Helper()
-	token, err := server.ReadWebToken(stateDir)
-	if err != nil {
-		t.Fatal(err)
+	e, _ := logins.LoadOrStore(stateDir+"|"+webBase(base), &loginEntry{})
+	entry := e.(*loginEntry)
+	entry.once.Do(func() {
+		l := &loginWeb{h: &servertest.Harness{Client: apiclient.New(server.SocketPath(stateDir))}, base: webBase(base)}
+		entry.cookie, _ = l.signIn(t)
+	})
+	if entry.cookie == nil {
+		t.Fatal("sign-in failed earlier in this harness")
 	}
-	resp, err := noRedirect.Get(base + "/?gx_token=" + token)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	cookies := resp.Cookies()
-	if len(cookies) != 1 {
-		t.Fatalf("login set %d cookies, want 1 (status %d)", len(cookies), resp.StatusCode)
-	}
-	return cookies[0]
+	return entry.cookie
 }
 
 func webDoCookie(t *testing.T, method, url string, cookie *http.Cookie) (int, string) {
@@ -165,9 +175,9 @@ func TestWeb_GetNeedsNoOrigin(t *testing.T) {
 	}
 }
 
-// The token check runs before the Origin check, so an unauthenticated write is
+// The login check runs before the Origin check, so an unauthenticated write is
 // 401 even with a bad Origin.
-func TestWeb_WriteTokenCheckComesFirst(t *testing.T) {
+func TestWeb_WriteLoginCheckComesFirst(t *testing.T) {
 	t.Parallel()
 	_, base := startWeb(t)
 	if code, _ := webDoCookie(t, http.MethodPost, base+"/nope", nil); code != http.StatusUnauthorized {
@@ -320,67 +330,43 @@ func TestWeb_EverythingElseIs404(t *testing.T) {
 	}
 }
 
-// Vite appends ?t=<timestamp> to modules it reloaded; that is not a login
-// attempt, so a signed-in browser still gets the module.
-func TestWeb_ViteTimestampParamIsNotATokenAttempt(t *testing.T) {
+// An old sign-in link or an old gx_web cookie is not a login: the page is served
+// like for any visitor, nothing is set, and the API stays closed.
+func TestWeb_OldTokenLinkAndCookieAreIgnored(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
-	cookie := login(t, h.StateDir, base)
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/src/main.tsx?t=1792556497813", cookie); code == http.StatusUnauthorized {
-		t.Errorf("status %d with a valid cookie, want the request let through", code)
-	}
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot?t=1792556497813", nil); code != http.StatusUnauthorized {
-		t.Errorf("status %d without a cookie, want 401", code)
-	}
-	token, err := server.ReadWebToken(h.StateDir)
+	_, base := startWeb(t)
+	req, err := http.NewRequest(http.MethodGet, base+"/?gx_token=abc", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot?t="+token, nil); code != http.StatusUnauthorized {
-		t.Errorf("status %d for the old ?t= link, want 401", code)
-	}
-}
-
-func TestWeb_ValidTokenSetsCookieAndRedirects(t *testing.T) {
-	t.Parallel()
-	h, base := startWeb(t)
-	token, err := server.ReadWebToken(h.StateDir)
+	req.AddCookie(&http.Cookie{Name: "gx_web", Value: "x"})
+	resp, err := noRedirect.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := noRedirect.Get(base + "/some/route?gx_token=" + token)
-	if err != nil {
-		t.Fatal(err)
-	}
+	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/" {
-		t.Errorf("status %d, Location %q, want 303 to /", resp.StatusCode, resp.Header.Get("Location"))
+	if resp.StatusCode != http.StatusOK || !strings.Contains(strings.ToLower(string(body)), "<!doctype html>") {
+		t.Errorf("GET /?gx_token = %d %q, want the HTML page", resp.StatusCode, body)
 	}
-	cookies := resp.Cookies()
-	if len(cookies) != 1 {
-		t.Fatalf("got %d cookies, want 1", len(cookies))
+	if len(resp.Cookies()) != 0 {
+		t.Errorf("old token link set cookies %v, want none", resp.Cookies())
 	}
-	c := cookies[0]
-	if !c.HttpOnly || c.SameSite != http.SameSiteStrictMode || c.MaxAge != 365*24*60*60 {
-		t.Errorf("cookie = %+v, want HttpOnly, SameSite=Strict and a one-year max age", c)
-	}
-	if strings.Contains(c.Value, token) {
-		t.Errorf("cookie value contains the token itself")
+	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot?gx_token=abc", &http.Cookie{Name: "gx_web", Value: "x"}); code != http.StatusUnauthorized {
+		t.Errorf("snapshot with an old token and cookie = %d, want 401", code)
 	}
 }
 
-func TestWeb_BadOrMissingTokenIs401(t *testing.T) {
+func TestWeb_StartDeletesTheOldTokenFile(t *testing.T) {
 	t.Parallel()
-	h, base := startWeb(t)
-	for _, path := range []string{"/v1/snapshot", "/v1/events", "/v1/snapshot?gx_token=nope"} {
-		code, body := webDoCookie(t, http.MethodGet, base+path, nil)
-		if code != http.StatusUnauthorized || body == "" {
-			t.Errorf("GET %s = %d %q, want 401 with a page", path, code, body)
-		}
+	h, _ := startWeb(t)
+	path := filepath.Join(h.StateDir, "web-token")
+	if err := os.WriteFile(path, []byte("old\n"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot", &http.Cookie{Name: login(t, h.StateDir, base).Name, Value: "forged"})
-	if code != http.StatusUnauthorized {
-		t.Errorf("forged cookie = %d, want 401", code)
+	h.Restart(t)
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("web-token after start: %v, want it deleted", err)
 	}
 }
 
@@ -399,70 +385,6 @@ func TestWeb_CookieAuthenticatesEventStream(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("GET /v1/events = %d, want 200", resp.StatusCode)
-	}
-}
-
-func TestWeb_TokenChangeInvalidatesOldCookies(t *testing.T) {
-	t.Parallel()
-	h, base := startWeb(t)
-	old := login(t, h.StateDir, base)
-	if err := os.WriteFile(server.WebTokenPath(h.StateDir), []byte("a-new-token\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	h.Restart(t)
-	hs, err := h.Client.Handshake(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if code, _ := webDoCookie(t, http.MethodGet, hs.WebURL+"/v1/snapshot", old); code != http.StatusUnauthorized {
-		t.Errorf("old cookie after token change = %d, want 401", code)
-	}
-	if code, _ := webDoCookie(t, http.MethodGet, hs.WebURL+"/v1/snapshot", login(t, h.StateDir, hs.WebURL)); code != http.StatusOK {
-		t.Errorf("new cookie = %d, want 200", code)
-	}
-}
-
-func TestWeb_RotateInvalidatesCookiesOfRunningServer(t *testing.T) {
-	t.Parallel()
-	h, base := startWeb(t)
-	old := login(t, h.StateDir, base)
-	before, _ := server.ReadWebToken(h.StateDir)
-	token, err := server.RotateWebToken(h.StateDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if token == before || len(token) != 64 {
-		t.Errorf("rotated token %q, was %q: want a new 32-byte hex token", token, before)
-	}
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot", old); code != http.StatusUnauthorized {
-		t.Errorf("old cookie after rotate = %d, want 401", code)
-	}
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot?gx_token="+before, nil); code != http.StatusUnauthorized {
-		t.Errorf("old token after rotate = %d, want 401", code)
-	}
-	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot", login(t, h.StateDir, base)); code != http.StatusOK {
-		t.Errorf("new cookie = %d, want 200", code)
-	}
-	info, err := os.Stat(server.WebTokenPath(h.StateDir))
-	if err != nil || info.Mode().Perm() != 0o600 {
-		t.Errorf("token file after rotate: %v, %v, want mode 0600", info, err)
-	}
-}
-
-func TestWeb_TokenFileIs0600AndSurvivesRestart(t *testing.T) {
-	t.Parallel()
-	h, _ := startWeb(t)
-	info, err := os.Stat(server.WebTokenPath(h.StateDir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Errorf("token file mode = %v, want 0600", info.Mode().Perm())
-	}
-	before, _ := server.ReadWebToken(h.StateDir)
-	h.Restart(t)
-	if after, _ := server.ReadWebToken(h.StateDir); after != before || len(before) != 64 {
-		t.Errorf("token changed across restart or is not 32 hex-encoded bytes: %q -> %q", before, after)
 	}
 }
 

@@ -105,22 +105,6 @@ func TestServerStatus_PrintsFingerprintAndAWarningPerLeftOutHost(t *testing.T) {
 	if res, err := h.Client.ReloadConfig(context.Background()); err != nil || res.Refused {
 		t.Fatalf("reload: %+v, %v", res, err)
 	}
-	// Status reads the token from the user's state dir, which the harness does not use.
-	token, err := server.ReadWebToken(h.StateDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stateDir, err := dirs.StateDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(stateDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(server.WebTokenPath(stateDir), []byte(token+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
 	var out bytes.Buffer
 	if err := runServerStatusWith(context.Background(), dirs, h.Client, false, &out); err != nil {
 		t.Fatal(err)
@@ -139,21 +123,6 @@ func TestServerStatus_PrintsFingerprintAndAWarningPerLeftOutHost(t *testing.T) {
 func TestServerStatus_PrintsThePlainWebURLAndTheSetupCodeWhilePending(t *testing.T) {
 	dirs := config.DirsFrom(tempEnv(t))
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
-	token, err := server.ReadWebToken(h.StateDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// web_url in --json still carries the token and reads it from the user's state dir, which the harness does not use.
-	stateDir, err := dirs.StateDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(stateDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(server.WebTokenPath(stateDir), []byte(token+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	hs, err := h.Client.Handshake(context.Background())
 	if err != nil {
 		t.Fatal(err)
@@ -171,9 +140,6 @@ func TestServerStatus_PrintsThePlainWebURLAndTheSetupCodeWhilePending(t *testing
 	if !strings.Contains(out.String(), want) {
 		t.Errorf("status = %q, want it to contain %q", out.String(), want)
 	}
-	if strings.Contains(out.String(), "gx_token") || strings.Contains(out.String(), token) {
-		t.Errorf("status = %q, want no token in the text output", out.String())
-	}
 
 	var js bytes.Buffer
 	if err := runServerStatusWith(context.Background(), dirs, h.Client, true, &js); err != nil {
@@ -183,6 +149,9 @@ func TestServerStatus_PrintsThePlainWebURLAndTheSetupCodeWhilePending(t *testing
 	if err := json.Unmarshal(js.Bytes(), &got); err != nil {
 		t.Fatalf("json: %v\n%s", err, js.String())
 	}
+	if got.WebURL != hs.WebURL {
+		t.Errorf("json web_url = %q, want the plain URL %q", got.WebURL, hs.WebURL)
+	}
 	if got.WebSetupCode != info.SetupCode || got.WebSetupExpires.IsZero() {
 		t.Errorf("json setup code %q expires %v, want %q with an expiry", got.WebSetupCode, got.WebSetupExpires, info.SetupCode)
 	}
@@ -191,20 +160,6 @@ func TestServerStatus_PrintsThePlainWebURLAndTheSetupCodeWhilePending(t *testing
 func TestServerStatus_NoSetupCodeAfterSetup(t *testing.T) {
 	dirs := config.DirsFrom(tempEnv(t))
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
-	token, err := server.ReadWebToken(h.StateDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	stateDir, err := dirs.StateDir()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(stateDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(server.WebTokenPath(stateDir), []byte(token+"\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	finishWebSetup(t, h)
 
 	var out, js bytes.Buffer

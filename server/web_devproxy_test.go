@@ -12,7 +12,7 @@ import (
 )
 
 // startWebDev starts a server whose web UI proxies to devURL. It returns the
-// web base URL and the harness state dir, which holds the login token.
+// web base URL and the harness.
 func startWebDev(t *testing.T, devURL string) (string, *servertest.Harness) {
 	t.Helper()
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) {
@@ -41,6 +41,23 @@ func TestWebDevProxy_ServesAssetsFromDevFrontend(t *testing.T) {
 	code, body := webDoCookie(t, http.MethodGet, base+"/src/main.tsx", cookie)
 	if code != http.StatusOK || body != "dev:/src/main.tsx" {
 		t.Errorf("asset = %d %q, want the dev frontend's response", code, body)
+	}
+}
+
+func TestWebDevProxy_ModulesNeedNoCookieButTheAPIDoes(t *testing.T) {
+	t.Parallel()
+	dev := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("dev:" + r.URL.Path))
+	}))
+	t.Cleanup(dev.Close)
+
+	base, _ := startWebDev(t, dev.URL)
+	code, body := webDoCookie(t, http.MethodGet, base+"/src/main.tsx?t=1792556497813", nil)
+	if code != http.StatusOK || body != "dev:/src/main.tsx" {
+		t.Errorf("module without a cookie = %d %q, want the dev frontend's response", code, body)
+	}
+	if code, _ := webDoCookie(t, http.MethodGet, base+"/v1/snapshot", nil); code != http.StatusUnauthorized {
+		t.Errorf("API without a cookie = %d, want 401", code)
 	}
 }
 
