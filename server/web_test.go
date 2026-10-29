@@ -277,14 +277,14 @@ func TestWeb_ValidTokenSetsCookieAndRedirects(t *testing.T) {
 
 func TestWeb_BadOrMissingTokenIs401(t *testing.T) {
 	t.Parallel()
-	_, base := startWeb(t)
+	h, base := startWeb(t)
 	for _, path := range []string{"/", "/?gx_token=nope", "/v1/snapshot", "/v1/events", "/v1/snapshot?gx_token=nope"} {
 		code, body := webDoCookie(t, http.MethodGet, base+path, nil)
 		if code != http.StatusUnauthorized || body == "" {
 			t.Errorf("GET %s = %d %q, want 401 with a page", path, code, body)
 		}
 	}
-	code, _ := webDoCookie(t, http.MethodGet, base+"/", &http.Cookie{Name: "gx_web", Value: "forged"})
+	code, _ := webDoCookie(t, http.MethodGet, base+"/", &http.Cookie{Name: login(t, h.StateDir, base).Name, Value: "forged"})
 	if code != http.StatusUnauthorized {
 		t.Errorf("forged cookie = %d, want 401", code)
 	}
@@ -387,5 +387,33 @@ func TestWeb_BindFailureIsReportedAndServerKeepsRunning(t *testing.T) {
 	}
 	if hs.WebURL != "" || hs.WebError == "" {
 		t.Errorf("handshake web fields = %q %q, want an error and no url", hs.WebURL, hs.WebError)
+	}
+}
+
+// Browsers share cookies across ports on one host, so two servers must not
+// overwrite each other's session.
+func TestWeb_TwoServersKeepSeparateCookies(t *testing.T) {
+	h1, base1 := startWeb(t)
+	h2, base2 := startWeb(t)
+	c1, c2 := login(t, h1.StateDir, base1), login(t, h2.StateDir, base2)
+	if c1.Name == c2.Name {
+		t.Fatalf("both servers use cookie %q", c1.Name)
+	}
+	for _, tc := range []struct {
+		base    string
+		cookies []*http.Cookie
+	}{{base1, []*http.Cookie{c1, c2}}, {base2, []*http.Cookie{c2, c1}}} {
+		req, _ := http.NewRequest(http.MethodGet, tc.base+"/v1/snapshot", nil)
+		for _, c := range tc.cookies {
+			req.AddCookie(c)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("%s with both cookies = %d, want 200", tc.base, resp.StatusCode)
+		}
 	}
 }

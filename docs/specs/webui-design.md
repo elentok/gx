@@ -300,7 +300,7 @@ Sending prompts
 
 - `POST /v1/sessions/prompt`, a `webWrites` entry with a CLI twin. The implementer picks the CLI verb name. It reuses the path that types into a session.
 - It works only when the session is Idle, and skips the draft guard in v1 because of the placeholder-as-draft bug (gx:follow-ups/07).
-- The route keeps the four web write checks (Host allowlist, `gx_web` cookie, Origin equal to Host, JSON Content-Type) and adds no new auth.
+- The route keeps the four web write checks (Host allowlist, `gx_web_<port>` cookie, Origin equal to Host, JSON Content-Type) and adds no new auth.
 - Refusals:
   - `not-design-session` when the session's `Design` flag is not set. The flag, not the Session ticket's epic kind, is the check, so a New Design session counts before Chart writes the map.
   - `harness-not-supported` for a non-Claude session.

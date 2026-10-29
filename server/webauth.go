@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,7 +17,10 @@ import (
 )
 
 const (
-	webCookieName = "gx_web"
+	// webCookiePrefix gets the request port appended: browsers share cookies
+	// across ports on one host, so servers on 127.0.0.1:A and :B would
+	// otherwise overwrite each other's session.
+	webCookiePrefix = "gx_web"
 	// webTokenParam is the query parameter of the sign-in link. It is namespaced
 	// because the Vite dev frontend appends its own ?t=<timestamp> to modules.
 	webTokenParam   = "gx_token"
@@ -94,6 +98,15 @@ func webCookieValue(token string) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
+// webCookieName names the session cookie after the listener's port. The Host
+// header is not used: a proxy or a spoofed Host may omit the port.
+func webCookieName(ln net.Listener) string {
+	if _, port, err := net.SplitHostPort(ln.Addr().String()); err == nil && port != "" {
+		return webCookiePrefix + "_" + port
+	}
+	return webCookiePrefix
+}
+
 func sameSecret(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
@@ -105,7 +118,7 @@ func sameSecret(a, b string) bool {
 // the cookie cannot be Secure. It lives 365 days, so rotating the token is the
 // only revocation. The file is read on every request so rotation takes effect
 // at once; do not cache it. Security design: map gx:webui-security.
-func requireToken(stateDir string, next http.Handler) http.Handler {
+func requireToken(stateDir, cookieName string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := ReadWebToken(stateDir)
 		if err != nil {
@@ -119,13 +132,13 @@ func requireToken(stateDir string, next http.Handler) http.Handler {
 				return
 			}
 			http.SetCookie(w, &http.Cookie{
-				Name: webCookieName, Value: want, Path: "/", MaxAge: webCookieMaxAge,
+				Name: cookieName, Value: want, Path: "/", MaxAge: webCookieMaxAge,
 				HttpOnly: true, SameSite: http.SameSiteStrictMode,
 			})
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
-		if c, err := r.Cookie(webCookieName); err == nil && sameSecret(c.Value, want) {
+		if c, err := r.Cookie(cookieName); err == nil && sameSecret(c.Value, want) {
 			next.ServeHTTP(w, r)
 			return
 		}

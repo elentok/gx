@@ -47,7 +47,7 @@ func (s *Server) bindWeb() {
 		s.log.Warn("web listener is bound to all interfaces and serves its token over plain HTTP", "addr", ln.Addr().String())
 	}
 	s.web = ln
-	s.webHTTP = &http.Server{Handler: requireHost(func() []string { return s.settings.Load().WebAllowedHosts }, requireToken(s.cfg.StateDir, s.webHandler()))}
+	s.webHTTP = &http.Server{Handler: requireHost(func() []string { return s.settings.Load().WebAllowedHosts }, requireToken(s.cfg.StateDir, webCookieName(ln), s.webHandler()))}
 }
 
 // WebURL is the web listener's base URL, or "" when it is off or failed to bind.
