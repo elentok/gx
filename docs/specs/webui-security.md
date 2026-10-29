@@ -49,7 +49,7 @@ from an authenticator app.
   the setup, login and Settings pages and in `gx server status`.
 - **Reach.** The listener closes connections from source IPs outside the private LAN ranges, the
   tailnet range and loopback, before TLS. The Host allowlist and the Origin plus Content-Type check
-  stay.
+  stay. The opt-in loopback TCP listener refuses requests that come from a browser.
 - **iOS fixes.** The cookie is `SameSite=Lax`, so a reload after a cross-site link keeps it. An
   unauthenticated page shows an HTML login page at the same URL, so the home-screen app can always
   recover. `index.html` and the hashed assets get cache headers, a missing asset is a 404, and a
@@ -86,20 +86,28 @@ from an authenticator app.
     about a token sent in plain text that no longer exists.
 14. As the person, I want the web listener to stay off until I set `server.web.listen`, so that a
     fresh install opens no network port.
+104. As the person, I want the opt-in loopback TCP listener (`server.tcp-listen`) to refuse any
+     request with an `Origin` or `Sec-Fetch-Site` header, or with a Host that is not a loopback
+     name or IP, so that a web page in a browser on the server machine cannot call gx routes, such
+     as `POST /v1/sessions/prompt`.
 
 ### Certificates and trust
 
 15. As the person, I want gx to make a root certificate and a server certificate on the first start
     with the listener on, so that I need no outside certificate authority.
 16. As the person, I want the root limited by critical name constraints to the parent domain of each
-    allowed host, `localhost`, and the private, tailnet, loopback, link-local and ULA IP ranges, so
-    that a stolen root key cannot sign a certificate for any public site.
-17. As the person, I want the server certificate to list every allowed name and every local IP, so
-    that every address I use passes the check on iOS.
+    allowed host (the exact host when its parent is a public suffix such as `com` or `github.io`),
+    `localhost`, and the private, tailnet, loopback, link-local and ULA IP ranges, so that a stolen
+    root key cannot sign a certificate for any public site.
+17. As the person, I want the server certificate to list every allowed name and every local IP
+    inside the root's constraints, and to leave out public and unspecified IPs with a line in
+    `gx.log`, so that every address I use passes the check on iOS and one public IP never breaks the
+    certificate for every name.
 18. As the person, I want a new IP or a new allowed host to get a new server certificate from the
     same root, live, so that I never re-trust a device for a network change.
-19. As the person, I want gx to re-issue the server certificate 30 days before it expires, so that
-    the web UI never shows an expired certificate.
+19. As the person, I want gx to re-issue the server certificate 30 days before it expires, also on
+    a server that has been running for a year, so that the web UI never shows an expired
+    certificate.
 20. As the person, I want an allowed host outside the root's constraints left out of the server
     certificate, with a warning in `gx.log` and `gx server status`, so that I know why that name
     fails.
@@ -128,7 +136,8 @@ from an authenticator app.
 30. As the person, I want the Setup code to work once and expire after an hour, with a server
     restart making a new one, so that a leaked code is soon useless.
 31. As the person, I want `gx server web-url --qr` to print a QR code that opens the setup page with
-    the code filled in, so that I can start setup on the phone with one scan.
+    the code filled in, and the page to drop the code from its URL once read, so that I can start
+    setup on the phone with one scan and no bookmark or error report keeps the code.
 32. As the person, I want the TUI About dialog to say "Web UI: setup needed, run `gx server web-url
     --qr`" and never show the code, so that the code does not sit on a screen.
 33. As the person, I want setup to be one card with "step N of 3" and a progress bar, so that I know
@@ -242,6 +251,10 @@ from an authenticator app.
     `web_setup_code` field only while setup is pending, so that I can automate setup.
 78. As the person, I want `gx server web-url` to print the plain URL after setup, so that I can open
     the web UI on a new device.
+105. As the person, I want the printed web URL and the QR code to use the first allowed host that
+     the root permits, else the listen IP, else (for a `0.0.0.0` or empty listen host) the first
+     private interface IP, so that the link opens on my phone and my first web login lands on
+     `gertsel.elentok.com`, not on an IP.
 79. As the person, I want `gx server web-reset` to ask y/N, then clear the password, the TOTP
     secret, every web login and the rate limits and print a new Setup code, so that I can recover
     when I lose both my password and my authenticator.
@@ -354,7 +367,9 @@ from an authenticator app.
 - Password rule: at least 12 characters. The server checks it on every path; the clients check it
   too, for the message.
 - TOTP: SHA-1, 30 seconds, 6 digits, one step of skew each way. A step at or below the last
-  accepted step is rejected. The `otpauth://` issuer and label are the implementer's choice.
+  accepted step is rejected. The last accepted step belongs to the secret: a new secret (setup
+  finish, authenticator reset, `web-reset`) starts with none, so its first code is never refused as
+  a replay of a code from the old secret. The `otpauth://` issuer and label are the implementer's choice.
 - The name comes from the user agent ("Safari on iPhone", "Chrome on Mac"). The implementer owns the
   table and the max name length.
 - Rate limits live in memory. Per IP: after 5 failures, wait 1 minute, doubling up to 1 hour. A
@@ -373,13 +388,18 @@ from an authenticator app.
   two devices race, the first to finish wins and the other gets the wrong-or-expired message.
 - The `--qr` link opens `/#/setup?code=<code>`. The code sits in the hash, so it never reaches the
   server log or a `Referer`, and `index.html` is still served only for `/`.
+- The setup page reads the code from the hash, puts it in the field, then replaces the hash with
+  `#/setup` through `history.replaceState`. A home-screen bookmark made after that holds no code.
+  Finishing setup navigates to `#/`.
 
 ### Routes
 
 Web-only routes are served on the web mux only. They are not in `routeTable` and have no CLI verb.
-The spec amends ADR 0028: "Routes that act on the caller's own web login, or serve public files to
-the browser, are web-only. They are listed in one place in `server`, and a test checks that list
-against the web mux." The implementer picks the paths. The list:
+The spec amends ADR 0028: "A route is web-only when it needs the web login cookie, or when a browser
+needs it before login. Web-only routes are listed in one place in `server`, and a test checks that
+list against the web mux. A CLI action with the same effect is a separate socket route with its own
+verb, because a local shell skips the browser's checks (cookie, password, TOTP code)." The
+implementer picks the paths. The list:
 
 - Public (no login): the auth state read (setup pending, signed out, or signed in with this web
   login's id), setup step 1 and finish, login, the iOS profile, the `.cer`, the client error report,
@@ -402,9 +422,17 @@ reads (ADR 0030), all refusing with `server-not-running` when the server is down
 - List web logins, revoke one by id, change password (new password only), reset authenticator (new
   secret and one code), make a new root. The implementer names these commands and flags.
 
-These socket routes are refused on the opt-in loopback TCP listener. Only the 0600 socket proves a
-local shell; loopback TCP is open to any page in a browser on the machine. The web listener being
-off makes every one of them fail with today's "the web UI is off" message.
+The web listener being off makes every one of them fail with today's "the web UI is off" message.
+
+### Loopback TCP listener
+
+The opt-in loopback TCP listener (`server.tcp-listen`) serves the same handler as the socket with no
+auth, so any web page in a browser on the machine can reach it. It gains one browser check in front
+of every route: a request with an `Origin` or a `Sec-Fetch-Site` header, or with a Host that is not
+`localhost` or a loopback IP (with or without a port), is refused with 403 and logged at most once a
+minute. The CLI and other local clients send none of these headers, so they keep working. Every
+route, the account routes included, is then served the same on the socket and the TCP listener;
+there is no per-route split.
 
 ### CLI commands
 
@@ -441,14 +469,21 @@ gets a 401 on reconnect and shows login.
   cRLSign, 10 years. Critical name constraints:
   - DNS: `localhost` plus the parent domain of each allowed host (the host minus its first label:
     `gertsel.elentok.com` gives `elentok.com`). A single-label host is permitted as the exact name.
+    When the parent is a public suffix (`golang.org/x/net/publicsuffix`, already an indirect
+    dependency), the exact host is permitted instead: `elentok.com` gives `elentok.com`, not `com`,
+    and `gx.github.io` gives `gx.github.io`, not `github.io`.
   - IP: `10/8`, `172.16/12`, `192.168/16`, `100.64/10`, `127/8`, `169.254/16`, `::1/128`,
     `fc00::/7`, `fe80::/10`.
   The constraints are fixed when the root is made.
 - Leaf: ECDSA P-256, CA false, digitalSignature, EKU serverAuth, NotBefore one hour back, 365 days.
-  SAN: `localhost`, each allowed host inside the constraints (dNSName), every local interface IP and
-  the listen IP (iPAddress). The CN does not matter.
-- Re-issue at start, on a config reload that changes allowed hosts, 30 days before expiry, and in
-  `GetCertificate` when a connection arrives on a local IP the leaf lacks. No interface polling.
+  SAN: `localhost`, each allowed host inside the constraints (dNSName), and each local interface IP
+  and the listen IP that falls inside the root's IP ranges (iPAddress). An unspecified address
+  (`0.0.0.0`, `::`) never goes in. Each IP left out is logged once per re-issue. A SAN outside the
+  constraints would make `Verify` fail for the whole leaf, so hosts and IPs are filtered the same
+  way. The CN does not matter.
+- Re-issue at start, on a config reload that changes allowed hosts, and in `GetCertificate` when a
+  connection arrives on a local IP the leaf lacks (and that the root permits) or when the leaf has
+  under 30 days left, checked against the injected clock. No interface polling and no timer.
 - Files in `<stateDir>/web-tls/`, 0600, made on the first start with the listener on.
 - Profile: an unsigned `.mobileconfig` with one `com.apple.security.root` payload, a stable
   `PayloadIdentifier`, a fresh `PayloadUUID` each build, `Content-Type:
@@ -465,7 +500,13 @@ gets a 401 on reconnect and shows login.
 - First byte `0x16` goes to TLS. Anything else is read as plain HTTP and answered with a redirect to
   `https://` on the same host and path, but only when the Host passes `hostAllowed`; any other Host
   gets the 403. The implementer picks the redirect status.
-- `WebURL()` returns `https://<addr>`.
+- `WebURL()` returns `https://<host>:<port>`, with the listen port and the first match of:
+  1. the first entry of `server.web.allowed-hosts` that the root's constraints permit;
+  2. the listen IP, when it is not unspecified;
+  3. for a `0.0.0.0`, `::` or empty listen host, the first local interface IP in the private,
+     tailnet or ULA ranges, else `localhost`.
+  `gx server status`, `gx server web-url`, the QR code and the design links in session banners all
+  use it.
 - The dev frontend proxy keeps working behind TLS. Vite modules are public, like the built assets.
 
 ### Serving
@@ -499,7 +540,9 @@ Sign out clears it.
   Reload button. It and `window` error and `unhandledrejection` handlers post to the error report
   route.
 - Client error report: message, stack, page URL and user agent. Size-capped and rate-limited per IP
-  (the implementer picks the numbers). Written to `gx.log` at warn level. It holds no cookies.
+  (the implementer picks the numbers). Written to `gx.log` at warn level. It holds no cookies. The
+  reporter drops the query part of the hash (everything after `?`) from the page URL before it
+  sends, so a Setup code never reaches the report.
 
 ### Logging
 
@@ -539,15 +582,21 @@ Seams:
    address. Prior art: `server/web_test.go`, `server/webhost_test.go`.
 2. **Pure rules.** Table tests for TOTP (RFC 6238 vectors, skew, replay), the Setup code alphabet and
    expiry, the user-agent names, the rate limiter with a fake clock, and name-constraint building
-   (parent domain, single label, `localhost`). Certificate tests parse the root and leaf with
-   `crypto/x509` and check every field listed under TLS, verify the leaf against the root, and check
-   that a name outside the constraints fails `Verify`. A plist test parses the `.mobileconfig`.
+   (parent domain, single label, `localhost`, `elentok.com` and `gx.github.io` as exact hosts). Leaf
+   SAN building takes the interface IPs and listen IP as input: a table with a public IPv4, a global
+   IPv6 and a `0.0.0.0` listen IP checks that they are left out and the leaf still verifies.
+   Certificate tests parse the root and leaf with `crypto/x509` and check every field listed under
+   TLS, verify the leaf against the root, and check that a name outside the constraints fails
+   `Verify`. A plist test parses the `.mobileconfig`. A table for the base URL rule covers an
+   allowed host inside the constraints, one outside, a specific listen IP, and an unspecified
+   listen IP with and without a private interface IP.
 3. **CLI.** `cmd` tests against the servertest harness, as `cmd/server_web_test.go` does today: status
    text and `--json`, `web-url` with and without `--qr`, `web-reset` with `--yes` and without a
    terminal, list, revoke, change password from stdin, reset authenticator with a code computed in
-   the test, `server-not-running`, "the web UI is off". Plus `TestRouteTableHasCLIVerbs`, a check that
-   the account routes refuse on the TCP listener, and the new web-only route list test next to
-   `TestWeb_EverythingElseIs404`.
+   the test, `server-not-running`, "the web UI is off", and the base URL `status` and `web-url` print
+   for an allowed host and for a `0.0.0.0` listen address. Plus `TestRouteTableHasCLIVerbs`, the
+   TCP listener's browser check (a CLI call passes; `Origin`, `Sec-Fetch-Site` and a non-loopback
+   Host each get 403), and the new web-only route list test next to `TestWeb_EverythingElseIs404`.
 4. **Web.** Vitest for the auth gate, the fetch helper's 401 path and cache clearing, the login,
    setup and Settings pages in every mock state, the error boundary, and the error reporter. A
    gallery entry per mock state. Prior art: `webui/src/connection.test.ts`,
@@ -555,7 +604,11 @@ Seams:
 5. **Fixture and e2e.** `gxfixture` signs in through the real routes: it reads `web_setup_code` from
    `gx server status --json`, finishes setup with a fixed password and a TOTP code computed from the
    returned secret, and puts the cookie in its JSON. `fixture.ts` adds the cookie to the browser
-   context, and Playwright ignores the self-made certificate. New scenarios:
+   context, and Playwright ignores the self-made certificate. The running server has no test clock
+   and refuses a TOTP code from a step it already accepted, so `fixture.ts` gets one helper that
+   returns a code for a secret only after waiting for a step later than the last code it handed out
+   for that secret (up to 30 seconds). `gxfixture` does the same for its setup code. Every flow
+   gets TOTP codes through this helper, never by computing them itself. New scenarios:
    - `web-setup`: setup pending, page not signed in.
    - `web-login`: setup done, page not signed in. The fixture JSON carries the password and the
      TOTP secret so a flow can compute a code.
@@ -583,7 +636,8 @@ New flows to write:
   goes on. Step 3: QR and key show; a wrong code shows the clock error, and `gx server status` still
   says setup is pending; the right code opens the Epics page signed in.
 - **Flow Q, "Setup from the QR link":** scenario `web-setup`. Open the link `gx server web-url`
-  prints; step 1 has the code filled in.
+  prints; step 1 has the code filled in, and the page URL ends in `#/setup` with no code. Finish
+  setup; the page URL is `#/`.
 - **Flow L, "Login":** scenario `web-login`. Open `#/stats`; the login card shows. A wrong code
   shows "Wrong password or code". The right password and code open the Stats page.
 - **Flow R, "Login rate limit":** scenario `web-login`. Fail 5 times; see "Too many tries. Try
@@ -633,10 +687,13 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
 15. Shell check: `<stateDir>/web-tls/` exists after the fixture starts. Go test (seam 2).
 16. Go test (seam 2): the root's constraints; a leaf for `example.com` signed by it fails `Verify`.
 17. Server check: `openssl s_client -connect <addr> -servername localhost` shows a SAN with
-    `localhost` and `127.0.0.1`. Go test (seam 2).
+    `localhost` and `127.0.0.1`. Go test (seam 2): public IPs and an unspecified listen IP are left
+    out, logged, and the leaf verifies.
 18. Go test (seam 1): a config reload that adds a host serves a leaf with it, from the same root.
     Go test (seam 1): a connection on a local IP the leaf lacks gets a leaf with it.
-19. Go test (seam 1): a leaf 29 days from expiry is re-issued at start.
+19. Go test (seam 1): a leaf 29 days from expiry is re-issued at start. Go test (seam 1): on a
+    running server, moving the web auth clock to 29 days before expiry makes the next handshake get
+    a new leaf from the same root.
 20. Go test (seam 1): an allowed host outside the constraints is not in the leaf, and `gx.log` and
     the web info route carry the warning. CLI check: `gx server status` prints it. Go test (seam 3).
 21. CLI check: new root with `--json` succeeds; `gx server status` prints a new fingerprint; the old
@@ -654,6 +711,8 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
 29. Go test (seam 2): the alphabet has no `0 O 1 I L`; the code is 8 characters.
 30. Go test (seam 1): a used code fails, an hour-old code fails, a restart changes the code.
 31. Flow Q. CLI check: `gx server web-url --qr` prints a QR block and a link with `#/setup?code=`.
+    Vitest (seam 4): the setup page clears the code from the hash after reading it, and finishing
+    setup navigates to `#/`.
 32. Go test (`ui/app` About test): with setup pending, the About dialog reads "Web UI: setup needed,
     run `gx server web-url --qr`" and holds no code.
 33. Flow S. Mock states setup-code-phone, setup-code-desktop, setup-password-phone,
@@ -725,12 +784,13 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
     code computed from the printed key saves.
 86. CLI check: after change password, list shows 0 web logins. Go test (seam 3) for both commands.
 87. CLI check: each new command against a stopped fixture exits with `server-not-running`. Go test
-    (seam 3): "the web UI is off" with the listener off. Go test (seam 3): each refuses on the TCP
-    listener.
+    (seam 3): "the web UI is off" with the listener off.
 88. Go test (seam 3): a CLI revoke writes the same log event as a web revoke, and ends the stream.
 89. Go test (seam 1): each event writes one `gx.log` line with IP and name.
 90. Go test (seam 1): after a full setup, login, password change and reset, `gx.log` holds none of
-    the password, codes, secret, cookie or Setup code.
+    the password, codes, secret, cookie or Setup code. Vitest (seam 4): an error report sent from
+    `#/setup?code=…` carries a page URL with no code. Go test (seam 1): an error report posted
+    during setup leaves no Setup code in `gx.log`.
 91. Go test (seam 1): a start with `web-token` present deletes it. CLI check: `gx server web-token`
     exits with "unknown command".
 92. Server check: `curl` of `/?gx_token=abc` with cookie `gx_web=x` answers the HTML page and sets
@@ -752,6 +812,13 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
      without the list. Shell check: ADR 0028 has the amendment.
 103. Go test (seam 1): with `server.web.dev-url` set to a stub on loopback, a module request is
      proxied over HTTPS without a cookie and an API request still needs one.
+104. Server check: with `server.tcp-listen` on, `curl http://127.0.0.1:7421/v1/snapshot` answers
+     200, and the same call with `-H 'Origin: http://evil.example'`, with
+     `-H 'Sec-Fetch-Site: cross-site'`, or with `-H 'Host: evil.example'` answers 403. A CLI command
+     over the TCP listener works. Go test (seam 3).
+105. CLI check: in a fixture with an allowed host, `gx server web-url` and `gx server web-url --qr`
+     use that host. Go test (seam 2): the base URL table. Go test (seam 3): with a `0.0.0.0` listen
+     address, `gx server status` prints a private interface IP or `localhost`, never `0.0.0.0`.
 
 **Mock states** (each line: mock path, state, width, fixture scenario, parts):
 
@@ -820,9 +887,6 @@ The three fixture scenarios do not exist yet; they are listed under the new scen
 
 These came up after the two spec rounds were used up.
 
-- **Which listeners serve the account socket routes?** Choice: the unix socket only; the loopback
-  TCP listener refuses them. Reason: only the 0600 socket proves a local shell. Loopback TCP answers
-  any page in a browser on the same machine, so it would let a hostile page reset the password.
 - **How does the CLI reset authenticator fit one route?** Choice: the CLI makes the secret with the
   shared TOTP code and sends secret plus code in one request. Reason: one route and one verb, no
   pending state on the server, and the secret never leaves the machine.
@@ -863,8 +927,6 @@ These came up after the two spec rounds were used up.
 - A readable audit log in the UI. The web login list plus `gx.log` is enough.
 - Rename from the CLI.
 - A PWA manifest or service worker (ticket 01: neither changes how iOS stores or sends cookies).
-- An Origin check on the loopback TCP listener for the other socket routes. This spec only keeps the
-  account routes off it. File a follow-up for the rest.
 
 ## Further Notes
 
