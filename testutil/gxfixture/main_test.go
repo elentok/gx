@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -1303,4 +1304,109 @@ func TestOtherScenariosReportNoMissingChecks(t *testing.T) {
 			}
 		}
 	}
+}
+
+// designSessions polls `gx agents list` until every ticket has a design session
+// that satisfies ok, and returns them by ticket.
+func (r *running) designSessions(t *testing.T, tickets []string, ok func(server.SessionInfo) bool) map[string]server.SessionInfo {
+	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		var list []server.SessionInfo
+		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]server.SessionInfo{}
+		for _, s := range list {
+			if s.Design && slices.Contains(tickets, s.Ticket) && ok(s) {
+				got[s.Ticket] = s
+			}
+		}
+		if len(got) == len(tickets) {
+			return got
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("design sessions of %v = %+v", tickets, list)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// launchModels is the --model of every fake agent started so far, sorted. The
+// fake logs its argv under the session's home.
+func (r *running) launchModels(t *testing.T) []string {
+	t.Helper()
+	home := filepath.Join(filepath.Dir(filepath.Dir(r.StateDir)), "home")
+	paths, _ := filepath.Glob(agentfake.TUIArgsPath(home, "*"))
+	var models []string
+	for _, p := range paths {
+		args, err := agentfake.ReadTUIArgs(home, strings.TrimSuffix(filepath.Base(p), ".args"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i := slices.Index(args, "--model"); i >= 0 {
+			models = append(models, args[i+1])
+		}
+	}
+	slices.Sort(models)
+	return models
+}
+
+// waitLaunchModels polls until the fakes started so far launched under want.
+func (r *running) waitLaunchModels(t *testing.T, want []string) {
+	t.Helper()
+	var got []string
+	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
+		if got = r.launchModels(t); slices.Equal(got, want) {
+			return
+		}
+	}
+	t.Fatalf("launch models = %v, want %v", got, want)
+}
+
+func TestDesignModelTiersScenario_TierPerMapAndLaunchArgs(t *testing.T) {
+	r := start(t, "design-model-tiers")
+	want := map[string]string{
+		"demo:tier-chart":       "strongest",
+		"demo:tier-later":       "worker",
+		"demo:tier-unconfirmed": "strongest",
+		"demo:tier-no-step":     "strongest",
+	}
+	tickets := slices.Collect(maps.Keys(want))
+	got := r.designSessions(t, tickets, func(server.SessionInfo) bool { return true })
+	for ticket, tier := range want {
+		if string(got[ticket].Tier) != tier {
+			t.Errorf("%s tier = %q, want %q", ticket, got[ticket].Tier, tier)
+		}
+	}
+	r.waitLaunchModels(t, []string{"opus", "opus", "opus", "sonnet"})
+	// The session list shows the model the fake reports on its replies.
+	r.designSessions(t, tickets, func(s server.SessionInfo) bool {
+		return s.Model == map[string]string{"strongest": "opus", "worker": "sonnet"}[string(s.Tier)]
+	})
+	r.stop(t)
+}
+
+func TestChartingHandoffScenario_ContinueRestartsOnWorkerOrFailsOnStaleSlug(t *testing.T) {
+	r := start(t, "charting-handoff")
+	tickets := []string{"demo:handoff-auto", "demo:handoff-manual", "stale:handoff-stale"}
+	sessions := r.designSessions(t, tickets, func(s server.SessionInfo) bool { return s.Tier == "strongest" })
+	if !sessions[tickets[0]].AutoAdvance {
+		t.Errorf("%s auto-advance is off, want on", tickets[0])
+	}
+	for _, ticket := range tickets[1:] {
+		id := sessions[ticket].ID
+		if sessions[ticket].AutoAdvance {
+			t.Errorf("%s auto-advance is on, want off", ticket)
+		}
+		chat := r.waitChat(t, id, func(c server.SessionChatResponse) bool { return len(c.Messages) > 0 })
+		r.postWhenIdle(t, id, "/v1/sessions/prompt", map[string]any{"id": id, "continue": true, "last_message": chat.Messages[len(chat.Messages)-1].ID})
+	}
+	// The auto-advance countdown restarts the first session by itself.
+	r.designSessions(t, tickets[:2], func(s server.SessionInfo) bool { return s.Tier == "worker" })
+	r.designSessions(t, tickets[2:], func(s server.SessionInfo) bool { return s.Status.State == server.SessionExited })
+	if models := r.launchModels(t); !slices.Contains(models, agentfake.StaleModel) {
+		t.Errorf("launch models = %v, want the stale one among them", models)
+	}
+	r.stop(t)
 }

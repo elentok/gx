@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -231,6 +232,51 @@ func TestTUIClaude_ChatKnobMakesAPlainPromptAChatTurn(t *testing.T) {
 		!strings.Contains(lines[1], `"type":"assistant"`) || !strings.Contains(lines[1], chatReply) {
 		t.Fatalf("transcript = %q", raw)
 	}
+}
+
+func TestTUIClaude_LogsItsArgv(t *testing.T) {
+	args := append([]string{"--model", "opus", "--effort", "max"}, tuiLaunchArgs...)
+	f := startTUIFake(t, args)
+	f.waitStatus(StatusIdle, "")
+
+	got, err := ReadTUIArgs(f.home, "sess-1")
+	if err != nil || !slices.Equal(got, args) {
+		t.Fatalf("logged argv = %v, %v; want %v", got, err, args)
+	}
+}
+
+func TestTUIClaude_RepliesReportTheModelItWasStartedWith(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"flag", append([]string{"--model", "opus"}, tuiLaunchArgs...), "opus"},
+		{"default", tuiLaunchArgs, ReportedModel},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := startTUIFake(t, tc.args)
+			path := f.transcriptPath()
+			f.writeWorkerConfig(WorkerConfig{Chat: true})
+
+			f.typeLine("hello there")
+			f.waitStatus(StatusBusy, "")
+			f.waitStatus(StatusIdle, "")
+			usage, ok, err := transcript.LastAssistantUsage(path)
+			if err != nil || !ok || usage.Model != tc.want {
+				t.Fatalf("reported model = %q, %v, %v; want %q", usage.Model, ok, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestTUIClaude_StaleModelExitsAtStart(t *testing.T) {
+	f := startTUIFake(t, append([]string{"--model", StaleModel}, tuiLaunchArgs...))
+
+	if code := f.waitExit(); code != 1 {
+		t.Fatalf("exit code = %d, want 1; screen: %q", code, f.screen.String())
+	}
+	f.waitScreen("is not available")
 }
 
 func TestTUIClaude_ChatSlowMarkerStaysBusyUntilFinished(t *testing.T) {

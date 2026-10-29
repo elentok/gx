@@ -34,6 +34,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/nativerunner"
@@ -277,8 +278,24 @@ func run(args []string) (err error) {
 		plain[addr] = id
 	}
 	for _, addr := range sc.openDesigns {
-		if out, err := f.cli("designs", "open", addr); err != nil {
+		out, err := f.cli("designs", "open", addr, "--json")
+		if err != nil {
 			return fmt.Errorf("open design %s: %w\n%s", addr, err, out)
+		}
+		if slices.Contains(sc.autoAdvanceOff, addr) {
+			var res server.SessionResult
+			if err := json.Unmarshal(out, &res); err != nil || res.Session == nil {
+				return fmt.Errorf("open design %s: no session in %s", addr, out)
+			}
+			// Not the CLI verb: its on|off arg validation rejects the session id.
+			if res, err := apiclient.New(server.SocketPath(f.stateD)).SetAutoAdvance(ctx, res.Session.ID, false); err != nil || res.Refused {
+				return fmt.Errorf("auto-advance off for %s: %v %+v", addr, err, res)
+			}
+		}
+	}
+	for addr, step := range sc.advanceSteps {
+		if out, err := f.cli("tickets", "set", addr, "--design-step", step); err != nil {
+			return fmt.Errorf("advance %s to %s: %w\n%s", addr, step, err, out)
 		}
 	}
 	for addr, id := range plain {

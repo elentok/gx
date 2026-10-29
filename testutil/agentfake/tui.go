@@ -2,6 +2,7 @@ package agentfake
 
 import (
 	"bufio"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -123,6 +124,31 @@ func TUIAckPath(home, sessionID string) string {
 	return filepath.Join(home, ".claude", "agentfake", sessionID+".ack")
 }
 
+// TUIArgsPath holds the argv (a JSON array) the TUI fake running sessionID
+// under home was started with.
+func TUIArgsPath(home, sessionID string) string {
+	return filepath.Join(home, ".claude", "agentfake", sessionID+".args")
+}
+
+// ReadTUIArgs is the argv the TUI fake running sessionID under home was
+// started with.
+func ReadTUIArgs(home, sessionID string) ([]string, error) {
+	data, err := os.ReadFile(TUIArgsPath(home, sessionID))
+	if err != nil {
+		return nil, err
+	}
+	var args []string
+	return args, json.Unmarshal(data, &args)
+}
+
+// ReportedModel is the model the TUI fake reports on its replies when it was
+// started without --model; StaleModel makes it exit at once, as claude does
+// for a model it no longer knows.
+const (
+	ReportedModel = "claude-fake-1"
+	StaleModel    = "stale-model"
+)
+
 // SendTUIControl writes c to the side channel of the TUI fake running
 // sessionID under home, waiting for the fake to create it and then to handle
 // c. The control FIFO and the PTY's keys reach the fake on separate paths, so
@@ -185,6 +211,8 @@ type tuiOptions struct {
 	dropKey   bool
 	noPidFile bool
 	mouse     bool
+	// model is --model, reported on every reply.
+	model string
 }
 
 // parseTUIArgs accepts exactly the PTY runner's launch flags, so a new flag
@@ -198,7 +226,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	fs.String("disallowedTools", "", "")
 	fs.String("append-system-prompt", "", "")
 	fs.String("append-system-prompt-file", "", "")
-	fs.String("model", "", "")
+	model := fs.String("model", "", "")
 	fs.String("effort", "", "")
 	fs.String("remote-control", "", "")
 	if err := fs.Parse(args); err != nil {
@@ -220,6 +248,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		dropKey:   os.Getenv(TUITrustDropKeyEnv) == "1",
 		noPidFile: os.Getenv(TUINoPidFileEnv) == "1",
 		mouse:     os.Getenv(TUIMouseEnv) == "1",
+		model:     cmp.Or(*model, ReportedModel),
 	}, nil
 }
 
@@ -267,6 +296,16 @@ func runTUIClaude() (int, error) {
 		return 0, err
 	}
 	defer ack.Close()
+	argv, err := json.Marshal(os.Args[1:])
+	if err != nil {
+		return 0, err
+	}
+	if err := os.WriteFile(TUIArgsPath(home, opts.sessionID), argv, 0o644); err != nil {
+		return 0, err
+	}
+	if opts.model == StaleModel {
+		return 0, fmt.Errorf("agentfake: model %q is not available", opts.model)
+	}
 
 	now := time.Now()
 	t := &tui{

@@ -153,7 +153,7 @@ func (t *tui) designTurn(text string) error {
 			return err
 		}
 	}
-	if err := appendMessage(path, "assistant", []map[string]any{{"type": "text", "text": msg}}); err != nil {
+	if err := appendReply(path, t.opts.model, []map[string]any{{"type": "text", "text": msg}}); err != nil {
 		return err
 	}
 	go func() {
@@ -186,7 +186,7 @@ func (t *tui) chatTurn(text string) error {
 	if strings.Contains(text, ChatSlowMarker) {
 		return nil
 	}
-	if err := appendMessage(path, "assistant", []map[string]any{{"type": "text", "text": chatReply}}); err != nil {
+	if err := appendReply(path, t.opts.model, []map[string]any{{"type": "text", "text": chatReply}}); err != nil {
 		return err
 	}
 	go func() {
@@ -231,13 +231,22 @@ func appendMessage(path, role string, content any) error {
 
 // appendEntry is appendMessage with extra top-level fields on the line.
 func appendEntry(path, role string, content any, extra map[string]any) error {
+	return writeEntry(path, role, map[string]any{"role": role, "content": content}, extra)
+}
+
+// appendReply appends an assistant line that reports model, as claude does.
+func appendReply(path, model string, content any) error {
+	return writeEntry(path, "assistant", map[string]any{"role": "assistant", "content": content, "model": model}, nil)
+}
+
+func writeEntry(path, role string, message, extra map[string]any) error {
 	now := time.Now().UTC()
 	entry := map[string]any{
 		"type": role,
 		// Grilling counts dedupe on the line's uuid, so each line needs its own.
 		"uuid":      fmt.Sprintf("fake-%d", now.UnixNano()),
 		"timestamp": now.Format(time.RFC3339Nano),
-		"message":   map[string]any{"role": role, "content": content},
+		"message":   message,
 	}
 	for k, v := range extra {
 		entry[k] = v

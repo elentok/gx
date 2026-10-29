@@ -60,6 +60,11 @@ type scenario struct {
 	recentlyFinished int
 	// openDesigns lists the maps whose design session is opened once the server is up.
 	openDesigns []string
+	// autoAdvanceOff lists the opened maps whose design session gets auto-advance off.
+	autoAdvanceOff []string
+	// advanceSteps moves each map, by address, to a design step once its design
+	// session is open, as the agent does while it charts.
+	advanceSteps map[string]string
 	// linkedDesigns lists the maps that get an extra plain session, linked to the
 	// map as a design session before openDesigns runs, so it is the older run.
 	linkedDesigns []string
@@ -232,6 +237,12 @@ var scenarios = map[string]scenario{
 	"design-defaulted": designScript(tickets.StepResolveTickets, agentfake.DesignTurnDefaulted),
 	// design-working: a long busy turn, for the Working row.
 	"design-working": designScript(tickets.StepResolveTickets, agentfake.DesignTurnSlow),
+	// design-model-tiers: four design sessions, one per launch tier rule. See
+	// designModelTiers.
+	"design-model-tiers": designModelTiers(),
+	// charting-handoff: three design sessions launched at the chart step whose
+	// map has since moved on. See chartingHandoff.
+	"charting-handoff": chartingHandoff(),
 	// united: one card per Epics page section and per Needs-you reason, across
 	// two projects. demo has auto-merge off and a two-agent cap, so with the
 	// workers held the permission and running epics fill it and the queued
@@ -361,6 +372,84 @@ func designTwoLive() scenario {
 	sc.linkedDesigns = []string{project + ":design-epic"}
 	sc.openDesigns = []string{project + ":design-epic"}
 	return sc
+}
+
+// Models the tier scenarios configure: the strongest tier and worker tier of
+// the demo project, and a worker model the fake claude refuses to start with.
+const (
+	strongestModel = "opus"
+	workerModel    = "sonnet"
+	staleProject   = "stale"
+)
+
+// tierAgents is project.json's agents key: a strongest and a worker model.
+func tierAgents(worker string) string {
+	return `,"agents":{"claude":{"model":"` + worker + `","effort":"medium","strongest":{"model":"` + strongestModel + `","effort":"max"}}}`
+}
+
+// mapMeta is the ticket.md frontmatter of an open map at step.
+func mapMeta(step string) string {
+	return "status: open\nkind: map\ndesign_step: " + step + "\n"
+}
+
+// designModelTiers opens one design session on each of four maps: at chart
+// (strongest), at a later step (worker), at a later step with an unconfirmed
+// destination (strongest) and with no design step (strongest).
+func designModelTiers() scenario {
+	addr := func(name string) string { return project + ":" + name }
+	return scenario{
+		epics: []epic{
+			{project, "tier-chart", nil},
+			{project, "tier-later", nil},
+			{project, "tier-unconfirmed", nil},
+			{project, "tier-no-step", nil},
+		},
+		projectExtra: map[string]string{project: tierAgents(workerModel)},
+		epicMeta: map[string]string{
+			addr("tier-chart"):       mapMeta(string(tickets.StepChart)),
+			addr("tier-later"):       mapMeta(string(tickets.StepResolveTickets)),
+			addr("tier-unconfirmed"): mapMeta(string(tickets.StepResolveTickets)) + "destination_unconfirmed: true\n",
+			addr("tier-no-step"):     "status: open\nkind: map\n",
+		},
+		openDesigns: []string{addr("tier-chart"), addr("tier-later"), addr("tier-unconfirmed"), addr("tier-no-step")},
+	}
+}
+
+// chartingHandoff opens a design session on three maps at the chart step, then
+// moves each to the next step, so the session is due the handoff to the worker
+// tier. The sessions differ in how they get there: auto-advance on (the agent
+// ends its run and the countdown runs), auto-advance off (a person presses
+// Continue), and a project whose worker model is stale, so the restart fails.
+func chartingHandoff() scenario {
+	auto, manual, stale := project+":handoff-auto", project+":handoff-manual", staleProject+":handoff-stale"
+	return scenario{
+		epics: []epic{
+			{project, "handoff-auto", nil},
+			{project, "handoff-manual", nil},
+			{staleProject, "handoff-stale", nil},
+		},
+		projectExtra: map[string]string{
+			project:      tierAgents(workerModel),
+			staleProject: tierAgents(agentfake.StaleModel),
+		},
+		epicMeta: map[string]string{
+			auto:   mapMeta(string(tickets.StepChart)),
+			manual: mapMeta(string(tickets.StepChart)),
+			stale:  mapMeta(string(tickets.StepChart)),
+		},
+		designByMap: map[string][]string{
+			auto:   {agentfake.DesignTurnRunEnd},
+			manual: {agentfake.DesignTurnPlain},
+			stale:  {agentfake.DesignTurnPlain},
+		},
+		openDesigns:    []string{auto, manual, stale},
+		autoAdvanceOff: []string{manual, stale},
+		advanceSteps: map[string]string{
+			auto:   string(tickets.StepResolveTickets),
+			manual: string(tickets.StepResolveTickets),
+			stale:  string(tickets.StepResolveTickets),
+		},
+	}
 }
 
 // grillingStats is the design scenario with conversation records that carry
