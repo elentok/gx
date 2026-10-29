@@ -1,10 +1,9 @@
-import { Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import type { SessionInfo } from "../generated/server";
 import { agentHref } from "../hrefs";
 import { RowList, type ListRowData, type ListSection } from "../nav/JumpMenu";
-import { StatusMark } from "./AgentSidebar";
 import { isActionable, stateLabel } from "./rules";
+import { SessionBadges, SessionGlyphs } from "./SessionGlyphs";
 
 // Port of ui/agents/jump.go: attention order, and the search fields plus the session ticket.
 const SECTIONS = ["Actionable", "Unread", "Other"];
@@ -20,30 +19,8 @@ function sessionRow(s: SessionInfo, current: boolean): ListRowData {
     href: agentHref(s.id),
     searchText: [name, s.project, s.dir, s.ticket].join(" "),
     current,
-    lead: (
-      <>
-        <StatusMark session={s} />
-        {s.design && (
-          <Text as="span" role="img" aria-label="Design" fontSize="xs" color="kind.design.fg">
-            ◆
-          </Text>
-        )}
-      </>
-    ),
-    trailing: (
-      <>
-        {s.unread.unread && (
-          <Text as="span" role="img" aria-label="Unread" color="kind.design.fg">
-            ●
-          </Text>
-        )}
-        {isActionable(s) && (
-          <Text as="span" role="img" aria-label="Actionable" color="tone.waiting.fg">
-            ★
-          </Text>
-        )}
-      </>
-    ),
+    lead: <SessionGlyphs session={s} />,
+    trailing: <SessionBadges session={s} />,
   };
 }
 

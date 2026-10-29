@@ -1,4 +1,12 @@
-import { SessionBlocked, SessionExited, type SessionInfo } from "../generated/server";
+import {
+  SessionBlocked,
+  SessionExitCrashed,
+  SessionExited,
+  SessionIdle,
+  SessionWorking,
+  type SessionInfo,
+} from "../generated/server";
+import type { Tone } from "../ui/tone";
 
 // Ports of ui/agents/sidebar.go: orderedSessions, liveCount and isActionable.
 
@@ -19,5 +27,21 @@ export const liveCount = (sessions: SessionInfo[]) => sessions.filter((s) => s.s
 export const isActionable = (s: SessionInfo) => !!s.actionable.reason || s.status.state === SessionBlocked;
 
 export const stateLabel = (s: SessionInfo) => s.status.state.charAt(0).toUpperCase() + s.status.state.slice(1).replace("-", " ");
+
+// Ports of statusIcon in ui/agents/sidebar.go; Working is the animated glyph there.
+export function statusMark(s: SessionInfo): { glyph: string; tone: Tone; faded?: boolean } {
+  switch (s.status.state) {
+    case SessionWorking:
+      return { glyph: "●", tone: "running" };
+    case SessionIdle:
+      return { glyph: "○", tone: "done" };
+    case SessionBlocked:
+      return { glyph: "?", tone: "waiting" };
+    case SessionExited:
+      return s.exit === SessionExitCrashed ? { glyph: "✕", tone: "deadlocked" } : { glyph: "○", tone: "muted", faded: true };
+    default:
+      return { glyph: "◌", tone: "paused" };
+  }
+}
 
 export const actionableCount =(sessions: SessionInfo[]) => sessions.filter(isActionable).length;

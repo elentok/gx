@@ -13,15 +13,14 @@ import { AGENTS_HREF, designHref } from "../hrefs";
 import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
-import { StatusMark, statusMark } from "./AgentSidebar";
-import { stateLabel } from "./rules";
+import { stateLabel, statusMark } from "./rules";
+import { StatusMark } from "./SessionGlyphs";
 import { SessionSwitcher } from "./SessionSwitcher";
 
 // No question sheet, no step names, no "gx stopped", no Done state, and no Restore or New session.
 const AGENT_OPTIONS: ChatOptions = { sheet: false, steps: false, gxStopped: false, done: false, restore: false, composer: false };
 
 const noop = () => {};
-
 
 function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; sessions: SessionInfo[]; onNew: () => void }) {
   const { tone } = statusMark(s);
@@ -97,8 +96,7 @@ function sendReason(s: SessionInfo, connected: boolean): string | undefined {
   if (s.harness !== "claude") return "Sending works for Claude sessions only";
   if (state === "exited") return "Exited. Restore it in gx, Agents tab.";
   if (!promptable(s)) {
-    const label = state.charAt(0).toUpperCase() + state.slice(1).replace("-", " ");
-    return `${label}. Send turns on when the session is idle.`;
+    return `${stateLabel(s)}. Send turns on when the session is idle.`;
   }
 }
 

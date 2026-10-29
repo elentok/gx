@@ -1,47 +1,11 @@
-import { Box, chakra, Spinner, Text } from "@chakra-ui/react";
+import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import {
-  SessionBlocked,
-  SessionExitCrashed,
-  SessionExited,
-  SessionIdle,
-  SessionWorking,
-  type SessionInfo,
-} from "../generated/server";
+import { SessionWorking, type SessionInfo } from "../generated/server";
 import { agentHref } from "../hrefs";
-import type { Tone } from "../ui/tone";
 import { useWide } from "../useWide";
-import { groupSessions, isActionable, liveCount } from "./rules";
-
-// Ports of statusIcon in ui/agents/sidebar.go; Working is the animated glyph there.
-export function statusMark(s: SessionInfo): { glyph: string; tone: Tone; faded?: boolean } {
-  switch (s.status.state) {
-    case SessionWorking:
-      return { glyph: "●", tone: "running" };
-    case SessionIdle:
-      return { glyph: "○", tone: "done" };
-    case SessionBlocked:
-      return { glyph: "?", tone: "waiting" };
-    case SessionExited:
-      return s.exit === SessionExitCrashed ? { glyph: "✕", tone: "deadlocked" } : { glyph: "○", tone: "muted", faded: true };
-    default:
-      return { glyph: "◌", tone: "paused" };
-  }
-}
-
-/** The status glyph; Working is a spinner, as in the mock. */
-export function StatusMark({ session: s }: { session: SessionInfo }) {
-  const { glyph, tone, faded } = statusMark(s);
-  const label = s.exit === SessionExitCrashed ? "crashed" : s.status.state;
-  return (
-    <Text as="span" role="img" aria-label={label} color={`tone.${tone}.fg`} opacity={faded ? 0.5 : 1} display="inline-flex" w="4" justifyContent="center" flex="none">
-      {s.status.state === SessionWorking ? <Spinner size="xs" borderWidth="2px" /> : glyph}
-    </Text>
-  );
-}
-
-const actionableReason =(s: SessionInfo) => s.actionable.reason || s.status.message || "Blocked";
+import { groupSessions, liveCount } from "./rules";
+import { SessionBadges, SessionGlyphs } from "./SessionGlyphs";
 
 function Row({ session: s, current }: { session: SessionInfo; current: boolean }) {
   const navigate = useNavigate();
@@ -68,12 +32,7 @@ function Row({ session: s, current }: { session: SessionInfo; current: boolean }
       bg={current ? "surface" : undefined}
       _hover={{ bg: current ? "surface" : "surface.sunken" }}
     >
-      <StatusMark session={s} />
-      {s.design && (
-        <Text as="span" role="img" aria-label="Design" fontSize="xs" color="kind.design.fg">
-          ◆
-        </Text>
-      )}
+      <SessionGlyphs session={s} />
       <Text as="span" flex="1" truncate fontSize="sm" color={current ? "text" : "text.muted"} fontWeight={s.unread.unread ? "700" : "400"}>
         {s.name || s.id}
       </Text>
@@ -87,44 +46,7 @@ function Row({ session: s, current }: { session: SessionInfo; current: boolean }
           {s.ticket}
         </Text>
       )}
-      {s.unread.unread && (
-        <Text as="span" role="img" aria-label="Unread" color="kind.design.fg">
-          ●
-        </Text>
-      )}
-      {isActionable(s) && (
-        <Box as="span" className="group" position="relative" color="tone.waiting.fg">
-          <Text as="span" role="img" aria-label="Actionable">
-            ★
-          </Text>
-          <Box
-            as="span"
-            role="tooltip"
-            display="none"
-            _groupHover={{ display: "block" }}
-            position="absolute"
-            zIndex="5"
-            top="100%"
-            right="0"
-            mt="1"
-            px="2.5"
-            py="1.5"
-            borderWidth="1px"
-            borderColor="border"
-            borderRadius="md"
-            bg="surface.raised"
-            boxShadow="0 6px 20px rgba(0,0,0,.5)"
-            fontSize="xs"
-            color="text"
-            whiteSpace="nowrap"
-          >
-            <Box as="b" color="tone.waiting.fg">
-              ★ Actionable:
-            </Box>{" "}
-            {actionableReason(s)}
-          </Box>
-        </Box>
-      )}
+      <SessionBadges session={s} tooltip />
     </chakra.a>
   );
 }

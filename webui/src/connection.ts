@@ -102,6 +102,12 @@ export function createConnection(deps: ConnectionDeps = {}) {
     clearTimeout(retry);
   }
 
+  // A torn-down stream makes the held snapshot stale, so it may no longer redirect or call a label gone.
+  function dropStream() {
+    teardown();
+    if (state.liveSnapshot) set({ liveSnapshot: false });
+  }
+
   function markUp() {
     clearTimeout(offline);
     offline = undefined;
@@ -117,8 +123,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
   }
 
   function fail() {
-    teardown();
-    if (state.liveSnapshot) set({ liveSnapshot: false });
+    dropStream();
     markDown();
     retry = setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, BACKOFF_MAX_MS);
@@ -184,8 +189,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
   }
 
   async function connect() {
-    teardown();
-    if (state.liveSnapshot) set({ liveSnapshot: false });
+    dropStream();
     const g = gen;
     let snap: Snapshot;
     try {

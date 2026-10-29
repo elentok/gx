@@ -34,6 +34,44 @@ function writeLast(id: string) {
   }
 }
 
+function GoneNotice({ id, wide }: { id: string; wide: boolean }) {
+  return (
+    <>
+      <Text fontWeight="600">Session not found</Text>
+      <Text color="text.muted">{id} no longer exists.</Text>
+      {!wide && (
+        <Link href={AGENTS_HREF} color="tone.running.fg">
+          Back to sessions
+        </Link>
+      )}
+    </>
+  );
+}
+
+function EmptyState({ empty, wide, onNew }: { empty: boolean; wide: boolean; onNew: () => void }) {
+  return (
+    <Box h="100%" display="flex" flexDirection="column" alignItems="center" justifyContent="center" gap="3" textAlign="center">
+      <Heading as="h3" fontFamily="condensed" textTransform="uppercase" fontSize="2xl">
+        {empty ? "No sessions yet" : "Pick a session"}
+      </Heading>
+      <Text color="text.muted" maxW="42ch">
+        {empty ? (
+          "Sessions you start here or in the gx Agents tab show up in this list."
+        ) : wide ? (
+          <>
+            Choose a session on the left, or press <Kbd bg="surface" color="text.muted" borderWidth="1px" borderColor="border">⌘K</Kbd> to search.
+          </>
+        ) : (
+          "Choose a session from the list."
+        )}
+      </Text>
+      <Button type="button" emphasis="secondary" size="sm" onClick={onNew}>
+        New session
+      </Button>
+    </Box>
+  );
+}
+
 // The snapshot is cached by snapshotCache, so a reload repaints from it before the stream lands.
 // The cache may predate the session list, so only a live snapshot may redirect or call a label gone.
 export function AgentsPage({
@@ -55,11 +93,11 @@ export function AgentsPage({
   const conn = useConnectionContext();
   const { snapshot, liveSnapshot, streams } = useConnectionState(conn);
   const sessions = snapshot?.sessions;
-  const listed = !!selected && !!sessions?.some((s) => s.id === selected);
+  const session = selected ? sessions?.find((s) => s.id === selected) : undefined;
+  const listed = !!session;
   const gone = !!selected && !!sessions && liveSnapshot && !listed;
   useFocusReport(conn, listed ? selected : undefined, streams);
-  const selectedProject = sessions?.find((s) => s.id === selected)?.project;
-  const openNew = (project = selectedProject) => setCreating({ project });
+  const openNew = (project = session?.project) => setCreating({ project });
   useEffect(() => {
     if (!sessions || !liveSnapshot) return;
     if (listed) writeLast(selected!);
@@ -79,46 +117,10 @@ export function AgentsPage({
           {(wide || selected) && (
             <Box as="main" p={wide ? "4" : "3"} minW="0">
               {!listed && <SessionSwitcher name="Switch session" sessions={sessions} onNew={() => openNew()} />}
-              {gone ? (
-                <>
-                  <Text fontWeight="600">Session not found</Text>
-                  <Text color="text.muted">{selected} no longer exists.</Text>
-                  {!wide && (
-                    <Link href={AGENTS_HREF} color="tone.running.fg">
-                      Back to sessions
-                    </Link>
-                  )}
-                </>
-              ) : selected ? (
-                listed && (
-                  <SessionView
-                    session={sessions.find((s) => s.id === selected)!}
-                    sessions={sessions}
-                    onNew={() => openNew()}
-                    fetchChat={fetchChat}
-                    fetchScreen={fetchScreen}
-                  />
-                )
-              ) : (
-                <Box h="100%" display="flex" flexDirection="column" alignItems="center" justifyContent="center" gap="3" textAlign="center">
-                  <Heading as="h3" fontFamily="condensed" textTransform="uppercase" fontSize="2xl">
-                    {sessions.length === 0 ? "No sessions yet" : "Pick a session"}
-                  </Heading>
-                  <Text color="text.muted" maxW="42ch">
-                    {sessions.length === 0 ? (
-                      "Sessions you start here or in the gx Agents tab show up in this list."
-                    ) : wide ? (
-                      <>
-                        Choose a session on the left, or press <Kbd bg="surface" color="text.muted" borderWidth="1px" borderColor="border">⌘K</Kbd> to search.
-                      </>
-                    ) : (
-                      "Choose a session from the list."
-                    )}
-                  </Text>
-                  <Button type="button" emphasis="secondary" size="sm" onClick={() => openNew()}>
-                    New session
-                  </Button>
-                </Box>
+              {gone && <GoneNotice id={selected!} wide={wide} />}
+              {!selected && <EmptyState empty={sessions.length === 0} wide={wide} onNew={() => openNew()} />}
+              {session && (
+                <SessionView session={session} sessions={sessions} onNew={() => openNew()} fetchChat={fetchChat} fetchScreen={fetchScreen} />
               )}
             </Box>
           )}
