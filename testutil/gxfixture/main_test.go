@@ -1310,26 +1310,24 @@ func TestOtherScenariosReportNoMissingChecks(t *testing.T) {
 // that satisfies ok, and returns them by ticket.
 func (r *running) designSessions(t *testing.T, tickets []string, ok func(server.SessionInfo) bool) map[string]server.SessionInfo {
 	t.Helper()
-	deadline := time.Now().Add(30 * time.Second)
-	for {
-		var list []server.SessionInfo
+	var list []server.SessionInfo
+	got := map[string]server.SessionInfo{}
+	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
+		list = nil
 		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
 			t.Fatal(err)
 		}
-		got := map[string]server.SessionInfo{}
+		got = map[string]server.SessionInfo{}
 		for _, s := range list {
 			if s.Design && slices.Contains(tickets, s.Ticket) && ok(s) {
 				got[s.Ticket] = s
 			}
 		}
-		if len(got) == len(tickets) {
-			return got
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("design sessions of %v = %+v", tickets, list)
-		}
-		time.Sleep(200 * time.Millisecond)
+		return len(got) == len(tickets)
+	}) {
+		t.Fatalf("design sessions of %v = %+v", tickets, list)
 	}
+	return got
 }
 
 // launchModels is the --model of every fake agent started so far, sorted. The
@@ -1356,10 +1354,11 @@ func (r *running) launchModels(t *testing.T) []string {
 func (r *running) waitLaunchModels(t *testing.T, want []string) {
 	t.Helper()
 	var got []string
-	for deadline := time.Now().Add(20 * time.Second); time.Now().Before(deadline); time.Sleep(200 * time.Millisecond) {
-		if got = r.launchModels(t); slices.Equal(got, want) {
-			return
-		}
+	if testutil.Poll(20*time.Second, 200*time.Millisecond, func() bool {
+		got = r.launchModels(t)
+		return slices.Equal(got, want)
+	}) {
+		return
 	}
 	t.Fatalf("launch models = %v, want %v", got, want)
 }
