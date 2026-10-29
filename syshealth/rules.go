@@ -86,6 +86,11 @@ func (w *Window) Add(v float64) {
 	}
 }
 
+// Reset drops every held value.
+func (w *Window) Reset() {
+	w.vals = nil
+}
+
 // Average is the mean of the held values, or 0 for none.
 func (w *Window) Average() float64 {
 	if len(w.vals) == 0 {

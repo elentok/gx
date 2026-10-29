@@ -140,6 +140,31 @@ func TestHealth_MovementWithinAStepPublishesNoEvent(t *testing.T) {
 	}
 }
 
+// Seam: a failed read clears both one-minute windows, so the first meter
+// after the error is not an average of readings from before it.
+func TestHealth_ReadErrorClearsTheOneMinuteWindows(t *testing.T) {
+	fake := servertest.NewFakeSystem()
+	fake.SetMem(90)
+	fake.SetBusy(90)
+	h := startHealth(t, fake, healthInterval)
+	waitReads(t, fake, syshealth.AverageWindow+2)
+	healthWhen(t, h, "high memory and cpu", func(v server.Health) bool {
+		return v.Memory.State != server.HealthStateNormal && v.CPU.State != server.HealthStateNormal
+	})
+	fake.Fail(errors.New("boom"))
+	healthWhen(t, h, "unknown after the error", func(v server.Health) bool { return v.Memory.State == server.HealthStateUnknown })
+	fake.SetMem(10)
+	fake.SetBusy(5)
+	fake.Fail(nil)
+	// The first known meters come from fresh windows: one low reading, not a stale average.
+	got := healthWhen(t, h, "known memory and cpu", func(v server.Health) bool {
+		return v.Memory.State != server.HealthStateUnknown && v.CPU.State != server.HealthStateUnknown
+	})
+	if got.Memory.State != server.HealthStateNormal || got.CPU.State != server.HealthStateNormal {
+		t.Fatalf("health = %+v, want memory and cpu normal", got)
+	}
+}
+
 // Seam: unknown reasons (story 34).
 func TestHealth_UnknownReasons(t *testing.T) {
 	t.Run("first interval is waiting", func(t *testing.T) {

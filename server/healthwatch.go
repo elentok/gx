@@ -90,6 +90,9 @@ func (s *Server) observeHealth(r syshealth.Reading, err error, now time.Time) {
 		unknown := MeterHealth{State: HealthStateUnknown, Reason: reason, ReadAt: now}
 		w.health.CPU, w.health.Memory = unknown, unknown
 		w.prev = nil
+		// The level restarts from none after unknown, so the average must too.
+		w.cpu.win.Reset()
+		w.mem.win.Reset()
 		w.latest = latestReading{}
 	default:
 		busy, reason := syshealth.BusyPercent(w.prev, r)
