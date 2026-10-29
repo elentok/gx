@@ -20,6 +20,7 @@ import (
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 func TestMain(m *testing.M) {
@@ -406,6 +407,55 @@ func TestPty_UsesTheHarnessProcessTable(t *testing.T) {
 
 	if got := ptyOf(t, h, "a").Procs; got == nil || got != NewProcessTable() {
 		t.Errorf("Procs = %T, want the harness's process table", got)
+	}
+}
+
+func TestPty_LeavePtyRunLiveReattachesAfterRestart(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	h := startPty(t, store, repo)
+	h.LeavePtyRun(t, store, repo, true)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	h.Restart(t)
+	evs, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	WaitForEvent(ctx, t, evs, server.EventReclaimed, "proj:epic-a/01")
+
+	if runs := h.Server.Runs(); len(runs) != 1 || runs[0].Runner != "pty" || runs[0].Session.Label == "" {
+		t.Errorf("runs = %+v, want the live run reattached on pty", runs)
+	}
+	if got := len(h.Starts()); got != 0 {
+		t.Errorf("Starts = %d, want the staged launch not counted", got)
+	}
+}
+
+func TestPty_LeavePtyRunDeadReclaimsAsDead(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	h := startPty(t, store, repo)
+	_, ticketPath := h.LeavePtyRun(t, store, repo, false)
+
+	h.Restart(t)
+	WaitFor(t, 30*time.Second, "the dead run to pause the ticket for repair", func() bool {
+		tk, err := schema.ParseTicket(ticketPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return tk.Status == schema.StatusPaused && tk.PausedClass() == schema.PauseClassRepair
+	})
+	body, err := os.ReadFile(ticketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), nativerunner.ReasonAgentDied) {
+		t.Errorf("ticket lacks %q:\n%s", nativerunner.ReasonAgentDied, body)
+	}
+	if runs := h.Server.Runs(); len(runs) != 0 {
+		t.Errorf("runs = %+v, want the dead run dropped", runs)
 	}
 }
 
