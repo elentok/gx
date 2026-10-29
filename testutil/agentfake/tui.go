@@ -303,6 +303,9 @@ type tui struct {
 	fast bool
 	// dialogNext makes the next "/" command open a dialog.
 	dialogNext bool
+	// busyNext makes the next "/" command start a turn that stays busy until a
+	// control ends it.
+	busyNext bool
 	// dialog replaces the default waiting rows while set by ActionBlock.
 	dialog []string
 	// trustYes is whether the trust dialog's cursor is on "Yes"; arrow
@@ -522,10 +525,7 @@ func (t *tui) submit() error {
 		}
 		t.prompt = text
 		if t.fast {
-			t.fast = false
-			writeReport(t.out, "working", "", "")
-			writeReport(t.out, "done", "", "")
-			return nil
+			return t.fastTurn()
 		}
 		if cfg, err := LoadWorkerConfig(t.pid.Cwd); err == nil && cfg.Chat {
 			return t.chatTurn(text)
@@ -601,8 +601,18 @@ func (t *tui) work(cfg WorkerConfig, address string) {
 	_ = SendControl(t.ctlPath, Control{Action: ActionFinish})
 }
 
+// fastTurn runs an armed fast turn: working, then done, with no busy status.
+func (t *tui) fastTurn() error {
+	t.fast = false
+	writeReport(t.out, "working", "", "")
+	writeReport(t.out, "done", "", "")
+	return nil
+}
+
 // slashCommand handles a "/" command at idle as claude does: it starts no
 // turn. /clear starts a new conversation; a dialog command waits on a dialog.
+// The server launches every iteration with a slash prompt, so an armed fast or
+// busy turn makes one run a turn anyway.
 func (t *tui) slashCommand(text string) error {
 	switch {
 	case t.dialogNext:
@@ -611,6 +621,12 @@ func (t *tui) slashCommand(text string) error {
 	case text == "/clear":
 		t.pid.SessionID += "-cleared"
 		return t.writePid()
+	case t.fast:
+		return t.fastTurn()
+	case t.busyNext:
+		t.busyNext = false
+		t.prompt = text
+		return t.setStatus(StatusBusy, "")
 	}
 	return nil
 }
@@ -678,6 +694,9 @@ func (t *tui) handleControl(c Control) error {
 		return nil
 	case ActionDialog:
 		t.dialogNext = true
+		return nil
+	case ActionBusy:
+		t.busyNext = true
 		return nil
 	case ActionReport:
 		writeReport(t.out, c.State, c.Kind, c.Message)

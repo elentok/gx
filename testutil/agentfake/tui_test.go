@@ -306,6 +306,49 @@ func TestTUIClaude_StallLeavesPromptsUnstarted(t *testing.T) {
 	}
 }
 
+func TestTUIClaude_FastTurnRunsForASlashPrompt(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	f.control(Control{Action: ActionFast})
+	f.typeLine("/gx-implement gx:epic/01")
+	f.waitScreen("\x1b]7501;state=working")
+	f.waitScreen("\x1b]7501;state=done")
+	if m := f.pidFile(); m["status"] != StatusIdle {
+		t.Fatalf("status after a fast slash turn = %v, want idle", m["status"])
+	}
+}
+
+func TestTUIClaude_BusyTurnRunsForASlashPromptUntilFinished(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	f.control(Control{Action: ActionBusy})
+	f.typeLine("/gx-implement gx:epic/01")
+	f.waitStatus(StatusBusy, "")
+	f.control(Control{Action: ActionFinish})
+	f.waitStatus(StatusIdle, "")
+}
+
+func TestTUIClaude_SlashPromptWithNothingArmedStartsNoTurn(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	f.typeLine("/gx-implement gx:epic/01")
+	time.Sleep(200 * time.Millisecond)
+	if m := f.pidFile(); m["status"] != StatusIdle {
+		t.Fatalf("status after an unarmed slash prompt = %v, want idle", m["status"])
+	}
+}
+
+func TestTUIClaude_ClearStillChangesTheSessionIDWhenArmed(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	f.control(Control{Action: ActionBusy})
+	f.typeLine("/clear")
+	f.waitFor("the cleared sessionId", func() bool { return f.pidFile()["sessionId"] == "sess-1-cleared" })
+	if m := f.pidFile(); m["status"] != StatusIdle {
+		t.Fatalf("status after /clear = %v, want idle", m["status"])
+	}
+}
+
 func TestTUIClaude_CtrlCEndsTheTurnAndRestoresThePrompt(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")

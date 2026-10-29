@@ -37,6 +37,10 @@ const (
 	// ActionDialog makes the TUI fake open a dialog on the next "/" command,
 	// as /help does.
 	ActionDialog = "dialog"
+	// ActionBusy makes the TUI fake's next "/" command start a turn that stays
+	// busy until ActionFinish, ActionBlock or ActionExit. Unlike ActionStall,
+	// the prompt is accepted.
+	ActionBusy = "busy"
 	// ActionAPIError makes the TUI fake append the transcript line claude
 	// writes for a failed API call: Error, Status and Message say which.
 	ActionAPIError = "apierror"
