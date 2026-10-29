@@ -481,3 +481,43 @@ test("the draft is back after a remount, and one written through the store shows
   render([session("s-2", "p")], "/agents/s-2", true, chatOf(chat()));
   expect((await composerBox()).value).toBe("from the design page");
 });
+
+const failureCases: {
+  kind: string;
+  over: Partial<SessionInfo>;
+  label: string;
+  text?: string;
+  buttons: string[];
+  reason?: string;
+  sendOff: boolean;
+}[] = [
+  { kind: "crashed", over: { status: { state: "exited" }, exit: "crashed" }, label: "Agent crashed", buttons: [], reason: "Exited. Restore it in gx, Agents tab.", sendOff: true },
+  { kind: "ended", over: { status: { state: "exited" }, exit: "clean" }, label: "Session ended", buttons: [], reason: "Exited. Restore it in gx, Agents tab.", sendOff: true },
+  { kind: "auth", over: {}, label: "Not signed in", text: "Run /login", buttons: ["Retry"], sendOff: false },
+  { kind: "stalled", over: { status: { state: "working" } }, label: "No progress for 15 min", buttons: ["Screen"], reason: "Working. Send turns on when the session is idle.", sendOff: true },
+  { kind: "blocked", over: { status: { state: "blocked" } }, label: "Waiting at a prompt in the terminal", buttons: ["Screen"], reason: "Blocked. Send turns on when the session is idle.", sendOff: true },
+  { kind: "rate-limit", over: { status: { state: "rate-limited" } }, label: "Rate limited", text: "resets at 5pm", buttons: [], reason: "Rate limited. Send turns on when the session is idle.", sendOff: true },
+];
+
+test.each(failureCases)("$kind failure: label, text, only its buttons, and the composer state", async (c) => {
+  const failure = { kind: c.kind, label: c.label, text: c.text };
+  render([session("s-1", "p", { ...c.over, failure })], "/agents/s-1", true, chatOf(chat()));
+  const banner = within(await screen.findByRole("region", { name: "Session failure" }));
+  expect(banner.getByText(c.label)).toBeTruthy();
+  if (c.text) expect(banner.getByText(c.text)).toBeTruthy();
+  expect(banner.queryAllByRole("button").map((b) => b.textContent)).toEqual(c.buttons);
+  expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "New session" })).toBeNull();
+  expect(screen.getByText("hello there")).toBeTruthy();
+  await type("hi");
+  if (c.reason) expect(screen.getByText(c.reason)).toBeTruthy();
+  expect(sendButton().disabled).toBe(c.sendOff);
+});
+
+test("Retry on an auth failure posts continue with the last message id", async () => {
+  prompts.length = 0;
+  stubPrompt(accepted);
+  render([session("s-1", "p", { failure: { kind: "auth", label: "Not signed in" } })], "/agents/s-1", true, chatOf(chat()));
+  fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
+  await vi.waitFor(() => expect(prompts).toEqual([expect.objectContaining({ id: "s-1", text: "continue", last_message: "m1" })]));
+});
