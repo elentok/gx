@@ -57,7 +57,7 @@ func (f *webFocus) openTab(t *testing.T, client string) {
 		t.Fatal(err)
 	}
 	req.AddCookie(f.cookie)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := webClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

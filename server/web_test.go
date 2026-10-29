@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -28,8 +29,35 @@ func startWeb(t *testing.T) (*servertest.Harness, string) {
 	return h, hs.WebURL
 }
 
+// webHTTP is the one client every test uses to reach the web listener.
+var webHTTP = &http.Client{}
+
+// webClient returns the client for the web listener.
+func webClient() *http.Client { return webHTTP }
+
 // noRedirect lets a test see the redirect itself instead of its target.
-var noRedirect = &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+var noRedirect = &http.Client{
+	Transport:     webHTTP.Transport,
+	CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+}
+
+// webBase returns the scheme and host of a web URL, for example "http://127.0.0.1:8080".
+func webBase(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		panic(err)
+	}
+	return u.Scheme + "://" + u.Host
+}
+
+// webHostPort returns the host:port of a web URL.
+func webHostPort(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		panic(err)
+	}
+	return u.Host
+}
 
 // login follows the token link the way a browser does and returns the cookie.
 func login(t *testing.T, stateDir, base string) *http.Cookie {
@@ -59,7 +87,7 @@ func webDoCookie(t *testing.T, method, url string, cookie *http.Cookie) (int, st
 	if cookie != nil {
 		req.AddCookie(cookie)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := webClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,23 +99,21 @@ func webDoCookie(t *testing.T, method, url string, cookie *http.Cookie) (int, st
 // webDo sends an authenticated request.
 func webDo(t *testing.T, h *servertest.Harness, method, url string) (int, string) {
 	t.Helper()
-	base, _, _ := strings.Cut(url[len("http://"):], "/")
-	return webDoCookie(t, method, url, login(t, h.StateDir, "http://"+base))
+	return webDoCookie(t, method, url, login(t, h.StateDir, webBase(url)))
 }
 
 // webSend sends an authenticated request with the given headers and an empty JSON body.
 func webSend(t *testing.T, h *servertest.Harness, method, url string, headers map[string]string) int {
 	t.Helper()
-	base, _, _ := strings.Cut(url[len("http://"):], "/")
 	req, err := http.NewRequest(method, url, strings.NewReader("{}"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.AddCookie(login(t, h.StateDir, "http://"+base))
+	req.AddCookie(login(t, h.StateDir, webBase(url)))
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := webClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +124,7 @@ func webSend(t *testing.T, h *servertest.Harness, method, url string, headers ma
 func TestWeb_WriteRequestOriginAndJSONCheck(t *testing.T) {
 	t.Parallel()
 	h, base := startWeb(t)
-	host := strings.TrimPrefix(base, "http://")
+	host := webHostPort(base)
 	hostname, port, _ := net.SplitHostPort(host)
 	otherPort := "http://" + hostname + ":1"
 	if port == "1" {
@@ -160,16 +186,15 @@ func TestWeb_OffByDefault(t *testing.T) {
 // webGet sends an authenticated GET with extra headers and returns the response.
 func webGet(t *testing.T, h *servertest.Harness, url string, headers map[string]string) *http.Response {
 	t.Helper()
-	base, _, _ := strings.Cut(url[len("http://"):], "/")
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.AddCookie(login(t, h.StateDir, "http://"+base))
+	req.AddCookie(login(t, h.StateDir, webBase(url)))
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := webClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,7 +392,7 @@ func TestWeb_CookieAuthenticatesEventStream(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.AddCookie(login(t, h.StateDir, base))
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := webClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -477,7 +502,7 @@ func TestWeb_TwoServersKeepSeparateCookies(t *testing.T) {
 		for _, c := range tc.cookies {
 			req.AddCookie(c)
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := webClient().Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}

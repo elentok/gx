@@ -27,7 +27,7 @@ func webPostJSON(t *testing.T, url, body string, cookie *http.Cookie, host strin
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := webClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}

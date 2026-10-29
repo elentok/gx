@@ -25,7 +25,7 @@ func hostStatus(t *testing.T, base, host string, cookie *http.Cookie) (int, stri
 	if cookie != nil {
 		req.AddCookie(cookie)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := webClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func startWebHosts(t *testing.T, hosts ...string) (*servertest.Harness, string, 
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
-	_, port, _ := net.SplitHostPort(strings.TrimPrefix(hs.WebURL, "http://"))
+	_, port, _ := net.SplitHostPort(webHostPort(hs.WebURL))
 	return h, hs.WebURL, port
 }
 
@@ -90,7 +90,7 @@ func TestWebHost_AllRoutesRefuseUnlistedName(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, base+path, nil)
 		req.Host = "evil.example"
 		req.AddCookie(cookie)
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := webClient().Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -106,7 +106,7 @@ func TestWebHost_RefusalIsShortPlainText(t *testing.T) {
 	_, base, _ := startWebHosts(t)
 	req, _ := http.NewRequest(http.MethodGet, base+"/", nil)
 	req.Host = "evil.example"
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := webClient().Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +135,7 @@ func TestWebHost_WrongHostWithoutCookieIs403Not401(t *testing.T) {
 func TestWebHost_MissingHostIs403(t *testing.T) {
 	t.Parallel()
 	_, base, _ := startWebHosts(t)
-	conn, err := net.Dial("tcp", strings.TrimPrefix(base, "http://"))
+	conn, err := net.Dial("tcp", webHostPort(base))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestWebHost_AnyHostIPLiteralPassesOnAllInterfacesBind(t *testing.T) {
 	if err != nil || hs.WebURL == "" {
 		t.Fatalf("handshake web_url = %q (err %v)", hs.WebURL, err)
 	}
-	_, port, _ := net.SplitHostPort(strings.TrimPrefix(hs.WebURL, "http://"))
+	_, port, _ := net.SplitHostPort(webHostPort(hs.WebURL))
 	base := "http://127.0.0.1:" + port
 	cookie := login(t, h.StateDir, base)
 	for _, host := range []string{"0.0.0.0:" + port, "192.168.1.20:" + port, "100.64.0.1:" + port} {
