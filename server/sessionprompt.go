@@ -131,9 +131,7 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 			return SessionResult{}, err
 		}
 		s.events.publish(EventSessionChanged, req.ID)
-		s.sessionWatches.start(func() {
-			s.sendAction(dir, "Continue", action)
-		})
+		s.startContinue(dir, meta, "Continue", action)
 		ev.Action = "continue"
 		for _, a := range action {
 			ev.Bytes += len(a)

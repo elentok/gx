@@ -46,9 +46,7 @@ func (s *Server) sendSessionAction(req SessionRequest, auto bool) (SessionResult
 		return SessionResult{}, err
 	}
 	s.events.publish(EventSessionChanged, req.ID)
-	s.sessionWatches.start(func() {
-		s.sendAction(dir, "Action", action)
-	})
+	s.startContinue(dir, meta, "Action", action)
 	info := meta.info()
 	return SessionResult{Session: &info}, nil
 }
