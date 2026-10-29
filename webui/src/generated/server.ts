@@ -1426,6 +1426,11 @@ export interface Snapshot {
    */
   skills_install_problem?: string;
   /**
+   * NodeMissing is set while node is not on the server's PATH, so web
+   * dependency installs fail; filled in by the handler.
+   */
+  node_missing?: boolean;
+  /**
    * Sessions are the interactive sessions, oldest first; filled in by the
    * handler.
    */

@@ -3,6 +3,7 @@ import { RouterProvider } from "react-router";
 import { ConnectionContext, useConnection, type ConnectionDeps } from "./connection";
 import { routeHashLinkClicks } from "./nav/hashLinks";
 import { createAppRouter } from "./routes";
+import { NodeMissingToast } from "./NodeMissingToast";
 import { SkillsProblemToast } from "./SkillsProblemToast";
 import type { FetchDetail } from "./ticket/detail";
 
@@ -14,6 +15,7 @@ export function App({ deps, fetchDetail }: { deps?: ConnectionDeps; fetchDetail?
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
       <SkillsProblemToast />
+      <NodeMissingToast />
     </ConnectionContext.Provider>
   );
 }

@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
+	"github.com/elentok/gx/brief"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
@@ -635,6 +636,10 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Mode = s.pause.currentMode()
 	snap.AFK = s.afk.isOn()
 	snap.SkillsInstallProblem = skills.ReadProblem(skills.StatusPath(s.cfg.StateDir))
+	// Checked on every snapshot: a PATH entry can vanish while the server
+	// runs, like an fnm per-shell dir once its shell exits.
+	_, nodeErr := brief.LookPath(s.cfg.Env, "node")
+	snap.NodeMissing = nodeErr != nil
 	sessions, err := s.listSessions()
 	if err != nil {
 		s.log.Warn("list sessions for snapshot", "err", err)

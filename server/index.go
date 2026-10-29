@@ -105,6 +105,9 @@ type Snapshot struct {
 	// SkillsInstallProblem is why the skill install `gx server start` ran
 	// last did not finish; empty when it did. Filled in by the handler.
 	SkillsInstallProblem string `json:"skills_install_problem,omitempty"`
+	// NodeMissing is set while node is not on the server's PATH, so web
+	// dependency installs fail; filled in by the handler.
+	NodeMissing bool `json:"node_missing,omitempty"`
 	// Sessions are the interactive sessions, oldest first; filled in by the
 	// handler.
 	Sessions []SessionInfo `json:"sessions"`
