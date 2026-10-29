@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"rsc.io/qr"
@@ -39,13 +40,9 @@ func newServerWebURLCmd(d deps) *cobra.Command {
 	var showQR, jsonOut bool
 	c := &cobra.Command{
 		Use:   "web-url",
-		Short: "Print the web UI link with its token",
+		Short: "Print the web UI link, with the Setup code while setup is pending",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			stateDir, err := d.dirs().StateDir()
-			if err != nil {
-				return err
-			}
 			cl, err := d.dial()()
 			if err != nil {
 				return err
@@ -54,7 +51,7 @@ func newServerWebURLCmd(d deps) *cobra.Command {
 			if ctx == nil {
 				ctx = context.Background()
 			}
-			return runWebURL(ctx, cl, stateDir, showQR, jsonOut, c.OutOrStdout())
+			return runWebURL(ctx, cl, showQR, jsonOut, c.OutOrStdout())
 		},
 	}
 	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
@@ -93,22 +90,31 @@ func webInfoOrRefusal(ctx context.Context, c *apiclient.Client) (server.WebInfo,
 // webURLResult is the `gx server web-url --json` payload.
 type webURLResult struct {
 	server.WebInfo
-	// URL is the base URL with the token appended.
+	// URL is the setup link while setup is pending, else the base URL.
 	URL string `json:"url,omitempty"`
 }
 
-func runWebURL(ctx context.Context, c *apiclient.Client, stateDir string, showQR, jsonOut bool, w io.Writer) error {
+// setupLink is the link that opens the web page's setup step with the code filled in.
+func setupLink(baseURL, code string) string {
+	return baseURL + "/#/setup?code=" + code
+}
+
+// setupCodeLine is the Setup code and the time it stops working, for text output.
+func setupCodeLine(code string, expires time.Time) string {
+	return "setup code: " + code + " (expires " + expires.Local().Format("15:04") + ")"
+}
+
+func runWebURL(ctx context.Context, c *apiclient.Client, showQR, jsonOut bool, w io.Writer) error {
 	info, err := webInfoOrRefusal(ctx, c)
 	if err != nil {
 		return err
 	}
 	res := webURLResult{WebInfo: info}
 	if !info.Refused {
-		token, err := server.ReadWebToken(stateDir)
-		if err != nil {
-			return err
+		res.URL = info.BaseURL
+		if info.SetupPending {
+			res.URL = setupLink(info.BaseURL, info.SetupCode)
 		}
-		res.URL = info.BaseURL + "/?gx_token=" + token
 	}
 	if jsonOut {
 		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
@@ -131,7 +137,12 @@ func runWebURL(ctx context.Context, c *apiclient.Client, stateDir string, showQR
 			return err
 		}
 	}
-	_, err = fmt.Fprintln(w, url)
+	if _, err = fmt.Fprintln(w, url); err != nil {
+		return err
+	}
+	if info.SetupPending {
+		_, err = fmt.Fprintln(w, setupCodeLine(info.SetupCode, info.SetupExpires))
+	}
 	return err
 }
 

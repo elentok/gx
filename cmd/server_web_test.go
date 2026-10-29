@@ -14,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
@@ -102,37 +103,96 @@ func TestWebToken_PrintsTheCurrentTokenAndRotateReplacesIt(t *testing.T) {
 	}
 }
 
-func TestWebURL_QRFlagPrintsAQRForTheTokenedURL(t *testing.T) {
-	h := startWebServer(t)
-	token, err := server.ReadWebToken(h.StateDir)
+// finishWebSetup sets the web account up through the real routes, so the server
+// stops showing a Setup code.
+func finishWebSetup(t *testing.T, h *servertest.Harness) {
+	t.Helper()
+	info, err := h.Client.WebInfo(context.Background())
+	if err != nil || !info.SetupPending {
+		t.Fatalf("web info %+v, %v; want setup pending", info, err)
+	}
+	client := &http.Client{Transport: servertest.WebTransport()}
+	post := func(path, body string) []byte {
+		req, err := http.NewRequest(http.MethodPost, info.BaseURL+path, strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Origin", info.BaseURL)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return b
+	}
+	var start struct{ Secret string }
+	if err := json.Unmarshal(post("/v1/web/auth/setup-start", `{"code":"`+info.SetupCode+`"}`), &start); err != nil || start.Secret == "" {
+		t.Fatalf("setup-start: %v, secret %q", err, start.Secret)
+	}
+	totp, err := server.TOTPCode(start.Secret, time.Now().Unix()/30)
 	if err != nil {
 		t.Fatal(err)
 	}
+	post("/v1/web/auth/setup-finish", `{"code":"`+info.SetupCode+`","password":"correct horse battery","totp_code":"`+totp+`"}`)
+	if after, _ := h.Client.WebInfo(context.Background()); after.SetupPending {
+		t.Fatalf("setup still pending after setup-finish: %+v", after)
+	}
+}
+
+func TestWebURL_PendingSetupPrintsTheSetupLinkAndCode(t *testing.T) {
+	h := startWebServer(t)
+	info, err := h.Client.WebInfo(context.Background())
+	if err != nil || info.SetupCode == "" {
+		t.Fatalf("web info %+v, %v", info, err)
+	}
+	link := info.BaseURL + "/#/setup?code=" + info.SetupCode
+
+	var plain bytes.Buffer
+	if err := runWebURL(context.Background(), h.Client, false, false, &plain); err != nil {
+		t.Fatal(err)
+	}
+	if want := link + "\nsetup code: " + info.SetupCode + " (expires "; !strings.HasPrefix(plain.String(), want) {
+		t.Errorf("web-url = %q, want prefix %q", plain.String(), want)
+	}
+
+	var qr bytes.Buffer
+	if err := runWebURL(context.Background(), h.Client, true, false, &qr); err != nil {
+		t.Fatal(err)
+	}
+	art, _, ok := strings.Cut(qr.String(), link+"\n")
+	if !ok {
+		t.Fatalf("web-url --qr = %q, want the setup link", qr.String())
+	}
+	// A code of the setup link is at least 29 modules tall plus a quiet zone; two modules fit in one text row.
+	if rows := strings.Count(art, "\n"); rows < 17 || !strings.ContainsAny(art, "▀▄█") {
+		t.Errorf("web-url --qr printed %d rows without block characters:\n%s", rows, qr.String())
+	}
+	wantArt, err := renderQR(link)
+	if err != nil || art != wantArt {
+		t.Errorf("web-url --qr drew a code for something other than the setup link (err %v)", err)
+	}
+	for _, out := range []string{plain.String(), qr.String()} {
+		if strings.Contains(out, "gx_token") || strings.Contains(out, "otpauth://") {
+			t.Errorf("web-url output holds a token or TOTP secret: %q", out)
+		}
+	}
+}
+
+func TestWebURL_AfterSetupPrintsThePlainURL(t *testing.T) {
+	h := startWebServer(t)
+	finishWebSetup(t, h)
 	hs, err := h.Client.Handshake(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantURL := hs.WebURL + "/?gx_token=" + token
-
-	var plain bytes.Buffer
-	if err := runWebURL(context.Background(), h.Client, h.StateDir, false, false, &plain); err != nil {
+	var out bytes.Buffer
+	if err := runWebURL(context.Background(), h.Client, false, false, &out); err != nil {
 		t.Fatal(err)
 	}
-	if plain.String() != wantURL+"\n" {
-		t.Errorf("web-url = %q, want %q", plain.String(), wantURL+"\n")
-	}
-
-	var qr bytes.Buffer
-	if err := runWebURL(context.Background(), h.Client, h.StateDir, true, false, &qr); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasSuffix(qr.String(), wantURL+"\n") {
-		t.Errorf("web-url --qr = %q, want it to end with the URL", qr.String())
-	}
-	lines := strings.Split(strings.TrimSuffix(qr.String(), wantURL+"\n"), "\n")
-	// A version-4 code is 33 modules tall plus a quiet zone; two modules fit in one text row.
-	if len(lines) < 17 || !strings.ContainsAny(qr.String(), "▀▄█") {
-		t.Errorf("web-url --qr printed %d rows without block characters:\n%s", len(lines), qr.String())
+	if out.String() != hs.WebURL+"\n" {
+		t.Errorf("web-url = %q, want %q", out.String(), hs.WebURL+"\n")
 	}
 }
 
@@ -141,16 +201,12 @@ func TestWebURL_UsesAnAllowedHostSetBeforeTheRootIsMade(t *testing.T) {
 		c.WebAddr = "127.0.0.1:0"
 		c.WebAllowedHosts = []string{"gx.example.com"}
 	})
-	token, err := server.ReadWebToken(h.StateDir)
-	if err != nil {
-		t.Fatal(err)
-	}
 	for _, qr := range []bool{false, true} {
 		var out bytes.Buffer
-		if err := runWebURL(context.Background(), h.Client, h.StateDir, qr, false, &out); err != nil {
+		if err := runWebURL(context.Background(), h.Client, qr, false, &out); err != nil {
 			t.Fatal(err)
 		}
-		if !strings.Contains(out.String(), "https://gx.example.com:") || !strings.Contains(out.String(), "/?gx_token="+token) {
+		if !strings.Contains(out.String(), "https://gx.example.com:") || !strings.Contains(out.String(), "/#/setup?code=") {
 			t.Errorf("web-url (qr=%v) = %q, want the allowed host", qr, out.String())
 		}
 	}
@@ -183,7 +239,7 @@ func TestWebURL_AllInterfacesBindNeverPrintsTheUnspecifiedAddress(t *testing.T) 
 
 func TestWebURL_WebListenerOffIsAnError(t *testing.T) {
 	h := servertest.Start(t)
-	err := runWebURL(context.Background(), h.Client, h.StateDir, false, false, &bytes.Buffer{})
+	err := runWebURL(context.Background(), h.Client, false, false, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "web UI is off") {
 		t.Errorf("err = %v, want a web UI is off error", err)
 	}
@@ -197,7 +253,7 @@ func TestWebURL_NoServerIsServerNotRunning(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
 	cl := apiclient.New(filepath.Join(dir, "none.sock"))
-	err = runWebURL(context.Background(), cl, t.TempDir(), false, false, &bytes.Buffer{})
+	err = runWebURL(context.Background(), cl, false, false, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) {
 		t.Errorf("err = %v, want %s", err, server.ReasonServerNotRunning)
 	}
@@ -206,7 +262,7 @@ func TestWebURL_NoServerIsServerNotRunning(t *testing.T) {
 func TestWebURL_JSONCarriesBaseURLAndFingerprint(t *testing.T) {
 	h := startWebServer(t)
 	var out bytes.Buffer
-	if err := runWebURL(context.Background(), h.Client, h.StateDir, false, true, &out); err != nil {
+	if err := runWebURL(context.Background(), h.Client, false, true, &out); err != nil {
 		t.Fatal(err)
 	}
 	var got webURLResult
@@ -217,8 +273,8 @@ func TestWebURL_JSONCarriesBaseURLAndFingerprint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.BaseURL != hs.WebURL || !strings.HasPrefix(got.URL, hs.WebURL+"/?gx_token=") {
-		t.Errorf("json = %+v, want base url %q and a tokened url", got, hs.WebURL)
+	if got.BaseURL != hs.WebURL || got.URL != hs.WebURL+"/#/setup?code="+got.SetupCode {
+		t.Errorf("json = %+v, want base url %q and the setup link", got, hs.WebURL)
 	}
 	if !regexp.MustCompile(`^([0-9a-f]{8} ){7}[0-9a-f]{8}$`).MatchString(got.Fingerprint) {
 		t.Errorf("fingerprint = %q, want 8 groups of 8", got.Fingerprint)

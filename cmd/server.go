@@ -249,7 +249,14 @@ type StatusInfo struct {
 	Build   string `json:"build,omitempty"`
 	Paused  bool   `json:"paused,omitempty"`
 	// WebURL is the web UI link with its token; empty when the web listener is off.
+	// Temporary: it keeps the token because gxfixture still signs the e2e page in
+	// through it; the remove-token ticket makes it the plain URL.
 	WebURL string `json:"web_url,omitempty"`
+	// WebSetupCode and WebSetupExpires are set only while the web Setup code exists.
+	WebSetupCode    string    `json:"web_setup_code,omitempty"`
+	WebSetupExpires time.Time `json:"web_setup_expires,omitzero"`
+	// webBase is the plain web URL that the text output prints.
+	webBase string
 	// WebFingerprint is the web root certificate's SHA-256 in 8 groups of 8.
 	WebFingerprint string `json:"web_fingerprint,omitempty"`
 	// Starting: a server holds the lock but does not answer yet. It builds the
@@ -297,9 +304,12 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 			if terr != nil {
 				return terr
 			}
-			info.WebURL = n.WebURL + "/?gx_token=" + token
+			info.WebURL, info.webBase = n.WebURL+"/?gx_token="+token, n.WebURL
 			if wi, werr := c.WebInfo(ctx); werr == nil && !wi.Refused {
 				info.WebFingerprint = wi.Fingerprint
+				if wi.SetupPending {
+					info.WebSetupCode, info.WebSetupExpires = wi.SetupCode, wi.SetupExpires
+				}
 				for _, host := range wi.LeftOutHosts {
 					info.Warnings = append(info.Warnings, "web certificate leaves out allowed host "+host+": the root does not permit it")
 				}
@@ -345,8 +355,13 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 	if _, err = fmt.Fprintf(w, "running\npid: %d\nbuild: %s\n", info.Pid, info.Build); err != nil {
 		return err
 	}
-	if info.WebURL != "" {
-		if _, err = fmt.Fprintln(w, "web: "+info.WebURL); err != nil {
+	if info.webBase != "" {
+		if _, err = fmt.Fprintln(w, "web: "+info.webBase); err != nil {
+			return err
+		}
+	}
+	if info.WebSetupCode != "" {
+		if _, err = fmt.Fprintln(w, setupCodeLine(info.WebSetupCode, info.WebSetupExpires)); err != nil {
 			return err
 		}
 	}

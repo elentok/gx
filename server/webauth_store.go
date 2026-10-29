@@ -157,16 +157,22 @@ func SeedWebLogin(stateDir, userAgent string, lastUsed time.Time) (string, error
 
 // SetupState reports whether setup is pending and, if so, the Setup code to show.
 func (w *WebAuth) SetupState() (pending bool, code string, err error) {
+	pending, code, _, err = w.SetupStateWithExpiry()
+	return pending, code, err
+}
+
+// SetupStateWithExpiry is SetupState plus the moment the Setup code stops working.
+func (w *WebAuth) SetupStateWithExpiry() (pending bool, code string, expires time.Time, err error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.file.Password != nil {
-		return false, "", nil
+		return false, "", time.Time{}, nil
 	}
 	code, err = w.currentSetupCodeLocked()
 	if err != nil {
-		return false, "", err
+		return false, "", time.Time{}, err
 	}
-	return true, formatSetupCode(code), nil
+	return true, formatSetupCode(code), w.setupCreated.Add(setupCodeLifetime), nil
 }
 
 // ResetPending is whether the authenticator was cleared and login needs the Setup code (TOTP on).

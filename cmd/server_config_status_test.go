@@ -136,14 +136,14 @@ func TestServerStatus_PrintsFingerprintAndAWarningPerLeftOutHost(t *testing.T) {
 	}
 }
 
-func TestServerStatus_PrintsWebURLWithToken(t *testing.T) {
+func TestServerStatus_PrintsThePlainWebURLAndTheSetupCodeWhilePending(t *testing.T) {
 	dirs := config.DirsFrom(tempEnv(t))
 	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
 	token, err := server.ReadWebToken(h.StateDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Status reads the token from the user's state dir, which the harness does not use.
+	// web_url in --json still carries the token and reads it from the user's state dir, which the harness does not use.
 	stateDir, err := dirs.StateDir()
 	if err != nil {
 		t.Fatal(err)
@@ -158,12 +158,63 @@ func TestServerStatus_PrintsWebURLWithToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	info, err := h.Client.WebInfo(context.Background())
+	if err != nil || info.SetupCode == "" {
+		t.Fatalf("web info %+v, %v", info, err)
+	}
 
 	var out bytes.Buffer
 	if err := runServerStatusWith(context.Background(), dirs, h.Client, false, &out); err != nil {
 		t.Fatal(err)
 	}
-	if want := "web: " + hs.WebURL + "/?gx_token=" + token + "\n"; !strings.Contains(out.String(), want) {
-		t.Errorf("status = %q, want line %q", out.String(), want)
+	want := "web: " + hs.WebURL + "\nsetup code: " + info.SetupCode + " (expires "
+	if !strings.Contains(out.String(), want) {
+		t.Errorf("status = %q, want it to contain %q", out.String(), want)
+	}
+	if strings.Contains(out.String(), "gx_token") || strings.Contains(out.String(), token) {
+		t.Errorf("status = %q, want no token in the text output", out.String())
+	}
+
+	var js bytes.Buffer
+	if err := runServerStatusWith(context.Background(), dirs, h.Client, true, &js); err != nil {
+		t.Fatal(err)
+	}
+	var got StatusInfo
+	if err := json.Unmarshal(js.Bytes(), &got); err != nil {
+		t.Fatalf("json: %v\n%s", err, js.String())
+	}
+	if got.WebSetupCode != info.SetupCode || got.WebSetupExpires.IsZero() {
+		t.Errorf("json setup code %q expires %v, want %q with an expiry", got.WebSetupCode, got.WebSetupExpires, info.SetupCode)
+	}
+}
+
+func TestServerStatus_NoSetupCodeAfterSetup(t *testing.T) {
+	dirs := config.DirsFrom(tempEnv(t))
+	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.WebAddr = "127.0.0.1:0" })
+	token, err := server.ReadWebToken(h.StateDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir, err := dirs.StateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(server.WebTokenPath(stateDir), []byte(token+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	finishWebSetup(t, h)
+
+	var out, js bytes.Buffer
+	if err := runServerStatusWith(context.Background(), dirs, h.Client, false, &out); err != nil {
+		t.Fatal(err)
+	}
+	if err := runServerStatusWith(context.Background(), dirs, h.Client, true, &js); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.String(), "setup code") || strings.Contains(js.String(), "web_setup_code") {
+		t.Errorf("status holds a setup code after setup:\n%s\n%s", out.String(), js.String())
 	}
 }
