@@ -15,7 +15,7 @@ import type { Tone } from "../ui/tone";
 import { groupSessions, isActionable, liveCount } from "./rules";
 
 // Ports of statusIcon in ui/agents/sidebar.go; Working is the animated glyph there.
-function statusMark(s: SessionInfo): { glyph: string; tone: Tone; faded?: boolean } {
+export function statusMark(s: SessionInfo): { glyph: string; tone: Tone; faded?: boolean } {
   switch (s.status.state) {
     case SessionWorking:
       return { glyph: "●", tone: "running" };

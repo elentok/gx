@@ -2,11 +2,13 @@ import { Box, Text } from "@chakra-ui/react";
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
+import type { FetchChat } from "../design/chat";
 import { useFocusReport } from "../design/focus";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
 import { useWide } from "../useWide";
 import { AgentSidebar } from "./AgentSidebar";
+import { SessionView } from "./SessionView";
 
 const LAST_KEY = "gx.agents.last";
 
@@ -28,7 +30,7 @@ function writeLast(id: string) {
 
 // The snapshot is cached by snapshotCache, so a reload repaints from it before the stream lands.
 // The cache may predate the session list, so only a live snapshot may redirect or call a label gone.
-export function AgentsPage() {
+export function AgentsPage({ fetchChat }: { fetchChat?: FetchChat }) {
   const selected = useParams()["*"] || undefined;
   const wide = useWide();
   const navigate = useNavigate();
@@ -60,7 +62,9 @@ export function AgentsPage() {
                   <Text fontWeight="600">Session not found</Text>
                   <Text color="text.muted">{selected} no longer exists.</Text>
                 </>
-              ) : selected ? null : (
+              ) : selected ? (
+                listed && <SessionView session={sessions.find((s) => s.id === selected)!} fetchChat={fetchChat} />
+              ) : (
                 <Text color="text.muted">{sessions.length === 0 ? "No sessions yet" : "Pick a session"}</Text>
               )}
             </Box>

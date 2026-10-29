@@ -3,7 +3,8 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { SessionInfo } from "../generated/server";
-import { appRoutes } from "../routes";
+import type { SessionChatResponse } from "../generated/server";
+import { appRoutes, type RouteFetchers } from "../routes";
 import { renderThemed } from "../ui/render";
 
 afterEach(cleanup);
@@ -36,9 +37,10 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function render(sessions: SessionInfo[] | undefined, path = "/agents", live = !!sessions) {
+function render(sessions: SessionInfo[] | undefined, path = "/agents", live = !!sessions, fetchers: RouteFetchers = {}) {
   let state = { snapshot: sessions && { sessions }, connected: true, loadedOnce: !!sessions, liveSnapshot: live, streams: 1, tick: 0 } as unknown as ConnectionState;
   const listeners = new Set<() => void>();
+  const handlers = new Set<(a?: string) => void>();
   const conn = {
     clientId: "c1",
     getState: () => state,
@@ -46,10 +48,13 @@ function render(sessions: SessionInfo[] | undefined, path = "/agents", live = !!
       listeners.add(fn);
       return () => listeners.delete(fn);
     },
-    onEvent: () => () => {},
+    onEvent: (fn: (a?: string) => void) => {
+      handlers.add(fn);
+      return () => handlers.delete(fn);
+    },
     refresh: () => {},
   } as unknown as Connection;
-  const router = createMemoryRouter(appRoutes(), { initialEntries: [path] });
+  const router = createMemoryRouter(appRoutes(fetchers), { initialEntries: [path] });
   renderThemed(
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
@@ -61,7 +66,8 @@ function render(sessions: SessionInfo[] | undefined, path = "/agents", live = !!
   };
   const setSessions = (next: SessionInfo[]) => update({ snapshot: { sessions: next } } as Partial<ConnectionState>);
   const goLive = () => update({ liveSnapshot: true });
-  return { router, setSessions, goLive };
+  const emit = (address: string) => act(() => handlers.forEach((fn) => fn(address)));
+  return { router, setSessions, goLive, emit };
 }
 
 const rows = () => screen.getAllByRole("link").filter((l) => l.getAttribute("href")?.startsWith("#/agents/"));
@@ -210,4 +216,68 @@ test("shows the spinner until the snapshot lands, then follows it", () => {
   expect(rows()).toHaveLength(1);
   setSessions([session("s-1", "p", { name: "one" }), session("s-2", "p", { name: "two" })]);
   expect(rows()).toHaveLength(2);
+});
+
+const chat = (over: Partial<SessionChatResponse> = {}): SessionChatResponse => ({
+  conversation_id: "c1",
+  messages: [{ id: "m1", role: "agent", kind: "text", text: "hello there", at: "2026-01-01T00:00:00Z" }],
+  round: null,
+  background: [],
+  ...over,
+});
+
+const chatOf = (c: SessionChatResponse) => ({ chat: async () => ({ kind: "ok" as const, detail: c }) });
+
+test("the header names the session, status, dir and ticket, with a harness chip only for non-Claude", async () => {
+  render([session("s-1", "p", { name: "one", dir: "/work/one", ticket: "gx:m/01" })], "/agents/s-1", true, chatOf(chat()));
+  const header = within((await screen.findByRole("heading", { name: "one" })).parentElement!);
+  expect(header.getByText("idle")).toBeTruthy();
+  expect(header.getByText("/work/one")).toBeTruthy();
+  expect(header.getByText("gx:m/01")).toBeTruthy();
+  expect(header.queryByText("codex")).toBeNull();
+  cleanup();
+  render([session("s-2", "p", { name: "two", harness: "codex" })], "/agents/s-2", true, chatOf(chat()));
+  expect(await screen.findByText("codex")).toBeTruthy();
+});
+
+test("renders messages, the truncation note and the background strip", async () => {
+  render(
+    [session("s-1", "p")],
+    "/agents/s-1",
+    true,
+    chatOf(chat({ truncated: true, background: [{ kind: "shell", label: "tail -f" }] as SessionChatResponse["background"] })),
+  );
+  expect(await screen.findByText("hello there")).toBeTruthy();
+  expect(screen.getByText("Earlier messages hidden")).toBeTruthy();
+  expect(screen.getByRole("list", { name: "Running in background" })).toBeTruthy();
+});
+
+test("a busy session shows a plain Working row, and an empty chat says so", async () => {
+  render([session("s-1", "p", { status: { state: "working" } })], "/agents/s-1", true, chatOf(chat()));
+  expect((await screen.findByRole("status")).textContent).toBe("Working");
+  cleanup();
+  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat({ messages: [] })));
+  expect(await screen.findByText("No messages yet")).toBeTruthy();
+});
+
+test("a round in the chat shows no question sheet", async () => {
+  const round = [{ label: "Pick", title: "Which?", options: [{ label: "A" }] }] as unknown as SessionChatResponse["round"];
+  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat({ round })));
+  expect(await screen.findByText("hello there")).toBeTruthy();
+  expect(screen.queryByText("Which?")).toBeNull();
+  expect(screen.queryByRole("group", { name: "View" })).toBeNull();
+});
+
+test("a failed re-read keeps the last chat", async () => {
+  let calls = 0;
+  const { emit } = render([session("s-1", "p")], "/agents/s-1", true, {
+    chat: async () => {
+      if (++calls > 1) throw new Error("500");
+      return { kind: "ok", detail: chat() };
+    },
+  });
+  expect(await screen.findByText("hello there")).toBeTruthy();
+  emit("s-1");
+  await vi.waitFor(() => expect(calls).toBe(2));
+  expect(screen.getByText("hello there")).toBeTruthy();
 });
