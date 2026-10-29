@@ -200,6 +200,9 @@ func (s *Server) RunOf(address string) (Run, bool) { return s.registry.runOf(add
 // WatchGates runs one gate watchdog pass as of now.
 func (s *Server) WatchGates(now time.Time) { s.watchGates(now) }
 
+// PauseStuckFinishedClaims runs one finished-claim watchdog pass as of now.
+func (s *Server) PauseStuckFinishedClaims(now time.Time) { s.pauseStuckFinishedClaims(now) }
+
 // WorktreeDir is where the project's iteration worktrees live.
 func (s *Server) WorktreeDir(project string) string { return s.worktreeDir(project) }
 

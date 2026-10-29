@@ -36,7 +36,9 @@ func (s *Server) keepGatesWatched(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.watchGates(time.Now())
+			now := time.Now()
+			s.watchGates(now)
+			s.pauseStuckFinishedClaims(now)
 		}
 	}
 }
