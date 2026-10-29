@@ -52,6 +52,7 @@ async function startFixture(
   hold: boolean,
   autoAdvanceDelay?: string,
   config: Record<string, string> = {},
+  stallThreshold?: string,
 ): Promise<{ fixture: Fixture; stop: () => Promise<void> }> {
   const proc = spawn(
     process.env.GX_E2E_GXFIXTURE!,
@@ -62,6 +63,7 @@ async function startFixture(
       process.env.GX_E2E_FAKECLAUDE!,
       ...(hold ? ["--hold"] : []),
       ...(autoAdvanceDelay ? ["--auto-advance-delay", autoAdvanceDelay] : []),
+      ...(stallThreshold ? ["--stall-threshold", stallThreshold] : []),
       ...Object.entries(config).flatMap(([key, value]) => ["--config", `${key}=${value}`]),
       scenario,
     ],
@@ -117,13 +119,13 @@ async function startFixture(
 export const test = base.extend<{
   start: (
     scenario: string,
-    opts?: { hold?: boolean; autoAdvanceDelay?: string; config?: Record<string, string> },
+    opts?: { hold?: boolean; autoAdvanceDelay?: string; stallThreshold?: string; config?: Record<string, string> },
   ) => Promise<Fixture>;
 }>({
   start: async ({ page }, use) => {
     const stops: Array<() => Promise<void>> = [];
     await use(async (scenario, opts) => {
-      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config);
+      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config, opts?.stallThreshold);
       stops.push(stop);
       return fixture;
     });

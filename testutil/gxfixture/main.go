@@ -4,9 +4,10 @@
 // after two hours, and it runs the server with OS notifications off. It never reads or writes the real HOME, config
 // or state: the server and every CLI verb run in a temp HOME and temp XDG dirs.
 //
-//	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] [--auto-advance-delay <duration>] <scenario>
+//	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] [--auto-advance-delay <duration>] [--stall-threshold <duration>] <scenario>
 //
 // --auto-advance-delay shortens the server's run-end countdown (default 10s).
+// --stall-threshold shortens how long a Working session's transcript may stay untouched before it counts as stalled (default 15m).
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 //
@@ -82,7 +83,7 @@ func main() {
 }
 
 func run(args []string) (err error) {
-	var gxBin, fakeBin, name, autoAdvance string
+	var gxBin, fakeBin, name, autoAdvance, stallThreshold string
 	var configs []string
 	var hold, shellEnv bool
 	for i := 0; i < len(args); i++ {
@@ -96,6 +97,12 @@ func run(args []string) (err error) {
 				return fmt.Errorf("%s needs a value", args[i])
 			}
 			autoAdvance = args[i+1]
+			i++
+		case "--stall-threshold":
+			if i+1 == len(args) {
+				return fmt.Errorf("%s needs a value", args[i])
+			}
+			stallThreshold = args[i+1]
 			i++
 		case "--config":
 			if i+1 == len(args) {
@@ -167,6 +174,12 @@ func run(args []string) (err error) {
 			return fmt.Errorf("--auto-advance-delay: %w", err)
 		}
 		f.env = append(f.env, "GX_AUTO_ADVANCE_DELAY="+autoAdvance)
+	}
+	if stallThreshold != "" {
+		if _, err := time.ParseDuration(stallThreshold); err != nil {
+			return fmt.Errorf("--stall-threshold: %w", err)
+		}
+		f.env = append(f.env, "GX_STALL_THRESHOLD="+stallThreshold)
 	}
 	if err := f.setupDisk(); err != nil {
 		return err

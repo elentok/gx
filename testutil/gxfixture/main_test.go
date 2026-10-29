@@ -1060,6 +1060,20 @@ func TestStart_AutoAdvanceDelayFlagIsAccepted(t *testing.T) {
 	r.stop(t)
 }
 
+func TestStart_StallThresholdFlagIsAccepted(t *testing.T) {
+	t.Parallel()
+	r := startWith(t, "design", nil, "--stall-threshold", "2s")
+	r.stop(t)
+}
+
+func TestStart_BadStallThresholdIsRefused(t *testing.T) {
+	t.Parallel()
+	out, err := exec.Command(fixtureBin, "--gx", gxBin, "--fakeclaude", fakeBin, "--stall-threshold", "soon", "design").CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "--stall-threshold") {
+		t.Fatalf("err = %v, output = %q, want a refusal naming --stall-threshold", err, out)
+	}
+}
+
 // checksOf is `gx server checks --json`, by project.
 func (r *running) checksOf(t *testing.T) map[string]server.ProjectChecks {
 	t.Helper()

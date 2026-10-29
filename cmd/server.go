@@ -178,6 +178,13 @@ func runServer(ctx context.Context, d deps) error {
 			return fmt.Errorf("GX_AUTO_ADVANCE_DELAY: %w", err)
 		}
 	}
+	// Test hook: gxfixture shortens the stalled-session threshold for the stalled failure flow.
+	var stallThreshold time.Duration
+	if v := os.Getenv("GX_STALL_THRESHOLD"); v != "" {
+		if stallThreshold, err = time.ParseDuration(v); err != nil {
+			return fmt.Errorf("GX_STALL_THRESHOLD: %w", err)
+		}
+	}
 	// Test hook: gxfixture reads free space from a file and shortens the watcher
 	// interval, so a flow can steer the disk watcher from outside the process.
 	var freeSpace func(string) (server.DiskReading, error)
@@ -213,7 +220,7 @@ func runServer(ctx context.Context, d deps) error {
 	}
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
-		AutoAdvanceDelay: autoAdvanceDelay, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
+		AutoAdvanceDelay: autoAdvanceDelay, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval,
 		ProcessSource: processSource, ProcessArgv: processArgv})
 	if err != nil {
