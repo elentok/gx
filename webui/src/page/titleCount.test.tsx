@@ -1,14 +1,20 @@
 import { act, cleanup } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, expect, test } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { renderThemed } from "../ui/render";
-import { usePageTitle } from "./title";
+import { DetailPage } from "./DetailPage";
 
 afterEach(cleanup);
 
 function Probe() {
-  usePageTitle({ kind: "Epics" });
-  return null;
+  return (
+    <MemoryRouter>
+      <DetailPage mode="wide" title={{ kind: "Epics" }}>
+        x
+      </DetailPage>
+    </MemoryRouter>
+  );
 }
 
 const session = (reason: string) => ({ actionable: { reason }, status: { state: "idle" } });

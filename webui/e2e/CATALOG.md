@@ -887,25 +887,16 @@ an exited session.
 
 ## 83. Tab titles
 
-- **Scenario:** part A `mixed`, part B `design`
+- **Scenario:** `mixed`
 - **Steps:**
-  - Part A:
-    1. Open the Epics page.
-    2. Click the top bar's Stats link, then pick a different range and a project.
-    3. Click Epics, open `mixed-epic`.
-    4. Open ticket `02` from the epic page.
-    5. Press the browser back button.
-    6. Set the hash to `#/t/demo:mixed-epic/99`.
-    7. Set the hash to an unknown path.
-  - Part B, before any session starts:
-    1. Open `#/d/demo:design-epic`.
-    2. Open `#/e/demo:design-epic-impl`.
-    3. Open `#/e/demo:design-epic`.
-- **Pass:**
-  - Part A: the title is `Epics · gx`; `Stats · gx` after each Stats step; `mixed-epic · Epic · gx`; `<ticket 02's title> · Ticket · gx`
-    (the title in the page's h1); `mixed-epic · Epic · gx` again after back. Step 6 shows "Ticket not found" and the title
-    `demo:mixed-epic/99 · Ticket · gx`. Step 7 lands on `#/epics` with title `Epics · gx`.
-  - Part B: the titles are `design-epic · Design · gx`, `design-epic-impl · Epic · gx` and `design-epic · Epic · gx`.
+  1. Open the Epics page.
+  2. Click the top bar's Stats link.
+  3. Click Epics, open `mixed-epic`.
+  4. Open ticket `02` from the epic page.
+  5. Set the hash to `#/d/demo:mixed-epic`.
+- **Pass:** one smoke case per page. The title is `Epics · gx`; `Stats · gx`; `mixed-epic · Epic · gx`;
+  `<ticket 02's title> · Ticket · gx` (the title in the page's h1); `mixed-epic · Design · gx`. The ticket-title edge cases
+  (pending, not found, blank title, refetch) live in the unit tests.
 
 ## 72. Agents tab
 

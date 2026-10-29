@@ -45,12 +45,14 @@ const okFor: FetchDetail = async (address) => ({ kind: "ok", detail: detailOf(ad
 // A connection that never touches the network: the state is whatever the test sets.
 function fakeConnection(connected: boolean, snapshot: Snapshot = emptySnapshot) {
   const state: ConnectionState = { snapshot, connected, loadedOnce: true, liveSnapshot: true, tick: 0, streams: 0 };
+  const listeners = new Set<(address: string | undefined) => void>();
   return {
     getState: () => state,
     subscribe: () => () => {},
-    onEvent: () => () => {},
+    onEvent: (l: (address: string | undefined) => void) => (listeners.add(l), () => listeners.delete(l)),
     refresh: () => {},
-  } as unknown as Connection;
+    emit: (address?: string) => listeners.forEach((l) => l(address)),
+  } as unknown as Connection & { emit: (address?: string) => void };
 }
 
 function renderAt(
@@ -82,10 +84,12 @@ test.each([
   await waitFor(() => expect(title()).toBe(expected));
 });
 
-test("the epic page titles the tab by its slug, loading or not found", async () => {
+test("the epic page titles the tab by its slug while loading", async () => {
   renderAt("/e/gx:e", okFor, undefined, () => pending());
   await waitFor(() => expect(title()).toBe("e · Epic · gx"));
-  cleanup();
+});
+
+test("the epic page titles the tab by its slug when not found", async () => {
   renderAt("/e/gx:nope", okFor, undefined, async () => ({ kind: "not-found" }));
   await screen.findByText("Epic not found");
   expect(title()).toBe("nope · Epic · gx");
@@ -124,18 +128,13 @@ test.each([[""], ["  "]])("the ticket page titles the tab by its address for the
 test("a refetch with a new ticket title changes the tab title", async () => {
   let calls = 0;
   const conn = fakeConnection(true);
-  let listener: ((a: string | undefined) => void) | undefined;
-  (conn as unknown as { onEvent: unknown }).onEvent = (l: typeof listener) => {
-    listener = l;
-    return () => {};
-  };
   renderAt(
     "/t/gx:e/01",
     async (address) => ({ kind: "ok", detail: { ...detailOf(address), title: `Round ${++calls}` } }),
     conn,
   );
   await waitFor(() => expect(title()).toBe("Round 1 · Ticket · gx"));
-  await act(async () => listener?.("gx:e/01"));
+  await act(async () => conn.emit("gx:e/01"));
   await waitFor(() => expect(title()).toBe("Round 2 · Ticket · gx"));
 });
 
@@ -210,11 +209,6 @@ test("a 404 shows Ticket not found", async () => {
 test("a failed refetch keeps the last page, and the Offline strip shows", async () => {
   let calls = 0;
   const conn = fakeConnection(false);
-  let listener: ((a: string | undefined) => void) | undefined;
-  (conn as unknown as { onEvent: unknown }).onEvent = (l: typeof listener) => {
-    listener = l;
-    return () => {};
-  };
   renderAt(
     "/t/gx:e/01",
     async (address) => {
@@ -224,7 +218,7 @@ test("a failed refetch keeps the last page, and the Offline strip shows", async 
     conn,
   );
   expect(await screen.findByRole("heading", { name: "Title of gx:e/01" })).toBeTruthy();
-  await act(async () => listener?.("gx:e/01"));
+  await act(async () => conn.emit("gx:e/01"));
   await waitFor(() => expect(calls).toBe(2));
   expect(screen.getByRole("heading", { name: "Title of gx:e/01" })).toBeTruthy();
   expect(screen.getByText("Offline, reconnecting…")).toBeTruthy();

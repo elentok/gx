@@ -1,5 +1,6 @@
 import { Box } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
+import { useActionableCount } from "../agents/useActionableCount";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { type PageMode, PageModeContext } from "../useWide";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
@@ -7,7 +8,16 @@ import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
 import type { TopBarTab } from "../ui/top-bar/TopBar";
 import { DiskStrips } from "./DiskStrips";
-import { type PageTitle, usePageTitle } from "./title";
+import { formatTitle, type PageTitle } from "./title";
+
+// The only place that writes `document.title`. Writes on mount and whenever the string changes;
+// the next page sets its own, so nothing is restored.
+function usePageTitle(title: PageTitle) {
+  const text = formatTitle(title, useActionableCount());
+  useEffect(() => {
+    document.title = text;
+  }, [text]);
+}
 
 // The frame every page shares: offline strip, page container and the connected top bar.
 // `fill` makes the page exactly the window tall; its children then share the space below the top bar.
