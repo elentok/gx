@@ -81,8 +81,8 @@ test("81. Tray popover", async ({ page, start }) => {
 
   await expect(dialog.getByText("gx server")).toBeVisible();
   for (const part of ["cpu", "memory", "disk"]) await expect(dialog.locator(`[data-part="${part}"]`)).toBeVisible();
-  await expect(dialog.locator('[data-part="cpu"]')).toContainText(/high at \d+%, critical at \d+%/);
-  await expect(dialog.locator('[data-part="memory"]')).toContainText(/high at \d+%, critical at \d+%/);
+  await expect(dialog.locator('[data-part="cpu"]')).not.toContainText(/high at|critical at/);
+  await expect(dialog.locator('[data-part="memory"]')).not.toContainText(/high at|critical at/);
 
   const cpuCauses = dialog.locator('[data-part="cpu-causes"]');
   const agent = cpuCauses.getByRole("link", { name: "demo:health-epic/01" });
@@ -90,7 +90,7 @@ test("81. Tray popover", async ({ page, start }) => {
   await expect(agent).toHaveAttribute("href", /\/t\/demo:health-epic\/01$/, { timeout: 30_000 });
   await expect(cpuCauses).toContainText("go test");
   await expect(cpuCauses).toContainText("other users");
-  await expect(dialog.locator('[data-part="disk-entry"]').first()).toContainText("demo");
+  await expect(dialog.locator('[data-part="disk-entry"]').first()).toContainText("fixture disk");
 
   const footer = dialog.locator('[data-part="footer"]');
   const seconds = async () => Number(/Updated (\d+)s ago/.exec((await footer.textContent()) ?? "")?.[1] ?? NaN);

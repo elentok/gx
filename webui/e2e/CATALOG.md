@@ -873,11 +873,11 @@ an exited session.
 - **Scenario:** `health`
 - **Steps:**
   1. Set free to `450G/500G` and click the Tray. Wait for the agent row in the CPU cause list.
-  2. Read the header, rows, thresholds, cause lists, disk entry and footer. Watch the footer count up.
+  2. Read the header, rows, cause lists, disk entry and footer. Watch the footer count up.
   3. Set `cpu=60 mem=10`.
   4. Press Esc.
   5. Set the width to 390px and open the Tray again.
-- **Pass:** the header shows `gx server` and the host. CPU, memory and disk rows show, with "high at N%, critical at N%" on CPU and memory. The CPU list links `demo:health-epic/01` to its ticket page, names `go test` and lists "other users". The disk entry names the project. The footer reads "Updated Ns ago" and N grows. Within 5s the CPU row reads "60% busy". Esc closes the popover. At 390px the popover and its rows stay inside the screen and cause names are cut short with an ellipsis.
+- **Pass:** the header shows `gx server` and the host. CPU, memory and disk rows show. The CPU and memory rows have no "high at" or "critical at" threshold text. The CPU list links `demo:health-epic/01` to its ticket page, names `go test` and lists "other users". The disk entry names the disk (`fixture disk`). The footer reads "Updated Ns ago" and N grows. Within 5s the CPU row reads "60% busy". Esc closes the popover. At 390px the popover and its rows stay inside the screen and cause names are cut short with an ellipsis.
 
 ## 82. Tray offline
 
