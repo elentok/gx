@@ -29,7 +29,10 @@ function totpCode(secret: string, step: number): string {
 interface FixtureOutput {
   web_url: string;
   cookie_name: string;
+  /** Empty in the `web-setup` and `web-login` scenarios, where the page starts signed out. */
   cookie: string;
+  /** The web password; absent while the setup is pending (`web-setup`). */
+  password?: string;
   /** Absent when the server runs with `server.web.totp=false`. */
   totp_secret?: string;
   /** The last TOTP step the fixture used. */
@@ -65,6 +68,10 @@ export interface Fixture {
    * begun (up to 30 seconds), since the server takes each step once. Every flow that needs a code uses it.
    */
   nextTotpCode(): Promise<string>;
+  /** The web password the fixture's setup used; empty while the setup is pending. */
+  readonly password: string;
+  /** The TOTP secret; empty when the server runs with `server.web.totp=false`. */
+  readonly totpSecret: string;
 }
 
 /** The value after `--name` in an argv, or undefined. */
@@ -125,6 +132,8 @@ async function startFixture(
   const env = { ...process.env, ...Object.fromEntries(out.env.map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)])) };
   let lastStep = out.totp_step ?? 0;
   const fixture: Fixture = {
+    password: out.password ?? "",
+    totpSecret: out.totp_secret ?? "",
     async cli(...args) {
       const { stdout } = await run(out.gx, args, { env, cwd: tmpdir() });
       return stdout;
@@ -163,7 +172,10 @@ async function startFixture(
     },
   };
   // The cookie is `__Host-`: set with the URL (secure, no domain), never a domain.
-  await page.context().addCookies([{ name: out.cookie_name, value: out.cookie, url: out.web_url, secure: true }]);
+  // The web-setup and web-login scenarios start signed out, with no cookie.
+  if (out.cookie) {
+    await page.context().addCookies([{ name: out.cookie_name, value: out.cookie, url: out.web_url, secure: true }]);
+  }
   await page.goto(out.web_url);
   await page.evaluate((key) => ((window as unknown as Record<string, unknown>)[key] = true), NO_RELOAD);
   return { fixture, stop };

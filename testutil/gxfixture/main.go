@@ -49,10 +49,13 @@ import (
 // Output is the JSON gxfixture prints once the server answers.
 type Output struct {
 	// WebURL is the plain URL: it signs nobody in. Cookie is the web login's
-	// cookie value under CookieName, from the setup the fixture finished.
+	// cookie value under CookieName, from the setup the fixture finished; it is
+	// empty in the web-setup and web-login scenarios, where the page starts signed out.
+	// Password is the web password, empty while the setup is pending.
 	WebURL     string `json:"web_url"`
 	CookieName string `json:"cookie_name"`
 	Cookie     string `json:"cookie"`
+	Password   string `json:"password,omitempty"`
 	// TOTPSecret and TOTPStep (the last step used) are left out when the server
 	// runs with server.web.totp=false.
 	TOTPSecret string `json:"totp_secret,omitempty"`
@@ -233,6 +236,17 @@ func run(args []string) (err error) {
 	if err := f.seed(sc); err != nil {
 		return err
 	}
+	// The running server has no test clock, so the old logins are written first.
+	if len(sc.extraLogins) > 0 {
+		if err := os.MkdirAll(f.stateD, 0o700); err != nil {
+			return err
+		}
+	}
+	for i, ago := range sc.extraLogins {
+		if _, err := server.SeedWebLogin(f.stateD, fmt.Sprintf("gxfixture browser %d", i+1), time.Now().Add(-ago)); err != nil {
+			return fmt.Errorf("seed web login: %w", err)
+		}
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -256,9 +270,16 @@ func run(args []string) (err error) {
 	if err != nil {
 		return fmt.Errorf("%w\n%s", err, f.serverOutput())
 	}
-	in, err := webSetup(f.stateD, webURL, setupCode)
-	if err != nil {
-		return fmt.Errorf("web setup: %w\n%s", err, f.serverOutput())
+	var in signIn
+	password := ""
+	if sc.web != webSetupPending {
+		if in, err = webSetup(f.stateD, webURL, setupCode); err != nil {
+			return fmt.Errorf("web setup: %w\n%s", err, f.serverOutput())
+		}
+		password = fixturePassword
+	}
+	if sc.web == webSignedOut {
+		in.cookieName, in.cookie = "", ""
 	}
 	// --hold freezes every worker as running until the caller removes the hold file.
 	if hold || sc.hold {
@@ -316,7 +337,7 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
-	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath}
+	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath}
 	if cwd, err := os.Getwd(); err == nil {
 		o.BrowserSession = filepath.Base(cwd)
 	}

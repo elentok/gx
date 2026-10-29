@@ -91,13 +91,35 @@ type scenario struct {
 	// stallThreshold is how long a Working session's transcript may stay untouched
 	// before it counts as stalled; the --stall-threshold flag overrides it.
 	stallThreshold string
+	// web is how far the fixture takes the web login; the zero value signs in.
+	web webMode
+	// extraLogins seeds web logins before the server starts, as how long ago each was last used.
+	extraLogins []time.Duration
 }
+
+// webMode is how far the fixture takes the web setup and sign-in.
+type webMode int
+
+const (
+	// webSignedIn finishes the setup and keeps the login cookie.
+	webSignedIn webMode = iota
+	// webSetupPending leaves the setup undone.
+	webSetupPending
+	// webSignedOut finishes the setup and drops the login cookie.
+	webSignedOut
+)
 
 type recommendation struct{ verb, diagnosis string }
 
 var scenarios = map[string]scenario{
 	// empty: a project with no epics, so the Epics page has no cards.
 	"empty": {projects: []string{project}},
+	// web-setup: the web setup is pending and the page is not signed in.
+	"web-setup": {projects: []string{project}, web: webSetupPending},
+	// web-login: the setup is done and the page is not signed in.
+	"web-login": {projects: []string{project}, web: webSignedOut},
+	// web-logins: signed in, with three more web logins, one idle for 70 days.
+	"web-logins": {projects: []string{project}, extraLogins: []time.Duration{time.Hour, 3 * 24 * time.Hour, 70 * 24 * time.Hour}},
 	// ready: an epic that is not queued yet.
 	"ready": {
 		epics: []epic{{project, "ready-epic", []ticket{
