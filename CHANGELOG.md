@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.41.0 - 2026-10-29
+
+- Added disk space protection. The gx server checks free space on each project's repo disk and Go build cache disk. Two settings in `config.json` set the limits: warn (default `"20G"`) and clean (default `"10G"`). Zero turns a limit off. Under the warn limit, every web page shows a banner with a "Clean now" button, and gx sends a chat notice. Under the clean limit, gx holds dispatch for the projects on that disk and runs their cleanup command, `go clean -cache` by default. A project can replace that command in `project.json`, or set it empty to turn cleanup off. Held tickets show a "disk low" verdict on the web, and dispatch resumes once free space is back. Also added `gx server disk status`, `gx server disk clean` and their routes.
+- Added removal of a merged epic's feature worktree. gx removes it only when it has no changes, no live session or pane works in it, the epic is not queued and it has no open tickets. The epic branch stays.
+- Added `gx check`, one entry point for format, lint, typecheck and test. A project can name its own command for each kind in a committed `.gx/checks.json`, or under `checks` in `project.json`. A kind it leaves out runs the gx default. `gx check` runs on working changes by default and takes `--staged`, `--since <ref>`, `--full` and `--kind`. gx records each run. Finishing a ticket is refused unless `gx check` passed or `--check-failures` names follow-ups. Agent skills now verify through `gx check`, and `gx evolve` reports slower checks and flaky tests.
+- Added check onboarding. gx detects commands from the project's Makefile, mise, just and `package.json`. `gx project add` and `gx project onboard` ask for the check config. The Epics page shows a banner for projects with no check config, with a "Set up checks" dialog that saves it.
+- Added the Tray to the web top bar. It holds three small meters for the gx server's machine: CPU, memory and disk. Each meter is grey, amber or red by state, and hollow when there is no reading. Clicking it opens a popover with the host name, CPU and memory values, the top 3 processes or agents by CPU and by memory, and the disk rows. A disk row lists its projects only when projects sit on more than one disk. An agent row adds up its whole process tree and links to its ticket. The Tray fades and keeps its last values while the server is offline. Also added `GET /v1/health` and `gx server health`.
+- Added `gx tickets follow-up search`, to check new follow-ups for duplicates among open and archived ones.
+- Added `gx brief go-build` and `gx brief go-vet`. `gx brief` now shows the error first, collapses repeated go-test failures into one line with a count, and skips the e2e web build when `dist` is current. `gx brief playwright` takes bare flow numbers. `gx brief go-test` sets `GOMAXPROCS` to two fifths of the CPU budget (half the cores, or `GX_TEST_CPUS`) unless it is already set, so parallel agent runs no longer saturate the machine.
+- Changed `gx tickets section` to refuse blank content. It gains `--clear`, and the 2-argument form now reads a section without changing it.
+- Changed `gx tickets` addresses to accept single-digit ticket ids without the leading zero, such as `epic/3`.
+- Changed the gx test suite to run its steps side by side through `scripts/test.sh`, with server tests in parallel and sleeps replaced by condition waits. `make test-server`, `test-race` and `test-short` and `scripts/test-shards.sh` are gone.
+- Fixed moving a ticket blocked by an archived epic being refused. A `blocked_by` on an archived epic now counts as satisfied.
+- Fixed `gx cleanup` archiving the follow-ups and follow-ups-archived epics.
+- Fixed a queue where every remaining pause waits for an answer being logged as deadlocked, which started an investigate ticket.
+- Fixed "Clean now" with no cleanup work to report "no cleanup command set".
+- Fixed a failed agent launch deleting other launches' registry entries.
+- Fixed `expected_context_window` values under 1000 being accepted.
+- Fixed Playwright e2e runs leaving a new temp dir of binaries behind each time, and test temp homes leaking Go module caches.
+
 ## v0.40.2 - 2026-10-28
 
 - Fixed long Design page answers being typed into the agent but never submitted. The native runner now waits after a paste before sending Enter, so claude no longer reads the Enter as part of the bracketed paste.
