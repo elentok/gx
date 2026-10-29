@@ -50,6 +50,7 @@ func TestMockRulesAnchors(t *testing.T) {
 			"$(gx tickets root)/<map>/mocks/",
 			"minus `-impl`",
 			"blocks `finished`",
+			"Skipping the check is never a question to ask a person",
 			"## Spec deviations",
 			"`gx tickets ask`",
 		}},

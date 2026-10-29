@@ -157,7 +157,10 @@ heading. It lists the mock file, the states with their widths, the parts and the
 - Check only the parts the ticket built.
 - Every listed state needs a result line (`pass`, `fail`, `unchecked`) in your report. A state that
   is `unchecked` (skipped, out of time or tools, or its PNG `Read` came back blank) blocks
-  `finished`: follow "When only a person can answer", never report `finished`.
+  `finished`: never report `finished`.
+- Skipping the check is never a question to ask a person: "OK to finish without it?" has one
+  answer, run it. Only a tool failure you cannot get past (after the MOCK-CHECK.md setup steps)
+  justifies "When only a person can answer", and then you ask about that failure.
 - Fix each look difference. A difference kept on purpose goes under `## Spec deviations` (below),
   with the reason.
 - A named mock file that is missing is a check that cannot run. Follow "When only a person can
