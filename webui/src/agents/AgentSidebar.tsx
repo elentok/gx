@@ -93,7 +93,7 @@ function Row({ session: s, current }: { session: SessionInfo; current: boolean }
         </Text>
       )}
       {isActionable(s) && (
-        <Box as="span" role="group" position="relative" color="tone.waiting.fg">
+        <Box as="span" className="group" position="relative" color="tone.waiting.fg">
           <Text as="span" role="img" aria-label="Actionable">
             ★
           </Text>
@@ -118,7 +118,10 @@ function Row({ session: s, current }: { session: SessionInfo; current: boolean }
             color="text"
             whiteSpace="nowrap"
           >
-            <b>★ Actionable:</b> {actionableReason(s)}
+            <Box as="b" color="tone.waiting.fg">
+              ★ Actionable:
+            </Box>{" "}
+            {actionableReason(s)}
           </Box>
         </Box>
       )}
