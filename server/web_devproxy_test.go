@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server"
@@ -69,5 +70,19 @@ func TestWebDevProxy_RejectsNonLoopbackTarget(t *testing.T) {
 	}
 	if hs.WebURL != "" || hs.WebError == "" {
 		t.Errorf("web_url = %q, web_error = %q; want the bind refused with an error", hs.WebURL, hs.WebError)
+	}
+}
+
+func TestWebDevProxy_ExplainsWhenDevFrontendIsDown(t *testing.T) {
+	t.Parallel()
+	dev := httptest.NewServer(http.NotFoundHandler())
+	devURL := dev.URL
+	dev.Close()
+
+	base, h := startWebDev(t, devURL)
+	cookie := login(t, h.StateDir, base)
+	code, body := webDoCookie(t, http.MethodGet, base+"/", cookie)
+	if code != http.StatusBadGateway || !strings.Contains(body, devURL) {
+		t.Errorf("page = %d %q, want 502 naming %s", code, body, devURL)
 	}
 }

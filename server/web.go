@@ -180,6 +180,10 @@ func devFrontendProxy(raw string) (http.Handler, error) {
 		direct(r)
 		r.Host = u.Host
 	}
+	// Without this the browser gets an empty 502 and shows a blank page.
+	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
+		http.Error(w, fmt.Sprintf("502: the dev frontend at %s is not answering (%v). Start it with `npm run dev` in webui/, or turn off server.web.dev-frontend.", raw, err), http.StatusBadGateway)
+	}
 	return proxy, nil
 }
 
