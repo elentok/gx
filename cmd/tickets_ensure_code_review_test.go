@@ -284,6 +284,38 @@ func TestRunTicketsEnsureVerify_BodyNamesEpicOwnSpecMd(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsEnsureCodeReview_BodyNamesSpecAndCommitPrefix(t *testing.T) {
+	store := isolateTicketStore(t)
+	repoDir := testutil.TempRepo(t)
+	project := addProject(t, store, "mine", repoDir)
+	if err := os.MkdirAll(filepath.Join(repoDir, "docs", "specs"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repoDir, "docs", "specs", "widget.md"), []byte("# spec\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, epic := range []string{"widget-impl", "other-impl"} {
+		writeDoneImplTicket(t, filepath.Join(project, epic))
+	}
+
+	for epic, wantSpec := range map[string]bool{"widget-impl": true, "other-impl": false} {
+		if _, err := runIn(t, repoDir, "tickets", "ensure-code-review", epic); err != nil {
+			t.Fatalf("ensure-code-review %s: %v", epic, err)
+		}
+		raw, err := os.ReadFile(filepath.Join(project, epic, "issues", "02-code-review.md"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := string(raw)
+		if got := strings.Contains(body, "docs/specs/widget.md"); got != wantSpec {
+			t.Errorf("%s: body names repo spec = %v, want %v\n%s", epic, got, wantSpec, body)
+		}
+		if !strings.Contains(body, "`"+epic+"/`") {
+			t.Errorf("%s: body does not name the commit subject prefix\n%s", epic, body)
+		}
+	}
+}
+
 // writeDoneImplTicket gives epicPath one done implement ticket, creating its
 // issues dir.
 func writeDoneImplTicket(t *testing.T, epicPath string) {

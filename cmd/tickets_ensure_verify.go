@@ -19,13 +19,13 @@ func runTicketsEnsureVerify(epicPath string, w io.Writer) error {
 		ticketType:    schema.TypeVerify,
 		name:          "verify",
 		contextWindow: verifyContextWindow,
-		bodyArgs:      []any{verifySpecLine(epicPath)},
+		bodyArgs:      []any{epicSpecLine(epicPath)},
 		bodyFormat:    "\n# %s — Verify: %s\n\n## What to verify\n\n%s\n## Test seams\n\nnone — verify ticket, opens child tickets (`parent:` pointing back here) if it finds anything.\n\n## Acceptance criteria\n\n- [ ] The finished epic checked in a running gx\n- [ ] Any findings opened as child tickets\n",
 	})
 }
 
-// verifySpecLine names the epic's spec, or is empty when there is none.
-func verifySpecLine(epicPath string) string {
+// epicSpecLine names the epic's spec, or is empty when there is none.
+func epicSpecLine(epicPath string) string {
 	if spec := tickets.EpicSpecPath(filepath.Clean(epicPath)); spec != "" {
 		return "Spec: `" + spec + "`\n\n"
 	}
