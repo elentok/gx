@@ -5,7 +5,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 )
@@ -88,13 +87,8 @@ func (s *Server) restartOnWorker(dir string, meta *sessionMeta, old string) erro
 	if err != nil {
 		return err
 	}
-	agent := ralphloop.AgentClaude
-	if meta.Harness == string(harness.Codex) {
-		agent = ralphloop.AgentCodex
-	}
 	meta.ConversationID = conv
-	meta.Tier = ralphloop.TierWorker
-	meta.Model, meta.Effort = ralphloop.ResolveTier(s.agentsConfig(meta.Project), agent, meta.Tier)
+	s.applyTier(meta, ralphloop.TierWorker)
 	meta.FirstPrompt = "/gx-design " + ticketEpic(meta.Ticket)
 	meta.Actionable = SessionActionable{}
 	s.recordConversation(*meta)

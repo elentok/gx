@@ -135,9 +135,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 			return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("dir %s does not exist", req.Dir)), nil
 		}
 	}
-	switch req.Tier {
-	case "", ralphloop.TierLight, ralphloop.TierWorker, ralphloop.TierStrongest:
-	default:
+	if req.Tier != "" && !req.Tier.Valid() {
 		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("unknown tier %q (want light, worker or strongest)", req.Tier)), nil
 	}
 	if req.Harness == "" {
@@ -164,15 +162,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	if req.launchDesign {
 		tier = s.designLaunchTier(req.Ticket)
 	}
-	agent := ralphloop.AgentClaude
-	if req.Harness == string(harness.Codex) {
-		agent = ralphloop.AgentCodex
-	}
-	model, effort := ralphloop.ResolveTier(s.agentsConfig(req.Project), agent, tier)
 	meta := sessionMeta{
-		Tier:           tier,
-		Model:          model,
-		Effort:         effort,
 		Harness:        req.Harness,
 		Project:        req.Project,
 		Dir:            req.Dir,
@@ -187,6 +177,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		ConversationID: conv,
 		CreatedAt:      time.Now(),
 	}
+	s.applyTier(&meta, tier)
 	dir, err := s.saveNewSession(&meta, req.UniqueName)
 	if errors.Is(err, errSessionNameTaken) {
 		return sessionRefusal(ReasonSessionNameTaken, fmt.Sprintf("a live session is already named %q", meta.Name)), nil
@@ -217,6 +208,13 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	return SessionResult{Session: &info}, nil
 }
 
+// applyTier sets the session's tier and the model and effort it resolves to for
+// the session's harness and project.
+func (s *Server) applyTier(meta *sessionMeta, tier ralphloop.Tier) {
+	meta.Tier = tier
+	meta.Model, meta.Effort = ralphloop.ResolveTier(s.agentsConfig(meta.Project), ralphloop.AgentFor(meta.Harness), tier)
+}
+
 // recordConversation keeps the session's current conversation on the record,
 // counted toward its current Session ticket. A session with no ticket records
 // nothing.
@@ -239,10 +237,7 @@ func (s *Server) saveConversationTotals(m sessionMeta, conversation string) {
 	if m.Ticket == "" || conversation == "" {
 		return
 	}
-	agent := ralphloop.AgentClaude
-	if m.Harness == string(ralphloop.AgentCodex) {
-		agent = ralphloop.AgentCodex
-	}
+	agent := ralphloop.AgentFor(m.Harness)
 	home, err := s.envHome()
 	if err != nil {
 		s.log.Warn("read conversation totals", "session", m.ID, "conversation", conversation, "err", err)

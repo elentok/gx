@@ -119,6 +119,15 @@ const (
 	AgentCodex  AgentKind = "codex"
 )
 
+// AgentFor maps a harness name to its agent kind: "codex" is Codex, anything
+// else reads as Claude.
+func AgentFor(harnessName string) AgentKind {
+	if harnessName == string(AgentCodex) {
+		return AgentCodex
+	}
+	return AgentClaude
+}
+
 func (a AgentKind) valid() bool {
 	return a == AgentClaude || a == AgentCodex
 }
@@ -247,6 +256,12 @@ const (
 	TierWorker    Tier = "worker"
 	TierStrongest Tier = "strongest"
 )
+
+// AllTiers lists every tier, in picker order.
+var AllTiers = []Tier{TierLight, TierWorker, TierStrongest}
+
+// Valid reports whether t is one of AllTiers.
+func (t Tier) Valid() bool { return slices.Contains(AllTiers, t) }
 
 // ResolveTier is the one place that turns (agent, tier) into the model and
 // effort to pass. An empty result means "pass no flag".

@@ -50,3 +50,27 @@ func TestResolveTier(t *testing.T) {
 		}
 	})
 }
+
+func TestAgentFor(t *testing.T) {
+	for name, want := range map[string]AgentKind{"codex": AgentCodex, "claude": AgentClaude, "": AgentClaude} {
+		if got := AgentFor(name); got != want {
+			t.Errorf("AgentFor(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestTierValid(t *testing.T) {
+	if len(AllTiers) != 3 {
+		t.Errorf("AllTiers = %v, want 3 tiers", AllTiers)
+	}
+	for _, tier := range AllTiers {
+		if !tier.Valid() {
+			t.Errorf("%q should be valid", tier)
+		}
+	}
+	for _, tier := range []Tier{"", "bogus"} {
+		if tier.Valid() {
+			t.Errorf("%q should be invalid", tier)
+		}
+	}
+}

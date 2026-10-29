@@ -26,18 +26,24 @@ func newAgentModelCmd(d deps) *cobra.Command {
 			"overrides on top, and falls back to the built-in default. It is printed as written,\n" +
 			"without validation. An empty model prints nothing.",
 		Args:      cobra.ExactArgs(1),
-		ValidArgs: []string{string(ralphloop.TierLight), string(ralphloop.TierWorker), string(ralphloop.TierStrongest)},
+		ValidArgs: tierNames(),
 		RunE: func(c *cobra.Command, args []string) error {
 			return runAgentModel(d, c.OutOrStdout(), args[0])
 		},
 	}
 }
 
+func tierNames() []string {
+	names := make([]string, len(ralphloop.AllTiers))
+	for i, t := range ralphloop.AllTiers {
+		names[i] = string(t)
+	}
+	return names
+}
+
 func runAgentModel(d deps, out io.Writer, tierName string) error {
 	tier := ralphloop.Tier(tierName)
-	switch tier {
-	case ralphloop.TierLight, ralphloop.TierWorker, ralphloop.TierStrongest:
-	default:
+	if !tier.Valid() {
 		return fmt.Errorf("unknown tier %q (want light, worker or strongest)", tierName)
 	}
 	cfg, err := d.loadConfig()
@@ -64,16 +70,10 @@ func runAgentModel(d deps, out io.Writer, tierName string) error {
 func currentAgent(d deps) ralphloop.AgentKind {
 	if id := d.getenv(nativerunner.AgentSessionEnv); id != "" {
 		if h, ok := sessionHarness(d, id); ok {
-			if h == string(ralphloop.AgentCodex) {
-				return ralphloop.AgentCodex
-			}
-			return ralphloop.AgentClaude
+			return ralphloop.AgentFor(h)
 		}
 	}
-	if d.getenv(server.AgentEnv) == string(ralphloop.AgentCodex) {
-		return ralphloop.AgentCodex
-	}
-	return ralphloop.AgentClaude
+	return ralphloop.AgentFor(d.getenv(server.AgentEnv))
 }
 
 func sessionHarness(d deps, id string) (string, bool) {
