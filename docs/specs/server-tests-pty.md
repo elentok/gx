@@ -66,7 +66,8 @@ The 2-minute target under agent load is not in this epic. It moves to the store 
    goes through `Reattach` as it does in production.
 10. As a developer writing a test that fakes a runner state, I want `servertest.WithRunner(r)`, so
     that I hand the harness a `runnerfake` without hand-written `c.Runner` and `c.RunnerFor`
-    closures.
+    closures. For a test about per-run routing (which runner or project a run goes to), I want
+    `servertest.WithRunnerFor(fn)`.
 11. As a developer writing a herdr test, I want `servertest.WithHerdr(servertest.HerdrIsTheSubject)`,
     so that the test says in code that herdr is its subject.
 12. As the developer who builds `gx:pty-as-default`, I want each test that waits on codex routing or
@@ -80,10 +81,11 @@ The 2-minute target under agent load is not in this epic. It moves to the store 
     can't register herdr handlers by mistake.
 16. As a developer, I want the `servertest` package doc to state when a test uses PTY, `runnerfake`
     or herdr, so that I pick the runner for a new test without asking.
-17. As a developer, I want `runnerShapes` to run its cases on PTY and headless, so that the shared
-    cases cover the two native runners.
+17. As a developer, I want `runnerShapes` to run its cases on PTY and its `headless` shape, so that
+    the shared cases cover PTY and a `runnerfake` reattach verdict.
 18. As a developer, I want the herdr branch of reclaim to keep its coverage through the herdr-subject
-    restart tests, so that moving `runnerShapes` off herdr loses no coverage.
+    tests (the restart tests, the lookup-error test and one test per reclaim outcome), so that moving
+    `runnerShapes` off herdr loses no coverage.
 19. As a developer, I want the codex start-option tests on `runnerfake`, so that they check what the
     server passed to `Start` without a codex agent on any runner.
 20. As a developer, I want the R5 and undeliverable-prompt recovery tests on `runnerfake` and the two
@@ -92,8 +94,8 @@ The 2-minute target under agent load is not in this epic. It moves to the store 
     `agent start` argv, so that they run on PTY.
 22. As a developer, I want a failing `TestDiskCleanNow_UnheldDiskKeepsDispatching` to fail, not hang
     the whole run, so that one bad test can't eat my test timeout.
-23. As a developer, I want the PTY runner's process lookups to read an in-process process table on
-    macOS and Linux, so that no lookup spawns `ps`.
+23. As a developer, I want the harness's PTY runner to read an in-process process table on macOS
+    and Linux, so that no process lookup in a server test spawns `ps`.
 24. As a developer, I want each seeded run in a test to name its runner, so that an empty runner
     never loads as herdr and calls the fake `herdr`.
 25. As a developer, I want every server test that can run in parallel to call `t.Parallel`, so that
@@ -126,13 +128,26 @@ The `servertest` package doc states the rule. Every test follows it.
   `StartWithTCP` and `StartHerdrDown`. `Start` and `StartWithTCP` take options like the others. No
   new start functions.
 - The harness uses PTY when `cfg.Runner` is still nil after the options run.
-- The PTY runner is a `nativerunner.Pty` built on each `serve`, so `Restart` reattaches like a real
-  restart. The holder is the test binary. The agent program is the TUI fake (`agentfake`,
-  `GX_AGENTFAKE_TUI`). The holder env is the server's env.
-- `servertest.WithRunner(r)` sets the runner. It replaces every hand-written `c.Runner = fake` and
-  `c.RunnerFor = …` closure in the server tests.
-- `servertest.WithHerdr(reason)` picks herdr. `reason` is a typed constant with two values:
-  `HerdrIsTheSubject` and `UntilPtyAsDefault`. `gx:pty-as-default` deletes `UntilPtyAsDefault`.
+- The harness builds `cfg.Runner` and `cfg.RunnerFor` the way production does. `serverRunner`'s
+  build-by-name logic (`cmd/server_preflight.go`) moves into a package the harness can import, and
+  `cmd` calls it from there. So the harness gets one `nativerunner.Pty` per project with
+  `Root: AgentsRoot(stateDir, project)`, as production does. The harness overrides only the holder
+  program and the agent program. The holder is the test binary. The agent program is the TUI fake
+  (`agentfake`, `GX_AGENTFAKE_TUI`). The holder env is the server's env. The implementer picks the
+  package and how the overrides are passed. This move changes no production behaviour.
+- The harness builds the runners again on each `serve`, so `Restart` reattaches like a real restart.
+- `servertest.WithRunner(r)` sets one runner for every run: `cfg.Runner` is `r` and `cfg.RunnerFor`
+  returns `r`. It replaces every hand-written `c.Runner = fake` and single-fake `c.RunnerFor = …`
+  closure in the server tests.
+- `servertest.WithRunnerFor(fn)` is for tests about per-run routing: it sets `cfg.RunnerFor` to `fn`.
+  Its users include `TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner` (it records the
+  `project` argument) and `restartUnder` in `reclaim_route_test.go` (it maps runner names to
+  different runners). The implementer picks how it sets `cfg.Runner`.
+- `servertest.WithHerdr(reason)` turns on the fake herdr: `h.Herdr` is set and fake `herdr` calls are
+  allowed. It makes herdr the configured runner only when no other option set `cfg.Runner`. So
+  `TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr` combines it with a renamed fake as
+  the configured runner. `reason` is a typed constant with two values: `HerdrIsTheSubject` and
+  `UntilPtyAsDefault`. `gx:pty-as-default` deletes `UntilPtyAsDefault`.
 - `StartHerdrDown` implies herdr. Its callers are herdr-subject tests and pass
   `WithHerdr(HerdrIsTheSubject)`; the implementer picks whether `StartHerdrDown` sets it itself.
 - `h.Herdr` is nil unless the test passed `WithHerdr`.
@@ -167,13 +182,19 @@ The `servertest` package doc states the rule. Every test follows it.
 - Every helper that seeds a run (`stampRun`, `PutRun`, `leaveIteration` and the like) names the
   runner. An empty runner loads as herdr, so in a PTY test it would call the fake `herdr` and fail.
 - `runnerShapes` runs its subtests as `pty` and `headless`. `runnerOf` stamps `pty`. There is no
-  third herdr shape.
+  third herdr shape. The `headless` shape stays what it is today: a `runnerfake` (`headlessFake`,
+  runner name `fake`), not `nativerunner.Headless`.
 
 ### Process table
 
-- The harness gives the PTY runner an in-process `ProcessTable` (`Pty.Procs`): sysctl
+- The table is harness-only. It lives in `servertest`, with darwin and linux build files. The
+  harness gives the PTY runner this in-process `ProcessTable` (`Pty.Procs`): sysctl
   (`kern.proc.pid`, `kern.procargs2`) on macOS and `/proc` on Linux, since CI runs both. No PTY
-  process lookup spawns `ps`.
+  process lookup in a server test spawns `ps`.
+- Its start time format only has to match itself. Production keeps `psTable`: the `pid_start`
+  values in stored agent metas use `ps`'s `lstart` format, and another format would make live agents
+  look dead at reclaim. Replacing `ps` in production is a follow-up that must handle the stored
+  `lstart` values. The verify ticket files it.
 - The remaining `ps` calls from `harness/claudepid.go` stay as they are.
 
 ### No production change for herdr probes
@@ -197,6 +218,10 @@ herdr fills:
 - `TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach`
 - `TestPauseFold_HerdrOutagePausesBecomeOneDigest`
 - `TestReclaim_HerdrLookupErrorNeverReopens`
+- A herdr-subject version of `TestReclaim_DeadEmptyClaimReopens` (herdr's not-found →
+  `reopenEmptyClaim` path in `server/runs.go` `reclaim`)
+- A herdr-subject version of `TestReclaim_LaunchingIdleAgentIsStoppedThenReopens` (herdr's
+  launching-and-waiting → `stopLaunching` path)
 - `TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr`
 - `TestRecoveryRunner_LiveCheckAgreesAcrossShapes` (its herdr rows)
 - `TestRunner_RestartPausesAHandleWhoseWorktreeIsGone`
@@ -206,8 +231,9 @@ herdr fills:
 - `TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled` (it asserts herdr's `ctrl+c` keys and tab
   close; `TestBudget_HardLimitStopsRunThroughRunner` covers the server side)
 
-The three restart tests are the herdr reclaim branch's coverage (`server/runs.go` `Find` by label)
-once `runnerShapes` leaves herdr.
+Once `runnerShapes` leaves herdr, these cover the herdr reclaim branch (`server/runs.go`): the three
+restart tests cover resume (`Find` by label), `TestReclaim_HerdrLookupErrorNeverReopens` the lookup
+error, and the two new herdr-subject reclaim versions cover the not-found and launching outcomes.
 
 **Already on `runnerfake` or a renamed fake, unchanged.** `TestHerdr_ProbedThroughConfiguredRunner`
 and `TestHerdr_RunOnANonConfiguredHerdrIsNotProbed` keep their current fakes and assertions. The
@@ -301,7 +327,8 @@ the spike's throwaway counter. Off by default.
 
 1. Disk test hang fix.
 2. `RegisterLaunch` to `OnTurn` rename, still on herdr.
-3. `WithRunner` and `WithHerdr`, the in-process process table, the PTY default, the failing fake
+3. Moving `serverRunner`'s build logic into a shared package, `WithRunner`, `WithRunnerFor` and
+   `WithHerdr`, the in-process process table, the PTY default, the failing fake
    `herdr`, the leftover-run helper and the turn controls, with the test moves.
 4. Serial tests to parallel.
 5. The herdr counter can land at any point before verify.
@@ -316,7 +343,9 @@ The implementer may split step 3 by test file, as long as the suite stays green 
   `server` package: `OnTurn` on PTY commits in `Turn.Cwd` and the ticket merges; each turn control
   reaches the expected runner state on PTY; a herdr-unsupported control fails a test with the
   message (checked through a fake `testing.TB` or a subprocess test); a fake `herdr` call in a PTY
-  test fails with the verb and noun in the message; `h.Herdr` is nil without `WithHerdr`; the
+  test fails with the verb and noun in the message; `h.Herdr` is nil without `WithHerdr`;
+  `WithHerdr` combined with a `WithRunner` fake keeps the fake as the configured runner and allows
+  fake `herdr` calls; a PTY harness with two projects builds one `Pty` per project root; the
   leftover-run helper's live run reattaches as live after `Restart` and its dead run reclaims as
   dead.
 - The in-process process table gets a test on each OS that it finds the test process's own pid and
@@ -355,7 +384,8 @@ the cause and files a follow-up instead of tuning.
 9. A PTY restart test (`TestRunner_*Restart*` on PTY, or the helper test) reclaims through
    `Reattach`; the server log names the PTY runner for the reclaimed run.
 10. `rg -n 'RunnerFor *=' server --glob '*_test.go'` finds no hand-written closure outside the
-    harness.
+    harness. Per-run routing closures appear only as `WithRunnerFor` arguments. The harness test
+    shows two projects get two `Pty` runners with different roots.
 11. `rg -n 'HerdrIsTheSubject' server` lists exactly the tests in the herdr-subject list.
 12. `rg -n 'UntilPtyAsDefault' server` lists exactly the seven tests in that list. Deleting the
     constant in a scratch edit makes `go vet ./server/...` fail at each of them.
@@ -366,7 +396,8 @@ the cause and files a follow-up instead of tuning.
 16. `go doc ./server/servertest` shows the runner rule.
 17. `go test -run 'TestReclaim_' -v ./server/` lists `pty` and `headless` subtests and no `herdr`
     subtest for `runnerShapes` tests.
-18. `go test -run 'TestRunner_Restart|TestLaunchPort_Restart' ./server/` passes on herdr.
+18. `go test -run 'TestRunner_Restart|TestLaunchPort_Restart|TestReclaim_Herdr' ./server/` passes on
+    herdr, including the two new herdr-subject reclaim tests.
 19. `go test -run 'TestRunner_ClaimsWrite|TestRunner_CodexEvolve|TestRunner_OneOff' ./server/` passes
     and makes no herdr calls (counter file empty for that run).
 20. `go test -run 'TestRecovery_' -v ./server/` passes; the counter shows no herdr calls.
@@ -374,7 +405,8 @@ the cause and files a follow-up instead of tuning.
 22. With a scratch edit that makes `TestDiskCleanNow_UnheldDiskKeepsDispatching` fail, `go test -run
     TestDiskCleanNow ./server/` exits 1 within its own timeout and does not hang.
 23. A run with a PATH wrapper that logs `ps` shows no `ps -ww -p` call. The process-table test passes
-    on macOS, and CI's Linux job passes it too.
+    on macOS, and CI's Linux job passes it too. `rg -n 'ProcessTable' nativerunner cmd` shows
+    production still uses `psTable`, and the follow-up for a production table is filed.
 24. `rg -n 'stampRun\(|PutRun\(' server --glob '*_test.go'` shows a runner on every seeded run; the
     stray-call check (story 13) catches any empty one at run time.
 25. The serial-test count script from the spec research (top-level `Test` functions in `server/`
@@ -400,6 +432,8 @@ the cause and files a follow-up instead of tuning.
 - Watching herdr health for a live herdr run under a non-herdr server.
 - A smaller holder binary. One exec costs 4 to 7ms of CPU, so it would save only a few seconds.
 - Raising the harness `PollInterval` to 1s.
+- Replacing `ps` in production with an in-process process table. It needs a follow-up that handles
+  the stored `lstart` values.
 - More `-parallel` slots. `-parallel 20` made the run slower and flakier.
 
 ## Further Notes
