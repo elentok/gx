@@ -23,7 +23,7 @@ iteration handles, locks.
 - Only gx commits the store. Agents, the CLI and humans never run git in it, so there are no commit
   races; edits made while gx is down are committed on the next start.
 - Agents touch tickets through `gx tickets` verbs, by address, never by path.
-- Rescans must tolerate a stale index. A watch speeds up noticing external edits; the poll
+- Rescans must tolerate a stale index. The store watch speeds up noticing external edits; the store poll
   guarantees it (ADR 0025). Claiming re-reads the file, so a missed event can delay a schedule but
   never produce a wrong one.
 - Queue state, locks and `gx.log` are server-owned and live in the per-OS state dir, never in the

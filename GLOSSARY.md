@@ -834,16 +834,14 @@ auto-reload only in that it flashes a "refreshed" notification; like auto-reload
 position and expand/collapse state. It is also the escape hatch for changes made _outside_ gx
 (external terminal git commands), which do not bump the repo epoch.
 
-**Scratch watch** — the Tickets and Queue tabs' event-driven notice that `.scratch` changed. It
-exists because `.scratch` is written by processes the repo epoch cannot see: another gx, a
-ralph-loop running in a sibling worktree, or a hand edit. It is explicitly **best-effort**: it may
-miss changes, and it may fail to start at all. Active only while its own tab is active.
+**Store watch** — the server's event-driven notice that the ticket store changed. It exists because
+the store is written by processes the server cannot observe directly: agents running `gx tickets`
+verbs, the CLI, and hand edits. It is explicitly **best-effort**: it may miss changes, and it may
+fail to start at all.
 
-**Scratch poll** — the slow periodic reload of `.scratch` that runs alongside the scratch watch.
-Unlike the watch it is a guarantee, not an optimization: it is what makes "the tab eventually shows
-what is on disk" true even when no event ever arrives (see ADR 0025). Also active only while its own
-tab is active; both watch and poll are started when the tab is activated and are allowed to stop
-when it is deactivated.
+**Store poll** — the periodic rescan of the ticket store that runs alongside the store watch. Unlike
+the watch it is a guarantee, not an optimization: it is what makes "the server eventually shows
+what is on disk" true even when no event ever arrives (see ADR 0025).
 
 ## Queue Lifecycle (Queue Tab)
 
