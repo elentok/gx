@@ -284,6 +284,56 @@ func TestTCP_SameRoutesAnswerOverLoopback(t *testing.T) {
 	}
 }
 
+func TestTCP_RefusesBrowserRequests(t *testing.T) {
+	t.Parallel()
+	h := servertest.StartWithTCP(t)
+
+	get := func(header, value string) int {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodGet, "http://"+h.TCPAddr+"/v1/snapshot", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		switch header {
+		case "Host":
+			req.Host = value
+		case "":
+		default:
+			req.Header.Set(header, value)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	for _, tc := range []struct {
+		name, header, value string
+		want                int
+	}{
+		{"plain", "", "", http.StatusOK},
+		{"localhost host", "Host", "localhost:7421", http.StatusOK},
+		{"origin", "Origin", "http://evil.example", http.StatusForbidden},
+		{"sec-fetch-site", "Sec-Fetch-Site", "cross-site", http.StatusForbidden},
+		{"foreign host", "Host", "evil.example", http.StatusForbidden},
+		{"foreign ip host", "Host", "10.0.0.1:80", http.StatusForbidden},
+	} {
+		if got := get(tc.header, tc.value); got != tc.want {
+			t.Errorf("%s: status %d, want %d", tc.name, got, tc.want)
+		}
+	}
+
+	logged, err := os.ReadFile(server.LogPath(h.StateDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(string(logged), "refused browser request"); n != 1 {
+		t.Errorf("%d refusal log lines for 4 refusals, want 1", n)
+	}
+}
+
 func TestTCP_OffByDefault(t *testing.T) {
 	t.Parallel()
 	got, err := servertest.Start(t).Client.Handshake(context.Background())

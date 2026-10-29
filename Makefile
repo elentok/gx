@@ -1,4 +1,4 @@
-.PHONY: build web-build web-dev web-dev-proxy web-test web-e2e web-types install test e2e test-docker-ubuntu run demos demo-seed
+.PHONY: build web-build web-dev web-test web-e2e web-types install test e2e test-docker-ubuntu run demos demo-seed
 
 GO_VERSION := 1.25.0
 
@@ -17,13 +17,9 @@ web-build:
 	cd webui && pnpm install --frozen-lockfile && pnpm build
 	touch webui/dist/.gitkeep # vite empties dist; the Go embed needs this file to compile
 
-# Serves the canned snapshot; GX_WEBUI_PROXY=1 proxies /v1 to 127.0.0.1:7421 instead.
+# Serves the canned snapshot. Against a real server, set server.web.dev-url instead.
 web-dev:
 	cd webui && pnpm install --frozen-lockfile && pnpm dev
-
-# Serves the UI with hot reload and proxies /v1 to a running gx server on 127.0.0.1:7421.
-web-dev-proxy:
-	cd webui && pnpm install --frozen-lockfile && GX_WEBUI_PROXY=1 pnpm dev
 
 # WEB_TEST_WORKERS caps vitest's workers; scripts/test.sh sets it to share the CPU budget.
 WEB_TEST_WORKERS ?=

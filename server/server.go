@@ -257,6 +257,7 @@ type Server struct {
 	ln          net.Listener
 	tcp         net.Listener // nil unless Config.TCPAddr is set
 	http        *http.Server
+	tcpHTTP     *http.Server // the socket's routes behind refuseBrowsers
 	web         net.Listener // nil unless Config.WebAddr is set and bound
 	webDev      http.Handler // nil unless Config.WebDevURL is set and valid
 	webHTTP     *http.Server
@@ -493,6 +494,7 @@ func New(cfg Config) (*Server, error) {
 		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) { r.handler(s, w, req) })
 	}
 	s.http = &http.Server{Handler: mux}
+	s.tcpHTTP = &http.Server{Handler: refuseBrowsers(mux, log)}
 	s.bindWeb()
 	// A down herdr never stops the server; it is reported and retried.
 	s.checkHerdr()
@@ -747,16 +749,17 @@ func (s *Server) Serve(ctx context.Context) error {
 	s.restoreSessions()
 	errc := make(chan error, 3)
 	lns := []net.Listener{s.ln}
+	go func() { errc <- s.http.Serve(s.ln) }()
 	if s.tcp != nil {
 		lns = append(lns, s.tcp)
+		go func() { errc <- s.tcpHTTP.Serve(s.tcp) }()
 	}
-	for _, ln := range lns {
-		go func() { errc <- s.http.Serve(ln) }()
+	shutdown := func() error {
+		return errors.Join(s.http.Shutdown(context.Background()), s.tcpHTTP.Shutdown(context.Background()))
 	}
-	shutdown := func() error { return s.http.Shutdown(context.Background()) }
 	if s.web != nil {
 		shutdown = func() error {
-			return errors.Join(s.http.Shutdown(context.Background()), s.webHTTP.Shutdown(context.Background()))
+			return errors.Join(s.http.Shutdown(context.Background()), s.tcpHTTP.Shutdown(context.Background()), s.webHTTP.Shutdown(context.Background()))
 		}
 		lns = append(lns, s.web)
 		go func() { errc <- s.webHTTP.Serve(s.web) }()

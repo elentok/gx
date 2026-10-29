@@ -4,8 +4,7 @@ import { defineConfig } from "vite";
 import cannedSnapshot from "./src/canned-snapshot.json";
 
 // Serves the canned snapshot at /v1/snapshot so `make web-dev` needs no gx
-// server. Set GX_WEBUI_PROXY=1 to proxy /v1 to a real one instead.
-const useRealServer = process.env.GX_WEBUI_PROXY === "1";
+// server.
 
 export default defineConfig({
   plugins: [
@@ -13,7 +12,6 @@ export default defineConfig({
     {
       name: "canned-snapshot",
       configureServer(server) {
-        if (useRealServer) return;
         server.middlewares.use("/v1/snapshot", (_req, res) => {
           res.setHeader("Content-Type", "application/json");
           res.end(JSON.stringify(cannedSnapshot));
@@ -31,7 +29,6 @@ export default defineConfig({
   server: {
     // gx server proxies to http://127.0.0.1:5173; Vite's default "localhost" can bind only ::1.
     host: "127.0.0.1",
-    proxy: useRealServer ? { "/v1": "http://127.0.0.1:7421" } : undefined,
   },
   build: {
     rollupOptions: {
