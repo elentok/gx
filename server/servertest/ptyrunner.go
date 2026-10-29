@@ -3,7 +3,6 @@ package servertest
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -68,10 +67,7 @@ func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge fun
 		r.mu.Lock()
 		cwd := r.cwds[s.Label]
 		r.mu.Unlock()
-		_, rest, _ := strings.Cut(text, " ")
-		addr, _, _ := strings.Cut(rest, "\n")
-		addr = strings.TrimPrefix(addr, "--ticket ") // gx-merge's form
-		t := &Turn{Address: addr, Cwd: cwd, Text: text, h: r.h, sessionID: s.SessionID}
+		t := newTurn(r.h, text, cwd, s.SessionID)
 		(*turn)(t)
 		arm := agentfake.ActionFast
 		if t.control.busy {

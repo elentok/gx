@@ -233,17 +233,34 @@ type Turn struct {
 	Cwd     string // the worktree the agent's tab was opened in
 	Text    string // the whole prompt, notes included
 
-	control turnControl
-	h       *Harness
-	// sessionID is the agent's conversation id; empty on herdr.
-	sessionID string
+	control   turnControl
+	h         *Harness
+	pty       bool   // the turn runs on PTY; the controls need it
+	sessionID string // the agent's conversation id; set on PTY only
+}
+
+// newTurn builds the Turn for an `agent prompt` whose text names the ticket as
+// its first argument, on either runner.
+func newTurn(h *Harness, text, cwd, sessionID string) *Turn {
+	_, rest, _ := strings.Cut(text, " ")
+	addr, _, _ := strings.Cut(rest, "\n")
+	addr = strings.TrimPrefix(addr, "--ticket ") // gx-merge's form
+	return &Turn{Address: addr, Cwd: cwd, Text: text, h: h, pty: h.pty, sessionID: sessionID}
+}
+
+// unsupported fails the test, naming control, when the turn is on herdr, where
+// the PTY-only controls cannot act.
+func (t *Turn) unsupported(control string) bool {
+	if !t.pty {
+		t.h.tb.Errorf("servertest: Turn.%s is not supported on herdr; run this test on PTY (drop WithHerdr)", control)
+	}
+	return !t.pty
 }
 
 // turnControl is what a hook asked of the turn besides ending it. The harness
 // applies it to the TUI fake once the prompt is in, since the hook runs before
 // the prompt reaches the fake.
 type turnControl struct {
-	name string // the Turn method, for the herdr failure message
 	// busy keeps the turn open past the prompt instead of ending it at once.
 	busy bool
 	// after is sent once the prompt is in.
@@ -251,27 +268,36 @@ type turnControl struct {
 }
 
 // Stall makes the turn start and never end: the run stays working. PTY only.
-func (t *Turn) Stall() { t.control = turnControl{name: "Stall", busy: true} }
+func (t *Turn) Stall() {
+	if !t.unsupported("Stall") {
+		t.control = turnControl{busy: true}
+	}
+}
 
 // Block makes the agent wait on a permission prompt for reason. PTY only.
 func (t *Turn) Block(reason string) {
-	t.control = turnControl{name: "Block", busy: true, after: &agentfake.Control{
+	if t.unsupported("Block") {
+		return
+	}
+	t.control = turnControl{busy: true, after: &agentfake.Control{
 		Action: agentfake.ActionBlock, Dialog: agentfake.BashPermissionDialog(reason),
 	}}
 }
 
 // Exit makes the agent process exit with code, ending the session. PTY only.
 func (t *Turn) Exit(code int) {
-	t.control = turnControl{name: "Exit", busy: true, after: &agentfake.Control{Action: agentfake.ActionExit, Code: code}}
+	if !t.unsupported("Exit") {
+		t.control = turnControl{busy: true, after: &agentfake.Control{Action: agentfake.ActionExit, Code: code}}
+	}
 }
 
 // Hold keeps the turn open until the returned release is called, which ends
 // it. PTY only.
 func (t *Turn) Hold() (release func()) {
-	t.control = turnControl{name: "Hold", busy: true}
-	if t.sessionID == "" {
+	if t.unsupported("Hold") {
 		return func() {}
 	}
+	t.control = turnControl{busy: true}
 	return func() {
 		err := agentfake.SendTUIControl(t.h.Env("HOME"), t.sessionID, agentfake.Control{Action: agentfake.ActionFinish})
 		if err != nil {
@@ -283,8 +309,7 @@ func (t *Turn) Hold() (release func()) {
 // Transcript appends an assistant line saying text to the agent's conversation
 // transcript, where the server reads the agent's last words. PTY only.
 func (t *Turn) Transcript(text string) {
-	if t.sessionID == "" {
-		t.control.name = "Transcript"
+	if t.unsupported("Transcript") {
 		return
 	}
 	line, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{
@@ -455,14 +480,7 @@ func (h *Harness) OnTurn(agent func(t *Turn)) {
 		cwd := cwds[pane]
 		turns[pane]++ // the prompt starts a turn
 		mu.Unlock()
-		_, rest, _ := strings.Cut(text, " ")
-		addr, _, _ := strings.Cut(rest, "\n")
-		addr = strings.TrimPrefix(addr, "--ticket ") // gx-merge's form
-		turn := &Turn{Address: addr, Cwd: cwd, Text: text, h: h}
-		agent(turn)
-		if name := turn.control.name; name != "" {
-			h.tb.Errorf("servertest: Turn.%s is not supported on herdr; run this test on PTY (drop WithHerdr)", name)
-		}
+		agent(newTurn(h, text, cwd, ""))
 		return reply(pane), herdrfake.Identities{}, nil
 	})
 }
