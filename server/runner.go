@@ -392,18 +392,9 @@ func (s *Server) parentAwaitsAdoption(dir string, addr tickets.Address, e ticket
 	return false
 }
 
-// nextTicket is the ticket a claim of e's root starts next: the first of its
-// frontier. The pending rows name the same one.
-func nextTicket(e tickets.Epic) (tickets.Ticket, bool) {
-	frontier := ralphloop.Frontier(e)
-	if len(frontier) == 0 {
-		return tickets.Ticket{}, false
-	}
-	return frontier[0], true
-}
-
-// nextUntracked is the first frontier ticket of e with no registry entry. The
-// last scan can still list a ticket whose launch already began.
+// nextUntracked is the first frontier ticket of e with no registry entry: the
+// ticket a claim of e's root starts next, and the one its pending row names.
+// The last scan can still list a ticket whose launch already began.
 func (s *Server) nextUntracked(project string, e tickets.Epic) (tickets.Ticket, bool) {
 	for _, t := range ralphloop.Frontier(e) {
 		addr := tickets.Address{Project: project, Epic: filepath.Base(e.Path), ID: t.Identifier}

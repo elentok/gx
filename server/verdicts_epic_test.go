@@ -50,6 +50,25 @@ func TestPending_WholeEpicEntryGivesOneRowForItsFrontierTicket(t *testing.T) {
 	}
 }
 
+func TestPending_WholeEpicEntrySkipsAFrontierTicketThatIsAlreadyRunning(t *testing.T) {
+	h, _ := startCapHeldEpics(t)
+	h.Server.PutRun("proj:epic-b/01", server.Run{Address: "proj:epic-b/01"})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range snap.Pending {
+		if row.Address == "proj:epic-b/01" {
+			t.Fatalf("pending = %+v, want no row for the running proj:epic-b/01", snap.Pending)
+		}
+	}
+}
+
 func TestPending_TicketQueuedAloneAndItsWholeEpicGiveOneRow(t *testing.T) {
 	h, _ := startCapHeldEpics(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

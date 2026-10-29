@@ -258,7 +258,7 @@ func (s *Server) nextQueuedTicket(epic tickets.Address, epicsOf func(project str
 		if filepath.Base(e.Path) != epic.Epic {
 			continue
 		}
-		t, ok := nextTicket(e)
+		t, ok := s.nextUntracked(epic.Project, e)
 		return tickets.Address{Project: epic.Project, Epic: epic.Epic, ID: t.Identifier}, ok
 	}
 	return tickets.Address{}, false
