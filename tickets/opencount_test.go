@@ -34,6 +34,40 @@ func TestRenderedStatus_BuildsForkChildrenOncePerEpic(t *testing.T) {
 	}
 }
 
+func codeReviewEpic(n int) Epic {
+	e := Epic{forks: &forkCache{}}
+	for i := 1; i <= n; i++ {
+		tk := Ticket{Number: i, Identifier: fmt.Sprintf("%02d", i), Status: "open"}
+		if i == n {
+			tk.Type = typeCodeReview
+		}
+		e.Tickets = append(e.Tickets, tk)
+	}
+	return e
+}
+
+// A code-review ticket's blocker expansion looks tickets up by number for every
+// other ticket; the index behind that is built once per epic, not per lookup.
+func TestRenderedStatus_BuildsTicketIndexOncePerEpic(t *testing.T) {
+	e := codeReviewEpic(70)
+	before := ticketIndexBuilds.Load()
+	for _, tk := range e.Tickets {
+		e.RenderedStatus(tk)
+	}
+	if got := ticketIndexBuilds.Load() - before; got != 1 {
+		t.Errorf("ticket-index builds = %d, want 1", got)
+	}
+}
+
+func BenchmarkRenderedStatus_CodeReviewEpic(b *testing.B) {
+	e := codeReviewEpic(70)
+	for b.Loop() {
+		for _, tk := range e.Tickets {
+			e.RenderedStatus(tk)
+		}
+	}
+}
+
 // OpenCount must build the fork-children map once per pass, not once per
 // ticket: allocations grow linearly with the epic, not quadratically.
 func TestOpenCount_AllocationsStayLinearInEpicSize(t *testing.T) {

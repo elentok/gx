@@ -287,13 +287,19 @@ func (e Epic) effectiveBlockedBy(t Ticket) []string {
 		return slices.DeleteFunc(slices.Clone(t.BlockedBy), crossEpicRef)
 	}
 	var tokens []string
+	var verifies []Ticket
+	for _, other := range e.Tickets {
+		if other.IsVerify() {
+			verifies = append(verifies, other)
+		}
+	}
 	for _, other := range e.Tickets {
 		if other.Type == typeCodeReview {
 			continue
 		}
 		// Verify runs after the review, so waiting on it (or on a ticket it
 		// opened) would deadlock both.
-		if e.inVerifySubtree(other) {
+		if e.inVerifySubtree(other, verifies) {
 			continue
 		}
 		if other.Number == t.Number && other.Identifier == t.Identifier {
@@ -326,13 +332,14 @@ func (e Epic) verifyBlockers(t Ticket) []string {
 	return tokens
 }
 
-// inVerifySubtree reports whether t is a verify ticket or was forked from one.
-func (e Epic) inVerifySubtree(t Ticket) bool {
+// inVerifySubtree reports whether t is a verify ticket or was forked from one
+// of verifies, the epic's verify tickets (collected once by the caller).
+func (e Epic) inVerifySubtree(t Ticket, verifies []Ticket) bool {
 	if t.IsVerify() {
 		return true
 	}
-	for _, other := range e.Tickets {
-		if other.IsVerify() && e.descendsFrom(t, other) {
+	for _, v := range verifies {
+		if e.descendsFrom(t, v) {
 			return true
 		}
 	}
@@ -418,9 +425,23 @@ func (e Epic) UnresolvedBlockers(t Ticket) []string {
 // match the ticket file's exactly (e.g. "Blocked by: 4a" still finds "04a"),
 // and a childless-suffix ticket (Identifier "04", or unset in test fixtures)
 // is still found by a bare-number token.
+//
+// Like forkChildren, the index is built once per loaded epic.
 func (e Epic) byNumberAndSuffix() map[string]Ticket {
-	index := make(map[string]Ticket, len(e.Tickets))
-	for _, t := range e.Tickets {
+	if e.forks == nil {
+		return buildTicketIndex(e.Tickets)
+	}
+	return e.forks.getIndex(e.Tickets)
+}
+
+// ticketIndexBuilds counts buildTicketIndex calls, so a test can pin the
+// once-per-epic build.
+var ticketIndexBuilds atomic.Int64
+
+func buildTicketIndex(ts []Ticket) map[string]Ticket {
+	ticketIndexBuilds.Add(1)
+	index := make(map[string]Ticket, len(ts))
+	for _, t := range ts {
 		_, suffix := splitBlockedByToken(t.Identifier)
 		index[siblingKey(t.Number, suffix)] = t
 	}
@@ -441,23 +462,44 @@ func (e Epic) forkChildren() map[string][]Ticket {
 	return e.forks.get(e.Tickets)
 }
 
-// forkCache holds the fork-children map for one Tickets slice. Epic copies
-// share it, so it is guarded and keyed by the slice it was built from.
+// forkCache holds the fork-children map and the ticket index for one Tickets
+// slice. Epic copies share it, so it is guarded and keyed by the slice it was
+// built from.
 type forkCache struct {
 	mu       sync.Mutex
 	first    *Ticket
 	n        int
 	children map[string][]Ticket
+	index    map[string]Ticket
+}
+
+// reset drops both maps when ts is not the slice they were built from.
+// The caller holds c.mu.
+func (c *forkCache) reset(ts []Ticket) {
+	if c.first != unsafe.SliceData(ts) || c.n != len(ts) {
+		c.children, c.index = nil, nil
+		c.first, c.n = unsafe.SliceData(ts), len(ts)
+	}
 }
 
 func (c *forkCache) get(ts []Ticket) map[string][]Ticket {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.children == nil || c.first != unsafe.SliceData(ts) || c.n != len(ts) {
+	c.reset(ts)
+	if c.children == nil {
 		c.children = buildForkChildren(ts)
-		c.first, c.n = unsafe.SliceData(ts), len(ts)
 	}
 	return c.children
+}
+
+func (c *forkCache) getIndex(ts []Ticket) map[string]Ticket {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.reset(ts)
+	if c.index == nil {
+		c.index = buildTicketIndex(ts)
+	}
+	return c.index
 }
 
 // forkChildrenBuilds counts buildForkChildren calls, so a test can pin the
