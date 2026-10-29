@@ -209,6 +209,9 @@ Run Go tests with `gx brief go-test`, not raw `go test`. While iterating, always
 
 Before every commit, and before `--iteration-status finished`, run `gx check` once (changed files).
 It is the only package-wide run. Run it in the foreground, unpiped: no `tail`, no background.
+Pass Bash `timeout: 600000`: the default 120s moves it to the background. The `./server` tests alone
+take about 4 minutes. Iterate with `gx brief go-test -run <Test>`, then run `gx check` once at the
+end. It already runs the full suite, so do not run the package separately first.
 
 A new or changed test that waits on time or concurrency runs with `-count=20` before commit.
 

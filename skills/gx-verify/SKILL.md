@@ -16,7 +16,9 @@ Run cheap, targeted verification for changed files. `gx check` does the work.
      Run `gx check`.
    - `working-changes`: verify every changed and new file after completing a task, without staging.
      Run `gx check`.
-2. Run it in the foreground, unpiped. Report the exit code:
+2. Run it in the foreground, unpiped, with Bash `timeout: 600000`: the default 120s moves it to the
+   background, and `./server` tests alone take about 4 minutes. Do not run the package separately
+   first. Report the exit code:
    - `0`: pass
    - `1`: fail
    - `2`: could not run
