@@ -142,12 +142,16 @@ The `servertest` package doc states the rule. Every test follows it.
   - the env. It uses it for herdr's CLI (`herdr.CLI{Env: env}`), `HOME`, the codex home and
     `Pty.Env`.
   - `N`, the runner wait.
-  - an optional PTY override: the holder program, the agent program and `Procs`.
+  - an optional PTY override: the holder program, the agent program, `Procs`, and the PTY
+    timings `PollInterval`, `StartTimeout`, `PromptGrace` and `StopGrace` (the `nativerunner.Pty`
+    field names).
 
   Production passes its process env and no override. The harness passes `cfg.Env` (so the fake
   `herdr` is first on PATH), `RunnerWait`, and an override where the holder is the test binary, the
-  agent program is the TUI fake (`agentfake`, `GX_AGENTFAKE_TUI`) and `Procs` is the harness
-  process table. So a herdr run in a PTY test reaches the fake `herdr` and fails the test, never the
+  agent program is the TUI fake (`agentfake`, `GX_AGENTFAKE_TUI`), `Procs` is the harness
+  process table, and the timings come from the harness's test settings. The `Pty` defaults (100ms
+  poll, 30s start timeout, the default prompt grace, a 10s stop) are too slow for the suite; the
+  spike used shorter ones. So a herdr run in a PTY test reaches the fake `herdr` and fails the test, never the
   real one.
 - The harness builds the runners again on each `serve`, so `Restart` reattaches like a real restart.
 - `servertest.WithRunner(r)` sets one runner for every run: `cfg.Runner` is `r` and `cfg.RunnerFor`
@@ -201,7 +205,8 @@ The `servertest` package doc states the rule. Every test follows it.
 
 ### Process table
 
-- The table is harness-only. It lives in `servertest`, with darwin and linux build files. The
+- The table is harness-only. It lives in `servertest`. ADR 0035 applies: only the sysctl file,
+  which cannot compile on Linux, gets a `darwin` build tag; the `/proc` reader is a plain file. The
   harness gives the PTY runner this in-process `ProcessTable` (`Pty.Procs`): sysctl
   (`kern.proc.pid`, `kern.procargs2`) on macOS and `/proc` on Linux, since CI runs both. No PTY
   process lookup in a server test spawns `ps`.
@@ -314,7 +319,11 @@ A test that moves to the other side than listed says why in its commit message.
 
 **Everything else** runs on the PTY default with `OnTurn`, unchanged in what it asserts. This
 includes the 208 tests that use only the herdr launch fake and the 23 that use the fake `herdr` only
-to answer the startup probe (those drop the fake). The 36 tests the classification flagged as
+to answer the startup probe. Harness tests among those 23 drop their probe handler. The 3 builders
+that call `server.New` without the harness (`chatServerFlushing`, the one beside it in
+`server_notify_test.go`, and `reloadChatServer`) set a `runnerfake` as `Config.Runner`, so the server
+never probes herdr, and keep the fake `herdr` first on PATH (story 14), where any call fails the
+test. The 36 tests the classification flagged as
 queueing or restarting on the default runner without herdr handlers now start a real holder if they
 launch. The implementer checks each one at the switch.
 
@@ -350,6 +359,17 @@ the spike's throwaway counter. Off by default.
 
 The implementer may split step 3 by test file, as long as the suite stays green after each ticket.
 
+Keeping the suite green across the switch:
+
+- Before the PTY default, the harness gets PTY wiring behind an unexported switch that only the
+  `servertest` package's own tests use. The default flip makes PTY the default and removes the
+  switch.
+- Before the flip, a temporary third `WithHerdr` reason marks each test that moves to the PTY
+  turn fixture later (the turn controls and the leftover-run helper land after the flip). Each move
+  removes the mark from its tests. The last move deletes the reason, so the build fails on any test
+  not moved. The reason is gone before verify, so stories 11 and 12 see only the two lasting
+  reasons.
+
 ## Testing Decisions
 
 - A good test here checks the server's behaviour through the API client, the run registry and the
@@ -362,7 +382,8 @@ The implementer may split step 3 by test file, as long as the suite stays green 
   `WithHerdr` combined with a `WithRunner` fake keeps the fake as the configured runner and allows
   fake `herdr` calls; each order of `WithHerdr` and `WithRunner` or `WithRunnerFor` resolves the
   same runner; a herdr-named run in a PTY test reaches the fake `herdr` and fails the test with the
-  verb and noun; a PTY harness with two projects builds one `Pty` per project root; the
+  verb and noun; a PTY harness with two projects builds one `Pty` per project root, each with the
+  override's holder, agent program, `Procs` and timings; the
   leftover-run helper's live run reattaches as live after `Restart` and its dead run reclaims as
   dead.
 - The in-process process table gets a test on each OS that it finds the test process's own pid and
@@ -411,19 +432,21 @@ the cause and files a follow-up instead of tuning.
     the harness test).
 15. The harness test asserts `h.Herdr == nil` without `WithHerdr`.
 16. `go doc ./server/servertest` shows the runner rule.
-17. `go test -run 'TestReclaim_' -v ./server/` lists `pty` and `headless` subtests and no `herdr`
-    subtest for `runnerShapes` tests.
+17. `go test -run 'TestReclaim_|TestLateFinish_' -v ./server/` lists `pty` and `headless` subtests
+    and no `herdr` subtest for `runnerShapes` tests.
 18. `go test -run 'TestRunner_Restart|TestLaunchPort_Restart|TestReclaim_Herdr' ./server/` passes on
     herdr, including the two new herdr-subject reclaim tests.
-19. `go test -run 'TestRunner_ClaimsWrite|TestRunner_CodexEvolve|TestRunner_OneOff' ./server/` passes
-    and makes no herdr calls (counter file empty for that run).
+19. `go test -run '^(TestRunner_ClaimsWrite|TestRunner_CodexEvolve|TestRunner_OneOffsRun|TestRunner_OneOffWithout)' ./server/`
+    runs exactly the four codex start-option tests, passes, and makes no herdr calls (counter file
+    empty for that run).
 20. `go test -run 'TestRecovery_' -v ./server/` passes; the counter shows no herdr calls.
 21. `go test -run 'TestDisk' ./server/` passes with no herdr calls.
 22. With a scratch edit that makes `TestDiskCleanNow_UnheldDiskKeepsDispatching` fail, `go test -run
     TestDiskCleanNow ./server/` exits 1 within its own timeout and does not hang.
 23. A run with a PATH wrapper that logs `ps` shows no `ps -ww -p` call. The process-table test passes
-    on macOS, and CI's Linux job passes it too. `rg -n 'Procs' <shared build package> cmd` finds
-    nothing, so production still uses `psTable`. The harness table's files live only under
+    on macOS, and CI's Linux job passes it too. Production passes no PTY override: `cmd`'s call to
+    the shared builder passes none, and the builder's production path leaves `Procs` and the
+    timings unset, so production still uses `psTable`. The harness table's files live only under
     `server/servertest`. The follow-up for a production table is filed.
 24. `rg -n 'stampRun\(|PutRun\(' server --glob '*_test.go'` shows a runner on every seeded run; the
     stray-call check (story 13) catches any empty one at run time.
