@@ -10,7 +10,7 @@ import { DetailPage } from "../page/DetailPage";
 import { Button } from "../ui/button/Button";
 import { Spinner } from "../ui/spinner/Spinner";
 import { useWide } from "../useWide";
-import { AgentSidebar } from "./AgentSidebar";
+import { AgentSidebar, NO_SESSIONS_HINT, NO_SESSIONS_TITLE } from "./AgentSidebar";
 import type { CreateSession, FetchWorktrees } from "./newSession";
 import { NewSessionForm } from "./NewSessionForm";
 import { SessionSwitcher } from "./SessionSwitcher";
@@ -52,11 +52,11 @@ function EmptyState({ empty, wide, onNew }: { empty: boolean; wide: boolean; onN
   return (
     <Box h="100%" display="flex" flexDirection="column" alignItems="center" justifyContent="center" gap="3" textAlign="center">
       <Heading as="h3" fontFamily="condensed" textTransform="uppercase" fontSize="2xl">
-        {empty ? "No sessions yet" : "Pick a session"}
+        {empty ? NO_SESSIONS_TITLE : "Pick a session"}
       </Heading>
       <Text color="text.muted" maxW="42ch">
         {empty ? (
-          "Sessions you start here or in the gx Agents tab show up in this list."
+          NO_SESSIONS_HINT
         ) : wide ? (
           <>
             Choose a session on the left, or press <Kbd bg="surface" color="text.muted" borderWidth="1px" borderColor="border">⌘K</Kbd> to search.

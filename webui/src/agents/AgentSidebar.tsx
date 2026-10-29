@@ -82,6 +82,9 @@ function NewButton({ onNew, full }: { onNew: () => void; full?: boolean }) {
   );
 }
 
+export const NO_SESSIONS_TITLE = "No sessions yet";
+export const NO_SESSIONS_HINT = "Sessions you start here or in the gx Agents tab show up in this list.";
+
 /** `onNew` gets the project of the group whose "+" was pressed, or nothing from the top button. */
 export function AgentSidebar({
   sessions,
@@ -118,6 +121,14 @@ export function AgentSidebar({
       {wide && (
         <Box px="3" pb="3">
           <NewButton onNew={onNew} full />
+        </Box>
+      )}
+      {!wide && sessions.length === 0 && (
+        <Box px="3.5" py="4">
+          <Text fontWeight="600">{NO_SESSIONS_TITLE}</Text>
+          <Text color="text.muted" fontSize="sm">
+            {NO_SESSIONS_HINT}
+          </Text>
         </Box>
       )}
       <Box flex={wide ? "1" : undefined} minH="0" overflowY="auto" px="1.5">

@@ -79,6 +79,12 @@ test("the main column says what to do, or that there is nothing yet", () => {
   expect(screen.getByText("No sessions yet")).toBeTruthy();
 });
 
+test("on a phone with no sessions the list says so and keeps one New session button", () => {
+  render([], "/agents", true, {}, false);
+  expect(screen.getByText("No sessions yet")).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: /New session/ })).toHaveLength(1);
+});
+
 test("reopens the last viewed session when it is listed, else asks to pick one", () => {
   localStorage.setItem("gx.agents.last", "s-2");
   const { router } = render([session("s-1", "p"), session("s-2", "p")]);
