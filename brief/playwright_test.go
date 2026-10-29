@@ -114,6 +114,34 @@ func TestPlaywrightPlan_BareFlowNumbersBecomeOneAnchoredGrep(t *testing.T) {
 	}
 }
 
+func TestFlowNumbersToGrep(t *testing.T) {
+	const grep = `› (69)\. `
+	tests := []struct {
+		name    string
+		args    []string
+		want    []string
+		wantErr bool
+	}{
+		{"number after a boolean flag is a flow", []string{"--headed", "69"}, []string{"--headed", "-g", grep}, false},
+		{"number after a value flag stays", []string{"--workers", "2"}, []string{"--workers", "2"}, false},
+		{"no numbers leaves args alone", []string{"a.e2e.ts", "-g", "x"}, []string{"a.e2e.ts", "-g", "x"}, false},
+		{"numbers mixed with -g", []string{"69", "-g", "x"}, nil, true},
+		{"numbers mixed with --grep", []string{"--grep", "x", "69"}, nil, true},
+		{"numbers mixed with --grep=", []string{"69", "--grep=x"}, nil, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := flowNumbersToGrep(tc.args)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tc.wantErr)
+			}
+			if !slices.Equal(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestPlaywrightPlan_BuildsWebOnlyWhenDistIsMissing(t *testing.T) {
 	dir := playwrightDir(t, true)
 	var builtAt string

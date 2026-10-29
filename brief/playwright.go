@@ -45,7 +45,10 @@ func (Playwright) Plan(env []string, dir string, args []string) (Invocation, err
 	if replaced {
 		note = "brief: --reporter replaced with line"
 	}
-	rest = flowNumbersToGrep(rest)
+	rest, err = flowNumbersToGrep(rest)
+	if err != nil {
+		return Invocation{}, err
+	}
 	argv := []string{"test", "--reporter=line"}
 	if !slices.ContainsFunc(rest, func(a string) bool {
 		return a == "-c" || a == "--config" || strings.HasPrefix(a, "--config=")
@@ -70,20 +73,44 @@ func (Playwright) Plan(env []string, dir string, args []string) (Invocation, err
 // flowNumbersToGrep replaces bare flow numbers (`disk.e2e.ts 69 70`) with one
 // -g pattern. Playwright matches -g against "[project] › file:line:col › title",
 // so a "^" anchor on the bare title never matches; "› " is the anchor instead.
-// A number after a flag is that flag's value (`--workers 2`) and stays.
-func flowNumbersToGrep(args []string) []string {
+// A number after a value flag is that flag's value (`--workers 2`) and stays;
+// a number after a boolean flag (`--headed 69`) is a flow. Mixing bare numbers
+// with a caller's -g/--grep is an error rather than a second -g.
+func flowNumbersToGrep(args []string) ([]string, error) {
 	var out, nums []string
 	for i, a := range args {
-		if isDigits(a) && (i == 0 || !strings.HasPrefix(args[i-1], "-")) {
+		if isDigits(a) && (i == 0 || !takesValue(args[i-1])) {
 			nums = append(nums, a)
 			continue
 		}
 		out = append(out, a)
 	}
 	if len(nums) == 0 {
-		return args
+		return args, nil
 	}
-	return append(out, "-g", `› (`+strings.Join(nums, "|")+`)\. `)
+	if slices.ContainsFunc(args, isGrepFlag) {
+		return nil, fmt.Errorf("brief: bare flow numbers %s cannot be mixed with -g/--grep; use one or the other", strings.Join(nums, " "))
+	}
+	return append(out, "-g", `› (`+strings.Join(nums, "|")+`)\. `), nil
+}
+
+// playwrightBoolFlags are the `playwright test` flags that take no value, so a
+// number after one is not its value. `--debug` counts: its optional mode is a
+// word, never a number. Pinned against `playwright test --help`; update it
+// when the Playwright version adds a flag.
+var playwrightBoolFlags = []string{
+	"--debug", "--fail-on-flaky-tests", "--forbid-only", "--fully-parallel", "--headed",
+	"--ignore-snapshots", "--last-failed", "--list", "--no-deps", "--pass-with-no-tests",
+	"--quiet", "--ui",
+}
+
+// takesValue reports whether a number after arg is arg's value.
+func takesValue(arg string) bool {
+	return strings.HasPrefix(arg, "-") && !slices.Contains(playwrightBoolFlags, arg)
+}
+
+func isGrepFlag(a string) bool {
+	return a == "-g" || a == "--grep" || strings.HasPrefix(a, "--grep=")
 }
 
 func isDigits(s string) bool {
