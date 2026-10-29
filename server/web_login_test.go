@@ -120,8 +120,9 @@ func TestWebLogin_SetupPendingServesThePageAndNothingElse(t *testing.T) {
 	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
 		t.Errorf("/: status %d type %q, want 200 text/html", resp.StatusCode, resp.Header.Get("Content-Type"))
 	}
-	if _, body := l.get(t, "/v1/web/auth", nil); !strings.Contains(body, `"setup"`) {
-		t.Errorf("auth state %q, want setup", body)
+	if _, body := l.get(t, "/v1/web/auth", nil); !strings.Contains(body, `"setup"`) ||
+		!strings.Contains(body, `"totp_on":true`) || !strings.Contains(body, `"setup_code_required":false`) {
+		t.Errorf("auth state %q, want setup with totp_on and no setup code required", body)
 	}
 }
 

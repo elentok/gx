@@ -49,6 +49,9 @@ type webAuthResult struct {
 type webAuthState struct {
 	State   string `json:"state"`
 	LoginID string `json:"login_id,omitempty"`
+	// TOTPOn and SetupCodeRequired tell the login and setup pages which fields to ask for.
+	TOTPOn            bool `json:"totp_on"`
+	SetupCodeRequired bool `json:"setup_code_required"`
 }
 
 type webAuthBody struct {
@@ -140,8 +143,10 @@ func (s *Server) denyWeb(mux http.Handler) http.Handler {
 }
 
 func (s *Server) webAuthStateRead(w http.ResponseWriter, r *http.Request) {
+	state := webAuthState{TOTPOn: webTOTPOn, SetupCodeRequired: webTOTPOn && s.webAuth.ResetPending()}
 	if login, _, ok := s.webLoginFor(r); ok {
-		writeJSON(w, webAuthState{State: webAuthStateSignedIn, LoginID: login.ID})
+		state.State, state.LoginID = webAuthStateSignedIn, login.ID
+		writeJSON(w, state)
 		return
 	}
 	pending, _, err := s.webAuth.SetupState()
@@ -149,11 +154,11 @@ func (s *Server) webAuthStateRead(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "web auth unavailable", http.StatusInternalServerError)
 		return
 	}
+	state.State = webAuthStateSignedOut
 	if pending {
-		writeJSON(w, webAuthState{State: webAuthStateSetup})
-		return
+		state.State = webAuthStateSetup
 	}
-	writeJSON(w, webAuthState{State: webAuthStateSignedOut})
+	writeJSON(w, state)
 }
 
 func readWebAuthBody(w http.ResponseWriter, r *http.Request) (webAuthBody, bool) {

@@ -169,6 +169,13 @@ func (w *WebAuth) SetupState() (pending bool, code string, err error) {
 	return true, formatSetupCode(code), nil
 }
 
+// ResetPending is whether the authenticator was cleared and login needs the Setup code (TOTP on).
+func (w *WebAuth) ResetPending() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.file.AuthenticatorResetPending
+}
+
 // SetupStart checks the Setup code and returns a new TOTP secret tied to it.
 // With TOTP off it returns no secret.
 func (w *WebAuth) SetupStart(totpOn bool, code, ip string) (string, error) {
