@@ -1,13 +1,14 @@
 import { Box, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
-import { createMemoryRouter, RouterProvider } from "react-router";
+import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
+import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { WideContext } from "../useWide";
 import { EpicPage } from "../epic/EpicPage";
 import { EpicCard } from "../epics/EpicCard";
-import type { EpicDetail, EpicDetailRow, EpicListRow, FixAgentResult } from "../generated/server";
+import type { EpicDetail, EpicDetailRow, EpicListRow, FixAgentResult, SessionInfo } from "../generated/server";
 import { JumpRow } from "../nav/JumpMenu";
 import { Arc } from "../ui/arc/Arc";
 import { StatusIcon, STATUS_LABELS, type StatusKind } from "../ui/status-icon/StatusIcon";
@@ -119,6 +120,30 @@ const withRows = (over: Partial<EpicDetail>, rows: EpicDetailRow[]) =>
 
 const claimed = new Date().toISOString();
 const doneRows = [epicRow("01", { rendered_status: "done", elapsed: 120 }), epicRow("02", { rendered_status: "done", elapsed: 300 })];
+
+const agentSession = (id: string, over: Partial<SessionInfo>): SessionInfo => ({
+  id,
+  name: id,
+  project: "gx",
+  dir: "/x",
+  harness: "claude",
+  status: { state: "idle" },
+  status_changed_at: claimed,
+  run_started_at: claimed,
+  unread: {},
+  actionable: {},
+  auto_advance: true,
+  ...over,
+});
+const AGENT_SESSIONS: SessionInfo[] = [
+  agentSession("s-1", { status: { state: "starting" } }),
+  agentSession("s-2", { status: { state: "working", background: true }, design: true, ticket: "gx:map/01" }),
+  agentSession("s-3", { unread: { unread: true } }),
+  agentSession("s-4", { status: { state: "blocked" }, actionable: { reason: "Pick a layout" } }),
+  agentSession("s-5", { status: { state: "rate-limited" } }),
+  agentSession("s-6", { status: { state: "exited" }, exit: "clean" }),
+  agentSession("s-7", { project: "other", status: { state: "exited" }, exit: "crashed" }),
+];
 
 // getState must return the same object each call, or useSyncExternalStore loops.
 const idleEpicState = { snapshot: { sessions: [] }, connected: true, loadedOnce: true, tick: 0 };
@@ -325,6 +350,7 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [
       ...perTone((tone) => <TopBar active="epics" tone={tone} build="v1.2.3" connected />),
       { label: "Epics active", node: <TopBar active="epics" build="v1.2.3" connected /> },
+      { label: "Agents active", node: <TopBar active="agents" build="v1.2.3" connected actionable={2} /> },
       { label: "Stats active", node: <TopBar active="stats" build="v1.2.3" connected /> },
       { label: "none active", node: <TopBar build="v1.2.3" connected /> },
       { label: "Paused", node: <TopBar active="epics" build="v1.2.3" mode="paused" connected /> },
@@ -505,6 +531,19 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [
       ...perTone((tone) => <EmptyState tone={tone} title="All quiet" />),
       { label: "with body", node: <EmptyState title="All quiet">Nothing is running.</EmptyState> },
+    ],
+  },
+  {
+    name: "AgentSidebar",
+    cases: [
+      {
+        label: "one row per state",
+        node: (
+          <MemoryRouter>
+            <AgentSidebar selected="s-2" sessions={AGENT_SESSIONS} />
+          </MemoryRouter>
+        ),
+      },
     ],
   },
   {

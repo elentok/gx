@@ -156,6 +156,12 @@ test.each(["/", "/q", "/designs", "/nonsense/here", "/epics"])("%s lands on the 
   expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
 });
 
+test.each(["/agents", "/agents/s-1"])("%s renders the Agents page with the Agents tab marked", async (path) => {
+  renderAt(path, okFor);
+  await waitFor(() => expect(currentTab()).toBe("Agents"));
+  expect(screen.getByText("Sessions")).toBeTruthy();
+});
+
 test("the epic and ticket pages mark no tab", async () => {
   renderAt("/e/gx:e", okFor, undefined, epicFetch());
   await screen.findByText("No tickets yet");

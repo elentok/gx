@@ -1,3 +1,4 @@
+import { actionableCount } from "../agents/rules";
 import { toggleAfk } from "../afk";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { TopBar, type TopBarTab } from "../ui/top-bar/TopBar";
@@ -12,6 +13,7 @@ export function ConnectedTopBar({ active, waiting }: { active?: TopBarTab; waiti
       mode={snapshot?.mode}
       connected={connected}
       waiting={waiting}
+      actionable={actionableCount(snapshot?.sessions ?? [])}
       afk={snapshot?.afk}
       health={snapshot?.health}
       onToggleAfk={() => toggleAfk(snapshot?.afk)}

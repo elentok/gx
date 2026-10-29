@@ -4,9 +4,10 @@ import { renderThemed } from "../render";
 import { TopBar } from "./TopBar";
 
 describe("TopBar", () => {
-  it("has only the Epics and Stats tabs and marks the active one", () => {
+  it("has the Epics, Agents and Stats tabs in that order and marks the active one", () => {
     const { getAllByRole, getByRole } = renderThemed(<TopBar active="stats" connected />);
-    expect(getAllByRole("link").map((l) => l.textContent)).toEqual(["Epics", "Stats"]);
+    expect(getAllByRole("link").map((l) => l.textContent)).toEqual(["Epics", "Agents", "Stats"]);
+    expect(getByRole("link", { name: "Agents" }).getAttribute("href")).toBe("#/agents");
     expect(getByRole("link", { name: "Epics" }).getAttribute("href")).toBe("#/epics");
     expect(getByRole("link", { name: "Stats" }).getAttribute("href")).toBe("#/stats");
     expect(getByRole("link", { name: "Stats" }).getAttribute("aria-current")).toBe("page");
@@ -18,6 +19,14 @@ describe("TopBar", () => {
     expect(getByRole("link", { name: "Epics · 3 need you" }).textContent).toBe("Epics3");
     unmount();
     expect(renderThemed(<TopBar connected waiting={0} />).getByRole("link", { name: "Epics" }).textContent).toBe("Epics");
+  });
+
+  it("counts the Actionable sessions on the Agents tab, leaves out a zero and marks it current", () => {
+    const { getByRole, unmount } = renderThemed(<TopBar active="agents" connected actionable={2} />);
+    expect(getByRole("link", { name: "Agents · 2 need you" }).textContent).toBe("Agents2");
+    expect(getByRole("link", { name: "Agents · 2 need you" }).getAttribute("aria-current")).toBe("page");
+    unmount();
+    expect(renderThemed(<TopBar connected actionable={0} />).getByRole("link", { name: "Agents" }).textContent).toBe("Agents");
   });
 
   it("has no menu button without a toggle or a build", () => {

@@ -1,7 +1,7 @@
 import { Box, chakra, Menu, Text } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
 import type { Health } from "../../generated/server";
-import { STATS_HREF } from "../../hrefs";
+import { AGENTS_HREF, STATS_HREF } from "../../hrefs";
 import type { QueueMode } from "../../snapshot";
 import { Chip } from "../chip/Chip";
 import { LiveDot } from "../live-dot/LiveDot";
@@ -9,10 +9,11 @@ import { TOP_BAR_HEIGHT_VAR } from "../modal/useVisualViewportHeight";
 import type { Tone } from "../tone";
 import { Tray } from "../tray/Tray";
 
-export type TopBarTab = "epics" | "stats";
+export type TopBarTab = "epics" | "agents" | "stats";
 
 const TABS: { key: TopBarTab; label: string; href: string }[] = [
   { key: "epics", label: "Epics", href: "#/epics" },
+  { key: "agents", label: "Agents", href: AGENTS_HREF },
   { key: "stats", label: "Stats", href: STATS_HREF },
 ];
 
@@ -25,6 +26,8 @@ interface Props {
   connected: boolean;
   /** Epics in Needs you other than the one on screen; it reads on the Epics tab and is left out at zero. */
   waiting?: number;
+  /** Sessions that are Actionable; it reads on the Agents tab and is left out at zero. */
+  actionable?: number;
   afk?: boolean;
   // Absent until the first snapshot lands, so the Tray is left out then.
   health?: Health;
@@ -33,7 +36,7 @@ interface Props {
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, afk = false, health, onToggleAfk }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
   const nav = useRef<HTMLElement>(null);
   // Sheets that sit below the bar read its real height from the root.
@@ -53,12 +56,14 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
   return (
     <Box as="nav" ref={nav} display="flex" alignItems="center" justifyContent="space-between" mb="4">
       <Box display="flex" gap="5">
-        {TABS.map(({ key, label, href }) => (
+        {TABS.map(({ key, label, href }) => {
+          const count = key === "epics" ? waiting : key === "agents" ? actionable : 0;
+          return (
           <chakra.a
             key={key}
             href={href}
             aria-current={key === active ? "page" : undefined}
-            aria-label={key === "epics" && waiting > 0 ? `${label} · ${waiting} ${waiting === 1 ? "needs" : "need"} you` : undefined}
+            aria-label={count > 0 ? `${label} · ${count} ${count === 1 ? "needs" : "need"} you` : undefined}
             fontFamily="condensed"
             fontSize="xl"
             fontWeight="600"
@@ -68,13 +73,14 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
             borderBottomColor={key === active ? `tone.${tone}.fg` : "transparent"}
           >
             {label}
-            {key === "epics" && waiting > 0 && (
+            {count > 0 && (
               <Text as="span" aria-hidden ml="2" color="tone.waiting.fg">
-                {waiting}
+                {count}
               </Text>
             )}
           </chakra.a>
-        ))}
+          );
+        })}
       </Box>
       <Box display="flex" alignItems="center" gap="2">
         {queueChip && <Chip tone="waiting">{queueChip}</Chip>}
