@@ -942,3 +942,36 @@ an exited session.
   1. Open `#/agents` with no session viewed.
   2. Open a session, then open `#/agents` in a fresh page.
 - **Pass:** the first visit shows "Pick a session". The fresh page redirects to the viewed session and marks its row as current.
+
+## 75. Read a session
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. Open an idle Claude session; read the header and the chat. Open a design session.
+  2. Open the session that has Unread.
+  3. Open the Working session.
+  4. Open the idle session at 560px high, send eight prompts with `gx agents prompt` and read the newest reply; send a ninth; scroll to the top and send a tenth.
+  5. Hold `/v1/sessions/chat` to answer 500, send a prompt, then stop holding and send another.
+- **Pass:** the header shows the status mark, the state chip and the directory, and no harness chip for Claude. The chat shows the person message and the reply. A design session shows "Open design page →". Opening the Unread session drops its Unread mark and `gx agents list` shows it read. The Working session shows a plain "Working" row. The chat opens at the newest reply and follows the ninth; after scrolling to the top it stays there for the tenth. While the chat read fails, the chat stays and the new prompt does not show; after the next event it shows both.
+
+## 77. Send while busy
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. Open the Working session.
+  2. Type a draft in the Message box.
+- **Pass:** the composer reads "Working. Send turns on when the session is idle." The draft stays in the box and Send is off.
+
+## 81. Session without chat
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. Open the session of the non-Claude harness.
+  2. Click Show screen, then press Esc.
+- **Pass:** the notice reads "Chat works for Claude sessions only." The composer reads "Sending works for Claude sessions only" and Send is off. Show screen opens the screen dialog and Esc closes it.
+
+## 82. No messages yet
+
+- **Scenario:** `agents`
+- **Steps:** open a Claude session whose chat is empty (`gx agents chat`).
+- **Pass:** the chat reads "No messages yet" and the Message box shows.

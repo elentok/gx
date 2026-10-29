@@ -20,6 +20,135 @@ async function freshVisit(page: Page, hash: string) {
   return other;
 }
 
+const REPLY = "Sure, here is a short answer.";
+
+const chatOf = async (fixture: Fixture, id: string) =>
+  JSON.parse(await fixture.cli("agents", "chat", id, "--json")) as { messages: unknown[] };
+
+/** Prompts a session and waits for the reply. A prompt is refused until the last turn ends, so it retries. */
+async function ask(fixture: Fixture, id: string, text: string) {
+  const before = (await chatOf(fixture, id)).messages.length;
+  await expect
+    .poll(() => fixture.cli("agents", "prompt", id, text).then(() => true, () => false))
+    .toBe(true);
+  await expect.poll(async () => (await chatOf(fixture, id)).messages.length).toBe(before + 2);
+  // The server's state follows the fake a moment late, so a prompt sent now could still land on the old turn.
+  await expect.poll(async () => (await sessions(fixture)).find((s) => s.id === id)!.status.state).toBe("working");
+  await expect.poll(async () => (await sessions(fixture)).find((s) => s.id === id)!.status.state).toBe("idle");
+}
+
+/** The chat's scroll box, found from a message in it. */
+const scrollBox = (page: Page, text: string) => page.getByText(text, { exact: true }).first();
+const scrollTo = (page: Page, text: string, top: boolean) =>
+  scrollBox(page, text).evaluate((el, toTop) => {
+    let box = el.parentElement;
+    while (box && getComputedStyle(box).overflowY !== "auto") box = box.parentElement;
+    box!.scrollTop = toTop ? 0 : box!.scrollHeight;
+  }, top);
+
+const composer = (page: Page) => page.getByRole("form", { name: "Composer" });
+
+test("75. Read a session", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const list = await sessions(fixture);
+  const idle = list[0];
+  const working = list[1];
+  const design = list[2];
+  const unread = list.find((s) => s.unread.unread && s.harness === "claude")!;
+  await page.setViewportSize({ width: 1280, height: 560 });
+
+  // Header fields and the chat.
+  await go(page, `#/agents/${idle.id}`);
+  const header = page.getByRole("banner").or(page.locator("header")).last();
+  await expect(header.getByRole("img", { name: "status" })).toBeVisible();
+  await expect(header.getByText(idle.status.state, { exact: true })).toBeVisible();
+  await expect(header.getByText(idle.dir)).toBeVisible();
+  await expect(header.getByText(idle.harness, { exact: true })).toHaveCount(0);
+  await expect(page.getByText("hello", { exact: true })).toBeVisible();
+  await expect(page.getByText(REPLY)).toBeVisible();
+  await go(page, `#/agents/${design.id}`);
+  await expect(page.getByRole("link", { name: "Open design page →" })).toBeVisible();
+
+  // Unread clears when the session is viewed.
+  expect(unread.unread.unread).toBe(true);
+  await expect(row(page, unread).getByRole("img", { name: "Unread" })).toBeVisible();
+  await go(page, `#/agents/${unread.id}`);
+  await expect(row(page, unread).getByRole("img", { name: "Unread" })).toHaveCount(0);
+  await expect.poll(async () => !!(await sessions(fixture)).find((s) => s.id === unread.id)!.unread.unread).toBe(false);
+
+  // A Working session shows a plain Working row.
+  await go(page, `#/agents/${working.id}`);
+  await expect(page.getByRole("status").filter({ hasText: /^Working$/ })).toBeVisible();
+
+  // The chat opens at the newest message and follows new ones until the reader scrolls up.
+  await go(page, `#/agents/${idle.id}`);
+  for (const n of [1, 2, 3, 4, 5, 6, 7, 8]) await ask(fixture, idle.id, `turn ${n}`);
+  const newest = page.getByText(REPLY).last();
+  await expect(page.getByText(REPLY)).toHaveCount(9);
+  await expect(newest).toBeInViewport();
+  await expect(page.getByText("hello", { exact: true })).not.toBeInViewport();
+  await ask(fixture, idle.id, "turn 9");
+  await expect(page.getByText(REPLY)).toHaveCount(10);
+  await expect(newest).toBeInViewport();
+  await scrollTo(page, "hello", true);
+  await expect(page.getByText("hello", { exact: true })).toBeInViewport();
+  await ask(fixture, idle.id, "turn 10");
+  await expect(page.getByText(REPLY)).toHaveCount(11);
+  await expect(newest).not.toBeInViewport();
+  await scrollTo(page, "hello", false);
+
+  // A failed chat read keeps the chat; the next event refetches it.
+  let failing = true;
+  await page.route("**/v1/sessions/chat*", (route) => (failing ? route.fulfill({ status: 500, body: "boom" }) : route.continue()));
+  await ask(fixture, idle.id, "while failing");
+  await expect(page.getByText("turn 10", { exact: true })).toBeVisible();
+  await expect(page.getByText("while failing", { exact: true })).toHaveCount(0);
+  failing = false;
+  await ask(fixture, idle.id, "after recovery");
+  await expect(page.getByText("while failing", { exact: true })).toHaveCount(1);
+  await expect(page.getByText("after recovery", { exact: true })).toBeVisible();
+});
+
+test("77. Send while busy", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const working = (await sessions(fixture))[1];
+  expect(working.status.state).toBe("working");
+  await go(page, `#/agents/${working.id}`);
+
+  await expect(composer(page).getByText("Working. Send turns on when the session is idle.")).toBeVisible();
+  const box = composer(page).getByRole("textbox", { name: "Message" });
+  await box.fill("a draft for later");
+  await expect(box).toHaveValue("a draft for later");
+  await expect(composer(page).getByRole("button", { name: "Send" })).toBeDisabled();
+});
+
+test("81. Session without chat", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const other = (await sessions(fixture)).find((s) => s.harness !== "claude")!;
+  await go(page, `#/agents/${other.id}`);
+
+  await expect(page.getByText("Chat works for Claude sessions only.")).toBeVisible();
+  await expect(composer(page).getByText("Sending works for Claude sessions only")).toBeVisible();
+  await expect(composer(page).getByRole("button", { name: "Send" })).toBeDisabled();
+
+  await page.getByRole("button", { name: "Show screen" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("82. No messages yet", async ({ page, start }) => {
+  const fixture = await start("agents");
+  const claude = (await sessions(fixture)).filter((s) => s.harness === "claude");
+  const empty: SessionInfo[] = [];
+  for (const s of claude) if ((await chatOf(fixture, s.id)).messages.length === 0) empty.push(s);
+  expect(empty.length).toBeGreaterThan(0);
+  await go(page, `#/agents/${empty[0].id}`);
+
+  await expect(page.getByText("No messages yet")).toBeVisible();
+  await expect(composer(page).getByRole("textbox", { name: "Message" })).toBeVisible();
+});
+
 test("72. Agents tab", async ({ page, start }) => {
   const fixture = await start("agents");
   const list = await sessions(fixture);
