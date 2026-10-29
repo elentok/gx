@@ -56,6 +56,7 @@ func (r *cleanRig) afterEachRun(f func()) {
 
 // Story 37.
 func TestDiskCleanNow_RunsTheSameWorkAndStaysArmed(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"plain": "", "custom": overrideCmd}, 0, 10*gb)
 	r.known(t)
 	res := r.cleanNow(t)
@@ -73,6 +74,7 @@ func TestDiskCleanNow_RunsTheSameWorkAndStaysArmed(t *testing.T) {
 
 // Story 38, held disk.
 func TestDiskCleanNow_HoldEndsInTheResponse(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 	r.setFree(3 * gb)
 	r.waitClean(t, 1)
@@ -87,7 +89,7 @@ func TestDiskCleanNow_HoldEndsInTheResponse(t *testing.T) {
 		t.Errorf("snapshot disks = %+v, %v; want none", snap.Disks, err)
 	}
 	r.waitClean(t, 2)
-	letWatcherRead()
+	r.letWatcherRead(t)
 	if n := r.countBodies("disk clean"); n != 2 {
 		t.Errorf("clean notices = %d, want 2", n)
 	}
@@ -98,6 +100,7 @@ func TestDiskCleanNow_HoldEndsInTheResponse(t *testing.T) {
 
 // Story 38, warned disk.
 func TestDiskCleanNow_UnheldDiskKeepsDispatching(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 20*gb, 10*gb)
 	r.setFree(15 * gb)
 	r.known(t)
@@ -121,6 +124,7 @@ func TestDiskCleanNow_UnheldDiskKeepsDispatching(t *testing.T) {
 
 // Story 39.
 func TestDiskCleanNow_NoCleanupWorkOnlyReadsAgain(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": noCmd}, 0, 10*gb)
 	r.setFree(3 * gb)
 	r.waitClean(t, 1)
@@ -137,7 +141,9 @@ func TestDiskCleanNow_NoCleanupWorkOnlyReadsAgain(t *testing.T) {
 
 // Story 41.
 func TestDiskCleanNow_Refusals(t *testing.T) {
+	t.Parallel()
 	t.Run("automatic clean running", func(t *testing.T) {
+		t.Parallel()
 		r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 		r.clean.blockUntilCleanup(t)
 		r.setFree(3 * gb)
@@ -149,6 +155,7 @@ func TestDiskCleanNow_Refusals(t *testing.T) {
 		r.clean.release()
 	})
 	t.Run("clean now running", func(t *testing.T) {
+		t.Parallel()
 		r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 		r.known(t)
 		r.clean.blockUntilCleanup(t)
@@ -164,6 +171,7 @@ func TestDiskCleanNow_Refusals(t *testing.T) {
 		}
 	})
 	t.Run("unknown disk", func(t *testing.T) {
+		t.Parallel()
 		r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 		res, err := r.h.Client.CleanDisk(context.Background(), "nope")
 		if err != nil || !res.Refused || res.Reason != server.ReasonUnknownDisk {
@@ -174,6 +182,7 @@ func TestDiskCleanNow_Refusals(t *testing.T) {
 
 // Story 41: a "clean now" never changes armed or spent.
 func TestDiskCleanNow_ArmedStaysArmed(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 	r.known(t)
 	r.clean.blockUntilCleanup(t)
@@ -190,6 +199,7 @@ func TestDiskCleanNow_ArmedStaysArmed(t *testing.T) {
 }
 
 func TestDiskCleanNow_FailureIsAnAnswer(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 	r.known(t)
 	r.clean.err = errors.New("boom")
@@ -203,6 +213,7 @@ func TestDiskCleanNow_FailureIsAnAnswer(t *testing.T) {
 }
 
 func TestWebDiskClean_PostReachesTheHandler(t *testing.T) {
+	t.Parallel()
 	h, base := startWeb(t)
 	cookie := login(t, h.StateDir, base)
 	code, body := webPostJSON(t, base+"/v1/disk/clean", `{"disk":"nope"}`, cookie, "", jsonPost(base))

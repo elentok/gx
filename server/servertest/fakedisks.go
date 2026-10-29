@@ -2,6 +2,8 @@ package servertest
 
 import (
 	"sync"
+	"testing"
+	"time"
 
 	"github.com/elentok/gx/server"
 )
@@ -18,6 +20,7 @@ const (
 type FakeDisks struct {
 	mu     sync.Mutex
 	byPath map[string]server.DiskReading
+	reads  int
 }
 
 // Put sets what path reports: its disk id, display name and free bytes.
@@ -64,7 +67,24 @@ func (f *FakeDisks) SetFree(path string, free uint64) {
 func (f *FakeDisks) Read(path string) (server.DiskReading, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.reads++
 	return f.read(path), nil
+}
+
+// Reads is how many times the server has read a path.
+func (f *FakeDisks) Reads() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.reads
+}
+
+// WaitReads waits until the server has read n more times than it had when the
+// call began. A reading taken after a change is the event an unwanted effect
+// of that change would follow, so a test checks for its absence once this returns.
+func (f *FakeDisks) WaitReads(t *testing.T, n int) {
+	t.Helper()
+	want := f.Reads() + n
+	WaitFor(t, 5*time.Second, "the watcher to read again", func() bool { return f.Reads() >= want })
 }
 
 func (f *FakeDisks) read(path string) server.DiskReading {

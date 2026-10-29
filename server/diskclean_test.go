@@ -157,10 +157,16 @@ func (r *cleanRig) waitClean(t *testing.T, n int) string {
 	return last
 }
 
-// settle gives the watcher time to take several readings, then checks the run count.
+// letWatcherRead waits for the watcher to take several more readings.
+func (r *cleanRig) letWatcherRead(t *testing.T) {
+	t.Helper()
+	r.disks.WaitReads(t, 10*max(1, len(r.repos)))
+}
+
+// wantCalls waits for several more readings, then checks the run count.
 func (r *cleanRig) wantCalls(t *testing.T, n int) {
 	t.Helper()
-	letWatcherRead()
+	r.letWatcherRead(t)
 	if got := r.clean.recorded(); len(got) != n {
 		t.Errorf("cleanup calls = %v, want %d", got, n)
 	}
@@ -175,6 +181,7 @@ func (r *cleanRig) queue(t *testing.T, addr string) {
 
 // Story 4.
 func TestDiskClean_DefaultCommandRunsInTheRepo(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 	r.setFree(3 * gb)
 	got := r.waitCalls(t, 1)
@@ -185,6 +192,7 @@ func TestDiskClean_DefaultCommandRunsInTheRepo(t *testing.T) {
 
 // Story 5.
 func TestDiskClean_OverrideRunsForItsProjectOnly(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"plain": "", "custom": overrideCmd}, 0, 10*gb)
 	r.setFree(3 * gb)
 	got := r.waitCalls(t, 2)
@@ -198,6 +206,7 @@ func TestDiskClean_OverrideRunsForItsProjectOnly(t *testing.T) {
 
 // Story 6.
 func TestDiskClean_CleanupOffHoldsAndSaysSo(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": noCmd}, 0, 10*gb)
 	r.setFree(3 * gb)
 	body := r.waitClean(t, 1)
@@ -218,6 +227,7 @@ func (r *cleanRig) disksWhen(t *testing.T, what string, pred func([]server.DiskS
 
 // Story 3.
 func TestDiskClean_ZeroThresholdNeverCleansOrHolds(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 0)
 	r.setFree(1)
 	r.wantCalls(t, 0)
@@ -226,6 +236,7 @@ func TestDiskClean_ZeroThresholdNeverCleansOrHolds(t *testing.T) {
 
 // Story 21 and the resume rule: a reading while a clean runs never clears the hold.
 func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 	r.clean.blockUntilCleanup(t)
 	r.setFree(3 * gb)
@@ -233,7 +244,7 @@ func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T)
 	r.queue(t, "proj:epic-a/01")
 	r.disksWhen(t, "held and cleaning", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held && d[0].Cleaning })
 	r.setFree(50 * gb)
-	letWatcherRead()
+	r.letWatcherRead(t)
 	if len(r.start()) != 0 || len(r.h.Server.Runs()) != 0 {
 		t.Fatalf("a ticket started during the clean: %v", r.start())
 	}
@@ -251,6 +262,7 @@ func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T)
 
 // Story 22.
 func TestDiskClean_DedupesPairs(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"a": "", "b": "", "c": ""}, 0, 10*gb)
 	r.setFree(3 * gb)
 	r.waitCalls(t, 3)
@@ -274,7 +286,7 @@ func TestDiskClean_DedupesPairs(t *testing.T) {
 		c.DiskSpace = config.DiskSpaceConfig{CleanBelow: 10 * gb, CleanupCommand: []string{"go", "clean", "-cache"}}
 	})
 	waitFor(t, func() bool { return len(fake.recorded()) >= 1 })
-	letWatcherRead()
+	disks.WaitReads(t, 10)
 	if got := fake.recorded(); len(got) != 1 {
 		t.Errorf("calls for a shared repo = %v, want 1", got)
 	}
@@ -282,6 +294,7 @@ func TestDiskClean_DedupesPairs(t *testing.T) {
 
 // Story 23.
 func TestDiskClean_ReArmsOnlyWellAboveTheLine(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name      string
 		warn      config.ByteSize
@@ -293,19 +306,20 @@ func TestDiskClean_ReArmsOnlyWellAboveTheLine(t *testing.T) {
 		{"warn equals clean", 10 * gb, 11 * gb, 13*gb + 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			r := startCleanRig(t, map[string]string{"proj": ""}, tc.warn, 10*gb)
 			r.setFree(3 * gb)
 			r.waitCalls(t, 1)
 			for _, f := range []uint64{8 * gb, 3 * gb, 9 * gb, 3 * gb} {
 				r.setFree(f)
-				letWatcherRead()
+				r.letWatcherRead(t)
 			}
 			r.setFree(tc.justAbove)
-			letWatcherRead()
+			r.letWatcherRead(t)
 			r.setFree(3 * gb)
 			r.wantCalls(t, 1)
 			r.setFree(tc.wellAbove)
-			letWatcherRead()
+			r.letWatcherRead(t)
 			r.setFree(3 * gb)
 			r.waitCalls(t, 2)
 			r.wantCalls(t, 2)
@@ -315,6 +329,7 @@ func TestDiskClean_ReArmsOnlyWellAboveTheLine(t *testing.T) {
 
 // Story 24.
 func TestDiskClean_NoCleanInNormalUse(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 	r.queue(t, "proj:epic-a/01")
 	waitFor(t, func() bool { return len(r.start()) >= 1 })
@@ -335,6 +350,7 @@ func TestDiskClean_NoCleanInNormalUse(t *testing.T) {
 
 // Story 25.
 func TestDiskClean_NoticeCarriesFreedFreeAndHoldState(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name  string
 		free  uint64
@@ -345,6 +361,7 @@ func TestDiskClean_NoticeCarriesFreedFreeAndHoldState(t *testing.T) {
 		{"not held", 50 * gb, "freed 47 GB; 50 GB free now", "dispatch is not held"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 			r.clean.after = func() { r.setFree(tc.free) }
 			r.setFree(3 * gb)
@@ -361,6 +378,7 @@ func TestDiskClean_NoticeCarriesFreedFreeAndHoldState(t *testing.T) {
 
 // Story 26.
 func TestDiskClean_FailureIsLoggedNoticedAndKeepsTheHold(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 	r.clean.err = errors.New("boom")
 	r.setFree(3 * gb)
@@ -377,6 +395,7 @@ func TestDiskClean_FailureIsLoggedNoticedAndKeepsTheHold(t *testing.T) {
 
 // Story 27.
 func TestDiskClean_TimeLimitKillsTheCommand(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": `,"disk-space":{"cleanup-command":["sleep","5"]}`}, 0, 10*gb,
 		func(c *server.Config) {
 			c.CleanupRunner = server.RunCleanupCommand
@@ -395,10 +414,11 @@ func TestDiskClean_TimeLimitKillsTheCommand(t *testing.T) {
 
 // Story 12 (clean part).
 func TestDiskClean_TwoProjectsOnOneDiskSendOneNotice(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"a": "", "b": ""}, 0, 10*gb)
 	r.setFree(3 * gb)
 	r.waitClean(t, 1)
-	letWatcherRead()
+	r.letWatcherRead(t)
 	if n := r.countBodies("disk clean"); n != 1 {
 		t.Errorf("clean notices = %d, want 1", n)
 	}
@@ -408,6 +428,7 @@ func TestDiskClean_TwoProjectsOnOneDiskSendOneNotice(t *testing.T) {
 // projects before the first claim, so the real command runs and no notice says
 // there was nothing to clean.
 func TestDiskClean_RestartWithAQueuedTicketRunsTheRealCommandOnce(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 20*gb, 10*gb)
 	r.clean.blockUntilCleanup(t)
 	r.queue(t, "proj:epic-a/01")
@@ -431,6 +452,7 @@ func TestDiskClean_RestartWithAQueuedTicketRunsTheRealCommandOnce(t *testing.T) 
 
 // Story 57.
 func TestDiskClean_RestartOnALowDiskWarnsHoldsAndCleansAgain(t *testing.T) {
+	t.Parallel()
 	r := startCleanRig(t, map[string]string{"proj": ""}, 20*gb, 10*gb)
 	r.setFree(3 * gb)
 	r.waitClean(t, 1)
