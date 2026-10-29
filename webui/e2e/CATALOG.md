@@ -12,7 +12,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 92). The numbers 72 to 74 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 75, 76 "Send and draft", 77, 78 "Send refused", 79 "Keyboard send", 81, 82, 92). The numbers 72 to 74 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -961,6 +961,49 @@ an exited session.
   1. Open the Working session.
   2. Type a draft in the Message box.
 - **Pass:** the composer reads "Working. Send turns on when the session is idle." The draft stays in the box and Send is off.
+
+## 76. Send and draft
+
+Run with `-g "76\. Send and draft"`: the number 76 is also used by the disk flow.
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. Open an idle Claude session at 1280px and type a draft in the Message box.
+  2. Open the same session in a new tab of the same browser.
+  3. Press Send in the first tab.
+- **Pass:** the first tab shows "Draft saved in this browser". The new tab has the draft in the box. After Send the box is empty, the note is gone, the chat shows the text and `gx agents chat <id>` lists it.
+
+## 78. Send refused
+
+Run with `-g "78\. Send refused"`: the number 78 is also used by the disk flow.
+
+- **Scenario:** `agents`
+- **Steps:**
+  1. Open an idle Claude session. Hold `/v1/sessions/chat` to answer 500 and send a prompt with `gx agents prompt`.
+  2. Type a draft, stop holding and press Send.
+  3. Type `/clear` and press Send.
+- **Pass:** the composer reads "the conversation moved; review it first" in a colour other than the draft note's. The chat reloads and shows the CLI prompt. The draft stays in the box and `gx agents chat` does not list it. The `/clear` send reads "text may not start with / or !" and keeps `/clear` in the box.
+
+## 79. Keyboard send
+
+Run with `-g "79\. Keyboard send"`: it matches three tests, and the number 79 is also used by the tray flow. The last two are the Design page half.
+
+- **Scenarios:** `agents`; `design` and `design-working` for the Design page.
+- **Steps:**
+  1. At 390px open an idle Claude session, type text and press Ctrl+Enter, then press Send. Wait for Idle.
+  2. At 1280px type a line, press Enter, type a second line, then press Ctrl+Enter.
+  3. Design page, `design`: start the session, press Note, press Ctrl+Enter with no question answered, press Escape.
+  4. Answer both questions and press Ctrl+Enter. When Continue shows, open Note and press Ctrl+Enter.
+  5. Type a message and press Ctrl+Enter.
+  6. Design page, `design-working`: start the session, open Note and send Ctrl+Enter to the box.
+- **Pass:**
+  - At 390px the key sends nothing and the text stays; the button sends.
+  - At 1280px Enter adds a newline, no prompt goes out, and Ctrl+Enter sends both lines.
+  - With gaps, the key opens the "Unanswered questions" popover with "2 questions are unanswered" and posts nothing.
+  - With every question answered, the key posts the round once.
+  - While Continue is the main button, the key posts nothing and opens no popover.
+  - With text, the main button is Send and the key posts it.
+  - While Interrupt is the main button the box is off. The key posts nothing and opens no popover.
 
 ## 81. Session without chat
 
