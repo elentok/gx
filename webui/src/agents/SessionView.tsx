@@ -4,6 +4,7 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import { useSessionChat, type FetchChat } from "../design/chat";
 import { DesignChat, type ChatOptions } from "../design/ChatLog";
 import { Composer } from "../design/Composer";
+import { FailureBanner, needsTranscript, visibleFailure } from "../design/FailureBanner";
 import { ScreenModal } from "../design/ScreenModal";
 import type { FetchScreen } from "../design/screen";
 import { designOf, promptable } from "../design/view";
@@ -69,18 +70,24 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
 }
 
 /** A non-Claude session has no transcript, so its screen is the only thing to read. */
-function NoChat({ sessionId, fetchScreen }: { sessionId: string; fetchScreen?: FetchScreen }) {
+function NoChat({ session, fetchScreen }: { session: SessionInfo; fetchScreen?: FetchScreen }) {
   const [screen, setScreen] = useState(false);
+  const failure = visibleFailure(session.failure);
   return (
-    <Box display="flex" alignItems="center" justifyContent="space-between" gap="3" flexWrap="wrap" borderWidth="1px" borderRadius="md" px="3" py="2">
-      <Text color="text.muted" fontSize="sm">
-        Chat works for Claude sessions only.
-      </Text>
-      <Button emphasis="secondary" onClick={() => setScreen(true)}>
-        Show screen
-      </Button>
-      {screen && <ScreenModal target={sessionId} fetcher={fetchScreen} onClose={() => setScreen(false)} />}
-    </Box>
+    <>
+      {failure && !needsTranscript(failure) && (
+        <FailureBanner failure={failure} session={session} restore={false} address="" />
+      )}
+      <Box display="flex" alignItems="center" justifyContent="space-between" gap="3" flexWrap="wrap" borderWidth="1px" borderRadius="md" px="3" py="2">
+        <Text color="text.muted" fontSize="sm">
+          Chat works for Claude sessions only.
+        </Text>
+        <Button emphasis="secondary" onClick={() => setScreen(true)}>
+          Show screen
+        </Button>
+        {screen && <ScreenModal target={session.id} fetcher={fetchScreen} onClose={() => setScreen(false)} />}
+      </Box>
+    </>
   );
 }
 
@@ -133,7 +140,7 @@ export function SessionView({
           options={AGENT_OPTIONS}
         />
       ) : (
-        <NoChat sessionId={session.id} fetchScreen={fetchScreen} />
+        <NoChat session={session} fetchScreen={fetchScreen} />
       )}
       <Composer
         design={false}

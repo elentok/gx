@@ -462,6 +462,33 @@ test("a non-Claude session loads no chat, shows the notice, Show screen opens th
   expect(screenCalls).toEqual(["s-2"]);
 });
 
+test.each([
+  { kind: "crashed", over: { status: { state: "exited" }, exit: "crashed" }, label: "Agent crashed", buttons: [] },
+  { kind: "blocked", over: { status: { state: "blocked" } }, label: "Waiting at a prompt in the terminal", buttons: ["Screen"] },
+  { kind: "rate-limit", over: { status: { state: "rate-limited" } }, label: "Rate limited", buttons: [] },
+] as { kind: string; over: Partial<SessionInfo>; label: string; buttons: string[] }[])(
+  "a non-Claude session with a $kind failure shows the banner with only its buttons",
+  async (c) => {
+    render([session("s-2", "p", { ...c.over, harness: "codex", failure: { kind: c.kind, label: c.label } })], "/agents/s-2", true);
+    const banner = within(await screen.findByRole("region", { name: "Session failure" }));
+    expect(banner.getByText(c.label)).toBeTruthy();
+    expect(banner.queryAllByRole("button").map((b) => b.textContent)).toEqual(c.buttons);
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "New session" })).toBeNull();
+    expect(screen.getByText("Chat works for Claude sessions only.")).toBeTruthy();
+  },
+);
+
+test.each(["auth", "stalled"])("a non-Claude session with a %s failure, which needs a transcript, or none, shows no banner", async (kind) => {
+  render([session("s-2", "p", { harness: "codex", failure: { kind, label: "x" } })], "/agents/s-2", true);
+  await screen.findByText("Chat works for Claude sessions only.");
+  expect(screen.queryByRole("region", { name: "Session failure" })).toBeNull();
+  cleanup();
+  render([session("s-2", "p", { harness: "codex" })], "/agents/s-2", true);
+  await screen.findByText("Chat works for Claude sessions only.");
+  expect(screen.queryByRole("region", { name: "Session failure" })).toBeNull();
+});
+
 test("a design session shows its plain chat with no sheet, and links to its map's design page", async () => {
   const round = [{ id: "q1", header: "Pick", question: "Which one?", options: [] }] as unknown as SessionChatResponse["round"];
   render([session("s-1", "p", { design: true, ticket: "gx:map/01" })], "/agents/s-1", true, chatOf(chat({ round })));
