@@ -95,6 +95,20 @@ func TestExecute_TicketsShow_FullAndShortAddressesPrintCanonical(t *testing.T) {
 	}
 }
 
+func TestExecute_TicketsShow_UnpaddedSubIDResolvesPaddedTicket(t *testing.T) {
+	repo, project := setupShowProject(t)
+	testutil.WriteFile(t, filepath.Join(project, "epic", "issues"), "06a-sub.md",
+		strings.Replace(showTicketFixture, `id: "06"`, `id: "06a"`, 1))
+
+	out, err := runIn(t, repo, "tickets", "show", "epic/6a")
+	if err != nil {
+		t.Fatalf("show epic/6a: %v", err)
+	}
+	if !strings.HasPrefix(out, "mine:epic/06a  ") {
+		t.Errorf("show epic/6a printed %q", out)
+	}
+}
+
 func TestExecute_TicketsShow_FollowsArchivedOneOff(t *testing.T) {
 	repo, project := setupShowProject(t)
 	archived := filepath.Join(project, tickets.ArchivedOneOffsEpic)
