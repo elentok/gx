@@ -173,7 +173,25 @@ structural (headings, link paths, selector names, numbers), never long prose.
 
 For a **bug-fix ticket**, the regression seam must also say "the test must fail on the old code" and
 name the test form the Decisions chose (table test, server-level test, ...). A test that passes on
-the old code proves nothing. When a seam names `ClaimNext`, name the queue step that feeds it too
+the old code proves nothing. A test that reads a new field or calls a new function cannot run on the
+old code: it does not compile. For such a seam write "must fail to compile or fail on the old code",
+and the agent confirms the compile error as the red step.
+
+For every seam file, state what the agent cannot guess:
+
+- **Test environment**: name the environment of each seam file (read its first lines for
+  `// @vitest-environment node`). A seam that checks the DOM (`data-state`, roles) in a node-environment
+  file cannot be met; name a DOM-environment file or say to add one.
+- **Playwright filters**: give a `-g` pattern that matches the full test title. Check it with
+  `gx brief -C webui playwright` on the flow numbers. A `^` anchor finds no tests, because Playwright
+  matches `-g` against the full title, which starts with the project and file prefix.
+- **Generated files**: when the ticket says "regenerate", name the exact command (e.g.
+  `make web-types`) after checking the Makefile target exists.
+- **Mock path**: for a ticket that builds from a stored mock, give the mock HTML path
+  (`$(gx tickets root)/<map>/mocks/<file>.html`), not only its name.
+- **Examples against the helper**: when a ticket reuses a predicate or helper (e.g.
+  `!needsTranscript(failure)`) and also gives examples of what it shows or hides, read the helper and
+  check each example against it. If they disagree, say which one wins. When a seam names `ClaimNext`, name the queue step that feeds it too
 (e.g. `h.Client.QueueAdd(...)`), or the test never reaches the branch under test.
 
 ### 4b. Write each implement ticket's "Where to look" map
