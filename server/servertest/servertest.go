@@ -60,6 +60,10 @@ type Harness struct {
 	herdrDown atomic.Bool
 
 	extraRunners []agentrunner.Runner
+	// pty is set when the harness builds the PTY runner itself; turn is the
+	// OnTurn hook it runs on a prompt.
+	pty  bool
+	turn atomic.Pointer[func(*Turn)]
 	// Stop does what SIGTERM does to the real server: shut down, release the
 	// lock, and return Serve's result. Safe to call more than once.
 	Stop func() error
@@ -210,6 +214,10 @@ type Turn struct {
 // pane and cwd, and runs agent for every turn (e.g. a commit in t.Cwd). The
 // agent is idle again when the hook returns.
 func (h *Harness) OnTurn(agent func(t *Turn)) {
+	if h.pty {
+		h.turn.Store(&agent)
+		return
+	}
 	var mu sync.Mutex
 	cwds := map[string]string{}  // pane -> cwd
 	named := map[string]string{} // agent name -> pane
@@ -477,6 +485,7 @@ type runnerChoice struct {
 	runner    agentrunner.Runner
 	runnerFor func(name, dir string) agentrunner.Runner
 	herdr     bool
+	pty       bool
 }
 
 // choices maps a config under construction to its runnerChoice. Options are
@@ -614,6 +623,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 		o(&h.cfg)
 	}
 	resolveRunner(&h.cfg, choice)
+	h.pty = choice.pty && choice.runner == nil
 	if h.cfg.Notifier == nil {
 		h.Banners = &Banners{}
 		h.cfg.Notifier = h.Banners
@@ -689,6 +699,9 @@ func (h *Harness) runners() []agentrunner.Runner {
 
 func (h *Harness) serve(t *testing.T) {
 	t.Helper()
+	if h.pty {
+		h.buildPty()
+	}
 	srv, err := server.New(h.cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -715,6 +728,9 @@ func (h *Harness) serve(t *testing.T) {
 			if sa, ok := r.(interface{ StopAll() }); ok {
 				sa.StopAll()
 			}
+		}
+		if h.pty {
+			h.stopAgents()
 		}
 		if !srv.WaitSettled(10 * time.Second) {
 			t.Logf("servertest: a run was still settling 10s after stop")
