@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { readPageCache, writePageCache } from "../pageCache";
+import { readRoundDraft, writeRoundDraft } from "../drafts";
 import type { Answers } from "./round";
 
 type RoundDraftData = { answers: Answers; notes: string; index: number; scroll: number };
@@ -22,10 +22,9 @@ function useScrollRestore(initial: number, onScroll: (y: number) => void) {
 export type RoundDraft = ReturnType<typeof useRoundDraft>;
 
 // A half-answered round survives a reload: its answers, the notes box, the open question and the page scroll.
-// pageCache keeps one entry per session, tagged with the round, so a new round never picks up an old draft.
+// drafts.ts keeps one entry per session, tagged with the round, so a new round never picks up an old draft.
 export function useRoundDraft(sessionId: string, roundKey: string) {
-  const cacheKey = `round.${sessionId}`;
-  const [draft, setDraft] = useState<RoundDraftData>(() => ({ ...EMPTY, ...readPageCache<RoundDraftData>(cacheKey, roundKey) }));
+  const [draft, setDraft] = useState<RoundDraftData>(() => ({ ...EMPTY, ...readRoundDraft<RoundDraftData>(sessionId, roundKey) }));
   // The scroll lives in a ref: every scroll event saving through state would repaint the page.
   const scroll = useRef(draft.scroll);
   const latest = useRef(draft);
@@ -34,9 +33,9 @@ export function useRoundDraft(sessionId: string, roundKey: string) {
 
   const save = useCallback(
     (d: RoundDraftData) => {
-      if (!sent.current) writePageCache(cacheKey, { ...d, scroll: scroll.current }, roundKey);
+      if (!sent.current) writeRoundDraft(sessionId, roundKey, { ...d, scroll: scroll.current });
     },
-    [cacheKey, roundKey],
+    [sessionId, roundKey],
   );
   useEffect(() => save(draft), [save, draft]);
   useScrollRestore(
@@ -58,7 +57,7 @@ export function useRoundDraft(sessionId: string, roundKey: string) {
     /** The round went out: drop the draft and stop saving until the round changes. */
     clear: useCallback(() => {
       sent.current = true;
-      writePageCache(cacheKey, null, roundKey);
-    }, [cacheKey, roundKey]),
+      writeRoundDraft(sessionId, roundKey, null);
+    }, [sessionId, roundKey]),
   };
 }
