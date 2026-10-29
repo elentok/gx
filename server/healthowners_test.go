@@ -36,8 +36,7 @@ func startOwnedRun(t *testing.T, r *pidRunner) *servertest.Harness {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Runner = r
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(r), func(c *server.Config) {
 		c.HealthPollInterval = 5 * time.Millisecond
 		c.ProcessSecondReadDelay = 5 * time.Millisecond
 		c.ProcessShareWindow = 50 * time.Millisecond

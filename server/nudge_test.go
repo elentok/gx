@@ -93,7 +93,7 @@ func TestNudge_NotReadyRefuses(t *testing.T) {
 	claimTicket(t, store, "epic-a", "01", "01-first.md")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
 	fake := runnerfake.NewRunner()
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Runner = fake })
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 	const label = "epic-a-iter-01"
 	if _, err := fake.Start(agentrunner.StartOptions{Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
 		t.Fatal(err)

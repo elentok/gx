@@ -15,6 +15,7 @@ import (
 
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 // chatHook is a fake Slack webhook that records each body. With a gate, every
@@ -66,11 +67,7 @@ func (h *chatHook) waitFor(t *testing.T, want string) []string {
 // returned path. flush is the batch tick.
 func reloadChatServer(t *testing.T, global string, flush time.Duration) (*Server, string) {
 	t.Helper()
-	fake := herdrfake.NewState(t)
-	fake.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
-	})
-	_, herdrEnv := herdrfake.StartStateEnv(t, fake)
+	_, herdrEnv := herdrfake.StartStateEnv(t, herdrfake.NewState(t))
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +75,7 @@ func reloadChatServer(t *testing.T, global string, flush time.Duration) (*Server
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
 	store := t.TempDir()
 	path := filepath.Join(t.TempDir(), "config.json")
-	s, err := New(Config{Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: store, ConfigPath: path, Settings: Settings{
+	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: store, ConfigPath: path, Settings: Settings{
 		Chat: ralphloop.ServerChatConfig{SlackWebhookURL: global, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush},
 	}})
 	if err != nil {

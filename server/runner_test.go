@@ -958,14 +958,12 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 	fake := runnerfake.NewRunner()
 	var projects []string
 	var mu sync.Mutex
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, project string) agentrunner.Runner {
-			mu.Lock()
-			defer mu.Unlock()
-			projects = append(projects, project)
-			return fake
-		}
-	})
+	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(fake, func(_, project string) agentrunner.Runner {
+		mu.Lock()
+		defer mu.Unlock()
+		projects = append(projects, project)
+		return fake
+	}))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)

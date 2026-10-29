@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -92,9 +91,7 @@ func runToConflict(t *testing.T, agents string, midRun func(store, repo string))
 		testutil.CommitAll(t, feature, "conflicting")
 		midRun(store, repo)
 	})
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
-	})
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}

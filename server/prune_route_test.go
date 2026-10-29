@@ -63,17 +63,15 @@ func TestPrune_HeadlessDirsArePrunedUnderAHerdrConfig(t *testing.T) {
 	fresh := agentDir(t, root, "fresh", time.Now())
 
 	configured := newRenamedFake("herdr", nativerunner.VerdictLive)
-	servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Runner = configured
-		c.RunnerFor = func(name, project string) agentrunner.Runner {
-			if name == "headless" && project == "proj" {
-				return &nativerunner.Headless{Root: root, Procs: noProcs{}}
-			}
-			if name == configured.Name() {
-				return configured
-			}
-			return nil
+	servertest.StartWithStore(t, store, servertest.WithRunnerFor(configured, func(name, project string) agentrunner.Runner {
+		if name == "headless" && project == "proj" {
+			return &nativerunner.Headless{Root: root, Procs: noProcs{}}
 		}
+		if name == configured.Name() {
+			return configured
+		}
+		return nil
+	}), func(c *server.Config) {
 		c.LogRetention = retention
 	})
 

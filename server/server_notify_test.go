@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/subscription"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/testutil/runnerfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -47,19 +48,15 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 		}
 	}))
 	t.Cleanup(hook.Close)
-	// New probes herdr; answer it so a runner without herdr doesn't leak a
-	// "herdr unavailable" notice into the recorded sends.
-	fake := herdrfake.NewState(t)
-	fake.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
-	})
-	_, herdrEnv := herdrfake.StartStateEnv(t, fake)
+	// A configured runner keeps New from probing herdr, so no "herdr
+	// unavailable" notice leaks into the recorded sends.
+	_, herdrEnv := herdrfake.StartStateEnv(t, herdrfake.NewState(t))
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
-	s, err := New(Config{Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: soft, BudgetHardLimit: hard,
+	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: soft, BudgetHardLimit: hard,
 		Chat: ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL, GateStatePath: filepath.Join(t.TempDir(), "gate.json"), FlushInterval: flush}},
 		// Not the real ~/.claude.json, which could add an extra-usage notice.
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
@@ -474,17 +471,13 @@ func TestServerChat_EmptyGateStatePathUsesTheStateDir(t *testing.T) {
 	t.Parallel()
 	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	t.Cleanup(hook.Close)
-	fake := herdrfake.NewState(t)
-	fake.Register("workspace", "list", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		return map[string]any{"workspaces": []any{}}, herdrfake.Identities{}, nil
-	})
-	_, herdrEnv := herdrfake.StartStateEnv(t, fake)
+	_, herdrEnv := herdrfake.StartStateEnv(t, herdrfake.NewState(t))
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
-	s, err := New(Config{Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(),
+	s, err := New(Config{Runner: runnerfake.NewRunner(), Env: append(os.Environ(), herdrEnv...), StateDir: stateDir, TicketStore: t.TempDir(),
 		Settings:        Settings{Chat: ralphloop.ServerChatConfig{SlackWebhookURL: hook.URL}},
 		ExtraUsageCheck: func() subscription.State { return subscription.StateDisabled }})
 	if err != nil {

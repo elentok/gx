@@ -336,8 +336,7 @@ func runBudgetKill(t *testing.T, cost func() float64, ticket servertest.TicketOp
 	}
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := runnerfake.NewRunner()
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Runner = fake
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.BudgetHardLimit = 5
 		c.BudgetKillGrace = 50 * time.Millisecond
 		c.BudgetPollInterval = time.Hour
@@ -385,8 +384,7 @@ func startBudgetRuns(t *testing.T, n int, grace time.Duration) (*servertest.Harn
 	}
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := runnerfake.NewRunner()
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.Runner = fake
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.BudgetHardLimit = 5
 		c.BudgetKillGrace = grace
 		c.BudgetPollInterval = time.Hour

@@ -53,8 +53,7 @@ func startGraceServer(t *testing.T, grace time.Duration, opts ...func(*server.Co
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "second", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	path := filepath.Join(t.TempDir(), "config.json")
-	opts = append([]func(*server.Config){servertest.WithConfigFile(path), func(c *server.Config) {
-		c.Runner = runnerfake.NewRunner()
+	opts = append([]func(*server.Config){servertest.WithConfigFile(path), servertest.WithRunner(runnerfake.NewRunner()), func(c *server.Config) {
 		c.BudgetHardLimit = 20
 		c.BudgetKillGrace = 10 * time.Millisecond
 		c.BudgetPollInterval = time.Hour

@@ -58,9 +58,7 @@ func claimOpen(t *testing.T, runner string, agent string, answered bool, fake *r
 		t.Fatal(err)
 	}
 
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return namedFake{fake, runner} }
-	})
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(namedFake{fake, runner}))
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)

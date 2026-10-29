@@ -37,7 +37,7 @@ func startAnswerEnv(t *testing.T, wrap func(*runnerfake.Runner) agentrunner.Runn
 	if wrap != nil {
 		runner = wrap(fake)
 	}
-	h := servertest.StartWithStore(t, store, append([]func(*server.Config){func(c *server.Config) { c.Runner = runner }}, opts...)...)
+	h := servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithRunner(runner)}, opts...)...)
 	if _, err := fake.Start(agentrunner.StartOptions{Label: answerLabel, Epic: "epic-a", Cwd: t.TempDir(), Kind: "claude"}); err != nil {
 		t.Fatal(err)
 	}

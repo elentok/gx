@@ -18,7 +18,7 @@ func startAgentVerbs(t *testing.T) (*servertest.Harness, *runnerfake.Runner) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
 	fake := runnerfake.NewRunner()
-	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Runner = fake })
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 	return h, fake
 }
 

@@ -349,9 +349,8 @@ func TestHerdr_NotProbedForRunnerWithoutHost(t *testing.T) {
 	t.Parallel()
 	// Embedding only the interface hides runnerfake's Healthy, like a native runner.
 	native := struct{ agentrunner.Runner }{runnerfake.NewRunner()}
-	h := servertest.StartHerdrDown(t, func(c *server.Config) {
+	h := servertest.StartHerdrDown(t, servertest.WithRunner(native), func(c *server.Config) {
 		c.HerdrRetryInterval = 20 * time.Millisecond
-		c.Runner = native
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -377,7 +376,7 @@ func TestHerdr_ProbedThroughConfiguredRunner(t *testing.T) {
 	t.Parallel()
 	fake := runnerfake.NewRunner()
 	fake.SetHealthErr(errors.New("down"))
-	h := servertest.StartWithStore(t, t.TempDir(), func(c *server.Config) { c.Runner = fake })
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithRunner(fake))
 	got, err := h.Client.Handshake(context.Background())
 	if err != nil || !got.HerdrUnavailable {
 		t.Errorf("handshake = %+v (err %v), want HerdrUnavailable", got, err)

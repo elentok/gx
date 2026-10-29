@@ -25,8 +25,7 @@ func TestSlotRelease_QueuedRootClaimsAfterGrace(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "second", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictLive}
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.BudgetPollInterval = time.Hour
 		c.MaxAgents = 1
 		c.WaitingSlotGrace = time.Minute

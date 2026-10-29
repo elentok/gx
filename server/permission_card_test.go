@@ -56,8 +56,7 @@ func startBlockedClaimed(t *testing.T, herdr bool, p *agentrunner.Pending) (*ser
 	if herdr {
 		runner = herdrHosted{fake}
 	}
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return runner }
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(runner), func(c *server.Config) {
 		c.BudgetPollInterval = time.Hour
 		c.WebAddr = "127.0.0.1:0"
 	})
