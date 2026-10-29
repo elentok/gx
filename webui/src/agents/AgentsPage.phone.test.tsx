@@ -19,6 +19,16 @@ test("phone: a session shows ‹, the title button and project · status, and �
   expect(screen.getByRole("link", { name: "All sessions" }).getAttribute("href")).toBe("#/agents");
 });
 
+test("phone: a design session's header links to its design page", () => {
+  render([session("s-1", "p", { design: true, ticket: "gx:map/01" })], "/agents/s-1", true, {}, false);
+  expect(screen.getByRole("link", { name: "Open design page →" }).getAttribute("href")).toBe("#/d/gx:map");
+});
+
+test("phone: a plain session's header has no design link", () => {
+  render([session("s-2", "p")], "/agents/s-2", true, {}, false);
+  expect(screen.queryByRole("link", { name: "Open design page →" })).toBeNull();
+});
+
 test("phone: the title button opens a full-screen switcher with Close, and Close dismisses it", () => {
   render([session("s-1", "gx", { name: "plain" })], "/agents/s-1", true, {}, false);
   fireEvent.click(screen.getByRole("button", { name: /plain/ }));

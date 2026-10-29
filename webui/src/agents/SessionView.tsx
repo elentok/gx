@@ -22,6 +22,14 @@ const AGENT_OPTIONS: ChatOptions = { sheet: false, steps: false, gxStopped: fals
 
 const noop = () => {};
 
+function DesignLink({ map, ml }: { map: string; ml?: string }) {
+  return (
+    <Link fontSize="sm" ml={ml} color="tone.running.fg" href={designHref(map)}>
+      Open design page →
+    </Link>
+  );
+}
+
 function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; sessions: SessionInfo[]; onNew: () => void }) {
   const { tone } = statusMark(s);
   const map = designOf(s);
@@ -39,6 +47,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
             {s.project} · {stateLabel(s)}
           </Text>
         </Box>
+        {map && <DesignLink map={map} ml="auto" />}
       </Box>
     );
   }
@@ -58,11 +67,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
           {s.ticket}
         </Text>
       )}
-      {map && (
-        <Link fontSize="sm" ml="auto" color="tone.running.fg" href={designHref(map)}>
-          Open design page →
-        </Link>
-      )}
+      {map && <DesignLink map={map} ml="auto" />}
     </Box>
   );
 }
