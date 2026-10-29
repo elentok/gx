@@ -977,13 +977,14 @@ _Avoid_: status area, indicators bar
 ## Web access
 
 **Web login** — one device's signed-in state in the web UI, made by one successful login with the
-password and a TOTP code. The person can rename it, and revoke it from the Settings page. A phone's
-browser and its home-screen app hold separate web logins.
+password and, when TOTP is on, a TOTP code. The person can rename it, and revoke it from the
+Settings page. A phone's browser and its home-screen app hold separate web logins.
 _Avoid_: session, device session (a session is an agent session), sign-in
 
-**Setup code** — a short one-time code that the CLI prints while the web UI has no password yet.
-The person enters it on the setup page to choose the password and TOTP. It works once and expires
-after an hour.
+**Setup code** — a short one-time code that the CLI prints while the web UI has no password yet,
+or after the CLI resets the authenticator. The person enters it on the setup page to choose the
+password and TOTP, or on the login card to add a new authenticator. It works once and expires after
+an hour.
 _Avoid_: token, setup token, invite code
 
 ## Skills

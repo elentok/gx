@@ -1,6 +1,6 @@
 # webui-security
 
-Map epic: `gx:webui-security`. Decisions come from its tickets 01 to 08. Research:
+Map epic: `gx:webui-security`. Decisions come from its tickets 01 to 09. Research:
 `docs/research/webui-security-ios-cookie-loss.md` and `docs/research/webui-security-ios-root-trust.md`.
 Approved mock: `$(gx tickets root)/webui-security/mocks/06-login-setup-and-settings-ui.html`. The
 prototype is on the local branch `prototype/webui-security-login-ui`.
@@ -34,15 +34,21 @@ The shared token goes away. The web UI gets a login for one person with a passwo
 from an authenticator app.
 
 - **First-run setup.** The CLI prints a one-time Setup code (`gx server status`,
-  `gx server web-url --qr`). The person enters it on the setup page, picks a password, scans a TOTP
-  QR code, and enters one code to finish. That device is signed in.
+  `gx server web-url --qr`). The person enters it on the setup page, picks a password, adds gx to an
+  authenticator app (QR code, an "Add to authenticator app" link, or the key), and enters one code
+  to finish. That device is signed in. The TOTP secret appears only on the setup page, never in the
+  CLI.
+- **TOTP can be turned off.** `server.web.totp` (default `true`) turned off makes login password
+  only and setup two steps. Turned back on with no saved secret, the next login adds the
+  authenticator after the password.
 - **Web logins.** Each successful login on a device is its own Web login. It ends after 90 days
   without use. The new Settings page lists the web logins, renames them and signs them out one at a
   time. It also changes the password and resets the authenticator. Both sign out every other web
   login.
-- **CLI fallback.** A local shell is trusted. The CLI lists and revokes web logins, changes the
-  password and resets the authenticator without the old secrets. `gx server web-reset` clears
-  everything and goes back to first-run setup.
+- **CLI fallback.** A local shell is trusted. The CLI lists and revokes web logins and changes the
+  password without the old one. Its reset authenticator clears the TOTP secret and prints a Setup
+  code; the next web login asks for that code and the password, then adds the new authenticator.
+  `gx server web-reset` clears everything and goes back to first-run setup.
 - **HTTPS always.** gx makes its own root certificate and a server certificate on the first start
   with the listener on. A plain-HTTP request on the same port is redirected to `https://`. The root
   is offered as an iOS profile and a Mac `.cer` at a public path. Its SHA-256 fingerprint shows on
@@ -130,7 +136,8 @@ from an authenticator app.
 27. As the person, I want every page to show the setup page and every API route to answer 401 until
     setup is done, so that nobody uses gx without a password.
 28. As the person, I want `gx server status` and `gx server web-url` to print a Setup code while
-    setup is pending, so that I can start setup from the shell on the server.
+    setup or an authenticator reset is pending, so that I can start either from the shell on the
+    server.
 29. As the person, I want the Setup code to be 8 characters with no look-alike letters, so that I
     can type it from a terminal without mistakes.
 30. As the person, I want the Setup code to work once and expire after an hour, with a server
@@ -140,14 +147,15 @@ from an authenticator app.
     setup on the phone with one scan and no bookmark or error report keeps the code.
 32. As the person, I want the TUI About dialog to say "Web UI: setup needed, run `gx server web-url
     --qr`" and never show the code, so that the code does not sit on a screen.
-33. As the person, I want setup to be one card with "step N of 3" and a progress bar, so that I know
-    how far I am.
+33. As the person, I want setup to be one card with "step N of 3" (or "of 2" with TOTP off) and a
+    progress bar, so that I know how far I am.
 34. As the person, I want step 1 to tell me when the code is wrong or expired, so that I go back to
     the CLI for a new one.
 35. As the person, I want step 2 to ask for the password twice, with "At least 12 characters.", so
     that I do not lock myself out with a typo.
-36. As the person, I want step 3 to show the TOTP QR code, the key as text and one code field, so
-    that I can add gx to my authenticator app by scan or by hand.
+36. As the person, I want step 3 to show the TOTP QR code, an "Add to authenticator app" link, the
+    key as text and one code field, so that I can add gx to my authenticator app by scan, by tap or
+    by hand.
 37. As the person, I want gx to save nothing until the TOTP code checks out, with "doesn't match,
     check the phone's clock" on a wrong code, so that a broken authenticator never becomes my only
     way in.
@@ -161,8 +169,8 @@ from an authenticator app.
 40. As the person, I want an unauthenticated page to show an HTML login page at the same URL, never
     plain text, so that the home-screen app can always recover.
 41. As the person, I want the login page to be one card with the `gx` wordmark and host, a password
-    field, one "Code from your authenticator app" field and Sign in, so that logging in again is
-    cheap when iOS drops the cookie.
+    field, one "Code from your authenticator app" field (left out with TOTP off) and Sign in, so
+    that logging in again is cheap when iOS drops the cookie.
 42. As the person, I want the code field to be one numeric input with `autocomplete="one-time-code"`,
     so that iOS can fill it.
 43. As the person, I want one message, "Wrong password or code", whichever part was wrong, so that a
@@ -229,7 +237,8 @@ from an authenticator app.
 69. As the person, I want to change the password with the current password, a code and the new
     password twice, so that someone holding my unlocked phone cannot change it.
 70. As the person, I want to reset the authenticator with the password and a code from the current
-    app, then a new QR code, key and code field, so that I can move to a new phone.
+    app, then a new QR code, "Add to authenticator app" link, key and code field, so that I can move
+    to a new phone.
 71. As the person, I want the old authenticator to keep working until a code from the new one checks
     out, so that a reset I abandon halfway changes nothing.
 72. As the person, I want password change and authenticator reset to say "N other devices will be
@@ -245,10 +254,11 @@ from an authenticator app.
 ### CLI
 
 76. As the person, I want `gx server status` to print the plain web URL, the Setup code while setup
-    is pending, the root fingerprint, and any names left out of the certificate, so that one command
-    shows the web UI's state.
+    or an authenticator reset is pending, the root fingerprint, and any names left out of the
+    certificate, so that one command shows the web UI's state.
 77. As a script, I want `gx server status --json` to carry `web_url` as the plain URL and a
-    `web_setup_code` field only while setup is pending, so that I can automate setup.
+    `web_setup_code` field only while setup or an authenticator reset is pending, so that I can
+    automate setup.
 78. As the person, I want `gx server web-url` to print the plain URL after setup, so that I can open
     the web UI on a new device.
 105. As the person, I want the printed web URL and the QR code to use the first allowed host that
@@ -269,9 +279,9 @@ from an authenticator app.
     authenticator.
 84. As a script, I want a non-terminal way to pass the new password, so that I can set it without a
     prompt.
-85. As the person, I want a CLI command that resets the authenticator with no old code, prints the
-    new QR code and key in the terminal and asks for one code from the new app, so that I can recover
-    a lost phone and keep my password.
+85. As the person, I want a CLI command that resets the authenticator with no old code: it clears
+    the TOTP secret, signs out every web login and prints a new Setup code, so that I can recover a
+    lost phone and keep my password, and the TOTP key never shows in a terminal or a transcript.
 86. As the person, I want both CLI commands to sign out every web login, so that whatever device was
     lost is out.
 87. As the person, I want every new web CLI command to fail with `server-not-running` when the server
@@ -280,6 +290,33 @@ from an authenticator app.
 88. As the person, I want each CLI action to write the same `gx.log` lines as its web version and to
     close the event streams of the web logins it signs out, so that the shell and the web leave the
     same trail.
+
+### Optional TOTP
+
+106. As the person, I want a `server.web.totp` config key, `true` by default, that turned off makes
+     login ask for the password only, so that I can drop the code when I do not want it.
+107. As the person, I want setup to have 2 steps (Setup code, password) with TOTP off, so that I do
+     not add an authenticator I will not use.
+108. As the person, I want the Settings page to hide "Reset authenticator" with TOTP off, so that it
+     offers nothing that does not apply.
+109. As the person, I want turning TOTP off to keep the saved secret, so that turning it back on
+     works with the same authenticator.
+110. As the person, I want the key to take effect on a config reload, with signed-in web logins
+     staying signed in, so that changing it needs no restart and signs nobody out.
+111. As the person, I want a login with TOTP on and no saved secret to show an add-authenticator
+     step after a correct password (QR code, "Add to authenticator app" link, key, one code field),
+     and to sign in only after a valid code, so that turning TOTP on never locks me out.
+112. As the person, I want an "Add to authenticator app" `otpauth://` link on setup step 3, the
+     Settings reset page and the add-authenticator step, so that my phone adds gx with one tap
+     instead of a scan of its own screen.
+113. As the person, I want no CLI command to print or take a TOTP secret, and first setup to happen
+     only on the web through the Setup code, so that the key never reaches a terminal or a Claude
+     transcript.
+114. As the person, I want the login after a CLI reset authenticator to ask for the Setup code and
+     the current password, then show the add-authenticator step, so that a stolen password alone
+     cannot add a new authenticator.
+115. As the person, I want wrong Setup codes and wrong codes on the add-authenticator step to count
+     toward the login rate limit, so that nobody can guess them there.
 
 ### Logging
 
@@ -332,9 +369,11 @@ from an authenticator app.
 - **Web auth module (new, in `server`).** Owns the one 0600 state file and its rules: password hash,
   TOTP secret, last accepted TOTP step, web logins, Setup code, rate limits. It has a small
   interface the web mux, the socket routes and tests call. Suggested shape (names are the
-  implementer's): set up, log in, look up a cookie, list, rename, revoke, change password (with and
-  without the old checks), begin and finish an authenticator reset, reset everything, current Setup
-  code. It takes a clock, so tests set the time for TOTP, idle expiry and rate limits.
+  implementer's): set up, log in, add an authenticator, look up a cookie, list, rename, revoke,
+  change password (with and without the old checks), begin and finish an authenticator reset, clear
+  the authenticator (the CLI reset), reset everything, current Setup code. It takes a clock, so
+  tests set the time for TOTP, idle expiry and rate limits. It takes the TOTP setting per call, so a
+  config reload applies at once.
 - **Web TLS module (new, in `server`).** Makes and loads the root and leaf in `<stateDir>/web-tls/`,
   builds the root's name constraints, re-issues the leaf, serves `GetCertificate`, and builds the
   `.mobileconfig` and `.cer`. Stdlib only (`crypto/ecdsa`, `crypto/x509`, `crypto/tls`,
@@ -349,6 +388,8 @@ from an authenticator app.
 - **Web UI (`webui`).** New login, setup and Settings pages, a shared fetch helper, an auth gate at
   the app root, a root error boundary, client error reporting, a "Settings" menu item.
 - **Fixture (`testutil/gxfixture`) and `webui/e2e/fixture.ts`.** Real sign-in, new scenarios.
+- **Config (`config`).** `server.web.totp`, a boolean, `true` when absent, in the schema
+  (`docs/config-schema.json`) and applied on reload.
 
 ### Web login store
 
@@ -374,18 +415,42 @@ from an authenticator app.
   table and the max name length.
 - Rate limits live in memory. Per IP: after 5 failures, wait 1 minute, doubling up to 1 hour. A
   success clears that IP's count. Global: 50 failures in an hour from all IPs make every check wait
-  15 minutes. Failures are failed logins, wrong Setup codes, and failed password or code checks on
-  the Settings page. `web-reset` clears the limits; a restart clears them too.
+  15 minutes. Failures are failed logins, wrong Setup codes, wrong codes on the add-authenticator
+  step, and failed password or code checks on the Settings page. `web-reset` clears the limits; a
+  restart clears them too.
+
+### TOTP setting
+
+- `server.web.totp` (default `true`) is read per request, so a config reload applies it at once.
+  Web logins that are signed in stay signed in when it changes.
+- Off: login checks the password only; setup has 2 steps (Setup code, password) and finish takes the
+  code and the password; the Settings page hides "Reset authenticator"; the account routes that need
+  a TOTP code refuse with a stable reason. The saved secret and its last accepted step stay in the
+  state file.
+- On with a saved secret: login checks the password and a code, as above.
+- On with no saved secret (setup done while off, or after the CLI reset authenticator): a correct
+  password (plus the Setup code after a CLI reset) answers "authenticator needed" with a new secret
+  and a pending id. The server holds that pair in memory for 10 minutes, single use; a restart drops
+  it. The add-authenticator route takes the pending id and one code for the new secret, saves the
+  secret, and creates the web login. A wrong code saves nothing and counts toward the rate limit.
+- The Settings reset page with TOTP on and no saved secret is an "Add authenticator" page: it asks
+  for the password only, then shows the new QR code, link, key and code field.
+- After the CLI reset authenticator the state file records "authenticator reset pending". While it
+  is set, a Setup code exists (as during first-run setup) and login needs it. Saving a new secret
+  clears the flag and consumes the code. With TOTP off the flag waits: login is password only, and
+  the first login after TOTP is turned back on asks for the Setup code.
+- The "Add to authenticator app" link is the same `otpauth://` URI the QR code holds.
 
 ### Setup code
 
 - 8 characters from an alphabet with no look-alikes, shown as `K7QM-3XPD`. The server holds it in
   memory. It expires an hour after it is made; a read after that makes a new one. A restart makes a
-  new one. It exists only while setup is pending.
-- Setup step 1 checks the code (a failure counts toward the rate limit) and hands back a new TOTP
-  secret tied to that code in memory. Step 2 is client-side. Step 3 sends the code, the password, and
-  one TOTP code. The server checks all three, saves, consumes the code and signs the device in. If
-  two devices race, the first to finish wins and the other gets the wrong-or-expired message.
+  new one. It exists only while setup or an authenticator reset is pending.
+- Setup step 1 checks the code (a failure counts toward the rate limit) and, with TOTP on, hands
+  back a new TOTP secret tied to that code in memory. Step 2 is client-side. Step 3 sends the code,
+  the password, and one TOTP code. The server checks all three, saves, consumes the code and signs
+  the device in. With TOTP off, step 2 is the last: it sends the code and the password. If two
+  devices race, the first to finish wins and the other gets the wrong-or-expired message.
 - The `--qr` link opens `/#/setup?code=<code>`. The code sits in the hash, so it never reaches the
   server log or a `Referer`, and `index.html` is still served only for `/`.
 - The setup page reads the code from the hash, puts it in the field, then replaces the hash with
@@ -403,7 +468,8 @@ verb, because a local shell skips the browser's checks (cookie, password, TOTP c
 implementer picks the paths. The list:
 
 - Public (no login): the auth state read (setup pending, signed out, or signed in with this web
-  login's id), setup step 1 and finish, login, the iOS profile, the `.cer`, the client error report,
+  login's id; plus whether TOTP is on and whether login needs the Setup code), setup step 1 and
+  finish, login, add authenticator, the iOS profile, the `.cer`, the client error report,
   `index.html` at `/`, and the assets.
 - With the cookie: sign out, list web logins, rename, revoke one, change password, begin and finish
   an authenticator reset.
@@ -412,7 +478,8 @@ Every other web route needs a valid cookie and answers 401 without one. Every no
 not, keeps `checkWriteRequest`. Refusals on the web-only routes follow ADR 0028's refusal results
 (`200`, `refused: true`, a stable `reason`). The implementer names the reasons: wrong credentials,
 rate limited (with the wait in seconds), Setup code wrong or expired, TOTP mismatch, password too
-short, unknown web login.
+short, unknown web login, TOTP off. "Authenticator needed" is not a refusal: it is a login result
+that carries the new secret, its `otpauth://` URI and the pending id.
 
 Socket routes, each in `routeTable` with a `gx server …` verb and `--json`, all server writes or
 reads (ADR 0030), all refusing with `server-not-running` when the server is down:
@@ -420,8 +487,8 @@ reads (ADR 0030), all refusing with `server-not-running` when the server is down
 - The web info read, whose verb is `gx server web-url`: base URL, setup pending, Setup code while
   pending, root fingerprint, names left out of the leaf. `gx server status` calls it too.
 - `gx server web-reset`.
-- List web logins, revoke one by id, change password (new password only), reset authenticator (new
-  secret and one code), make a new root. The implementer names these commands and flags.
+- List web logins, revoke one by id, change password (new password only), reset authenticator (no
+  input), make a new root. The implementer names these commands and flags.
 
 The web listener being off makes every one of them fail with today's "the web UI is off" message.
 
@@ -455,10 +522,10 @@ the proxy mode change with it.
 - Revoke: takes the id. Closes that web login's event streams.
 - Change password: asks twice with no echo, plus a non-terminal input (the implementer picks it,
   for example `--password-stdin`). No old password. Signs out every web login.
-- Reset authenticator: the CLI makes the new secret with the same code the server uses, prints the
-  QR code (the existing `renderQR`) and the key, reads one code, and sends secret and code in one
-  request. The server checks the code against that secret, saves, and signs out every web login.
-  Nothing is saved on a wrong code. No old code.
+- Reset authenticator: clears the TOTP secret, sets "authenticator reset pending", signs out every
+  web login, closes their event streams and prints a new Setup code. No old code. It never prints or
+  reads a TOTP secret; no CLI command does. The person then logs in on the web with the Setup code
+  and the password and adds the new authenticator there.
 - Make a new root: a flag or command the implementer names. The server swaps the root and leaf
   live. Every device must trust the new root. Web logins are kept.
 - `gx server web-token` and `--rotate` are removed.
@@ -540,6 +607,12 @@ Sign out clears it.
 - Login, setup and Settings follow the approved mock (variant A card, variant A card stepper,
   variant C grouped list). The prototype's components are a starting point. The implementer picks
   the sub-page routes (for example `#/settings/logins`) and where the pages live.
+- The mock has no state for the TOTP-off screens, the add-authenticator step or the link. They reuse
+  approved states: login with TOTP off is the login card without the code field; the 2-step setup is
+  setup steps 1 and 2 with "step N of 2", and step 2's button finishes setup; the add-authenticator
+  step on the login card is the setup step 3 card (QR, key, code field, save note) with the "Add to
+  authenticator app" link under the QR. The Settings reset page and setup step 3 get the same link
+  under the QR. After a CLI reset, the login card adds a Setup code field above the password.
 - The TOTP QR code on the setup and reset pages: the implementer picks server or client rendering.
 - A "Settings" item in the hamburger menu opens `#/settings`. "Sign out of this device" is not in
   the menu.
@@ -554,7 +627,8 @@ Sign out clears it.
 ### Logging
 
 `gx.log` records login, failed login (with the reason kind), wrong Setup code, sign out, revoke,
-rename, password change, authenticator reset, web reset and new root. Each line has the IP (or
+rename, password change, authenticator reset (web and CLI), authenticator added, web reset and new
+root. Each line has the IP (or
 "cli") and the web login name. It never records a password, a TOTP code, the TOTP secret, a cookie
 value or a Setup code. Request bodies of the web auth and account routes are never logged.
 
@@ -580,13 +654,17 @@ auth module's internal fields.
 
 Seams:
 
-1. **Server web listener, through servertest.** The existing `startWeb` setup in `server/web_test.go`
-   with an HTTPS client that trusts the root from `<stateDir>/web-tls/`. A `Config` field sets the web
-   auth clock; the implementer names it, and production uses the real clock. Tests drive setup,
-   login, rate limits, cookies, idle expiry, revoke closing the event stream, serving headers, the
-   plain-HTTP redirect, the public paths, the 401s and the Host and Origin checks. The source-IP rule
-   is tested as a table over addresses, plus one listener test with a fake connection from a public
-   address. Prior art: `server/web_test.go`, `server/webhost_test.go`.
+1. **Server web listener, through servertest.** The existing `startWeb` setup in
+   `server/web_test.go` with an HTTPS client that trusts the root from `<stateDir>/web-tls/`. A
+   `Config` field sets the web auth clock; the implementer names it, and production uses the real
+   clock. Tests drive setup, login, rate limits, cookies, idle expiry, revoke closing the event
+   stream, serving headers, the plain-HTTP redirect, the public paths, the 401s and the Host and
+   Origin checks. TOTP setting tests start the harness with the setting off or on and change it with
+   a config reload (prior art `TestWebHost_ReloadAppliesAllowedHostsWithoutRestart`): password-only
+   login, 2-step setup, the add-authenticator step with and without the Setup code, and web logins
+   surviving the change. The source-IP rule is tested as a table over addresses, plus one listener
+   test with a fake connection from a public address. Prior art: `server/web_test.go`,
+   `server/webhost_test.go`.
 2. **Pure rules.** Table tests for TOTP (RFC 6238 vectors, skew, replay), the Setup code alphabet and
    expiry, the user-agent names, the rate limiter with a fake clock, and name-constraint building
    (parent domain, single label, `localhost`, `elentok.com` and `gx.github.io` as exact hosts). Leaf
@@ -598,17 +676,20 @@ Seams:
    allowed host inside the constraints, one outside, a private listen IP, a public listen IP (falls
    to rule 3), an IPv6 listen IP (bracketed), and an unspecified listen IP with and without a
    private interface IP.
-3. **CLI.** `cmd` tests against the servertest harness, as `cmd/server_web_test.go` does today: status
-   text and `--json`, `web-url` with and without `--qr`, `web-reset` with `--yes` and without a
-   terminal, list, revoke, change password from stdin, reset authenticator with a code computed in
-   the test, `server-not-running`, "the web UI is off", and the base URL `status` and `web-url` print
-   for an allowed host set before the root is made and for a `0.0.0.0` listen address. Plus
-   `TestRouteTableHasCLIVerbs`, the TCP listener's browser check through
-   `servertest.StartWithTCP` (a plain `net/http` request with a loopback Host passes; `Origin`,
-   `Sec-Fetch-Site` and a non-loopback Host each get 403), and the new web-only route list test next to `TestWeb_EverythingElseIs404`.
+3. **CLI.** `cmd` tests against the servertest harness, as `cmd/server_web_test.go` does today:
+   status text and `--json`, `web-url` with and without `--qr`, `web-reset` with `--yes` and without
+   a terminal, list, revoke, change password from stdin, reset authenticator (prints a Setup code
+   and no secret, then the web login route asks for that code), `server-not-running`, "the web UI is
+   off", and the base URL `status` and `web-url` print for an allowed host set before the root is
+   made and for a `0.0.0.0` listen address. Plus `TestRouteTableHasCLIVerbs`, the TCP listener's
+   browser check through `servertest.StartWithTCP` (a plain `net/http` request with a loopback Host
+   passes; `Origin`, `Sec-Fetch-Site` and a non-loopback Host each get 403), and the new web-only
+   route list test next to `TestWeb_EverythingElseIs404`.
 4. **Web.** Vitest for the auth gate, the fetch helper's 401 path and cache clearing, the login,
    setup and Settings pages in every mock state, the error boundary, and the error reporter. A
-   gallery entry per mock state. Prior art: `webui/src/connection.test.ts`,
+   gallery entry per mock state. The screens with no mock state (login and setup with TOTP off, the
+   add-authenticator step, login with the Setup code field) get Vitest cases and a gallery entry
+   each, checked against the approved state they reuse. Prior art: `webui/src/connection.test.ts`,
    `webui/src/pageCache.test.ts`, `webui/src/routes.test.tsx`, the `TopBar` tests and gallery entry.
 5. **Fixture and e2e.** `gxfixture` signs in through the real routes: it reads `web_setup_code` from
    `gx server status --json`, finishes setup with a fixed password and a TOTP code computed from the
@@ -625,6 +706,8 @@ Seams:
    - `web-logins`: signed in, plus three more web logins (one with last used 70 days ago). Before
      the server starts, the fixture writes them through the web auth module's own store code. The
      running server has no test clock.
+   With `--config server.web.totp=false`, `gxfixture` finishes setup with no TOTP code, and the
+   `web-login` JSON carries no secret. No new scenario: flows pass the config to `start`.
    `gxfixture`'s own tests (`testutil/gxfixture/main_test.go`) change from the token URL to the
    cookie.
 
@@ -643,7 +726,8 @@ New flows to write:
 - **Flow S, "First-run setup":** scenario `web-setup`. Open `web_url`; the setup card shows step 1.
   Enter a wrong code; see the wrong-or-expired error. Enter the code from `gx server status`.
   Step 2: a short password shows "At least 12 characters."; a mismatch is refused; a good one
-  goes on. Step 3: QR and key show; a wrong code shows the clock error, and `gx server status` still
+  goes on. Step 3: QR, the "Add to authenticator app" link (`href` starts with `otpauth://totp/`)
+  and key show; a wrong code shows the clock error, and `gx server status` still
   says setup is pending; the right code opens the Epics page signed in.
 - **Flow Q, "Setup from the QR link":** scenario `web-setup`. Open the link `gx server web-url`
   prints; step 1 has the code filled in, and the page URL ends in `#/setup` with no code. Finish
@@ -664,14 +748,26 @@ New flows to write:
 - **Flow P, "Change password":** scenario `web-logins`. The note reads "3 other devices will be
   signed out". Change it. The list has one row. A new context logs in with the new password.
 - **Flow A, "Reset authenticator":** scenario `web-logins`. Enter password and code; see the new QR,
-  key and keep note. Leave the page; the old secret still logs in a new context. Do it again and
-  finish with a code from the new secret; the old secret now fails and the list has one row.
+  the "Add to authenticator app" link, key and keep note. Leave the page; the old secret still logs
+  in a new context. Do it again and finish with a code from the new secret; the old secret now fails
+  and the list has one row.
 - **Flow O, "Sign out of this device":** scenario `web-logins`. Click it on the Settings home; the
   login page shows; the CLI list has three rows.
 - **Flow X, "Web reset from the CLI":** scenario `web-logins`. Run `gx server web-reset --yes`; the
   open page shows the setup page with no reload; the printed code finishes setup.
 - **Flow Y, "CLI revoke":** scenario `web-logins`. Revoke this device's id from the CLI; the page
   shows login with no reload.
+- **Flow T, "Setup and login with TOTP off":** scenario `web-setup` with config
+  `server.web.totp=false`. The setup card shows "step 1 of 2". Enter the code from
+  `gx server status`, then a good password twice; the button finishes setup and opens the Epics
+  page. Open Settings: no "Reset authenticator" row. Sign out of this device; the login card has no
+  code field; the password alone opens the Epics page.
+- **Flow K, "Add the authenticator after a CLI reset":** scenario `web-login`. Run the CLI reset
+  authenticator; it prints a Setup code and no key. Open `web_url`; the login card shows a Setup
+  code field above the password. The password without the code is refused. Enter the code and the
+  password; the add-authenticator step shows the QR code, an "Add to authenticator app" link whose
+  `href` starts with `otpauth://totp/`, the key and one code field. A wrong code is refused; a code
+  from the shown key opens the Epics page. A new context with the old secret fails.
 
 CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against the fixture.
 
@@ -716,8 +812,9 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
 25. Flow C. Mock states login-default-phone, login-trust-open-phone, setup-code-phone.
 26. Shell check: `stat` on each file in `<stateDir>/web-tls/` shows mode 0600.
 27. Flow S. Server check: in `web-setup`, `curl` of `/v1/snapshot` answers 401. Go test (seam 1).
-28. CLI check: in `web-setup`, `gx server status` and `gx server web-url` print the code. Go test
-    (seam 3).
+28. CLI check: in `web-setup`, `gx server status` and `gx server web-url` print the code. Flow K
+    (the code after a CLI reset). Go test (seam 3): both print a code after the CLI reset
+    authenticator.
 29. Go test (seam 2): the alphabet has no `0 O 1 I L`; the code is 8 characters.
 30. Go test (seam 1): a used code fails, an hour-old code fails, a restart changes the code.
 31. Flow Q. CLI check: `gx server web-url --qr` prints a QR block and a link with `#/setup?code=`.
@@ -725,17 +822,18 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
     setup navigates to `#/`.
 32. Go test (`ui/app` About test): with setup pending, the About dialog reads "Web UI: setup needed,
     run `gx server web-url --qr`" and holds no code.
-33. Flow S. Mock states setup-code-phone, setup-code-desktop, setup-password-phone,
-    setup-totp-phone.
+33. Flow S. Flow T ("step 1 of 2"). Mock states setup-code-phone, setup-code-desktop,
+    setup-password-phone, setup-totp-phone.
 34. Flow S. Mock state setup-code-expired-phone.
 35. Flow S. Mock state setup-password-phone. Vitest (seam 4): mismatch and short password.
-36. Flow S. Mock state setup-totp-phone.
+36. Flow S. Mock state setup-totp-phone (the link is not in the mock; Flow S checks it). Vitest
+    (seam 4): the link's `href` is the `otpauth://` URI of the shown secret.
 37. Flow S. Mock state setup-totp-error-phone. Go test (seam 1): a wrong finish code saves nothing.
 38. Flow S (ends signed in). Go test (seam 1): the finish response sets the cookie and the list has
     one web login.
 39. Go test (seam 1): 5 wrong codes lock the IP for logins too.
 40. Flow L. Server check: `curl` of `/` with no cookie answers `200 text/html`. Go test (seam 1).
-41. Flow L. Mock states login-default-phone, login-default-desktop.
+41. Flow L. Flow T (no code field). Mock states login-default-phone, login-default-desktop.
 42. Vitest (seam 4): the code input is numeric with `autocomplete="one-time-code"`.
 43. Flow L. Mock state login-error-phone. Go test (seam 1): a wrong password and a wrong code give
     the same refusal reason.
@@ -769,16 +867,19 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
 68. Flow V. Go test (seam 1): revoke ends that web login's open event stream.
 69. Flow P. Mock state settings-password-phone. Go test (seam 1): a wrong current password or code
     is refused.
-70. Flow A. Mock states settings-totp-phone, settings-totp-new-phone.
+70. Flow A. Mock states settings-totp-phone, settings-totp-new-phone (the link is not in the mock;
+    Flow A checks it).
 71. Flow A. Go test (seam 1): an abandoned reset leaves the old secret working.
 72. Flow P, Flow A. Go test (seam 1): only the current web login is left.
 73. Go test (seam 1): 5 wrong current passwords on change password lock the IP for login.
 74. Mock state settings-cert-phone. Flow C (downloads).
 75. Flow O. Vitest (seam 4): the device's own sub-page has "Sign out this device".
 76. CLI check: `gx server status` in `web-setup` prints `web: https://…`, the code and the
-    fingerprint; in `web-logins` it prints no code. Go test (seam 3).
+    fingerprint; in `web-logins` it prints no code. Go test (seam 3), also after the CLI reset
+    authenticator (prints a code).
 77. CLI check: `gx server status --json` has `web_setup_code` in `web-setup` and not in
-    `web-logins`; `web_url` has no query. Go test (seam 3).
+    `web-logins`; `web_url` has no query. Go test (seam 3): `web_setup_code` is present after the
+    CLI reset authenticator and gone once the new authenticator is added.
 78. CLI check: `gx server web-url` in `web-logins` prints the plain URL.
 79. Flow X. CLI check: `gx server web-reset` with `y` on a terminal prints a new code; with `n`
     changes nothing. Go test (seam 3).
@@ -790,8 +891,9 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
 83. Go test (seam 3): change password asks twice with no echo (pty), and refuses a mismatch.
 84. CLI check: `printf 'a-new-password-1\n' | gx server <change password> --password-stdin --json`
     succeeds and a new context logs in with it (or the implementer's flag).
-85. Go test (seam 3): reset authenticator prints a QR and key, a wrong code saves nothing, the right
-    code computed from the printed key saves.
+85. Flow K. Go test (seam 3): reset authenticator prints a Setup code and no QR, key or
+    `otpauth://` text; afterwards the old secret no longer logs in, every web login is signed out,
+    and the login route answers a correct password without the Setup code with a refusal.
 86. CLI check: after change password, list shows 0 web logins. Go test (seam 3) for both commands.
 87. CLI check: each new command against a stopped fixture exits with `server-not-running`. Go test
     (seam 3): "the web UI is off" with the listener off.
@@ -829,6 +931,34 @@ CLI and server checks use `curl --cacert <stateDir>/web-tls/<root file>` against
 105. Go test (seam 2): the base URL table. Go test (seam 3): with an allowed host set before the
      root is made, `gx server web-url` and `--qr` use that host; with a `0.0.0.0` listen address,
      `gx server status` prints a private interface IP or `localhost`, never `0.0.0.0`.
+106. Flow T. Go test (seam 1): with TOTP off, the password alone signs in and a sent code is
+     ignored. Shell check: `rg '"totp"' docs/config-schema.json` finds the key with default `true`.
+107. Flow T. Go test (seam 1): with TOTP off, setup finish takes the code and the password and signs
+     in. Vitest (seam 4): the setup card shows "step 1 of 2" and step 2's button finishes setup; a
+     gallery entry shows it next to setup-password-phone.
+108. Flow T. Vitest (seam 4): the Settings home has no "Reset authenticator" row with TOTP off. Go
+     test (seam 1): the reset routes refuse with the TOTP-off reason.
+109. Go test (seam 1): turn TOTP off by a config reload, then on again; the old secret's code still
+     signs in.
+110. Go test (seam 1): a config reload that turns TOTP off or on keeps a signed-in cookie working,
+     and the next login follows the new setting.
+111. Go test (seam 1): set up with TOTP off, reload with it on; login with the password answers
+     "authenticator needed" with a secret; a wrong code saves nothing; the right code signs in and
+     saves the secret; a pending id older than 10 minutes is refused. Vitest (seam 4): the login
+     card shows the add-authenticator step (QR, link, key, code field) after that answer; a gallery
+     entry shows it next to setup-totp-phone.
+112. Flow S, Flow A, Flow K. Vitest (seam 4): the setup step 3, Settings reset and add-authenticator
+     screens each have an "Add to authenticator app" link whose `href` is the shown secret's
+     `otpauth://` URI.
+113. Go test (seam 3): no `gx server` command's output, with or without `--json`, holds a TOTP
+     secret or `otpauth://` text, in setup pending, after setup and after the CLI reset
+     authenticator. Shell check: `rg -n 'otpauth' cmd/ --glob '!*_test.go'` finds nothing.
+114. Flow K. Go test (seam 1): after the CLI reset authenticator, login with the password alone is
+     refused with the Setup code reason; with the code and the password it answers "authenticator
+     needed"; adding the authenticator consumes the code. Vitest (seam 4): the login card shows the
+     Setup code field when the auth state asks for it.
+115. Go test (seam 1): 5 wrong Setup codes on the login route, or 5 wrong codes on the
+     add-authenticator route, lock the IP for login.
 
 **Mock states** (each line: mock path, state, width, fixture scenario, parts):
 
@@ -897,9 +1027,17 @@ The three fixture scenarios do not exist yet; they are listed under the new scen
 
 These came up after the two spec rounds were used up.
 
-- **How does the CLI reset authenticator fit one route?** Choice: the CLI makes the secret with the
-  shared TOTP code and sends secret plus code in one request. Reason: one route and one verb, no
-  pending state on the server, and the secret never leaves the machine.
+- **How does the server know the password was checked before the add-authenticator code?**
+  Choice: the login answer carries a pending id the server holds in memory with the new secret for
+  10 minutes, single use. Reason: the client never sends a secret back, and a restart drops nothing
+  that matters (the person logs in again).
+- **What does the CLI reset authenticator do with TOTP off?** Choice: it still clears the secret,
+  signs everyone out and prints a Setup code; login stays password only, and the first login after
+  TOTP is turned back on asks for the Setup code. Reason: one behaviour for the command, and the
+  reset still protects a later turn-on.
+- **What does the Settings reset page show with TOTP on and no saved secret?** Choice: "Add
+  authenticator", which asks for the password only. Reason: there is no current app to ask a code
+  from, and the device is already signed in.
 - **Where does the QR setup link point?** Choice: `/#/setup?code=…`. Reason: `index.html` stays only
   at `/` (ticket 01), and the code never reaches server logs or a `Referer`.
 - **Where does a plain-HTTP request on a wrong Host go?** Choice: 403, no redirect. Reason: a
