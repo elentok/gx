@@ -35,7 +35,7 @@ func TestNudge_TypesIntoLivePaneLogsAndRateLimits(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	claimTicket(t, store, "epic-a", "01", "01-first.md")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyAsDefault))
 	var mu sync.Mutex
 	var typed []string
 	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {

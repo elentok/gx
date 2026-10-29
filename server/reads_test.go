@@ -165,7 +165,7 @@ func TestReads_IterationsAndQueue(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Replace(string(raw), "status: open", "status: claimed", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
 	h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
 		if argv[2] != "epic-a-iter-01" && argv[2] != "pane-1" {
 			return nil, herdrfake.Identities{}, errors.New("agent not found")

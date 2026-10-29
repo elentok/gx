@@ -148,7 +148,7 @@ func TestRunner_CodeReviewTicketLaunchesUnderTheCodeReviewSkill(t *testing.T) {
 	if err := os.WriteFile(path, []byte(strings.Replace(string(raw), "type: implement", "type: code-review", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyAsDefault))
 	_, prompt, _ := registerTurn(h)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -186,7 +186,7 @@ func TestRunner_LaunchSkillFollowsTicketType(t *testing.T) {
 			store, repo := t.TempDir(), testutil.TempRepo(t)
 			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: tc.typ})
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			h := servertest.StartWithStore(t, store)
+			h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyAsDefault))
 			_, prompt, _ := registerTurn(h)
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
@@ -814,7 +814,7 @@ func TestRunner_RestartPausesAHandleWhoseWorktreeIsGone(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
 	registerLiveAgent(h)
 	wtPath, ticketPath := leaveIteration(t, h, store, repo)
 	if err := os.RemoveAll(wtPath); err != nil {
@@ -862,7 +862,7 @@ func TestRunner_RestartReclaimsTheLiveIterationAndItFinishes(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject))
 	registerLiveAgent(h)
 	leaveIteration(t, h, store, repo)
 

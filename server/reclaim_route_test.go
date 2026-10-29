@@ -133,7 +133,7 @@ func TestReclaim_HerdrRunUnderAHeadlessServerFinishesThroughHerdr(t *testing.T) 
 	headless := newRenamedFake("headless", nativerunner.VerdictLive)
 	others := map[string]agentrunner.Runner{}
 	// The runner reaches the fake herdr through the server's own env.
-	_, ticketPath := restartUnder(t, "", headless, others, func(c *server.Config) {
+	_, ticketPath := restartUnder(t, "", headless, others, servertest.WithHerdr(servertest.HerdrIsTheSubject), func(c *server.Config) {
 		others["herdr"] = herdrrunner.NewIn(herdr.CLI{Env: c.Env}, harness.LookupEnv(c.Env, "HOME"), sessionlookup.RootsFrom(c.Env).CodexHome)
 	})
 	waitStatus(t, ticketPath, schema.StatusDone)

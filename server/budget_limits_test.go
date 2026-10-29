@@ -60,7 +60,7 @@ func TestBudget_NudgedPausedPaneIsMeteredAndKilled(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyAsDefault), func(c *server.Config) {
 		c.BudgetHardLimit = 5
 		c.BudgetKillGrace = 50 * time.Millisecond
 		c.BudgetPollInterval = time.Hour
@@ -195,7 +195,7 @@ func TestBudget_HardLimitStopsLivePaneAndPausesBudgetKilled(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.HerdrIsTheSubject), func(c *server.Config) {
 		c.BudgetHardLimit = 5
 		c.BudgetKillGrace = time.Millisecond
 		c.BudgetPollInterval = time.Hour

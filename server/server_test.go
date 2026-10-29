@@ -302,7 +302,7 @@ func TestTCP_RefusesNonLoopbackAddr(t *testing.T) {
 
 func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T) {
 	t.Parallel()
-	h := servertest.StartHerdrDown(t, func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
+	h := servertest.StartHerdrDown(t, servertest.WithHerdr(servertest.HerdrIsTheSubject), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -385,7 +385,7 @@ func TestHerdr_ProbedThroughConfiguredRunner(t *testing.T) {
 
 func TestHandshake_ReportsHerdrUnavailable(t *testing.T) {
 	t.Parallel()
-	h := servertest.StartHerdrDown(t, func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
+	h := servertest.StartHerdrDown(t, servertest.WithHerdr(servertest.HerdrIsTheSubject), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
 	got, err := h.Client.Handshake(context.Background())
 	if err != nil || !got.HerdrUnavailable {
 		t.Errorf("handshake = %+v (err %v), want HerdrUnavailable", got, err)
