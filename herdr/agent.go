@@ -164,13 +164,13 @@ func (c CLI) runAgentJSON(args []string) (Agent, error) {
 
 // PaneShellPID returns the pid of the shell running in pane, via `herdr pane
 // process-info`.
-func PaneShellPID(pane string) (int, error) {
+func (c CLI) PaneShellPID(pane string) (int, error) {
 	var result struct {
 		ProcessInfo struct {
 			ShellPID int `json:"shell_pid"`
 		} `json:"process_info"`
 	}
-	if err := runJSON([]string{"pane", "process-info", "--pane", pane}, &result); err != nil {
+	if err := c.runJSON([]string{"pane", "process-info", "--pane", pane}, &result); err != nil {
 		return 0, err
 	}
 	if result.ProcessInfo.ShellPID <= 0 {

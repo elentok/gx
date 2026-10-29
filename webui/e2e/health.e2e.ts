@@ -73,7 +73,7 @@ test("80. Held disk in the popover", async ({ page, start }) => {
 
 const popover = (page: Page) => page.getByRole("dialog", nav("System health"));
 
-test("74. Tray popover", async ({ page, start }) => {
+test("81. Tray popover", async ({ page, start }) => {
   const fixture = await start("health");
   await fixture.setDiskFree("450G/500G");
   await tray(page).click();
@@ -124,7 +124,7 @@ test("74. Tray popover", async ({ page, start }) => {
     .toEqual([42, 388]);
 });
 
-test("75. Tray offline", async ({ page, start }) => {
+test("82. Tray offline", async ({ page, start }) => {
   const fixture = await start("health");
   await fixture.setHealth("cpu=75 mem=85");
   await expect(meter(page, "C")).toHaveAttribute("data-state", "high");

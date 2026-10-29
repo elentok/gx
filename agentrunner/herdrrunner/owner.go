@@ -2,7 +2,6 @@ package herdrrunner
 
 import (
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/syshealth"
 )
 
@@ -17,7 +16,7 @@ func (r *Runner) OwnerPIDs(s agentrunner.Session) ([]agentrunner.OwnerPID, error
 	if owner, ok := r.shells[s.ID]; ok {
 		return []agentrunner.OwnerPID{owner}, nil
 	}
-	pid, err := herdr.PaneShellPID(s.ID)
+	pid, err := r.CLI.PaneShellPID(s.ID)
 	if err != nil {
 		return nil, err
 	}

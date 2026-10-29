@@ -23,7 +23,7 @@ type ownerHarness struct {
 
 func newOwnerHarness(t *testing.T) *ownerHarness {
 	h := &ownerHarness{paneSession: agentrunner.Session{Label: "x", ID: "w1:p3"}}
-	herdrfake.Start(t, func(argv []string) ([]byte, int) {
+	_, fakeEnv := herdrfake.StartEnv(t, func(argv []string) ([]byte, int) {
 		h.execs++
 		h.argv = argv
 		if h.herdrFails {
@@ -31,7 +31,7 @@ func newOwnerHarness(t *testing.T) *ownerHarness {
 		}
 		return herdrfake.Result(map[string]any{"process_info": map[string]any{"shell_pid": 555}})
 	})
-	h.runner = herdrrunner.New()
+	h.runner = newTestRunner(fakeEnv)
 	h.runner.PIDStart = func(pid int) (int64, error) {
 		h.startReads++
 		if h.startFails {
