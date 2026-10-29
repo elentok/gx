@@ -373,8 +373,10 @@ func (h *Harness) OnTurn(agent func(t *Turn)) {
 		h.turn.Store(&agent)
 		return
 	}
-	// A test on its own runner never launches through herdr: nothing to answer.
+	// A test on its own runner never launches through herdr, so the hook would
+	// never run and the test could pass without its script.
 	if h.Herdr == nil {
+		h.tb.Errorf("servertest: Harness.OnTurn needs PTY or WithHerdr")
 		return
 	}
 	var mu sync.Mutex

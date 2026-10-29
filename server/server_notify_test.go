@@ -50,7 +50,9 @@ func chatServerFlushing(t *testing.T, soft, hard float64, flush time.Duration) (
 	t.Cleanup(hook.Close)
 	// A configured runner keeps New from probing herdr, so no "herdr
 	// unavailable" notice leaks into the recorded sends.
-	_, herdrEnv := herdrfake.StartStateEnv(t, herdrfake.NewState(t))
+	herdr := herdrfake.NewState(t)
+	herdr.Forbid() // the fake runner launches nothing, so any herdr call is stray
+	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)
@@ -471,7 +473,9 @@ func TestServerChat_EmptyGateStatePathUsesTheStateDir(t *testing.T) {
 	t.Parallel()
 	hook := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	t.Cleanup(hook.Close)
-	_, herdrEnv := herdrfake.StartStateEnv(t, herdrfake.NewState(t))
+	herdr := herdrfake.NewState(t)
+	herdr.Forbid() // the fake runner launches nothing, so any herdr call is stray
+	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)

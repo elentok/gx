@@ -67,7 +67,9 @@ func (h *chatHook) waitFor(t *testing.T, want string) []string {
 // returned path. flush is the batch tick.
 func reloadChatServer(t *testing.T, global string, flush time.Duration) (*Server, string) {
 	t.Helper()
-	_, herdrEnv := herdrfake.StartStateEnv(t, herdrfake.NewState(t))
+	herdr := herdrfake.NewState(t)
+	herdr.Forbid() // the fake runner launches nothing, so any herdr call is stray
+	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 	stateDir, err := os.MkdirTemp("", "gx") // short path: unix socket limit
 	if err != nil {
 		t.Fatal(err)

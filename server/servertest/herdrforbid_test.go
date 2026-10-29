@@ -16,6 +16,20 @@ func TestHerdr_NilWithoutWithHerdr(t *testing.T) {
 	}
 }
 
+func TestHerdr_OnTurnOnAWithRunnerHarnessFailsNamingOnTurn(t *testing.T) {
+	h := Start(t, WithRunner(runnerfake.NewRunner()))
+	rec := &failRecorder{TB: t}
+	h.tb = rec
+
+	h.OnTurn(func(*Turn) {})
+
+	rec.mu.Lock()
+	defer rec.mu.Unlock()
+	if len(rec.errors) != 1 || !strings.Contains(rec.errors[0], "OnTurn") {
+		t.Errorf("errors = %q, want one naming OnTurn", rec.errors)
+	}
+}
+
 func TestHerdr_NilByDefault(t *testing.T) {
 	if h := Start(t); h.Herdr != nil {
 		t.Errorf("h.Herdr = %v, want nil on the default runner", h.Herdr)

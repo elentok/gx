@@ -36,21 +36,25 @@ func newMergeFixtureWith(t *testing.T, turn func(f *schedFixture, cwd string, n 
 	t.Helper()
 	var mu sync.Mutex
 	var seen []mergeTurn
-	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: "merge"}}, func(f *schedFixture, p *servertest.Turn, _ string) {
-		mu.Lock()
-		seen = append(seen, mergeTurn{
-			prompt:          p,
-			branch:          gitOut(t, p.Cwd, "branch", "--show-current"),
-			iterationBranch: strings.TrimSpace(f.git(t, "branch", "--list", "ralph-loop/*")),
-		})
-		n := len(seen)
-		mu.Unlock()
-		report := turn(f, p.Cwd, n)
-		if report == "" {
-			return
+	var agentTurn func(f *schedFixture, p *servertest.Turn, _ string)
+	if turn != nil {
+		agentTurn = func(f *schedFixture, p *servertest.Turn, _ string) {
+			mu.Lock()
+			seen = append(seen, mergeTurn{
+				prompt:          p,
+				branch:          gitOut(t, p.Cwd, "branch", "--show-current"),
+				iterationBranch: strings.TrimSpace(f.git(t, "branch", "--list", "ralph-loop/*")),
+			})
+			n := len(seen)
+			mu.Unlock()
+			report := turn(f, p.Cwd, n)
+			if report == "" {
+				return
+			}
+			reportIteration(t, f.ticketFile(t, "01"), report)
 		}
-		reportIteration(t, f.ticketFile(t, "01"), report)
-	}, cfgOpts...)
+	}
+	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: "merge"}}, agentTurn, cfgOpts...)
 	// One commit of its own, so the epic completes unmerged and keeps its worktree.
 	commitOnBranch(t, f.repo, schedEpic)
 	// Merging the epic is not this ticket's concern.
@@ -155,7 +159,7 @@ func TestMergeTicket_FailedLaunchKeepsTheFeatureWorktree(t *testing.T) {
 	t.Parallel()
 	fake := runnerfake.NewRunner()
 	fake.SetStartErr(schedEpic+"-iter-01", errors.New("start refused"))
-	f, _ := newMergeFixture(t, func(int) string { return "finished" }, servertest.WithRunner(fake))
+	f, _ := newMergeFixtureWith(t, nil, servertest.WithRunner(fake))
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")

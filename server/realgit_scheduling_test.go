@@ -47,6 +47,9 @@ func newSchedFixture(t *testing.T, tickets map[string]servertest.TicketOpts, age
 			o(c)
 		}
 	})
+	if agentTurn == nil { // a runner of its own: no agent ever takes a turn
+		return f
+	}
 	f.h.OnTurn(func(p *servertest.Turn) {
 		_, id, _ := strings.Cut(p.Address, "/")
 		f.mu.Lock()
