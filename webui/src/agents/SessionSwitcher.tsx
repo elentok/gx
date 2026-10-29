@@ -4,7 +4,7 @@ import type { SessionInfo } from "../generated/server";
 import { agentHref } from "../hrefs";
 import { RowList, type ListRowData, type ListSection } from "../nav/JumpMenu";
 import { StatusMark } from "./AgentSidebar";
-import { isActionable } from "./rules";
+import { isActionable, stateLabel } from "./rules";
 
 // Port of ui/agents/jump.go: attention order, and the search fields plus the session ticket.
 const SECTIONS = ["Actionable", "Unread", "Other"];
@@ -16,7 +16,7 @@ function sessionRow(s: SessionInfo, current: boolean): ListRowData {
   return {
     key: s.id,
     title: name,
-    subtitle: [s.project, s.status.state, s.ticket, s.actionable.reason].filter(Boolean).join(" · "),
+    subtitle: [s.project, stateLabel(s), s.ticket, s.actionable.reason].filter(Boolean).join(" · "),
     href: agentHref(s.id),
     searchText: [name, s.project, s.dir, s.ticket].join(" "),
     current,

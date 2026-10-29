@@ -14,6 +14,7 @@ import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
 import { StatusMark, statusMark } from "./AgentSidebar";
+import { stateLabel } from "./rules";
 import { SessionSwitcher } from "./SessionSwitcher";
 
 // No question sheet, no step names, no "gx stopped", no Done state, and no Restore or New session.
@@ -21,7 +22,6 @@ const AGENT_OPTIONS: ChatOptions = { sheet: false, steps: false, gxStopped: fals
 
 const noop = () => {};
 
-const stateLabel = (s: SessionInfo) => s.status.state.charAt(0).toUpperCase() + s.status.state.slice(1).replace("-", " ");
 
 function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; sessions: SessionInfo[]; onNew: () => void }) {
   const { tone } = statusMark(s);

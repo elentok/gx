@@ -18,4 +18,6 @@ export const liveCount = (sessions: SessionInfo[]) => sessions.filter((s) => s.s
 /** A Blocked session always waits on the person, with or without a recorded reason. */
 export const isActionable = (s: SessionInfo) => !!s.actionable.reason || s.status.state === SessionBlocked;
 
-export const actionableCount = (sessions: SessionInfo[]) => sessions.filter(isActionable).length;
+export const stateLabel = (s: SessionInfo) => s.status.state.charAt(0).toUpperCase() + s.status.state.slice(1).replace("-", " ");
+
+export const actionableCount =(sessions: SessionInfo[]) => sessions.filter(isActionable).length;

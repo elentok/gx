@@ -302,7 +302,7 @@ test("the title button opens the switcher with Actionable, Unread, Other section
   expect(dialog().getAllByRole("group").map((g) => g.getAttribute("aria-label"))).toEqual(["Actionable", "Unread", "Other"]);
   const names = optionNames();
   expect(names[0]).toContain("needs you");
-  expect(names[0]).toContain("beta · idle · gx:m/07 · Pick one");
+  expect(names[0]).toContain("beta · Idle · gx:m/07 · Pick one");
   expect(names[1]).toContain("unread one");
   expect(names.slice(2).join()).toContain("plain");
 });
