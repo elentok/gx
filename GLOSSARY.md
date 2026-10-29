@@ -981,6 +981,11 @@ password and a TOTP code. The person can rename it, and revoke it from the Setti
 browser and its home-screen app hold separate web logins.
 _Avoid_: session, device session (a session is an agent session), sign-in
 
+**Setup code** — a short one-time code that the CLI prints while the web UI has no password yet.
+The person enters it on the setup page to choose the password and TOTP. It works once and expires
+after an hour.
+_Avoid_: token, setup token, invite code
+
 ## Skills
 
 **Bundled skill** — a skill that ships inside gx and is installed with it. Every bundled skill is
