@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { postAuth, type AuthResult, type AuthState } from "./authState";
 
-// Unstyled stand-ins for the login and setup pages; those tickets replace this file.
+// Unstyled stand-in for the setup page; that ticket replaces this file.
 interface FormProps {
   auth: AuthState;
   onDone: () => void;
@@ -25,25 +25,6 @@ function useSubmit(step: "setup-start" | "setup-finish" | "login", onDone: () =>
 
 function field(form: HTMLFormElement, name: string): string {
   return (form.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
-}
-
-export function PlainLoginForm({ auth, onDone }: FormProps) {
-  const { message, result, submit } = useSubmit("login", onDone);
-  const onSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = e.currentTarget;
-    void submit({ password: field(f, "password"), totp_code: field(f, "totp_code"), setup_code: field(f, "setup_code") });
-  };
-  return (
-    <form onSubmit={onSubmit}>
-      <input name="password" type="password" placeholder="Password" />
-      {auth.totp_on && <input name="totp_code" placeholder="Code" />}
-      {auth.setup_code_required && <input name="setup_code" placeholder="Setup code" />}
-      <button type="submit">Sign in</button>
-      {result?.authenticator_needed && <p>{result.secret}</p>}
-      {message && <p role="alert">{message}</p>}
-    </form>
-  );
 }
 
 export function PlainSetupForm({ auth, onDone }: FormProps) {

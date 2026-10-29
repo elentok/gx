@@ -41,7 +41,7 @@ test("shows the app when signed in", async () => {
 
 test("login asks for the setup code only when the state says so", async () => {
   renderGate(async () => ({ ...stateOf("signed-out"), setup_code_required: true }));
-  expect(await screen.findByPlaceholderText("Setup code")).toBeTruthy();
+  expect(await screen.findByLabelText("Setup code")).toBeTruthy();
 });
 
 test("a 401 in the app switches to login and keeps the hash", async () => {
@@ -58,7 +58,7 @@ test("a successful login re-reads the state and keeps the hash", async () => {
   let current = stateOf("signed-out");
   vi.stubGlobal("fetch", vi.fn(async () => new Response("{}")));
   renderGate(async () => current);
-  fireEvent.change(await screen.findByPlaceholderText("Password"), { target: { value: "pw" } });
+  fireEvent.change(await screen.findByLabelText("Password"), { target: { value: "pw" } });
   current = stateOf("signed-in");
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
   expect(await screen.findByText("the app")).toBeTruthy();

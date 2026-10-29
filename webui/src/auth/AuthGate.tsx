@@ -3,7 +3,8 @@ import { onSignedOut } from "../apiFetch";
 import { Spinner } from "../ui/spinner/Spinner";
 import { AuthCard } from "./AuthCard";
 import { fetchAuthState, type AuthState } from "./authState";
-import { PlainLoginForm, PlainSetupForm } from "./PlainAuthForms";
+import { LoginPage } from "./LoginPage";
+import { PlainSetupForm } from "./PlainAuthForms";
 
 /**
  * Shows setup, login or the app by the auth state. It never touches the hash, and the app mounts
@@ -33,13 +34,12 @@ export function AuthGate({
   if (failed) return <AuthCard>Could not reach the server.</AuthCard>;
   if (!auth) return <Spinner label="Loading" />;
   if (auth.state === "signed-in") return <>{children}</>;
-  return (
-    <AuthCard>
-      {auth.state === "setup" ? (
+  if (auth.state === "setup") {
+    return (
+      <AuthCard>
         <PlainSetupForm auth={auth} onDone={refresh} />
-      ) : (
-        <PlainLoginForm auth={auth} onDone={refresh} />
-      )}
-    </AuthCard>
-  );
+      </AuthCard>
+    );
+  }
+  return <LoginPage auth={auth} onDone={refresh} />;
 }
