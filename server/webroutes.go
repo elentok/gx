@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"errors"
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -21,12 +20,18 @@ var webOnlyRoutes = []WebOnlyRoute{
 	{Pattern: "POST /v1/client-errors", Public: true},
 	{Pattern: "GET " + webRootProfilePath, Public: true},
 	{Pattern: "GET " + webRootCerPath, Public: true},
+	{Pattern: "GET " + webAuthPathState, Public: true},
+	{Pattern: "POST " + webAuthPathSetupStart, Public: true},
+	{Pattern: "POST " + webAuthPathSetupFinish, Public: true},
+	{Pattern: "POST " + webAuthPathLogin, Public: true},
+	{Pattern: "POST " + webAuthPathSignOut},
 }
 
 // webPublicGets names the GET routes in webOnlyRoutes and their handlers.
 var webPublicGets = map[string]func(*Server) http.HandlerFunc{
 	"GET " + webRootProfilePath: func(s *Server) http.HandlerFunc { return s.webRootProfileRead },
 	"GET " + webRootCerPath:     func(s *Server) http.HandlerFunc { return s.webRootCerRead },
+	"GET " + webAuthPathState:   func(s *Server) http.HandlerFunc { return s.webAuthStateRead },
 }
 
 // WebPublicGetPatterns names every web-only "GET /path" the web mux serves.
@@ -113,10 +118,7 @@ type clientErrorResult struct {
 // it reads only the four body fields: never a cookie or other header.
 func (s *Server) clientErrorReport(w http.ResponseWriter, r *http.Request) {
 	refuse := func(reason string) { writeJSON(w, clientErrorResult{Refused: true, Reason: reason}) }
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		ip = r.RemoteAddr
-	}
+	ip := remoteIP(r)
 	if !s.clientErrs.allow(ip, clientErrorRateLimit, clientErrorWindow) {
 		refuse("rate-limited")
 		return

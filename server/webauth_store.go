@@ -38,6 +38,8 @@ const (
 var (
 	// ErrWebAuthRefused is the one refusal for a wrong password, TOTP code or Setup code.
 	ErrWebAuthRefused = errors.New("web auth refused")
+	// ErrTOTPMismatch is ErrWebAuthRefused for the setup code that does not match the secret.
+	ErrTOTPMismatch = fmt.Errorf("totp code does not match: %w", ErrWebAuthRefused)
 	// ErrSetupNotPending means a password is already set.
 	ErrSetupNotPending = errors.New("web auth setup is not pending")
 	// ErrPasswordTooShort means the password breaks the length rule.
@@ -210,7 +212,7 @@ func (w *WebAuth) SetupFinish(totpOn bool, code, password, totpCode, ip, userAge
 		var ok bool
 		if step, ok = verifyTOTP(secret, totpCode, w.now(), 0); !ok {
 			w.limiter.Fail(ip)
-			return "", ErrWebAuthRefused
+			return "", ErrTOTPMismatch
 		}
 	}
 	hash, err := hashWebPassword(password)

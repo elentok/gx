@@ -269,9 +269,14 @@ type Server struct {
 	webListenIP net.IP    // nil when the listener binds every interface
 	webCerts    *webCerts // nil unless the web listener is bound
 	clientErrs  ipLimiter
-	logf        *rotatingFile
-	log         *slog.Logger
-	idx         *index
+	// webAuth is the web login store; nil unless the web listener is bound.
+	webAuth        *WebAuth
+	webLoginCookie string
+	webStreams     webStreams
+	webRenewed     sync.Map // map web login id -> time its cookie was last renewed
+	logf           *rotatingFile
+	log            *slog.Logger
+	idx            *index
 
 	queued       *queueStore
 	pause        *pauseState
@@ -693,6 +698,12 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer cancel()
+	ctx := r.Context()
+	if id := webLoginIDFrom(ctx); id != "" {
+		var untrack func()
+		ctx, untrack = s.webStreams.track(ctx, id)
+		defer untrack()
+	}
 	if client := r.URL.Query().Get("client"); client != "" {
 		s.focus.connect(client)
 		defer s.focus.disconnect(client)
@@ -712,7 +723,7 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 	defer beat.Stop()
 	for {
 		select {
-		case <-r.Context().Done():
+		case <-ctx.Done():
 			return
 		case <-beat.C:
 			if _, err := io.WriteString(w, ": heartbeat\n\n"); err != nil {

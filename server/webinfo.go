@@ -16,9 +16,12 @@ type WebInfo struct {
 	// LeftOutHosts and LeftOutIPs are the names the leaf omits because the root does not permit them.
 	LeftOutHosts []string `json:"left_out_hosts,omitempty"`
 	LeftOutIPs   []string `json:"left_out_ips,omitempty"`
-	Refused      bool     `json:"refused,omitempty"`
-	Reason       string   `json:"reason,omitempty"`
-	Message      string   `json:"message,omitempty"`
+	// SetupPending is true until the first password is set; SetupCode is the Setup code while it is.
+	SetupPending bool   `json:"setup_pending,omitempty"`
+	SetupCode    string `json:"setup_code,omitempty"`
+	Refused      bool   `json:"refused,omitempty"`
+	Reason       string `json:"reason,omitempty"`
+	Message      string `json:"message,omitempty"`
 }
 
 func (s *Server) webInfo(w http.ResponseWriter, _ *http.Request) {
@@ -56,6 +59,11 @@ func (s *Server) webInfoNow() WebInfo {
 		Fingerprint:  webRootFingerprint(s.webCerts.Root().Raw),
 		LeftOutHosts: skipped.Hosts,
 	}
+	pending, code, err := s.webAuth.SetupState()
+	if err != nil {
+		s.log.Error("web setup state unavailable", "err", err)
+	}
+	info.SetupPending, info.SetupCode = pending, code
 	for _, ip := range skipped.IPs {
 		info.LeftOutIPs = append(info.LeftOutIPs, ip.String())
 	}

@@ -112,23 +112,23 @@ func sameSecret(a, b string) bool {
 }
 
 // requireToken lets a request through when it carries the session cookie. A
-// valid ?gx_token= starts a session and redirects to the app root; anything else is a 401.
+// valid ?gx_token= starts a session and redirects to the app root; anything else goes to deny.
 //
 // Plain HTTP means anyone on the LAN can sniff the ?gx_token= link and the cookie, and
 // the cookie cannot be Secure. It lives 365 days, so rotating the token is the
 // only revocation. The file is read on every request so rotation takes effect
 // at once; do not cache it. Security design: map gx:webui-security.
-func requireToken(stateDir, cookieName string, next http.Handler) http.Handler {
+func requireToken(stateDir, cookieName string, next, deny http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := ReadWebToken(stateDir)
 		if err != nil {
-			unauthorized(w)
+			deny.ServeHTTP(w, r)
 			return
 		}
 		want := webCookieValue(token)
 		if t := r.URL.Query().Get(webTokenParam); t != "" {
 			if !sameSecret(t, token) {
-				unauthorized(w)
+				deny.ServeHTTP(w, r)
 				return
 			}
 			http.SetCookie(w, &http.Cookie{
@@ -142,12 +142,12 @@ func requireToken(stateDir, cookieName string, next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		unauthorized(w)
+		deny.ServeHTTP(w, r)
 	})
 }
 
 func unauthorized(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusUnauthorized)
-	_, _ = w.Write([]byte("401: open the link printed by `gx server status` to sign in.\n"))
+	_, _ = w.Write([]byte("401: sign in on the web page.\n"))
 }

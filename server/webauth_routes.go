@@ -1,0 +1,257 @@
+package server
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+)
+
+// Refusal reasons of the web login routes (ADR 0028).
+const (
+	ReasonWrongCredentials   = "wrong-credentials"
+	ReasonSetupCodeWrong     = "setup-code-wrong"
+	ReasonSetupCodeRequired  = "setup-code-required"
+	ReasonSetupNotPending    = "setup-not-pending"
+	ReasonTOTPMismatch       = "totp-mismatch"
+	ReasonPasswordTooShort   = "password-too-short"
+	webLoginCookiePrefix     = "__Host-gx_login"
+	webLoginCookieMaxAge     = int(webLoginIdleLimit / time.Second)
+	webAuthBodyMax           = 4 << 10
+	webAuthPathState         = "/v1/web/auth"
+	webAuthPathSetupStart    = "/v1/web/auth/setup-start"
+	webAuthPathSetupFinish   = "/v1/web/auth/setup-finish"
+	webAuthPathLogin         = "/v1/web/auth/login"
+	webAuthPathSignOut       = "/v1/web/auth/sign-out"
+	webAuthStateSetup        = "setup"
+	webAuthStateSignedOut    = "signed-out"
+	webAuthStateSignedIn     = "signed-in"
+	webLoginCookieRenewEvery = time.Minute
+)
+
+// webTOTPOn is whether login asks for a TOTP code. The config key comes later.
+const webTOTPOn = true
+
+type webAuthResult struct {
+	Refused     bool   `json:"refused,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	WaitSeconds int    `json:"wait_seconds,omitempty"`
+	// The fields below carry a secret: setup step 1 and the "authenticator needed" login result.
+	AuthenticatorNeeded bool   `json:"authenticator_needed,omitempty"`
+	PendingID           string `json:"pending_id,omitempty"`
+	Secret              string `json:"secret,omitempty"`
+	URI                 string `json:"uri,omitempty"`
+}
+
+type webAuthState struct {
+	State   string `json:"state"`
+	LoginID string `json:"login_id,omitempty"`
+}
+
+type webAuthBody struct {
+	Code     string `json:"code"`
+	Password string `json:"password"`
+	TOTPCode string `json:"totp_code"`
+	// SetupCode is the Setup code a login needs after the CLI reset.
+	SetupCode string `json:"setup_code"`
+}
+
+type webLoginKey struct{}
+
+// webLoginIDFrom returns the id of the web login a gated request came in with.
+func webLoginIDFrom(ctx context.Context) string {
+	id, _ := ctx.Value(webLoginKey{}).(string)
+	return id
+}
+
+// loginCookieName names the web login cookie after the listener's port, for the
+// reason webCookiePrefix gives.
+func loginCookieName(ln net.Listener) string {
+	if _, port, err := net.SplitHostPort(ln.Addr().String()); err == nil && port != "" {
+		return webLoginCookiePrefix + "_" + port
+	}
+	return webLoginCookiePrefix
+}
+
+func (s *Server) webNow() time.Time {
+	if s.cfg.Clock != nil {
+		return s.cfg.Clock()
+	}
+	return time.Now()
+}
+
+func (s *Server) setLoginCookie(w http.ResponseWriter, value string, maxAge int) {
+	http.SetCookie(w, &http.Cookie{
+		Name: s.webLoginCookie, Value: value, Path: "/", MaxAge: maxAge,
+		Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func remoteIP(r *http.Request) string {
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return ip
+}
+
+// webLoginFor finds the web login behind the request's cookie.
+func (s *Server) webLoginFor(r *http.Request) (WebLogin, string, bool) {
+	c, err := r.Cookie(s.webLoginCookie)
+	if err != nil {
+		return WebLogin{}, "", false
+	}
+	login, ok := s.webAuth.Lookup(c.Value, remoteIP(r))
+	return login, c.Value, ok
+}
+
+// requireWebLogin lets a request through with a valid web login cookie and
+// renews the cookie at most once a minute. Any other request goes to fallback,
+// which still lets the old token cookie in until the token goes away.
+func (s *Server) requireWebLogin(next, fallback http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		login, value, ok := s.webLoginFor(r)
+		if !ok {
+			fallback.ServeHTTP(w, r)
+			return
+		}
+		now := s.webNow()
+		if last, seen := s.webRenewed.Load(login.ID); !seen || now.Sub(last.(time.Time)) >= webLoginCookieRenewEvery {
+			s.webRenewed.Store(login.ID, now)
+			s.setLoginCookie(w, value, webLoginCookieMaxAge)
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), webLoginKey{}, login.ID)))
+	})
+}
+
+// denyWeb serves what needs no login (the page and the assets) and answers 401
+// to everything else.
+func (s *Server) denyWeb(mux http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && !strings.HasPrefix(r.URL.Path, "/v1/") {
+			mux.ServeHTTP(w, r)
+			return
+		}
+		unauthorized(w)
+	})
+}
+
+func (s *Server) webAuthStateRead(w http.ResponseWriter, r *http.Request) {
+	if login, _, ok := s.webLoginFor(r); ok {
+		writeJSON(w, webAuthState{State: webAuthStateSignedIn, LoginID: login.ID})
+		return
+	}
+	pending, _, err := s.webAuth.SetupState()
+	if err != nil {
+		http.Error(w, "web auth unavailable", http.StatusInternalServerError)
+		return
+	}
+	if pending {
+		writeJSON(w, webAuthState{State: webAuthStateSetup})
+		return
+	}
+	writeJSON(w, webAuthState{State: webAuthStateSignedOut})
+}
+
+func readWebAuthBody(w http.ResponseWriter, r *http.Request) (webAuthBody, bool) {
+	var body webAuthBody
+	r.Body = http.MaxBytesReader(w, r.Body, webAuthBodyMax)
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad JSON", http.StatusBadRequest)
+		return body, false
+	}
+	return body, true
+}
+
+// refuseWebAuth answers a store error with its refusal. Anything unknown is a 500.
+func refuseWebAuth(w http.ResponseWriter, err error, wrong string) {
+	var wait *WebAuthWaitError
+	reason := ""
+	switch {
+	case errors.As(err, &wait):
+		writeJSON(w, webAuthResult{Refused: true, Reason: ReasonRateLimited, WaitSeconds: wait.Seconds})
+		return
+	case errors.Is(err, ErrTOTPMismatch):
+		reason = ReasonTOTPMismatch
+	case errors.Is(err, ErrWebAuthRefused):
+		reason = wrong
+	case errors.Is(err, ErrSetupNotPending):
+		reason = ReasonSetupNotPending
+	case errors.Is(err, ErrPasswordTooShort):
+		reason = ReasonPasswordTooShort
+	case errors.Is(err, ErrSetupCodeRequired):
+		reason = ReasonSetupCodeRequired
+	default:
+		http.Error(w, "web auth unavailable", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, webAuthResult{Refused: true, Reason: reason})
+}
+
+func (s *Server) webSetupStart(w http.ResponseWriter, r *http.Request) {
+	body, ok := readWebAuthBody(w, r)
+	if !ok {
+		return
+	}
+	secret, err := s.webAuth.SetupStart(webTOTPOn, body.Code, remoteIP(r))
+	if err != nil {
+		refuseWebAuth(w, err, ReasonSetupCodeWrong)
+		return
+	}
+	res := webAuthResult{Secret: secret}
+	if secret != "" {
+		res.URI = totpURI(secret, totpAccountLabel)
+	}
+	writeJSON(w, res)
+}
+
+func (s *Server) webSetupFinish(w http.ResponseWriter, r *http.Request) {
+	body, ok := readWebAuthBody(w, r)
+	if !ok {
+		return
+	}
+	cookie, err := s.webAuth.SetupFinish(webTOTPOn, body.Code, body.Password, body.TOTPCode, remoteIP(r), r.UserAgent())
+	if err != nil {
+		refuseWebAuth(w, err, ReasonSetupCodeWrong)
+		return
+	}
+	s.setLoginCookie(w, cookie, webLoginCookieMaxAge)
+	writeJSON(w, webAuthResult{})
+}
+
+func (s *Server) webLoginWrite(w http.ResponseWriter, r *http.Request) {
+	body, ok := readWebAuthBody(w, r)
+	if !ok {
+		return
+	}
+	cookie, err := s.webAuth.Login(webTOTPOn, body.Password, body.TOTPCode, body.SetupCode, remoteIP(r), r.UserAgent())
+	var needed *AuthenticatorNeededError
+	if errors.As(err, &needed) {
+		writeJSON(w, webAuthResult{AuthenticatorNeeded: true, PendingID: needed.PendingID, Secret: needed.Secret, URI: needed.URI})
+		return
+	}
+	if err != nil {
+		refuseWebAuth(w, err, ReasonWrongCredentials)
+		return
+	}
+	s.setLoginCookie(w, cookie, webLoginCookieMaxAge)
+	writeJSON(w, webAuthResult{})
+}
+
+// webSignOut drops this web login, ends its streams and clears the cookie.
+func (s *Server) webSignOut(w http.ResponseWriter, r *http.Request) {
+	id := webLoginIDFrom(r.Context())
+	if id != "" {
+		removed, err := s.webAuth.RevokeLogin(id)
+		if err != nil && !errors.Is(err, ErrWebLoginNotFound) {
+			http.Error(w, "web auth unavailable", http.StatusInternalServerError)
+			return
+		}
+		s.webStreams.closeLogins(removed...)
+	}
+	s.setLoginCookie(w, "", -1)
+	writeJSON(w, webAuthResult{})
+}

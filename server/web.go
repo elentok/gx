@@ -41,6 +41,12 @@ func (s *Server) bindWeb() {
 		s.webDev = proxy
 		s.log.Warn("web UI is served from a dev frontend", "url", s.cfg.WebDevURL)
 	}
+	auth, err := OpenWebAuth(s.cfg.StateDir, s.webNow)
+	if err != nil {
+		s.webErr = "web auth: " + err.Error()
+		s.log.Error("web auth unavailable", "err", err)
+		return
+	}
 	rawLn, err := net.Listen("tcp", s.cfg.WebAddr)
 	if err != nil {
 		s.webErr = err.Error()
@@ -71,8 +77,9 @@ func (s *Server) bindWeb() {
 	}
 	ln := newSniffListener(newSourceIPListener(rawLn, s.log, time.Now), &tls.Config{GetCertificate: certs.getCertificate, MinVersion: tls.VersionTLS12})
 	s.web, s.webListenIP, s.webCerts = ln, listenIP, certs
+	s.webAuth, s.webLoginCookie = auth, loginCookieName(ln)
 	mux := s.webHandler()
-	protected := requireToken(s.cfg.StateDir, webCookieName(ln), mux)
+	protected := s.requireWebLogin(mux, requireToken(s.cfg.StateDir, webCookieName(ln), mux, s.denyWeb(mux)))
 	allowed := func() []string { return s.settings.Load().WebAllowedHosts }
 	s.webHTTP = &http.Server{Handler: requireHost(allowed, redirectPlainHTTP(servePublicFirst(mux, protected)))}
 }
@@ -183,6 +190,11 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/checks/save":       func(s *Server) http.HandlerFunc { return s.checksSaveWrite },
 	"POST /v1/disk/clean":        func(s *Server) http.HandlerFunc { return s.diskCleanWrite },
 	"POST /v1/client-errors":     func(s *Server) http.HandlerFunc { return s.clientErrorReport },
+
+	"POST " + webAuthPathSetupStart:  func(s *Server) http.HandlerFunc { return s.webSetupStart },
+	"POST " + webAuthPathSetupFinish: func(s *Server) http.HandlerFunc { return s.webSetupFinish },
+	"POST " + webAuthPathLogin:       func(s *Server) http.HandlerFunc { return s.webLoginWrite },
+	"POST " + webAuthPathSignOut:     func(s *Server) http.HandlerFunc { return s.webSignOut },
 }
 
 // checkWriteRequest returns why a non-GET request is refused, or "". It is the
