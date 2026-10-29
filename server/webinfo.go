@@ -11,6 +11,9 @@ const ReasonWebOff = "web-off"
 // ReasonWebNewRootFailed refuses a new-root request when the root could not be made or saved.
 const ReasonWebNewRootFailed = "web-new-root-failed"
 
+// ReasonWebResetFailed refuses a web reset when the account could not be cleared or saved.
+const ReasonWebResetFailed = "web-reset-failed"
+
 // WebInfo is the GET /v1/web/info payload behind `gx server web-url`.
 type WebInfo struct {
 	BaseURL string `json:"base_url,omitempty"`
@@ -48,6 +51,24 @@ func (s *Server) webNewRoot(w http.ResponseWriter, _ *http.Request) {
 	info := s.webInfoNow()
 	s.log.Info("new root", "fingerprint", info.Fingerprint)
 	writeJSON(w, info)
+}
+
+// webReset clears the web account, ends every web login's event streams and
+// answers with the new Setup code. The socket is the only way in.
+func (s *Server) webReset(w http.ResponseWriter, _ *http.Request) {
+	if s.web == nil {
+		writeJSON(w, webOffInfo())
+		return
+	}
+	removed, err := s.webAuth.WebReset()
+	if err != nil {
+		s.log.Error("web reset failed", "err", err)
+		writeJSON(w, WebInfo{Refused: true, Reason: ReasonWebResetFailed, Message: "could not reset the web account: " + err.Error()})
+		return
+	}
+	s.webStreams.closeLogins(removed...)
+	s.logWebAuth("web reset", "cli", "", "")
+	writeJSON(w, s.webInfoNow())
 }
 
 func webOffInfo() WebInfo {

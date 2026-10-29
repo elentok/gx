@@ -137,6 +137,14 @@ func (c *Client) WebNewRoot(ctx context.Context) (server.WebInfo, error) {
 	return info, err
 }
 
+// WebReset clears the web account and returns the new Setup code in the result.
+// A refusal is a result (Refused set), not an error.
+func (c *Client) WebReset(ctx context.Context) (server.WebInfo, error) {
+	var info server.WebInfo
+	err := c.post(ctx, "/v1/web/reset", struct{}{}, &info)
+	return info, err
+}
+
 // Snapshot returns every indexed ticket plus the server-wide sequence number.
 func (c *Client) Snapshot(ctx context.Context) (server.Snapshot, error) {
 	var s server.Snapshot

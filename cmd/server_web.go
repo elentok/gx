@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -156,6 +158,64 @@ func runWebNewRoot(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.
 		return nil
 	}
 	_, err = fmt.Fprintln(w, "new root fingerprint: "+info.Fingerprint)
+	return err
+}
+
+func newServerWebResetCmd(d deps) *cobra.Command {
+	var yes, jsonOut bool
+	c := &cobra.Command{
+		Use:   "web-reset",
+		Short: "Clear the web password, authenticator and web logins, and print a new Setup code",
+		Long:  "Clears the password, the TOTP secret, every web login and the rate limits, and signs every browser out.\nAsks first on a terminal; without one, --yes is required.",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			if !yes {
+				if !isTerminal(d) {
+					return errors.New("refusing to reset the web account without a terminal to confirm on; pass --yes")
+				}
+				fmt.Fprint(d.stdout, "Clear the web password, authenticator and every web login? [y/N] ")
+				line, _ := bufio.NewReader(d.stdin).ReadString('\n')
+				if a := strings.ToLower(strings.TrimSpace(line)); a != "y" && a != "yes" {
+					fmt.Fprintln(d.stdout, "cancelled; nothing changed")
+					return nil
+				}
+			}
+			cl, err := d.dial()()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runWebReset(ctx, cl, jsonOut, c.OutOrStdout())
+		},
+	}
+	c.Flags().BoolVar(&yes, "yes", false, "reset without asking")
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return c
+}
+
+func runWebReset(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
+	info, err := c.WebReset(ctx)
+	switch {
+	case apiclient.IsNotRunning(err):
+		info = server.WebInfo{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+	case err != nil:
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	if jsonOut {
+		if err := encodeProvenance(w, info, viaServer, callerActor(os.Getwd)); err != nil {
+			return err
+		}
+	}
+	if info.Refused {
+		return fmt.Errorf("refused (%s): %s", info.Reason, info.Message)
+	}
+	if jsonOut {
+		return nil
+	}
+	_, err = fmt.Fprintln(w, setupCodeLine(info.SetupCode, info.SetupExpires))
 	return err
 }
 
