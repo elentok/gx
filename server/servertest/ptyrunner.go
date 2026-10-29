@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
@@ -123,6 +124,25 @@ func (h *Harness) buildPty() {
 	}
 	h.cfg.Runner = wrap(runnerFor("pty", runnerbuild.FallbackProject))
 	h.cfg.RunnerFor = func(name, project string) agentrunner.Runner { return wrap(runnerFor(name, project)) }
+}
+
+// KillAgents ends every live agent of proj:epic-a without counting a Stop, so
+// the runner no longer finds them. PTY only.
+func (h *Harness) KillAgents(t *testing.T) {
+	t.Helper()
+	if !h.ptyOnly("KillAgents") {
+		return
+	}
+	p := h.cfg.RunnerFor("pty", "proj").(*ptyRunner).Pty
+	live, err := p.List("epic-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range live {
+		if err := p.Stop(s); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 // stopAgents stops every holder under the state dir's agents roots.

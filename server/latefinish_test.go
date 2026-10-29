@@ -16,7 +16,6 @@ import (
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
-	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -66,19 +65,15 @@ func pauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) 
 		base := fake.stops.Load()
 		p.stops = func() int32 { return fake.stops.Load() - base }
 	} else {
-		p.h = servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithHerdr(servertest.UntilPtyFixture)}, opts...)...)
-		runToZeroCommitPauseOnHerdr(t, p.h, "done")
-		p.agentGone = func() {
-			p.h.Herdr.Register("agent", "get", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
-				return nil, herdrfake.Identities{}, servertest.AgentNotFound(argv[2])
-			})
+		p.h = servertest.StartWithStore(t, store, opts...)
+		p.h.OnTurn(func(turn *servertest.Turn) { turn.Transcript("done") })
+		if res, err := p.h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+			t.Fatalf("add: %+v, %v", res, err)
 		}
-		var closes atomic.Int32
-		p.h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-			closes.Add(1)
-			return map[string]any{}, herdrfake.Identities{}, nil
-		})
-		p.stops = func() int32 { return closes.Load() }
+		waitStatus(t, p.ticketPath, schema.StatusLegacyAnswer)
+		p.agentGone = func() { p.h.KillAgents(t) }
+		base := p.h.Stops()
+		p.stops = func() int32 { return int32(p.h.Stops() - base) }
 	}
 	// The pause writes the ticket's status before its run-log event.
 	waitFor(t, func() bool {

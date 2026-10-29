@@ -410,11 +410,19 @@ func TestPty_UsesTheHarnessProcessTable(t *testing.T) {
 	}
 }
 
+// commitWork is an agent that committed a file in its worktree.
+func commitWork(t *testing.T) func(string) {
+	return func(wtPath string) {
+		testutil.WriteFile(t, wtPath, "agent.txt", "work")
+		testutil.CommitAll(t, wtPath, "agent work")
+	}
+}
+
 func TestPty_LeavePtyRunLiveReattachesAfterRestart(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	h := startPty(t, store, repo)
-	h.LeavePtyRun(t, store, repo, true)
+	h.LeavePtyRun(t, store, repo, true, commitWork(t))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -437,7 +445,7 @@ func TestPty_LeavePtyRunDeadReclaimsAsDead(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	h := startPty(t, store, repo)
-	_, ticketPath := h.LeavePtyRun(t, store, repo, false)
+	_, ticketPath := h.LeavePtyRun(t, store, repo, false, commitWork(t))
 
 	h.Restart(t)
 	WaitFor(t, 30*time.Second, "the dead run to pause the ticket for repair", func() bool {

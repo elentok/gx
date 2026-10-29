@@ -9,19 +9,19 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
-	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 )
 
 // LeavePtyRun stages what a server that died mid-iteration leaves behind for
 // proj:epic-a/01 (as WriteTicket and SetProjectRepo made it): a claimed ticket,
-// its worktree with the agent's commit, and a runs.json entry on the pty runner.
-// The next Restart reclaims it.
+// its worktree, and a runs.json entry on the pty runner. The next Restart
+// reclaims it.
 //
-// A live run is a real holder and TUI fake the reclaim reattaches to. A dead
-// run is an agent directory whose holder and agent are gone. It returns the
-// worktree path and the ticket file.
-func (h *Harness) LeavePtyRun(t *testing.T, store, repo string, live bool) (wtPath, ticketPath string) {
+// work is what the agent did in its worktree; nil leaves an empty claim. A live
+// run is a real holder and TUI fake the reclaim reattaches to. A dead run is an
+// agent directory whose holder and agent are gone. It returns the worktree path
+// and the ticket file.
+func (h *Harness) LeavePtyRun(t *testing.T, store, repo string, live bool, work func(wtPath string)) (wtPath, ticketPath string) {
 	t.Helper()
 	epics, err := tickets.Load(filepath.Join(store, "proj"))
 	if err != nil {
@@ -37,11 +37,12 @@ func (h *Harness) LeavePtyRun(t *testing.T, store, repo string, live bool) (wtPa
 	if err != nil {
 		t.Fatal(err)
 	}
-	testutil.WriteFile(t, wt.Path, "agent.txt", "work")
-	testutil.CommitAll(t, wt.Path, "agent work")
+	if work != nil {
+		work(wt.Path)
+	}
 
 	label, _, _ := ralphloop.IterationIdentity("epic-a", tk.Identifier, "")
-	session := agentrunner.Session{Label: label, ID: label}
+	session := agentrunner.Session{Label: label, ID: label, SessionID: "dead-session"}
 	if live {
 		// The embedded Pty, so the staged launch is not counted by Starts.
 		session, err = h.cfg.RunnerFor("pty", "proj").(*ptyRunner).Pty.Start(agentrunner.StartOptions{
