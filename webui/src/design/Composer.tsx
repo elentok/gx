@@ -1,4 +1,4 @@
-import { Box, Spinner, Text } from "@chakra-ui/react";
+import { Box, Spinner, Text, Textarea } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { useComposerDraft } from "../drafts";
 import type {
@@ -46,6 +46,8 @@ export function Composer({
   onRoundSent,
   onReview,
   autoMenu,
+  design = true,
+  reason,
 }: {
   session: SessionInfo;
   /** The id of the last chat message the page saw. */
@@ -68,7 +70,11 @@ export function Composer({
   /** A row of the unanswered popover: open the sheet at that question. */
   onReview?: (index: number) => void;
   /** The Auto popover's open state, kept by the caller so a remount of the composer does not close it. */
-  autoMenu: AutoMenuState;
+  autoMenu?: AutoMenuState;
+  /** The design-only parts: Auto menu, Continue, Send answers, Interrupt and the Note toggle. Off, the box is always open with Send beside it. */
+  design?: boolean;
+  /** The line under the box when `design` is off; the caller decides the text. */
+  reason?: string;
 }) {
   const wide = useWide();
   const [gapsOpen, setGapsOpen] = useState(false);
@@ -185,7 +191,53 @@ export function Composer({
     </Button>
   );
 
-  const autoAdvanceBar = (
+  if (!design) {
+    return (
+      <Box
+        position="sticky"
+        bottom="0"
+        bg="surface"
+        borderTopWidth={wide ? "1px" : "0"}
+        py="3"
+        display="flex"
+        flexDirection="column"
+        gap="2"
+        role="form"
+        aria-label="Composer"
+      >
+        <Box display="flex" gap="2" alignItems="flex-end">
+          <Textarea
+            flex="1"
+            fontSize="16px"
+            color="text"
+            bg="surface"
+            borderColor="border"
+            borderRadius="12px"
+            rows={3}
+            resize="none"
+            aria-label="Message"
+            placeholder="A message to the agent"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <Button
+            disabled={!enabled || text.trim() === ""}
+            onClick={() => send({ text }, () => setText(""))}
+          >
+            {pending && <Spinner size="sm" />}
+            Send
+          </Button>
+        </Box>
+        {reason && (
+          <Text fontSize="xs" color="text.dim">
+            {reason}
+          </Text>
+        )}
+      </Box>
+    );
+  }
+
+  const autoAdvanceBar = autoMenu && (
     <AutoAdvanceBar
       session={session}
       disabled={!connected || pending}
