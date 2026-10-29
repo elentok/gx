@@ -974,6 +974,13 @@ use and free disk space of the gx server's machine. Each icon shows a state; its
 values. The name comes from the macOS menu bar.
 _Avoid_: status area, indicators bar
 
+## Web access
+
+**Web login** — one device's signed-in state in the web UI, made by one successful login with the
+password and a TOTP code. The person can rename it, and revoke it from the Settings page. A phone's
+browser and its home-screen app hold separate web logins.
+_Avoid_: session, device session (a session is an agent session), sign-in
+
 ## Skills
 
 **Bundled skill** — a skill that ships inside gx and is installed with it. Every bundled skill is
