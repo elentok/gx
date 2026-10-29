@@ -142,6 +142,16 @@ type Epic struct {
 	forks *forkCache
 }
 
+// WithTickets returns a copy of e holding ts and no fork or index cache, so
+// every lookup reads ts as it stands. A caller that edits ts in place (a
+// status flip in a plan simulation) uses it, because a cache holds Ticket
+// values and would keep serving the old ones.
+func (e Epic) WithTickets(ts []Ticket) Epic {
+	e.Tickets = ts
+	e.forks = nil
+	return e
+}
+
 // TotalCount is the epic's total ticket count.
 func (e Epic) TotalCount() int {
 	return len(e.Tickets)

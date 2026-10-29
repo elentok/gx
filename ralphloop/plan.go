@@ -25,8 +25,7 @@ func PlanWaves(epic tickets.Epic, scope RunScope, maxParallel int) ([][]tickets.
 		maxParallel = defaultMaxParallel
 	}
 
-	sim := epic
-	sim.Tickets = append([]tickets.Ticket(nil), epic.Tickets...)
+	sim := epic.WithTickets(append([]tickets.Ticket(nil), epic.Tickets...))
 	indexByID := make(map[string]int, len(sim.Tickets))
 	for i, t := range sim.Tickets {
 		indexByID[t.DisplayNumber()] = i
