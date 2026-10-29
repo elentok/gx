@@ -152,6 +152,25 @@ describe("Tray popover", () => {
       expect(row.querySelector("[data-part='cause-busiest']")!.textContent).toBe("go test");
     });
 
+    it("colors the agent link like the other cause rows", async () => {
+      withCauses({
+        cpu: { rows: [causeRow({ kind: "agent", label: "gx:foo/03", ticket: "gx:foo/03", busiest: "go test", cpu: 30 }), causeRow({ kind: "other", label: "launchd", cpu: 5 })] },
+        memory: { rows: [] },
+      });
+      await openTray();
+      const rows = part("cpu-causes").querySelectorAll("[data-part='cause-row']");
+      const link = rows[0].querySelector("a")!;
+      const plain = rows[1].querySelector("[data-part='cause-label']")!;
+      // A browser's default link color beats the inherited one, so the link needs its own rule.
+      const ownColor = [...document.styleSheets]
+        .flatMap((s) => [...s.cssRules])
+        .filter((r): r is CSSStyleRule => r instanceof CSSStyleRule && link.classList.contains(r.selectorText.replace(/^\./, "").split(/[:\s]/)[0]))
+        .map((r) => r.style.color)
+        .find(Boolean);
+      expect(ownColor).toBe("var(--chakra-colors-text-dim)");
+      expect(getComputedStyle(link).color).toBe(getComputedStyle(plain).color);
+    });
+
     it("shows a session name as plain text", async () => {
       withCauses({ cpu: { rows: [causeRow({ kind: "agent", label: "design-1", cpu: 5 })] }, memory: { rows: [] } });
       await openTray();

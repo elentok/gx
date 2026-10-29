@@ -267,7 +267,7 @@ function CauseList({ part, list, value }: { part: string; list: CauseListData; v
         list.rows.map((row, i) => (
           <Box key={i} display="flex" gap="2" data-part="cause-row">
             <Text as="span" flex="1" minW="0" overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" data-part="cause-label">
-              {row.ticket ? <Link href={ticketHref(row.ticket)}>{row.label}</Link> : row.label}
+              {row.ticket ? <Link href={ticketHref(row.ticket)} color="text.dim">{row.label}</Link> : row.label}
               {row.ticket && row.busiest && (
                 <>
                   {" · "}
