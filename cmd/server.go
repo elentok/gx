@@ -138,7 +138,7 @@ a migration fails, the failed store is named and the server stays stopped.`,
 	}
 	kinds.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	eventsCmd.AddCommand(kinds)
-	cmd.AddCommand(eventsCmd, newServerLocksCmd(d), newServerTicketsCmd(d), newServerEpicsCmd(d), newServerStatsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d), newServerQueueCmd(d), newServerOneOffCmd(d), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d), newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDiskCmd(d), newServerHealthCmd(d), newServerCPUSpikeCmd(d), newServerWebURLCmd(d), newServerWebNewRootCmd(d), newServerWebResetCmd(d), newServerWebLoginsCmd(d), newServerWebRevokeCmd(d))
+	cmd.AddCommand(eventsCmd, newServerLocksCmd(d), newServerTicketsCmd(d), newServerEpicsCmd(d), newServerStatsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d), newServerQueueCmd(d), newServerOneOffCmd(d), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d), newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDiskCmd(d), newServerHealthCmd(d), newServerCPUSpikeCmd(d), newServerWebURLCmd(d), newServerWebNewRootCmd(d), newServerWebResetCmd(d), newServerWebLoginsCmd(d), newServerWebRevokeCmd(d), newServerWebPasswordCmd(d))
 	return cmd
 }
 

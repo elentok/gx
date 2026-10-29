@@ -10,6 +10,9 @@ import (
 // ReasonWebRevokeFailed refuses a CLI revoke when the web logins could not be saved.
 const ReasonWebRevokeFailed = "web-revoke-failed"
 
+// ReasonWebPasswordFailed refuses a CLI password change when it could not be saved.
+const ReasonWebPasswordFailed = "web-password-failed"
+
 // ReasonWebOff refuses a web read when the web listener is off or failed to bind.
 const ReasonWebOff = "web-off"
 
@@ -120,6 +123,35 @@ func (s *Server) webLoginRevokeCLI(w http.ResponseWriter, r *http.Request) {
 		s.log.Error("web revoke failed", "err", err)
 		writeJSON(w, WebLoginsResult{Refused: true, Reason: ReasonWebRevokeFailed, Message: "could not revoke the web login: " + err.Error()})
 	default:
+		writeJSON(w, WebLoginsResult{})
+	}
+}
+
+// webSetPasswordCLI saves a new password without asking for the old one, signs
+// out every web login, ends their streams and logs a password change from "cli".
+func (s *Server) webSetPasswordCLI(w http.ResponseWriter, r *http.Request) {
+	if s.web == nil {
+		writeJSON(w, webOffLogins())
+		return
+	}
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad JSON", http.StatusBadRequest)
+		return
+	}
+	removed, err := s.webAuth.SetPassword(body.Password)
+	switch {
+	case errors.Is(err, ErrPasswordTooShort):
+		s.logWebAuth("web password change refused", "cli", "", ReasonPasswordTooShort)
+		writeJSON(w, WebLoginsResult{Refused: true, Reason: ReasonPasswordTooShort, Message: "the password is too short: use at least 12 characters"})
+	case err != nil:
+		s.log.Error("web password change failed", "err", err)
+		writeJSON(w, WebLoginsResult{Refused: true, Reason: ReasonWebPasswordFailed, Message: "could not save the password: " + err.Error()})
+	default:
+		s.logWebAuth("web password changed", "cli", "", "")
+		s.webStreams.closeLogins(removed...)
 		writeJSON(w, WebLoginsResult{})
 	}
 }

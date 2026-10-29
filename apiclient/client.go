@@ -161,6 +161,16 @@ func (c *Client) WebRevokeLogin(ctx context.Context, id string) (server.WebLogin
 	return res, err
 }
 
+// WebSetPassword saves a new web password and signs every web login out. A
+// refusal is a result, not an error.
+func (c *Client) WebSetPassword(ctx context.Context, password string) (server.WebLoginsResult, error) {
+	var res server.WebLoginsResult
+	err := c.post(ctx, "/v1/web/set-password", struct {
+		Password string `json:"password"`
+	}{password}, &res)
+	return res, err
+}
+
 // Snapshot returns every indexed ticket plus the server-wide sequence number.
 func (c *Client) Snapshot(ctx context.Context) (server.Snapshot, error) {
 	var s server.Snapshot

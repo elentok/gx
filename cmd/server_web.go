@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 	"rsc.io/qr"
 
@@ -324,6 +325,88 @@ func runWebRevoke(ctx context.Context, c *apiclient.Client, id string, jsonOut b
 		return nil
 	}
 	_, err = fmt.Fprintln(w, "revoked web login "+id)
+	return err
+}
+
+func newServerWebPasswordCmd(d deps) *cobra.Command {
+	var jsonOut, fromStdin bool
+	c := &cobra.Command{
+		Use:   "web-password",
+		Short: "Set a new web password without the old one and sign every web login out",
+		Long:  "Asks for the new password twice, without echo, on a terminal.\nWithout one, pass --password-stdin and send the password as the first line of stdin.",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			password, err := readNewPassword(d, fromStdin)
+			if err != nil {
+				return err
+			}
+			cl, err := d.dial()()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runWebPassword(ctx, cl, password, jsonOut, c.OutOrStdout())
+		},
+	}
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	c.Flags().BoolVar(&fromStdin, "password-stdin", false, "read the new password from the first line of stdin")
+	return c
+}
+
+// readNewPassword takes the password from stdin or, on a terminal, prompts for
+// it twice without echo and refuses a mismatch.
+func readNewPassword(d deps, fromStdin bool) (string, error) {
+	if fromStdin {
+		line, err := bufio.NewReader(d.stdin).ReadString('\n')
+		if err != nil && line == "" {
+			return "", errors.New("no password on stdin")
+		}
+		return strings.TrimRight(line, "\r\n"), nil
+	}
+	f, ok := d.stdin.(*os.File)
+	if !isTerminal(d) || !ok {
+		return "", errors.New("no terminal to ask on; pass --password-stdin")
+	}
+	ask := func(prompt string) (string, error) {
+		fmt.Fprint(d.stdout, prompt)
+		b, err := term.ReadPassword(f.Fd())
+		fmt.Fprintln(d.stdout)
+		return string(b), err
+	}
+	first, err := ask("New web password: ")
+	if err != nil {
+		return "", err
+	}
+	again, err := ask("New web password again: ")
+	if err != nil {
+		return "", err
+	}
+	if first != again {
+		return "", errors.New("the passwords do not match; nothing changed")
+	}
+	return first, nil
+}
+
+func runWebPassword(ctx context.Context, c *apiclient.Client, password string, jsonOut bool, w io.Writer) error {
+	res, err := c.WebSetPassword(ctx, password)
+	if res, err = webLoginsOrRefusal(res, err); err != nil {
+		return err
+	}
+	if jsonOut {
+		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
+			return err
+		}
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	if jsonOut {
+		return nil
+	}
+	_, err = fmt.Fprintln(w, "web password changed; every web login is signed out")
 	return err
 }
 

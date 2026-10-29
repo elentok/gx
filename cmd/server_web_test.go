@@ -59,6 +59,13 @@ func TestWebToken_CommandIsGone(t *testing.T) {
 // It returns the first web login's cookie.
 func finishWebSetup(t *testing.T, h *servertest.Harness) *http.Cookie {
 	t.Helper()
+	cookie, _ := finishWebSetupWithSecret(t, h)
+	return cookie
+}
+
+// finishWebSetupWithSecret is finishWebSetup that also returns the authenticator secret.
+func finishWebSetupWithSecret(t *testing.T, h *servertest.Harness) (*http.Cookie, string) {
+	t.Helper()
 	var login *http.Cookie
 	info, err := h.Client.WebInfo(context.Background())
 	if err != nil || !info.SetupPending {
@@ -95,7 +102,7 @@ func finishWebSetup(t *testing.T, h *servertest.Harness) *http.Cookie {
 	if after, _ := h.Client.WebInfo(context.Background()); after.SetupPending {
 		t.Fatalf("setup still pending after setup-finish: %+v", after)
 	}
-	return login
+	return login, start.Secret
 }
 
 // webLoginsStatus is the status the web logins list answers an old or new cookie with.
