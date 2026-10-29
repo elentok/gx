@@ -16,7 +16,8 @@ import (
 func TestWeb_OnlyRoutesMatchTheMux(t *testing.T) {
 	t.Parallel()
 	socket := server.RoutePatterns()
-	served := server.WebWritePatterns()
+	writes := server.WebWritePatterns()
+	served := append(slices.Clone(writes), server.WebPublicGetPatterns()...)
 	listed := map[string]bool{}
 	for _, route := range server.WebOnlyRoutes() {
 		listed[route.Pattern] = true
@@ -27,7 +28,7 @@ func TestWeb_OnlyRoutesMatchTheMux(t *testing.T) {
 			t.Errorf("%s is on the web-only list but is also a socket route", route.Pattern)
 		}
 	}
-	for _, pattern := range served {
+	for _, pattern := range writes {
 		if !slices.Contains(socket, pattern) && !listed[pattern] {
 			t.Errorf("%s is served by the web mux, is not a socket route, and is missing from the web-only list", pattern)
 		}

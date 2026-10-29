@@ -111,6 +111,10 @@ func (s *Server) webHandler() http.Handler {
 			http.NotFound(w, r)
 			return
 		}
+		if handler, ok := webPublicGets["GET "+r.URL.Path]; ok {
+			handler(s)(w, r)
+			return
+		}
 		switch {
 		case r.URL.Path == "/v1/snapshot":
 			s.snapshot(w, r)
