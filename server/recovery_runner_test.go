@@ -30,7 +30,7 @@ func startOnRunner(t *testing.T, name string, opts ...func(*server.Config)) (*se
 	claimTicket(t, store, "epic-a", "01", "01-first.md")
 	servertest.SetProjectRepo(t, store, "proj", t.TempDir())
 	fake := newRenamedFake(name, nativerunner.VerdictLive)
-	h := servertest.StartWithStore(t, store, append([]func(*server.Config){func(c *server.Config) { c.Runner = fake }}, opts...)...)
+	h := servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithRunner(fake)}, opts...)...)
 	sess, err := fake.Start(agentrunner.StartOptions{Label: iterLabel, Epic: "epic-a"})
 	if err != nil {
 		t.Fatal(err)

@@ -31,9 +31,7 @@ func restartDead(t *testing.T, headless bool, work func(t *testing.T, wtPath str
 	var opts []func(*server.Config)
 	if headless {
 		fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictDied}
-		opts = append(opts, func(c *server.Config) {
-			c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
-		})
+		opts = append(opts, servertest.WithRunner(fake))
 	}
 	h := servertest.StartWithStore(t, store, opts...)
 	wtPath, ticketPath := leaveIterationWith(t, h, store, repo, func(p string) { work(t, p) })

@@ -1055,9 +1055,8 @@ func raiseGateHeld(t *testing.T, runner string, state agentrunner.State, prepare
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake, sess := iterationAgent(t, runner, state)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.Recovery = recovery.Default()
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
 	})
 	_, branch, worktree := ralphloop.IterationIdentity("epic-a", "01", h.Server.WorktreeDir("proj"))
 	testutil.MustGitExported(t, repo, "worktree", "add", "-b", branch, worktree)
@@ -1391,9 +1390,8 @@ func watchHeldGate(t *testing.T, state agentrunner.State, seed ...ralphloop.Even
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
 	fake, sess := iterationAgent(t, "headless", state)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.Recovery = recovery.Default()
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
 	})
 	dir := filepath.Join(store, "proj")
 	for _, ev := range seed {

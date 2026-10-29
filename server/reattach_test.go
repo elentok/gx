@@ -105,8 +105,7 @@ func startHeadlessRestart(t *testing.T, verdict nativerunner.Verdict, retention 
 	servertest.WriteTicket(t, store, "proj", "epic-a", "02", "second", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: verdict}
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.LogRetention = retention
 	})
 	_, ticketPath := leaveIteration(t, h, store, repo)
@@ -172,8 +171,7 @@ func TestPrune_RunsAtStartWithConfiguredRetentionAndSkipsPaused(t *testing.T) {
 		t.Fatal(err)
 	}
 	fake := &headlessFake{Runner: runnerfake.NewRunner()}
-	servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
+	servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.LogRetention = 36 * time.Hour
 	})
 	var paused map[string]bool

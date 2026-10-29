@@ -32,13 +32,7 @@ func startBlockable(t *testing.T, runnerName string, opts ...func(*server.Config
 	case "pty":
 		fake = ptyNamed{turn}
 	}
-	h := servertest.StartWithStore(t, store, func(cfg *server.Config) {
-		cfg.Runner = fake
-		cfg.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
-		for _, o := range opts {
-			o(cfg)
-		}
-	})
+	h := servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithRunner(fake)}, opts...)...)
 	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}

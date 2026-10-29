@@ -53,8 +53,7 @@ func startWaitingRestartFake(t *testing.T, hardLimit float64, tweak ...func(*ser
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: nativerunner.VerdictLive}
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
 		c.BudgetHardLimit = hardLimit
 		c.BudgetKillGrace = time.Millisecond
 		c.BudgetPollInterval = time.Hour

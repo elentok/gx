@@ -57,9 +57,7 @@ func launchOne(t *testing.T, spy *launchSpy, want string) *servertest.Harness {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return spy }
-	})
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(spy))
 	spy.mu.Lock()
 	spy.runsJSON = filepath.Join(h.StateDir, "runs.json")
 	spy.mu.Unlock()
@@ -140,9 +138,7 @@ func restartLaunching(t *testing.T, fake *headlessFake, herdr func(*servertest.H
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	var opts []func(*server.Config)
 	if fake != nil {
-		opts = append(opts, func(c *server.Config) {
-			c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
-		})
+		opts = append(opts, servertest.WithRunner(fake))
 	}
 	h := servertest.StartWithStore(t, store, opts...)
 	if herdr != nil {

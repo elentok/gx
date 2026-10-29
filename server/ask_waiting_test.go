@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets/schema"
@@ -43,10 +42,7 @@ func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 			ticketPath := store + "/proj/epic-a/issues/01-first.md"
 			turn := newTurnRunner(func(_, _ string) { reportIteration(t, ticketPath, "asking") })
 			fake := c.wrap(turn)
-			h := servertest.StartWithStore(t, store, func(cfg *server.Config) {
-				cfg.Runner = fake
-				cfg.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
-			})
+			h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 			if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", c.agent); err != nil || res.Refused {
 				t.Fatalf("add: %+v, %v", res, err)
 			}
@@ -75,9 +71,7 @@ func TestAsk_NativeAgentStaysAliveWaiting(t *testing.T) {
 		worktree = cwd
 		reportIteration(t, ticketPath, "asking")
 	})
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
-	})
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}

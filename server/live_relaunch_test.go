@@ -34,9 +34,7 @@ func startWithLeftover(t *testing.T, state agentrunner.State) (*servertest.Harne
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
-	})
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 	return h, fake, leftover, path
 }
 

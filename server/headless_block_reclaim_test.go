@@ -6,7 +6,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -24,9 +23,7 @@ func restartHeadlessClaimed(t *testing.T, verdict nativerunner.Verdict, prepare 
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	fake := &headlessFake{Runner: runnerfake.NewRunner(), verdict: verdict}
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
-		c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
-	})
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
 	wtPath, ticketPath := leaveIteration(t, h, store, repo)
 	if _, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01", Cwd: wtPath}); err != nil {
 		t.Fatal(err)

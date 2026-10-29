@@ -41,15 +41,12 @@ func restartUnder(t *testing.T, savedRunner string, configured agentrunner.Runne
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, append([]func(*server.Config){func(c *server.Config) {
-		c.Runner = configured
-		c.RunnerFor = func(name, _ string) agentrunner.Runner {
-			if name == configured.Name() {
-				return configured
-			}
-			return others[name]
+	h := servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithRunnerFor(configured, func(name, _ string) agentrunner.Runner {
+		if name == configured.Name() {
+			return configured
 		}
-	}}, opts...)...)
+		return others[name]
+	})}, opts...)...)
 	registerLiveAgent(h)
 	h.DropAgentsAtCleanup(configured)
 	for _, r := range others {

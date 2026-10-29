@@ -53,9 +53,7 @@ func pauseZeroCommit(t *testing.T, headless bool, opts ...func(*server.Config)) 
 	p := zeroCommitPaused{store: store, ticketPath: filepath.Join(store, "proj/epic-a/issues/01-first.md")}
 	if headless {
 		fake := &stopCounter{turnRunner: newTurnRunner(func(string, string) {})}
-		p.h = servertest.StartWithStore(t, store, append([]func(*server.Config){func(c *server.Config) {
-			c.RunnerFor = func(_, _ string) agentrunner.Runner { return fake }
-		}}, opts...)...)
+		p.h = servertest.StartWithStore(t, store, append([]func(*server.Config){servertest.WithRunner(fake)}, opts...)...)
 		if res, err := p.h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 			t.Fatalf("add: %+v, %v", res, err)
 		}
