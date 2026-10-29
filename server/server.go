@@ -59,6 +59,9 @@ type Handshake struct {
 	WebURL string `json:"web_url,omitempty"`
 	// WebError is why the web listener failed to bind; empty otherwise.
 	WebError string `json:"web_error,omitempty"`
+	// WebSetupPending is set until the first web password exists. It is only a flag: the
+	// handshake never carries the Setup code.
+	WebSetupPending bool `json:"web_setup_pending,omitempty"`
 	// HerdrUnavailable is set while herdr isn't answering, so a client can say
 	// why nothing starts.
 	HerdrUnavailable bool `json:"herdr_unavailable,omitempty"`
@@ -754,7 +757,14 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr, HerdrUnavailable: s.herdr.isUnavailable()})
+	h := Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr, HerdrUnavailable: s.herdr.isUnavailable()}
+	if s.web != nil {
+		var err error
+		if h.WebSetupPending, _, err = s.webAuth.SetupState(); err != nil {
+			s.log.Error("web setup state unavailable", "err", err)
+		}
+	}
+	_ = json.NewEncoder(w).Encode(h)
 }
 
 // DefaultMergeStopTimeout is how long a stop waits for a merge in flight.

@@ -24,6 +24,8 @@ func aboutLines(conn *atomic.Pointer[ServerConn], terminal ui.Terminal) func() [
 		switch {
 		case c.WebError != "":
 			lines = append(lines, ui.AboutLine{Label: "Web UI", Value: "error: " + c.WebError})
+		case c.WebURL != "" && c.WebSetupPending:
+			lines = append(lines, ui.AboutLine{Label: "Web UI", Value: "setup needed, run `gx server web-url --qr`"})
 		case c.WebURL != "":
 			lines = append(lines, ui.AboutLine{Label: "Web UI", Value: c.WebURL})
 		}

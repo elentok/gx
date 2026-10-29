@@ -27,6 +27,8 @@ type ServerConn struct {
 	PID      int
 	WebURL   string
 	WebError string
+	// WebSetupPending hides the URL in About until the first password is set.
+	WebSetupPending bool
 }
 
 // serverBadge is how the title row draws one connection state: a colored icon

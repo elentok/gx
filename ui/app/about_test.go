@@ -58,6 +58,14 @@ func TestHelpAbout_ShowsCurrentServerAndSplitApp(t *testing.T) {
 		t.Errorf("help view shows Web UI while it is off:\n%s", view)
 	}
 
+	view = helpAbout(ServerConn{State: ServerUp, WebURL: "http://127.0.0.1:7777", WebSetupPending: true})
+	if !strings.Contains(view, "Web UI   setup needed, run `gx server web-url --qr`") {
+		t.Errorf("help view missing setup-needed line:\n%s", view)
+	}
+	if strings.Contains(view, "http://127.0.0.1:7777") {
+		t.Errorf("help view shows the URL while setup is pending:\n%s", view)
+	}
+
 	view = helpAbout(ServerConn{State: ServerDown})
 	if !strings.Contains(view, "server   server down") {
 		t.Errorf("help view missing down state:\n%s", view)

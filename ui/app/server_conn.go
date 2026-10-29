@@ -74,7 +74,7 @@ func handshake(d *ServerDeps) serverConnMsg {
 	case err != nil:
 		return serverConnMsg{conn: ServerConn{State: ServerDown}}
 	}
-	conn := ServerConn{State: ServerUp, PID: n.Pid, WebURL: n.WebURL, WebError: n.WebError}
+	conn := ServerConn{State: ServerUp, PID: n.Pid, WebURL: n.WebURL, WebError: n.WebError, WebSetupPending: n.WebSetupPending}
 	switch {
 	case n.ReadOnly:
 		conn.State = ServerReadOnly

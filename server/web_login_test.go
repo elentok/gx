@@ -126,6 +126,19 @@ func TestWebLogin_SetupPendingServesThePageAndNothingElse(t *testing.T) {
 	}
 }
 
+func TestWebLogin_HandshakeFlagsPendingSetupUntilItIsDone(t *testing.T) {
+	t.Parallel()
+	l := startLoginWeb(t)
+	hs, err := l.h.Client.Handshake(context.Background())
+	if err != nil || !hs.WebSetupPending {
+		t.Fatalf("handshake %+v, %v; want setup pending", hs, err)
+	}
+	l.signIn(t)
+	if hs, err = l.h.Client.Handshake(context.Background()); err != nil || hs.WebSetupPending {
+		t.Errorf("handshake after setup %+v, %v; want no pending setup", hs, err)
+	}
+}
+
 func TestWebLogin_SetupFinishSetsTheCookieAndOpensTheApp(t *testing.T) {
 	t.Parallel()
 	l := startLoginWeb(t)
