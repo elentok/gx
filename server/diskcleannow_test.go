@@ -101,12 +101,12 @@ func TestDiskCleanNow_UnheldDiskKeepsDispatching(t *testing.T) {
 	r := startCleanRig(t, map[string]string{"proj": ""}, 20*gb, 10*gb)
 	r.setFree(15 * gb)
 	r.known(t)
-	r.clean.block = make(chan struct{})
+	r.clean.blockUntilCleanup(t)
 	done := r.cleanNowAsync()
 	r.waitCalls(t, 1)
 	r.queue(t, "proj:epic-a/01")
 	waitFor(t, func() bool { return len(*r.start) >= 1 })
-	close(r.clean.block)
+	r.clean.release()
 	if res := <-done; res.Refused || res.Held {
 		t.Fatalf("result = %+v", res)
 	}
@@ -139,26 +139,26 @@ func TestDiskCleanNow_NoCleanupWorkOnlyReadsAgain(t *testing.T) {
 func TestDiskCleanNow_Refusals(t *testing.T) {
 	t.Run("automatic clean running", func(t *testing.T) {
 		r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
-		r.clean.block = make(chan struct{})
+		r.clean.blockUntilCleanup(t)
 		r.setFree(3 * gb)
 		r.waitCalls(t, 1)
 		res := r.cleanNow(t)
 		if !res.Refused || res.Reason != server.ReasonCleanRunning || res.Message != "clean already running" {
 			t.Errorf("result = %+v", res)
 		}
-		close(r.clean.block)
+		r.clean.release()
 	})
 	t.Run("clean now running", func(t *testing.T) {
 		r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 		r.known(t)
-		r.clean.block = make(chan struct{})
+		r.clean.blockUntilCleanup(t)
 		done := r.cleanNowAsync()
 		r.waitCalls(t, 1)
 		res := r.cleanNow(t)
 		if !res.Refused || res.Message != "clean already running" {
 			t.Errorf("result = %+v", res)
 		}
-		close(r.clean.block)
+		r.clean.release()
 		if first := <-done; first.Refused {
 			t.Errorf("first = %+v", first)
 		}
@@ -176,13 +176,13 @@ func TestDiskCleanNow_Refusals(t *testing.T) {
 func TestDiskCleanNow_ArmedStaysArmed(t *testing.T) {
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
 	r.known(t)
-	r.clean.block = make(chan struct{})
+	r.clean.blockUntilCleanup(t)
 	done := r.cleanNowAsync()
 	r.waitCalls(t, 1)
 	r.setFree(3 * gb)
 	r.disksWhen(t, "held", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held })
 	r.wantCalls(t, 1)
-	close(r.clean.block)
+	r.clean.release()
 	if res := <-done; !res.Held {
 		t.Fatalf("result = %+v, want held", res)
 	}

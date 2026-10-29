@@ -29,6 +29,22 @@ type fakeCleaner struct {
 	block chan struct{} // nil: do not block
 	err   error
 	after func() // runs inside each call, before it returns
+
+	release func() // releases block; set by blockUntilCleanup
+}
+
+// blockUntilCleanup makes every call block until release runs or the test ends.
+// A test that fails while the cleaner is blocked would otherwise leave
+// Server.Stop waiting on the open request forever.
+func (f *fakeCleaner) blockUntilCleanup(t *testing.T) {
+	t.Helper()
+	ch := make(chan struct{})
+	var once sync.Once
+	release := func() { once.Do(func() { close(ch) }) }
+	f.mu.Lock()
+	f.block, f.release = ch, release
+	f.mu.Unlock()
+	t.Cleanup(release)
 }
 
 func (f *fakeCleaner) run(ctx context.Context, argv []string, dir string) ([]byte, error) {
@@ -211,7 +227,7 @@ func TestDiskClean_ZeroThresholdNeverCleansOrHolds(t *testing.T) {
 // Story 21 and the resume rule: a reading while a clean runs never clears the hold.
 func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T) {
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb)
-	r.clean.block = make(chan struct{})
+	r.clean.blockUntilCleanup(t)
 	r.setFree(3 * gb)
 	r.waitCalls(t, 1)
 	r.queue(t, "proj:epic-a/01")
@@ -222,7 +238,7 @@ func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T)
 		t.Fatalf("a ticket started during the clean: %v", *r.start)
 	}
 	r.disksWhen(t, "still held", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held })
-	close(r.clean.block)
+	r.clean.release()
 	body := r.waitClean(t, 1)
 	if !strings.Contains(body, "dispatch is not held") {
 		t.Errorf("notice = %s, want not held", body)
@@ -393,11 +409,11 @@ func TestDiskClean_TwoProjectsOnOneDiskSendOneNotice(t *testing.T) {
 // there was nothing to clean.
 func TestDiskClean_RestartWithAQueuedTicketRunsTheRealCommandOnce(t *testing.T) {
 	r := startCleanRig(t, map[string]string{"proj": ""}, 20*gb, 10*gb)
-	r.clean.block = make(chan struct{})
+	r.clean.blockUntilCleanup(t)
 	r.queue(t, "proj:epic-a/01")
 	r.setFree(3 * gb)
 	r.waitCalls(t, 1)
-	close(r.clean.block)
+	r.clean.release()
 	r.waitClean(t, 1)
 	r.h.Restart(t)
 	r.start, _, _ = registerLaunch(r.h)
