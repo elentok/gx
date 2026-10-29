@@ -87,12 +87,18 @@ type diskWatch struct {
 }
 
 // diskChange is what one reading did to a disk's state, for the effects that
-// run after the lock is released.
+// run after the lock is released. warn and clean are the thresholds the
+// reading was judged against. changed is only set by readTransition.
 type diskChange struct {
 	changed, warnSet, holdSet, resumed, startClean bool
-	held                                           bool
-	projects                                       []string
-	lastClean                                      string
+	warn, clean                                    uint64
+}
+
+// diskSnapshot is the disk's state after a reading, copied under the lock.
+type diskSnapshot struct {
+	held      bool
+	projects  []string
+	lastClean string
 }
 
 // beginClean marks a clean as running; freeBefore is what "freed" is measured from.
@@ -116,7 +122,7 @@ func (st *diskState) updateWarn(free, warn uint64) (set, changed bool) {
 // readTransition applies an ordinary reading: the hold, the re-arm and the
 // start of the automatic clean.
 func (st *diskState) readTransition(free, warn, clean uint64) diskChange {
-	var c diskChange
+	c := diskChange{warn: warn, clean: clean}
 	c.warnSet, c.changed = st.updateWarn(free, warn)
 	if st.spent && free > max(warn, clean+diskWarnMargin) {
 		st.spent = false
@@ -139,9 +145,8 @@ func (st *diskState) readTransition(free, warn, clean uint64) diskChange {
 // endTransition applies the reading that ends a clean. One rule ends every
 // clean: the fresh reading decides the hold. It never re-arms; a later reading does.
 func (st *diskState) endTransition(free, warn, clean uint64, end cleanEnd) diskChange {
-	var c diskChange
+	c := diskChange{warn: warn, clean: clean}
 	c.warnSet, _ = st.updateWarn(free, warn)
-	c.changed = true
 	st.cleaning = false
 	switch {
 	case end.failed != "":
@@ -163,7 +168,7 @@ func (st *diskState) endTransition(free, warn, clean uint64, end cleanEnd) diskC
 // disk now; nil keeps the last list. probe is a path on the disk, read again
 // when a clean ends.
 func (s *Server) transition(r DiskReading, probe string, projects []string, now time.Time,
-	fn func(st *diskState, warn, clean uint64) diskChange) diskChange {
+	fn func(st *diskState, warn, clean uint64) diskChange) (diskChange, diskSnapshot) {
 	ds := s.settings.Load().DiskSpace
 	d := &s.disks
 	defer s.observeDiskHealth(now) // runs after the unlock below
@@ -185,18 +190,17 @@ func (s *Server) transition(r DiskReading, probe string, projects []string, now 
 		st.projects = projects
 	}
 	c := fn(st, uint64(ds.WarnBelow), uint64(ds.CleanBelow))
-	c.held, c.projects, c.lastClean = st.held, slices.Clone(st.projects), st.lastClean
-	return c
+	return c, diskSnapshot{held: st.held, projects: slices.Clone(st.projects), lastClean: st.lastClean}
 }
 
 // observe applies one ordinary reading to the state machine and reports
 // whether the disk is held after it.
 func (s *Server) observe(r DiskReading, probe string, projects []string, now time.Time) (held bool) {
-	c := s.transition(r, probe, projects, now, func(st *diskState, warn, clean uint64) diskChange {
+	c, snap := s.transition(r, probe, projects, now, func(st *diskState, warn, clean uint64) diskChange {
 		return st.readTransition(r.Free, warn, clean)
 	})
 	if !c.changed {
-		return c.held
+		return snap.held
 	}
 	s.publishChange(r, c)
 	if c.resumed {
@@ -205,37 +209,36 @@ func (s *Server) observe(r DiskReading, probe string, projects []string, now tim
 		s.kickRunner()
 	}
 	if c.startClean {
-		s.startClean(r.ID, probe, c.projects)
+		s.startClean(r.ID, probe, snap.projects)
 	}
-	return c.held
+	return snap.held
 }
 
 // observeCleanEnd applies the reading that ends a clean and reports whether
 // the disk is held after it.
 func (s *Server) observeCleanEnd(r DiskReading, probe string, end cleanEnd) (held bool) {
-	c := s.transition(r, probe, nil, time.Now(), func(st *diskState, warn, clean uint64) diskChange {
+	c, snap := s.transition(r, probe, nil, time.Now(), func(st *diskState, warn, clean uint64) diskChange {
 		return st.endTransition(r.Free, warn, clean, end)
 	})
 	s.publishChange(r, c)
 	if c.resumed {
 		s.kickRunner()
 	}
-	s.sendCleanNotice(r.Name, c.lastClean, r.Free, c.held)
-	return c.held
+	s.sendCleanNotice(r.Name, snap.lastClean, r.Free, snap.held)
+	return snap.held
 }
 
 // publishChange announces a changed disk: the event, the warn and hold logs and
 // the warn notice.
 func (s *Server) publishChange(r DiskReading, c diskChange) {
-	ds := s.settings.Load().DiskSpace
 	s.events.publish(EventDiskWarnChanged, "")
 	if c.warnSet {
-		s.log.Warn("disk low on space", "disk", r.Name, "free", r.Free, "warn_below", uint64(ds.WarnBelow))
+		s.log.Warn("disk low on space", "disk", r.Name, "free", r.Free, "warn_below", c.warn)
 		s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeDiskWarn, Emoji: "💾", Title: "low disk space on " + r.Name,
-			Detail: humanize.Bytes(r.Free) + " free, under the warn threshold of " + humanize.Bytes(uint64(ds.WarnBelow))})
+			Detail: humanize.Bytes(r.Free) + " free, under the warn threshold of " + humanize.Bytes(c.warn)})
 	}
 	if c.holdSet {
-		s.log.Warn("disk low, holding dispatch", "disk", r.Name, "free", r.Free, "clean_below", uint64(ds.CleanBelow))
+		s.log.Warn("disk low, holding dispatch", "disk", r.Name, "free", r.Free, "clean_below", c.clean)
 	}
 	if c.resumed {
 		s.log.Info("disk recovered, resuming dispatch", "disk", r.Name, "free", r.Free)
