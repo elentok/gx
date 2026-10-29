@@ -18,7 +18,7 @@ func TestAgentsPrompt_JSON(t *testing.T) {
 		t.Fatalf("create = %+v, %v", created, err)
 	}
 	var out bytes.Buffer
-	if err := runAgentsPrompt(context.Background(), h.Client, &out, true, server.SessionPromptRequest{ID: created.Session.ID, Text: "hello"}); err != nil {
+	if err := runAgentsPrompt(context.Background(), h.Client, &out, true, server.SessionPromptRequest{ID: created.Session.ID, Continue: true}); err != nil {
 		t.Fatal(err)
 	}
 	var res server.SessionResult

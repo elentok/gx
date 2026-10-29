@@ -99,17 +99,23 @@ func TestSessionPrompt_NotIdle(t *testing.T) {
 	}
 }
 
-func TestSessionPrompt_NotADesignSession(t *testing.T) {
+func TestSessionPrompt_PlainSessionAcceptsText(t *testing.T) {
 	t.Parallel()
 	f := startPromptSession(t)
 	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
-	got, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: res.Session.ID, Text: "hello"})
-	if err != nil || !got.Refused || got.Reason != server.ReasonSessionNotDesign {
-		t.Errorf("prompt = %+v, %v; want %s", got, err, server.ReasonSessionNotDesign)
+	id := res.Session.ID
+	conv, _ := readMeta(t, f.h, id)["conversation_id"].(string)
+	waitForHolder(t, filepath.Join(f.h.SessionsDir, id))
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSession(f.ctx, t, f.h, f.evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionIdle })
+	got, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: id, Text: "hello"})
+	if err != nil || got.Refused {
+		t.Fatalf("prompt = %+v, %v; want accepted", got, err)
 	}
+	waitForSubmitted(t, conv, strconv.Quote("hello")+"\n")
 }
 
 func TestSessionPrompt_HarnessWithoutChat(t *testing.T) {

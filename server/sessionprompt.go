@@ -62,8 +62,9 @@ func (s *Server) sessionPromptHandler(source string) http.HandlerFunc {
 	}
 }
 
-// promptSession types a person's text into an Idle design session, in the
-// background so the nudges outlive the request. It skips the draft guard:
+// promptSession types a person's text into an Idle Claude session, in the
+// background so the nudges outlive the request. Continue is for design
+// sessions only: it types /clear and /gx-design. It skips the draft guard:
 // gx.follow-ups/07 tracks that.
 func (s *Server) promptSession(req SessionPromptRequest, source string) (SessionResult, error) {
 	s.sessionWatches.metaMu.Lock()
@@ -72,7 +73,7 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 	if res.Refused || err != nil {
 		return res, err
 	}
-	if !meta.Design {
+	if req.Continue && !meta.Design {
 		return sessionRefusal(ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
 	if meta.Harness != s.settings.Load().chatHarness() {

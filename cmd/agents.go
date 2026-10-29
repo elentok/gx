@@ -80,7 +80,7 @@ func newAgentsPromptCmd(d deps) *cobra.Command {
 	var req server.SessionPromptRequest
 	cmd := &cobra.Command{
 		Use:   "prompt <id> <text>",
-		Short: "type text into an Idle design session",
+		Short: "type text into an Idle Claude session",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(c *cobra.Command, args []string) error {
 			cl, err := d.dial()()
