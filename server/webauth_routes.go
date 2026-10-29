@@ -177,12 +177,43 @@ func readWebAuthBody(w http.ResponseWriter, r *http.Request) (webAuthBody, bool)
 	return body, true
 }
 
-// refuseWebAuth answers a store error with its refusal. Anything unknown is a 500.
-func refuseWebAuth(w http.ResponseWriter, err error, wrong string) {
+// logWebAuth writes one line per web auth event. It takes only the IP, the
+// login name and a reason kind: never a request body, so no secret can reach it.
+func (s *Server) logWebAuth(event, ip, name, reason string) {
+	attrs := []any{"ip", ip}
+	if name != "" {
+		attrs = append(attrs, "name", name)
+	}
+	if reason != "" {
+		s.log.Warn(event, append(attrs, "reason", reason)...)
+		return
+	}
+	s.log.Info(event, attrs...)
+}
+
+func (s *Server) webLoginName(id string) string {
+	for _, l := range s.webAuth.List() {
+		if l.ID == id {
+			return l.Name
+		}
+	}
+	return ""
+}
+
+// logWebLogin logs a login event under the name of the web login the cookie opens.
+func (s *Server) logWebLogin(event, ip, cookie string) {
+	login, _ := s.webAuth.Lookup(cookie, ip)
+	s.logWebAuth(event, ip, login.Name, "")
+}
+
+// refuseWebAuth answers a store error with its refusal and logs it. Anything
+// unknown is a 500.
+func (s *Server) refuseWebAuth(w http.ResponseWriter, r *http.Request, event string, err error, wrong string) {
 	var wait *WebAuthWaitError
 	reason := ""
 	switch {
 	case errors.As(err, &wait):
+		s.logWebAuth(event, remoteIP(r), "", ReasonRateLimited)
 		writeJSON(w, webAuthResult{Refused: true, Reason: ReasonRateLimited, WaitSeconds: wait.Seconds})
 		return
 	case errors.Is(err, ErrTOTPMismatch):
@@ -196,9 +227,11 @@ func refuseWebAuth(w http.ResponseWriter, err error, wrong string) {
 	case errors.Is(err, ErrSetupCodeRequired):
 		reason = ReasonSetupCodeRequired
 	default:
+		s.log.Error("web auth failed", "event", event, "ip", remoteIP(r), "err", err)
 		http.Error(w, "web auth unavailable", http.StatusInternalServerError)
 		return
 	}
+	s.logWebAuth(event, remoteIP(r), "", reason)
 	writeJSON(w, webAuthResult{Refused: true, Reason: reason})
 }
 
@@ -209,7 +242,7 @@ func (s *Server) webSetupStart(w http.ResponseWriter, r *http.Request) {
 	}
 	secret, err := s.webAuth.SetupStart(s.webTOTPOn(), body.Code, remoteIP(r))
 	if err != nil {
-		refuseWebAuth(w, err, ReasonSetupCodeWrong)
+		s.refuseWebAuth(w, r, "web setup refused", err, ReasonSetupCodeWrong)
 		return
 	}
 	res := webAuthResult{Secret: secret}
@@ -226,9 +259,10 @@ func (s *Server) webSetupFinish(w http.ResponseWriter, r *http.Request) {
 	}
 	cookie, err := s.webAuth.SetupFinish(s.webTOTPOn(), body.Code, body.Password, body.TOTPCode, remoteIP(r), r.UserAgent())
 	if err != nil {
-		refuseWebAuth(w, err, ReasonSetupCodeWrong)
+		s.refuseWebAuth(w, r, "web setup refused", err, ReasonSetupCodeWrong)
 		return
 	}
+	s.logWebLogin("web login", remoteIP(r), cookie)
 	s.setLoginCookie(w, cookie, webLoginCookieMaxAge)
 	writeJSON(w, webAuthResult{})
 }
@@ -245,9 +279,10 @@ func (s *Server) webLoginWrite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		refuseWebAuth(w, err, ReasonWrongCredentials)
+		s.refuseWebAuth(w, r, "web login refused", err, ReasonWrongCredentials)
 		return
 	}
+	s.logWebLogin("web login", remoteIP(r), cookie)
 	s.setLoginCookie(w, cookie, webLoginCookieMaxAge)
 	writeJSON(w, webAuthResult{})
 }
@@ -265,11 +300,10 @@ func (s *Server) webAddAuthenticator(w http.ResponseWriter, r *http.Request) {
 	ip := remoteIP(r)
 	cookie, err := s.webAuth.AddAuthenticator(body.PendingID, body.TOTPCode, ip, r.UserAgent())
 	if err != nil {
-		refuseWebAuth(w, err, ReasonWrongCredentials)
+		s.refuseWebAuth(w, r, "web login refused", err, ReasonWrongCredentials)
 		return
 	}
-	login, _ := s.webAuth.Lookup(cookie, ip)
-	s.log.Info("authenticator added", "ip", ip, "name", login.Name)
+	s.logWebLogin("web login", ip, cookie)
 	s.setLoginCookie(w, cookie, webLoginCookieMaxAge)
 	writeJSON(w, webAuthResult{})
 }
@@ -278,11 +312,13 @@ func (s *Server) webAddAuthenticator(w http.ResponseWriter, r *http.Request) {
 func (s *Server) webSignOut(w http.ResponseWriter, r *http.Request) {
 	id := webLoginIDFrom(r.Context())
 	if id != "" {
+		name := s.webLoginName(id)
 		removed, err := s.webAuth.RevokeLogin(id)
 		if err != nil && !errors.Is(err, ErrWebLoginNotFound) {
 			http.Error(w, "web auth unavailable", http.StatusInternalServerError)
 			return
 		}
+		s.logWebAuth("web sign out", remoteIP(r), name, "")
 		s.webStreams.closeLogins(removed...)
 	}
 	s.setLoginCookie(w, "", -1)

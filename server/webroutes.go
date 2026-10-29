@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -134,6 +135,12 @@ func (s *Server) clientErrorReport(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Error(w, "bad JSON", http.StatusBadRequest)
 		return
+	}
+	// The page strips the Setup code from the hash query; cut it here too, so a client that does not never leaks it.
+	if i := strings.Index(body.URL, "#"); i >= 0 {
+		if q := strings.Index(body.URL[i:], "?"); q >= 0 {
+			body.URL = body.URL[:i+q]
+		}
 	}
 	s.log.Warn("client error", "message", body.Message, "stack", body.Stack, "page_url", body.URL, "user_agent", body.UserAgent, "ip", ip)
 	writeJSON(w, clientErrorResult{})
