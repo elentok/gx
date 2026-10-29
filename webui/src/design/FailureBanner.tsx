@@ -56,9 +56,12 @@ export function FailureBanner({
   fetchScreen,
   address,
   open,
+  restore: canRestore = true,
 }: {
   failure: SessionFailure;
   session: SessionInfo;
+  /** Off drops Restore and New session. */
+  restore?: boolean;
   /** The id of the last chat message the page saw, for Retry's stale guard. */
   lastMessage?: string;
   post?: PostPrompt;
@@ -92,7 +95,9 @@ export function FailureBanner({
     Screen: () => setScreen(true),
     Retry: () => (setClicked("Retry"), retry()),
   };
-  const buttons = (BUTTONS[failure.kind] ?? []).filter((name) => !(name === "Restore" && restoreHidden));
+  const buttons = (BUTTONS[failure.kind] ?? []).filter(
+    (name) => (canRestore || (name !== "Restore" && name !== "New session")) && !(name === "Restore" && restoreHidden),
+  );
 
   return (
     <Box

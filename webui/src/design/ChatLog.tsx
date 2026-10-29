@@ -121,6 +121,22 @@ export interface WorkingStep {
   title?: string;
 }
 
+/** The design-only parts of the chat. The Design page keeps them all on; the Agents page turns them off. */
+export interface ChatOptions {
+  /** The question sheet and the Questions/Chat toggle. */
+  sheet: boolean;
+  /** The busy row names the step. Off: a plain "Working" row. */
+  steps: boolean;
+  /** The "gx stopped" notice for a gx-raised Actionable. */
+  gxStopped: boolean;
+  /** The Done state: no composer, no `ended` banner. */
+  done: boolean;
+  /** The failure notice's Restore and New session buttons. */
+  restore: boolean;
+}
+
+export const ALL_OPTIONS: ChatOptions = { sheet: true, steps: true, gxStopped: true, done: true, restore: true };
+
 // Inline, not the page-centered Spinner: this one sits at the bottom of the chat.
 function WorkingRow({ step, title }: WorkingStep) {
   return (
@@ -156,6 +172,7 @@ function ChatTail({
   onQuestions,
   roundDraft,
   autoMenu,
+  options,
 }: {
   session: SessionInfo;
   chat: SessionChatResponse;
@@ -167,6 +184,7 @@ function ChatTail({
   actions: FailureActions;
   questions: boolean;
   onQuestions: (on: boolean) => void;
+  options: ChatOptions;
   roundDraft: RoundDraft;
   autoMenu: AutoMenuState;
 }) {
@@ -204,10 +222,12 @@ function ChatTail({
           lastMessage={chat.messages.at(-1)?.id}
           post={post}
           onStale={onStale}
+          restore={options.restore}
           {...actions}
         />
       )}
-      {!failure &&
+      {options.gxStopped &&
+        !failure &&
         session.actionable.gx_raised &&
         session.actionable.reason && (
           <GxStopped reason={session.actionable.reason} />
@@ -353,6 +373,7 @@ function ChatBody({
   questions,
   onQuestions,
   autoMenu,
+  options,
 }: {
   session: SessionInfo;
   roundKey: string;
@@ -367,6 +388,7 @@ function ChatBody({
   questions: boolean;
   onQuestions: (on: boolean) => void;
   autoMenu: AutoMenuState;
+  options: ChatOptions;
 }) {
   const roundDraft = useRoundDraft(session.id, roundKey);
   const round = chat.round ?? [];
@@ -410,7 +432,7 @@ function ChatBody({
           {chat.background.length > 0 && (
             <BackgroundStrip tasks={chat.background} />
           )}
-          {busy && step && <WorkingRow {...step} />}
+          {busy && (options.steps ? step && <WorkingRow {...step} /> : <WorkingRow />)}
         </ChatScroller>
       )}
       <ChatTail
@@ -426,6 +448,7 @@ function ChatBody({
         onQuestions={onQuestions}
         roundDraft={roundDraft}
         autoMenu={autoMenu}
+        options={options}
       />
     </Box>
   );
@@ -436,6 +459,9 @@ function ChatLog({
   session,
   chat,
   refetch,
+  options,
+  working,
+  questions,
   ...rest
 }: {
   session: SessionInfo;
@@ -448,6 +474,7 @@ function ChatLog({
   actions: FailureActions;
   questions: boolean;
   onQuestions: (on: boolean) => void;
+  options: ChatOptions;
 }) {
   const conn = useConnectionContext();
   const connected = useConnectionState(conn).connected;
@@ -460,9 +487,14 @@ function ChatLog({
       autoMenu={{ open: autoMenuOpen, setOpen: setAutoMenuOpen }}
       session={session}
       roundKey={roundKey}
-      chat={chat}
+      // Without the sheet the round is ignored: no sheet, no toggle, and the composer sends a plain prompt.
+      chat={options.sheet ? chat : { ...chat, round: null }}
       connected={connected}
       onStale={refetch}
+      // An empty step makes a plain "Working" row.
+      working={options.steps ? working : {}}
+      questions={options.sheet && questions}
+      options={options}
       {...rest}
     />
   );
@@ -480,6 +512,7 @@ export function DesignChat({
   actions,
   questions,
   onQuestions,
+  options = ALL_OPTIONS,
 }: {
   session?: SessionInfo;
   /** The Claude session's chat, fetched by the page; null while it loads. */
@@ -496,14 +529,17 @@ export function DesignChat({
   /** The Questions view: only the questions sheet, the failure notices and the composer. The page derives it. */
   questions: boolean;
   onQuestions: (on: boolean) => void;
+  /** The design-only parts; the Design page leaves them all on. */
+  options?: ChatOptions;
 }) {
   if (!session) return null;
+  if (!options.done) done = undefined;
   if (session.harness !== "claude") {
     const failure = visibleFailure(session.failure, done);
     return (
       <>
         {failure && !needsTranscript(failure) && (
-          <FailureBanner failure={failure} session={session} {...actions} />
+          <FailureBanner failure={failure} session={session} restore={options.restore} {...actions} />
         )}
         <Text color="text.muted" fontSize="sm">
           Chat works for Claude sessions only. Open it in gx, Agents tab.
@@ -525,6 +561,7 @@ export function DesignChat({
       actions={actions}
       questions={questions}
       onQuestions={onQuestions}
+      options={options}
     />
   );
 }
