@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/server"
-	"github.com/elentok/gx/server/servertest"
 )
 
 const cleanDisk = "d1"
@@ -99,7 +98,7 @@ func TestDiskCleanNow_HoldEndsInTheResponse(t *testing.T) {
 
 // Story 38, warned disk.
 func TestDiskCleanNow_UnheldDiskKeepsDispatching(t *testing.T) {
-	r := startCleanRig(t, map[string]string{"proj": ""}, 20*gb, 10*gb, servertest.WithHerdr(servertest.UntilPtyFixture))
+	r := startCleanRig(t, map[string]string{"proj": ""}, 20*gb, 10*gb)
 	r.setFree(15 * gb)
 	r.known(t)
 	r.clean.blockUntilCleanup(t)
