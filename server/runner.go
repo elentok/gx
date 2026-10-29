@@ -790,6 +790,7 @@ type runContext struct {
 func (s *Server) settleRun(rc runContext, err error) {
 	deps, root, mode, one, wt, run, ticketAddr := rc.deps, rc.root, rc.mode, rc.one, rc.wt, rc.run, rc.ticketAddr
 	defer s.kickRunner()
+	s.registry.markSettling(ticketAddr)
 	keepRun := false
 	defer func() {
 		if !keepRun {

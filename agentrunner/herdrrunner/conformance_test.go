@@ -494,6 +494,34 @@ func TestStatus_FinishedAgentIgnoresBackgroundTasks(t *testing.T) {
 	}
 }
 
+// Finished scans every ticket, so a probe without a background task must not ask it.
+func TestStatus_NoBackgroundTaskSkipsFinished(t *testing.T) {
+	for name, background := range map[string]func(agentrunner.Session) bool{
+		"nil":   nil,
+		"false": func(agentrunner.Session) bool { return false },
+	} {
+		t.Run(name, func(t *testing.T) {
+			r, _, s := startAgent(t, "claude", nil)
+			r.BackgroundTasks = background
+			calls := 0
+			r.Finished = func(agentrunner.Session) bool {
+				calls++
+				return false
+			}
+			st, err := r.Status(s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if calls != 0 {
+				t.Fatalf("Finished called %d times, want 0", calls)
+			}
+			if st.State != agentrunner.StateIdle {
+				t.Fatalf("state = %q, want idle", st.State)
+			}
+		})
+	}
+}
+
 // An agent herdr shows idle but a background task keeps working answers every
 // wait at once; Wait must not re-ask at its 20ms pace, since each round spawns
 // herdr twice and parses the transcript (a busy loop for the task's lifetime).

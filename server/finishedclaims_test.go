@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
@@ -73,5 +74,34 @@ func TestPauseStuckFinishedClaims(t *testing.T) {
 	}
 	if tk.Status != schema.StatusPaused {
 		t.Errorf("past the grace: status = %q, want paused", tk.Status)
+	}
+
+	reclaim := func() {
+		t.Helper()
+		if err := schema.UpdateTicket(path, func(tk *schema.Ticket) {
+			tk.Status = schema.StatusClaimed
+			tk.IterationStatus = schema.IterationStatusFinished
+			tk.IterationFinishedAt = finishedAt
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := h.Client.TicketChanged(context.Background(), "proj:epic-a/01"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	past := finishedAt.Add(time.Hour)
+
+	reclaim()
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01"})
+	h.Server.MarkSettling("proj:epic-a/01")
+	h.Server.PauseStuckFinishedClaims(past)
+	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusClaimed {
+		t.Fatalf("settling run: status = %q, err = %v, want claimed", tk.Status, err)
+	}
+
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01"})
+	h.Server.PauseStuckFinishedClaims(past)
+	if tk, err := schema.ParseTicket(path); err != nil || tk.Status != schema.StatusPaused {
+		t.Errorf("run stuck in a wait: status = %q, err = %v, want paused", tk.Status, err)
 	}
 }

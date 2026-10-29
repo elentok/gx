@@ -45,6 +45,9 @@ func (s *Server) pauseStuckFinishedClaims(now time.Time) {
 					continue
 				}
 				addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(e.Path), ID: it.Identifier}
+				if tr, ok := s.registry.tracked(addr.String()); ok && tr.Settling {
+					continue
+				}
 				run, _ := s.registry.runOf(addr.String())
 				reason := fmt.Sprintf("agent reported finished at %s but the ticket was never processed", t.IterationFinishedAt.UTC().Format(time.RFC3339))
 				if err := s.pauseTicket(dir, addr, it.Path, events.IterationError, reason, run); err != nil {

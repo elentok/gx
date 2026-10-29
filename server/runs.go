@@ -97,6 +97,9 @@ type trackedRun struct {
 	// (see watchNudgedPane): it is metered and budget-stopped like a run, but
 	// never finished, and never saved, so a restart cannot reclaim it.
 	Watched bool `json:"-"`
+	// Settling is set once settleRun starts merging the run, while the ticket
+	// still reads finished. Never saved: a restart reclaims and settles again.
+	Settling bool `json:"-"`
 }
 
 // runRegistry is the server's own record of launched iterations, keyed by
@@ -393,6 +396,16 @@ func (r *runRegistry) markWaiting(address string, at time.Time) {
 		t.WaitingSince = at
 		r.runs[address] = t
 		r.save()
+	}
+}
+
+// markSettling flags the run at address as inside settleRun.
+func (r *runRegistry) markSettling(address string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if t, ok := r.runs[address]; ok {
+		t.Settling = true
+		r.runs[address] = t
 	}
 }
 

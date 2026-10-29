@@ -62,6 +62,9 @@ func (s *Server) HardGraceRunning() bool { return !s.hardGrace.deadline().IsZero
 // a run live as long as they need.
 func (s *Server) PutRun(root string, r Run) { s.registry.put(trackedRun{Run: r, Root: root}) }
 
+// MarkSettling flags the tracked run at address as inside settleRun.
+func (s *Server) MarkSettling(address string) { s.registry.markSettling(address) }
+
 // ClaimTicket claims and launches one ticket the way a claim pass would, but
 // without asking the frontier, and reports whether an iteration launched.
 func (s *Server) ClaimTicket(address, agent string) (bool, error) {
