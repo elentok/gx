@@ -66,6 +66,26 @@ func TestGxDesignEndsRunAfterChartAndDestination(t *testing.T) {
 	}
 }
 
+func TestGxDesignChartingSessionSubagentTiers(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+	start := strings.Index(text, "1. **The map has no `## Destination`**")
+	end := strings.Index(text, "2. **`destination_unconfirmed: true`**")
+	if start < 0 || end < start {
+		t.Fatal("gx-design/SKILL.md lacks the chart step")
+	}
+	step := text[start:end]
+	for _, want := range []string{
+		"`gx agent model strongest`",
+		"`gx agent model worker`",
+		"gx-to-spec, gx-to-tickets and gx-research",
+		"Research tickets spawned while charting also use `gx agent model worker`",
+	} {
+		if !strings.Contains(step, want) {
+			t.Errorf("gx-design chart step lacks %q", want)
+		}
+	}
+}
+
 func TestGxDesignChainingRules(t *testing.T) {
 	text := readFile(t, "gx-design/SKILL.md")
 	for _, want := range []string{
