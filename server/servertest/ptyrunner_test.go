@@ -2,18 +2,23 @@ package servertest
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
+	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/herdrfake"
 )
 
@@ -233,9 +238,11 @@ func (r *failRecorder) Errorf(format string, args ...any) {
 func TestHerdr_TurnControlFailsTheTestNamingTheControl(t *testing.T) {
 	t.Parallel()
 	for name, control := range map[string]func(*Turn){
-		"Stall": func(turn *Turn) { turn.Stall() },
-		"Block": func(turn *Turn) { turn.Block("why") },
-		"Exit":  func(turn *Turn) { turn.Exit(1) },
+		"Stall":      func(turn *Turn) { turn.Stall() },
+		"Block":      func(turn *Turn) { turn.Block("why") },
+		"Exit":       func(turn *Turn) { turn.Exit(1) },
+		"Hold":       func(turn *Turn) { turn.Hold() },
+		"Transcript": func(turn *Turn) { turn.Transcript("hi") },
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
@@ -256,6 +263,125 @@ func TestHerdr_TurnControlFailsTheTestNamingTheControl(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHerdr_HarnessHooksFailTheTestNamingTheHook(t *testing.T) {
+	t.Parallel()
+	h := startPty(t, t.TempDir(), testutil.TempRepo(t), WithHerdr(HerdrIsTheSubject))
+	rec := &failRecorder{TB: t}
+	h.tb = rec
+
+	h.FailNextStart(errors.New("boom"))
+	h.Stops()
+	h.BlockStops()
+
+	for i, name := range []string{"FailNextStart", "Stops", "BlockStops"} {
+		if len(rec.errors) != 3 || !strings.Contains(rec.errors[i], "Harness."+name) || !strings.Contains(rec.errors[i], "PTY") {
+			t.Fatalf("errors = %q, want one each naming Harness.%s and PTY", rec.errors, name)
+		}
+	}
+}
+
+func TestPty_HoldKeepsTheRunWorkingUntilReleased(t *testing.T) {
+	t.Parallel()
+	h := startPty(t, t.TempDir(), testutil.TempRepo(t))
+	var release func()
+	queueWithTurn(t, h, func(turn *Turn) { release = turn.Hold() })
+	WaitFor(t, 30*time.Second, "the live iteration", func() bool { return liveIterations(t, h) == 1 })
+
+	time.Sleep(10 * ptyPollInterval)
+	if n := liveIterations(t, h); n != 1 {
+		t.Fatalf("live iterations = %d, want the held run still live", n)
+	}
+
+	release()
+	WaitFor(t, 30*time.Second, "the turn to end", func() bool { return liveIterations(t, h) == 0 })
+}
+
+func TestPty_FailNextStartPausesTheTicketAndFailsOnlyOneStart(t *testing.T) {
+	t.Parallel()
+	h := startPty(t, t.TempDir(), testutil.TempRepo(t))
+	h.FailNextStart(errors.New("boom"))
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+
+	WaitFor(t, 30*time.Second, "the ticket to pause", func() bool {
+		body, _ := os.ReadFile(filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-first.md"))
+		return strings.Contains(string(body), "status: paused")
+	})
+	if starts := h.Starts(); len(starts) != 0 {
+		t.Errorf("starts = %+v, want none: the failed start launched nothing", starts)
+	}
+	if h.failStart.Load() != nil {
+		t.Error("the failure is still armed, want it spent by the one start")
+	}
+}
+
+func TestPty_BlockStopsCountsAStopAndHoldsItUntilReleased(t *testing.T) {
+	t.Parallel()
+	h := startPty(t, t.TempDir(), testutil.TempRepo(t))
+	release := h.BlockStops()
+	h.OnTurn(func(turn *Turn) {
+		testutil.WriteFile(t, turn.Cwd, "agent.txt", "work")
+		testutil.CommitAll(t, turn.Cwd, "agent work")
+	})
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+
+	WaitFor(t, 30*time.Second, "the stop to be counted", func() bool { return h.Stops() == 1 })
+	// A killed agent leaves its pid file, so count the processes still alive.
+	alive := func() (n int) {
+		files, _ := filepath.Glob(filepath.Join(h.Env("CLAUDE_CONFIG_DIR"), "sessions", "*.json"))
+		for _, f := range files {
+			var pf agentfake.PidFile
+			body, _ := os.ReadFile(f)
+			if json.Unmarshal(body, &pf) == nil && pf.Pid > 0 && syscall.Kill(pf.Pid, 0) == nil {
+				n++
+			}
+		}
+		return n
+	}
+	time.Sleep(10 * ptyPollInterval)
+	if n := alive(); n != 1 {
+		t.Fatalf("live agent processes = %d, want the one the blocked stop holds alive", n)
+	}
+
+	release()
+	WaitFor(t, 30*time.Second, "the agent process to end", func() bool { return alive() == 0 })
+	if n := h.Stops(); n != 1 {
+		t.Errorf("stops = %d, want 1", n)
+	}
+}
+
+func TestPty_TranscriptIsWhatTheServerReadsForTheSession(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	h := startPty(t, store, repo, func(c *server.Config) {
+		c.Recovery = recovery.Default()
+		for i := range c.Recovery.Entries {
+			c.Recovery.Entries[i].Enabled = true
+		}
+	})
+	h.OnTurn(func(turn *Turn) {
+		turn.Transcript("The feature is already implemented on the feature branch.")
+	})
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+
+	// R3 matches the agent's last words, so only a transcript the server found
+	// under the session's id can propose it.
+	WaitFor(t, 30*time.Second, "R3 to match on the transcript", func() bool {
+		files, _ := filepath.Glob(filepath.Join(store, "proj", "epic-a", "issues", "*.md"))
+		for _, f := range files {
+			if body, _ := os.ReadFile(f); strings.Contains(string(body), "R3") {
+				return true
+			}
+		}
+		return false
+	})
 }
 
 func TestPty_EachProjectGetsItsOwnRunnerRoot(t *testing.T) {

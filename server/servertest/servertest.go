@@ -47,6 +47,7 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/testutil/claudeenv"
 	"github.com/elentok/gx/testutil/herdrfake"
+	"github.com/elentok/gx/transcript"
 )
 
 // Harness is a running test server.
@@ -81,6 +82,10 @@ type Harness struct {
 	turn atomic.Pointer[func(*Turn)]
 	// tb reports a failure from a goroutine that is not the test's.
 	tb testing.TB
+	// failStart, stops and stopGate back FailNextStart, Stops and BlockStops.
+	failStart atomic.Pointer[error]
+	stops     atomic.Int32
+	stopGate  atomic.Pointer[chan struct{}]
 
 	startsMu sync.Mutex
 	starts   []AgentStart
@@ -230,6 +235,9 @@ type Turn struct {
 	Text    string // the whole prompt, notes included
 
 	control turnControl
+	h       *Harness
+	// sessionID is the agent's conversation id; empty on herdr.
+	sessionID string
 }
 
 // turnControl is what a hook asked of the turn besides ending it. The harness
@@ -256,6 +264,85 @@ func (t *Turn) Block(reason string) {
 // Exit makes the agent process exit with code, ending the session. PTY only.
 func (t *Turn) Exit(code int) {
 	t.control = turnControl{name: "Exit", busy: true, after: &agentfake.Control{Action: agentfake.ActionExit, Code: code}}
+}
+
+// Hold keeps the turn open until the returned release is called, which ends
+// it. PTY only.
+func (t *Turn) Hold() (release func()) {
+	t.control = turnControl{name: "Hold", busy: true}
+	if t.sessionID == "" {
+		return func() {}
+	}
+	return func() {
+		err := agentfake.SendTUIControl(t.h.Env("HOME"), t.sessionID, agentfake.Control{Action: agentfake.ActionFinish})
+		if err != nil {
+			t.h.tb.Errorf("servertest: release the held turn: %v", err)
+		}
+	}
+}
+
+// Transcript appends an assistant line saying text to the agent's conversation
+// transcript, where the server reads the agent's last words. PTY only.
+func (t *Turn) Transcript(text string) {
+	if t.sessionID == "" {
+		t.control.name = "Transcript"
+		return
+	}
+	line, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{
+		"content": []map[string]any{{"type": "text", "text": text}},
+	}})
+	path := transcript.PathIn(t.h.Env("HOME"), t.Cwd, t.sessionID)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.h.tb.Errorf("servertest: write the transcript: %v", err)
+		return
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
+	if err == nil {
+		_, err = f.Write(append(line, '\n'))
+		err = errors.Join(err, f.Close())
+	}
+	if err != nil {
+		t.h.tb.Errorf("servertest: write the transcript: %v", err)
+	}
+}
+
+// ptyOnly reports whether the harness runs on PTY; on herdr it fails the test
+// naming hook, as the turn controls do.
+func (h *Harness) ptyOnly(hook string) bool {
+	if !h.pty {
+		h.tb.Errorf("servertest: Harness.%s is not supported on herdr; run this test on PTY (drop WithHerdr)", hook)
+	}
+	return h.pty
+}
+
+// FailNextStart makes the next agent start fail with err, so the launch fails
+// the way a runner start error does. PTY only.
+func (h *Harness) FailNextStart(err error) {
+	if h.ptyOnly("FailNextStart") {
+		h.failStart.Store(&err)
+	}
+}
+
+// Stops is how many times the server stopped an agent. PTY only.
+func (h *Harness) Stops() int {
+	if !h.ptyOnly("Stops") {
+		return 0
+	}
+	return int(h.stops.Load())
+}
+
+// BlockStops holds every agent stop, after it is counted, until release is
+// called. The test's end releases it too. PTY only.
+func (h *Harness) BlockStops() (release func()) {
+	if !h.ptyOnly("BlockStops") {
+		return func() {}
+	}
+	gate := make(chan struct{})
+	h.stopGate.Store(&gate)
+	var once sync.Once
+	release = func() { once.Do(func() { close(gate) }) }
+	h.tb.Cleanup(release)
+	return release
 }
 
 // AgentStart is one agent launch the server made.
@@ -370,7 +457,7 @@ func (h *Harness) OnTurn(agent func(t *Turn)) {
 		_, rest, _ := strings.Cut(text, " ")
 		addr, _, _ := strings.Cut(rest, "\n")
 		addr = strings.TrimPrefix(addr, "--ticket ") // gx-merge's form
-		turn := &Turn{Address: addr, Cwd: cwd, Text: text}
+		turn := &Turn{Address: addr, Cwd: cwd, Text: text, h: h}
 		agent(turn)
 		if name := turn.control.name; name != "" {
 			h.tb.Errorf("servertest: Turn.%s is not supported on herdr; run this test on PTY (drop WithHerdr)", name)

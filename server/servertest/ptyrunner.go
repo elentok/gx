@@ -32,6 +32,9 @@ type ptyRunner struct {
 }
 
 func (r *ptyRunner) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
+	if failed := r.h.failStart.Swap(nil); failed != nil {
+		return agentrunner.Session{}, *failed
+	}
 	s, err := r.Pty.Start(opts)
 	if err == nil {
 		r.mu.Lock()
@@ -40,6 +43,15 @@ func (r *ptyRunner) Start(opts agentrunner.StartOptions) (agentrunner.Session, e
 		r.h.recordStart(AgentStart{Label: s.Label, Cwd: opts.Cwd, Kind: string(opts.Kind)})
 	}
 	return s, err
+}
+
+// Stop counts the stop, then waits out a BlockStops gate before stopping.
+func (r *ptyRunner) Stop(s agentrunner.Session) error {
+	r.h.stops.Add(1)
+	if gate := r.h.stopGate.Load(); gate != nil {
+		<-*gate
+	}
+	return r.Pty.Stop(s)
 }
 
 func (r *ptyRunner) Prompt(s agentrunner.Session, text string) error {
@@ -58,7 +70,7 @@ func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge fun
 		_, rest, _ := strings.Cut(text, " ")
 		addr, _, _ := strings.Cut(rest, "\n")
 		addr = strings.TrimPrefix(addr, "--ticket ") // gx-merge's form
-		t := &Turn{Address: addr, Cwd: cwd, Text: text}
+		t := &Turn{Address: addr, Cwd: cwd, Text: text, h: r.h, sessionID: s.SessionID}
 		(*turn)(t)
 		arm := agentfake.ActionFast
 		if t.control.busy {
