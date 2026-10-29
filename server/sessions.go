@@ -135,6 +135,11 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 			return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("dir %s does not exist", req.Dir)), nil
 		}
 	}
+	switch req.Tier {
+	case "", ralphloop.TierLight, ralphloop.TierWorker, ralphloop.TierStrongest:
+	default:
+		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("unknown tier %q (want light, worker or strongest)", req.Tier)), nil
+	}
 	if req.Harness == "" {
 		req.Harness = string(harness.Claude)
 	}
@@ -155,7 +160,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 			req.Name = req.Worktree
 		}
 	}
-	tier := cmp.Or(req.tier, ralphloop.TierWorker)
+	tier := cmp.Or(req.Tier, ralphloop.TierWorker)
 	if req.launchDesign {
 		tier = s.designLaunchTier(req.Ticket)
 	}

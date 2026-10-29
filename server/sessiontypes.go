@@ -152,8 +152,8 @@ type CreateSessionRequest struct {
 	// remoteControl is the --remote-control name, saved in the meta so resumes
 	// keep it whatever the setting says by then.
 	remoteControl string
-	// tier is the model tier; empty means worker.
-	tier ralphloop.Tier
+	// Tier is the model tier; empty means worker.
+	Tier ralphloop.Tier `json:"tier,omitempty"`
 	// launchDesign marks a launch by a design path (Start design, New Design):
 	// the tier follows the map's step, and the meta saves LaunchDesign.
 	launchDesign bool

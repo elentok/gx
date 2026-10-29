@@ -1914,6 +1914,10 @@ export interface CreateSessionRequest {
    * RebaseNote is saved in the meta as RebaseNote.
    */
   rebase_note?: string;
+  /**
+   * Tier is the model tier; empty means worker.
+   */
+  tier?: any /* ralphloop.Tier */;
 }
 /**
  * SessionResult is a session write's outcome: the session, or a refusal.

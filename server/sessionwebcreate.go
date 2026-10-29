@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"path/filepath"
 	"slices"
+
+	"github.com/elentok/gx/ralphloop"
 )
 
 // WebCreateSessionRequest is the body of POST /v1/sessions/create on the web
@@ -19,6 +21,8 @@ type WebCreateSessionRequest struct {
 	Name     string `json:"name,omitempty"`
 	// Prompt is typed at the session's first Idle.
 	Prompt string `json:"prompt,omitempty"`
+	// Tier is light, worker or strongest; empty means worker.
+	Tier ralphloop.Tier `json:"tier,omitempty"`
 }
 
 // sessionCreateWeb is sessionCreateWrite for the web mux. A body with any
@@ -66,6 +70,7 @@ func (s *Server) createWebSession(req WebCreateSessionRequest) (SessionResult, e
 		Worktree: req.Worktree,
 		Name:     req.Name,
 		Prompt:   prompt,
+		Tier:     req.Tier,
 		Harness:  s.settings.Load().chatHarness(),
 	})
 }

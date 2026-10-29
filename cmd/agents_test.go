@@ -131,6 +131,48 @@ func TestAgentsCreateCmd_WorktreeAndPrompt(t *testing.T) {
 	}
 }
 
+func TestAgentsCreateCmd_Tier(t *testing.T) {
+	sock := filepath.Join(shortTempDir(t), "a.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got server.CreateSessionRequest
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Error(err)
+		}
+		_ = json.NewEncoder(w).Encode(server.SessionResult{Session: &server.SessionInfo{ID: "s1"}})
+	})}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	run := func(args ...string) string {
+		cmd := newAgentsCreateCmd(func() (*apiclient.Client, error) { return apiclient.New(sock), nil })
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		cmd.SetArgs(append([]string{"--project", "proj", "--harness", "codex", "--json"}, args...))
+		if err := cmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		return string(got.Tier)
+	}
+	if tier := run(); tier != "worker" {
+		t.Errorf("default tier = %q, want worker", tier)
+	}
+	if tier := run("--tier", "strongest"); tier != "strongest" {
+		t.Errorf("tier = %q, want strongest", tier)
+	}
+	var help bytes.Buffer
+	cmd := newAgentsCreateCmd(func() (*apiclient.Client, error) { return nil, nil })
+	cmd.SetOut(&help)
+	cmd.SetArgs([]string{"--help"})
+	_ = cmd.Execute()
+	if !strings.Contains(help.String(), "--tier") {
+		t.Errorf("help = %q, want --tier", help.String())
+	}
+}
+
 func TestAgentActionable(t *testing.T) {
 	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder())
 	ctx := context.Background()
