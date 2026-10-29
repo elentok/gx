@@ -1060,6 +1060,71 @@ func TestStart_AutoAdvanceDelayFlagIsAccepted(t *testing.T) {
 	r.stop(t)
 }
 
+func TestStart_MockDirServesTheDirectoryAndReportsMockURL(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "mock.html"), []byte("<p>mock</p>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r := startWith(t, "empty", nil, "--mock-dir", dir)
+	if !strings.HasPrefix(r.MockURL, "http://127.0.0.1:") {
+		t.Fatalf("mock_url = %q, want a loopback URL", r.MockURL)
+	}
+	resp, err := http.Get(r.MockURL + "mock.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if string(body) != "<p>mock</p>" {
+		t.Errorf("GET mock.html = %q", body)
+	}
+	r.stop(t)
+	if resp, err := http.Get(r.MockURL + "mock.html"); err == nil {
+		resp.Body.Close()
+		t.Errorf("mock server still answers after SIGTERM")
+	}
+}
+
+func TestStart_NoMockDirLeavesMockURLOut(t *testing.T) {
+	t.Parallel()
+	r := startWith(t, "empty", nil)
+	defer r.stop(t)
+	if r.MockURL != "" {
+		t.Errorf("mock_url = %q, want empty without --mock-dir", r.MockURL)
+	}
+}
+
+func TestShellEnv_ExportsMockURLWhenSet(t *testing.T) {
+	got := Output{MockURL: "http://127.0.0.1:2/"}.ShellEnv()
+	if want := "export GXF_MOCK_URL='http://127.0.0.1:2/'\n"; !strings.Contains(got, want) {
+		t.Errorf("ShellEnv() = %s, want it to contain %s", got, want)
+	}
+}
+
+func TestIsolatedEnv_NamesTheRealPlaywrightCacheForTheServerAndTheCLI(t *testing.T) {
+	t.Setenv("PLAYWRIGHT_BROWSERS_PATH", "/real/pw")
+	env, cliEnv := isolatedEnv("/tmp/r", "/tmp/r/bin")
+	const want = "PLAYWRIGHT_BROWSERS_PATH=/real/pw"
+	if !slices.Contains(cliEnv, want) || !slices.Contains(env, want) {
+		t.Errorf("env/cliEnv = %v / %v, want both to carry %s", env, cliEnv, want)
+	}
+}
+
+func TestIsolatedEnv_DefaultsPlaywrightCacheToTheRealHomeNotTheTempOne(t *testing.T) {
+	t.Setenv("PLAYWRIGHT_BROWSERS_PATH", "")
+	_, cliEnv := isolatedEnv("/tmp/r", "/tmp/r/bin")
+	var got string
+	for _, kv := range cliEnv {
+		if v, ok := strings.CutPrefix(kv, "PLAYWRIGHT_BROWSERS_PATH="); ok {
+			got = v
+		}
+	}
+	if got == "" || strings.HasPrefix(got, "/tmp/r/") || !strings.HasSuffix(got, "ms-playwright") {
+		t.Errorf("PLAYWRIGHT_BROWSERS_PATH = %q, want the real home's ms-playwright cache", got)
+	}
+}
+
 func TestStart_StallThresholdFlagIsAccepted(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "design", nil, "--stall-threshold", "2s")

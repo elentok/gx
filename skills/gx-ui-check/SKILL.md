@@ -38,6 +38,7 @@ $TMPDIR/gx-ui/gxfixture --gx $TMPDIR/gx-ui/gx --fakeclaude $TMPDIR/gx-ui/claude 
 - Pass `--hold` only for a flow that says so (flow 7, and the Stash flow on `dirty-trunk`). It
   freezes the workers until you delete the file named by `hold_file`.
 - Each run is its own isolated server and state. Start one per flow.
+- Resolve `gx tickets root` before any `cd`. It fails with "not inside a git repo" from `$TMPDIR`.
 - To run `gx` against the fixture from the shell, pass `--env` and source the output. It prints
   `export` lines instead of the JSON: the `env` entries, plus `GXF_WEB_URL`, `GXF_GX`,
   `GXF_DISK_DIR`, `GXF_HEALTH_DIR`, `GXF_HOLD_FILE`, `GXF_STATE_DIR` and `GXF_SOCKET`. Redirect the background run's stdout to a file,
@@ -49,14 +50,20 @@ The JSON line has these fields:
 - `web_url`: the page URL, with the token that signs you in.
 - `gx`: the gx binary to use for CLI steps.
 - `env`: `KEY=value` entries. Set them for every `gx` call, so the call reaches this fixture's server
-  and no other.
+  and no other. They include the real `PLAYWRIGHT_BROWSERS_PATH`: the fixture replaces `HOME`, and
+  Playwright would otherwise look for its browsers in the empty temp one. Keep it set for any
+  Playwright script you run.
+- `mock_url`: only with `--mock-dir <path>`. The fixture serves that directory over loopback http at
+  this base URL (`file:` is blocked in the browser) and stops it with itself. `--env` exports it as
+  `GXF_MOCK_URL`.
 - `hold_file`: the file that holds the workers when you passed `--hold`.
 - `disk_dir`: the directory of the fake disk's control files (see "How the fixture behaves").
 - `health_dir`: the directory of the fake CPU and memory control file (see "How the fixture behaves").
 
 ## 2. Open the page and run a flow
 
-1. Open `web_url` once. That visit trades the token for a cookie.
+1. Open `web_url` once. That visit trades the token for a cookie. In a Playwright script use
+   `waitUntil: "domcontentloaded"`: the page keeps a live connection, so `load` can time out.
 2. Do the flow's steps from the catalog with `playwright-cli`. Use roles and visible text; the page
    has no `data-testid`.
 3. Never reload the page. The UI updates by itself, and a reload would hide a missing update. If a

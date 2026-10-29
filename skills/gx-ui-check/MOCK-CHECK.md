@@ -5,18 +5,15 @@ steps. The browser commands come from the `playwright-cli` skill.
 
 ## Steps
 
-1. Start the fixture scenario with [gx-ui-check](SKILL.md) (section 1). That includes its
-   `make web-build` when `webui/dist/index.html` is missing. Open its `web_url` once.
-2. Serve the mock's directory over local http and open the mock from there. `playwright-cli` blocks
-   `file:` URLs, and the block is not to be lifted: never set `allowUnrestrictedFileAccess` or pass a
-   `--config` for it. Start the server with `run_in_background`, never `nohup` or `&`:
-
-   ```
-   python3 -m http.server 0 --bind 127.0.0.1 --directory "$(gx tickets root)/<map>/mocks"
-   ```
-
-   Port `0` picks a free port. Read the port from the server's first output line, then open
-   `http://127.0.0.1:<port>/<NN>-<slug>.html`. You may run this server without asking.
+1. Resolve the mock directory first: `mocks=$(gx tickets root)/<map>/mocks`. Do it before any `cd`;
+   outside a git repo `gx tickets root` fails with "not inside a git repo".
+2. Start the fixture scenario with [gx-ui-check](SKILL.md) (section 1), adding `--mock-dir "$mocks"`.
+   That includes its `make web-build` when `webui/dist/index.html` is missing. Open its `web_url`
+   once. The fixture serves the mock directory over local http and reports the base URL as
+   `mock_url`: open `<mock_url><NN>-<slug>.html`. `playwright-cli` blocks `file:` URLs, and the block
+   is not to be lifted: never set `allowUnrestrictedFileAccess` or pass a `--config` for it. Never
+   start `python3 -m http.server` yourself. Use `waitUntil: "domcontentloaded"` for a mock page
+   (its fonts and images may never settle).
 3. Run every `playwright-cli` call from inside the repo worktree. Outside a git repo it fails with
    "not inside a git repo". Never `cd $TMPDIR &&` before a call. Give `--filename` an absolute path in
    your scratchpad directory, and `Read` the PNG from that same path.
@@ -45,5 +42,5 @@ steps. The browser commands come from the `playwright-cli` skill.
 A phone state is a fixed-width box in the mock, where media queries do not fire. Compare it with the
 built page at that viewport width, not at the desktop width.
 
-Stop the fixture (gx-ui-check, section 3) and the mock's http server when you are done, even when the
-check failed.
+Stop the fixture (gx-ui-check, section 3) when you are done, even when the check failed. That also
+stops the mock's http server.

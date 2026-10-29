@@ -33,7 +33,11 @@ func TestMockRulesAnchors(t *testing.T) {
 			"device scale factor 1",
 			"Start the fixture scenario with [gx-ui-check](SKILL.md)",
 			"A later decision wins on behaviour",
-			"python3 -m http.server 0 --bind 127.0.0.1 --directory",
+			"--mock-dir \"$mocks\"",
+			"`mock_url`",
+			"Never start `python3 -m http.server` yourself",
+			"`waitUntil: \"domcontentloaded\"`",
+			"Resolve the mock directory first",
 			"never set `allowUnrestrictedFileAccess`",
 			"from inside the repo worktree",
 			"`--filename` an absolute path",
@@ -43,6 +47,10 @@ func TestMockRulesAnchors(t *testing.T) {
 		}},
 		{"ui check build", "gx-ui-check/SKILL.md", []string{
 			"go build -tags gxfixture -o $TMPDIR/gx-ui/gx .",
+			"`--mock-dir <path>`",
+			"`PLAYWRIGHT_BROWSERS_PATH`",
+			"Resolve `gx tickets root` before any `cd`",
+			"`waitUntil: \"domcontentloaded\"`",
 		}},
 		{"implement", "gx-implement/SKILL.md", []string{
 			"## Mock check",

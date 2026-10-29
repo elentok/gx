@@ -10,6 +10,7 @@
 // --stall-threshold shortens how long a Working session's transcript may stay untouched before it counts as stalled (default 15m).
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
+// --mock-dir <path> serves that directory over loopback HTTP and reports its base URL as mock_url.
 //
 // A binary left out is built with `go build`, which needs the module as the
 // working directory.
@@ -20,10 +21,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"syscall"
@@ -54,6 +58,8 @@ type Output struct {
 	DiskDir string `json:"disk_dir"`
 	// HealthDir holds the fake CPU and memory control file: system.
 	HealthDir string `json:"health_dir"`
+	// MockURL is the base URL serving --mock-dir; empty without the flag.
+	MockURL string `json:"mock_url,omitempty"`
 }
 
 // ShellEnv is the output as `export` lines a shell can source: the CLI env, then
@@ -72,6 +78,9 @@ func (o Output) ShellEnv() string {
 	export("GXF_HOLD_FILE", o.HoldFile)
 	export("GXF_STATE_DIR", o.StateDir)
 	export("GXF_SOCKET", o.Socket)
+	if o.MockURL != "" {
+		export("GXF_MOCK_URL", o.MockURL)
+	}
 	return b.String()
 }
 
@@ -83,7 +92,7 @@ func main() {
 }
 
 func run(args []string) (err error) {
-	var gxBin, fakeBin, name, autoAdvance, stallThreshold string
+	var gxBin, fakeBin, name, autoAdvance, stallThreshold, mockDir string
 	var configs []string
 	var hold, shellEnv bool
 	for i := 0; i < len(args); i++ {
@@ -104,11 +113,15 @@ func run(args []string) (err error) {
 			}
 			stallThreshold = args[i+1]
 			i++
-		case "--config":
+		case "--config", "--mock-dir":
 			if i+1 == len(args) {
 				return fmt.Errorf("%s needs a value", args[i])
 			}
-			configs = append(configs, args[i+1])
+			if args[i] == "--config" {
+				configs = append(configs, args[i+1])
+			} else {
+				mockDir = args[i+1]
+			}
 			i++
 		case "--gx", "--fakeclaude":
 			if i+1 == len(args) {
@@ -259,6 +272,14 @@ func run(args []string) (err error) {
 		}
 	}
 	o := Output{WebURL: webURL, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir()}
+	if mockDir != "" {
+		stopMock, mockURL, err := serveMock(mockDir)
+		if err != nil {
+			return err
+		}
+		defer stopMock()
+		o.MockURL = mockURL
+	}
 	if shellEnv {
 		fmt.Print(o.ShellEnv())
 	} else {
@@ -282,6 +303,21 @@ func run(args []string) (err error) {
 	case err := <-exited:
 		return fmt.Errorf("server exited: %v\n%s", err, f.serverOutput())
 	}
+}
+
+// serveMock serves dir on a loopback port (`file://` is blocked in the
+// browser) and returns its base URL and a stop func.
+func serveMock(dir string) (stop func(), url string, err error) {
+	if st, err := os.Stat(dir); err != nil || !st.IsDir() {
+		return nil, "", fmt.Errorf("--mock-dir %q: not a directory", dir)
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, "", err
+	}
+	srv := &http.Server{Handler: http.FileServer(http.Dir(dir))}
+	go func() { _ = srv.Serve(ln) }()
+	return func() { _ = srv.Close() }, "http://" + ln.Addr().String() + "/", nil
 }
 
 const (
@@ -339,6 +375,11 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 		"XDG_STATE_HOME=" + filepath.Join(root, "state"),
 		"XDG_CONFIG_HOME=" + filepath.Join(root, "config"),
 	}
+	// HOME is replaced, so Playwright would look for its browsers in the empty
+	// temp HOME: name the real cache.
+	if p := playwrightBrowsersPath(); p != "" {
+		cliEnv = append(cliEnv, "PLAYWRIGHT_BROWSERS_PATH="+p)
+	}
 	env = append(env, cliEnv...)
 	env = append(env,
 		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
@@ -348,6 +389,22 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 		"GIT_COMMITTER_NAME=gxfixture", "GIT_COMMITTER_EMAIL=gxfixture@example.com",
 	)
 	return git.WithMaintenanceOff(env), cliEnv
+}
+
+// playwrightBrowsersPath is the caller's PLAYWRIGHT_BROWSERS_PATH, else
+// Playwright's default cache under the real home ("" when it cannot be told).
+func playwrightBrowsersPath() string {
+	if p := os.Getenv("PLAYWRIGHT_BROWSERS_PATH"); p != "" {
+		return p
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	if runtime.GOOS == "darwin" {
+		return filepath.Join(home, "Library", "Caches", "ms-playwright")
+	}
+	return filepath.Join(home, ".cache", "ms-playwright")
 }
 
 // writeConfig writes the fixture's config. overrides are `dotted.key=<json>`
