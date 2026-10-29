@@ -106,7 +106,7 @@ func TestDiskCleanNow_UnheldDiskKeepsDispatching(t *testing.T) {
 	done := r.cleanNowAsync()
 	r.waitCalls(t, 1)
 	r.queue(t, "proj:epic-a/01")
-	waitFor(t, func() bool { return len(*r.start) >= 1 })
+	waitFor(t, func() bool { return len(r.start()) >= 1 })
 	r.clean.release()
 	if res := <-done; res.Refused || res.Held {
 		t.Fatalf("result = %+v", res)

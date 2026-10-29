@@ -254,8 +254,8 @@ func TestRelaunch_StartsAFreshIterationOfAPausedTicket(t *testing.T) {
 	if !strings.Contains(string(data), "status: claimed") {
 		t.Errorf("relaunched ticket is not claimed:\n%s", data)
 	}
-	if len(*start) == 0 || !strings.Contains(strings.Join(*prompt, " "), "proj:epic-a/01") {
-		t.Errorf("agent start = %v, prompt = %v", *start, *prompt)
+	if len(start()) == 0 || !strings.Contains(strings.Join(prompt(), " "), "proj:epic-a/01") {
+		t.Errorf("agent start = %v, prompt = %v", start(), prompt())
 	}
 }
 

@@ -25,7 +25,7 @@ type holdRig struct {
 	h      *servertest.Harness
 	disks  *servertest.FakeDisks
 	store  string
-	start  *[]string
+	start  func() []servertest.AgentStart
 	resume func() int
 }
 
@@ -98,13 +98,13 @@ func (r *holdRig) explainWhen(t *testing.T, addr, want string) server.Explanatio
 	return ex
 }
 
-func (r *holdRig) started(n int) func() bool { return func() bool { return len(*r.start) >= n } }
+func (r *holdRig) started(n int) func() bool { return func() bool { return len(r.start()) >= n } }
 
 func (r *holdRig) neverStarts(t *testing.T) {
 	t.Helper()
 	time.Sleep(300 * time.Millisecond)
-	if len(*r.start) != 0 || len(r.h.Server.Runs()) != 0 {
-		t.Errorf("an agent started on a held disk: %v, runs %d", *r.start, len(r.h.Server.Runs()))
+	if len(r.start()) != 0 || len(r.h.Server.Runs()) != 0 {
+		t.Errorf("an agent started on a held disk: %v, runs %d", r.start(), len(r.h.Server.Runs()))
 	}
 }
 
@@ -325,8 +325,8 @@ func TestDiskHold_RelaunchAndRetryRefused(t *testing.T) {
 			t.Errorf("%s = %+v, %v; want refusal %s naming the disk and its free space", name, res, err, server.ReasonDiskLow)
 		}
 	}
-	if len(*r.start) != 0 {
-		t.Errorf("agent started on a held disk: %v", *r.start)
+	if len(r.start()) != 0 {
+		t.Errorf("agent started on a held disk: %v", r.start())
 	}
 	r.disks.SetFree(repo, 50*gb)
 	if res, err := r.h.Client.TicketRelaunch(ctx, "proj:epic-a/01", false); err != nil || res.Reason == server.ReasonDiskLow {

@@ -10,7 +10,6 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/runnerbuild"
-	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -21,13 +20,6 @@ const (
 	ptyPromptGrace  = 500 * time.Millisecond
 	ptyStopGrace    = 2 * time.Second
 )
-
-// withPty is the expand step of the PTY default: it makes the PTY runner the
-// configured one, for servertest's own tests. The PTY default ticket makes it
-// the default branch and removes this.
-func withPty() func(*server.Config) {
-	return func(c *server.Config) { choiceOf(c).pty = true }
-}
 
 // ptyRunner is a nativerunner.Pty whose prompts run the harness's OnTurn hook.
 // It embeds the Pty so its optional interfaces (Reattach, Nudger) still promote.
@@ -45,6 +37,7 @@ func (r *ptyRunner) Start(opts agentrunner.StartOptions) (agentrunner.Session, e
 		r.mu.Lock()
 		r.cwds[s.Label] = opts.Cwd
 		r.mu.Unlock()
+		r.h.recordStart(AgentStart{Label: s.Label, Cwd: opts.Cwd, Kind: string(opts.Kind)})
 	}
 	return s, err
 }

@@ -197,8 +197,8 @@ func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {
 	if merged {
 		t.Error("one-offs epic was merged")
 	}
-	if len(*start) != 0 {
-		t.Errorf("an agent started (retro?): %v", *start)
+	if len(start()) != 0 {
+		t.Errorf("an agent started (retro?): %v", start())
 	}
 }
 

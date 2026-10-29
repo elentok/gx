@@ -4,13 +4,11 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
-	"github.com/elentok/gx/testutil/herdrfake"
 )
 
 // installFailure is the fake install of a worktree whose dependencies will not install.
@@ -20,26 +18,21 @@ func installFailure(path, _ string) ([]string, error) {
 
 // runFailingInstall queues ticket 01 of a fixture whose install fails and waits
 // for the launch to be given up on. starts counts the agent start calls.
-func runFailingInstall(t *testing.T, typ string) (f *schedFixture, starts *atomic.Int32) {
+func runFailingInstall(t *testing.T, typ string) (f *schedFixture, starts func() []servertest.AgentStart) {
 	t.Helper()
 	f = newSchedFixture(t, map[string]servertest.TicketOpts{"01": {Type: typ}},
 		func(*schedFixture, *servertest.Turn, string) {},
 		func(c *server.Config) { c.InstallDeps = installFailure })
 	gitOut(t, f.repo, "branch", schedEpic)
 	servertest.SetProjectRepoNoAutoMerge(t, f.store, "proj", f.repo)
-	starts = &atomic.Int32{}
-	f.h.Herdr.Register("agent", "start", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
-		starts.Add(1)
-		return nil, herdrfake.Identities{}, errors.New("agent must not start")
-	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	evs := f.queueEpic(ctx, t, "01")
 	servertest.WaitForEvent(ctx, t, evs, server.EventIterationLaunchFailed, "proj:"+schedEpic+"/01")
-	return f, starts
+	return f, f.h.Starts
 }
 
-func assertPausedOnInstallFailure(t *testing.T, f *schedFixture, starts *atomic.Int32) {
+func assertPausedOnInstallFailure(t *testing.T, f *schedFixture, starts func() []servertest.AgentStart) {
 	t.Helper()
 	body := readFile(t, f.ticketFile(t, "01"))
 	if !strings.Contains(body, "status: paused") {
@@ -48,8 +41,8 @@ func assertPausedOnInstallFailure(t *testing.T, f *schedFixture, starts *atomic.
 	if !strings.Contains(body, "launch failed: installing dependencies in") {
 		t.Errorf("pause reason missing the install failure:\n%s", body)
 	}
-	if got := starts.Load(); got != 0 {
-		t.Errorf("agent start calls = %d, want none", got)
+	if got := starts(); len(got) != 0 {
+		t.Errorf("agent starts = %v, want none", got)
 	}
 }
 

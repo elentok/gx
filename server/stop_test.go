@@ -27,8 +27,8 @@ func TestStop_WaitsForAMergeInFlightAndFlushesTheStoreCommit(t *testing.T) {
 	})
 	_, _, cwd := registerTurn(h)
 	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
-		testutil.WriteFile(t, *cwd, "agent.txt", "work")
-		testutil.CommitAll(t, *cwd, "agent work")
+		testutil.WriteFile(t, cwd(), "agent.txt", "work")
+		testutil.CommitAll(t, cwd(), "agent work")
 		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
 	})
 	// The merge closes the iteration's tab; hold it there.
@@ -84,7 +84,7 @@ func TestStop_LeavesALiveAgentRunningAndUnmerged(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store)
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture))
 	registerTurn(h)
 	closed := make(chan struct{}, 4)
 	h.Herdr.Register("tab", "close", func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {

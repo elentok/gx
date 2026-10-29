@@ -25,7 +25,7 @@ func startPty(t *testing.T, store, repo string, opts ...func(*server.Config)) *H
 	t.Helper()
 	WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	SetProjectRepo(t, store, "proj", repo)
-	return StartWithStore(t, store, append(opts, withPty())...)
+	return StartWithStore(t, store, opts...)
 }
 
 func ptyOf(t *testing.T, h *Harness, project string) *nativerunner.Pty {
@@ -101,6 +101,44 @@ func TestPty_TheRunRecordsThePtyRunner(t *testing.T) {
 	runs := h.Server.Runs()
 	if len(runs) != 1 || runs[0].Runner != "pty" {
 		t.Errorf("runs = %+v, want one run on the pty runner", runs)
+	}
+}
+
+func TestDefault_NoRunnerOptionRunsOnPtyWithOneStartAndNoHerdrCall(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	h := startPty(t, store, repo)
+	h.OnTurn(func(*Turn) {})
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	WaitFor(t, 30*time.Second, "the launch", func() bool { return len(h.Starts()) == 1 })
+
+	if runs := h.Server.Runs(); len(runs) != 1 || runs[0].Runner != "pty" {
+		t.Errorf("runs = %+v, want one run on the pty runner", runs)
+	}
+	if h.Herdr != nil {
+		t.Errorf("h.Herdr = %v, want nil: the default makes no herdr call", h.Herdr)
+	}
+	got := h.Starts()
+	if got[0].Kind != "claude" || got[0].Cwd == "" || got[0].Label == "" {
+		t.Errorf("start = %+v, want label, cwd and kind claude", got[0])
+	}
+}
+
+func TestDefault_WithHerdrRecordsOneStartPerLaunch(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	h := startPty(t, store, repo, WithHerdr(HerdrIsTheSubject))
+	h.OnTurn(func(*Turn) {})
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	WaitFor(t, 30*time.Second, "the launch", func() bool { return len(h.Starts()) == 1 })
+
+	got := h.Starts()
+	if got[0].Kind != "claude" || got[0].Cwd == "" || got[0].Label == "" {
+		t.Errorf("start = %+v, want label, cwd and kind claude", got[0])
 	}
 }
 

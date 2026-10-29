@@ -16,10 +16,13 @@ func TestHerdr_NilWithoutWithHerdr(t *testing.T) {
 	}
 }
 
-func TestHerdr_SetOnTheFallbackAndWithHerdr(t *testing.T) {
-	if h := Start(t); h.Herdr == nil {
-		t.Error("h.Herdr = nil on the herdr fallback, want the fake")
+func TestHerdr_NilByDefault(t *testing.T) {
+	if h := Start(t); h.Herdr != nil {
+		t.Errorf("h.Herdr = %v, want nil on the default runner", h.Herdr)
 	}
+}
+
+func TestHerdr_SetWithHerdr(t *testing.T) {
 	if h := Start(t, WithRunner(runnerfake.NewRunner()), WithHerdr(HerdrIsTheSubject)); h.Herdr == nil {
 		t.Error("h.Herdr = nil with WithHerdr, want the fake")
 	}

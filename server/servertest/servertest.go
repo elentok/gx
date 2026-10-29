@@ -1,8 +1,23 @@
 // Package servertest is seam A: an in-process server on a temp state dir,
-// temp socket and temp ticket store, with the fake herdr executable first in
-// PATH of the server's Config.Env, driven only through the API client. Start
+// temp socket and temp ticket store, driven only through the API client. Start
 // changes no process env, so harnesses may run in parallel subtests; the
 // package's TestMain must call herdrfake.RunHelperProcess.
+//
+// # The runner rule
+//
+// A test that sets no runner runs on the PTY runner, built the production way
+// over holder processes and a TUI fake; OnTurn runs a hook for each agent turn
+// and Starts records each launch. Pick another runner only for a reason:
+//
+//   - PTY (the default): the test needs a real agent turn.
+//   - runnerfake (WithRunner, WithRunnerFor): the test sets a runner state
+//     directly, or checks only what the server passed to Start.
+//   - herdr (WithHerdr): herdr is the subject, or the test is marked
+//     UntilPtyAsDefault.
+//
+// The fake herdr executable is first in PATH of every server's Config.Env but
+// fails any call unless the test asked for WithHerdr, so a stray herdr call
+// fails the test and names the command.
 package servertest
 
 import (
@@ -64,6 +79,9 @@ type Harness struct {
 	// OnTurn hook it runs on a prompt.
 	pty  bool
 	turn atomic.Pointer[func(*Turn)]
+
+	startsMu sync.Mutex
+	starts   []AgentStart
 	// Stop does what SIGTERM does to the real server: shut down, release the
 	// lock, and return Serve's result. Safe to call more than once.
 	Stop func() error
@@ -210,9 +228,30 @@ type Turn struct {
 	Text    string // the whole prompt, notes included
 }
 
-// OnTurn answers the herdr commands a launch makes, giving each tab its own
-// pane and cwd, and runs agent for every turn (e.g. a commit in t.Cwd). The
-// agent is idle again when the hook returns.
+// AgentStart is one agent launch the server made.
+type AgentStart struct {
+	Label string // the agent's name, e.g. epic-a-iter-01
+	Cwd   string // the worktree the agent started in
+	Kind  string // the agent kind, e.g. claude
+}
+
+// Starts is every agent launch so far, in order, on PTY and on herdr (the
+// latter once OnTurn answers its commands).
+func (h *Harness) Starts() []AgentStart {
+	h.startsMu.Lock()
+	defer h.startsMu.Unlock()
+	return slices.Clone(h.starts)
+}
+
+func (h *Harness) recordStart(s AgentStart) {
+	h.startsMu.Lock()
+	defer h.startsMu.Unlock()
+	h.starts = append(h.starts, s)
+}
+
+// OnTurn runs agent for every turn (e.g. a commit in t.Cwd). The agent is idle
+// again when the hook returns. On herdr it also answers the commands a launch
+// makes, giving each tab its own pane and cwd.
 func (h *Harness) OnTurn(agent func(t *Turn)) {
 	if h.pty {
 		h.turn.Store(&agent)
@@ -284,7 +323,9 @@ func (h *Harness) OnTurn(agent func(t *Turn)) {
 		pane := flagValue(argv, "--pane")
 		mu.Lock()
 		named[argv[2]] = pane
+		cwd := cwds[pane]
 		mu.Unlock()
+		h.recordStart(AgentStart{Label: argv[2], Cwd: cwd, Kind: flagValue(argv, "--kind")})
 		return reply(pane), herdrfake.Identities{}, nil
 	})
 	h.Herdr.Register("agent", "wait", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
@@ -492,7 +533,6 @@ type runnerChoice struct {
 	runner    agentrunner.Runner
 	runnerFor func(name, dir string) agentrunner.Runner
 	herdr     bool
-	pty       bool
 }
 
 // choices maps a config under construction to its runnerChoice. Options are
@@ -529,21 +569,16 @@ func WithHerdr(HerdrReason) func(*server.Config) {
 	return func(c *server.Config) { choiceOf(c).herdr = true }
 }
 
-// resolveRunner applies the recorded choice: WithRunner / WithRunnerFor first;
-// otherwise the default, which is still herdr (server.New builds it when
-// cfg.Runner is nil), so WithHerdr changes nothing yet.
-func resolveRunner(cfg *server.Config, ch *runnerChoice) {
+// resolveRunner applies the recorded choice: WithRunner / WithRunnerFor first,
+// then herdr (server.New builds it when cfg.Runner is nil) for WithHerdr. It
+// reports whether the harness builds the PTY runner itself, the default.
+func resolveRunner(cfg *server.Config, ch *runnerChoice) (pty bool) {
 	if ch.runner != nil {
 		cfg.Runner = ch.runner
 		cfg.RunnerFor = ch.runnerFor
+		return false
 	}
-}
-
-// herdrAllowed is whether the test may reach the fake herdr: it asked with
-// WithHerdr, or it set no runner and falls back to herdr. gx:pty-as-default
-// drops the fallback.
-func herdrAllowed(ch *runnerChoice) bool {
-	return ch.herdr || (ch.runner == nil && !ch.pty)
+	return !ch.herdr
 }
 
 // shortTempRoot is the temp root of a harness's state dir, short enough for the
@@ -568,7 +603,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	})
 
 	// The fake herdr is first on PATH in every test; h.Herdr is only set, and the
-	// fake only answers, when the test may use herdr (see herdrAllowed).
+	// fake only answers, when the test asked for WithHerdr.
 	herdr := herdrfake.NewState(t)
 	h := &Harness{
 		StateDir:    filepath.Join(stateDir, "state"),
@@ -638,9 +673,8 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	for _, o := range opts {
 		o(&h.cfg)
 	}
-	resolveRunner(&h.cfg, choice)
-	h.pty = choice.pty && choice.runner == nil
-	if herdrAllowed(choice) {
+	h.pty = resolveRunner(&h.cfg, choice)
+	if choice.herdr {
 		h.Herdr = herdr
 	} else {
 		herdr.Forbid()

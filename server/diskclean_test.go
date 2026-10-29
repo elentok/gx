@@ -73,7 +73,7 @@ type cleanRig struct {
 	clean  *fakeCleaner
 	store  string
 	repos  map[string]string
-	start  *[]string
+	start  func() []servertest.AgentStart
 	bodies func() []string
 }
 
@@ -234,8 +234,8 @@ func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T)
 	r.disksWhen(t, "held and cleaning", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held && d[0].Cleaning })
 	r.setFree(50 * gb)
 	letWatcherRead()
-	if len(*r.start) != 0 || len(r.h.Server.Runs()) != 0 {
-		t.Fatalf("a ticket started during the clean: %v", *r.start)
+	if len(r.start()) != 0 || len(r.h.Server.Runs()) != 0 {
+		t.Fatalf("a ticket started during the clean: %v", r.start())
 	}
 	r.disksWhen(t, "still held", func(d []server.DiskStatus) bool { return len(d) == 1 && d[0].Held })
 	r.clean.release()
@@ -243,7 +243,7 @@ func TestDiskClean_HoldsWhileCleaningThenResumesWithOneCleanNotice(t *testing.T)
 	if !strings.Contains(body, "dispatch is not held") {
 		t.Errorf("notice = %s, want not held", body)
 	}
-	waitFor(t, func() bool { return len(*r.start) >= 1 })
+	waitFor(t, func() bool { return len(r.start()) >= 1 })
 	if r.countBodies("dispatch resumed") != 0 {
 		t.Error("a resume notice was sent for the end of a clean")
 	}
@@ -317,7 +317,7 @@ func TestDiskClean_ReArmsOnlyWellAboveTheLine(t *testing.T) {
 func TestDiskClean_NoCleanInNormalUse(t *testing.T) {
 	r := startCleanRig(t, map[string]string{"proj": ""}, 0, 10*gb, servertest.WithHerdr(servertest.UntilPtyFixture))
 	r.queue(t, "proj:epic-a/01")
-	waitFor(t, func() bool { return len(*r.start) >= 1 })
+	waitFor(t, func() bool { return len(r.start()) >= 1 })
 	r.wantCalls(t, 0)
 
 	path := filepath.Join(r.store, "proj", "epic-a", "issues", "01-first.md")
@@ -424,8 +424,8 @@ func TestDiskClean_RestartWithAQueuedTicketRunsTheRealCommandOnce(t *testing.T) 
 			t.Errorf("notice = %s, want the real command to run", b)
 		}
 	}
-	if len(*r.start) != 0 {
-		t.Errorf("a claim started on a held disk: %v", *r.start)
+	if len(r.start()) != 0 {
+		t.Errorf("a claim started on a held disk: %v", r.start())
 	}
 }
 
@@ -446,8 +446,8 @@ func TestDiskClean_RestartOnALowDiskWarnsHoldsAndCleansAgain(t *testing.T) {
 	if err != nil || ex.Verdict != server.VerdictDiskLow {
 		t.Errorf("explain = %+v, %v, want %q", ex, err, server.VerdictDiskLow)
 	}
-	if len(*r.start) != 0 {
-		t.Errorf("a claim started on a held disk: %v", *r.start)
+	if len(r.start()) != 0 {
+		t.Errorf("a claim started on a held disk: %v", r.start())
 	}
 	if got := r.clean.recorded(); len(got) != 2 {
 		t.Errorf("cleanup calls after a restart = %v, want 2", got)

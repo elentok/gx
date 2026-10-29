@@ -45,7 +45,7 @@ func TestConfigReload_MaxAgentsAppliesWithoutKillingAgents(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	path := filepath.Join(t.TempDir(), "config.json")
-	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture), servertest.WithConfigFile(path), func(c *server.Config) {
 		c.MaxAgents = 1
 		c.PollInterval = time.Hour
 		c.Sleep = time.Sleep

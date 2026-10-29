@@ -44,8 +44,8 @@ func TestBudget_SoftLimitRefusesRelaunchAndNudge(t *testing.T) {
 	if res, err := h.Client.TicketRetry(ctx, "proj:epic-a/01", false); err != nil || !res.Refused || res.Reason != server.ReasonBudgetLimit || !strings.Contains(res.Message, "budget") {
 		t.Errorf("retry = %+v, %v; want refusal %s naming the budget", res, err, server.ReasonBudgetLimit)
 	}
-	if len(*start) != 0 {
-		t.Errorf("agent started past the soft limit: %v", *start)
+	if len(start()) != 0 {
+		t.Errorf("agent started past the soft limit: %v", start())
 	}
 	if res, err := h.Client.TicketNudge(ctx, "proj:epic-a/01", "finish up"); err != nil || !res.Refused || res.Reason != server.ReasonBudgetLimit {
 		t.Errorf("nudge = %+v, %v; want refusal %s", res, err, server.ReasonBudgetLimit)

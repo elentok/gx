@@ -686,7 +686,16 @@ func startR3(t *testing.T, opts ...func(*server.Config)) *servertest.Harness {
 func runToZeroCommitPause(t *testing.T, h *servertest.Harness, last string) {
 	t.Helper()
 	home := h.Env("HOME")
-	_, _, cwd := registerTurn(h)
+	registerTurn(h)
+	var cwd atomic.Value // the tab's cwd: the overridden agent start records no AgentStart
+	h.Herdr.Register("tab", "create", func(_ *herdrfake.State, argv []string) (any, herdrfake.Identities, error) {
+		for i, a := range argv {
+			if a == "--cwd" && i+1 < len(argv) {
+				cwd.Store(argv[i+1])
+			}
+		}
+		return map[string]any{"tab": map[string]any{"tab_id": "t1"}, "root_pane": map[string]any{"pane_id": "p1"}}, herdrfake.Identities{}, nil
+	})
 	var started atomic.Bool
 	var turns atomic.Int32
 	agentAt := func(turn int32) map[string]any {
@@ -696,7 +705,7 @@ func runToZeroCommitPause(t *testing.T, h *servertest.Harness, last string) {
 	turn := func(*herdrfake.State, []string) (any, herdrfake.Identities, error) {
 		agent := agentAt(turns.Add(1))
 		line, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{"content": []map[string]any{{"type": "text", "text": last}}}})
-		path := transcript.PathIn(home, *cwd, "s1")
+		path := transcript.PathIn(home, cwd.Load().(string), "s1")
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return nil, herdrfake.Identities{}, err
 		}
