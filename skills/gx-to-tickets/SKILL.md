@@ -175,7 +175,8 @@ For a **bug-fix ticket**, the regression seam must also say "the test must fail 
 name the test form the Decisions chose (table test, server-level test, ...). A test that passes on
 the old code proves nothing. A test that reads a new field or calls a new function cannot run on the
 old code: it does not compile. For such a seam write "must fail to compile or fail on the old code",
-and the agent confirms the compile error as the red step.
+and the agent confirms the compile error as the red step. When a seam names `ClaimNext`, name the queue
+step that feeds it too (e.g. `h.Client.QueueAdd(...)`), or the test never reaches the branch under test.
 
 For every seam file, state what the agent cannot guess:
 
@@ -191,8 +192,7 @@ For every seam file, state what the agent cannot guess:
   (`$(gx tickets root)/<map>/mocks/<file>.html`), not only its name.
 - **Examples against the helper**: when a ticket reuses a predicate or helper (e.g.
   `!needsTranscript(failure)`) and also gives examples of what it shows or hides, read the helper and
-  check each example against it. If they disagree, say which one wins. When a seam names `ClaimNext`, name the queue step that feeds it too
-(e.g. `h.Client.QueueAdd(...)`), or the test never reaches the branch under test.
+  check each example against it. If they disagree, say which one wins.
 
 ### 4b. Write each implement ticket's "Where to look" map
 
