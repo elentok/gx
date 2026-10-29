@@ -33,6 +33,9 @@ const (
 	webAuthPathLogins        = "/v1/web/logins"
 	webAuthPathLoginRename   = "/v1/web/logins/rename"
 	webAuthPathLoginRevoke   = "/v1/web/logins/revoke"
+	webAuthPathPassword      = "/v1/web/account/password"
+	webAuthPathResetBegin    = "/v1/web/account/authenticator/begin"
+	webAuthPathResetFinish   = "/v1/web/account/authenticator/finish"
 	webAuthStateSetup        = "setup"
 	webAuthStateSignedOut    = "signed-out"
 	webAuthStateSignedIn     = "signed-in"
@@ -73,6 +76,8 @@ type webAuthBody struct {
 	// ID and Name pick a web login and give it a new name (the logins routes).
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// NewPassword is the password change password saves.
+	NewPassword string `json:"new_password"`
 }
 
 type webLoginEntry struct {
@@ -378,6 +383,66 @@ func (s *Server) webLoginRevoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logWebAuth("web login revoked", remoteIP(r), name, "")
+	s.webStreams.closeLogins(removed...)
+	writeJSON(w, webAuthResult{})
+}
+
+// webChangePassword saves a new password and signs out every other web login.
+func (s *Server) webChangePassword(w http.ResponseWriter, r *http.Request) {
+	body, ok := readWebAuthBody(w, r)
+	if !ok {
+		return
+	}
+	this := webLoginIDFrom(r.Context())
+	name := s.webLoginName(this)
+	removed, err := s.webAuth.ChangePassword(s.webTOTPOn(), body.Password, body.TOTPCode, body.NewPassword, this, remoteIP(r))
+	if err != nil {
+		s.refuseWebAuth(w, r, "web password change refused", err, ReasonWrongCredentials)
+		return
+	}
+	s.logWebAuth("web password changed", remoteIP(r), name, "")
+	s.webStreams.closeLogins(removed...)
+	writeJSON(w, webAuthResult{})
+}
+
+// webAuthenticatorBegin hands out a new secret once the password and a code from
+// the current app check out.
+func (s *Server) webAuthenticatorBegin(w http.ResponseWriter, r *http.Request) {
+	body, ok := readWebAuthBody(w, r)
+	if !ok {
+		return
+	}
+	if !s.webTOTPOn() {
+		writeJSON(w, webAuthResult{Refused: true, Reason: ReasonTOTPOff})
+		return
+	}
+	secret, err := s.webAuth.AuthenticatorResetBegin(true, body.Password, body.TOTPCode, remoteIP(r))
+	if err != nil {
+		s.refuseWebAuth(w, r, "web authenticator reset refused", err, ReasonWrongCredentials)
+		return
+	}
+	writeJSON(w, webAuthResult{Secret: secret, URI: totpURI(secret, totpAccountLabel)})
+}
+
+// webAuthenticatorFinish saves the new secret once a code from it checks out and
+// signs out every other web login.
+func (s *Server) webAuthenticatorFinish(w http.ResponseWriter, r *http.Request) {
+	body, ok := readWebAuthBody(w, r)
+	if !ok {
+		return
+	}
+	if !s.webTOTPOn() {
+		writeJSON(w, webAuthResult{Refused: true, Reason: ReasonTOTPOff})
+		return
+	}
+	this := webLoginIDFrom(r.Context())
+	name := s.webLoginName(this)
+	removed, err := s.webAuth.AuthenticatorResetFinish(body.TOTPCode, this, remoteIP(r))
+	if err != nil {
+		s.refuseWebAuth(w, r, "web authenticator reset refused", err, ReasonTOTPMismatch)
+		return
+	}
+	s.logWebAuth("web authenticator reset", remoteIP(r), name, "")
 	s.webStreams.closeLogins(removed...)
 	writeJSON(w, webAuthResult{})
 }

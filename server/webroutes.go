@@ -30,6 +30,9 @@ var webOnlyRoutes = []WebOnlyRoute{
 	{Pattern: "POST " + webAuthPathLogins},
 	{Pattern: "POST " + webAuthPathLoginRename},
 	{Pattern: "POST " + webAuthPathLoginRevoke},
+	{Pattern: "POST " + webAuthPathPassword},
+	{Pattern: "POST " + webAuthPathResetBegin},
+	{Pattern: "POST " + webAuthPathResetFinish},
 }
 
 // webPublicGets names the GET routes in webOnlyRoutes and their handlers.

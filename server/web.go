@@ -197,6 +197,9 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST " + webAuthPathLogins:      func(s *Server) http.HandlerFunc { return s.webLoginsList },
 	"POST " + webAuthPathLoginRename: func(s *Server) http.HandlerFunc { return s.webLoginRename },
 	"POST " + webAuthPathLoginRevoke: func(s *Server) http.HandlerFunc { return s.webLoginRevoke },
+	"POST " + webAuthPathPassword:    func(s *Server) http.HandlerFunc { return s.webChangePassword },
+	"POST " + webAuthPathResetBegin:  func(s *Server) http.HandlerFunc { return s.webAuthenticatorBegin },
+	"POST " + webAuthPathResetFinish: func(s *Server) http.HandlerFunc { return s.webAuthenticatorFinish },
 }
 
 // checkWriteRequest returns why a non-GET request is refused, or "". It is the

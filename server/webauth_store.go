@@ -394,6 +394,8 @@ func (w *WebAuth) checkCredentialsLocked(totpOn bool, password, totpCode, ip str
 	if w.file.Password == nil {
 		return 0, ErrWebAuthRefused
 	}
+	// With no saved secret there is no code to ask for ("Add authenticator").
+	totpOn = totpOn && w.file.TOTPSecret != ""
 	// Both checks always run so a refusal does not show which part was wrong.
 	passOK := w.passwordOKLocked(password)
 	step, totpOK := w.file.LastTOTPStep, true
