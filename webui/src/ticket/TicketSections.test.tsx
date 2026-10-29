@@ -5,6 +5,7 @@ import canned from "../canned-detail.json";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { DetailRun, RelatedTicket, TicketDetail } from "../generated/server";
 import { appRoutes } from "../routes";
+import { slugOf } from "../slug";
 import { renderThemed } from "../ui/render";
 import type { FetchDetail } from "./detail";
 import { formatStart } from "./runs";
@@ -47,7 +48,7 @@ const related = (relation: string, address: string, status: string): RelatedTick
   relation,
   address,
   linkable: address.includes(":"),
-  title: `Title of ${address.slice(address.indexOf(":") + 1)}`,
+  title: `Title of ${slugOf(address)}`,
   status,
 });
 

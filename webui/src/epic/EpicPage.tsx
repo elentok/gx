@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { OpenDesign } from "../design/open";
 import { StartDesignButton } from "../design/SessionControls";
+import { slugOf } from "../slug";
 import { useWide } from "../useWide";
 import { verdictText } from "../verdict";
 import { hasDesignSession, liveSessions } from "../design/view";
@@ -262,7 +263,7 @@ export function EpicPage(props: EpicPageProps) {
   return (
     <DetailPage
       mode="narrow"
-      title={{ kind: "Epic", name: props.address.slice(props.address.indexOf(":") + 1) }}
+      title={{ kind: "Epic", name: slugOf(props.address) }}
       waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}
     >
       <EpicPageBody {...props} list={list} />
@@ -279,7 +280,7 @@ function EpicPageBody({ address, fetchDetail, openDesign, fixAgent, list }: Epic
   const designLive = liveSessions(address, sessions).length > 0;
   const { detail, notFound, refetch } = useEpicDetail(address, conn, fetchDetail);
   // The payload has no name field: the epic name is the address after the project.
-  const name = address.slice(address.indexOf(":") + 1);
+  const name = slugOf(address);
   // A joined card lists both of its epics; the other one is the Design or its -impl epic.
   const joinedCard = list?.epics?.find((e) => e.addresses?.includes(address));
   const partner = joinedCard?.addresses?.find((a) => a !== address);

@@ -18,6 +18,7 @@ import { ImplLink, Progress, StepLine, StepsSheet, showsImplLink } from "./Progr
 import type { FetchScreen } from "./screen";
 import { DesignActionsMenu, Failure, StartDesignButton } from "./SessionControls";
 import type { EpicListRow, SessionInfo } from "../generated/server";
+import { slugOf } from "../slug";
 import { useWide } from "../useWide";
 import { designSession, liveSessions } from "./view";
 
@@ -107,7 +108,7 @@ function DesignBody({
     (current?.step === "resolve-tickets" &&
       detail?.rows.find((r) => r.current)?.title) ||
     current?.label;
-  const name = address.slice(address.indexOf(":") + 1);
+  const name = slugOf(address);
   // The card speaks for this page only while its active (first) address is this Design.
   const card = epics.find((e) => e.addresses?.[0] === address);
   const live = liveSessions(address, sessions);
@@ -252,7 +253,7 @@ export function DesignPage(props: DesignPageProps) {
       active="epics"
       fill
       mode="wide"
-      title={{ kind: "Design", name: props.address.slice(props.address.indexOf(":") + 1) }}
+      title={{ kind: "Design", name: slugOf(props.address) }}
       waiting={list ? waitingCount(list.epics ?? [], props.address) : 0}
     >
       <DesignPageBody {...props} list={list} failed={failed} />

@@ -1,5 +1,6 @@
 import type { RelatedTicket, TicketDetail } from "../generated/server";
 import { RelationBlocker, RelationFork, RelationParent } from "../generated/server";
+import { slugOf } from "../slug";
 import { epicOfTicket } from "./detail";
 
 const FENCE = /^\s*(```|~~~)/;
@@ -54,6 +55,6 @@ export const reasonOf = (r: RelatedTicket) => `${REASONS[r.relation] ?? Relation
 export function relatedId(r: RelatedTicket, epic: string): string {
   if (!r.linkable) return r.address;
   const own = epicOfTicket(r.address) === epic;
-  const tail = r.address.slice(r.address.indexOf(":") + 1);
+  const tail = slugOf(r.address);
   return own ? tail.slice(tail.lastIndexOf("/") + 1) : tail;
 }
