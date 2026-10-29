@@ -1106,7 +1106,7 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   1. At 375px open `#/agents`.
   2. Press a session row, then "‹".
   3. Open a session, press its title, then Close.
-  4. Press "‹", then "New session in demo", then ×.
+  4. Press "‹", then the header "+ New session", then ×.
 - **Pass:**
   - The list shows alone, with no "Pick a session" panel.
   - A row opens the session without the list; "‹" returns to `#/agents`.

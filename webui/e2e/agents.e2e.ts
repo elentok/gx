@@ -60,7 +60,7 @@ test("75. Read a session", async ({ page, start }) => {
   // Header fields and the chat.
   await go(page, `#/agents/${idle.id}`);
   const header = page.getByRole("banner").or(page.locator("header")).last();
-  await expect(header.getByRole("img", { name: "status" })).toBeVisible();
+  await expect(header.getByRole("img", { name: idle.status.state, exact: true })).toBeVisible();
   await expect(header.getByText(idle.status.state, { exact: true })).toBeVisible();
   await expect(header.getByText(idle.dir)).toBeVisible();
   await expect(header.getByText(idle.harness, { exact: true })).toHaveCount(0);
@@ -400,6 +400,7 @@ test("74. Design sessions toggle", async ({ page, start }) => {
   await go(page, "#/agents");
   const side = sidebar(page);
   const toggle = side.getByRole("checkbox", { name: /^Design sessions/ });
+  const toggleLabel = side.getByText(/^Design sessions/);
 
   // Hidden by default, with the count.
   await expect(toggle).not.toBeChecked();
@@ -407,7 +408,7 @@ test("74. Design sessions toggle", async ({ page, start }) => {
   for (const s of designs) await expect(row(page, s)).toHaveCount(0);
 
   // Remembered in a fresh page of the same browser.
-  await toggle.check();
+  await toggleLabel.click();
   for (const s of designs) await expect(row(page, s)).toBeVisible();
   await expect(side.getByText("hidden")).toHaveCount(0);
   const second = await freshVisit(page, "/#/agents");
@@ -416,7 +417,7 @@ test("74. Design sessions toggle", async ({ page, start }) => {
   await second.close();
 
   // A selected design session keeps its row while the rest hide.
-  await toggle.uncheck();
+  await toggleLabel.click();
   for (const s of designs) await expect(row(page, s)).toHaveCount(0);
   await go(page, `#/agents/${designs[0].id}`);
   await expect(row(page, designs[0])).toHaveAttribute("aria-current", "page");
@@ -789,7 +790,7 @@ test("88. Phone, Agents page", async ({ page, start }) => {
 
   // Create opens as a sheet at the bottom of the screen.
   await page.getByRole("link", { name: "All sessions" }).click();
-  await page.getByRole("button", { name: "New session in demo" }).click();
+  await page.getByRole("button", { name: "+ New session", exact: true }).click();
   await expect(newForm(page)).toBeVisible();
   await expect(page.getByTestId("grab-handle")).toBeVisible();
   await expect

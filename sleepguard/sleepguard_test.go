@@ -100,7 +100,7 @@ var allowed = map[string]int{
 	"server/unavailable_test.go":                    1,
 	"storecommit/storecommit_test.go":               3,
 	"testutil/agentfake/harness_test.go":            1,
-	"testutil/agentfake/tui_test.go":                4,
+	"testutil/agentfake/tui_test.go":                5, // one is a negative wait: a slow-marker status must stay busy
 	"testutil/agentfake/worker_test.go":             1,
 	"testutil/gxfixture/disk_test.go":               2,
 	"testutil/gxfixture/main_test.go":               8,
