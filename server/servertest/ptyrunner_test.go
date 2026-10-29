@@ -2,10 +2,12 @@ package servertest
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -139,6 +141,120 @@ func TestDefault_WithHerdrRecordsOneStartPerLaunch(t *testing.T) {
 	got := h.Starts()
 	if got[0].Kind != "claude" || got[0].Cwd == "" || got[0].Label == "" {
 		t.Errorf("start = %+v, want label, cwd and kind claude", got[0])
+	}
+}
+
+// queueWithTurn queues the one ticket and returns once the hook has run.
+func queueWithTurn(t *testing.T, h *Harness, hook func(*Turn)) {
+	t.Helper()
+	ran := make(chan struct{}, 1)
+	h.OnTurn(func(turn *Turn) {
+		hook(turn)
+		ran <- struct{}{}
+	})
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	select {
+	case <-ran:
+	case <-time.After(30 * time.Second):
+		t.Fatal("OnTurn never ran")
+	}
+}
+
+func liveIterations(t *testing.T, h *Harness) int {
+	t.Helper()
+	its, err := h.Client.Iterations(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return len(its)
+}
+
+func TestPty_TurnStallLeavesTheRunWorkingWithNoTurnEnd(t *testing.T) {
+	t.Parallel()
+	h := startPty(t, t.TempDir(), testutil.TempRepo(t))
+	queueWithTurn(t, h, func(turn *Turn) { turn.Stall() })
+	WaitFor(t, 30*time.Second, "the live iteration", func() bool { return liveIterations(t, h) == 1 })
+
+	time.Sleep(10 * ptyPollInterval)
+
+	if n := liveIterations(t, h); n != 1 {
+		t.Errorf("live iterations = %d, want the stalled run still live", n)
+	}
+	if runs := h.Server.Runs(); len(runs) != 1 {
+		t.Errorf("runs = %+v, want the one stalled run", runs)
+	}
+	if body, _ := os.ReadFile(filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-first.md")); !strings.Contains(string(body), "status: claimed") {
+		t.Errorf("ticket = %s, want it still claimed", body)
+	}
+}
+
+func TestPty_TurnBlockShowsAPendingPermissionWithTheReason(t *testing.T) {
+	t.Parallel()
+	h := startPty(t, t.TempDir(), testutil.TempRepo(t))
+	queueWithTurn(t, h, func(turn *Turn) { turn.Block("rg needle") })
+
+	var card *server.PermissionCard
+	WaitFor(t, 30*time.Second, "a pending permission", func() bool {
+		d, err := h.Client.Detail(context.Background(), "proj:epic-a/01")
+		card = d.Permission
+		return err == nil && card != nil
+	})
+
+	if !strings.Contains(card.Description, "rg needle") {
+		t.Errorf("permission = %+v, want the reason in its description", card)
+	}
+}
+
+func TestPty_TurnExitEndsTheSession(t *testing.T) {
+	t.Parallel()
+	h := startPty(t, t.TempDir(), testutil.TempRepo(t))
+	queueWithTurn(t, h, func(turn *Turn) { turn.Exit(3) })
+
+	WaitFor(t, 30*time.Second, "the agent gone from the server", func() bool {
+		return len(h.Starts()) == 1 && liveIterations(t, h) == 0
+	})
+}
+
+// failRecorder is a testing.TB whose Errorf records instead of failing.
+type failRecorder struct {
+	testing.TB
+	mu     sync.Mutex
+	errors []string
+}
+
+func (r *failRecorder) Errorf(format string, args ...any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.errors = append(r.errors, fmt.Sprintf(format, args...))
+}
+
+func TestHerdr_TurnControlFailsTheTestNamingTheControl(t *testing.T) {
+	t.Parallel()
+	for name, control := range map[string]func(*Turn){
+		"Stall": func(turn *Turn) { turn.Stall() },
+		"Block": func(turn *Turn) { turn.Block("why") },
+		"Exit":  func(turn *Turn) { turn.Exit(1) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			h := startPty(t, t.TempDir(), testutil.TempRepo(t), WithHerdr(HerdrIsTheSubject))
+			rec := &failRecorder{TB: t}
+			h.tb = rec
+			queueWithTurn(t, h, control)
+			WaitFor(t, 30*time.Second, "the failure report", func() bool {
+				rec.mu.Lock()
+				defer rec.mu.Unlock()
+				return len(rec.errors) > 0
+			})
+
+			rec.mu.Lock()
+			defer rec.mu.Unlock()
+			if len(rec.errors) != 1 || !strings.Contains(rec.errors[0], "Turn."+name) || !strings.Contains(rec.errors[0], "PTY") {
+				t.Errorf("errors = %q, want one naming Turn.%s and PTY", rec.errors, name)
+			}
+		})
 	}
 }
 

@@ -49,7 +49,8 @@ const PermissionPromptPrefix = "fakeclaude:permission "
 // PermissionCommand is the Bash command a BehaviourPermission worker asks to run.
 const PermissionCommand = "rg fixture"
 
-func bashPermissionDialog(command string) []string {
+// BashPermissionDialog is the screen rows of a Bash permission prompt for command.
+func BashPermissionDialog(command string) []string {
 	return []string{
 		"────────────────────",
 		"Bash command",
@@ -511,7 +512,7 @@ func (t *tui) submit() error {
 		case promptWorker:
 			t.prompt = text
 			if cfg.Behaviour[address] == BehaviourPermission {
-				t.dialog = bashPermissionDialog(PermissionCommand)
+				t.dialog = BashPermissionDialog(PermissionCommand)
 				return t.setStatus(StatusWaiting, "permission prompt")
 			}
 			go t.work(cfg, address)
@@ -520,7 +521,7 @@ func (t *tui) submit() error {
 			return t.slashCommand(text)
 		case promptPermission:
 			t.prompt = text
-			t.dialog = bashPermissionDialog(strings.TrimPrefix(text, PermissionPromptPrefix))
+			t.dialog = BashPermissionDialog(strings.TrimPrefix(text, PermissionPromptPrefix))
 			return t.setStatus(StatusWaiting, "permission prompt")
 		}
 		t.prompt = text

@@ -79,6 +79,8 @@ type Harness struct {
 	// OnTurn hook it runs on a prompt.
 	pty  bool
 	turn atomic.Pointer[func(*Turn)]
+	// tb reports a failure from a goroutine that is not the test's.
+	tb testing.TB
 
 	startsMu sync.Mutex
 	starts   []AgentStart
@@ -226,6 +228,34 @@ type Turn struct {
 	Address string // the ticket the skill prompt names
 	Cwd     string // the worktree the agent's tab was opened in
 	Text    string // the whole prompt, notes included
+
+	control turnControl
+}
+
+// turnControl is what a hook asked of the turn besides ending it. The harness
+// applies it to the TUI fake once the prompt is in, since the hook runs before
+// the prompt reaches the fake.
+type turnControl struct {
+	name string // the Turn method, for the herdr failure message
+	// busy keeps the turn open past the prompt instead of ending it at once.
+	busy bool
+	// after is sent once the prompt is in.
+	after *agentfake.Control
+}
+
+// Stall makes the turn start and never end: the run stays working. PTY only.
+func (t *Turn) Stall() { t.control = turnControl{name: "Stall", busy: true} }
+
+// Block makes the agent wait on a permission prompt for reason. PTY only.
+func (t *Turn) Block(reason string) {
+	t.control = turnControl{name: "Block", busy: true, after: &agentfake.Control{
+		Action: agentfake.ActionBlock, Dialog: agentfake.BashPermissionDialog(reason),
+	}}
+}
+
+// Exit makes the agent process exit with code, ending the session. PTY only.
+func (t *Turn) Exit(code int) {
+	t.control = turnControl{name: "Exit", busy: true, after: &agentfake.Control{Action: agentfake.ActionExit, Code: code}}
 }
 
 // AgentStart is one agent launch the server made.
@@ -340,7 +370,11 @@ func (h *Harness) OnTurn(agent func(t *Turn)) {
 		_, rest, _ := strings.Cut(text, " ")
 		addr, _, _ := strings.Cut(rest, "\n")
 		addr = strings.TrimPrefix(addr, "--ticket ") // gx-merge's form
-		agent(&Turn{Address: addr, Cwd: cwd, Text: text})
+		turn := &Turn{Address: addr, Cwd: cwd, Text: text}
+		agent(turn)
+		if name := turn.control.name; name != "" {
+			h.tb.Errorf("servertest: Turn.%s is not supported on herdr; run this test on PTY (drop WithHerdr)", name)
+		}
 		return reply(pane), herdrfake.Identities{}, nil
 	})
 }
@@ -606,6 +640,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	// fake only answers, when the test asked for WithHerdr.
 	herdr := herdrfake.NewState(t)
 	h := &Harness{
+		tb:          t,
 		StateDir:    filepath.Join(stateDir, "state"),
 		SessionsDir: filepath.Join(stateDir, "sessions"),
 		TicketStore: store,

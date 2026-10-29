@@ -47,8 +47,10 @@ func (r *ptyRunner) Prompt(s agentrunner.Session, text string) error {
 }
 
 // PromptNudged runs the turn hook, then arms the TUI fake's next turn to start
-// and end at once, which the typed prompt then runs.
-func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
+// and end at once, which the typed prompt then runs. A turn control keeps the
+// turn open instead, and its follow-up goes in once the prompt is.
+func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) (err error) {
+	home := r.h.Env("HOME")
 	if turn := r.h.turn.Load(); turn != nil {
 		r.mu.Lock()
 		cwd := r.cwds[s.Label]
@@ -56,9 +58,21 @@ func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge fun
 		_, rest, _ := strings.Cut(text, " ")
 		addr, _, _ := strings.Cut(rest, "\n")
 		addr = strings.TrimPrefix(addr, "--ticket ") // gx-merge's form
-		(*turn)(&Turn{Address: addr, Cwd: cwd, Text: text})
-		if err := agentfake.SendTUIControl(r.h.Env("HOME"), s.SessionID, agentfake.Control{Action: agentfake.ActionFast}); err != nil {
+		t := &Turn{Address: addr, Cwd: cwd, Text: text}
+		(*turn)(t)
+		arm := agentfake.ActionFast
+		if t.control.busy {
+			arm = agentfake.ActionBusy
+		}
+		if err := agentfake.SendTUIControl(home, s.SessionID, agentfake.Control{Action: arm}); err != nil {
 			return err
+		}
+		if after := t.control.after; after != nil {
+			defer func() {
+				if err == nil {
+					err = agentfake.SendTUIControl(home, s.SessionID, *after)
+				}
+			}()
 		}
 	}
 	return r.Pty.PromptNudged(s, text, onNudge)
