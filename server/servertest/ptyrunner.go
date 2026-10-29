@@ -145,3 +145,23 @@ func newPtyRunner(stateDir string, env []string, wait time.Duration) *ptyRunner 
 		cwds: map[string]string{},
 	}
 }
+
+// herdrListed reports whether the top-level test of name is in the file
+// $GX_SPIKE_HERDR_TESTS (one name per line): such a test keeps herdr.
+func herdrListed(name string) bool {
+	path := os.Getenv("GX_SPIKE_HERDR_TESTS")
+	if path == "" {
+		return false
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	top, _, _ := strings.Cut(name, "/")
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == top {
+			return true
+		}
+	}
+	return false
+}

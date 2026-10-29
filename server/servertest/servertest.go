@@ -601,7 +601,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	if h.cfg.CleanupRunner == nil {
 		h.cfg.CleanupRunner = func(context.Context, []string, string) ([]byte, error) { return nil, nil }
 	}
-	if h.cfg.Runner == nil && os.Getenv("GX_SPIKE_HERDR") == "" {
+	if h.cfg.Runner == nil && os.Getenv("GX_SPIKE_HERDR") == "" && !herdrListed(t.Name()) {
 		h.ptyDefault = true
 		h.ptyRoot = stateDir
 		t.Cleanup(func() { stopSessionHolders(filepath.Join(stateDir, "agents")) })
