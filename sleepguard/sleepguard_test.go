@@ -60,13 +60,13 @@ var allowed = map[string]int{
 	"server/configreload_grace_test.go":             5,
 	"server/configreload_test.go":                   2,
 	"server/deadlock_test.go":                       2,
-	"server/diskhold_test.go":                       5,
+	"server/diskhealth_test.go":                     1, // negative wait: failed readings never leave the waiting state
+	"server/diskhold_test.go":                       3,
 	"server/diskwatch_test.go":                      3,
 	"server/handmerged_test.go":                     1,
 	"server/headless_block_reclaim_test.go":         2,
 	"server/headless_block_test.go":                 1,
 	"server/healthprocs_test.go":                    4,
-	"server/healthwatch_test.go":                    1,
 	"server/latefinish_test.go":                     2,
 	"server/map_done_test.go":                       1,
 	"server/merge_finish_test.go":                   1,
@@ -96,11 +96,12 @@ var allowed = map[string]int{
 	"server/sessions_test.go":                       1,
 	"server/slackhook_test.go":                      1,
 	"server/trunkconflict_claim_test.go":            1,
+	"server/servertest/ptyrunner_test.go":           3, // negative waits: a wrong reap or kill would come within a few polls
 	"server/trunklock_test.go":                      1,
 	"server/unavailable_test.go":                    1,
 	"storecommit/storecommit_test.go":               3,
 	"testutil/agentfake/harness_test.go":            1,
-	"testutil/agentfake/tui_test.go":                5, // one is a negative wait: a slow-marker status must stay busy
+	"testutil/agentfake/tui_test.go":                6, // two are negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn
 	"testutil/agentfake/worker_test.go":             1,
 	"testutil/gxfixture/disk_test.go":               2,
 	"testutil/gxfixture/main_test.go":               8,
