@@ -1,9 +1,70 @@
 package skills
 
 import (
+	"io/fs"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
+
+func collapseSpace(s string) string { return strings.Join(strings.Fields(s), " ") }
+
+func TestSkillsAskForTierNotModel(t *testing.T) {
+	for _, path := range []string{
+		"gx-design/SKILL.md", "gx-wayfinder/SKILL.md", "gx-code-review/SKILL.md",
+		"gx-evolve/SKILL.md", "gx-triage-follow-ups/SKILL.md",
+	} {
+		if !strings.Contains(readFile(t, path), "gx agent model") {
+			t.Errorf("%s lacks `gx agent model`", path)
+		}
+	}
+	hardCoded := regexp.MustCompile(`model: ?"|"(sonnet|opus|haiku)"`)
+	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".md") {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if m := hardCoded.Find(data); m != nil {
+			t.Errorf("%s hard-codes a model: %q", path, m)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSkillConventionModelTier(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-local-tracker.md"))
+	for _, want := range []string{
+		"`gx agent model <tier>`",
+		"`light`, `worker`, `strongest`",
+		"leave out the `model` field",
+		"the subagent runs on the session model",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("gx-local-tracker.md lacks %q", want)
+		}
+	}
+}
+
+func TestGxDesignEndsRunAfterChartAndDestination(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+	for _, want := range []string{
+		"After charting, end the run with the run-end line",
+		"end the run with the run-end line: never chain into step 3",
+		"steps 1 and 2 end the run",
+	} {
+		if !strings.Contains(text, collapseSpace(want)) {
+			t.Errorf("gx-design/SKILL.md lacks %q", want)
+		}
+	}
+}
 
 func TestGxDesignChainingRules(t *testing.T) {
 	text := readFile(t, "gx-design/SKILL.md")

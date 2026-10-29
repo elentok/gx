@@ -32,7 +32,7 @@ predates the format: infer `bug` or `idea` from its body, and read its sections 
 
 ## 1. Verify
 
-Send one message with one `Agent` call per item (`general-purpose`, `model: "sonnet"`, foreground),
+Send one message with one `Agent` call per item (`general-purpose`, model from `gx agent model worker`, foreground),
 about 8 in parallel; start the next batch as each finishes. Each gets the ticket address and this
 brief:
 

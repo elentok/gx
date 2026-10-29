@@ -41,7 +41,7 @@ Pick tickets from the flag table. A ticket with no flags is **never** read.
   `gx config show` prints the effective config as JSON; read `.["evolve.deep-read-cap"]`.
 - Tickets flagged past the cap are not read; they appear as rows in step 4.
 
-Send **one message** with one `Agent` call per picked ticket (`general-purpose`, `model: "sonnet"`,
+Send **one message** with one `Agent` call per picked ticket (`general-purpose`, model from `gx agent model worker`,
 foreground). Each gets the ticket id, its flag row, and the digest paths for its sessions. Brief:
 "Read these digests. Report what in the tooling or process cost time, tokens or correctness —
 prompts, skills, agent docs, gx/ralph-loop behaviour — each with a quoted line or ticket id as
@@ -95,7 +95,7 @@ cap") for every flagged ticket you did not deep-read, so nothing flagged disappe
 
 ## 5. Consultant triage
 
-Start **one** fresh-context, read-only subagent with `model: "opus"` (as in gx-code-review). Brief it
+Start **one** fresh-context, read-only subagent on the model from `gx agent model strongest` (as in gx-code-review). Brief it
 with:
 
 - The joined findings and the table rows from step 4.

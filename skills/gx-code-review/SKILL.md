@@ -122,7 +122,7 @@ Collect every subagent's raw findings verbatim; don't summarize or filter them y
 
 Once every review subagent has returned, start **one** fresh-context, read-only consultant subagent
 (same pattern as `~/.dotfiles/core/ai/skills/consult`'s consultant-selection step: request the
-highest available Opus model — `model: "opus"` on the `Agent` tool call).
+strongest tier — pass the output of `gx agent model strongest` as the `Agent` call's model).
 
 Brief it with every subagent's raw findings joined into one list, each labeled by the axis and skill
 that produced it (`Quality / <skill-name>`, or `Spec`), plus the epic's ticket list for context (what

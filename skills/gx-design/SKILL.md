@@ -99,16 +99,17 @@ the ticket title during `resolve-tickets`.
 
 1. **The map has no `## Destination`** → report the step as `chart`. Read `## Initial prompt` as the
    loose idea and follow gx-wayfinder's "Chart the map" into the existing map, including its
-   Destination grilling.
+   Destination grilling. After charting, end the run with the run-end line: never chain into a later
+   step in this run.
    - **No map epic** (`gx tickets epics --maps` doesn't list it): a direct invocation. Text after the
      epic address in `/gx-design <epic> <idea>` is the idea; without it, ask for the idea first.
      Write the map as the tracker's "Chart" operation says (`kind: map`, `design_step: chart`, body
      holding only `## Initial prompt` with the idea text). That map has no Destination, so go on
      with the chart step above.
 2. **`destination_unconfirmed: true`** → follow `gx-grilling` on the Destination alone, then clear the
-   flag with `gx tickets set <project:epic> --destination-unconfirmed false`. Continue to step 3 in
-   the same session, unless the grilling changed the Destination enough that seeded tickets must
-   change. Then rework them and stop.
+   flag with `gx tickets set <project:epic> --destination-unconfirmed false`. Then end the run with
+   the run-end line: never chain into step 3 in this run. If the grilling changed the Destination
+   enough that seeded tickets must change, rework them first.
 3. **Open tickets, or a non-empty `## Not yet specified`** → follow gx-wayfinder's "Work through the
    map", resolving one frontier ticket at a time. Skip claimed tickets.
    For a `grilling` ticket, load the skills named under "Asking questions" before the first
@@ -122,7 +123,7 @@ the ticket title during `resolve-tickets`.
    - Grilling, research and AFK task tickets chain. A chain never enters a prototype or HITL task ticket:
      end with the run-end line just before it. A run that starts on one ends after it.
    - The last map ticket closing chains into the spec step (step 4) when the budget allows.
-4. **No `docs/specs/<epic>.md`** → dispatch a subagent to read [gx-to-spec](../gx-to-spec/SKILL.md) and follow it. Seed it with
+4. **No `docs/specs/<epic>.md`** → dispatch a subagent (model from `gx agent model worker`) to read [gx-to-spec](../gx-to-spec/SKILL.md) and follow it. Seed it with
    the map body (Destination, Decisions so far) and each closed ticket's title and resolution gist,
    not full ticket bodies. Also seed it with the list of stored mocks under `<root>/<map>/mocks/`.
    The spec is where the map's gaps first show, so tell the subagent to sort
@@ -151,7 +152,7 @@ the ticket title during `resolve-tickets`.
      without a redraft: the next run matches step 3 and resumes the map.
    - A spec never carries open design questions to the review.
    - Set `--design-step spec` only after the draft is written.
-5. **No `## Review findings` section on the map** → dispatch a design-review subagent against the
+5. **No `## Review findings` section on the map** → dispatch a design-review subagent (model from `gx agent model strongest`) against the
    spec (rubric below). It writes the findings as a markdown checklist (`- [ ] …`) with
    `gx tickets section <project:epic> "Review findings" -`. Write `- [x] No findings` if there are none. Then set `--design-step review`.
 6. **Unchecked findings** → set `--design-step grill-findings`, then run a `gx-grilling` session on them, resident in this same run. Amend
@@ -164,7 +165,7 @@ the ticket title during `resolve-tickets`.
 6a. **Every review finding is checked, at least one has the `(stories/scope changed)` marker, and the
    map has no `## Re-review findings` section** → run `gx agent context-window --fits review`; on
    stop, end the run. Otherwise move back with `gx tickets set <project:epic> --design-step review
-   --allow-backward` and dispatch the second design-review subagent. Give it the first checklist
+   --allow-backward` and dispatch the second design-review subagent (model from `gx agent model strongest`). Give it the first checklist
    with its resolutions and the full spec. It checks only the changed stories and scope and what
    they affect, and writes the findings as a checklist with `gx tickets section <project:epic>
    "Re-review findings" -`. It may write `- [x] No findings`.
@@ -172,7 +173,7 @@ the ticket title during `resolve-tickets`.
    one `gx-grilling` round on them, resident in this same run, checking each off as in step 6. Then
    continue to step 7, even if this round changes stories again. Never run a third review.
 7. **No `<epic>-impl` epic, and neither findings section has an unchecked finding** → follow [gx-to-tickets](../gx-to-tickets/SKILL.md) on the amended
-   spec, publishing into `<epic>-impl`. Never publish into the map epic: its tickets are
+   spec (its subagents use the model from `gx agent model worker`), publishing into `<epic>-impl`. Never publish into the map epic: its tickets are
    hand-resolved decisions, and implementation tickets belong to ralph-loop. Set
    `--design-step create-tickets` before publishing, then continue to step 8 in the same run.
 8. **No `<epic>-impl` branch** (`git -C <worktree> rev-parse --verify refs/heads/<epic>-impl` fails) →
@@ -227,7 +228,7 @@ Review the spec against the map it came from and its own template, not in the ab
 Start a fresh session between runs (`/clear` in Claude, `/new` in Codex). The run that just ended
 is not the place for the next one, except where a step says to continue.
 
-Every step chains by the same check. After a step finishes, run detection to find the next step,
+Every step except charting and Destination confirmation (steps 1 and 2 end the run) chains by the same check. After a step finishes, run detection to find the next step,
 then run `gx agent context-window --fits <next step>`. On exit 0, chain: go back to "Detecting the
 next step" in the same session. On exit 1 or an error, end the run with the run-end line below;
 the server's auto-advance starts the next step in a fresh session. For a map ticket, use

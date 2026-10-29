@@ -326,10 +326,11 @@ here rather than restating it. The filing procedure lives in the
 
 Rules every gx skill follows when it names a model or launches a sub-agent:
 
-- **Models by alias only** — `sonnet`, `opus` — never a pinned model ID.
-- **On Codex**, name a tier (worker / strongest) and give the Claude alias as the example, e.g.
-  "worker (`sonnet`)". Both use the default model; the strongest step runs at the highest effort.
-  There is no tier→ID configuration.
+- **Ask for a tier, never a model.** Before a subagent call, run `gx agent model <tier>` and pass
+  its output as the call's `model` field. Tiers: `light`, `worker`, `strongest`. Never write a
+  model alias or ID in a skill.
+- **On empty output, leave out the `model` field.**
+- **On Codex**, if the spawn call has no model field, the subagent runs on the session model.
 
 ## Claiming
 
