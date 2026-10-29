@@ -16,6 +16,13 @@ test.each<[PageTitle, string]>([
   expect(formatTitle(title)).toBe(expected);
 });
 
+test.each<[number, string]>([
+  [0, "Epics · gx"],
+  [2, "(2) Epics · gx"],
+])("%i actionable sessions format as %s", (count, expected) => {
+  expect(formatTitle({ kind: "Epics" }, count)).toBe(expected);
+});
+
 test("the separator is a space, U+00B7 and a space", () => {
   expect(formatTitle({ kind: "Epic", name: "a" })).toBe("a · Epic · gx");
 });
