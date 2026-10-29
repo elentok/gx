@@ -104,6 +104,41 @@ test("the ticket page titles the tab by its address while the fetch is pending",
   await waitFor(() => expect(title()).toBe("gx:e/01 · Ticket · gx"));
 });
 
+test("the ticket page titles the tab by the loaded ticket's title", async () => {
+  renderAt("/t/gx:e/01", okFor);
+  await waitFor(() => expect(title()).toBe("Title of gx:e/01 · Ticket · gx"));
+});
+
+test("the ticket page titles the tab by its address when not found", async () => {
+  renderAt("/t/gx:e/99", async () => ({ kind: "not-found" }));
+  await screen.findByText("Ticket not found");
+  expect(title()).toBe("gx:e/99 · Ticket · gx");
+});
+
+test.each([[""], ["  "]])("the ticket page titles the tab by its address for the title %j", async (blank) => {
+  renderAt("/t/gx:e/01", async (address) => ({ kind: "ok", detail: { ...detailOf(address), title: blank } }));
+  await waitFor(() => expect(screen.queryByRole("status", { name: "Loading ticket" })).toBeNull());
+  expect(title()).toBe("gx:e/01 · Ticket · gx");
+});
+
+test("a refetch with a new ticket title changes the tab title", async () => {
+  let calls = 0;
+  const conn = fakeConnection(true);
+  let listener: ((a: string | undefined) => void) | undefined;
+  (conn as unknown as { onEvent: unknown }).onEvent = (l: typeof listener) => {
+    listener = l;
+    return () => {};
+  };
+  renderAt(
+    "/t/gx:e/01",
+    async (address) => ({ kind: "ok", detail: { ...detailOf(address), title: `Round ${++calls}` } }),
+    conn,
+  );
+  await waitFor(() => expect(title()).toBe("Round 1 · Ticket · gx"));
+  await act(async () => listener?.("gx:e/01"));
+  await waitFor(() => expect(title()).toBe("Round 2 · Ticket · gx"));
+});
+
 test("navigating between routes changes the tab title", async () => {
   const { router } = renderAt("/epics", okFor, undefined, epicFetch());
   await waitFor(() => expect(title()).toBe("Epics · gx"));

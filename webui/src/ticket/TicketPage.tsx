@@ -32,7 +32,7 @@ export function TicketPage({
   const [showScreen, setShowScreen] = useState(false);
 
   return (
-    <DetailPage mode="narrow" title={{ kind: "Ticket", name: address }}>
+    <DetailPage mode="narrow" title={{ kind: "Ticket", name: detail?.title.trim() || address }}>
         {notFound ? (
           <EmptyState title="Ticket not found">{address} does not exist.</EmptyState>
         ) : detail ? (
