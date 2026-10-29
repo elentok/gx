@@ -183,6 +183,21 @@ func (w *WebAuth) AuthenticatorResetPending() bool {
 	return w.file.AuthenticatorResetPending
 }
 
+// AuthenticatorResetCode is the Setup code a login needs while the authenticator
+// reset is pending, with the moment it stops working. ok is false otherwise.
+func (w *WebAuth) AuthenticatorResetCode() (code string, expires time.Time, ok bool, err error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if !w.file.AuthenticatorResetPending {
+		return "", time.Time{}, false, nil
+	}
+	code, err = w.currentSetupCodeLocked()
+	if err != nil {
+		return "", time.Time{}, false, err
+	}
+	return formatSetupCode(code), w.setupCreated.Add(setupCodeLifetime), true, nil
+}
+
 // SetupStart checks the Setup code and returns a new TOTP secret tied to it.
 // With TOTP off it returns no secret.
 func (w *WebAuth) SetupStart(totpOn bool, code, ip string) (string, error) {

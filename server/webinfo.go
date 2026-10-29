@@ -22,6 +22,9 @@ const ReasonWebNewRootFailed = "web-new-root-failed"
 // ReasonWebResetFailed refuses a web reset when the account could not be cleared or saved.
 const ReasonWebResetFailed = "web-reset-failed"
 
+// ReasonWebAuthenticatorResetFailed refuses a CLI authenticator reset when it could not be saved.
+const ReasonWebAuthenticatorResetFailed = "web-authenticator-reset-failed"
+
 // WebInfo is the GET /v1/web/info payload behind `gx server web-url`.
 type WebInfo struct {
 	BaseURL string `json:"base_url,omitempty"`
@@ -77,6 +80,39 @@ func (s *Server) webReset(w http.ResponseWriter, _ *http.Request) {
 	s.webStreams.closeLogins(removed...)
 	s.logWebAuth("web reset", "cli", "", "")
 	writeJSON(w, s.webInfoNow())
+}
+
+// webResetAuthenticator is the CLI authenticator reset: it signs out every web
+// login, ends their streams and answers with the new Setup code. The answer
+// holds no TOTP secret.
+func (s *Server) webResetAuthenticator(w http.ResponseWriter, _ *http.Request) {
+	if s.web == nil {
+		writeJSON(w, webOffInfo())
+		return
+	}
+	removed, _, err := s.webAuth.ClearAuthenticator()
+	if err != nil {
+		s.log.Error("web authenticator reset failed", "err", err)
+		writeJSON(w, WebInfo{Refused: true, Reason: ReasonWebAuthenticatorResetFailed, Message: "could not reset the authenticator: " + err.Error()})
+		return
+	}
+	s.webStreams.closeLogins(removed...)
+	s.logWebAuth("web authenticator reset", "cli", "", "")
+	info := s.webInfoNow()
+	s.addResetCode(&info)
+	writeJSON(w, info)
+}
+
+// addResetCode puts the pending authenticator reset's Setup code on info.
+func (s *Server) addResetCode(info *WebInfo) {
+	code, expires, ok, err := s.webAuth.AuthenticatorResetCode()
+	if err != nil {
+		s.log.Error("web setup code unavailable", "err", err)
+		return
+	}
+	if ok {
+		info.SetupCode, info.SetupExpires = code, expires
+	}
 }
 
 // WebLoginsResult is the payload of the web login list and revoke routes behind
@@ -175,6 +211,9 @@ func (s *Server) webInfoNow() WebInfo {
 		s.log.Error("web setup state unavailable", "err", err)
 	}
 	info.SetupPending, info.SetupCode, info.SetupExpires = pending, code, expires
+	if !pending && s.webTOTPOn() {
+		s.addResetCode(&info)
+	}
 	for _, ip := range skipped.IPs {
 		info.LeftOutIPs = append(info.LeftOutIPs, ip.String())
 	}

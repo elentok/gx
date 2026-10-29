@@ -110,7 +110,7 @@ func runWebURL(ctx context.Context, c *apiclient.Client, showQR, jsonOut bool, w
 	if _, err = fmt.Fprintln(w, url); err != nil {
 		return err
 	}
-	if info.SetupPending {
+	if info.SetupCode != "" {
 		_, err = fmt.Fprintln(w, setupCodeLine(info.SetupCode, info.SetupExpires))
 	}
 	return err
@@ -407,6 +407,52 @@ func runWebPassword(ctx context.Context, c *apiclient.Client, password string, j
 		return nil
 	}
 	_, err = fmt.Fprintln(w, "web password changed; every web login is signed out")
+	return err
+}
+
+func newServerWebResetAuthenticatorCmd(d deps) *cobra.Command {
+	var jsonOut bool
+	c := &cobra.Command{
+		Use:   "web-reset-authenticator",
+		Short: "Clear the web authenticator, sign every browser out and print a new Setup code",
+		Long:  "Clears the TOTP secret and signs every web login out. The next web login needs the Setup code and the password, then adds a new authenticator in the browser.\nNothing here prints a TOTP secret.",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			cl, err := d.dial()()
+			if err != nil {
+				return err
+			}
+			ctx := c.Context()
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			return runWebResetAuthenticator(ctx, cl, jsonOut, c.OutOrStdout())
+		},
+	}
+	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	return c
+}
+
+func runWebResetAuthenticator(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
+	info, err := c.WebResetAuthenticator(ctx)
+	switch {
+	case apiclient.IsNotRunning(err):
+		info = server.WebInfo{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+	case err != nil:
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	if jsonOut {
+		if err := encodeProvenance(w, info, viaServer, callerActor(os.Getwd)); err != nil {
+			return err
+		}
+	}
+	if info.Refused {
+		return fmt.Errorf("refused (%s): %s", info.Reason, info.Message)
+	}
+	if jsonOut {
+		return nil
+	}
+	_, err = fmt.Fprintln(w, setupCodeLine(info.SetupCode, info.SetupExpires))
 	return err
 }
 
