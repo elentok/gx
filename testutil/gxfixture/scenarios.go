@@ -79,6 +79,10 @@ type scenario struct {
 	ownRepos []string
 	// diskLow gives each project a cleanup command that follows the disk's clean file.
 	diskLow bool
+	// chat turns the fake's chat knob on, so a plain prompt is a chat turn.
+	chat bool
+	// sessions are created in order once the server is up, as `gx agents create` makes them.
+	sessions []sessionSpec
 }
 
 type recommendation struct{ verb, diagnosis string }
@@ -310,6 +314,9 @@ var scenarios = map[string]scenario{
 			{"06", "open", servertest.TicketOpts{}},
 		}}},
 	},
+	// agents: eight sessions in demo (4), other (2) and site (2), one per row of
+	// the Agents mock, and a worktree in demo. See agentsScenario.
+	"agents": agentsScenario(),
 	// edge: a project with no epics, an epic with no tickets, and a ticket
 	// blocked by a dependency that is not merged.
 	"edge": {

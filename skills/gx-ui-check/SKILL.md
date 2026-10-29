@@ -33,7 +33,7 @@ $TMPDIR/gx-ui/gxfixture --gx $TMPDIR/gx-ui/gx --fakeclaude $TMPDIR/gx-ui/claude 
   fixture started any other way keeps running after you finish, with its `gx server` and fake agents.
   As a backstop it exits when its parent process dies or after 2 hours.
 - The scenario names are in the catalog (`empty`, `ready`, `mixed`, `finishing`, `paused`, `united`,
-  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`, `disk-low`, `health`). An unknown name makes the command list
+  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`, `disk-low`, `health`, `agents`). An unknown name makes the command list
   the known ones.
 - Pass `--hold` only for a flow that says so (flow 7, and the Stash flow on `dirty-trunk`). It
   freezes the workers until you delete the file named by `hold_file`.

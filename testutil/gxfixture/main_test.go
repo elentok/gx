@@ -1112,6 +1112,64 @@ func TestChecksMissingScenarioReportsBothProjectsMissing(t *testing.T) {
 	}
 }
 
+func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
+	t.Parallel()
+	r := start(t, "agents")
+	var list []server.SessionInfo
+	if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+		t.Fatal(err)
+	}
+	type row struct {
+		project, harness, state string
+		design, unread          bool
+		actionable              string
+	}
+	var got []row
+	for _, s := range list {
+		got = append(got, row{s.Project, s.Harness, s.Status.State, s.Design, s.Unread.Unread, s.Actionable.Reason})
+	}
+	want := []row{
+		{"demo", "claude", server.SessionIdle, false, false, ""},
+		{"demo", "claude", server.SessionWorking, false, false, ""},
+		{"demo", "claude", server.SessionIdle, true, false, ""},
+		{"demo", fakeHarness, server.SessionIdle, false, false, ""},
+		{"other", "claude", server.SessionIdle, false, true, ""},
+		{"other", "claude", server.SessionIdle, false, false, "needs a decision"},
+		{"site", "claude", server.SessionIdle, true, false, ""},
+		{"site", "claude", server.SessionExited, false, false, ""},
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("sessions = %+v\nwant     %+v", got, want)
+	}
+	if list[7].Exit != server.SessionExitCrashed {
+		t.Errorf("c2 exit = %q, want crashed", list[7].Exit)
+	}
+	chatLen := func(i int) int {
+		var chat server.SessionChatResponse
+		if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", list[i].ID, "--json")), &chat); err != nil {
+			t.Fatal(err)
+		}
+		return len(chat.Messages)
+	}
+	if chatLen(0) == 0 {
+		t.Error("a1 has no chat messages")
+	}
+	if n := chatLen(5); n != 0 {
+		t.Errorf("b2 has %d chat messages, want none", n)
+	}
+
+	var projects []server.ProjectWorktrees
+	if err := json.Unmarshal([]byte(r.gx(t, "project", "worktrees", "--json")), &projects); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range projects {
+		if p.Project == "demo" && p.Root != "" && len(p.Worktrees) == 1 && strings.HasSuffix(p.Worktrees[0], "feature") {
+			return
+		}
+	}
+	t.Errorf("project worktrees = %+v, want demo with its root and one worktree", projects)
+}
+
 func TestOtherScenariosReportNoMissingChecks(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{"united", "empty"} {

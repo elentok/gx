@@ -231,12 +231,15 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
+	if err := f.seedSessions(sc); err != nil {
+		return err
+	}
 	// Plain sessions are made before openDesigns, which then starts the newer
 	// run, but linked after it: a map with a live design session makes `designs
 	// open` return that one instead of starting another.
 	plain := make(map[string]string)
 	for _, addr := range sc.linkedDesigns {
-		id, err := f.createPlainSession(addr)
+		id, err := f.createSession(project, filepath.Join(f.root, "repo"), "hello", "")
 		if err != nil {
 			return err
 		}
@@ -397,9 +400,21 @@ func (f *fixture) seed(sc scenario) error {
 	if sc.hold {
 		holdTimeout = "1h"
 	}
-	cfg, err := json.Marshal(agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.behaviour, Design: sc.design, DesignByMap: sc.designByMap})
+	cfg, err := json.Marshal(agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.behaviour, Design: sc.design, DesignByMap: sc.designByMap, Chat: sc.chat})
 	if err != nil {
 		return err
+	}
+	// ownRepo makes a project's own repo; with the chat knob it carries the
+	// worker config too, since a session reads the config from its dir.
+	ownRepo := func(p string) (string, error) {
+		dir := filepath.Join(f.root, p+"-repo")
+		if err := f.initRepo(dir); err != nil {
+			return "", err
+		}
+		if sc.chat {
+			return dir, os.WriteFile(filepath.Join(dir, agentfake.WorkerConfigFile), cfg, 0o644)
+		}
+		return dir, nil
 	}
 	if err := os.WriteFile(filepath.Join(repo, agentfake.WorkerConfigFile), cfg, 0o644); err != nil {
 		return err
@@ -433,6 +448,19 @@ func (f *fixture) seed(sc scenario) error {
 		if !sc.noCheckConfig {
 			body := `{"name":"` + p + `","checks":{}}`
 			if err := os.WriteFile(filepath.Join(f.store, p, "project.json"), []byte(body), 0o644); err != nil {
+				return err
+			}
+		}
+		if slices.Contains(sc.ownRepos, p) {
+			dir, err := ownRepo(p)
+			if err != nil {
+				return err
+			}
+			extra := ""
+			if !sc.noCheckConfig {
+				extra = `,"checks":{}`
+			}
+			if err := servertest.WriteProjectRepo(f.store, p, dir, extra); err != nil {
 				return err
 			}
 		}
@@ -482,8 +510,7 @@ func (f *fixture) seed(sc scenario) error {
 		}
 		projectRepo := repo
 		if slices.Contains(sc.ownRepos, e.project) {
-			projectRepo = filepath.Join(f.root, e.project+"-repo")
-			if err := f.initRepo(projectRepo); err != nil {
+			if projectRepo, err = ownRepo(e.project); err != nil {
 				return err
 			}
 		}
@@ -544,24 +571,6 @@ func (f *fixture) cli(args ...string) ([]byte, error) {
 	cmd := exec.Command(f.gx, args...)
 	cmd.Env = f.env
 	return cmd.CombinedOutput()
-}
-
-// createPlainSession starts a session in the project repo that is not yet a
-// design session, and returns its id.
-func (f *fixture) createPlainSession(addr string) (string, error) {
-	out, err := f.cli("agents", "create", "--project", project, "--dir", filepath.Join(f.root, "repo"), "--prompt", "hello", "--json")
-	if err != nil {
-		return "", fmt.Errorf("create session for %s: %w\n%s", addr, err, out)
-	}
-	var res struct {
-		Session struct {
-			ID string `json:"id"`
-		} `json:"session"`
-	}
-	if err := json.Unmarshal(out, &res); err != nil || res.Session.ID == "" {
-		return "", fmt.Errorf("create session for %s: no session id in %s", addr, out)
-	}
-	return res.Session.ID, nil
 }
 
 // linkSession marks the session id a design session of the map at addr.

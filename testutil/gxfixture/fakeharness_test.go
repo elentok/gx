@@ -10,8 +10,6 @@ import (
 	"github.com/elentok/gx/server"
 )
 
-const fakeHarness = "fakecodex"
-
 func TestFakeHarness_OnlyInTheGxfixtureBuild(t *testing.T) {
 	t.Parallel()
 	goFiles := func(args ...string) string {
