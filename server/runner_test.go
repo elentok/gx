@@ -260,13 +260,11 @@ func TestRunner_MergesTheIterationAndClosesTheRoot(t *testing.T) {
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture))
-	_, _, cwd := registerTurn(h)
+	h := servertest.StartWithStore(t, store)
 	// The agent's turn: commit a file in its own worktree.
-	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
-		testutil.WriteFile(t, cwd(), "agent.txt", "work")
-		testutil.CommitAll(t, cwd(), "agent work")
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
+	h.OnTurn(func(turn *servertest.Turn) {
+		testutil.WriteFile(t, turn.Cwd, "agent.txt", "work")
+		testutil.CommitAll(t, turn.Cwd, "agent work")
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -387,15 +385,13 @@ func TestRunner_BackfillsTheNextQueuedRootWhenASlotFrees(t *testing.T) {
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithHerdr(servertest.UntilPtyFixture), func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, func(c *server.Config) {
 		c.MaxAgents = 1
 	})
-	_, _, cwd := registerTurn(h)
-	h.Herdr.Register("agent", "prompt", func(_ *herdrfake.State, _ []string) (any, herdrfake.Identities, error) {
+	h.OnTurn(func(turn *servertest.Turn) {
 		// Root A merges on main first, so root B needs work of its own to commit.
-		testutil.WriteFile(t, cwd(), filepath.Base(cwd())+".txt", "work")
-		testutil.CommitAll(t, cwd(), "agent work")
-		return map[string]any{"agent": map[string]any{"pane_id": "p1", "agent_status": "idle", "state_change_seq": 1}}, herdrfake.Identities{}, nil
+		testutil.WriteFile(t, turn.Cwd, filepath.Base(turn.Cwd)+".txt", "work")
+		testutil.CommitAll(t, turn.Cwd, "agent work")
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
