@@ -80,7 +80,7 @@ func pauseMessagesOf(sent []string, kind events.Kind) []string {
 func waitPauseMessages(t *testing.T, sent func() []string, kind events.Kind) []string {
 	t.Helper()
 	servertest.Poll(10*time.Second, func() bool { return len(pauseMessagesOf(sent(), kind)) > 0 })
-	time.Sleep(1500 * time.Millisecond)
+	time.Sleep(1500 * time.Millisecond) // negative wait: a wrong second message would show by now
 	return pauseMessagesOf(sent(), kind)
 }
 
