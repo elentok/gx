@@ -7,6 +7,13 @@
 // parent test process, sends its argv, and prints whatever the test's
 // Handler decides to answer. It never execs or dials anything else, so it
 // cannot reach a real herdr installation or user session.
+//
+// # Call counter
+//
+// To count fake herdr calls (e.g. to check a test run stays under a call
+// budget), set GX_HERDR_FAKE_COUNT_FILE to a file path in the environment the
+// tests run in. Each fake exec then appends one line, "herdr <verb> <noun>",
+// to that file. With the variable unset nothing is written.
 package herdrfake
 
 import (
@@ -175,6 +182,26 @@ func handleConn(conn net.Conn, handler Handler) {
 	_ = json.NewEncoder(conn).Encode(&response{Output: output, ExitCode: exitCode})
 }
 
+// countFileEnv names the file the opt-in call counter appends to.
+const countFileEnv = "GX_HERDR_FAKE_COUNT_FILE"
+
+// countCall appends "herdr <verb> <noun>" for one helper exec to the counter
+// file, if enabled. One O_APPEND write per line keeps concurrent helpers from
+// interleaving. Counting is best effort and never fails the call.
+func countCall(argv []string) {
+	path := os.Getenv(countFileEnv)
+	if path == "" {
+		return
+	}
+	line := strings.Join(append([]string{"herdr"}, argv[:min(len(argv), 2)]...), " ") + "\n"
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(line)
+}
+
 // RunHelperProcess must be the first thing called in a package's TestMain,
 // before m.Run. If the process was launched as the fake herdr helper (i.e.
 // GX_HERDR_FAKE_HELPER_SOCKET is set), it forwards its complete argv to the
@@ -191,6 +218,7 @@ func RunHelperProcess() {
 	if sockPath == "" {
 		return
 	}
+	countCall(os.Args[1:])
 
 	conn, err := net.Dial("unix", sockPath)
 	if err != nil {

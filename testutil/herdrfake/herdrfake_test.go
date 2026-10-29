@@ -60,6 +60,41 @@ func TestStartEnv_CommandErrorNonZeroExit(t *testing.T) {
 	}
 }
 
+func TestCallCounter(t *testing.T) {
+	_, env := StartEnv(t, func(argv []string) ([]byte, int) { return nil, 0 })
+	count := filepath.Join(t.TempDir(), "count")
+
+	for _, args := range [][]string{{"workspace", "list", "--json"}, {"agent", "wait"}} {
+		cmd := herdrIn(env, args...)
+		cmd.Env = append(cmd.Env, countFileEnv+"="+count)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("herdr %v: %v\n%s", args, err, out)
+		}
+	}
+
+	got, err := os.ReadFile(count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "herdr workspace list\nherdr agent wait\n"; string(got) != want {
+		t.Errorf("count file = %q, want %q", got, want)
+	}
+}
+
+func TestCallCounter_OffByDefault(t *testing.T) {
+	_, env := StartEnv(t, func(argv []string) ([]byte, int) { return nil, 0 })
+	count := filepath.Join(t.TempDir(), "count")
+
+	cmd := herdrIn(env, "workspace", "list")
+	cmd.Env = append(cmd.Env, countFileEnv+"=")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("herdr: %v\n%s", err, out)
+	}
+	if _, err := os.Stat(count); err == nil {
+		t.Errorf("%s exists with the counter off", count)
+	}
+}
+
 func TestStartEnv_LeavesProcessEnvAlone(t *testing.T) {
 	StartEnv(t, func(argv []string) ([]byte, int) { return nil, 0 })
 
