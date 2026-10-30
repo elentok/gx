@@ -29,6 +29,11 @@ const (
 )
 
 func TestMain(m *testing.M) {
+	// The TUI fake runs the pty's statusline command, which names this binary;
+	// without this it would run the whole suite until the fake's timeout.
+	if len(os.Args) > 2 && os.Args[1] == "claude" && os.Args[2] == "statusline" {
+		return
+	}
 	if os.Getenv(fakeClaudeEnv) == "1" {
 		fakeClaude()
 		return
