@@ -124,6 +124,17 @@ type WebLoginsResult struct {
 	Message string     `json:"message,omitempty"`
 }
 
+// Refusal and Refuse let the CLI treat both web payloads as one Refusable.
+func (i WebInfo) Refusal() (bool, string, string) { return i.Refused, i.Reason, i.Message }
+func (WebInfo) Refuse(reason, message string) WebInfo {
+	return WebInfo{Refused: true, Reason: reason, Message: message}
+}
+
+func (r WebLoginsResult) Refusal() (bool, string, string) { return r.Refused, r.Reason, r.Message }
+func (WebLoginsResult) Refuse(reason, message string) WebLoginsResult {
+	return WebLoginsResult{Refused: true, Reason: reason, Message: message}
+}
+
 func webOffLogins() WebLoginsResult {
 	off := webOffInfo()
 	return WebLoginsResult{Refused: true, Reason: off.Reason, Message: off.Message}

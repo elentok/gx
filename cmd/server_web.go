@@ -21,6 +21,50 @@ import (
 // qrQuietZone is the blank border, in modules, that scanners need around a code.
 const qrQuietZone = 2
 
+// Refusable is a web payload that can carry a refusal, so one runner serves every web command.
+type Refusable[T any] interface {
+	Refusal() (refused bool, reason, message string)
+	Refuse(reason, message string) T
+}
+
+// webClient dials the server and returns the command's context.
+func webClient(d deps, c *cobra.Command) (*apiclient.Client, context.Context, error) {
+	cl, err := d.dial()()
+	if err != nil {
+		return nil, nil, err
+	}
+	ctx := c.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return cl, ctx, nil
+}
+
+// runWebCall runs one web socket call and prints its result. A server that is
+// not running comes back as a refusal, like the other socket reads; failure
+// prefixes any other error.
+func runWebCall[T Refusable[T]](ctx context.Context, call func(context.Context) (T, error), failure string, jsonOut bool, w io.Writer, print func(T) error) error {
+	res, err := call(ctx)
+	switch {
+	case apiclient.IsNotRunning(err):
+		res = res.Refuse(server.ReasonServerNotRunning, "no server is running; start it with `gx server start`")
+	case err != nil:
+		return fmt.Errorf("%s: %w", failure, err)
+	}
+	if jsonOut {
+		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
+			return err
+		}
+	}
+	if refused, reason, message := res.Refusal(); refused {
+		return fmt.Errorf("refused (%s): %s", reason, message)
+	}
+	if jsonOut {
+		return nil
+	}
+	return print(res)
+}
+
 func newServerWebURLCmd(d deps) *cobra.Command {
 	var showQR, jsonOut bool
 	c := &cobra.Command{
@@ -28,13 +72,9 @@ func newServerWebURLCmd(d deps) *cobra.Command {
 		Short: "Print the web UI link, with the Setup code while setup is pending",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := d.dial()()
+			cl, ctx, err := webClient(d, c)
 			if err != nil {
 				return err
-			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
 			}
 			return runWebURL(ctx, cl, showQR, jsonOut, c.OutOrStdout())
 		},
@@ -44,24 +84,15 @@ func newServerWebURLCmd(d deps) *cobra.Command {
 	return c
 }
 
-// webInfoOrRefusal reads the web info route; a server that is not running comes
-// back as a refusal, like the other socket reads.
-func webInfoOrRefusal(ctx context.Context, c *apiclient.Client) (server.WebInfo, error) {
-	info, err := c.WebInfo(ctx)
-	switch {
-	case apiclient.IsNotRunning(err):
-		return server.WebInfo{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, nil
-	case err != nil:
-		return info, fmt.Errorf("server read failed: %w", err)
-	}
-	return info, nil
-}
-
 // webURLResult is the `gx server web-url --json` payload.
 type webURLResult struct {
 	server.WebInfo
 	// URL is the setup link while setup is pending, else the base URL.
 	URL string `json:"url,omitempty"`
+}
+
+func (webURLResult) Refuse(reason, message string) webURLResult {
+	return webURLResult{WebInfo: server.WebInfo{}.Refuse(reason, message)}
 }
 
 // setupLink is the link that opens the web page's setup step with the code filled in.
@@ -75,45 +106,36 @@ func setupCodeLine(code string, expires time.Time) string {
 }
 
 func runWebURL(ctx context.Context, c *apiclient.Client, showQR, jsonOut bool, w io.Writer) error {
-	info, err := webInfoOrRefusal(ctx, c)
-	if err != nil {
+	read := func(ctx context.Context) (webURLResult, error) {
+		info, err := c.WebInfo(ctx)
+		res := webURLResult{WebInfo: info}
+		if err == nil && !info.Refused {
+			res.URL = info.BaseURL
+			if info.SetupPending {
+				res.URL = setupLink(info.BaseURL, info.SetupCode)
+			}
+		}
+		return res, err
+	}
+	return runWebCall(ctx, read, "server read failed", jsonOut, w, func(res webURLResult) error {
+		if showQR {
+			art, err := renderQR(res.URL)
+			if err != nil {
+				return err
+			}
+			if _, err = io.WriteString(w, art); err != nil {
+				return err
+			}
+		}
+		if _, err := fmt.Fprintln(w, res.URL); err != nil {
+			return err
+		}
+		if res.SetupCode == "" {
+			return nil
+		}
+		_, err := fmt.Fprintln(w, setupCodeLine(res.SetupCode, res.SetupExpires))
 		return err
-	}
-	res := webURLResult{WebInfo: info}
-	if !info.Refused {
-		res.URL = info.BaseURL
-		if info.SetupPending {
-			res.URL = setupLink(info.BaseURL, info.SetupCode)
-		}
-	}
-	if jsonOut {
-		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
-			return err
-		}
-	}
-	if info.Refused {
-		return fmt.Errorf("refused (%s): %s", info.Reason, info.Message)
-	}
-	if jsonOut {
-		return nil
-	}
-	url := res.URL
-	if showQR {
-		art, err := renderQR(url)
-		if err != nil {
-			return err
-		}
-		if _, err = io.WriteString(w, art); err != nil {
-			return err
-		}
-	}
-	if _, err = fmt.Fprintln(w, url); err != nil {
-		return err
-	}
-	if info.SetupCode != "" {
-		_, err = fmt.Fprintln(w, setupCodeLine(info.SetupCode, info.SetupExpires))
-	}
-	return err
+	})
 }
 
 func newServerWebNewRootCmd(d deps) *cobra.Command {
@@ -124,13 +146,9 @@ func newServerWebNewRootCmd(d deps) *cobra.Command {
 		Long:  "Makes a new root from the current allowed hosts and re-issues the leaf from it.\nDevices must trust the new root again; web logins are kept.",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := d.dial()()
+			cl, ctx, err := webClient(d, c)
 			if err != nil {
 				return err
-			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
 			}
 			return runWebNewRoot(ctx, cl, jsonOut, c.OutOrStdout())
 		},
@@ -140,26 +158,10 @@ func newServerWebNewRootCmd(d deps) *cobra.Command {
 }
 
 func runWebNewRoot(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
-	info, err := c.WebNewRoot(ctx)
-	switch {
-	case apiclient.IsNotRunning(err):
-		info = server.WebInfo{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
-	case err != nil:
-		return fmt.Errorf("server write failed: %w", err)
-	}
-	if jsonOut {
-		if err := encodeProvenance(w, info, viaServer, callerActor(os.Getwd)); err != nil {
-			return err
-		}
-	}
-	if info.Refused {
-		return fmt.Errorf("refused (%s): %s", info.Reason, info.Message)
-	}
-	if jsonOut {
-		return nil
-	}
-	_, err = fmt.Fprintln(w, "new root fingerprint: "+info.Fingerprint)
-	return err
+	return runWebCall(ctx, c.WebNewRoot, "server write failed", jsonOut, w, func(info server.WebInfo) error {
+		_, err := fmt.Fprintln(w, "new root fingerprint: "+info.Fingerprint)
+		return err
+	})
 }
 
 func newServerWebResetCmd(d deps) *cobra.Command {
@@ -181,13 +183,9 @@ func newServerWebResetCmd(d deps) *cobra.Command {
 					return nil
 				}
 			}
-			cl, err := d.dial()()
+			cl, ctx, err := webClient(d, c)
 			if err != nil {
 				return err
-			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
 			}
 			return runWebReset(ctx, cl, jsonOut, c.OutOrStdout())
 		},
@@ -198,26 +196,15 @@ func newServerWebResetCmd(d deps) *cobra.Command {
 }
 
 func runWebReset(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
-	info, err := c.WebReset(ctx)
-	switch {
-	case apiclient.IsNotRunning(err):
-		info = server.WebInfo{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
-	case err != nil:
-		return fmt.Errorf("server write failed: %w", err)
+	return runWebCall(ctx, c.WebReset, "server write failed", jsonOut, w, printSetupCode(w))
+}
+
+// printSetupCode prints the Setup code line of a reset result.
+func printSetupCode(w io.Writer) func(server.WebInfo) error {
+	return func(info server.WebInfo) error {
+		_, err := fmt.Fprintln(w, setupCodeLine(info.SetupCode, info.SetupExpires))
+		return err
 	}
-	if jsonOut {
-		if err := encodeProvenance(w, info, viaServer, callerActor(os.Getwd)); err != nil {
-			return err
-		}
-	}
-	if info.Refused {
-		return fmt.Errorf("refused (%s): %s", info.Reason, info.Message)
-	}
-	if jsonOut {
-		return nil
-	}
-	_, err = fmt.Fprintln(w, setupCodeLine(info.SetupCode, info.SetupExpires))
-	return err
 }
 
 func newServerWebLoginsCmd(d deps) *cobra.Command {
@@ -227,13 +214,9 @@ func newServerWebLoginsCmd(d deps) *cobra.Command {
 		Short: "List the web logins with their name, created time, last use and last IP",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := d.dial()()
+			cl, ctx, err := webClient(d, c)
 			if err != nil {
 				return err
-			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
 			}
 			return runWebLogins(ctx, cl, jsonOut, c.OutOrStdout())
 		},
@@ -242,48 +225,24 @@ func newServerWebLoginsCmd(d deps) *cobra.Command {
 	return c
 }
 
-// webLoginsOrRefusal turns a server that is not running into a refusal.
-func webLoginsOrRefusal(res server.WebLoginsResult, err error) (server.WebLoginsResult, error) {
-	switch {
-	case apiclient.IsNotRunning(err):
-		return server.WebLoginsResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}, nil
-	case err != nil:
-		return res, fmt.Errorf("server request failed: %w", err)
-	}
-	return res, nil
-}
-
 func runWebLogins(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
-	res, err := c.WebLogins(ctx)
-	if res, err = webLoginsOrRefusal(res, err); err != nil {
-		return err
-	}
-	if jsonOut {
-		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
+	return runWebCall(ctx, c.WebLogins, "server request failed", jsonOut, w, func(res server.WebLoginsResult) error {
+		if len(res.Logins) == 0 {
+			_, err := fmt.Fprintln(w, "no web logins")
 			return err
 		}
-	}
-	if res.Refused {
-		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
-	}
-	if jsonOut {
+		for _, l := range res.Logins {
+			last := "never"
+			if !l.LastUsed.IsZero() {
+				last = l.LastUsed.Local().Format("2006-01-02 15:04")
+			}
+			if _, err := fmt.Fprintf(w, "%s  %s  created %s  last used %s  from %s\n",
+				l.ID, l.Name, l.Created.Local().Format("2006-01-02 15:04"), last, l.LastIP); err != nil {
+				return err
+			}
+		}
 		return nil
-	}
-	if len(res.Logins) == 0 {
-		_, err = fmt.Fprintln(w, "no web logins")
-		return err
-	}
-	for _, l := range res.Logins {
-		last := "never"
-		if !l.LastUsed.IsZero() {
-			last = l.LastUsed.Local().Format("2006-01-02 15:04")
-		}
-		if _, err := fmt.Fprintf(w, "%s  %s  created %s  last used %s  from %s\n",
-			l.ID, l.Name, l.Created.Local().Format("2006-01-02 15:04"), last, l.LastIP); err != nil {
-			return err
-		}
-	}
-	return nil
+	})
 }
 
 func newServerWebRevokeCmd(d deps) *cobra.Command {
@@ -293,13 +252,9 @@ func newServerWebRevokeCmd(d deps) *cobra.Command {
 		Short: "Sign one web login out by id and close its event streams",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			cl, err := d.dial()()
+			cl, ctx, err := webClient(d, c)
 			if err != nil {
 				return err
-			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
 			}
 			return runWebRevoke(ctx, cl, args[0], jsonOut, c.OutOrStdout())
 		},
@@ -309,23 +264,11 @@ func newServerWebRevokeCmd(d deps) *cobra.Command {
 }
 
 func runWebRevoke(ctx context.Context, c *apiclient.Client, id string, jsonOut bool, w io.Writer) error {
-	res, err := c.WebRevokeLogin(ctx, id)
-	if res, err = webLoginsOrRefusal(res, err); err != nil {
+	revoke := func(ctx context.Context) (server.WebLoginsResult, error) { return c.WebRevokeLogin(ctx, id) }
+	return runWebCall(ctx, revoke, "server request failed", jsonOut, w, func(server.WebLoginsResult) error {
+		_, err := fmt.Fprintln(w, "revoked web login "+id)
 		return err
-	}
-	if jsonOut {
-		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
-			return err
-		}
-	}
-	if res.Refused {
-		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
-	}
-	if jsonOut {
-		return nil
-	}
-	_, err = fmt.Fprintln(w, "revoked web login "+id)
-	return err
+	})
 }
 
 func newServerWebPasswordCmd(d deps) *cobra.Command {
@@ -340,13 +283,9 @@ func newServerWebPasswordCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			cl, err := d.dial()()
+			cl, ctx, err := webClient(d, c)
 			if err != nil {
 				return err
-			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
 			}
 			return runWebPassword(ctx, cl, password, jsonOut, c.OutOrStdout())
 		},
@@ -391,23 +330,11 @@ func readNewPassword(d deps, fromStdin bool) (string, error) {
 }
 
 func runWebPassword(ctx context.Context, c *apiclient.Client, password string, jsonOut bool, w io.Writer) error {
-	res, err := c.WebSetPassword(ctx, password)
-	if res, err = webLoginsOrRefusal(res, err); err != nil {
+	set := func(ctx context.Context) (server.WebLoginsResult, error) { return c.WebSetPassword(ctx, password) }
+	return runWebCall(ctx, set, "server request failed", jsonOut, w, func(server.WebLoginsResult) error {
+		_, err := fmt.Fprintln(w, "web password changed; every web login is signed out")
 		return err
-	}
-	if jsonOut {
-		if err := encodeProvenance(w, res, viaServer, callerActor(os.Getwd)); err != nil {
-			return err
-		}
-	}
-	if res.Refused {
-		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
-	}
-	if jsonOut {
-		return nil
-	}
-	_, err = fmt.Fprintln(w, "web password changed; every web login is signed out")
-	return err
+	})
 }
 
 func newServerWebResetAuthenticatorCmd(d deps) *cobra.Command {
@@ -418,13 +345,9 @@ func newServerWebResetAuthenticatorCmd(d deps) *cobra.Command {
 		Long:  "Clears the TOTP secret and signs every web login out. The next web login needs the Setup code and the password, then adds a new authenticator in the browser.\nNothing here prints a TOTP secret.",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
-			cl, err := d.dial()()
+			cl, ctx, err := webClient(d, c)
 			if err != nil {
 				return err
-			}
-			ctx := c.Context()
-			if ctx == nil {
-				ctx = context.Background()
 			}
 			return runWebResetAuthenticator(ctx, cl, jsonOut, c.OutOrStdout())
 		},
@@ -434,26 +357,7 @@ func newServerWebResetAuthenticatorCmd(d deps) *cobra.Command {
 }
 
 func runWebResetAuthenticator(ctx context.Context, c *apiclient.Client, jsonOut bool, w io.Writer) error {
-	info, err := c.WebResetAuthenticator(ctx)
-	switch {
-	case apiclient.IsNotRunning(err):
-		info = server.WebInfo{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
-	case err != nil:
-		return fmt.Errorf("server write failed: %w", err)
-	}
-	if jsonOut {
-		if err := encodeProvenance(w, info, viaServer, callerActor(os.Getwd)); err != nil {
-			return err
-		}
-	}
-	if info.Refused {
-		return fmt.Errorf("refused (%s): %s", info.Reason, info.Message)
-	}
-	if jsonOut {
-		return nil
-	}
-	_, err = fmt.Fprintln(w, setupCodeLine(info.SetupCode, info.SetupExpires))
-	return err
+	return runWebCall(ctx, c.WebResetAuthenticator, "server write failed", jsonOut, w, printSetupCode(w))
 }
 
 // renderQR draws the code with half-block characters, so two modules share one
