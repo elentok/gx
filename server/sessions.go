@@ -650,7 +650,9 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 			// An idle whose turn start this watch did not see (an idle-to-busy
 			// edge) is not Live, e.g. a turn already running at connect.
 			live := seenBusy
-			busy := st.State != SessionIdle
+			// A turn also ends while Working with Background: the agent is
+			// waiting for input even though its background task is still alive.
+			busy := !st.Promptable()
 			if busy {
 				endSettle()
 			}
@@ -670,10 +672,10 @@ func (s *Server) watchSession(dir, id string, run int, crashUntil time.Time, rec
 					}
 					m.Status, m.StatusChangedAt = st, time.Now()
 					changed = true
-					if st.State == SessionIdle {
+					if st.Promptable() {
 						m.ReportedStep, m.ReportedTitle = "", ""
 					}
-					if st.State == SessionIdle && prev.State != SessionIdle {
+					if st.Promptable() && !prev.Promptable() {
 						idleEdge = true
 						if m.Design {
 							design = designRef{m.ConversationID, m.Ticket, live}

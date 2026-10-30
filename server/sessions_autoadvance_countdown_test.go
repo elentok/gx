@@ -80,6 +80,23 @@ func TestAutoAdvance_RunEndSendsContinueAfterTheCountdown(t *testing.T) {
 	}
 }
 
+func TestAutoAdvance_RunEndWithBackgroundTaskSendsContinue(t *testing.T) {
+	t.Parallel()
+	f := startAdvancing(t, storeWithMapStep(t, "spec"))
+	c := waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
+	report(t, f.conv, agentfake.Control{State: "working"})
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool {
+		return s.Status.State == server.SessionWorking && !s.Status.Background
+	})
+	writeAssistantMessage(t, f.path, runEndText)
+	report(t, f.conv, agentfake.Control{State: "background"})
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool {
+		return s.Status.Background && s.AutoAdvanceAt != nil
+	})
+	waitForScreen(t, c, "/clear")
+	waitForScreen(t, c, "/gx-design map")
+}
+
 func TestAutoAdvance_EndingsThatNeverAdvance(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct {
