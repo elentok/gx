@@ -4,11 +4,18 @@
 
 <img src="docs/logo.png" alt="gx logo" width="400" />
 
-_gx_ runs coding agents on your tickets. You write tickets, group them into epics, and queue them.
-The `gx server` daemon gives each ticket its own git worktree and agent session, reviews the
-result and lands it on the epic's branch. You follow and steer it from a terminal UI or a web UI
-that works from your phone. gx is also still a TUI for everyday git work: worktrees, staging,
-history and stashes.
+_gx_ is an agentic development platform for desktop and phone.
+
+- **Autonomous implementation.** The ralph loop gives each ticket its own worktree and branch. It runs code review, spec review and verification before the work lands.
+- **Smart-zone aware agents.** gx pauses and compacts a session before its context reaches the smart-zone ceiling.
+- **Design flow.** A full UI takes an idea through a map of decisions and into tickets.
+- **Agent management.** List, prompt, interrupt and resume agent sessions.
+- **Terminal UI and web UI.** Use the terminal on your desk and the web UI from your phone. The web UI uses HTTPS and a one-time code from an authenticator app.
+- **Budget and notifications.** A daily budget caps spend. Telegram or Slack tells you when an agent needs you.
+- **Resource monitoring.** gx watches CPU, memory and disk space, and cleans the disk when space runs low.
+- **Learning loop.** `gx evolve` reviews a finished epic. Follow-ups collect bugs and ideas found along the way, and a triage step goes through them.
+- **Built on popular skills.** gx bundles adapted skills from Matt Pocock, Lauren Tan (pstack) and Cursor. See [Credits](#credits).
+- **Git TUI.** gx is also a git TUI for worktrees, staging, history and stashes.
 
 ## Disclaimer
 
@@ -16,28 +23,7 @@ I wrote the original version of the tool in Typescript a while ago but at some
 point I realized I wanted something a bit different and had Claude Code migrate it
 to Go with a lot of UI changes (see [convert-to-go.md](./docs/prompts/convert-to-go.md)
 and [go-migration-plan.md](/docs/go-migration-plan.md)). It has since grown into the agent
-orchestrator described below.
-
-## Agent orchestrator
-
-- **Tickets and epics**: tickets are markdown files with frontmatter, kept in a local ticket store
-  outside your repo. An epic groups tickets and has one shared feature worktree and branch.
-  Manage them with `gx tickets` (`tk`) or in the tickets UI.
-- **Queue and ralph-loop**: queue tickets or whole epics and `gx server` schedules them. Each
-  ticket runs in its own worktree and branch. Finished work is cherry-picked onto the epic branch,
-  then `gx merge` fast-forwards the epic onto trunk. See
-  [the queue orchestrator](./docs/ralph-loop-queue-orchestrator.md).
-- **Agent sessions**: the server hosts interactive agent sessions (`gx agents`) that you can
-  prompt, interrupt and resume. Design sessions (`gx designs`) map out an epic before
-  it is charted into tickets. Models are chosen by tier in `config.json`.
-- **Safety nets**: a daily budget with soft and hard limits (`gx budget`), disk-space watching
-  with automatic cleanup, a health monitor, stuck-ticket watchdogs, and Telegram or Slack
-  notifications (`gx notify`).
-- **Checks**: `gx check` runs a project's format, lint, typecheck and test checks.
-- **Agent skills**: `gx skills install` installs gx's skill bundle for Claude and Codex. The
-  server does this on every start.
-- **Web UI**: `gx server` serves the Epics, Agents, Stats and Settings pages, plus design and ticket pages, over HTTPS. Sign-in
-  is a password plus an authenticator code, with one web login per device.
+orchestrator described above.
 
 ## Git TUI
 
@@ -493,3 +479,11 @@ project.json it creates or rewrites:
 make test   # run all tests
 make run    # run without building
 ```
+
+## Credits
+
+gx bundles skills adapted from these projects. Each copy lives in `skills/` with its upstream, author and MIT license. [skills/gx.md](skills/gx.md) lists every skill.
+
+- [Matt Pocock](https://github.com/mattpocock), from [mattpocock/skills](https://github.com/mattpocock/skills): to-tickets, tdd, implement, research, prototype, wayfinder, to-spec, domain-modeling and grilling. The merge-conflict skill started there too.
+- [Lauren Tan](https://github.com/poteto), from `pstack` in [cursor/plugins](https://github.com/cursor/plugins): unslop.
+- [Eric Zakariasson](https://github.com/ericzakariasson), from `cursor-team-kit` in [cursor/plugins](https://github.com/cursor/plugins): thermo-nuclear-code-quality-review.
