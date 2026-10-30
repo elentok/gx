@@ -12,7 +12,7 @@ _gx_ is an agentic development platform for desktop and phone.
 - **Agent management.** List, prompt, interrupt and resume agent sessions.
 - **Terminal UI and web UI.** Use the terminal on your desk and the web UI from your phone. The web UI uses HTTPS and a one-time code from an authenticator app.
 - **Budget and notifications.** A daily budget caps spend. Telegram or Slack tells you when an agent needs you.
-- **Resource monitoring.** gx watches CPU, memory and disk space, and cleans the disk when space runs low.
+- **Resource monitoring.** gx watches CPU, memory and disk space, and warns when disk space runs low.
 - **Learning loop.** `gx evolve` reviews a finished epic. Follow-ups collect bugs and ideas found along the way, and a triage step goes through them.
 - **Built on popular skills.** gx bundles adapted skills from Matt Pocock, Lauren Tan (pstack) and Cursor. See [Credits](#credits).
 - **Git TUI.** gx is also a git TUI for worktrees, staging, history and stashes.
