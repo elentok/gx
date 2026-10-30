@@ -67,6 +67,8 @@ export const Markdown = memo(function Markdown({
           paddingInline: "3",
           paddingBlock: "2",
           marginBlock: "2",
+          // Leave room for macOS overlay scrollbars before the following paragraph.
+          marginBottom: "4",
           overflowX: "auto",
           lineHeight: "1.5",
         },
