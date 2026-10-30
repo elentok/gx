@@ -63,6 +63,20 @@ func BashPermissionDialog(command string) []string {
 	}
 }
 
+// QuestionMenuDialog is the screen rows of a question menu: a numbered choice
+// list that is not an approvable permission card.
+func QuestionMenuDialog() []string {
+	return []string{
+		"────────────────────",
+		"Question",
+		"  Which option should the fake worker take?",
+		"Do you want option A or option B?",
+		"❯ 1. Option A",
+		"  2. Option B",
+		"Esc to cancel",
+	}
+}
+
 // ActionExit makes the TUI fake exit with Control.Code.
 const ActionExit = "exit"
 
@@ -359,6 +373,14 @@ type tui struct {
 	seq                []byte
 	wheelUp, wheelDown int
 	design             designState
+	// resume is the ticket a ratelimit or question-menu worker finishes on the
+	// next prompt, whatever that prompt says.
+	resume *pendingWork
+}
+
+type pendingWork struct {
+	cfg     WorkerConfig
+	address string
 }
 
 // designState is set once a /gx-design prompt arrives; rounds counts the ones
@@ -544,15 +566,29 @@ func (t *tui) submit() error {
 	}
 	switch t.pid.Status {
 	case StatusIdle:
+		if w := t.resume; w != nil && text != "" {
+			t.resume = nil
+			t.prompt = text
+			go t.work(w.cfg, w.address)
+			return t.setStatus(StatusBusy, "")
+		}
 		kind, address, cfg := t.classify(text)
 		switch kind {
 		case promptDesign:
 			return t.designTurn(text)
 		case promptWorker:
 			t.prompt = text
-			if cfg.Behaviour[address] == BehaviourPermission {
+			switch cfg.Behaviour[address] {
+			case BehaviourPermission:
 				t.dialog = BashPermissionDialog(PermissionCommand)
 				return t.setStatus(StatusWaiting, "permission prompt")
+			case BehaviourQuestionMenu:
+				t.resume = &pendingWork{cfg, address}
+				t.dialog = QuestionMenuDialog()
+				return t.setStatus(StatusWaiting, "question menu")
+			case BehaviourRateLimit:
+				t.resume = &pendingWork{cfg, address}
+				return t.rateLimit(cfg)
 			}
 			go t.work(cfg, address)
 			return t.setStatus(StatusBusy, "")

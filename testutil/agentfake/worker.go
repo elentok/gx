@@ -36,6 +36,9 @@ type WorkerConfig struct {
 	// Behaviour maps a ticket address to what the worker does with it:
 	// BehaviourFinish (the default), BehaviourAsk, BehaviourFail or BehaviourPermission.
 	Behaviour map[string]string `json:"behaviour,omitempty"`
+	// RateLimitReset is a Go duration: how far ahead of now a BehaviourRateLimit
+	// error puts its reset clock. Empty means DefaultRateLimitReset.
+	RateLimitReset string `json:"ratelimit_reset,omitempty"`
 	// Design scripts the design agent's turns, one DesignTurn* kind per prompt
 	// in order. Empty means today's behaviour: a round per /gx-design prompt,
 	// the run-end message for any other text.
@@ -64,7 +67,17 @@ const (
 	// BehaviourPermission blocks the TUI fake on a Bash permission prompt, which
 	// only the pty runner can approve. WorkTicket itself does nothing for it.
 	BehaviourPermission = "permission"
+	// BehaviourRateLimit makes the TUI fake answer its prompt with a rate-limit
+	// API error and go idle; the next prompt finishes the ticket.
+	BehaviourRateLimit = "ratelimit"
+	// BehaviourQuestionMenu blocks the TUI fake on a question menu, which is not
+	// an approvable dialog; Esc leaves it and the next prompt finishes the ticket.
+	BehaviourQuestionMenu = "question-menu"
 )
+
+// DefaultRateLimitReset is how far ahead a BehaviourRateLimit error puts the
+// reset clock when WorkerConfig.RateLimitReset is empty.
+const DefaultRateLimitReset = time.Minute
 
 const askBody = "## Question\nWhich option should the fake worker take?\n\n## Handoff\nNo files touched; the fake worker waits for an answer.\n"
 

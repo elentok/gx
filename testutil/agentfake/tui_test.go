@@ -445,6 +445,60 @@ func TestTUIClaude_FailingWorkerExitsNonZero(t *testing.T) {
 	}
 }
 
+func TestTUIClaude_RateLimitWorkerWritesTheErrorThenFinishesOnContinue(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	path := f.transcriptPath()
+	hold := filepath.Join(t.TempDir(), "hold")
+	f.writeWorkerConfig(WorkerConfig{Hold: hold, Behaviour: map[string]string{"p:e/01": BehaviourRateLimit}})
+
+	f.typeLine("/gx-implement p:e/01")
+	var e transcript.APIError
+	f.waitFor("rate-limit error", func() bool {
+		var ok bool
+		var err error
+		e, ok, err = transcript.LastAPIError(path)
+		return err == nil && ok
+	})
+	if !e.RateLimited() || !strings.Contains(e.Message, "You've hit your limit · resets ") {
+		t.Errorf("rate-limit error = %+v", e)
+	}
+	f.waitStatus(StatusIdle, "")
+	if fileExists(hold + StartedSuffix) {
+		t.Fatal("the worker started its work under the rate limit")
+	}
+
+	f.typeLine("continue")
+	f.waitFor("worker started", func() bool { return fileExists(hold + StartedSuffix) })
+	f.waitStatus(StatusIdle, "")
+}
+
+func TestTUIClaude_QuestionMenuWorkerBlocksOnANonApprovableDialogUntilEsc(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	hold := filepath.Join(t.TempDir(), "hold")
+	f.writeWorkerConfig(WorkerConfig{Hold: hold, Behaviour: map[string]string{"p:e/01": BehaviourQuestionMenu}})
+
+	f.typeLine("/gx-implement p:e/01")
+	f.waitStatus(StatusWaiting, "question menu")
+	f.waitScreen("Option A")
+	d := claudeui.ParseDialog(QuestionMenuDialog())
+	if d.Approvable || len(d.Options) != 2 {
+		t.Fatalf("question menu parses as %+v", d)
+	}
+
+	if _, err := io.WriteString(f.stdin, "\x1b"); err != nil {
+		t.Fatal(err)
+	}
+	f.waitStatus(StatusIdle, "")
+	if fileExists(hold + StartedSuffix) {
+		t.Fatal("the worker started its work before the retry prompt")
+	}
+
+	f.typeLine("/gx-implement p:e/01")
+	f.waitFor("worker started", func() bool { return fileExists(hold + StartedSuffix) })
+	f.waitStatus(StatusIdle, "")
+}
+
 func TestTUIClaude_TrustDialogBeforePidFile(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs, TUITrustEnv+"=1")
 	f.waitFor("the trust dialog", func() bool {

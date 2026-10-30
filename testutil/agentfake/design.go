@@ -209,6 +209,17 @@ func (t *tui) apiError(c Control) error {
 	})
 }
 
+// rateLimit answers the worker's prompt with the rate-limit error claude writes
+// when the usage limit is hit, and stays idle.
+func (t *tui) rateLimit(cfg WorkerConfig) error {
+	reset := DefaultRateLimitReset
+	if d, err := time.ParseDuration(cfg.RateLimitReset); err == nil && d > 0 {
+		reset = d
+	}
+	msg := "You've hit your limit · resets " + time.Now().Add(reset).Format("3:04pm")
+	return t.apiError(Control{Error: "rate_limit", Status: 429, Message: msg})
+}
+
 func (t *tui) transcriptPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
