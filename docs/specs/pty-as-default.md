@@ -43,7 +43,7 @@ From the person's side:
   and lands on it in the Agents tab, ready for typing.
 - A blocked agent on any runner pauses the ticket `needs-answer`, with a reason that says where to
   answer.
-- A rate-limited agent on any runner holds in place. The ticket shows "rate-limited, resets <time>".
+- A rate-limited agent on any runner holds in place. The ticket shows "rate-limited: resets <time>".
   gx sends "continue" at the reset and starts no new ticket for that harness until then.
 - A herdr outage holds only the tickets that need herdr. The "herdr down" banner shows only while
   one of those is queued or running.
@@ -210,7 +210,7 @@ From the person's side:
     quota banner never parks a ticket `needs-answer`.
 61. As a person, I want a rate-limited run to hold its slot rather than pause, so that gx recovers on
     its own (ADR 0042).
-62. As a person, I want the ticket to show "rate-limited, resets <time>" while it holds, so that I know
+62. As a person, I want the ticket to show "rate-limited: resets <time>" while it holds, so that I know
     why it is quiet.
 63. As a person, I want no stall nudge during the hold, so that gx does not prompt an agent that cannot
     answer.
@@ -337,7 +337,7 @@ From the person's side:
 - When the agent is limited, the run enters a hold:
   - The run keeps its slot and its tracked state, and gains a "rate-limited until <time>" mark. The
     implementer picks where the run state keeps it.
-  - The ticket shows "rate-limited, resets <time>" wherever a running ticket's state shows: the TUI
+  - The ticket shows "rate-limited: resets <time>" wherever a running ticket's state shows: the TUI
     Queue tab, the web epic row and the ticket page. With no reset time it shows "rate-limited".
   - The stall nudge and the stall and idle timers do not run during the hold.
   - At the reset time plus the existing buffer, the server prompts "continue" through the normal
@@ -501,7 +501,7 @@ numbers after the highest in `webui/e2e/CATALOG.md`, and file names.
   its line. The confirm turns it on, and Cancel keeps it off. Reopening is read-only again.
 - Flow "Blocked pause on PTY": `blocked-pty`. After the dwell, the ticket card reads "needs answer"
   and the reason names the answer button. The answer button clears it without a reload.
-- Flow "Rate-limit hold": `rate-limited`. The ticket shows "rate-limited, resets <time>" and is not
+- Flow "Rate-limit hold": `rate-limited`. The ticket shows "rate-limited: resets <time>" and is not
   paused. The second ticket waits with its reason. After the reset, the first ticket goes on and the
   second starts.
 
@@ -521,7 +521,7 @@ Per story:
 8. Flow catalog: none; existing split-launch tests pass.
 9. Server test (Codex routing, PTY and headless configured): the run's runner is herdr.
 10. Server test: with herdr down, the Codex ticket stays queued with the herdr wait reason. The same
-    reason shows in `gx server tickets show <addr>`.
+    reason shows in `gx server tickets explain <addr>`.
 11. Server test: the Codex launch prompt starts with `$gx-`.
 12. Server test: herdr probe runs with PTY configured and herdr on PATH.
 13. Server test: herdr down, a Claude ticket claims and launches.
@@ -587,7 +587,7 @@ Per story:
     record and still renders the line.
 60. Server test: a Codex quota banner while blocked holds, never pauses `needs-answer`.
 61. Flow "Rate-limit hold" (not paused); server test for the kept slot.
-62. Flow "Rate-limit hold" (text); `gx server tickets show <addr>` shows the hold.
+62. Flow "Rate-limit hold" (text); `gx server tickets explain <addr>` shows the hold.
 63. Server test: no stall nudge during the hold.
 64. Server test: "continue" prompt at the reset.
 65. Server test on a fake clock: with zero reset time, "continue" goes out every 5 minutes; the hold
@@ -697,7 +697,10 @@ Per story:
   wait loop, and the old copy is deleted if nothing in production calls it. Keeping two copies would
   let them drift.
 - How does a Queue agent row leave the list? With its PTY session: once gx stops the session at
-  finish, or a person stops it. A ticket paused with its agent still alive (blocked or asking) keeps
+  finish, or a person pauses or cancels the ticket from the Queue tab. A Queue agent row offers view
+  and type only: stop, remove and restore (TUI `x`/`d`/`r`, web buttons) are hidden on it, and the
+  session write routes refuse a Queue agent id. Decided at create-tickets (2026-10-30).
+  A ticket paused with its agent still alive (blocked or asking) keeps
   its row. The list shows live hosting, not ticket status.
 
 ## Further Notes
