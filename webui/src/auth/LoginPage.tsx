@@ -3,10 +3,13 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { AuthCard } from "./AuthCard";
 import { ErrorLine, Field } from "./AuthFields";
-import { postAuth, type AuthResult, type AuthState } from "./authState";
+import { postAuth, SETUP_CODE_WRONG, type AuthResult, type AuthState } from "./authState";
+import { AddAuthenticator, TOTP_MISMATCH } from "./AddAuthenticator";
 
 const WRONG_CREDENTIALS = "wrong-credentials";
 const RATE_LIMITED = "rate-limited";
+const SETUP_CODE_WRONG_REASON = "setup-code-wrong";
+const TOTP_MISMATCH_REASON = "totp-mismatch";
 
 export interface LoginCardProps {
   totpOn: boolean;
@@ -15,8 +18,34 @@ export interface LoginCardProps {
   submitDisabled?: boolean;
   /** Echoed back into the fields; only the gallery sets it. */
   password?: string;
-  secret?: string;
+  setupCode?: string;
   onSubmit?: (e: FormEvent<HTMLFormElement>) => void;
+}
+
+export interface LoginAuthenticatorCardProps {
+  secret: string;
+  uri: string;
+  error?: string;
+  onSubmit?: (e: FormEvent<HTMLFormElement>) => void;
+}
+
+export function LoginAuthenticatorCard({ secret, uri, error, onSubmit }: LoginAuthenticatorCardProps) {
+  return (
+    <AuthCard below={<TrustHelp />}>
+      <chakra.form onSubmit={onSubmit} display="flex" flexDirection="column" gap="4">
+        <Heading as="h1" data-mock-part="heading" fontFamily="condensed" fontSize="xl">
+          Add gx to your authenticator app
+        </Heading>
+        <AddAuthenticator secret={secret} uri={uri} error={error} />
+        <Button type="submit" data-mock-part="submit" style={{ justifyContent: "center" }}>
+          Sign in
+        </Button>
+        <Text data-mock-part="save-note" fontSize="xs" color="text.dim">
+          gx saves nothing until this code checks out.
+        </Text>
+      </chakra.form>
+    </AuthCard>
+  );
 }
 
 // The trust help's unfolded content is a later ticket.
@@ -30,7 +59,7 @@ export function TrustHelp() {
   );
 }
 
-export function LoginCard({ totpOn, setupCodeRequired, error, submitDisabled, password, secret, onSubmit }: LoginCardProps) {
+export function LoginCard({ totpOn, setupCodeRequired, error, submitDisabled, password, setupCode, onSubmit }: LoginCardProps) {
   return (
     <AuthCard below={<TrustHelp />}>
       <chakra.form onSubmit={onSubmit} display="flex" flexDirection="column" gap="4">
@@ -38,6 +67,9 @@ export function LoginCard({ totpOn, setupCodeRequired, error, submitDisabled, pa
           Sign in
         </Heading>
         {error && <ErrorLine>{error}</ErrorLine>}
+        {setupCodeRequired && (
+          <Field part="setup-code" label="Setup code" name="setup_code" placeholder="XXXX-XXXX" defaultValue={setupCode} />
+        )}
         <Field part="password" label="Password" name="password" type="password" defaultValue={password} autoFocus />
         {totpOn && (
           <Field
@@ -49,11 +81,9 @@ export function LoginCard({ totpOn, setupCodeRequired, error, submitDisabled, pa
             autoComplete="one-time-code"
           />
         )}
-        {setupCodeRequired && <Field label="Setup code" name="setup_code" placeholder="XXXX-XXXX" />}
         <Button type="submit" data-mock-part="submit" disabled={submitDisabled} style={{ justifyContent: "center" }}>
           Sign in
         </Button>
-        {secret && <Text>{secret}</Text>}
         <Text data-mock-part="reset-hint" fontSize="xs" color="text.dim">
           Forgot the password or lost the authenticator? Run <code>gx server web-reset</code> on the server.
         </Text>
@@ -69,6 +99,8 @@ export function rateLimitText(waitSeconds: number): string {
 
 function refusalText(res: AuthResult): string {
   if (res.reason === WRONG_CREDENTIALS) return "Wrong password or code";
+  if (res.reason === SETUP_CODE_WRONG_REASON) return SETUP_CODE_WRONG;
+  if (res.reason === TOTP_MISMATCH_REASON) return TOTP_MISMATCH;
   if (res.reason === RATE_LIMITED && res.wait_seconds) return rateLimitText(res.wait_seconds);
   return res.reason ?? "Sign in refused";
 }
@@ -79,7 +111,7 @@ function value(form: HTMLFormElement, name: string): string {
 
 export function LoginPage({ auth, onDone }: { auth: AuthState; onDone: () => void }) {
   const [error, setError] = useState("");
-  const [secret, setSecret] = useState("");
+  const [authenticator, setAuthenticator] = useState<{ pending_id: string; secret: string; uri: string } | null>(null);
   const [limited, setLimited] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -92,7 +124,9 @@ export function LoginPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
     try {
       const res = await postAuth("login", body);
       setError(res.refused ? refusalText(res) : "");
-      setSecret(res.authenticator_needed ? (res.secret ?? "") : "");
+      if (res.authenticator_needed) {
+        setAuthenticator({ pending_id: res.pending_id ?? "", secret: res.secret ?? "", uri: res.uri ?? "" });
+      }
       if (res.refused && res.reason === RATE_LIMITED && res.wait_seconds) {
         setLimited(true);
         clearTimeout(timer.current);
@@ -106,13 +140,33 @@ export function LoginPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
       setError(String(err));
     }
   };
+  const onAddAuthenticator = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const totp_code = value(e.currentTarget, "totp_code");
+    try {
+      const res = await postAuth("add-authenticator", { pending_id: authenticator?.pending_id, totp_code });
+      if (res.refused) return setError(refusalText(res));
+      onDone();
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+  if (authenticator) {
+    return (
+      <LoginAuthenticatorCard
+        secret={authenticator.secret}
+        uri={authenticator.uri}
+        error={error}
+        onSubmit={(e) => void onAddAuthenticator(e)}
+      />
+    );
+  }
   return (
     <LoginCard
       totpOn={auth.totp_on}
       setupCodeRequired={auth.setup_code_required}
       error={error}
       submitDisabled={limited}
-      secret={secret}
       onSubmit={(e) => void onSubmit(e)}
     />
   );

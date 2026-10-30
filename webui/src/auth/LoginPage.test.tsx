@@ -78,6 +78,60 @@ test("success sends the password and code and calls the gate", async () => {
   expect(sentBody(fetchMock)).toEqual({ password: "pw", totp_code: "123456" });
 });
 
+const URI = "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP&issuer=gx";
+
+test("the Setup code field shows only when the auth state asks and is sent with the password", async () => {
+  renderThemed(<LoginPage auth={authOf(true)} onDone={() => {}} />);
+  expect(screen.queryByLabelText("Setup code")).toBeNull();
+  cleanup();
+  const fetchMock = stubLogin({});
+  const onDone = vi.fn();
+  renderThemed(<LoginPage auth={{ ...authOf(true), setup_code_required: true }} onDone={onDone} />);
+  fireEvent.change(screen.getByLabelText("Setup code"), { target: { value: "K7QM-3XPD" } });
+  fireEvent.change(screen.getByLabelText("Password"), { target: { value: "pw" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  await waitFor(() => expect(onDone).toHaveBeenCalled());
+  expect(sentBody(fetchMock)).toEqual({ password: "pw", totp_code: "", setup_code: "K7QM-3XPD" });
+});
+
+test("a wrong Setup code shows the wrong-or-expired message", async () => {
+  stubLogin({ refused: true, reason: "setup-code-wrong" });
+  renderThemed(<LoginPage auth={{ ...authOf(true), setup_code_required: true }} onDone={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  expect((await screen.findByRole("alert")).textContent).toBe(
+    "That code is wrong or expired. Run gx server status for a new one.",
+  );
+});
+
+test("an authenticator-needed answer shows the add step; a mismatch shows the clock message; success signs in", async () => {
+  const answers: AuthResult[] = [
+    { authenticator_needed: true, pending_id: "p1", secret: "JBSWY3DPEHPK3PXP", uri: URI },
+    { refused: true, reason: "totp-mismatch" },
+    {},
+  ];
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify(answers.shift())));
+  vi.stubGlobal("fetch", fetchMock);
+  const onDone = vi.fn();
+  const { container } = renderThemed(<LoginPage auth={authOf(true)} onDone={onDone} />);
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  const link = await screen.findByRole("link", { name: "Add to authenticator app" });
+  expect(link.getAttribute("href")).toBe(URI);
+  expect(container.querySelector("[data-mock-part=totp-qr] svg")).not.toBeNull();
+  expect(screen.getByText("JBSW Y3DP EHPK 3PXP")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Enter the code it shows"), { target: { value: "000000" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  expect((await screen.findByRole("alert")).textContent).toBe(
+    "That code doesn't match. Check the clock on your phone and try again.",
+  );
+  expect(onDone).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("Enter the code it shows"), { target: { value: "123456" } });
+  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  await waitFor(() => expect(onDone).toHaveBeenCalled());
+  const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+  expect(calls[2][0]).toContain("/v1/web/auth/add-authenticator");
+  expect(JSON.parse(calls[2][1].body as string)).toEqual({ pending_id: "p1", totp_code: "123456" });
+});
+
 test("the reset hint and the folded certificate help are shown", () => {
   renderThemed(<LoginPage auth={authOf(true)} onDone={() => {}} />);
   expect(screen.getByText("gx server web-reset")).toBeTruthy();

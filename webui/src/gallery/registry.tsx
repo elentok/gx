@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
-import { LoginCard, rateLimitText } from "../auth/LoginPage";
+import { LoginAuthenticatorCard, LoginCard, rateLimitText } from "../auth/LoginPage";
 import { TOTP_MISMATCH } from "../auth/AddAuthenticator";
 import { SetupCodeCard, SetupPasswordCard, SetupTotpCard } from "../auth/SetupPage";
 import { ConnectionContext, type Connection } from "../connection";
@@ -780,6 +780,26 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "default", node: <LoginCard totpOn /> },
       { label: "wrong password or code", node: <LoginCard totpOn password="hunter2hunter2" error="Wrong password or code" /> },
       { label: "TOTP off", node: <LoginCard totpOn={false} /> },
+      { label: "setup code", node: <LoginCard totpOn setupCodeRequired setupCode="K7QM-3XPD" /> },
+      {
+        label: "setup code wrong or expired",
+        node: (
+          <LoginCard
+            totpOn
+            setupCodeRequired
+            setupCode="K7QM-3XPP"
+            error="That code is wrong or expired. Run gx server status for a new one."
+          />
+        ),
+      },
+      {
+        label: "add authenticator",
+        node: <LoginAuthenticatorCard secret="JBSWY3DPEHPK3PXP4N2Q7ZLA" uri={GALLERY_OTPAUTH_URI} />,
+      },
+      {
+        label: "add authenticator, clock mismatch",
+        node: <LoginAuthenticatorCard secret="JBSWY3DPEHPK3PXP4N2Q7ZLA" uri={GALLERY_OTPAUTH_URI} error={TOTP_MISMATCH} />,
+      },
       {
         label: "rate limited",
         node: <LoginCard totpOn password="hunter2hunter2" error={rateLimitText(181)} submitDisabled />,

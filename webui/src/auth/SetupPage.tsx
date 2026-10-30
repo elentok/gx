@@ -4,12 +4,11 @@ import { Button } from "../ui/button/Button";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { AuthCard } from "./AuthCard";
 import { ErrorLine, Field } from "./AuthFields";
-import { postAuth, type AuthState } from "./authState";
+import { postAuth, SETUP_CODE_WRONG as WRONG_CODE, type AuthState } from "./authState";
 import { AddAuthenticator, TOTP_MISMATCH } from "./AddAuthenticator";
 import { TrustHelp } from "./LoginPage";
 
 const SETUP_HASH = "#/setup";
-const WRONG_CODE = "That code is wrong or expired. Run gx server status for a new one.";
 const MIN_PASSWORD = 12;
 const SHORT_PASSWORD = `The password needs at least ${MIN_PASSWORD} characters.`;
 const MISMATCH = "The two passwords don't match.";

@@ -23,7 +23,12 @@ export async function fetchAuthState(): Promise<AuthState> {
   return res.json();
 }
 
-export async function postAuth(step: "setup-start" | "setup-finish" | "login", body: object): Promise<AuthResult> {
+export const SETUP_CODE_WRONG = "That code is wrong or expired. Run gx server status for a new one.";
+
+export async function postAuth(
+  step: "setup-start" | "setup-finish" | "login" | "add-authenticator",
+  body: object,
+): Promise<AuthResult> {
   const res = await apiFetch(`/v1/web/auth/${step}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
