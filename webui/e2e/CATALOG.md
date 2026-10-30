@@ -1242,3 +1242,21 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
 - **Scenario:** `web-logins`
 - **Steps:** open "Reset authenticator", enter the password and a code, click Next, read the key, then go back to Settings. Sign in from a new context with the old secret. Open the page again and click Next, enter a wrong code, then a code from the new key shown. Open Web logins. Sign in from new contexts with a code from the old secret, then from the new one.
 - **Pass:** the second step shows the QR code, the "Add to authenticator app" link, the key and the keep note. The old secret still signs in after leaving. The wrong code shows "That code doesn't match." After saving, Web logins has one row, the old secret is refused and the new one signs in.
+
+## 110. Web reset from the CLI
+
+- **Scenario:** `web-logins`
+- **Steps:** run `gx server web-reset --yes`. Enter the printed setup code, a password twice and a code from the key shown.
+- **Pass:** the open page shows setup step 1 of 3 with no reload. The printed code finishes setup and the Epics page shows.
+
+## 111. CLI revoke
+
+- **Scenario:** `web-logins`
+- **Steps:** open Web logins, read this device's id from its row, then run `gx server web-revoke <id>`.
+- **Pass:** the open page shows the login page with no reload. `gx server web-logins` no longer lists the id.
+
+## 112. Add the authenticator after a CLI reset
+
+- **Scenario:** `web-login`
+- **Steps:** run `gx server web-reset-authenticator`. Open `web_url`. Submit the password without the setup code, then with it. Enter a wrong code, then a code from the key shown. In a new context, sign in with the old secret.
+- **Pass:** the CLI prints a setup code and no key. The login card shows a Setup code field above the password. The password alone is refused. The next step shows the QR code, an `otpauth://totp/` link, the key and one code field. A wrong code shows "Wrong password or code". The right code opens the Epics page. The old secret is refused.

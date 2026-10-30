@@ -46,11 +46,22 @@ test("login asks for the setup code only when the state says so", async () => {
 
 test("a 401 in the app switches to login and keeps the hash", async () => {
   window.location.hash = "#/stats";
-  renderGate(async () => stateOf("signed-in"));
+  let current = stateOf("signed-in");
+  renderGate(async () => current);
   await screen.findByText("the app");
+  current = stateOf("signed-out");
   act(() => signOut());
   expect(await screen.findByRole("button", { name: "Sign in" })).toBeTruthy();
   expect(window.location.hash).toBe("#/stats");
+});
+
+test("a 401 after a web reset switches to setup", async () => {
+  let current = stateOf("signed-in");
+  renderGate(async () => current);
+  await screen.findByText("the app");
+  current = stateOf("setup");
+  act(() => signOut());
+  expect(await screen.findByLabelText("Setup code")).toBeTruthy();
 });
 
 test("a successful login re-reads the state and keeps the hash", async () => {

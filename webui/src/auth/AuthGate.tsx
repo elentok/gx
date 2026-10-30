@@ -26,11 +26,8 @@ export function AuthGate({
   }, [fetchState]);
 
   useEffect(refresh, [refresh]);
-  // A 401 is the signed-out signal; keep the flags so the login page still knows what to ask for.
-  useEffect(
-    () => onSignedOut(() => setAuth((a) => (a ? { ...a, state: "signed-out" } : a))),
-    [],
-  );
+  // A 401 is the signed-out signal. Re-read the state: a `gx server web-reset` leaves nothing to sign in to, so the page has to move to setup.
+  useEffect(() => onSignedOut(refresh), [refresh]);
 
   if (failed) return <AuthCard>Could not reach the server.</AuthCard>;
   if (!auth) return <Spinner label="Loading" />;

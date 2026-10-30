@@ -177,3 +177,96 @@ test("109. Reset authenticator", async ({ page, start }) => {
     await browser.close();
   }
 });
+
+/** The Setup code a CLI reset prints. */
+const printedSetupCode = (out: string) => {
+  const code = out.match(/setup code: (\S+)/)?.[1];
+  if (!code) throw new Error(`the CLI printed no setup code:\n${out}`);
+  return code;
+};
+
+test("110. Web reset from the CLI", async ({ page, start }) => {
+  const fixture = await start("web-logins");
+  await expect(page.getByRole("heading", { name: "Sign in" })).toHaveCount(0);
+
+  const code = printedSetupCode(await fixture.cli("server", "web-reset", "--yes"));
+  await expect(page.getByText("step 1 of 3")).toBeVisible();
+
+  const password = "a fresh passphrase 123";
+  await page.getByLabel("Setup code").fill(code);
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.locator('[data-mock-part="password"] input').fill(password);
+  await page.locator('[data-mock-part="password-again"] input').fill(password);
+  await page.getByRole("button", { name: "Continue" }).click();
+  fixture.useTotpSecret(await page.locator('[data-mock-part="totp-key"] code').innerText());
+  await page.getByLabel("Enter the code it shows").fill(await fixture.nextTotpCode());
+  await page.getByRole("button", { name: "Finish setup" }).click();
+  await expect(page.getByRole("link", { name: "Epics", exact: true }).or(page.getByRole("heading", { name: "Epics" })).first()).toBeVisible();
+});
+
+test("111. CLI revoke", async ({ page, start }) => {
+  const fixture = await start("web-logins");
+  await openWebLogins(page);
+  const href = await loginRows(page).filter({ has: page.getByText("This device") }).getAttribute("href");
+  const id = href?.split("/").pop();
+  expect(id, "the Web logins page links this device by id").toBeTruthy();
+
+  await fixture.cli("server", "web-revoke", id!);
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  expect(await loginIds(fixture)).not.toContain(id);
+});
+
+test("112. Add the authenticator after a CLI reset", async ({ page: first, start }) => {
+  // Two codes, each waits for a new 30 second TOTP step.
+  test.setTimeout(180_000);
+  const fixture = await start("web-login");
+  const oldSecret = fixture.totpSecret;
+
+  const out = await fixture.cli("server", "web-reset-authenticator");
+  const code = printedSetupCode(out);
+  expect(out, "the CLI prints no key").not.toContain(oldSecret);
+
+  // The login page reads its flags on load, and the fixture fails a flow whose first page reloads, so it opens in a new page.
+  const page = await first.context().newPage();
+  await page.goto(first.url());
+  await expect(page.getByLabel("Setup code")).toBeVisible();
+  const order = await page.locator("label").allInnerTexts();
+  expect(order.findIndex((t) => t.startsWith("Setup code"))).toBeLessThan(order.findIndex((t) => t.startsWith("Password")));
+
+  const submit = async (setupCode: string) => {
+    await page.getByLabel("Setup code").fill(setupCode);
+    await page.getByLabel("Password").fill(fixture.password);
+    const totp = page.getByLabel(/Code from your authenticator app/);
+    if (await totp.count()) await totp.fill("000000");
+    await page.getByRole("button", { name: "Sign in" }).click();
+  };
+
+  await submit("");
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Add gx to your authenticator app" })).toHaveCount(0);
+
+  await submit(code);
+  await expect(page.getByRole("heading", { name: "Add gx to your authenticator app" })).toBeVisible();
+  await expect(page.locator('[data-mock-part="totp-qr"] svg')).toBeVisible();
+  await expect(page.getByRole("link", { name: "Add to authenticator app" })).toHaveAttribute("href", /^otpauth:\/\/totp\//);
+  const key = await page.locator('[data-mock-part="totp-key"] code').innerText();
+  expect(key.replace(/\s/g, "")).not.toBe(oldSecret);
+
+  await page.getByLabel("Enter the code it shows").fill("000000");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("alert")).toHaveText("Wrong password or code");
+
+  fixture.useTotpSecret(key);
+  await page.getByLabel("Enter the code it shows").fill(await fixture.nextTotpCode());
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("link", { name: "Epics", exact: true }).or(page.getByRole("heading", { name: "Epics" })).first()).toBeVisible();
+
+  const browser = await chromium.launch();
+  try {
+    fixture.useTotpSecret(oldSecret);
+    const rejected = await signInElsewhere(browser, page.url(), fixture.password, await fixture.nextTotpCode());
+    await expect(rejected.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  } finally {
+    await browser.close();
+  }
+});
