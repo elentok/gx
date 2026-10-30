@@ -85,7 +85,17 @@ export function SettingsHomeView({ loginCount, totpOn, onSignOut }: { loginCount
 }
 
 const BackLink = () => (
-  <chakra.a href={SETTINGS_HREF} display="inline-block" fontSize="sm" color="text.muted" mb="2" _hover={{ color: "text" }}>
+  <chakra.a
+    href={SETTINGS_HREF}
+    display="inline-flex"
+    alignItems="center"
+    h="8"
+    px="3"
+    fontSize="sm"
+    fontWeight="600"
+    color="text.muted"
+    _hover={{ color: "text" }}
+  >
     ‹ Settings
   </chakra.a>
 );
@@ -95,14 +105,14 @@ export function WebLoginsView({ logins, now }: { logins: WebLoginEntry[]; now: n
     <Frame>
       <BackLink />
       <PageHeader title="Web logins" />
-      <Text mt="2" color="text.muted">
+      <Text mt="2" fontSize="sm" color="text.muted">
         A web login ends after 90 days without use.
       </Text>
       <Group>
         {logins.map((login) => {
           const endsIn = endsInDays(login.last_used, now);
           return (
-            <chakra.a key={login.id} href={`${LOGINS_HREF}/${login.id}`} {...rowProps}>
+            <chakra.a key={login.id} href={`${LOGINS_HREF}/${login.id}`} {...rowProps} py="1">
               <Box flex="1" minW="0">
                 <Text fontWeight="600">{login.name}</Text>
                 <Text fontSize="sm" color={endsIn === undefined ? "text.muted" : "tone.waiting.fg"}>

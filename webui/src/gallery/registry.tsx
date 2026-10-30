@@ -830,6 +830,20 @@ export const galleryEntries: GalleryEntry[] = [
           />
         ),
       },
+      {
+        label: "desktop, four logins",
+        node: (
+          <WebLoginsView
+            now={Date.now()}
+            logins={[
+              { id: "a", name: "Safari on iPhone", last_used: new Date().toISOString(), last_ip: "192.168.1.23", this_device: true },
+              { id: "b", name: "Chrome on Mac", last_used: new Date(Date.now() - 2 * 3600_000).toISOString(), last_ip: "100.101.12.4", this_device: false },
+              { id: "c", name: "Home-screen app on iPad", last_used: new Date(Date.now() - 12 * 86400_000).toISOString(), last_ip: "192.168.1.40", this_device: false },
+              { id: "d", name: "Firefox on Linux", last_used: new Date(Date.now() - 71 * 86400_000).toISOString(), last_ip: "192.168.1.41", this_device: false },
+            ]}
+          />
+        ),
+      },
     ],
   },
   {
