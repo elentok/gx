@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -101,17 +103,42 @@ func (u *usageSamples) scan(agentsRoot string) error {
 // ahead of now. A window past its reset is not at limit even if no newer
 // sample arrived. The five-hour window is preferred when both are at limit.
 func (u *usageSamples) atLimit(now time.Time) (*nativerunner.UsageWindow, bool) {
+	_, w, ok := u.limitWindow(now)
+	return w, ok
+}
+
+// limitWindow is atLimit plus the window's name as the gate wording uses it.
+func (u *usageSamples) limitWindow(now time.Time) (string, *nativerunner.UsageWindow, bool) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	if u.sample == nil {
-		return nil, false
+		return "", nil, false
 	}
-	for _, w := range []*nativerunner.UsageWindow{u.sample.FiveHour, u.sample.SevenDay} {
-		if w != nil && w.UsedPercentage >= usageLimitPercent && time.Unix(w.ResetsAt, 0).After(now) {
-			return w, true
+	windows := []struct {
+		name string
+		w    *nativerunner.UsageWindow
+	}{{"5-hour", u.sample.FiveHour}, {"weekly", u.sample.SevenDay}}
+	for _, c := range windows {
+		if c.w != nil && c.w.UsedPercentage >= usageLimitPercent && time.Unix(c.w.ResetsAt, 0).After(now) {
+			return c.name, c.w, true
 		}
 	}
-	return nil, false
+	return "", nil, false
+}
+
+// usageGate holds a new Claude claim while a usage window is at its limit.
+// Extra usage does not lift it. The verdict is the whole phrase, like
+// rateLimitVerdict.
+func (s *Server) usageGate(agent ralphloop.AgentKind, now time.Time) (string, bool) {
+	if agent != ralphloop.AgentClaude {
+		return "", false
+	}
+	name, w, ok := s.usage.limitWindow(now)
+	if !ok {
+		return "", false
+	}
+	return fmt.Sprintf("usage at %.0f%% of the %s limit, resets %s", w.UsedPercentage, name,
+		time.Unix(w.ResetsAt, 0).UTC().Format(time.RFC3339)), true
 }
 
 // usageWindowAtLimit is the window at its limit now, if any.

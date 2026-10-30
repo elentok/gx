@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets"
 )
 
 type usageRig struct {
@@ -143,6 +146,28 @@ func TestUsageSample_SevenDayWindowCounts(t *testing.T) {
 	w, ok := s.usageWindowAtLimit(now)
 	if !ok || w.UsedPercentage != 98 {
 		t.Fatalf("window = %+v, %v; want the 98%% seven-day window", w, ok)
+	}
+}
+
+func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
+	t.Parallel()
+	r := newUsageRig(t)
+	s := r.server()
+	now := time.Now()
+	r.write("a", usageRecord(now, 99, now.Add(time.Hour)))
+	s.scanUsage()
+
+	h, held := s.claimHold("proj", tickets.Ticket{}, ralphloop.AgentClaude)
+	if !held || !strings.HasPrefix(h.Verdict, "usage at 99% of the 5-hour limit") {
+		t.Fatalf("gate alone = %+v, %v", h, held)
+	}
+
+	reset := now.Add(2 * time.Hour)
+	s.registry.runs["proj:e/01"] = trackedRun{Run: Run{Address: "proj:e/01", Agent: string(ralphloop.AgentClaude)}}
+	s.registry.markRateLimit("proj:e/01", true, reset)
+	h, held = s.claimHold("proj", tickets.Ticket{}, ralphloop.AgentClaude)
+	if !held || h.Verdict != rateLimitVerdict(reset) {
+		t.Errorf("hold and gate = %+v, %v; want the hold's verdict", h, held)
 	}
 }
 

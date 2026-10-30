@@ -1,8 +1,11 @@
 package server
 
 import (
+	"time"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/tickets"
 )
 
 // VerdictHerdrDown is the explain verdict for a queued ticket that launches on
@@ -18,13 +21,19 @@ type claimHold struct {
 
 // claimHold asks whether a ticket of agent in project is held from claiming.
 // claimRoot and scheduleVerdict both ask it, so a rule added here holds the
-// ticket and explains the wait.
-func (s *Server) claimHold(project string, agent ralphloop.AgentKind) (claimHold, bool) {
+// ticket and explains the wait. The usage gate comes last, so a rate-limit
+// hold's reason wins; a handoff restart (an answered ticket) is never gated.
+func (s *Server) claimHold(project string, t tickets.Ticket, agent ralphloop.AgentKind) (claimHold, bool) {
 	if reason, held := s.herdrHolds(s.launchRunner(project, agent)); held {
 		return claimHold{Verdict: VerdictHerdrDown, Reason: reason}, true
 	}
 	if t, held := s.registry.rateLimitHeld(string(agent)); held {
 		return claimHold{Verdict: rateLimitVerdict(t.RateLimitReset)}, true
+	}
+	if answeredSession(t) == "" {
+		if v, held := s.usageGate(agent, time.Now()); held {
+			return claimHold{Verdict: v}, true
+		}
 	}
 	return claimHold{}, false
 }

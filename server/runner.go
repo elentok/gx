@@ -371,7 +371,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 		}
 		s.refused.set(ticketAddr, false)
 		agent := ticketAgent(t, ralphloop.AgentKind(item.Agent))
-		if _, held := s.claimHold(addr.Project, agent); held {
+		if _, held := s.claimHold(addr.Project, t, agent); held {
 			return false, nil
 		}
 		return s.claimAndLaunch(root, addr, t, repo, agent, loaded)

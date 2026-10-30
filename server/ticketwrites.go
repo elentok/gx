@@ -32,6 +32,8 @@ const (
 	// ReasonBudgetLimit refuses a relaunch or nudge past the daily soft
 	// limit (the hard limit implies it), as claims are held back.
 	ReasonBudgetLimit = "budget-limit"
+	// ReasonUsageLimit refuses an automatic relaunch while the usage gate holds.
+	ReasonUsageLimit = "usage-limit"
 )
 
 // budgetRefusal refuses new agent work past the daily soft limit; ok is
@@ -251,6 +253,11 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		}
 		if res, refused := s.budgetRefusal(); refused {
 			return res, nil
+		}
+		if req.actor != "" {
+			if v, held := s.usageGate(ticketAgent(ref.ticket, ralphloop.AgentClaude), time.Now()); held {
+				return refusal(ReasonUsageLimit, v), nil
+			}
 		}
 		if d, held := s.freshHeldDisk(ref.addr.Project); held {
 			return refusal(ReasonDiskLow, diskLowReason(d)), nil
