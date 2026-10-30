@@ -267,6 +267,14 @@ type Nudger interface {
 	PromptNudged(s Session, text string, onNudge func(decision string)) error
 }
 
+// PersonInputter is implemented by runners whose agent a person can type into
+// (pty). PersonInput sends on events each time a person presses a key or
+// pastes; watching alone sends nothing. Events collapse while the receiver is
+// busy. stop ends the subscription.
+type PersonInputter interface {
+	PersonInput(s Session) (events <-chan struct{}, stop func(), err error)
+}
+
 // PromptNudged is r.Prompt reporting nudge decisions to onNudge; a runner
 // that never nudges just prompts.
 func PromptNudged(r Runner, s Session, text string, onNudge func(decision string)) error {

@@ -826,17 +826,74 @@ func (p *Pty) PromptNudged(s agentrunner.Session, text string, onNudge func(stri
 		return err
 	}
 	pr := &ptyPrompter{p: p, ss: ss, turn: turn}
-	if isSlashCommand(text) {
-		return p.promptSlash(pr, text)
+	// Without the watch op a person's keys go unseen, as on any older holder.
+	if person, stop, err := p.PersonInput(s); err == nil {
+		defer stop()
+		pr.person = person
 	}
-	// One bare-Enter nudge and one retype, then ErrNotDelivered: herdr's caps
-	// would hold a stuck prompt for minutes before the loop hears of it.
-	caps := claudeui.NudgeCaps{Grace: p.promptGrace(), Nudges: 2, Retypes: 1}
-	err = claudeui.PromptWithNudge(pr, text, caps, time.Time{}, time.Now, claudeui.ReportDecisions(onNudge))
+	if err := pr.awaitEmptyInput(p.promptGrace()); err != nil {
+		return notDelivered(err)
+	}
+	if isSlashCommand(text) {
+		err = p.promptSlash(pr, text)
+	} else {
+		// One bare-Enter nudge and one retype, then ErrNotDelivered: herdr's caps
+		// would hold a stuck prompt for minutes before the loop hears of it.
+		caps := claudeui.NudgeCaps{Grace: p.promptGrace(), Nudges: 2, Retypes: 1}
+		err = claudeui.PromptWithNudge(pr, text, caps, time.Time{}, time.Now, claudeui.ReportDecisions(onNudge))
+	}
+	if errors.Is(err, errPersonInput) {
+		return nil
+	}
+	return notDelivered(err)
+}
+
+func notDelivered(err error) error {
 	if errors.Is(err, claudeui.ErrStuckSubmission) || errors.Is(err, claudeui.ErrStartTimeout) {
 		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
 	}
 	return err
+}
+
+var (
+	_ agentrunner.PersonInputter = (*Pty)(nil)
+
+	// errPersonInput ends a prompt once a person typed after gx did: the rest of
+	// its nudges would fight that input. It is not a failure.
+	errPersonInput = errors.New("a person typed after the prompt")
+)
+
+// PersonInput watches the holder for a person's keys and pastes. A holder
+// without the watch op returns an error.
+func (p *Pty) PersonInput(s agentrunner.Session) (<-chan struct{}, func(), error) {
+	ss, err := p.live(s)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !ss.holder.Supports(OpWatch) {
+		return nil, nil, errors.New("holder has no watch op")
+	}
+	watch, err := ss.holder.Watch()
+	if err != nil {
+		return nil, nil, err
+	}
+	events := make(chan struct{}, 1)
+	go func() {
+		for {
+			m, err := watch.Next()
+			if err != nil {
+				return
+			}
+			if m.Type != StreamInput {
+				continue
+			}
+			select {
+			case events <- struct{}{}:
+			default:
+			}
+		}
+	}()
+	return events, func() { _ = watch.Close() }, nil
 }
 
 // isSlashCommand reports whether text is a "/" command that takes the
@@ -901,21 +958,80 @@ func (p *Pty) awaitNotBusy(ss *ptySession) (int, error) {
 
 // ptyPrompter is claudeui.Prompter over holder.sock. A turn has started once
 // the holder's Turn passes turn.
+//
+// person carries a person's input (nil when unseen). Input before gx typed is
+// the draft check's case; input after it sets stopped, and every later key or
+// wait returns errPersonInput.
 type ptyPrompter struct {
-	p    *Pty
-	ss   *ptySession
-	turn int
+	p       *Pty
+	ss      *ptySession
+	turn    int
+	person  <-chan struct{}
+	typed   bool
+	stopped bool
+}
+
+// cancelled returns errPersonInput once a person typed after gx did.
+func (pr *ptyPrompter) cancelled() error {
+	if !pr.typed {
+		return nil
+	}
+	if !pr.stopped {
+		select {
+		case <-pr.person:
+			pr.stopped = true
+		default:
+		}
+	}
+	if pr.stopped {
+		return errPersonInput
+	}
+	return nil
+}
+
+// awaitEmptyInput waits up to wait for a person's draft to go, so gx never
+// types over it. A check that can't decide types as before.
+func (pr *ptyPrompter) awaitEmptyInput(wait time.Duration) error {
+	deadline := time.Now().Add(wait)
+	for {
+		empty, known, err := pr.InputEmpty()
+		if err != nil || empty || !known {
+			return err
+		}
+		if !time.Now().Before(deadline) {
+			return fmt.Errorf("%w: %w", claudeui.ErrStuckSubmission, claudeui.ErrInputNotEmpty)
+		}
+		select {
+		case <-pr.ss.exited:
+			return pr.p.died(pr.ss, errors.New("holder exited"))
+		case <-time.After(pr.p.pollInterval()):
+		}
+	}
 }
 
 func (pr *ptyPrompter) Submit(text string) error {
+	if err := pr.cancelled(); err != nil {
+		return err
+	}
+	if !pr.typed {
+		// Input so far was before gx typed.
+		select {
+		case <-pr.person:
+		default:
+		}
+	}
 	if err := pr.ss.holder.TypeText(text); err != nil {
 		return pr.p.died(pr.ss, err)
 	}
+	pr.typed = true
 	return pr.SendEnter()
 }
 
 // Clear presses the harness clear key once.
 func (pr *ptyPrompter) Clear() error {
+	if err := pr.cancelled(); err != nil {
+		return err
+	}
 	return pr.p.died(pr.ss, pr.ss.holder.SendKeys(pr.p.typing().ClearKey()))
 }
 
@@ -971,11 +1087,19 @@ func (p *Pty) typing() harness.Typing {
 	return harness.ClaudeTypingIn(env)
 }
 
-func (pr *ptyPrompter) SendEnter() error { return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\r")) }
+func (pr *ptyPrompter) SendEnter() error {
+	if err := pr.cancelled(); err != nil {
+		return err
+	}
+	return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\r"))
+}
 
 func (pr *ptyPrompter) WaitStart(timeout time.Duration) (bool, error) {
 	deadline := time.Now().Add(timeout)
 	for {
+		if err := pr.cancelled(); err != nil {
+			return false, err
+		}
 		_, turn, err := pr.ss.holder.Status()
 		if err != nil {
 			return false, pr.p.died(pr.ss, err)

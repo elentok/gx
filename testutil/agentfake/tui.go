@@ -40,6 +40,10 @@ const (
 	// reporting on, as claude does, and counts the wheel events it reads on
 	// screen. An Esc then only interrupts as part of a sequence.
 	TUIMouseEnv = "GX_AGENTFAKE_TUI_MOUSE"
+	// TUIDraftEnv, when not empty, seeds the input with that draft and draws
+	// the input row as claude does: a styled marker, and a dim placeholder while
+	// empty, so a draft check can decide.
+	TUIDraftEnv = "GX_AGENTFAKE_TUI_DRAFT"
 )
 
 // PermissionPromptPrefix, at the start of a submitted prompt, makes the TUI
@@ -225,6 +229,8 @@ type tuiOptions struct {
 	dropKey   bool
 	noPidFile bool
 	mouse     bool
+	// draft seeds the input; a non-empty one also styles the input row.
+	draft string
 	// model is --model, reported on every reply.
 	model string
 	// settings is --settings: inline JSON or a path to a JSON file.
@@ -264,6 +270,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		dropKey:   os.Getenv(TUITrustDropKeyEnv) == "1",
 		noPidFile: os.Getenv(TUINoPidFileEnv) == "1",
 		mouse:     os.Getenv(TUIMouseEnv) == "1",
+		draft:     os.Getenv(TUIDraftEnv),
 		model:     cmp.Or(*model, ReportedModel),
 		settings:  *settings,
 	}, nil
@@ -343,6 +350,7 @@ func runTUIClaude() (int, error) {
 			Entrypoint: "cli",
 		},
 	}
+	t.typed.WriteString(opts.draft)
 	return t.run(io.TeeReader(os.Stdin, in), ctl)
 }
 
@@ -893,6 +901,12 @@ func (t *tui) draw() {
 	case t.pid.Status == StatusBusy:
 		title = workingTitle
 		rows = []string{"> " + t.prompt, "✻ Working…"}
+	case t.opts.draft != "":
+		input := promptMarker + t.typed.String()
+		if t.typed.Len() == 0 {
+			input = promptMarker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m"
+		}
+		rows = []string{colored("✻ Welcome to Claude Code"), "", input}
 	default:
 		rows = []string{colored("✻ Welcome to Claude Code"), "", "> " + t.typed.String()}
 	}
