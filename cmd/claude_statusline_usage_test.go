@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/testutil/agentfake"
 )
 
 const usagePayload = `{"model":{"display_name":"Claude"},"rate_limits":{"five_hour":{"used_percentage":11.5,"resets_at":1790000000},"seven_day":{"used_percentage":72,"resets_at":1790500000}}}`
@@ -62,6 +63,37 @@ func TestClaudeStatusline_AgentDirWritesUsageRecord(t *testing.T) {
 	}
 	if rec.SeenAt.Before(before) || rec.SeenAt.After(time.Now()) {
 		t.Errorf("seen_at = %v, want about now", rec.SeenAt)
+	}
+}
+
+// The fake claude's payload is what the statusline mode records.
+func TestClaudeStatusline_RecordsFakeclaudePayload(t *testing.T) {
+	t.Parallel()
+	usage := &agentfake.UsageConfig{
+		FiveHour: agentfake.UsageWindow{UsedPercentage: 33, ResetsAt: 1790000000},
+		SevenDay: agentfake.UsageWindow{UsedPercentage: 9, ResetsAt: 1790500000},
+	}
+	payload, err := agentfake.StatusLinePayload("Claude", usage)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if _, err := runStatuslineCmd(t, string(payload), "--agent-dir", dir); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, nativerunner.UsageFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rec nativerunner.UsageRecord
+	if err := json.Unmarshal(data, &rec); err != nil {
+		t.Fatal(err)
+	}
+	if rec.FiveHour == nil || *rec.FiveHour != (nativerunner.UsageWindow{UsedPercentage: 33, ResetsAt: 1790000000}) {
+		t.Errorf("five_hour = %+v", rec.FiveHour)
+	}
+	if rec.SevenDay == nil || *rec.SevenDay != (nativerunner.UsageWindow{UsedPercentage: 9, ResetsAt: 1790500000}) {
+		t.Errorf("seven_day = %+v", rec.SevenDay)
 	}
 }
 

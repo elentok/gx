@@ -50,6 +50,20 @@ type WorkerConfig struct {
 	// reply land in the transcript and the turn ends. Off, a plain prompt only
 	// sets the fake busy.
 	Chat bool `json:"chat,omitempty"`
+	// Usage is the rate-limit usage the TUI fake reports to the statusLine
+	// command after each turn. Nil leaves rate_limits out, like an API-key account.
+	Usage *UsageConfig `json:"usage,omitempty"`
+}
+
+// UsageConfig is one account's rate-limit windows. ResetsAt is Unix seconds.
+type UsageConfig struct {
+	FiveHour UsageWindow `json:"five_hour"`
+	SevenDay UsageWindow `json:"seven_day"`
+}
+
+type UsageWindow struct {
+	UsedPercentage float64 `json:"used_percentage"`
+	ResetsAt       int64   `json:"resets_at"`
 }
 
 // What a worker does with a ticket.

@@ -227,6 +227,8 @@ type tuiOptions struct {
 	mouse     bool
 	// model is --model, reported on every reply.
 	model string
+	// settings is --settings: inline JSON or a path to a JSON file.
+	settings string
 }
 
 // parseTUIArgs accepts exactly the PTY runner's launch flags, so a new flag
@@ -236,7 +238,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	sessionID := fs.String("session-id", "", "")
 	resume := fs.String("resume", "", "")
 	fs.String("permission-mode", "", "")
-	fs.String("settings", "", "")
+	settings := fs.String("settings", "", "")
 	fs.String("disallowedTools", "", "")
 	fs.String("append-system-prompt", "", "")
 	fs.String("append-system-prompt-file", "", "")
@@ -263,6 +265,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		noPidFile: os.Getenv(TUINoPidFileEnv) == "1",
 		mouse:     os.Getenv(TUIMouseEnv) == "1",
 		model:     cmp.Or(*model, ReportedModel),
+		settings:  *settings,
 	}, nil
 }
 
@@ -752,7 +755,11 @@ func (t *tui) cancel() error {
 func (t *tui) handleControl(c Control) error {
 	switch c.Action {
 	case ActionFinish:
-		return t.setStatus(StatusIdle, "")
+		if err := t.setStatus(StatusIdle, ""); err != nil {
+			return err
+		}
+		t.runStatusLine()
+		return nil
 	case ActionBlock:
 		waitingFor := c.WaitingFor
 		if waitingFor == "" {
