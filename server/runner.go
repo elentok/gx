@@ -730,6 +730,9 @@ func (s *Server) prepareAndLaunch(
 // moves the root on: the next frontier ticket, or the root's completion.
 func (s *Server) finishRun(rc runContext) {
 	rc.one.Runner = rc.run.Runner
+	rc.one.OnRateLimit = func(limited bool, resetAt time.Time) {
+		s.registry.markRateLimit(rc.ticketAddr, limited, resetAt)
+	}
 	stop := make(chan struct{})
 	if !rc.one.PausesAtOnce() {
 		go s.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)

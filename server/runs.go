@@ -100,6 +100,11 @@ type trackedRun struct {
 	// Settling is set once settleRun starts merging the run, while the ticket
 	// still reads finished. Never saved: a restart reclaims and settles again.
 	Settling bool `json:"-"`
+	// RateLimited marks a run the wait loop holds for the agent's rate limit;
+	// RateLimitReset is when it resets (zero when unknown). Never saved: a
+	// restart re-derives the hold from the runner's rate-limit check.
+	RateLimited    bool      `json:"-"`
+	RateLimitReset time.Time `json:"-"`
 }
 
 // runRegistry is the server's own record of launched iterations, keyed by
@@ -397,6 +402,30 @@ func (r *runRegistry) markWaiting(address string, at time.Time) {
 		r.runs[address] = t
 		r.save()
 	}
+}
+
+// markRateLimit sets or clears the rate-limit hold of the run at address.
+func (r *runRegistry) markRateLimit(address string, limited bool, resetAt time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if t, ok := r.runs[address]; ok {
+		t.RateLimited, t.RateLimitReset = limited, resetAt
+		r.runs[address] = t
+	}
+}
+
+// rateLimitedRuns are the held runs, ordered by address.
+func (r *runRegistry) rateLimitedRuns() []trackedRun {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var held []trackedRun
+	for _, t := range r.runs {
+		if t.RateLimited {
+			held = append(held, t)
+		}
+	}
+	slices.SortFunc(held, func(a, b trackedRun) int { return strings.Compare(a.Address, b.Address) })
+	return held
 }
 
 // markSettling flags the run at address as inside settleRun.

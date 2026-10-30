@@ -25,6 +25,8 @@ const (
 	VerdictConcurrencyCap = "concurrency cap"
 	VerdictNotQueued      = "not queued"
 
+	VerdictRateLimited = "rate-limited"
+
 	VerdictWaitingOnAnswer    = "waiting on answer"
 	VerdictWaitingReleased    = "waiting (slot released)"
 	VerdictWaitingReleaseCapd = "waiting (slot held, release cap reached)"
@@ -49,6 +51,10 @@ type verdictLog struct {
 func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Address) Explanation {
 	// A launch is tracked before the index may have reread its claim.
 	claimed := t.Status == "claimed" || s.registry.has(addr.String())
+	// A rate-limit hold outranks every other wait reason.
+	if t, ok := s.registry.tracked(addr.String()); ok && t.RateLimited {
+		return Explanation{Address: addr.String(), Verdict: rateLimitVerdict(t.RateLimitReset)}
+	}
 	// A live agent waiting for its answer outranks the stored status.
 	if v, ok := s.waitingVerdict(addr); ok {
 		return Explanation{Address: addr.String(), Verdict: v}
@@ -75,6 +81,15 @@ func (s *Server) verdictOf(e tickets.Epic, t tickets.Ticket, addr tickets.Addres
 		}
 	}
 	return Explanation{Address: addr.String(), Verdict: string(d.Decision), Reason: d.Reason}
+}
+
+// rateLimitVerdict is the whole phrase a held run reads as: the verdict line
+// joins verdict and reason with a colon, so the phrase is carried as the verdict.
+func rateLimitVerdict(resetAt time.Time) string {
+	if resetAt.IsZero() {
+		return VerdictRateLimited
+	}
+	return VerdictRateLimited + ": resets " + resetAt.UTC().Format(time.RFC3339)
 }
 
 // waitingVerdict is the verdict of a ticket whose live agent waits for an answer.
@@ -227,6 +242,13 @@ func (s *Server) pendingRows() []PendingRow {
 			ex = Explanation{Verdict: "error", Reason: err.Error()}
 		}
 		rows = append(rows, PendingRow{Address: target.String(), Agent: item.Agent, Verdict: ex.Verdict, Reason: ex.Reason})
+	}
+	// A running ticket is no queue target; a held run still gets a row so the
+	// verdict plumbing shows its hold.
+	for _, t := range s.registry.rateLimitedRuns() {
+		if !covered[t.Address] {
+			rows = append(rows, PendingRow{Address: t.Address, Agent: t.Agent, Verdict: rateLimitVerdict(t.RateLimitReset)})
+		}
 	}
 	return rows
 }
