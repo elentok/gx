@@ -65,7 +65,7 @@ func TestPtyChecks_OnFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FixtureSource: %v", err)
 	}
-	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "permission-dialog": Pass, "rate-limit-screen": Skip, "holder-survives-kickstart": Skip}
+	want := map[string]Status{"pid-status": Pass, "trust-screen": Pass, "permission-dialog": Pass, "rate-limit-transcript": Pass, "holder-survives-kickstart": Skip}
 	got := map[string]Result{}
 	for _, r := range Run(Table, "pty", src) {
 		got[r.Name] = r
@@ -75,11 +75,30 @@ func TestPtyChecks_OnFixtures(t *testing.T) {
 			t.Errorf("%s: %+v, want %s", name, got[name], status)
 		}
 	}
-	if d := got["rate-limit-screen"].Detail; d != "banner never captured" {
-		t.Errorf("rate-limit-screen detail = %q", d)
-	}
 	if d := got["holder-survives-kickstart"].Detail; d != "live only" {
 		t.Errorf("holder-survives-kickstart detail = %q", d)
+	}
+}
+
+func TestCheckRateLimitTranscript_FailsWithoutARateLimit(t *testing.T) {
+	t.Parallel()
+	events := func(lines ...string) Input {
+		var raw []json.RawMessage
+		for _, l := range lines {
+			raw = append(raw, json.RawMessage(l))
+		}
+		return Input{Recording: Recording{Events: raw}}
+	}
+	reply := `{"type":"assistant","timestamp":"2026-10-11T07:00:00.000Z","message":{"content":"Done."}}`
+	serverErr := `{"type":"assistant","timestamp":"2026-10-11T07:02:00.000Z","isApiErrorMessage":true,"error":"server_error","message":{"content":"API Error"}}`
+	for name, in := range map[string]Input{
+		"no events":        {},
+		"only a reply":     events(reply),
+		"not a rate limit": events(reply, serverErr),
+	} {
+		if detail, ok := checkRateLimitTranscript(in); ok {
+			t.Errorf("%s: passed (%s)", name, detail)
+		}
 	}
 }
 

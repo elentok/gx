@@ -1,0 +1,4 @@
+{"claude_version":"2.1.296"}
+{"type":"assistant","timestamp":"2026-10-11T07:00:00.000Z","message":{"role":"assistant","content":[{"type":"text","text":"Done."}]}}
+{"type":"user","timestamp":"2026-10-11T07:01:00.000Z","message":{"role":"user","content":"keep going"}}
+{"type":"assistant","timestamp":"2026-10-11T07:02:00.000Z","isApiErrorMessage":true,"error":"rate_limit","apiErrorStatus":429,"message":{"role":"assistant","content":[{"type":"text","text":"You've hit your session limit · resets 11pm (Asia/Jerusalem)"}]}}

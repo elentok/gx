@@ -62,7 +62,12 @@ func TestPtyLive_RecordsTrustFrameAndWaitingSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PtyLive: %v", err)
 	}
-	src := claudedoctor.Source{Session: func(string) (claudedoctor.Recording, error) { return rec, nil }}
+	src := claudedoctor.Source{Session: func(name string) (claudedoctor.Recording, error) {
+		if name == "pty-rate-limit" { // a live run is never rate limited
+			return claudedoctor.Recording{}, claudedoctor.ErrNoLiveSession
+		}
+		return rec, nil
+	}}
 	for _, r := range claudedoctor.Run(claudedoctor.Table, "pty", src) {
 		// The recording ends at the trust dialog; no permission dialog is shown.
 		if r.Status == claudedoctor.Fail && r.Name != "permission-dialog" {

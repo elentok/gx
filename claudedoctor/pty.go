@@ -1,6 +1,7 @@
 package claudedoctor
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -8,16 +9,49 @@ import (
 
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/transcript"
 )
 
 var ptyChecks = []Check{
 	{Runner: "pty", Name: "pid-status", Mode: Fixture, Session: "pty-status", Run: checkPidStatus},
 	{Runner: "pty", Name: "trust-screen", Mode: Fixture, Session: "pty-trust", Run: checkTrustScreen},
 	{Runner: "pty", Name: "permission-dialog", Mode: Fixture, Session: "pty-dialog", Run: checkPermissionDialog},
-	// No recorded session has hit a rate limit, so there is no banner to
-	// write a screen rule against; PTY RateLimit reports nothing until then.
-	{Runner: "pty", Name: "rate-limit-screen", Mode: Fixture, SkipReason: "banner never captured"},
+	{Runner: "pty", Name: "rate-limit-transcript", Mode: Fixture, Session: "pty-rate-limit", Run: checkRateLimitTranscript},
 	{Runner: "pty", Name: "holder-survives-kickstart", Mode: Live, Run: checkHolderSurvivesKickstart},
+}
+
+// checkRateLimitTranscript reads the recorded transcript with the reader the
+// PTY runner uses for rate limits (transcript.LastAPIError), written to a temp
+// file because that reader takes a path.
+func checkRateLimitTranscript(in Input) (string, bool) {
+	var buf bytes.Buffer
+	for _, e := range in.Events {
+		buf.Write(e)
+		buf.WriteByte('\n')
+	}
+	f, err := os.CreateTemp("", "gx-doctor-*.jsonl")
+	if err != nil {
+		return err.Error(), false
+	}
+	defer os.Remove(f.Name())
+	_, err = f.Write(buf.Bytes())
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return err.Error(), false
+	}
+	e, ok, err := transcript.LastAPIError(f.Name())
+	if err != nil {
+		return err.Error(), false
+	}
+	if !ok {
+		return fmt.Sprintf("no API error in %d transcript lines", len(in.Events)), false
+	}
+	if !e.RateLimited() {
+		return fmt.Sprintf("API error %q (status %d) is not a rate limit", e.Error, e.Status), false
+	}
+	return fmt.Sprintf("API error %q (status %d) read as a rate limit", e.Error, e.Status), true
 }
 
 // checkHolderSurvivesKickstart starts `gx agent-holder` detached from a
