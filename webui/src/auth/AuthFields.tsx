@@ -5,11 +5,13 @@ export function Field({
   label,
   part,
   error,
+  hint,
   ...input
 }: {
   label: string;
   part?: string;
   error?: boolean;
+  hint?: string;
 } & Omit<React.ComponentProps<typeof chakra.input>, "label">) {
   return (
     <chakra.label display="block" data-mock-part={part}>
@@ -29,6 +31,11 @@ export function Field({
         _focus={{ outline: "none", borderColor: "tone.running.fg" }}
         {...input}
       />
+      {hint && (
+        <Text fontSize="xs" color="text.dim" mt="1">
+          {hint}
+        </Text>
+      )}
     </chakra.label>
   );
 }

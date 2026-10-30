@@ -4,7 +4,7 @@ import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
 import { LoginCard, rateLimitText } from "../auth/LoginPage";
-import { SetupCodeCard } from "../auth/SetupPage";
+import { SetupCodeCard, SetupPasswordCard } from "../auth/SetupPage";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { WideContext } from "../useWide";
@@ -799,6 +799,13 @@ export const galleryEntries: GalleryEntry[] = [
           />
         ),
       },
+    ],
+  },
+  {
+    name: "SetupPasswordCard",
+    cases: [
+      { label: "default", node: <SetupPasswordCard totpOn /> },
+      { label: "TOTP off", node: <SetupPasswordCard totpOn={false} /> },
     ],
   },
   {
