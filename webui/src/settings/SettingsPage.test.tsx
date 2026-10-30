@@ -75,6 +75,24 @@ describe("WebLoginsView", () => {
     expect(queryByText(/Ends in/)?.textContent).toBe("Ends in 29 days unless used");
   });
 
+  it("lists this device first, then the other logins newest to oldest", () => {
+    const { getAllByRole } = renderThemed(
+      <WebLoginsView
+        logins={[
+          login({ id: "a", name: "Old", last_used: usedDaysAgo(3) }),
+          login({ id: "b", name: "Mine", last_used: usedDaysAgo(20), this_device: true }),
+          login({ id: "c", name: "New", last_used: usedDaysAgo(0.04) }),
+        ]}
+        now={NOW}
+      />,
+    );
+    const names = getAllByRole("link")
+      .map((a) => a.textContent ?? "")
+      .filter((t) => /Old|Mine|New/.test(t))
+      .map((t) => /Old|Mine|New/.exec(t)?.[0]);
+    expect(names).toEqual(["Mine", "New", "Old"]);
+  });
+
   it("counts the days left at the 30-day edge", () => {
     expect(endsInDays(usedDaysAgo(60), NOW)).toBeUndefined();
     expect(endsInDays(usedDaysAgo(61), NOW)).toBe(29);

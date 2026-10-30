@@ -109,6 +109,10 @@ export function SettingsHomeView({
   );
 }
 
+// The mock lists this device first, then the other logins newest to oldest.
+const sortLogins = (logins: WebLoginEntry[]) =>
+  [...logins].sort((a, b) => Number(b.this_device) - Number(a.this_device) || Date.parse(b.last_used) - Date.parse(a.last_used));
+
 export function WebLoginsView({ logins, now }: { logins: WebLoginEntry[]; now: number }) {
   return (
     <Frame>
@@ -118,7 +122,7 @@ export function WebLoginsView({ logins, now }: { logins: WebLoginEntry[]; now: n
         A web login ends after 90 days without use.
       </Text>
       <Group>
-        {logins.map((login) => {
+        {sortLogins(logins).map((login) => {
           const endsIn = endsInDays(login.last_used, now);
           return (
             <chakra.a key={login.id} href={`${LOGINS_HREF}/${login.id}`} {...rowProps} py="1">
