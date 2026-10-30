@@ -87,10 +87,14 @@ func (s State) OlderServer() bool {
 	})
 }
 
-// ActionableCount is how many sessions are Actionable.
+// ActionableCount is how many of a person's own interactive sessions are
+// Actionable. Queue and Design agents are never counted; Fix agents are.
 func (s State) ActionableCount() int {
 	n := 0
 	for _, se := range s.Sessions {
+		if se.Queue || se.Design {
+			continue
+		}
 		if se.Actionable.Reason != "" {
 			n++
 		}

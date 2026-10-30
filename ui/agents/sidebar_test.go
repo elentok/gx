@@ -112,6 +112,22 @@ func assertGolden(t *testing.T, name, text string) {
 	}
 }
 
+func TestMarks_QueueAndDesignAgentsShowNone(t *testing.T) {
+	icons := ui.IconSet{Unread: "U", SuggestedAction: "A"}
+	flagged := server.SessionInfo{
+		Status: server.SessionStatus{State: server.SessionBlocked},
+		Unread: server.SessionUnread{Unread: true}, Actionable: server.SessionActionable{Reason: "blocked"}}
+	if got := ansi.Strip(marks(flagged, icons)); got != "U A " {
+		t.Fatalf("plain marks = %q, want both", got)
+	}
+	for name, s := range map[string]server.SessionInfo{"queue": flagged, "design": flagged} {
+		s.Queue, s.Design = name == "queue", name == "design"
+		if got := strings.TrimSpace(ansi.Strip(marks(s, icons))); got != "" {
+			t.Errorf("%s marks = %q, want none", name, got)
+		}
+	}
+}
+
 func TestSidebar_GroupsByProjectInCreationOrder(t *testing.T) {
 	m := sidebarModel(t, false, fixtureSessions(), 70, 14)
 	var names []string

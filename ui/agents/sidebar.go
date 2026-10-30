@@ -250,8 +250,13 @@ func sessionLabel(s server.SessionInfo, icons ui.IconSet) string {
 	return label
 }
 
+// marks fills the Unread and Actionable slots; Queue and Design agents leave
+// them blank, their status mark is all a row shows.
 func marks(s server.SessionInfo, icons ui.IconSet) string {
 	unread, actionable := " ", " "
+	if s.Queue || s.Design {
+		return unread + " " + actionable + " "
+	}
 	if s.Unread.Unread {
 		unread = styleUnreadMark.Render(icons.Unread)
 	}

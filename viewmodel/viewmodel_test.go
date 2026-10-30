@@ -112,9 +112,12 @@ func TestActionableCount(t *testing.T) {
 		{ID: "a", Actionable: server.SessionActionable{Reason: "blocked"}},
 		{ID: "b"},
 		{ID: "c", Actionable: server.SessionActionable{Reason: "review"}},
+		{ID: "fix-gx:m/01", Actionable: server.SessionActionable{Reason: "blocked"}},
+		{ID: "d", Design: true, Actionable: server.SessionActionable{Reason: "review"}},
+		{ID: "q", Queue: true, Actionable: server.SessionActionable{Reason: "blocked"}},
 	}})
-	if got := s.ActionableCount(); got != 2 {
-		t.Fatalf("ActionableCount = %d, want 2", got)
+	if got := s.ActionableCount(); got != 3 {
+		t.Fatalf("ActionableCount = %d, want 3 (Design and Queue agents excluded)", got)
 	}
 	if got := (viewmodel.State{}).ActionableCount(); got != 0 {
 		t.Fatalf("empty ActionableCount = %d, want 0", got)
