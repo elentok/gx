@@ -239,6 +239,7 @@ test("114. Read-only Queue agent", async ({ page, start }) => {
 
   // Cancel keeps it off.
   await turnOn.click();
+  await expect(dialog.getByRole("button", { name: "Cancel" })).toBeFocused();
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(line).toBeVisible();

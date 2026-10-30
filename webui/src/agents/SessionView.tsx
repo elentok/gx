@@ -140,7 +140,7 @@ function UnlockPrompt({ kind, onConfirm, onCancel }: { kind: string; onConfirm: 
     <Modal label={`Turn on composer for ${kind} agent`} onClose={onCancel} maxW="sm">
       <Text>gx is driving this agent. Turn on the composer for this {kind} agent anyway?</Text>
       <Box display="flex" gap="2" justifyContent="flex-end">
-        <Button emphasis="secondary" onClick={onCancel}>
+        <Button emphasis="secondary" onClick={onCancel} autoFocus>
           Cancel
         </Button>
         <Button onClick={onConfirm}>Turn on composer</Button>

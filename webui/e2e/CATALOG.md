@@ -1281,7 +1281,7 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   2. Click "Turn on composer", then Cancel.
   3. Click "Turn on composer", then confirm.
   4. Open the same URL in a fresh page.
-- **Pass:** the page reads "gx is driving this agent, so the composer is off." and Send is disabled. Cancel keeps it off. The confirm removes the line and the button, and the message box takes text. The fresh page is read-only again.
+- **Pass:** the page reads "gx is driving this agent, so the composer is off." and Send is disabled. The confirm dialog opens with Cancel focused. Cancel keeps it off. The confirm removes the line and the button, and the message box takes text. The fresh page is read-only again.
 
 ## 115. Blocked pause on PTY
 
