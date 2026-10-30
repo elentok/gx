@@ -23,6 +23,7 @@ var webOnlyRoutes = []WebOnlyRoute{
 	{Pattern: "GET " + webRootCerPath, Public: true},
 	{Pattern: "GET " + webAuthPathState, Public: true},
 	{Pattern: "POST " + webAuthPathSetupStart, Public: true},
+	{Pattern: "POST " + webAuthPathSetupPassword, Public: true},
 	{Pattern: "POST " + webAuthPathSetupFinish, Public: true},
 	{Pattern: "POST " + webAuthPathLogin, Public: true},
 	{Pattern: "POST " + webAuthPathAddAuth, Public: true},

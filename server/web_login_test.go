@@ -269,7 +269,7 @@ func TestWebLogin_SignOutClearsTheCookieAndEndsStreams(t *testing.T) {
 func TestWebLogin_AuthWritesKeepTheWriteChecks(t *testing.T) {
 	t.Parallel()
 	l := startLoginWeb(t)
-	for _, path := range []string{"/v1/web/auth/setup-start", "/v1/web/auth/setup-finish", "/v1/web/auth/login"} {
+	for _, path := range []string{"/v1/web/auth/setup-start", "/v1/web/auth/setup-password", "/v1/web/auth/setup-finish", "/v1/web/auth/login"} {
 		for name, headers := range map[string]map[string]string{
 			"wrong Origin": {"Origin": "http://evil.example", "Content-Type": "application/json"},
 			"form post":    {"Origin": l.base, "Content-Type": "application/x-www-form-urlencoded"},

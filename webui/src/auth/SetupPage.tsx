@@ -149,7 +149,8 @@ interface Saved {
 }
 
 // A phone may discard this page while the person is in the authenticator app. The code and key are
-// kept for the tab (never the password) so the reload lands on the password step, not a new key.
+// kept for the tab so the reload lands on the code step of the authenticator, not a new key. The
+// password is never kept here: the server holds it from setup-password until setup-finish.
 function loadSaved(): Saved | undefined {
   try {
     return JSON.parse(sessionStorage.getItem(SAVED_KEY) ?? "null") ?? undefined;
@@ -172,9 +173,8 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
   const [saved] = useState(() => (auth.totp_on && !initial ? loadSaved() : undefined));
   const [code, setCode] = useState(initial || saved?.code || "");
   const [error, setError] = useState("");
-  const [password, setPassword] = useState("");
   const [authenticator, setAuthenticator] = useState(saved?.authenticator ?? { secret: "", uri: "" });
-  const [step, setStep] = useState<1 | 2 | 3>(saved ? 2 : 1);
+  const [step, setStep] = useState<1 | 2 | 3>(saved?.authenticator.secret ? 3 : 1);
 
   const onCode = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -186,7 +186,6 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
       if (res.refused) return;
       const next = { secret: res.secret ?? "", uri: res.uri ?? "" };
       setAuthenticator(next);
-      if (auth.totp_on) saveSetup({ code: typed, authenticator: next });
       setStep(2);
     } catch (err) {
       setError(String(err));
@@ -195,7 +194,7 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
 
   const finish = async (body: object) => {
     try {
-      const res = await postJSON<AuthResult>("/v1/web/auth/setup-finish", { code, password, ...body });
+      const res = await postJSON<AuthResult>("/v1/web/auth/setup-finish", { code, ...body });
       if (res.refused) {
         if (res.reason === SETUP_CODE_WRONG) saveSetup();
         return setError(reasonText(res));
@@ -214,12 +213,16 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
     const typed = v.password;
     if (typed.length < MIN_PASSWORD) return setError(reasonText({ reason: PASSWORD_TOO_SHORT }));
     if (typed !== v.again) return setError(MISMATCH);
-    setPassword(typed);
-    if (auth.totp_on) {
+    if (!auth.totp_on) return finish({ password: typed });
+    try {
+      const res = await postJSON<AuthResult>("/v1/web/auth/setup-password", { code, password: typed });
+      if (res.refused) return setError(reasonText(res));
       setError("");
-      return setStep(3);
+      saveSetup({ code, authenticator });
+      setStep(3);
+    } catch (err) {
+      setError(String(err));
     }
-    await finish({ password: typed });
   };
 
   const onTotp = (e: FormEvent<HTMLFormElement>) => {

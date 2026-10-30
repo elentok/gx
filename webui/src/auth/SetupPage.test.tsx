@@ -115,7 +115,6 @@ test("the right TOTP code finishes setup and goes to the app", async () => {
   const [, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];
   expect(JSON.parse(init.body as string)).toEqual({
     code: "K7QM-3XPD",
-    password: "correct horse battery",
     totp_code: "123456",
   });
   expect(window.location.hash).toBe("#/");
@@ -143,15 +142,21 @@ test("a refusal from setup finish is shown", async () => {
   );
 });
 
-test("after a reload mid-setup the password step comes back with the same key", async () => {
-  stubStart({ secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP" });
-  await toPasswordStep(true);
+test("the password goes to setup-password at step 2, not to setup-finish", async () => {
+  await toTotpStep();
+  const calls = vi.mocked(fetch).mock.calls as unknown as [string, RequestInit][];
+  const [url, init] = calls.at(-1)!;
+  expect(url).toMatch(/\/v1\/web\/auth\/setup-password$/);
+  expect(JSON.parse(init.body as string)).toEqual({ code: "K7QM-3XPD", password: "correct horse battery" });
+});
+
+test("after a reload on the authenticator step it comes back with the same key and no new request", async () => {
+  await toTotpStep();
   cleanup();
 
   const again = stubStart({});
   renderThemed(<SetupPage auth={authOf(true)} onDone={() => {}} />);
-  expect(screen.getByText("Choose a password")).toBeTruthy();
-  submitPasswords("correct horse battery", "correct horse battery", "Continue");
-  expect(await screen.findByText("JBSW Y3DP EHPK 3PXP")).toBeTruthy();
+  expect(screen.getByText(/step 3 of 3/)).toBeTruthy();
+  expect(screen.getByText("JBSW Y3DP EHPK 3PXP 4N2Q 7ZLA")).toBeTruthy();
   expect(again).not.toHaveBeenCalled();
 });

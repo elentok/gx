@@ -323,6 +323,45 @@ func TestWebAuthStoreSetupStartRepeatedWithTheSameCodeKeepsTheSecret(t *testing.
 	}
 }
 
+func TestWebAuthStoreSetupPasswordIsKeptForFinish(t *testing.T) {
+	w, clock, _ := newStoreForTest(t)
+	_, code, err := w.SetupState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret, err := w.SetupStart(true, code, "1.1.1.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.SetupPassword(code, storeTestPassword, "1.1.1.1"); err != nil {
+		t.Fatal(err)
+	}
+	totp, _ := TOTPCode(secret, totpStepAt(clock.Now()))
+	if _, err := w.SetupFinish(true, code, "", totp, "1.1.1.1", storeTestUA); err != nil {
+		t.Fatalf("finish without a password: %v", err)
+	}
+	if _, err := w.Login(true, storeTestPassword, "", "", "1.1.1.1", storeTestUA); err == nil {
+		t.Error("login without the TOTP code should not pass")
+	}
+}
+
+func TestWebAuthStoreSetupPasswordRefusesShortAndWrongCode(t *testing.T) {
+	w, _, _ := newStoreForTest(t)
+	_, code, err := w.SetupState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.SetupPassword(code, "short", "1.1.1.1"); !errors.Is(err, ErrPasswordTooShort) {
+		t.Errorf("short: err = %v, want ErrPasswordTooShort", err)
+	}
+	if err := w.SetupPassword("AAAA-AAAA", storeTestPassword, "1.1.1.1"); !errors.Is(err, ErrWebAuthRefused) {
+		t.Errorf("wrong code: err = %v, want ErrWebAuthRefused", err)
+	}
+	if _, err := w.SetupFinish(false, code, "", "", "1.1.1.1", storeTestUA); err == nil {
+		t.Error("finish with no kept password and no password should be refused")
+	}
+}
+
 func TestWebAuthStoreSetupStartWrongCodeIsRefusedAndCounted(t *testing.T) {
 	w, _, _ := newStoreForTest(t)
 	for i := 0; i < authIPFreeFailures; i++ {

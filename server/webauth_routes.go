@@ -26,6 +26,7 @@ const (
 	webAuthBodyMax           = 4 << 10
 	webAuthPathState         = "/v1/web/auth"
 	webAuthPathSetupStart    = "/v1/web/auth/setup-start"
+	webAuthPathSetupPassword = "/v1/web/auth/setup-password"
 	webAuthPathSetupFinish   = "/v1/web/auth/setup-finish"
 	webAuthPathLogin         = "/v1/web/auth/login"
 	webAuthPathAddAuth       = "/v1/web/auth/add-authenticator"
@@ -292,6 +293,19 @@ func (s *Server) webSetupStart(w http.ResponseWriter, r *http.Request) {
 		res.URI = totpURI(secret, totpAccountLabel)
 	}
 	writeJSON(w, res)
+}
+
+// webSetupPassword checks the password and keeps it for setup-finish, so the browser need not hold it.
+func (s *Server) webSetupPassword(w http.ResponseWriter, r *http.Request) {
+	body, ok := readWebAuthBody(w, r)
+	if !ok {
+		return
+	}
+	if err := s.webAuth.SetupPassword(body.Code, body.Password, remoteIP(r)); err != nil {
+		s.refuseWebAuth(w, r, "web setup refused", err, ReasonSetupCodeWrong)
+		return
+	}
+	writeJSON(w, webAuthResult{})
 }
 
 func (s *Server) webSetupFinish(w http.ResponseWriter, r *http.Request) {

@@ -122,6 +122,8 @@ type WebAuth struct {
 	// pendingSecret is the TOTP secret handed out by SetupStart, tied to pendingCode.
 	pendingSecret string
 	pendingCode   string
+	// pendingHash is the hashed password from SetupPassword, tied to pendingCode like the secret.
+	pendingHash *webPasswordHash
 	// resetSecret is the new TOTP secret from AuthenticatorResetBegin, not saved until finish.
 	resetSecret string
 	// pending holds the secrets Login handed out, by pending id.
@@ -221,6 +223,25 @@ func (w *WebAuth) SetupStart(totpOn bool, code, ip string) (string, error) {
 	return secret, nil
 }
 
+// SetupPassword checks the Setup code and the password and keeps the password's hash for SetupFinish,
+// so a page reload on the authenticator step does not lose it. Nothing is saved to disk.
+func (w *WebAuth) SetupPassword(code, password, ip string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if err := w.checkSetupCodeLocked(code, ip); err != nil {
+		return err
+	}
+	if err := checkWebPassword(password); err != nil {
+		return err
+	}
+	hash, err := hashWebPassword(password)
+	if err != nil {
+		return err
+	}
+	w.pendingHash, w.pendingCode = hash, w.setupCode
+	return nil
+}
+
 // SetupFinish checks the Setup code, password and, with TOTP on, one TOTP code,
 // saves them and returns the first web login's cookie. Nothing is saved when
 // any check fails.
@@ -238,8 +259,15 @@ func (w *WebAuth) SetupFinish(totpOn bool, code, password, totpCode, ip, userAge
 		}
 		secret = w.pendingSecret
 	}
-	if err := checkWebPassword(password); err != nil {
-		return "", err
+	// An empty password means the one SetupPassword kept for this code.
+	var hash *webPasswordHash
+	if password == "" && w.pendingCode == w.setupCode {
+		hash = w.pendingHash
+	}
+	if hash == nil {
+		if err := checkWebPassword(password); err != nil {
+			return "", err
+		}
 	}
 	if totpOn {
 		var ok bool
@@ -248,9 +276,11 @@ func (w *WebAuth) SetupFinish(totpOn bool, code, password, totpCode, ip, userAge
 			return "", ErrTOTPMismatch
 		}
 	}
-	hash, err := hashWebPassword(password)
-	if err != nil {
-		return "", err
+	if hash == nil {
+		var err error
+		if hash, err = hashWebPassword(password); err != nil {
+			return "", err
+		}
 	}
 	cookie, rec, err := newWebLoginRecord(userAgent, ip, w.now())
 	if err != nil {
@@ -267,6 +297,7 @@ func (w *WebAuth) SetupFinish(totpOn bool, code, password, totpCode, ip, userAge
 	}
 	w.file = next
 	w.setupCode, w.pendingSecret, w.pendingCode = "", "", ""
+	w.pendingHash = nil
 	w.limiter.Success(ip)
 	return cookie, nil
 }
@@ -581,6 +612,7 @@ func (w *WebAuth) WebReset() ([]string, error) {
 	}
 	w.limiter.Reset()
 	w.setupCode, w.pendingSecret, w.pendingCode, w.resetSecret = "", "", "", ""
+	w.pendingHash = nil
 	w.pending = map[string]pendingAuthenticator{}
 	if _, err := w.currentSetupCodeLocked(); err != nil {
 		return nil, err
@@ -682,6 +714,7 @@ func (w *WebAuth) currentSetupCodeLocked() (string, error) {
 	}
 	w.setupCode, w.setupCreated = code, w.now()
 	w.pendingSecret, w.pendingCode = "", ""
+	w.pendingHash = nil
 	return code, nil
 }
 
