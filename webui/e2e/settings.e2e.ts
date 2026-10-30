@@ -78,6 +78,7 @@ test("106. Sign out another device", async ({ page, start }) => {
 
     await openWebLogins(page);
     await expect(loginRows(page)).toHaveCount(5);
+    await expect(page.locator(`a[href$="/${id}"]`), "a UI sign-in is named from the user agent").toContainText(/Chrome on (Mac|Linux|Windows)/);
     await page.locator(`a[href$="/${id}"]`).click();
     await page.getByRole("button", { name: "Sign out this device" }).click();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();

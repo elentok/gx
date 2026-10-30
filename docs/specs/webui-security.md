@@ -743,7 +743,8 @@ New flows to write:
   the Security group with "4 devices". Open Web logins: four rows, one "This device", one "Ends in
   20 days unless used". Open another row; rename it; the list shows the new name.
 - **Flow V, "Sign out another device":** scenario `web-logins` with a second browser context signed
-  in through login. From the first, open the second's web login, sign out, confirm. The second
+  in through login. From the first, the second's row is named from its user agent (for example
+  "Chrome on Mac"). Open the second's web login, sign out, confirm. The second
   page shows login with no reload. The CLI list no longer has it.
 - **Flow P, "Change password":** scenario `web-logins`. The note reads "3 other devices will be
   signed out". Change it. The list has one row. A new context logs in with the new password.
