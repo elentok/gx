@@ -1,6 +1,9 @@
 package nativerunner_test
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -65,6 +68,77 @@ func TestPty_RateLimitWithoutResetIsLimitedWithZeroTime(t *testing.T) {
 	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Message: "You've hit your limit"})
 	if at := waitRateLimit(t, p, s, true); !at.IsZero() {
 		t.Errorf("reset = %v; want zero", at)
+	}
+}
+
+// writeUsageRecord writes the usage record the statusline would, by hand.
+func writeUsageRecord(t *testing.T, p *nativerunner.Pty, s agentrunner.Session, rec nativerunner.UsageRecord) {
+	t.Helper()
+	data, err := json.Marshal(rec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(p.Root, s.Label, nativerunner.UsageFile), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func limitWithoutReset(t *testing.T, p *nativerunner.Pty, s agentrunner.Session) {
+	t.Helper()
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Message: "You've hit your limit"})
+}
+
+func TestPty_RateLimitFallsBackToTheLatestResetAtOrAbove98(t *testing.T) {
+	t.Parallel()
+	p, s := startRateLimitSession(t)
+	soon := time.Now().Add(time.Hour).Unix()
+	later := time.Now().Add(48 * time.Hour).Unix()
+	writeUsageRecord(t, p, s, nativerunner.UsageRecord{
+		FiveHour: &nativerunner.UsageWindow{UsedPercentage: 99, ResetsAt: soon},
+		SevenDay: &nativerunner.UsageWindow{UsedPercentage: 100, ResetsAt: later},
+	})
+	limitWithoutReset(t, p, s)
+	if at := waitRateLimit(t, p, s, true); at.Unix() != later {
+		t.Errorf("reset = %v; want %v", at, time.Unix(later, 0))
+	}
+}
+
+func TestPty_RateLimitMessageResetWinsOverTheRecord(t *testing.T) {
+	t.Parallel()
+	p, s := startRateLimitSession(t)
+	writeUsageRecord(t, p, s, nativerunner.UsageRecord{
+		FiveHour: &nativerunner.UsageWindow{UsedPercentage: 100, ResetsAt: time.Now().Add(100 * time.Hour).Unix()},
+	})
+	ptyControl(t, p, s, agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Message: "You've hit your limit · resets 3pm"})
+	at := waitRateLimit(t, p, s, true)
+	if at.After(time.Now().Add(25 * time.Hour)) {
+		t.Errorf("reset = %v; want the message's 3pm, not the record", at)
+	}
+}
+
+func TestPty_RateLimitIgnoresRecordWindowsUnder98(t *testing.T) {
+	t.Parallel()
+	p, s := startRateLimitSession(t)
+	writeUsageRecord(t, p, s, nativerunner.UsageRecord{
+		FiveHour: &nativerunner.UsageWindow{UsedPercentage: 97, ResetsAt: time.Now().Add(time.Hour).Unix()},
+	})
+	limitWithoutReset(t, p, s)
+	if at := waitRateLimit(t, p, s, true); !at.IsZero() {
+		t.Errorf("reset = %v; want zero", at)
+	}
+}
+
+func TestPty_RateLimitReturnsAPastRecordResetUnchanged(t *testing.T) {
+	t.Parallel()
+	p, s := startRateLimitSession(t)
+	past := time.Now().Add(-2 * time.Hour).Unix()
+	writeUsageRecord(t, p, s, nativerunner.UsageRecord{
+		SeenAt:   time.Now().Add(-24 * time.Hour),
+		FiveHour: &nativerunner.UsageWindow{UsedPercentage: 98, ResetsAt: past},
+	})
+	limitWithoutReset(t, p, s)
+	if at := waitRateLimit(t, p, s, true); at.Unix() != past {
+		t.Errorf("reset = %v; want %v", at, time.Unix(past, 0))
 	}
 }
 
