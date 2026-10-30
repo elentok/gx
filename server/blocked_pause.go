@@ -10,21 +10,20 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
-// waitsOnHeadlessBlock reports whether tk is paused blocked-pane with a tracked
-// headless run behind it. A herdr or pty blocked-pane pause owns no tracked run
-// here, so it keeps its own rules.
-func (s *Server) waitsOnHeadlessBlock(tk schema.Ticket, address string) bool {
+// waitsOnBlockedPause reports whether tk is paused blocked-pane with a tracked,
+// waiting run behind it, on any runner.
+func (s *Server) waitsOnBlockedPause(tk schema.Ticket, address string) bool {
 	if s.registry == nil || tk.PauseReason != schema.PauseBlockedPane {
 		return false
 	}
-	run, ok := s.registry.tracked(address)
-	return ok && pausesOnBlock(run.Run)
+	_, ok := s.registry.tracked(address)
+	return ok
 }
 
-// leaveBlocked returns a ticket paused blocked-pane on a headless run to
-// claimed and lets the same session keep going, as an answer to a question
-// does. Any other ticket is left alone. The answer verb and the unblock watcher
-// both call it; the first one in does the work.
+// leaveBlocked returns a ticket paused blocked-pane to claimed and lets the
+// same session keep going, as an answer to a question does. Any other ticket is
+// left alone. The answer verb and the unblock watcher both call it; the first
+// one in does the work.
 func (s *Server) leaveBlocked(address string) error {
 	if s.registry == nil {
 		return nil
@@ -32,7 +31,7 @@ func (s *Server) leaveBlocked(address string) error {
 	s.unblockMu.Lock()
 	defer s.unblockMu.Unlock()
 	run, ok := s.registry.tracked(address)
-	if !ok || run.WaitingSince.IsZero() || !pausesOnBlock(run.Run) {
+	if !ok || run.WaitingSince.IsZero() {
 		return nil
 	}
 	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
@@ -47,7 +46,7 @@ func (s *Server) leaveBlocked(address string) error {
 	if err != nil {
 		return err
 	}
-	if !s.waitsOnHeadlessBlock(tk, address) || !tk.PausedAsking() {
+	if !s.waitsOnBlockedPause(tk, address) || !tk.PausedAsking() {
 		return nil
 	}
 	if err := ralphloop.Claim(t.Path); err != nil {

@@ -538,7 +538,7 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (RepairResult, 
 	selfReported := tk.PauseReason == schema.PauseSelfReported
 	dir := filepath.Dir(epicPath)
 	address := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}.String()
-	if !selfReported && !s.waitsOnHeadlessBlock(tk, address) {
+	if !selfReported && !s.waitsOnBlockedPause(tk, address) {
 		return RepairResult{}, false, nil
 	}
 	if s.registry != nil {

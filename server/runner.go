@@ -739,13 +739,6 @@ func (s *Server) finishRun(rc runContext) {
 	s.settleRun(rc, err)
 }
 
-// pausesOnBlock reports whether run's block is a tracker fact the wait pauses
-// on at once: a Claude agent on the headless runner. Herdr, pty and Codex keep
-// the polled watcher and the dwell.
-func pausesOnBlock(run Run) bool {
-	return run.Agent == string(ralphloop.AgentClaude) && run.Runner == string(agentrunner.ChoiceHeadless)
-}
-
 // blockWatchPoll bounds each Wait of watchBlocked. A herdr Wait is one herdr
 // process, so a short poll would cost an idle server a process per tick.
 const blockWatchPoll = 30 * time.Second
