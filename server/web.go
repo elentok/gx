@@ -100,7 +100,7 @@ func (s *Server) interfaceIPs() []net.IP {
 func (s *Server) webHandler() http.Handler {
 	static := serveAsset(webui.Assets())
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
+		if !isWebRead(r) {
 			if reason := checkWriteRequest(r); reason != "" {
 				http.Error(w, reason, http.StatusForbidden)
 				return

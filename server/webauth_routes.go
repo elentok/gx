@@ -175,7 +175,7 @@ func (s *Server) requireWebLogin(next, fallback http.Handler) http.Handler {
 // to everything else.
 func (s *Server) denyWeb(mux http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && !strings.HasPrefix(r.URL.Path, "/v1/") {
+		if isWebRead(r) && !strings.HasPrefix(r.URL.Path, "/v1/") {
 			mux.ServeHTTP(w, r)
 			return
 		}

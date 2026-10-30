@@ -63,8 +63,26 @@ func WebWritePatterns() []string {
 	return out
 }
 
+// isWebRead reports whether the web mux serves r as a read. HEAD counts only
+// for the public GET routes and the page and assets, never for /v1/ reads: the
+// event stream would block on it.
+func isWebRead(r *http.Request) bool {
+	if r.Method == http.MethodGet {
+		return true
+	}
+	if r.Method != http.MethodHead {
+		return false
+	}
+	_, public := webPublicGets["GET "+r.URL.Path]
+	return public || !strings.HasPrefix(r.URL.Path, "/v1/")
+}
+
 func isPublicWebRoute(r *http.Request) bool {
-	key := r.Method + " " + r.URL.Path
+	method := r.Method
+	if isWebRead(r) {
+		method = http.MethodGet
+	}
+	key := method + " " + r.URL.Path
 	for _, route := range webOnlyRoutes {
 		if route.Public && route.Pattern == key {
 			return true

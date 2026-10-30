@@ -49,3 +49,51 @@ func TestWebRoot_DownloadsNeedNoLoginAndCarryNoHSTS(t *testing.T) {
 		tt.check(t, body)
 	}
 }
+
+func TestWebHead_PublicRoutesMatchGetWithoutBody(t *testing.T) {
+	t.Parallel()
+	_, base := startWeb(t)
+	for _, path := range []string{"/gx-root.mobileconfig", "/gx-root.cer", "/"} {
+		get, err := webClient().Get(base + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		get.Body.Close()
+		resp, err := webClient().Head(base + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK || get.StatusCode != http.StatusOK {
+			t.Errorf("%s: HEAD %d, GET %d, want 200", path, resp.StatusCode, get.StatusCode)
+		}
+		for _, name := range []string{"Content-Type", "Cache-Control", "Strict-Transport-Security"} {
+			if got, want := resp.Header.Get(name), get.Header.Get(name); got != want {
+				t.Errorf("%s: HEAD %s %q, GET %q", path, name, got, want)
+			}
+		}
+	}
+}
+
+func TestWebHead_NeedsLoginOutsidePublicRoutes(t *testing.T) {
+	t.Parallel()
+	_, base := startWeb(t)
+	for _, path := range []string{"/v1/snapshot", "/v1/events"} {
+		resp, err := webClient().Head(base + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("HEAD %s = %d, want 401", path, resp.StatusCode)
+		}
+	}
+	resp, err := webClient().Head(base + "/assets/missing.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("HEAD /assets/missing.js = %d, want 404 from the asset handler, not the login gate", resp.StatusCode)
+	}
+}
