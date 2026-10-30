@@ -59,6 +59,32 @@ func (s *Server) leaveBlocked(address string) error {
 	return nil
 }
 
+// retryBlocked ends the blocked pause of a PTY or herdr run and interrupts its
+// agent, and reports whether it did. A headless run is left alone. The pause ends
+// first, through the same path as the answer verb, so the unblock watch seeing
+// the interrupt finds nothing left to do. Interrupt waits for idle, which a raw
+// Esc would not: the retry prompt then lands on an agent that is ready for it.
+func (s *Server) retryBlocked(address string) (bool, error) {
+	run, ok := s.registry.tracked(address)
+	if !ok {
+		return false, nil
+	}
+	runner, err := s.runnerOf(run.Run)
+	if err != nil {
+		return false, err
+	}
+	if runner.Name() == string(agentrunner.ChoiceHeadless) {
+		return false, nil
+	}
+	if err := s.leaveBlocked(address); err != nil {
+		return false, err
+	}
+	if err := runner.Interrupt(run.Session); err != nil {
+		return false, fmt.Errorf("interrupt %s: %w", address, err)
+	}
+	return true, nil
+}
+
 // watchUnblock returns the ticket to claimed when its blocked agent leaves the
 // blocked state by any route: an answer, an interrupt, a cancelled request, or
 // the agent running on or finishing by itself. It ends when the run stops

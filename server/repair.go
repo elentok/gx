@@ -546,6 +546,18 @@ func (s *Server) resumeSelfReported(epicPath, id, origin string) (RepairResult, 
 		if err != nil {
 			return RepairResult{}, false, err
 		}
+		if !gone && !selfReported {
+			// A PTY or herdr run has no approvable card for a question menu, so
+			// Retry is the way out: end the pause, interrupt, and let the caller
+			// send the retry prompt.
+			interrupted, err := s.retryBlocked(address)
+			if errors.Is(err, agentrunner.ErrNotReady) {
+				return repairRefusal(&repair.RefusalError{Reason: ReasonAgentNotReady, Message: err.Error()}), true, nil
+			}
+			if err != nil || interrupted {
+				return RepairResult{}, false, err
+			}
+		}
 		if !gone {
 			msg := fmt.Sprintf("%s has a live agent waiting on its question; reply with `gx tickets answer`", address)
 			if !selfReported {

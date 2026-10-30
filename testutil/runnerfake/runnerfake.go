@@ -31,6 +31,7 @@ type session struct {
 	diedErr        error
 	bgTask         bool
 	prompts        []string
+	interrupts     int
 	answers        []agentrunner.Answer
 }
 
@@ -243,6 +244,7 @@ func (r *Runner) Interrupt(s agentrunner.Session) error {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	ss.interrupts++
 	ss.status.State = agentrunner.StateIdle
 	ss.status.BlockedReason = ""
 	r.notify()
@@ -471,6 +473,17 @@ func (r *Runner) Prompts(label string) []string {
 		return slices.Clone(ss.prompts)
 	}
 	return nil
+}
+
+// Interrupts counts the successful Interrupts of the latest session started
+// with label, including a stopped one.
+func (r *Runner) Interrupts(label string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if ss := r.history[label]; ss != nil {
+		return ss.interrupts
+	}
+	return 0
 }
 
 // Args returns the launch args of the latest session started with label,
