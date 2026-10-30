@@ -147,13 +147,15 @@ type State struct {
 	traceMu sync.Mutex
 	trace   []TraceEntry
 
-	logf     func(format string, args ...any)
-	errorf   func(format string, args ...any)
-	failed   func() bool
-	forbid   bool
-	inFlight atomic.Bool
-	lastBeat atomic.Int64
-	dumped   atomic.Bool
+	logf   func(format string, args ...any)
+	errorf func(format string, args ...any)
+	failed func() bool
+	forbid bool
+	// forbidAllow is the one "verb noun" command forbid still answers.
+	forbidAllow string
+	inFlight    atomic.Bool
+	lastBeat    atomic.Int64
+	dumped      atomic.Bool
 }
 
 // NewState creates an empty State that reports failures and dumps its trace
@@ -179,6 +181,15 @@ func (s *State) Forbid() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.forbid = true
+}
+
+// ForbidExcept is Forbid, except that command "verb noun" still answers. The
+// server probes herdr's health whenever herdr is on PATH, so a test that must
+// never launch on herdr still lets the probe through.
+func (s *State) ForbidExcept(verb, noun string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.forbid, s.forbidAllow = true, verb+" "+noun
 }
 
 // Register installs fn as the implementation of the herdr subcommand named
@@ -254,7 +265,7 @@ func (s *State) dispatch(argv []string) ([]byte, int) {
 		exitCode int
 		ids      Identities
 	)
-	if s.forbid {
+	if s.forbid && !(len(argv) >= 2 && argv[0]+" "+argv[1] == s.forbidAllow) {
 		msg := fmt.Sprintf("herdrfake: unexpected herdr call: herdr %s", strings.Join(argv[:min(len(argv), 2)], " "))
 		s.errorf("%s", msg)
 		output, exitCode = CommandError(msg)

@@ -102,6 +102,9 @@ func (h *Harness) buildPty() {
 		PromptGrace:  ptyPromptGrace,
 		StopGrace:    ptyStopGrace,
 	})
+	// The fake herdr executable is this binary too; the TUI env would make it
+	// answer as a Claude fake, so herdr is built over the plain env.
+	_, herdrFor := runnerbuild.New("herdr", h.cfg.Env, h.StateDir, h.cfg.RunnerWait, nil)
 	var mu sync.Mutex
 	wrapped := map[*nativerunner.Pty]*ptyRunner{}
 	wrap := func(r agentrunner.Runner) agentrunner.Runner {
@@ -119,7 +122,12 @@ func (h *Harness) buildPty() {
 		return w
 	}
 	h.cfg.Runner = wrap(runnerFor("pty", runnerbuild.FallbackProject))
-	h.cfg.RunnerFor = func(name, project string) agentrunner.Runner { return wrap(runnerFor(name, project)) }
+	h.cfg.RunnerFor = func(name, project string) agentrunner.Runner {
+		if name == "herdr" {
+			return herdrFor(name, project)
+		}
+		return wrap(runnerFor(name, project))
+	}
 }
 
 // KillAgents ends every live agent of tg's epic without counting a Stop, so

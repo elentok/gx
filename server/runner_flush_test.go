@@ -26,16 +26,12 @@ func TestStart_LogsRunsStillOnANonConfiguredRunner(t *testing.T) {
 	}
 }
 
-func TestHerdr_RunOnANonConfiguredHerdrIsNotProbed(t *testing.T) {
+func TestHerdr_NonConfiguredHerdrIsProbed(t *testing.T) {
 	t.Parallel()
 	h, own, _ := liveUnder(t, newRenamedFake("herdr", nativerunner.VerdictLive), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
 	own.SetHealthErr(errors.New("herdr down"))
-	time.Sleep(100 * time.Millisecond) // negative wait: a probe would show within a few 20ms retries
-	snap, err := h.Client.Snapshot(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if snap.HerdrUnavailable {
-		t.Error("a live run on a non-configured herdr made the server probe it")
-	}
+	servertest.WaitFor(t, 10*time.Second, "the probe to see herdr down", func() bool {
+		snap, err := h.Client.Snapshot(context.Background())
+		return err == nil && snap.HerdrUnavailable
+	})
 }

@@ -216,10 +216,10 @@ func (s *Server) keepClaiming(ctx context.Context) {
 }
 
 // claimNext backfills free slots in queue order: it claims and launches the
-// frontier tickets of each queued root, up to its per-root cap, until the concurrency limit is reached. It does nothing while herdr is down:
-// a claim without an agent behind it would only be rolled back.
+// frontier tickets of each queued root, up to its per-root cap, until the concurrency limit is reached.
+// claimRoot skips a ticket the claim hold names: a claim without an agent behind it would only be rolled back.
 func (s *Server) claimNext() {
-	if s.herdr.isUnavailable() || s.pause.blocked() || s.budgetSoftReached(time.Now()) {
+	if s.pause.blocked() || s.budgetSoftReached(time.Now()) {
 		return
 	}
 	limit := s.concurrencyLimit()
@@ -369,7 +369,11 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 			return false, nil
 		}
 		s.refused.set(ticketAddr, false)
-		return s.claimAndLaunch(root, addr, t, repo, ticketAgent(t, ralphloop.AgentKind(item.Agent)), loaded)
+		agent := ticketAgent(t, ralphloop.AgentKind(item.Agent))
+		if _, held := s.claimHold(addr.Project, agent); held {
+			return false, nil
+		}
+		return s.claimAndLaunch(root, addr, t, repo, agent, loaded)
 	}
 	return false, nil
 }

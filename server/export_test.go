@@ -257,11 +257,12 @@ func (s *Server) RemoveMergedWorktree(project, epic string) {
 	s.goSettle(func() { s.removeMergedWorktree(root) })
 }
 
-// PutRunIn registers a run of address in root, started in cwd, whose herdr
-// session does not exist (a stopped agent whose entry settleRun has not yet
-// deleted). launching marks it as one whose agent may not have started.
+// PutRunIn registers a run of address in root, started in cwd, whose session
+// on the configured runner does not exist (a stopped agent whose entry
+// settleRun has not yet deleted). launching marks it as one whose agent may not
+// have started.
 func (s *Server) PutRunIn(address, root, cwd string, launching bool) {
-	t := trackedRun{Run: Run{Address: address, Runner: runnerHerdr, Session: agentrunner.Session{Label: "gone", ID: "gone"}}, Root: root, Cwd: cwd}
+	t := trackedRun{Run: Run{Address: address, Runner: s.cfg.Runner.Name(), Session: agentrunner.Session{Label: "gone", ID: "gone"}}, Root: root, Cwd: cwd}
 	if launching {
 		t.State = runLaunching
 	}

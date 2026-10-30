@@ -246,8 +246,8 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
 			return QueueResult{}, nil
 		}
-		if s.herdr.isUnavailable() {
-			return refusal(ReasonHerdrUnavailable, "herdr is unavailable"), nil
+		if reason, held := s.herdrHolds(s.launchRunner(ref.addr.Project, ticketAgent(ref.ticket, ralphloop.AgentClaude))); held {
+			return refusal(ReasonHerdrUnavailable, reason), nil
 		}
 		if res, refused := s.budgetRefusal(); refused {
 			return res, nil

@@ -15,6 +15,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -220,7 +221,7 @@ func TestRunner_RefusesAClaimWhenTheFileChangedUnderTheIndexThenClaimsOnTheNextP
 	}
 	addCtx, addCancel := call()
 	defer addCancel()
-	if res, err := h.Client.QueueAdd(addCtx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+	if res, err := h.Client.QueueAdd(addCtx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 30*time.Second, "the claim-reread-mismatch verdict", func() bool {
@@ -489,7 +490,7 @@ func TestRunner_SkipsAFrontierTicketThatIsAlreadyTracked(t *testing.T) {
 		c.PollInterval = 50 * time.Millisecond
 	})
 	registerTurn(h)
-	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "herdr"})
+	h.Server.PutRun("proj:epic-a", server.Run{Address: "proj:epic-a/01", Runner: "pty"})
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -914,7 +915,8 @@ func TestRunner_LaunchesAndRecordsThroughTheConfiguredRunner(t *testing.T) {
 	defer mu.Unlock()
 	for _, p := range projects {
 		// scratch is asked by the log prune, which visits every project.
-		if p != "proj" && p != server.ScratchProject {
+		// The herdr health probe is asked for the fallback project.
+		if p != "proj" && p != server.ScratchProject && p != runnerbuild.FallbackProject {
 			t.Errorf("RunnerFor asked for project %q", p)
 		}
 	}

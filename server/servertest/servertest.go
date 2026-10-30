@@ -816,7 +816,7 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	if choice.herdr {
 		h.Herdr = herdr
 	} else {
-		herdr.Forbid()
+		herdr.ForbidExcept("workspace", "list")
 	}
 	if h.cfg.Notifier == nil {
 		h.Banners = &Banners{}

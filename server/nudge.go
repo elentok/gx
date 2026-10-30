@@ -65,8 +65,10 @@ func (s *Server) ticketNudge(req QueueRequest) (QueueResult, error) {
 	}
 	return s.resolvedWrite(req, func(ref ticketRef) (QueueResult, error) {
 		address := ref.addr.String()
-		if r, err := s.iterationRunner(ref.addr); err == nil && r.Name() == runnerHerdr && s.herdr.isUnavailable() {
-			return refusal(ReasonHerdrUnavailable, "herdr is unavailable"), nil
+		if r, err := s.iterationRunner(ref.addr); err == nil {
+			if reason, held := s.herdrHolds(r); held {
+				return refusal(ReasonHerdrUnavailable, reason), nil
+			}
 		}
 		if res, refused := s.budgetRefusal(); refused {
 			return res, nil
