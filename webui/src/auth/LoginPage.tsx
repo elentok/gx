@@ -20,7 +20,7 @@ export interface LoginCardProps {
 }
 
 // The trust help's unfolded content is a later ticket.
-function TrustHelp() {
+export function TrustHelp() {
   return (
     <chakra.details data-mock-part="trust-help" mt="6" color="text.dim" fontSize="sm">
       <Box as="summary" cursor="pointer" textAlign="center">

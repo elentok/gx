@@ -27,7 +27,7 @@ function field(form: HTMLFormElement, name: string): string {
   return (form.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
 }
 
-export function PlainSetupForm({ auth, onDone }: FormProps) {
+export function PlainSetupForm({ auth, code, onDone }: FormProps & { code: string }) {
   const start = useSubmit("setup-start", onDone);
   const finish = useSubmit("setup-finish", onDone);
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -37,7 +37,7 @@ export function PlainSetupForm({ auth, onDone }: FormProps) {
   };
   return (
     <form onSubmit={onSubmit}>
-      <input name="code" placeholder="Setup code" />
+      <input name="code" placeholder="Setup code" defaultValue={code} />
       <input name="password" type="password" placeholder="Password" />
       {auth.totp_on && (
         <>

@@ -4,6 +4,7 @@ import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
 import { LoginCard, rateLimitText } from "../auth/LoginPage";
+import { SetupCodeCard } from "../auth/SetupPage";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { WideContext } from "../useWide";
@@ -780,6 +781,23 @@ export const galleryEntries: GalleryEntry[] = [
       {
         label: "rate limited",
         node: <LoginCard totpOn password="hunter2hunter2" error={rateLimitText(181)} submitDisabled />,
+      },
+    ],
+  },
+  {
+    name: "SetupCodeCard",
+    cases: [
+      { label: "default", node: <SetupCodeCard totpOn code="K7QM-3XPD" /> },
+      { label: "TOTP off", node: <SetupCodeCard totpOn={false} code="K7QM-3XPD" /> },
+      {
+        label: "wrong or expired",
+        node: (
+          <SetupCodeCard
+            totpOn
+            code="K7QM-3XPP"
+            error="That code is wrong or expired. Run gx server status for a new one."
+          />
+        ),
       },
     ],
   },

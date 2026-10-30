@@ -4,7 +4,7 @@ import { Spinner } from "../ui/spinner/Spinner";
 import { AuthCard } from "./AuthCard";
 import { fetchAuthState, type AuthState } from "./authState";
 import { LoginPage } from "./LoginPage";
-import { PlainSetupForm } from "./PlainAuthForms";
+import { SetupPage } from "./SetupPage";
 
 /**
  * Shows setup, login or the app by the auth state. It never touches the hash, and the app mounts
@@ -34,12 +34,6 @@ export function AuthGate({
   if (failed) return <AuthCard>Could not reach the server.</AuthCard>;
   if (!auth) return <Spinner label="Loading" />;
   if (auth.state === "signed-in") return <>{children}</>;
-  if (auth.state === "setup") {
-    return (
-      <AuthCard>
-        <PlainSetupForm auth={auth} onDone={refresh} />
-      </AuthCard>
-    );
-  }
+  if (auth.state === "setup") return <SetupPage auth={auth} onDone={refresh} />;
   return <LoginPage auth={auth} onDone={refresh} />;
 }

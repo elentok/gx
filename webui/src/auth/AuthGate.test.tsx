@@ -26,7 +26,7 @@ function renderGate(fetchState: () => Promise<AuthState>) {
 
 test("shows setup for a pending setup", async () => {
   renderGate(async () => stateOf("setup"));
-  expect(await screen.findByRole("button", { name: "Finish setup" })).toBeTruthy();
+  expect(await screen.findByRole("button", { name: "Continue" })).toBeTruthy();
 });
 
 test("shows login when signed out", async () => {
