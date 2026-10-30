@@ -1,8 +1,11 @@
-import { fireEvent } from "@testing-library/react";
+import { fireEvent, waitFor } from "@testing-library/react";
+import type { ComponentProps } from "react";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
+import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { renderThemed } from "../ui/render";
 import { endsInDays } from "./logins";
-import { SettingsHomeView, SettingsStubView, WebLoginsView } from "./SettingsPage";
+import { SettingsHomeView, SettingsStubView, WebLoginPage, WebLoginsView } from "./SettingsPage";
 import type { WebLoginEntry } from "./logins";
 
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -58,6 +61,63 @@ describe("WebLoginsView", () => {
   it("counts the days left at the 30-day edge", () => {
     expect(endsInDays(usedDaysAgo(60), NOW)).toBeUndefined();
     expect(endsInDays(usedDaysAgo(61), NOW)).toBe(29);
+  });
+});
+
+describe("WebLoginPage", () => {
+  const state: ConnectionState = {
+    snapshot: undefined as unknown as ConnectionState["snapshot"],
+    connected: true,
+    loadedOnce: true,
+    liveSnapshot: true,
+    tick: 0,
+    streams: 0,
+  };
+  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+  const entries = [login({ id: "a", name: "Safari on iPhone", this_device: true }), login({ id: "b", name: "Firefox on Linux" })];
+  const renderAt = (id: string, props: Partial<ComponentProps<typeof WebLoginPage>> = {}) =>
+    renderThemed(
+      <ConnectionContext.Provider value={conn}>
+        <MemoryRouter initialEntries={[`/settings/logins/${id}`]}>
+          <Routes>
+            <Route path="/settings/logins/:id" element={<WebLoginPage fetchList={async () => entries} now={() => NOW} {...props} />} />
+          </Routes>
+        </MemoryRouter>
+      </ConnectionContext.Provider>,
+    );
+
+  it("renames on leaving the name field and refreshes the list", async () => {
+    const rename = vi.fn(async () => ({}));
+    const fetchList = vi.fn(async () => entries);
+    const { findByDisplayValue } = renderAt("b", { rename, fetchList });
+    const input = await findByDisplayValue("Firefox on Linux");
+    fireEvent.change(input, { target: { value: "Work laptop" } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(rename).toHaveBeenCalledWith("b", "Work laptop"));
+    await waitFor(() => expect(fetchList).toHaveBeenCalledTimes(2));
+  });
+
+  it("revokes another web login only after the confirm step", async () => {
+    const revoke = vi.fn(async () => ({}));
+    const { findByText, getByText, queryByText } = renderAt("b", { revoke });
+    fireEvent.click(await findByText("Sign out this device"));
+    expect(revoke).not.toHaveBeenCalled();
+    expect(getByText("It has to sign in again with the password and a code.")).toBeTruthy();
+    fireEvent.click(getByText("Cancel"));
+    expect(queryByText("Cancel")).toBeNull();
+    fireEvent.click(getByText("Sign out this device"));
+    fireEvent.click(getByText("Sign out"));
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith("b"));
+  });
+
+  it("signs this device out through the gate instead of revoking", async () => {
+    const revoke = vi.fn(async () => ({}));
+    const signOut = vi.fn();
+    const { findByText, getByText } = renderAt("a", { revoke, signOut });
+    fireEvent.click(await findByText("Sign out this device"));
+    fireEvent.click(getByText("Sign out"));
+    await waitFor(() => expect(signOut).toHaveBeenCalledOnce());
+    expect(revoke).not.toHaveBeenCalled();
   });
 });
 

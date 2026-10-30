@@ -5,7 +5,7 @@ import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
 import { LoginAuthenticatorCard, LoginCard, rateLimitText } from "../auth/LoginPage";
 import { TOTP_MISMATCH } from "../auth/AddAuthenticator";
-import { SettingsHomeView, WebLoginsView } from "../settings/SettingsPage";
+import { SettingsHomeView, WebLoginsView, WebLoginView } from "../settings/SettingsPage";
 import { SetupCodeCard, SetupPasswordCard, SetupTotpCard } from "../auth/SetupPage";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
@@ -841,6 +841,66 @@ export const galleryEntries: GalleryEntry[] = [
               { id: "c", name: "Home-screen app on iPad", last_used: new Date(Date.now() - 12 * 86400_000).toISOString(), last_ip: "192.168.1.40", this_device: false },
               { id: "d", name: "Firefox on Linux", last_used: new Date(Date.now() - 71 * 86400_000).toISOString(), last_ip: "192.168.1.41", this_device: false },
             ]}
+          />
+        ),
+      },
+    ],
+  },
+  {
+    name: "WebLoginView",
+    cases: [
+      {
+        label: "another device",
+        node: (
+          <WebLoginView
+            now={Date.now()}
+            login={{
+              id: "d",
+              name: "Firefox on Linux",
+              created: new Date(Date.now() - 80 * 86400_000).toISOString(),
+              last_used: new Date(Date.now() - 71 * 86400_000).toISOString(),
+              last_ip: "100.77.3.9",
+              this_device: false,
+            }}
+            onRename={() => {}}
+            onSignOut={() => {}}
+          />
+        ),
+      },
+      {
+        label: "confirm sign out",
+        node: (
+          <WebLoginView
+            startConfirming
+            now={Date.now()}
+            login={{
+              id: "d",
+              name: "Firefox on Linux",
+              created: new Date(Date.now() - 80 * 86400_000).toISOString(),
+              last_used: new Date(Date.now() - 71 * 86400_000).toISOString(),
+              last_ip: "100.77.3.9",
+              this_device: false,
+            }}
+            onRename={() => {}}
+            onSignOut={() => {}}
+          />
+        ),
+      },
+      {
+        label: "this device",
+        node: (
+          <WebLoginView
+            now={Date.now()}
+            login={{
+              id: "a",
+              name: "Safari on iPhone",
+              created: new Date(Date.now() - 20 * 86400_000).toISOString(),
+              last_used: new Date().toISOString(),
+              last_ip: "192.168.1.23",
+              this_device: true,
+            }}
+            onRename={() => {}}
+            onSignOut={() => {}}
           />
         ),
       },

@@ -2,7 +2,7 @@ import { createHashRouter, Navigate, redirect, useLocation, useParams, type Rout
 import { AgentsPage } from "./agents/AgentsPage";
 import type { CreateSession, FetchWorktrees } from "./agents/newSession";
 import type { AuthState } from "./auth/authState";
-import { SettingsPage, SettingsStubPage, WebLoginsPage } from "./settings/SettingsPage";
+import { SettingsPage, SettingsStubPage, WebLoginPage, WebLoginsPage } from "./settings/SettingsPage";
 import type { FetchLogins } from "./settings/logins";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
@@ -107,7 +107,8 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
     { path: "/settings", element: <SettingsPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} signOut={fetchers.signOut} /> },
     { path: "/settings/logins", element: <WebLoginsPage fetchList={fetchers.logins} /> },
-    // Password, authenticator, certificate and one login: later tickets fill these in.
+    { path: "/settings/logins/:id", element: <WebLoginPage fetchList={fetchers.logins} signOut={fetchers.signOut} /> },
+    // Password, authenticator and certificate: later tickets fill these in.
     { path: "/settings/*", element: <SettingsStubPage /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },

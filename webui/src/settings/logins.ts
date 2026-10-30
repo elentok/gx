@@ -1,9 +1,11 @@
 import { apiFetch, signOut } from "../apiFetch";
 import { formatAge } from "../epics/cardTime";
+import { WriteError, type Refusable } from "../useWrite";
 
 export interface WebLoginEntry {
   id: string;
   name: string;
+  created?: string;
   last_used: string;
   last_ip: string;
   this_device: boolean;
@@ -16,6 +18,18 @@ export const fetchLogins: FetchLogins = async () => {
   if (!res.ok) throw new Error(`web logins: HTTP ${res.status}`);
   return (await res.json()).logins;
 };
+
+export type LoginWrite = (id: string, name?: string) => Promise<Refusable>;
+
+async function postLogin(path: string, body: object): Promise<Refusable> {
+  const res = await apiFetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) throw new WriteError(`Could not save (HTTP ${res.status}).`);
+  return res.json();
+}
+
+export const renameLogin: LoginWrite = (id, name) => postLogin("/v1/web/logins/rename", { id, name });
+
+export const revokeLogin: LoginWrite = (id) => postLogin("/v1/web/logins/revoke", { id });
 
 /** Ends this browser's login on the server, then signs the page out. */
 export async function signOutThisDevice(): Promise<void> {
