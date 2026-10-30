@@ -58,14 +58,14 @@ test("an accepted code moves on to the password step", async () => {
   stubStart({});
   await toPasswordStep(false);
   expect(screen.getByText(/step 2 of 2/)).toBeTruthy();
-  expect(screen.getByText("At least 12 characters.")).toBeTruthy();
+  expect(screen.getByText("At least 6 characters.")).toBeTruthy();
 });
 
 test("a short password is refused", async () => {
   stubStart({});
   await toPasswordStep(true);
   submitPasswords("short", "short", "Continue");
-  expect((await screen.findByRole("alert")).textContent).toBe("The password needs at least 12 characters.");
+  expect((await screen.findByRole("alert")).textContent).toBe("The password needs at least 6 characters.");
 });
 
 test("a mismatch is refused", async () => {

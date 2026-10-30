@@ -1184,7 +1184,7 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   2. Enter the code from `gx server status`.
   3. Try a short password, then a mismatched pair, then a good one.
   4. On step 3, enter a wrong authenticator code, then the right one from the fixture's wait helper.
-- **Pass:** the card shows "step 1 of 3" and the wrong-or-expired error. Step 2 shows "At least 12 characters.", refuses the short and mismatched passwords and goes on with the good one. Step 3 shows the QR, an "Add to authenticator app" link whose `href` starts with `otpauth://totp/` and the key. The wrong code shows the clock error and `gx server status` still prints a setup code. The right code opens the Epics page signed in.
+- **Pass:** the card shows "step 1 of 3" and the wrong-or-expired error. Step 2 shows "At least 6 characters.", refuses the short and mismatched passwords and goes on with the good one. Step 3 shows the QR, an "Add to authenticator app" link whose `href` starts with `otpauth://totp/` and the key. The wrong code shows the clock error and `gx server status` still prints a setup code. The right code opens the Epics page signed in.
 
 ## 100. Setup from the QR link
 

@@ -82,7 +82,7 @@ describe("ChangePasswordPage", () => {
     );
 
   it("counts the other devices from the list and shows a refusal's message", async () => {
-    const change = vi.fn(async () => ({ refused: true, reason: "password-too-short", message: "The password needs at least 12 characters." }));
+    const change = vi.fn(async () => ({ refused: true, reason: "password-too-short", message: "The password needs at least 6 characters." }));
     const { container, findByText, getByLabelText, getByRole } = renderPage({ change });
     expect(await findByText("The 2 other devices will be signed out.")).toBeTruthy();
     type(getByLabelText("Current password"), "old");
@@ -90,7 +90,7 @@ describe("ChangePasswordPage", () => {
     type(input(container, "new_password"), "short pass word");
     type(input(container, "new_password_again"), "short pass word");
     fireEvent.click(getByRole("button", { name: "Change password" }));
-    expect(await findByText("The password needs at least 12 characters.")).toBeTruthy();
+    expect(await findByText("The password needs at least 6 characters.")).toBeTruthy();
     expect(change).toHaveBeenCalledWith({ password: "old", totp_code: "123456", new_password: "short pass word" });
   });
 });

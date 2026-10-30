@@ -1,4 +1,4 @@
-export const MIN_PASSWORD = 12;
+export const MIN_PASSWORD = 6;
 export const PASSWORD_HINT = `At least ${MIN_PASSWORD} characters.`;
 
 export const WRONG_CREDENTIALS = "wrong-credentials";

@@ -192,7 +192,7 @@ func (s *Server) webSetPasswordCLI(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, ErrPasswordTooShort):
 		s.logWebAuth("web password change refused", "cli", "", ReasonPasswordTooShort)
-		writeJSON(w, WebLoginsResult{Refused: true, Reason: ReasonPasswordTooShort, Message: "the password is too short: use at least 12 characters"})
+		writeJSON(w, WebLoginsResult{Refused: true, Reason: ReasonPasswordTooShort, Message: "the password is too short: use at least 6 characters"})
 	case err != nil:
 		s.log.Error("web password change failed", "err", err)
 		writeJSON(w, WebLoginsResult{Refused: true, Reason: ReasonWebPasswordFailed, Message: "could not save the password: " + err.Error()})

@@ -20,7 +20,7 @@ import (
 
 const (
 	webAuthFileName         = "web-auth.json"
-	webPasswordMinLen       = 12
+	webPasswordMinLen       = 6
 	webLoginIdleLimit       = 90 * 24 * time.Hour
 	webLoginWriteInterval   = time.Minute
 	webCookieBytes          = 32

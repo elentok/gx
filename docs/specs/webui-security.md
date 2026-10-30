@@ -151,7 +151,7 @@ from an authenticator app.
     progress bar, so that I know how far I am.
 34. As the person, I want step 1 to tell me when the code is wrong or expired, so that I go back to
     the CLI for a new one.
-35. As the person, I want step 2 to ask for the password twice, with "At least 12 characters.", so
+35. As the person, I want step 2 to ask for the password twice, with "At least 6 characters.", so
     that I do not lock myself out with a typo.
 36. As the person, I want step 3 to show the TOTP QR code, an "Add to authenticator app" link, the
     key as text and one code field, so that I can add gx to my authenticator app by scan, by tap or
@@ -405,7 +405,7 @@ from an authenticator app.
 - A web login unused for 90 days is gone: a lookup refuses it and the store drops it.
 - Argon2id from `golang.org/x/crypto`. The implementer picks parameters at or above OWASP's minimum
   (19 MiB, 2 passes, 1 lane). The stored parameters let a later version change them.
-- Password rule: at least 12 characters. The server checks it on every path; the clients check it
+- Password rule: at least 6 characters. The server checks it on every path; the clients check it
   too, for the message.
 - TOTP: SHA-1, 30 seconds, 6 digits, one step of skew each way. A step at or below the last
   accepted step is rejected. The last accepted step belongs to the secret: a new secret (setup
@@ -725,7 +725,7 @@ New flows to write:
 
 - **Flow S, "First-run setup":** scenario `web-setup`. Open `web_url`; the setup card shows step 1.
   Enter a wrong code; see the wrong-or-expired error. Enter the code from `gx server status`.
-  Step 2: a short password shows "At least 12 characters."; a mismatch is refused; a good one
+  Step 2: a short password shows "At least 6 characters."; a mismatch is refused; a good one
   goes on. Step 3: QR, the "Add to authenticator app" link (`href` starts with `otpauth://totp/`)
   and key show; a wrong code shows the clock error, and `gx server status` still
   says setup is pending; the right code opens the Epics page signed in.

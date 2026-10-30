@@ -35,11 +35,11 @@ test("99. First-run setup", async ({ page, start }) => {
   await page.getByLabel("Setup code").fill(await setupCode(fixture));
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(stepText(page, "step 2 of 3")).toBeVisible();
-  await expect(page.getByText("At least 12 characters.")).toBeVisible();
+  await expect(page.getByText("At least 6 characters.")).toBeVisible();
 
   await passwords(page, "short");
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByText("The password needs at least 12 characters.")).toBeVisible();
+  await expect(page.getByText("The password needs at least 6 characters.")).toBeVisible();
   await passwords(page, GOOD_PASSWORD, `${GOOD_PASSWORD}x`);
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByText("The two passwords don't match.")).toBeVisible();

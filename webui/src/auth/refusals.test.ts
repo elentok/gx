@@ -15,7 +15,7 @@ describe("reasonText", () => {
     expect(reasonText({ reason: WRONG_CREDENTIALS })).toBe("Wrong password or code");
     expect(reasonText({ reason: SETUP_CODE_WRONG })).toBe("That code is wrong or expired. Run gx server status for a new one.");
     expect(reasonText({ reason: TOTP_MISMATCH })).toBe(TOTP_MISMATCH_TEXT);
-    expect(reasonText({ reason: PASSWORD_TOO_SHORT })).toBe("The password needs at least 12 characters.");
+    expect(reasonText({ reason: PASSWORD_TOO_SHORT })).toBe("The password needs at least 6 characters.");
     expect(reasonText({ reason: TOTP_OFF })).toBe("The authenticator is turned off.");
   });
 
