@@ -169,6 +169,8 @@ type launchAndPromptParams struct {
 
 	// SessionCwd is the cwd Pane's agent was launched in.
 	SessionCwd string
+	// input restarts the finish debounce on a person's key; nil sees none.
+	input *personInput
 	// SmartZone is the context-token ceiling before this agent gets paused.
 	SmartZone int
 	// Gate is the pause/resume coordinator shared across the whole Run call.

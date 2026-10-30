@@ -105,7 +105,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				continue
 			}
 
-			confirmed, err := confirmFinished(d, p.session(), waitForFinishStates)
+			confirmed, err := confirmFinished(d, nil, p.session(), waitForFinishStates)
 			if err != nil {
 				return fmt.Errorf("confirming %s finished: %w", p.Label, err)
 			}
@@ -573,8 +573,8 @@ func waitForCompactionSignal(
 // whether the agent is still in one of until's finish states. A poll timeout
 // (the agent went back to "working" in the meantime) means the original
 // signal was a transient blip, not a real finish.
-func confirmFinished(d Deps, s agentrunner.Session, until []agentrunner.State) (bool, error) {
-	d.Sleep(finishDebounceMs * time.Millisecond)
+func confirmFinished(d Deps, in *personInput, s agentrunner.Session, until []agentrunner.State) (bool, error) {
+	in.sleep(d, finishDebounceMs*time.Millisecond)
 	_, err := d.Runner.Wait(s, until, finishConfirmMs*time.Millisecond)
 	if err == nil {
 		return true, nil
@@ -659,7 +659,7 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, u
 			if !gated {
 				return true, nil
 			}
-			confirmed, err := confirmFinished(d, p.session(), until)
+			confirmed, err := confirmFinished(d, p.input, p.session(), until)
 			if err != nil {
 				return false, fmt.Errorf("confirming %s still finished after background task gate: %w", p.Label, err)
 			}

@@ -70,6 +70,7 @@ type Runner struct {
 	startErrs map[string]error
 	failNext  map[string]failPrompts
 	dieAfter  map[string]error
+	input     map[string]chan struct{}
 }
 
 type failPrompts struct {
@@ -215,6 +216,37 @@ func (r *Runner) Wait(s agentrunner.Session, states []agentrunner.State, timeout
 		case <-deadline:
 			return st, agentrunner.ErrTimeout
 		}
+	}
+}
+
+// PersonInput implements agentrunner.PersonInputter: events fire on each
+// SendPersonInput for the session's label.
+func (r *Runner) PersonInput(s agentrunner.Session) (<-chan struct{}, func(), error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, err := r.live(s); err != nil {
+		return nil, nil, err
+	}
+	if r.input == nil {
+		r.input = map[string]chan struct{}{}
+	}
+	ch, ok := r.input[s.Label]
+	if !ok {
+		ch = make(chan struct{}, 1)
+		r.input[s.Label] = ch
+	}
+	return ch, func() {}, nil
+}
+
+// SendPersonInput reports a person's key on label's session, as a pty runner
+// does. Events collapse while the receiver is busy.
+func (r *Runner) SendPersonInput(label string) {
+	r.mu.Lock()
+	ch := r.input[label]
+	r.mu.Unlock()
+	select {
+	case ch <- struct{}{}:
+	default:
 	}
 }
 

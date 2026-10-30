@@ -146,6 +146,70 @@ func TestWaitIterationFinished_ZeroDelayDisablesNudge(t *testing.T) {
 	}
 }
 
+// typeDuring makes the first sleep of dur press a key, as a person does while
+// the loop waits.
+func typeDuring(d *Deps, r *runnerfake.Runner, dur time.Duration, sleeps *[]time.Duration) {
+	typed := false
+	d.Sleep = func(got time.Duration) {
+		*sleeps = append(*sleeps, got)
+		if got == dur && !typed {
+			typed = true
+			r.SendPersonInput("iter-01")
+		}
+	}
+}
+
+func countSleeps(sleeps []time.Duration, dur time.Duration) int {
+	n := 0
+	for _, s := range sleeps {
+		if s == dur {
+			n++
+		}
+	}
+	return n
+}
+
+// A key inside the stall delay restarts it: the nudge comes a full delay after
+// the last key.
+func TestWaitIterationFinished_PersonInputRestartsStallDelay(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	var sleeps []time.Duration
+	typeDuring(&d, r, 2*time.Minute, &sleeps)
+	waitStallFixture(t, d, one)
+	if n := countSleeps(sleeps, 2*time.Minute); n != 2 {
+		t.Errorf("stall delay slept %d times, want 2 (restarted by the key)", n)
+	}
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+		t.Errorf("prompts = %q, want the stall nudge once", got)
+	}
+}
+
+// A key inside the finish debounce makes the loop wait the debounce again.
+func TestWaitIterationFinished_PersonInputRestartsFinishDebounce(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 0)
+	var sleeps []time.Duration
+	typeDuring(&d, r, finishDebounceMs*time.Millisecond, &sleeps)
+	waitStallFixture(t, d, one)
+	if n := countSleeps(sleeps, finishDebounceMs*time.Millisecond); n != 2 {
+		t.Errorf("finish debounce slept %d times, want 2 (restarted by the key)", n)
+	}
+}
+
+// No key, no change: each timer runs once.
+func TestWaitIterationFinished_NoPersonInputKeepsTimersOnce(t *testing.T) {
+	t.Parallel()
+	d, _, one, sleeps := stallNudgeFixture(t, "", 2*time.Minute)
+	waitStallFixture(t, d, one)
+	if n := countSleeps(*sleeps, 2*time.Minute); n != 1 {
+		t.Errorf("stall delay slept %d times, want 1", n)
+	}
+	if n := countSleeps(*sleeps, finishDebounceMs*time.Millisecond); n < 1 {
+		t.Errorf("finish debounce never slept")
+	}
+}
+
 // blipRunner times out its timeoutOn-th Wait: a finish recheck finds the
 // agent back at work. runnerfake can't script that without a real-time
 // timeout.

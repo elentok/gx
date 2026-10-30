@@ -343,6 +343,9 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 		ScratchDir: o.ScratchDir, EpicName: o.Epic, Ticket: o.Ticket.Identifier, TicketPath: o.Ticket.Path,
 		TicketData: o.Ticket, SmartZone: o.smartZone(), verifyCap: new(verifyCapState),
 	}
+	in := watchPersonInput(d.Runner, s)
+	defer in.close()
+	p.input = in
 	vcap := newVerifyCap(p, p.SmartZone)
 	elapsedMs := 0
 	nudged := false
@@ -381,7 +384,7 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 			}
 			continue
 		}
-		confirmed, err := confirmFinished(d, s, until)
+		confirmed, err := confirmFinished(d, in, s, until)
 		if err != nil {
 			return fmt.Errorf("confirming %s finished: %w", w.Label, err)
 		}
@@ -399,7 +402,7 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 		if nudged || o.StallNudgeDelay <= 0 {
 			return nil
 		}
-		nudgedNow, again, err := nudgeIfStalled(d, o, w, s, until)
+		nudgedNow, again, err := nudgeIfStalled(d, in, o, w, s, until)
 		if err != nil {
 			return err
 		}
@@ -414,11 +417,11 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 // agent that is still idle with no open question and no finished report.
 // again tells the caller to wait for the agent to settle once more: after the
 // nudge, or because the agent went back to work during the delay.
-func nudgeIfStalled(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session, until []agentrunner.State) (nudged, again bool, err error) {
+func nudgeIfStalled(d Deps, in *personInput, o OneIteration, w IterationWorktree, s agentrunner.Session, until []agentrunner.State) (nudged, again bool, err error) {
 	if reported, err := agentReported(o.Ticket.Path); err != nil || reported {
 		return false, false, err
 	}
-	d.Sleep(o.StallNudgeDelay)
+	in.sleep(d, o.StallNudgeDelay)
 	// The agent may have asked or finished during the delay.
 	if reported, err := agentReported(o.Ticket.Path); err != nil || reported {
 		return false, false, err

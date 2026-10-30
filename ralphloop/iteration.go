@@ -214,7 +214,7 @@ func reattachIteration(d Deps, p iterationParams) error {
 		// still-working agent - which is how both real pause/reopen/reattach
 		// incidents actually looped, since this short-circuit used to skip
 		// waitForFinish (and its gate) entirely.
-		confirmed, err := confirmFinished(d, launchParams.session(), runnerFinishStates)
+		confirmed, err := confirmFinished(d, nil, launchParams.session(), runnerFinishStates)
 		if err != nil {
 			return fmt.Errorf("confirming %s already finished at reattach: %w", label, err)
 		}
