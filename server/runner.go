@@ -724,9 +724,9 @@ func (s *Server) prepareAndLaunch(
 // finishRun waits for the agent to settle, then merges (or pauses) the ticket and
 // moves the root on: the next frontier ticket, or the root's completion.
 func (s *Server) finishRun(rc runContext) {
-	rc.one.PauseOnBlock = pausesOnBlock(rc.run)
+	rc.one.Runner = rc.run.Runner
 	stop := make(chan struct{})
-	if !rc.one.PauseOnBlock {
+	if !rc.one.PausesAtOnce() {
 		go s.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)
 	}
 	err := ralphloop.WaitIterationFinished(rc.deps, rc.one, rc.wt, rc.run.Session)

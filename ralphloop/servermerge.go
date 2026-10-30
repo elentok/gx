@@ -57,13 +57,19 @@ type OneIteration struct {
 	// StallNudgeDelay is how long an idle agent with no question and no finished
 	// report waits before the one stall nudge; zero sends none.
 	StallNudgeDelay time.Duration
-	// PauseOnBlock pauses the ticket the moment the agent blocks on a request,
-	// with no dwell: a headless agent's block is a tracker fact, not a pane
-	// guess. Herdr, pty and Codex leave it false and keep the dwell path.
-	PauseOnBlock bool
+	// Runner is the name of the runner the agent runs on (agentrunner.Choice).
+	// It picks how a block pauses: see PausesAtOnce.
+	Runner string
 	// SmartZone is the context-token ceiling the iteration's agent is held to,
 	// the same as the SmartZone run option; zero means defaultSmartZone.
 	SmartZone int
+}
+
+// PausesAtOnce reports whether a block pauses the ticket with no dwell: a
+// headless Claude agent's block is a tracker fact, not a pane guess. Every
+// other runner and agent dwells first, since its block is read off a screen.
+func (o OneIteration) PausesAtOnce() bool {
+	return o.Agent == AgentClaude && o.Runner == string(agentrunner.ChoiceHeadless)
 }
 
 func (o OneIteration) smartZone() int {
@@ -327,10 +333,7 @@ const mergeDeferCap = 2*conflictResolutionTimeoutMs*time.Millisecond + 10*time.M
 // finish, and the ticket is paused zero-commit before the agent commits.
 func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentrunner.Session) error {
 	until := runnerFinishStates
-	waitStates := until
-	if o.PauseOnBlock {
-		waitStates = append(slices.Clone(until), agentrunner.StateBlocked)
-	}
+	waitStates := append(slices.Clone(until), agentrunner.StateBlocked)
 	p := launchAndPromptParams{
 		Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink(),
 		ScratchDir: o.ScratchDir, EpicName: o.Epic, Ticket: o.Ticket.Identifier, TicketPath: o.Ticket.Path,
@@ -355,7 +358,18 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 			return err
 		}
 		if st.State == agentrunner.StateBlocked {
-			return pauseBlockedAtOnce(d, p, o.Ticket.Path, st)
+			// The rate-limit check goes here, before any blocked pause.
+			if o.PausesAtOnce() {
+				return pauseBlockedAtOnce(d, p, o.Ticket.Path, st)
+			}
+			reason, paused, err := dwellThenPauseBlocked(d, p, o.Runner, recordLiveSession(d, w.Label, o.Ticket.Path))
+			if err != nil {
+				return err
+			}
+			if paused {
+				return &BlockedPausedError{Reason: reason}
+			}
+			continue
 		}
 		confirmed, err := confirmFinished(d, s, until)
 		if err != nil {

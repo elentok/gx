@@ -84,7 +84,8 @@ const blockedDwellMs = 15_000
 // yet.
 var errBlockedPanePaused = errors.New("iteration paused: pane blocked on an unanswered prompt")
 
-// pauseOnBlockedPane waits out blockedDwellMs, then re-reads the session once via
+// pauseOnBlockedPane is the in-process loop's entry to dwellThenPauseBlocked:
+// it waits out blockedDwellMs, then re-reads the session once via
 // Runner.Status (a peek, not another Wait) and, only if it is still blocked
 // at that instant, writes the pane-answered pause (paused (answer), a reason, and
 // a "## Needs Answer" stub, both naming p.Label — the pane is named by its
@@ -101,22 +102,37 @@ var errBlockedPanePaused = errors.New("iteration paused: pane blocked on an unan
 // docs/runbooks/blocked-form-regression-check.md for the (necessarily
 // interactive, via `gx doctor --check-blocked-form`) way to check it.
 func pauseOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (paused bool, err error) {
+	_, paused, err = dwellThenPauseBlocked(d, p, "", sessionID)
+	return paused, err
+}
+
+// dwellThenPauseBlocked is the dwell-and-recheck shared by the in-process loop
+// and the server wait loop (WaitIterationFinished). runner names the runner
+// whose block this is, so the reason names the ways to answer on it.
+func dwellThenPauseBlocked(d Deps, p launchAndPromptParams, runner, sessionID string) (reason string, paused bool, err error) {
 	d.Sleep(blockedDwellMs * time.Millisecond)
 
 	st, err := d.Runner.Status(p.session())
 	if err != nil {
-		return false, fmt.Errorf("rechecking %s for pause: %w", p.Label, err)
+		return "", false, fmt.Errorf("rechecking %s for pause: %w", p.Label, err)
 	}
 	if st.State != agentrunner.StateBlocked {
-		return false, nil
+		return "", false, nil
 	}
 
-	reason := fmt.Sprintf("%s is blocked on a prompt gx did not send; answer it in the pane", p.Label)
+	how := "answer it in the pane"
 	if st.BlockedReason != "" {
-		reason = fmt.Sprintf("%s is blocked on a prompt gx did not send (%s); answer it with `gx server agents answer`, or in the pane", p.Label, st.BlockedReason)
+		how = "answer it with `gx server agents answer`, or in the pane"
+	}
+	if runner == string(agentrunner.ChoicePTY) {
+		how = "answer it with the web answer button, `gx server agents answer`, or by typing in the Agents tab live panel"
+	}
+	reason = fmt.Sprintf("%s is blocked on a prompt gx did not send; %s", p.Label, how)
+	if st.BlockedReason != "" {
+		reason = fmt.Sprintf("%s is blocked on a prompt gx did not send (%s); %s", p.Label, st.BlockedReason, how)
 	}
 	p.pauseBlockedPane(sessionID, reason)
-	return true, nil
+	return reason, true, nil
 }
 
 // pauseBlockedAtOnce is pauseOnBlockedPane without the dwell, for a headless

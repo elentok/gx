@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
@@ -92,21 +91,15 @@ type ptyNamed struct{ *turnRunner }
 
 func (ptyNamed) Name() string { return "pty" }
 
-// A herdr or pty hosted agent that blocks keeps the dwell path: the ticket stays claimed.
-func TestHeadlessBlock_NonHeadlessStaysClaimed(t *testing.T) {
+// A herdr or pty hosted agent that stays blocked past the dwell is paused by
+// the server wait loop, like a headless one.
+func TestHeadlessBlock_NonHeadlessPausesAfterDwell(t *testing.T) {
 	t.Parallel()
 	for _, runner := range []string{"herdr", "pty"} {
 		t.Run(runner, func(t *testing.T) {
 			_, ticketPath, turn := startBlockable(t, runner)
 			turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
-			time.Sleep(300 * time.Millisecond) // negative wait: a pause would come within a few polls
-			tk, err := schema.ParseTicket(ticketPath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if tk.Status != schema.StatusClaimed {
-				t.Errorf("status = %q, want claimed", tk.Status)
-			}
+			waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
 		})
 	}
 }

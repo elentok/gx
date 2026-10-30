@@ -1,6 +1,7 @@
 package ralphloop
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -245,5 +246,82 @@ func TestMergeBuilt_RetriesWhileMergeLockHeld(t *testing.T) {
 	}
 	if sleeps != 3 {
 		t.Errorf("retry sleeps = %d, want 3 (held 3 times, then the lock was free)", sleeps)
+	}
+}
+
+// blockedWaitFixture is a blocked agent on the named runner; onSleep runs when
+// the loop sleeps (the dwell).
+func blockedWaitFixture(t *testing.T, agent AgentKind, runner string, onSleep func(*runnerfake.Runner)) (Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
+	t.Helper()
+	d, r, one, sleeps := stallNudgeFixture(t, "", 0)
+	one.Agent, one.Runner = agent, runner
+	r.SetState("iter-01", agentrunner.StateBlocked, "Bash: rm -rf x")
+	d.Sleep = func(dur time.Duration) {
+		*sleeps = append(*sleeps, dur)
+		if onSleep != nil {
+			onSleep(r)
+		}
+	}
+	return d, r, one, sleeps
+}
+
+func waitBlocked(t *testing.T, d Deps, one OneIteration) error {
+	t.Helper()
+	return WaitIterationFinished(d, one, IterationWorktree{Label: "iter-01"}, agentrunner.Session{Label: "iter-01", ID: "pane-1"})
+}
+
+func TestWaitIterationFinished_HeadlessBlockedPausesAtOnce(t *testing.T) {
+	d, _, one, sleeps := blockedWaitFixture(t, AgentClaude, string(agentrunner.ChoiceHeadless), nil)
+	var paused *BlockedPausedError
+	if err := waitBlocked(t, d, one); !errors.As(err, &paused) {
+		t.Fatalf("err = %v, want *BlockedPausedError", err)
+	}
+	if len(*sleeps) != 0 {
+		t.Errorf("sleeps = %v, want none", *sleeps)
+	}
+}
+
+func TestWaitIterationFinished_DwellingRunnersPauseOnlyIfStillBlocked(t *testing.T) {
+	cases := []struct {
+		name   string
+		agent  AgentKind
+		runner string
+		want   []string
+	}{
+		{"pty claude", AgentClaude, "pty", []string{"web answer button", "gx server agents answer", "Agents tab live panel"}},
+		{"pty codex", AgentCodex, "pty", []string{"web answer button", "gx server agents answer", "Agents tab live panel"}},
+		{"herdr claude", AgentClaude, "herdr", []string{"gx server agents answer", "or in the pane"}},
+		{"herdr codex", AgentCodex, "herdr", []string{"gx server agents answer", "or in the pane"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name+" still blocked", func(t *testing.T) {
+			d, _, one, sleeps := blockedWaitFixture(t, c.agent, c.runner, nil)
+			var paused *BlockedPausedError
+			if err := waitBlocked(t, d, one); !errors.As(err, &paused) {
+				t.Fatalf("err = %v, want *BlockedPausedError", err)
+			}
+			if !slices.Equal(*sleeps, []time.Duration{blockedDwellMs * time.Millisecond}) {
+				t.Errorf("sleeps = %v, want one dwell", *sleeps)
+			}
+			for _, w := range c.want {
+				if !strings.Contains(paused.Reason, w) {
+					t.Errorf("reason %q lacks %q", paused.Reason, w)
+				}
+			}
+			if c.runner != "pty" && strings.Contains(paused.Reason, "web answer button") {
+				t.Errorf("reason %q names the web button on %s", paused.Reason, c.runner)
+			}
+		})
+		t.Run(c.name+" clears in the dwell", func(t *testing.T) {
+			d, _, one, sleeps := blockedWaitFixture(t, c.agent, c.runner, func(r *runnerfake.Runner) {
+				r.SetState("iter-01", agentrunner.StateIdle, "")
+			})
+			if err := waitBlocked(t, d, one); err != nil {
+				t.Fatalf("err = %v, want the wait to finish", err)
+			}
+			if len(*sleeps) == 0 || (*sleeps)[0] != blockedDwellMs*time.Millisecond {
+				t.Errorf("sleeps = %v, want the dwell first", *sleeps)
+			}
+		})
 	}
 }
