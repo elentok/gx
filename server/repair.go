@@ -177,7 +177,7 @@ func (s *Server) repairMerge(req RepairRequest) (RepairResult, error) {
 	res, _, err := repair.Merge(repair.MergeInput{
 		EpicPath: epicPath, ID: id, From: req.From, To: req.To,
 		IgnoreLiveTab: req.IgnoreLiveTab, Continue: req.Continue, Abort: req.Abort, Source: req.origin, Cwd: cwd,
-	}, s.defaultDeps())
+	}, s.hostingDeps(epicTicketAddress(epicPath, id)))
 	if err != nil {
 		return repairRefusal(err), nil
 	}
@@ -278,25 +278,28 @@ func (s *Server) repairStartOver(req RepairRequest) (RepairResult, error) {
 	res, err := repair.StartOver(repair.StartOverInput{
 		EpicPath: epicPath, ID: id, Reason: req.Reason, Force: req.Force,
 		DeleteBranch: deleteBranch, Source: req.origin, Cwd: cwd, Now: time.Now(), Subjects: repair.GitCommitSubjects,
-	}, s.startOverDeps(req.Address))
+	}, s.hostingDeps(epicTicketAddress(epicPath, id)))
 	if err != nil {
 		return repairRefusal(err), nil
 	}
 	return repairOK(res)
 }
 
-// startOverDeps talks to the runner hosting address's iteration, so start-over sees
-// and closes the agent where it actually runs. A direct start-over has no server
-// runner and keeps the default.
-func (s *Server) startOverDeps(address string) ralphloop.Deps {
-	addr, err := tickets.ParseAddress(address, tickets.AddressContext{})
-	if s.cfg.Runner == nil || err != nil {
+// hostingDeps talks to the runner hosting addr's iteration, so start-over and
+// merge see (and close) the agent where it actually runs. A direct repair has
+// no server runner, so there is no agent to ask and the defaults stand.
+func (s *Server) hostingDeps(addr tickets.Address) ralphloop.Deps {
+	if s.cfg.Runner == nil {
 		return s.defaultDeps()
 	}
 	// An unavailable runner is nil, which reports no session, as for an
 	// unreachable host.
 	runner, _ := s.iterationRunner(addr)
 	return s.depsWith(runner)
+}
+
+func epicTicketAddress(epicPath, id string) tickets.Address {
+	return tickets.Address{Project: tickets.ProjectName(filepath.Dir(epicPath)), Epic: filepath.Base(epicPath), ID: id}
 }
 
 func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
@@ -566,7 +569,7 @@ func (s *Server) repairVerify(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
-	run, err := repair.DefaultVerifyRun(epicPath, cwd)
+	run, err := repair.DefaultVerifyRun(epicPath, cwd, s.hostingDeps(epicTicketAddress(epicPath, id)).Runner)
 	if err != nil {
 		return repairRefusal(err), nil
 	}

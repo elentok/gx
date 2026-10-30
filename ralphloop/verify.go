@@ -85,10 +85,12 @@ func (d Deps) verifyDeps() VerifyDeps {
 	return vd
 }
 
-// DefaultVerifyDeps wires VerifyDeps to the real git and herdr packages, for
-// one-shot CLI callers.
-func DefaultVerifyDeps() VerifyDeps {
-	return DefaultDeps().verifyDeps()
+// DefaultVerifyDeps wires VerifyDeps to the real git package and lists
+// sessions on runner (nil: leftovers unknown).
+func DefaultVerifyDeps(runner agentrunner.Runner) VerifyDeps {
+	d := DefaultDeps()
+	d.Runner = runner
+	return d.verifyDeps()
 }
 
 // VerifyParams selects what VerifyEpic checks. Epic is also the feature

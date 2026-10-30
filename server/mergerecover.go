@@ -59,7 +59,7 @@ func (s *Server) recoverEpicMerge(projectDir, epicPath string) error {
 	if err != nil {
 		return err
 	}
-	run, err := repair.DefaultVerifyRun(epicPath, repo)
+	run, err := repair.DefaultVerifyRun(epicPath, repo, s.hostingDeps(tickets.Address{Project: project, Epic: filepath.Base(epicPath), ID: owner.Ticket}).Runner)
 	if err != nil {
 		return err
 	}

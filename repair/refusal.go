@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -112,9 +113,10 @@ func IsGuardedBranch(branch string) bool {
 	return strings.HasPrefix(branch, "ralph-loop/")
 }
 
-// DefaultVerifyRun wires the real git and runner dependencies. A runner that
-// can't list sessions leaves the session leftovers unknown.
-func DefaultVerifyRun(epicPath, cwd string) (VerifyRun, error) {
+// DefaultVerifyRun wires the real git dependencies and lists leftover sessions
+// on runner, the one hosting the ticket. A nil runner or one that can't list
+// sessions leaves the session leftovers unknown.
+func DefaultVerifyRun(epicPath, cwd string, runner agentrunner.Runner) (VerifyRun, error) {
 	repo, err := git.FindRepo(cwd)
 	if err != nil {
 		return VerifyRun{}, fmt.Errorf("not inside a git repo: %w", err)
@@ -124,6 +126,6 @@ func DefaultVerifyRun(epicPath, cwd string) (VerifyRun, error) {
 		EpicPath:        epicPath,
 		FeatureWorktree: filepath.Join(repo.WorktreeDir, filepath.Base(epicPath)),
 		WorktreeDir:     repo.WorktreeDir,
-		Deps:            ralphloop.DefaultVerifyDeps(),
+		Deps:            ralphloop.DefaultVerifyDeps(runner),
 	}, nil
 }

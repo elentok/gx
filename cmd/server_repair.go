@@ -55,7 +55,7 @@ func addServerRepairCmds(parent *cobra.Command, d deps) {
 	verb("merge", "merge <project:epic/NN>", "merge a stuck ticket's commits onto the feature branch and mark it done", cobra.ExactArgs(1), func(c *cobra.Command) {
 		c.Flags().StringVar(&req.From, "from", "", "exclusive base of an explicit commit range (requires --to)")
 		c.Flags().StringVar(&req.To, "to", "", "tip of an explicit commit range (requires --from)")
-		c.Flags().BoolVar(&req.IgnoreLiveTab, "ignore-live-tab", false, "merge even though the iteration's herdr tab exists")
+		c.Flags().BoolVar(&req.IgnoreLiveTab, "ignore-live-tab", false, "merge even though the iteration's agent session exists")
 		c.Flags().BoolVar(&req.Continue, "continue", false, "finish a conflicted merge after resolving it")
 		c.Flags().BoolVar(&req.Abort, "abort", false, "abandon a conflicted merge")
 	})

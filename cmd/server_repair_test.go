@@ -8,11 +8,29 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 )
+
+func TestServerRepair_IgnoreLiveTabHelpNamesTheAgentSession(t *testing.T) {
+	parent := &cobra.Command{Use: "repair"}
+	addServerRepairCmds(parent, defaultDeps())
+	merge, _, err := parent.Find([]string{"merge"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := merge.Flags().Lookup("ignore-live-tab")
+	if f == nil {
+		t.Fatal("merge has no --ignore-live-tab flag")
+	}
+	if !strings.Contains(f.Usage, "agent session") || strings.Contains(f.Usage, "herdr") {
+		t.Errorf("--ignore-live-tab usage = %q; want it to say \"agent session\", not herdr", f.Usage)
+	}
+}
 
 func TestServerRepair_RunsDirectlyWhenNoServerRunning(t *testing.T) {
 	store := t.TempDir()
