@@ -286,8 +286,8 @@ func TestTicketMenuItems_DimReasons(t *testing.T) {
 	if got := disabled(paused, resumeLabel); got != "" {
 		t.Errorf("resume on a paused ticket = %q, want enabled", got)
 	}
-	if got := disabled(paused, "Investigate"); got != herdrDownText {
-		t.Errorf("investigate with herdr down = %q", got)
+	if got := disabled(paused, "Investigate"); got != "" {
+		t.Errorf("investigate with herdr down = %q, want enabled", got)
 	}
 }
 

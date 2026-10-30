@@ -33,7 +33,7 @@ func dispatchMenuAction(api ServerAPI, worktreeRoot string, settings ui.Settings
 	case actionStartSession:
 		return startSessionCmd(api, settings.TicketStore, result.Path)
 	case actionInvestigate:
-		return cmdLaunchInvestigate(worktreeRoot, result.EpicName, result.TicketID)
+		return investigateCmd(api, result.Path)
 	case actionTranscript:
 		file, address := resolveTicketPath(settings.TicketStore, result.Path)
 		return cmdTranscript(settings.Dirs, file, address, width)

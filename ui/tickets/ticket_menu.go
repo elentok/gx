@@ -147,7 +147,7 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		pick("Watch", "", actionWatch, contextmenu.Agent, in.watchReason),
 		pick("Transcript", "", actionTranscript, contextmenu.Agent, ""),
 		suggest(investigateSuggested(in.rendered),
-			pick("Investigate", "", actionInvestigate, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText))))
+			pick("Investigate", "", actionInvestigate, contextmenu.Agent, "")))
 	switch {
 	case in.queueAgent != "":
 		// A PTY pane is the Agents tab's live panel, so herdr being down is moot.

@@ -70,11 +70,11 @@ func (s *Server) fixAgentHandler(web bool) http.HandlerFunc {
 	}
 }
 
-// fixAgentName is the session name of the agent fixing addr. Creating with a
+// FixAgentName is the session name of the agent fixing addr. Creating with a
 // unique name makes it the one-agent-per-ticket guard, so the mapping must be
 // injective: "_" starts every escape, and is itself escaped, so two addresses
 // never share a name even when their parts contain hyphens.
-func fixAgentName(addr string) string {
+func FixAgentName(addr string) string {
 	return "fix-" + strings.NewReplacer("_", "__", ":", "_c", "/", "_s").Replace(addr)
 }
 
@@ -137,7 +137,7 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 	cs := CreateSessionRequest{
 		Project:    ref.addr.Project,
 		Dir:        checkout,
-		Name:       fixAgentName(addr),
+		Name:       FixAgentName(addr),
 		UniqueName: true,
 		Prompt:     fixAgentPrompt(addr, t),
 		Harness:    settings.chatHarness(),
