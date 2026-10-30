@@ -617,10 +617,16 @@ func newDoctorCmd(d deps) *cobra.Command {
 		Long: `Check the repo for common configuration issues.
 
 --check-ghostty runs instead of the repo checks and probes Ghostty's AppleScript
-interface. It may show a macOS Automation prompt.`,
-		// runDoctor does its own flag parsing.
+interface. It may show a macOS Automation prompt.
+
+--check-blocked-form <target> checks herdr only: it reads herdr's blocked-pane
+recognition. For a PTY agent run "gx claude doctor" instead.`,
+		// runDoctor does its own flag parsing, so cobra never sees --help.
 		DisableFlagParsing: true,
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+				return cmd.Help()
+			}
 			return runDoctor(args, d)
 		},
 	}

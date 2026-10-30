@@ -1,7 +1,10 @@
 # Runbook: blocked-form regression check
 
-The orchestrator's blocked-pane check (in `ralphloop/waitforfinish.go`) pauses the ticket
-whenever herdr reports a pane's `agent_status` as `blocked`. That recognition — which detection
+The server wait loop's blocked pause (`pauseOnBlockedPane` in `ralphloop/waitforfinish_recovery.go`,
+driven from `ralphloop/servermerge.go`) pauses the ticket whenever the agent's pane is blocked. This
+runbook covers **herdr only**: `gx doctor --check-blocked-form` reads herdr's `agent_status:
+blocked` recognition. For a PTY agent, run `gx claude doctor` instead. On the herdr runner, the
+recognition — which detection
 rule in herdr's pane monitor fires, and whether it fires at all — lives entirely outside this repo,
 in herdr's own agent-detection manifest. An upgrade to Claude Code or to herdr's manifest can change
 what a blocked prompt looks like on screen and silently stop herdr from recognizing it, which would

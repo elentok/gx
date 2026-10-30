@@ -252,6 +252,22 @@ func TestDoctor_CheckBlockedForm_FailsOnWrongRule(t *testing.T) {
 	}
 }
 
+func TestDoctor_Help_SaysBlockedFormIsHerdrOnly(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := deps{env: envFor(t), stdout: &stdout, stderr: &stdout}
+
+	if err := execute([]string{"doctor", "--help"}, d); err != nil {
+		t.Fatalf("doctor --help: %v", err)
+	}
+	out := strings.Join(strings.Fields(stdout.String()), " ")
+	for _, want := range []string{"--check-blocked-form", "herdr only", "gx claude doctor"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("doctor --help missing %q, got: %q", want, out)
+		}
+	}
+}
+
 func TestDoctor_CheckBlockedForm_RequiresTarget(t *testing.T) {
 	t.Parallel()
 	d := deps{
