@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react
 import { afterEach, expect, test, vi } from "vitest";
 import { renderThemed } from "../ui/render";
 import type { AuthResult, AuthState } from "./authState";
+import { CertContext } from "./cert";
 import { LoginPage } from "./LoginPage";
 
 afterEach(() => {
@@ -130,6 +131,20 @@ test("an authenticator-needed answer shows the add step; a mismatch shows the cl
   const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
   expect(calls[2][0]).toContain("/v1/web/auth/add-authenticator");
   expect(JSON.parse(calls[2][1].body as string)).toEqual({ pending_id: "p1", totp_code: "123456" });
+});
+
+test("the certificate help unfolds to both links, the trust step and the fingerprint", () => {
+  const cert = { fingerprint: "3F9A1C7E 52B0D488", profile_path: "/gx-root.mobileconfig", cer_path: "/gx-root.cer" };
+  renderThemed(
+    <CertContext.Provider value={{ cert }}>
+      <LoginPage auth={authOf(true)} onDone={() => {}} />
+    </CertContext.Provider>,
+  );
+  expect(screen.getByRole("link", { name: "iPhone or iPad profile" }).getAttribute("href")).toBe("/gx-root.mobileconfig");
+  expect(screen.getByRole("link", { name: "Mac certificate" }).getAttribute("href")).toBe("/gx-root.cer");
+  expect(screen.getByText(/Certificate Trust Settings/)).toBeTruthy();
+  expect(screen.getByText("3F9A1C7E")).toBeTruthy();
+  expect(screen.getByText("52B0D488")).toBeTruthy();
 });
 
 test("the reset hint and the folded certificate help are shown", () => {

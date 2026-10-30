@@ -126,6 +126,32 @@ func TestWebLogin_SetupPendingServesThePageAndNothingElse(t *testing.T) {
 	}
 }
 
+func TestWebLogin_AuthStateCarriesTheRootFingerprintWithoutACookie(t *testing.T) {
+	t.Parallel()
+	l := startLoginWeb(t)
+	info, err := l.h.Client.WebInfo(context.Background())
+	if err != nil || info.Fingerprint == "" {
+		t.Fatalf("web info %+v, %v; want a fingerprint", info, err)
+	}
+	_, body := l.get(t, "/v1/web/auth", nil)
+	var state struct {
+		Fingerprint string `json:"fingerprint"`
+		ProfilePath string `json:"profile_path"`
+		CerPath     string `json:"cer_path"`
+	}
+	if err := json.Unmarshal([]byte(body), &state); err != nil {
+		t.Fatalf("auth state %q: %v", body, err)
+	}
+	if state.Fingerprint != info.Fingerprint {
+		t.Errorf("auth state fingerprint %q, web info %q", state.Fingerprint, info.Fingerprint)
+	}
+	for _, path := range []string{state.ProfilePath, state.CerPath} {
+		if resp, _ := l.get(t, path, nil); resp.StatusCode != http.StatusOK {
+			t.Errorf("GET %q: status %d, want 200", path, resp.StatusCode)
+		}
+	}
+}
+
 func TestWebLogin_HandshakeFlagsPendingSetupUntilItIsDone(t *testing.T) {
 	t.Parallel()
 	l := startLoginWeb(t)

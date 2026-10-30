@@ -6,7 +6,8 @@ import canned from "../canned-snapshot.json";
 import { LoginAuthenticatorCard, LoginCard, rateLimitText } from "../auth/LoginPage";
 import { TOTP_MISMATCH } from "../auth/AddAuthenticator";
 import { AuthenticatorView, ChangePasswordView } from "../settings/AccountPages";
-import { SettingsHomeView, WebLoginsView, WebLoginView } from "../settings/SettingsPage";
+import { CertificateView, SettingsHomeView, WebLoginsView, WebLoginView } from "../settings/SettingsPage";
+import { CertContext } from "../auth/cert";
 import { SetupCodeCard, SetupPasswordCard, SetupTotpCard } from "../auth/SetupPage";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
@@ -54,7 +55,12 @@ export interface GalleryEntry {
   cases: GalleryCase[];
 }
 
-const GALLERY_OTPAUTH_URI = "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP4N2Q7ZLA&issuer=gx";
+const GALLERY_CERT = {
+  fingerprint: "3F9A1C7E 52B0D488 0E61A73B C912F54D 6AE09927 B35C0871 DE441F8B A263C05E",
+  profile_path: "/gx-root.mobileconfig",
+  cer_path: "/gx-root.cer",
+};
+const GALLERY_OTPAUTH_URI ="otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP4N2Q7ZLA&issuer=gx";
 const ticket = canned.tickets[0];
 const longReason = "Waiting on a long chain of upstream tickets that all have to merge first. ".repeat(4);
 
@@ -806,6 +812,14 @@ export const galleryEntries: GalleryEntry[] = [
         label: "rate limited",
         node: <LoginCard totpOn password="hunter2hunter2" error={rateLimitText(181)} submitDisabled />,
       },
+      {
+        label: "certificate help open",
+        node: (
+          <CertContext.Provider value={{ cert: GALLERY_CERT, startOpen: true }}>
+            <LoginCard totpOn />
+          </CertContext.Provider>
+        ),
+      },
     ],
   },
   {
@@ -907,6 +921,10 @@ export const galleryEntries: GalleryEntry[] = [
         ),
       },
     ],
+  },
+  {
+    name: "CertificateView",
+    cases: [{ label: "default", node: <CertificateView cert={GALLERY_CERT} /> }],
   },
   {
     name: "ChangePasswordView",

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { onSignedOut } from "../apiFetch";
 import { Spinner } from "../ui/spinner/Spinner";
 import { AuthCard } from "./AuthCard";
-import { fetchAuthState, type AuthState } from "./authState";
+import { CertContext } from "./cert";
+import { certOf, fetchAuthState, type AuthState } from "./authState";
 import { LoginPage } from "./LoginPage";
 import { SetupPage } from "./SetupPage";
 
@@ -34,6 +35,9 @@ export function AuthGate({
   if (failed) return <AuthCard>Could not reach the server.</AuthCard>;
   if (!auth) return <Spinner label="Loading" />;
   if (auth.state === "signed-in") return <>{children}</>;
-  if (auth.state === "setup") return <SetupPage auth={auth} onDone={refresh} />;
-  return <LoginPage auth={auth} onDone={refresh} />;
+  return (
+    <CertContext.Provider value={{ cert: certOf(auth) }}>
+      {auth.state === "setup" ? <SetupPage auth={auth} onDone={refresh} /> : <LoginPage auth={auth} onDone={refresh} />}
+    </CertContext.Provider>
+  );
 }

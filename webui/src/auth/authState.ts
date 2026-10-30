@@ -1,10 +1,17 @@
 import { apiFetch } from "../apiFetch";
+import type { CertInfo } from "./cert";
 
-export interface AuthState {
+export interface AuthState extends Partial<CertInfo> {
   state: "setup" | "signed-out" | "signed-in";
   login_id?: string;
   totp_on: boolean;
   setup_code_required: boolean;
+}
+
+/** The certificate fields the state route returns, or undefined when it sent none. */
+export function certOf(auth: AuthState): CertInfo | undefined {
+  const { fingerprint, profile_path, cer_path } = auth;
+  return fingerprint && profile_path && cer_path ? { fingerprint, profile_path, cer_path } : undefined;
 }
 
 export interface AuthResult {

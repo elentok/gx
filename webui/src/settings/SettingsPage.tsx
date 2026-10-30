@@ -1,7 +1,8 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
 import { useParams } from "react-router";
-import { fetchAuthState, type AuthState } from "../auth/authState";
+import { certOf, fetchAuthState, type AuthState } from "../auth/authState";
+import { CER_LABEL, Fingerprint, PROFILE_LABEL, type CertInfo } from "../auth/cert";
 import { SETTINGS_HREF } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
@@ -248,6 +249,37 @@ export function WebLoginView({
         </Box>
       )}
     </Frame>
+  );
+}
+
+export function CertificateView({ cert }: { cert: CertInfo }) {
+  return (
+    <Frame>
+      <BackLink />
+      <PageHeader title="Certificate" />
+      <Box data-mock-part="downloads">
+        <Group>
+          <LinkRow href={cert.profile_path} label={PROFILE_LABEL} />
+          <LinkRow href={cert.cer_path} label={`${CER_LABEL} (.cer)`} />
+        </Group>
+      </Box>
+      <Box data-mock-part="fingerprint" mt="4">
+        <Text fontSize="sm" color="text.dim" mb="1">
+          SHA-256 fingerprint
+        </Text>
+        <Fingerprint value={cert.fingerprint} size="sm" />
+      </Box>
+    </Frame>
+  );
+}
+
+export function CertificatePage({ fetchAuth = fetchAuthState }: { fetchAuth?: () => Promise<AuthState> }) {
+  const auth = useFetched("settings-auth", fetchAuth);
+  const cert = auth.data && certOf(auth.data);
+  return (
+    <DetailPage mode="narrow" title={{ kind: "Settings", name: "Certificate" }}>
+      {!auth.data ? <Spinner label="Loading" /> : cert ? <CertificateView cert={cert} /> : <SettingsStubView />}
+    </DetailPage>
   );
 }
 

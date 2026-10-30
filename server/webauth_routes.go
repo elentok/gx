@@ -63,6 +63,11 @@ type webAuthState struct {
 	// is whether it also needs the Setup code (after the CLI authenticator reset).
 	TOTPOn            bool `json:"totp_on"`
 	SetupCodeRequired bool `json:"setup_code_required"`
+	// The root certificate's fingerprint and download paths: public, so the login and
+	// setup pages can show them before anyone signs in.
+	Fingerprint string `json:"fingerprint"`
+	ProfilePath string `json:"profile_path"`
+	CerPath     string `json:"cer_path"`
 }
 
 type webAuthBody struct {
@@ -171,7 +176,13 @@ func (s *Server) denyWeb(mux http.Handler) http.Handler {
 
 func (s *Server) webAuthStateRead(w http.ResponseWriter, r *http.Request) {
 	totp := s.webTOTPOn()
-	state := webAuthState{TOTPOn: totp, SetupCodeRequired: totp && s.webAuth.AuthenticatorResetPending()}
+	state := webAuthState{
+		TOTPOn:            totp,
+		SetupCodeRequired: totp && s.webAuth.AuthenticatorResetPending(),
+		Fingerprint:       webRootFingerprint(s.webCerts.Root().Raw),
+		ProfilePath:       webRootProfilePath,
+		CerPath:           webRootCerPath,
+	}
 	if login, _, ok := s.webLoginFor(r); ok {
 		state.State, state.LoginID = webAuthStateSignedIn, login.ID
 		writeJSON(w, state)

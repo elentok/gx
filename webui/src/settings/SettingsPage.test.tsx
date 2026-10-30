@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { renderThemed } from "../ui/render";
 import { endsInDays } from "./logins";
-import { SettingsHomeView, SettingsStubView, WebLoginPage, WebLoginsView } from "./SettingsPage";
+import { CertificateView, SettingsHomeView, SettingsStubView, WebLoginPage, WebLoginsView } from "./SettingsPage";
 import type { WebLoginEntry } from "./logins";
 
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -19,6 +19,17 @@ const login = (over: Partial<WebLoginEntry> = {}): WebLoginEntry => ({
   ...over,
 });
 const usedDaysAgo = (days: number) => new Date(NOW - days * DAY).toISOString();
+
+describe("CertificateView", () => {
+  it("shows both downloads and the fingerprint", () => {
+    const cert = { fingerprint: "3F9A1C7E 52B0D488", profile_path: "/gx-root.mobileconfig", cer_path: "/gx-root.cer" };
+    const { getByRole, getByText } = renderThemed(<CertificateView cert={cert} />);
+    expect(getByRole("link", { name: /iPhone or iPad profile/ }).getAttribute("href")).toBe("/gx-root.mobileconfig");
+    expect(getByRole("link", { name: /Mac certificate/ }).getAttribute("href")).toBe("/gx-root.cer");
+    expect(getByText("3F9A1C7E")).toBeTruthy();
+    expect(getByText("52B0D488")).toBeTruthy();
+  });
+});
 
 describe("SettingsHomeView", () => {
   it("lists the Security rows with the device count and signs out through the callback", () => {

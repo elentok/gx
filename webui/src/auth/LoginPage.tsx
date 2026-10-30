@@ -5,6 +5,7 @@ import { AuthCard } from "./AuthCard";
 import { ErrorLine, Field } from "./AuthFields";
 import { postAuth, SETUP_CODE_WRONG, type AuthResult, type AuthState } from "./authState";
 import { AddAuthenticator, TOTP_MISMATCH } from "./AddAuthenticator";
+import { CER_LABEL, CertLink, Fingerprint, PROFILE_LABEL, useCert } from "./cert";
 
 const WRONG_CREDENTIALS = "wrong-credentials";
 const RATE_LIMITED = "rate-limited";
@@ -48,13 +49,26 @@ export function LoginAuthenticatorCard({ secret, uri, error, onSubmit }: LoginAu
   );
 }
 
-// The trust help's unfolded content is a later ticket.
 export function TrustHelp() {
+  const { cert, startOpen } = useCert();
   return (
-    <chakra.details data-mock-part="trust-help" mt="6" color="text.dim" fontSize="sm">
+    <chakra.details data-mock-part="trust-help" open={startOpen} mt="6" color="text.dim" fontSize="sm">
       <Box as="summary" cursor="pointer" textAlign="center">
         Browser warns about this page?
       </Box>
+      {cert && (
+        <Box mt="3" display="flex" flexDirection="column" gap="2">
+          <Text>
+            gx signs this page with its own certificate. Install it once per device:{" "}
+            <CertLink href={cert.profile_path}>{PROFILE_LABEL}</CertLink> · <CertLink href={cert.cer_path}>{CER_LABEL}</CertLink>
+          </Text>
+          <Text>On iPhone, after installing, turn it on in Settings › General › About › Certificate Trust Settings.</Text>
+          <Text>
+            Check that the fingerprint matches <code>gx server status</code>:
+          </Text>
+          <Fingerprint value={cert.fingerprint} />
+        </Box>
+      )}
     </chakra.details>
   );
 }

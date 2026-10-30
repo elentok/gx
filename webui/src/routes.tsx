@@ -3,7 +3,7 @@ import { AgentsPage } from "./agents/AgentsPage";
 import type { CreateSession, FetchWorktrees } from "./agents/newSession";
 import type { AuthState } from "./auth/authState";
 import { AuthenticatorPage, ChangePasswordPage } from "./settings/AccountPages";
-import { SettingsPage,SettingsStubPage, WebLoginPage, WebLoginsPage } from "./settings/SettingsPage";
+import { CertificatePage, SettingsPage,SettingsStubPage, WebLoginPage, WebLoginsPage } from "./settings/SettingsPage";
 import type { FetchLogins } from "./settings/logins";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
@@ -111,7 +111,7 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
     { path: "/settings/logins/:id", element: <WebLoginPage fetchList={fetchers.logins} signOut={fetchers.signOut} /> },
     { path: "/settings/password", element: <ChangePasswordPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} /> },
     { path: "/settings/authenticator", element: <AuthenticatorPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} /> },
-    // Certificate: a later ticket fills this in.
+    { path: "/settings/certificate", element: <CertificatePage fetchAuth={fetchers.authState} /> },
     { path: "/settings/*", element: <SettingsStubPage /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },
