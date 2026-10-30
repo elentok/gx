@@ -213,7 +213,7 @@ func TestWebAuthStorePendingAuthenticatorExpiresAndDoesNotSurviveRestart(t *test
 	restarted := neededAuthenticator(t, err)
 
 	if _, err := openStoreForTest(t, dir, clock).AddAuthenticator(restarted.PendingID, "000000", "2.2.2.2", storeTestUA); !errors.Is(err, ErrWebAuthRefused) {
-		t.Fatalf("new module err = %v, want refused", err)
+		t.Fatalf("reopened store err = %v, want refused", err)
 	}
 	clock.t = clock.t.Add(pendingAuthenticatorTTL)
 	code, _ := TOTPCode(old.Secret, totpStepAt(clock.Now()))
@@ -255,7 +255,7 @@ func TestWebAuthStoreClearAuthenticatorGatesLoginOnSetupCode(t *testing.T) {
 	// The old secret is gone, so the flag and the missing secret survive a restart.
 	again := openStoreForTest(t, dir, clock)
 	if _, err := again.Login(true, storeTestPassword, "", "", "9.9.9.9", storeTestUA); !errors.Is(err, ErrSetupCodeRequired) {
-		t.Fatalf("new module err = %v, want ErrSetupCodeRequired", err)
+		t.Fatalf("reopened store err = %v, want ErrSetupCodeRequired", err)
 	}
 
 	code, _ := TOTPCode(needed.Secret, totpStepAt(clock.Now()))
@@ -400,7 +400,7 @@ func TestWebAuthStoreLookupExpiresAfter90IdleDays(t *testing.T) {
 		t.Fatalf("list = %v, want the login dropped", got)
 	}
 	if got := openStoreForTest(t, dir, clock).List(); len(got) != 0 {
-		t.Fatalf("new module list = %v, want the login dropped", got)
+		t.Fatalf("reopened store list = %v, want the login dropped", got)
 	}
 }
 

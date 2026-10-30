@@ -28,6 +28,13 @@ var (
 // the placeholder embed does not have.
 func ServeAsset(assets fs.FS) http.Handler { return serveAsset(assets) }
 
+// WebRenewedCount counts the web logins the cookie renewal table remembers.
+func (s *Server) WebRenewedCount() int {
+	n := 0
+	s.webRenewed.Range(func(_, _ any) bool { n++; return true })
+	return n
+}
+
 // LiveDiskSpace is the disk-space settings the server currently runs on.
 func (s *Server) LiveDiskSpace() config.DiskSpaceConfig {
 	return s.settings.Load().DiskSpace

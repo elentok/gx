@@ -119,6 +119,15 @@ func (s *Server) webNow() time.Time {
 	return time.Now()
 }
 
+// dropWebLogins ends the streams of removed web logins and forgets their cookie
+// renewals.
+func (s *Server) dropWebLogins(ids ...string) {
+	for _, id := range ids {
+		s.webRenewed.Delete(id)
+	}
+	s.webStreams.closeLogins(ids...)
+}
+
 func (s *Server) setLoginCookie(w http.ResponseWriter, value string, maxAge int) {
 	http.SetCookie(w, &http.Cookie{
 		Name: s.webLoginCookie, Value: value, Path: "/", MaxAge: maxAge,
@@ -403,7 +412,7 @@ func (s *Server) revokeWebLogin(id, ip string) error {
 		return err
 	}
 	s.logWebAuth("web login revoked", ip, name, "")
-	s.webStreams.closeLogins(removed...)
+	s.dropWebLogins(removed...)
 	return nil
 }
 
@@ -421,7 +430,7 @@ func (s *Server) webChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.logWebAuth("web password changed", remoteIP(r), name, "")
-	s.webStreams.closeLogins(removed...)
+	s.dropWebLogins(removed...)
 	writeJSON(w, webAuthResult{})
 }
 
@@ -463,7 +472,7 @@ func (s *Server) webAuthenticatorFinish(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	s.logWebAuth("web authenticator reset", remoteIP(r), name, "")
-	s.webStreams.closeLogins(removed...)
+	s.dropWebLogins(removed...)
 	writeJSON(w, webAuthResult{})
 }
 
@@ -478,7 +487,7 @@ func (s *Server) webSignOut(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.logWebAuth("web sign out", remoteIP(r), name, "")
-		s.webStreams.closeLogins(removed...)
+		s.dropWebLogins(removed...)
 	}
 	s.setLoginCookie(w, "", -1)
 	writeJSON(w, webAuthResult{})

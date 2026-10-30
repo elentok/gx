@@ -77,7 +77,7 @@ func (s *Server) webReset(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, WebInfo{Refused: true, Reason: ReasonWebResetFailed, Message: "could not reset the web account: " + err.Error()})
 		return
 	}
-	s.webStreams.closeLogins(removed...)
+	s.dropWebLogins(removed...)
 	s.logWebAuth("web reset", "cli", "", "")
 	writeJSON(w, s.webInfoNow())
 }
@@ -96,7 +96,7 @@ func (s *Server) webResetAuthenticator(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, WebInfo{Refused: true, Reason: ReasonWebAuthenticatorResetFailed, Message: "could not reset the authenticator: " + err.Error()})
 		return
 	}
-	s.webStreams.closeLogins(removed...)
+	s.dropWebLogins(removed...)
 	s.logWebAuth("web authenticator reset", "cli", "", "")
 	info := s.webInfoNow()
 	s.addResetCode(&info)
@@ -198,7 +198,7 @@ func (s *Server) webSetPasswordCLI(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, WebLoginsResult{Refused: true, Reason: ReasonWebPasswordFailed, Message: "could not save the password: " + err.Error()})
 	default:
 		s.logWebAuth("web password changed", "cli", "", "")
-		s.webStreams.closeLogins(removed...)
+		s.dropWebLogins(removed...)
 		writeJSON(w, WebLoginsResult{})
 	}
 }

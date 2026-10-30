@@ -132,6 +132,30 @@ func TestWebAccount_RevokeEndsTheStreamAndTheNextRequestGets401(t *testing.T) {
 	}
 }
 
+func TestWebAccount_RevokeAndSignOutForgetTheCookieRenewal(t *testing.T) {
+	t.Parallel()
+	a := startAccountWeb(t)
+	a.logins(t, a.first)
+	a.logins(t, a.second)
+	if got := a.h.Server.WebRenewedCount(); got != 2 {
+		t.Fatalf("renewal entries before = %d, want 2", got)
+	}
+	var second accountLogin
+	for _, l := range a.logins(t, a.second) {
+		if l.ThisDevice {
+			second = l
+		}
+	}
+	a.post(t, "/v1/web/logins/revoke", `{"id":"`+second.ID+`"}`, a.first)
+	if got := a.h.Server.WebRenewedCount(); got != 1 {
+		t.Errorf("renewal entries after revoke = %d, want 1", got)
+	}
+	a.post(t, "/v1/web/auth/sign-out", `{}`, a.first)
+	if got := a.h.Server.WebRenewedCount(); got != 0 {
+		t.Errorf("renewal entries after sign-out = %d, want 0", got)
+	}
+}
+
 func TestWebAccount_UnknownIDIsRefusedWithItsReason(t *testing.T) {
 	t.Parallel()
 	a := startAccountWeb(t)

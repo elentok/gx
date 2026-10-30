@@ -25,7 +25,7 @@ import {
 import { BackLink, Frame } from "./parts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const LOGINS_HREF =`${SETTINGS_HREF}/logins`;
+const LOGINS_HREF = `${SETTINGS_HREF}/logins`;
 
 const Group = ({ label, children }: { label?: string; children: ReactNode }) => (
   <Box mt="6">

@@ -55,14 +55,10 @@ func (s *Server) bindWeb() {
 	if a, ok := rawLn.Addr().(*net.TCPAddr); ok && !a.IP.IsUnspecified() {
 		listenIP = a.IP
 	}
-	now := s.cfg.Clock
-	if now == nil {
-		now = time.Now
-	}
 	certs, err := newWebCerts(&webCerts{
 		stateDir: s.cfg.StateDir,
 		listenIP: listenIP,
-		now:      now,
+		now:      s.webNow,
 		hosts:    func() []string { return s.settings.Load().WebAllowedHosts },
 		ifaceIPs: s.interfaceIPs,
 		log:      s.log,

@@ -661,7 +661,7 @@ func (w *WebAuth) dropLoginLocked(id string) {
 	}
 	next := w.file
 	next.Logins = kept
-	// A failed write leaves the login in the file; a new module drops it again on lookup.
+	// A failed write leaves the login in the file; a later lookup drops it again.
 	_ = saveWebAuthFile(w.dir, next)
 	w.file = next
 }

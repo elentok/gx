@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,11 +31,18 @@ const (
 )
 
 // webRootIPRanges are the private, loopback and link-local ranges the root may
-// sign IPs for. They are fixed in the root's name constraints.
-var webRootIPRanges = mustParseCIDRs(
-	"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10",
-	"127.0.0.0/8", "169.254.0.0/16", "::1/128", "fc00::/7", "fe80::/10",
-)
+// sign IPs for. They are fixed in the root's name constraints and are the
+// source IP gate's allow list.
+var webRootIPRanges = ipNets(webAllowedPrefixes)
+
+func ipNets(prefixes []netip.Prefix) []*net.IPNet {
+	nets := make([]*net.IPNet, len(prefixes))
+	for i, p := range prefixes {
+		addr := p.Addr()
+		nets[i] = &net.IPNet{IP: addr.AsSlice(), Mask: net.CIDRMask(p.Bits(), addr.BitLen())}
+	}
+	return nets
+}
 
 func mustParseCIDRs(cidrs ...string) []*net.IPNet {
 	nets := make([]*net.IPNet, len(cidrs))

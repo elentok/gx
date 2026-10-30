@@ -13,6 +13,17 @@ import (
 
 var webTLSNow = time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
+func TestWebRootIPRangesEqualTheSourceAllowList(t *testing.T) {
+	if len(webRootIPRanges) != len(webAllowedPrefixes) {
+		t.Fatalf("%d root ranges, %d allowed prefixes", len(webRootIPRanges), len(webAllowedPrefixes))
+	}
+	for i, p := range webAllowedPrefixes {
+		if got := webRootIPRanges[i].String(); got != p.String() {
+			t.Errorf("root range %d = %s, want %s", i, got, p)
+		}
+	}
+}
+
 func TestWebTLSConstraintDomains(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -58,7 +69,7 @@ func TestWebTLSRootFields(t *testing.T) {
 	for _, n := range c.PermittedIPRanges {
 		ranges = append(ranges, n.String())
 	}
-	wantRanges := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "::1/128", "fc00::/7", "fe80::/10"}
+	wantRanges := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "::1/128", "fe80::/10", "fc00::/7"}
 	if !reflect.DeepEqual(ranges, wantRanges) {
 		t.Errorf("ip ranges = %v", ranges)
 	}
