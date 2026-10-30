@@ -134,7 +134,7 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 		ex.Verdict, ex.Reason = VerdictDiskLow, diskLowReason(d)
 		return ex
 	}
-	if h, held := s.claimHold(addr.Project, t, ticketAgent(t, s.rootAgent(root))); held {
+	if h, held := s.claimHold(addr.Project, t, ticketAgent(t, s.queuedAgent(root))); held {
 		ex.Verdict, ex.Reason = h.Verdict, h.Reason
 		return ex
 	}
@@ -269,7 +269,8 @@ func (s *Server) queuedTarget(item QueueItem, covered map[string]bool, epicsOf f
 	if addr.ID != "" {
 		return addr, true
 	}
-	next, ok := s.nextQueuedTicket(addr, epicsOf)
+	t, ok := s.nextQueuedTicket(addr, epicsOf)
+	next := tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}
 	if !ok || covered[next.String()] {
 		return tickets.Address{}, false
 	}
@@ -279,19 +280,17 @@ func (s *Server) queuedTarget(item QueueItem, covered map[string]bool, epicsOf f
 
 // nextQueuedTicket is the ticket a whole-epic queue entry would start next, if
 // its epic is readable and has a frontier.
-func (s *Server) nextQueuedTicket(epic tickets.Address, epicsOf func(project string) ([]tickets.Epic, error)) (tickets.Address, bool) {
+func (s *Server) nextQueuedTicket(epic tickets.Address, epicsOf func(project string) ([]tickets.Epic, error)) (tickets.Ticket, bool) {
 	epics, err := epicsOf(epic.Project)
 	if err != nil {
-		return tickets.Address{}, false
+		return tickets.Ticket{}, false
 	}
 	for _, e := range epics {
-		if filepath.Base(e.Path) != epic.Epic {
-			continue
+		if filepath.Base(e.Path) == epic.Epic {
+			return s.nextUntracked(epic.Project, e)
 		}
-		t, ok := s.nextUntracked(epic.Project, e)
-		return tickets.Address{Project: epic.Project, Epic: epic.Epic, ID: t.Identifier}, ok
 	}
-	return tickets.Address{}, false
+	return tickets.Ticket{}, false
 }
 
 // publishVerdictChanges streams one event per queued ticket whose verdict word

@@ -84,19 +84,23 @@ func (s *Server) herdrRunner() agentrunner.Runner {
 }
 
 // herdrWaiting is the tickets that need herdr: queued ones that launch on it
-// and tracked runs it hosts. It uses the same rule as the claim hold.
+// and tracked runs it hosts. A queued root waits when its next ticket, with the
+// agent the claim picks for it, launches on herdr.
 func (s *Server) herdrWaiting() []string {
 	var out []string
+	seen := map[string]bool{}
 	for _, item := range s.queued.list() {
-		project := ""
-		if a, err := parseQueuedAddress(item.Address); err == nil {
-			project = a.Project
+		addr, err := parseQueuedAddress(item.Address)
+		if err != nil || seen[rootOf(addr).String()] {
+			continue
 		}
-		agent := ralphloop.AgentKind(item.Agent)
-		if agent == "" {
-			agent = ralphloop.AgentClaude
+		seen[rootOf(addr).String()] = true
+		t, ok := s.nextQueuedTicket(addr, s.projectEpics)
+		if !ok {
+			continue
 		}
-		if r := s.launchRunner(project, agent); r != nil && r.Name() == runnerHerdr {
+		agent := ticketAgent(t, s.queuedAgent(item.Address))
+		if r := s.launchRunner(addr.Project, agent); r != nil && r.Name() == runnerHerdr {
 			out = append(out, item.Address)
 		}
 	}

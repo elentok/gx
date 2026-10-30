@@ -47,10 +47,15 @@ func (s *Server) herdrHolds(r agentrunner.Runner) (string, bool) {
 	return s.herdr.holdReason()
 }
 
-// rootAgent is the default agent of root's queue entry, "project:epic".
-func (s *Server) rootAgent(root string) ralphloop.AgentKind {
+// queuedAgent is the default agent of the queue entry for address's root (a
+// ticket address or "project:epic"), claude when none names one.
+func (s *Server) queuedAgent(address string) ralphloop.AgentKind {
+	want, err := parseQueuedAddress(address)
+	if err != nil {
+		return ralphloop.AgentClaude
+	}
 	for _, item := range s.queued.list() {
-		if a, err := parseQueuedAddress(item.Address); err == nil && a.Project+":"+a.Epic == root && item.Agent != "" {
+		if a, err := parseQueuedAddress(item.Address); err == nil && rootOf(a) == rootOf(want) && item.Agent != "" {
 			return ralphloop.AgentKind(item.Agent)
 		}
 	}

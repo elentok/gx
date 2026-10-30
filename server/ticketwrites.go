@@ -300,17 +300,6 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 	})
 }
 
-// queuedAgent is the agent the ticket is queued with, claude otherwise.
-func (s *Server) queuedAgent(address string) ralphloop.AgentKind {
-	agent := ralphloop.AgentClaude
-	for _, it := range s.queued.list() {
-		if it.Address == address {
-			agent = ralphloop.AgentKind(it.Agent)
-		}
-	}
-	return agent
-}
-
 // ticketAgent is the agent the ticket's own frontmatter names, fallback when it
 // names none or one that is not a known agent.
 func ticketAgent(t tickets.Ticket, fallback ralphloop.AgentKind) ralphloop.AgentKind {
