@@ -1387,10 +1387,12 @@ export interface Snapshot {
    */
   build?: string;
   /**
-   * HerdrUnavailable is set while herdr isn't answering; the server's own
-   * view, filled in by the handler rather than the index.
+   * HerdrUnavailable is set while herdr isn't answering and a ticket needs it;
+   * the server's own view, filled in by the handler rather than the index.
+   * HerdrText says which tickets wait.
    */
   herdr_unavailable?: boolean;
+  herdr_text?: string;
   /**
    * Budget is today's spend, filled in by the handler like HerdrUnavailable.
    */

@@ -80,9 +80,11 @@ type Snapshot struct {
 	// Build is the server's own version, filled in by the handler. Empty from a
 	// server that predates it.
 	Build string `json:"build,omitempty"`
-	// HerdrUnavailable is set while herdr isn't answering; the server's own
-	// view, filled in by the handler rather than the index.
-	HerdrUnavailable bool `json:"herdr_unavailable,omitempty"`
+	// HerdrUnavailable is set while herdr isn't answering and a ticket needs it;
+	// the server's own view, filled in by the handler rather than the index.
+	// HerdrText says which tickets wait.
+	HerdrUnavailable bool   `json:"herdr_unavailable,omitempty"`
+	HerdrText        string `json:"herdr_text,omitempty"`
 	// Budget is today's spend, filled in by the handler like HerdrUnavailable.
 	Budget BudgetStatus `json:"budget"`
 	// ExtraUsage is set while the account auto-purchases extra usage, so the

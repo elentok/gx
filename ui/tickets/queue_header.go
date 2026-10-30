@@ -401,7 +401,11 @@ func (m QueueModel) queueHeaderBodyLines() []string {
 		return []string{epicStatusPausedAnswerStyle.Render(queueServerDownBanner)}
 	}
 	if m.serverAPI != nil && m.herdrDown {
-		return []string{epicStatusProblemStyle.Render(queueHerdrDownBanner)}
+		banner := queueHerdrDownBanner
+		if m.herdrText != "" {
+			banner = "herdr unavailable — " + m.herdrText
+		}
+		return []string{epicStatusProblemStyle.Render(banner)}
 	}
 	if m.paused {
 		return []string{epicStatusProblemStyle.Render(queuePausedLine(m.runningTicketCount()))}

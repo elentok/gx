@@ -631,6 +631,12 @@ func StartHerdrDown(t *testing.T, opts ...func(*server.Config)) *Harness {
 	return startWith(t, t.TempDir(), "", true, opts...)
 }
 
+// StartHerdrDownWithStore is StartHerdrDown over a caller-seeded ticket store.
+func StartHerdrDownWithStore(t *testing.T, store string, opts ...func(*server.Config)) *Harness {
+	t.Helper()
+	return startWith(t, store, "", true, opts...)
+}
+
 // Start runs a server until the test ends. Tickets already written to
 // TicketStore are indexed at startup; since the harness creates TicketStore
 // itself, use StartWithStore to seed it first.

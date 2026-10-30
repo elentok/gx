@@ -44,7 +44,10 @@ type State struct {
 	// Loaded is set once a snapshot has been applied.
 	Loaded           bool
 	HerdrUnavailable bool
-	Budget           server.BudgetStatus
+	// HerdrText says which tickets wait on herdr. Events carry none, so it stays
+	// empty until the next snapshot.
+	HerdrText string
+	Budget    server.BudgetStatus
 	// ExtraUsage is the snapshot's extra-usage warning flag.
 	ExtraUsage bool
 	// Tickets is in snapshot order (by address, forks under their parent).
@@ -168,6 +171,7 @@ func (s State) ApplySnapshot(snap server.Snapshot) State {
 		Seq:              snap.Seq,
 		Loaded:           true,
 		HerdrUnavailable: snap.HerdrUnavailable,
+		HerdrText:        snap.HerdrText,
 		Budget:           snap.Budget,
 		ExtraUsage:       snap.ExtraUsage,
 		Tickets:          slices.Clone(snap.Tickets),
@@ -217,7 +221,7 @@ func (s State) Reduce(ev server.Event) (State, Effect) {
 		s.HerdrUnavailable = true
 		return s, EffectNone
 	case server.EventHerdrAvailable:
-		s.HerdrUnavailable = false
+		s.HerdrUnavailable, s.HerdrText = false, ""
 		return s, EffectNone
 	case server.EventSessionFocus:
 		return s, EffectNone

@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/herdrfake"
 	"github.com/elentok/gx/testutil/runnerfake"
 )
@@ -358,34 +359,60 @@ func TestNew_RequiresARunner(t *testing.T) {
 	}
 }
 
+// herdrTicketStore is a store with one ticket, which a herdr-configured server
+// needs herdr for once it is queued.
+func herdrTicketStore(t *testing.T) string {
+	t.Helper()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "one", "")
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	return store
+}
+
+func queueHerdrTicket(ctx context.Context, t *testing.T, h *servertest.Harness) {
+	t.Helper()
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("queue add: %+v, %v", res, err)
+	}
+}
+
 func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T) {
 	t.Parallel()
-	h := servertest.StartHerdrDown(t, servertest.WithHerdr(servertest.HerdrIsTheSubject), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
+	h := servertest.StartHerdrDownWithStore(t, herdrTicketStore(t), servertest.WithHerdr(servertest.HerdrIsTheSubject), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	// herdr is down but nothing needs it yet: no banner.
 	snap, err := h.Client.Snapshot(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !snap.HerdrUnavailable {
-		t.Fatal("snapshot does not report herdr unavailable")
+	if snap.HerdrUnavailable {
+		t.Fatal("snapshot reports herdr unavailable with no ticket needing it")
 	}
 	events, err := h.Client.Events(ctx, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	next := func() server.Event {
-		select {
-		case ev := <-events:
-			return ev
-		case <-ctx.Done():
-			t.Fatal("event missing")
-			return server.Event{}
+		for {
+			select {
+			case ev := <-events:
+				if ev.Type == server.EventHerdrUnavailable || ev.Type == server.EventHerdrAvailable {
+					return ev
+				}
+			case <-ctx.Done():
+				t.Fatal("event missing")
+				return server.Event{}
+			}
 		}
 	}
+	queueHerdrTicket(ctx, t, h)
 	if ev := next(); ev.Type != server.EventHerdrUnavailable {
 		t.Fatalf("first event = %+v", ev)
+	}
+	if snap, err = h.Client.Snapshot(ctx); err != nil || !snap.HerdrUnavailable || !strings.Contains(snap.HerdrText, "proj:epic-a/01") {
+		t.Fatalf("snapshot = %v %q (err %v), want the banner naming the queued ticket", snap.HerdrUnavailable, snap.HerdrText, err)
 	}
 
 	// Several failed retries must not repeat the event.
@@ -398,7 +425,7 @@ func TestHerdr_DownAtStartIsReportedAndRecoveryStreamsOneEventEach(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if after.HerdrUnavailable || after.Seq != 2 {
+	if after.HerdrUnavailable || after.HerdrText != "" {
 		t.Errorf("after recovery: %+v", after)
 	}
 }
@@ -432,10 +459,15 @@ func TestHerdr_NotProbedForRunnerWithoutHost(t *testing.T) {
 
 func TestHerdr_ProbedThroughConfiguredRunner(t *testing.T) {
 	t.Parallel()
-	fake := runnerfake.NewRunner()
+	fake := namedFake{runnerfake.NewRunner(), "herdr"}
 	fake.SetHealthErr(errors.New("down"))
-	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithRunner(fake))
-	got, err := h.Client.Handshake(context.Background())
+	h := servertest.StartWithStore(t, herdrTicketStore(t), servertest.WithRunner(fake))
+	ctx := context.Background()
+	if got, err := h.Client.Handshake(ctx); err != nil || got.HerdrUnavailable {
+		t.Errorf("handshake = %+v (err %v), want no banner while nothing needs herdr", got, err)
+	}
+	queueHerdrTicket(ctx, t, h)
+	got, err := h.Client.Handshake(ctx)
 	if err != nil || !got.HerdrUnavailable {
 		t.Errorf("handshake = %+v (err %v), want HerdrUnavailable", got, err)
 	}
@@ -443,9 +475,35 @@ func TestHerdr_ProbedThroughConfiguredRunner(t *testing.T) {
 
 func TestHandshake_ReportsHerdrUnavailable(t *testing.T) {
 	t.Parallel()
-	h := servertest.StartHerdrDown(t, servertest.WithHerdr(servertest.HerdrIsTheSubject), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
-	got, err := h.Client.Handshake(context.Background())
-	if err != nil || !got.HerdrUnavailable {
-		t.Errorf("handshake = %+v (err %v), want HerdrUnavailable", got, err)
+	h := servertest.StartHerdrDownWithStore(t, herdrTicketStore(t), servertest.WithHerdr(servertest.HerdrIsTheSubject), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
+	ctx := context.Background()
+	if got, err := h.Client.Handshake(ctx); err != nil || got.HerdrUnavailable {
+		t.Errorf("handshake = %+v (err %v), want no banner while nothing needs herdr", got, err)
 	}
+	queueHerdrTicket(ctx, t, h)
+	got, err := h.Client.Handshake(ctx)
+	if err != nil || !got.HerdrUnavailable || !strings.Contains(got.HerdrText, "proj:epic-a/01") {
+		t.Errorf("handshake = %+v (err %v), want HerdrUnavailable naming the ticket", got, err)
+	}
+}
+
+// The banner clears when the ticket that needs herdr leaves the queue, with
+// herdr still down.
+func TestHerdr_BannerClearsWhenTheNeedGoesAway(t *testing.T) {
+	t.Parallel()
+	h := servertest.StartHerdrDownWithStore(t, herdrTicketStore(t), servertest.WithHerdr(servertest.HerdrIsTheSubject))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	queueHerdrTicket(ctx, t, h)
+	servertest.WaitFor(t, 5*time.Second, "banner on", func() bool {
+		snap, err := h.Client.Snapshot(ctx)
+		return err == nil && snap.HerdrUnavailable
+	})
+	if res, err := h.Client.QueueRemove(ctx, "proj:epic-a/01"); err != nil || res.Refused {
+		t.Fatalf("queue remove: %+v, %v", res, err)
+	}
+	servertest.WaitFor(t, 5*time.Second, "banner off", func() bool {
+		snap, err := h.Client.Snapshot(ctx)
+		return err == nil && !snap.HerdrUnavailable
+	})
 }

@@ -23,10 +23,9 @@ func TestClaimHold_HerdrOutageHoldsOnlyHerdrTickets(t *testing.T) {
 		name       string
 		err        error
 		wantReason string
-		wantEvent  bool
 	}{
-		{"down", errors.New("socket closed"), "herdr is down", true},
-		{"not on PATH", fmt.Errorf("$ herdr workspace list: %w", exec.ErrNotFound), "not found", false},
+		{"down", errors.New("socket closed"), "herdr is down"},
+		{"not on PATH", fmt.Errorf("$ herdr workspace list: %w", exec.ErrNotFound), "not found"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -82,26 +81,70 @@ func TestClaimHold_HerdrOutageHoldsOnlyHerdrTickets(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if snap.HerdrUnavailable != tc.wantEvent {
-				t.Errorf("snapshot HerdrUnavailable = %v, want %v", snap.HerdrUnavailable, tc.wantEvent)
+			if !snap.HerdrUnavailable || !strings.Contains(snap.HerdrText, tc.wantReason) || !strings.Contains(snap.HerdrText, "proj:epic-a/01") || strings.Contains(snap.HerdrText, "epic-b") {
+				t.Errorf("snapshot banner = %v %q, want it on, naming the codex ticket only and %q", snap.HerdrUnavailable, snap.HerdrText, tc.wantReason)
 			}
 
 			herdr.SetHealthErr(nil)
 			servertest.WaitFor(t, 10*time.Second, "codex ticket launches once herdr answers", func() bool {
 				return len(herdr.Prompts("epic-a-iter-01")) > 0
 			})
-			sawDown := false
-			for drained := false; !drained; {
+			for sawDown := false; !sawDown; {
 				select {
 				case ev := <-evs:
-					sawDown = sawDown || ev.Type == server.EventHerdrUnavailable
-				default:
-					drained = true
+					sawDown = ev.Type == server.EventHerdrUnavailable
+				case <-ctx.Done():
+					t.Fatal("no herdr-unavailable event for the waiting codex ticket")
 				}
 			}
-			if sawDown != tc.wantEvent {
-				t.Errorf("herdr-unavailable event = %v, want %v", sawDown, tc.wantEvent)
-			}
 		})
+	}
+}
+
+// With PTY configured and herdr down, a queue holding no herdr ticket shows no
+// banner and streams no herdr event.
+func TestHerdrBanner_HiddenWhileNoTicketNeedsHerdr(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "claude one", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	pty := namedFake{runnerfake.NewRunner(), "pty"}
+	herdr := namedFake{runnerfake.NewRunner(), "herdr"}
+	herdr.SetHealthErr(errors.New("socket closed"))
+	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(name, _ string) agentrunner.Runner {
+		if name == "herdr" {
+			return herdr
+		}
+		return pty
+	}), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
+	t.Cleanup(func() { pty.SetState("epic-b-iter-01", agentrunner.StateDone, "") })
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	evs, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-b/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add claude: %+v, %v", res, err)
+	}
+	servertest.WaitFor(t, 10*time.Second, "claude ticket launches on pty", func() bool {
+		return len(pty.Prompts("epic-b-iter-01")) > 0
+	})
+	time.Sleep(100 * time.Millisecond) // negative wait: a herdr event would show within a few retries
+	for done := false; !done; {
+		select {
+		case ev := <-evs:
+			if ev.Type == server.EventHerdrUnavailable || ev.Type == server.EventHerdrAvailable {
+				t.Errorf("unexpected herdr event %+v", ev)
+			}
+		default:
+			done = true
+		}
+	}
+	if snap, err := h.Client.Snapshot(ctx); err != nil || snap.HerdrUnavailable || snap.HerdrText != "" {
+		t.Errorf("snapshot banner = %v %q (err %v), want none", snap.HerdrUnavailable, snap.HerdrText, err)
+	}
+	if got, err := h.Client.Handshake(ctx); err != nil || got.HerdrUnavailable {
+		t.Errorf("handshake = %+v (err %v), want no banner", got, err)
 	}
 }

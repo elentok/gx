@@ -59,9 +59,10 @@ type Handshake struct {
 	// WebSetupPending is set until the first web password exists. It is only a flag: the
 	// handshake never carries the Setup code.
 	WebSetupPending bool `json:"web_setup_pending,omitempty"`
-	// HerdrUnavailable is set while herdr isn't answering, so a client can say
-	// why nothing starts.
-	HerdrUnavailable bool `json:"herdr_unavailable,omitempty"`
+	// HerdrUnavailable is set while herdr isn't answering and a ticket needs it,
+	// so a client can say why nothing starts. HerdrText names what waits.
+	HerdrUnavailable bool   `json:"herdr_unavailable,omitempty"`
+	HerdrText        string `json:"herdr_text,omitempty"`
 }
 
 // Settings are the Config fields a config reload may change. The server reads
@@ -646,7 +647,7 @@ func (s *Server) TCPAddr() string {
 func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	snap := s.idx.snapshot()
-	snap.HerdrUnavailable = s.herdr.isUnavailable()
+	snap.HerdrText, snap.HerdrUnavailable = s.herdrBanner()
 	for i, t := range snap.Tickets {
 		switch t.Status {
 		case string(schema.StatusClaimed):
@@ -754,7 +755,8 @@ func (s *Server) streamEvents(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	h := Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr, HerdrUnavailable: s.herdr.isUnavailable()}
+	h := Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr}
+	h.HerdrText, h.HerdrUnavailable = s.herdrBanner()
 	if s.web != nil {
 		var err error
 		if h.WebSetupPending, _, err = s.webAuth.SetupState(); err != nil {

@@ -39,6 +39,9 @@ type QueueModel struct {
 	// launch agents.
 	summaries map[string]server.EpicSummary
 	herdrDown bool
+	// herdrText names the tickets waiting on herdr; empty falls back to the
+	// generic banner.
+	herdrText string
 	// finished is the snapshot's Recently finished list. finishedGen numbers the
 	// refresh tick chain: each page activation starts a new chain and the older
 	// chain's pending tick is ignored.

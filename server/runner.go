@@ -206,6 +206,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 		s.releaseWaitingSlots(time.Now())
 		s.claimNext()
 		s.publishVerdictChanges()
+		s.syncHerdrBanner()
 		select {
 		case <-ctx.Done():
 			return

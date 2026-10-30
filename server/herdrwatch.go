@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -30,6 +31,17 @@ type herdrWatch struct {
 	// herdr unavailable when herdr is the configured runner: a person running
 	// PTY without herdr installed has nothing to be told.
 	missing bool
+	// shown is the banner state last streamed: herdr down while a ticket needs it.
+	shown bool
+}
+
+// setShown records the banner state and reports whether it changed.
+func (w *herdrWatch) setShown(v bool) (changed bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	changed = v != w.shown
+	w.shown = v
+	return changed
 }
 
 func (w *herdrWatch) isUnavailable() bool {
@@ -71,23 +83,75 @@ func (s *Server) herdrRunner() agentrunner.Runner {
 	return s.runnerNamed(runnerHerdr, runnerbuild.FallbackProject)
 }
 
-// checkHerdr probes once and, on a transition, logs and streams it.
+// herdrWaiting is the tickets that need herdr: queued ones that launch on it
+// and tracked runs it hosts. It uses the same rule as the claim hold.
+func (s *Server) herdrWaiting() []string {
+	var out []string
+	for _, item := range s.queued.list() {
+		project := ""
+		if a, err := parseQueuedAddress(item.Address); err == nil {
+			project = a.Project
+		}
+		agent := ralphloop.AgentKind(item.Agent)
+		if agent == "" {
+			agent = ralphloop.AgentClaude
+		}
+		if r := s.launchRunner(project, agent); r != nil && r.Name() == runnerHerdr {
+			out = append(out, item.Address)
+		}
+	}
+	for _, t := range s.registry.list() {
+		if r := s.runnerForRun(t.Run); r != nil && r.Name() == runnerHerdr {
+			out = append(out, t.Address)
+		}
+	}
+	return out
+}
+
+// herdrBanner is the text of the "herdr down" banner, and whether it shows: herdr
+// is down or missing and a ticket needs it.
+func (s *Server) herdrBanner() (string, bool) {
+	reason, down := s.herdr.holdReason()
+	if !down {
+		return "", false
+	}
+	waiting := s.herdrWaiting()
+	if len(waiting) == 0 {
+		return "", false
+	}
+	return reason + "; waiting: " + strings.Join(waiting, ", "), true
+}
+
+// checkHerdr probes once and, on a transition, logs it. The banner transition
+// is streamed by syncHerdrBanner.
 func (s *Server) checkHerdr() {
-	if !s.herdr.probe(s.herdrRunner(), s.cfg.Runner.Name() == runnerHerdr) {
+	changed := s.herdr.probe(s.herdrRunner(), s.cfg.Runner.Name() == runnerHerdr)
+	if changed {
+		s.log.Warn("herdr state changed", "unavailable", s.herdr.isUnavailable())
+	}
+	s.syncHerdrBanner()
+	if changed && !s.herdr.isUnavailable() {
+		s.flushPauseFold()
+	}
+}
+
+// syncHerdrBanner streams the banner appearing or going away, with a chat
+// notice. The need changes with the queue and the runs, so the claim loop calls
+// it too.
+func (s *Server) syncHerdrBanner() {
+	text, show := s.herdrBanner()
+	if !s.herdr.setShown(show) {
 		return
 	}
-	typ := EventHerdrAvailable
-	if s.herdr.isUnavailable() {
-		typ = EventHerdrUnavailable
-	}
-	s.log.Warn("herdr state changed", "event", typ)
-	s.events.publish(typ, "")
-	if typ == EventHerdrUnavailable {
-		s.chat.Notice(ralphloop.ServerNotice{Kind: typ, Emoji: "🔌", Title: "herdr unavailable", Detail: "Agents cannot start until herdr answers again"})
+	if show {
+		s.events.publish(EventHerdrUnavailable, "")
+		s.chat.Notice(ralphloop.ServerNotice{Kind: EventHerdrUnavailable, Emoji: "🔌", Title: "herdr unavailable", Detail: text})
 		return
 	}
-	s.chat.Notice(ralphloop.ServerNotice{Kind: typ, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again"})
-	s.flushPauseFold()
+	s.events.publish(EventHerdrAvailable, "")
+	if !s.herdr.isUnavailable() {
+		s.chat.Notice(ralphloop.ServerNotice{Kind: EventHerdrAvailable, Emoji: "✅", Title: "herdr back", Detail: "herdr answers again"})
+	}
 }
 
 // keepHerdrChecked retries herdr until ctx ends, so a herdr that starts late

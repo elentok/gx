@@ -141,6 +141,15 @@ func TestQueueServerMode_HerdrDownBanner(t *testing.T) {
 	}
 }
 
+func TestQueueServerMode_HerdrDownBannerNamesWhatWaits(t *testing.T) {
+	m, _ := deliverQueue(t, server.Snapshot{Seq: 1, HerdrUnavailable: true, HerdrText: "herdr is down; waiting: gx:alpha/01"}, nil)
+
+	body := strings.Join(m.queueHeaderBodyLines(), "\n")
+	if !strings.Contains(body, "waiting: gx:alpha/01") {
+		t.Errorf("header body %q does not name the waiting ticket", body)
+	}
+}
+
 // The web UI queues a whole epic as one epic-address item, which names no
 // ticket; every ticket of that epic must still show.
 func TestQueueServerMode_EpicAddressItemShowsItsTickets(t *testing.T) {
