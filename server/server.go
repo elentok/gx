@@ -675,7 +675,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	// runs, like an fnm per-shell dir once its shell exits.
 	_, nodeErr := brief.LookPath(s.cfg.Env, "node")
 	snap.NodeMissing = nodeErr != nil
-	sessions, err := s.listSessions()
+	sessions, err := s.listSessionsWithQueue()
 	if err != nil {
 		s.log.Warn("list sessions for snapshot", "err", err)
 	}

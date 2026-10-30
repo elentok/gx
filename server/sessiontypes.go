@@ -18,7 +18,12 @@ type SessionInfo struct {
 	// Ticket is the Session ticket's address.
 	Ticket string `json:"ticket,omitempty"`
 	// Design marks a session whose ticket is on a map epic: a gx-design run.
-	Design          bool          `json:"design,omitempty"`
+	Design bool `json:"design,omitempty"`
+	// Queue marks a Queue agent row: a PTY-hosted ticket iteration. It has
+	// no Unread or Actionable, and Holder is the agent dir the TUI opens the
+	// live panel from.
+	Queue           bool          `json:"queue,omitempty"`
+	Holder          string        `json:"holder,omitempty"`
 	Status          SessionStatus `json:"status"`
 	StatusChangedAt time.Time     `json:"status_changed_at"`
 	// RunStartedAt is when the current run began: the last Restore, else the

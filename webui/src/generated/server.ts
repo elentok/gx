@@ -1757,6 +1757,13 @@ export interface SessionInfo {
    * Design marks a session whose ticket is on a map epic: a gx-design run.
    */
   design?: boolean;
+  /**
+   * Queue marks a Queue agent row: a PTY-hosted ticket iteration. It has
+   * no Unread or Actionable, and Holder is the agent dir the TUI opens the
+   * live panel from.
+   */
+  queue?: boolean;
+  holder?: string;
   status: SessionStatus;
   status_changed_at: string;
   /**

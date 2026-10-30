@@ -116,7 +116,7 @@ func (s *Server) sessionCreateWrite(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) sessionsRead(w http.ResponseWriter, _ *http.Request) {
-	list, err := s.listSessions()
+	list, err := s.listSessionsWithQueue()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
