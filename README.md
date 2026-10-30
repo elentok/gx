@@ -4,16 +4,42 @@
 
 <img src="docs/logo.png" alt="gx logo" width="400" />
 
-_gx_ is a TUI for git worktree management, staging, history inspection, and other everyday repo workflows.
+_gx_ runs coding agents on your tickets. You write tickets, group them into epics, and queue them.
+The `gx server` daemon gives each ticket its own git worktree and agent session, reviews the
+result and lands it on the epic's branch. You follow and steer it from a terminal UI or a web UI
+that works from your phone. gx is also still a TUI for everyday git work: worktrees, staging,
+history and stashes.
 
 ## Disclaimer
 
 I wrote the original version of the tool in Typescript a while ago but at some
 point I realized I wanted something a bit different and had Claude Code migrate it
 to Go with a lot of UI changes (see [convert-to-go.md](./docs/prompts/convert-to-go.md)
-and [go-migration-plan.md](/docs/go-migration-plan.md)).
+and [go-migration-plan.md](/docs/go-migration-plan.md)). It has since grown into the agent
+orchestrator described below.
 
-## Features
+## Agent orchestrator
+
+- **Tickets and epics**: tickets are markdown files with frontmatter, kept in a local ticket store
+  outside your repo. An epic groups tickets and has one shared feature worktree and branch.
+  Manage them with `gx tickets` (`tk`) or in the tickets UI.
+- **Queue and ralph-loop**: queue tickets or whole epics and `gx server` schedules them. Each
+  ticket runs in its own worktree and branch. Finished work is cherry-picked onto the epic branch,
+  then `gx merge` fast-forwards the epic onto trunk. See
+  [the queue orchestrator](./docs/ralph-loop-queue-orchestrator.md).
+- **Agent sessions**: the server hosts interactive agent sessions (`gx agents`) that you can
+  prompt, interrupt and resume. Design sessions (`gx designs`) map out an epic before
+  it is charted into tickets. Models are chosen by tier in `config.json`.
+- **Safety nets**: a daily budget with soft and hard limits (`gx budget`), disk-space watching
+  with automatic cleanup, a health monitor, stuck-ticket watchdogs, and Telegram or Slack
+  notifications (`gx notify`).
+- **Checks**: `gx check` runs a project's format, lint, typecheck and test checks.
+- **Agent skills**: `gx skills install` installs gx's skill bundle for Claude and Codex. The
+  server does this on every start.
+- **Web UI**: `gx server` serves the Epics, Agents, Stats and Settings pages, plus design and ticket pages, over HTTPS. Sign-in
+  is a password plus an authenticator code, with one web login per device.
+
+## Git TUI
 
 - Browse all linked worktrees in a table with sync status (ahead / behind / diverged) and rebase status relative to main
 - Sidebar showing the latest commit (with relative date), commits ahead/behind the remote tracking branch, rebase status relative to main, and uncommitted file changes
@@ -54,6 +80,9 @@ and [go-migration-plan.md](/docs/go-migration-plan.md)).
 - Go 1.21+
 - Git
 - tmux (optional, for `N` and `T` keybindings)
+- A coding agent for the orchestrator: Claude Code is hosted by `gx server` itself; herdr is an
+  optional alternative runner
+- macOS or Linux. `gx server install` registers a launchd agent (macOS only)
 
 ## Installation
 
@@ -78,6 +107,59 @@ make install
 ```
 
 ## Usage
+
+### Agent orchestrator
+
+Start the server (it also installs the skill bundle) and check on it:
+
+```sh
+gx server start      # detached; no-op if it is already running
+gx server status     # pid, build, web URL, setup code while setup is pending
+gx server restart    # after upgrading gx
+gx server install    # macOS: start at login and after a crash
+```
+
+Work with tickets, then queue them from the tickets UI or from the CLI:
+
+```sh
+gx tickets                      # tickets UI (alias: gx tk)
+gx tickets epic ...             # create and manage epics
+gx tickets add ...              # add a ticket
+gx tickets show <epic>/<id>     # print a ticket, or an epic and its tickets
+gx server queue ...             # the server-wide queue
+gx server one-off ...           # a top-level ticket from a prompt, queued at once
+```
+
+Run `gx tickets --help` and `gx server --help` for everything else. Other useful commands:
+
+```sh
+gx agents list       # interactive agent sessions
+gx designs open ...  # an epic's design session
+gx budget            # today's spend against the soft and hard limits
+gx check             # the project's format, lint, typecheck and test checks
+gx merge             # fast-forward an epic or branch onto trunk
+```
+
+#### Web UI
+
+`gx server status` prints the web URL (`gx server web-url` prints just that). The server makes its
+own root certificate on first start and serves HTTPS on the web port. Add every host name you use
+to `server.web.allowed-hosts` before the first start, so the certificate covers it, and trust the
+root certificate on each device (Settings has the iOS profile and the Mac `.cer`).
+
+The first visit asks for the one-time setup code from `gx server status`, then a password of at
+least 6 characters, then an authenticator app code. Each device gets its own web login, which ends
+after 90 days without use. Set `server.web.totp` to `false` for password-only login.
+
+```sh
+gx server web-logins              # list web logins
+gx server web-revoke <id>         # sign one out
+gx server web-password            # set a new password, signs everyone out
+gx server web-reset-authenticator # clear the authenticator, prints a new setup code
+gx server web-reset               # clear everything, prints a new setup code
+```
+
+### Git TUI
 
 Run from inside any git repository or bare repo:
 
@@ -281,6 +363,8 @@ Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open
 | `disk-space.warn-below`    | size string                     | `"20G"`   | Free space below which gx warns. Sizes are decimal (`G` is 10^9 bytes); `GiB` is binary. `"0"` turns the warning off. Raised to `clean-below` if it is non-zero and lower.                   |
 | `disk-space.clean-below`   | size string                     | `"10G"`   | Free space below which gx runs the cleanup command. `"0"` turns cleaning off.                                                                                                                |
 | `disk-space.cleanup-command` | array of strings (argv)       | `["go", "clean", "-cache"]` | The cleanup command, not a shell string. `[]` turns cleanup off. A project's `project.json` can replace it (`[]` turns it off for that project). |
+| `server.web.allowed-hosts` | array of strings | `[]` | Host names the web listener accepts besides IP literals and `localhost` (e.g. a MagicDNS name). Any other Host gets a 403. Reloads without a restart. |
+| `server.web.totp`          | boolean | `true` | Whether web login asks for an authenticator code besides the password. Reloads without a restart. |
 | `log.important-refs`       | array                           | see below | Rules for highlighting important refs in the log view. Refs matching a rule get a bright colored badge and are sorted to the front; all others get a dim surface badge.                      |
 | `log.hide-refs`            | array of strings                | `[]`      | Regular expressions matched against full ref names. Matching refs are hidden from the log view entirely. Takes priority over `important-refs`.                                               |
 
