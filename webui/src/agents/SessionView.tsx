@@ -1,5 +1,5 @@
 import { Box, Link, Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useSessionChat, type FetchChat } from "../design/chat";
 import { FailureBanner, needsTranscript, visibleFailure } from "../design/FailureBanner";
@@ -11,6 +11,7 @@ import { AGENTS_HREF, designHref } from "../hrefs";
 import { useWide } from "../useWide";
 import { Button } from "../ui/button/Button";
 import { Chip } from "../ui/chip/Chip";
+import { Modal } from "../ui/modal/Modal";
 import { AgentChat } from "./AgentChat";
 import { AgentComposer } from "./AgentComposer";
 import { TIERS } from "./NewSessionForm";
@@ -120,6 +121,34 @@ function sendReason(s: SessionInfo, connected: boolean): string | undefined {
   }
 }
 
+/** Which kind of gx-driven agent this is; undefined for a plain session. */
+function drivenKind(s: SessionInfo): "Queue" | "Design" | undefined {
+  if (s.queue) return "Queue";
+  if (s.design) return "Design";
+}
+
+/** The composer stays off for a gx-driven agent until a person confirms; selecting another session resets it. */
+function useComposerUnlock(session: SessionInfo) {
+  const [unlockedId, setUnlockedId] = useState<string>();
+  useEffect(() => setUnlockedId(undefined), [session.id]);
+  const kind = drivenKind(session);
+  return { kind, locked: kind !== undefined && unlockedId !== session.id, unlock: () => setUnlockedId(session.id) };
+}
+
+function UnlockPrompt({ kind, onConfirm, onCancel }: { kind: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <Modal label={`Turn on composer for ${kind} agent`} onClose={onCancel} maxW="sm">
+      <Text>gx is driving this agent. Turn on the composer for this {kind} agent anyway?</Text>
+      <Box display="flex" gap="2" justifyContent="flex-end">
+        <Button emphasis="secondary" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button onClick={onConfirm}>Turn on composer</Button>
+      </Box>
+    </Modal>
+  );
+}
+
 /** The main column for a selected session: its header, chat and composer. */
 export function SessionView({
   session,
@@ -137,6 +166,8 @@ export function SessionView({
   const conn = useConnectionContext();
   const { connected } = useConnectionState(conn);
   const claude = session.harness === "claude";
+  const { kind, locked, unlock } = useComposerUnlock(session);
+  const [confirming, setConfirming] = useState(false);
   const { detail: chat, refetch } = useSessionChat(claude ? session.id : undefined, conn, fetchChat);
   return (
     <Box display="flex" flexDirection="column" height="100%" minH="0">
@@ -154,12 +185,32 @@ export function SessionView({
           <Box flex="1" />
         </>
       )}
+      {locked && (
+        <Box display="flex" alignItems="center" gap="2" flexWrap="wrap">
+          <Text fontSize="sm" color="text.dim">
+            gx is driving this agent, so the composer is off.
+          </Text>
+          <Button emphasis="secondary" onClick={() => setConfirming(true)}>
+            Turn on composer
+          </Button>
+        </Box>
+      )}
+      {confirming && kind && (
+        <UnlockPrompt
+          kind={kind}
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            unlock();
+            setConfirming(false);
+          }}
+        />
+      )}
       <AgentComposer
         session={session}
-        connected={connected && claude}
+        connected={connected && claude && !locked}
         lastMessage={chat?.messages.at(-1)?.id}
         onStale={refetch}
-        reason={sendReason(session, connected)}
+        reason={locked ? undefined : sendReason(session, connected)}
       />
     </Box>
   );

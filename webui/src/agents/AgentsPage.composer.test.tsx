@@ -184,3 +184,40 @@ test("Retry on an auth failure posts continue with the last message id", async (
   fireEvent.click(await screen.findByRole("button", { name: "Retry" }));
   await vi.waitFor(() => expect(prompts).toEqual([expect.objectContaining({ id: "s-1", text: "continue", last_message: "m1" })]));
 });
+
+const driven = [
+  { kind: "Queue", over: { queue: true } },
+  { kind: "Design", over: { design: true } },
+];
+
+test.each(driven)("a $kind agent opens with the composer off; confirm turns it on", async (c) => {
+  prompts.length = 0;
+  stubPrompt(accepted);
+  render([session("s-1", "p", c.over)], "/agents/s-1", true, chatOf(chat()));
+  expect(await screen.findByText("gx is driving this agent, so the composer is off.")).toBeTruthy();
+  await type("hi");
+  expect(sendButton().disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Turn on composer" }));
+  const dialog = within(await screen.findByRole("dialog", { name: `Turn on composer for ${c.kind} agent` }));
+  fireEvent.click(dialog.getByRole("button", { name: "Turn on composer" }));
+  await vi.waitFor(() => expect(sendButton().disabled).toBe(false));
+  expect(screen.queryByText("gx is driving this agent, so the composer is off.")).toBeNull();
+  fireEvent.click(sendButton());
+  await vi.waitFor(() => expect(prompts).toEqual([expect.objectContaining({ id: "s-1", text: "hi" })]));
+});
+
+test("Cancel keeps a Queue agent's composer off", async () => {
+  render([session("s-1", "p", { queue: true })], "/agents/s-1", true, chatOf(chat()));
+  await type("hi");
+  fireEvent.click(await screen.findByRole("button", { name: "Turn on composer" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(sendButton().disabled).toBe(true);
+  expect(screen.getByText("gx is driving this agent, so the composer is off.")).toBeTruthy();
+});
+
+test("a plain session shows no driven line", async () => {
+  render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
+  await composerBox();
+  expect(screen.queryByRole("button", { name: "Turn on composer" })).toBeNull();
+});
