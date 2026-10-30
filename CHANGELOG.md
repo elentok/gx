@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Changed `agent-runner: auto` to pick the PTY runner after a server restart. No config migration is needed. `auto` without claude on PATH now refuses to start `gx server`. Set `agent-runner: herdr` to bring herdr back. Iterations already running on herdr keep herdr until they end.
+
 ## v0.43.0 - 2026-10-30
 
 - Changed web UI sign-in to a password plus a TOTP code from an authenticator app. This is a hard cut: every device signs in again. A one-time Setup code from `gx server status` starts the first-run setup in the browser, in three steps: Setup code, password, authenticator. The minimum password length is 6 characters. Setup progress survives a page reload. Each device gets its own web login, which ends after 90 days without use. The new Settings page lists web logins (this device first, then newest to oldest), renames and signs them out, changes the password and resets the authenticator. The login page shows the rate-limit state and certificate help. The TUI About dialog shows "setup needed" until setup is done.

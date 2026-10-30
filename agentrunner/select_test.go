@@ -31,6 +31,19 @@ func probe(onPath []string, herdrUp bool) agentrunner.Probe {
 	}
 }
 
+func TestSelectAutoNeverPingsHerdr(t *testing.T) {
+	p := probe([]string{"herdr", "claude"}, true)
+	p.PingHerdr = func(time.Duration) error {
+		t.Fatal("auto pinged herdr")
+		return nil
+	}
+	for _, setting := range []string{"auto", ""} {
+		if got, err := agentrunner.Select(setting, p); err != nil || got != agentrunner.ChoicePTY {
+			t.Fatalf("Select(%q) = %q, %v; want pty", setting, got, err)
+		}
+	}
+}
+
 func TestSelect(t *testing.T) {
 	both := []string{"herdr", "claude"}
 	tests := []struct {
@@ -41,11 +54,12 @@ func TestSelect(t *testing.T) {
 		want    agentrunner.Choice
 		wantErr string
 	}{
-		{name: "auto picks herdr when up", setting: "auto", onPath: both, herdrUp: true, want: agentrunner.ChoiceHerdr},
-		{name: "empty means auto", setting: "", onPath: both, herdrUp: true, want: agentrunner.ChoiceHerdr},
-		{name: "auto falls back to headless when herdr down", setting: "auto", onPath: both, want: agentrunner.ChoiceHeadless},
-		{name: "auto falls back to headless without herdr binary", setting: "auto", onPath: []string{"claude"}, herdrUp: true, want: agentrunner.ChoiceHeadless},
-		{name: "auto without herdr or claude", setting: "auto", wantErr: "needs claude on PATH"},
+		{name: "auto picks pty when herdr up", setting: "auto", onPath: both, herdrUp: true, want: agentrunner.ChoicePTY},
+		{name: "auto picks pty when herdr down", setting: "auto", onPath: both, want: agentrunner.ChoicePTY},
+		{name: "auto picks pty without herdr binary", setting: "auto", onPath: []string{"claude"}, want: agentrunner.ChoicePTY},
+		{name: "empty means auto", setting: "", onPath: both, herdrUp: true, want: agentrunner.ChoicePTY},
+		{name: "auto without claude", setting: "auto", onPath: []string{"herdr"}, herdrUp: true, wantErr: "agent-runner: herdr"},
+		{name: "auto without claude names claude", setting: "", wantErr: "needs claude on PATH"},
 		{name: "herdr up", setting: "herdr", onPath: []string{"herdr"}, herdrUp: true, want: agentrunner.ChoiceHerdr},
 		{name: "herdr down does not fall back", setting: "herdr", onPath: both, wantErr: "herdr is unavailable"},
 		{name: "headless", setting: "headless", onPath: both, herdrUp: true, want: agentrunner.ChoiceHeadless},

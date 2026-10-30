@@ -28,7 +28,8 @@ func TestPreflightAgentRunner(t *testing.T) {
 		{"bad value", "tmux", agentrunner.Probe{LookPath: found, PingHerdr: up}, `invalid agent-runner "tmux"`, "ERROR"},
 		{"explicit herdr down", "herdr", agentrunner.Probe{LookPath: found, PingHerdr: down}, "herdr is unavailable", "ERROR"},
 		{"headless without claude", "headless", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "needs claude on PATH", "ERROR"},
-		{"auto picks herdr", "auto", agentrunner.Probe{LookPath: found, PingHerdr: up}, "", "INFO"},
+		{"auto picks pty", "auto", agentrunner.Probe{LookPath: found, PingHerdr: up}, "", "INFO"},
+		{"auto without claude", "auto", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "agent-runner: herdr", "ERROR"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -59,6 +60,9 @@ func TestPreflightAgentRunner(t *testing.T) {
 			}
 			if tt.wantErr != "" && !strings.Contains(rec["err"].(string), tt.wantErr) {
 				t.Errorf("log err = %v, want containing %q", rec["err"], tt.wantErr)
+			}
+			if tt.name == "auto picks pty" && rec["runner"] != "pty" {
+				t.Errorf("log = %s, want runner=pty", lines[0])
 			}
 		})
 	}

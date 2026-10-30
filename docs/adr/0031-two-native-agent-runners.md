@@ -1,5 +1,8 @@
 # Two native agent runners: headless by default, PTY by hand
 
+> Superseded in part by ADR [0043](0043-auto-picks-the-pty-runner.md): `auto` now picks the PTY
+> runner, and headless is picked only by hand.
+
 Some organizations block herdr, so `gx server` hosts claude agents itself. We build two native agent
 runners behind the same agent runner interface: the **headless runner** (`claude -p` stream-json)
 and the **PTY runner** (interactive claude on a terminal gx owns). Headless is the default because

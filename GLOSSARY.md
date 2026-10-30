@@ -343,7 +343,7 @@ what runs inside it. Say "agent harness" in full where "test harness" could be m
 
 **Native agent runner** — any agent runner that `gx server` hosts itself, with no external
 multiplexer. There are two: the headless runner and the PTY runner. A person can watch a native
-agent read-only and act on it with one-shot prompt, interrupt and answer verbs. Only an interactive session can be viewed live and typed into. _Avoid_: "herdr-free runner" (describes what it lacks, not what it is).
+agent read-only and act on it with one-shot prompt, interrupt and answer verbs. A PTY Queue agent can also be opened: read-only first, and typing only after a confirm. _Avoid_: "herdr-free runner" (describes what it lacks, not what it is).
 
 **Session** — one agent hosted by an agent runner, identified by its label. Replaces herdr's
 tab, pane and workspace triple as what ralph-loop holds on to. _Avoid_: "pane", "tab" outside herdr.
@@ -431,10 +431,11 @@ _Avoid_: unread (a read session can still be actionable).
 session on the person's request (e.g. clear, then run the next design step).
 
 **Headless runner** — the native agent runner that drives claude through its non-interactive,
-structured-event mode. The default native choice.
+structured-event mode. Never picked automatically; a person sets `agent-runner: headless` by hand.
 
 **PTY runner** — the native agent runner that drives interactive claude on a terminal gx owns. The
-backup for when the headless runner is unavailable; never picked automatically.
+default: `agent-runner: auto` picks it whenever claude is on PATH. Queue agents, Design agents and
+the Fix agent run on it.
 
 **GX system prompt** — the fixed text gx appends to the system prompt of every Claude agent it
 launches or resumes. It tells the agent how to ask a person (`gx tickets ask`) instead of using an
