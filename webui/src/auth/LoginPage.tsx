@@ -1,16 +1,13 @@
-import { Box, chakra, Heading, Text } from "@chakra-ui/react";
+import { chakra, Heading, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { AuthCard } from "./AuthCard";
-import { ErrorLine, Field } from "./AuthFields";
-import { postAuth, SETUP_CODE_WRONG, type AuthResult, type AuthState } from "./authState";
-import { AddAuthenticator, TOTP_MISMATCH } from "./AddAuthenticator";
-import { CER_LABEL, CertLink, Fingerprint, PROFILE_LABEL, useCert } from "./cert";
-
-const WRONG_CREDENTIALS = "wrong-credentials";
-const RATE_LIMITED = "rate-limited";
-const SETUP_CODE_WRONG_REASON = "setup-code-wrong";
-const TOTP_MISMATCH_REASON = "totp-mismatch";
+import { ErrorLine, Field, formValues } from "./AuthFields";
+import type { AuthResult, AuthState } from "./authState";
+import { AddAuthenticator } from "./AddAuthenticator";
+import { TrustHelp } from "./cert";
+import { postJSON } from "./http";
+import { RATE_LIMITED, reasonText } from "./refusals";
 
 export interface LoginCardProps {
   totpOn: boolean;
@@ -49,30 +46,6 @@ export function LoginAuthenticatorCard({ secret, uri, error, onSubmit }: LoginAu
   );
 }
 
-export function TrustHelp() {
-  const { cert, startOpen } = useCert();
-  return (
-    <chakra.details data-mock-part="trust-help" open={startOpen} mt="6" color="text.dim" fontSize="sm">
-      <Box as="summary" cursor="pointer" textAlign="center">
-        Browser warns about this page?
-      </Box>
-      {cert && (
-        <Box mt="3" display="flex" flexDirection="column" gap="2">
-          <Text>
-            gx signs this page with its own certificate. Install it once per device:{" "}
-            <CertLink href={cert.profile_path}>{PROFILE_LABEL}</CertLink> · <CertLink href={cert.cer_path}>{CER_LABEL}</CertLink>
-          </Text>
-          <Text>On iPhone, after installing, turn it on in Settings › General › About › Certificate Trust Settings.</Text>
-          <Text>
-            Check that the fingerprint matches <code>gx server status</code>:
-          </Text>
-          <Fingerprint value={cert.fingerprint} />
-        </Box>
-      )}
-    </chakra.details>
-  );
-}
-
 export function LoginCard({ totpOn, setupCodeRequired, error, submitDisabled, password, setupCode, onSubmit }: LoginCardProps) {
   return (
     <AuthCard below={<TrustHelp />}>
@@ -106,23 +79,6 @@ export function LoginCard({ totpOn, setupCodeRequired, error, submitDisabled, pa
   );
 }
 
-export function rateLimitText(waitSeconds: number): string {
-  const minutes = Math.max(1, Math.ceil(waitSeconds / 60));
-  return `Too many tries. Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`;
-}
-
-function refusalText(res: AuthResult): string {
-  if (res.reason === WRONG_CREDENTIALS) return "Wrong password or code";
-  if (res.reason === SETUP_CODE_WRONG_REASON) return SETUP_CODE_WRONG;
-  if (res.reason === TOTP_MISMATCH_REASON) return TOTP_MISMATCH;
-  if (res.reason === RATE_LIMITED && res.wait_seconds) return rateLimitText(res.wait_seconds);
-  return res.reason ?? "Sign in refused";
-}
-
-function value(form: HTMLFormElement, name: string): string {
-  return (form.elements.namedItem(name) as HTMLInputElement | null)?.value ?? "";
-}
-
 export function LoginPage({ auth, onDone }: { auth: AuthState; onDone: () => void }) {
   const [error, setError] = useState("");
   const [authenticator, setAuthenticator] = useState<{ pending_id: string; secret: string; uri: string } | null>(null);
@@ -131,13 +87,13 @@ export function LoginPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
   useEffect(() => () => clearTimeout(timer.current), []);
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const f = e.currentTarget;
-    const body: Record<string, string> = { password: value(f, "password") };
-    if (auth.totp_on) body.totp_code = value(f, "totp_code");
-    if (auth.setup_code_required) body.setup_code = value(f, "setup_code");
+    const v = formValues(e.currentTarget);
+    const body: Record<string, string> = { password: v.password };
+    if (auth.totp_on) body.totp_code = v.totp_code;
+    if (auth.setup_code_required) body.setup_code = v.setup_code;
     try {
-      const res = await postAuth("login", body);
-      setError(res.refused ? refusalText(res) : "");
+      const res = await postJSON<AuthResult>("/v1/web/auth/login", body);
+      setError(res.refused ? reasonText(res) : "");
       if (res.authenticator_needed) {
         setAuthenticator({ pending_id: res.pending_id ?? "", secret: res.secret ?? "", uri: res.uri ?? "" });
       }
@@ -156,10 +112,10 @@ export function LoginPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
   };
   const onAddAuthenticator = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const totp_code = value(e.currentTarget, "totp_code");
+    const { totp_code } = formValues(e.currentTarget);
     try {
-      const res = await postAuth("add-authenticator", { pending_id: authenticator?.pending_id, totp_code });
-      if (res.refused) return setError(refusalText(res));
+      const res = await postJSON<AuthResult>("/v1/web/auth/add-authenticator", { pending_id: authenticator?.pending_id, totp_code });
+      if (res.refused) return setError(reasonText(res));
       onDone();
     } catch (err) {
       setError(String(err));

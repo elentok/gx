@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { renderThemed } from "../ui/render";
 import { endsInDays } from "./logins";
-import { CertificateView, SettingsHomeView, SettingsStubView, WebLoginPage, WebLoginsView } from "./SettingsPage";
+import { CertificateView, SettingsHomeView, WebLoginPage, WebLoginsView } from "./SettingsPage";
 import type { WebLoginEntry } from "./logins";
 
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -135,11 +135,5 @@ describe("WebLoginPage", () => {
     fireEvent.click(getByText("Sign out"));
     await waitFor(() => expect(signOut).toHaveBeenCalledOnce());
     expect(revoke).not.toHaveBeenCalled();
-  });
-});
-
-describe("SettingsStubView", () => {
-  it("renders only the back link", () => {
-    expect(renderThemed(<SettingsStubView />).getByRole("link", { name: "‹ Settings" })).toBeTruthy();
   });
 });

@@ -1,7 +1,7 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
 import { useParams } from "react-router";
-import { certOf, fetchAuthState, type AuthState } from "../auth/authState";
+import { fetchAuthState, type AuthState } from "../auth/authState";
 import { CER_LABEL, Fingerprint, PROFILE_LABEL, type CertInfo } from "../auth/cert";
 import { SETTINGS_HREF } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
@@ -22,11 +22,10 @@ import {
   type LoginWrite,
   type WebLoginEntry,
 } from "./logins";
+import { BackLink, Frame } from "./parts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LOGINS_HREF =`${SETTINGS_HREF}/logins`;
-
-export const Frame = ({ children }: { children: ReactNode }) => <Box maxW="560px">{children}</Box>;
 
 const Group = ({ label, children }: { label?: string; children: ReactNode }) => (
   <Box mt="6">
@@ -109,22 +108,6 @@ export function SettingsHomeView({
     </Frame>
   );
 }
-
-export const BackLink = () => (
-  <chakra.a
-    href={SETTINGS_HREF}
-    display="inline-flex"
-    alignItems="center"
-    h="8"
-    px="3"
-    fontSize="sm"
-    fontWeight="600"
-    color="text.muted"
-    _hover={{ color: "text" }}
-  >
-    ‹ Settings
-  </chakra.a>
-);
 
 export function WebLoginsView({ logins, now }: { logins: WebLoginEntry[]; now: number }) {
   return (
@@ -275,19 +258,10 @@ export function CertificateView({ cert }: { cert: CertInfo }) {
 
 export function CertificatePage({ fetchAuth = fetchAuthState }: { fetchAuth?: () => Promise<AuthState> }) {
   const auth = useFetched("settings-auth", fetchAuth);
-  const cert = auth.data && certOf(auth.data);
   return (
     <DetailPage mode="narrow" title={{ kind: "Settings", name: "Certificate" }}>
-      {!auth.data ? <Spinner label="Loading" /> : cert ? <CertificateView cert={cert} /> : <SettingsStubView />}
+      {auth.data ? <CertificateView cert={auth.data} /> : <Spinner label="Loading" />}
     </DetailPage>
-  );
-}
-
-export function SettingsStubView() {
-  return (
-    <Frame>
-      <BackLink />
-    </Frame>
   );
 }
 
@@ -376,10 +350,13 @@ export function WebLoginPage({
   );
 }
 
-export function SettingsStubPage() {
+/** The `/settings/*` catch-all: a settings URL nothing handles, so only the way back. */
+export function UnknownSettingsPage() {
   return (
     <DetailPage mode="narrow" title={{ kind: "Settings" }}>
-      <SettingsStubView />
+      <Frame>
+        <BackLink />
+      </Frame>
     </DetailPage>
   );
 }

@@ -4,6 +4,7 @@ import { signOut } from "../apiFetch";
 import { renderThemed } from "../ui/render";
 import { AuthGate } from "./AuthGate";
 import type { AuthState } from "./authState";
+import { TEST_CERT } from "./testCert";
 
 afterEach(() => {
   cleanup();
@@ -14,7 +15,7 @@ beforeEach(() => {
   window.location.hash = "";
 });
 
-const stateOf = (state: AuthState["state"]): AuthState => ({ state, totp_on: true, setup_code_required: false });
+const stateOf = (state: AuthState["state"]): AuthState => ({ ...TEST_CERT, state, totp_on: true, setup_code_required: false });
 
 function renderGate(fetchState: () => Promise<AuthState>) {
   return renderThemed(

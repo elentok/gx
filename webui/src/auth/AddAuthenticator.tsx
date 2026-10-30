@@ -2,8 +2,6 @@ import { Box, chakra, Text } from "@chakra-ui/react";
 import qrcode from "qrcode-generator";
 import { ErrorLine, Field } from "./AuthFields";
 
-export const TOTP_MISMATCH = "That code doesn't match. Check the clock on your phone and try again.";
-
 function qrSvg(uri: string): string {
   const qr = qrcode(0, "M");
   qr.addData(uri);

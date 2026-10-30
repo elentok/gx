@@ -4,13 +4,14 @@ import { renderThemed } from "../ui/render";
 import type { AuthResult, AuthState } from "./authState";
 import { CertContext } from "./cert";
 import { LoginPage } from "./LoginPage";
+import { TEST_CERT } from "./testCert";
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
 
-const authOf = (totp_on: boolean): AuthState => ({ state: "signed-out", totp_on, setup_code_required: false });
+const authOf = (totp_on: boolean): AuthState => ({ ...TEST_CERT, state: "signed-out", totp_on, setup_code_required: false });
 
 function stubLogin(result: AuthResult) {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify(result)));

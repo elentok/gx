@@ -3,6 +3,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { renderThemed } from "../ui/render";
 import type { AuthResult, AuthState } from "./authState";
 import { SetupPage } from "./SetupPage";
+import { TEST_CERT } from "./testCert";
 
 afterEach(() => {
   cleanup();
@@ -10,7 +11,7 @@ afterEach(() => {
   window.location.hash = "";
 });
 
-const authOf = (totp_on: boolean): AuthState => ({ state: "setup", totp_on, setup_code_required: false });
+const authOf = (totp_on: boolean): AuthState => ({ ...TEST_CERT, state: "setup", totp_on, setup_code_required: false });
 
 function stubStart(result: AuthResult) {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify(result)));

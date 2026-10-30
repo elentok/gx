@@ -1,8 +1,9 @@
 import { Box, chakra, Text } from "@chakra-ui/react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { AddAuthenticator } from "../auth/AddAuthenticator";
-import { ErrorLine, Field } from "../auth/AuthFields";
+import { ErrorLine, Field, formValues } from "../auth/AuthFields";
 import { fetchAuthState, type AuthState } from "../auth/authState";
+import { MIN_PASSWORD, PASSWORD_HINT } from "../auth/refusals";
 import { SETTINGS_HREF } from "../hrefs";
 import { DetailPage } from "../page/DetailPage";
 import { PageHeader } from "../page/PageHeader";
@@ -12,18 +13,20 @@ import { useFetched } from "../useFetched";
 import { useWrite } from "../useWrite";
 import { beginReset, changePassword, finishReset, type AccountCall } from "./account";
 import { fetchLogins, type FetchLogins } from "./logins";
-import { BackLink, Frame } from "./SettingsPage";
-
-const MIN_PASSWORD = 12;
-
-const formValues = (e: FormEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  return Object.fromEntries(new FormData(e.currentTarget)) as Record<string, string>;
-};
+import { BackLink, Frame } from "./parts";
 
 function Form({ onSubmit, children }: { onSubmit: (e: FormEvent<HTMLFormElement>) => void; children: ReactNode }) {
   return (
-    <chakra.form mt="4" display="flex" flexDirection="column" gap="3" onSubmit={onSubmit}>
+    <chakra.form
+      mt="4"
+      display="flex"
+      flexDirection="column"
+      gap="3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(e);
+      }}
+    >
       {children}
     </chakra.form>
   );
@@ -68,7 +71,7 @@ export function ChangePasswordView({
       <PageHeader title="Change password" />
       <Form
         onSubmit={(e) => {
-          const v = formValues(e);
+          const v = formValues(e.currentTarget);
           const differ = v.new_password !== v.new_password_again;
           setMismatch(differ);
           if (!differ) onSubmit({ password: v.password, ...(totpOn && { totp_code: v.totp_code }), new_password: v.new_password });
@@ -94,7 +97,7 @@ export function ChangePasswordView({
           type="password"
           autoComplete="new-password"
           minLength={MIN_PASSWORD}
-          hint={`At least ${MIN_PASSWORD} characters.`}
+          hint={PASSWORD_HINT}
           required
         />
         <Field part="new-password-again" label="New password again" name="new_password_again" type="password" autoComplete="new-password" required />
@@ -136,7 +139,7 @@ export function AuthenticatorView({
       <BackLink />
       <PageHeader title={mode === "add" ? "Add authenticator" : "Reset authenticator"} />
       {next ? (
-        <Form onSubmit={(e) => onFinish({ totp_code: formValues(e).totp_code })}>
+        <Form onSubmit={(e) => onFinish({ totp_code: formValues(e.currentTarget).totp_code })}>
           <AddAuthenticator secret={next.secret} uri={next.uri} error={error} codeLabel="Code from the new app" />
           <Submit pending={pending}>Save new authenticator</Submit>
           {mode === "reset" && (
@@ -148,7 +151,7 @@ export function AuthenticatorView({
       ) : (
         <Form
           onSubmit={(e) => {
-            const v = formValues(e);
+            const v = formValues(e.currentTarget);
             onBegin({ password: v.password, ...(mode === "reset" && { totp_code: v.totp_code }) });
           }}
         >

@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthState } from "../auth/authState";
+import { TEST_CERT } from "../auth/testCert";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import { renderThemed } from "../ui/render";
 import { AuthenticatorPage, AuthenticatorView, ChangePasswordPage, ChangePasswordView } from "./AccountPages";
@@ -20,6 +21,7 @@ const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => 
 const entry = (id: string, this_device: boolean): WebLoginEntry => ({ id, name: id, last_used: "2026-10-30T12:00:00Z", last_ip: "", this_device });
 const logins = async () => [entry("a", true), entry("b", false), entry("c", false)];
 const auth = (over: Partial<AuthState> = {}) => async (): Promise<AuthState> => ({
+  ...TEST_CERT,
   state: "signed-in",
   totp_on: true,
   setup_code_required: false,
@@ -80,7 +82,7 @@ describe("ChangePasswordPage", () => {
     );
 
   it("counts the other devices from the list and shows a refusal's message", async () => {
-    const change = vi.fn(async () => ({ refused: true, reason: "password-too-short", message: "The new password is too short. Use at least 12 characters." }));
+    const change = vi.fn(async () => ({ refused: true, reason: "password-too-short", message: "The password needs at least 12 characters." }));
     const { container, findByText, getByLabelText, getByRole } = renderPage({ change });
     expect(await findByText("The 2 other devices will be signed out.")).toBeTruthy();
     type(getByLabelText("Current password"), "old");
@@ -88,7 +90,7 @@ describe("ChangePasswordPage", () => {
     type(input(container, "new_password"), "short pass word");
     type(input(container, "new_password_again"), "short pass word");
     fireEvent.click(getByRole("button", { name: "Change password" }));
-    expect(await findByText("The new password is too short. Use at least 12 characters.")).toBeTruthy();
+    expect(await findByText("The password needs at least 12 characters.")).toBeTruthy();
     expect(change).toHaveBeenCalledWith({ password: "old", totp_code: "123456", new_password: "short pass word" });
   });
 });
@@ -139,14 +141,14 @@ describe("AuthenticatorPage", () => {
   it("shows a refusal on step 1, then step 2 after the password and code check out, and finishes", async () => {
     const begin = vi
       .fn()
-      .mockResolvedValueOnce({ refused: true, reason: "wrong-credentials", message: "The password or code is wrong." })
+      .mockResolvedValueOnce({ refused: true, reason: "wrong-credentials", message: "Wrong password or code" })
       .mockResolvedValueOnce(NEXT);
     const finish = vi.fn(async () => ({}));
     const { findByLabelText, findByText, getByLabelText, getByRole } = renderPage({ begin, finish });
     type(await findByLabelText("Current password"), "pw");
     type(getByLabelText("Code from the current app"), "111111");
     fireEvent.click(getByRole("button", { name: "Next" }));
-    expect(await findByText("The password or code is wrong.")).toBeTruthy();
+    expect(await findByText("Wrong password or code")).toBeTruthy();
     fireEvent.click(getByRole("button", { name: "Next" }));
     type(await findByLabelText("Code from the new app"), "222222");
     expect(begin).toHaveBeenLastCalledWith({ password: "pw", totp_code: "111111" });

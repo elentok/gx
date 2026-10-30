@@ -1,6 +1,7 @@
-import { apiFetch, signOut } from "../apiFetch";
+import { signOut } from "../apiFetch";
+import { postJSON } from "../auth/http";
 import { formatAge } from "../epics/cardTime";
-import { WriteError, type Refusable } from "../useWrite";
+import type { Refusable } from "../useWrite";
 
 export interface WebLoginEntry {
   id: string;
@@ -13,28 +14,21 @@ export interface WebLoginEntry {
 
 export type FetchLogins = () => Promise<WebLoginEntry[]>;
 
-export const fetchLogins: FetchLogins = async () => {
-  const res = await apiFetch("/v1/web/logins", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-  if (!res.ok) throw new Error(`web logins: HTTP ${res.status}`);
-  return (await res.json()).logins;
-};
+export const fetchLogins: FetchLogins = async () => (await postJSON<{ logins: WebLoginEntry[] }>("/v1/web/logins")).logins;
 
 export type LoginWrite = (id: string, name?: string) => Promise<Refusable>;
 
-async function postLogin(path: string, body: object): Promise<Refusable> {
-  const res = await apiFetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) throw new WriteError(`Could not save (HTTP ${res.status}).`);
-  return res.json();
-}
+export const renameLogin: LoginWrite = (id, name) => postJSON("/v1/web/logins/rename", { id, name });
 
-export const renameLogin: LoginWrite = (id, name) => postLogin("/v1/web/logins/rename", { id, name });
+export const revokeLogin: LoginWrite = (id) => postJSON("/v1/web/logins/revoke", { id });
 
-export const revokeLogin: LoginWrite = (id) => postLogin("/v1/web/logins/revoke", { id });
-
-/** Ends this browser's login on the server, then signs the page out. */
+/** Ends this browser's login on the server, then signs the page out, whatever the server answered. */
 export async function signOutThisDevice(): Promise<void> {
-  await apiFetch("/v1/web/auth/sign-out", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-  signOut();
+  try {
+    await postJSON("/v1/web/auth/sign-out");
+  } finally {
+    signOut();
+  }
 }
 
 const DAY = 24 * 60 * 60 * 1000;

@@ -3,7 +3,7 @@ import { onSignedOut } from "../apiFetch";
 import { Spinner } from "../ui/spinner/Spinner";
 import { AuthCard } from "./AuthCard";
 import { CertContext } from "./cert";
-import { certOf, fetchAuthState, type AuthState } from "./authState";
+import { fetchAuthState, type AuthState } from "./authState";
 import { LoginPage } from "./LoginPage";
 import { SetupPage } from "./SetupPage";
 
@@ -33,7 +33,7 @@ export function AuthGate({
   if (!auth) return <Spinner label="Loading" />;
   if (auth.state === "signed-in") return <>{children}</>;
   return (
-    <CertContext.Provider value={{ cert: certOf(auth) }}>
+    <CertContext.Provider value={{ cert: auth }}>
       {auth.state === "setup" ? <SetupPage auth={auth} onDone={refresh} /> : <LoginPage auth={auth} onDone={refresh} />}
     </CertContext.Provider>
   );

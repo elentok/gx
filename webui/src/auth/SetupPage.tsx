@@ -3,24 +3,15 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "../ui/button/Button";
 import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { AuthCard } from "./AuthCard";
-import { ErrorLine, Field } from "./AuthFields";
-import { postAuth, SETUP_CODE_WRONG as WRONG_CODE, type AuthState } from "./authState";
-import { AddAuthenticator, TOTP_MISMATCH } from "./AddAuthenticator";
-import { TrustHelp } from "./LoginPage";
+import { ErrorLine, Field, formValues } from "./AuthFields";
+import type { AuthResult, AuthState } from "./authState";
+import { AddAuthenticator } from "./AddAuthenticator";
+import { TrustHelp } from "./cert";
+import { postJSON } from "./http";
+import { MIN_PASSWORD, PASSWORD_HINT, PASSWORD_TOO_SHORT, reasonText } from "./refusals";
 
 const SETUP_HASH = "#/setup";
-const MIN_PASSWORD = 12;
-const SHORT_PASSWORD = `The password needs at least ${MIN_PASSWORD} characters.`;
 const MISMATCH = "The two passwords don't match.";
-const REFUSALS: Record<string, string> = {
-  "setup-code-wrong": WRONG_CODE,
-  "password-too-short": SHORT_PASSWORD,
-  "totp-mismatch": TOTP_MISMATCH,
-};
-
-function field(form: HTMLFormElement, name: string): string {
-  return (form.elements.namedItem(name) as HTMLInputElement).value;
-}
 
 export interface SetupCodeCardProps {
   totpOn: boolean;
@@ -92,7 +83,7 @@ export function SetupPasswordCard({ totpOn, error, onSubmit }: SetupPasswordCard
           name="password"
           type="password"
           autoComplete="new-password"
-          hint="At least 12 characters."
+          hint={PASSWORD_HINT}
           autoFocus
         />
         <Field
@@ -161,11 +152,11 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
 
   const onCode = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const typed = field(e.currentTarget, "code");
+    const typed = formValues(e.currentTarget).code;
     setCode(typed);
     try {
-      const res = await postAuth("setup-start", { code: typed });
-      setError(res.refused ? WRONG_CODE : "");
+      const res = await postJSON<AuthResult>("/v1/web/auth/setup-start", { code: typed });
+      setError(res.refused ? reasonText(res) : "");
       if (res.refused) return;
       setAuthenticator({ secret: res.secret ?? "", uri: res.uri ?? "" });
       setStep(2);
@@ -176,8 +167,8 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
 
   const finish = async (body: object) => {
     try {
-      const res = await postAuth("setup-finish", { code, password, ...body });
-      if (res.refused) return setError(REFUSALS[res.reason ?? ""] ?? res.reason ?? "refused");
+      const res = await postJSON<AuthResult>("/v1/web/auth/setup-finish", { code, password, ...body });
+      if (res.refused) return setError(reasonText(res));
       window.location.hash = "#/";
       onDone();
     } catch (err) {
@@ -187,9 +178,10 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
 
   const onPassword = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const typed = field(e.currentTarget, "password");
-    if (typed.length < MIN_PASSWORD) return setError(SHORT_PASSWORD);
-    if (typed !== field(e.currentTarget, "again")) return setError(MISMATCH);
+    const v = formValues(e.currentTarget);
+    const typed = v.password;
+    if (typed.length < MIN_PASSWORD) return setError(reasonText({ reason: PASSWORD_TOO_SHORT }));
+    if (typed !== v.again) return setError(MISMATCH);
     setPassword(typed);
     if (auth.totp_on) {
       setError("");
@@ -200,7 +192,7 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
 
   const onTotp = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    void finish({ totp_code: field(e.currentTarget, "totp_code") });
+    void finish({ totp_code: formValues(e.currentTarget).totp_code });
   };
 
   if (step === 3) {

@@ -1,5 +1,5 @@
-import { LoginAuthenticatorCard, LoginCard, rateLimitText } from "../auth/LoginPage";
-import { TOTP_MISMATCH } from "../auth/AddAuthenticator";
+import { LoginAuthenticatorCard, LoginCard } from "../auth/LoginPage";
+import { PASSWORD_TOO_SHORT, rateLimitText, reasonText, TOTP_MISMATCH_TEXT as TOTP_MISMATCH, WRONG_CREDENTIALS } from "../auth/refusals";
 import { AuthenticatorView, ChangePasswordView } from "../settings/AccountPages";
 import { CertificateView, SettingsHomeView, WebLoginsView, WebLoginView } from "../settings/SettingsPage";
 import { CertContext } from "../auth/cert";
@@ -18,7 +18,7 @@ export const authEntries: GalleryEntry[] = [
     name: "LoginCard",
     cases: [
       { label: "default", node: <LoginCard totpOn /> },
-      { label: "wrong password or code", node: <LoginCard totpOn password="hunter2hunter2" error="Wrong password or code" /> },
+      { label: "wrong password or code", node: <LoginCard totpOn password="hunter2hunter2" error={reasonText({ reason: WRONG_CREDENTIALS })} /> },
       { label: "TOTP off", node: <LoginCard totpOn={false} /> },
       { label: "setup code", node: <LoginCard totpOn setupCodeRequired setupCode="K7QM-3XPD" /> },
       {
@@ -165,7 +165,7 @@ export const authEntries: GalleryEntry[] = [
       { label: "TOTP off", node: <ChangePasswordView otherDevices={3} totpOn={false} onSubmit={() => {}} /> },
       {
         label: "too short",
-        node: <ChangePasswordView otherDevices={1} totpOn onSubmit={() => {}} error="The new password is too short. Use at least 12 characters." />,
+        node: <ChangePasswordView otherDevices={1} totpOn onSubmit={() => {}} error={reasonText({ reason: PASSWORD_TOO_SHORT })} />,
       },
     ],
   },
