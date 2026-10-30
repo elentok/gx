@@ -31,12 +31,8 @@ func (p *Pty) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 	return p.usageRecordReset(ss.session.Label), true, nil
 }
 
-// usageLimitPercent is the fixed usage at which a record window counts as the
-// limit that fired.
-const usageLimitPercent = 98
-
 // usageRecordReset is the latest resets_at among label's record windows at
-// usageLimitPercent or more, or zero when there is no such window. A missing
+// UsageLimitPercent or more, or zero when there is no such window. A missing
 // or unreadable record gives zero: the record only refines the message.
 func (p *Pty) usageRecordReset(label string) time.Time {
 	data, err := os.ReadFile(filepath.Join(p.Root, label, UsageFile))
@@ -49,7 +45,7 @@ func (p *Pty) usageRecordReset(label string) time.Time {
 	}
 	var latest int64
 	for _, w := range []*UsageWindow{rec.FiveHour, rec.SevenDay} {
-		if w != nil && w.UsedPercentage >= usageLimitPercent {
+		if w != nil && w.UsedPercentage >= UsageLimitPercent {
 			latest = max(latest, w.ResetsAt)
 		}
 	}

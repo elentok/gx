@@ -73,7 +73,7 @@ func TestUsageSample_NoRecordMeansNoLimit(t *testing.T) {
 	t.Parallel()
 	s := newUsageRig(t).server()
 	s.scanUsage()
-	if _, ok := s.usageWindowAtLimit(time.Now()); ok {
+	if _, _, ok := s.usage.limitWindow(time.Now()); ok {
 		t.Fatal("no sample, but a window is at limit")
 	}
 }
@@ -87,19 +87,19 @@ func TestUsageSample_NewestRecordAcrossAgentsWins(t *testing.T) {
 
 	r.write("a", usageRecord(now, 50, resets))
 	s.scanUsage()
-	if _, ok := s.usageWindowAtLimit(now); ok {
+	if _, _, ok := s.usage.limitWindow(now); ok {
 		t.Fatal("50% is at limit")
 	}
 
 	r.write("b", usageRecord(now.Add(time.Minute), 99, resets))
 	s.scanUsage()
-	if _, ok := s.usageWindowAtLimit(now); !ok {
+	if _, _, ok := s.usage.limitWindow(now); !ok {
 		t.Fatal("newer 99% record did not replace the sample")
 	}
 
 	r.write("c", usageRecord(now.Add(-time.Minute), 10, resets))
 	s.scanUsage()
-	if _, ok := s.usageWindowAtLimit(now); !ok {
+	if _, _, ok := s.usage.limitWindow(now); !ok {
 		t.Fatal("older record replaced the newer sample")
 	}
 }
@@ -125,7 +125,7 @@ func TestUsageSample_LimitIs98PercentUntilResetsAt(t *testing.T) {
 			resets := time.Unix(2_000_000, 0)
 			r.write("a", usageRecord(resets.Add(-2*time.Hour), tc.pct, resets))
 			s.scanUsage()
-			if _, got := s.usageWindowAtLimit(resets.Add(tc.at)); got != tc.want {
+			if _, _, got := s.usage.limitWindow(resets.Add(tc.at)); got != tc.want {
 				t.Fatalf("at limit = %v, want %v", got, tc.want)
 			}
 		})
@@ -143,7 +143,7 @@ func TestUsageSample_SevenDayWindowCounts(t *testing.T) {
 		SevenDay: &nativerunner.UsageWindow{UsedPercentage: 98, ResetsAt: now.Add(24 * time.Hour).Unix()},
 	})
 	s.scanUsage()
-	w, ok := s.usageWindowAtLimit(now)
+	_, w, ok := s.usage.limitWindow(now)
 	if !ok || w.UsedPercentage != 98 {
 		t.Fatalf("window = %+v, %v; want the 98%% seven-day window", w, ok)
 	}
@@ -185,7 +185,7 @@ func TestUsageSample_SurvivesRestart(t *testing.T) {
 	}
 	// A second Server on the same state dir would fail on the lock, so reopen
 	// the store as New does.
-	if _, ok := openUsageSamples(r.stateDir).atLimit(now); !ok {
+	if _, _, ok := openUsageSamples(r.stateDir).limitWindow(now); !ok {
 		t.Fatal("sample lost across restart")
 	}
 }

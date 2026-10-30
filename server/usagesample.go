@@ -17,9 +17,6 @@ import (
 )
 
 const (
-	// usageLimitPercent is the used percentage at which a window counts as at
-	// its limit. Fixed on purpose: no config key.
-	usageLimitPercent = 98
 	// defaultUsagePoll is slow on purpose: a record is one small file per agent
 	// dir and a limit only matters to the next claim.
 	defaultUsagePoll = time.Minute
@@ -108,15 +105,10 @@ func (u *usageSamples) scan(agentsRoot string) error {
 	return errors.Join(errs...)
 }
 
-// atLimit returns the window of the sample at 98% or more whose reset is still
-// ahead of now. A window past its reset is not at limit even if no newer
-// sample arrived. The five-hour window is preferred when both are at limit.
-func (u *usageSamples) atLimit(now time.Time) (*nativerunner.UsageWindow, bool) {
-	_, w, ok := u.limitWindow(now)
-	return w, ok
-}
-
-// limitWindow is atLimit plus the window's name as the gate wording uses it.
+// limitWindow returns the unlifted window of the sample at the usage limit
+// whose reset is still ahead of now, with its name as the gate wording uses
+// it. A window past its reset is not at limit even if no newer sample arrived.
+// The five-hour window is preferred when both are at limit.
 func (u *usageSamples) limitWindow(now time.Time) (string, *nativerunner.UsageWindow, bool) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
@@ -141,7 +133,7 @@ func (u *usageSamples) atLimitLocked(now time.Time) []namedWindow {
 	}
 	var out []namedWindow
 	for _, c := range []namedWindow{{"5-hour", u.sample.FiveHour}, {"weekly", u.sample.SevenDay}} {
-		if c.w != nil && c.w.UsedPercentage >= usageLimitPercent && time.Unix(c.w.ResetsAt, 0).After(now) {
+		if c.w != nil && c.w.UsedPercentage >= nativerunner.UsageLimitPercent && time.Unix(c.w.ResetsAt, 0).After(now) {
 			out = append(out, c)
 		}
 	}
@@ -231,11 +223,6 @@ func (s *Server) usageOverrideWrite(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, res)
-}
-
-// usageWindowAtLimit is the window at its limit now, if any.
-func (s *Server) usageWindowAtLimit(now time.Time) (*nativerunner.UsageWindow, bool) {
-	return s.usage.atLimit(now)
 }
 
 // scanUsage offers every project's PTY agent records to the sample.

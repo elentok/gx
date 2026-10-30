@@ -27,8 +27,8 @@ func (s *Server) claimHold(project string, t tickets.Ticket, agent ralphloop.Age
 	if reason, held := s.herdrHolds(s.launchRunner(project, agent)); held {
 		return claimHold{Verdict: VerdictHerdrDown, Reason: reason}, true
 	}
-	if t, held := s.registry.rateLimitHeld(string(agent)); held {
-		return claimHold{Verdict: rateLimitVerdict(t.RateLimitReset)}, true
+	if limited, held := s.registry.rateLimitHeld(string(agent)); held {
+		return claimHold{Verdict: rateLimitVerdict(limited.RateLimitReset)}, true
 	}
 	if answeredSession(t) == "" {
 		if v, held := s.usageGate(agent, time.Now()); held {
