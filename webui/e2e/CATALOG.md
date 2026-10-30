@@ -1230,3 +1230,15 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
 - **Scenario:** `web-logins`
 - **Steps:** open Settings and click "Sign out of this device".
 - **Pass:** the login page shows. `gx server web-logins` lists three rows.
+
+## 108. Change password
+
+- **Scenario:** `web-logins`
+- **Steps:** open Settings, click "Change password". Enter the current password, a code, and a new password twice. Submit, then open Web logins. In a new browser context, sign in with the new password.
+- **Pass:** the page says "The 3 other devices will be signed out." After the change Settings shows and Web logins has one row. The new context signs in.
+
+## 109. Reset authenticator
+
+- **Scenario:** `web-logins`
+- **Steps:** open "Reset authenticator", enter the password and a code, click Next, read the key, then go back to Settings. Sign in from a new context with the old secret. Open the page again and click Next, enter a wrong code, then a code from the new key shown. Open Web logins. Sign in from new contexts with a code from the old secret, then from the new one.
+- **Pass:** the second step shows the QR code, the "Add to authenticator app" link, the key and the keep note. The old secret still signs in after leaving. The wrong code shows "That code doesn't match." After saving, Web logins has one row, the old secret is refused and the new one signs in.
