@@ -246,7 +246,14 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 	sessionID := fs.String("session-id", "", "")
 	resume := fs.String("resume", "", "")
 	fs.String("permission-mode", "", "")
-	settings := fs.String("settings", "", "")
+	// Claude merges repeated --settings; the fake only needs the statusLine one.
+	var settings string
+	fs.Func("settings", "", func(v string) error {
+		if settings == "" || statusLineCommand(v) != "" {
+			settings = v
+		}
+		return nil
+	})
 	fs.String("disallowedTools", "", "")
 	fs.String("append-system-prompt", "", "")
 	fs.String("append-system-prompt-file", "", "")
@@ -274,7 +281,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		mouse:     os.Getenv(TUIMouseEnv) == "1",
 		draft:     os.Getenv(TUIDraftEnv),
 		model:     cmp.Or(*model, ReportedModel),
-		settings:  *settings,
+		settings:  settings,
 	}, nil
 }
 
@@ -690,6 +697,9 @@ func (t *tui) workerPrompt(text string) (string, WorkerConfig, bool) {
 // work does the ticket's work off the input loop, then sends the turn's end
 // down the control channel like a test would.
 func (t *tui) work(cfg WorkerConfig, address string) {
+	// The finish report ends the agent, so a statusLine run after the turn can
+	// be too late; claude also refreshes it mid-turn.
+	t.runStatusLine()
 	if err := WorkTicket(cfg, address); err != nil {
 		fmt.Fprintln(os.Stderr, "fakeclaude worker:", err)
 	}

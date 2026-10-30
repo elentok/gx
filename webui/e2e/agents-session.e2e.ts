@@ -219,3 +219,13 @@ test("103. Rate-limit hold", async ({ page, start }) => {
   await go(page, "#/e/demo:waiting-epic");
   await expect(verdict("waiting-epic")).toHaveCount(0, holdEnds);
 });
+
+test("104. Usage gate and override", async ({ page, start }) => {
+  await start("usage-gated");
+  const verdict = page.locator('a[href$="/t/demo:gated-epic/01"]').filter({ hasNotText: "→" }).locator("[data-verdict]");
+
+  await go(page, "#/e/demo:gated-epic");
+  await expect(verdict).toContainText(/usage at 99% of the weekly limit, resets /);
+  await verdict.locator("..").getByRole("button", { name: "Override" }).click();
+  await expect(verdict).toHaveCount(0);
+});

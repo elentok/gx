@@ -292,6 +292,21 @@ func run(args []string) (err error) {
 			return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
 		}
 	}
+	if len(sc.queueAfterUsage) > 0 {
+		sample := filepath.Join(f.root, "state", "gx", "usage-sample.json")
+		deadline := time.Now().Add(30 * time.Second)
+		for _, err := os.Stat(sample); err != nil; _, err = os.Stat(sample) {
+			if time.Now().After(deadline) {
+				return fmt.Errorf("no usage sample at %s", sample)
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		for _, addr := range sc.queueAfterUsage {
+			if out, err := f.cli("server", "queue", "add", addr); err != nil {
+				return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
+			}
+		}
+	}
 	if sc.agentProcs {
 		if err := f.tieAgentProcesses(ctx); err != nil {
 			return err
@@ -529,7 +544,15 @@ func (f *fixture) seed(sc scenario) error {
 	if sc.hold {
 		holdTimeout = "1h"
 	}
-	cfg, err := json.Marshal(agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.behaviour, Design: sc.design, DesignByMap: sc.designByMap, Chat: sc.chat})
+	wcfg := agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.behaviour, Design: sc.design, DesignByMap: sc.designByMap, Chat: sc.chat}
+	if sc.usage {
+		resets := time.Now().Add(72 * time.Hour).Unix()
+		wcfg.Usage = &agentfake.UsageConfig{
+			FiveHour: agentfake.UsageWindow{UsedPercentage: 10, ResetsAt: resets},
+			SevenDay: agentfake.UsageWindow{UsedPercentage: 99, ResetsAt: resets},
+		}
+	}
+	cfg, err := json.Marshal(wcfg)
 	if err != nil {
 		return err
 	}

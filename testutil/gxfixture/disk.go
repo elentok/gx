@@ -47,6 +47,6 @@ func (f *fixture) setupDisk() error {
 	if err := os.WriteFile(f.cleanScript(), []byte(cleanScriptBody), 0o755); err != nil {
 		return err
 	}
-	f.env = append(f.env, "GX_DISK_FREE_FILE="+free, "GX_DISK_WATCH_INTERVAL="+diskWatchInterval)
+	f.env = append(f.env, "GX_DISK_FREE_FILE="+free, "GX_DISK_WATCH_INTERVAL="+diskWatchInterval, "GX_USAGE_POLL_INTERVAL="+diskWatchInterval)
 	return nil
 }

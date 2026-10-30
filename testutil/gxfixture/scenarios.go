@@ -82,6 +82,11 @@ type scenario struct {
 	noCheckConfig bool
 	// ownRepos lists the projects that get a repo of their own instead of the shared one.
 	ownRepos []string
+	// queueAfterUsage lists the epics queued once the server has stored a usage
+	// sample, so the usage gate is already up when they first try to claim.
+	queueAfterUsage []string
+	// usage makes the fake workers report the weekly window at 99%.
+	usage bool
 	// diskLow gives each project a cleanup command that follows the disk's clean file.
 	diskLow bool
 	// chat turns the fake's chat knob on, so a plain prompt is a chat turn.
@@ -198,6 +203,18 @@ var scenarios = map[string]scenario{
 		},
 		queue:     []string{project + ":limited-epic", project + ":waiting-epic"},
 		behaviour: map[string]string{project + ":limited-epic/01": agentfake.BehaviourRateLimit},
+	},
+	// usage-gated: the first epic's worker reports the weekly window at 99% and
+	// holds, so the usage gate keeps the second epic's ticket from claiming.
+	"usage-gated": {
+		epics: []epic{
+			{project, "busy-epic", []ticket{{"01", "busy", servertest.TicketOpts{}}}},
+			{project, "gated-epic", []ticket{{"01", "gated", servertest.TicketOpts{}}}},
+		},
+		queue:           []string{project + ":busy-epic"},
+		queueAfterUsage: []string{project + ":gated-epic"},
+		hold:            true,
+		usage:           true,
 	},
 	// paused: one ticket per recovery path. Every paused ticket opens a pause
 	// round. The approve epic is queued, so its worker really blocks on a

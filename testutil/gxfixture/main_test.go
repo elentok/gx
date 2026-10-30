@@ -556,6 +556,18 @@ func TestRateLimitedScenario_StartsAndQueuesBothTickets(t *testing.T) {
 	r.stop(t)
 }
 
+func TestUsageGatedScenario_ServerSeesTheUsageSample(t *testing.T) {
+	t.Parallel()
+	r := start(t, "usage-gated")
+	const gated = "demo:gated-epic/01"
+	if !testutil.Poll(60*time.Second, time.Second, func() bool {
+		return strings.Contains(r.gx(t, "server", "tickets", "explain", gated), "usage at 99% of the weekly limit")
+	}) {
+		t.Fatalf("explain %s = %q, want the usage gate", gated, r.gx(t, "server", "tickets", "explain", gated))
+	}
+	r.stop(t)
+}
+
 // web is a client of the fixture's web server, signed in with the fixture's cookie.
 type web struct {
 	client *http.Client
