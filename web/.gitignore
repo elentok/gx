@@ -1,6 +1,0 @@
-node_modules
-dist
-dev-dist
-.wrangler
-*.local
-.DS_Store

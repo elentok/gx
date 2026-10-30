@@ -1,7 +1,14 @@
 # ADR 0012 — Marketing website lives in-repo, deployed standalone to Cloudflare Pages
 
 ## Status
-Accepted
+Superseded for repository location on 2026-10-30.
+
+The marketing website now lives in the separate `gx-website` repository, created
+at `~/dev/gx-website` with a fresh initial commit. It builds from its own assets
+and keeps the existing manual Cloudflare Pages deployment. Recording tools also live
+in `gx-website` under `scripts/demo/` and use the installed `gx` from PATH.
+Recordings write directly into the website's `public/demos/`; copy updated GIFs
+back into gx's `docs/` when refreshing the README demos. The original decision below is retained as history.
 
 ## Context
 

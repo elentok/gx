@@ -1,5 +1,12 @@
 # Publish gx: README refresh + landing site
 
+> Repository update, 2026-10-30: the website moved to `~/dev/gx-website`.
+> Recording tools also live there under `scripts/demo/` and use gx from PATH.
+> They write to `public/demos/`. Copy GIFs back to gx's `docs/` for README updates.
+> See ADR 0012 for the decision.
+> The original plan below describes the earlier in-repo layout.
+
+
 Goal: make `gx` presentable for a public release — refresh the README visuals and ship a one-pager
 at `gx.elentok.com`.
 

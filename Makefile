@@ -1,13 +1,9 @@
-.PHONY: build web-build web-dev web-test web-e2e web-types install test e2e test-docker-ubuntu run demos demo-seed
+.PHONY: build web-build web-dev web-test web-e2e web-types install test e2e test-docker-ubuntu run
 
 GO_VERSION := 1.25.0
 
 # Runs `gx brief`. CI has no installed gx, and an installed one can be older than the checkout.
 GX ?= go run .
-
-DEMO_DIR   := web/demo
-DEMO_WORK  := $(DEMO_DIR)/.work
-DEMO_TAPES := $(DEMO_DIR)/tapes
 
 build: web-build
 	go build -ldflags "-X github.com/elentok/gx/version.version=$(shell git describe --tags --always --dirty)" -o gx .
@@ -65,25 +61,3 @@ test-docker-ubuntu:
 
 run:
 	go run .
-
-# demo-seed rebuilds the deterministic throwaway repo the demos render against.
-demo-seed:
-	bash $(DEMO_DIR)/seed.sh $(DEMO_WORK)
-
-# demos regenerates all demo GIFs into docs/ (single source for README + web/).
-# Builds gx, then renders every VHS tape — re-seeding the fixture before each one
-# so the tapes (which stage hunks, reword, create worktrees, …) always start from
-# a clean, deterministic state regardless of order. Requires vhs + ttyd and the
-# "Agave Nerd Font" installed. The kitty image-diff demo is captured separately
-# via web/demo/image-diff.sh (VHS can't render the kitty graphics protocol).
-demos: build
-	@if ls $(DEMO_TAPES)/*.tape >/dev/null 2>&1; then \
-		for tape in $(DEMO_TAPES)/*.tape; do \
-			echo "==> seeding fixture"; \
-			bash $(DEMO_DIR)/seed.sh $(DEMO_WORK) >/dev/null; \
-			echo "==> vhs $$tape"; \
-			PATH="$(CURDIR):$$PATH" vhs "$$tape"; \
-		done; \
-	else \
-		echo "no tapes in $(DEMO_TAPES) yet — see beads main-3vg.3"; \
-	fi
