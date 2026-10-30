@@ -538,6 +538,24 @@ func TestBlockedMenuScenario_QuestionMenuPausesBlockedPaneAfterTheDwell(t *testi
 	r.stop(t)
 }
 
+func TestRateLimitedScenario_StartsAndQueuesBothTickets(t *testing.T) {
+	t.Parallel()
+	r := start(t, "rate-limited")
+	for _, addr := range []string{"demo:limited-epic/01", "demo:waiting-epic/01"} {
+		if r.detail(t, addr).Address != addr {
+			t.Fatalf("ticket %s missing", addr)
+		}
+	}
+	// The first worker's rate limit holds the second ticket's claim.
+	const waiting = "demo:waiting-epic/01"
+	if !testutil.Poll(60*time.Second, time.Second, func() bool {
+		return strings.Contains(r.gx(t, "server", "tickets", "explain", waiting), "rate-limited")
+	}) {
+		t.Fatalf("explain %s = %q, want the rate-limit hold", waiting, r.gx(t, "server", "tickets", "explain", waiting))
+	}
+	r.stop(t)
+}
+
 // web is a client of the fixture's web server, signed in with the fixture's cookie.
 type web struct {
 	client *http.Client

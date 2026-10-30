@@ -194,3 +194,28 @@ test("83. Design session on the Agents page", async ({ page, start }) => {
   await page.getByRole("link", { name: "Open design page →" }).click();
   await expect(page).toHaveURL(/#\/d\/demo:design-epic$/);
 });
+
+// The hold ends at the reset clock plus the 60 s buffer.
+const holdEnds = { timeout: 180_000 };
+
+test("103. Rate-limit hold", async ({ page, start }) => {
+  test.setTimeout(240_000);
+  const fixture = await start("rate-limited");
+  const verdict = (epic: string) => page.locator(`a[href$="/t/demo:${epic}/01"]`).filter({ hasNotText: "→" }).locator("[data-verdict]");
+
+  await page.getByRole("link", { name: "limited-epic", exact: true }).click();
+  await expect(page.getByText(/rate-limited: resets /).first()).toBeVisible();
+  await expect(page.getByText("Paused", { exact: false })).toHaveCount(0);
+
+  await go(page, "#/e/demo:waiting-epic");
+  await expect(verdict("waiting-epic")).toContainText("rate-limited");
+
+  await go(page, "#/agents");
+  await page.getByRole("complementary").getByText(/^Queue agents/).click();
+  const [queueAgent] = (await sessions(fixture)).filter((s) => s.id.startsWith("queue-limited-epic"));
+  await expect(row(page, queueAgent).getByRole("img", { name: "rate-limited" })).toBeVisible();
+
+  await expect(row(page, queueAgent).getByRole("img", { name: "rate-limited" })).toHaveCount(0, holdEnds);
+  await go(page, "#/e/demo:waiting-epic");
+  await expect(verdict("waiting-epic")).toHaveCount(0, holdEnds);
+});

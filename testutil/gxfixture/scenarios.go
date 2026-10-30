@@ -189,6 +189,16 @@ var scenarios = map[string]scenario{
 		queue:     []string{project + ":menu-epic"},
 		behaviour: map[string]string{project + ":menu-epic/01": agentfake.BehaviourQuestionMenu},
 	},
+	// rate-limited: both epics are queued. The first epic's worker hits a Claude
+	// rate limit, so the hold keeps the second epic's ticket from claiming.
+	"rate-limited": {
+		epics: []epic{
+			{project, "limited-epic", []ticket{{"01", "limited", servertest.TicketOpts{}}}},
+			{project, "waiting-epic", []ticket{{"01", "waiting", servertest.TicketOpts{}}}},
+		},
+		queue:     []string{project + ":limited-epic", project + ":waiting-epic"},
+		behaviour: map[string]string{project + ":limited-epic/01": agentfake.BehaviourRateLimit},
+	},
 	// paused: one ticket per recovery path. Every paused ticket opens a pause
 	// round. The approve epic is queued, so its worker really blocks on a
 	// permission prompt in the pty runner; the other epic is not, so nothing
