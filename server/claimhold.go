@@ -23,6 +23,9 @@ func (s *Server) claimHold(project string, agent ralphloop.AgentKind) (claimHold
 	if reason, held := s.herdrHolds(s.launchRunner(project, agent)); held {
 		return claimHold{Verdict: VerdictHerdrDown, Reason: reason}, true
 	}
+	if t, held := s.registry.rateLimitHeld(string(agent)); held {
+		return claimHold{Verdict: rateLimitVerdict(t.RateLimitReset)}, true
+	}
 	return claimHold{}, false
 }
 

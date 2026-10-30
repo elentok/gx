@@ -428,6 +428,19 @@ func (r *runRegistry) rateLimitedRuns() []trackedRun {
 	return held
 }
 
+// rateLimitHeld reports the held run of agent that resets last (any run when
+// none has a known reset), whose limit the whole harness shares.
+func (r *runRegistry) rateLimitHeld(agent string) (trackedRun, bool) {
+	var best trackedRun
+	found := false
+	for _, t := range r.rateLimitedRuns() {
+		if t.Agent == agent && (!found || t.RateLimitReset.After(best.RateLimitReset)) {
+			best, found = t, true
+		}
+	}
+	return best, found
+}
+
 // markSettling flags the run at address as inside settleRun.
 func (r *runRegistry) markSettling(address string) {
 	r.mu.Lock()
@@ -607,8 +620,21 @@ func (s *Server) reclaimHeadless(t trackedRun, runner agentrunner.Runner) error 
 		// through the registry.
 		return nil
 	}
+	s.holdIfRateLimited(runner, t)
 	s.goSettle(func() { s.finishRun(runContext{deps, root, mode, one, wt, t.Run, t.Address}) })
 	return nil
+}
+
+// holdIfRateLimited marks a reclaimed run the runner reports as limited,
+// before the first claim pass, so a restart never claims a ticket of a limited
+// harness. The wait loop clears the mark when the limit lifts. The mark is
+// the whole state: nothing is stored.
+func (s *Server) holdIfRateLimited(runner agentrunner.Runner, t trackedRun) {
+	resetAt, limited, err := runner.RateLimit(t.Session)
+	if err != nil || !limited {
+		return
+	}
+	s.registry.markRateLimit(t.Address, true, resetAt)
 }
 
 // reclaim goes through the runner that started t, whatever runner is
@@ -672,6 +698,7 @@ func (s *Server) reclaim(t trackedRun) error {
 		s.goSettle(func() { s.settleRun(rc, nil) })
 		return nil
 	}
+	s.holdIfRateLimited(runner, t)
 	s.goSettle(func() { s.finishRun(rc) })
 	return nil
 }

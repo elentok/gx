@@ -92,6 +92,9 @@ func stampRun(t *testing.T, h *servertest.Harness, runner string, session agentr
 	}
 	runs[0]["runner"] = runner
 	runs[0]["session"] = session
+	if _, ok := runs[0]["agent"]; !ok {
+		runs[0]["agent"] = "claude" // a real launch always records it
+	}
 	delete(runs[0], "pane")
 	if data, err = json.Marshal(runs); err != nil {
 		t.Fatal(err)
