@@ -494,7 +494,7 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 		Model: model, Effort: effort, Sink: s.finishSink(ticket, t.Path), StallNudgeDelay: s.stalledNudgeDelay(),
 	}
-	deps := s.depsFor(ticket.Project)
+	deps := s.depsWith(s.launchRunner(ticket.Project, agent))
 	deps.GateReleased = s.registry.gateReleased(ticketAddr)
 	// Only Claude on the pty runner resumes; every other claim starts cold.
 	if agent == ralphloop.AgentClaude && deps.Runner.Name() == string(agentrunner.ChoicePTY) {
@@ -899,6 +899,15 @@ func (s *Server) runnerFor(project string) agentrunner.Runner {
 	return s.runnerNamed(s.cfg.Runner.Name(), project)
 }
 
+// launchRunner is the runner a new launch of agent in project uses. Only herdr
+// hosts Codex, so a native configured runner hands Codex to herdr.
+func (s *Server) launchRunner(project string, agent ralphloop.AgentKind) agentrunner.Runner {
+	if agent == ralphloop.AgentCodex && s.cfg.Runner.Name() != runnerHerdr {
+		return s.runnerNamed(runnerHerdr, project)
+	}
+	return s.runnerFor(project)
+}
+
 // runnerForRun is the runner that started run, whatever the configured one is.
 // It is nil when that runner cannot be built.
 func (s *Server) runnerForRun(run Run) agentrunner.Runner {
@@ -944,7 +953,11 @@ func (s *Server) iterationRunner(addr tickets.Address) (agentrunner.Runner, erro
 	if run, ok := s.registry.runOf(addr.String()); ok {
 		return s.runnerOf(run)
 	}
-	return s.runnerFor(addr.Project), nil
+	agent := ralphloop.AgentClaude
+	if _, t, ok := s.freshTicket(addr); ok {
+		agent = ticketAgent(t, agent)
+	}
+	return s.launchRunner(addr.Project, agent), nil
 }
 
 func (s *Server) runnerNamed(name, project string) agentrunner.Runner {
@@ -957,12 +970,6 @@ func (s *Server) runnerNamed(name, project string) agentrunner.Runner {
 		return s.cfg.Runner
 	}
 	return nil
-}
-
-// depsFor is the default deps with the project's runner, so launch, wait and
-// finish all talk to the runner that hosts the agent.
-func (s *Server) depsFor(project string) ralphloop.Deps {
-	return s.depsWith(s.runnerFor(project))
 }
 
 // depsWith is the default deps talking to runner.
