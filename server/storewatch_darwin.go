@@ -15,13 +15,17 @@ const fseventsLatency = 20 * time.Millisecond
 
 // NewStoreWatch watches every directory and file under root.
 func NewStoreWatch(root string) (*StoreWatch, error) {
+	return newStoreWatch(root, (*fsevents.EventStream).Start)
+}
+
+func newStoreWatch(root string, start func(*fsevents.EventStream) error) (*StoreWatch, error) {
 	es := &fsevents.EventStream{
 		Paths:   []string{root},
 		Latency: fseventsLatency,
 		Flags:   fsevents.FileEvents | fsevents.WatchRoot,
 	}
-	if err := es.Start(); err != nil {
-		return nil, err
+	if err := start(es); err != nil {
+		return newFSNotifyStoreWatch(root)
 	}
 	out := make(chan fsnotify.Event, 64)
 	done := make(chan struct{})

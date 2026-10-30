@@ -201,8 +201,10 @@ var scenarios = map[string]scenario{
 			{project, "limited-epic", []ticket{{"01", "limited", servertest.TicketOpts{}}}},
 			{project, "waiting-epic", []ticket{{"01", "waiting", servertest.TicketOpts{}}}},
 		},
-		queue:     []string{project + ":limited-epic", project + ":waiting-epic"},
-		behaviour: map[string]string{project + ":limited-epic/01": agentfake.BehaviourRateLimit},
+		// Keep the waiting ticket queued until the first worker reports its hold.
+		projectExtra: map[string]string{project: `,"max-agents":1`},
+		queue:        []string{project + ":limited-epic", project + ":waiting-epic"},
+		behaviour:    map[string]string{project + ":limited-epic/01": agentfake.BehaviourRateLimit},
 	},
 	// usage-gated: the first epic's worker reports the weekly window at 99% and
 	// holds, so the usage gate keeps the second epic's ticket from claiming.

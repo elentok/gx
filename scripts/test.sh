@@ -91,10 +91,12 @@ for name in "${names[@]}"; do
 	fi
 done
 
-for name in "${failed[@]}"; do
-	echo
-	echo "== $name =="
-	cat "$work/$name.log"
-done
+if [[ ${#failed[@]} -gt 0 ]]; then
+	for name in "${failed[@]}"; do
+		echo
+		echo "== $name =="
+		cat "$work/$name.log"
+	done
+fi
 
 [[ ${#failed[@]} -eq 0 ]]

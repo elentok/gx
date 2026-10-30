@@ -403,12 +403,19 @@ func TestRunEditorCommand_ChildGetsTheGivenEnv(t *testing.T) {
 	t.Setenv("EDITOR_LEAK", "leaked")
 	var stdout bytes.Buffer
 	env := append(tempEnv(t), "EDITOR_PROBE=given")
-	// printenv takes the variable names as its args; the "path" is the second name.
-	err := runEditorCommand(env, "printenv EDITOR_PROBE", "EDITOR_LEAK", bytes.NewBuffer(nil), &stdout, bytes.NewBuffer(nil))
-	if err == nil {
-		t.Fatal("printenv should exit 1: EDITOR_LEAK is not in the given env")
+	err := runEditorCommand(env, "printenv", "EDITOR_PROBE", bytes.NewBuffer(nil), &stdout, bytes.NewBuffer(nil))
+	if err != nil {
+		t.Fatalf("printenv EDITOR_PROBE: %v", err)
 	}
 	if got := strings.TrimSpace(stdout.String()); got != "given" {
 		t.Fatalf("child env output = %q, want only the given EDITOR_PROBE", got)
+	}
+	stdout.Reset()
+	err = runEditorCommand(env, "printenv", "EDITOR_LEAK", bytes.NewBuffer(nil), &stdout, bytes.NewBuffer(nil))
+	if err == nil {
+		t.Fatal("printenv should exit 1: EDITOR_LEAK is not in the given env")
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("child inherited EDITOR_LEAK: %q", stdout.String())
 	}
 }

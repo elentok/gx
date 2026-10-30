@@ -9,11 +9,21 @@ import (
 
 func TestStoreWatchSeesNewFilesAndSkipsGit(t *testing.T) {
 	t.Parallel()
+	testStoreWatchSeesNewFilesAndSkipsGit(t, NewStoreWatch)
+}
+
+func TestFSNotifyStoreWatchSeesNewFilesAndSkipsGit(t *testing.T) {
+	t.Parallel()
+	testStoreWatchSeesNewFilesAndSkipsGit(t, newFSNotifyStoreWatch)
+}
+
+func testStoreWatchSeesNewFilesAndSkipsGit(t *testing.T, newWatch func(string) (*StoreWatch, error)) {
+	t.Helper()
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, ".git", "objects"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	w, err := NewStoreWatch(root)
+	w, err := newWatch(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,5 +63,28 @@ func TestStoreWatchSeesNewFilesAndSkipsGit(t *testing.T) {
 		case <-deadline:
 			t.Fatal("no event for the new ticket file")
 		}
+	}
+}
+
+func TestFSNotifyStoreWatchCloseWithoutReadingEvents(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	w, err := newFSNotifyStoreWatch(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "01-a.md"), []byte("ticket"), 0o644); err != nil {
+		w.Close()
+		t.Fatal(err)
+	}
+	closed := make(chan struct{})
+	go func() {
+		w.Close()
+		close(closed)
+	}()
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("watcher and error reader did not stop")
 	}
 }
