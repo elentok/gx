@@ -86,6 +86,14 @@ func TestGxDesignChartingSessionSubagentTiers(t *testing.T) {
 	}
 }
 
+func TestGxResearchRunsOnWorkerTier(t *testing.T) {
+	for _, f := range []string{"gx-research/SKILL.md", "gx-wayfinder/SKILL.md"} {
+		if !strings.Contains(readFile(t, f), "`gx agent model worker`") {
+			t.Errorf("%s lacks the worker-tier model for research", f)
+		}
+	}
+}
+
 func TestGxDesignChainingRules(t *testing.T) {
 	text := readFile(t, "gx-design/SKILL.md")
 	for _, want := range []string{

@@ -3,7 +3,7 @@ name: gx-research
 description: Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.
 ---
 
-Spin up a **background agent** to do the research, so you keep working while it reads.
+Spin up a **background agent** to do the research, so you keep working while it reads. Run it on the worker tier: pass the output of `gx agent model worker` as its `model`, or leave out the `model` field when the output is empty.
 
 Its job:
 
