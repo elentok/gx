@@ -43,6 +43,15 @@ test("shows every mark and counts non-Exited sessions as live", () => {
   expect(within(row("blocked")).getByRole("img", { name: "Actionable" })).toBeTruthy();
 });
 
+test("a Queue row shows only its status mark", () => {
+  render([session("q", "p", { name: "queued", queue: true, unread: { unread: true }, status: { state: "blocked" }, actionable: { reason: "Pick one" } })]);
+  const queued = within(row("queued"));
+  expect(queued.getByRole("img", { name: "blocked" })).toBeTruthy();
+  expect(queued.queryByRole("img", { name: "Unread" })).toBeNull();
+  expect(queued.queryByRole("img", { name: "Actionable" })).toBeNull();
+  expect(queued.queryByRole("tooltip", { hidden: true })).toBeNull();
+});
+
 test("design sessions are hidden with a count until the toggle is on, and the choice is remembered", () => {
   const sessions = [session("1", "p", { name: "plain" }), session("2", "p", { name: "d1", design: true }), session("3", "p", { name: "d2", design: true })];
   render(sessions);

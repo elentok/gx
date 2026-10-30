@@ -3,6 +3,7 @@ import {
   SessionExitCrashed,
   SessionExited,
   SessionIdle,
+  SessionRateLimited,
   SessionWorking,
   type SessionInfo,
 } from "../generated/server";
@@ -23,8 +24,11 @@ export function groupSessions(sessions: SessionInfo[]): { project: string; sessi
 
 export const liveCount = (sessions: SessionInfo[]) => sessions.filter((s) => s.status.state !== SessionExited).length;
 
+/** Queue and Design agents carry only a status mark: no Unread, no Actionable, no count. */
+export const hasAttentionMarks = (s: SessionInfo) => !s.queue && !s.design;
+
 /** A Blocked session always waits on the person, with or without a recorded reason. */
-export const isActionable = (s: SessionInfo) => !!s.actionable.reason || s.status.state === SessionBlocked;
+export const isActionable = (s: SessionInfo) => hasAttentionMarks(s) && (!!s.actionable.reason || s.status.state === SessionBlocked);
 
 export const stateLabel = (s: SessionInfo) => s.status.state.charAt(0).toUpperCase() + s.status.state.slice(1).replace("-", " ");
 
@@ -37,6 +41,8 @@ export function statusMark(s: SessionInfo): { glyph: string; tone: Tone; faded?:
       return { glyph: "○", tone: "done" };
     case SessionBlocked:
       return { glyph: "?", tone: "waiting" };
+    case SessionRateLimited:
+      return { glyph: "⏸", tone: "paused" };
     case SessionExited:
       return s.exit === SessionExitCrashed ? { glyph: "✕", tone: "deadlocked" } : { glyph: "○", tone: "muted", faded: true };
     default:

@@ -2,13 +2,13 @@ import { useMemo } from "react";
 import type { SessionInfo } from "../generated/server";
 import { agentHref } from "../hrefs";
 import { RowList, type ListRowData, type ListSection } from "../nav/JumpMenu";
-import { isActionable, stateLabel } from "./rules";
+import { hasAttentionMarks, isActionable, stateLabel } from "./rules";
 import { SessionBadges, SessionGlyphs } from "./SessionGlyphs";
 
 // Port of ui/agents/jump.go: attention order, and the search fields plus the session ticket.
 const SECTIONS = ["Actionable", "Unread", "Other"];
 
-const bucket = (s: SessionInfo) => (isActionable(s) ? 0 : s.unread.unread ? 1 : 2);
+const bucket = (s: SessionInfo) => (isActionable(s) ? 0 : hasAttentionMarks(s) && s.unread.unread ? 1 : 2);
 
 function sessionRow(s: SessionInfo, current: boolean): ListRowData {
   const name = s.name || s.id;

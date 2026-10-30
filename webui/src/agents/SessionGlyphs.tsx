@@ -1,6 +1,6 @@
 import { Box, Spinner, Text } from "@chakra-ui/react";
 import { SessionExitCrashed, SessionWorking, type SessionInfo } from "../generated/server";
-import { isActionable, statusMark } from "./rules";
+import { hasAttentionMarks, isActionable, statusMark } from "./rules";
 
 /** The status glyph; Working is a spinner, as in the mock. */
 export function StatusMark({ session: s }: { session: SessionInfo }) {
@@ -33,7 +33,7 @@ export function SessionGlyphs({ session: s }: { session: SessionInfo }) {
 export function SessionBadges({ session: s, tooltip }: { session: SessionInfo; tooltip?: boolean }) {
   return (
     <>
-      {s.unread.unread && (
+      {hasAttentionMarks(s) && s.unread.unread && (
         <Text as="span" role="img" aria-label="Unread" color="kind.design.fg">
           ●
         </Text>

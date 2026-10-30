@@ -53,6 +53,18 @@ test("a design session is listed while the sidebar hides it, and the current one
   expect(dialog().getByText("current")).toBeTruthy();
 });
 
+test("Design and Queue rows carry no Unread or Actionable mark and sort under Other", () => {
+  const asks = { unread: { unread: true }, actionable: { reason: "Pick one" } };
+  render([session("s-1", "alpha", { name: "plain" }), session("d", "alpha", { name: "dz", design: true, ...asks }), session("q", "alpha", { name: "qz", queue: true, ...asks })], "/agents/s-1");
+  openSwitcher();
+  for (const name of ["dz", "qz"]) {
+    const option = dialog().getAllByRole("option").find((o) => o.textContent?.includes(name))!;
+    expect(within(option).queryByRole("img", { name: "Unread" })).toBeNull();
+    expect(within(option).queryByRole("img", { name: "Actionable" })).toBeNull();
+  }
+  expect(dialog().queryByText("Actionable")).toBeNull();
+});
+
 test("switcher rows use the sidebar marks: purple design diamond and unread dot, ? for blocked", () => {
   const blocked = session("s-5", "beta", { name: "stuck" });
   blocked.status = { state: "blocked" } as SessionInfo["status"];
