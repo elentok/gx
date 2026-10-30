@@ -1194,3 +1194,21 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
 - **Scenario:** `web-setup`, with config `server.web.totp=false`.
 - **Steps:** enter the Setup code and a good password twice, open Settings, sign out of this device, sign in again.
 - **Pass:** the card shows "step 1 of 2" and its button reads "Finish setup", which opens the Epics page. Settings has no "Reset authenticator" row. The login card has no code field and the password alone opens the Epics page.
+
+## 102. Login
+
+- **Scenario:** `web-login`
+- **Steps:** set the hash to `#/stats`. Sign in with the right password and a wrong code, then with the right password and the code from the fixture's wait helper.
+- **Pass:** the login card shows. The wrong code shows "Wrong password or code". The right pair opens the Stats page at `#/stats`.
+
+## 103. Login rate limit
+
+- **Scenario:** `web-login`
+- **Steps:** sign in with a wrong code 5 times, then once more.
+- **Pass:** each of the 5 tries shows "Wrong password or code". The next one shows "Too many tries. Try again in N minute(s)." and Sign in is disabled.
+
+## 104. Certificate help
+
+- **Scenario:** `web-login`
+- **Steps:** unfold "Browser warns about this page?"; request the profile and the Mac certificate links through the page context.
+- **Pass:** the links show only after unfolding. The profile answers `application/x-apple-aspen-config` and the certificate `application/pkix-cert`, both with a body. The fingerprint groups match the `fingerprint:` line of `gx server status`.
