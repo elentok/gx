@@ -13,7 +13,7 @@ import (
 
 // CurrentSchemaVersion is the manifest schema version this build writes and
 // the highest version it knows how to read.
-const CurrentSchemaVersion = 1
+const CurrentSchemaVersion = 2
 
 // InstallMode records how a skill's managed files were placed on disk.
 type InstallMode string
@@ -27,10 +27,20 @@ const (
 	ModeSymlink InstallMode = "symlink"
 )
 
-// ManagedFile is one path gx installed as part of a skill, relative to the
-// agent root(s) it was installed under.
+// EntryKind distinguishes file ownership from ownership of a directory link.
+type EntryKind string
+
+const (
+	KindCopiedFile    EntryKind = "copied-file"
+	KindFileLink      EntryKind = "file-link"
+	KindDirectoryLink EntryKind = "directory-link"
+)
+
+// ManagedFile records one owned entry relative to each discovery root.
+// A directory link owns the link itself, never the contents of its target.
 type ManagedFile struct {
-	Path string `json:"path"`
+	Kind EntryKind `json:"kind,omitempty"`
+	Path string    `json:"path"`
 	// Hash is the installed content's hash, set when Mode is ModeManagedCopy.
 	Hash string `json:"hash,omitempty"`
 	// LinkTarget is the symlink's intended target, set when Mode is ModeSymlink.
@@ -45,6 +55,7 @@ type Manifest struct {
 	Source        string        `json:"source"`
 	AgentRoots    []string      `json:"agent-roots"`
 	Files         []ManagedFile `json:"files"`
+	BackupDir     string        `json:"backup-dir,omitempty"`
 }
 
 var (
@@ -88,6 +99,9 @@ func Load(path string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("%w: %s: schema version %d", ErrUnsupportedVersion, path, m.SchemaVersion)
 	}
 
+	if err := validateEntries(m.Files, m.SchemaVersion); err != nil {
+		return Manifest{}, fmt.Errorf("%w: %v", ErrMalformed, err)
+	}
 	return m, nil
 }
 
@@ -130,6 +144,33 @@ func Save(path string, m Manifest) error {
 	}
 	if err := os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("rename temp manifest into place: %w", err)
+	}
+	return nil
+}
+
+func validateEntries(files []ManagedFile, version int) error {
+	paths := map[string]bool{}
+	for _, f := range files {
+		if !validRelative(f.Path) || paths[f.Path] {
+			return fmt.Errorf("invalid or duplicate entry %q", f.Path)
+		}
+		if f.Kind != "" && f.Kind != KindCopiedFile && f.Kind != KindFileLink && f.Kind != KindDirectoryLink {
+			return fmt.Errorf("unknown entry kind for %q", f.Path)
+		}
+		if version == 1 && f.Kind == KindDirectoryLink {
+			return fmt.Errorf("v1 cannot own directory link %q", f.Path)
+		}
+		if f.LinkTarget != "" && !filepath.IsAbs(f.LinkTarget) {
+			return fmt.Errorf("link target must be absolute: %q", f.Path)
+		}
+		paths[f.Path] = true
+	}
+	for path := range paths {
+		for parent := filepath.Dir(path); parent != "."; parent = filepath.Dir(parent) {
+			if paths[parent] {
+				return fmt.Errorf("overlapping entries %q and %q", path, parent)
+			}
+		}
 	}
 	return nil
 }

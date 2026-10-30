@@ -17,7 +17,7 @@ import (
 func fakeSkillsDeps(t *testing.T, stdout *bytes.Buffer) deps {
 	t.Helper()
 	claudeRoot := filepath.Join(t.TempDir(), "claude-skills")
-	codexRoot := filepath.Join(t.TempDir(), "codex-prompts")
+	codexRoot := filepath.Join(t.TempDir(), "codex-skills")
 	manifestPath := filepath.Join(t.TempDir(), "manifest.json")
 	statusPath := filepath.Join(t.TempDir(), "skills-install.json")
 
@@ -272,12 +272,12 @@ func TestExecute_SkillsInstallDev_SymlinksCurrentCheckoutIntoBothAgentRoots(t *t
 	}
 
 	for _, root := range []string{claudeRoot, codexRoot} {
-		linkPath := filepath.Join(root, "gx-implement", "SKILL.md")
+		linkPath := filepath.Join(root, "gx-implement")
 		target, err := os.Readlink(linkPath)
 		if err != nil {
 			t.Fatalf("Readlink(%s): %v", linkPath, err)
 		}
-		want := filepath.Join(bundleDir, "gx-implement", "SKILL.md")
+		want := filepath.Join(bundleDir, "gx-implement")
 		if target != want {
 			t.Errorf("symlink target = %q, want %q", target, want)
 		}

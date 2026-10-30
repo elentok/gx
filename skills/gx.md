@@ -1,7 +1,7 @@
 # gx skill bundle
 
 This directory is gx's canonical, installable skill bundle: the content `gx skills install` copies
-into both Claude's and Codex's user skill/prompt roots (see the `gx skills` command once it ships).
+into Claude's and Codex's user skill roots.
 
 ## Origin
 
@@ -91,65 +91,80 @@ person starts a map, a spec or a harsh review, and other skills reach them by re
 `gx-grilling`, `gx-domain-modeling`, `gx-unslop` and `gx-verify` carry no flag, so the model and
 other skills can call them.
 
-Codex has no equivalent auto-invocation concept — a Codex custom prompt is only ever run by explicit
-`/name` invocation, never launched by the model on its own. That's already at least as restrictive as
-`disable-model-invocation: true`, so `gx-implement`, `gx-cleanup`, `gx-merge`, and `gx-bump`
-preserve their intended policy under Codex without any extra metadata: their explicit-only intent
-holds as-is, and
-`gx-to-tickets`'s, `gx-tdd`'s, and `gx-resolving-merge-conflicts`' "the model may reach for it" intent
-is satisfied whenever the calling skill (e.g. `gx-implement` invoking `gx-tdd`) explicitly invokes it.
+Codex discovers these as skills under `~/.agents/skills`. Both agents receive the same directory
+layout and relative references. Invocation metadata is consumed according to each agent's skill
+support.
 
 ## Installation
 
-This directory is embedded in the `gx` binary at compile time (`bundle.go`), so a release, Homebrew,
-`go install`, or locally built `gx` all ship the identical bundle. `gx skills install` copies it as
-managed files into both Claude's and Codex's user skill roots — `~/.claude/skills` and
-`~/.codex/prompts` — under the same relative layout this directory has, so every relative reference
-(like `../gx-local-tracker.md`) resolves identically under both agents:
+The `gx` binary embeds this bundle. Ordinary installations copy its files into real directories
+under `~/.claude/skills` and `~/.agents/skills`. They need no source checkout. Both roots receive the
+same layout, so references such as `../gx-local-tracker.md` resolve in either agent.
 
 ```sh
-gx skills install                            # install/upgrade for both agents
-gx skills install --force <relative-path>    # replace a specific detected conflict
-gx skills uninstall                          # remove gx's managed copies
-gx skills uninstall --force <relative-path>  # remove a specific locally-modified file
+gx skills install                            # install or update bundled copies
+gx skills install --dev                      # link this checkout's skill directories
+gx skills install --force <relative-path>    # replace one conflicting entry
+gx skills install --force-all                # authorize all reported replacements
+gx skills uninstall                          # remove owned entries, preserving local edits
+gx skills uninstall --force <relative-path>  # remove one edited entry
 ```
 
-Each target is reported as `installed`, `updated`, `skipped` (already up to date), `conflicted`
-(left untouched — locally modified or unrelated content occupies that path; pass `--force` with the
-path to override), or `removed`. A conflict aborts the whole install, so re-running `gx skills
-install` after a `gx` upgrade is the way to refresh the bundle: unaffected files report `skipped`,
-changed ones report `updated`.
+Each target is reported as `installed`, `updated`, `skipped`, `conflicted` or `removed`.
+A conflict aborts installation before any destination changes. `--force` names the reported
+bundle-relative path. For a directory link or a directory being replaced by a link, name the
+skill directory, such as `gx-implement`.
 
-`gx server start` and `gx server restart` run the same install before they start the server, so an
-upgrade refreshes the bundle on its own. They keep the mode you chose last: a `--dev` install is
-re-linked from the same checkout, anything else (or no install yet) gets managed copies. They never
-force. A conflict, or a dev checkout that is gone, prints a warning, the server still starts, and
-the web UI shows the problem until you close it or an install succeeds.
+Gx owns directory links as single entries. Updating or uninstalling a dev skill removes the link
+itself and preserves its source directory. Copied installations own individual files, so unrelated
+files inside their directories remain untouched by normal updates and uninstall.
+
+Discovery roots may be user-managed symlinks. Gx preserves those links and handles roots that point
+to the same physical directory once. Force never authorizes writing through a skill-directory link
+into the source checkout.
 
 ### Development mode
 
-Working from a gx source checkout, `--dev` symlinks this directory's files into both agents'
-discovery roots instead of installing embedded copies, so an edit under `skills/**` shows up to both
-agents immediately, without rerunning `gx skills install`:
+Run `gx skills install --dev` from a gx checkout, including a nested directory or linked worktree.
+Each bundled skill directory is linked to its directory in that checkout. Its `SKILL.md` remains a
+real source file. The whole directory is visible, including supporting files outside the embedded
+bundle. Shared files `gx.md`, `gx-local-tracker.md` and `gx-failing-tests.md` are linked separately
+beside the skill directories.
+
+Repeat installation from the same checkout leaves correct links untouched. Changing checkout or
+switching between copies and links requires explicit force. For example:
 
 ```sh
-go run . skills install --dev    # symlink this checkout's skill files
+gx skills install --dev --force-all  # switch to this checkout after reviewing conflicts
+gx skills install --force-all        # switch back to bundled copies
 ```
 
-`--dev` resolves the git repository containing the current working directory (not the `gx` binary's
-own location), so it works the same from a nested subdirectory or a linked worktree, and it refuses
-to change anything if that repository doesn't contain gx's skill bundle. Re-running it from the same
-checkout is idempotent (`skipped`); running it from a *different* gx checkout reports every path
-`conflicted` rather than silently retargeting the existing symlinks — pass `--force` with each path to
-relink to the new checkout.
+### Migration and recovery
 
-To go back to a production install of gx's embedded, released skills, run `gx skills install` (no
-`--dev`) and pass `--force` with each path it reports as `conflicted` — switching *out* of dev mode is
-a mode change like any other and needs the same explicit confirmation:
+Gx reads the old file-based manifest and migrates verified, unchanged entries. It can adopt an
+existing correct directory link without touching its target. Edited files, wrong link targets and
+unrelated directory contents block migration until their reported replacements are forced.
+After successful placement, gx removes unchanged owned files from the retired `~/.codex/prompts`
+root. Unrelated prompts remain. Modified owned prompts block migration.
 
-```sh
-gx skills install --force gx.md --force gx-implement/SKILL.md ...   # one --force per reported conflict
-```
+Before changing destinations, gx saves recovery snapshots under
+`~/.local/share/gx/skills-backups`, honoring `XDG_DATA_HOME`. The command prints the dated backup
+location. Backups remain until you remove them. Symlinks are backed up as links, including broken
+links. Forced directory replacement backs up the entire replaced directory.
+
+Each backup contains `paths.json`, which maps original absolute paths to numbered snapshots, and
+`manifest.json` when an installation already existed. An empty snapshot field means that path was
+absent before the operation. To recover manually, stop gx, inspect that mapping, restore the listed
+snapshots to their original paths while preserving symlinks, and restore the previous manifest to
+`~/.config/gx/skills/gx-canonical.json`. Never copy through an existing directory link.
+
+Install, refresh and uninstall serialize against the same manifest. If a write or manifest
+publication fails, gx restores the previous destinations and reports the retained backup location.
+If restoration fails too, the error names the affected paths and recovery location.
+
+`gx server start` and `gx server restart` use the same installer. They keep the recorded mode and
+dev checkout and never force. A conflict leaves the installation unchanged, lets the server start,
+and records a warning naming the path and the `gx skills install` command needed to resolve it.
 
 ## Layout
 

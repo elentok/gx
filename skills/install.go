@@ -2,8 +2,7 @@ package skills
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"reflect"
 )
 
 // SourceFile is one skill file to install: RelPath is where it is written,
@@ -29,6 +28,8 @@ type InstallRequest struct {
 	// Mode selects how files are placed on disk. The zero value is
 	// ModeManagedCopy.
 	Mode InstallMode
+	// BackupDir retains dated recovery snapshots. Defaults beside the manifest.
+	BackupDir string
 }
 
 // effectiveMode returns r.Mode, defaulting to ModeManagedCopy when unset.
@@ -50,68 +51,30 @@ func (e *ConflictError) Error() string {
 	return fmt.Sprintf("refused %d conflicting path(s), use force to override", len(e.Conflicts))
 }
 
-// Install installs or upgrades a skill's managed-copy files into every
-// AgentRoot in req, recording the result in the manifest at manifestPath.
-// It returns the same per-target classification Plan would have produced -
-// classified once, via classifyInstall, and reused for both the writes and
-// the returned report - so a caller never needs a separate Plan call just
-// to report what Install did.
-//
-// A path whose on-disk content is locally modified, or that holds content
-// unrelated to any prior install of this skill, is left untouched unless
-// req.Force explicitly authorizes it; Install then writes nothing at all
-// and returns the classification alongside a *ConflictError, so a refused
-// install never leaves behind a manifest claiming it succeeded. The same
-// holds for any other failure encountered while copying: the manifest is
-// only written after every file has been copied to every agent root.
+// Install plans the complete update before changing any destination, retains
+// recoverable backups, and publishes the manifest after all writes succeed.
 func Install(manifestPath string, req InstallRequest) ([]Target, error) {
-	mode := req.effectiveMode()
-
-	targets, sourceIdentities, err := classifyInstall(manifestPath, req)
+	unlock, err := lockInstallation(manifestPath)
 	if err != nil {
 		return nil, err
 	}
-
-	conflicts := map[string]Ownership{}
-	for _, t := range targets {
-		if t.Status == StatusConflicted {
-			conflicts[t.Path] = t.Ownership
+	defer unlock()
+	p, err := buildInstallPlan(manifestPath, req)
+	if err != nil {
+		return nil, err
+	}
+	if err := p.conflictError(); err != nil {
+		return p.targets, err
+	}
+	if len(p.operations) == 0 {
+		prev, err := Load(manifestPath)
+		if err == nil && reflect.DeepEqual(prev, p.manifest) {
+			return p.targets, nil
 		}
 	}
-	if len(conflicts) > 0 {
-		return targets, &ConflictError{Conflicts: conflicts}
+	backup, err := executePlan(p, manifestPath, func() error { return Save(manifestPath, p.manifest) })
+	for i := range p.targets {
+		p.targets[i].BackupDir = backup
 	}
-
-	for _, root := range req.AgentRoots {
-		if err := os.MkdirAll(root, 0755); err != nil {
-			return targets, fmt.Errorf("create agent root %s: %w", root, err)
-		}
-		for _, f := range req.Files {
-			target := filepath.Join(root, f.RelPath)
-			if err := placeFile(f.AbsPath, target, mode); err != nil {
-				return targets, fmt.Errorf("install %s: %w", target, err)
-			}
-		}
-	}
-
-	files := make([]ManagedFile, 0, len(req.Files))
-	for _, f := range req.Files {
-		mf := ManagedFile{Path: f.RelPath}
-		if mode == ModeSymlink {
-			mf.LinkTarget = sourceIdentities[f.RelPath]
-		} else {
-			mf.Hash = sourceIdentities[f.RelPath]
-		}
-		files = append(files, mf)
-	}
-	newManifest := Manifest{
-		Mode:       mode,
-		Source:     req.Source,
-		AgentRoots: req.AgentRoots,
-		Files:      files,
-	}
-	if err := Save(manifestPath, newManifest); err != nil {
-		return targets, fmt.Errorf("save manifest: %w", err)
-	}
-	return targets, nil
+	return p.targets, err
 }

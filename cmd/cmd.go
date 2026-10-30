@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"runtime"
 
 	"github.com/elentok/gx/apiclient"
@@ -61,6 +62,7 @@ type deps struct {
 	// skillsStatusPath is where `gx server start` records a skill install
 	// problem for the server to show.
 	skillsStatusPath func() (string, error)
+	skillsBackupDir  func() (string, error)
 	explainAgent     func(target string) (herdr.AgentExplainResult, error)
 	probeGhostty     func() error
 	// serverClient dials the server; nil means the real one (tests inject a fake).
@@ -124,14 +126,21 @@ func defaultDeps() deps {
 		skillsAgentRoots:   func() ([]string, error) { return defaultSkillsAgentRoots(dirs) },
 		skillsManifestPath: func() (string, error) { return defaultSkillsManifestPath(dirs) },
 		skillsStatusPath:   func() (string, error) { return defaultSkillsStatusPath(dirs) },
-		explainAgent:       herdr.AgentExplain,
-		probeGhostty:       terminalrun.ProbeGhostty,
+		skillsBackupDir: func() (string, error) {
+			base, err := dirs.DataDir()
+			if err != nil {
+				return "", err
+			}
+			return filepath.Join(base, "skills-backups"), nil
+		},
+		explainAgent: herdr.AgentExplain,
+		probeGhostty: terminalrun.ProbeGhostty,
 	}
 }
 
 // defaultSkillsAgentRoots resolves gx's canonical skill bundle's two install
 // targets under the real user's home directory: Claude Code's user skill
-// discovery root and Codex's user custom-prompt discovery root.
+// discovery root and Codex's user skill discovery root.
 func defaultSkillsAgentRoots(dirs config.Dirs) ([]string, error) {
 	home, err := dirs.Home()
 	if err != nil {

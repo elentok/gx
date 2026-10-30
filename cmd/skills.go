@@ -51,7 +51,7 @@ func newSkillsInstallCmd(d deps) *cobra.Command {
 	cmd.Flags().BoolVar(&forceAll, "force-all", false,
 		"force-overwrite every conflicting path")
 	cmd.Flags().BoolVar(&dev, "dev", false,
-		"symlink the current checkout's skill files instead of installing embedded copies")
+		"symlink the current checkout's skill directories; link shared files separately")
 	return cmd
 }
 
@@ -161,7 +161,15 @@ func installSkillTargets(d deps, force skills.ForcePolicy, source string, source
 	if err != nil {
 		return nil, err
 	}
+	backupDir := ""
+	if d.skillsBackupDir != nil {
+		backupDir, err = d.skillsBackupDir()
+		if err != nil {
+			return nil, err
+		}
+	}
 	return skills.Install(manifestPath, skills.InstallRequest{
+		BackupDir:  backupDir,
 		Source:     source,
 		AgentRoots: roots,
 		Files:      sources,
@@ -226,6 +234,7 @@ func refreshSkillsProblem(d deps, out io.Writer) string {
 	if err != nil {
 		return installProblem(targets, err, fix)
 	}
+	printSkillsBackup(out, targets)
 	fmt.Fprintf(out, "skills: %s\n", summarizeTargets(targets))
 	return ""
 }
@@ -235,7 +244,7 @@ func refreshSkillsProblem(d deps, out io.Writer) string {
 func installProblem(targets []skills.Target, err error, fix string) string {
 	var conflictErr *skills.ConflictError
 	if !errors.As(err, &conflictErr) {
-		return err.Error()
+		return fmt.Sprintf("%v; %s", err, fix)
 	}
 	var paths []string
 	for _, t := range targets {
@@ -278,7 +287,14 @@ func runSkillsUninstall(d deps, force []string, out io.Writer) error {
 	}
 	forcePolicy := skills.NewForcePolicy(force...)
 
-	targets, err := skills.Uninstall(manifestPath, forcePolicy)
+	backupDir := ""
+	if d.skillsBackupDir != nil {
+		backupDir, err = d.skillsBackupDir()
+		if err != nil {
+			return err
+		}
+	}
+	targets, err := skills.Uninstall(manifestPath, forcePolicy, skills.UninstallOptions{BackupDir: backupDir})
 	if errors.Is(err, skills.ErrNotExist) {
 		fmt.Fprintln(out, "gx's skill bundle is not installed")
 		return nil
@@ -295,11 +311,21 @@ func runSkillsUninstall(d deps, force []string, out io.Writer) error {
 // that case), so every non-conflicted target is downgraded to "skipped" to
 // match what the filesystem actually shows.
 func printTargetReport(out io.Writer, targets []skills.Target, committed bool) {
+	printSkillsBackup(out, targets)
 	for _, t := range targets {
 		status := t.Status
 		if !committed && status != skills.StatusConflicted {
 			status = skills.StatusSkipped
 		}
 		fmt.Fprintf(out, "%-10s %s\n", status, t.RootRelPath())
+	}
+}
+
+func printSkillsBackup(out io.Writer, targets []skills.Target) {
+	for _, t := range targets {
+		if t.BackupDir != "" {
+			fmt.Fprintf(out, "skills backups: %s\n", t.BackupDir)
+			return
+		}
 	}
 }

@@ -76,7 +76,7 @@ func TestRefreshSkills_DevInstallRelinksFromSameCheckout(t *testing.T) {
 	if err := execute([]string{"skills", "install", "--dev"}, d); err != nil {
 		t.Fatalf("skills install --dev: %v", err)
 	}
-	link := filepath.Join(claudeRoot, "gx-implement", "SKILL.md")
+	link := filepath.Join(claudeRoot, "gx-implement")
 	if err := os.Remove(link); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestRefreshSkills_DevInstallRelinksFromSameCheckout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Readlink: %v (output %q)", err, out.String())
 	}
-	if want := filepath.Join(bundleDir, "gx-implement", "SKILL.md"); target != want {
+	if want := filepath.Join(bundleDir, "gx-implement"); target != want {
 		t.Errorf("link target = %q, want %q", target, want)
 	}
 	if m := manifestOf(t, d); m.Mode != skills.ModeSymlink {
@@ -155,5 +155,81 @@ func TestRefreshSkills_ConflictRecordsProblemAndCleanInstallClearsIt(t *testing.
 	}
 	if p := skills.ReadProblem(statusPathOf(t, d)); p != "" {
 		t.Errorf("recorded problem after a clean install = %q, want none", p)
+	}
+}
+
+func TestRefreshSkills_MigratesV1AndKeepsServerWarningOnConflict(t *testing.T) {
+	for _, conflict := range []bool{false, true} {
+		t.Run(map[bool]string{false: "migrates", true: "warns"}[conflict], func(t *testing.T) {
+			var out bytes.Buffer
+			repo := testutil.TempRepo(t)
+			bundle := writeDevBundle(t, repo)
+			d := fakeSkillsDevDeps(t, &out, repo)
+			roots, _ := d.skillsAgentRoots()
+			manifest, _ := d.skillsManifestPath()
+			rels, err := skills.BundleFiles()
+			if err != nil {
+				t.Fatal(err)
+			}
+			m := skills.Manifest{SchemaVersion: 1, Mode: skills.ModeSymlink, Source: skills.DevSourcePrefix + repo, AgentRoots: roots}
+			for _, rel := range rels {
+				source := filepath.Join(bundle, rel)
+				m.Files = append(m.Files, skills.ManagedFile{Path: rel, LinkTarget: source})
+				for _, root := range roots {
+					dest := filepath.Join(root, rel)
+					if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.Symlink(source, dest); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			conflicting := filepath.Join(roots[0], "gx-implement", "personal.txt")
+			if conflict {
+				if err := os.WriteFile(conflicting, []byte("keep"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := skills.Save(manifest, m); err != nil {
+				t.Fatal(err)
+			}
+			before, err := os.ReadFile(manifest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			d.getwd = func() (string, error) { t.Fatal("startup used invocation checkout"); return "", nil }
+			refreshSkills(d, &out)
+			if conflict {
+				after, err := os.ReadFile(manifest)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(after) != string(before) {
+					t.Fatal("failed refresh changed manifest")
+				}
+				problem := skills.ReadProblem(statusPathOf(t, d))
+				if !strings.Contains(problem, "gx-implement") || !strings.Contains(problem, "gx skills install --dev") {
+					t.Fatal(problem)
+				}
+				if _, err := os.Stat(conflicting); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if _, err := os.Readlink(filepath.Join(roots[0], "gx-implement")); err != nil {
+					t.Fatal(err)
+				}
+				if manifestOf(t, d).SchemaVersion != 2 {
+					t.Fatal("legacy manifest not migrated")
+				}
+				if !strings.Contains(out.String(), "skills backups:") {
+					t.Fatal("missing recovery location", out.String())
+				}
+			}
+			sourceInfo, err := os.Lstat(filepath.Join(bundle, "gx-implement", "SKILL.md"))
+			if err != nil || !sourceInfo.Mode().IsRegular() {
+				t.Fatal("source changed", err)
+			}
+		})
 	}
 }

@@ -318,6 +318,7 @@ Install (or refresh, after upgrading `gx`) gx's built-in agent skill bundle for 
 
 ```sh
 gx skills install                            # install/upgrade for both agents
+gx skills install --dev                      # link this checkout's skill directories
 gx skills install --force <relative-path>    # replace a specific detected conflict
 gx skills uninstall                          # remove gx's managed copies
 gx skills uninstall --force <relative-path>  # remove a specific locally-modified file
@@ -326,7 +327,10 @@ gx skills uninstall --force <relative-path>  # remove a specific locally-modifie
 Each target is reported as `installed`, `updated`, `skipped` (already up to date), `conflicted`
 (locally modified or unrelated content is left untouched — pass `--force <relative-path>` to
 override), or `removed`. `gx server start` and `gx server restart` run this install for you and
-keep a `--dev` install as dev. See [skills/gx.md](skills/gx.md) for what's in the bundle.
+keep a `--dev` install linked to its recorded checkout. Claude discovers skills under
+`~/.claude/skills`; Codex uses `~/.agents/skills`. Switching mode or checkout requires force.
+Changes retain recovery backups under gx's data directory. See [skills/gx.md](skills/gx.md) for
+migration, ownership and recovery details.
 
 ## Configuration
 
