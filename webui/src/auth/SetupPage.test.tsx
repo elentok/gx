@@ -9,6 +9,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   window.location.hash = "";
+  sessionStorage.clear();
 });
 
 const authOf = (totp_on: boolean): AuthState => ({ ...TEST_CERT, state: "setup", totp_on, setup_code_required: false });
@@ -140,4 +141,17 @@ test("a refusal from setup finish is shown", async () => {
   expect((await screen.findByRole("alert")).textContent).toBe(
     "That code is wrong or expired. Run gx server status for a new one.",
   );
+});
+
+test("after a reload mid-setup the password step comes back with the same key", async () => {
+  stubStart({ secret: "JBSWY3DPEHPK3PXP", uri: "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP" });
+  await toPasswordStep(true);
+  cleanup();
+
+  const again = stubStart({});
+  renderThemed(<SetupPage auth={authOf(true)} onDone={() => {}} />);
+  expect(screen.getByText("Choose a password")).toBeTruthy();
+  submitPasswords("correct horse battery", "correct horse battery", "Continue");
+  expect(await screen.findByText("JBSW Y3DP EHPK 3PXP")).toBeTruthy();
+  expect(again).not.toHaveBeenCalled();
 });

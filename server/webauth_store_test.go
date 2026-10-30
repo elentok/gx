@@ -304,6 +304,25 @@ func TestWebAuthStoreClearAuthenticatorFlagWaitsWhileTOTPIsOff(t *testing.T) {
 	}
 }
 
+func TestWebAuthStoreSetupStartRepeatedWithTheSameCodeKeepsTheSecret(t *testing.T) {
+	w, _, _ := newStoreForTest(t)
+	_, code, err := w.SetupState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := w.SetupStart(true, code, "1.1.1.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := w.SetupStart(true, code, "1.1.1.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == "" || first != second {
+		t.Errorf("second secret %q, want the first %q", second, first)
+	}
+}
+
 func TestWebAuthStoreSetupStartWrongCodeIsRefusedAndCounted(t *testing.T) {
 	w, _, _ := newStoreForTest(t)
 	for i := 0; i < authIPFreeFailures; i++ {

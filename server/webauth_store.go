@@ -198,7 +198,7 @@ func (w *WebAuth) AuthenticatorResetCode() (code string, expires time.Time, ok b
 	return formatSetupCode(code), w.setupCreated.Add(setupCodeLifetime), true, nil
 }
 
-// SetupStart checks the Setup code and returns a new TOTP secret tied to it.
+// SetupStart checks the Setup code and returns the TOTP secret tied to it, minting one on the first call.
 // With TOTP off it returns no secret.
 func (w *WebAuth) SetupStart(totpOn bool, code, ip string) (string, error) {
 	w.mu.Lock()
@@ -208,6 +208,10 @@ func (w *WebAuth) SetupStart(totpOn bool, code, ip string) (string, error) {
 	}
 	if !totpOn {
 		return "", nil
+	}
+	// A reload mid-setup asks again with the same code; keep the secret the authenticator app already has.
+	if w.pendingSecret != "" && w.pendingCode == w.setupCode {
+		return w.pendingSecret, nil
 	}
 	secret, err := newTOTPSecret()
 	if err != nil {

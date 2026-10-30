@@ -8,7 +8,7 @@ import type { AuthResult, AuthState } from "./authState";
 import { AddAuthenticator } from "./AddAuthenticator";
 import { TrustHelp } from "./cert";
 import { postJSON } from "./http";
-import { MIN_PASSWORD, PASSWORD_HINT, PASSWORD_TOO_SHORT, reasonText } from "./refusals";
+import { MIN_PASSWORD, PASSWORD_HINT, PASSWORD_TOO_SHORT, reasonText, SETUP_CODE_WRONG } from "./refusals";
 
 const SETUP_HASH = "#/setup";
 const MISMATCH = "The two passwords don't match.";
@@ -142,13 +142,39 @@ function useCodeFromHash(): string {
   return code;
 }
 
+const SAVED_KEY = "gx.setup";
+interface Saved {
+  code: string;
+  authenticator: { secret: string; uri: string };
+}
+
+// A phone may discard this page while the person is in the authenticator app. The code and key are
+// kept for the tab (never the password) so the reload lands on the password step, not a new key.
+function loadSaved(): Saved | undefined {
+  try {
+    return JSON.parse(sessionStorage.getItem(SAVED_KEY) ?? "null") ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function saveSetup(saved?: Saved) {
+  try {
+    if (saved) sessionStorage.setItem(SAVED_KEY, JSON.stringify(saved));
+    else sessionStorage.removeItem(SAVED_KEY);
+  } catch {
+    // Storage can be blocked; the page then works without the restore.
+  }
+}
+
 export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => void }) {
   const initial = useCodeFromHash();
-  const [code, setCode] = useState(initial);
+  const [saved] = useState(() => (auth.totp_on && !initial ? loadSaved() : undefined));
+  const [code, setCode] = useState(initial || saved?.code || "");
   const [error, setError] = useState("");
   const [password, setPassword] = useState("");
-  const [authenticator, setAuthenticator] = useState({ secret: "", uri: "" });
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [authenticator, setAuthenticator] = useState(saved?.authenticator ?? { secret: "", uri: "" });
+  const [step, setStep] = useState<1 | 2 | 3>(saved ? 2 : 1);
 
   const onCode = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -158,7 +184,9 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
       const res = await postJSON<AuthResult>("/v1/web/auth/setup-start", { code: typed });
       setError(res.refused ? reasonText(res) : "");
       if (res.refused) return;
-      setAuthenticator({ secret: res.secret ?? "", uri: res.uri ?? "" });
+      const next = { secret: res.secret ?? "", uri: res.uri ?? "" };
+      setAuthenticator(next);
+      if (auth.totp_on) saveSetup({ code: typed, authenticator: next });
       setStep(2);
     } catch (err) {
       setError(String(err));
@@ -168,7 +196,11 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
   const finish = async (body: object) => {
     try {
       const res = await postJSON<AuthResult>("/v1/web/auth/setup-finish", { code, password, ...body });
-      if (res.refused) return setError(reasonText(res));
+      if (res.refused) {
+        if (res.reason === SETUP_CODE_WRONG) saveSetup();
+        return setError(reasonText(res));
+      }
+      saveSetup();
       window.location.hash = "#/";
       onDone();
     } catch (err) {
