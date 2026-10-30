@@ -307,12 +307,16 @@ func (w *WebAuth) Login(totpOn bool, password, totpCode, setupCode, ip, userAgen
 
 // AddAuthenticator takes a pending id from Login and one code for its secret,
 // saves the secret and returns a new web login's cookie. A pending id works
-// once and for 10 minutes. A wrong code saves nothing and counts as a failure.
+// once and for 10 minutes. It is refused while a secret is saved and no reset is
+// pending, and a successful add drops every pending id. A wrong code saves nothing and counts as a failure.
 func (w *WebAuth) AddAuthenticator(pendingID, totpCode, ip, userAgent string) (string, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if wait := w.limiter.Wait(ip); wait > 0 {
 		return "", &WebAuthWaitError{Seconds: wait}
+	}
+	if w.file.TOTPSecret != "" && !w.file.AuthenticatorResetPending {
+		return "", ErrWebAuthRefused
 	}
 	p, ok := w.pending[pendingID]
 	if ok && w.now().Sub(p.created) >= pendingAuthenticatorTTL {
@@ -333,7 +337,7 @@ func (w *WebAuth) AddAuthenticator(pendingID, totpCode, ip, userAgent string) (s
 	if err != nil {
 		return "", err
 	}
-	delete(w.pending, pendingID)
+	w.pending = map[string]pendingAuthenticator{}
 	w.setupCode = ""
 	return cookie, nil
 }

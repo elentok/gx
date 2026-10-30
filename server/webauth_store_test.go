@@ -148,6 +148,47 @@ func TestWebAuthStoreAddAuthenticatorSavesSecretAndSignsIn(t *testing.T) {
 	}
 }
 
+func TestWebAuthStoreAddAuthenticatorSecondPendingIDCannotReplaceSecret(t *testing.T) {
+	w, clock, _ := newStoreForTest(t)
+	finishStoreSetupTOTPOff(t, w)
+	_, err := loginTOTPOn(w, storeTestPassword, "", "2.2.2.2", storeTestUA)
+	first := neededAuthenticator(t, err)
+	_, err = loginTOTPOn(w, storeTestPassword, "", "3.3.3.3", storeTestUA)
+	second := neededAuthenticator(t, err)
+
+	code, _ := TOTPCode(first.Secret, totpStepAt(clock.Now()))
+	if _, err := w.AddAuthenticator(first.PendingID, code, "2.2.2.2", storeTestUA); err != nil {
+		t.Fatal(err)
+	}
+	attacker, _ := TOTPCode(second.Secret, totpStepAt(clock.Now()))
+	if _, err := w.AddAuthenticator(second.PendingID, attacker, "3.3.3.3", storeTestUA); !errors.Is(err, ErrWebAuthRefused) {
+		t.Fatalf("second pending id err = %v, want refused", err)
+	}
+	if _, err := loginTOTPOn(w, storeTestPassword, nextCode(clock, first.Secret), "4.4.4.4", storeTestUA); err != nil {
+		t.Fatalf("login with the owner's secret: %v", err)
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if len(w.pending) != 0 {
+		t.Fatalf("pending ids left after add: %d", len(w.pending))
+	}
+}
+
+func TestWebAuthStoreAddAuthenticatorRefusedWhenSecretSavedAndNoResetPending(t *testing.T) {
+	w, clock, _ := newStoreForTest(t)
+	finishStoreSetupTOTPOff(t, w)
+	_, err := loginTOTPOn(w, storeTestPassword, "", "2.2.2.2", storeTestUA)
+	needed := neededAuthenticator(t, err)
+	w.mu.Lock()
+	w.file.TOTPSecret = "JBSWY3DPEHPK3PXP"
+	w.mu.Unlock()
+
+	code, _ := TOTPCode(needed.Secret, totpStepAt(clock.Now()))
+	if _, err := w.AddAuthenticator(needed.PendingID, code, "2.2.2.2", storeTestUA); !errors.Is(err, ErrWebAuthRefused) {
+		t.Fatalf("err = %v, want refused", err)
+	}
+}
+
 func TestWebAuthStoreAddAuthenticatorWrongCodesAreCounted(t *testing.T) {
 	w, _, _ := newStoreForTest(t)
 	finishStoreSetupTOTPOff(t, w)
