@@ -15,6 +15,7 @@ import (
 	"strings"
 	"syscall"
 	"text/tabwriter"
+	"time"
 
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
@@ -242,6 +243,50 @@ func newBudgetCmd(d deps) *cobra.Command {
 	cmd.AddCommand(override)
 	cmd.AddCommand(newBudgetIncreaseCmd(d))
 	return cmd
+}
+
+func newUsageCmd(d deps) *cobra.Command {
+	cmd := &cobra.Command{Use: "usage", Short: "usage gate", Args: cobra.NoArgs}
+	var jsonOut bool
+	override := &cobra.Command{
+		Use:   "override",
+		Short: "let new Claude claims start until the gating usage window resets (asks the server)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return runUsageOverride(d.dial(), c, jsonOut)
+		},
+	}
+	override.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
+	cmd.AddCommand(override)
+	return cmd
+}
+
+// runUsageOverride mirrors runBudgetWrite.
+func runUsageOverride(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool) error {
+	ctx := c.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cl, err := dial()
+	if err != nil {
+		return err
+	}
+	res, err := cl.UsageOverride(ctx)
+	switch {
+	case apiclient.IsNotRunning(err):
+		res = server.UsageOverrideResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}
+	case err != nil:
+		return fmt.Errorf("server write failed: %w", err)
+	}
+	w := c.OutOrStdout()
+	if jsonOut {
+		return encodeProvenance(w, res, viaServer, callerActor(os.Getwd))
+	}
+	if res.Refused {
+		return fmt.Errorf("refused (%s): %s", res.Reason, res.Message)
+	}
+	_, err = fmt.Fprintf(w, "usage gate lifted for the %s window until %s\n", strings.Join(res.Windows, " and "), res.Until.UTC().Format(time.RFC3339))
+	return err
 }
 
 func newBudgetIncreaseCmd(d deps) *cobra.Command {

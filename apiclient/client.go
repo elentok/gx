@@ -732,6 +732,14 @@ func (c *Client) BudgetOverride(ctx context.Context) (server.BudgetResult, error
 	return res, err
 }
 
+// UsageOverride lifts the usage gate until the gating windows reset. A refusal
+// is a result (Refused set), not an error.
+func (c *Client) UsageOverride(ctx context.Context) (server.UsageOverrideResult, error) {
+	var res server.UsageOverrideResult
+	err := c.post(ctx, "/v1/usage/override", struct{}{}, &res)
+	return res, err
+}
+
 // ReloadConfig reloads the global config file into the server. A refusal is
 // a result (Refused set), not an error.
 func (c *Client) ReloadConfig(ctx context.Context) (server.ReloadResult, error) {

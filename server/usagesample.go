@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -23,26 +24,34 @@ const (
 	// dir and a limit only matters to the next claim.
 	defaultUsagePoll = time.Minute
 	usageSampleFile  = "usage-sample.json"
+	usageLiftFile    = "usage-override.json"
 )
 
 // usageSamples keeps the newest usage record any PTY agent wrote, across all
 // projects. It is persisted in the state dir so a restart keeps it.
 type usageSamples struct {
-	path string
+	path     string
+	liftPath string
 
 	mu     sync.Mutex
 	sample *nativerunner.UsageRecord
+	// lifted maps a window name to the resets_at the override covers. A window
+	// is keyed by its reset, so the next window gates again with no cleanup.
+	lifted map[string]int64
 }
 
-// openUsageSamples loads the persisted sample; a missing or unreadable file
-// means no sample.
+// openUsageSamples loads the persisted sample and override; a missing or
+// unreadable file means none.
 func openUsageSamples(stateDir string) *usageSamples {
-	u := &usageSamples{path: filepath.Join(stateDir, usageSampleFile)}
+	u := &usageSamples{path: filepath.Join(stateDir, usageSampleFile), liftPath: filepath.Join(stateDir, usageLiftFile)}
 	if data, err := os.ReadFile(u.path); err == nil {
 		var rec nativerunner.UsageRecord
 		if json.Unmarshal(data, &rec) == nil {
 			u.sample = &rec
 		}
+	}
+	if data, err := os.ReadFile(u.liftPath); err == nil {
+		_ = json.Unmarshal(data, &u.lifted)
 	}
 	return u
 }
@@ -111,19 +120,66 @@ func (u *usageSamples) atLimit(now time.Time) (*nativerunner.UsageWindow, bool) 
 func (u *usageSamples) limitWindow(now time.Time) (string, *nativerunner.UsageWindow, bool) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
-	if u.sample == nil {
-		return "", nil, false
-	}
-	windows := []struct {
-		name string
-		w    *nativerunner.UsageWindow
-	}{{"5-hour", u.sample.FiveHour}, {"weekly", u.sample.SevenDay}}
-	for _, c := range windows {
-		if c.w != nil && c.w.UsedPercentage >= usageLimitPercent && time.Unix(c.w.ResetsAt, 0).After(now) {
+	for _, c := range u.atLimitLocked(now) {
+		if u.lifted[c.name] != c.w.ResetsAt {
 			return c.name, c.w, true
 		}
 	}
 	return "", nil, false
+}
+
+type namedWindow struct {
+	name string
+	w    *nativerunner.UsageWindow
+}
+
+// atLimitLocked lists the windows at their limit with a reset still ahead,
+// lifted or not, five-hour first.
+func (u *usageSamples) atLimitLocked(now time.Time) []namedWindow {
+	if u.sample == nil {
+		return nil
+	}
+	var out []namedWindow
+	for _, c := range []namedWindow{{"5-hour", u.sample.FiveHour}, {"weekly", u.sample.SevenDay}} {
+		if c.w != nil && c.w.UsedPercentage >= usageLimitPercent && time.Unix(c.w.ResetsAt, 0).After(now) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// lift covers every window now gating until its reset and persists that. It
+// returns the lifted window names and the latest reset among them; none means
+// nothing was gating.
+func (u *usageSamples) lift(now time.Time) ([]string, time.Time, error) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	next := map[string]int64{}
+	for k, v := range u.lifted {
+		next[k] = v
+	}
+	var names []string
+	var until int64
+	for _, c := range u.atLimitLocked(now) {
+		if next[c.name] == c.w.ResetsAt {
+			continue
+		}
+		next[c.name] = c.w.ResetsAt
+		names = append(names, c.name)
+		until = max(until, c.w.ResetsAt)
+	}
+	if len(names) == 0 {
+		return nil, time.Time{}, nil
+	}
+	data, err := json.Marshal(next)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	if err := writeFileAtomic(u.liftPath, data); err != nil {
+		return nil, time.Time{}, err
+	}
+	u.lifted = next
+	return names, time.Unix(until, 0), nil
 }
 
 // usageGate holds a new Claude claim while a usage window is at its limit.
@@ -139,6 +195,42 @@ func (s *Server) usageGate(agent ralphloop.AgentKind, now time.Time) (string, bo
 	}
 	return fmt.Sprintf("usage at %.0f%% of the %s limit, resets %s", w.UsedPercentage, name,
 		time.Unix(w.ResetsAt, 0).UTC().Format(time.RFC3339)), true
+}
+
+// UsageOverrideResult is the outcome of lifting the usage gate: the windows
+// lifted and when the lift ends, or a refusal.
+type UsageOverrideResult struct {
+	Windows []string  `json:"windows,omitempty"`
+	Until   time.Time `json:"until,omitzero"`
+	Refused bool      `json:"refused,omitempty"`
+	Reason  string    `json:"reason,omitempty"`
+	Message string    `json:"message,omitempty"`
+}
+
+// ReasonNotGated refuses a usage override when no window is gating.
+const ReasonNotGated = "not-gated"
+
+// usageOverride lets new claims start until the gating windows reset.
+func (s *Server) usageOverride(now time.Time) (UsageOverrideResult, error) {
+	names, until, err := s.usage.lift(now)
+	if err != nil {
+		return UsageOverrideResult{}, err
+	}
+	if len(names) == 0 {
+		return UsageOverrideResult{Refused: true, Reason: ReasonNotGated, Message: "no usage window is at its limit"}, nil
+	}
+	s.events.publish(EventQueueChanged, "")
+	s.kickRunner()
+	return UsageOverrideResult{Windows: names, Until: until}, nil
+}
+
+func (s *Server) usageOverrideWrite(w http.ResponseWriter, _ *http.Request) {
+	res, err := s.usageOverride(time.Now())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, res)
 }
 
 // usageWindowAtLimit is the window at its limit now, if any.

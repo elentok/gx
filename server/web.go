@@ -181,6 +181,7 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/tickets/fix-agent": func(s *Server) http.HandlerFunc { return s.fixAgentWeb() },
 	"POST /v1/sessions/focus":    func(s *Server) http.HandlerFunc { return s.sessionFocusWriteWeb },
 	"POST /v1/afk":               func(s *Server) http.HandlerFunc { return s.afkWrite },
+	"POST /v1/usage/override":    func(s *Server) http.HandlerFunc { return s.usageOverrideWrite },
 	"POST /v1/checks/save":       func(s *Server) http.HandlerFunc { return s.checksSaveWrite },
 	"POST /v1/disk/clean":        func(s *Server) http.HandlerFunc { return s.diskCleanWrite },
 	"POST /v1/client-errors":     func(s *Server) http.HandlerFunc { return s.clientErrorReport },

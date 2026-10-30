@@ -92,6 +92,40 @@ func TestUsageGate_HoldsClaudeClaimsOnly(t *testing.T) {
 	}
 }
 
+func TestUsageGate_OverrideLetsAClaudeTicketClaim(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "epic-a", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	pty := namedFake{runnerfake.NewRunner(), "pty"}
+	rec := nativerunner.UsageRecord{SeenAt: time.Now(), FiveHour: &nativerunner.UsageWindow{UsedPercentage: 99, ResetsAt: time.Now().Add(time.Hour).Unix()}}
+	h := servertest.StartWithStore(t, store,
+		servertest.WithRunnerFor(pty, func(string, string) agentrunner.Runner { return pty }),
+		withUsageSample(t, rec))
+	t.Cleanup(func() {
+		if len(pty.Prompts("epic-a-iter-01")) > 0 {
+			pty.SetState("epic-a-iter-01", agentrunner.StateDone, "")
+		}
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	if n := len(pty.Prompts("epic-a-iter-01")); n != 0 {
+		t.Fatalf("claimed %d prompts while gated", n)
+	}
+	res, err := h.Client.UsageOverride(ctx)
+	if err != nil || res.Refused {
+		t.Fatalf("override: %+v, %v", res, err)
+	}
+	servertest.WaitFor(t, 10*time.Second, "the claim lands after the override", func() bool { return len(pty.Prompts("epic-a-iter-01")) > 0 })
+	res, err = h.Client.UsageOverride(ctx)
+	if err != nil || !res.Refused || res.Reason != server.ReasonNotGated {
+		t.Errorf("second override = %+v, %v; want refused %s", res, err, server.ReasonNotGated)
+	}
+}
+
 func TestUsageGate_LiftsAtResetWithNoNewSample(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)

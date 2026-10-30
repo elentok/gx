@@ -541,6 +541,7 @@ var routeTable = []struct {
 	{"GET /v1/locks", (*Server).locks},
 	{"GET /v1/budget", (*Server).budget},
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
+	{"POST /v1/usage/override", (*Server).usageOverrideWrite},
 	{"POST /v1/config/reload", (*Server).configReloadWrite},
 	{"GET /v1/config/status", (*Server).configStatusRead},
 	{"GET /v1/disk/status", (*Server).diskStatusRead},

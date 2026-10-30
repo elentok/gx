@@ -314,7 +314,7 @@ func TestWeb_EverythingElseIs404(t *testing.T) {
 			pattern == "POST /v1/tickets/answer" || pattern == "POST /v1/tickets/unpark" || pattern == "POST /v1/tickets/resume" || pattern == "POST /v1/agents/answer" ||
 			pattern == "POST /v1/tickets/retry" || pattern == "POST /v1/tickets/merge" || pattern == "POST /v1/tickets/start-over" ||
 			pattern == "POST /v1/sessions/stop" || pattern == "POST /v1/sessions/resume" || pattern == "POST /v1/designs/open" || pattern == "POST /v1/designs/delete" || pattern == "POST /v1/tickets/fix-agent" || pattern == "POST /v1/sessions/prompt" || pattern == "POST /v1/sessions/create" || pattern == "POST /v1/sessions/interrupt" || pattern == "POST /v1/sessions/auto-advance" || pattern == "POST /v1/sessions/auto-advance/cancel" || pattern == "POST /v1/sessions/focus" ||
-			pattern == "POST /v1/queue/add" || pattern == "POST /v1/epics/merge" || pattern == "POST /v1/epics/stash-merge" || pattern == "POST /v1/afk" || pattern == "POST /v1/checks/save" || pattern == "POST /v1/disk/clean" {
+			pattern == "POST /v1/queue/add" || pattern == "POST /v1/epics/merge" || pattern == "POST /v1/epics/stash-merge" || pattern == "POST /v1/afk" || pattern == "POST /v1/usage/override" || pattern == "POST /v1/checks/save" || pattern == "POST /v1/disk/clean" {
 			continue
 		}
 		if code := webSend(t, h, method, base+path, validWrite); code != http.StatusNotFound {

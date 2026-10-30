@@ -2049,6 +2049,7 @@ export const VerdictEligible = "eligible";
 export const VerdictWaitingInQueue = "waiting in queue";
 export const VerdictConcurrencyCap = "concurrency cap";
 export const VerdictNotQueued = "not queued";
+export const VerdictRateLimited = "rate-limited";
 export const VerdictWaitingOnAnswer = "waiting on answer";
 export const VerdictWaitingReleased = "waiting (slot released)";
 export const VerdictWaitingReleaseCapd = "waiting (slot held, release cap reached)";
@@ -2056,7 +2057,7 @@ export const VerdictWaitingReleaseCapd = "waiting (slot held, release cap reache
  * Verdicts only the server's queue and slot state can give. The rest are the
  * scheduler's own decision words (blocked, stalled, done, error, claimed, ...).
  */
-export type Verdict = typeof VerdictEligible | typeof VerdictWaitingInQueue | typeof VerdictConcurrencyCap | typeof VerdictNotQueued | typeof VerdictWaitingOnAnswer | typeof VerdictWaitingReleased | typeof VerdictWaitingReleaseCapd;
+export type Verdict = typeof VerdictEligible | typeof VerdictWaitingInQueue | typeof VerdictConcurrencyCap | typeof VerdictNotQueued | typeof VerdictRateLimited | typeof VerdictWaitingOnAnswer | typeof VerdictWaitingReleased | typeof VerdictWaitingReleaseCapd;
 /**
  * PendingRow is one queue entry with its explain verdict.
  */
