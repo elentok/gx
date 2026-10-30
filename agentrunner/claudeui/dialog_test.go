@@ -74,6 +74,15 @@ func TestParseDialog_IDIgnoresTipCwdAndFooter(t *testing.T) {
 	}
 }
 
+func TestParseDialog_WordWrappedBodyKeepsIDAndText(t *testing.T) {
+	tail := []string{"Do you want to proceed?", "❯ 1. Yes", "  2. No", "Esc to cancel"}
+	wide := ParseDialog(append([]string{"────", "Bash command", "  rg --files --hidden ./internal/some/deep/path ./other"}, tail...))
+	narrow := ParseDialog(append([]string{"────", "Bash command", "  rg --files --hidden", "  ./internal/some/deep/path ./other"}, tail...))
+	if !wide.Approvable || narrow.Body != wide.Body || narrow.ID != wide.ID {
+		t.Fatalf("narrow = %+v, wide = %+v; want the same body and ID", narrow, wide)
+	}
+}
+
 func TestParseDialog_IDChangesWithBody(t *testing.T) {
 	rows := dialogRows(t, "permission-w160.screen.txt")
 	base := ParseDialog(rows).ID

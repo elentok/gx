@@ -9,12 +9,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/term"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/transcript"
@@ -409,6 +411,7 @@ type designState struct {
 type tuiEvent struct {
 	key     byte
 	control *Control
+	resized bool
 	err     error
 }
 
@@ -430,6 +433,8 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 				return 0, t.exit(0)
 			}
 			return 0, ev.err
+		case ev.resized:
+			t.draw()
 		case ev.control != nil:
 			if ev.control.Action == ActionExit {
 				return ev.control.Code, t.exit(ev.control.Code)
@@ -500,6 +505,13 @@ func tuiEvents(in io.Reader, ctl io.Reader) <-chan tuiEvent {
 				return
 			}
 			events <- tuiEvent{control: &c}
+		}
+	}()
+	winch := make(chan os.Signal, 1)
+	signal.Notify(winch, syscall.SIGWINCH)
+	go func() {
+		for range winch {
+			events <- tuiEvent{resized: true}
 		}
 	}()
 	return events
@@ -912,6 +924,14 @@ func (t *tui) draw() {
 	}
 	if t.opts.mouse {
 		rows = append(rows, fmt.Sprintf("wheel up %d down %d", t.wheelUp, t.wheelDown))
+	}
+	if cols, _, err := term.GetSize(os.Stdout.Fd()); err == nil && cols > 0 {
+		// Claude lays its text out for the width it has and redraws when it changes.
+		wrapped := make([]string, len(rows))
+		for i, row := range rows {
+			wrapped[i] = strings.ReplaceAll(ansi.Wordwrap(row, cols, ""), "\n", "\r\n")
+		}
+		rows = wrapped
 	}
 	fmt.Fprint(t.out, "\x1b[2J\x1b[H"+title+strings.Join(rows, "\r\n"))
 }
