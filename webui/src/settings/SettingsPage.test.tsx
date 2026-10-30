@@ -31,6 +31,12 @@ describe("SettingsHomeView", () => {
     expect(onSignOut).toHaveBeenCalledOnce();
   });
 
+  it("reads Add authenticator when TOTP is on and the saved secret was cleared", () => {
+    const { getByRole, queryByRole } = renderThemed(<SettingsHomeView loginCount={1} totpOn authenticatorMissing onSignOut={() => {}} />);
+    expect(getByRole("link", { name: "Add authenticator" }).getAttribute("href")).toBe("#/settings/authenticator");
+    expect(queryByRole("link", { name: "Reset authenticator" })).toBeNull();
+  });
+
   it("has no Reset authenticator row while TOTP is off, and counts one device in the singular", () => {
     const { queryByRole, getByRole } = renderThemed(<SettingsHomeView loginCount={1} totpOn={false} onSignOut={() => {}} />);
     expect(queryByRole("link", { name: "Reset authenticator" })).toBeNull();

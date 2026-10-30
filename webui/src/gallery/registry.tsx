@@ -5,6 +5,7 @@ import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
 import { LoginAuthenticatorCard, LoginCard, rateLimitText } from "../auth/LoginPage";
 import { TOTP_MISMATCH } from "../auth/AddAuthenticator";
+import { AuthenticatorView, ChangePasswordView } from "../settings/AccountPages";
 import { SettingsHomeView, WebLoginsView, WebLoginView } from "../settings/SettingsPage";
 import { SetupCodeCard, SetupPasswordCard, SetupTotpCard } from "../auth/SetupPage";
 import { ConnectionContext, type Connection } from "../connection";
@@ -812,6 +813,7 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [
       { label: "default", node: <SettingsHomeView loginCount={4} totpOn onSignOut={() => {}} /> },
       { label: "TOTP off", node: <SettingsHomeView loginCount={1} totpOn={false} onSignOut={() => {}} /> },
+      { label: "no saved authenticator", node: <SettingsHomeView loginCount={1} totpOn authenticatorMissing onSignOut={() => {}} /> },
     ],
   },
   {
@@ -904,6 +906,36 @@ export const galleryEntries: GalleryEntry[] = [
           />
         ),
       },
+    ],
+  },
+  {
+    name: "ChangePasswordView",
+    cases: [
+      { label: "default", node: <ChangePasswordView otherDevices={3} totpOn onSubmit={() => {}} /> },
+      { label: "TOTP off", node: <ChangePasswordView otherDevices={3} totpOn={false} onSubmit={() => {}} /> },
+      {
+        label: "too short",
+        node: <ChangePasswordView otherDevices={1} totpOn onSubmit={() => {}} error="The new password is too short. Use at least 12 characters." />,
+      },
+    ],
+  },
+  {
+    name: "AuthenticatorView",
+    cases: [
+      { label: "reset, step 1", node: <AuthenticatorView mode="reset" otherDevices={3} onBegin={() => {}} onFinish={() => {}} /> },
+      {
+        label: "reset, step 2",
+        node: (
+          <AuthenticatorView
+            mode="reset"
+            otherDevices={3}
+            next={{ secret: "JBSWY3DPEHPK3PXP4N2Q7ZLA", uri: "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP4N2Q7ZLA" }}
+            onBegin={() => {}}
+            onFinish={() => {}}
+          />
+        ),
+      },
+      { label: "add authenticator", node: <AuthenticatorView mode="add" otherDevices={3} onBegin={() => {}} onFinish={() => {}} /> },
     ],
   },
   {

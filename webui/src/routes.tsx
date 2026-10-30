@@ -2,7 +2,8 @@ import { createHashRouter, Navigate, redirect, useLocation, useParams, type Rout
 import { AgentsPage } from "./agents/AgentsPage";
 import type { CreateSession, FetchWorktrees } from "./agents/newSession";
 import type { AuthState } from "./auth/authState";
-import { SettingsPage, SettingsStubPage, WebLoginPage, WebLoginsPage } from "./settings/SettingsPage";
+import { AuthenticatorPage, ChangePasswordPage } from "./settings/AccountPages";
+import { SettingsPage,SettingsStubPage, WebLoginPage, WebLoginsPage } from "./settings/SettingsPage";
 import type { FetchLogins } from "./settings/logins";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
@@ -108,7 +109,9 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
     { path: "/settings", element: <SettingsPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} signOut={fetchers.signOut} /> },
     { path: "/settings/logins", element: <WebLoginsPage fetchList={fetchers.logins} /> },
     { path: "/settings/logins/:id", element: <WebLoginPage fetchList={fetchers.logins} signOut={fetchers.signOut} /> },
-    // Password, authenticator and certificate: later tickets fill these in.
+    { path: "/settings/password", element: <ChangePasswordPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} /> },
+    { path: "/settings/authenticator", element: <AuthenticatorPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} /> },
+    // Certificate: a later ticket fills this in.
     { path: "/settings/*", element: <SettingsStubPage /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },

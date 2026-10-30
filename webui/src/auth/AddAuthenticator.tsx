@@ -21,10 +21,11 @@ export interface AddAuthenticatorProps {
   /** The otpauth:// URI that the QR code and the link both hold. */
   uri: string;
   error?: string;
+  codeLabel?: string;
 }
 
 /** QR code, add link, key and code field. The caller supplies the form, heading and submit button. */
-export function AddAuthenticator({ secret, uri, error }: AddAuthenticatorProps) {
+export function AddAuthenticator({ secret, uri, error, codeLabel = "Enter the code it shows" }: AddAuthenticatorProps) {
   return (
     <>
       <Box data-mock-part="totp-qr" display="flex" justifyContent="center">
@@ -49,7 +50,7 @@ export function AddAuthenticator({ secret, uri, error }: AddAuthenticatorProps) 
       {error && <ErrorLine>{error}</ErrorLine>}
       <Field
         part="code"
-        label="Enter the code it shows"
+        label={codeLabel}
         name="totp_code"
         error={!!error}
         placeholder="123456"

@@ -25,7 +25,7 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LOGINS_HREF =`${SETTINGS_HREF}/logins`;
 
-const Frame = ({ children }: { children: ReactNode }) => <Box maxW="560px">{children}</Box>;
+export const Frame = ({ children }: { children: ReactNode }) => <Box maxW="560px">{children}</Box>;
 
 const Group = ({ label, children }: { label?: string; children: ReactNode }) => (
   <Box mt="6">
@@ -75,7 +75,18 @@ function LinkRow({ href, label, detail }: { href: string; label: string; detail?
   );
 }
 
-export function SettingsHomeView({ loginCount, totpOn, onSignOut }: { loginCount?: number; totpOn: boolean; onSignOut: () => void }) {
+export function SettingsHomeView({
+  loginCount,
+  totpOn,
+  authenticatorMissing = false,
+  onSignOut,
+}: {
+  loginCount?: number;
+  totpOn: boolean;
+  /** TOTP is on but the saved secret was cleared, so the row adds one instead of resetting it. */
+  authenticatorMissing?: boolean;
+  onSignOut: () => void;
+}) {
   return (
     <Frame>
       <PageHeader title="Settings" />
@@ -86,7 +97,7 @@ export function SettingsHomeView({ loginCount, totpOn, onSignOut }: { loginCount
           detail={loginCount === undefined ? undefined : `${loginCount} ${loginCount === 1 ? "device" : "devices"}`}
         />
         <LinkRow href={`${SETTINGS_HREF}/password`} label="Change password" />
-        {totpOn && <LinkRow href={`${SETTINGS_HREF}/authenticator`} label="Reset authenticator" />}
+        {totpOn && <LinkRow href={`${SETTINGS_HREF}/authenticator`} label={authenticatorMissing ? "Add authenticator" : "Reset authenticator"} />}
         <LinkRow href={`${SETTINGS_HREF}/certificate`} label="Certificate" />
       </Group>
       <Group>
@@ -98,7 +109,7 @@ export function SettingsHomeView({ loginCount, totpOn, onSignOut }: { loginCount
   );
 }
 
-const BackLink = () => (
+export const BackLink = () => (
   <chakra.a
     href={SETTINGS_HREF}
     display="inline-flex"
@@ -262,7 +273,12 @@ export function SettingsPage({
   return (
     <DetailPage mode="narrow" title={{ kind: "Settings" }}>
       {auth.data ? (
-        <SettingsHomeView loginCount={logins.data?.length} totpOn={auth.data.totp_on} onSignOut={() => void signOut()} />
+        <SettingsHomeView
+          loginCount={logins.data?.length}
+          totpOn={auth.data.totp_on}
+          authenticatorMissing={auth.data.setup_code_required}
+          onSignOut={() => void signOut()}
+        />
       ) : (
         <Spinner label="Loading" />
       )}
