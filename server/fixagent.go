@@ -79,9 +79,16 @@ func fixAgentName(addr string) string {
 }
 
 // fixAgentPrompt is the prompt the fix agent starts from; a pause label
-// follows the colon, none leaves the sentence at "paused for repair".
+// follows the colon, none leaves the sentence at the state name.
 func fixAgentPrompt(addr string, t tickets.Ticket) string {
-	prompt := "/gx-investigate " + addr + " is paused for repair"
+	state := "paused for repair"
+	switch t.RawStatus() {
+	case tickets.StatusPausedAnswer:
+		state = "paused for an answer"
+	case tickets.StatusError:
+		state = "in error"
+	}
+	prompt := "/gx-investigate " + addr + " is " + state
 	if label := t.PauseReason.Label(); label != "" {
 		prompt += ": " + label
 	}
@@ -89,7 +96,7 @@ func fixAgentPrompt(addr string, t tickets.Ticket) string {
 }
 
 // startFixAgent starts a /gx-investigate session in the project's trunk
-// checkout for a ticket paused for repair.
+// checkout for a ticket paused for an answer or repair, or in error (web: repair only).
 func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, error) {
 	if web && req.State == "" {
 		return fixAgentRefusal(ReasonStale, "a state token is required; review the current pause"), nil
@@ -110,8 +117,14 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 			return fixAgentRefusal(ReasonFixInvestigating, fmt.Sprintf("%s is already being investigated in %s", addr, ticketAddress(ref.root(), c.DisplayNumber()))), nil
 		}
 	}
-	if t.PausedClass() != schema.PauseClassRepair {
-		return fixAgentRefusal(ReasonFixNotRepair, fmt.Sprintf("%s is not paused for repair", addr)), nil
+	// The web button stays repair-only; the TUI's Investigate also takes an
+	// answer-paused or error ticket.
+	if web {
+		if t.PausedClass() != schema.PauseClassRepair {
+			return fixAgentRefusal(ReasonFixNotRepair, fmt.Sprintf("%s is not paused for repair", addr)), nil
+		}
+	} else if st := ref.epic.RenderedStatus(t); st != tickets.StatusPausedAnswer && st != tickets.StatusPausedRepair && st != tickets.StatusError {
+		return fixAgentRefusal(ReasonFixNotRepair, fmt.Sprintf("%s is not paused or in error", addr)), nil
 	}
 	if web && req.State != repairState(readLogLenient(t), t.PausedClass()) {
 		return fixAgentRefusal(ReasonStale, "the pause changed; review the current one"), nil

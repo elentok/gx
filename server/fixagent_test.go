@@ -62,6 +62,59 @@ func TestFixAgent_StartsInTheTrunkCheckout(t *testing.T) {
 	}
 }
 
+func TestFixAgent_AcceptsAnswerRepairAndErrorStates(t *testing.T) {
+	t.Parallel()
+	f := startFixAgent(t, func(store string) {
+		servertest.WriteTicketWith(t, store, "proj", "loop", "03", "asking", servertest.TicketOpts{PauseReason: "manual"})
+		servertest.WriteTicketWith(t, store, "proj", "loop", "04", "dangling", servertest.TicketOpts{BlockedBy: []string{"99"}})
+	})
+	for _, tc := range []struct{ addr, prompt string }{
+		{"proj:loop/01", "/gx-investigate proj:loop/01 is paused for repair: Merge conflict"},
+		{"proj:loop/03", "/gx-investigate proj:loop/03 is paused for an answer: "},
+		{"proj:loop/04", "/gx-investigate proj:loop/04 is in error"},
+	} {
+		res := f.fix(t, tc.addr)
+		if res.Refused || res.Session == nil {
+			t.Fatalf("fix %s = %+v", tc.addr, res)
+		}
+		if got := readMeta(t, f.h, res.Session.ID)["first_prompt"].(string); !strings.HasPrefix(got, tc.prompt) {
+			t.Errorf("fix %s prompt = %q, want prefix %q", tc.addr, got, tc.prompt)
+		}
+	}
+}
+
+func TestFixAgent_WebRefusesAnAnswerPausedTicket(t *testing.T) {
+	t.Parallel()
+	f := startFixAgent(t, func(store string) {
+		servertest.WriteTicketWith(t, store, "proj", "loop", "03", "asking", servertest.TicketOpts{PauseReason: "manual"})
+	})
+	body, _ := json.Marshal(server.FixAgentRequest{Address: "proj:loop/03", State: "0:answer"})
+	code, out := webPostJSON(t, f.base+"/v1/tickets/fix-agent", string(body), f.ck, "", jsonPost(f.base))
+	if code != http.StatusOK || reasonOf(t, out) != server.ReasonFixNotRepair {
+		t.Errorf("web fix = %d %s, want %s", code, out, server.ReasonFixNotRepair)
+	}
+}
+
+func TestFixAgent_SurvivesResumingTheTicket(t *testing.T) {
+	t.Parallel()
+	f := startFixAgent(t, func(store string) {
+		servertest.WriteTicketWith(t, store, "proj", "loop", "03", "asking", servertest.TicketOpts{PauseReason: "manual"})
+	})
+	if res := f.fix(t, "proj:loop/03"); res.Refused {
+		t.Fatalf("fix = %+v", res)
+	}
+	res, err := f.h.Client.Repair(f.ctx, "resume", server.RepairRequest{Address: "proj:loop/03"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Refused {
+		t.Fatalf("resume = %+v", res)
+	}
+	if n := len(f.live(t)); n != 1 {
+		t.Errorf("%d live sessions after resume, want the Fix agent", n)
+	}
+}
+
 func TestFixAgent_Refusals(t *testing.T) {
 	t.Parallel()
 	f := startFixAgent(t, func(store string) {
@@ -69,7 +122,7 @@ func TestFixAgent_Refusals(t *testing.T) {
 		servertest.WriteTicketWith(t, store, "proj", "loop", "04", "probe", servertest.TicketOpts{Type: "investigate", Parent: "03"})
 	})
 	for _, tc := range []struct{ addr, reason, msg string }{
-		{"proj:loop/02", server.ReasonFixNotRepair, "not paused for repair"},
+		{"proj:loop/02", server.ReasonFixNotRepair, "not paused or in error"},
 		{"proj:loop/03", server.ReasonFixInvestigating, "proj:loop/04"},
 		{"proj:loop/99", server.ReasonFixUnknownTicket, "no ticket"},
 	} {
