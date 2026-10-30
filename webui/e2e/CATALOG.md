@@ -1212,3 +1212,21 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
 - **Scenario:** `web-login`
 - **Steps:** unfold "Browser warns about this page?"; request the profile and the Mac certificate links through the page context.
 - **Pass:** the links show only after unfolding. The profile answers `application/x-apple-aspen-config` and the certificate `application/pkix-cert`, both with a body. The fingerprint groups match the `fingerprint:` line of `gx server status`.
+
+## 105. Settings and web logins
+
+- **Scenario:** `web-logins`
+- **Steps:** open the menu, click Settings, open Web logins, open a row that is not this device, rename it, go back to the list.
+- **Pass:** Settings shows the Security group with "4 devices". Web logins has four rows, one with "This device" and one with "Ends in 20 days unless used". The list shows the new name.
+
+## 106. Sign out another device
+
+- **Scenario:** `web-logins`
+- **Steps:** a second browser context signs in through the login page. From the first page, open Web logins, open the second's row, click "Sign out this device" and confirm.
+- **Pass:** the second page shows the login page with no reload. `gx server web-logins` no longer lists it.
+
+## 107. Sign out of this device
+
+- **Scenario:** `web-logins`
+- **Steps:** open Settings and click "Sign out of this device".
+- **Pass:** the login page shows. `gx server web-logins` lists three rows.
