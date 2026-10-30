@@ -1365,7 +1365,7 @@ func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 	want := []row{
 		{"demo", "claude", server.SessionIdle, false, false, ""},
 		{"demo", "claude", server.SessionWorking, false, false, ""},
-		{"demo", "claude", server.SessionIdle, true, false, ""},
+		{"demo", "claude", server.SessionIdle, true, false, "needs a decision"},
 		{"demo", fakeHarness, server.SessionIdle, false, false, ""},
 		{"other", "claude", server.SessionIdle, false, true, ""},
 		{"other", "claude", server.SessionIdle, false, false, "needs a decision"},
@@ -1402,6 +1402,30 @@ func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 		}
 	}
 	t.Errorf("project worktrees = %+v, want demo with its root and one worktree", projects)
+}
+
+func TestQueueAgentsScenario_ListsAQueueAgentAndADesignAgent(t *testing.T) {
+	t.Parallel()
+	r := start(t, "queue-agents")
+	var queue, design []server.SessionInfo
+	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
+		var list []server.SessionInfo
+		if err := json.Unmarshal([]byte(r.gx(t, "agents", "list", "--json")), &list); err != nil {
+			t.Fatal(err)
+		}
+		queue, design = nil, nil
+		for _, s := range list {
+			switch {
+			case s.Queue:
+				queue = append(queue, s)
+			case s.Design:
+				design = append(design, s)
+			}
+		}
+		return len(queue) == 1 && len(design) == 1
+	}) {
+		t.Fatalf("queue agents = %+v, design agents = %+v, want one each", queue, design)
+	}
 }
 
 func TestAgentsFailuresScenario_OneSessionPerFailureKind(t *testing.T) {

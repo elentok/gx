@@ -223,3 +223,38 @@ test("93. Shared draft", async ({ page, start }) => {
   await expect(box).toHaveValue("");
   await agentsPage.close();
 });
+
+test("114. Read-only Queue agent", async ({ page, start }) => {
+  const fixture = await start("queue-agents");
+  await expect.poll(async () => (await sessions(fixture)).filter((s) => s.queue).length).toBe(1);
+  const queue = (await sessions(fixture)).find((s) => s.queue)!;
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await go(page, `#/agents/${queue.id}`);
+
+  const line = page.getByText("gx is driving this agent, so the composer is off.");
+  const turnOn = page.getByRole("button", { name: "Turn on composer" });
+  const dialog = page.getByRole("dialog", { name: "Turn on composer for Queue agent" });
+  await expect(line).toBeVisible();
+  await expect(sendButton(page)).toBeDisabled();
+
+  // Cancel keeps it off.
+  await turnOn.click();
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(line).toBeVisible();
+  await expect(sendButton(page)).toBeDisabled();
+
+  // The confirm turns it on.
+  await turnOn.click();
+  await dialog.getByRole("button", { name: "Turn on composer" }).click();
+  await expect(line).toHaveCount(0);
+  await expect(turnOn).toHaveCount(0);
+  await messageBox(page).fill("hello");
+  await expect(messageBox(page)).toHaveValue("hello");
+
+  // Reopening is read-only again.
+  const second = await freshVisit(page, `/#/agents/${queue.id}`);
+  await expect(second.getByText("gx is driving this agent, so the composer is off.")).toBeVisible();
+  await expect(sendButton(second)).toBeDisabled();
+  await second.close();
+});

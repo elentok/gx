@@ -353,6 +353,8 @@ var scenarios = map[string]scenario{
 	// agents: eight sessions in demo (4), other (2) and site (2), one per row of
 	// the Agents mock, and a worktree in demo. See agentsScenario.
 	"agents": agentsScenario(),
+	// queue-agents: one PTY Queue agent and one Design agent. See queueAgentsScenario.
+	"queue-agents": queueAgentsScenario(),
 	// agents-failures: four Claude sessions in demo, one per failure (stalled,
 	// auth, rate-limit, blocked). See agentsFailuresScenario.
 	"agents-failures": agentsFailuresScenario(),

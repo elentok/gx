@@ -11,6 +11,7 @@ import (
 
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
@@ -219,6 +220,25 @@ func agentsFailuresScenario() scenario {
 	}
 }
 
+// queueAgentsScenario lists one PTY Queue agent and one Design agent. The
+// ticket's worker idles in a long turn until the hold file is removed.
+func queueAgentsScenario() scenario {
+	const mapAddr = "design-epic"
+	return scenario{
+		epics: []epic{
+			{project, "queue-epic", []ticket{{"01", "held", servertest.TicketOpts{}}}},
+			{project, mapAddr, nil},
+		},
+		designSteps: map[string]string{project + ":" + mapAddr: string(tickets.StepResolveTickets)},
+		queue:       []string{project + ":queue-epic"},
+		hold:        true,
+		chat:        true,
+		sessions: []sessionSpec{
+			{project: project, prompt: "hello", link: project + ":" + mapAddr, read: true},
+		},
+	}
+}
+
 // agentsScenario is the Agents page fixture: eight sessions in three
 // projects, one per row of the mock, and a worktree in demo.
 func agentsScenario() scenario {
@@ -241,7 +261,7 @@ func agentsScenario() scenario {
 		sessions: []sessionSpec{
 			{project: project, prompt: "hello", read: true},
 			{project: project, prompt: agentfake.ChatSlowMarker + " a long turn"},
-			{project: project, prompt: "hello", link: project + ":" + mapAddr, read: true},
+			{project: project, prompt: "hello", link: project + ":" + mapAddr, read: true, actionable: "needs a decision"},
 			{project: project, harness: fakeHarness},
 			{project: "other", prompt: "hello"},
 			{project: "other", actionable: "needs a decision"},

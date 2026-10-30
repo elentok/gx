@@ -4,7 +4,8 @@ import { expect, type Fixture } from "./fixture";
 
 export const sessions = async (fixture: Fixture) => JSON.parse(await fixture.cli("agents", "list", "--json")) as SessionInfo[];
 
-export const isActionable = (s: SessionInfo) => !!s.actionable.reason || s.status.state === "blocked";
+/** Design and Queue agents never count: gx drives them. */
+export const isActionable = (s: SessionInfo) => !s.design && !s.queue && (!!s.actionable.reason || s.status.state === "blocked");
 
 export const row = (page: Page, s: SessionInfo) => page.locator(`a[href$="/agents/${s.id}"]`);
 

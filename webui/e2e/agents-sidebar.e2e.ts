@@ -56,7 +56,7 @@ test("73. Agents sidebar", async ({ page, start }) => {
     await expect(row(page, s).getByRole("img", { name: "Unread" })).toHaveCount(s.unread.unread ? 1 : 0);
     await expect(row(page, s).getByRole("img", { name: "Actionable" })).toHaveCount(isActionable(s) ? 1 : 0);
   }
-  const waiting = list.find((s) => s.actionable.reason)!;
+  const waiting = visible.find((s) => s.actionable.reason)!;
   await row(page, waiting).getByRole("img", { name: "Actionable" }).hover();
   await expect(row(page, waiting).getByRole("tooltip")).toHaveText(`★ Actionable: ${waiting.actionable.reason!}`);
 
@@ -81,15 +81,14 @@ test("73. Agents sidebar", async ({ page, start }) => {
   await expect(side.getByText(`${live} live`)).toBeVisible();
 });
 
-test("74. Design sessions toggle", async ({ page, start }) => {
-  const fixture = await start("agents");
+test("74. Design sessions toggle", async ({ page, start }) => {  const fixture = await start("agents");
   const list = await sessions(fixture);
   const designs = list.filter((s) => s.design);
   expect(designs.length).toBe(2);
   await go(page, "#/agents");
   const side = sidebar(page);
-  const toggle = side.getByRole("checkbox", { name: /^Design sessions/ });
-  const toggleLabel = side.getByText(/^Design sessions/);
+  const toggle = side.getByRole("checkbox", { name: /^Design agents/ });
+  const toggleLabel = side.getByText(/^Design agents/);
 
   // Hidden by default, with the count.
   await expect(toggle).not.toBeChecked();
@@ -101,7 +100,7 @@ test("74. Design sessions toggle", async ({ page, start }) => {
   for (const s of designs) await expect(row(page, s)).toBeVisible();
   await expect(side.getByText("hidden")).toHaveCount(0);
   const second = await freshVisit(page, "/#/agents");
-  await expect(sidebar(second).getByRole("checkbox", { name: /^Design sessions/ })).toBeChecked();
+  await expect(sidebar(second).getByRole("checkbox", { name: /^Design agents/ })).toBeChecked();
   for (const s of designs) await expect(row(second, s)).toBeVisible();
   await second.close();
 
@@ -181,4 +180,42 @@ test("89. Session not found", async ({ page, start }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await page.getByRole("link", { name: "Back to sessions" }).click();
   await expect(page).toHaveURL(/#\/agents$/);
+});
+
+test("113. Queue agents switch", async ({ page, start }) => {
+  const fixture = await start("queue-agents");
+  await expect.poll(async () => (await sessions(fixture)).filter((s) => s.queue).length).toBe(1);
+  const list = await sessions(fixture);
+  const queue = list.find((s) => s.queue)!;
+  const design = list.find((s) => s.design)!;
+  await go(page, "#/agents");
+  const side = sidebar(page);
+  const queueSwitch = side.getByRole("checkbox", { name: /^Queue agents/ });
+  const designSwitch = side.getByRole("checkbox", { name: /^Design agents/ });
+
+  // Both groups are off, with their counts.
+  await expect(queueSwitch).not.toBeChecked();
+  await expect(designSwitch).not.toBeChecked();
+  await expect(queueSwitch).toHaveAccessibleName("Queue agents · 1 hidden");
+  await expect(designSwitch).toHaveAccessibleName("Design agents · 1 hidden");
+  await expect(row(page, queue)).toHaveCount(0);
+  await expect(row(page, design)).toHaveCount(0);
+
+  // The Queue agent shows with only a status mark.
+  await side.getByText(/^Queue agents/).click();
+  await expect(row(page, queue)).toBeVisible();
+  await expect(row(page, queue).getByRole("img")).toHaveCount(1);
+  await expect(row(page, design)).toHaveCount(0);
+
+  // A fresh page keeps the choice.
+  const second = await freshVisit(page, "/#/agents");
+  await expect(sidebar(second).getByRole("checkbox", { name: /^Queue agents/ })).toBeChecked();
+  await expect(sidebar(second).getByRole("checkbox", { name: /^Design agents/ })).not.toBeChecked();
+  await expect(row(second, queue)).toBeVisible();
+  await second.close();
+
+  // Neither group counts as needing you.
+  await side.getByText(/^Design agents/).click();
+  await expect(row(page, design)).toBeVisible();
+  await expect(page.getByRole("navigation").first().getByRole("link").nth(1)).toHaveAccessibleName("Agents");
 });

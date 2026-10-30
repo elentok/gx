@@ -15,7 +15,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -905,7 +905,7 @@ an exited session.
 
 - **Scenario:** `agents`, then `empty`
 - **Steps:**
-  1. Read the top bar tabs.
+  1. Read the top bar tabs. The count skips Design agents and Queue agents; one Design agent in `agents` raises an Actionable and stays out of it.
   2. Click Agents.
   3. Set the hash to `#/agents/<id>`, then open the same URL in a fresh page of the same context.
   4. Start `empty` and read the tab.
@@ -925,9 +925,9 @@ an exited session.
 - **Scenario:** `agents`
 - **Steps:**
   1. Open `#/agents`; read the toggle and the count.
-  2. Check "Design sessions", then open `#/agents` in a fresh page.
+  2. Check "Design agents", then open `#/agents` in a fresh page.
   3. Uncheck it, then select a design session.
-- **Pass:** the toggle starts off with "· 2 hidden" and no design rows. Checking it shows both, and the fresh page has it still checked. With it off, the selected design session keeps its row and the count reads "· 1 hidden".
+- **Pass:** the "Design agents" toggle starts off with "· 2 hidden" and no design rows. Checking it shows both, and the fresh page has it still checked. With it off, the selected design session keeps its row and the count reads "· 1 hidden".
 
 ## 92. Last viewed session
 
@@ -1263,3 +1263,22 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
 - **Scenario:** `web-login`
 - **Steps:** run `gx server web-reset-authenticator`. Open `web_url`. Submit the password without the setup code, then with it. Enter a wrong code, then a code from the key shown. In a new context, sign in with the old secret.
 - **Pass:** the CLI prints a setup code and no key. The login card shows a Setup code field above the password. The password alone is refused. The next step shows the QR code, an `otpauth://totp/` link, the key and one code field. A wrong code shows "Wrong password or code". The right code opens the Epics page. The old secret is refused.
+
+## 113. Queue agents switch
+
+- **Scenario:** `queue-agents`
+- **Steps:**
+  1. Open `#/agents`; read the "Queue agents" and "Design agents" switches.
+  2. Check "Queue agents", then open `#/agents` in a fresh page.
+  3. Check "Design agents" and read the Agents tab.
+- **Pass:** both switches start off with "· 1 hidden" and no rows. Checking "Queue agents" shows the Queue agent's row with only a status mark, and the Design agent stays hidden. The fresh page keeps the choice. The Agents tab reads no "needs you" count with both groups shown.
+
+## 114. Read-only Queue agent
+
+- **Scenario:** `queue-agents`
+- **Steps:**
+  1. Open `#/agents/<queue agent id>`.
+  2. Click "Turn on composer", then Cancel.
+  3. Click "Turn on composer", then confirm.
+  4. Open the same URL in a fresh page.
+- **Pass:** the page reads "gx is driving this agent, so the composer is off." and Send is disabled. Cancel keeps it off. The confirm removes the line and the button, and the message box takes text. The fresh page is read-only again.
