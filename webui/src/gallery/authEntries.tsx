@@ -172,12 +172,12 @@ export const authEntries: GalleryEntry[] = [
   {
     name: "AuthenticatorView",
     cases: [
-      { label: "reset, step 1", node: <AuthenticatorView mode="reset" otherDevices={3} onBegin={() => {}} onFinish={() => {}} /> },
+      { label: "replace, step 1", node: <AuthenticatorView mode="replace"otherDevices={3} onBegin={() => {}} onFinish={() => {}} /> },
       {
-        label: "reset, step 2",
+        label: "replace, step 2",
         node: (
           <AuthenticatorView
-            mode="reset"
+            mode="replace"
             otherDevices={3}
             next={{ secret: "JBSWY3DPEHPK3PXP4N2Q7ZLA", uri: "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP4N2Q7ZLA" }}
             onBegin={() => {}}

@@ -113,8 +113,8 @@ export interface NewAuthenticator {
   uri: string;
 }
 
-/** "reset" asks for a code from the current app; "add" is for a cleared secret, so only the password. */
-export type AuthenticatorMode = "reset" | "add";
+/** "replace" asks for a code from the current app; "add" is for a cleared secret, so only the password. */
+export type AuthenticatorMode = "replace" | "add";
 
 export function AuthenticatorView({
   mode,
@@ -142,7 +142,7 @@ export function AuthenticatorView({
         <Form onSubmit={(e) => onFinish({ totp_code: formValues(e.currentTarget).totp_code })}>
           <AddAuthenticator secret={next.secret} uri={next.uri} error={error} codeLabel="Code from the new app" />
           <Submit pending={pending}>Save new authenticator</Submit>
-          {mode === "reset" && (
+          {mode === "replace" && (
             <Text data-mock-part="keep-note" fontSize="sm" color="text.dim">
               The old app keeps working until this code checks out.
             </Text>
@@ -152,12 +152,12 @@ export function AuthenticatorView({
         <Form
           onSubmit={(e) => {
             const v = formValues(e.currentTarget);
-            onBegin({ password: v.password, ...(mode === "reset" && { totp_code: v.totp_code }) });
+            onBegin({ password: v.password, ...(mode === "replace" && { totp_code: v.totp_code }) });
           }}
         >
           {error && <ErrorLine>{error}</ErrorLine>}
           <Field part="current-password" label="Current password" name="password" type="password" autoComplete="current-password" required />
-          {mode === "reset" && (
+          {mode === "replace" && (
             <Field
               part="code"
               label="Code from the current app"
@@ -229,7 +229,7 @@ export function AuthenticatorPage({
 }) {
   const { auth, loading, otherDevices, write, leave, error } = useAccountPage(fetchAuth, fetchList);
   const [next, setNext] = useState<NewAuthenticator>();
-  const mode: AuthenticatorMode = auth?.setup_code_required ? "add" : "reset";
+  const mode: AuthenticatorMode = auth?.setup_code_required ? "add" : "replace";
   return (
     <DetailPage mode="narrow" title={{ kind: "Settings", name: mode === "add" ? "Add authenticator" : "Reset authenticator" }}>
       {loading || !auth ? (

@@ -96,16 +96,16 @@ describe("ChangePasswordPage", () => {
 });
 
 describe("AuthenticatorView", () => {
-  it("reset step 1 asks for the password and a code from the current app", () => {
-    const { getByLabelText } = renderThemed(<AuthenticatorView mode="reset" otherDevices={3} onBegin={() => {}} onFinish={() => {}} />);
+  it("replace step 1 asks for the password and a code from the current app", () => {
+    const { getByLabelText } = renderThemed(<AuthenticatorView mode="replace"otherDevices={3} onBegin={() => {}} onFinish={() => {}} />);
     expect(getByLabelText("Current password")).toBeTruthy();
     expect(getByLabelText("Code from the current app")).toBeTruthy();
   });
 
-  it("reset step 2 shows the QR, link, key, code field and the keep note", () => {
+  it("replace step 2 shows the QR, link, key, code field and the keep note", () => {
     const onFinish = vi.fn();
     const { container, getByRole, getByText, getByLabelText } = renderThemed(
-      <AuthenticatorView mode="reset" otherDevices={3} next={NEXT} onBegin={() => {}} onFinish={onFinish} />,
+      <AuthenticatorView mode="replace"otherDevices={3} next={NEXT} onBegin={() => {}} onFinish={onFinish} />,
     );
     expect(container.querySelector('[data-mock-part="totp-qr"] svg')).toBeTruthy();
     expect(getByRole("link", { name: "Add to authenticator app" }).getAttribute("href")).toBe(NEXT.uri);
