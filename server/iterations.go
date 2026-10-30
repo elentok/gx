@@ -17,10 +17,14 @@ import (
 // transcript path is only located here: parsing it belongs to the transcript
 // module.
 type IterationInfo struct {
-	Address    string `json:"address"`
-	Agent      string `json:"agent,omitempty"`
-	Pane       string `json:"pane"`
-	Tab        string `json:"tab,omitempty"`
+	Address string `json:"address"`
+	Agent   string `json:"agent,omitempty"`
+	Pane    string `json:"pane"`
+	Tab     string `json:"tab,omitempty"`
+	// Runner names what hosts the iteration; QueueAgent is the PTY run's row id
+	// in the sessions listing, empty for every other runner.
+	Runner     string `json:"runner,omitempty"`
+	QueueAgent string `json:"queueAgent,omitempty"`
 	Worktree   string `json:"worktree"`
 	Branch     string `json:"branch"`
 	Base       string `json:"base,omitempty"`
@@ -78,7 +82,10 @@ func (s *Server) liveIteration(address string) (liveIter, bool) {
 		sess.SessionID = st.SessionID
 	}
 	label, branch, worktree := ralphloop.IterationIdentity(a.Epic, a.ID, s.worktreeDir(a.Project))
-	it := IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID}
+	it := IterationInfo{Address: address, Worktree: worktree, Branch: branch, Session: sess.SessionID, Runner: runner.Name()}
+	if runner.Name() == runnerPTY {
+		it.QueueAgent = queueAgentIDPrefix + iterationLabel(address)
+	}
 	if runner.Name() == runnerHerdr {
 		it.Pane = sess.ID
 		cli := herdr.CLI{Env: s.cfg.Env}

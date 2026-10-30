@@ -69,6 +69,16 @@ func ticketSession(sessions []server.SessionInfo, epicAddress string, ticket tic
 	})
 }
 
+// queueAgentOf is the Queue agent row running address's ticket, "" when none.
+func queueAgentOf(sessions []server.SessionInfo, address string) string {
+	for _, s := range sessions {
+		if s.Queue && s.Ticket == address {
+			return s.ID
+		}
+	}
+	return ""
+}
+
 func goToSessionItem(id string) contextmenu.Item[ticketTarget] {
 	return contextmenu.Item[ticketTarget]{
 		Label: goToSessionLabel, Group: contextmenu.Suggested,

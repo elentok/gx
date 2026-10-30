@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -441,11 +442,31 @@ func TestTicketMenuItems_GoToPane(t *testing.T) {
 	}{
 		{"live pane", ticketMenuInput{paneLive: true}, ""},
 		{"herdr down", ticketMenuInput{paneLive: true, herdrDown: true}, herdrDownText},
+		{"pty live", ticketMenuInput{queueAgent: "queue-a", ptyLive: true}, ""},
+		{"pty live, herdr down", ticketMenuInput{queueAgent: "queue-a", ptyLive: true, herdrDown: true}, ""},
+		{"pty holder gone", ticketMenuInput{queueAgent: "queue-a"}, holderGoneText},
 	} {
 		item := itemByLabel(t, ticketMenuItems(tt.in), "Go to pane")
 		if item.Disabled != tt.want || item.Group != contextmenu.Agent {
 			t.Errorf("%s: Go to pane = %q in %v, want %q in Agent", tt.name, item.Disabled, item.Group, tt.want)
 		}
+	}
+}
+
+func TestTicketMenuItems_GoToPanePTYOpensTheAgentsRow(t *testing.T) {
+	item := itemByLabel(t, ticketMenuItems(ticketMenuInput{queueAgent: "queue-a", ptyLive: true}), "Go to pane")
+	if got := item.Run(ticketTarget{})(); got != (GoToSessionMsg{ID: "queue-a"}) {
+		t.Fatalf("Go to pane sent %v, want GoToSessionMsg{queue-a}", got)
+	}
+}
+
+func TestCmdTicketMenu_PTYIterationOffersTheAgentRow(t *testing.T) {
+	api := fakeServerAPI{iterations: []server.IterationInfo{{Address: "gx:alpha/01", Runner: "pty", QueueAgent: "queue-gx-alpha-01"}}}
+	in := newTicketMenuInput(tickets.Epic{}, tickets.Ticket{Path: "gx:alpha/01"}, true, "")
+	msg := cmdTicketMenu(api, config.Dirs{}, in)().(ticketMenuReadyMsg)
+	item := itemByLabel(t, msg.items, "Go to pane")
+	if item.Disabled != "" {
+		t.Fatalf("Go to pane dimmed %q with a live PTY holder and herdr down", item.Disabled)
 	}
 }
 

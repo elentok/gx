@@ -318,6 +318,28 @@ func TestServerStream_SessionFocusShowsSessionInThisTUIOnly(t *testing.T) {
 	}
 }
 
+func TestGoToSession_ShowsAQueueAgentOnTheAgentsTab(t *testing.T) {
+	h, f := newStreamHarness(t)
+	f.mu.Lock()
+	f.sessions = []server.SessionInfo{
+		{ID: "s1", Name: "alpha", Status: server.SessionStatus{State: server.SessionIdle}},
+		{ID: "queue-q", Name: "gx-map-01", Queue: true, Status: server.SessionStatus{State: server.SessionIdle}},
+	}
+	f.mu.Unlock()
+	h.probeUp()
+
+	h.send(ticketsui.GoToSessionMsg{ID: "queue-q"})
+	h.pump()
+
+	if got := h.m.navState.ActiveTab(); got != nav.TabAgents {
+		t.Fatalf("active tab = %s, want %s", got, nav.TabAgents)
+	}
+	view := ansi.Strip(h.m.activePage().model.(agentsui.Model).View().Content)
+	if !strings.Contains(view, "gx-map-01") {
+		t.Errorf("the Queue agent is not on screen:\n%s", view)
+	}
+}
+
 func TestStartSession_OpensThePrefilledCreateFormOnTheAgentsTab(t *testing.T) {
 	h, _ := newStreamHarness(t)
 	h.probeUp()

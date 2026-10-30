@@ -59,6 +59,22 @@ func TestQueueAgentRows_PtyRunListsAWorkingRowWithoutUnreadOrActionable(t *testi
 	}
 }
 
+func TestQueueAgentRows_IterationsNameTheRunnerAndTheRow(t *testing.T) {
+	t.Parallel()
+	h, fake := startQueueRows(t, "pty")
+	fake.SetState(resumeLabel, agentrunner.StateWorking, "")
+
+	servertest.WaitFor(t, 10*time.Second, "a live iteration", func() bool {
+		its, err := h.Client.Iterations(context.Background())
+		return err == nil && len(its) == 1
+	})
+	its, _ := h.Client.Iterations(context.Background())
+	rows := queueRows(t, h)
+	if its[0].Runner != "pty" || len(rows) != 1 || its[0].QueueAgent != rows[0].ID {
+		t.Errorf("iteration = %+v, Queue rows = %+v; want runner pty and the row's id", its[0], rows)
+	}
+}
+
 func TestQueueAgentRows_HeldRunShowsRateLimited(t *testing.T) {
 	t.Parallel()
 	h, fake := startQueueRows(t, "pty")

@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -35,6 +36,31 @@ func readOnlyTerminal(t *testing.T, info server.SessionInfo) (Model, *fakeAttach
 	}
 	m, _ = dialed(t, m, cmd)
 	return update1(t, m, tea.KeyPressMsg{Code: tea.KeyEnter}), h.attaches["a"]
+}
+
+// Go to pane on a PTY Queue agent: WithFocusSession selects the agent with its
+// group hidden and opens its panel read-only.
+func TestReadOnly_FocusSessionOpensAHiddenQueueAgentReadOnly(t *testing.T) {
+	h := &fakeHolders{attaches: map[string]*fakeAttach{}}
+	m := NewModel(&fakeSessionClient{}, ui.Settings{Dirs: config.DirsFrom([]string{"HOME=" + t.TempDir()})})
+	m.sessionsDir = "/sessions"
+	m.dial = h.dial
+	m.opened = true
+	m = update1(t, m, tea.WindowSizeMsg{Width: 80, Height: 12})
+	m = m.WithFocusSession("q2")
+	st := &viewmodel.State{Sessions: groupSessions()}
+	for i := range st.Sessions {
+		st.Sessions[i].Status = idleStatus
+	}
+	next, cmd := m.WithServerState(st, ticketsui.ServerLinkUp)
+	m = next.(Model)
+	m, _ = dialed(t, m, cmd)
+	if m.showQueue || m.selectedID() != "q2" {
+		t.Fatalf("showQueue=%v selected=%q, want the hidden group's q2 selected", m.showQueue, m.selectedID())
+	}
+	if a := m.attach; a == nil || a.id != "q2" || !a.readOnly {
+		t.Fatalf("attach = %+v, want q2 read-only", a)
+	}
 }
 
 func TestReadOnly_QueueAndDesignAgentsDropKeysAndPaste(t *testing.T) {

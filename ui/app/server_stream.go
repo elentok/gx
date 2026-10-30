@@ -389,15 +389,19 @@ func (m Model) withServerState(model tea.Model) (tea.Model, tea.Cmd) {
 }
 
 // focusSession switches to the Agents tab with session id on screen, for a
-// banner click. The session is focused on the next state delivery.
+// banner click or a Go to pane. The session is focused on the next state
+// delivery, which is made here so it needn't wait for an event.
 func (m Model) focusSession(id string) (Model, tea.Cmd) {
 	m, cmd := m.switchTab(nav.ViewState{Tab: nav.TabAgents})
 	current := m.activePage()
-	if agents, ok := current.model.(agentsui.Model); ok {
-		current.model = agents.WithFocusSession(id)
-		m.setActivePage(current)
+	agents, ok := current.model.(agentsui.Model)
+	if !ok {
+		return m, cmd
 	}
-	return m, cmd
+	next, deliver := m.withServerState(agents.WithFocusSession(id))
+	current.model = next
+	m.setActivePage(current)
+	return m, tea.Batch(cmd, deliver)
 }
 
 // startSession switches to the Agents tab with its create form open,

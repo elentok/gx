@@ -33,10 +33,14 @@ type ticketMenuInput struct {
 	rendered tickets.RenderedStatus
 	ticket   tickets.Ticket
 	isMap    bool
-	// paneLive marks a herdr agent, the only kind with a pane to go to.
-	paneLive  bool
-	herdrDown bool
-	archived  bool
+	// paneLive marks a live herdr agent, which has a tab to focus.
+	paneLive bool
+	// queueAgent is the Agents-tab row id of a PTY run; ptyLive is whether its
+	// holder is still there.
+	queueAgent string
+	ptyLive    bool
+	herdrDown  bool
+	archived   bool
 	// watchReason is why Watch is dim; empty when it can open.
 	watchReason string
 	// serverReason is why orchestration writes are off; empty when usable.
@@ -56,6 +60,7 @@ const (
 	notPaused      = "not paused"
 	notMuted       = "not muted"
 	herdrDownText  = "herdr not running"
+	holderGoneText = "agent is gone"
 	noAgentLog     = "no agent log"
 	archivedText   = "archived"
 	noProposal     = "no recovery proposal"
@@ -143,7 +148,16 @@ func ticketMenuItems(in ticketMenuInput) []contextmenu.Item[ticketTarget] {
 		pick("Transcript", "", actionTranscript, contextmenu.Agent, ""),
 		suggest(investigateSuggested(in.rendered),
 			pick("Investigate", "", actionInvestigate, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText))))
-	if in.paneLive {
+	switch {
+	case in.queueAgent != "":
+		// A PTY pane is the Agents tab's live panel, so herdr being down is moot.
+		it := pick("Go to pane", "", actionGoToPane, contextmenu.Agent, reasonIf(!in.ptyLive, holderGoneText))
+		if it.Disabled == "" {
+			id := in.queueAgent
+			it.Run = func(ticketTarget) tea.Cmd { return func() tea.Msg { return GoToSessionMsg{ID: id} } }
+		}
+		items = append(items, it)
+	case in.paneLive:
 		items = append(items, pick("Go to pane", "", actionGoToPane, contextmenu.Agent, reasonIf(in.herdrDown, herdrDownText)))
 	}
 
@@ -270,6 +284,9 @@ func cmdTicketMenu(api ServerAPI, dirs config.Dirs, in ticketMenuInput) tea.Cmd 
 		api := snapshotIterations(api)
 		it, live := serverIteration(api, address)
 		in.paneLive = live && it.Tab != ""
+		if live && it.QueueAgent != "" {
+			in.queueAgent, in.ptyLive = it.QueueAgent, true
+		}
 		in.watchReason = watchReason(api, dirs, agentAddress(address, target.ticketID))
 		var err error
 		in.detail, err = ticketDetail(api, address)
@@ -307,6 +324,7 @@ func (m Model) openTicketMenu(epic tickets.Epic, ticket tickets.Ticket, archived
 	in := newTicketMenuInput(epic, ticket, m.settings.HerdrUnavailable, serverReason(m.serverAPI, m.link))
 	in.archived = archived
 	in.session = ticketSession(m.vm.Sessions, epic.Path, ticket)
+	in.queueAgent = queueAgentOf(m.vm.Sessions, ticket.Path)
 	m.ticketMenuPending = ticket.Path
 	return m, cmdTicketMenu(m.serverAPI, m.settings.Dirs, in)
 }
