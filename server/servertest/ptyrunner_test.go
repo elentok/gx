@@ -14,7 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil"
@@ -501,5 +504,91 @@ func TestPty_RestartBuildsFreshRunnersAndReclaimsTheLiveRun(t *testing.T) {
 	}
 	if runs := h.Server.Runs(); len(runs) != 1 || runs[0].Runner != "pty" {
 		t.Errorf("runs = %+v, want the live run reclaimed on pty", runs)
+	}
+}
+
+// holderPID is the pid of label's holder process, read from its agent dir.
+func holderPID(t *testing.T, h *Harness, project, label string) int {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(ptyOf(t, h, project).Root, label, nativerunner.MetaFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var meta nativerunner.Meta
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		t.Fatal(err)
+	}
+	return meta.HolderPID
+}
+
+func TestPty_ResumeAfterRestartStartsNoSecondClaude(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	h := startPty(t, store, repo)
+	h.LeavePtyRun(t, store, repo, Target{"proj", "epic-a", "01"}, true, commitWork(t))
+	const label = "epic-a-iter-01"
+	before := holderPID(t, h, "proj", label)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	h.Restart(t)
+	evs, err := h.Client.Events(ctx, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	WaitForEvent(ctx, t, evs, server.EventReclaimed, "proj:epic-a/01")
+
+	if after := holderPID(t, h, "proj", label); after != before {
+		t.Errorf("holder pid %d -> %d, want the same holder adopted", before, after)
+	}
+	if got := len(h.Starts()); got != 0 {
+		t.Errorf("Starts = %d, want no second claude started", got)
+	}
+	files, _ := filepath.Glob(filepath.Join(h.Env("CLAUDE_CONFIG_DIR"), "sessions", "*.json"))
+	if len(files) != 1 {
+		t.Errorf("agent session files = %d, want the one claude", len(files))
+	}
+}
+
+func TestPty_StaleHolderIsClosedAndTheLaunchRetried(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	h := startPty(t, store, repo)
+	h.OnTurn(func(*Turn) {})
+	const label = "epic-a-iter-01"
+	// An idle holder of the launch's label in another directory is not adopted.
+	holder, err := ptyOf(t, h, "proj").Start(agentrunner.StartOptions{
+		Label: label, Epic: "epic-a", Cwd: t.TempDir(), Kind: agentrunner.Kind("claude"),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	WaitFor(t, 30*time.Second, "the holder to be idle", func() bool {
+		st, err := ptyOf(t, h, "proj").Status(holder)
+		return err == nil && st.Waiting()
+	})
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+
+	WaitFor(t, 30*time.Second, "the launch to hold a session", func() bool {
+		runs := h.Server.Runs()
+		return len(runs) == 1 && runs[0].Session.ID != ""
+	})
+	logged, _, err := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var closed []ralphloop.Event
+	for _, ev := range logged {
+		if ev.Type == string(events.StalePaneClosed) {
+			closed = append(closed, ev)
+		}
+	}
+	if len(closed) != 1 || closed[0].Pane != holder.ID {
+		t.Errorf("stale-pane-closed events = %+v, want one for %s", closed, holder.ID)
+	}
+	if runs := h.Server.Runs(); runs[0].Session.SessionID == holder.SessionID {
+		t.Errorf("run session = %+v, want a fresh session", runs[0].Session)
 	}
 }
