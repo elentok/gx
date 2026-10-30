@@ -288,6 +288,7 @@ type Server struct {
 	pause        *pauseState
 	afk          *afkState
 	ledger       *budgetLedger
+	usage        *usageSamples
 	budgetNotes  budgetNotes
 	hardGrace    hardGrace
 	extraUsage   extraUsageNotes
@@ -485,6 +486,7 @@ func New(cfg Config) (*Server, error) {
 		pause:       pause,
 		afk:         afk,
 		ledger:      ledger,
+		usage:       openUsageSamples(cfg.StateDir),
 		costOf:      iterationCostIn(cfg.Env),
 		mergeInto:   git.MergeBranchInto,
 		mergedProbe: git.IsAncestor,
@@ -829,6 +831,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(disksDone); s.keepDisksWatched(freshCtx) }()
 	healthDone := make(chan struct{})
 	go func() { defer close(healthDone); s.keepHealthWatched(freshCtx) }()
+	usageDone := make(chan struct{})
+	go func() { defer close(usageDone); s.keepUsageScanned(freshCtx) }()
 	sweepDone := make(chan struct{})
 	go func() { defer close(sweepDone); s.sweepDesignCounts() }()
 	var err error
@@ -858,6 +862,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	<-cpuDone
 	<-disksDone
 	<-healthDone
+	<-usageDone
 	<-sweepDone
 	// A watcher reload still in flight can start a countdown, so stop it after.
 	s.configWatch.running.Wait()

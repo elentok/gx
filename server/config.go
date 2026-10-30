@@ -82,6 +82,9 @@ type Config struct {
 
 	// SystemHealth takes one CPU and memory reading; nil reads the real machine.
 	SystemHealth syshealth.Reader
+	// UsagePollInterval is how often the usage sample reader scans the agent
+	// dirs; zero means one minute.
+	UsagePollInterval time.Duration
 	// HealthPollInterval is how often the health watcher reads; zero means 5 seconds.
 	HealthPollInterval time.Duration
 
