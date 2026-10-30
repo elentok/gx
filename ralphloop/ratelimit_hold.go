@@ -9,6 +9,11 @@ import (
 	"github.com/elentok/gx/events"
 )
 
+func codexBlocked(d Deps, p launchAndPromptParams) bool {
+	st, err := d.Runner.Status(p.session())
+	return err == nil && st.State == agentrunner.StateBlocked
+}
+
 // holdRateLimit keeps a rate-limited agent in place: no nudge, no pause kind,
 // no needs-answer. It sends "continue" once the reset (plus rateLimitResetBuffer)
 // has passed, or every rateLimitPollInterval when the reset is unknown, and
@@ -35,10 +40,15 @@ func holdRateLimit(d Deps, o OneIteration, p launchAndPromptParams, waitStates [
 		} else if wait := resetAt.Add(rateLimitResetBuffer).Sub(d.Now()); wait > 0 {
 			d.Sleep(wait)
 		}
-		// A refused prompt means the agent is already working (claude's own
-		// auto-continue) or blocked; the wait below and the caller handle both.
-		if err := d.Runner.Prompt(p.session(), "continue"); err != nil && !errors.Is(err, agentrunner.ErrNotReady) {
-			return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
+		// A Codex pane back on its own dialog is not waiting for "continue": that
+		// is a prompt, not a dialog answer. Release the hold and let the caller's
+		// blocked rule pause it.
+		if !(p.Agent == AgentCodex && codexBlocked(d, p)) {
+			// A refused prompt means the agent is already working (claude's own
+			// auto-continue) or blocked; the wait below and the caller handle both.
+			if err := d.Runner.Prompt(p.session(), "continue"); err != nil && !errors.Is(err, agentrunner.ErrNotReady) {
+				return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
+			}
 		}
 		for {
 			_, err := d.Runner.Wait(p.session(), waitStates, smartZonePollMs*time.Millisecond)

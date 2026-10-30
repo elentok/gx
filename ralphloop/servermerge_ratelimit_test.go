@@ -127,6 +127,54 @@ func TestWaitIterationFinished_RateLimitUnknownResetPollsWhileLimitedAgain(t *te
 	}
 }
 
+// codexBlockedLimitFixture is a blocked Codex agent on herdr with a quota
+// limit; onReset runs on the hold sleep.
+func codexBlockedLimitFixture(t *testing.T, onReset func(r *runnerfake.Runner)) (Deps, *runnerfake.Runner, OneIteration, *[]time.Duration) {
+	t.Helper()
+	d, r, one, sleeps, _ := rateLimitFixture(t, func(r *runnerfake.Runner) {
+		r.SetState("iter-01", agentrunner.StateBlocked, "Approve command?")
+		r.SetRateLimit("iter-01", rateLimitClock.Add(time.Minute))
+	}, func(*runnerfake.Runner, int) {})
+	one.Agent, one.Runner = AgentCodex, "herdr"
+	d.Sleep = func(dur time.Duration) {
+		*sleeps = append(*sleeps, dur)
+		r.SetRateLimit("iter-01", time.Time{})
+		if onReset != nil && len(*sleeps) == 1 {
+			onReset(r)
+		}
+	}
+	return d, r, one, sleeps
+}
+
+func TestWaitIterationFinished_CodexQuotaWhileBlockedHoldsThenContinues(t *testing.T) {
+	d, r, one, sleeps := codexBlockedLimitFixture(t, func(r *runnerfake.Runner) {
+		r.SetState("iter-01", agentrunner.StateIdle, "")
+	})
+	if err := waitBlocked(t, d, one); err != nil {
+		t.Fatalf("err = %v, want nil: a Codex quota holds, it does not pause", err)
+	}
+	if (*sleeps)[0] != time.Minute+rateLimitResetBuffer {
+		t.Errorf("sleeps = %v, want the hold sleep first", *sleeps)
+	}
+	if got := r.Prompts("iter-01"); !slices.Equal(got, []string{"continue"}) {
+		t.Errorf("prompts = %q, want one continue", got)
+	}
+}
+
+func TestWaitIterationFinished_CodexBlockedAfterQuotaResetPausesWithoutContinue(t *testing.T) {
+	d, r, one, sleeps := codexBlockedLimitFixture(t, nil)
+	var paused *BlockedPausedError
+	if err := waitBlocked(t, d, one); !errors.As(err, &paused) {
+		t.Fatalf("err = %v, want *BlockedPausedError", err)
+	}
+	if want := []time.Duration{time.Minute + rateLimitResetBuffer, blockedDwellMs * time.Millisecond}; !slices.Equal(*sleeps, want) {
+		t.Errorf("sleeps = %v, want hold then dwell", *sleeps)
+	}
+	if got := r.Prompts("iter-01"); len(got) != 0 {
+		t.Errorf("prompts = %q, want no continue", got)
+	}
+}
+
 func TestWaitIterationFinished_RateLimitedBlockedAgentHolds(t *testing.T) {
 	d, r, one, sleeps, _ := rateLimitFixture(t, func(r *runnerfake.Runner) {
 		r.SetState("iter-01", agentrunner.StateBlocked, "usage limit")
