@@ -196,14 +196,14 @@ From the person's side:
     and typing in the Agents tab live panel, so that I know every way to answer.
 57. As a person, I want a web button to end every blocked pause, so that no pause needs a CLI step
     (ADR 0042). Approve/Deny ends a pause on an approvable tool card. On any other dialog (a question
-    menu, a trust dialog), Retry on PTY or herdr presses Esc first and then sends the retry prompt.
+    menu), Retry on PTY or herdr interrupts the agent and then sends the retry prompt.
 58. As a person who answers in the live panel instead, I want the ticket to lift its pause once the
     agent leaves the blocked state, so that I do not have to answer twice.
 
 ### Rate limits
 
 59. As a person, I want a rate-limited PTY agent to be noticed from its transcript, with the reset time
-    read from the statusline usage data (or from claude's message when that data is missing), so
+    read from claude's message (or from the statusline usage record when the message has none), so
     that PTY reports limits as herdr does.
 60. As a person, I want the server wait loop to handle a rate limit on every runner that reports one
     (PTY, herdr, headless, Codex quota on herdr), and to check it before the blocked pause, so that a
@@ -245,6 +245,9 @@ From the person's side:
 74. As a person, I want the waiting tickets to say "usage at N% of the 5-hour (or weekly) limit,
     resets <time>", and the gate to lift at that reset time, so that I know why nothing starts and
     when it will.
+75. As a person who wants queued tickets to start anyway, I want a web button and a CLI verb that
+    lift the usage gate until that window resets, so that a weekly gate never leaves me waiting for
+    days with no way past it.
 
 ## Implementation Decisions
 
@@ -307,18 +310,27 @@ From the person's side:
 - The unblock watch then ends the pause when the agent leaves blocked, on every runner. This is how an
   answer typed in the live panel lifts the pause.
 - The web ends a blocked pause with Approve/Deny when the block is an approvable tool card. On any
-  other dialog (a question menu, a trust dialog), Retry on a PTY or herdr run presses Esc first, then
-  sends the retry prompt through the normal prompt path.
+  other dialog (a question menu), Retry on a PTY or herdr run does this:
+  1. It ends the pause through the same `unblockMu` path as the answer verb, so the unblock watch and
+     Retry never both act ("the first one in does the work", `server/headless_block.go`).
+  2. It calls the hosting runner's `Interrupt`, which presses Esc, waits for idle and clears the input
+     line. A raw Esc is not used: it skips the wait, and claude may start a turn that the busy guard
+     then refuses the prompt against.
+  3. It sends the retry prompt through the normal prompt path.
+- gx answers the trust dialog at startup (`claudeui.TrustKey`), so it never becomes a blocked pause.
 - This is a new way into the existing `needs-answer` pause. gx cannot answer a prompt it did not send,
   and the web answer button ends the pause (ADR 0042).
 
 ### Rate-limit hold on the server wait loop
 
 - `Pty.RateLimit` reads the holder's transcript rate-limit status (`error: rate_limit` or status 429)
-  to learn that a limit was hit. It does not scan the screen. The reset time comes from the agent's
-  usage record (see "Usage record from the statusline") when it has one: the `resets_at` of the
-  window at or near 100%. Without a record, it parses the reset time from the message with the
-  existing `claudeui` parsers. With neither, it reports limited with a zero reset time.
+  to learn that a limit was hit. It does not scan the screen. The reset time comes, in this order,
+  from:
+  1. The message, parsed with the existing `claudeui` parsers. It names the limit that fired.
+  2. The agent's usage record (see "Usage record from the statusline"): the latest `resets_at` among
+     the windows at 98% or more.
+  3. Neither: limited with a zero reset time.
+  A reset time in the past means the server sends "continue" at once.
 - The server wait loop asks the hosting runner's `RateLimit` when the agent goes idle or blocked,
   before the blocked pause and before the finish check. For Codex it reads the quota as the old loop
   did.
@@ -565,11 +577,13 @@ Per story:
 55. Existing headless block tests pass.
 56. Flow "Blocked pause on PTY" (reason text).
 57. Flow "Blocked pause on PTY" (answer button); flow 3's Approve row still passes. A new fixture
-    scenario with a non-approvable block (a question menu): Retry presses Esc, sends the prompt and
-    lifts the pause.
+    scenario with a non-approvable block (a question menu): Retry interrupts, sends the prompt and
+    lifts the pause. Server test with the unblock watch running: Retry ends the pause once and sends
+    one prompt.
 58. Server test per runner (PTY, herdr, headless): the agent leaving blocked lifts the pause.
-59. `nativerunner` test: `RateLimit` from a transcript error, with a usage record, with only a reset
-    time in the message, and with neither. `cmd` test: the statusline mode writes the `rate_limits`
+59. `nativerunner` test: `RateLimit` from a transcript error: the message's reset time wins over a
+    usage record; a record alone gives the latest `resets_at` of the windows at 98% or more; neither
+    gives a zero reset time; a past reset time continues at once. `cmd` test: the statusline mode writes the `rate_limits`
     record and still renders the line.
 60. Server test: a Codex quota banner while blocked holds, never pauses `needs-answer`.
 61. Flow "Rate-limit hold" (not paused); server test for the kept slot.
@@ -589,7 +603,12 @@ Per story:
     a Claude claim; a Codex ticket still claims; a sample at 97% does not block.
 74. Server test: the wait reason names the window, the percentage and the reset time; the gate lifts
     at `resets_at` on a fake clock with no new sample; the gate comes back after a restart. Flow
-    "Rate-limit hold" or a new fixture scenario shows the reason on a queued ticket.
+    "Rate-limit hold" or a new fixture scenario shows the reason on a queued ticket. Server tests:
+    a person's relaunch, a handoff restart and a Fix agent start while the gate holds; with both the
+    hold and the gate, the hold's reason shows.
+75. Server test: the override lets a Claude ticket claim at 99%, and a new sample at 99% does not bring
+    the gate back before `resets_at`; the override survives a restart. Flow: the web override button
+    on the usage-gate wait reason; `cmd` test for the CLI verb.
 
 ### Usage record from the statusline
 
@@ -598,10 +617,13 @@ Per story:
   (Unix seconds). It refreshes after each API response, is missing before the first reply and for
   API-key accounts, and drops a window once its `resets_at` passes
   (https://code.claude.com/docs/en/statusline).
-- PTY agents get a `statusLine` entry in the `--settings` JSON gx already passes. It runs
-  `gx claude statusline` in a mode that renders the line as today and also writes the `rate_limits`
-  object, with the time it was seen, into the agent's dir. The implementer names the mode and the
-  file. Interactive sessions keep the person's own statusline.
+- PTY agents get a `statusLine` entry in the `--settings` JSON gx already passes. `ptyLaunchArgs`
+  builds that JSON per agent instead of the fixed `{"tui":"default"}`. The command is the absolute gx
+  path (`os.Executable`) running `gx claude statusline` in a mode that takes the agent's dir as a
+  flag. The mode renders the line as today and also writes the `rate_limits` object, with the time it
+  was seen, into that dir. A failed write never changes the rendered line or the exit code. The
+  implementer names the mode, the flag and the file. Interactive sessions keep the person's own
+  statusline.
 - gx does not call the undocumented `api.anthropic.com/api/oauth/usage` endpoint. It needs the OAuth
   token from the keychain and can change in any release.
 - Claude Code's own auto-continue at a usage limit (since v2.1.234) stays on.
@@ -620,6 +642,16 @@ Per story:
 - Running agents are not stopped or held by the gate. The rate-limit hold still handles a real limit
   hit.
 - With no usage data (API-key accounts, or no reply yet), there is no gate.
+- The gate stays on when extra usage is on (`server/extra_usage.go`), even though the account keeps
+  working past 100%. The override below is the way past it.
+- The gate covers queue claims and automatic relaunches (recovery). It does not gate a person's own
+  relaunch or Retry, handoff restarts of a running ticket, or Design, Fix and interactive sessions.
+- When the rate-limit hold and the gate both apply to a ticket, the hold's reason shows.
+- Override: a web button and a CLI verb, like the budget override (`server/budget.go`
+  `budgetOverride`). It lifts the gate for new claims until that window's `resets_at`. The window
+  stays at 98% or more until then, so lifting it only until the next sample would not work. Running
+  tickets are never gated, so the override is only about starting queued ones. The implementer names
+  the verb and the route, and where the override is stored so it survives a restart.
 - This is not a pause and adds no pause kind.
 
 ## Out of Scope
