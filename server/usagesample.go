@@ -193,7 +193,7 @@ func (s *Server) usageGate(agent ralphloop.AgentKind, now time.Time) (string, bo
 	if !ok {
 		return "", false
 	}
-	return fmt.Sprintf("usage at %.0f%% of the %s limit, resets %s", w.UsedPercentage, name,
+	return fmt.Sprintf("%s%.0f%% of the %s limit, resets %s", VerdictUsagePrefix, w.UsedPercentage, name,
 		time.Unix(w.ResetsAt, 0).UTC().Format(time.RFC3339)), true
 }
 

@@ -2038,6 +2038,25 @@ export interface StatsGrilling {
 }
 
 //////////
+// source: usagesample.go
+
+/**
+ * UsageOverrideResult is the outcome of lifting the usage gate: the windows
+ * lifted and when the lift ends, or a refusal.
+ */
+export interface UsageOverrideResult {
+  windows?: string[];
+  until?: string;
+  refused?: boolean;
+  reason?: string;
+  message?: string;
+}
+/**
+ * ReasonNotGated refuses a usage override when no window is gating.
+ */
+export const ReasonNotGated = "not-gated";
+
+//////////
 // source: verdicts.go
 
 /**
@@ -2050,6 +2069,11 @@ export const VerdictWaitingInQueue = "waiting in queue";
 export const VerdictConcurrencyCap = "concurrency cap";
 export const VerdictNotQueued = "not queued";
 export const VerdictRateLimited = "rate-limited";
+/**
+ * VerdictUsagePrefix starts every usage-gate verdict (the rest is the
+ * window and its reset); the web shows its override button on it.
+ */
+export const VerdictUsagePrefix = "usage at ";
 export const VerdictWaitingOnAnswer = "waiting on answer";
 export const VerdictWaitingReleased = "waiting (slot released)";
 export const VerdictWaitingReleaseCapd = "waiting (slot held, release cap reached)";
@@ -2057,7 +2081,7 @@ export const VerdictWaitingReleaseCapd = "waiting (slot held, release cap reache
  * Verdicts only the server's queue and slot state can give. The rest are the
  * scheduler's own decision words (blocked, stalled, done, error, claimed, ...).
  */
-export type Verdict = typeof VerdictEligible | typeof VerdictWaitingInQueue | typeof VerdictConcurrencyCap | typeof VerdictNotQueued | typeof VerdictRateLimited | typeof VerdictWaitingOnAnswer | typeof VerdictWaitingReleased | typeof VerdictWaitingReleaseCapd;
+export type Verdict = typeof VerdictEligible | typeof VerdictWaitingInQueue | typeof VerdictConcurrencyCap | typeof VerdictNotQueued | typeof VerdictRateLimited | typeof VerdictUsagePrefix | typeof VerdictWaitingOnAnswer | typeof VerdictWaitingReleased | typeof VerdictWaitingReleaseCapd;
 /**
  * PendingRow is one queue entry with its explain verdict.
  */

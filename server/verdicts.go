@@ -27,6 +27,10 @@ const (
 
 	VerdictRateLimited = "rate-limited"
 
+	// VerdictUsagePrefix starts every usage-gate verdict (the rest is the
+	// window and its reset); the web shows its override button on it.
+	VerdictUsagePrefix = "usage at "
+
 	VerdictWaitingOnAnswer    = "waiting on answer"
 	VerdictWaitingReleased    = "waiting (slot released)"
 	VerdictWaitingReleaseCapd = "waiting (slot held, release cap reached)"
