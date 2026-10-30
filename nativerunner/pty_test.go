@@ -701,10 +701,90 @@ func TestPty_ReattachDeadAgentDied(t *testing.T) {
 			if err != nil || verdict != nativerunner.VerdictDied {
 				t.Fatalf("Reattach = %v, %v; want died", verdict, err)
 			}
-			if _, found, _ := p.Find("e-01"); found {
+			// A silent holder is findable, but as a dead session.
+			if _, found, _ := p.Find("e-01"); found && !tt.silent {
 				t.Error("a dead agent was adopted")
 			}
 		})
+	}
+}
+
+// A restarted server's fresh runner finds the live holder a previous one left.
+func TestPty_FindAdoptsUntrackedLiveHolder(t *testing.T) {
+	t.Parallel()
+	p, dir := preparePtyAgent(t, ptyAgentProcs())
+	serveOldHolder(t, dir, map[string]any{
+		"ping":   map[string]any{"pid": agentPID},
+		"status": map[string]any{"claude": nativerunner.PidStatus{Status: nativerunner.ClaudeIdle}, "turn": 3},
+	})
+
+	s, ok, err := p.Find("e-01")
+	if err != nil || !ok {
+		t.Fatalf("Find = %v, %v; want found", ok, err)
+	}
+	again, ok, _ := p.Find("e-01")
+	if !ok || again != s {
+		t.Errorf("second Find = %+v, %v; want %+v", again, ok, s)
+	}
+	if st, err := p.Status(s); err != nil || st.State != agentrunner.StateIdle {
+		t.Errorf("Status = %+v, %v; want idle", st, err)
+	}
+	if _, ok, err := p.Find("e-99"); ok || err != nil {
+		t.Errorf("Find(e-99) = %v, %v; want not found", ok, err)
+	}
+}
+
+func TestPty_FindDeadHolderIsNotFound(t *testing.T) {
+	t.Parallel()
+	procs := ptyAgentProcs()
+	procs.kill(holderPID)
+	p, _ := preparePtyAgent(t, procs)
+	if _, ok, err := p.Find("e-01"); ok || err != nil {
+		t.Errorf("Find = %v, %v; want not found", ok, err)
+	}
+}
+
+func TestPty_FindSilentHolderIsDead(t *testing.T) {
+	t.Parallel()
+	p, dir := preparePtyAgent(t, ptyAgentProcs())
+	serveOldHolder(t, dir, nil)
+
+	s, ok, err := p.Find("e-01")
+	if err != nil || !ok {
+		t.Fatalf("Find = %v, %v; want found", ok, err)
+	}
+	if _, err := p.Status(s); !errors.Is(err, agentrunner.ErrSessionDied) {
+		t.Errorf("Status = %v; want session died", err)
+	}
+	if err := p.Prompt(s, "hi"); !errors.Is(err, agentrunner.ErrSessionDied) {
+		t.Errorf("Prompt = %v; want session died", err)
+	}
+}
+
+func TestPty_ListAdoptsUntrackedAgentsOfTheEpic(t *testing.T) {
+	t.Parallel()
+	p, dir := preparePtyAgent(t, ptyAgentProcs())
+	serveOldHolder(t, dir, map[string]any{"ping": map[string]any{"pid": agentPID}})
+
+	got, err := p.List("e")
+	if err != nil || len(got) != 1 || got[0].Label != "e-01" {
+		t.Fatalf("List(e) = %+v, %v; want [e-01]", got, err)
+	}
+	if got, err := p.List("other"); err != nil || len(got) != 0 {
+		t.Errorf("List(other) = %+v, %v; want none", got, err)
+	}
+	if _, ok, _ := p.Find("e-01"); !ok {
+		t.Error("List did not track e-01")
+	}
+}
+
+func TestPty_ListSkipsDeadHolder(t *testing.T) {
+	t.Parallel()
+	procs := ptyAgentProcs()
+	procs.kill(holderPID)
+	p, _ := preparePtyAgent(t, procs)
+	if got, err := p.List("e"); err != nil || len(got) != 0 {
+		t.Errorf("List = %+v, %v; want none", got, err)
 	}
 }
 
