@@ -1,13 +1,24 @@
 # Changelog
 
-## Next
+## v0.43.0 - 2026-10-30
 
-- Changed web UI sign-in to a password plus a TOTP code from an authenticator app. This is a hard cut: every device signs in again. A one-time Setup code from `gx server status` starts the first-run setup. Each device gets its own web login, which ends after 90 days without use. The new Settings page lists web logins, signs them out, changes the password and resets the authenticator.
-- Added HTTPS for the web UI. gx makes its own root certificate on the first start. Trust it on each device (iOS profile or Mac `.cer`). Add every name you use to `server.web.allowed-hosts` before the first start, so the certificate covers it.
+- Changed web UI sign-in to a password plus a TOTP code from an authenticator app. This is a hard cut: every device signs in again. A one-time Setup code from `gx server status` starts the first-run setup in the browser, in three steps: Setup code, password, authenticator. The minimum password length is 6 characters. Setup progress survives a page reload. Each device gets its own web login, which ends after 90 days without use. The new Settings page lists web logins (this device first, then newest to oldest), renames and signs them out, changes the password and resets the authenticator. The login page shows the rate-limit state and certificate help. The TUI About dialog shows "setup needed" until setup is done.
+- Added HTTPS for the web UI. gx makes its own root certificate on the first start and redirects plain HTTP on the same port. Trust the root on each device (iOS profile or Mac `.cer`). Add every name you use to `server.web.allowed-hosts` before the first start, so the certificate covers it. `gx server web-new-root` swaps the root and leaf live.
 - Added `server.web.totp`. Set it to `false` for password-only login.
-- Added `gx server web-logins`, `web-revoke`, `web-password`, `web-reset-authenticator` and `web-reset`.
-- Added a source-IP rule: the listener closes connections from public IPs. The loopback TCP listener refuses browser requests.
+- Added `gx server web-logins`, `web-revoke`, `web-password`, `web-reset-authenticator` and `web-reset`, and `gx server web-url` now prints the Setup code.
+- Added a source-IP rule: the web listener closes connections from public IPs before TLS. The loopback TCP listener refuses browser requests. The web server serves `index.html` only at the root, with cache headers, and answers HEAD on public routes.
+- Added a root error boundary in the web UI that reports client errors to the server.
 - Removed `gx server web-token`, `make web-dev-proxy` and `GX_WEBUI_PROXY`. `?gx_token=` links and the `gx_web` cookie no longer work.
+- Added design model tiers. Skills now ask for a tier instead of a model, and `config.json` maps tiers to models. Sessions carry a tier, model and effort; `gx agents create --tier` and a new `gx agent model` verb set them. The New session dialog has a tier picker, and the session header shows the model the agent reports. Design sessions hand off to charting on Continue and auto-advance, and a resume after a failed handoff restart reads the fixed config. Sessions created before this change show the reported model.
+- Added a count of Actionable sessions to the browser tab title.
+- Changed the Agents page: it has its own composer, split from the Design chat core. The phone Agents list shows the empty-state text when there are no sessions, and a design session's phone header links to its design page.
+- Changed `gx tickets reclaim` to settle finished claims, and added a watchdog that pauses stuck ones. A finished agent's background tasks are ignored, and pane leftovers are killed on Stop. A finished commitless ticket now closes as done on merge. The finished probe waits for a background task, and the watchdog spares a run that is settling.
+- Changed the health monitor so a read error clears the CPU and memory one-minute windows.
+- Changed ticket addressing: `ParseAddress` pads an unpadded sub-id such as `6a`. In e2e flow selection, a number after a boolean flag is a flow, and bare numbers mixed with `-g` are an error.
+- Changed `gx-code-review` to share one diff file, verify suspicions and gate the quality pass by size. The `gx-to-tickets` skill now states seam environments, filters, generate commands and mock paths. Agents are told to pass a 600000 Bash timeout to `gx check`. The Mock check can no longer be skipped by asking a person.
+- Changed `gxfixture` to print `log_file`, export the real Playwright cache and serve the mock with `--mock-dir`. `gx-ui-check` starts it via `go run` and names a per-worktree browser session.
+- Fixed `PlanWaves` simulating on a cached epic copy, and cached the ticket index per loaded epic.
+- Changed server tests to run on a real PTY runner by default, with fake runners and herdr chosen per test. Many sleeps became event waits, and flaky negative-check tests were fixed. Internal only.
 
 ## v0.42.0 - 2026-10-29
 
