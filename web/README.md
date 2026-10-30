@@ -37,7 +37,8 @@ The `gx.elentok.com` custom domain is configured once in the Cloudflare Pages da
 ```
 public/
   logo-440.webp                # web-optimized hero logo (~63 KB), from ../docs/logo.png
-  favicon-64.png               # favicon, from ../docs/logo.png
+  favicon-64.png               # compact gx favicon; iOS keeps the mascot icon
+  apple-touch-icon.png         # 180px mascot icon for iOS home screens
   fonts/                       # self-hosted, offline-safe
     Agave-Regular.woff2        # the terminal font gx is used with
     Agave-Bold.woff2
