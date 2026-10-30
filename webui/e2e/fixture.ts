@@ -68,6 +68,8 @@ export interface Fixture {
    * begun (up to 30 seconds), since the server takes each step once. Every flow that needs a code uses it.
    */
   nextTotpCode(): Promise<string>;
+  /** Adopts the secret the setup page showed (spaces allowed), for a fixture that started with setup pending. */
+  useTotpSecret(secret: string): void;
   /** The web password the fixture's setup used; empty while the setup is pending. */
   readonly password: string;
   /** The TOTP secret; empty when the server runs with `server.web.totp=false`. */
@@ -131,6 +133,7 @@ async function startFixture(
   });
   const env = { ...process.env, ...Object.fromEntries(out.env.map((kv) => [kv.slice(0, kv.indexOf("=")), kv.slice(kv.indexOf("=") + 1)])) };
   let lastStep = out.totp_step ?? 0;
+  let totpSecret = out.totp_secret ?? "";
   const fixture: Fixture = {
     password: out.password ?? "",
     totpSecret: out.totp_secret ?? "",
@@ -158,17 +161,20 @@ async function startFixture(
       return Promise.all(ordered.map(async ({ n }) => JSON.parse(await readFile(join(dir, n), "utf8")) as string[]));
     },
     async nextTotpCode() {
-      if (!out.totp_secret) throw new Error("this fixture runs without TOTP");
+      if (!totpSecret) throw new Error("this fixture runs without TOTP");
       const deadline = Date.now() + (TOTP_PERIOD_S + 1) * 1000;
       for (;;) {
         const step = Math.floor(Date.now() / 1000 / TOTP_PERIOD_S);
         if (step > lastStep) {
           lastStep = step;
-          return totpCode(out.totp_secret, step);
+          return totpCode(totpSecret, step);
         }
         if (Date.now() > deadline) throw new Error("no new TOTP step began in time");
         await new Promise((resolve) => setTimeout(resolve, 250));
       }
+    },
+    useTotpSecret(secret) {
+      totpSecret = secret.replace(/\s/g, "");
     },
   };
   // The cookie is `__Host-`: set with the URL (secure, no domain), never a domain.

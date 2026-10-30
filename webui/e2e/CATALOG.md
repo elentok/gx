@@ -1172,3 +1172,25 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
 - **Scenario:** `agents`
 - **Steps:** create a session in project `other` from the Agents page, then send it a prompt and wait for the reply.
 - **Pass:** the header reads `sonnet · medium` with the tooltip "Worker tier", before and after the reply.
+
+## 99. First-run setup
+
+- **Scenario:** `web-setup`
+- **Steps:**
+  1. Open `web_url`. Enter a wrong Setup code and continue.
+  2. Enter the code from `gx server status`.
+  3. Try a short password, then a mismatched pair, then a good one.
+  4. On step 3, enter a wrong authenticator code, then the right one from the fixture's wait helper.
+- **Pass:** the card shows "step 1 of 3" and the wrong-or-expired error. Step 2 shows "At least 12 characters.", refuses the short and mismatched passwords and goes on with the good one. Step 3 shows the QR, an "Add to authenticator app" link whose `href` starts with `otpauth://totp/` and the key. The wrong code shows the clock error and `gx server status` still prints a setup code. The right code opens the Epics page signed in.
+
+## 100. Setup from the QR link
+
+- **Scenario:** `web-setup`
+- **Steps:** open the link `gx server web-url` prints, then finish setup.
+- **Pass:** step 1 has the Setup code filled in and the page URL ends in `#/setup` with no code. After setup the page URL ends in `#/epics` (setup sets `#/`, which redirects there).
+
+## 101. Setup and login with TOTP off
+
+- **Scenario:** `web-setup`, with config `server.web.totp=false`.
+- **Steps:** enter the Setup code and a good password twice, open Settings, sign out of this device, sign in again.
+- **Pass:** the card shows "step 1 of 2" and its button reads "Finish setup", which opens the Epics page. Settings has no "Reset authenticator" row. The login card has no code field and the password alone opens the Epics page.
