@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
 )
 
 const newWebPassword = "a brand new passphrase"
@@ -144,14 +145,10 @@ func readUntil(t *testing.T, r io.Reader, want string) string {
 // so typed input is never echoed by a race with the prompt.
 func waitForNoEcho(t *testing.T, tty *os.File) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if tio, err := termios.GetTermios(int(tty.Fd())); err == nil && tio.Lflag&unix.ECHO == 0 {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	t.Fatal("the command never switched the terminal's echo off")
+	testutil.WaitFor(t, 5*time.Second, "the command to switch the terminal's echo off", func() bool {
+		tio, err := termios.GetTermios(int(tty.Fd()))
+		return err == nil && tio.Lflag&unix.ECHO == 0
+	})
 }
 
 // runOnPty runs web-password with its stdin and stdout on a pty, types each
