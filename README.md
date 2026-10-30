@@ -10,7 +10,7 @@ _gx_ is an agentic development platform for desktop and phone.
 - **Smart-zone aware agents.** gx pauses and compacts a session before its context reaches the smart-zone ceiling.
 - **Design flow.** A full UI takes an idea through a map of decisions and into tickets.
 - **Agent management.** List, prompt, interrupt and resume agent sessions.
-- **Terminal UI and web UI.** Use the terminal on your desk and the web UI from your phone. The web UI uses HTTPS and a one-time code from an authenticator app.
+- **Web UI and terminal UI.** The web UI is the main interface, on desktop and phone. It uses HTTPS and a one-time code from an authenticator app. A terminal UI is also available.
 - **Budget and notifications.** A daily budget caps spend. Telegram or Slack tells you when an agent needs you.
 - **Resource monitoring.** gx watches CPU, memory and disk space, and warns when disk space runs low.
 - **Learning loop.** `gx evolve` reviews a finished epic. Follow-ups collect bugs and ideas found along the way, and a triage step goes through them.
