@@ -278,92 +278,6 @@ func (p *Pty) Reattach(label string) (agentrunner.Session, Verdict, error) {
 	return agentrunner.Session{}, VerdictDied, nil
 }
 
-type adoption int
-
-const (
-	adoptGone   adoption = iota // holder pid is not alive
-	adoptSilent                 // holder pid is alive but its socket doesn't answer
-	adoptedLive                 // session is tracked and drivable
-)
-
-// tracked returns label's drivable in-memory session. A silent one that Find
-// registered as dead doesn't count, so Reattach still re-checks it.
-func (p *Pty) tracked(label string) (agentrunner.Session, bool) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	ss, ok := p.sessions[label]
-	if !ok || ss.died != nil {
-		return agentrunner.Session{}, false
-	}
-	return ss.session, true
-}
-
-// adopt tracks the holder under label's dir. It is the one adopt path for
-// Reattach, Find and List.
-func (p *Pty) adopt(label string) (agentrunner.Session, adoption, error) {
-	if s, ok := p.tracked(label); ok {
-		return s, adoptedLive, nil
-	}
-	dir := filepath.Join(p.Root, label)
-	meta, err := readMeta(dir)
-	if err != nil {
-		return agentrunner.Session{}, 0, err
-	}
-	live, err := ptyAlive(orPS(p.Procs), meta)
-	if err != nil {
-		return agentrunner.Session{}, 0, err
-	}
-	if !live {
-		return agentrunner.Session{}, adoptGone, nil
-	}
-	// A holder whose socket stays silent can't be driven.
-	holder, err := DialHolder(dir)
-	if err != nil {
-		return p.trackSilent(label, meta), adoptSilent, nil
-	}
-	ss := p.newSession(label, meta)
-	ss.holder = holder
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	// A concurrent adopt of label may have won meanwhile.
-	if other, ok := p.sessions[label]; ok && other.died == nil {
-		return other.session, adoptedLive, nil
-	}
-	go p.watchExit(ss, meta)
-	if p.sessions == nil {
-		p.sessions = map[string]*ptySession{}
-	}
-	p.sessions[label] = ss
-	return ss.session, adoptedLive, nil
-}
-
-func (p *Pty) newSession(label string, meta Meta) *ptySession {
-	return &ptySession{
-		session:     agentrunner.Session{Label: label, ID: label, SessionID: meta.SessionID},
-		epic:        meta.Epic,
-		holderPID:   meta.HolderPID,
-		claudePID:   meta.PID,
-		holderStart: meta.HolderPIDStart,
-		claudeStart: meta.PIDStart,
-		exited:      make(chan struct{}),
-	}
-}
-
-// trackSilent registers a live-pid holder that doesn't answer as a dead
-// session, so every call on it fails with ErrSessionDied.
-func (p *Pty) trackSilent(label string, meta Meta) agentrunner.Session {
-	ss := p.newSession(label, meta)
-	ss.died = agentrunner.SessionDied("holder socket is silent")
-	close(ss.exited)
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.sessions == nil {
-		p.sessions = map[string]*ptySession{}
-	}
-	p.sessions[label] = ss
-	return ss.session
-}
-
 // watchExit closes ss.exited once an adopted holder is gone. It isn't the
 // server's child, so there is no Wait to block on.
 func (p *Pty) watchExit(ss *ptySession, meta Meta) {
@@ -529,34 +443,6 @@ func (p *Pty) awaitHolderGone(ss *ptySession, grace time.Duration) error {
 	}
 }
 
-// heldLabel decides what a live holder under opts.Label means for Start: the
-// holder's session when it is adopted, a LabelTakenError when it blocks the
-// launch, and neither when the dir has no live holder. It never touches the
-// holder's files.
-func (p *Pty) heldLabel(opts agentrunner.StartOptions) (agentrunner.Session, bool, error) {
-	s, outcome, err := p.adopt(opts.Label)
-	if errors.Is(err, agentrunner.ErrNotFound) {
-		return agentrunner.Session{}, false, nil
-	}
-	if err != nil {
-		return agentrunner.Session{}, false, err
-	}
-	if outcome == adoptGone {
-		return agentrunner.Session{}, false, nil
-	}
-	meta, err := readMeta(filepath.Join(p.Root, opts.Label))
-	if err != nil {
-		return agentrunner.Session{}, false, err
-	}
-	if outcome == adoptedLive && !opts.NoAdopt && filepath.Clean(meta.Cwd) == filepath.Clean(opts.Cwd) {
-		return s, true, nil
-	}
-	return agentrunner.Session{}, false, &agentrunner.LabelTakenError{
-		HolderCwd: meta.Cwd,
-		Err:       fmt.Errorf("%s: holder pid %d runs in %s", opts.Label, meta.HolderPID, meta.Cwd),
-	}
-}
-
 func (p *Pty) reserve(label string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -698,10 +584,7 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 		// wait on the pid itself.
 		p.killSessions(ss)
 		if err := p.awaitHolderGone(ss, grace); err != nil {
-			p.mu.Lock()
-			ss.stopped = false
-			p.mu.Unlock()
-			return err
+			return p.stopFailed(ss, err)
 		}
 	} else {
 		wait := grace
@@ -713,10 +596,7 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 		case <-time.After(wait):
 			p.killSessions(ss)
 			if err := awaitExit(ss.exited, grace, ss.holderPID); err != nil {
-				p.mu.Lock()
-				ss.stopped = false
-				p.mu.Unlock()
-				return err
+				return p.stopFailed(ss, err)
 			}
 		}
 	}
@@ -725,6 +605,14 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 	delete(p.sessions, s.Label)
 	p.mu.Unlock()
 	return p.Cleanup(s.Label)
+}
+
+// stopFailed lets a later Stop retry after err and returns err.
+func (p *Pty) stopFailed(ss *ptySession, err error) error {
+	p.mu.Lock()
+	ss.stopped = false
+	p.mu.Unlock()
+	return err
 }
 
 // Cleanup removes label's holder.sock, which a crashed holder leaves behind.
@@ -746,66 +634,6 @@ func (p *Pty) Cleanup(label string) error {
 		}
 	}
 	return removeAll(dir, layouts[ptyRunnerName].transient)
-}
-
-// Find returns label's agent, adopting a live holder an earlier server left
-// behind. A holder with a live pid and a silent socket is returned dead.
-func (p *Pty) Find(label string) (agentrunner.Session, bool, error) {
-	p.mu.Lock()
-	ss, ok := p.sessions[label]
-	p.mu.Unlock()
-	if ok {
-		return ss.session, true, nil
-	}
-	s, outcome, err := p.adopt(label)
-	if errors.Is(err, agentrunner.ErrNotFound) {
-		return agentrunner.Session{}, false, nil
-	}
-	if err != nil {
-		return agentrunner.Session{}, false, err
-	}
-	if outcome == adoptGone {
-		return agentrunner.Session{}, false, nil
-	}
-	return s, true, nil
-}
-
-// List returns epic's agents, adopting live holders on disk that this value
-// doesn't track yet.
-func (p *Pty) List(epic string) ([]agentrunner.Session, error) {
-	labels := map[string]struct{}{}
-	p.mu.Lock()
-	for label, ss := range p.sessions {
-		if ss.epic == epic {
-			labels[label] = struct{}{}
-		}
-	}
-	p.mu.Unlock()
-	entries, err := os.ReadDir(p.Root)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	}
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		meta, err := readMeta(filepath.Join(p.Root, e.Name()))
-		if err == nil && meta.Epic == epic {
-			labels[e.Name()] = struct{}{}
-		}
-	}
-	var out []agentrunner.Session
-	for label := range labels {
-		s, ok, err := p.Find(label)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			out = append(out, s)
-		}
-	}
-	slices.SortFunc(out, func(a, b agentrunner.Session) int { return strings.Compare(a.Label, b.Label) })
-	return out, nil
 }
 
 var _ agentrunner.Nudger = (*Pty)(nil)
@@ -853,47 +681,6 @@ func notDelivered(err error) error {
 		return fmt.Errorf("%w: %w", agentrunner.ErrNotDelivered, err)
 	}
 	return err
-}
-
-var (
-	_ agentrunner.PersonInputter = (*Pty)(nil)
-
-	// errPersonInput ends a prompt once a person typed after gx did: the rest of
-	// its nudges would fight that input. It is not a failure.
-	errPersonInput = errors.New("a person typed after the prompt")
-)
-
-// PersonInput watches the holder for a person's keys and pastes. A holder
-// without the watch op returns an error.
-func (p *Pty) PersonInput(s agentrunner.Session) (<-chan struct{}, func(), error) {
-	ss, err := p.live(s)
-	if err != nil {
-		return nil, nil, err
-	}
-	if !ss.holder.Supports(OpWatch) {
-		return nil, nil, errors.New("holder has no watch op")
-	}
-	watch, err := ss.holder.Watch()
-	if err != nil {
-		return nil, nil, err
-	}
-	events := make(chan struct{}, 1)
-	go func() {
-		for {
-			m, err := watch.Next()
-			if err != nil {
-				return
-			}
-			if m.Type != StreamInput {
-				continue
-			}
-			select {
-			case events <- struct{}{}:
-			default:
-			}
-		}
-	}()
-	return events, func() { _ = watch.Close() }, nil
 }
 
 // isSlashCommand reports whether text is a "/" command that takes the
@@ -956,173 +743,6 @@ func (p *Pty) awaitNotBusy(ss *ptySession) (int, error) {
 	}
 }
 
-// ptyPrompter is claudeui.Prompter over holder.sock. A turn has started once
-// the holder's Turn passes turn.
-//
-// person carries a person's input (nil when unseen). Input before gx typed is
-// the draft check's case; input after it sets stopped, and every later key or
-// wait returns errPersonInput.
-type ptyPrompter struct {
-	p       *Pty
-	ss      *ptySession
-	turn    int
-	person  <-chan struct{}
-	typed   bool
-	stopped bool
-}
-
-// cancelled returns errPersonInput once a person typed after gx did.
-func (pr *ptyPrompter) cancelled() error {
-	if !pr.typed {
-		return nil
-	}
-	if !pr.stopped {
-		select {
-		case <-pr.person:
-			pr.stopped = true
-		default:
-		}
-	}
-	if pr.stopped {
-		return errPersonInput
-	}
-	return nil
-}
-
-// awaitEmptyInput waits up to wait for a person's draft to go, so gx never
-// types over it. A check that can't decide types as before.
-func (pr *ptyPrompter) awaitEmptyInput(wait time.Duration) error {
-	deadline := time.Now().Add(wait)
-	for {
-		empty, known, err := pr.InputEmpty()
-		if err != nil || empty || !known {
-			return err
-		}
-		if !time.Now().Before(deadline) {
-			return fmt.Errorf("%w: %w", claudeui.ErrStuckSubmission, claudeui.ErrInputNotEmpty)
-		}
-		select {
-		case <-pr.ss.exited:
-			return pr.p.died(pr.ss, errors.New("holder exited"))
-		case <-time.After(pr.p.pollInterval()):
-		}
-	}
-}
-
-func (pr *ptyPrompter) Submit(text string) error {
-	if err := pr.cancelled(); err != nil {
-		return err
-	}
-	if !pr.typed {
-		// Input so far was before gx typed.
-		select {
-		case <-pr.person:
-		default:
-		}
-	}
-	if err := pr.ss.holder.TypeText(text); err != nil {
-		return pr.p.died(pr.ss, err)
-	}
-	pr.typed = true
-	return pr.SendEnter()
-}
-
-// Clear presses the harness clear key once.
-func (pr *ptyPrompter) Clear() error {
-	if err := pr.cancelled(); err != nil {
-		return err
-	}
-	return pr.p.died(pr.ss, pr.ss.holder.SendKeys(pr.p.typing().ClearKey()))
-}
-
-// InputEmpty runs the harness empty check when the holder serves styled rows.
-func (pr *ptyPrompter) InputEmpty() (bool, bool, error) {
-	if !pr.ss.holder.Supports(OpScreenStyled) {
-		return false, false, nil
-	}
-	rows, err := pr.ss.holder.StyledScreen()
-	if err != nil {
-		return false, false, pr.p.died(pr.ss, err)
-	}
-	switch pr.p.typing().InputIsEmpty(rows) {
-	case harness.InputEmpty:
-		return true, true, nil
-	case harness.InputNotEmpty:
-		return false, true, nil
-	}
-	return false, false, nil
-}
-
-// ReadyToType runs claude's ready-to-type step over the holder.
-func (pr *ptyPrompter) ReadyToType() bool {
-	return pr.p.typing().ReadyToType(HolderTypingIO(pr.ss.holder))
-}
-
-// HolderTypingIO reads styled rows when the holder serves them, plain rows
-// otherwise; the ready-to-type step needs only the text.
-func HolderTypingIO(h *HolderClient) harness.TypingIO {
-	return harness.TypingIO{
-		Rows: func() ([]string, error) {
-			if h.Supports(OpScreenStyled) {
-				return h.StyledScreen()
-			}
-			rows, _, err := h.Screen(0)
-			return rows, err
-		},
-		SendKeys: h.SendKeys,
-	}
-}
-
-// claudeTyping is the holder child's typing rules; it reads the env the
-// parent gave that child.
-var claudeTyping = harness.ClaudeTyping()
-
-// typing is claude's typing rules reading its config from p.Env. A nil Env
-// becomes an empty one, which harness would read as the process env.
-func (p *Pty) typing() harness.Typing {
-	env := p.Env
-	if env == nil {
-		env = []string{}
-	}
-	return harness.ClaudeTypingIn(env)
-}
-
-func (pr *ptyPrompter) SendEnter() error {
-	if err := pr.cancelled(); err != nil {
-		return err
-	}
-	return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\r"))
-}
-
-func (pr *ptyPrompter) WaitStart(timeout time.Duration) (bool, error) {
-	deadline := time.Now().Add(timeout)
-	for {
-		if err := pr.cancelled(); err != nil {
-			return false, err
-		}
-		_, turn, err := pr.ss.holder.Status()
-		if err != nil {
-			return false, pr.p.died(pr.ss, err)
-		}
-		if turn > pr.turn {
-			return true, nil
-		}
-		if time.Now().After(deadline) {
-			return false, nil
-		}
-		select {
-		case <-pr.ss.exited:
-			return false, pr.p.died(pr.ss, errors.New("holder exited"))
-		case <-time.After(pr.p.pollInterval()):
-		}
-	}
-}
-
-func (pr *ptyPrompter) Screen() (string, error) {
-	rows, _, err := pr.ss.holder.Screen(0)
-	return strings.Join(rows, "\n"), pr.p.died(pr.ss, err)
-}
-
 // Interrupt picks its key by state: Ctrl+C when busy, a lone Esc when blocked
 // (it denies the dialog), nothing otherwise. After a key it waits up to N for
 // idle, then presses Ctrl+C once: claude restores the cancelled prompt into the
@@ -1180,55 +800,6 @@ func (p *Pty) awaitIdle(ss *ptySession) error {
 		case <-time.After(p.pollInterval()):
 		}
 	}
-}
-
-// RateLimit reads the limit from the transcript fact the holder reports, not
-// the screen. A message without a parseable reset time gives a zero time.
-func (p *Pty) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
-	ss, err := p.live(s)
-	if err != nil {
-		return time.Time{}, false, err
-	}
-	message, limited, err := ss.holder.RateLimitMessage()
-	if err != nil {
-		return time.Time{}, false, p.died(ss, err)
-	}
-	if !limited {
-		return time.Time{}, false, nil
-	}
-	now := time.Now()
-	if d, ok := claudeui.SecondsUntilReset(claudeui.ResetToken(message), now); ok {
-		return now.Add(d), true, nil
-	}
-	return p.usageRecordReset(ss.session.Label), true, nil
-}
-
-// usageLimitPercent is the fixed usage at which a record window counts as the
-// limit that fired.
-const usageLimitPercent = 98
-
-// usageRecordReset is the latest resets_at among label's record windows at
-// usageLimitPercent or more, or zero when there is no such window. A missing
-// or unreadable record gives zero: the record only refines the message.
-func (p *Pty) usageRecordReset(label string) time.Time {
-	data, err := os.ReadFile(filepath.Join(p.Root, label, UsageFile))
-	if err != nil {
-		return time.Time{}
-	}
-	var rec UsageRecord
-	if json.Unmarshal(data, &rec) != nil {
-		return time.Time{}
-	}
-	var latest int64
-	for _, w := range []*UsageWindow{rec.FiveHour, rec.SevenDay} {
-		if w != nil && w.UsedPercentage >= usageLimitPercent {
-			latest = max(latest, w.ResetsAt)
-		}
-	}
-	if latest == 0 {
-		return time.Time{}
-	}
-	return time.Unix(latest, 0)
 }
 
 // permissionPrompt is the waitingFor of both tool permission and plan
