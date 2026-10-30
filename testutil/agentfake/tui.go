@@ -788,7 +788,9 @@ func (t *tui) handleControl(c Control) error {
 		if err := t.setStatus(StatusIdle, ""); err != nil {
 			return err
 		}
-		t.runStatusLine()
+		// Off the input loop: claude keeps reading keys while its statusLine
+		// command runs, and a slow one must not look like a missed prompt.
+		go t.runStatusLine()
 		return nil
 	case ActionBlock:
 		waitingFor := c.WaitingFor
