@@ -452,6 +452,15 @@ func TestPty_StartRecordsBothPidsAndLaunchArgs(t *testing.T) {
 	if got := strings.Count(claude.Cmdline, "--append-system-prompt"); got != 1 {
 		t.Errorf("claude cmdline %q has --append-system-prompt %d times, want 1", claude.Cmdline, got)
 	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"tui":"default"`, `"statusLine"`, exe + "' claude statusline --agent-dir '" + filepath.Join(p.Root, "e-01") + "'"} {
+		if !strings.Contains(claude.Cmdline, want) {
+			t.Errorf("claude cmdline %q lacks %q", claude.Cmdline, want)
+		}
+	}
 }
 
 func TestPty_ResumeStartsClaudeWithResumeAlone(t *testing.T) {

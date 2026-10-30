@@ -1,6 +1,7 @@
 package nativerunner
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -427,7 +428,11 @@ func (p *Pty) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec
 		}
 		holder = []string{exe, "agent-holder"}
 	}
-	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: ptyLaunchArgs(opts.Args), Env: slices.Concat(p.Env, opts.Env)}
+	claudeArgs, err := ptyLaunchArgs(opts.Args, dir)
+	if err != nil {
+		return nil, err
+	}
+	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: claudeArgs, Env: slices.Concat(p.Env, opts.Env)}
 	var launch harness.Command
 	if opts.ResumeSessionID != "" {
 		// --resume and --session-id fail together, so claude gets only --resume.
@@ -462,12 +467,32 @@ var ptyHarness = func() harness.Harness {
 	return h
 }()
 
-func ptyLaunchArgs(extra []string) []string {
+func ptyLaunchArgs(extra []string, dir string) ([]string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	settings, err := json.Marshal(map[string]any{
+		// The main screen keeps a scrollback to read back.
+		"tui": "default",
+		// The statusline command records the usage limits into the agent dir.
+		"statusLine": map[string]any{
+			"type":    "command",
+			"command": shellQuote(exe) + " claude statusline --agent-dir " + shellQuote(dir),
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
 	return harness.WithGXSystemPrompt(agentrunner.WithLoopDisallowedTools(append([]string{
 		"--permission-mode", "auto",
-		// The main screen keeps a scrollback to read back.
-		"--settings", `{"tui":"default"}`,
-	}, extra...)))
+		"--settings", string(settings),
+	}, extra...))), nil
+}
+
+// shellQuote single-quotes s for the shell that runs the statusline command.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // killLaunch SIGKILLs each nonzero pid's whole session unchecked. Only a

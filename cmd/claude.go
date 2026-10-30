@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"bytes"
+	"io"
+	"time"
+
 	"github.com/spf13/cobra"
 
 	"github.com/elentok/gx/ui/history"
@@ -35,6 +39,7 @@ func newClaudeHistoryCmd(d deps) *cobra.Command {
 
 func newClaudeStatuslineCmd(d deps) *cobra.Command {
 	var silent, demo, install bool
+	var agentDir string
 
 	cmd := &cobra.Command{
 		Use:   "statusline",
@@ -44,9 +49,18 @@ func newClaudeStatuslineCmd(d deps) *cobra.Command {
 			if install {
 				return installClaudeStatusline(d)
 			}
-			return runClaudeStatusline(d, silent, demo)
+			if agentDir == "" || demo {
+				return runClaudeStatusline(d, silent, demo)
+			}
+			var payload bytes.Buffer
+			d.stdin = io.TeeReader(d.stdin, &payload)
+			err := runClaudeStatusline(d, silent, demo)
+			// A failed record write never changes the line or the exit code.
+			_ = recordStatuslineUsage(agentDir, payload.Bytes(), time.Now())
+			return err
 		},
 	}
+	cmd.Flags().StringVar(&agentDir, "agent-dir", "", "also record the payload's rate_limits into this pty agent directory")
 	cmd.Flags().BoolVar(&silent, "silent", false, "omit missing/invalid fields instead of rendering an error segment")
 	cmd.Flags().BoolVar(&demo, "demo", false, "print sample statusline output instead of reading the hook JSON from stdin")
 	cmd.Flags().BoolVar(&install, "install", false, "install this command as Claude Code's statusLine in ~/.claude/settings.json")
