@@ -74,16 +74,9 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 					continue
 				}
 				if p.Agent == AgentCodex {
-					resetAt, limited, evidence, limitErr := runnerRateLimit(d, p)
+					_, _, evidence, limitErr := runnerRateLimit(d, p)
 					if limitErr != nil {
 						return fmt.Errorf("detecting %s Codex quota: %w", p.Label, limitErr)
-					}
-					if limited {
-						if err := recoverCodexRateLimit(d, p, sessionID, resetAt); err != nil {
-							return err
-						}
-						elapsedMs = 0
-						continue
 					}
 					// Codex can sit blocked on its own context-exhaustion
 					// banner; that is recoverable, not a question for a human.
@@ -99,31 +92,16 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 				return fmt.Errorf("%s is blocked on a prompt gx did not send", p.Label)
 			}
 
-			// Claude has no structured "rate limited" status of its own: a
-			// real hit just looks like the pane going idle, same as an
-			// ordinary finish. So check for the rate-limit message here,
-			// once the pane has actually stopped — not on every poll tick
-			// while it's still working, which is what caused false alarms
-			// from stale "approaching the limit" mentions still visible in
-			// scrollback mid-turn.
 			// A read failure here is not worth failing a finish over: the
-			// ordinary finish checks below run regardless. Codex quota is
-			// deliberately not acted on here, only its context exhaustion.
-			resetAt, limited, evidence, _ := runnerRateLimit(d, p)
+			// ordinary finish checks below run regardless. Rate limits are
+			// not acted on here, only Codex context exhaustion.
+			_, _, evidence, _ := runnerRateLimit(d, p)
 			if p.Agent == AgentCodex && evidence != "" {
 				// Wait returns at once on an idle pane, so pace the retry.
 				elapsedMs, err = recoverCodexContextExhaustionPoll(d, p, sessionID, evidence, smartZone, elapsedMs, true)
 				if err != nil {
 					return err
 				}
-				continue
-			}
-
-			if p.Agent == AgentClaude && limited {
-				if err := recoverClaudeRateLimit(d, p, sessionID, resetAt); err != nil {
-					return err
-				}
-				elapsedMs = 0
 				continue
 			}
 
@@ -188,16 +166,9 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 		elapsedMs += pollMs
 
 		if p.Agent == AgentCodex {
-			resetAt, limited, evidence, checkErr := runnerRateLimit(d, p)
+			_, _, evidence, checkErr := runnerRateLimit(d, p)
 			if checkErr != nil {
 				return fmt.Errorf("detecting %s Codex quota: %w", p.Label, checkErr)
-			}
-			if limited {
-				if err := recoverCodexRateLimit(d, p, sessionID, resetAt); err != nil {
-					return err
-				}
-				elapsedMs = 0
-				continue
 			}
 			if evidence != "" {
 				// The Wait above already paced this poll.
@@ -708,69 +679,6 @@ func waitForBackgroundTasks(d Deps, p launchAndPromptParams, sessionID string, u
 		d.Sleep(time.Duration(pollMs) * time.Millisecond)
 		*elapsedMs += pollMs
 	}
-}
-
-// recoverClaudeRateLimit pauses label for display, waits out the rate limit
-// via waitForClaudeRateLimitReset (racing the reset deadline against a
-// resume request rather than blocking through it), then resumes and
-// re-prompts the agent to continue.
-func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID string, resetAt time.Time) error {
-	reason := "rate limit detected"
-	if !resetAt.IsZero() {
-		reason = fmt.Sprintf("rate limit detected, resets %s", resetAt.UTC().Format(time.RFC3339))
-	}
-	p.Gate.pause(p.Label, reason)
-	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
-	p.logAgentEvent(string(events.PausedRateLimit), sessionID, reason)
-	waitForClaudeRateLimitReset(d, p.Gate, p.session(), resetAt)
-	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
-	p.logLifecycleEvent(string(events.Resumed), sessionID)
-	p.Gate.ForceResume(p.Label)
-
-	if err := promptIdle(d, p, "continue"); err != nil {
-		return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
-	}
-	return nil
-}
-
-func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, resetAt time.Time) error {
-	reason := "Codex quota exhausted"
-	if !resetAt.IsZero() {
-		reason += fmt.Sprintf(", resets %s", resetAt.UTC().Format(time.RFC3339))
-	}
-	p.Gate.pause(p.Label, reason)
-	p.sink().IterationPaused(p.Ticket, p.Label, PauseRateLimit, reason)
-	p.logAgentEvent(string(events.PausedRateLimit), sessionID, reason)
-	waitForCodexRateLimitReset(d, p.session(), resetAt)
-	p.sink().IterationResumed(p.Ticket, p.Label, PauseRateLimit)
-	p.logLifecycleEvent(string(events.Resumed), sessionID)
-	p.Gate.ForceResume(p.Label)
-
-	st, err := d.Runner.Status(p.session())
-	if err != nil {
-		return fmt.Errorf("re-observing %s after Codex quota reset: %w", p.Label, err)
-	}
-	if st.State != agentrunner.StateBlocked {
-		return nil
-	}
-
-	return pauseBlockedAfterCodexQuotaReset(p, sessionID, st.BlockedReason)
-}
-
-// pauseBlockedAfterCodexQuotaReset handles a Codex pane that comes back
-// blocked once its quota reset: unlike waitForClaudeRateLimitReset's plain
-// "continue" re-prompt, a blocked pane here is sitting on its own dialog, not
-// waiting for the iteration to resume — "continue" is a prompt, not a dialog
-// answer, and gx never raised the dialog in the first place, so it must not
-// be sent. There is also no trust_directory branch to try: the directory was
-// already trusted at launch and gx was asleep for the reset, so the only
-// answerable-dialog case (see ticket 01) can't occur here. This pauses for a
-// human instead, naming the unanswered dialog by the runner's
-// Status.BlockedReason.
-func pauseBlockedAfterCodexQuotaReset(p launchAndPromptParams, sessionID, blockedReason string) error {
-	reason := fmt.Sprintf("%s came back blocked on dialog %q after a Codex quota reset; answer it in the pane", p.Label, blockedReason)
-	p.pauseBlockedPane(sessionID, reason)
-	return errBlockedPanePaused
 }
 
 // contextOccupancy reads the selected agent's own local session data. A

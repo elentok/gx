@@ -5,10 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/elentok/gx/agentrunner"
-	"github.com/elentok/gx/tickets/schema"
 )
 
 // TestRun_ReattachedSmartZoneBreach_AutoRecoversThenMerges covers ticket 23's
@@ -55,63 +53,5 @@ func TestRun_ReattachedSmartZoneBreach_AutoRecoversThenMerges(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), "status: done") {
 		t.Errorf("ticket after reattached smart-zone recovery = %s, want status: done", raw)
-	}
-}
-
-// TestRun_ReattachedCodexQuota_StructuredRecoveryThenMerges covers ticket 23's
-// second requirement: a reattached Codex iteration's wait still detects a
-// structured (session-file-backed) quota exhaustion and pauses/resumes the
-// gate around the reset. Per ticket 04, a pane still blocked once that reset
-// completes must pause for a human instead of being re-prompted — herdr
-// 0.8.2 hard-rejects a prompt into a blocked pane, and even without that
-// guard "continue" isn't an answer to whatever dialog the pane is sitting
-// on.
-func TestRun_ReattachedCodexQuota_StructuredRecoveryThenMerges(t *testing.T) {
-	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n",
-	})
-	d, promptsPtr, removed := fakeDeps()
-	hostLiveAgent(t, d, "epic-iter-01")
-	fakeRunner(d).SetState("epic-iter-01", agentrunner.StateBlocked, "usage limit")
-	fakeRunner(d).SetRateLimit("epic-iter-01", time.Now().Add(-time.Second))
-	d.Sleep = func(time.Duration) { fakeRunner(d).SetRateLimit("epic-iter-01", time.Time{}) }
-	// The pane stays blocked forever in this fake — there is no dialog for a
-	// human to answer here, only a scripted proof that the pause happened. The
-	// pause poll is the run's only path to noticing an external status change,
-	// so it doubles as that "human" here: on the first poll it reads back the
-	// paused ticket to prove it merged on paused (answer) with the reset's
-	// pane never prompted, then marks it done directly, the same way a person
-	// resolving the dialog by hand would let the run settle.
-	path := ticketPath(scratchDir, "epic", "01-a.md")
-	var pausePolls int
-	d.PauseTimer = func(dur time.Duration) <-chan time.Time {
-		pausePolls++
-		if pausePolls == 1 {
-			raw, err := os.ReadFile(path)
-			if err != nil {
-				t.Errorf("ReadFile %s: %v", path, err)
-			} else {
-				assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
-			}
-			if err := SetStatus(path, "done"); err != nil {
-				t.Errorf("SetStatus %s: %v", path, err)
-			}
-		}
-		return readyTimer(dur)
-	}
-
-	if err := Run(RunOptions{EpicName: "epic", Agent: AgentCodex, Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, noopEventSink{}); err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	if len(*promptsPtr) != 0 {
-		t.Errorf("prompts = %v, want none — a pane herdr reports blocked must never be prompted", *promptsPtr)
-	}
-	if len(*removed) != 0 {
-		t.Errorf("removed worktree branches = %v, want none — the ticket was resolved directly, not through the ordinary merging path", *removed)
-	}
-	if pausePolls == 0 {
-		t.Errorf("run never paused (no pause poll), want it to pause on the blocked-after-reset ticket")
 	}
 }

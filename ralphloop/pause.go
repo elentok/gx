@@ -9,9 +9,8 @@ import (
 
 // pausedPollInterval is how often a paused run (nothing runnable, something
 // human-clearable) re-reads the epic looking for a status a person has
-// cleared. Slower than resumePollInterval (see ratelimit.go) on purpose:
-// every pass writes a scheduler-scan line to the run log, and a pause can
-// last hours.
+// cleared. Slow on purpose: every pass writes a scheduler-scan line to the run
+// log, and a pause can last hours.
 const pausedPollInterval = 30 * time.Second
 
 // QueuePauseLabel identifies the in-process pause controlled by the Queue UI.
@@ -84,17 +83,6 @@ func (g *Gate) claimIfRunning(claim func() error) (bool, error) {
 		return false, nil
 	}
 	return true, claim()
-}
-
-// isLabelPaused reports whether label specifically is still paused, letting
-// a caller notice an in-process ForceResume (e.g. from the TUI) without
-// waiting on the shared wake channel — see waitForClaudeRateLimitReset,
-// which also races a reset deadline.
-func (g *Gate) isLabelPaused(label string) bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	_, paused := g.reasons[label]
-	return paused
 }
 
 // snapshot returns a copy of every currently-paused iteration's reason, for

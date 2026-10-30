@@ -64,9 +64,8 @@ func promptIdle(d Deps, p launchAndPromptParams, text string) error {
 // window ends.
 const blockedDwellMs = 15_000
 
-// errBlockedPanePaused is the sentinel return for a pane paused after its
-// Codex quota reset (pauseBlockedAfterCodexQuotaReset): not a failure, but a
-// signal to the callers (launchAndPrompt, runIteration, reattachIteration) to
+// errBlockedPanePaused is the sentinel return for a pane paused on an
+// unanswered prompt: not a failure, but a signal to the callers (launchAndPrompt, runIteration, reattachIteration) to
 // end the iteration without running the ordinary finish path (commit check,
 // cherry-pick, worktree/tab cleanup) that assumes the agent actually finished
 // — this pane's agent is still live, just waiting on a prompt nobody has

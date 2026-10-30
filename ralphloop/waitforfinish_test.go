@@ -12,7 +12,6 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	eventsc "github.com/elentok/gx/events"
 	"github.com/elentok/gx/testutil/runnerfake"
-	"github.com/elentok/gx/tickets/schema"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -1187,31 +1186,6 @@ type occupancyCall struct {
 	tokens     int
 }
 
-type quotaEventSink struct {
-	noopEventSink
-	paused  []quotaPauseEvent
-	resumed []quotaResumeEvent
-}
-
-type quotaPauseEvent struct {
-	identifier string
-	kind       PauseKind
-	reason     string
-}
-
-type quotaResumeEvent struct {
-	identifier string
-	kind       PauseKind
-}
-
-func (s *quotaEventSink) IterationPaused(identifier, label string, kind PauseKind, reason string) {
-	s.paused = append(s.paused, quotaPauseEvent{identifier: label, kind: kind, reason: reason})
-}
-
-func (s *quotaEventSink) IterationResumed(identifier, label string, kind PauseKind) {
-	s.resumed = append(s.resumed, quotaResumeEvent{identifier: label, kind: kind})
-}
-
 func (s *occupancySink) ContextOccupancy(identifier string, tokens int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1306,68 +1280,6 @@ func TestWaitForFinish_InverseGuard_BlockedAfterOwnSmartZoneRecoveryNotPaused(t 
 	}
 }
 
-// TestWaitForFinish_CodexQuotaDoesNotBecomeRepair covers a Codex pane
-// still blocked once its quota resets: per ticket 04, that must pause for a
-// human (paused (answer)), never a hard failure that stalled-agent detection
-// would flag paused (repair), and never a "continue" re-prompt into a pane the
-// runner reports blocked.
-func TestWaitForFinish_CodexQuotaDoesNotBecomeRepair(t *testing.T) {
-	t.Parallel()
-	ticketPath := writeFrontmatterTicket(t, "claimed")
-	scratchDir := t.TempDir()
-	gate := NewGate()
-	sink := &quotaEventSink{}
-	var sawPausedGate bool
-	r := &blipRunner{Runner: blockedRunner("iter-01")}
-	r.SetState("iter-01", agentrunner.StateBlocked, "approval_prompt")
-	r.SetRateLimit("iter-01", time.Now().Add(-time.Second))
-	d := Deps{
-		Runner: r,
-		// The reset's own recheck is the first Sleep: the quota clears there
-		// while the pane stays blocked.
-		Sleep: func(time.Duration) {
-			sawPausedGate = gate.isPaused()
-			r.SetRateLimit("iter-01", time.Time{})
-		},
-		Now: time.Now,
-	}
-
-	err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", Ticket: "01", TicketPath: ticketPath,
-		ScratchDir: scratchDir, EpicName: "epic", Gate: gate, Sink: sink,
-	}, "codex-session-1")
-	if !errors.Is(err, errBlockedPanePaused) {
-		t.Fatalf("waitForFinish() err = %v, want errBlockedPanePaused", err)
-	}
-	if prompts := r.Prompts("iter-01"); len(prompts) != 0 {
-		t.Errorf("prompts = %v, want none — a blocked pane must never be prompted", prompts)
-	}
-	if r.interrupts != 0 {
-		t.Errorf("pane interruptions = %d, want 0", r.interrupts)
-	}
-	if !sawPausedGate {
-		t.Error("shared gate was not paused while waiting for the Codex quota reset")
-	}
-	if gate.isPaused() {
-		t.Error("gate remains paused after the Codex quota reset")
-	}
-	if len(sink.paused) != 1 || sink.paused[0].identifier != "iter-01" ||
-		sink.paused[0].kind != PauseRateLimit || !strings.Contains(sink.paused[0].reason, "Codex quota exhausted") {
-		t.Errorf("paused events = %+v, want one typed rate-limit pause", sink.paused)
-	}
-	if len(sink.resumed) != 1 || sink.resumed[0] != (quotaResumeEvent{identifier: "iter-01", kind: PauseRateLimit}) {
-		t.Errorf("resumed events = %+v, want one typed rate-limit resume", sink.resumed)
-	}
-	raw, err := os.ReadFile(ticketPath)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
-	if got := openQuestionSummary(t, ticketPath); !strings.Contains(got, "approval_prompt") {
-		t.Errorf("open question summary %q, want the pause reason to name the runner's blocked reason", got)
-	}
-}
-
 func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing.T) {
 	t.Parallel()
 	ticketPath := writeFrontmatterTicket(t, "claimed")
@@ -1384,39 +1296,6 @@ func TestWaitForFinish_CodexQuotaDetectionErrorPreservesClaimedTicket(t *testing
 	raw, readErr := os.ReadFile(ticketPath)
 	if readErr != nil {
 		t.Fatalf("ReadFile: %v", readErr)
-	}
-	if !strings.Contains(string(raw), "claimed") || rawIsPaused(t, string(raw), "") {
-		t.Errorf("ticket status = %s, want claimed without a pause", raw)
-	}
-}
-
-func TestWaitForFinish_CodexQuotaDoesNotBecomeRepairWhenPaneIdlesAfterReset(t *testing.T) {
-	t.Parallel()
-	ticketPath := writeFrontmatterTicket(t, "claimed")
-	gate := NewGate()
-	sink := &quotaEventSink{}
-	r := blockedRunner("iter-01")
-	r.SetLimitedUnknownReset("iter-01")
-	d := Deps{
-		Runner: r,
-		// The pane comes back idle once the quota resets.
-		Sleep: func(time.Duration) {
-			r.SetRateLimit("iter-01", time.Time{})
-			r.SetState("iter-01", agentrunner.StateIdle, "")
-		},
-	}
-
-	if err := waitForFinish(d, launchAndPromptParams{
-		Label: "iter-01", Agent: AgentCodex, Pane: "pane-1", TicketPath: ticketPath, Gate: gate, Sink: sink,
-	}, "session-1"); err != nil {
-		t.Fatalf("waitForFinish: %v", err)
-	}
-	if len(sink.paused) != 1 || sink.paused[0].kind != PauseRateLimit || len(sink.resumed) != 1 {
-		t.Errorf("quota events = paused %+v, resumed %+v; want one of each", sink.paused, sink.resumed)
-	}
-	raw, err := os.ReadFile(ticketPath)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
 	}
 	if !strings.Contains(string(raw), "claimed") || rawIsPaused(t, string(raw), "") {
 		t.Errorf("ticket status = %s, want claimed without a pause", raw)

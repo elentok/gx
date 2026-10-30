@@ -177,10 +177,8 @@ type launchAndPromptParams struct {
 	// concurrently.
 	Sink EventSink
 	// Report writes a line to the loop's output, safe to call concurrently.
-	// Only recoverCodexRateLimit's Codex quota-exhaustion path still reads
-	// this (waitForAttentionRecovery moved to Sink in ticket 04a, closing the
-	// gap that left operator-intervention pauses with no live event) — the
-	// rest of the package reports through Sink instead. Run itself has no
+	// Only the reattach path still reads this — the rest of the package
+	// reports through Sink instead. Run itself has no
 	// legacy text sink to source one from, so it leaves this nil (report()
 	// below no-ops on a nil Report); tests exercising that path in isolation
 	// set it directly.

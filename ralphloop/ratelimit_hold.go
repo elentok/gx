@@ -9,6 +9,14 @@ import (
 	"github.com/elentok/gx/events"
 )
 
+// rateLimitPollInterval is how often holdRateLimit re-checks a pane when the
+// reset time in its rate-limit message couldn't be parsed.
+const rateLimitPollInterval = 5 * time.Minute
+
+// rateLimitResetBuffer is added past a successfully-parsed reset time so the
+// loop wakes just after the quota actually rolls over, not right at it.
+const rateLimitResetBuffer = 60 * time.Second
+
 func codexBlocked(d Deps, p launchAndPromptParams) bool {
 	st, err := d.Runner.Status(p.session())
 	return err == nil && st.State == agentrunner.StateBlocked
