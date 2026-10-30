@@ -1,4 +1,4 @@
-import { Box, chakra, Menu, Text } from "@chakra-ui/react";
+import { Box, Button, chakra, Image, Menu, Text } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
 import type { Health } from "../../generated/server";
 import { AGENTS_HREF, SETTINGS_HREF, STATS_HREF } from "../../hrefs";
@@ -88,11 +88,29 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
         {health && <Tray health={health} connected={connected} />}
         <Menu.Root closeOnSelect={false} lazyMount unmountOnExit positioning={{ placement: "bottom-end" }}>
           <Menu.Trigger asChild>
-            <chakra.button type="button" aria-label="Menu" cursor="pointer" color="text.muted" display="flex" p="1">
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <path d="M3 5h12M3 9h12M3 13h12" />
+            <Button
+              type="button"
+              aria-label="Menu"
+              variant="ghost"
+              cursor="pointer"
+              color="text.dim"
+              h={{ base: "11", md: "12" }}
+              minW={{ base: "15", md: "16" }}
+              px="2"
+              gap="1"
+              bg="surface.raised"
+              borderWidth="1px"
+              borderColor="hairline"
+              borderRadius="lg"
+              _hover={{ borderColor: "tone.running.fg" }}
+              _focusVisible={{ outlineWidth: "2px", outlineColor: "tone.running.fg" }}
+              _open={{ borderColor: "tone.running.fg" }}
+            >
+              <Image src="/gx-menu-mascot.png" alt="" draggable={false} h={{ base: "7", md: "9" }} w="auto" />
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m3 4.5 3 3 3-3" />
               </svg>
-            </chakra.button>
+            </Button>
           </Menu.Trigger>
           <Menu.Positioner>
             <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40">

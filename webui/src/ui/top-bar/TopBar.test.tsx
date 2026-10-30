@@ -31,7 +31,9 @@ describe("TopBar", () => {
 
   it("holds a Settings link in the menu, with no AFK item without a toggle", async () => {
     const { getByRole, findByRole, queryByRole } = renderThemed(<TopBar connected />);
-    fireEvent.click(getByRole("button", { name: "Menu" }));
+    const trigger = getByRole("button", { name: "Menu" });
+    expect(trigger.querySelector("img")?.getAttribute("src")).toBe("/gx-menu-mascot.png");
+    fireEvent.click(trigger);
     expect((await findByRole("menuitem", { name: "Settings" })).getAttribute("href")).toBe("#/settings");
     expect(queryByRole("menuitemcheckbox", { name: "AFK" })).toBeNull();
   });
