@@ -63,6 +63,10 @@ type OneIteration struct {
 	// SmartZone is the context-token ceiling the iteration's agent is held to,
 	// the same as the SmartZone run option; zero means defaultSmartZone.
 	SmartZone int
+	// OnRateLimit hears the wait loop's rate-limit hold: (true, resetAt) when it
+	// starts or the reset changes (zero resetAt: no known reset), (false, zero)
+	// when it ends. Nil hears nothing.
+	OnRateLimit func(limited bool, resetAt time.Time)
 }
 
 // PausesAtOnce reports whether a block pauses the ticket with no dwell: a
@@ -357,8 +361,14 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 			}
 			return err
 		}
+		// A limit holds the agent in place before any blocked pause or finish check.
+		if resetAt, limited, _, _ := runnerRateLimit(d, p); limited {
+			if err := holdRateLimit(d, o, p, waitStates, resetAt); err != nil {
+				return err
+			}
+			continue
+		}
 		if st.State == agentrunner.StateBlocked {
-			// The rate-limit check goes here, before any blocked pause.
 			if o.PausesAtOnce() {
 				return pauseBlockedAtOnce(d, p, o.Ticket.Path, st)
 			}
