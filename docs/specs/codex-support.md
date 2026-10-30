@@ -60,11 +60,16 @@ Who follows the default
 18. As a person, I want `gx server queue --agent` and `gx agents new --harness` to stay as an override for one launch, so that I can still pick by hand.
 19. As a person, I want a running session to keep the harness it started with, so that a switch never changes work in progress.
 20. As a person, I want a ticket pinned to a harness that is not on PATH to wait in the queue with a reason that names the program and the `--agent` override, so that I can fix it.
+82. As a person, I want a ticket I queue from the web, the TUI or the server with no explicit harness choice to follow the default, so that a switch reaches it. A queue item's harness applies to every ticket of its root, and a ticket with `agent:` in its frontmatter counts as pinned and shows "pinned".
+83. As a person, I want any launch whose resolved harness is not on PATH to be blocked: a queue claim waits with the reason, and an interactive launch (Agents tab Create, `gx agents new`, Restore of an Exited session, design step, charting handoff, Fix agent, TUI Investigate) is refused with a message that names the program. This covers a project override that points at a missing harness and a default changed by hand edit or config reload, so that a missing program never fails silently.
+84. As a person, I want one resolver to decide a ticket's harness for every claim, relaunch, usage gate, runner choice and row, with the order frontmatter `agent:` > explicit queue item agent > harness of an earlier run > default, so that every part of gx agrees and the wait reason names a fix that works.
+85. As a person, I want a one-off, evolve retro or diagnose ticket to follow the default unless I chose a harness, so that these tickets never stay on Claude by accident.
+86. As a person, I want chat, replies, turn settle, failure detection, the chat watch and the charting handoff to work for every running session by its own recorded harness, so that a switch never turns them off for running sessions.
 
 Rows
 
 21. As a person, I want Agent rows in the web to show `harness · tier · model effort`, for Claude too, so that I see what runs.
-22. As a person, I want Queue rows to show the same three parts, "follows default" for a waiting ticket with no pin, and the harness plus "pinned" for a pinned one, so that I know what a ticket will use.
+22. As a person, I want Queue rows to show the same three parts, "follows default" for a waiting ticket with no pin, the harness plus "pinned" for a pinned one, and the recorded harness plus "keeps <harness> (ran before)" for a waiting ticket that already ran, so that I know what a ticket will use and when a switch will not apply.
 23. As a person, I want the design page header to show the same three parts, so that I know which harness runs the design.
 24. As a TUI user, I want TUI Agent rows, Queue rows and the design view to show the same three parts, so that the TUI and the web agree.
 25. As a person, I want a session with no reply yet to show "<Tier> · CLI default", so that the row is honest before the model is known.
@@ -112,7 +117,7 @@ Limits, failures and compaction
 
 56. As a person, I want the usage gate to hold new Codex claims from the `rate_limits` data in Codex's rollout, with its own gate per harness, so that Codex limits work like Claude's.
 57. As a person, I want the wait reason to name the harness ("Codex usage: N% of the 5h limit, resets ..."), and the override to lift only that harness's gate, so that a Claude gate never blocks Codex.
-58. As a person, I want a Codex agent that hits a usage limit to hold in place with "rate-limited: resets <time>", so that nothing is lost.
+58. As a person, I want a Codex agent that hits a usage limit to hold in place with "rate-limited: resets <time>", so that nothing is lost. gx classifies an error as a usage limit when the newest `rate_limits` sample in the rollout is at 100% with `resets_at` not passed, or when the error kind says usage limit; any other error, and any unclear one, takes the `needs-answer` pause of story 59.
 59. As a person, I want a Codex turn that ends in an error (OSC 7501 `error`) to pause the ticket `needs-answer` after the dwell, with Codex's own error text and a Retry button, so that I can see what went wrong and retry.
 60. As a person, I want a silent Codex agent to get the normal stall nudge, so that a network stall does not wait forever.
 61. As a person, I want recovery and session lookup to read the Codex rollout, and a Codex agent that died before its first prompt to count as having done nothing, so that the retry starts from the Handoff with no error.
@@ -151,14 +156,51 @@ Doctor and tests
 ### The Default harness
 
 - One harness value, read from the global config and, when present, from the project's own config.
-  The project value wins. Values are `claude` and `codex`. The implementer picks the key name and the
-  API shape.
+  The project value wins. Values are `claude` and `codex`. The key is `agents.default-harness` in
+  `config.json`, and the same key under the `agents` override of `project.json` (added to the
+  whitelist of project-overridable keys). It is on the config-reload key list, so a change applies to
+  a running server. The startup error names it, and the README documents it. The implementer picks
+  the API shape.
+- One resolver decides a ticket's harness, with this order: frontmatter `agent:` (`ticketAgent`), then
+  an explicit queue item agent (which applies to every ticket of its root), then the harness of an
+  earlier run, then the default. Every site calls it: claim, relaunch, the herdr hold and usage gate
+  (`ticketwrites.go`), `iterationRunner`, `resolveAgent` and the queue item loop (`queue.go`), the
+  row labels and the wait reasons. Each of these falls back to `claude` today and stops doing so. A
+  harness that differs from the earlier run starts from the Handoff, because there is no resume
+  across harnesses.
+- A ticket counts as "ran" only when a run recorded a session with a transcript or rollout. A run
+  that died before its first prompt does not lock the harness, shows no "keeps" label and counts as
+  never-run in the switch notice.
+- Web, TUI and server enqueues with no explicit choice store an empty agent, meaning "follows
+  default". Today the TUI add sends `claude` (`serverEnqueueDefaultAgent`) and the server fills
+  `claude` for an empty agent (`queue.go`, `ensureRootQueued`, `queuedAgent`); those paths stop doing
+  so. Items stored before this change keep their explicit `claude`.
+- One-off submit, evolve retro (`RetroSubmit`) and diagnose one-off (`cpuspike.go`) write `agent:`
+  into frontmatter only for an explicit choice, from the request or the payload file. One-offs stored
+  before this change keep theirs.
+- `settings.chatHarness()` (`Config.ChatHarness`) stops being a harness source. Launch sites (design
+  launches, the Fix agent, web Create, tier models) read the resolved default harness, and tier models
+  use the project's default. Per-session gates (chat read, prompt, turn settle, failure detection, the
+  chat watch, the charting handoff) read the session's own recorded harness, and both harnesses pass.
+  `ChatHarness` and `RemoteControlHarness` stay only as test seams that map a harness to the fake.
 - The web and TUI control writes the global value to `~/.config/gx/config.json` and a project value
   to the project's `project.json`. The write follows a symlink so a dotfiles link survives, and it
   keeps other keys. Remove override deletes the key from `project.json`.
 - The control uses the same PATH check as server start. If the chosen harness is not on PATH, the
-  write is refused and the message names the program. One check serves both places. The rule is
-  that a running server never holds a default it cannot launch.
+  write is refused and the message names the program. One check serves both places. The control
+  never writes a harness it cannot launch, and each launch checks again (story 83).
+- The TUI picker always writes through the server API. With no server it shows the standard "no
+  server is running" refusal and writes nothing.
+- One rule covers every launch: if the harness it resolves to is not on PATH, it is blocked. This
+  includes a project override that points at a missing harness and a default changed by hand edit or
+  config reload while the server runs. The check runs once, at the shared process-start seam, before
+  anything is stopped. A queue claim waits with the reason. An interactive launch (Agents tab Create,
+  `gx agents new`, Restore, design step, Fix agent, TUI Investigate) is refused. The charting handoff
+  refuses before it stops the old agent, and the session stays at the run-end line with the message.
+- The message has one shared stem that names the program and the source of the harness (for example
+  "codex is not on PATH (from the project default)"), plus a suffix per context. Queue suffix: "Install
+  it, or requeue with --agent <other>" (or "edit agent: in the ticket" when frontmatter won). Interactive
+  suffix: "Install it or change the default harness".
 - Where it is read: the Queue claim (a ticket with no `--agent`), a new design session, an Agents tab
   Create, the Fix agent and TUI Investigate, and root auto-queue tickets. The harness read at
   launch is recorded on the run. A running session never changes harness.
@@ -172,7 +214,9 @@ Doctor and tests
   the program and the `--agent` override. It shows in `gx server tickets explain`.
 - The Settings page note: while `agent-runner` is `headless` it reads "Codex runs on PTY". While it is
   `herdr` it reads "Codex runs on herdr with a reduced flow".
-- The switch notice reads the count of waiting tickets and running agents when the write succeeds.
+- The switch notice reads its counts when the write succeeds. A global switch counts only waiting,
+  unpinned, never-run tickets in projects that inherit the default, plus the running agents. A project
+  switch scopes both counts to that project.
 
 ### Rows and labels
 
@@ -182,9 +226,13 @@ Doctor and tests
   model after the tier comes from config and from the newest reply (Claude) or the newest Codex
   rollout turn. A session with no reply yet reads "<Tier> · CLI default".
 - A row can carry a "switched by hand" note when the shown model differs from the model the launch
-  tier chose. The model names in the mock are placeholders.
-- A waiting Queue ticket with no pin reads "follows default". A pinned one shows its harness and
-  "pinned".
+  tier chose. When the launch tier named no explicit model (the CLI default, or inherit on Codex with
+  hidden fields), there is no note. The model names in the mock are placeholders.
+- A waiting Queue ticket with no pin and no earlier run reads "follows default". A pinned one shows
+  its harness and "pinned" (frontmatter `agent:` or an explicit queue item agent). A waiting ticket
+  that already ran and has no pin shows its recorded harness and "keeps <harness> (ran before)",
+  because a retry keeps its harness and a switch will not apply. The label follows the source that
+  wins in the resolver, so "pinned" beats "keeps".
 
 ### Runner selection and hosting
 
@@ -271,7 +319,10 @@ Doctor and tests
   - OSC 7501 `error` counts as a blocked pane. gx cannot recover on its own because it cannot know
     if the cause (a login problem, a failed request, a quota) clears, and it does not auto-retry. The
     pause shows the error text from the rollout (`task_complete.error`) and the web ends it with
-    Retry (the retry prompt). Usage-limit errors do not pause: they go to the rate-limit hold.
+    Retry (the retry prompt). Usage-limit errors do not pause: they go to the rate-limit hold. gx
+    treats an error as a usage limit when the newest `rate_limits` sample is at 100% with `resets_at`
+    not passed, or when the error kind says usage limit (the implementer picks the exact field from
+    a recorded rollout). Any other or unclear error pauses.
 - No screen matcher for a network stall. The idle-agent stall nudge covers a silent agent.
 - Recovery and session lookup read the rollout through the shared message reader. When the agent
   died before its first prompt there is no rollout, so gx treats the agent as having done nothing and
@@ -311,11 +362,13 @@ Doctor and tests
 - The Codex usage gate follows the rule of the Claude gate: the newest sample of the 5-hour or the
   weekly window at 98% or more, with `resets_at` not passed, claims no new Codex ticket. The sample
   comes from `token_count.rate_limits` in Codex rollouts. The threshold is fixed. The gate lifts at
-  `resets_at` without a new sample. Each harness has its own gate and its own override: the override
-  verb takes a harness argument and defaults to the default harness. The implementer picks the verb
-  and the storage. Running agents are not held. No pause kind is added.
-- A held ticket shows the wait reason with the harness name. The web override button lifts only that
-  ticket's harness gate.
+  `resets_at` without a new sample. Each harness has its own gate and its own override: the existing
+  `gx server usage override` becomes `gx server usage override [claude|codex]`, defaulting to the
+  default harness. The implementer picks the storage. Running agents are not held. No pause kind is
+  added.
+- A held ticket shows the wait reason with the harness name. The Claude reason changes from "usage at
+  99% of the weekly limit" to "Claude usage: ...", and the catalog flow `usage-gated` is updated to
+  match. The web override button lifts only that ticket's harness gate.
 - The rate-limit hold on the server wait loop covers Codex: the reset time comes from the rollout
   error and `rate_limits`. The hold keeps the slot, sends "continue" at the reset, and stops claims
   for that harness until then.
@@ -383,7 +436,7 @@ Doctor and tests
 | No dollar cost | Codex rows show tokens and a dash in dollar columns. Dollar totals count Claude only. |
 | No budget limits | Budget soft and hard limits skip Codex. The usage gate and the rate-limit hold are the Codex limits. |
 | No extra-usage warning | Codex enqueues show no warning. |
-| No background-task hold | A Codex turn that ends with a terminal still running finishes at turn end, and the ticket finishes while a terminal ran. Closing the session kills the terminals. The implementation first verifies if a Codex terminal wakes the agent on exit, and if it does, the gate holds like Claude's with the same cap and recovery. |
+| No background-task hold | A Codex turn that ends with a terminal still running finishes at turn end, and the ticket finishes while a terminal ran. Closing the session kills the terminals. This epic builds no hold. Whether a Codex terminal wakes the agent on exit is a check on the smoke checklist (story 80); if it wakes, a follow-up is filed and this epic's behaviour does not change. |
 | No `/stop` on interrupt | An interrupted tool stays as a background terminal and the row keeps the marker. The person types `/stop`. |
 | No background-task signal or `run_in_background` for skills | A step that asks for it waits or runs inline. |
 | No auto-retry on error | The ticket pauses `needs-answer` with Codex's error text and a Retry button. |
@@ -454,7 +507,7 @@ New scenarios and flows to write. Each becomes an implementation ticket.
   Agents tab with one Claude and one Codex agent, and one Claude agent whose newest reply names a
   model other than its tier's.
 - Scenario `codex-queue`: one running Codex ticket, one running Claude ticket, a waiting ticket with
-  no pin and a waiting ticket pinned to Codex.
+  no pin, a waiting ticket pinned to Codex and a waiting ticket that already ran on Claude.
 - Scenario `codex-blocked`: a Codex ticket whose worker raises a `PermissionRequest` hook and stays
   blocked.
 - Scenario `codex-rate-limited`: a Codex ticket whose rollout writes `rate_limits` at the limit and a
@@ -483,10 +536,13 @@ Per story:
 3. Flow "Default harness setting". Mock states `settings-agents` (override and inherit rows).
 4. Flow "Default harness setting". Mock states `settings-home`.
 5. TUI model test: the command opens the picker for global and, in a project, for the project. It
-   writes the same keys as the web.
+   writes the same keys as the web, through the server API. With no server it shows the "no server is
+   running" refusal and the file is unchanged.
 6. Server test on a temp config dir: the target is a symlink, the write keeps the link and other
    keys. Project write keeps other `project.json` keys. Remove override deletes the key.
-7. Flow "Default harness setting". Mock states `settings-agents-switched`.
+7. Flow "Default harness setting". Mock states `settings-agents-switched`. Server test for the
+   counts: a global switch counts only waiting, unpinned, never-run tickets in inheriting projects; a
+   project switch scopes the counts to that project.
 8. `cmd` test: a PATH without `codex` and default `codex`: non-zero exit, the message names the
    program. Mock states `start-error`.
 9. Server test: the web write and the TUI picker refuse a harness not on PATH, the message names the
@@ -499,10 +555,17 @@ Per story:
 13. Server tests: the Fix agent route and TUI Investigate start the default harness (`ui/tickets`
     test calls the route).
 14. Server tests: a root auto-queue ticket and code-review, verify and evolve tickets claim with the
-    default harness.
+    default harness. An evolve retro ticket and a diagnose one-off have no `agent:` and claim on the
+    default; a one-off with an explicit choice writes `agent:`.
 15. Flow "Codex queue rows" (switch applies to the waiting unpinned ticket). Server test: claim reads
-    the default at claim time.
-16. Server test: retry of a ticket that ran on Claude after a switch to Codex runs Claude.
+    the default at claim time. Server tests: a ticket queued from the web, from the TUI add path and
+    through the server with no explicit choice stores an empty agent and follows the default; a queue
+    item's explicit agent pins every ticket of its root; frontmatter `agent:` pins and shows "pinned".
+16. Server test: retry of a ticket that ran on Claude after a switch to Codex runs Claude, checks
+    Claude's usage gate and picks the Claude runner. A ticket whose run died before its first prompt
+    (no transcript or rollout) does not lock the harness and follows the new default. Table test of the
+    resolver for the order frontmatter > queue item agent > earlier run > default, and that a
+    different harness starts from the Handoff.
 17. Server test: a stored item with explicit `claude` stays `claude` after a switch.
 18. `cmd` tests: `gx server queue --agent codex` and `gx agents new --harness claude` override for one
     launch.
@@ -511,13 +574,15 @@ Per story:
 20. Flow "Codex queue rows" with `--fakecodex` off. Mock states `queue-rows` (missing-harness-reason).
     `gx server tickets explain <addr>` shows the same reason.
 21. Flow "Default harness setting" (Agents tab). Mock states `agents-rows`.
-22. Flow "Codex queue rows". Mock states `queue-rows`.
+22. Flow "Codex queue rows" (includes a waiting ticket that already ran, reading "keeps <harness>
+    (ran before)" and unchanged by a switch). Mock states `queue-rows`. Server test for the row text of
+    the cases, including that "pinned" beats "keeps" and that a run that did nothing shows no "keeps".
 23. Flow "Codex design run". Mock states `design-header`.
 24. TUI model tests for Agent rows, Queue rows and the design view.
 25. Flow "Default harness setting": a fresh session shows "<Tier> · CLI default". Mock states
     `agents-rows`.
 26. Flow "Default harness setting": the model changes after the next reply. Mock states `agents-rows`
-    ("switched by hand").
+    ("switched by hand"). Test: a launch tier that named no explicit model shows no note.
 27. Server test: the run's runner is PTY for Codex under `auto` and `pty`.
 28. Server test: under `headless`, a Codex ticket records PTY and a Claude ticket records headless.
 29. Server test with the herdr fake: under `agent-runner: herdr`, Codex runs on herdr.
@@ -553,10 +618,13 @@ Per story:
 55. Vitest and server test: turns present and zero messages gives the notice.
 56. Flow "Codex rate-limit wait" (a sample at 98% blocks Codex claims). Server test on a fake clock.
 57. Flow "Codex rate-limit wait" (reason names Codex); server test: the Codex override lifts only
-    Codex. `cmd` test for the verb with a harness argument.
+    Codex. `cmd` test for `gx server usage override [claude|codex]`, including the default. Update
+    the `usage-gated` flow for the "Claude usage: ..." reason.
 58. Server test: the Codex hold keeps the slot, sends "continue" at the reset and stops claims for the
-    harness.
-59. Flow "Codex error pause".
+    harness. Server test: a `task_complete.error` with a `rate_limits` sample at 100% (or a
+    usage-limit error kind) holds and does not pause; any other error pauses.
+59. Flow "Codex error pause". Server test: an error with no usage-limit signal, and an unclear one,
+    pause `needs-answer`.
 60. Server test: a silent Codex agent gets the idle stall nudge.
 61. Server test: recovery reads the rollout, and with no rollout the retry starts from the Handoff
     without an error.
@@ -577,13 +645,28 @@ Per story:
 75. `gx codex doctor` fixture mode in CI. Live mode by hand.
 76. Doctor test with a config that hides the spawn fields, and with no managed rules.
 77. `gx codex doctor --help` and `--record` tests match the Claude doctor's.
-78. Read the `gx-investigate` skill text.
+78. Bundle test: the `gx-investigate` skill names the rollout-format check (`gx codex doctor`) and
+    the Codex rollout path.
 79. `fakecodex` tests, including the version fix.
 80. Hand-run smoke checklist (tagged "real Codex only", run after each Codex upgrade, never in CI):
     a usage-limit error and an auth failure (text and the `needs-answer` pause); an auto-compaction
-    at the context limit; the Background flag and wake behaviour; `codex resume` after a restart; a
-    reviewer denial under `--approve-for-me`.
+    at the context limit; the Background flag and wake behaviour (a wake means a follow-up, no
+    change here); `codex resume` after a restart; a reviewer denial under `--approve-for-me`; how often
+    the reviewer escalates.
 81. The hardcoded-literal test.
+82. Covered by the story 15 tests.
+83. Server tests: a project override pointing at a missing harness, and a default changed by config
+    reload to a missing harness, make a queue claim wait with the reason and refuse an Agents tab
+    Create, `gx agents new`, Restore of an Exited session, a design step, the Fix agent and TUI
+    Investigate with the shared stem and the context suffix. The charting handoff refuses before it
+    stops the old agent and the session stays at the run-end line.
+84. Covered by the story 16 resolver table test. Server test: a relaunch of a follows-default ticket
+    with default `codex` checks the Codex gate and picks the PTY runner. The wait reason names the
+    winning source and a fix that works for it.
+85. Covered by the story 14 tests.
+86. Server test: after a switch to `codex`, a running Claude session still gets chat, replies, turn
+    settle, failure detection, the chat watch and the charting handoff (and the reverse). Config
+    reload applies the harness without a restart.
 
 Mock states (the stored mock `$(gx tickets root)/codex-support/mocks/07-default-harness-control.html`):
 
@@ -598,7 +681,8 @@ Mock states (the stored mock `$(gx tickets root)/codex-support/mocks/07-default-
   width 640, scenario `default-harness`, part `agent-rows`.
 - `$(gx tickets root)/codex-support/mocks/07-default-harness-control.html`, state `queue-rows`,
   width 640, scenario `codex-queue` (the part `missing-harness-reason` runs with `--fakecodex` off),
-  parts `queue-rows`, `missing-harness-reason`.
+  parts `queue-rows`, `missing-harness-reason`. The scenario also holds a waiting ticket that already
+  ran, and the state shows its "keeps <harness> (ran before)" line.
 - `$(gx tickets root)/codex-support/mocks/07-default-harness-control.html`, state `design-header`,
   width 640, scenario `codex-design`, part `design-harness`.
 - `$(gx tickets root)/codex-support/mocks/07-default-harness-control.html`, state `start-error`,
@@ -627,7 +711,6 @@ Mock states (the stored mock `$(gx tickets root)/codex-support/mocks/07-default-
   adds.
 - ADRs that apply: 0031 (superseded in part by the `pty-as-default` ADR, which this effort amends),
   0042 (pauses recoverable from the web), 0039 (server launches never adopt), 0037 (live attach).
-- Untested at design time, to be checked in implementation: how often the automatic reviewer
-  escalates and what the model sees on a denial, whether a duplicate `developer_instructions` reaches
-  the model on resume, whether a Codex background terminal wakes the agent when it exits, and
-  `--add-dir` itself (the `writable_roots` key was the tested path).
+- Checks left to the hand-run smoke checklist (story 80), none of them a design question: how often
+  the automatic reviewer escalates and what the model sees on a denial, and whether a Codex
+  background terminal wakes the agent when it exits.
