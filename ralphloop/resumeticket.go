@@ -21,7 +21,7 @@ import (
 // manual resume to race.
 //
 // The live-pane check is what tells the two pause kinds apart. A gate pause
-// (waitForFinish's pauseOnBlockedPane) still owns its pane, so answering it
+// (the wait loop's dwellThenPauseBlocked) still owns its pane, so answering it
 // leaves it live and unblocked — auto-resumed here. An announce-and-stop
 // pause has already released its pane/tab/worktree, so the check reports not
 // live and this pass skips it, leaving it to be answered in the file by a

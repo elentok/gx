@@ -38,11 +38,9 @@ func recoverCodexContextExhaustionPoll(d Deps, p launchAndPromptParams, sessionI
 // promptIdle sends text to a session its caller expects to be idle. A
 // refusal with ErrNotReady means that expectation was stale, so Status is
 // re-read: busy (the agent is already working) skips the prompt, since the
-// caller goes on to wait for the iteration to finish anyway; blocked goes
-// through pauseOnBlockedPane and returns errBlockedPanePaused when it pauses.
-// Any other state, or a block that cleared before the re-check, returns the
-// original error.
-func promptIdle(d Deps, p launchAndPromptParams, sessionID, text string) error {
+// caller goes on to wait for the iteration to finish anyway. Any other state
+// returns the original error.
+func promptIdle(d Deps, p launchAndPromptParams, text string) error {
 	err := d.Runner.Prompt(p.session(), text)
 	if !errors.Is(err, agentrunner.ErrNotReady) {
 		return err
@@ -51,23 +49,14 @@ func promptIdle(d Deps, p launchAndPromptParams, sessionID, text string) error {
 	if statusErr != nil {
 		return fmt.Errorf("re-reading %s after refused prompt: %w", p.Label, statusErr)
 	}
-	switch st.State {
-	case agentrunner.StateWorking:
+	if st.State == agentrunner.StateWorking {
 		return nil
-	case agentrunner.StateBlocked:
-		paused, pauseErr := pauseOnBlockedPane(d, p, sessionID)
-		if pauseErr != nil {
-			return pauseErr
-		}
-		if paused {
-			return errBlockedPanePaused
-		}
 	}
 	return err
 }
 
-// blockedDwellMs is the fixed window waitForFinish waits, once, after first
-// observing a pane blocked, before pauseOnBlockedPane's single re-check. A
+// blockedDwellMs is the fixed window the server wait loop waits, once, after first
+// observing a pane blocked, before dwellThenPauseBlocked's single re-check. A
 // momentary block (the agent clearing its own transient prompt) shouldn't
 // pause a healthy iteration, but this is a fixed window, not a settle timer:
 // a pane that leaves and re-enters the blocked state inside it does not
@@ -75,22 +64,24 @@ func promptIdle(d Deps, p launchAndPromptParams, sessionID, text string) error {
 // window ends.
 const blockedDwellMs = 15_000
 
-// errBlockedPanePaused is waitForFinish's sentinel return for a pane paused
-// by pauseOnBlockedPane: not a failure, but a signal to its callers
-// (launchAndPrompt, runIteration, reattachIteration) to end the iteration
-// without running the ordinary finish path (commit check, cherry-pick,
-// worktree/tab cleanup) that assumes the agent actually finished — this
-// pane's agent is still live, just waiting on a prompt nobody has answered
-// yet.
+// errBlockedPanePaused is the sentinel return for a pane paused after its
+// Codex quota reset (pauseBlockedAfterCodexQuotaReset): not a failure, but a
+// signal to the callers (launchAndPrompt, runIteration, reattachIteration) to
+// end the iteration without running the ordinary finish path (commit check,
+// cherry-pick, worktree/tab cleanup) that assumes the agent actually finished
+// — this pane's agent is still live, just waiting on a prompt nobody has
+// answered yet.
 var errBlockedPanePaused = errors.New("iteration paused: pane blocked on an unanswered prompt")
 
-// pauseOnBlockedPane is the in-process loop's entry to dwellThenPauseBlocked:
-// it waits out blockedDwellMs, then re-reads the session once via
-// Runner.Status (a peek, not another Wait) and, only if it is still blocked
-// at that instant, writes the pane-answered pause (paused (answer), a reason, and
-// a "## Needs Answer" stub, both naming p.Label — the pane is named by its
-// iteration label, never a raw pane id, since a label still resolves after a
-// restart or reattach and a pane id does not) and reports paused=true.
+// dwellThenPauseBlocked is the server wait loop's dwell-and-recheck
+// (WaitIterationFinished): it waits out blockedDwellMs, then re-reads the
+// session once via Runner.Status (a peek, not another Wait) and, only if it is
+// still blocked at that instant, writes the pane-answered pause (paused
+// (answer), a reason, and a "## Needs Answer" stub, both naming p.Label — the
+// pane is named by its iteration label, never a raw pane id, since a label
+// still resolves after a restart or reattach and a pane id does not).
+// runner names the runner whose block this is, so the reason names the ways to
+// answer on it.
 //
 // No prompt is ever sent to the pane here: typing into a pane sitting on an
 // operator's own pending dialog would be the destructive interrupt this path
@@ -101,14 +92,6 @@ var errBlockedPanePaused = errors.New("iteration paused: pane blocked on an unan
 // this repo and can silently regress on a Claude Code or herdr upgrade. See
 // docs/runbooks/blocked-form-regression-check.md for the (necessarily
 // interactive, via `gx doctor --check-blocked-form`) way to check it.
-func pauseOnBlockedPane(d Deps, p launchAndPromptParams, sessionID string) (paused bool, err error) {
-	_, paused, err = dwellThenPauseBlocked(d, p, "", sessionID)
-	return paused, err
-}
-
-// dwellThenPauseBlocked is the dwell-and-recheck shared by the in-process loop
-// and the server wait loop (WaitIterationFinished). runner names the runner
-// whose block this is, so the reason names the ways to answer on it.
 func dwellThenPauseBlocked(d Deps, p launchAndPromptParams, runner, sessionID string) (reason string, paused bool, err error) {
 	d.Sleep(blockedDwellMs * time.Millisecond)
 
@@ -135,7 +118,7 @@ func dwellThenPauseBlocked(d Deps, p launchAndPromptParams, runner, sessionID st
 	return reason, true, nil
 }
 
-// pauseBlockedAtOnce is pauseOnBlockedPane without the dwell, for a headless
+// pauseBlockedAtOnce is dwellThenPauseBlocked without the dwell, for a headless
 // agent whose block st the tracker reported. The reason names the tool and its
 // input, with the verb that exits that block: a permission request is answered,
 // a bare requires_action (no request to answer) is interrupted.

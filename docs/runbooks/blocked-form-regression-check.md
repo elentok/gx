@@ -1,6 +1,6 @@
 # Runbook: blocked-form regression check
 
-The server wait loop's blocked pause (`pauseOnBlockedPane` in `ralphloop/waitforfinish_recovery.go`,
+The server wait loop's blocked pause (`dwellThenPauseBlocked` in `ralphloop/waitforfinish_recovery.go`,
 driven from `ralphloop/servermerge.go`) pauses the ticket whenever the agent's pane is blocked. This
 runbook covers **herdr only**: `gx doctor --check-blocked-form` reads herdr's `agent_status:
 blocked` recognition. For a PTY agent, run `gx claude doctor` instead. On the herdr runner, the

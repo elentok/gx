@@ -1,14 +1,11 @@
 package ralphloop
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/tickets/schema"
 )
 
 // adoptLiveSession leaves a live session of ticket 01's iteration, as a
@@ -92,29 +89,4 @@ func TestRun_AdoptedStalledSession_PromptRefusedWhileBusy_KeepsWaiting(t *testin
 	if got := fakeRunner(d).Prompts(label); len(got) != 1 {
 		t.Errorf("prompts = %v, want only the 1 sent before adoption (re-prompt skipped)", got)
 	}
-}
-
-// TestRun_AdoptedStalledSession_PromptRefusedWhileBlocked_Pauses: the stalled
-// session sits on a dialog, so the re-prompt is refused and the iteration
-// pauses blocked-pane.
-func TestRun_AdoptedStalledSession_PromptRefusedWhileBlocked_Pauses(t *testing.T) {
-	t.Parallel()
-	scratchDir := writeEpic(t, "epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
-	})
-	path := filepath.Join(scratchDir, "epic", "issues", "01-a.md")
-	d, _, _ := fakeDeps()
-	adoptLiveSession(t, d, scratchDir, 0)
-	onRunnerPrompt(d, func(s agentrunner.Session, text string) error {
-		fakeRunner(d).SetState(s.Label, agentrunner.StateBlocked, "approval")
-		return agentrunner.ErrNotReady
-	})
-
-	runUntilPaused(t, RunOptions{EpicName: "epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo"}, d, &recordingSink{})
-
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	assertRawPaused(t, string(raw), schema.PauseClassAnswer, "")
 }

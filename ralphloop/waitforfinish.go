@@ -96,15 +96,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 						continue
 					}
 				}
-				paused, err := pauseOnBlockedPane(d, p, sessionID)
-				if err != nil {
-					return err
-				}
-				if paused {
-					return errBlockedPanePaused
-				}
-				elapsedMs = 0
-				continue
+				return fmt.Errorf("%s is blocked on a prompt gx did not send", p.Label)
 			}
 
 			// Claude has no structured "rate limited" status of its own: a
@@ -735,10 +727,7 @@ func recoverClaudeRateLimit(d Deps, p launchAndPromptParams, sessionID string, r
 	p.logLifecycleEvent(string(events.Resumed), sessionID)
 	p.Gate.ForceResume(p.Label)
 
-	if err := promptIdle(d, p, sessionID, "continue"); err != nil {
-		if errors.Is(err, errBlockedPanePaused) {
-			return err
-		}
+	if err := promptIdle(d, p, "continue"); err != nil {
 		return fmt.Errorf("re-prompting %s after rate-limit reset: %w", p.Label, err)
 	}
 	return nil
@@ -777,8 +766,7 @@ func recoverCodexRateLimit(d Deps, p launchAndPromptParams, sessionID string, re
 // already trusted at launch and gx was asleep for the reset, so the only
 // answerable-dialog case (see ticket 01) can't occur here. This pauses for a
 // human instead, naming the unanswered dialog by the runner's
-// Status.BlockedReason — unlike pauseOnBlockedPane, whose pause reason names no
-// dialog at all.
+// Status.BlockedReason.
 func pauseBlockedAfterCodexQuotaReset(p launchAndPromptParams, sessionID, blockedReason string) error {
 	reason := fmt.Sprintf("%s came back blocked on dialog %q after a Codex quota reset; answer it in the pane", p.Label, blockedReason)
 	p.pauseBlockedPane(sessionID, reason)

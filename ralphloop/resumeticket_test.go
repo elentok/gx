@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -222,97 +221,6 @@ func TestResumeAnswered_LiveButStillBlocked_LeftPaused(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), "status: needs-answer") {
 		t.Errorf("still-blocked ticket should stay needs-answer, got:\n%s", raw)
-	}
-}
-
-// TestRun_AnsweredPauseWithSiblingRunning_ResumesWithoutWaitingForSibling
-// covers test seam 2 — "the case that matters most": ticket 01 gate-pauses
-// (its pane stays live, per waitForFinish's pauseOnBlockedPane) while ticket
-// 02 is still genuinely running. Answering ticket 01's pane must reattach it
-// before ticket 02 finishes, not after — the ticket-15 wake-source gap a
-// plain blocking receive on results left open. ticket02Gate blocks ticket
-// 02's own finish until the test explicitly releases it, so a pass here can
-// only happen if the scheduler noticed ticket 01's answer on its own, not by
-// coincidentally waiting for ticket 02 anyway.
-func TestRun_AnsweredPauseWithSiblingRunning_ResumesWithoutWaitingForSibling(t *testing.T) {
-	scratchDir := writeEpic(t, "my-epic", map[string]string{
-		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\n# A\n",
-		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\n---\n# B\n",
-	})
-	path01 := ticketPath(scratchDir, "my-epic", "01-a.md")
-	path02 := ticketPath(scratchDir, "my-epic", "02-b.md")
-	d, _, removed := fakeDeps()
-	// The "status: done" write merges before the worktree removal, so the
-	// removal count is only meaningful once a removal has been signalled.
-	removedSignal := make(chan struct{}, 2)
-	removeWorktree := d.RemoveWorktree
-	d.RemoveWorktree = func(repoDir, path string, force bool) error {
-		err := removeWorktree(repoDir, path, force)
-		removedSignal <- struct{}{}
-		return err
-	}
-
-	var mu sync.Mutex
-	unblocked01 := false
-	ticket02Gate := make(chan struct{})
-
-	onRunnerWait(d, func(s agentrunner.Session) {
-		if !strings.Contains(s.Label, "iter-01") {
-			<-ticket02Gate
-			return
-		}
-		mu.Lock()
-		state := agentrunner.StateBlocked
-		if unblocked01 {
-			state = agentrunner.StateIdle
-		}
-		mu.Unlock()
-		fakeRunner(d).SetState(s.Label, state, "")
-	})
-
-	sink := &recordingSink{}
-	done := make(chan error, 1)
-	go func() {
-		done <- Run(RunOptions{
-			EpicName: "my-epic", Skill: "implement", ScratchDir: scratchDir, RepoDir: "/fake/repo",
-			MaxParallel: 2,
-		}, d, sink)
-	}()
-
-	// Wait for ticket 01 to gate-pause (its pane stays blocked and live).
-	waitForFileContains(t, path01, "status: paused")
-
-	// Answer the pane, but do NOT release ticket 02 yet.
-	mu.Lock()
-	unblocked01 = true
-	mu.Unlock()
-	fakeRunner(d).SetState("my-epic-iter-01", agentrunner.StateIdle, "")
-
-	// If the fix didn't work, this blocks until the test times out, since the
-	// old code wouldn't notice ticket 01's answer until ticket 02's result
-	// arrived — which the still-held ticket02Gate prevents.
-	waitForFileContains(t, path01, "status: done")
-
-	select {
-	case <-removedSignal:
-	case <-time.After(5 * time.Second):
-		t.Fatal("ticket 01's worktree was never removed after it merged")
-	}
-	if len(*removed) != 1 {
-		t.Errorf("removed worktree branches after ticket 01 reattached+merged = %v, want exactly one (ticket 01), ticket 02 still running", *removed)
-	}
-
-	close(ticket02Gate)
-	if err := <-done; err != nil {
-		t.Fatalf("Run() error = %v, want nil", err)
-	}
-
-	raw02, err := os.ReadFile(path02)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	if !strings.Contains(string(raw02), "status: done") {
-		t.Errorf("ticket 02 not marked done:\n%s", raw02)
 	}
 }
 

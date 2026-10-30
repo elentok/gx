@@ -96,20 +96,7 @@ func runIteration(d Deps, p iterationParams) error {
 	launchParams.verifyCap = p.verifyCap
 	launchParams.Session = l.Session
 	var sessionID string
-	if errors.Is(err, agentrunner.ErrNotReady) {
-		// The agent is live but blocked on a dialog gx did not raise: same
-		// pause as a mid-turn block. One that cleared before the re-check is a
-		// plain launch failure.
-		paused, pauseErr := pauseOnBlockedPane(d, launchParams, l.SessionID)
-		if pauseErr != nil {
-			return pauseErr
-		}
-		if paused {
-			sessionID, err = l.SessionID, errBlockedPanePaused
-		}
-	}
 	switch {
-	case errors.Is(err, errBlockedPanePaused):
 	case err != nil:
 		err = fmt.Errorf("sending initial prompt: %w", err)
 		p.logLaunchFailed(label, 1, events.IterationError, err)
@@ -491,8 +478,8 @@ const unexecutedToolCallCorrection = "Your last turn ended with a tool call writ
 // untouched and falls straight to paused (answer), same as before this ticket.
 // A pane that reads blocked at the moment of the check gets no prompt sent
 // at all, honoring the rule that gx never types into a pane sitting on a
-// dialog it did not raise (see pauseOnBlockedPane); an err wrapping
-// errBlockedPanePaused reports the retry's own re-wait pausing the same way.
+// dialog it did not raise; an err wrapping errBlockedPanePaused reports the
+// retry's own re-wait pausing after a Codex quota reset.
 func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, base, branch, sessionID string) (retried bool, ahead int, newSessionID string, err error) {
 	matched, err := d.ReadUnexecutedToolCall(path, sessionID)
 	if err != nil {
@@ -522,10 +509,7 @@ func retryUnexecutedToolCallOnce(d Deps, p iterationParams, path, pane, base, br
 	launchParams := p.launchAndPromptParams(label, pane, "", path, "", "")
 	launchParams.verifyCap = p.verifyCap
 	launchParams.Session = s
-	if err := promptIdle(d, launchParams, retrySessionID, unexecutedToolCallCorrection); err != nil {
-		if errors.Is(err, errBlockedPanePaused) {
-			return false, 0, "", err
-		}
+	if err := promptIdle(d, launchParams, unexecutedToolCallCorrection); err != nil {
 		return false, 0, "", fmt.Errorf("sending corrective prompt to %s: %w", label, err)
 	}
 

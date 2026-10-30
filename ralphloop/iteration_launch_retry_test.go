@@ -168,31 +168,6 @@ func TestRunIteration_PromptNotDeliveredTwice_PausesPromptStalled(t *testing.T) 
 	}
 }
 
-func TestRunIteration_PromptNotReady_PausesBlockedPane(t *testing.T) {
-	t.Parallel()
-	d, _, removed := fakeDeps()
-	r := fakeRunner(d)
-	// The agent is blocked on a dialog by the time the initial prompt arrives,
-	// so the runner reports ErrNotReady and then stays blocked.
-	onRunnerPrompt(d, func(s agentrunner.Session, _ string) error {
-		r.SetState(s.Label, agentrunner.StateBlocked, "trust_directory")
-		return nil
-	})
-
-	scratchDir := runLaunchEpic(t, d, true)
-
-	assertTicketPaused(t, scratchDir, schema.PauseClassAnswer)
-	if _, found, _ := r.Find(launchLabel); !found {
-		t.Error("blocked session was stopped, want it live for a person to answer")
-	}
-	if len(*removed) != 0 {
-		t.Errorf("removed worktrees = %v, want the paused worktree kept", *removed)
-	}
-	if failed := launchFailedEvents(t, scratchDir); len(failed) != 0 {
-		t.Errorf("launch-failed events = %+v, want none for a pause", failed)
-	}
-}
-
 func TestRunIteration_MissingCapability_PausesWithDoctorHint(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()

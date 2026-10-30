@@ -40,7 +40,7 @@ const (
 	// the scheduler itself keeps running every other ticket. A renderer (see
 	// ticket 04a) treats it as its own "paused for repair" state rather than a
 	// generic pause. A pane blocked on an operator prompt is a different pause
-	// entirely (paused (answer), no pause — see pauseOnBlockedPane).
+	// entirely (paused (answer), no pause — see dwellThenPauseBlocked).
 	PauseRepair PauseKind = "repair"
 )
 
