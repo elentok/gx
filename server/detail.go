@@ -219,7 +219,8 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 		return TicketDetail{}, err
 	}
 	d.Related = relatedTickets(ref, epics)
-	if t.Status == schema.StatusClaimed {
+	// A blocked-pane pause keeps its agent's prompt, and Approve ends that pause.
+	if t.Status == schema.StatusClaimed || t.PauseReason == schema.PauseBlockedPane {
 		if d.Permission, err = s.permissionCard(ref.addr); err != nil {
 			return TicketDetail{}, err
 		}

@@ -180,6 +180,15 @@ var scenarios = map[string]scenario{
 		queue:     []string{project + ":refused-epic"},
 		behaviour: map[string]string{project + ":refused-epic/01": agentfake.BehaviourRefuseAsk},
 	},
+	// blocked-menu: queued, and its only ticket's worker blocks on a question
+	// menu, which Approve cannot answer, so only Retry lifts the pause.
+	"blocked-menu": {
+		epics: []epic{{project, "menu-epic", []ticket{
+			{"01", "menu", servertest.TicketOpts{}},
+		}}},
+		queue:     []string{project + ":menu-epic"},
+		behaviour: map[string]string{project + ":menu-epic/01": agentfake.BehaviourQuestionMenu},
+	},
 	// paused: one ticket per recovery path. Every paused ticket opens a pause
 	// round. The approve epic is queued, so its worker really blocks on a
 	// permission prompt in the pty runner; the other epic is not, so nothing

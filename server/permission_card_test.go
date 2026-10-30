@@ -17,6 +17,7 @@ import (
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/runnerfake"
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // herdrHosted is a runner that reports itself as herdr-hosted.
@@ -126,6 +127,33 @@ func TestPermissionCard_AppearsForBlockedAgentAndVanishesAfterAnswer(t *testing.
 	}
 	if got := fake.Answers("epic-a-iter-01"); len(got) != 1 || got[0].Decision != agentrunner.DecisionAllow {
 		t.Errorf("answers = %+v", got)
+	}
+}
+
+// A ticket paused blocked-pane keeps its agent's approvable prompt, so Approve is
+// the web button that ends that pause.
+func TestPermissionCard_StaysOnABlockedPanePause(t *testing.T) {
+	t.Parallel()
+	h, _ := startBlockedClaimed(t, false, &agentrunner.Pending{ID: "req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"ls"}`)})
+	paths, _ := filepath.Glob(filepath.Join(h.TicketStore, "proj", "epic-a", "issues", "01-*.md"))
+	if len(paths) != 1 {
+		t.Fatalf("ticket files = %v", paths)
+	}
+	if err := schema.UpdateTicket(paths[0], func(tk *schema.Ticket) {
+		tk.Status, tk.PauseReason = schema.StatusPaused, schema.PauseBlockedPane
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	d, err := h.Client.Detail(context.Background(), answerAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Permission == nil || d.Permission.RequestID != "req-1" {
+		t.Errorf("permission = %+v, want the pending request", d.Permission)
+	}
+	if !slices.Contains(d.Actions, server.ActionApprove) {
+		t.Errorf("actions = %v, want approve", d.Actions)
 	}
 }
 

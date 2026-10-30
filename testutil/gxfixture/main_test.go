@@ -527,6 +527,17 @@ func TestRefusedAskScenario_RefusedFinishThenAskPausesSelfReported(t *testing.T)
 	r.stop(t)
 }
 
+func TestBlockedMenuScenario_QuestionMenuPausesBlockedPaneAfterTheDwell(t *testing.T) {
+	t.Parallel()
+	r := start(t, "blocked-menu")
+	const addr = "demo:menu-epic/01"
+	// The wait loop pauses once the agent has stayed blocked past its 15 s dwell.
+	if !testutil.Poll(60*time.Second, time.Second, func() bool { return r.detail(t, addr).PauseReason == "blocked-pane" }) {
+		t.Fatalf("ticket %s pause_reason = %q, want blocked-pane", addr, r.detail(t, addr).PauseReason)
+	}
+	r.stop(t)
+}
+
 // web is a client of the fixture's web server, signed in with the fixture's cookie.
 type web struct {
 	client *http.Client

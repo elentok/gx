@@ -1282,3 +1282,21 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   3. Click "Turn on composer", then confirm.
   4. Open the same URL in a fresh page.
 - **Pass:** the page reads "gx is driving this agent, so the composer is off." and Send is disabled. Cancel keeps it off. The confirm removes the line and the button, and the message box takes text. The fresh page is read-only again.
+
+## 115. Blocked pause on PTY
+
+- **Scenario:** `paused` (its `approve-epic` worker blocks on a permission prompt)
+- **Steps:**
+  1. Open the Epics page and the `approve-epic` card; wait up to 30 s (the 15 s dwell).
+  2. Open ticket 01.
+  3. Click "Allow once".
+- **Pass:** the epic page reads "needs answer" after the dwell. The ticket page reads "Paused · Agent stuck", and its action card names the web answer button. "Allow once" clears the pause without a reload.
+
+## 116. Retry on a question menu
+
+- **Scenario:** `blocked-menu` (its worker blocks on a question menu)
+- **Steps:**
+  1. Open the `menu-epic` card; wait up to 30 s.
+  2. Open ticket 01.
+  3. Click Retry in "Recovery actions".
+- **Pass:** after the dwell the epic page reads "needs answer" and the ticket page reads "Paused · Agent stuck" with no "Allow once". Retry lifts the pause.

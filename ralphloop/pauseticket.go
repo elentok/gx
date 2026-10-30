@@ -41,6 +41,9 @@ var gxQuestions = map[events.Kind]string{
 	events.StrandedCommits:    "The agent stopped with commits that never merged. Reopen the ticket to retry?",
 	events.BackgroundTaskGate: "The agent ended its turn with a background task still running. Reopen the ticket?",
 	events.AmbiguousBase:      "Several blockers have different branches. Pick the base branch.",
+	// The blocked-pane reason names the prompt and every way to answer, which
+	// outgrows a summary; it goes in the question's text.
+	events.BlockedPane: "The agent is blocked on a prompt gx did not send.",
 }
 
 var (
@@ -53,9 +56,6 @@ var (
 // question lives only in the pane, so its summary is the pause reason.
 func logGxQuestion(ticketPath string, kind events.Kind, reason string) error {
 	summary, ok := gxQuestions[kind]
-	if kind == events.BlockedPane && reason != "" {
-		summary, ok = reason, true
-	}
 	if !ok {
 		return nil
 	}

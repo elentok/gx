@@ -206,8 +206,11 @@ const openFixDialog = async (page: Page) => {
   }).toPass({ timeout: 10_000 });
 };
 
+// The Fix-it agent is a session of its own; the queued epic's Queue agents are not.
 const sessions = async (fixture: Fixture) =>
-  JSON.parse(await fixture.cli("agents", "list", "--json")) as Array<{ dir: string; harness: string }>;
+  (JSON.parse(await fixture.cli("agents", "list", "--json")) as Array<{ dir: string; harness: string; queue?: boolean }>).filter(
+    (s) => !s.queue,
+  );
 
 // The fixture keeps the store at <root>/data/gx/tickets and the project's trunk checkout at <root>/repo.
 const trunkDir = async (fixture: Fixture) => {
@@ -245,6 +248,43 @@ test.describe("55. Fix it with an agent", () => {
     // The refusal is a toast, outside the dialog.
     await expect(toasts(second).filter({ hasText: "an agent is already fixing demo:paused-epic/07" })).toBeVisible();
     expect((await sessions(fixture)).length).toBe(before + 1);
+  });
+});
+
+// The wait loop pauses an agent that stays blocked for its 15 s dwell.
+const dwell = { timeout: 30_000 };
+// The header pill; the Runs list repeats the label in a longer line.
+const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: true });
+
+test.describe("115. Blocked pause on PTY", () => {
+  test("names the answer button and Approve clears it", async ({ page, start }) => {
+    await start("paused");
+
+    await page.getByRole("link", { name: "approve-epic" }).click();
+    await expect(page.getByText("needs answer").first()).toBeVisible(dwell);
+    await page.locator('a[href$="/t/demo:approve-epic/01"]').filter({ hasNotText: "→" }).click();
+
+    await expect(stuck(page)).toBeVisible();
+    await expect(page.getByText(/answer it with the web answer button/)).toBeVisible();
+    await page.getByRole("button", nav("Allow once")).click();
+    await expect(stuck(page)).toHaveCount(0);
+  });
+});
+
+test.describe("116. Retry on a question menu", () => {
+  test("Retry lifts the pause", async ({ page, start }) => {
+    await start("blocked-menu");
+
+    await page.getByRole("link", { name: "menu-epic" }).click();
+    await expect(page.getByText("needs answer").first()).toBeVisible(dwell);
+    await page.locator('a[href$="/t/demo:menu-epic/01"]').filter({ hasNotText: "→" }).click();
+
+    await expect(stuck(page)).toBeVisible();
+    await expect(page.getByRole("button", nav("Allow once"))).toHaveCount(0);
+    await recovery(page).getByRole("button", nav("Retry")).click();
+    await expect(stuck(page)).toHaveCount(0);
+    // The agent left the menu and the ticket went on.
+    await expect(page.getByText(/^(Paused|needs-answer)/)).toHaveCount(0);
   });
 });
 

@@ -247,6 +247,35 @@ func openQuestionSummary(t *testing.T, path string) string {
 	return ""
 }
 
+// A blocked pane's reason can run past the log's summary limit (it names the
+// prompt and every way to answer); the question must still open, with the whole
+// reason in its text.
+func TestPause_BlockedPaneLongReasonStillOpensAQuestion(t *testing.T) {
+	t.Parallel()
+	scratchDir := writeEpic(t, "my-epic", map[string]string{"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: implement\n---\n# A\n"})
+	path := ticketPath(scratchDir, "my-epic", "01-a.md")
+	reason := strings.Repeat("blocked on a prompt gx did not send; ", 6)
+
+	got, err := pause(&recordingSink{}, pauseRequest{
+		ScratchDir: scratchDir, EpicName: "my-epic", Ticket: "01", Path: path,
+		Type: events.Paused, Kind: events.BlockedPane, Reason: reason,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != reason {
+		t.Errorf("reason = %q, want it unchanged (no failed-logging suffix)", got)
+	}
+	evs, err := tickets.ReadLog(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := tickets.OpenQuestion(evs)
+	if q == nil || !strings.Contains(q.Text, reason) {
+		t.Errorf("open question = %+v, want one carrying the whole reason", q)
+	}
+}
+
 // Seam 1: Pause derives the event type from the kind, and a paused (answer) pause
 // never writes a Handoff section into the markdown: the question
 // lives in the log.
