@@ -1,8 +1,19 @@
 # Changelog
 
-## Unreleased
+## v0.44.0 - 2026-10-30
 
 - Changed `agent-runner: auto` to pick the PTY runner after a server restart. No config migration is needed. `auto` without claude on PATH now refuses to start `gx server`. Set `agent-runner: herdr` to bring herdr back. Iterations already running on herdr keep herdr until they end.
+- Added discovery and adoption of live PTY holders, so agents can resume after a server restart without launching a duplicate. Codex agents still use herdr when a native runner is configured.
+- Added Claude usage tracking through the PTY statusline. New Claude claims wait when the 5-hour or weekly usage window reaches 98%, until that window resets. `gx usage override` and a web button lift the gate through the current window. Usage samples and overrides survive server restarts.
+- Changed rate-limited runs to wait in place and show their reset time. A rate-limit hold stops new claims for the same harness and survives a server restart. `gx claude doctor` now checks PTY rate-limit detection live.
+- Added Queue and Design agent switches to the TUI and web Agents views. These agents stay out of the normal session list and needs-you count. Open them read-only, then confirm to unlock input. "Go to pane" on a PTY Queue agent now opens its live Agents panel.
+- Changed agent input handling so a person's typing stops gx's nudges and restarts the idle and stall timers. gx waits for an unfinished draft before sending its own prompt.
+- Changed blocked-agent recovery to work across runners. Retry can clear a blocked question menu, and leaving the blocked state lifts the pause. Herdr outages hold only tickets that need herdr. Merge, verification and repair use the runner hosting the ticket. Investigate now starts a Fix agent and opens it.
+- Changed `gx skills install --dev` to link whole skill directories from the recorded checkout. Claude uses `~/.claude/skills`; Codex uses `~/.agents/skills`. Server start and restart preserve the dev checkout. Switching mode or checkout requires force, and changes keep recovery backups under gx's data directory.
+- Updated gx branding with a robotic goblin mascot, wordmark, favicons and web menu artwork.
+- Fixed auto-advance after an agent finishes a turn while background tasks remain alive.
+- Fixed macOS store watchers to fall back to fsnotify when FSEvents cannot start.
+- Fixed fixture shutdown leaking detached holders and fake agents. Added a regression test for holder and child exit, and fixed portable editor-environment assertions, rate-limit fixture ordering and Bash 3.2 test reporting.
 
 ## v0.43.0 - 2026-10-30
 
