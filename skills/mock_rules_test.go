@@ -53,6 +53,8 @@ func TestMockRulesAnchors(t *testing.T) {
 			"`PLAYWRIGHT_BROWSERS_PATH`",
 			"Resolve `gx tickets root` before any `cd`",
 			"`waitUntil: \"domcontentloaded\"`",
+			"`cookie_name`",
+			"`nextTotpCode()`",
 		}},
 		{"implement", "gx-implement/SKILL.md", []string{
 			"## Mock check",

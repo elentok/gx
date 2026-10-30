@@ -33,7 +33,8 @@ go run ./testutil/gxfixture [--hold] <scenario>
   fixture started any other way keeps running after you finish, with its `gx server` and fake agents.
   As a backstop it exits when its parent process dies or after 2 hours.
 - The scenario names are in the catalog (`empty`, `ready`, `mixed`, `finishing`, `paused`, `united`,
-  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`, `disk-low`, `health`, `agents`, `agents-failures`). An unknown name makes the command list
+  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`, `disk-low`, `health`, `agents`, `agents-failures`, and the sign-in scenarios `web-setup`, `web-login`
+  and `web-logins`). An unknown name makes the command list
   the known ones.
 - Pass `--hold` only for a flow that says so (flow 7, and the Stash flow on `dirty-trunk`). It
   freezes the workers until you delete the file named by `hold_file`.
@@ -47,7 +48,13 @@ go run ./testutil/gxfixture [--hold] <scenario>
 
 The JSON line has these fields:
 
-- `web_url`: the page URL, with the token that signs you in.
+- `web_url`: the page URL. It is HTTPS from the fixture's own root certificate.
+- `cookie_name` and `cookie`: the web login the fixture created. Add this cookie to the browser
+  (secure, with `web_url` as its URL) and the page is signed in. Both are empty in the `web-setup`
+  and `web-login` scenarios, which start signed out.
+- `password`: the password of the fixture's web login.
+- `totp_secret`: the TOTP secret. Absent when the fixture runs with `server.web.totp=false`, which
+  you pass through `start`'s `config` in a Playwright flow (`{ "server.web.totp": "false" }`).
 - `gx`: the gx binary to use for CLI steps.
 - `env`: `KEY=value` entries. Set them for every `gx` call, so the call reaches this fixture's server
   and no other. They include the real `PLAYWRIGHT_BROWSERS_PATH`: the fixture replaces `HOME`, and
@@ -68,8 +75,10 @@ The JSON line has these fields:
 
 ## 2. Open the page and run a flow
 
-1. Open `web_url` once. That visit trades the token for a cookie. In a Playwright script use
-   `waitUntil: "domcontentloaded"`: the page keeps a live connection, so `load` can time out.
+1. Set the `cookie_name` cookie to `cookie`, then open `web_url` once. In a Playwright script use
+   `waitUntil: "domcontentloaded"`: the page keeps a live connection, so `load` can time out. A flow
+   that types a TOTP code uses the `nextTotpCode()` helper in `webui/e2e/fixture.ts`. It waits for a
+   TOTP step the server has not accepted yet, because a code works once per step.
 2. Do the flow's steps from the catalog with `playwright-cli`. Use roles and visible text; the page
    has no `data-testid`.
 3. Never reload the page. The UI updates by itself, and a reload would hide a missing update. If a

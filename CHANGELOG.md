@@ -1,5 +1,14 @@
 # Changelog
 
+## Next
+
+- Changed web UI sign-in to a password plus a TOTP code from an authenticator app. This is a hard cut: every device signs in again. A one-time Setup code from `gx server status` starts the first-run setup. Each device gets its own web login, which ends after 90 days without use. The new Settings page lists web logins, signs them out, changes the password and resets the authenticator.
+- Added HTTPS for the web UI. gx makes its own root certificate on the first start. Trust it on each device (iOS profile or Mac `.cer`). Add every name you use to `server.web.allowed-hosts` before the first start, so the certificate covers it.
+- Added `server.web.totp`. Set it to `false` for password-only login.
+- Added `gx server web-logins`, `web-revoke`, `web-password`, `web-reset-authenticator` and `web-reset`.
+- Added a source-IP rule: the listener closes connections from public IPs. The loopback TCP listener refuses browser requests.
+- Removed `gx server web-token`, `make web-dev-proxy` and `GX_WEBUI_PROXY`. `?gx_token=` links and the `gx_web` cookie no longer work.
+
 ## v0.42.0 - 2026-10-29
 
 - Added the Agents page to the web UI. It has a new Agents tab and a session sidebar with a toggle for design sessions. You can read a session's chat, switch between sessions, and send messages with Cmd/Ctrl+Enter. Drafts are saved per session in the browser and shared with the Design composer. Plain Claude sessions accept typed prompts. Sessions without chat, design sessions and non-Claude sessions show a notice, and failures show a banner with Retry. The page also works on a phone, with a full-screen switcher and a New session sheet.

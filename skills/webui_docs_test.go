@@ -13,13 +13,13 @@ func TestWebUISecurityDocsKeepWarnings(t *testing.T) {
 	}
 	doc := string(b)
 	for _, phrase := range []string{
-		"plain HTTP",
-		"sniffed cookie",
-		"permission approvals",
-		"full-permission agent",
 		"server.web.allowed-hosts",
-		"before you upgrade",
-		"IP addresses and `localhost` are unaffected",
+		"server.web.totp",
+		"before the first start with this version",
+		"trust the root certificate",
+		"sign in again",
+		"gx server web-reset-authenticator",
+		"IP addresses and `localhost` need no entry",
 		"gx tickets migrate",
 		"once after you upgrade",
 		"shows no open question",

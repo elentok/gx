@@ -1,7 +1,10 @@
 # Web e2e flow catalog
 
 Run with `make web-e2e`. Each flow starts its own fixture server (`testutil/gxfixture`), opens the
-`web_url` once for the web cookie, and never reloads the page. The suite fails if a page reloads.
+`web_url` once, already signed in: the fixture finishes the web setup and `fixture.ts` adds the
+`cookie_name` cookie to the browser. The `web-setup`, `web-login` and `web-logins` scenarios start
+signed out or with extra web logins. `nextTotpCode()` returns a code for a new TOTP step, and
+`start(scenario, { config: { "server.web.totp": "false" } })` runs without TOTP. It never reloads the page. The suite fails if a page reloads.
 Retries are off. Locators use roles and visible text, plus `data-testid` `pill` and `reason` on
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.
 
