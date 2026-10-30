@@ -44,6 +44,7 @@ test("shows every mark and counts non-Exited sessions as live", () => {
 });
 
 test("a Queue row shows only its status mark", () => {
+  localStorage.setItem("gx.agents.queue", "1");
   render([session("q", "p", { name: "queued", queue: true, unread: { unread: true }, status: { state: "blocked" }, actionable: { reason: "Pick one" } })]);
   const queued = within(row("queued"));
   expect(queued.getByRole("img", { name: "blocked" })).toBeTruthy();
@@ -52,24 +53,43 @@ test("a Queue row shows only its status mark", () => {
   expect(queued.queryByRole("tooltip", { hidden: true })).toBeNull();
 });
 
-test("design sessions are hidden with a count until the toggle is on, and the choice is remembered", () => {
-  const sessions = [session("1", "p", { name: "plain" }), session("2", "p", { name: "d1", design: true }), session("3", "p", { name: "d2", design: true })];
+test("Queue and Design agents are hidden with counts until their switches are on, and each choice is remembered", () => {
+  const sessions = [
+    session("1", "p", { name: "plain" }),
+    session("2", "p", { name: "d1", design: true }),
+    session("3", "p", { name: "d2", design: true }),
+    session("4", "p", { name: "q1", queue: true }),
+  ];
+  const queue = () => screen.getByRole("checkbox", { name: /Queue agents/ }) as HTMLInputElement;
+  const design = () => screen.getByRole("checkbox", { name: /Design agents/ }) as HTMLInputElement;
   render(sessions);
   expect(rows()).toHaveLength(1);
   expect(screen.getByText("· 2 hidden")).toBeTruthy();
-  fireEvent.click(screen.getByRole("checkbox", { name: /Design sessions/ }));
-  expect(rows()).toHaveLength(3);
+  expect(screen.getByText("· 1 hidden")).toBeTruthy();
+  fireEvent.click(queue());
+  expect(rows()).toHaveLength(2);
+  expect(screen.queryByText("· 1 hidden")).toBeNull();
+  expect(localStorage.getItem("gx.agents.queue")).toBe("1");
+  expect(localStorage.getItem("gx.agents.design")).toBeNull();
+  fireEvent.click(design());
+  expect(rows()).toHaveLength(4);
   expect(screen.queryByText(/hidden/)).toBeNull();
   cleanup();
   render(sessions);
-  expect(rows()).toHaveLength(3);
-  expect((screen.getByRole("checkbox", { name: /Design sessions/ }) as HTMLInputElement).checked).toBe(true);
+  expect(rows()).toHaveLength(4);
+  expect(queue().checked).toBe(true);
+  expect(design().checked).toBe(true);
 });
 
-test("a selected design session keeps its row and is not counted as hidden", () => {
-  render([session("1", "p", { name: "plain" }), session("2", "p", { name: "d1", design: true }), session("3", "p", { name: "d2", design: true })], "/agents/2");
+test("a selected Queue or Design agent keeps its row and is not counted as hidden", () => {
+  const sessions = [session("1", "p", { name: "plain" }), session("2", "p", { name: "d1", design: true }), session("3", "p", { name: "q1", queue: true }), session("4", "p", { name: "q2", queue: true })];
+  render(sessions, "/agents/2");
   expect(rows().map((r) => r.textContent)).toEqual([expect.stringContaining("plain"), expect.stringContaining("d1")]);
-  expect(screen.getByText("· 1 hidden")).toBeTruthy();
+  expect(screen.getByText("· 2 hidden")).toBeTruthy();
+  cleanup();
+  render(sessions, "/agents/3");
+  expect(rows().map((r) => r.textContent)).toEqual([expect.stringContaining("plain"), expect.stringContaining("q1")]);
+  expect(screen.getAllByText("· 1 hidden")).toHaveLength(2);
 });
 
 test("a click opens the session and marks its row", () => {

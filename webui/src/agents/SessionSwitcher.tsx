@@ -25,7 +25,7 @@ function sessionRow(s: SessionInfo, current: boolean): ListRowData {
 }
 
 /**
- * The Agents page title as a button that opens every session, Design sessions included, even
+ * The Agents page title as a button that opens every agent, Queue and Design agents included, even
  * while the sidebar hides them.
  */
 export function SessionSwitcher({
