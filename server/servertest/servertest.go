@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -313,22 +314,38 @@ func (t *Turn) Transcript(text string) {
 	if t.unsupported("Transcript") {
 		return
 	}
-	line, _ := json.Marshal(map[string]any{"type": "assistant", "message": map[string]any{
-		"content": []map[string]any{{"type": "text", "text": text}},
-	}})
-	path := transcript.PathIn(t.h.Env("HOME"), t.Cwd, t.sessionID)
+	now := time.Now().UTC()
+	line, _ := json.Marshal(map[string]any{
+		"type": "assistant",
+		// The chat read keys messages on uuid and orders them by timestamp.
+		"uuid":      fmt.Sprintf("turn-%d", now.UnixNano()),
+		"timestamp": now.Format(time.RFC3339Nano),
+		"message": map[string]any{
+			"role":    "assistant",
+			"content": []map[string]any{{"type": "text", "text": text}},
+		},
+	})
+	// Recovery looks under HOME, the chat read under CLAUDE_CONFIG_DIR.
+	for _, path := range []string{
+		transcript.PathIn(t.h.Env("HOME"), t.Cwd, t.sessionID),
+		filepath.Join(t.h.Env("CLAUDE_CONFIG_DIR"), "projects", transcript.Slugify(t.Cwd), t.sessionID+".jsonl"),
+	} {
+		if err := appendLine(path, append(line, '\n')); err != nil {
+			t.h.tb.Errorf("servertest: write the transcript: %v", err)
+		}
+	}
+}
+
+func appendLine(path string, line []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		t.h.tb.Errorf("servertest: write the transcript: %v", err)
-		return
+		return err
 	}
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
-	if err == nil {
-		_, err = f.Write(append(line, '\n'))
-		err = errors.Join(err, f.Close())
-	}
 	if err != nil {
-		t.h.tb.Errorf("servertest: write the transcript: %v", err)
+		return err
 	}
+	_, err = f.Write(line)
+	return errors.Join(err, f.Close())
 }
 
 // ptyOnly reports whether the harness runs on PTY; on herdr it fails the test

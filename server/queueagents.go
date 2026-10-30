@@ -1,7 +1,9 @@
 package server
 
 import (
+	"cmp"
 	"path/filepath"
+	"strings"
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
@@ -71,6 +73,35 @@ func (s *Server) queueAgentRow(t trackedRun) (SessionInfo, bool) {
 		info.Status.Message = st.BlockedReason
 	}
 	return info, true
+}
+
+// readableSession resolves a session read's id: a sessions-dir session, else a
+// live Queue agent. Only the chat and screen reads use it; the write routes
+// call sessionDir and so refuse a Queue agent id as an unknown session.
+func (s *Server) readableSession(id string) (string, sessionMeta, SessionResult, error) {
+	dir, meta, res, err := s.sessionDir(id)
+	if !res.Refused || res.Reason != ReasonSessionUnknown || !strings.HasPrefix(id, queueAgentIDPrefix) {
+		return dir, meta, res, err
+	}
+	for _, row := range s.queueAgentRows() {
+		if row.ID != id {
+			continue
+		}
+		d, err := nativerunner.OpenDir(row.Holder)
+		if err != nil {
+			break
+		}
+		// No Ticket: it would make the chat read the agent as a design step.
+		return row.Holder, sessionMeta{
+			ID:             id,
+			Harness:        row.Harness,
+			Project:        row.Project,
+			Dir:            cmp.Or(d.Meta.Cwd, row.Dir),
+			ConversationID: d.Meta.SessionID,
+			Status:         row.Status,
+		}, SessionResult{}, nil
+	}
+	return dir, meta, res, nil
 }
 
 // queueAgentState maps a run's live state to a session state. The hold lives

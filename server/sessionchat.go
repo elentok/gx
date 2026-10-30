@@ -152,7 +152,7 @@ func (s Settings) chatHarness() string {
 
 func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("session")
-	_, meta, res, err := s.sessionDir(id)
+	_, meta, res, err := s.readableSession(id)
 	if res.Refused {
 		status := http.StatusBadRequest
 		if res.Reason == ReasonSessionUnknown {

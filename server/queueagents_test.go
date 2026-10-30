@@ -3,6 +3,7 @@ package server_test
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -88,6 +89,88 @@ func TestQueueAgentRows_RowLeavesWhenTheRunFinishes(t *testing.T) {
 
 	fake.SetState(resumeLabel, agentrunner.StateDone, "")
 	servertest.WaitFor(t, 20*time.Second, "the row to leave", func() bool { return len(queueRows(t, h)) == 0 })
+}
+
+// startQueueChat queues the ticket on the default PTY runner and holds its
+// turn open after the agent wrote text to its transcript. The returned
+// release ends the turn.
+func startQueueChat(t *testing.T, text string) (*servertest.Harness, server.SessionInfo, func()) {
+	t.Helper()
+	store := t.TempDir()
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
+	servertest.SetProjectRepo(t, store, "proj", testutil.TempRepo(t))
+	h := servertest.StartWithStore(t, store)
+	var release func()
+	held := make(chan struct{})
+	h.OnTurn(func(turn *servertest.Turn) {
+		turn.Transcript(text)
+		release = turn.Hold()
+		close(held)
+	})
+	if res, err := h.Client.QueueAdd(context.Background(), queueRowTicket, "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	select {
+	case <-held:
+	case <-time.After(30 * time.Second):
+		t.Fatal("OnTurn never ran")
+	}
+	servertest.WaitFor(t, 10*time.Second, "a Queue row", func() bool { return len(queueRows(t, h)) == 1 })
+	return h, queueRows(t, h)[0], release
+}
+
+func TestQueueAgentChat_LivePtyAgentServesItsChatAndScreen(t *testing.T) {
+	t.Parallel()
+	h, row, release := startQueueChat(t, "queue agent says hi")
+	defer release()
+	ctx := context.Background()
+
+	servertest.WaitFor(t, 10*time.Second, "the agent's message in the chat", func() bool {
+		chat, err := h.Client.SessionChat(ctx, row.ID)
+		return err == nil && slices.ContainsFunc(chat.Messages, func(m server.SessionChatMessage) bool {
+			return strings.Contains(m.Text, "queue agent says hi")
+		})
+	})
+	screen, err := h.Client.SessionScreen(ctx, row.ID)
+	if err != nil || len(screen.Rows) == 0 {
+		t.Errorf("screen = %+v, %v; want the agent's rows", screen, err)
+	}
+}
+
+func TestQueueAgentChat_GoneAgentReadsAsUnknownSession(t *testing.T) {
+	t.Parallel()
+	h, row, release := startQueueChat(t, "bye")
+	release()
+	servertest.WaitFor(t, 20*time.Second, "the row to leave", func() bool { return len(queueRows(t, h)) == 0 })
+	ctx := context.Background()
+
+	if _, err := h.Client.SessionChat(ctx, row.ID); err == nil || !strings.Contains(err.Error(), "404") {
+		t.Errorf("chat err = %v, want a 404", err)
+	}
+	if _, err := h.Client.SessionScreen(ctx, row.ID); err == nil || !strings.Contains(err.Error(), "404") {
+		t.Errorf("screen err = %v, want a 404", err)
+	}
+}
+
+func TestQueueAgentChat_WriteRoutesRefuseAQueueAgentAsUnknown(t *testing.T) {
+	t.Parallel()
+	h, row, release := startQueueChat(t, "hello")
+	defer release()
+	ctx := context.Background()
+
+	for name, call := range map[string]func() (server.SessionResult, error){
+		"stop":      func() (server.SessionResult, error) { return h.Client.StopSession(ctx, row.ID) },
+		"interrupt": func() (server.SessionResult, error) { return h.Client.InterruptSession(ctx, row.ID) },
+		"remove":    func() (server.SessionResult, error) { return h.Client.RemoveSession(ctx, row.ID) },
+		"prompt": func() (server.SessionResult, error) {
+			return h.Client.PromptSession(ctx, server.SessionPromptRequest{ID: row.ID, Text: "hi"})
+		},
+	} {
+		res, err := call()
+		if err != nil || !res.Refused || res.Reason != server.ReasonSessionUnknown {
+			t.Errorf("%s = %+v, %v; want a refusal as unknown session", name, res, err)
+		}
+	}
 }
 
 func TestQueueAgentRows_HerdrAndHeadlessRunsAreAbsent(t *testing.T) {

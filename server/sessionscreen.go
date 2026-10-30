@@ -25,7 +25,7 @@ func (s *Server) sessionScreenRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.URL.Query().Get("session")
-	dir, meta, res, err := s.sessionDir(id)
+	dir, meta, res, err := s.readableSession(id)
 	if res.Refused {
 		status := http.StatusBadRequest
 		if res.Reason == ReasonSessionUnknown {
