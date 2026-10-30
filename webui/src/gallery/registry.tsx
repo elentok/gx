@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
-import { LoginCard } from "../auth/LoginPage";
+import { LoginCard, rateLimitText } from "../auth/LoginPage";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { WideContext } from "../useWide";
@@ -777,6 +777,10 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "default", node: <LoginCard totpOn /> },
       { label: "wrong password or code", node: <LoginCard totpOn password="hunter2hunter2" error="Wrong password or code" /> },
       { label: "TOTP off", node: <LoginCard totpOn={false} /> },
+      {
+        label: "rate limited",
+        node: <LoginCard totpOn password="hunter2hunter2" error={rateLimitText(181)} submitDisabled />,
+      },
     ],
   },
   {

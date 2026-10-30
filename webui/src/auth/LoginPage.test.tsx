@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { renderThemed } from "../ui/render";
 import type { AuthResult, AuthState } from "./authState";
@@ -47,6 +47,24 @@ test("a wrong credentials refusal shows one message and does not call the gate",
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
   expect((await screen.findByRole("alert")).textContent).toBe("Wrong password or code");
   expect(onDone).not.toHaveBeenCalled();
+});
+
+test("a rate limited refusal shows the wait in minutes and disables Sign in until it ends", async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  try {
+    stubLogin({ refused: true, reason: "rate-limited", wait_seconds: 181 });
+    renderThemed(<LoginPage auth={authOf(true)} onDone={() => {}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Too many tries. Try again in 4 minutes.");
+    expect((screen.getByRole("button", { name: "Sign in" }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(181_000);
+    });
+    expect((screen.getByRole("button", { name: "Sign in" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByRole("alert")).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("success sends the password and code and calls the gate", async () => {
