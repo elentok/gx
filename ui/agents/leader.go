@@ -54,6 +54,8 @@ var sidebarBindings = []keys.Binding{
 	{Seq: []string{"a"}, Title: "run action"},
 	{Seq: []string{"m"}, Title: "session menu"},
 	{Seq: []string{"b"}, Title: "toggle sidebar"},
+	{Seq: []string{"t", "q"}, Display: "t q", Title: "show/hide Queue agents"},
+	{Seq: []string{"t", "d"}, Display: "t d", Title: "show/hide Design agents"},
 	{Seq: []string{"?"}, Title: "help"},
 }
 
@@ -157,9 +159,9 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 	case "[":
 		return m.enterCopyMode()
 	case "n":
-		m.cursor = min(m.cursor+1, max(0, len(m.sessions)-1))
+		m.cursor = m.stepCursor(1)
 	case "p":
-		m.cursor = max(m.cursor-1, 0)
+		m.cursor = m.stepCursor(-1)
 	case "u":
 		m.cursor = m.nextNeedingAttention()
 	case "b":

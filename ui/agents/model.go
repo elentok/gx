@@ -95,6 +95,12 @@ type Model struct {
 	opened bool
 	// lastViewed is the session viewed last by an earlier TUI.
 	lastViewed string
+	// showQueue and showDesign: the Queue and Design groups are listed, not
+	// folded into a count; remembered in groupsPath.
+	showQueue, showDesign bool
+	groupsPath            string
+	// togglePending: `t` was pressed and the next key picks the group.
+	togglePending bool
 	// focused: the TUI's terminal has focus.
 	focused     bool
 	termProgram string
@@ -117,6 +123,8 @@ func NewModel(client SessionClient, settings ui.Settings) Model {
 	if data, err := settings.Dirs.DataDir(); err == nil {
 		m.sessionsDir = filepath.Join(data, "sessions")
 	}
+	m.groupsPath = groupsFile(settings.Dirs)
+	m.showQueue, m.showDesign = loadGroups(m.groupsPath)
 	return m
 }
 
@@ -144,7 +152,7 @@ func (m Model) WithServerState(st *viewmodel.State, link ticketsui.ServerLink) (
 // after the leader, in the jump popup, create form, confirm or menu and while
 // typing a help filter, and in copy mode.
 func (m Model) InputFocused() bool {
-	return m.terminalFocused || m.leaderPending || m.copy != nil || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menu.IsOpen || m.help.InputFocused()
+	return m.terminalFocused || m.leaderPending || m.togglePending || m.copy != nil || m.jump != nil || m.create != nil || m.confirm.IsOpen || m.menu.IsOpen || m.help.InputFocused()
 }
 
 // TerminalFocused tells the shell ctrl+o is the page's: the agent's in the
@@ -268,14 +276,21 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateSidebarKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.togglePending {
+		m.togglePending = false
+		return m.toggleGroup(msg.String()).refresh()
+	}
 	switch {
 	case key.Matches(msg, keyFocusTerminal):
 		m.focusTerminal()
 		return m, nil
+	case msg.String() == "t":
+		m.togglePending = true
+		return m, nil
 	case key.Matches(msg, keyDown):
-		m.cursor = min(m.cursor+1, max(0, len(m.sessions)-1))
+		m.cursor = m.stepCursor(1)
 	case key.Matches(msg, keyUp):
-		m.cursor = max(m.cursor-1, 0)
+		m.cursor = m.stepCursor(-1)
 	case key.Matches(msg, keyToggleSidebar):
 		m.hideSidebar = !m.hideSidebar
 	case key.Matches(msg, keyAttention):

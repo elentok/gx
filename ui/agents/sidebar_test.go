@@ -30,7 +30,7 @@ func fixtureSessions() []server.SessionInfo {
 		{ID: "s2", Name: "nvim", Project: "dotfiles",
 			Status: server.SessionStatus{State: server.SessionExited}, Exit: server.SessionExitCrashed,
 			Actionable: server.SessionActionable{Reason: "crashed"}},
-		{ID: "s3", Name: "docs", Project: "gx", Ticket: "gx:map/01", Design: true,
+		{ID: "s3", Name: "docs", Project: "gx", Ticket: "gx:map/01",
 			Status: server.SessionStatus{State: server.SessionIdle}},
 		{ID: "s4", Name: "review", Project: "gx", Status: server.SessionStatus{State: server.SessionBlocked},
 			Unread: server.SessionUnread{Unread: true}},
@@ -47,6 +47,7 @@ func sidebarModel(t *testing.T, nerd bool, sessions []server.SessionInfo, width,
 	m := NewModel(&fakeSessionClient{}, ui.Settings{UseNerdFontIcons: nerd, Dirs: dirs})
 	// Start on the first session in the sidebar, past the opening focus.
 	m.opened = true
+	m.showQueue, m.showDesign = true, true
 	m = withState(t, m, &viewmodel.State{Sessions: sessions}, ticketsui.ServerLinkUp)
 	return update1(t, m, tea.WindowSizeMsg{Width: width, Height: height})
 }

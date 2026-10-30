@@ -46,20 +46,26 @@ type sidebarRow struct {
 	session int
 }
 
-// orderedSessions groups sessions by project, projects in order of their
-// first session, keeping creation order inside each group so rows never jump.
+// orderedSessions lists regular sessions, then Queue agents, then Design
+// agents; each part is grouped by project, projects in order of their first
+// session, keeping creation order inside each group so rows never jump.
 func orderedSessions(sessions []server.SessionInfo) []server.SessionInfo {
-	var projects []string
-	byProject := map[string][]server.SessionInfo{}
-	for _, s := range sessions {
-		if _, ok := byProject[s.Project]; !ok {
-			projects = append(projects, s.Project)
-		}
-		byProject[s.Project] = append(byProject[s.Project], s)
-	}
 	out := make([]server.SessionInfo, 0, len(sessions))
-	for _, p := range projects {
-		out = append(out, byProject[p]...)
+	for _, g := range []agentGroup{groupRegular, groupQueue, groupDesign} {
+		var projects []string
+		byProject := map[string][]server.SessionInfo{}
+		for _, s := range sessions {
+			if groupOf(s) != g {
+				continue
+			}
+			if _, ok := byProject[s.Project]; !ok {
+				projects = append(projects, s.Project)
+			}
+			byProject[s.Project] = append(byProject[s.Project], s)
+		}
+		for _, p := range projects {
+			out = append(out, byProject[p]...)
+		}
 	}
 	return out
 }
@@ -77,19 +83,42 @@ func liveCount(sessions []server.SessionInfo) int {
 func (m Model) sidebarRows(innerW int) []sidebarRow {
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
 	var rows []sidebarRow
-	for i, s := range m.sessions {
-		if i == 0 || s.Project != m.sessions[i-1].Project {
-			if i > 0 {
-				rows = append(rows, sidebarRow{session: -1})
-			}
-			header := styleProjectHeader.Render(icons.FolderClosed + " " + s.Project)
-			rows = append(rows, sidebarRow{text: header, session: -1})
+	header := func(text string) {
+		if len(rows) > 0 {
+			rows = append(rows, sidebarRow{session: -1})
 		}
+		rows = append(rows, sidebarRow{text: styleProjectHeader.Render(icons.FolderClosed + " " + text), session: -1})
+	}
+	// prev is the last session listed, to know when a header starts.
+	var prev *server.SessionInfo
+	for i, s := range m.sessions {
+		if !m.onSidebar(i) {
+			continue
+		}
+		switch g := groupOf(s); {
+		case prev == nil || groupOf(*prev) != g:
+			if g == groupRegular {
+				header(s.Project)
+			} else {
+				header(g.title() + "s")
+			}
+		case g == groupRegular && s.Project != prev.Project:
+			header(s.Project)
+		}
+		prev = &m.sessions[i]
 		row := fit(" "+m.statusIcon(s, icons)+" "+sessionLabel(s, icons), innerW-markSlotsWidth) + " " + marks(s, icons)
 		if i == m.cursor {
 			row = ui.RenderRowHighlight(row)
 		}
 		rows = append(rows, sidebarRow{text: row, session: i})
+	}
+	for _, g := range []agentGroup{groupQueue, groupDesign} {
+		if n := m.hiddenCount(g); n > 0 {
+			if len(rows) > 0 {
+				rows = append(rows, sidebarRow{session: -1})
+			}
+			rows = append(rows, hiddenRow(g, n))
+		}
 	}
 	return rows
 }
