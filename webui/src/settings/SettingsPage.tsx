@@ -46,12 +46,13 @@ const rowProps = {
   gap: "3",
   px: "4",
   py: "3",
+  minH: "52px",
   color: "text",
   textAlign: "left",
   width: "100%",
   cursor: "pointer",
   bg: "transparent",
-  _notFirst: { borderTopWidth: "1px", borderTopColor: "border" },
+  _notFirst: { borderTopWidth: "1px", borderTopColor: "hairline" },
   _hover: { bg: "surface" },
 } as const;
 

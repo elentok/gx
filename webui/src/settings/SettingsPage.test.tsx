@@ -29,6 +29,15 @@ describe("CertificateView", () => {
     expect(getByText("3F9A1C7E")).toBeTruthy();
     expect(getByText("52B0D488")).toBeTruthy();
   });
+
+  it("draws a divider between the two download rows only", () => {
+    const cert = { fingerprint: "3F9A1C7E", profile_path: "/gx-root.mobileconfig", cer_path: "/gx-root.cer" };
+    const { getByRole } = renderThemed(<CertificateView cert={cert} />);
+    const top = (name: RegExp) => getComputedStyle(getByRole("link", { name })).borderTopWidth;
+    expect(top(/iPhone or iPad profile/)).not.toBe("1px");
+    expect(top(/Mac certificate/)).toBe("1px");
+    expect(getComputedStyle(getByRole("link", { name: /Mac certificate/ })).minHeight).toBe("52px");
+  });
 });
 
 describe("SettingsHomeView", () => {
