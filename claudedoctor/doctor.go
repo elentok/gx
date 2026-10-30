@@ -54,6 +54,8 @@ type Recording struct {
 }
 
 type Input struct {
+	// Live is set when the recording comes from a real claude run.
+	Live          bool
 	ClaudeVersion string
 	// Env is the KEY=VALUE env the live checks give their children and read
 	// HOME from. Empty means no home, not the process env.
@@ -130,7 +132,7 @@ func runCheck(c Check, src Source, status map[string]Status, sessions map[string
 		return r
 	}
 
-	in := Input{ClaudeVersion: src.ClaudeVersion, Env: src.Env}
+	in := Input{ClaudeVersion: src.ClaudeVersion, Env: src.Env, Live: src.Live}
 	if c.Session != "" {
 		rec, ok := sessions[c.Session]
 		if !ok {

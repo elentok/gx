@@ -1,6 +1,7 @@
 package claudedoctor_test
 
 import (
+	"encoding/json"
 	"os"
 	"slices"
 	"testing"
@@ -62,16 +63,30 @@ func TestPtyLive_RecordsTrustFrameAndWaitingSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PtyLive: %v", err)
 	}
-	src := claudedoctor.Source{Session: func(name string) (claudedoctor.Recording, error) {
-		if name == "pty-rate-limit" { // a live run is never rate limited
-			return claudedoctor.Recording{}, claudedoctor.ErrNoLiveSession
+	src := claudedoctor.Source{Live: true, Session: func(name string) (claudedoctor.Recording, error) {
+		if name == "pty-rate-limit" { // a normal reply: a live run is never rate limited
+			return claudedoctor.Recording{Events: []json.RawMessage{
+				json.RawMessage(`{"type":"assistant","message":{"content":"ok"}}`),
+			}}, nil
 		}
 		return rec, nil
 	}}
-	for _, r := range claudedoctor.Run(claudedoctor.Table, "pty", src) {
+	// holder-survives-kickstart needs launchd; it is not under test here.
+	var table []claudedoctor.Check
+	for _, c := range claudedoctor.Table {
+		if c.Name != "holder-survives-kickstart" {
+			table = append(table, c)
+		}
+	}
+	ran := map[string]bool{}
+	for _, r := range claudedoctor.Run(table, "pty", src) {
+		ran[r.Name] = r.Status != claudedoctor.Skip
 		// The recording ends at the trust dialog; no permission dialog is shown.
 		if r.Status == claudedoctor.Fail && r.Name != "permission-dialog" {
 			t.Errorf("%s failed on the live recording: %s", r.Name, r.Detail)
 		}
+	}
+	if !ran["rate-limit-transcript"] {
+		t.Error("rate-limit-transcript was skipped; it should run on a live transcript")
 	}
 }

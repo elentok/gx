@@ -64,7 +64,9 @@ func liveDoctorSource() claudedoctor.Source {
 		Env:  env,
 		Session: func(name string) (claudedoctor.Recording, error) {
 			switch name {
-			case "turn":
+			case "turn", "pty-rate-limit":
+				// pty-rate-limit reads a real turn's lines with the same reader;
+				// a live run is never rate limited, so it passes on "no API error".
 				events, err := liveTurn(env)
 				return claudedoctor.Recording{Events: events}, err
 			case "pty-status", "pty-trust":

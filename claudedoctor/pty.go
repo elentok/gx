@@ -46,6 +46,11 @@ func checkRateLimitTranscript(in Input) (string, bool) {
 		return err.Error(), false
 	}
 	if !ok {
+		// A live run is not rate limited, so the reader finding no error in a
+		// real transcript is the expected result.
+		if in.Live && len(in.Events) > 0 {
+			return fmt.Sprintf("read %d live transcript lines; no API error, so not rate limited", len(in.Events)), true
+		}
 		return fmt.Sprintf("no API error in %d transcript lines", len(in.Events)), false
 	}
 	if !e.RateLimited() {
