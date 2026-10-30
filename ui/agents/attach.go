@@ -84,6 +84,10 @@ type attachment struct {
 	// held is the button a forwarded press is waiting to be released from,
 	// plus one; zero when none is held.
 	held int
+	// readOnly: keys and paste are dropped (a Queue or Design agent) until the
+	// person confirms an unlock. A new attachment, so every new open, starts
+	// read-only again.
+	readOnly bool
 }
 
 func (a *attachment) close() {
@@ -168,7 +172,7 @@ func (m Model) redialDue(a *attachment) bool {
 func (m Model) dialAttach(attempt int) (Model, tea.Cmd) {
 	m.attach.close()
 	s := m.sessions[m.cursor]
-	a := &attachment{id: s.ID, status: s.Status, attempt: attempt}
+	a := &attachment{id: s.ID, status: s.Status, attempt: attempt, readOnly: s.Queue || s.Design}
 	m.attach = a
 	dir, dial := filepath.Join(m.sessionsDir, s.ID), m.dial
 	return m, func() tea.Msg {
@@ -268,7 +272,7 @@ const maxPasteBytes = 1 << 20
 
 // sendKey types k into the attached session.
 func (m Model) sendKey(k tea.KeyPressMsg) {
-	if a := m.attach; a.live() {
+	if a := m.attach; a.live() && !a.readOnly {
 		a.snapToBottom()
 		key := screen.Key{Code: k.Code, Text: k.Text, Mod: k.Mod}
 		a.write(func(s AttachStream) error { return s.SendKey(key) })
@@ -279,7 +283,7 @@ func (m Model) sendPaste(text string) tea.Cmd {
 	if len(text) > maxPasteBytes {
 		return notify.Warning("paste too large (over 1 MB), not sent")
 	}
-	if a := m.attach; a.live() {
+	if a := m.attach; a.live() && !a.readOnly {
 		a.snapToBottom()
 		a.write(func(s AttachStream) error { return s.Paste(text) })
 	}
@@ -343,7 +347,7 @@ func mouseButton(b tea.MouseButton) (int, bool) {
 func (m Model) forwardPress(mouse tea.Mouse) bool {
 	a := m.attach
 	button, ok := mouseButton(mouse.Button)
-	if !ok || !a.live() || !a.mouse || a.offset != 0 {
+	if !ok || !a.live() || a.readOnly || !a.mouse || a.offset != 0 {
 		return false
 	}
 	x, y, ok := m.screenCell(mouse)

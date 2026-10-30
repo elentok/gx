@@ -30,12 +30,18 @@ func (m Model) selected() (server.SessionInfo, bool) {
 	return m.sessions[m.cursor], true
 }
 
+// queueStopHint is shown instead of stop, remove and restore on a Queue agent.
+const queueStopHint = "stop a Queue agent from the Queue tab"
+
 // stopSelected asks before stopping: Stop always asks, even on a session
 // already Exited, where the server's refusal explains.
 func (m Model) stopSelected() (tea.Model, tea.Cmd) {
 	s, ok := m.selected()
 	if !ok {
 		return m, nil
+	}
+	if s.Queue {
+		return m, notify.Info(queueStopHint)
 	}
 	m.confirm = m.confirm.Open(confirm.Options{
 		Prompt:    "Stop session " + displayName(s) + "?",
@@ -51,6 +57,9 @@ func (m Model) removeSelected() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+	if s.Queue {
+		return m, notify.Info(queueStopHint)
+	}
 	remove := sessionActionCmd("remove", m.client.RemoveSession, s.ID)
 	if s.Status.State != server.SessionExited {
 		return m, remove
@@ -63,6 +72,9 @@ func (m Model) resumeSelected() (tea.Model, tea.Cmd) {
 	s, ok := m.selected()
 	if !ok {
 		return m, nil
+	}
+	if s.Queue {
+		return m, notify.Info(queueStopHint)
 	}
 	return m, sessionActionCmd("resume", m.client.ResumeSession, s.ID)
 }
@@ -99,6 +111,35 @@ func (m Model) runActionSelected() (tea.Model, tea.Cmd) {
 		AcceptCmd:  accept,
 		DefaultYes: true,
 	})
+	return m, nil
+}
+
+// unlockMsg lifts the read-only of a, once the person confirmed.
+type unlockMsg struct{ a *attachment }
+
+// unlockSelected asks before letting keys and paste reach a Queue or Design
+// agent; Cancel is the default.
+func (m Model) unlockSelected() (tea.Model, tea.Cmd) {
+	s, ok := m.selected()
+	a := m.attach
+	if !ok || a == nil || a.id != s.ID || !a.readOnly {
+		return m, nil
+	}
+	prompt := "This Design agent is waiting on gx-design. Typing into it can derail the hand-off. Unlock input?"
+	if s.Queue {
+		prompt = "gx is driving this Queue agent. Typing into it can derail the queue. Unlock input?"
+	}
+	m.confirm = m.confirm.Open(confirm.Options{
+		Prompt:    prompt,
+		AcceptCmd: func() tea.Msg { return unlockMsg{a: a} },
+	})
+	return m, nil
+}
+
+func (m Model) updateUnlock(msg unlockMsg) (tea.Model, tea.Cmd) {
+	if msg.a == m.attach && !msg.a.closed {
+		msg.a.readOnly = false
+	}
 	return m, nil
 }
 
@@ -172,12 +213,20 @@ func sessionMenuItems(s server.SessionInfo) []contextmenu.Item[server.SessionInf
 		}
 		return why
 	}
-	items := []contextmenu.Item[server.SessionInfo]{
-		item("Stop", "x", "x", reason(live, "exited")),
-		item("Restore session", "r", "r", reason(!live, "running")),
-		item("Remove", "d", "d", reason(!live, "running")),
+	var items []contextmenu.Item[server.SessionInfo]
+	if !s.Queue {
+		items = append(items,
+			item("Stop", "x", "x", reason(live, "exited")),
+			item("Restore session", "r", "r", reason(!live, "running")),
+			item("Remove", "d", "d", reason(!live, "running")),
+		)
+	}
+	items = append(items,
 		item("Mark read", "", "mark-read", reason(s.Unread.Unread, "nothing unread")),
 		item("Run Action", "a", "a", reason(len(actionSteps(s.Actionable)) > 0, "no action")),
+	)
+	if s.Queue || s.Design {
+		items = append(items, item("Unlock input", "i", "unlock", reason(live, "exited")))
 	}
 	if s.Design {
 		label := "Auto-advance: off"
@@ -239,6 +288,8 @@ func (m Model) updateMenuPick(msg sessionMenuPickMsg) (tea.Model, tea.Cmd) {
 		return m.markReadSelected()
 	case "a":
 		return m.runActionSelected()
+	case "unlock":
+		return m.unlockSelected()
 	case "auto-advance":
 		s, _ := m.selected()
 		return m, sessionActionCmd("auto-advance", func(ctx context.Context, id string) (server.SessionResult, error) {

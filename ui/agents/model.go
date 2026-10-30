@@ -236,6 +236,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.updateQueueAction(msg)
 	case sessionMenuPickMsg:
 		return m.updateMenuPick(msg)
+	case unlockMsg:
+		return m.updateUnlock(msg)
 	case pageActivatedMsg:
 		// The spinner's tick chain died while the tab was hidden. Focus
 		// reports reach only the page on screen, and switching tabs takes

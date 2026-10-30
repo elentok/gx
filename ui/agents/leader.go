@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/ui/help"
 	"github.com/elentok/gx/ui/keys"
 	"github.com/elentok/gx/ui/nav"
+	"github.com/elentok/gx/ui/notify"
 )
 
 // digitTabs is the shell's tab order, so leader 1-8 matches plain 1-8.
@@ -38,6 +39,7 @@ var leaderBindings = []keys.Binding{
 	{Seq: []string{"o"}, Title: "last active tab"},
 	{Seq: []string{"ctrl+o"}, Title: "switch view"},
 	{Seq: []string{"q"}, Title: "leave tab"},
+	{Seq: []string{"i"}, Title: "unlock Queue/Design input"},
 	{Seq: []string{"?"}, Title: "help"},
 }
 
@@ -119,6 +121,9 @@ func (m Model) updateKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.terminalFocused, m.hideSidebar = false, false
 		return m, nil
 	case m.terminalFocused:
+		if a := m.attach; a.live() && a.readOnly {
+			return m, notify.Info("read-only: " + m.leaderKeys()[0] + " then i to unlock")
+		}
 		m.sendKey(msg)
 		return m, nil
 	}
@@ -154,6 +159,8 @@ func (m Model) runLeaderAction(k string) (tea.Model, tea.Cmd) {
 		return m.removeSelected()
 	case "r":
 		return m.resumeSelected()
+	case "i":
+		return m.unlockSelected()
 	case "a":
 		return m.runActionSelected()
 	case "[":
