@@ -55,7 +55,8 @@ From the person's side:
 1. As a person on `agent-runner: auto` with claude on PATH, I want gx to run my Claude Queue agents
    on the PTY runner after a server restart, so that my queue no longer depends on herdr.
 2. As a person on `auto` without claude on PATH, I want `gx server` to refuse to start with an error
-   that names claude, so that I know what is missing.
+   that names claude and suggests `agent-runner: herdr`, so that I know what is missing and how to
+   keep running on herdr (for example with only Codex installed).
 3. As a person who wants herdr back, I want `agent-runner: herdr` to keep working exactly as before,
    so that herdr stays a backup.
 4. As a person who wants the headless runner, I want `agent-runner: headless` to keep working, so
@@ -63,8 +64,8 @@ From the person's side:
 5. As a person with herdr iterations running when the server restarts on PTY, I want those
    iterations to finish on herdr, so that nothing I started is lost or moved mid-run.
 6. As a person reading the changelog, I want an entry that says `auto` now picks PTY after a server
-   restart, that no config migration is needed, and that `agent-runner: herdr` brings herdr back, so
-   that the switch does not surprise me.
+   restart, that no config migration is needed, that `auto` without claude on PATH now refuses to
+   start, and that `agent-runner: herdr` brings herdr back, so that the switch does not surprise me.
 7. As a contributor, I want an ADR that supersedes ADR 0031's "PTY is never picked automatically",
    and a glossary that no longer calls PTY "the backup" or headless "the default native choice", so
    that the docs match the code.
@@ -89,7 +90,8 @@ From the person's side:
 14. As a person on PTY while herdr is down, I want only the tickets that run on herdr to wait, so that
     a claim never starts without an agent behind it.
 15. As a person on PTY, I want the "herdr down" banner to show only while a queued or running ticket
-    needs herdr, so that I am not warned about a tool I am not using.
+    needs herdr, so that I am not warned about a tool I am not using. herdr missing from PATH counts
+    as down, and the banner then says herdr was not found.
 16. As a person on PTY, I want no separate PTY health banner, so that the screen shows only what needs
     me. PTY launch failures already pause with a reason.
 
@@ -192,15 +194,17 @@ From the person's side:
     change.
 56. As a person, I want the PTY pause reason to name the web answer button, `gx server agents answer`,
     and typing in the Agents tab live panel, so that I know every way to answer.
-57. As a person, I want the web answer button to end the pause, so that no pause needs a CLI step
-    (ADR 0042).
+57. As a person, I want a web button to end every blocked pause, so that no pause needs a CLI step
+    (ADR 0042). Approve/Deny ends a pause on an approvable tool card. On any other dialog (a question
+    menu, a trust dialog), Retry on PTY or herdr presses Esc first and then sends the retry prompt.
 58. As a person who answers in the live panel instead, I want the ticket to lift its pause once the
     agent leaves the blocked state, so that I do not have to answer twice.
 
 ### Rate limits
 
 59. As a person, I want a rate-limited PTY agent to be noticed from its transcript, with the reset time
-    read from claude's message, so that PTY reports limits as herdr does.
+    read from the statusline usage data (or from claude's message when that data is missing), so
+    that PTY reports limits as herdr does.
 60. As a person, I want the server wait loop to handle a rate limit on every runner that reports one
     (PTY, herdr, headless, Codex quota on herdr), and to check it before the blocked pause, so that a
     quota banner never parks a ticket `needs-answer`.
@@ -212,8 +216,9 @@ From the person's side:
     answer.
 64. As a person, I want gx to send "continue" at the reset time, so that the agent picks up where it
     stopped.
-65. As a person, I want gx to re-check every 5 minutes when the message has no readable reset time, so
-    that the hold still ends.
+65. As a person, I want gx to send "continue" every 5 minutes when it has no reset time (no usage data
+    and none in the message), and to stay on hold only if that turn hits the limit again, so that the
+    hold still ends on PTY, whose transcript keeps the old error while the agent is idle.
 66. As a person, I want the server to claim no new tickets for that harness until the reset, and the
     waiting tickets to say why, so that gx does not start agents that would hit the same limit.
 67. As a person, I want a hold to come back after a server restart, so that a restart does not lose
@@ -232,23 +237,32 @@ From the person's side:
 72. As a contributor, I want no server code path to build a herdr runner by default when it needs the
     runner that hosts a ticket, so that PTY tickets are never checked against herdr.
 
+### Usage gate
+
+73. As a person on a claude.ai Pro/Max account, I want gx to stop claiming new Claude tickets once the
+    5-hour or weekly usage reaches 98%, so that new agents do not start only to hit the limit.
+    Running agents keep working.
+74. As a person, I want the waiting tickets to say "usage at N% of the 5-hour (or weekly) limit,
+    resets <time>", and the gate to lift at that reset time, so that I know why nothing starts and
+    when it will.
+
 ## Implementation Decisions
 
 ### Runner selection
 
 - `agentrunner.Select`: `auto` (and empty) picks PTY when claude is on PATH. Otherwise it returns an
-  error that names claude. It no longer pings herdr. Explicit `herdr`, `headless` and `pty` behave as
+  error that names claude and suggests `agent-runner: herdr`. It no longer pings herdr. Explicit `herdr`, `headless` and `pty` behave as
   today. The `ChoicePTY` comment ("auto never picks it") goes away.
 - The server preflight log records the chosen runner as today.
-- `server.New` no longer builds a herdr runner when `Config.Runner` is nil. The implementer picks
-  between making the runner required and building the selected runner through `runnerbuild`.
+- `Config.Runner` is required. `server.New` returns an error when it is nil and never builds a
+  default runner.
 - A new ADR supersedes ADR 0031's rule that `auto` never picks PTY. It records that `auto` picks PTY
   when claude is on PATH, that headless and herdr are picked only by hand, and that a Codex ticket on
   a native runner runs on herdr. The implementer picks the ADR's number and file name.
 - Glossary: the PTY runner and headless runner entries change to match. `docs/specs/agent-runner.md`
   and `docs/specs/agent-runner-hardening.md` are not rewritten. The new ADR is the record.
-- Changelog: one entry with the switch, the restart, no migration, and `agent-runner: herdr` as the
-  way back.
+- Changelog: one entry with the switch, the restart, no migration, that `auto` without claude on PATH
+  now refuses to start, and `agent-runner: herdr` as the way back.
 
 ### Codex routing
 
@@ -268,8 +282,10 @@ From the person's side:
 - The global gate in `claimNext` ("do nothing while herdr is down") becomes a per-ticket check: a
   ticket whose launch runner is herdr is skipped while herdr is down or missing, and shows a wait
   reason. Other tickets claim as usual. The implementer names the check.
+- herdr missing from PATH counts as down, for both the per-ticket claim check and the banner.
 - The "herdr down" banner and its chat notice show only while a queued or running ticket needs herdr
-  and herdr is down. Its text says which tickets wait.
+  and herdr is down. Its text says which tickets wait, and says herdr was not found when it is not on
+  PATH.
 - No PTY health signal is added.
 
 ### Blocked pause on the server wait loop
@@ -283,16 +299,26 @@ From the person's side:
   is added.
 - The PTY reason names the web answer button, `gx server agents answer`, and typing in the Agents tab
   live panel. herdr's reason names the answer verb and the pane.
-- The existing unblock watch ends the pause when the agent leaves blocked, on every runner. This is
-  how an answer typed in the live panel lifts the pause.
+- `pausesOnBlock` and the waiting-run code (keep the run, mark it waiting, watch for unblock, and the
+  answer verb's unblock path) widen from Claude on headless to every runner that reports blocked. It
+  is one shared rule with no headless special case. Today `leaveBlocked`, `waitsOnHeadlessBlock` and
+  the answer verb all check `pausesOnBlock`, which is true only for Claude on headless
+  (`server/runner.go`, `server/headless_block.go`).
+- The unblock watch then ends the pause when the agent leaves blocked, on every runner. This is how an
+  answer typed in the live panel lifts the pause.
+- The web ends a blocked pause with Approve/Deny when the block is an approvable tool card. On any
+  other dialog (a question menu, a trust dialog), Retry on a PTY or herdr run presses Esc first, then
+  sends the retry prompt through the normal prompt path.
 - This is a new way into the existing `needs-answer` pause. gx cannot answer a prompt it did not send,
   and the web answer button ends the pause (ADR 0042).
 
 ### Rate-limit hold on the server wait loop
 
 - `Pty.RateLimit` reads the holder's transcript rate-limit status (`error: rate_limit` or status 429)
-  and parses the reset time from its message with the existing `claudeui` parsers. It does not scan
-  the screen. A message with no readable reset time reports limited with a zero reset time.
+  to learn that a limit was hit. It does not scan the screen. The reset time comes from the agent's
+  usage record (see "Usage record from the statusline") when it has one: the `resets_at` of the
+  window at or near 100%. Without a record, it parses the reset time from the message with the
+  existing `claudeui` parsers. With neither, it reports limited with a zero reset time.
 - The server wait loop asks the hosting runner's `RateLimit` when the agent goes idle or blocked,
   before the blocked pause and before the finish check. For Codex it reads the quota as the old loop
   did.
@@ -303,17 +329,21 @@ From the person's side:
     Queue tab, the web epic row and the ticket page. With no reset time it shows "rate-limited".
   - The stall nudge and the stall and idle timers do not run during the hold.
   - At the reset time plus the existing buffer, the server prompts "continue" through the normal
-    prompt path (busy guard, `/` rule), then the wait goes on. With no reset time it re-checks every
-    5 minutes and prompts once the runner no longer reports a limit.
+    prompt path (busy guard, `/` rule), then the wait goes on. If claude's own auto-continue already
+    resumed the agent, the busy guard sends nothing.
+  - With a zero reset time, the server sends "continue" every 5 minutes. It stays on hold only if
+    that new turn hits the limit again. It does not re-check the transcript alone, because on PTY an
+    idle agent's transcript keeps the old error as its newest entry.
   - The `paused-rate-limit` and `resumed` events are logged as in the old loop, for friction counts
     and chat.
 - While any run of a harness holds, `claimNext` claims no new ticket of that harness. Those tickets
   show a wait reason. The implementer picks its exact text, and it uses the same mechanism as the
   herdr-down wait.
-- After a server restart, reattach runs the same wait loop, and its first check puts the run back on
-  hold.
+- After a server restart, reattach runs the rate-limit check before the scheduler's first claim
+  pass, and puts the run back on hold. So a restart never claims a new ticket of a limited harness.
 - This is not a pause and adds no pause kind.
 - Interactive sessions do not change.
+- herdr and headless keep their current rate-limit detection. Only PTY gets the usage record.
 - The old in-process loop's rate-limit and blocked-pane code is deleted once the shared loop covers
   it, if production still has no caller.
 
@@ -363,7 +393,9 @@ From the person's side:
 
 - The server's sessions listing adds PTY-hosted Queue agents as a group with their status. It does not
   list herdr or headless Queue agents. Design agents keep their current source.
-- A Queue agent row shows only its status mark (Working, Idle, Blocked, Rate-limited, Exited). It has
+- A Queue agent row shows only its status mark (Working, Idle, Blocked, Rate-limited, Exited). The
+  sessions listing reads Rate-limited from the run's hold mark, since the hold lives in the run state,
+  not in the session status. It has
   no Unread or Actionable mark and does not count in "N needs you". Design agent rows get the same
   treatment. "N needs you" (the TUI title row and tab switcher badge, the web Agents tab and
   switcher) counts only a person's own interactive sessions, Fix agents included.
@@ -411,8 +443,10 @@ From the person's side:
     reason.
   - The per-ticket herdr gate and the banner rule.
   - The blocked pause per runner: dwell, recheck, reason text, and unblock lifting the pause.
-  - The rate-limit hold: slot kept, no nudge, "continue" at the reset, the 5-minute recheck, no
-    claims for the harness, return after a restart.
+  - The rate-limit hold: slot kept, no nudge, "continue" at the reset, the 5-minute "continue" with
+    no reset time, no claims for the harness, return after a restart.
+  - The usage gate: a sample at 98% blocks Claude claims with the wait reason, Codex still claims,
+    and the gate lifts at `resets_at` on a fake clock.
   - The hosting-runner fix for repair merge and `verify`.
   - Prior art: the Find-by-label nudge, budget and recovery tests moved by `gx:server-tests-pty-impl`,
     `claim_resume_test.go`, `ask_waiting_test.go`.
@@ -461,10 +495,11 @@ numbers after the highest in `webui/e2e/CATALOG.md`, and file names.
 
 Per story:
 
-1. `gx server` with `agent-runner: auto` on the fixture; the server log line "agent-runner selected"
-   reads `runner=pty`.
+1. `cmd` preflight test with `agent-runner: auto`, claude on PATH and herdr up: the "agent-runner
+   selected" log line reads `runner=pty`. (The fixture forces `agent-runner: pty`, so it cannot test
+   `auto`.)
 2. Start `gx server` with `auto` and a PATH without claude; it exits non-zero with an error naming
-   claude.
+   claude and `agent-runner: herdr`.
 3. Config `agent-runner: herdr` with herdr running; the log reads `runner=herdr` (manual, herdr
    needed).
 4. Config `agent-runner: headless`; the log reads `runner=headless`.
@@ -480,7 +515,8 @@ Per story:
 13. Server test: herdr down, a Claude ticket claims and launches.
 14. Server test: herdr down, a Codex ticket does not claim.
 15. Server test and web: no banner with herdr down and no herdr ticket; the banner shows once a Codex
-    ticket is queued.
+    ticket is queued. Server test: with herdr not on PATH, the claim check holds the Codex ticket and
+    the banner says herdr was not found.
 16. Web: no PTY health banner on the fixture.
 17. TUI: "Go to pane" on a PTY Queue agent lands on the Agents tab with the live panel (`ui/tickets`
     and `ui/agents` tests; manual in tmux).
@@ -503,7 +539,8 @@ Per story:
 34. Flow "Queue agents switch" (fresh page); TUI test for remembered state.
 35. Flow "Queue agents switch" (counts).
 36. TUI test: "Go to pane" shows a hidden-group agent; flow 74's selected-session rule.
-37. Flow "Queue agents switch" (status mark only); vitest.
+37. Flow "Queue agents switch" (status mark only); vitest. On the `rate-limited` scenario, a Queue
+    agent row shows Rate-limited.
 38. Flow 72 "Agents tab" with a Design agent that is Actionable: the count excludes it; TUI switcher
     badge test.
 39. TUI test: Investigate posts to the fix-agent route. `gx agents list` shows `fix-<addr>`.
@@ -527,22 +564,63 @@ Per story:
 54. Server test: a block that clears inside 15 seconds does not pause.
 55. Existing headless block tests pass.
 56. Flow "Blocked pause on PTY" (reason text).
-57. Flow "Blocked pause on PTY" (answer button); flow 3's Approve row still passes.
-58. Server test: the agent leaving blocked lifts the pause.
-59. `nativerunner` test: `RateLimit` from a transcript error, with and without a reset time.
+57. Flow "Blocked pause on PTY" (answer button); flow 3's Approve row still passes. A new fixture
+    scenario with a non-approvable block (a question menu): Retry presses Esc, sends the prompt and
+    lifts the pause.
+58. Server test per runner (PTY, herdr, headless): the agent leaving blocked lifts the pause.
+59. `nativerunner` test: `RateLimit` from a transcript error, with a usage record, with only a reset
+    time in the message, and with neither. `cmd` test: the statusline mode writes the `rate_limits`
+    record and still renders the line.
 60. Server test: a Codex quota banner while blocked holds, never pauses `needs-answer`.
 61. Flow "Rate-limit hold" (not paused); server test for the kept slot.
 62. Flow "Rate-limit hold" (text); `gx server tickets show <addr>` shows the hold.
 63. Server test: no stall nudge during the hold.
 64. Server test: "continue" prompt at the reset.
-65. Server test: zero reset time re-checks every 5 minutes on a fake clock.
+65. Server test on a fake clock: with zero reset time, "continue" goes out every 5 minutes; the hold
+    ends after a turn that is not limited and stays after a turn that is.
 66. Flow "Rate-limit hold" (second ticket waits); server test per harness.
-67. Server test: restart during the hold, then hold again.
+67. Server test: restart during the hold, then hold again, with no new claim of that harness.
 68. Flow 80 "Failure notices" (rate-limit row) still passes.
 69. `gx claude doctor` lists the PTY rate-limit check as run, not skipped.
 70. `gx doctor --help` text names herdr and `gx claude doctor`.
 71. Read the runbook.
 72. `rg DefaultDeps` in `server/`: only calls that run no agent remain; server tests from story 51.
+73. Server test: a usage sample at 98% of the 5-hour window, and one of the weekly window, each block
+    a Claude claim; a Codex ticket still claims; a sample at 97% does not block.
+74. Server test: the wait reason names the window, the percentage and the reset time; the gate lifts
+    at `resets_at` on a fake clock with no new sample; the gate comes back after a restart. Flow
+    "Rate-limit hold" or a new fixture scenario shows the reason on a queued ticket.
+
+### Usage record from the statusline
+
+- Claude Code passes the statusline command a JSON object. For claude.ai Pro/Max accounts it holds
+  `rate_limits.five_hour` and `rate_limits.seven_day`, each with `used_percentage` and `resets_at`
+  (Unix seconds). It refreshes after each API response, is missing before the first reply and for
+  API-key accounts, and drops a window once its `resets_at` passes
+  (https://code.claude.com/docs/en/statusline).
+- PTY agents get a `statusLine` entry in the `--settings` JSON gx already passes. It runs
+  `gx claude statusline` in a mode that renders the line as today and also writes the `rate_limits`
+  object, with the time it was seen, into the agent's dir. The implementer names the mode and the
+  file. Interactive sessions keep the person's own statusline.
+- gx does not call the undocumented `api.anthropic.com/api/oauth/usage` endpoint. It needs the OAuth
+  token from the keychain and can change in any release.
+- Claude Code's own auto-continue at a usage limit (since v2.1.234) stays on.
+
+### Usage gate on claims
+
+- The server keeps the newest usage sample seen across PTY agents' records. The implementer picks
+  where it lives, and it survives a server restart.
+- While the newest sample shows the 5-hour or the weekly window at 98% or more, and that window's
+  `resets_at` has not passed, `claimNext` claims no new Claude ticket. The 98% threshold is fixed,
+  with no config key. Codex tickets are not gated.
+- The gate lifts at `resets_at`, even if no new sample arrives (the data is stale while agents are
+  idle).
+- Waiting Claude tickets show "usage at N% of the 5-hour limit, resets <time>" (or "weekly"). It uses
+  the same wait mechanism as the herdr-down wait and the rate-limit hold.
+- Running agents are not stopped or held by the gate. The rate-limit hold still handles a real limit
+  hit.
+- With no usage data (API-key accounts, or no reply yet), there is no gate.
+- This is not a pause and adds no pause kind.
 
 ## Out of Scope
 
@@ -560,22 +638,24 @@ Per story:
 
 ## Self-decided design questions
 
-- Can an answer typed in the live panel lift a `needs-answer` blocked pause? Yes. The existing unblock
-  watch runs for every runner, so the pause lifts once the agent leaves blocked. Ticket 02 makes the
+- Can an answer typed in the live panel lift a `needs-answer` blocked pause? Yes. The unblock watch
+  widens to every runner (see "Blocked pause on the server wait loop"), so the pause lifts once the
+  agent leaves blocked. Ticket 02 makes the
   live panel a way to answer, and a pause that outlived its cause would need a second click.
 - Do the idle and stall timers run during a rate-limit hold? No. A hold is not a stall, and a stall
   pause during a hold would turn a hold into a pause, which ADR 0042 rules out.
 - Where does the hold's reason show? Wherever a running ticket's state shows (TUI Queue tab, web epic
   row, ticket page), plus a wait reason on queued tickets of the same harness. One state with one
   reason is simpler than a separate banner. The herdr-down wait already works this way.
-- Does a hold survive a server restart? Yes. Reattach runs the same wait loop, whose first check
-  finds the limit again. No new stored state is needed.
+- Does a hold survive a server restart? Yes. Reattach runs the rate-limit check before the first
+  claim pass and finds the limit again. No new stored state is needed.
 - What does a Codex ticket do when herdr is not on PATH at all? It waits with a reason, the same as
   herdr down. Without herdr, gx cannot recover, but a queued ticket that has not claimed needs no
   pause. It starts once herdr appears.
-- With `auto` and claude missing, does gx fall back to herdr? No. It fails at start with an error
-  naming claude. The Destination says herdr runs only when set by hand, and every Claude ticket needs
-  claude anyway.
+- With `auto` and claude missing, does gx fall back to herdr? No (confirmed in the review). It fails
+  at start with an error naming claude and suggesting `agent-runner: herdr`. The Destination says herdr
+  runs only when set by hand. A person with herdr and only Codex sets `agent-runner: herdr`, and the
+  changelog says so.
 - Do Fix agents count in "N needs you"? Yes. A Fix agent is a person's own interactive session, not a
   Queue agent or a Design agent.
 - Does the Design page lose its Actionable and Unread state with the Agents list change? No. Round 2
