@@ -74,11 +74,49 @@ test("a mismatch is refused", async () => {
   expect((await screen.findByRole("alert")).textContent).toBe("The two passwords don't match.");
 });
 
-test("a good password moves on to step 3 when TOTP is on", async () => {
-  stubStart({});
-  await toPasswordStep(true);
+const URI = "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP4N2Q7ZLA&issuer=gx";
+
+async function toTotpStep(onDone = () => {}) {
+  stubStart({ secret: "JBSWY3DPEHPK3PXP4N2Q7ZLA", uri: URI });
+  await toPasswordStep(true, onDone);
   submitPasswords("correct horse battery", "correct horse battery", "Continue");
-  await waitFor(() => expect(screen.getByRole("button", { name: "Finish setup" })).toBeTruthy());
+  await screen.findByText("Add gx to your authenticator app");
+}
+
+test("a good password moves on to step 3 with the secret and the otpauth link", async () => {
+  await toTotpStep();
+  expect(screen.getByText(/step 3 of 3/)).toBeTruthy();
+  expect(screen.getByText("JBSW Y3DP EHPK 3PXP 4N2Q 7ZLA")).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Add to authenticator app" }).getAttribute("href")).toBe(URI);
+});
+
+test("a TOTP mismatch shows the clock message and does not sign in", async () => {
+  const onDone = vi.fn();
+  await toTotpStep(onDone);
+  stubStart({ refused: true, reason: "totp-mismatch" });
+  fireEvent.change(screen.getByLabelText("Enter the code it shows"), { target: { value: "482931" } });
+  fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
+  expect((await screen.findByRole("alert")).textContent).toBe(
+    "That code doesn't match. Check the clock on your phone and try again.",
+  );
+  expect(onDone).not.toHaveBeenCalled();
+  expect(window.location.hash).not.toBe("#/");
+});
+
+test("the right TOTP code finishes setup and goes to the app", async () => {
+  const onDone = vi.fn();
+  await toTotpStep(onDone);
+  const fetchMock = stubStart({});
+  fireEvent.change(screen.getByLabelText("Enter the code it shows"), { target: { value: "123456" } });
+  fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
+  await waitFor(() => expect(onDone).toHaveBeenCalled());
+  const [, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];
+  expect(JSON.parse(init.body as string)).toEqual({
+    code: "K7QM-3XPD",
+    password: "correct horse battery",
+    totp_code: "123456",
+  });
+  expect(window.location.hash).toBe("#/");
 });
 
 test("with TOTP off a good password finishes setup and goes to the app", async () => {

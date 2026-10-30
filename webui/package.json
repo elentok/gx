@@ -13,6 +13,7 @@
   "dependencies": {
     "@chakra-ui/react": "^3.0.0",
     "@emotion/react": "^11.14.0",
+    "qrcode-generator": "1.4.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",

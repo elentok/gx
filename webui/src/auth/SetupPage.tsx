@@ -5,7 +5,7 @@ import { ProgressBar } from "../ui/progress-bar/ProgressBar";
 import { AuthCard } from "./AuthCard";
 import { ErrorLine, Field } from "./AuthFields";
 import { postAuth, type AuthState } from "./authState";
-import { PlainSetupForm } from "./PlainAuthForms";
+import { AddAuthenticator, TOTP_MISMATCH } from "./AddAuthenticator";
 import { TrustHelp } from "./LoginPage";
 
 const SETUP_HASH = "#/setup";
@@ -16,6 +16,7 @@ const MISMATCH = "The two passwords don't match.";
 const REFUSALS: Record<string, string> = {
   "setup-code-wrong": WRONG_CODE,
   "password-too-short": SHORT_PASSWORD,
+  "totp-mismatch": TOTP_MISMATCH,
 };
 
 function field(form: HTMLFormElement, name: string): string {
@@ -110,6 +111,38 @@ export function SetupPasswordCard({ totpOn, error, onSubmit }: SetupPasswordCard
   );
 }
 
+export interface SetupTotpCardProps {
+  secret: string;
+  uri: string;
+  error?: string;
+  onSubmit?: (e: FormEvent<HTMLFormElement>) => void;
+}
+
+export function SetupTotpCard({ secret, uri, error, onSubmit }: SetupTotpCardProps) {
+  return (
+    <AuthCard below={<TrustHelp />}>
+      <chakra.form onSubmit={onSubmit} display="flex" flexDirection="column" gap="4">
+        <Box data-mock-part="step-header">
+          <Text fontSize="xs" color="text.dim" mb="2" textTransform="uppercase" letterSpacing="0.06em">
+            Set up the web UI · step 3 of 3
+          </Text>
+          <ProgressBar value={3} max={3} />
+        </Box>
+        <Heading as="h1" data-mock-part="heading" fontFamily="condensed" fontSize="xl">
+          Add gx to your authenticator app
+        </Heading>
+        <AddAuthenticator secret={secret} uri={uri} error={error} />
+        <Button type="submit" data-mock-part="submit">
+          Finish setup
+        </Button>
+        <Text data-mock-part="save-note" fontSize="xs" color="text.dim">
+          gx saves nothing until this code checks out.
+        </Text>
+      </chakra.form>
+    </AuthCard>
+  );
+}
+
 // Reads the code from `#/setup?code=…` once, then drops it from the URL.
 function useCodeFromHash(): string {
   const [code] = useState(() => new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("code") ?? "");
@@ -124,6 +157,7 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
   const [code, setCode] = useState(initial);
   const [error, setError] = useState("");
   const [password, setPassword] = useState("");
+  const [authenticator, setAuthenticator] = useState({ secret: "", uri: "" });
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const onCode = async (e: FormEvent<HTMLFormElement>) => {
@@ -133,7 +167,20 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
     try {
       const res = await postAuth("setup-start", { code: typed });
       setError(res.refused ? WRONG_CODE : "");
-      if (!res.refused) setStep(2);
+      if (res.refused) return;
+      setAuthenticator({ secret: res.secret ?? "", uri: res.uri ?? "" });
+      setStep(2);
+    } catch (err) {
+      setError(String(err));
+    }
+  };
+
+  const finish = async (body: object) => {
+    try {
+      const res = await postAuth("setup-finish", { code, password, ...body });
+      if (res.refused) return setError(REFUSALS[res.reason ?? ""] ?? res.reason ?? "refused");
+      window.location.hash = "#/";
+      onDone();
     } catch (err) {
       setError(String(err));
     }
@@ -149,23 +196,16 @@ export function SetupPage({ auth, onDone }: { auth: AuthState; onDone: () => voi
       setError("");
       return setStep(3);
     }
-    try {
-      const res = await postAuth("setup-finish", { code, password: typed });
-      if (res.refused) return setError(REFUSALS[res.reason ?? ""] ?? res.reason ?? "refused");
-      window.location.hash = "#/";
-      onDone();
-    } catch (err) {
-      setError(String(err));
-    }
+    await finish({ password: typed });
   };
 
-  // Step 3 is a later ticket; the plain form stands in and receives the code and password.
+  const onTotp = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    void finish({ totp_code: field(e.currentTarget, "totp_code") });
+  };
+
   if (step === 3) {
-    return (
-      <AuthCard>
-        <PlainSetupForm auth={auth} code={code} password={password} onDone={onDone} />
-      </AuthCard>
-    );
+    return <SetupTotpCard {...authenticator} error={error} onSubmit={onTotp} />;
   }
   if (step === 2) {
     return <SetupPasswordCard totpOn={auth.totp_on} error={error} onSubmit={(e) => void onPassword(e)} />;

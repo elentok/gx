@@ -4,7 +4,8 @@ import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
 import { LoginCard, rateLimitText } from "../auth/LoginPage";
-import { SetupCodeCard, SetupPasswordCard } from "../auth/SetupPage";
+import { TOTP_MISMATCH } from "../auth/AddAuthenticator";
+import { SetupCodeCard, SetupPasswordCard, SetupTotpCard } from "../auth/SetupPage";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
 import { WideContext } from "../useWide";
@@ -51,6 +52,7 @@ export interface GalleryEntry {
   cases: GalleryCase[];
 }
 
+const GALLERY_OTPAUTH_URI = "otpauth://totp/gx?secret=JBSWY3DPEHPK3PXP4N2Q7ZLA&issuer=gx";
 const ticket = canned.tickets[0];
 const longReason = "Waiting on a long chain of upstream tickets that all have to merge first. ".repeat(4);
 
@@ -806,6 +808,16 @@ export const galleryEntries: GalleryEntry[] = [
     cases: [
       { label: "default", node: <SetupPasswordCard totpOn /> },
       { label: "TOTP off", node: <SetupPasswordCard totpOn={false} /> },
+    ],
+  },
+  {
+    name: "SetupTotpCard",
+    cases: [
+      { label: "default", node: <SetupTotpCard secret="JBSWY3DPEHPK3PXP4N2Q7ZLA" uri={GALLERY_OTPAUTH_URI} /> },
+      {
+        label: "wrong code",
+        node: <SetupTotpCard secret="JBSWY3DPEHPK3PXP4N2Q7ZLA" uri={GALLERY_OTPAUTH_URI} error={TOTP_MISMATCH} />,
+      },
     ],
   },
   {
