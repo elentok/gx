@@ -5,6 +5,7 @@ import { AgentSidebar } from "../agents/AgentSidebar";
 import canned from "../canned-snapshot.json";
 import { LoginAuthenticatorCard, LoginCard, rateLimitText } from "../auth/LoginPage";
 import { TOTP_MISMATCH } from "../auth/AddAuthenticator";
+import { SettingsHomeView, WebLoginsView } from "../settings/SettingsPage";
 import { SetupCodeCard, SetupPasswordCard, SetupTotpCard } from "../auth/SetupPage";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
@@ -803,6 +804,31 @@ export const galleryEntries: GalleryEntry[] = [
       {
         label: "rate limited",
         node: <LoginCard totpOn password="hunter2hunter2" error={rateLimitText(181)} submitDisabled />,
+      },
+    ],
+  },
+  {
+    name: "SettingsHome",
+    cases: [
+      { label: "default", node: <SettingsHomeView loginCount={4} totpOn onSignOut={() => {}} /> },
+      { label: "TOTP off", node: <SettingsHomeView loginCount={1} totpOn={false} onSignOut={() => {}} /> },
+    ],
+  },
+  {
+    name: "WebLoginsView",
+    cases: [
+      {
+        label: "default",
+        node: (
+          <WebLoginsView
+            now={Date.now()}
+            logins={[
+              { id: "a", name: "Safari on iPhone", last_used: new Date().toISOString(), last_ip: "192.168.1.23", this_device: true },
+              { id: "b", name: "Chrome on Mac", last_used: new Date(Date.now() - 2 * 3600_000).toISOString(), last_ip: "100.101.12.4", this_device: false },
+              { id: "c", name: "Firefox on Linux", last_used: new Date(Date.now() - 71 * 86400_000).toISOString(), last_ip: "192.168.1.40", this_device: false },
+            ]}
+          />
+        ),
       },
     ],
   },

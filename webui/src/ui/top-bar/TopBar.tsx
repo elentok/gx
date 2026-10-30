@@ -1,7 +1,7 @@
 import { Box, chakra, Menu, Text } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
 import type { Health } from "../../generated/server";
-import { AGENTS_HREF, STATS_HREF } from "../../hrefs";
+import { AGENTS_HREF, SETTINGS_HREF, STATS_HREF } from "../../hrefs";
 import type { QueueMode } from "../../snapshot";
 import { Chip } from "../chip/Chip";
 import { LiveDot } from "../live-dot/LiveDot";
@@ -86,41 +86,42 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
         {queueChip && <Chip tone="waiting">{queueChip}</Chip>}
         {!connected && <LiveDot tone="muted" label="Offline" />}
         {health && <Tray health={health} connected={connected} />}
-        {(onToggleAfk || build) && (
-          <Menu.Root closeOnSelect={false} lazyMount unmountOnExit positioning={{ placement: "bottom-end" }}>
-            <Menu.Trigger asChild>
-              <chakra.button type="button" aria-label="Menu" cursor="pointer" color="text.muted" display="flex" p="1">
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                  <path d="M3 5h12M3 9h12M3 13h12" />
-                </svg>
-              </chakra.button>
-            </Menu.Trigger>
-            <Menu.Positioner>
-              <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40">
-                {onToggleAfk && (
-                  <Menu.CheckboxItem
-                    value="afk"
-                    checked={afk}
-                    onCheckedChange={onToggleAfk}
-                    cursor="pointer"
-                    color="text"
-                    ps="3"
-                    justifyContent="space-between"
-                    _highlighted={{ bg: "surface" }}
-                  >
-                    AFK
-                    <AfkSwitch on={afk} tone={tone} />
-                  </Menu.CheckboxItem>
-                )}
-                {build && (
-                  <Text px="3" py="1.5" fontSize="xs" color="text.muted" data-testid="server-build">
-                    {build}
-                  </Text>
-                )}
-              </Menu.Content>
-            </Menu.Positioner>
-          </Menu.Root>
-        )}
+        <Menu.Root closeOnSelect={false} lazyMount unmountOnExit positioning={{ placement: "bottom-end" }}>
+          <Menu.Trigger asChild>
+            <chakra.button type="button" aria-label="Menu" cursor="pointer" color="text.muted" display="flex" p="1">
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M3 5h12M3 9h12M3 13h12" />
+              </svg>
+            </chakra.button>
+          </Menu.Trigger>
+          <Menu.Positioner>
+            <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40">
+              <Menu.Item value="settings" asChild cursor="pointer" color="text" ps="3" _highlighted={{ bg: "surface" }}>
+                <a href={SETTINGS_HREF}>Settings</a>
+              </Menu.Item>
+              {onToggleAfk && (
+                <Menu.CheckboxItem
+                  value="afk"
+                  checked={afk}
+                  onCheckedChange={onToggleAfk}
+                  cursor="pointer"
+                  color="text"
+                  ps="3"
+                  justifyContent="space-between"
+                  _highlighted={{ bg: "surface" }}
+                >
+                  AFK
+                  <AfkSwitch on={afk} tone={tone} />
+                </Menu.CheckboxItem>
+              )}
+              {build && (
+                <Text px="3" py="1.5" fontSize="xs" color="text.muted" data-testid="server-build">
+                  {build}
+                </Text>
+              )}
+            </Menu.Content>
+          </Menu.Positioner>
+        </Menu.Root>
       </Box>
     </Box>
   );

@@ -29,9 +29,11 @@ describe("TopBar", () => {
     expect(renderThemed(<TopBar connected actionable={0} />).getByRole("link", { name: "Agents" }).textContent).toBe("Agents");
   });
 
-  it("has no menu button without a toggle or a build", () => {
-    const { queryByRole } = renderThemed(<TopBar connected />);
-    expect(queryByRole("button", { name: "Menu" })).toBeNull();
+  it("holds a Settings link in the menu, with no AFK item without a toggle", async () => {
+    const { getByRole, findByRole, queryByRole } = renderThemed(<TopBar connected />);
+    fireEvent.click(getByRole("button", { name: "Menu" }));
+    expect((await findByRole("menuitem", { name: "Settings" })).getAttribute("href")).toBe("#/settings");
+    expect(queryByRole("menuitemcheckbox", { name: "AFK" })).toBeNull();
   });
 
   it("holds the AFK item in the menu, checked while AFK is on, and keeps the menu open on toggle", async () => {

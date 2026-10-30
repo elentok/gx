@@ -11,5 +11,7 @@ export const STATS_HREF = "#/stats";
 
 export const AGENTS_HREF = "#/agents";
 
+export const SETTINGS_HREF = "#/settings";
+
 /** A session's label is its id. */
 export const agentHref = (label: string) => `${AGENTS_HREF}/${label}`;

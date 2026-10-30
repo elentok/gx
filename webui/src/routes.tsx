@@ -1,6 +1,9 @@
 import { createHashRouter, Navigate, redirect, useLocation, useParams, type RouteObject } from "react-router";
 import { AgentsPage } from "./agents/AgentsPage";
 import type { CreateSession, FetchWorktrees } from "./agents/newSession";
+import type { AuthState } from "./auth/authState";
+import { SettingsPage, SettingsStubPage, WebLoginsPage } from "./settings/SettingsPage";
+import type { FetchLogins } from "./settings/logins";
 import type { FetchChat } from "./design/chat";
 import { DesignPage } from "./design/DesignPage";
 import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./design/open";
@@ -91,6 +94,9 @@ export interface RouteFetchers {
   fixAgent?: FixAgent;
   worktrees?: FetchWorktrees;
   createSession?: CreateSession;
+  authState?: () => Promise<AuthState>;
+  logins?: FetchLogins;
+  signOut?: () => void | Promise<void>;
 }
 
 export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
@@ -99,6 +105,10 @@ export function appRoutes(fetchers: RouteFetchers = {}): RouteObject[] {
     // "/agents/*" also matches "/agents"; the splat is the session label.
     { path: "/agents/*", element: <AgentsPage fetchChat={fetchers.chat} fetchScreen={fetchers.screen} fetchTrees={fetchers.worktrees} createSession={fetchers.createSession} /> },
     { path: "/stats", element: <StatsPage fetchStats={fetchers.stats} fetchEpics={fetchers.epicList} /> },
+    { path: "/settings", element: <SettingsPage fetchAuth={fetchers.authState} fetchList={fetchers.logins} signOut={fetchers.signOut} /> },
+    { path: "/settings/logins", element: <WebLoginsPage fetchList={fetchers.logins} /> },
+    // Password, authenticator, certificate and one login: later tickets fill these in.
+    { path: "/settings/*", element: <SettingsStubPage /> },
     { path: "/d/*", element: <DesignRoute fetchers={fetchers} /> },
     { path: "/t/*", element: <TicketRoute fetchDetail={fetchers.ticket} fetchScreen={fetchers.ticketScreen} /> },
     {

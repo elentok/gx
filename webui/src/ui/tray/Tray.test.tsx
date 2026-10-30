@@ -55,9 +55,8 @@ describe("TopBar Tray", () => {
     expect(labels).toEqual(["Paused", "Offline", "System health: CPU normal; memory normal; disk normal", "Menu"]);
   });
 
-  it("renders without a menu", () => {
-    const { getByRole, queryByRole } = renderThemed(<TopBar connected health={healthOf(meter("normal"))} />);
-    expect(queryByRole("button", { name: "Menu" })).toBeNull();
+  it("renders without an AFK toggle or build", () => {
+    const { getByRole } = renderThemed(<TopBar connected health={healthOf(meter("normal"))} />);
     expect(getByRole("button", { name: /^System health/ })).toBeTruthy();
   });
 });
