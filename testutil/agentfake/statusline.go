@@ -58,8 +58,10 @@ func (t *tui) runStatusLine() {
 		return
 	}
 	var usage *UsageConfig
+	var env []string
 	if cfg, err := LoadWorkerConfig(t.pid.Cwd); err == nil {
 		usage = cfg.Usage
+		env = cfg.Env
 	}
 	payload, err := StatusLinePayload(t.opts.model, usage)
 	if err != nil {
@@ -69,6 +71,7 @@ func (t *tui) runStatusLine() {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	cmd.Dir = t.pid.Cwd
+	cmd.Env = append(os.Environ(), env...)
 	cmd.Stdin = bytes.NewReader(payload)
 	_ = cmd.Run()
 }

@@ -41,6 +41,7 @@ var allowed = map[string]int{
 	"nativerunner/holderattach_test.go":             1,
 	"nativerunner/holderwatch_test.go":              1,
 	"nativerunner/pty_pending_test.go":              1,
+	"nativerunner/pty_ratelimit_test.go":            1, // negative wait: another API error never marks the session limited
 	"nativerunner/pty_test.go":                      1,
 	"ralphloop/chat_eventsink_test.go":              4,
 	"ralphloop/claim_test.go":                       1,
@@ -50,12 +51,11 @@ var allowed = map[string]int{
 	"ralphloop/mergequeue_test.go":                  2,
 	"ralphloop/permit_test.go":                      2,
 	"ralphloop/resumeticket_test.go":                1,
-	"ralphloop/run_ratelimit_test.go":               1,
-	"ralphloop/run_realgit_codex_quota_test.go":     1,
 	"ralphloop/run_realgit_watchdog_test.go":        1,
 	"ralphloop/slack_eventsink_test.go":             4,
 	"ralphloop/telegram_eventsink_test.go":          7,
 	"server/budget_limits_test.go":                  2,
+	"server/claimhold_test.go":                      1, // negative wait: a herdr event would show within a few retries
 	"server/configreload_chat_test.go":              2,
 	"server/configreload_grace_test.go":             5,
 	"server/configreload_test.go":                   2,
@@ -65,7 +65,6 @@ var allowed = map[string]int{
 	"server/diskwatch_test.go":                      3,
 	"server/handmerged_test.go":                     1,
 	"server/headless_block_reclaim_test.go":         2,
-	"server/headless_block_test.go":                 1,
 	"server/healthprocs_test.go":                    4,
 	"server/latefinish_test.go":                     2,
 	"server/map_done_test.go":                       1,
@@ -76,9 +75,11 @@ var allowed = map[string]int{
 	"server/oneoffsweep_test.go":                    2,
 	"server/pause_test.go":                          1,
 	"server/reclaim_waiting_test.go":                1,
+	"server/ratelimit_claim_hold_test.go":           1, // negative wait: a claim would show within a few ticks
+	"server/ratelimit_hold_run_test.go":             1, // negative wait: a launch would show within a few ticks
 	"server/recovery_notify_test.go":                4,
 	"server/recovery_test.go":                       7,
-	"server/runner_flush_test.go":                   1,
+	"server/retry_prompt_test.go":                   1, // negative wait: no second interrupt or prompt follows the retry
 	"server/runner_test.go":                         1,
 	"server/server_notify_test.go":                  1,
 	"server/server_test.go":                         1,

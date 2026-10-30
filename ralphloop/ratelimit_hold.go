@@ -23,7 +23,7 @@ func codexBlocked(d Deps, p launchAndPromptParams) bool {
 }
 
 // holdRateLimit keeps a rate-limited agent in place: no nudge, no pause kind,
-// no needs-answer. It sends "continue" once the reset (plus rateLimitResetBuffer)
+// no question ticket. It sends "continue" once the reset (plus rateLimitResetBuffer)
 // has passed, or every rateLimitPollInterval when the reset is unknown, and
 // returns when a turn ends without the runner reporting a limit. It asks the
 // runner after each turn, not the transcript alone: on PTY an idle agent's

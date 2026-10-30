@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -51,12 +52,10 @@ func fakeKeysTyped(t *testing.T, p *nativerunner.Pty, s agentrunner.Session) str
 
 func waitFakeKeys(t *testing.T, p *nativerunner.Pty, s agentrunner.Session, want string) {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for !strings.Contains(fakeKeysTyped(t, p, s), want) {
-		if time.Now().After(deadline) {
-			t.Fatalf("keys typed = %q; want it to hold %q", fakeKeysTyped(t, p, s), want)
-		}
-		time.Sleep(10 * time.Millisecond)
+	if !testutil.Poll(10*time.Second, 10*time.Millisecond, func() bool {
+		return strings.Contains(fakeKeysTyped(t, p, s), want)
+	}) {
+		t.Fatalf("keys typed = %q; want it to hold %q", fakeKeysTyped(t, p, s), want)
 	}
 }
 

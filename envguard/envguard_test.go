@@ -47,7 +47,7 @@ type entry struct {
 // allowed is the seed generated from the tree by the scan below. A count only
 // goes down: take the value from config or the caller, then lower the count.
 var allowed = map[site]entry{
-	{"server/server.go", ruleConfigEnv}:                   {2, reasonStartup},
+	{"server/server.go", ruleConfigEnv}:                   {1, reasonStartup},
 	{"sound/sound.go", ruleConfigEnv}:                     {2, reasonStartup},
 	{"harness/claudepid.go", ruleChildEnv}:                {1, reasonChild},
 	{"harness/claudepid.go", ruleHomeDir}:                 {1, reasonChild},

@@ -10,26 +10,26 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
 // waitRateLimit polls p.RateLimit until limited matches or it times out.
 func waitRateLimit(t *testing.T, p *nativerunner.Pty, s agentrunner.Session, limited bool) time.Time {
 	t.Helper()
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		at, got, err := p.RateLimit(s)
+	var at time.Time
+	if !testutil.Poll(10*time.Second, 50*time.Millisecond, func() bool {
+		var got bool
+		var err error
+		at, got, err = p.RateLimit(s)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got == limited {
-			return at
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("RateLimit limited = %v; want %v", got, limited)
-		}
-		time.Sleep(50 * time.Millisecond)
+		return got == limited
+	}) {
+		t.Fatalf("RateLimit limited = %v; want %v", !limited, limited)
 	}
+	return at
 }
 
 func startRateLimitSession(t *testing.T) (*nativerunner.Pty, agentrunner.Session) {

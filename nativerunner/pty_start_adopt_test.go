@@ -12,6 +12,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/testutil"
 )
 
 // secondRunner is a fresh runner over p's root, like a restarted server.
@@ -181,12 +182,7 @@ func TestPty_StartSilentHolderIsTakenAndStopKillsIt(t *testing.T) {
 
 func waitGone(t *testing.T, pid int) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if err := syscall.Kill(pid, 0); err != nil {
-			return
-		}
-		time.Sleep(20 * time.Millisecond)
+	if !testutil.Poll(5*time.Second, 20*time.Millisecond, func() bool { return syscall.Kill(pid, 0) != nil }) {
+		t.Fatalf("pid %d still runs", pid)
 	}
-	t.Fatalf("pid %d still runs", pid)
 }

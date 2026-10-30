@@ -61,7 +61,7 @@ func TestRetry_BlockedPauseOnAQuestionMenuInterruptsAndPrompts(t *testing.T) {
 			}
 			waitStatus(t, ticketPath, schema.StatusClaimed)
 			waitFor(t, func() bool { return !runsJSONHas(h, `"waiting_since"`) })
-			// Give the watch time to run on the interrupted agent before counting.
+			// Negative wait: a second interrupt or prompt would show once the watch has run.
 			time.Sleep(300 * time.Millisecond)
 			if got := turn.Interrupts("epic-a-iter-01"); got != 1 {
 				t.Errorf("interrupts = %d; want 1", got)
