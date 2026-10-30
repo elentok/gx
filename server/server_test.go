@@ -176,7 +176,7 @@ func TestServer_StopReleasesLockSoNewServerCanStart(t *testing.T) {
 	if _, err := h.Client.Handshake(context.Background()); err == nil {
 		t.Error("stopped server still answers")
 	}
-	next, err := server.New(server.Config{StateDir: h.StateDir})
+	next, err := server.New(server.Config{StateDir: h.StateDir, Runner: runnerfake.NewRunner()})
 	if err != nil {
 		t.Fatalf("new server on same state dir: %v", err)
 	}
@@ -211,7 +211,7 @@ func TestServer_SecondServerOnSameStateDirIsRefused(t *testing.T) {
 	t.Parallel()
 	h := servertest.Start(t)
 
-	_, err := server.New(server.Config{StateDir: h.StateDir})
+	_, err := server.New(server.Config{StateDir: h.StateDir, Runner: runnerfake.NewRunner()})
 	// The first server lives in this process, so the lock error names the
 	// same-process case after the retry window.
 	want := "lock still held by this process (pid " + strconv.Itoa(os.Getpid()) + ")"
@@ -344,9 +344,17 @@ func TestTCP_OffByDefault(t *testing.T) {
 
 func TestTCP_RefusesNonLoopbackAddr(t *testing.T) {
 	t.Parallel()
-	_, err := server.New(server.Config{StateDir: t.TempDir(), TicketStore: t.TempDir(), TCPAddr: "0.0.0.0:0"})
+	_, err := server.New(server.Config{StateDir: t.TempDir(), TicketStore: t.TempDir(), TCPAddr: "0.0.0.0:0", Runner: runnerfake.NewRunner()})
 	if err == nil {
 		t.Fatal("expected error for non-loopback address")
+	}
+}
+
+func TestNew_RequiresARunner(t *testing.T) {
+	t.Parallel()
+	_, err := server.New(server.Config{StateDir: t.TempDir(), TicketStore: t.TempDir()})
+	if err == nil || !strings.Contains(err.Error(), "Runner is required") {
+		t.Fatalf("err = %v, want it to name the missing runner", err)
 	}
 }
 

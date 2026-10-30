@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 func near(t *testing.T, got, want float64) {
@@ -25,7 +27,7 @@ func TestBudgetStatus_SnapshotAndBudgetRouteAgree(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(stateDir) })
-	s, err := New(Config{StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: 300, BudgetHardLimit: 350}})
+	s, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, TicketStore: t.TempDir(), Settings: Settings{BudgetSoftLimit: 300, BudgetHardLimit: 350}})
 	if err != nil {
 		t.Fatal(err)
 	}

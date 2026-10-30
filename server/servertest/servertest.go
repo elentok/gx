@@ -40,6 +40,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/osnotify"
+	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
@@ -704,13 +705,16 @@ func WithHerdr(HerdrReason) func(*server.Config) {
 }
 
 // resolveRunner applies the recorded choice: WithRunner / WithRunnerFor first,
-// then herdr (server.New builds it when cfg.Runner is nil) for WithHerdr. It
-// reports whether the harness builds the PTY runner itself, the default.
+// then the herdr runner built here for WithHerdr. It reports whether the harness
+// builds the PTY runner itself, the default.
 func resolveRunner(cfg *server.Config, ch *runnerChoice) (pty bool) {
 	if ch.runner != nil {
 		cfg.Runner = ch.runner
 		cfg.RunnerFor = ch.runnerFor
 		return false
+	}
+	if ch.herdr {
+		cfg.Runner, _ = runnerbuild.New(agentrunner.ChoiceHerdr, cfg.Env, cfg.StateDir, cfg.RunnerWait, nil)
 	}
 	return !ch.herdr
 }

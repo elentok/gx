@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/testutil/runnerfake"
 )
 
 func TestRotatingFile_KeepsAtMostMaxFiles(t *testing.T) {
@@ -56,7 +58,7 @@ func TestServer_LogLevelGatesDebugLines(t *testing.T) {
 			}
 			t.Cleanup(func() { os.RemoveAll(base) })
 			stateDir := filepath.Join(base, "s")
-			srv, err := New(Config{StateDir: stateDir, Build: "b", LogLevel: tc.level})
+			srv, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, Build: "b", LogLevel: tc.level})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -88,7 +90,7 @@ func TestServer_WritesJSONLogToStateDir(t *testing.T) {
 	}
 	t.Cleanup(func() { os.RemoveAll(base) })
 	stateDir := filepath.Join(base, "s")
-	srv, err := New(Config{StateDir: stateDir, Build: "b"})
+	srv, err := New(Config{Runner: runnerfake.NewRunner(), StateDir: stateDir, Build: "b"})
 	if err != nil {
 		t.Fatal(err)
 	}

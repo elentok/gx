@@ -24,12 +24,9 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/harness"
-	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/recovery"
-	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/storecommit"
@@ -338,12 +335,7 @@ func New(cfg Config) (*Server, error) {
 		cfg.Env = os.Environ()
 	}
 	if cfg.Runner == nil {
-		h := herdrrunner.NewIn(herdr.CLI{Env: cfg.Env}, harness.LookupEnv(cfg.Env, "HOME"), sessionlookup.RootsFrom(cfg.Env).CodexHome)
-		h.N = cfg.RunnerWait
-		if h.N == 0 {
-			h.N = config.LoadRunnerWait()
-		}
-		cfg.Runner = h
+		return nil, errors.New("server: Config.Runner is required: the server builds no default runner")
 	}
 	if cfg.Notifier == nil {
 		cfg.Notifier = osnotify.NewSystemNotifier()
