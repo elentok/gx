@@ -263,8 +263,15 @@ func run(args []string) (err error) {
 		return err
 	}
 	exited := make(chan error, 1)
-	go func() { exited <- srv.Wait() }()
-	defer f.shutdown(srv, exited)
+	go func() {
+		defer close(exited)
+		err := srv.Wait()
+		select {
+		case exited <- err:
+		case <-ctx.Done():
+		}
+	}()
+	defer func() { err = errors.Join(err, f.shutdown(srv, exited)) }()
 
 	webURL, setupCode, err := f.waitReady(ctx, exited)
 	if err != nil {
@@ -768,21 +775,7 @@ func (f *fixture) serverOutput() string {
 	return string(out)
 }
 
-// shutdown stops the server, then any agent holder it left behind: holders
-// detach, and their command lines name the temp root.
-func (f *fixture) shutdown(srv *exec.Cmd, exited <-chan error) {
-	_ = srv.Process.Signal(syscall.SIGTERM)
-	select {
-	case <-exited:
-	case <-time.After(15 * time.Second):
-		_ = srv.Process.Kill()
-		<-exited
-	}
-	_ = exec.Command("pkill", "-f", f.root).Run()
-}
-
-// removeAll retries because a holder that pkill just signalled can still be
-// writing into dir while it dies, which fails a single RemoveAll.
+// removeAll retries while a stopped process finishes writing into dir.
 func removeAll(dir string) {
 	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(50 * time.Millisecond) {
 		if os.RemoveAll(dir) == nil {
