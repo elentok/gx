@@ -94,6 +94,9 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 	}
 	defer p.release(opts.Label)
 
+	if s, adopted, err := p.heldLabel(opts); adopted || err != nil {
+		return s, err
+	}
 	dir := filepath.Join(p.Root, opts.Label)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return agentrunner.Session{}, err
@@ -485,11 +488,54 @@ func (p *Pty) killSessions(ss *ptySession) {
 	signalGroup(procs, ss.holderPID, ss.holderStart, ss.session.SessionID, syscall.SIGKILL)
 }
 
+// awaitHolderGone polls until ss's holder pid is gone, for at most grace.
+func (p *Pty) awaitHolderGone(ss *ptySession, grace time.Duration) error {
+	procs := orPS(p.Procs)
+	deadline := time.Now().Add(grace)
+	for {
+		proc, ok, err := procs.Lookup(ss.holderPID)
+		if err == nil && (!ok || proc.Start != ss.holderStart) {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("stop: pid %d did not exit within %v", ss.holderPID, grace)
+		}
+		time.Sleep(p.pollInterval())
+	}
+}
+
+// heldLabel decides what a live holder under opts.Label means for Start: the
+// holder's session when it is adopted, a LabelTakenError when it blocks the
+// launch, and neither when the dir has no live holder. It never touches the
+// holder's files.
+func (p *Pty) heldLabel(opts agentrunner.StartOptions) (agentrunner.Session, bool, error) {
+	s, outcome, err := p.adopt(opts.Label)
+	if errors.Is(err, agentrunner.ErrNotFound) {
+		return agentrunner.Session{}, false, nil
+	}
+	if err != nil {
+		return agentrunner.Session{}, false, err
+	}
+	if outcome == adoptGone {
+		return agentrunner.Session{}, false, nil
+	}
+	meta, err := readMeta(filepath.Join(p.Root, opts.Label))
+	if err != nil {
+		return agentrunner.Session{}, false, err
+	}
+	if outcome == adoptedLive && !opts.NoAdopt && filepath.Clean(meta.Cwd) == filepath.Clean(opts.Cwd) {
+		return s, true, nil
+	}
+	return agentrunner.Session{}, false, &agentrunner.LabelTakenError{
+		HolderCwd: meta.Cwd,
+		Err:       fmt.Errorf("%s: holder pid %d runs in %s", opts.Label, meta.HolderPID, meta.Cwd),
+	}
+}
+
 func (p *Pty) reserve(label string) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	_, live := p.sessions[label]
-	if _, starting := p.starting[label]; live || starting {
+	if _, starting := p.starting[label]; starting {
 		return fmt.Errorf("%w: %s", agentrunner.ErrLabelTaken, label)
 	}
 	if p.starting == nil {
@@ -622,19 +668,31 @@ func (p *Pty) Stop(s agentrunner.Session) error {
 		// Longer than the holder's own grace for claude, plus its final flush.
 		grace = 2 * holderStopGrace
 	}
-	wait := grace
-	if ss.holder.Stop() != nil {
-		wait = 0
-	}
-	select {
-	case <-ss.exited:
-	case <-time.After(wait):
+	if ss.holder == nil {
+		// A silent holder can't be asked; its exited is already closed, so
+		// wait on the pid itself.
 		p.killSessions(ss)
-		if err := awaitExit(ss.exited, grace, ss.holderPID); err != nil {
+		if err := p.awaitHolderGone(ss, grace); err != nil {
 			p.mu.Lock()
 			ss.stopped = false
 			p.mu.Unlock()
 			return err
+		}
+	} else {
+		wait := grace
+		if ss.holder.Stop() != nil {
+			wait = 0
+		}
+		select {
+		case <-ss.exited:
+		case <-time.After(wait):
+			p.killSessions(ss)
+			if err := awaitExit(ss.exited, grace, ss.holderPID); err != nil {
+				p.mu.Lock()
+				ss.stopped = false
+				p.mu.Unlock()
+				return err
+			}
 		}
 	}
 
