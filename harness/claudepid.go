@@ -546,6 +546,16 @@ func (w *PidWatcher) ProgramState() string {
 	return st.program.State
 }
 
+// RateLimitMessage is the message of the transcript's rate-limit API error,
+// held until the next Working. limited is false when there is none.
+func (w *PidWatcher) RateLimitMessage() (message string, limited bool) {
+	st := w.state()
+	if st.rateLimit == nil {
+		return "", false
+	}
+	return st.rateLimit.Message, true
+}
+
 func programStatus(r *ProgramReport) (Status, bool) {
 	if r == nil {
 		return Status{}, false

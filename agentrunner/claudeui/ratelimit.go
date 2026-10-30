@@ -38,12 +38,18 @@ func DetectRateLimit(text string) (token string, matched bool) {
 		if loc == nil {
 			continue
 		}
-		if m := resetTimeTokenPattern.FindStringSubmatch(line[loc[1]:]); m != nil {
-			return m[1], true
-		}
-		return "", true
+		return ResetToken(line[loc[1]:]), true
 	}
 	return "", false
+}
+
+// ResetToken extracts the reset clock time from text already known to be a
+// rate-limit message, "" if it names none.
+func ResetToken(text string) string {
+	if m := resetTimeTokenPattern.FindStringSubmatch(text); m != nil {
+		return m[1]
+	}
+	return ""
 }
 
 // SecondsUntilReset parses token (a clock time, e.g. "10:10am" or "3pm",

@@ -111,6 +111,11 @@ type holderResponse struct {
 	// Program is claude's last session-wide OSC 7501 state, empty before one
 	// and after clear.
 	Program string `json:"program,omitempty"`
+	// RateLimited and RateLimitMessage carry the transcript's rate-limit API
+	// error the agent has not moved past. A holder without them reads as not
+	// limited, so no op negotiation is needed.
+	RateLimited      bool   `json:"rate_limited,omitempty"`
+	RateLimitMessage string `json:"rate_limit_message,omitempty"`
 	// Exited is claude's exit code, reported by status once claude exits.
 	Exited *int `json:"exited,omitempty"`
 }
@@ -228,7 +233,11 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 			return holderResponse{}, nil
 		}
 		claude, turn := h.pid.PidState()
-		return holderResponse{Claude: claude, Turn: turn, Program: h.pid.ProgramState()}, nil
+		message, limited := h.pid.RateLimitMessage()
+		return holderResponse{
+			Claude: claude, Turn: turn, Program: h.pid.ProgramState(),
+			RateLimited: limited, RateLimitMessage: message,
+		}, nil
 	case opScreen:
 		return holderResponse{Screen: h.scr.Rows(), Scrollback: h.scr.ScrollbackTail(req.Scrollback)}, nil
 	case opKeys:
@@ -507,6 +516,14 @@ func (c *HolderClient) statusWithProgram() (*PidStatus, int, string, error) {
 		return nil, 0, "", &ClaudeExitedError{Code: *resp.Exited}
 	}
 	return resp.Claude, resp.Turn, resp.Program, err
+}
+
+// RateLimitMessage returns the message of the transcript's rate-limit API
+// error, limited false when there is none. A holder without the field reports
+// not limited.
+func (c *HolderClient) RateLimitMessage() (message string, limited bool, err error) {
+	resp, err := c.call(holderRequest{Op: opStatus})
+	return resp.RateLimitMessage, resp.RateLimited, err
 }
 
 // ProgramState returns the last session-wide OSC 7501 state the holder

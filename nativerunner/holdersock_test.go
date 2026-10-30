@@ -241,6 +241,16 @@ func TestHolderSocket_StatusCarriesOSCState(t *testing.T) {
 	}
 }
 
+// A holder that never sets the rate-limit fields is what an older holder
+// looks like on the wire: status still answers, as not limited.
+func TestHolderSocket_StatusWithoutRateLimitFieldsIsNotLimited(t *testing.T) {
+	_, c, _ := startHolder(t, echoChild)
+	waitForScreen(t, c, "ready")
+	if _, limited, err := c.RateLimitMessage(); err != nil || limited {
+		t.Errorf("RateLimitMessage = %v, %v; want not limited", limited, err)
+	}
+}
+
 func TestHolderSocket_OlderHolderLacksTurnMarker(t *testing.T) {
 	nativerunner.SetHolderOptionalOps(t, nil)
 	_, c, _ := startHolder(t, echoChild)

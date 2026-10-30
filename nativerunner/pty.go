@@ -1033,10 +1033,25 @@ func (p *Pty) awaitIdle(ss *ptySession) error {
 	}
 }
 
-// RateLimit never reports a limit: phase 2 has no pty rate-limit rule.
+// RateLimit reads the limit from the transcript fact the holder reports, not
+// the screen. A message without a parseable reset time gives a zero time.
 func (p *Pty) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
-	_, err := p.live(s)
-	return time.Time{}, false, err
+	ss, err := p.live(s)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	message, limited, err := ss.holder.RateLimitMessage()
+	if err != nil {
+		return time.Time{}, false, p.died(ss, err)
+	}
+	if !limited {
+		return time.Time{}, false, nil
+	}
+	now := time.Now()
+	if d, ok := claudeui.SecondsUntilReset(claudeui.ResetToken(message), now); ok {
+		return now.Add(d), true, nil
+	}
+	return time.Time{}, true, nil
 }
 
 // permissionPrompt is the waitingFor of both tool permission and plan

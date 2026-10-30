@@ -88,6 +88,9 @@ type PidStatusWatcher interface {
 	// ProgramState is the last session-wide OSC 7501 state, "" before one or
 	// after clear.
 	ProgramState() string
+	// RateLimitMessage is the message of the transcript's rate-limit API error
+	// the agent has not moved past; limited is false when there is none.
+	RateLimitMessage() (message string, limited bool)
 	// Hold freezes what PidState and Status report until Release.
 	Hold()
 	Release()
