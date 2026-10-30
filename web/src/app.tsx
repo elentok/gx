@@ -61,10 +61,10 @@ function Hero() {
           class="hero-logo"
           src="/logo-440.webp"
           width={240}
-          height={264}
-          alt="gx goblin mascot"
+          height={100}
+          alt="gx robotic goblin logo"
         />
-        <p class="hero-tagline">a git TUI for reviewing changes, fast</p>
+        <p class="hero-tagline">Agentic development platform for desktop and mobile</p>
       </div>
       <img
         class="hero-demo"

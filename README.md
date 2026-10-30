@@ -2,15 +2,19 @@
 
 [![CI](https://github.com/elentok/gx/actions/workflows/ci.yml/badge.svg)](https://github.com/elentok/gx/actions/workflows/ci.yml)
 
-<img src="docs/logo.png" alt="gx logo" width="400" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.png" />
+  <source media="(prefers-color-scheme: light)" srcset="docs/logo-light.png" />
+  <img src="docs/logo-light.png" alt="gx" width="520" />
+</picture>
 
-_gx_ is an agentic development platform for desktop and phone.
+_gx_ is an agentic development platform for desktop and mobile.
 
 - **Autonomous implementation.** The ralph loop gives each ticket its own worktree and branch. It runs code review, spec review and verification before the work lands.
 - **Smart-zone aware agents.** gx pauses and compacts a session before its context reaches the smart-zone ceiling.
 - **Design flow.** A full UI takes an idea through a map of decisions and into tickets.
 - **Agent management.** List, prompt, interrupt and resume agent sessions.
-- **Web UI and terminal UI.** The web UI is the main interface, on desktop and phone. It uses HTTPS and a one-time code from an authenticator app. A terminal UI is also available.
+- **Web UI and terminal UI.** The web UI is the main interface, on desktop and mobile. It uses HTTPS and a one-time code from an authenticator app. A terminal UI is also available.
 - **Budget and notifications.** A daily budget caps spend. Telegram or Slack tells you when an agent needs you.
 - **Resource monitoring.** gx watches CPU, memory and disk space, and warns when disk space runs low.
 - **Learning loop.** `gx evolve` reviews a finished epic. Follow-ups collect bugs and ideas found along the way, and a triage step goes through them.
