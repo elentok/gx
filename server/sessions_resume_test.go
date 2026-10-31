@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -71,25 +72,42 @@ func TestResumeSession_UsesNewestConversation(t *testing.T) {
 func TestResumeSession_CodexNeedsItsRollout(t *testing.T) {
 	t.Parallel()
 	codexHome := t.TempDir()
-	h, ctx, evs, id, conv := startFakeSession(t, servertest.WithEnv("CODEX_HOME="+codexHome))
-	stopFakeSession(ctx, t, h, evs, id)
-	metaPath := filepath.Join(h.SessionsDir, id, "meta.json")
-	meta := readMeta(t, h, id)
-	meta["harness"] = "codex"
-	data, err := json.Marshal(meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	h, ctx, id, conv, dir := stoppedCodexSession(t, servertest.WithEnv("CODEX_HOME="+codexHome))
 
 	res, err := h.Client.ResumeSession(ctx, id)
 	if err != nil || !res.Refused || res.Reason != server.ReasonSessionNoResume || !strings.Contains(res.Message, "rollout") {
 		t.Fatalf("resume without rollout = %+v, %v; want refused %s naming the rollout", res, err, server.ReasonSessionNoResume)
 	}
 
-	dir, _ := meta["dir"].(string)
+	writeCodexRollout(t, codexHome, conv, dir)
+	// Past the rollout check; a host without codex still refuses, for the missing binary.
+	res, err = h.Client.ResumeSession(ctx, id)
+	if err != nil || res.Reason == server.ReasonSessionNoResume {
+		t.Errorf("resume with rollout = %+v, %v; want it past the rollout check", res, err)
+	}
+}
+
+// stoppedCodexSession is an Exited session whose meta says it ran on Codex.
+func stoppedCodexSession(t *testing.T, opts ...func(*server.Config)) (h *servertest.Harness, ctx context.Context, id, conv, dir string) {
+	t.Helper()
+	h, ctx, evs, id, conv := startFakeSession(t, opts...)
+	stopFakeSession(ctx, t, h, evs, id)
+	meta := readMeta(t, h, id)
+	meta["harness"] = "codex"
+	data, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(h.SessionsDir, id, "meta.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir, _ = meta["dir"].(string)
+	return h, ctx, id, conv, dir
+}
+
+// writeCodexRollout gives conv a rollout under codexHome, as Codex writes one for a session in dir.
+func writeCodexRollout(t *testing.T, codexHome, conv, dir string) {
+	t.Helper()
 	rollouts := filepath.Join(codexHome, "sessions", "2026", "10", "30")
 	if err := os.MkdirAll(rollouts, 0o755); err != nil {
 		t.Fatal(err)
@@ -98,10 +116,34 @@ func TestResumeSession_CodexNeedsItsRollout(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(rollouts, "rollout-2026-10-30T00-00-00-"+conv+".jsonl"), []byte(line), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Past the rollout check; a host without codex still refuses, for the missing binary.
-	res, err = h.Client.ResumeSession(ctx, id)
-	if err != nil || res.Reason == server.ReasonSessionNoResume {
-		t.Errorf("resume with rollout = %+v, %v; want it past the rollout check", res, err)
+}
+
+// Restore of an Exited interactive Codex session runs `codex resume <conv> --cd <dir>`.
+func TestResumeSession_CodexLaunchesCodexResume(t *testing.T) {
+	t.Parallel()
+	bin, argsFile, codexHome := t.TempDir(), filepath.Join(t.TempDir(), "args"), t.TempDir()
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$FAKE_CODEX_ARGS\"\nexec sleep 30\n"
+	if err := os.WriteFile(filepath.Join(bin, "codex"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	h, ctx, id, conv, dir := stoppedCodexSession(t, servertest.WithEnv(
+		"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"CODEX_HOME="+codexHome,
+		"FAKE_CODEX_ARGS="+argsFile,
+	))
+	writeCodexRollout(t, codexHome, conv, dir)
+
+	if res, err := h.Client.ResumeSession(ctx, id); err != nil || res.Refused {
+		t.Fatalf("resume = %+v, %v", res, err)
+	}
+	var args []string
+	waitFor(t, func() bool {
+		data, err := os.ReadFile(argsFile)
+		args = strings.Fields(string(data))
+		return err == nil && len(args) > 0
+	})
+	if len(args) < 4 || !slices.Equal(args[:4], []string{"resume", conv, "--cd", dir}) {
+		t.Errorf("codex args = %q, want to start with resume %s --cd %s", args, conv, dir)
 	}
 }
 

@@ -206,6 +206,50 @@ func TestAnswer_GoneAgentQueues(t *testing.T) {
 	requireQueued(t, h, ticketPath, fake, res, err)
 }
 
+// The queued answer leaves the ticket's Handoff in its log, and the next
+// Codex claim starts a fresh session whose prompt names the ticket to read it from.
+func TestAnswer_GoneAgentThenCodexClaimStartsFromTheHandoff(t *testing.T) {
+	t.Parallel()
+	h, ticketPath, fake := startWaitingRestartFake(t, 0)
+	waitFor(t, func() bool { return len(h.Server.Runs()) == 1 })
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
+	sess, ok, err := fake.Find("epic-a-iter-01")
+	if err != nil || !ok {
+		t.Fatalf("Find = %v, %v", ok, err)
+	}
+	if err := fake.Stop(sess); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	res, err := h.Client.TicketAnswer(ctx, server.QueueRequest{Address: answerAddr, State: state, Choice: "a"})
+	requireQueued(t, h, ticketPath, fake, res, err)
+
+	if res, err := h.Client.QueueAdd(ctx, answerAddr, "codex"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	waitFor(t, func() bool { return len(fake.Prompts("epic-a-iter-01")) > 0 && fake.Prompts("epic-a-iter-01")[0] != "" })
+	prompts := fake.Prompts("epic-a-iter-01")
+	if !strings.HasPrefix(prompts[0], "$") || !strings.Contains(prompts[0], answerAddr) {
+		t.Errorf("claim prompt = %q, want a Codex skill command naming %s", prompts[0], answerAddr)
+	}
+	if got := fake.ResumeSessionID("epic-a-iter-01"); got != "" {
+		t.Errorf("claim resumed session %q, want a cold start", got)
+	}
+	evs, err := tickets.ReadLog(ticketPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var handoff string
+	for _, ev := range evs {
+		if ev.Type == tickets.EventPauseQuestion {
+			handoff = ev.Handoff
+		}
+	}
+	if handoff != "h" {
+		t.Errorf("logged Handoff = %q, want h", handoff)
+	}
+}
+
 func TestAnswer_DeathAfterPromptQueues(t *testing.T) {
 	t.Parallel()
 	h, ticketPath, fake := startWaitingRestartFake(t, 0)

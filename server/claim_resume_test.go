@@ -132,6 +132,13 @@ func TestClaim_ResumesOrColdStarts(t *testing.T) {
 			if len(logged) != 1 || logged[0].Path != c.wantPath {
 				t.Errorf("iteration-started events = %+v, want one with path %q", logged, c.wantPath)
 			}
+			// A cold start carries no conversation: the skill command names the ticket,
+			// and the agent reads the Handoff from it.
+			if c.wantPath == "cold-start" {
+				if got := fake.Prompts(resumeLabel); len(got) == 0 || !strings.Contains(got[0], "proj:epic-a/01") {
+					t.Errorf("cold-start prompts = %q, want the first to name the ticket", got)
+				}
+			}
 		})
 	}
 }
