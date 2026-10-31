@@ -3,7 +3,7 @@ import { ChatMessages, WorkingRow } from "../design/ChatCore";
 import { FailureBanner, visibleFailure } from "../design/FailureBanner";
 import type { SessionChatResponse, SessionInfo } from "../generated/server";
 
-/** The chat of a Claude session on the Agents page: the messages, a plain Working row and the failure notice. */
+/** The chat of a Claude or Codex session on the Agents page: the messages, a plain Working row and the failure notice. */
 export function AgentChat({
   session,
   chat,
@@ -17,7 +17,7 @@ export function AgentChat({
   const failure = visibleFailure(session.failure);
   return (
     <Box display="flex" flexDirection="column" gap="3" flex="1" minH="0">
-      <ChatMessages chat={chat} busy={busy} working={<WorkingRow />} />
+      <ChatMessages chat={chat} busy={busy} sessionId={session.id} working={<WorkingRow />} />
       {failure && (
         <FailureBanner
           failure={failure}

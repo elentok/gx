@@ -128,11 +128,11 @@ test("a Done Design still shows a crashed banner", async () => {
 });
 
 test("a non-Claude session shows the kinds that need no transcript", async () => {
-  render(session("exited", { kind: "crashed", label: "Crashed" }, "codex"));
+  render(session("exited", { kind: "crashed", label: "Crashed" }, "other"));
   expect(buttonsOf(await banner())).toEqual(["Restore", "New session"]);
   cleanup();
-  render(session("blocked", { kind: "auth", label: "Signed out" }, "codex"));
-  await screen.findByText(/Chat works for Claude sessions only/);
+  render(session("blocked", { kind: "auth", label: "Signed out" }, "other"));
+  await screen.findByText(/Chat works for Claude and Codex sessions only/);
   expect(screen.queryByRole("region", { name: "Session failure" })).toBeNull();
 });
 

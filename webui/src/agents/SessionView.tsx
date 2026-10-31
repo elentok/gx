@@ -1,7 +1,7 @@
 import { Box, Link, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
-import { useSessionChat, type FetchChat } from "../design/chat";
+import { hasChat, useSessionChat, type FetchChat } from "../design/chat";
 import { FailureBanner, needsTranscript, visibleFailure } from "../design/FailureBanner";
 import { ScreenModal } from "../design/ScreenModal";
 import type { FetchScreen } from "../design/screen";
@@ -99,7 +99,7 @@ function NoChat({ session, fetchScreen }: { session: SessionInfo; fetchScreen?: 
       )}
       <Box display="flex" alignItems="center" justifyContent="space-between" gap="3" flexWrap="wrap" borderWidth="1px" borderRadius="md" px="3" py="2">
         <Text color="text.muted" fontSize="sm">
-          Chat works for Claude sessions only.
+          Chat works for Claude and Codex sessions only.
         </Text>
         <Button emphasis="secondary" onClick={() => setScreen(true)}>
           Show screen
@@ -114,7 +114,7 @@ function NoChat({ session, fetchScreen }: { session: SessionInfo; fetchScreen?: 
 function sendReason(s: SessionInfo, connected: boolean): string | undefined {
   const state = s.status.state;
   if (!connected) return "Offline. Send turns on when gx reconnects.";
-  if (s.harness !== "claude") return "Sending works for Claude sessions only";
+  if (!hasChat(s.harness)) return "Sending works for Claude and Codex sessions only";
   if (state === "exited") return "Exited. Restore it in gx, Agents tab.";
   if (!promptable(s)) {
     return `${stateLabel(s)}. Send turns on when the session is idle.`;
@@ -165,19 +165,19 @@ export function SessionView({
 }) {
   const conn = useConnectionContext();
   const { connected } = useConnectionState(conn);
-  const claude = session.harness === "claude";
+  const chatty = hasChat(session.harness);
   const { kind, locked, unlock } = useComposerUnlock(session);
   const [confirming, setConfirming] = useState(false);
-  const { detail: chat, refetch } = useSessionChat(claude ? session.id : undefined, conn, fetchChat);
+  const { detail: chat, refetch } = useSessionChat(chatty ? session.id : undefined, conn, fetchChat);
   return (
     <Box display="flex" flexDirection="column" height="100%" minH="0">
       <SessionHeader session={session} sessions={sessions} onNew={onNew} />
-      {claude && chat && chat.messages.length === 0 && (
+      {chatty && chat && chat.messages.length === 0 && !chat.archived && !chat.unreadable && (
         <Text color="text.muted" flex="1" display="flex" alignItems="center" justifyContent="center">
           No messages yet
         </Text>
       )}
-      {claude ? (
+      {chatty ? (
         chat && <AgentChat session={session} chat={chat} refetch={refetch} />
       ) : (
         <>
@@ -207,7 +207,7 @@ export function SessionView({
       )}
       <AgentComposer
         session={session}
-        connected={connected && claude && !locked}
+        connected={connected && chatty && !locked}
         lastMessage={chat?.messages.at(-1)?.id}
         onStale={refetch}
         reason={locked ? undefined : sendReason(session, connected)}

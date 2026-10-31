@@ -1,4 +1,5 @@
 import { Box, Spinner, Text, Textarea } from "@chakra-ui/react";
+import { codexSkillHint } from "../design/chat";
 import { submitOnCmdEnter } from "../design/NoteBox";
 import type { PostPrompt } from "../design/prompt";
 import { usePromptSend } from "../design/usePromptSend";
@@ -43,15 +44,18 @@ export function AgentComposer({
       }
     : undefined;
 
-  // The caller's reason comes first, then the last refusal in red, else the draft note.
+  // The caller's reason comes first, then the last refusal in red, then the Codex `$` hint, else the draft note.
   const failure = refusal ? refusalText(refusal) : error;
+  const hint = codexSkillHint(session.harness, text);
   const line = reason
     ? { text: reason, red: false }
     : failure
       ? { text: failure, red: true }
-      : text !== ""
-        ? { text: "Draft saved in this browser", red: false }
-        : undefined;
+      : hint
+        ? { text: hint, red: false }
+        : text !== ""
+          ? { text: "Draft saved in this browser", red: false }
+          : undefined;
 
   return (
     <Box

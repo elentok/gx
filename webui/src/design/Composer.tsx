@@ -18,6 +18,7 @@ import {
   type InterruptSession,
   type SetAutoAdvance,
 } from "./open";
+import { codexSkillHint } from "./chat";
 import { InterruptPopover } from "./InterruptPopover";
 import { NoteBox, submitOnCmdEnter } from "./NoteBox";
 import type { PostPrompt } from "./prompt";
@@ -215,6 +216,11 @@ export function Composer({
           onChange={setText}
           onSubmit={onSubmit}
         />
+      )}
+      {open && codexSkillHint(session.harness, text) && (
+        <Text fontSize="xs" color="text.dim">
+          {codexSkillHint(session.harness, text)}
+        </Text>
       )}
       {/* One line: the Auto menu on the left, the main action on the right. */}
       <Box display="flex" gap="2" alignItems="center">

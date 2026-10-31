@@ -86,6 +86,33 @@ test("a refused send shows its reason inline only, no toast, and keeps the draft
   toast.mockRestore();
 });
 
+const HINT = "Codex skills start with $. Type $gx-... instead.";
+const codex = (): SessionInfo => ({ ...session(), harness: "codex" });
+
+test("the $ hint shows for a Codex /gx- draft, not for Claude or other drafts", () => {
+  render({ s: codex() });
+  fireEvent.change(box(), { target: { value: "/gx-design x" } });
+  expect(screen.getByText(HINT)).toBeTruthy();
+  expect(screen.queryByText("Draft saved in this browser")).toBeNull();
+  fireEvent.change(box(), { target: { value: "/clear" } });
+  expect(screen.queryByText(HINT)).toBeNull();
+  fireEvent.change(box(), { target: { value: "$gx-design x" } });
+  expect(screen.queryByText(HINT)).toBeNull();
+  cleanup();
+  render();
+  fireEvent.change(box(), { target: { value: "/gx-design x" } });
+  expect(screen.queryByText(HINT)).toBeNull();
+});
+
+test("the $ hint yields to a refusal line", async () => {
+  const post = vi.fn(async () => ({ refused: true, message: "text may not start with / or !" })) as unknown as PostPrompt;
+  render({ s: codex(), post });
+  fireEvent.change(box(), { target: { value: "/gx-design x" } });
+  fireEvent.click(send());
+  expect(await screen.findByText("text may not start with / or !")).toBeTruthy();
+  expect(screen.queryByText(HINT)).toBeNull();
+});
+
 test("Send is off while a send is pending, then clears the box", async () => {
   let release: (v: { refused: false }) => void = () => {};
   const post = vi.fn(() => new Promise<{ refused: false }>((r) => (release = r))) as unknown as PostPrompt;

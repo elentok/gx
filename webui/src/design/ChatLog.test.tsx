@@ -215,11 +215,71 @@ test("an event for the session refetches and a new conversation replaces the cha
   expect(screen.queryByText("old talk")).toBeNull();
 });
 
-test("a non-Claude session shows the fixed text and loads no chat", async () => {
+test("a harness with no chat shows the fixed text and loads no chat", async () => {
   const fetchChat = vi.fn<FetchChat>(okChat(chatOf([])));
-  renderChat([session({ harness: "codex" })], fetchChat);
-  expect(await screen.findByText("Chat works for Claude sessions only. Open it in gx, Agents tab.")).toBeTruthy();
+  renderChat([session({ harness: "other" })], fetchChat);
+  expect(await screen.findByText("Chat works for Claude and Codex sessions only. Open it in gx, Agents tab.")).toBeTruthy();
   expect(fetchChat).not.toHaveBeenCalled();
+});
+
+test("a Codex session loads its chat and renders every entry kind", async () => {
+  const fetchChat = vi.fn<FetchChat>(
+    okChat(
+      chatOf([
+        msg({ text: "Hello **bold**" }),
+        msg({ role: "person", kind: "prompt", text: "do the thing" }),
+        msg({ role: "person", kind: "command", text: "$gx-design x" }),
+        msg({ kind: "tools", tool_count: 3, last_tool: "shell" }),
+        msg({ kind: "compacted" }),
+      ]),
+    ),
+  );
+  renderChat([session({ harness: "codex" })], fetchChat);
+  expect((await screen.findByText("bold")).tagName).toBe("STRONG");
+  expect(screen.getByText("do the thing")).toBeTruthy();
+  expect(screen.getByText("$gx-design x")).toBeTruthy();
+  expect(screen.getByText("Context compacted")).toBeTruthy();
+  expect(screen.queryByText(/tool call/)).toBeNull();
+  expect(fetchChat).toHaveBeenCalledWith("s-a");
+});
+
+test("an archived Codex chat asks first, and Decode shows the decoded messages", async () => {
+  const archive = vi.fn(async (_url: string) => new Response(JSON.stringify(chatOf([msg({ text: "from the archive" })])), { status: 200 }));
+  vi.stubGlobal("fetch", archive);
+  try {
+    renderChat([session({ harness: "codex" })], okChat(chatOf([], { archived: true })));
+    expect(await screen.findByText("Codex archived this conversation")).toBeTruthy();
+    const archiveCalls = () => archive.mock.calls.map((c) => String(c[0])).filter((u) => u.includes("/chat/archive"));
+    expect(archiveCalls()).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Decode" }));
+    expect(await screen.findByText("from the archive")).toBeTruthy();
+    expect(archiveCalls()).toEqual(["/v1/sessions/chat/archive?session=s-a"]);
+    expect(screen.queryByText("Codex archived this conversation")).toBeNull();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test("an unreadable Codex chat names the version and points to the doctor", async () => {
+  renderChat([session({ harness: "codex" })], okChat(chatOf([], { unreadable: true, codex_version: "0.99.1" })));
+  const notice = await screen.findByText(/gx cannot read this Codex conversation/);
+  const text = notice.textContent?.replace(/\s+/g, " ");
+  expect(text).toContain("(Codex 0.99.1)");
+  expect(text).toContain("The terminal and the agent are unaffected.");
+  expect(text).toContain("gx codex doctor");
+});
+
+test("the Design note box hints at $ for a Codex /gx- draft, never for Claude", async () => {
+  renderChat([session({ harness: "codex" })], okChat(chatOf([])));
+  fireEvent.click(await screen.findByRole("button", { name: "Note" }));
+  fireEvent.change(await screen.findByLabelText("Message"), { target: { value: "/gx-design x" } });
+  expect(screen.getByText("Codex skills start with $. Type $gx-... instead.")).toBeTruthy();
+  cleanup();
+  localStorage.clear(); // the draft would open the note box on its own
+  renderChat([session()], okChat(chatOf([])));
+  fireEvent.click(await screen.findByRole("button", { name: "Note" }));
+  fireEvent.change(await screen.findByLabelText("Message"), { target: { value: "/gx-design x" } });
+  expect(screen.queryByText(/Codex skills start with/)).toBeNull();
 });
 
 test("a Design with no session has an empty chat", async () => {
@@ -553,9 +613,9 @@ test("a new round opens Questions again, and a round that goes away shows the ch
   expect(screen.queryByRole("group", { name: "View" })).toBeNull();
 });
 
-test("switching from a Claude session in Questions to another harness leaves Questions: the impl link is back", async () => {
+test("switching from a Claude session in Questions to a harness with no chat leaves Questions: the impl link is back", async () => {
   renderChat(
-    [session(), session({ id: "s-b", name: "other", harness: "codex", run_started_at: ago(2) })],
+    [session(), session({ id: "s-b", name: "other", harness: "other", run_started_at: ago(2) })],
     focusChat(),
     undefined,
     implDetail,

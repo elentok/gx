@@ -2,7 +2,7 @@ import { Box, chakra, Text } from "@chakra-ui/react";
 import { useEffect, useState, type ReactNode } from "react";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { SessionChatResponse, SessionInfo } from "../generated/server";
-import { roundKeyOf } from "./chat";
+import { hasChat, roundKeyOf } from "./chat";
 import { ChatMessages, WorkingRow, type WorkingStep } from "./ChatCore";
 import type { AutoMenuState } from "./AutoMenu";
 import { Composer } from "./Composer";
@@ -240,6 +240,7 @@ function ChatBody({
         <ChatMessages
           chat={chat}
           busy={busy}
+          sessionId={session.id}
           working={step && <WorkingRow {...step} />}
         />
       )}
@@ -261,7 +262,7 @@ function ChatBody({
   );
 }
 
-// The chat of a Claude session. Other harnesses have no chat, so DesignChat never mounts this for them.
+// The chat of a Claude or Codex session. Other harnesses have no chat, so DesignChat never mounts this for them.
 function ChatLog({
   session,
   chat,
@@ -312,7 +313,7 @@ export function DesignChat({
   onQuestions,
 }: {
   session?: SessionInfo;
-  /** The Claude session's chat, fetched by the page; null while it loads. */
+  /** The session's chat, fetched by the page; null while it loads. */
   chat?: SessionChatResponse | null;
   refetch: () => void;
   post?: PostPrompt;
@@ -328,7 +329,7 @@ export function DesignChat({
   onQuestions: (on: boolean) => void;
 }) {
   if (!session) return null;
-  if (session.harness !== "claude") {
+  if (!hasChat(session.harness)) {
     const failure = visibleFailure(session.failure, done);
     return (
       <>
@@ -336,7 +337,7 @@ export function DesignChat({
           <FailureBanner failure={failure} session={session} {...actions} />
         )}
         <Text color="text.muted" fontSize="sm">
-          Chat works for Claude sessions only. Open it in gx, Agents tab.
+          Chat works for Claude and Codex sessions only. Open it in gx, Agents tab.
         </Text>
       </>
     );

@@ -9,7 +9,7 @@ import { useEpicList, waitingCount, type EpicList, type FetchEpicList } from "..
 import { JumpMenu } from "../nav/JumpMenu";
 import { DetailPage } from "../page/DetailPage";
 import { Spinner } from "../ui/spinner/Spinner";
-import { roundKeyOf, useSessionChat, type FetchChat } from "./chat";
+import { hasChat, roundKeyOf, useSessionChat, type FetchChat } from "./chat";
 import { useFocusReport, type PostFocus } from "./focus";
 import { DesignChat } from "./ChatLog";
 import type { DeleteDesign, OpenDesign, ResumeSession, StopSession } from "./open";
@@ -115,12 +115,12 @@ function DesignBody({
   // Switching shows an older live session; once it is gone the newest drives the page again.
   const session =
     live.find((s) => s.id === selected) ?? designSession(address, sessions);
-  const claude = session?.harness === "claude";
-  const { detail: chat, refetch: refetchChat } = useSessionChat(session && claude ? session.id : undefined, conn, deps.fetchChat);
+  const chatty = hasChat(session?.harness);
+  const { detail: chat, refetch: refetchChat } = useSessionChat(session && chatty ? session.id : undefined, conn, deps.fetchChat);
   // Derived, not stored, so it cannot go stale: a round opens in Questions, and the reader's toggle holds for
   // that session and round only. The message list and the impl link both read it.
   const viewKey = `${session?.id}|${roundKeyOf(chat)}`;
-  const questions = claude && (chat?.round?.length ?? 0) > 0 && (toggle?.key === viewKey ? toggle.on : true);
+  const questions = chatty &&(chat?.round?.length ?? 0) > 0 && (toggle?.key === viewKey ? toggle.on : true);
   // The busy row follows what the agent reported; Progress and Continue keep following the map.
   const running =
     detail?.steps?.find((s) => s.step === session?.reported_step) ?? current;

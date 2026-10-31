@@ -1,5 +1,7 @@
 import { Box, Spinner as ChakraSpinner, Text } from "@chakra-ui/react";
-import { useLayoutEffect, useRef, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Button } from "../ui/button/Button";
+import { fetchArchive } from "./chat";
 import type {
   SessionBackgroundTask,
   SessionChatMessage,
@@ -157,27 +159,75 @@ function ChatScroller({
   );
 }
 
+// The Codex notices. An archived rollout is decoded only when the person asks; the page load never does.
+function CodexNotices({
+  chat,
+  sessionId,
+  onDecoded,
+}: {
+  chat: SessionChatResponse;
+  sessionId: string;
+  onDecoded: (messages: SessionChatMessage[]) => void;
+}) {
+  const [error, setError] = useState<string>();
+  const decode = () => {
+    setError(undefined);
+    fetchArchive(sessionId).then(
+      (r) => (r.kind === "ok" ? onDecoded(r.detail.messages) : setError("No archived rollout for this session.")),
+      (e: Error) => setError(e.message),
+    );
+  };
+  return (
+    <>
+      {chat.archived && (
+        <Box role="status" display="flex" alignItems="center" gap="3" flexWrap="wrap" fontSize="sm" color="text.muted">
+          <Text as="span">Codex archived this conversation</Text>
+          <Button emphasis="secondary" onClick={decode}>
+            Decode
+          </Button>
+          {error && <Text as="span" color="tone.deadlocked.fg">{error}</Text>}
+        </Box>
+      )}
+      {chat.unreadable && (
+        <Text role="status" fontSize="sm" color="text.muted">
+          gx cannot read this Codex conversation
+          {chat.codex_version && ` (Codex ${chat.codex_version})`}. The terminal and the agent are unaffected. Run `gx
+          codex doctor`.
+        </Text>
+      )}
+    </>
+  );
+}
+
 /** The scrolling messages, the background strip and, while the agent works, the caller's working row. */
 export function ChatMessages({
   chat,
   busy,
   working,
+  sessionId,
 }: {
   chat: SessionChatResponse;
   busy: boolean;
   /** Shown at the bottom while `busy`. */
   working?: ReactNode;
+  /** The session the chat belongs to: the archive route needs it. */
+  sessionId: string;
 }) {
+  const [decoded, setDecoded] = useState<{ sessionId: string; messages: SessionChatMessage[] }>();
+  const messages = decoded?.sessionId === sessionId ? decoded.messages : chat.messages;
   return (
     <ChatScroller
-      signal={`${chat.messages.length}|${chat.background.length}|${busy}`}
+      signal={`${messages.length}|${chat.background.length}|${busy}`}
     >
+      {messages.length === 0 && (
+        <CodexNotices chat={chat} sessionId={sessionId} onDecoded={(m) => setDecoded({ sessionId, messages: m })} />
+      )}
       {chat.truncated && (
         <Text fontSize="xs" color="text.dim" textAlign="center">
           Earlier messages hidden
         </Text>
       )}
-      {chat.messages.map((m, i) => (
+      {messages.map((m, i) => (
         <Entry key={m.id || i} m={m} />
       ))}
       {chat.background.length > 0 && <BackgroundStrip tasks={chat.background} />}

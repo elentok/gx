@@ -20,8 +20,8 @@ test("the reason line names each state in order", async () => {
   expect(screen.getByText("Offline. Send turns on when gx reconnects.")).toBeTruthy();
   expect(sendButton().disabled).toBe(true);
   cleanup();
-  render([session("s-2", "p", { harness: "codex" })], "/agents/s-2", true, chatOf(chat()));
-  expect(await screen.findByText("Sending works for Claude sessions only")).toBeTruthy();
+  render([session("s-2", "p", { harness: "other" })], "/agents/s-2", true, chatOf(chat()));
+  expect(await screen.findByText("Sending works for Claude and Codex sessions only")).toBeTruthy();
   cleanup();
   render([session("s-3", "p", { status: { state: "exited" } })], "/agents/s-3", true, chatOf(chat()));
   expect(await screen.findByText("Exited. Restore it in gx, Agents tab.")).toBeTruthy();
@@ -72,10 +72,26 @@ test("stale refetches the chat and keeps the draft", async () => {
   expect((await composerBox()).value).toBe("keep me");
 });
 
-test("a non-Claude session loads no chat, shows the notice, Show screen opens the screen modal and the composer says why it is off", async () => {
+test("a Codex session shows its chat, and Send follows the idle rule", async () => {
+  prompts.length = 0;
+  stubPrompt(accepted);
+  render([session("s-2", "p", { harness: "codex" })], "/agents/s-2", true, chatOf(chat()));
+  expect(await screen.findByText("hello there")).toBeTruthy();
+  expect(screen.queryByText(/Chat works for/)).toBeNull();
+  expect(screen.queryByText(/Sending works for/)).toBeNull();
+  await type("hi");
+  expect(sendButton().disabled).toBe(false);
+  cleanup();
+  render([session("s-3", "p", { harness: "codex", status: { state: "working" } })], "/agents/s-3", true, chatOf(chat()));
+  await type("hi");
+  expect(sendButton().disabled).toBe(true);
+  expect(screen.getByText("Working. Send turns on when the session is idle.")).toBeTruthy();
+});
+
+test("a harness with no chat loads no chat, shows the notice, Show screen opens the screen modal and the composer says why it is off", async () => {
   const chatCalls: unknown[] = [];
   const screenCalls: string[] = [];
-  render([session("s-2", "p", { harness: "codex" })], "/agents/s-2", true, {
+  render([session("s-2", "p", { harness: "other" })], "/agents/s-2", true, {
     chat: async () => {
       chatCalls.push(1);
       return { kind: "ok", detail: chat() };
@@ -85,9 +101,9 @@ test("a non-Claude session loads no chat, shows the notice, Show screen opens th
       return { kind: "ok", detail: { rows: ["$ codex"] } } as never;
     },
   });
-  expect(await screen.findByText("Chat works for Claude sessions only.")).toBeTruthy();
+  expect(await screen.findByText("Chat works for Claude and Codex sessions only.")).toBeTruthy();
   expect(chatCalls).toEqual([]);
-  expect(screen.getByText("Sending works for Claude sessions only")).toBeTruthy();
+  expect(screen.getByText("Sending works for Claude and Codex sessions only")).toBeTruthy();
   expect(sendButton().disabled).toBe(true);
   fireEvent.click(screen.getByRole("button", { name: "Show screen" }));
   expect((await screen.findByLabelText("Screen rows")).textContent).toBe("$ codex");
@@ -101,23 +117,23 @@ test.each([
 ] as { kind: string; over: Partial<SessionInfo>; label: string; buttons: string[] }[])(
   "a non-Claude session with a $kind failure shows the banner with only its buttons",
   async (c) => {
-    render([session("s-2", "p", { ...c.over, harness: "codex", failure: { kind: c.kind, label: c.label } })], "/agents/s-2", true);
+    render([session("s-2", "p", { ...c.over, harness: "other", failure: { kind: c.kind, label: c.label } })], "/agents/s-2", true);
     const banner = within(await screen.findByRole("region", { name: "Session failure" }));
     expect(banner.getByText(c.label)).toBeTruthy();
     expect(banner.queryAllByRole("button").map((b) => b.textContent)).toEqual(c.buttons);
     expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
     expect(screen.queryByRole("button", { name: "New session" })).toBeNull();
-    expect(screen.getByText("Chat works for Claude sessions only.")).toBeTruthy();
+    expect(screen.getByText("Chat works for Claude and Codex sessions only.")).toBeTruthy();
   },
 );
 
 test.each(["auth", "stalled"])("a non-Claude session with a %s failure, which needs a transcript, or none, shows no banner", async (kind) => {
-  render([session("s-2", "p", { harness: "codex", failure: { kind, label: "x" } })], "/agents/s-2", true);
-  await screen.findByText("Chat works for Claude sessions only.");
+  render([session("s-2", "p", { harness: "other", failure: { kind, label: "x" } })], "/agents/s-2", true);
+  await screen.findByText("Chat works for Claude and Codex sessions only.");
   expect(screen.queryByRole("region", { name: "Session failure" })).toBeNull();
   cleanup();
-  render([session("s-2", "p", { harness: "codex" })], "/agents/s-2", true);
-  await screen.findByText("Chat works for Claude sessions only.");
+  render([session("s-2", "p", { harness: "other" })], "/agents/s-2", true);
+  await screen.findByText("Chat works for Claude and Codex sessions only.");
   expect(screen.queryByRole("region", { name: "Session failure" })).toBeNull();
 });
 
