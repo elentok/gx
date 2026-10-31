@@ -340,3 +340,171 @@ test.describe("123. Vi editor: layouts and touch bar", () => {
     });
   });
 });
+
+// The editor text, one line per `.cm-line`.
+const editorText = (editable: ReturnType<Page["getByRole"]>) =>
+  editable.evaluate((el) => [...el.querySelectorAll(".cm-line")].map((l) => l.textContent).join("\n"));
+
+// [anchor, head] of the editor's selection as character offsets in the text; `\n` counts as one.
+const editorSelection = (editable: ReturnType<Page["getByRole"]>) =>
+  editable.evaluate((el) => {
+    const lines = [...el.querySelectorAll(".cm-line")];
+    const offset = (node: Node, at: number) => {
+      const line = lines.findIndex((l) => l.contains(node));
+      let n = 0;
+      for (let i = 0; i < line; i++) n += (lines[i].textContent ?? "").length + 1;
+      const range = document.createRange();
+      range.setStart(lines[line], 0);
+      range.setEnd(node, at);
+      return n + range.toString().length;
+    };
+    const s = document.getSelection()!;
+    return [offset(s.anchorNode!, s.anchorOffset), offset(s.focusNode!, s.focusOffset)];
+  });
+
+const head = async (editable: ReturnType<Page["getByRole"]>) => (await editorSelection(editable))[1];
+
+// Opens the editor in vi mode on `text`, in NORMAL mode with the caret at the start.
+const openNormal = async (page: Page, fixture: Fixture, text: string) => {
+  await setViMode(fixture, page, true);
+  const { dialog } = await openWith(page, text, 0);
+  const editable = dialog.getByRole("textbox", nav(`${MESSAGE} text`));
+  // The mode shows as text, or as the pill on a touch device.
+  const mode = dialog.locator('[data-testid^="vi-mode-"]');
+  await page.keyboard.press("Escape");
+  await expect(mode).toHaveText("NORMAL");
+  return { dialog, editable, mode };
+};
+
+test.describe("125. Vi editor: commands", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test("the mode text follows INSERT, NORMAL, VISUAL", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    await setViMode(fixture, page, true);
+    const { dialog } = await openWith(page, "hello", 0);
+    const mode = dialog.getByTestId("vi-mode-text");
+    await expect(mode).toHaveText("INSERT");
+    await page.keyboard.press("Escape");
+    await expect(mode).toHaveText("NORMAL");
+    await page.keyboard.press("v");
+    await expect(mode).toHaveText("VISUAL");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("i");
+    await expect(mode).toHaveText("INSERT");
+  });
+
+  test("h j k l w e 0 f{char} gg G move the caret as vim does", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    const { editable } = await openNormal(page, fixture, "alpha beta gamma\ndelta epsilon\nzeta");
+    // j and k follow the pixel column in a proportional font, so they land within a character of col 11.
+    const steps: [string, number, number][] = [
+      ["l", 1, 1],
+      ["h", 0, 0],
+      ["w", 6, 6],
+      ["e", 9, 9],
+      ["0", 0, 0],
+      ["fg", 11, 11],
+      ["j", 27, 29],
+      ["k", 10, 12],
+      ["G", 31, 31],
+      ["gg", 0, 0],
+    ];
+    for (const [keys, min, max] of steps) {
+      await page.keyboard.type(keys);
+      await expect.poll(() => head(editable), { message: keys }).toBeGreaterThanOrEqual(min);
+      expect(await head(editable), keys).toBeLessThanOrEqual(max);
+    }
+  });
+
+  test("390px: j moves one screen line inside a wrapped paragraph", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    await page.setViewportSize({ width: 390, height: 800 });
+    const text = "word ".repeat(100).trim();
+    const { dialog, editable } = await openNormal(page, fixture, text);
+    const cursor = dialog.locator(".cm-cursor, .cm-fat-cursor").first();
+    const before = (await cursor.boundingBox())!;
+    await page.keyboard.press("j");
+    await expect.poll(() => head(editable)).toBeGreaterThan(0);
+    const after = (await cursor.boundingBox())!;
+    expect(await head(editable)).toBeLessThan(text.length / 2);
+    const lineHeight = await editable.locator(".cm-line").evaluate((l) => parseFloat(getComputedStyle(l).lineHeight));
+    expect(Math.abs(after.y - before.y - lineHeight)).toBeLessThanOrEqual(2);
+  });
+
+  test("a click resets the column that j and k keep", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    const { editable } = await openNormal(page, fixture, "aaaaaaaaaa\nbbbbbbbbbb\ncccccccccc\ndddddddddd");
+    await page.keyboard.type("5lj");
+    await expect.poll(() => head(editable)).toBe(16);
+    await editable.locator(".cm-line").nth(2).click({ position: { x: 1, y: 5 } });
+    await expect.poll(() => head(editable)).toBe(22);
+    await page.keyboard.press("j");
+    await expect.poll(() => head(editable)).toBe(33);
+  });
+
+  test("x dw yy p u Ctrl-R iXY . and v d edit the text", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    const { editable } = await openNormal(page, fixture, "one two three\nfour five");
+    const steps: [string, string][] = [
+      ["x", "ne two three\nfour five"],
+      ["dw", "two three\nfour five"],
+      ["yyp", "two three\ntwo three\nfour five"],
+      ["u", "two three\nfour five"],
+      ["Control+r", "two three\ntwo three\nfour five"],
+      ["ggj0iXY", "two three\nXYtwo three\nfour five"],
+      ["Escape", "two three\nXYtwo three\nfour five"],
+      [".", "two three\nXXYYtwo three\nfour five"],
+      ["0vld", "two three\nYYtwo three\nfour five"],
+    ];
+    for (const [keys, text] of steps) {
+      if (keys.includes("+") || keys === "Escape") await page.keyboard.press(keys);
+      else await page.keyboard.type(keys);
+      await expect.poll(() => editorText(editable), { message: keys }).toBe(text);
+    }
+  });
+
+  test("i a o and . change the text and the mode as in vim", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    const { editable, mode } = await openNormal(page, fixture, "abc");
+    await page.keyboard.type("iX");
+    await expect(mode).toHaveText("INSERT");
+    await page.keyboard.press("Escape");
+    await expect(mode).toHaveText("NORMAL");
+    await expect.poll(() => editorText(editable)).toBe("Xabc");
+    await page.keyboard.type("aY");
+    await expect(mode).toHaveText("INSERT");
+    await page.keyboard.press("Escape");
+    await expect.poll(() => editorText(editable)).toBe("XYabc");
+    await page.keyboard.type("oZ");
+    await expect(mode).toHaveText("INSERT");
+    await page.keyboard.press("Escape");
+    await expect(mode).toHaveText("NORMAL");
+    await expect.poll(() => editorText(editable)).toBe("XYabc\nZ");
+    await page.keyboard.type(".");
+    await expect(mode).toHaveText("NORMAL");
+    await expect.poll(() => editorText(editable)).toBe("XYabc\nZ\nZ");
+  });
+
+  test.describe("touch", () => {
+    test.use(touch);
+
+    test("390px: gs and ge move to the line start and end in normal and visual mode", async ({ page, start }) => {
+      const fixture = await start("design-working");
+      await page.setViewportSize({ width: 390, height: 800 });
+      const { editable, mode } = await openNormal(page, fixture, "hello world\nsecond line");
+      await page.keyboard.type("lll");
+      await expect.poll(() => head(editable)).toBe(3);
+      await page.keyboard.type("ge");
+      await expect.poll(() => head(editable)).toBe(10);
+      await page.keyboard.type("gs");
+      await expect.poll(() => head(editable)).toBe(0);
+      await page.keyboard.type("lllv");
+      await expect(mode).toHaveText("VISUAL");
+      await page.keyboard.type("ge");
+      await expect.poll(() => head(editable)).toBeGreaterThanOrEqual(10);
+      await page.keyboard.type("gs");
+      await expect.poll(() => head(editable)).toBeLessThanOrEqual(3);
+    });
+  });
+});

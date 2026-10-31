@@ -1455,3 +1455,16 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   9. On `agents` at 1280 px, fill the composer, open its editor, press Cmd-Enter.
   10. On `design-text` start the design session, open the editor of "Answer to question 13", press Cmd-Enter. At 390 px on `design-working` press Cmd-Enter in the composer's editor.
 - **Pass:** at 390 px the expand button shows. Vi on, Cmd-G in the field opens the editor; on the page body it opens nothing. Vi off, Cmd-G opens nothing and the keydown is not cancelled. The editor opens in INSERT and the typed `X` lands at the caret: the editor text reads `helloX world`. `ZZ` in normal mode closes the editor and the field keeps the text; Cmd-G inside the editor closes it. A backdrop press closes at 1280 px and does nothing at 390 px. With a mouse at 1280 px, vi on and off, Done is visible and closes. Escape leaves the editor open in insert and in normal mode. After closing by Done, Cmd-G, `ZZ` or the backdrop the field has focus and its caret is the editor's (after the last character, or on it after `ZZ`, because Escape steps back). The field follows typing in the editor, and Send posts a body holding the text. In the agent composer Cmd-Enter closes the editor and sends the message. On a question's answer editor, and at 390 px in the composer's editor, Cmd-Enter does nothing: the editor stays open and no prompt is posted.
+
+## 125. Vi editor: commands
+
+- **Scenario:** `design-working`, vi mode on (`gx vimode on`, confirmed on the "Vi mode" menu item). Each test waits out the 20 s first turn, then opens the editor with Cmd-G on text it fills in. The caret and text are read from the editor's DOM selection and `.cm-line` rows. The numbers in the flow list (118 in the ticket) were taken, so this flow is 125.
+- **Steps:**
+  1. Open the editor, press Escape, `v`, Escape, `i`; read the mode text.
+  2. On `alpha beta gamma / delta epsilon / zeta` press `l h w e 0 fg j k G gg`; read the caret after each.
+  3. At 390 px fill 100 words with no newline, press Escape and `j`; read the cursor box.
+  4. On four lines press `5l j`, click the start of line 3, press `j`.
+  5. On `one two three / four five` press `x`, `dw`, `yyp`, `u`, Ctrl-R, `iXY` Escape, `.`, `0vld`; read the text after each.
+  6. On `abc` press `iX`, `aY`, `oZ` (Escape after each) and `.`; read text and mode.
+  7. With touch at 390 px press `lll`, `ge`, `gs`, then `lllv`, `ge`, `gs`; read the caret.
+- **Pass:** the mode text reads INSERT, NORMAL, VISUAL, INSERT. The keys move the caret as vim does (`j` and `k` within one character of the column, because they follow the pixel column). In a wrapped paragraph `j` moves the cursor down one line height and the caret stays far from the paragraph end. After a click `j` uses the clicked column. Every edit step gives the text vim gives (`.` repeats `iXY` as `XXYY`; `0vld` deletes two characters). `i`, `a`, `o` enter INSERT, Escape returns to NORMAL, `.` repeats `oZ`. With touch `ge` goes to the line end and `gs` to the line start in normal mode, and in visual mode `ge` and `gs` move the selection head to the line end and start.
