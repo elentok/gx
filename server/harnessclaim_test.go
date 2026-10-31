@@ -69,6 +69,27 @@ func TestHarnessClaim_WaitingTicketFollowsDefaultAtClaimTime(t *testing.T) {
 	}
 }
 
+// Every ticket type that pins no harness claims on a codex default: the
+// root's auto-queued work, code-review, verify, evolve and diagnose tickets.
+func TestHarnessClaim_UnpinnedTicketTypesClaimOnTheDefault(t *testing.T) {
+	t.Parallel()
+	for _, typ := range []string{"implement", "code-review", "verify", "evolve", "diagnose"} {
+		t.Run(typ, func(t *testing.T) {
+			t.Parallel()
+			store := t.TempDir()
+			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{Type: typ})
+			h, fake, path := startHarnessClaim(t, store)
+			switchDefaultHarness(t, h, path, store, "codex")
+			if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", ""); err != nil || res.Refused {
+				t.Fatalf("add: %+v, %v", res, err)
+			}
+			if k := waitKind(t, fake, "epic-a-iter-01"); k != "codex" {
+				t.Errorf("%s ticket started as %q, want codex", typ, k)
+			}
+		})
+	}
+}
+
 // A retry keeps the harness of the earlier run; a run with no transcript does
 // not count; the ticket's own agent: beats the earlier run.
 func TestHarnessClaim_RelaunchKeepsEarlierRunHarness(t *testing.T) {
