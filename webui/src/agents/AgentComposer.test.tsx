@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import type { PostPrompt } from "../design/prompt";
 import type { SessionInfo } from "../generated/server";
+import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import { renderThemed } from "../ui/render";
 import { toaster } from "../ui/toaster";
 import { WideContext } from "../useWide";
@@ -172,6 +173,14 @@ test("plain Enter adds a newline and does not send", async () => {
   expect(fireEvent.keyDown(box(), { key: "Enter" })).toBe(true);
   await new Promise((r) => setTimeout(r, 20));
   expect(post).not.toHaveBeenCalled();
+});
+
+test("the Message field has an expand button and its editor is titled for the session", () => {
+  render();
+  fireEvent.click(screen.getByRole("button", { name: "Open the note in a large editor" }));
+  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(`Message to ${session().id}`);
+  typeInLargeEditor(`Message to ${session().id}`, "from editor");
+  expect((box() as HTMLTextAreaElement).value).toBe("from editor");
 });
 
 test("the narrow layout ignores the key", async () => {

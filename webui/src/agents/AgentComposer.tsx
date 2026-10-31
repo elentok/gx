@@ -1,6 +1,6 @@
-import { Box, Spinner, Text, Textarea } from "@chakra-ui/react";
+import { Box, Spinner, Text } from "@chakra-ui/react";
 import { codexSkillHint } from "../design/chat";
-import { submitOnCmdEnter } from "../ui/expandable-text/ExpandableTextField";
+import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import type { PostPrompt } from "../design/prompt";
 import { usePromptSend } from "../design/usePromptSend";
 import { useComposerDraft } from "../drafts";
@@ -70,21 +70,17 @@ export function AgentComposer({
       aria-label="Composer"
     >
       <Box display="flex" gap="2" alignItems="flex-end">
-        <Textarea
-          flex="1"
-          fontSize="16px"
-          color="text"
-          bg="surface"
-          borderColor="border"
-          borderRadius="12px"
-          rows={3}
-          resize="none"
-          aria-label="Message"
-          placeholder={`Message ${session.name || session.id}`}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={onSubmit && ((e) => submitOnCmdEnter(e, onSubmit))}
-        />
+        <Box flex="1">
+          <ExpandableTextField
+            rows={3}
+            label="Message"
+            title={`Message to ${session.name || session.id}`}
+            placeholder={`Message ${session.name || session.id}`}
+            value={text}
+            onChange={setText}
+            onSubmit={onSubmit}
+          />
+        </Box>
         <Button disabled={!enabled || text.trim() === ""} onClick={sendText}>
           {pending && <Spinner size="sm" />}
           Send

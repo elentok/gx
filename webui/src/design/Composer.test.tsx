@@ -294,7 +294,8 @@ test("with a round the modal is Note on this round and its text goes in the Note
   render({ post, chat: chatOf({ round: round() }) });
   const box = await openNote();
   expect(box.rows).toBe(5);
-  fireEvent.click(expand());
+  // The round's text answer has its own expand button above the note's.
+  fireEvent.click(screen.getAllByLabelText("Open the note in a large editor").at(-1)!);
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
     "Note on this round",
   );

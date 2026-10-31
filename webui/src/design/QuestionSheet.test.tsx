@@ -36,6 +36,36 @@ test.each([
   );
 });
 
+test("the text answer's large editor is titled with the question and its text reaches onAnswers; choice questions have no answer field", () => {
+  const seen: Answers[] = [];
+  function Harness({ kind }: { kind: string }) {
+    const [answers, setAnswers] = useState<Answers>({});
+    return (
+      <QuestionSheet
+        round={[card({ label: "2", title: "Pick one", kind })]}
+        answers={answers}
+        onAnswers={(u) =>
+          setAnswers((a) => {
+            const next = u(a);
+            seen.push(next);
+            return next;
+          })
+        }
+      />
+    );
+  }
+  renderThemed(<Harness kind="text" />);
+  fireEvent.click(screen.getByLabelText("Open the note in a large editor"));
+  expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
+    "Answer to Q2 - Pick one",
+  );
+  typeInLargeEditor("Answer to Q2 - Pick one", "yes please");
+  expect(seen.at(-1)?.["2"]?.text).toBe("yes please");
+  cleanup();
+  renderThemed(<Harness kind="yes-no" />);
+  expect(screen.queryByLabelText("Answer to question 2")).toBeNull();
+});
+
 test.each([false, true])("note opens five rows tall (big=%s)", (big) => {
   renderThemed(
     <Question
@@ -73,7 +103,8 @@ test("the question note's large editor is titled with the question and its text 
   }
   renderThemed(<Harness />);
   fireEvent.click(screen.getByLabelText("Note on question 2"));
-  fireEvent.click(screen.getByLabelText("Open the note in a large editor"));
+  // The text answer has its own expand button above the note's.
+  fireEvent.click(screen.getAllByLabelText("Open the note in a large editor")[1]);
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
     "Note on Q2 - Pick one",
   );

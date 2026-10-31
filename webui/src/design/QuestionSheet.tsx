@@ -1,8 +1,9 @@
-import { Box, chakra, Text, Textarea } from "@chakra-ui/react";
+import { Box, chakra, Text } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import type { SessionRoundCard } from "../generated/server";
 import { Markdown } from "../markdown/Markdown";
 import { Button } from "../ui/button/Button";
+import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import { NoteBox } from "./NoteBox";
 import {
   choicesOf,
@@ -85,14 +86,14 @@ export function Question({
               {card.note}
             </Text>
           )}
-          <Textarea
+          <ExpandableTextField
             size="sm"
-            borderRadius="12px"
             rows={big ? 5 : 2}
-            aria-label={`Answer to question ${card.label}`}
+            label={`Answer to question ${card.label}`}
+            title={`Answer to ${nameOf(card)} - ${card.title}`}
             placeholder="Your answer"
             value={answer.text ?? ""}
-            onChange={(e) => onChange({ ...answer, text: e.target.value })}
+            onChange={(t) => onChange({ ...answer, text: t })}
           />
         </>
       ) : (
