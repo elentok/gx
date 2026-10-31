@@ -1,5 +1,5 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { Compartment, EditorState } from "@codemirror/state";
+import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, placeholder as placeholderExt } from "@codemirror/view";
 import { getCM, vim, Vim } from "@replit/codemirror-vim";
 import { Box } from "@chakra-ui/react";
@@ -73,6 +73,8 @@ export default function CodeEditor({
   viMode,
   onModeChange,
   onZZ,
+  onSubmit,
+  onToggle,
   handle,
 }: {
   label: string;
@@ -88,12 +90,16 @@ export default function CodeEditor({
   onModeChange?: (mode: ViMode) => void;
   /** ZZ in normal mode. */
   onZZ?: () => void;
+  /** Mod-Enter. The key is handled either way, so it never inserts a line or reaches a form. */
+  onSubmit?: () => void;
+  /** Mod-g. Left unhandled when absent. */
+  onToggle?: () => void;
   handle?: Ref<CodeEditorHandle>;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
-  const callbacks = useRef({ onChange, onSelectionChange, onModeChange, onZZ });
-  callbacks.current = { onChange, onSelectionChange, onModeChange, onZZ };
+  const callbacks = useRef({ onChange, onSelectionChange, onModeChange, onZZ, onSubmit, onToggle });
+  callbacks.current = { onChange, onSelectionChange, onModeChange, onZZ, onSubmit, onToggle };
   const external = useRef(false);
   const viSlot = useRef(new Compartment());
   const stopVi = useRef<(() => void) | null>(null);
@@ -138,6 +144,27 @@ export default function CodeEditor({
         doc: value,
         selection: { anchor: clamp(selection.start), head: clamp(selection.end) },
         extensions: [
+          // Highest, or the vim keymap consumes these in normal mode.
+          Prec.highest(
+            keymap.of([
+              {
+                key: "Mod-Enter",
+                preventDefault: true,
+                stopPropagation: true,
+                run: () => (callbacks.current.onSubmit?.(), true),
+              },
+              {
+                key: "Mod-g",
+                preventDefault: true,
+                stopPropagation: true,
+                run: () => {
+                  if (!callbacks.current.onToggle) return false;
+                  callbacks.current.onToggle();
+                  return true;
+                },
+              },
+            ]),
+          ),
           viSlot.current.of(viMode ? vim() : []),
           history(),
           // No indentWithTab: Tab and Shift-Tab keep moving focus.

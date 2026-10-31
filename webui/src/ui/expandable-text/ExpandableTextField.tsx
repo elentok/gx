@@ -2,6 +2,8 @@ import { Box, chakra, Textarea } from "@chakra-ui/react";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { LargeEditor, type Selection } from "./LargeEditor";
 import { fieldLook } from "./look";
+import { isMac } from "../../platform";
+import { useViMode } from "../../vimode";
 
 /** Runs `submit` on Cmd/Ctrl+Enter; plain Enter stays a newline. */
 export function submitOnCmdEnter(
@@ -49,9 +51,22 @@ export function ExpandableTextField({
       start: area.current?.selectionStart ?? 0,
       end: area.current?.selectionEnd ?? 0,
     });
-  const close = (sel: Selection) => {
-    area.current?.setSelectionRange(sel.start, sel.end);
+  const viMode = useViMode();
+  // Focus and selection are set synchronously, inside the user's gesture and before the layer unmounts, so a phone keeps its keyboard.
+  const close = (sel: Selection, refocus: boolean) => {
+    if (refocus) {
+      area.current?.focus();
+      area.current?.setSelectionRange(sel.start, sel.end);
+    }
     setSelection(null);
+  };
+  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (viMode && !disabled && e.key.toLowerCase() === "g" && !e.altKey && !e.shiftKey && (isMac() ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey)) {
+      e.preventDefault();
+      open();
+      return;
+    }
+    if (onSubmit) submitOnCmdEnter(e, onSubmit);
   };
   return (
     <Box position="relative">
@@ -72,7 +87,7 @@ export function ExpandableTextField({
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onSubmit && ((e) => submitOnCmdEnter(e, onSubmit))}
+        onKeyDown={onKeyDown}
       />
       <chakra.button
         type="button"
@@ -106,6 +121,7 @@ export function ExpandableTextField({
           placeholder={placeholder}
           selection={selection}
           onClose={close}
+          onSubmit={onSubmit}
         />
       )}
     </Box>

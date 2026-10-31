@@ -21,6 +21,7 @@ export function LargeEditor({
   placeholder,
   selection,
   onClose,
+  onSubmit,
 }: {
   title: string;
   value: string;
@@ -28,8 +29,10 @@ export function LargeEditor({
   placeholder?: string;
   /** The selection the field had when the editor opened. */
   selection: Selection;
-  /** Called with the editor's selection when it closes. */
-  onClose: (selection: Selection) => void;
+  /** Called with the editor's selection when it closes. `refocus` is false after a submit. */
+  onClose: (selection: Selection, refocus: boolean) => void;
+  /** Mod-Enter: closes without refocus, then runs it. Absent: the key does nothing. */
+  onSubmit?: () => void;
 }) {
   const viMode = useViMode();
   const wide = useWide();
@@ -37,7 +40,13 @@ export function LargeEditor({
   const [mode, setMode] = useState<ViMode>("INSERT");
   const editor = useRef<CodeEditorHandle>(null);
   const current = useRef(selection);
-  const close = () => onClose(current.current);
+  const close = () => onClose(current.current, true);
+  const submit =
+    onSubmit &&
+    (() => {
+      onClose(current.current, false);
+      onSubmit();
+    });
   // Layout follows the width, the bar follows the pointer. A phone's touch bar replaces the header and footer.
   const header = wide || !coarse;
   return (
@@ -80,6 +89,8 @@ export function LargeEditor({
           onModeChange={setMode}
           handle={editor}
           onZZ={close}
+          onSubmit={submit}
+          onToggle={viMode ? close : undefined}
         />
       </Suspense>
       {coarse ? (

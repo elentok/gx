@@ -8,6 +8,7 @@ import {
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
 import { typeInLargeEditor } from "../ui/expandable-text/testing";
+import { WideContext } from "../useWide";
 import {
   ConnectionContext,
   type Connection,
@@ -111,6 +112,7 @@ function render(opts: {
   fetchChat?: FetchChat;
   rows?: EpicDetailRow[];
   steps?: MapStep[];
+  wide?: boolean;
 }) {
   const state = {
     snapshot: { sessions: [session(opts.state, opts.background, opts.auto)] },
@@ -167,11 +169,12 @@ function render(opts: {
     }),
     { initialEntries: ["/d/gx:a"] },
   );
-  renderThemed(
+  const app = (
     <ConnectionContext.Provider value={conn}>
       <RouterProvider router={router} />
-    </ConnectionContext.Provider>,
+    </ConnectionContext.Provider>
   );
+  renderThemed(opts.wide === undefined ? app : <WideContext.Provider value={opts.wide}>{app}</WideContext.Provider>);
 }
 
 const openNote = async () => {
@@ -965,6 +968,25 @@ test("design page: the key sends a complete round", async () => {
   cmdEnter(await openNote());
   await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
   expect(post.mock.calls[0][0].text).toBe("Q1 - T1: Alpha");
+});
+
+test("the key in the large editor sends on a wide screen and does nothing on a narrow one", async () => {
+  for (const wide of [true, false]) {
+    const post = vi.fn<PostPrompt>(async () => ok);
+    render({ post, wide });
+    const box = await openNote();
+    fireEvent.change(box, { target: { value: "hello" } });
+    fireEvent.click(expand());
+    const editor = await screen.findByRole("textbox", { name: "Message to the agent text" });
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+    if (wide) await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    else {
+      await new Promise((r) => setTimeout(r, 20));
+      expect(post).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog", { name: "Message to the agent" })).toBeTruthy();
+    }
+    cleanup();
+  }
 });
 
 test("design page: the key does nothing when the main button is Continue", async () => {

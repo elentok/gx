@@ -1,6 +1,9 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
-import { useState } from "react";
+import { getCM, Vim } from "@replit/codemirror-vim";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { useState, type ReactNode } from "react";
 import { afterEach, expect, test, vi } from "vitest";
+import { ConnectionContext, type Connection, type ConnectionState } from "../../connection";
+import { WideContext } from "../../useWide";
 import { renderThemed } from "../render";
 import { ExpandableTextField } from "./ExpandableTextField";
 import { findLargeEditor, largeEditorText, typeInLargeEditor, viewOf } from "./testing";
@@ -154,4 +157,137 @@ test("Escape does not close the editor", () => {
   fireEvent.click(expand());
   fireEvent.keyDown(window, { key: "Escape" });
   expect(screen.getByRole("dialog")).toBeTruthy();
+});
+
+function withVi(on: boolean, ui: ReactNode) {
+  const state = { snapshot: { sessions: [], vi_mode: on }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {} } as unknown as Connection;
+  return renderThemed(
+    <WideContext.Provider value>
+      <ConnectionContext.Provider value={conn}>{ui}</ConnectionContext.Provider>
+    </WideContext.Provider>,
+  );
+}
+
+function Keys({
+  disabled,
+  onSubmit,
+  onKeyDown,
+}: {
+  disabled?: boolean;
+  onSubmit?: () => void;
+  onKeyDown?: () => void;
+}) {
+  const [text, setText] = useState("hello world");
+  return (
+    <form onKeyDown={onKeyDown}>
+      <ExpandableTextField label="Note" title={TITLE} value={text} onChange={setText} disabled={disabled} onSubmit={onSubmit} />
+    </form>
+  );
+}
+
+function stubPlatform(platform: string) {
+  vi.spyOn(navigator, "platform", "get").mockReturnValue(platform);
+}
+
+afterEach(() => vi.restoreAllMocks());
+
+test("Cmd-G on a Mac and Ctrl-G elsewhere open the editor and cancel the browser default", async () => {
+  for (const [platform, mod, other] of [
+    ["MacIntel", "metaKey", "ctrlKey"],
+    ["Win32", "ctrlKey", "metaKey"],
+  ] as const) {
+    stubPlatform(platform);
+    withVi(true, <Keys />);
+    field().focus();
+    expect(fireEvent.keyDown(field(), { key: "g", [other]: true })).toBe(true);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(fireEvent.keyDown(field(), { key: "g", [mod]: true })).toBe(false);
+    await findLargeEditor(TITLE);
+    cleanup();
+  }
+});
+
+test("with vi mode off the key is not handled", () => {
+  stubPlatform("MacIntel");
+  withVi(false, <Keys />);
+  expect(fireEvent.keyDown(field(), { key: "g", metaKey: true })).toBe(true);
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("a disabled field opens nothing", () => {
+  stubPlatform("MacIntel");
+  withVi(true, <Keys disabled />);
+  fireEvent.keyDown(field(), { key: "g", metaKey: true });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect((expand() as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("the open key inside the editor closes it and cancels the default", async () => {
+  withVi(true, <Keys />);
+  fireEvent.click(expand());
+  const editor = await findLargeEditor(TITLE);
+  // CodeMirror reads Mod as Ctrl in jsdom.
+  expect(fireEvent.keyDown(editor, { key: "g", ctrlKey: true })).toBe(false);
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(field());
+});
+
+test("Cmd-Enter in the editor closes first, then submits once, without refocus or the field's handler", async () => {
+  const onKeyDown = vi.fn();
+  const onSubmit = vi.fn();
+  withVi(true, <Keys onSubmit={onSubmit} onKeyDown={onKeyDown} />);
+  const focus = vi.spyOn(field(), "focus");
+  fireEvent.click(expand());
+  const editor = await findLargeEditor(TITLE);
+  fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+  expect(onSubmit).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(focus).not.toHaveBeenCalled();
+  expect(onKeyDown).not.toHaveBeenCalled();
+});
+
+test("Cmd-Enter without a submit action leaves the editor open", async () => {
+  const onKeyDown = vi.fn();
+  withVi(true, <Keys onKeyDown={onKeyDown} />);
+  fireEvent.click(expand());
+  const editor = await findLargeEditor(TITLE);
+  fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  expect(onKeyDown).not.toHaveBeenCalled();
+});
+
+test("Done, a backdrop press and ZZ each refocus the field with the editor's selection, before the dialog goes", async () => {
+  const closers: [string, () => void][] = [
+    ["Done", () => fireEvent.click(screen.getByText("Done"))],
+    ["backdrop", () => {
+      const backdrop = screen.getByRole("dialog").parentElement!;
+      fireEvent.mouseDown(backdrop);
+      fireEvent.click(backdrop);
+    }],
+    ["ZZ", () => {
+      const cm = getCM(viewOf(TITLE))!;
+      act(() => void Vim.handleKey(cm, "ZZ", "user"));
+    }],
+  ];
+  for (const [name, close] of closers) {
+    withVi(true, <Keys />);
+    field().setSelectionRange(1, 3);
+    fireEvent.click(expand());
+    await findLargeEditor(TITLE);
+    // Vim's Escape moves the caret, so the expectation is read after it.
+    viewOf(TITLE).dispatch({ selection: { anchor: 2, head: 5 } });
+    act(() => void Vim.handleKey(getCM(viewOf(TITLE))!, "<Esc>", "user"));
+    const { from, to } = viewOf(TITLE).state.selection.main;
+    let dialogAtFocus: boolean | undefined;
+    vi.spyOn(field(), "focus").mockImplementation(() => {
+      dialogAtFocus = !!screen.queryByRole("dialog");
+    });
+    close();
+    await waitFor(() => expect(screen.queryByRole("dialog"), name).toBeNull());
+    expect(dialogAtFocus, name).toBe(true);
+    expect([field().selectionStart, field().selectionEnd], name).toEqual([from, to]);
+    cleanup();
+    vi.restoreAllMocks();
+  }
 });

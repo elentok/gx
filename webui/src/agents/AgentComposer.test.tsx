@@ -166,6 +166,25 @@ test("the key does nothing while Send is disabled", async () => {
   expect(offline).not.toHaveBeenCalled();
 });
 
+test("the key in the large editor sends on a wide screen and does nothing on a narrow one", async () => {
+  for (const wide of [true, false]) {
+    const post = vi.fn<PostPrompt>(async () => ok);
+    render({ post, wide });
+    fireEvent.change(box(), { target: { value: "hello" } });
+    fireEvent.click(screen.getByLabelText("Open the note in a large editor"));
+    const editor = await screen.findByRole("textbox", { name: /text$/ });
+    fireEvent.keyDown(editor, { key: "Enter", ctrlKey: true });
+    if (wide) await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+    else {
+      await new Promise((r) => setTimeout(r, 20));
+      expect(post).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog")).toBeTruthy();
+    }
+    cleanup();
+    localStorage.clear();
+  }
+});
+
 test("plain Enter adds a newline and does not send", async () => {
   const post = vi.fn<PostPrompt>(async () => ok);
   render({ post });
