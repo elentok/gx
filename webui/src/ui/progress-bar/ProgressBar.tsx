@@ -1,7 +1,15 @@
 import { Box } from "@chakra-ui/react";
 import type { Tone } from "../tone";
 
-export function ProgressBar({ value, max, tone = "running" }: { value: number; max: number; tone?: Tone }) {
+interface Props {
+  value: number;
+  max: number;
+  tone?: Tone;
+  /** A 4px bar on the neutral hairline track, as the menu's limits rows draw it. */
+  thin?: boolean;
+}
+
+export function ProgressBar({ value, max, tone = "running", thin = false }: Props) {
   const pct = max > 0 ? Math.min(100, Math.max(0, (value / max) * 100)) : 0;
   return (
     <Box
@@ -10,10 +18,11 @@ export function ProgressBar({ value, max, tone = "running" }: { value: number; m
       aria-valuemax={max}
       aria-valuenow={value}
       data-tone={tone}
-      h="bar"
-      borderRadius="sm"
+      data-thin={thin || undefined}
+      h={thin ? "barThin" : "bar"}
+      borderRadius={thin ? "2px" : "sm"}
       overflow="hidden"
-      bg={`tone.${tone}.bg`}
+      bg={thin ? "hairline" : `tone.${tone}.bg`}
     >
       <Box data-fill h="100%" style={{ width: `${pct}%` }} bg={`tone.${tone}.fg`} />
     </Box>

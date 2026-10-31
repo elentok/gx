@@ -12,6 +12,14 @@ describe("ProgressBar", () => {
     expect(bar.getAttribute("aria-valuemax")).toBe("10");
   });
 
+  it("draws the thin variant at 4px on the hairline track", () => {
+    const thin = renderThemed(<ProgressBar thin value={3} max={10} />).getByRole("progressbar");
+    expect(thin.getAttribute("data-thin")).toBe("true");
+    const plain = renderThemed(<ProgressBar value={3} max={10} />).getAllByRole("progressbar")[1];
+    expect(plain.hasAttribute("data-thin")).toBe(false);
+    expect(getComputedStyle(thin).height).not.toBe(getComputedStyle(plain).height);
+  });
+
   it.each([
     [5, 10, "50%"],
     [20, 10, "100%"],

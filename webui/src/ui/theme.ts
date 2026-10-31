@@ -101,6 +101,7 @@ export const themeConfig = defineConfig({
       },
       sizes: {
         bar: { value: "6px" },
+        barThin: { value: "4px" },
       },
     },
   },

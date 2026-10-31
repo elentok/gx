@@ -39,7 +39,9 @@ import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { TopBar } from "../ui/top-bar/TopBar";
 import { Tray } from "../ui/tray/Tray";
-import type { Health, HealthState } from "../generated/server";
+import type { Health, HealthState, LimitsReport, LimitWindow, UsageSummary } from "../generated/server";
+import { UsageModeLimits } from "../generated/server";
+import { LimitsBlock } from "../usage/LimitsBlock";
 import { KINDS, TONES, type Tone } from "../ui/tone";
 
 export interface GalleryCase {
@@ -92,6 +94,19 @@ const OpenMenu = ({ children }: { children: ReactNode }) => {
   useEffect(() => root.current?.querySelector<HTMLElement>("button[aria-label=Menu]")?.click(), []);
   return <div ref={root}>{children}</div>;
 };
+
+const limitsNow = Date.UTC(2026, 9, 31, 12, 0, 0);
+const limitWin = (pct: number, resetsInSec: number, seenAgoSec: number): LimitWindow => ({
+  used_percentage: pct,
+  resets_at: limitsNow / 1000 + resetsInSec,
+  received_at: limitsNow / 1000 - seenAgoSec,
+});
+const limitsStates: [string, LimitsReport][] = [
+  ["limits fresh", { five_hour: limitWin(34, 7800, 60), seven_day: limitWin(81, 187200, 60) }],
+  ["limits stale", { five_hour: limitWin(34, 7800, 10800), seven_day: limitWin(52, 187200, 10800) }],
+  ["limits past reset", { five_hour: limitWin(34, -60, 21600), seven_day: limitWin(52, 187200, 21600) }],
+  ["limits one window", { seven_day: limitWin(12, 464400, 60) }],
+];
 
 // Opens a tooltip the way a user does, by clicking its marker once mounted.
 const OpenTip = ({ children }: { children: ReactNode }) => {
@@ -390,6 +405,26 @@ export const galleryEntries: GalleryEntry[] = [
         ),
       },
       { label: "no build string", node: <TopBar active="epics" connected /> },
+      ...limitsStates.map(([label, limits]) => ({
+        label,
+        node: (
+          <OpenMenu>
+            <TopBar
+              active="epics"
+              build="v1.2.3"
+              connected
+              onToggleAfk={() => {}}
+              menuBlock={
+                <>
+                  <Menu.Separator />
+                  <LimitsBlock summary={{ mode: UsageModeLimits, limits, spend: {} as UsageSummary["spend"] }} now={limitsNow} />
+                  <Menu.Separator />
+                </>
+              }
+            />
+          </OpenMenu>
+        ),
+      })),
     ],
   },
   {
