@@ -208,6 +208,46 @@ test("121. Codex error pause", async ({ page, start }) => {
   await expect(page.getByText(/^(Paused|needs-answer)/)).toHaveCount(0);
 });
 
+test("122. Codex design run", async ({ page, start }) => {
+  const fixture = await start("codex-design", { autoAdvanceDelay: "1h" });
+  await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
+
+  // The header names the harness, the tier and the model.
+  await expect(page.getByText("Codex", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/^(Light|Worker|Strongest)$/).first()).toBeVisible();
+  await expect(page.getByText(/^\S+ · \S+$/).first()).toBeVisible();
+
+  const questions = page.getByRole("group", nav("Questions"));
+  await expect(questions.getByText("Q8 - Which store?")).toBeVisible();
+  await questions.getByRole("button", { name: /SQLite/ }).click();
+  await questions.getByRole("button", { name: /Yes/ }).click();
+  await page.getByRole("button", nav("Send answers")).click();
+
+  const cont = page.getByRole("button", { name: /^Continue/ });
+  await expect(cont).toBeVisible();
+  await expect(async () => {
+    await cont.click({ timeout: 2000 });
+    await expect(questions.getByText("Q9 - Keep going?")).toBeVisible({ timeout: 2000 });
+  }).toPass();
+
+  await page.getByRole("group", nav("View")).getByRole("button", nav("Chat")).click();
+  await expect(page.getByText(/^\$gx-design /).first()).toBeVisible();
+
+  const list = JSON.parse(await fixture.cli("agents", "list", "--json")) as { id: string; design?: boolean; harness: string }[];
+  const designs = list.filter((s) => s.design);
+  expect(designs).toHaveLength(1);
+  expect(designs[0].harness).toBe("codex");
+
+  // Rounds are counted when the conversation ends, so end it.
+  await fixture.cli("agents", "stop", designs[0].id);
+  await expect
+    .poll(async () => {
+      const stats = JSON.parse(await fixture.cli("server", "stats", "--json")) as { grilling: { questions: { value: number }[] } };
+      return stats.grilling.questions.reduce((n, d) => n + d.value, 0);
+    })
+    .toBeGreaterThan(0);
+});
+
 test.describe("119. Codex approval card", () => {
   test("Allow once answers the hook with allow", async ({ page, start }) => {
     const fixture = await start("codex-blocked");

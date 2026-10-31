@@ -369,10 +369,17 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 	if err != nil {
 		return err
 	}
+	env := s.cfg.Env
+	if meta.Harness == string(harness.Codex) {
+		// The SessionStart hook writes Codex's own session id here; without it
+		// the meta keeps gx's UUID and the chat misses the rollout.
+		env = append(slices.Clone(env), harness.CodexSessionFileEnv+"="+filepath.Join(dir, harness.CodexSessionFile),
+			harness.CodexAgentDirEnv+"="+dir)
+	}
 	opts := harness.LaunchOptions{
 		SessionID: meta.ConversationID,
 		Args:      launchArgs(meta, s.settings.Load().AgentsClaudeArgs, s.codexRoots(meta)),
-		Env:       s.cfg.Env,
+		Env:       env,
 		Cwd:       meta.Dir,
 	}
 	launch := h.Launch(opts)
