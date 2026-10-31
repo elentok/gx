@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -156,5 +157,68 @@ func TestSessionChat_NonChatHarnessIsUnsupported(t *testing.T) {
 	}
 	if !got.Unsupported || len(got.Messages) != 0 {
 		t.Errorf("chat = %+v, want unsupported and empty", got)
+	}
+}
+
+// startCodexChatSession starts a fake session and relabels it as a Codex one,
+// whose rollout lives under the returned CODEX_HOME.
+func startCodexChatSession(t *testing.T) (*servertest.Harness, context.Context, string, string) {
+	t.Helper()
+	codexHome := t.TempDir()
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithEnv("CODEX_HOME="+codexHome))
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	t.Cleanup(cancel)
+	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})
+	if err != nil || res.Session == nil {
+		t.Fatalf("create = %+v, %v", res, err)
+	}
+	id := res.Session.ID
+	meta := readMeta(t, h, id)
+	meta["harness"] = "codex"
+	data, _ := json.Marshal(meta)
+	if err := os.WriteFile(filepath.Join(h.SessionsDir, id, "meta.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	conv, _ := meta["conversation_id"].(string)
+	return h, ctx, id, filepath.Join(codexHome, "sessions", "2026", "01", "01", "rollout-2026-01-01T10-00-00-"+conv+".jsonl")
+}
+
+func TestSessionChat_CodexRolloutHasTheClaudeShape(t *testing.T) {
+	t.Parallel()
+	h, ctx, id, path := startCodexChatSession(t)
+	writeTranscript(t, path,
+		`{"timestamp":"2026-01-01T10:00:00Z","ordinal":0,"type":"session_meta","payload":{"cli_version":"0.166.0"}}`,
+		`{"timestamp":"2026-01-01T10:00:01Z","ordinal":1,"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hello"}]}}`,
+		`{"timestamp":"2026-01-01T10:00:02Z","ordinal":2,"type":"response_item","payload":{"type":"custom_tool_call","name":"exec"}}`,
+		`{"timestamp":"2026-01-01T10:00:03Z","ordinal":3,"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hi"}]}}`,
+		`{"timestamp":"2026-01-01T10:00:04Z","ordinal":4,"type":"event_msg","payload":{"type":"task_complete"}}`,
+	)
+	got, err := h.Client.SessionChat(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	for _, m := range got.Messages {
+		ids = append(ids, fmt.Sprintf("%s:%s:%s:%s:%d", m.ID, m.Role, m.Kind, m.Text, m.ToolCount))
+	}
+	want := "o1:person:prompt:hello:0,o2:agent:tools::1,o3:agent:text:hi:0"
+	if got.Unsupported || got.Unreadable || strings.Join(ids, ",") != want {
+		t.Errorf("chat = %+v, messages %v, want %s", got, ids, want)
+	}
+}
+
+func TestSessionChat_CodexTurnsWithoutMessagesAreUnreadable(t *testing.T) {
+	t.Parallel()
+	h, ctx, id, path := startCodexChatSession(t)
+	writeTranscript(t, path,
+		`{"ordinal":0,"type":"session_meta","payload":{"cli_version":"0.166.0"}}`,
+		`{"ordinal":1,"type":"event_msg","payload":{"type":"task_complete"}}`,
+	)
+	got, err := h.Client.SessionChat(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Unreadable || got.CodexVersion != "0.166.0" || len(got.Messages) != 0 {
+		t.Errorf("chat = %+v, want unreadable with version 0.166.0", got)
 	}
 }

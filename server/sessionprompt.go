@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
 )
 
@@ -167,7 +168,7 @@ func (s *Server) lastChatMessageID(id string, meta sessionMeta) (string, error) 
 		return "", nil
 	}
 	final := s.designFinal(meta.Ticket)
-	chat, err := s.chats.read(path, final, chatLoader(meta.Ticket, final))
+	chat, err := s.chats.read(path, final, chatLoader(harness.Claude, meta.Ticket, final))
 	if os.IsNotExist(err) || len(chat.msgs) == 0 {
 		return "", nil
 	}

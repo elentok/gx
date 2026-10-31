@@ -3,6 +3,7 @@ package transcript
 import (
 	"bufio"
 	"encoding/json"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -76,8 +77,17 @@ func ReadChat(path string) (msgs []ChatMessage, ok bool, err error) {
 		return nil, false, err
 	}
 	defer f.Close()
+	msgs, err = ReadChatFrom(f)
+	if err != nil {
+		return nil, false, err
+	}
+	return msgs, true, nil
+}
 
-	scanner := bufio.NewScanner(f)
+// ReadChatFrom is ReadChat over an open transcript, for callers that hold the
+// bytes in memory.
+func ReadChatFrom(r io.Reader) (msgs []ChatMessage, err error) {
+	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	var run *ChatMessage
 	flush := func() {
@@ -109,10 +119,10 @@ func ReadChat(path string) (msgs []ChatMessage, ok bool, err error) {
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	flush()
-	return msgs, true, nil
+	return msgs, nil
 }
 
 func (l chatLine) at() time.Time {

@@ -1551,6 +1551,12 @@ export interface SessionChatResponse {
    * Failure is the session's, as on its SessionInfo.
    */
   failure?: SessionFailure;
+  /**
+   * Unreadable marks a Codex conversation that has turns but no message gx
+   * could read; CodexVersion is the Codex that wrote it.
+   */
+  unreadable?: boolean;
+  codex_version?: string;
 }
 
 //////////

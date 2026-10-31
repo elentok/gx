@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/chatreader"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/transcript"
@@ -46,6 +49,10 @@ type SessionChatResponse struct {
 	Background     []SessionBackgroundTask `json:"background"`
 	// Failure is the session's, as on its SessionInfo.
 	Failure *SessionFailure `json:"failure,omitempty"`
+	// Unreadable marks a Codex conversation that has turns but no message gx
+	// could read; CodexVersion is the Codex that wrote it.
+	Unreadable   bool   `json:"unreadable,omitempty"`
+	CodexVersion string `json:"codex_version,omitempty"`
 }
 
 // chatCache keeps each transcript's parsed chat until its size or mtime
@@ -71,6 +78,9 @@ type chatSnapshot struct {
 	round     []SessionRoundCard
 	next      *SessionNext
 	tasks     []transcript.BackgroundTaskMarker
+	// unreadable and codexVersion are set for a Codex rollout gx cannot read.
+	unreadable   bool
+	codexVersion string
 }
 
 func (c *chatCache) read(path string, final bool, load func(string) (chatSnapshot, error)) (chatSnapshot, error) {
@@ -96,15 +106,16 @@ func (c *chatCache) read(path string, final bool, load func(string) (chatSnapsho
 
 // chatLoader returns the load func for a session whose design ticket is ticket;
 // final is whether its map is at a step with no Continue.
-func chatLoader(ticket string, final bool) func(string) (chatSnapshot, error) {
+func chatLoader(kind agentrunner.Kind, ticket string, final bool) func(string) (chatSnapshot, error) {
 	return func(path string) (chatSnapshot, error) {
-		loaded, _, err := transcript.ReadChat(path)
+		read, _, err := chatreader.ReadFile(kind, path)
 		if err != nil {
 			return chatSnapshot{}, err
 		}
+		loaded := read.Messages
 		// Read before the cap and the fence strip: both cut what the parsers need.
 		// An open round wins over the run-end line, as in designActionable.
-		snap := chatSnapshot{round: chatRound(loaded)}
+		snap := chatSnapshot{round: chatRound(loaded), unreadable: read.Unreadable, codexVersion: read.CodexVersion}
 		if snap.round == nil {
 			snap.next = chatNext(loaded, ticket, final)
 		}
@@ -118,6 +129,10 @@ func chatLoader(ticket string, final bool) func(string) (chatSnapshot, error) {
 				text, _ = grillround.SplitFences(text)
 			}
 			snap.msgs = append(snap.msgs, SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool})
+		}
+		// Codex has no background markers: its Background flag comes from the status.
+		if kind == harness.Codex {
+			return snap, nil
 		}
 		// A zero now keeps every unresolved marker fresh; the cache serves the
 		// read later, so ageing out waits for the request.
@@ -150,6 +165,44 @@ func (s Settings) chatHarness() string {
 	return cmp.Or(s.ChatHarness, string(harness.Claude))
 }
 
+// hasChatReader says whether sessions of harnessName have a chat reader: Codex,
+// and the chat harness, which reads the Claude format.
+func (s Settings) hasChatReader(harnessName string) bool {
+	return harnessName == string(harness.Codex) || harnessName == s.chatHarness()
+}
+
+// chatTranscript finds the conversation file of a session with a chat reader,
+// and the format kind to read it with.
+func (s *Server) chatTranscript(id string, meta sessionMeta) (string, agentrunner.Kind, bool) {
+	if meta.Harness == string(harness.Codex) {
+		path, ok := s.codexRollout(id, meta)
+		return path, harness.Codex, ok
+	}
+	path, ok := s.claudeTranscript(id, meta)
+	return path, harness.Claude, ok
+}
+
+// codexRollout finds the rollout of a session's conversation, like
+// claudeTranscript does for Claude.
+func (s *Server) codexRollout(id string, meta sessionMeta) (string, bool) {
+	if meta.ConversationID == "" {
+		return "", false
+	}
+	return s.transcripts.resolve(meta.ConversationID, meta.Status.State, time.Now(), s.cfg.TranscriptMissTTL, func() (string, bool) {
+		home, err := s.codexHome()
+		if err != nil {
+			s.log.Warn("codex home", "session", id, "err", err)
+			return "", false
+		}
+		path, ok, err := codexsession.RolloutPathIn(home, meta.ConversationID)
+		if err != nil {
+			s.log.Warn("find rollout", "session", id, "err", err)
+			return "", false
+		}
+		return path, ok
+	})
+}
+
 func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 	id := r.URL.Query().Get("session")
 	_, meta, res, err := s.readableSession(id)
@@ -166,7 +219,7 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := SessionChatResponse{ConversationID: meta.ConversationID, Messages: []SessionChatMessage{}, Background: []SessionBackgroundTask{}, Failure: s.sessionInfo(meta).Failure}
-	if meta.Harness != s.settings.Load().chatHarness() {
+	if !s.settings.Load().hasChatReader(meta.Harness) {
 		out.Unsupported = true
 		writeJSON(w, out)
 		return
@@ -174,9 +227,9 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 	// The page reads only on an event, so a remembered miss from before the
 	// transcript existed would hide the message the event announces.
 	s.transcripts.forgetMiss(meta.ConversationID)
-	if path, ok := s.claudeTranscript(id, meta); ok {
+	if path, kind, ok := s.chatTranscript(id, meta); ok {
 		final := s.designFinal(meta.Ticket)
-		chat, err := s.chats.read(path, final, chatLoader(meta.Ticket, final))
+		chat, err := s.chats.read(path, final, chatLoader(kind, meta.Ticket, final))
 		switch {
 		case os.IsNotExist(err): // vanished since the lookup: no chat yet
 		case err != nil:
@@ -185,6 +238,7 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 		default:
 			out.Messages, out.Truncated = chat.msgs, chat.truncated
 			out.Round, out.Next, out.Background = chat.round, chat.next, chat.background(time.Now())
+			out.Unreadable, out.CodexVersion = chat.unreadable, chat.codexVersion
 		}
 	}
 	writeJSON(w, out)
