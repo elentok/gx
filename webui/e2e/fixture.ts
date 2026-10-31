@@ -277,6 +277,9 @@ export const test = base.extend<{
   },
 });
 
+/** A touch device: `test.use(touch)` in a describe block makes `(pointer: coarse)` match. */
+export const touch = { hasTouch: true, isMobile: true } as const;
+
 /** Matches a role's accessible name exactly. */
 export const nav = (name: string) => ({ name, exact: true });
 

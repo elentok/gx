@@ -1430,3 +1430,12 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   2. Pipe a statusline payload with both windows into `gx claude statusline` against the fixture server.
   3. Run the same payload with `XDG_STATE_HOME` set to an empty directory (no server socket).
 - **Pass:** the open menu flips to "Claude limits" with 34% and 81% rows, no reopening. The command prints the same output with and without a server.
+
+## 123. Vi editor: layouts and touch bar
+
+- **Scenario:** `design-working` (the message box with no round). Touch tests run with `test.use(touch)` (`hasTouch`, `isMobile`).
+- **Steps:**
+  1. Start the design session, click "Note", then "Open the note in a large editor".
+  2. Touch at 390 px: read the bar, click Done. Touch at 1280 px: read the modal height.
+  3. Mouse at 1280 px: read the modal size, header and footer; click Done.
+- **Pass:** a touch device reports `(pointer: coarse)`. At 390 px with touch the bar holds Done only (no pill, no Esc) and Done closes the editor. At 1280 px with touch the bar shows and the modal is at most 680 px high. At 1280 px with a mouse there is no bar; the modal is 860 by 680 with the title, "Saved as you type", Done and no x button; Done closes it.
