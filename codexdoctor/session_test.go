@@ -50,7 +50,7 @@ func TestLaunchSession_AcceptedRunsDebugPromptInputInIsolatedHome(t *testing.T) 
 	if rec.Launch.Err != "" {
 		t.Fatalf("Launch.Err = %q, want none", rec.Launch.Err)
 	}
-	if !slices.Contains(rec.Launch.Args, "--sandbox") {
+	if !slices.Contains(rec.Launch.Args, "--approve-for-me") {
 		t.Errorf("Launch.Args = %v, want gx's launch args", rec.Launch.Args)
 	}
 	got, err := os.ReadFile(out)

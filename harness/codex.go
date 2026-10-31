@@ -220,8 +220,6 @@ type CodexArgsInput struct {
 func CodexArgs(in CodexArgsInput) []string {
 	args := []string{
 		"-c", "check_for_update_on_startup=false",
-		"--sandbox", "workspace-write",
-		"--ask-for-approval", "on-request",
 		"--approve-for-me",
 		"-c", "sandbox_workspace_write.network_access=true",
 		"-c", "disable_paste_burst=true",

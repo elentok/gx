@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -22,8 +23,6 @@ const codexFixtureRollout = "../../docs/specs/codex-support-fixtures/rollouts/pl
 // codexLaunchArgs is the shape the Codex harness launches with.
 var codexLaunchArgs = []string{
 	"-c", "check_for_update_on_startup=false",
-	"--sandbox", "workspace-write",
-	"--ask-for-approval", "on-request",
 	"--approve-for-me",
 	"-c", "sandbox_workspace_write.network_access=true",
 	"--dangerously-bypass-hook-trust",
@@ -353,5 +352,17 @@ func TestCodex_ResumeKeepsTheIDAndAppendsToTheRollout(t *testing.T) {
 	args, err := ReadCodexArgs(home, "resume-1")
 	if err != nil || args[0] != "resume" {
 		t.Errorf("recorded argv = %q, %v; want the resume launch", args, err)
+	}
+}
+
+func TestParseCodexArgs_RejectsFlagsConflictingWithApproveForMe(t *testing.T) {
+	if _, err := parseCodexArgs(codexLaunchArgs); err != nil {
+		t.Fatalf("launch args rejected: %v", err)
+	}
+	for _, extra := range [][]string{{"--sandbox", "workspace-write"}, {"--ask-for-approval", "on-request"}} {
+		_, err := parseCodexArgs(append(slices.Clone(extra), codexLaunchArgs...))
+		if err == nil || !strings.Contains(err.Error(), "cannot be used with '--approve-for-me'") {
+			t.Errorf("%v: err = %v, want the approve-for-me conflict", extra, err)
+		}
 	}
 }

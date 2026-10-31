@@ -191,6 +191,7 @@ func (d *Drivers) runCommit() (Recording, error) {
 	rec, err := d.runPTY(ptySpec{
 		cwd:    wt,
 		roots:  roots,
+		trust:  []string{repo},
 		prompt: "Run the shell command `git commit --allow-empty -m gx-doctor-probe` in the current directory, then reply with the word done.",
 	})
 	if err != nil {
@@ -208,8 +209,10 @@ func (d *Drivers) runCommit() (Recording, error) {
 
 // ptySpec describes one interactive session.
 type ptySpec struct {
-	cwd    string
-	roots  []string
+	cwd   string
+	roots []string
+	// trust lists extra dirs to trust; a linked worktree's trust is the main repo's.
+	trust  []string
 	prompt string
 	// deny makes the recording hook deny every PermissionRequest.
 	deny bool
@@ -251,7 +254,24 @@ func (d *Drivers) runPTY(spec ptySpec) (Recording, error) {
 		Hooks:         &harness.CodexHookCommands{Session: command, GuardBash: command, GuardQuestion: command, Permission: command},
 	})
 	// A fresh temp dir would otherwise stop at the trust dialog.
-	args = append(args, "-c", "projects."+strconv.Quote(spec.cwd)+".trust_level=\"trusted\"")
+	for _, dir := range append([]string{spec.cwd}, spec.trust...) {
+		// Codex keys trust by the resolved path (macOS temp dirs are symlinks).
+		if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+			dir = resolved
+		}
+		// config.toml, not -c: -c does not clear the dialog for a linked worktree's repo root.
+		f, err := os.OpenFile(filepath.Join(codexHome, "config.toml"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+		if err != nil {
+			return Recording{}, err
+		}
+		_, err = fmt.Fprintf(f, "\n[projects.%s]\ntrust_level = \"trusted\"\n", strconv.Quote(dir))
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			return Recording{}, err
+		}
+	}
 	args = codexHarness().Launch(harness.LaunchOptions{Args: args}).Args
 
 	cmd := exec.Command(bin, args...)

@@ -85,8 +85,6 @@ func TestCodexArgs_Shape(t *testing.T) {
 			joined := strings.Join(args, " ")
 			for _, want := range []string{
 				"-c check_for_update_on_startup=false",
-				"--sandbox workspace-write",
-				"--ask-for-approval on-request",
 				"--approve-for-me",
 				"-c sandbox_workspace_write.network_access=true",
 				"-c disable_paste_burst=true",
@@ -97,7 +95,7 @@ func TestCodexArgs_Shape(t *testing.T) {
 					t.Errorf("%q appears %d times in %q, want once", want, strings.Count(joined, want), joined)
 				}
 			}
-			for _, never := range []string{"--add-dir", "danger-full-access", "untrusted"} {
+			for _, never := range []string{"--add-dir", "danger-full-access", "untrusted", "--sandbox ", "--ask-for-approval"} {
 				if strings.Contains(joined, never) {
 					t.Errorf("%q in %q", never, joined)
 				}

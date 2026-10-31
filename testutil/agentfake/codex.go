@@ -112,6 +112,17 @@ func parseCodexArgs(args []string) (codexOptions, error) {
 	if err := flags.Parse(args); err != nil {
 		return opts, err
 	}
+	// Real Codex rejects these with --approve-for-me; keep the fake as strict so CI sees it.
+	conflict := false
+	flags.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "sandbox", "s", "ask-for-approval", "a":
+			conflict = true
+		}
+	})
+	if conflict && flags.Lookup("approve-for-me").Value.String() == "true" {
+		return opts, errors.New("--sandbox and --ask-for-approval cannot be used with '--approve-for-me'")
+	}
 	if flags.NArg() > 0 {
 		return opts, fmt.Errorf("fakecodex: unexpected argument %q", flags.Arg(0))
 	}
