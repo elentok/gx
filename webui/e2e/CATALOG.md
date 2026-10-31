@@ -1468,3 +1468,15 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   6. On `abc` press `iX`, `aY`, `oZ` (Escape after each) and `.`; read text and mode.
   7. With touch at 390 px press `lll`, `ge`, `gs`, then `lllv`, `ge`, `gs`; read the caret.
 - **Pass:** the mode text reads INSERT, NORMAL, VISUAL, INSERT. The keys move the caret as vim does (`j` and `k` within one character of the column, because they follow the pixel column). In a wrapped paragraph `j` moves the cursor down one line height and the caret stays far from the paragraph end. After a click `j` uses the clicked column. Every edit step gives the text vim gives (`.` repeats `iXY` as `XXYY`; `0vld` deletes two characters). `i`, `a`, `o` enter INSERT, Escape returns to NORMAL, `.` repeats `oZ`. With touch `ge` goes to the line end and `gs` to the line start in normal mode, and in visual mode `ge` and `gs` move the selection head to the line end and start.
+
+## 126. Vi editor: layers and focus
+
+- **Scenario:** `design` (question sheet), `paused` (start-over dialog), `design-working` (message box) and `united` (Triage dialog), all at 1280 px with vi mode on (`gx vimode on`). Touch is used for the Esc button test. The numbers in the flow list (119 in the ticket) were taken, so this flow is 126.
+- **Steps:**
+  1. On `design`, start the session, answer Q8, open the note of Q8b in the large editor, press Escape.
+  2. On `paused` open `#/t/demo:paused-epic/08`, click Start over, open the Reason editor, press the backdrop at (5, 5).
+  3. On `design-working` open the editor, press Cmd-K (Ctrl-K), click Done, press Cmd-K.
+  4. In the editor type `ab`, press Tab and Shift-Tab six times each, then Tab with focus in the text. Repeat Tab with touch.
+  5. On `united` open Ready to design, click Triage on the first card, press Tab and Shift-Tab eight times each.
+  6. On `paused` open the start-over dialog, press Tab and Shift-Tab eight times, press Escape. Open it again, open the Reason editor, press Escape.
+- **Pass:** Escape in the editor closes neither the editor nor the question sheet. The backdrop press closes only the editor; the start-over dialog stays. Cmd-K over the editor opens no Jump menu; after Done it opens "Jump to epic". Focus stays inside the editor on every Tab and Shift-Tab; with touch the cycle reaches Esc and Done. The text stays `ab` (no tab character). The editor is a dialog named "Message to the agent" with a textbox "Message to the agent text". In the Triage dialog and the start-over dialog focus never leaves. Escape closes the start-over dialog; with the editor open over it, Escape closes neither.

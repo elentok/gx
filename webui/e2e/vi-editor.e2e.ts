@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 import { composer, go, messageBox, sessions } from "./agentsKit";
-import { card, expect, type Fixture, nav, test, touch } from "./fixture";
+import { card, expect, type Fixture, nav, section, test, touch } from "./fixture";
 
 const TOLERANCE = 1;
 
@@ -506,5 +506,156 @@ test.describe("125. Vi editor: commands", () => {
       await page.keyboard.type("gs");
       await expect.poll(() => head(editable)).toBeLessThanOrEqual(3);
     });
+  });
+});
+
+type Locator = ReturnType<Page["getByRole"]>;
+
+// Presses `key` `times` times; after each press focus must sit inside `layer`.
+const expectFocusStays = async (page: Page, layer: Locator, key: string, times: number) => {
+  for (let i = 0; i < times; i++) {
+    await page.keyboard.press(key);
+    await expect.poll(() => layer.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+  }
+};
+
+const PAUSED_TICKET = "#/t/demo:paused-epic/08";
+const START_OVER = "Start over reason";
+
+// Opens the start-over dialog on the paused ticket; returns it.
+const openStartOver = async (page: Page) => {
+  await page.evaluate((hash) => (location.hash = hash), PAUSED_TICKET);
+  await page.getByRole("form", { name: "Recovery actions" }).getByRole("button", nav("Start over")).click();
+  const dialog = page.getByRole("dialog", nav("Start over"));
+  await expect(dialog).toBeVisible();
+  return dialog;
+};
+
+// Opens the large editor over the Reason field of the start-over dialog.
+const openReasonEditor = async (page: Page, dialog: Locator) => {
+  await dialog.getByRole("button", nav("Open the note in a large editor")).click();
+  const editor = page.getByRole("dialog", nav(START_OVER));
+  await expect(editor.getByRole("textbox", nav(`${START_OVER} text`))).toBeFocused();
+  return editor;
+};
+
+test.describe("126. Vi editor: layers and focus", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test("Escape in the editor over the question sheet closes neither", async ({ page, start }) => {
+    const fixture = await start("design", { autoAdvanceDelay: "1h" });
+    await setViMode(fixture, page, true);
+    await expect(card(page, "design-epic")).toBeVisible();
+    await page.evaluate(() => (location.hash = "#/d/demo:design-epic"));
+    await page.getByRole("button", nav("Start design session")).click();
+    const questions = page.getByRole("group", nav("Questions"));
+    // Answering Q8 moves the sheet on to Q8b.
+    await questions.getByRole("button", { name: /SQLite/ }).click();
+    await questions.getByRole("button", nav("Note on question 8b")).click();
+    await questions.getByRole("button", nav("Open the note in a large editor")).click();
+    const editor = page.getByRole("dialog", nav("Note on Q8b - Migrate at startup?"));
+    await expect(editor.getByRole("textbox", nav("Note on Q8b - Migrate at startup? text"))).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(editor).toBeVisible();
+    await expect(questions).toBeVisible();
+    // Escape in the Questions view would show the chat; it did not.
+    await expect(page.getByRole("group", nav("View")).getByRole("button", { name: /^Questions/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  test("a backdrop press closes only the editor over the start-over dialog", async ({ page, start }) => {
+    const fixture = await start("paused");
+    await setViMode(fixture, page, true);
+    const dialog = await openStartOver(page);
+    const editor = await openReasonEditor(page, dialog);
+    await page.mouse.click(5, 5);
+    await expect(editor).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+  });
+
+  test("Cmd-K does not open the Jump menu over the editor; it does once the editor is closed", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    await setViMode(fixture, page, true);
+    const dialog = await openEditor(page, 1280, 900);
+    const jump = page.getByRole("dialog", nav("Jump to epic"));
+    await page.keyboard.press("ControlOrMeta+k");
+    await expect(jump).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+    await expectDoneCloses(page, dialog);
+    await page.keyboard.press("ControlOrMeta+k");
+    await expect(jump).toBeVisible();
+  });
+
+  test("Tab and Shift-Tab never leave the editor; Tab leaves no tab character", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    await setViMode(fixture, page, true);
+    const dialog = await openEditor(page, 1280, 900);
+    const editable = dialog.getByRole("textbox", nav("Message to the agent text"));
+    await expect(editable).toBeFocused();
+    await page.keyboard.type("ab");
+    await expectFocusStays(page, dialog, "Tab", 6);
+    await expectFocusStays(page, dialog, "Shift+Tab", 6);
+    await editable.focus();
+    await page.keyboard.press("Tab");
+    expect(await editable.evaluate((el) => el.textContent)).not.toContain("\t");
+    await expect(editable).toHaveText("ab");
+  });
+
+  test.describe("with touch", () => {
+    test.use(touch);
+
+    test("Tab cycles through the editor, Esc and Done", async ({ page, start }) => {
+      const fixture = await start("design-working");
+      await setViMode(fixture, page, true);
+      const dialog = await openEditor(page, 1280, 900);
+      const seen = new Set<string>();
+      for (let i = 0; i < 6; i++) {
+        await page.keyboard.press("Tab");
+        await expect.poll(() => dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+        seen.add(await page.evaluate(() => document.activeElement?.textContent || document.activeElement?.getAttribute("aria-label") || "editor"));
+      }
+      expect([...seen]).toEqual(expect.arrayContaining(["Done", "Esc"]));
+      await expectFocusStays(page, dialog, "Shift+Tab", 6);
+    });
+  });
+
+  test("the editor is a named dialog with a named editable area", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    await setViMode(fixture, page, true);
+    const dialog = await openEditor(page, 1280, 900);
+    await expect(page.getByRole("dialog", { name: MESSAGE })).toHaveCount(1);
+    await expect(dialog.getByRole("textbox", { name: `${MESSAGE} text` })).toBeVisible();
+  });
+
+  test("Tab never leaves a plain modal", async ({ page, start }) => {
+    await start("united");
+    const ready = await section(page, "Ready to design");
+    const first = ready.locator("[data-kind]").first();
+    await first.getByRole("button", nav("Triage")).click();
+    const dialog = page.getByRole("dialog", { name: "Triage" });
+    await expect(dialog).toBeVisible();
+    await expectFocusStays(page, dialog, "Tab", 8);
+    await expectFocusStays(page, dialog, "Shift+Tab", 8);
+  });
+
+  test("Escape closes the start-over dialog, Tab stays in it, and the editor over it keeps both open", async ({
+    page,
+    start,
+  }) => {
+    const fixture = await start("paused");
+    await setViMode(fixture, page, true);
+    const dialog = await openStartOver(page);
+    await expectFocusStays(page, dialog, "Tab", 8);
+    await expectFocusStays(page, dialog, "Shift+Tab", 8);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+
+    const again = await openStartOver(page);
+    const editor = await openReasonEditor(page, again);
+    await page.keyboard.press("Escape");
+    await expect(editor).toBeVisible();
+    await expect(again).toBeVisible();
   });
 });
