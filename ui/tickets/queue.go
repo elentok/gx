@@ -38,7 +38,9 @@ type QueueModel struct {
 	// summary of each queued epic by epic name, and whether the server can
 	// launch agents.
 	summaries map[string]server.EpicSummary
-	herdrDown bool
+	// harnessLabels is the snapshot's row label by ticket address.
+	harnessLabels map[string]string
+	herdrDown     bool
 	// herdrText names the tickets waiting on herdr; empty falls back to the
 	// generic banner.
 	herdrText string

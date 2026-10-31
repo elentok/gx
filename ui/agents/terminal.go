@@ -21,6 +21,7 @@ var (
 	styleAction     = lipgloss.NewStyle().Foreground(ui.ColorSubtle)
 	styleDetail     = lipgloss.NewStyle().Foreground(ui.ColorYellow)
 	styleLastScreen = lipgloss.NewStyle().Foreground(ui.ColorOverlay).Faint(true)
+	styleHarness    = lipgloss.NewStyle().Foreground(ui.ColorOverlay)
 )
 
 // lastScreen is an Exited session's saved last screen; changedAt tells a
@@ -59,9 +60,11 @@ func (m Model) loadLastScreen() tea.Cmd {
 func (m Model) terminalTitle(s server.SessionInfo, titleStyle lipgloss.Style) string {
 	icons := ui.Icons(m.settings.UseNerdFontIcons)
 	title := m.statusIcon(s, icons) + " " + titleStyle.Render(displayName(s)) + " " + statusLabel(s)
+	rest := ""
 	if s.Ticket != "" {
-		title += " " + styleTicket.Render(s.Ticket)
+		rest += " " + styleTicket.Render(s.Ticket)
 	}
+	title += m.harnessLabelText(s, ansi.StringWidth(title)+ansi.StringWidth(rest)) + rest
 	if a := m.attach; a != nil && a.id == s.ID && a.offset > 0 {
 		badge := fmt.Sprintf("scrolled ↑ %d", a.offset)
 		if a.newLines > 0 {
@@ -73,6 +76,22 @@ func (m Model) terminalTitle(s server.SessionInfo, titleStyle lipgloss.Style) st
 		title += " " + styleDetail.Render("copy")
 	}
 	return title
+}
+
+// harnessLabelText is the session's dim ` harness · tier · model effort`,
+// cut to the header room left beside the right title (used is the width of
+// the title without it). Empty when a session has no harness or no room.
+func (m Model) harnessLabelText(s server.SessionInfo, used int) string {
+	if s.Harness == "" {
+		return ""
+	}
+	inner := m.mainWidth() - 2
+	room := inner - ansi.StringWidth(m.terminalRightTitle(s, inner)) - used - 2
+	if room < 2 {
+		return ""
+	}
+	label := ui.HarnessLabel(s.Harness, string(s.Tier), s.Model, s.Effort, s.ModelSwitched)
+	return " " + styleHarness.Render(ansi.Truncate(label, room-1, "…"))
 }
 
 // terminalRightTitle is the AFK mark, project, dir and the time since the

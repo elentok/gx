@@ -189,7 +189,7 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		if live, ok := m.live[epic.Name][t.Identifier]; ok {
 			if base, suffix, ok := renderLiveTicketRow(m.icons(), m.implementSpinner, t, live, indent+triangle); ok {
 				metrics := formatMetricsLine(liveElapsedSeconds(live), live.tokens, 0)
-				return appendRowMetrics(base, joinNonEmpty(" ", suffix, metrics), metricsLineStyle)
+				return appendRowMetrics(base, joinNonEmpty(" ", joinNonEmpty(" ", suffix, metrics), m.harnessLabels[t.Path]), metricsLineStyle)
 			}
 		}
 	}
@@ -248,10 +248,13 @@ func (m QueueModel) renderQueueTicketRow(r queueRow, rowIdx int) string {
 		}
 		line += " " + suffixStyle.Render(suffix)
 	}
-	if t.ElapsedTime <= 0 && t.ActualContextWindow <= 0 && t.ActualCost <= 0 {
+	metrics := m.harnessLabels[t.Path]
+	if t.ElapsedTime > 0 || t.ActualContextWindow > 0 || t.ActualCost > 0 {
+		metrics = joinNonEmpty(" ", formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost), metrics)
+	}
+	if metrics == "" {
 		return line
 	}
-	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost)
 	if dimmed {
 		return appendRowMetrics(line, metrics, dimStyle)
 	}

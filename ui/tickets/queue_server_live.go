@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/ui"
 	"github.com/elentok/gx/viewmodel"
 )
 
@@ -37,6 +38,12 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 	m.summaries = make(map[string]server.EpicSummary, len(st.Epics))
 	for _, sum := range st.Epics {
 		m.summaries[sum.Address] = sum
+	}
+	m.harnessLabels = make(map[string]string, len(st.Tickets))
+	for _, t := range st.Tickets {
+		if l := ui.QueueHarnessLabel(t.Harness, t.Tier, t.Model, t.Effort, t.HarnessNote); l != "" {
+			m.harnessLabels[t.Address] = l
+		}
 	}
 	hadFinished := len(m.finished) > 0
 	m.finished = st.RecentlyFinished
