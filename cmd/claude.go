@@ -19,6 +19,7 @@ func newClaudeCmd(d deps) *cobra.Command {
 	cmd.AddCommand(newClaudeHistoryCmd(d))
 	cmd.AddCommand(newClaudeSessionPathCmd(d))
 	cmd.AddCommand(newClaudeDoctorCmd(d))
+	cmd.AddCommand(newClaudeReportLimitsCmd(d))
 	return cmd
 }
 

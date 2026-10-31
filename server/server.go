@@ -297,6 +297,7 @@ type Server struct {
 	afk          *afkState
 	ledger       *budgetLedger
 	usage        *usageSamples // Claude's
+	limits       *limitsStore
 	usageCodex   *usageSamples
 	budgetNotes  budgetNotes
 	hardGrace    hardGrace
@@ -499,6 +500,7 @@ func New(cfg Config) (*Server, error) {
 		afk:         afk,
 		ledger:      ledger,
 		usage:       openUsageSamples(cfg.StateDir),
+		limits:      openLimitsStore(cfg.StateDir),
 		usageCodex:  openUsageFiles(cfg.StateDir, usageSampleFileCodex, usageLiftFileCodex),
 		costOf:      iterationCostIn(cfg.Env),
 		mergeInto:   git.MergeBranchInto,
@@ -555,6 +557,7 @@ var routeTable = []struct {
 	{"GET /v1/budget", (*Server).budget},
 	{"POST /v1/budget/override", (*Server).budgetOverrideWrite},
 	{"POST /v1/usage/override", (*Server).usageOverrideWrite},
+	{"POST /v1/usage/report", (*Server).limitsReportWrite},
 	{"POST /v1/config/reload", (*Server).configReloadWrite},
 	{"GET /v1/config/status", (*Server).configStatusRead},
 	{"GET /v1/disk/status", (*Server).diskStatusRead},

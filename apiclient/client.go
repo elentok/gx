@@ -748,6 +748,15 @@ func (c *Client) UsageOverride(ctx context.Context, harness string) (server.Usag
 	return res, err
 }
 
+// ReportLimits sends Claude rate-limit windows and returns the windows the
+// server stores after the merge. A report with no windows reads them back. A
+// refusal is a result (Refused set), not an error.
+func (c *Client) ReportLimits(ctx context.Context, report server.LimitsReport) (server.LimitsReportResult, error) {
+	var res server.LimitsReportResult
+	err := c.post(ctx, "/v1/usage/report", report, &res)
+	return res, err
+}
+
 // ReloadConfig reloads the global config file into the server. A refusal is
 // a result (Refused set), not an error.
 func (c *Client) ReloadConfig(ctx context.Context) (server.ReloadResult, error) {
