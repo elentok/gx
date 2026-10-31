@@ -47,6 +47,8 @@ type EpicDetailRow struct {
 	// ticket, else the frontier one; Blocked is an open ticket with unresolved blockers.
 	Current bool `json:"current,omitempty"`
 	Blocked bool `json:"blocked,omitempty"`
+	// HarnessLabel is set on a loop epic's open, blocked and claimed rows.
+	HarnessLabel `tstype:",extends"`
 }
 
 // MapStepState is where a Progress step stands.
@@ -321,6 +323,7 @@ func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) EpicDeta
 	status := e.RenderedStatus(t)
 	row := baseRow(root, e, t, status)
 	row.Elapsed, row.Cost = t.ElapsedTime, t.ActualCost
+	row.HarnessLabel = s.harnessLabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
 	if t.Parent != nil {
 		row.Parent = ticketAddress(root, *t.Parent)
 	}

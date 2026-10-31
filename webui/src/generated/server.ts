@@ -157,6 +157,11 @@ export interface DesignWorktreeResult {
   path?: string;
   note?: string;
   after_branch: boolean;
+  /**
+   * Harness is the one a session started in the project runs on, so the
+   * caller types its skill prefix.
+   */
+  harness?: string;
   refused?: boolean;
   reason?: string;
   message?: string;
@@ -664,7 +669,7 @@ export type EpicKind = typeof EpicKindLoop | typeof EpicKindMap;
  * EpicDetailRow is one ticket of an EpicDetail. A map epic's rows leave Parent,
  * Cost, Asking, Question and Reason empty.
  */
-export interface EpicDetailRow {
+export interface EpicDetailRow extends HarnessLabel {
   address: string;
   title: string;
   rendered_status: string;
@@ -1135,6 +1140,25 @@ export interface FixAgentResult extends SessionResult {
 }
 
 //////////
+// source: harnesslabel.go
+
+/**
+ * HarnessLabel is what a ticket row shows as `harness · tier · model effort`.
+ * A waiting ticket carries the harness it will launch under and why in
+ * HarnessNote; a running one carries what its run launched under.
+ */
+export interface HarnessLabel {
+  /**
+   * Harness is "claude" or "codex"; empty for a waiting ticket that follows the default.
+   */
+  harness?: string;
+  tier?: string;
+  model?: string;
+  effort?: string;
+  harness_note?: string;
+}
+
+//////////
 // source: healthreport.go
 
 export const PressureNormal = "normal";
@@ -1302,7 +1326,7 @@ export const EventHealthChanged = "health-changed";
  * TicketInfo is one ticket in the snapshot. Markdown stays the truth: this is
  * a read-only projection rebuilt from the store scan.
  */
-export interface TicketInfo {
+export interface TicketInfo extends HarnessLabel {
   address: string;
   title: string;
   status: string;
@@ -1826,6 +1850,11 @@ export interface SessionInfo {
   tier?: any /* ralphloop.Tier */;
   model?: string;
   effort?: string;
+  /**
+   * ModelSwitched is set when Model is not the one the launch tier chose, so
+   * the person switched it by hand. Never set for a launch with no explicit model.
+   */
+  model_switched?: boolean;
 }
 /**
  * SessionStatus is a Session status.

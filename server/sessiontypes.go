@@ -56,6 +56,9 @@ type SessionInfo struct {
 	Tier   ralphloop.Tier `json:"tier,omitempty"`
 	Model  string         `json:"model,omitempty"`
 	Effort string         `json:"effort,omitempty"`
+	// ModelSwitched is set when Model is not the one the launch tier chose, so
+	// the person switched it by hand. Never set for a launch with no explicit model.
+	ModelSwitched bool `json:"model_switched,omitempty"`
 }
 
 // SessionStatus is a Session status.

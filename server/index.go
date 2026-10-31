@@ -49,6 +49,11 @@ type TicketInfo struct {
 	ActualCost            float64 `json:"actual_cost,omitempty"`
 	Compactions           int     `json:"compactions,omitempty"`
 
+	// HarnessLabel is filled by the snapshot handler for open, blocked and claimed tickets.
+	HarnessLabel `tstype:",extends"`
+	// agent is the ticket's frontmatter `agent:`, the resolver's top input.
+	agent string
+
 	Category   string    `json:"category,omitempty"`
 	ExportedAt time.Time `json:"exported_at,omitzero"`
 	// Mutes is what the Context menu's "Unmute & Reopen" keys off.
@@ -303,6 +308,7 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 		Category:   t.Category,
 		ExportedAt: t.ExportedAt,
 		Mutes:      t.Mutes,
+		agent:      t.Agent,
 	}
 	if t.Parent != nil {
 		info.Parent = addr(*t.Parent)

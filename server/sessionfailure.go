@@ -3,8 +3,10 @@ package server
 import (
 	"cmp"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/transcript"
 )
@@ -61,9 +63,12 @@ func (m sessionMeta) statusFailure() *SessionFailure {
 }
 
 // reportedModel is the model ID on the newest assistant message of a Claude
-// session's transcript, or the saved one before a reply. Codex keeps the saved
-// one.
+// session's transcript, or the saved one before a reply. A Codex session reads
+// its rollout's newest turn instead, see reportedCodexTurn.
 func (s *Server) reportedModel(m sessionMeta) string {
+	if m.Harness == string(harness.Codex) {
+		return s.reportedCodexTurn(m).Model
+	}
 	if m.Harness != string(harness.Claude) {
 		return m.Model
 	}
@@ -81,11 +86,47 @@ func (s *Server) reportedModel(m sessionMeta) string {
 	return cmp.Or(model, m.Model)
 }
 
+// reportedCodexTurn is the model and effort on the newest turn of a Codex
+// session's rollout, or the saved ones while there is no rollout or turn.
+func (s *Server) reportedCodexTurn(m sessionMeta) codexsession.TurnModel {
+	saved := codexsession.TurnModel{Model: m.Model, Effort: m.Effort}
+	home, err := s.codexHome()
+	if err != nil {
+		return saved
+	}
+	path, ok, err := codexsession.RolloutPathIn(home, m.ConversationID)
+	if err != nil || !ok {
+		return saved
+	}
+	turn, err := s.codexTurns.read(path, func(p string) (codexsession.TurnModel, error) {
+		t, _, err := codexsession.ReadTurnModel(p)
+		return t, err
+	})
+	if err != nil {
+		s.log.Warn("read codex turn model", "session", m.ID, "err", err)
+	}
+	return codexsession.TurnModel{Model: cmp.Or(turn.Model, m.Model), Effort: cmp.Or(turn.Effort, m.Effort)}
+}
+
+// modelSwitched reports that the model shown is not the one the launch tier
+// chose. Claude launches with an alias and replies with a full id, so the alias
+// inside the reply counts as the same model.
+func modelSwitched(launched, shown string) bool {
+	if launched == "" || shown == "" {
+		return false
+	}
+	return !strings.Contains(strings.ToLower(shown), strings.ToLower(launched))
+}
+
 // sessionInfo is m.info() plus the failure that needs a transcript read, the
 // reported model and the running countdown.
 func (s *Server) sessionInfo(m sessionMeta) SessionInfo {
 	info := m.info()
 	info.Model = s.reportedModel(m)
+	info.ModelSwitched = modelSwitched(m.Model, info.Model)
+	if m.Harness == string(harness.Codex) {
+		info.Effort = s.reportedCodexTurn(m).Effort
+	}
 	if at := s.autoAdvances.deadline(m.ID); !at.IsZero() {
 		info.AutoAdvanceAt = &at
 	}

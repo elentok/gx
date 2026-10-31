@@ -4,6 +4,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner/herdrrunner"
 	"github.com/elentok/gx/brief"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/conversations"
 	"github.com/elentok/gx/git"
@@ -31,6 +33,7 @@ import (
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/syshealth"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -257,6 +260,8 @@ type Server struct {
 	authFailures authFailures
 	// reportedModels caches the model ID on each transcript's newest reply.
 	reportedModels fileCache[string]
+	// codexTurns caches the model and effort on each rollout's newest turn.
+	codexTurns fileCache[codexsession.TurnModel]
 	// filedRounds holds the round markers already in the follow-ups epic, so an
 	// Idle detection never rescans its tickets.
 	filedRounds sync.Map
@@ -661,6 +666,9 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap := s.idx.snapshot()
 	snap.HerdrText, snap.HerdrUnavailable = s.herdrBanner()
 	for i, t := range snap.Tickets {
+		if addr, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil {
+			snap.Tickets[i].HarnessLabel = s.harnessLabelFor(addr, t.agent, cmp.Or(t.RenderedStatus, t.Status))
+		}
 		switch t.Status {
 		case string(schema.StatusClaimed):
 			snap.Tickets[i].ClaimedAt, _ = s.registry.startedAtOf(t.Address)

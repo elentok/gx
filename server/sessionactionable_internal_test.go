@@ -166,8 +166,50 @@ func TestSessionInfoModel_CodexKeepsSavedValues(t *testing.T) {
 	t.Parallel()
 	s := modelTestServer(t, "/work/proj", replyWithModel("claude-opus-5-5"))
 	info := s.sessionInfo(sessionMeta{Harness: "codex", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: "gpt-5", Effort: "low"})
-	if info.Model != "gpt-5" || info.Effort != "low" {
-		t.Errorf("model/effort = %q/%q, want gpt-5/low", info.Model, info.Effort)
+	if info.Model != "gpt-5" || info.Effort != "low" || info.ModelSwitched {
+		t.Errorf("model/effort/switched = %q/%q/%v, want gpt-5/low/false", info.Model, info.Effort, info.ModelSwitched)
+	}
+}
+
+func TestSessionInfoModel_CodexReadsTheNewestRolloutTurn(t *testing.T) {
+	t.Parallel()
+	home := t.TempDir()
+	dir := filepath.Join(home, "sessions", "2026", "10", "30")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	rollout := `{"type":"turn_context","payload":{"model":"gpt-6.1-sol","effort":"low"}}
+{"type":"turn_context","payload":{"model":"gpt-6.1-terra","effort":"high"}}
+`
+	if err := os.WriteFile(filepath.Join(dir, "rollout-conv.jsonl"), []byte(rollout), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}
+	info := s.sessionInfo(sessionMeta{Harness: "codex", ConversationID: "conv", Tier: "worker", Model: "gpt-6.1-sol", Effort: "low"})
+	if info.Model != "gpt-6.1-terra" || info.Effort != "high" || !info.ModelSwitched {
+		t.Errorf("model/effort/switched = %q/%q/%v, want gpt-6.1-terra/high/true", info.Model, info.Effort, info.ModelSwitched)
+	}
+}
+
+func TestSessionInfoModel_ModelSwitchedNote(t *testing.T) {
+	t.Parallel()
+	meta := func(model string) sessionMeta {
+		return sessionMeta{Harness: "claude", Dir: "/work/proj", ConversationID: "conv", Tier: "worker", Model: model}
+	}
+	for name, tc := range map[string]struct {
+		launched string
+		lines    []string
+		want     bool
+	}{
+		"reply differs from the alias": {"sonnet", []string{replyWithModel("claude-opus-5-5")}, true},
+		"reply contains the alias":     {"sonnet", []string{replyWithModel("claude-Sonnet-5-5")}, false},
+		"no explicit launch model":     {"", []string{replyWithModel("claude-opus-5-5")}, false},
+		"before the first reply":       {"sonnet", []string{`{"type":"user","message":{"content":"hi"}}`}, false},
+	} {
+		s := modelTestServer(t, "/work/proj", tc.lines...)
+		if got := s.sessionInfo(meta(tc.launched)).ModelSwitched; got != tc.want {
+			t.Errorf("%s: ModelSwitched = %v, want %v", name, got, tc.want)
+		}
 	}
 }
 
