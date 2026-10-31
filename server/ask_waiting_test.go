@@ -23,7 +23,7 @@ type codexNamed struct{ *turnRunner }
 
 func (codexNamed) Name() string { return "headless" }
 
-// An ask from a herdr-hosted Claude or a Codex run cannot be answered live:
+// An ask from a herdr-hosted Claude or Codex run cannot be answered live:
 // the ticket pauses, the session closes and the run leaves the registry.
 func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 	t.Parallel()
@@ -32,7 +32,7 @@ func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 		wrap        func(*turnRunner) agentrunner.Runner
 	}{
 		{"herdr claude", "claude", func(r *turnRunner) agentrunner.Runner { return herdrNamed{r} }},
-		{"native codex", "codex", func(r *turnRunner) agentrunner.Runner { return codexNamed{r} }},
+		{"herdr codex", "codex", func(r *turnRunner) agentrunner.Runner { return herdrNamed{r} }},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -58,21 +58,36 @@ func TestAsk_HerdrClaudeAndCodexCloseSession(t *testing.T) {
 	}
 }
 
-// A native Claude agent that asks and goes idle stays alive: the ticket pauses
-// self-reported, but the worktree, session and run remain, flagged waiting.
+// A native Claude agent, or a Codex agent on the pty runner, that asks and goes
+// idle stays alive: the ticket pauses self-reported, but the worktree, session
+// and run remain, flagged waiting.
 func TestAsk_NativeAgentStaysAliveWaiting(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, agent string
+		wrap        func(*turnRunner) agentrunner.Runner
+	}{
+		{"claude", "claude", func(r *turnRunner) agentrunner.Runner { return r }},
+		{"codex on pty", "codex", func(r *turnRunner) agentrunner.Runner { return ptyNamed{r} }},
+	} {
+		t.Run(c.name, func(t *testing.T) { testAskStaysAlive(t, c.agent, c.wrap) })
+	}
+}
+
+func testAskStaysAlive(t *testing.T, agent string, wrap func(*turnRunner) agentrunner.Runner) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	ticketPath := store + "/proj/epic-a/issues/01-first.md"
 	var worktree string
-	fake := newTurnRunner(func(_, cwd string) {
+	turn := newTurnRunner(func(_, cwd string) {
 		worktree = cwd
 		reportIteration(t, ticketPath, "asking")
 	})
+	fake := wrap(turn)
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake))
-	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", agent); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	waitStatus(t, ticketPath, schema.StatusLegacyAnswer)

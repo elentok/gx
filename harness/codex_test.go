@@ -127,6 +127,11 @@ func TestCodexHarness_LaunchAndResume(t *testing.T) {
 	if !ok || resume.Name != "codex" || !slices.Equal(resume.Args, []string{"resume", "abc", "--model", "m"}) {
 		t.Errorf("Resume = %+v, %v, want codex resume abc --model m", resume, ok)
 	}
+	opts.Cwd = "/work/dir"
+	resume, _ = h.Resume("abc", opts)
+	if !slices.Equal(resume.Args, []string{"resume", "abc", "--cd", "/work/dir", "--model", "m"}) {
+		t.Errorf("Resume with a cwd = %q, want resume abc --cd /work/dir --model m", resume.Args)
+	}
 	if _, err := h.Watch(0, time.Time{}, nil, nil); err != nil {
 		t.Errorf("Watch error = %v, want a watcher", err)
 	}

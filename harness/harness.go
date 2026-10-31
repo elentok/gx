@@ -36,6 +36,8 @@ type LaunchOptions struct {
 	Args []string
 	// Env is added to the cleaned-up environment.
 	Env []string
+	// Cwd is the dir the session runs in. Codex resume takes it as --cd.
+	Cwd string
 }
 
 // Command is what to run for a session.

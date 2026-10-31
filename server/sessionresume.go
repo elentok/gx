@@ -60,6 +60,9 @@ func (s *Server) resumeRefusal(meta sessionMeta) SessionResult {
 	if _, ok := h.Resume(meta.ConversationID, harness.LaunchOptions{}); !ok {
 		return sessionRefusal(ReasonSessionNoResume, fmt.Sprintf("harness %s cannot resume", meta.Harness))
 	}
+	if agentrunner.Kind(meta.Harness) == harness.Codex && !s.codexRolloutExists(meta.Dir, meta.ConversationID) {
+		return sessionRefusal(ReasonSessionNoResume, fmt.Sprintf("no Codex rollout for conversation %q in %s", meta.ConversationID, meta.Dir))
+	}
 	if msg := s.interactiveMissingReason(meta.Harness, "the session's harness"); msg != "" {
 		return sessionRefusal(ReasonHarnessMissing, msg)
 	}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,9 +34,11 @@ const resumeLabel = "epic-a-iter-01"
 // claimOpen puts ticket 01 in the queue as a ticket that has run before
 // (session sess-old) and was paused, then waits for its next claim to launch.
 // answered says whether the pause ended with a person's answer or a plain resume.
-func claimOpen(t *testing.T, runner string, agent string, answered bool, fake *runnerfake.Runner) []ralphloop.Event {
+// rollout says whether Codex holds a rollout for sess-old in the claim's worktree.
+func claimOpen(t *testing.T, runner string, agent string, answered, rollout bool, fake *runnerfake.Runner) []ralphloop.Event {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
+	codexHome := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "first", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
@@ -58,7 +61,18 @@ func claimOpen(t *testing.T, runner string, agent string, answered bool, fake *r
 		t.Fatal(err)
 	}
 
-	h := servertest.StartWithStore(t, store, servertest.WithRunner(namedFake{fake, runner}))
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(namedFake{fake, runner}), servertest.WithEnv("CODEX_HOME="+codexHome))
+	if rollout {
+		_, _, wt := ralphloop.IterationIdentity("epic-a", "01", h.Server.WorktreeDir("proj"))
+		meta := `{"type":"session_meta","payload":{"id":"sess-old","cwd":` + strconv.Quote(wt) + `}}` + "\n"
+		dir := filepath.Join(codexHome, "sessions", "2026", "10", "30")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "rollout-2026-10-30T00-00-00-sess-old.jsonl"), []byte(meta), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	snap, err := h.Client.Snapshot(ctx)
@@ -92,22 +106,26 @@ func TestClaim_ResumesOrColdStarts(t *testing.T) {
 		runner    string
 		agent     string
 		answered  bool
+		rollout   bool
 		resumeErr error
 		wantIDs   []string
 		wantPath  string
 	}{
-		{"answered pty resumes", "pty", "claude", true, nil, []string{"sess-old"}, "resumed"},
-		{"failed resume falls back cold", "pty", "claude", true, errors.New("no conversation found"), []string{"sess-old", ""}, "cold-start"},
-		{"plain resume cold-starts", "pty", "claude", false, nil, []string{""}, "cold-start"},
-		{"herdr cold-starts", "herdr", "claude", true, nil, []string{""}, "cold-start"},
-		{"headless cold-starts", "headless", "claude", true, nil, []string{""}, "cold-start"},
-		{"codex cold-starts", "pty", "codex", true, nil, []string{""}, "cold-start"},
+		{"answered pty resumes", "pty", "claude", true, false, nil, []string{"sess-old"}, "resumed"},
+		{"failed resume falls back cold", "pty", "claude", true, false, errors.New("no conversation found"), []string{"sess-old", ""}, "cold-start"},
+		{"plain resume cold-starts", "pty", "claude", false, false, nil, []string{""}, "cold-start"},
+		{"herdr cold-starts", "herdr", "claude", true, false, nil, []string{""}, "cold-start"},
+		{"headless cold-starts", "headless", "claude", true, false, nil, []string{""}, "cold-start"},
+		{"codex resumes", "pty", "codex", true, true, nil, []string{"sess-old"}, "resumed"},
+		{"codex without rollout cold-starts", "pty", "codex", true, false, nil, []string{""}, "cold-start"},
+		{"codex plain resume cold-starts", "pty", "codex", false, true, nil, []string{""}, "cold-start"},
+		{"codex herdr cold-starts", "herdr", "codex", true, true, nil, []string{""}, "cold-start"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fake := runnerfake.NewRunner()
 			fake.ResumeErr = c.resumeErr
-			logged := claimOpen(t, c.runner, c.agent, c.answered, fake)
+			logged := claimOpen(t, c.runner, c.agent, c.answered, c.rollout, fake)
 			if got := fake.ResumeIDs(resumeLabel); !slices.Equal(got, c.wantIDs) {
 				t.Errorf("start attempts carried resume ids %q, want %q", got, c.wantIDs)
 			}

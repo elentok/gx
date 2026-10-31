@@ -501,12 +501,12 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	}
 	deps := s.depsWith(s.launchRunner(ticket.Project, agent))
 	deps.GateReleased = s.registry.gateReleased(ticketAddr)
-	// Only Claude on the pty runner resumes; every other claim starts cold, and so
-	// does one under another harness than the answered session's: the Handoff
-	// carries it over.
+	// Only Claude and Codex on the pty runner resume; every other claim starts
+	// cold, and so does one under another harness than the answered session's:
+	// the Handoff carries it over. launch drops a Codex id whose rollout is gone.
 	earlier := s.earlierRunHarness(ticket)
 	switchedHarness := earlier != "" && earlier != string(agent)
-	if agent == ralphloop.AgentClaude && deps.Runner.Name() == string(agentrunner.ChoicePTY) && !switchedHarness {
+	if (agent == ralphloop.AgentClaude || agent == ralphloop.AgentCodex) && deps.Runner.Name() == string(agentrunner.ChoicePTY) && !switchedHarness {
 		one.ResumeSessionID = answered
 	}
 	mode := s.iterationModeFor(ticket, t)
@@ -883,9 +883,16 @@ func (s *Server) settleRun(rc runContext, err error) {
 }
 
 // keepsAskedAgent reports whether run's agent stays alive after it asks: a
-// Claude agent on a native runner. Herdr-hosted and Codex runs clean up as before.
+// Claude agent on a native runner, or a Codex agent on the pty runner.
+// Herdr-hosted runs clean up as before.
 func keepsAskedAgent(run Run) bool {
-	return run.Agent == string(ralphloop.AgentClaude) && run.Runner != "" && run.Runner != runnerHerdr
+	switch run.Agent {
+	case string(ralphloop.AgentClaude):
+		return run.Runner != "" && run.Runner != runnerHerdr
+	case string(ralphloop.AgentCodex):
+		return run.Runner == string(agentrunner.ChoicePTY)
+	}
+	return false
 }
 
 // notifyDone tells chat a ticket merged. A one-off stays silent: it speaks

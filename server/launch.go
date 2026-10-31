@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/ralphloop"
@@ -116,6 +117,9 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	// herdr rejects a ticket address as an agent name; every lookup uses the iteration label.
 	label, _, _ := ralphloop.IterationIdentity(ticket.Epic, ticket.ID, "")
 	resumeID := one.ResumeSessionID
+	if agent == ralphloop.AgentCodex && !s.codexRolloutExists(cwd, resumeID) {
+		resumeID = ""
+	}
 	start := func() (agentrunner.Session, error) {
 		return ralphloop.StartAndPrompt(deps.Runner, agentrunner.StartOptions{
 			Label:           label,
@@ -169,6 +173,20 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 	})
 	run := Run{Address: ticket.String(), Agent: string(agent), Runner: deps.Runner.Name(), Session: session, Model: one.Model, Effort: one.Effort}
 	return run, nil
+}
+
+// codexRolloutExists reports whether Codex has a rollout for session id under
+// cwd. An empty id has none.
+func (s *Server) codexRolloutExists(cwd, id string) bool {
+	if id == "" {
+		return false
+	}
+	home, err := s.codexHome()
+	if err != nil {
+		return false
+	}
+	ok, err := codexsession.VerifyIdentityIn(home, cwd, id)
+	return err == nil && ok
 }
 
 // answeredSession is the last agent session of a ticket whose latest question

@@ -387,6 +387,7 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 		SessionID: meta.ConversationID,
 		Args:      launchArgs(meta, s.settings.Load().AgentsClaudeArgs, s.codexRoots(meta)),
 		Env:       s.cfg.Env,
+		Cwd:       meta.Dir,
 	}
 	launch := h.Launch(opts)
 	if resume {

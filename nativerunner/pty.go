@@ -403,7 +403,7 @@ func (p *Pty) launchCommand(opts agentrunner.StartOptions, dir, sessionID string
 		// The SessionStart hook writes Codex's own session id here.
 		env = append(env, harness.CodexSessionFileEnv+"="+filepath.Join(dir, harness.CodexSessionFile))
 	}
-	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: args, Env: env}
+	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: args, Env: env, Cwd: opts.Cwd}
 	var launch harness.Command
 	if opts.ResumeSessionID != "" {
 		// --resume and --session-id fail together, so the agent gets only

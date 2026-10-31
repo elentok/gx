@@ -2,8 +2,11 @@ package server_test
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server"
@@ -61,6 +64,45 @@ func TestResumeSession_UsesNewestConversation(t *testing.T) {
 	}
 	report(t, newer, agentfake.Control{State: "working"})
 	waitForSession(ctx, t, h, evs, id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+}
+
+// Restore of an Exited Codex session needs the conversation's rollout: without
+// it a fresh Codex would lose the conversation silently.
+func TestResumeSession_CodexNeedsItsRollout(t *testing.T) {
+	t.Parallel()
+	codexHome := t.TempDir()
+	h, ctx, evs, id, conv := startFakeSession(t, servertest.WithEnv("CODEX_HOME="+codexHome))
+	stopFakeSession(ctx, t, h, evs, id)
+	metaPath := filepath.Join(h.SessionsDir, id, "meta.json")
+	meta := readMeta(t, h, id)
+	meta["harness"] = "codex"
+	data, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := h.Client.ResumeSession(ctx, id)
+	if err != nil || !res.Refused || res.Reason != server.ReasonSessionNoResume || !strings.Contains(res.Message, "rollout") {
+		t.Fatalf("resume without rollout = %+v, %v; want refused %s naming the rollout", res, err, server.ReasonSessionNoResume)
+	}
+
+	dir, _ := meta["dir"].(string)
+	rollouts := filepath.Join(codexHome, "sessions", "2026", "10", "30")
+	if err := os.MkdirAll(rollouts, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	line := `{"type":"session_meta","payload":{"id":` + strconv.Quote(conv) + `,"cwd":` + strconv.Quote(dir) + `}}` + "\n"
+	if err := os.WriteFile(filepath.Join(rollouts, "rollout-2026-10-30T00-00-00-"+conv+".jsonl"), []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Past the rollout check; a host without codex still refuses, for the missing binary.
+	res, err = h.Client.ResumeSession(ctx, id)
+	if err != nil || res.Reason == server.ReasonSessionNoResume {
+		t.Errorf("resume with rollout = %+v, %v; want it past the rollout check", res, err)
+	}
 }
 
 func TestResumeSession_Refusals(t *testing.T) {

@@ -64,9 +64,13 @@ func (codexHarness) Launch(opts LaunchOptions) Command {
 	return codexCommand(args, opts.Env)
 }
 
-// Resume takes no rollout check or --cd yet.
+// Resume takes no rollout check: the caller verifies the rollout exists.
 func (codexHarness) Resume(conversationID string, opts LaunchOptions) (Command, bool) {
-	return codexCommand(append([]string{"resume", conversationID}, opts.Args...), opts.Env), true
+	args := []string{"resume", conversationID}
+	if opts.Cwd != "" {
+		args = append(args, "--cd", opts.Cwd)
+	}
+	return codexCommand(append(args, opts.Args...), opts.Env), true
 }
 
 func codexCommand(args, env []string) Command {
