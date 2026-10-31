@@ -25,6 +25,10 @@ type Config struct {
 	// changes it while the server runs.
 	RestartBinary func() string
 
+	// SpawnRestart starts the restart from the given binary, detached. Nil means
+	// `<binary> server restart --continue` in its own session; tests fake it.
+	SpawnRestart func(bin string) error
+
 	StateDir    string
 	Build       string
 	TicketStore string // ticket-store root; kept fresh by watch + poll

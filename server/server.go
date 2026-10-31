@@ -245,7 +245,10 @@ type Server struct {
 	// decision; a reload swaps in a new value and never mutates the old one.
 	settings atomic.Pointer[Settings]
 	reloadMu sync.Mutex // serializes config reloads
-	reloads  reloadHistory
+	// restarting is set once a restart is under way and never cleared on
+	// success: the new server replaces this one.
+	restarting atomic.Bool
+	reloads    reloadHistory
 	// cpuSpikes holds the CPU ticket cooldown.
 	cpuSpikes  cpuSpikes
 	disks      diskWatch
@@ -579,6 +582,7 @@ var routeTable = []struct {
 	{"GET /v1/health", (*Server).healthRead},
 	{"GET /v1/usage/summary", (*Server).usageSummaryRead},
 	{"GET /v1/restart/check", (*Server).restartCheckRead},
+	{"POST /v1/restart", (*Server).restartWrite},
 	{"POST /v1/disk/clean", (*Server).diskCleanWrite},
 	{"GET /v1/checks/status", (*Server).checksStatusRead},
 	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},

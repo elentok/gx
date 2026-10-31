@@ -794,6 +794,14 @@ func (c *Client) RestartCheck(ctx context.Context) (server.RestartCheckReport, e
 	return rep, err
 }
 
+// Restart starts a restart when the check still matches req. A refusal is a
+// result (Refused set), not an error.
+func (c *Client) Restart(ctx context.Context, req server.RestartRequest) (server.RestartResult, error) {
+	var res server.RestartResult
+	err := c.post(ctx, "/v1/restart", req, &res)
+	return res, err
+}
+
 // CleanDisk runs the cleanup of one disk now. A refusal is a result (Refused
 // set), not an error.
 func (c *Client) CleanDisk(ctx context.Context, disk string) (server.CleanNowResult, error) {
