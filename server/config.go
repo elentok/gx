@@ -20,6 +20,11 @@ type Config struct {
 	// it and starts every session holder with it. Nil means the process env.
 	Env []string
 
+	// RestartBinary returns the binary a restart would start; empty means none
+	// could be found. Nil means this executable. Read per request: a reinstall
+	// changes it while the server runs.
+	RestartBinary func() string
+
 	StateDir    string
 	Build       string
 	TicketStore string // ticket-store root; kept fresh by watch + poll

@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"html"
 	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strings"
@@ -103,6 +105,34 @@ func (a *launchdAgent) target() string { return a.domain() + "/" + launchdLabel 
 func (a *launchdAgent) Installed() bool {
 	_, err := os.Stat(a.plistPath())
 	return err == nil
+}
+
+var plistProgramRE = regexp.MustCompile(`(?s)<key>ProgramArguments</key>\s*<array>\s*<string>(.*?)</string>`)
+
+// installedBinary is the binary the installed agent starts, read from its
+// plist; false when the plist is missing or has none.
+func (a *launchdAgent) installedBinary() (string, bool) {
+	raw, err := os.ReadFile(a.plistPath())
+	if err != nil {
+		return "", false
+	}
+	m := plistProgramRE.FindSubmatch(raw)
+	if m == nil {
+		return "", false
+	}
+	return html.UnescapeString(string(m[1])), true
+}
+
+// restartBinary is the binary a restart would start: the launchd agent's when
+// it is installed, else this executable. Empty when neither is known.
+func restartBinary(dirs config.Dirs, stateDir string) string {
+	if a, err := newLaunchdAgent(dirs, stateDir); err == nil && a.Installed() {
+		if exe, ok := a.installedBinary(); ok {
+			return exe
+		}
+	}
+	exe, _ := os.Executable()
+	return exe
 }
 
 // plist renders the agent definition. KeepAlive restarts the server only after

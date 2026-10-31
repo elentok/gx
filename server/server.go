@@ -239,6 +239,8 @@ const DefaultTCPAddr = "127.0.0.1:7421"
 // Server owns the state-dir lock and the listening socket.
 type Server struct {
 	cfg Config
+	// instanceID is new on every start: a restart is done when it changes.
+	instanceID string
 	// settings is the live copy of cfg.Settings. A reader loads it once per
 	// decision; a reload swaps in a new value and never mutates the old one.
 	settings atomic.Pointer[Settings]
@@ -503,6 +505,8 @@ func New(cfg Config) (*Server, error) {
 		registry:  registry,
 		savedRuns: savedRuns,
 
+		instanceID: newInstanceID(),
+
 		queued:       queued,
 		pause:        pause,
 		afk:          afk,
@@ -574,6 +578,7 @@ var routeTable = []struct {
 	{"GET /v1/disk/status", (*Server).diskStatusRead},
 	{"GET /v1/health", (*Server).healthRead},
 	{"GET /v1/usage/summary", (*Server).usageSummaryRead},
+	{"GET /v1/restart/check", (*Server).restartCheckRead},
 	{"POST /v1/disk/clean", (*Server).diskCleanWrite},
 	{"GET /v1/checks/status", (*Server).checksStatusRead},
 	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},

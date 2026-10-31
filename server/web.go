@@ -145,6 +145,8 @@ func (s *Server) webHandler() http.Handler {
 			s.healthRead(w, r)
 		case r.URL.Path == "/v1/usage/summary":
 			s.usageSummaryRead(w, r)
+		case r.URL.Path == "/v1/restart/check":
+			s.restartCheckRead(w, r)
 		case r.URL.Path == "/v1/events":
 			s.streamEvents(w, r)
 		case strings.HasPrefix(r.URL.Path, "/v1/"):

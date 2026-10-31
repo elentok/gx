@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
@@ -14,23 +15,11 @@ import (
 // the binary a restart would start: a binary without the command exits non-zero
 // with an unknown-command error, one that ran exits zero even when the config
 // or a dry run failed (the failure is in the JSON).
-type restartCheck struct {
-	Version  string                `json:"version"`
-	Config   restartCheckConfig    `json:"config"`
-	Projects []restartCheckProject `json:"projects"`
-}
-
-type restartCheckConfig struct {
-	OK    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
-}
-
-type restartCheckProject struct {
-	Name  string   `json:"name"`
-	OK    bool     `json:"ok"`
-	Error string   `json:"error,omitempty"`
-	Files []string `json:"files"`
-}
+type (
+	restartCheck        = server.RestartCheckOutput
+	restartCheckConfig  = server.RestartCheckConfig
+	restartCheckProject = server.RestartCheckProject
+)
 
 func newRestartCheckCmd(d deps) *cobra.Command {
 	var configOnly bool

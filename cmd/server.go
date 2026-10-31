@@ -144,7 +144,7 @@ a migration fails, the failed store is named and the server stays stopped.`,
 	}
 	kinds.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
 	eventsCmd.AddCommand(kinds)
-	cmd.AddCommand(eventsCmd, newServerLocksCmd(d), newServerTicketsCmd(d), newServerEpicsCmd(d), newServerStatsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d), newServerQueueCmd(d), newServerOneOffCmd(d), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d), newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDefaultHarnessCmd(d), newServerDefaultHarnessSetCmd(d), newServerDiskCmd(d), newServerHealthCmd(d), newServerCPUSpikeCmd(d), newServerWebURLCmd(d), newServerWebNewRootCmd(d), newServerWebResetCmd(d), newServerWebResetAuthenticatorCmd(d), newServerWebLoginsCmd(d), newServerWebRevokeCmd(d), newServerWebPasswordCmd(d))
+	cmd.AddCommand(eventsCmd, newServerLocksCmd(d), newServerTicketsCmd(d), newServerEpicsCmd(d), newServerStatsCmd(d), newServerIterationsCmd(d), newServerAgentsCmd(d), newServerQueueCmd(d), newServerOneOffCmd(d), newServerReloadConfigCmd(d), newServerConfigStatusCmd(d), newServerChecksCmd(d), newServerChecksSaveCmd(d), newServerDefaultHarnessCmd(d), newServerDefaultHarnessSetCmd(d), newServerDiskCmd(d), newServerHealthCmd(d), newServerRestartCheckCmd(d), newServerCPUSpikeCmd(d), newServerWebURLCmd(d), newServerWebNewRootCmd(d), newServerWebResetCmd(d), newServerWebResetAuthenticatorCmd(d), newServerWebLoginsCmd(d), newServerWebRevokeCmd(d), newServerWebPasswordCmd(d))
 	return cmd
 }
 
@@ -238,7 +238,7 @@ func runServer(ctx context.Context, d deps) error {
 			return fmt.Errorf("GX_HEALTH_INTERVAL: %w", err)
 		}
 	}
-	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
+	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: func() string { return restartBinary(d.dirs(), stateDir) },
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval,

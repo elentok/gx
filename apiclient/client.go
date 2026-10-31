@@ -787,6 +787,13 @@ func (c *Client) ConfigStatus(ctx context.Context) (server.ConfigStatus, error) 
 	return st, err
 }
 
+// RestartCheck runs the restart check from the binary a restart would start.
+func (c *Client) RestartCheck(ctx context.Context) (server.RestartCheckReport, error) {
+	var rep server.RestartCheckReport
+	err := c.get(ctx, "/v1/restart/check", &rep)
+	return rep, err
+}
+
 // CleanDisk runs the cleanup of one disk now. A refusal is a result (Refused
 // set), not an error.
 func (c *Client) CleanDisk(ctx context.Context, disk string) (server.CleanNowResult, error) {
