@@ -39,9 +39,10 @@ import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { TopBar } from "../ui/top-bar/TopBar";
 import { Tray } from "../ui/tray/Tray";
-import type { Health, HealthState, LimitsReport, LimitWindow, UsageSummary } from "../generated/server";
-import { UsageModeLimits } from "../generated/server";
+import type { Health, HealthState, LimitsReport, LimitWindow, UsageSpend, UsageSummary } from "../generated/server";
+import { UsageModeLimits, UsageModeSpending } from "../generated/server";
 import { LimitsBlock } from "../usage/LimitsBlock";
+import { SpendBlock } from "../usage/SpendBlock";
 import { KINDS, TONES, type Tone } from "../ui/tone";
 
 export interface GalleryCase {
@@ -106,6 +107,14 @@ const limitsStates: [string, LimitsReport][] = [
   ["limits stale", { five_hour: limitWin(34, 7800, 10800), seven_day: limitWin(52, 187200, 10800) }],
   ["limits past reset", { five_hour: limitWin(34, -60, 21600), seven_day: limitWin(52, 187200, 21600) }],
   ["limits one window", { seven_day: limitWin(12, 464400, 60) }],
+];
+const spendStates: [string, UsageSpend][] = [
+  ["spend normal", { today: 4.82, since_sunday: 21.5, since_first: 96.1, first_day: "2026-09-01" }],
+  [
+    "spend short ledger",
+    { today: 1.2, since_sunday: 3.4, since_sunday_short: true, since_first: 3.4, since_first_short: true, first_day: "2026-10-30" },
+  ],
+  ["spend empty", { today: 0, since_sunday: 0, since_first: 0 }],
 ];
 
 // Opens a tooltip the way a user does, by clicking its marker once mounted.
@@ -418,6 +427,26 @@ export const galleryEntries: GalleryEntry[] = [
                 <>
                   <Menu.Separator />
                   <LimitsBlock summary={{ mode: UsageModeLimits, limits, spend: {} as UsageSummary["spend"] }} now={limitsNow} />
+                  <Menu.Separator />
+                </>
+              }
+            />
+          </OpenMenu>
+        ),
+      })),
+      ...spendStates.map(([label, spend]) => ({
+        label,
+        node: (
+          <OpenMenu>
+            <TopBar
+              active="epics"
+              build="v1.2.3"
+              connected
+              onToggleAfk={() => {}}
+              menuBlock={
+                <>
+                  <Menu.Separator />
+                  <SpendBlock summary={{ mode: UsageModeSpending, limits: {}, spend }} now={limitsNow} />
                   <Menu.Separator />
                 </>
               }
