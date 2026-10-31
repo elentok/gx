@@ -262,7 +262,7 @@ New flows and scenarios to write (these become implementation tickets):
 - A manual verification list for iPad Safari, Android and VoiceOver, in the verify ticket.
 - The edit to `united.e2e.ts` flow 28 for the new menu item.
 
-No new fixture scenario is needed.
+One new fixture scenario, `design-text`, plays a text-answer question, because check 33 (the question answer editor) has no such editor in `design`. Every other check uses an existing scenario.
 
 ## Out of Scope
 
