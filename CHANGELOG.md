@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added Codex support. A Default harness setting (Settings > Agents, or `agents.default-harness`) picks claude or codex for new agents. `gx codex doctor` checks the Codex features gx relies on, and `gx codex setup` installs the approvals. Codex runs on the PTY runner and needs Codex 0.166.0 or newer.
+
 ## v0.44.0 - 2026-10-30
 
 - Changed `agent-runner: auto` to pick the PTY runner after a server restart. No config migration is needed. `auto` without claude on PATH now refuses to start `gx server`. Set `agent-runner: herdr` to bring herdr back. Iterations already running on herdr keep herdr until they end.

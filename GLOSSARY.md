@@ -338,11 +338,16 @@ _Avoid_: "runner" alone, "backend", "run".
 
 **Harness** — the agent program a session runs: claude or codex. Separate
 from the agent runner that hosts it: the runner decides how a session is hosted, the harness decides
-what runs inside it. Say "agent harness" in full where "test harness" could be meant. _Avoid_:
+what runs inside it. claude and codex both run on the PTY runner; herdr hosts codex only under
+`agent-runner: herdr`. Say "agent harness" in full where "test harness" could be meant. _Avoid_:
 "kind", "agent kind", "provider".
 
 **Default harness** — the harness every new agent runs unless one launch names another. It has a
-global value and an optional value per project. A running session keeps the harness it started with.
+global value (`agents.default-harness`) and an optional value per project. gx resolves a launch's
+harness in this order: the ticket's frontmatter `agent:`, then the agent the queue item names, then
+the harness of an earlier run of the same ticket, then the Default harness. The UI labels the result
+"follows default" (nothing set it), "pinned" (frontmatter or queue item set it) or "keeps <harness>
+(ran before)". A running session keeps the harness it started with.
 
 **Native agent runner** — any agent runner that `gx server` hosts itself, with no external
 multiplexer. There are two: the headless runner and the PTY runner. A person can watch a native
@@ -434,11 +439,12 @@ _Avoid_: unread (a read session can still be actionable).
 session on the person's request (e.g. clear, then run the next design step).
 
 **Headless runner** — the native agent runner that drives claude through its non-interactive,
-structured-event mode. Never picked automatically; a person sets `agent-runner: headless` by hand.
+structured-event mode. It hosts Claude only: a Codex launch under `agent-runner: headless` runs on
+the PTY runner. Never picked automatically; a person sets `agent-runner: headless` by hand.
 
-**PTY runner** — the native agent runner that drives interactive claude on a terminal gx owns. The
-default: `agent-runner: auto` picks it whenever claude is on PATH. Queue agents, Design agents and
-the Fix agent run on it.
+**PTY runner** — the native agent runner that drives interactive claude or codex on a terminal gx
+owns. The default: `agent-runner: auto` picks it whenever the Default harness is on PATH. Queue
+agents, Design agents and the Fix agent run on it (ADR 0044).
 
 **GX system prompt** — the fixed text gx appends to the system prompt of every Claude agent it
 launches or resumes. It tells the agent how to ask a person (`gx tickets ask`) instead of using an

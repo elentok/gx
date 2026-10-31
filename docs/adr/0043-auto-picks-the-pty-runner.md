@@ -2,6 +2,9 @@
 
 > Supersedes in part ADR [0031](0031-two-native-agent-runners.md): its rule that `auto` never picks
 > the PTY runner and that headless is the default.
+>
+> Amended in part by ADR [0044](0044-codex-runs-on-the-pty-runner.md): a Codex ticket now runs on
+> the PTY runner, not herdr.
 
 `agent-runner: auto` now resolves to the PTY runner whenever claude is on PATH. It no longer pings
 herdr. A person can still ask for the others by hand:
