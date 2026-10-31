@@ -17,6 +17,12 @@ import (
 // replacements during cleanup. The holder protocol stops the child's entire
 // process group and lets the holder flush its output before exiting.
 func (f *fixture) shutdown(srv *exec.Cmd, exited <-chan error) error {
+	if f.restarted {
+		// A web restart replaced the server with one this process did not start.
+		stop := exec.Command(f.gx, "server", "stop")
+		stop.Env = f.env
+		_ = stop.Run()
+	}
 	_ = srv.Process.Signal(syscall.SIGTERM)
 	select {
 	case <-exited:

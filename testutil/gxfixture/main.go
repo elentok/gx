@@ -484,7 +484,15 @@ func run(args []string) (err error) {
 	case <-ended:
 		return nil
 	case err := <-exited:
-		return fmt.Errorf("server exited: %v\n%s", err, f.serverOutput())
+		if sc.restart == nil {
+			return fmt.Errorf("server exited: %v\n%s", err, f.serverOutput())
+		}
+		f.restarted = true
+		select {
+		case <-ctx.Done():
+		case <-ended:
+		}
+		return nil
 	}
 }
 
@@ -540,6 +548,9 @@ type fixture struct {
 	env, cliEnv []string
 	// codex is true when the fake codex is on the fixture PATH.
 	codex bool
+	// restarted is true once the server exited on a web restart: the fixture stays up
+	// for the server that restart started, and stops that one at shutdown.
+	restarted bool
 }
 
 // hostPathWithoutCodex is the caller's PATH with a real codex hidden, so a fixture

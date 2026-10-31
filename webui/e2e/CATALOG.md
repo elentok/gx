@@ -1495,3 +1495,75 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   2. With it on, open a second page of the same browser context on the same URL; open its menu.
   3. Turn vi on, wait out the first turn, fill `hello` with the caret after `he` and press Cmd-G. Read the mode text, text and caret. Run `gx vimode off`; read them again; press Escape and `x`. Run `gx vimode on`; press Escape and `x`.
 - **Pass:** the item is a checkbox, unchecked, then `aria-checked` is true after the click. The second page shows it checked. With the editor open the mode text reads INSERT, goes away on `off` and returns on `on`; the text stays `hello` and the caret stays at 2 throughout. With vi off Escape does nothing and `x` types (`hexllo`). With vi on Escape gives NORMAL and `x` deletes (`hllo`). The restart half of the check is a Go test.
+
+The restart flows (128-138, `restart.e2e.ts`) run on the `restart-*` scenarios, whose server path is a fake `gx` binary. A flow steers it through `setRestartControl` (`check.json`, `slow`, `old`, `start`). `restart-projects` has two projects, `demo` and `broken`, and no agents; its check file is rewritten to pass unless the flow wants the dry run to fail. `start` = `up` lets the restart bring the server back; the fixture stays up across that restart. A flow that restarts allows one reload (`reloads: 1`).
+
+## 128. Restart server in the menu
+
+- **Scenario:** `restart-projects`
+- **Steps:** open the Menu; click "Restart server".
+- **Pass:** "Restart server" sits below AFK and above the build text; the click closes the menu and opens the "Restart server" dialog.
+
+## 129. Restart server keyboard
+
+- **Scenario:** `restart-projects`
+- **Steps:** focus the Menu button, press Enter, ArrowDown twice, Enter, then Esc.
+- **Pass:** the second ArrowDown highlights "Restart server"; Enter opens the dialog; Esc closes it.
+
+## 130. Restart dialog confirms
+
+- **Scenario:** `restart-projects`, check passing with version `fixture-next`, `start` = `up`; one reload allowed.
+- **Steps:**
+  1. Open the dialog; wait for Restart to enable; press Esc.
+  2. Open the dialog again; click Restart.
+- **Pass:**
+  - After Esc, `gx server status` shows the same `pid:` line: nothing restarted before the click.
+  - After the click the dialog reads "Restarting...", then the tab reloads by itself and the pid line has changed.
+
+## 131. Restart dialog checks
+
+- **Scenario:** `restart-projects`, check passing, `slow` = 3 (seconds).
+- **Steps:** read the build text in the Menu; open the dialog.
+- **Pass:** the dialog reads "Checking..." with Restart disabled, then enables Restart. It shows "Running version: <the menu's build text>" and "Next version: fixture-next".
+
+## 132. Restart dialog, same version
+
+- **Scenario:** `restart-projects`, check version equal to the build text, `start` = `up`; one reload allowed.
+- **Steps:** open the dialog; click Restart.
+- **Pass:** the dialog says "Versions match" with Restart enabled; the restart completes (reload, new pid).
+
+## 133. Restart dialog, other install path
+
+- **Scenario:** `restart-launchd` (the fake binary sits at a launchd-style path), check version equal to the build text.
+- **Steps:** open the dialog.
+- **Pass:** the dialog says "Versions match" and Restart is enabled.
+
+## 134. Restart dialog, unreadable version
+
+- **Scenario:** `restart-projects` with `check.json` removed (the binary fails to run), then `restart-missing` (no file at the binary path).
+- **Steps:** on each, open the dialog.
+- **Pass:** the alert names the failure (`check.json`; "no such file"), Restart is disabled and `gx server status` shows the same pid.
+
+## 135. Restart dialog, bad config
+
+- **Scenario:** `restart-projects`, check with config `ok: false` and an error text.
+- **Steps:** open the dialog.
+- **Pass:** the alert shows the config error, Restart is disabled and the pid is unchanged.
+
+## 136. Restart dialog, old binary
+
+- **Scenario:** `restart-projects`, control file `old` present (no `restart-check` command).
+- **Steps:** open the dialog.
+- **Pass:** the alert names `gx server restart`; Restart is disabled.
+
+## 137. Restart dialog, running agents
+
+- **Scenario:** `restart-agents` (held, one running agent), `start` = `up`; one reload allowed.
+- **Steps:** open the dialog until its check counts the agent; click Restart.
+- **Pass:** the dialog reads "1 agent is running. Agents keep running through the restart." and "A migration runs while the agents work."; the restart completes (reload, new pid).
+
+## 138. Restart dialog, dry run
+
+- **Scenario:** `restart-projects` (project `broken` fails its dry run), `start` = `up`; one reload allowed.
+- **Steps:** open the dialog; click "Restart anyway".
+- **Pass:** the alert shows "broken: fixture migration failed"; the button reads "Restart anyway" (no plain "Restart"); the click restarts (reload, new pid).
