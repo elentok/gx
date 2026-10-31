@@ -391,8 +391,8 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "Paused", node: <TopBar active="epics" build="v1.2.3" mode="paused" connected /> },
       { label: "Offline", node: <TopBar active="epics" build="v1.2.3" connected={false} /> },
       { label: "menu closed", node: <TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} /> },
-      { label: "menu open, AFK off", node: <OpenMenu><TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} /></OpenMenu> },
-      { label: "menu open, AFK on", node: <OpenMenu><TopBar active="epics" build="v1.2.3" connected afk onToggleAfk={() => {}} /></OpenMenu> },
+      { label: "menu open, AFK off", node: <OpenMenu><TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} onToggleViMode={() => {}} /></OpenMenu> },
+      { label: "menu open, AFK on", node: <OpenMenu><TopBar active="epics" build="v1.2.3" connected afk onToggleAfk={() => {}} onToggleViMode={() => {}} /></OpenMenu> },
       {
         label: "menu open, with block",
         node: (

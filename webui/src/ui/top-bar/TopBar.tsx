@@ -37,10 +37,13 @@ interface Props {
   menuBlock?: ReactNode;
   // Whether menuBlock renders anything; the menu is wide only then. Defaults to whether menuBlock is set.
   menuBlockShown?: boolean;
+  viMode?: boolean;
+  // The Vi mode item shows only when the page can switch it.
+  onToggleViMode?: () => void;
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk, menuBlock, menuBlockShown }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk, viMode = false, onToggleViMode, menuBlock, menuBlockShown }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
   const nav = useRef<HTMLElement>(null);
   // Sheets that sit below the bar read its real height from the root.
@@ -133,7 +136,22 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
                   _highlighted={{ bg: "surface" }}
                 >
                   AFK
-                  <AfkSwitch on={afk} tone={tone} />
+                  <MenuSwitch on={afk} tone={tone} />
+                </Menu.CheckboxItem>
+              )}
+              {onToggleViMode && (
+                <Menu.CheckboxItem
+                  value="vimode"
+                  checked={viMode}
+                  onCheckedChange={onToggleViMode}
+                  cursor="pointer"
+                  color="text"
+                  ps="3"
+                  justifyContent="space-between"
+                  _highlighted={{ bg: "surface" }}
+                >
+                  Vi mode
+                  <MenuSwitch on={viMode} tone={tone} />
                 </Menu.CheckboxItem>
               )}
               {menuBlock}
@@ -151,7 +169,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
 }
 
 // A drawn switch: the menu item carries the checkbox role and state, so this is decoration only.
-function AfkSwitch({ on, tone }: { on: boolean; tone: Tone }) {
+function MenuSwitch({ on, tone }: { on: boolean; tone: Tone }) {
   return (
     <Box
       aria-hidden

@@ -227,6 +227,8 @@ const menuButton = (page: Page) => page.getByRole("button", nav("Menu"));
 const menu = (page: Page) => page.getByRole("menu", nav("Menu"));
 const afkItem = (page: Page) => menu(page).getByRole("menuitemcheckbox", nav("AFK"));
 
+const viModeItem = (page: Page) => menu(page).getByRole("menuitemcheckbox", nav("Vi mode"));
+
 test("28. Menu: AFK, build text, Paused chip", async ({ page, start }) => {
   const fixture = await start("united");
   const bar = page.getByRole("navigation");
@@ -246,6 +248,14 @@ test("28. Menu: AFK, build text, Paused chip", async ({ page, start }) => {
   // `gx afk` with no argument flips the server state, so "afk off" shows the click turned it on.
   expect(await fixture.cli("afk")).toContain("afk off");
   await expect(afkItem(page)).toHaveAttribute("aria-checked", "false");
+
+  // Vi mode sits next to AFK; `gx vimode` with no argument flips the server state.
+  await expect(viModeItem(page)).toHaveAttribute("aria-checked", "false");
+  await viModeItem(page).click();
+  await expect(viModeItem(page)).toHaveAttribute("aria-checked", "true");
+  await expect(menu(page)).toBeVisible();
+  expect(await fixture.cli("vimode")).toContain("vimode off");
+  await expect(viModeItem(page)).toHaveAttribute("aria-checked", "false");
 
   // The build text shows and does nothing.
   const build = menu(page).getByText(/^v\d/);

@@ -425,11 +425,14 @@ Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56)
 - **Steps:**
   1. Open the Menu (hamburger, right of the Live dot); click the AFK item.
   2. Run `gx afk` (a flip).
-  3. Click the build text; click AFK again; press Esc.
-  4. Run `gx server queue pause`.
+  3. Click the Vi mode item (under AFK); run `gx vimode` (a flip).
+  4. Click the build text; click AFK again; press Esc.
+  5. Run `gx server queue pause`.
 - **Pass:**
   - The AFK item reads unchecked, then checked after the click, and the menu stays open. `gx afk`
     reports `afk off`, so the server was on, and the item reads unchecked again.
+  - The Vi mode item reads unchecked, then checked after the click, and the menu stays open.
+    `gx vimode` reports `vimode off`, so the server was on, and the item reads unchecked again.
   - The build text (`v...`) shows and does nothing: the menu stays open and the URL does not change.
   - With AFK on and the menu closed, the bar has no AFK.
   - The "Paused" chip shows in the bar.

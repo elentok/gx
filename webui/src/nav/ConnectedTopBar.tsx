@@ -4,6 +4,7 @@ import { toggleAfk } from "../afk";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { TopBar, type TopBarTab } from "../ui/top-bar/TopBar";
 import { UsageMenuBlock } from "../usage/UsageMenuBlock";
+import { toggleViMode } from "../vimode";
 
 // The top bar for pages that do not receive the connection state as a prop.
 export function ConnectedTopBar({ active, waiting }: { active?: TopBarTab; waiting?: number }) {
@@ -22,6 +23,8 @@ export function ConnectedTopBar({ active, waiting }: { active?: TopBarTab; waiti
       afk={snapshot?.afk}
       health={snapshot?.health}
       onToggleAfk={() => toggleAfk(snapshot?.afk)}
+      viMode={snapshot?.vi_mode}
+      onToggleViMode={() => toggleViMode(snapshot?.vi_mode)}
       menuBlock={<UsageMenuBlock conn={conn} onShownChange={setUsageShown} />}
       menuBlockShown={usageShown}
     />

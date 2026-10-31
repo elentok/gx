@@ -55,6 +55,28 @@ describe("TopBar", () => {
     expect((await on.findByRole("menuitemcheckbox", { name: "AFK" })).getAttribute("aria-checked")).toBe("true");
   });
 
+  it("holds the Vi mode item in the menu, follows viMode, and keeps the menu open on toggle", async () => {
+    const onToggleViMode = vi.fn();
+    const off = renderThemed(<TopBar active="epics" connected onToggleViMode={onToggleViMode} />);
+    fireEvent.click(off.getByRole("button", { name: "Menu" }));
+    const item = await off.findByRole("menuitemcheckbox", { name: "Vi mode" });
+    expect(item.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(item);
+    await waitFor(() => expect(onToggleViMode).toHaveBeenCalledOnce());
+    expect(off.getByRole("menuitemcheckbox", { name: "Vi mode" })).toBeTruthy();
+    off.unmount();
+    const on = renderThemed(<TopBar active="epics" connected viMode onToggleViMode={onToggleViMode} />);
+    fireEvent.click(on.getByRole("button", { name: "Menu" }));
+    expect((await on.findByRole("menuitemcheckbox", { name: "Vi mode" })).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("has no Vi mode item without a toggle", async () => {
+    const { getByRole, findByRole, queryByRole } = renderThemed(<TopBar connected />);
+    fireEvent.click(getByRole("button", { name: "Menu" }));
+    await findByRole("menuitem", { name: "Settings" });
+    expect(queryByRole("menuitemcheckbox", { name: "Vi mode" })).toBeNull();
+  });
+
   it("shows the build as plain text in the menu, not in the bar", async () => {
     const { getByRole, findByTestId, queryByTestId } = renderThemed(<TopBar active="epics" build="v1.2.3" connected />);
     expect(queryByTestId("server-build")?.closest("[role=menu]") ?? null).toBeNull();
