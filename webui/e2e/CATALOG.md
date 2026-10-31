@@ -21,7 +21,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118), with shared helpers in `agentsKit.ts`. The numbers 72 to 74, 117 and 118 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -1381,3 +1381,19 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   3. Click Continue until Q9 shows, then open the Chat view.
   4. Run `gx agents list --json` and `gx server stats --json`.
 - **Pass:** the header shows `Codex`, the tier and `<model> · <effort>`. Q8 and Q8b show without a Start button. The chat holds a message starting `$gx-design `. After Continue the round is "Q9 - Keep going?" on the same session; the agent list has one design session with harness `codex`; the grilling question counts sum above zero.
+
+## 117. Limits block
+
+- **Scenario:** `limits` (shape `fresh`: 5h at 34%, weekly at 81%). Further tests start their own fixture: a touch context, and a 320px viewport.
+- **Steps:**
+  1. Open the menu and read the "Claude limits" block.
+  2. Pipe a new statusline payload (55% and 96%, resets later than the seeded ones) into `gx claude statusline`.
+  3. Hover the weekly "i" marker; in a touch context tap the 5h marker.
+  4. At 320px wide open the menu.
+- **Pass:** the title, "5h limit" and "Weekly limit" rows show 34% and 81% with progress bars (`aria-valuenow`); the weekly figure is amber and the 5h one is not; both rows read `resets in \d+[dhm]`. The order is Settings, AFK, the block, the build line. After the pipe the open menu reads 55% and 96% (red) without a reload. The tooltip holds a clock time by hover and by tap. At 320px the menu stays inside the viewport and adds no horizontal scroll (the page itself already scrolls one pixel sideways at that width).
+
+## 118. Limits states
+
+- **Scenario:** `limits`, three tests with shape `stale`, `past-reset` and `one-window`.
+- **Steps:** open the menu in each.
+- **Pass:** `stale`: both rows show "seen ... ago". `past-reset`: the 5h row reads "waiting" and "reset passed", has no bar and no "seen"; the weekly row is live with a bar. `one-window`: a single row, "Weekly limit".
