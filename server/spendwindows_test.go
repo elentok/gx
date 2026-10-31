@@ -85,8 +85,8 @@ func TestSpendWindows(t *testing.T) {
 			want: spendWindows{
 				First: "2026-10-13",
 				Today: spendWindow{Total: 16},
-				Week:  spendWindow{Total: 24, Since: "2026-10-13"},
-				Month: spendWindow{Total: 24, Since: "2026-10-13"},
+				Week:  spendWindow{Total: 24, Short: true},
+				Month: spendWindow{Total: 24, Short: true},
 			},
 		},
 		{
@@ -97,7 +97,7 @@ func TestSpendWindows(t *testing.T) {
 				First: "2026-10-11",
 				Today: spendWindow{Total: 16},
 				Week:  spendWindow{Total: 20},
-				Month: spendWindow{Total: 20, Since: "2026-10-11"},
+				Month: spendWindow{Total: 20, Short: true},
 			},
 		},
 		{
@@ -125,7 +125,7 @@ func TestSpendWindows(t *testing.T) {
 				First: "2026-03-07",
 				Today: spendWindow{Total: 8},
 				Week:  spendWindow{Total: 1 + 2 + 4 + 8},
-				Month: spendWindow{Total: 115, Since: "2026-03-07"},
+				Month: spendWindow{Total: 115, Short: true},
 			},
 		},
 		{
@@ -146,8 +146,8 @@ func TestSpendWindows(t *testing.T) {
 			want: spendWindows{
 				First: "2026-10-14",
 				Today: spendWindow{Total: 1},
-				Week:  spendWindow{Total: 1, Since: "2026-10-14"},
-				Month: spendWindow{Total: 1, Since: "2026-10-14"},
+				Week:  spendWindow{Total: 1, Short: true},
+				Month: spendWindow{Total: 1, Short: true},
 			},
 		},
 	}

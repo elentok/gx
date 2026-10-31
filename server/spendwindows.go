@@ -2,11 +2,11 @@ package server
 
 import "time"
 
-// spendWindow is one spend total. Since is set only when the ledger starts
-// after the window's start day, so the caller can write "since <day>".
+// spendWindow is one spend total. Short is set only when the ledger starts
+// after the window's start day; the caller then writes "since <First>".
 type spendWindow struct {
 	Total float64
-	Since string
+	Short bool
 }
 
 // spendWindows are the spend totals over the budget ledger. First is the first
@@ -62,15 +62,12 @@ func computeSpendWindows(now time.Time, days map[string]float64) spendWindows {
 		}
 	}
 	w.Today = spendWindow{Total: tod}
-	w.Week = spendWindow{Total: week, Since: shortSince(w.First, weekStart)}
-	w.Month = spendWindow{Total: month, Since: shortSince(w.First, monthStart)}
+	w.Week = spendWindow{Total: week, Short: isShort(w.First, weekStart)}
+	w.Month = spendWindow{Total: month, Short: isShort(w.First, monthStart)}
 	return w
 }
 
-// shortSince is first when the ledger starts after the window start, else "".
-func shortSince(first, start string) string {
-	if first != "" && first > start {
-		return first
-	}
-	return ""
+// isShort reports whether the ledger starts after the window start.
+func isShort(first, start string) bool {
+	return first != "" && first > start
 }

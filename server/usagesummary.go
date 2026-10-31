@@ -45,9 +45,9 @@ func (s *Server) usageSummaryRead(w http.ResponseWriter, _ *http.Request) {
 		Spend: UsageSpend{
 			Today:            sw.Today.Total,
 			SinceSunday:      sw.Week.Total,
-			SinceSundayShort: sw.Week.Since != "",
+			SinceSundayShort: sw.Week.Short,
 			SinceFirst:       sw.Month.Total,
-			SinceFirstShort:  sw.Month.Since != "",
+			SinceFirstShort:  sw.Month.Short,
 			FirstDay:         sw.First,
 		},
 	})
