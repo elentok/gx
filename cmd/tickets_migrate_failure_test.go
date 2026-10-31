@@ -35,7 +35,7 @@ func recordedFor(t *testing.T, state, project string) bool {
 func TestMigrate_PassingRunClearsTheProjectsFailure(t *testing.T) {
 	t.Parallel()
 	dirs := config.DirsFrom(tempEnv(t))
-	dir := writeStoreProject(t, t.TempDir(), "alpha", map[string]string{"01-a.md": legacyNeedsAnswer})
+	dir := writeStoreProject(t, t.TempDir(), "alpha", map[string]string{"01-a.md": legacyStatusTicket})
 	state := seedFailure(t, dirs, "alpha")
 	_ = migratefail.Record(state, "beta", "other")
 
@@ -78,7 +78,7 @@ func TestMigrate_FailingRunLeavesTheRecordUnchanged(t *testing.T) {
 func TestMigrate_DryRunKeepsTheFailure(t *testing.T) {
 	t.Parallel()
 	dirs := config.DirsFrom(tempEnv(t))
-	dir := writeStoreProject(t, t.TempDir(), "alpha", map[string]string{"01-a.md": legacyNeedsAnswer})
+	dir := writeStoreProject(t, t.TempDir(), "alpha", map[string]string{"01-a.md": legacyStatusTicket})
 	state := seedFailure(t, dirs, "alpha")
 
 	if err := runTicketsMigrate(dirs, dir, true, &bytes.Buffer{}); err != nil {

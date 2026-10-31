@@ -27,13 +27,13 @@ func writeStoreProject(t *testing.T, store, name string, files map[string]string
 	return dir
 }
 
-const legacyNeedsAnswer = "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\nBody.\n"
+const legacyStatusTicket = "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\nBody.\n"
 
 func TestMigrateAllProjects_MigratesEveryStoreAndNamesEach(t *testing.T) {
 	t.Parallel()
 	store := t.TempDir()
-	a := writeStoreProject(t, store, "alpha", map[string]string{"01-a.md": legacyNeedsAnswer})
-	b := writeStoreProject(t, store, "beta", map[string]string{"01-a.md": legacyNeedsAnswer})
+	a := writeStoreProject(t, store, "alpha", map[string]string{"01-a.md": legacyStatusTicket})
+	b := writeStoreProject(t, store, "beta", map[string]string{"01-a.md": legacyStatusTicket})
 
 	var out bytes.Buffer
 	if err := migrateAllProjects(config.DirsFrom(tempEnv(t)), store, &out); err != nil {
@@ -81,7 +81,7 @@ func TestMigrateAllProjectsContinue_RecordsFailureAndMigratesTheRest(t *testing.
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nparent: \"02\"\n---\nBody.\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
 	})
-	good := writeStoreProject(t, store, "beta", map[string]string{"01-a.md": legacyNeedsAnswer})
+	good := writeStoreProject(t, store, "beta", map[string]string{"01-a.md": legacyStatusTicket})
 
 	var out bytes.Buffer
 	if err := migrateAllProjectsContinue(config.DirsFrom(tempEnv(t)), state, store, &out); err != nil {
@@ -116,7 +116,7 @@ func TestMigrateAllProjectsContinue_RecordWriteFailureDoesNotStopLaterProjects(t
 		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nparent: \"02\"\n---\nBody.\n",
 		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
 	})
-	good := writeStoreProject(t, store, "beta", map[string]string{"01-a.md": legacyNeedsAnswer})
+	good := writeStoreProject(t, store, "beta", map[string]string{"01-a.md": legacyStatusTicket})
 
 	var out bytes.Buffer
 	if err := migrateAllProjectsContinue(config.DirsFrom(tempEnv(t)), state, store, &out); err != nil {

@@ -68,7 +68,7 @@ func TestRunTicketsMigrate_DryRunPassingProjectListsChangesAndWritesNothing(t *t
 	t.Parallel()
 	root := t.TempDir()
 	writeMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
-		"01-old.md": "---\nid: \"01\"\nstatus: needs-answer\ntype: implement\n---\nBody.\n",
+		"01-old.md": legacyStatusTicket,
 	})
 	before := snapshotTree(t, root)
 
