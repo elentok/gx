@@ -18,6 +18,8 @@ const (
 	Pass Status = "PASS"
 	Fail Status = "FAIL"
 	Skip Status = "SKIP"
+	// Warn is a failing Check with Warn set: reported, but never fails the run.
+	Warn Status = "WARN"
 )
 
 // Mode says where a check can run. A Fixture check only reads recorded
@@ -36,7 +38,9 @@ type Check struct {
 	// Session names the canned session whose recording Run reads; "" for none.
 	Session   string
 	DependsOn []string
-	Run       func(Input) (detail string, ok bool)
+	// Warn makes a failing run report Warn instead of Fail.
+	Warn bool
+	Run  func(Input) (detail string, ok bool)
 }
 
 // Rollout is one rollout file's name and bytes.
@@ -48,6 +52,34 @@ type Rollout struct {
 // Recording is what one canned session produced.
 type Recording struct {
 	Rollouts []Rollout
+	// Frames is the raw PTY output with the time each chunk arrived.
+	Frames []Frame
+	// Hooks names the hook events the recording script saw fire.
+	Hooks []string
+	// DenyHonoured is set when the denied action did not happen.
+	DenyHonoured bool
+	// Launch is the non-model `codex ... debug prompt-input` run.
+	Launch Launch
+	// Probe is the commit attempted from a Codex shell call.
+	Probe Probe
+}
+
+// Frame is one chunk of PTY output, T seconds after the session started.
+type Frame struct {
+	T    float64
+	Data []byte
+}
+
+// Launch is the result of running codex with gx's launch args.
+type Launch struct {
+	Args   []string
+	Stderr string
+	Err    string
+}
+
+// Probe is the result of a commit from a Codex shell call; Err is "" on success.
+type Probe struct {
+	Err string
 }
 
 type Input struct {
@@ -83,10 +115,27 @@ var ErrNoSession = errors.New("no rollout yet")
 // RolloutsSession is the session the rollout-format check reads.
 const RolloutsSession = "rollouts"
 
+// The canned live sessions. Each runs once and serves every check naming it.
+const (
+	LaunchSession       = "launch"
+	TurnSession         = "turn"
+	DenySession         = "deny"
+	CommitSession       = "commit"
+	LiveRolloutsSession = "live-rollouts"
+)
+
 // Table is the doctor's check list, in run order.
 var Table = []Check{
 	{Name: "codex-version", Mode: Live, Run: checkCodexVersion},
 	{Name: "rollout-format", Mode: Fixture, Session: RolloutsSession, Run: checkRolloutFormat},
+	{Name: "launch-flags", Mode: Live, Session: LaunchSession, DependsOn: []string{"codex-version"}, Run: checkLaunchFlags},
+	{Name: "osc7501-title", Mode: Live, Session: TurnSession, DependsOn: []string{"codex-version"}, Run: checkOSC7501Title},
+	{Name: "hooks-fire", Mode: Live, Session: TurnSession, DependsOn: []string{"codex-version"}, Run: checkHooksFire},
+	{Name: "permission-deny", Mode: Live, Session: DenySession, DependsOn: []string{"codex-version"}, Run: checkPermissionDeny},
+	{Name: "probe-commit", Mode: Live, Session: CommitSession, DependsOn: []string{"codex-version"}, Run: checkProbeCommit},
+	{Name: "rollout-reader", Mode: Live, Session: LiveRolloutsSession, DependsOn: []string{"codex-version"}, Run: checkRolloutReader},
+	{Name: "spawn-model-fields", Mode: Live, Warn: true, Run: checkSpawnModelFields},
+	{Name: "managed-rules", Mode: Live, Warn: true, Run: checkManagedRules},
 }
 
 // Run runs table's checks in order. A check whose dependency did not pass is
@@ -141,6 +190,9 @@ func runCheck(c Check, src Source, status map[string]Status, sessions map[string
 
 	detail, ok := c.Run(in)
 	r.Status, r.Detail = Fail, detail
+	if c.Warn {
+		r.Status = Warn
+	}
 	if ok {
 		r.Status = Pass
 	}

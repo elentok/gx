@@ -66,7 +66,7 @@ func TestRunCodexDoctor_JSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out.String()), &got); err != nil {
 		t.Fatalf("output is not a JSON array: %v\n%s", err, out.String())
 	}
-	if len(got) != 2 || got[1]["name"] != "rollout-format" || got[1]["mode"] != "fixture" || got[1]["status"] != "PASS" {
+	if len(got) != len(codexdoctor.Table) || got[1]["name"] != "rollout-format" || got[1]["mode"] != "fixture" || got[1]["status"] != "PASS" {
 		t.Errorf("results = %v", got)
 	}
 }

@@ -48,6 +48,10 @@ func liveCodexDoctorSource(d deps, fixtures codexdoctor.Source) codexdoctor.Sour
 		Live: true,
 		Env:  d.env,
 		Session: func(name string) (codexdoctor.Recording, error) {
+			if name != codexdoctor.RolloutsSession {
+				// The live session drivers are not built yet; skip, don't fail.
+				return codexdoctor.Recording{}, codexdoctor.ErrNoSession
+			}
 			base, err := fixtures.Session(name)
 			if err != nil {
 				return codexdoctor.Recording{}, err
