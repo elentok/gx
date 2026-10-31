@@ -321,7 +321,14 @@ func (s *Server) queueRoot(addr tickets.Address, agent string, front bool) (Queu
 	if !s.rootQueued(root) {
 		return s.queueAdd(QueueRequest{Address: addr.String(), Agent: agent, Front: front})
 	}
-	return s.withExtraUsage(s.queueRaise(root, front))
+	res, err := s.queueRaise(root, front)
+	var agents []string
+	for _, it := range s.queued.list() {
+		if a, perr := tickets.ParseAddress(it.Address, tickets.AddressContext{}); perr == nil && rootOf(a) == root {
+			agents = append(agents, it.Agent)
+		}
+	}
+	return s.withExtraUsage(root.Project, agents, res, err)
 }
 
 // queueRaise moves every queued item of root to the head, keeping their order.

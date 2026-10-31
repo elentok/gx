@@ -786,7 +786,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	s.log.Info("server started", "pid", os.Getpid(), "build", s.cfg.Build, "socket", SocketPath(s.cfg.StateDir))
 	s.seedBudgetNotes(time.Now())
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeServerStarted, Emoji: "🚀", Title: "server started", Detail: "build " + s.cfg.Build})
-	s.checkExtraUsage(time.Now())
+	s.startExtraUsageCheck(time.Now())
 	freshCtx, stopFresh := context.WithCancel(ctx)
 	// Armed before the socket serves, so no save after startup goes unseen.
 	s.startConfigWatch(freshCtx)

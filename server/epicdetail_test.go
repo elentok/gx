@@ -514,6 +514,27 @@ func TestEpicDetail_CodexDropsCost(t *testing.T) {
 	}
 }
 
+// A Codex ticket has tokens and no dollar cost: it adds nothing to the epic's
+// cost total, and the Claude ticket beside it still counts.
+func TestEpicDetail_CodexTicketAddsTokensNotDollars(t *testing.T) {
+	t.Parallel()
+	h, base := startEpicDetail(t, func(store string) {
+		writeEpicFiles(t, store, "work", "---\nstatus: open\n---\n", map[string]string{
+			"01-claude.md": issueMD("01", "done", "actual_cost: 2\ntotal_tokens: 100\n", "Claude"),
+			"02-codex.md":  issueMD("02", "done", "had_codex: true\ntotal_tokens: 900\n", "Codex"),
+		})
+	})
+	_, d, _ := getEpicDetail(t, h, base, "proj:work")
+	if d.CostTotal != 2 {
+		t.Errorf("cost_total = %v, want only the Claude ticket's 2", d.CostTotal)
+	}
+	for _, r := range d.Rows {
+		if strings.HasSuffix(r.Address, "/02") && r.Cost != 0 {
+			t.Errorf("codex row cost = %v, want 0", r.Cost)
+		}
+	}
+}
+
 func TestEpicDetail_MapEpicStats(t *testing.T) {
 	t.Parallel()
 	stamped := "---\nstatus: open\nkind: map\ncreated_at: 2026-01-01T00:00:00Z\ncompleted_at: 2026-01-01T02:00:00Z\ntotal_tokens: 900\nactual_cost: 0.5\n---\n"

@@ -482,6 +482,10 @@ func (s *Server) pollBudget(now time.Time) {
 		if t.Status != "claimed" && !s.registry.has(t.Address) {
 			continue
 		}
+		// The ledger is dollars, and only a Claude run has a dollar cost.
+		if run, found := s.registry.runOf(t.Address); found && isCodexRun(run) {
+			continue
+		}
 		it, ok := s.budgetIteration(t.Address)
 		if !ok {
 			continue
@@ -504,6 +508,13 @@ func (s *Server) pollBudget(now time.Time) {
 	}
 }
 
+// isCodexRun reports a run on a harness other than Claude (today only Codex).
+// Only Claude has a dollar cost for the budget to count. An unset agent counts
+// as Claude.
+func isCodexRun(r Run) bool {
+	return r.Agent != "" && r.Agent != string(ralphloop.AgentClaude)
+}
+
 // budgetSoftReached holds new starts back; the hard limit implies it.
 func (s *Server) budgetSoftReached(now time.Time) bool { return s.budgetLatches(now).Soft }
 
@@ -518,12 +529,13 @@ func (s *Server) killForBudget(now time.Time) int {
 	return s.killRuns(now, s.killableRuns())
 }
 
-// killableRuns is the runs a budget kill stops: every run with a session.
+// killableRuns is the runs a budget kill stops: every Claude run with a
+// session. A Codex run spends no dollars, so the limit never stops it.
 func (s *Server) killableRuns() []trackedRun {
 	var runs []trackedRun
 	for _, t := range s.registry.list() {
 		// A launch has no session to interrupt yet; a later check stops it once it runs.
-		if t.State != runLaunching {
+		if t.State != runLaunching && !isCodexRun(t.Run) {
 			runs = append(runs, t)
 		}
 	}

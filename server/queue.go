@@ -246,16 +246,25 @@ func canonical(raw string) (string, *QueueResult) {
 }
 
 // withExtraUsage runs the extra-usage check for an enqueue and puts the warning
-// on an accepted result.
-func (s *Server) withExtraUsage(res QueueResult, err error) (QueueResult, error) {
-	if err == nil && !res.Refused {
-		res.ExtraUsage = s.checkExtraUsage(time.Now())
+// on an accepted result. Extra usage is a Claude account matter, so the check
+// runs only when an enqueued agent runs on Claude. An empty agent follows the
+// project's Default harness.
+func (s *Server) withExtraUsage(project string, agents []string, res QueueResult, err error) (QueueResult, error) {
+	if err != nil || res.Refused {
+		return res, err
+	}
+	for _, agent := range agents {
+		if agent == "" && s.defaultHarness(project) == ralphloop.AgentClaude || agent == string(ralphloop.AgentClaude) {
+			res.ExtraUsage = s.checkExtraUsage(time.Now())
+			break
+		}
 	}
 	return res, err
 }
 
 func (s *Server) queueAdd(req QueueRequest) (QueueResult, error) {
-	return s.withExtraUsage(s.queueAddItem(req))
+	res, err := s.queueAddItem(req)
+	return s.withExtraUsage(projectOfAddress(req.Address), []string{req.Agent}, res, err)
 }
 
 // resolveAgent keeps an empty agent empty (it follows the Default harness) and
@@ -403,7 +412,12 @@ func (s *Server) queueRemove(req QueueRequest) (QueueResult, error) {
 // queueReplace swaps one project's pending entries for req.Items, leaving the
 // other projects' entries where they are. The new entries go at the end.
 func (s *Server) queueReplace(req QueueRequest) (QueueResult, error) {
-	return s.withExtraUsage(s.queueReplaceItems(req))
+	res, err := s.queueReplaceItems(req)
+	agents := make([]string, len(req.Items))
+	for i, it := range req.Items {
+		agents[i] = it.Agent
+	}
+	return s.withExtraUsage(req.Project, agents, res, err)
 }
 
 func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {

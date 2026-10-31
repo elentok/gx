@@ -41,6 +41,14 @@ func (s *Server) extraUsageOn() bool {
 	return check() == subscription.StateEnabled
 }
 
+// startExtraUsageCheck is the server-start check. No item is enqueued, so it
+// runs only when the global Default harness is Claude.
+func (s *Server) startExtraUsageCheck(now time.Time) {
+	if defaultOrClaude(s.settings.Load().AgentsDefaultHarness) == ralphloop.AgentClaude {
+		s.checkExtraUsage(now)
+	}
+}
+
 // checkExtraUsage runs at server start and on every enqueue. When extra usage
 // is on it sends at most one chat notice per day, and reports the state so the
 // caller can hand the client its warning.

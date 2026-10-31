@@ -402,6 +402,66 @@ func TestBudget_HardLimitInterruptsRunInParallelInsideGrace(t *testing.T) {
 	assertNoLiveSessions(t, fake)
 }
 
+// A Codex run has no dollar cost: a cost reader that returns dollars for it adds
+// nothing to the ledger, and the hard limit leaves it running while it stops the
+// Claude run beside it.
+func TestBudget_CodexRunIsNotMeteredOrKilled(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "claude ticket", "")
+	// Its own epic: a queue item's agent applies to every ticket of its root.
+	servertest.WriteTicket(t, store, "proj", "epic-b", "01", "codex ticket", "")
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	fake := runnerfake.NewRunner()
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(fake), func(c *server.Config) {
+		c.BudgetHardLimit = 5
+		c.BudgetKillGrace = 20 * time.Millisecond
+		c.BudgetPollInterval = time.Hour
+		c.PollInterval = 50 * time.Millisecond
+		c.MaxAgentsPerRoot = 2
+		c.MaxAgents = 2
+	})
+	var claudeCost atomic.Int64
+	h.Server.SetCostOf(func(it server.IterationInfo) (float64, bool) {
+		if strings.HasPrefix(it.Address, "proj:epic-b/") {
+			return 100, true
+		}
+		return float64(claudeCost.Load()), true
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for addr, agent := range map[string]string{"proj:epic-a/01": "claude", "proj:epic-b/01": "codex"} {
+		if _, err := h.Client.QueueAdd(ctx, addr, agent); err != nil {
+			t.Fatal(err)
+		}
+	}
+	servertest.WaitFor(t, 10*time.Second, "two live sessions", func() bool {
+		a, _ := fake.List("epic-a")
+		b, _ := fake.List("epic-b")
+		return len(a) == 1 && len(b) == 1
+	})
+
+	claudeCost.Store(2)
+	h.Server.PollBudget()
+	status, err := h.Client.Budget(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Total != 2 || status.HardLatched {
+		t.Fatalf("budget = total %v, hard latched %v; want the Claude run's 2 and no latch", status.Total, status.HardLatched)
+	}
+
+	claudeCost.Store(6)
+	h.Server.PollBudget()
+	servertest.WaitFor(t, 5*time.Second, "the Claude session stopped", func() bool {
+		live, _ := fake.List("epic-a")
+		return len(live) == 0
+	})
+	if live, _ := fake.List("epic-b"); len(live) != 1 {
+		t.Fatalf("codex sessions = %d, want it left running", len(live))
+	}
+}
+
 // A grace shorter than the Interrupts does not cut them off: Stop waits for
 // every Interrupt to return.
 func TestBudget_HardLimitStopWaitsForSlowInterrupts(t *testing.T) {
