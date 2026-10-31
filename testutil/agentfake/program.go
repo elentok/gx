@@ -178,32 +178,11 @@ func runProgram() (int, error) {
 	}
 	defer os.Remove(convPath)
 	_ = os.Remove(programSubmittedPath(id))
-	readyPath := programReadyPath(dir, id)
-	ctlPath := filepath.Join(dir, id+".ctl")
-	// A crashed or earlier run with the same id leaves its marker and FIFO
-	// behind; a sender must not take them for this run's.
-	_ = os.Remove(readyPath)
-	_ = os.Remove(ctlPath)
-	if err := syscall.Mkfifo(ctlPath, 0o600); err != nil {
-		return 0, err
-	}
-	defer os.Remove(ctlPath)
-	if s := os.Getenv(ProgramFifoDelayEnv); s != "" {
-		d, err := time.ParseDuration(s)
-		if err != nil {
-			return 0, err
-		}
-		time.Sleep(d)
-	}
-	// Read-write so the FIFO never reads EOF between two senders.
-	ctl, err := os.OpenFile(ctlPath, os.O_RDWR, 0)
+	ctl, closeCtl, err := openProgramChannel(dir, id)
 	if err != nil {
 		return 0, err
 	}
-	defer ctl.Close()
-	if err := os.WriteFile(readyPath, nil, 0o644); err != nil {
-		return 0, err
-	}
+	defer closeCtl()
 	p := &program{out: os.Stdout, trust: os.Getenv(ProgramTrustEnv) == "1", convPath: convPath, convID: id}
 	if os.Getenv(ProgramInputEnv) == "1" {
 		p.box = newInputBox(os.Stdout, os.Getenv(ProgramDraftEnv))
@@ -214,6 +193,45 @@ func runProgram() (int, error) {
 		}
 	}
 	return p.run(os.Stdin, ctl)
+}
+
+// openProgramChannel makes the control FIFO and the ready file of the fake
+// running id under dir, and returns the open FIFO and a func that closes and
+// removes it.
+func openProgramChannel(dir, id string) (*os.File, func(), error) {
+	readyPath := programReadyPath(dir, id)
+	ctlPath := filepath.Join(dir, id+".ctl")
+	// A crashed or earlier run with the same id leaves its marker and FIFO
+	// behind; a sender must not take them for this run's.
+	_ = os.Remove(readyPath)
+	_ = os.Remove(ctlPath)
+	if err := syscall.Mkfifo(ctlPath, 0o600); err != nil {
+		return nil, nil, err
+	}
+	fail := func(err error) (*os.File, func(), error) {
+		_ = os.Remove(ctlPath)
+		return nil, nil, err
+	}
+	if s := os.Getenv(ProgramFifoDelayEnv); s != "" {
+		d, err := time.ParseDuration(s)
+		if err != nil {
+			return fail(err)
+		}
+		time.Sleep(d)
+	}
+	// Read-write so the FIFO never reads EOF between two senders.
+	ctl, err := os.OpenFile(ctlPath, os.O_RDWR, 0)
+	if err != nil {
+		return fail(err)
+	}
+	if err := os.WriteFile(readyPath, nil, 0o644); err != nil {
+		_ = ctl.Close()
+		return fail(err)
+	}
+	return ctl, func() {
+		_ = ctl.Close()
+		_ = os.Remove(ctlPath)
+	}, nil
 }
 
 type program struct {
@@ -383,7 +401,11 @@ func (p *program) report(state, kind, msg string) {
 }
 
 func writeReport(out io.Writer, state, kind, msg string) {
-	s := "\x1b]7501;state=" + state + ":app=agentfake"
+	writeAppReport(out, "agentfake", state, kind, msg)
+}
+
+func writeAppReport(out io.Writer, app, state, kind, msg string) {
+	s := "\x1b]7501;state=" + state + ":app=" + app
 	if kind != "" {
 		s += ":kind=" + kind
 	}

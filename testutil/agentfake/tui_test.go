@@ -24,6 +24,9 @@ func TestMain(m *testing.M) {
 	if os.Getenv(TUIEnv) == "1" {
 		TUIClaude()
 	}
+	if os.Getenv(CodexEnv) == "1" {
+		TUICodex()
+	}
 	if os.Getenv(ProgramEnv) == "1" {
 		Program()
 	}

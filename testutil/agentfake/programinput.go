@@ -64,7 +64,9 @@ const normalModeText = "normal mode"
 
 // inputBox is claude's input box: lines of a draft, the last one being edited.
 type inputBox struct {
-	out       io.Writer
+	out io.Writer
+	// marker starts the first row: promptMarker unless a fake draws its own.
+	marker    string
 	lines     []string
 	swallow   int
 	vim       bool
@@ -73,7 +75,7 @@ type inputBox struct {
 }
 
 func newInputBox(out io.Writer, draft string) *inputBox {
-	return &inputBox{out: out, lines: strings.Split(draft, "\n")}
+	return &inputBox{out: out, marker: promptMarker, lines: strings.Split(draft, "\n")}
 }
 
 func (b *inputBox) text() string { return strings.Join(b.lines, "\n") }
@@ -84,13 +86,13 @@ func (b *inputBox) draw() {
 	if b.normal && b.text() == "" {
 		// Unstyled text, so a draft check that reads the screen before the
 		// INSERT switch sees a draft where the placeholder would be.
-		sb.WriteString(promptMarker + normalModeText)
+		sb.WriteString(b.marker + normalModeText)
 	} else if b.text() == "" {
-		sb.WriteString(promptMarker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m")
+		sb.WriteString(b.marker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m")
 	} else {
 		for i, line := range b.lines {
 			if i == 0 {
-				sb.WriteString(promptMarker + line)
+				sb.WriteString(b.marker + line)
 			} else {
 				sb.WriteString("\r\n  " + line)
 			}
