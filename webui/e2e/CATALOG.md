@@ -1582,9 +1582,9 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - On both pages a strip reads "broken: migration failed" with the error and a `gx tickets migrate` command.
   - The strip is gone after the manual migrate, shows again after the failing restart, and is gone after the passing restart.
 
-## 135. Fix agent for a failed migration
+## 140. Fix agent for a failed migration
 
-- **Scenario:** `restart-projects` with the failed `broken` migration of flow 134; one reload allowed (the restart).
+- **Scenario:** `restart-projects` with the failed `broken` migration of flow 139; one reload allowed (the restart).
 - **Steps:** click "Fix agent" on the strip; Copy; Start; open the Agents tab; in a second page click Fix agent and Start again.
 - **Pass:**
   - The dialog shows "The migration of project broken failed with:" and the error; Copy reads "Copied" and the clipboard holds the prompt.
@@ -1592,19 +1592,19 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - The Agents tab lists the session.
   - The second start shows the toast "an agent is already fixing broken" and adds no session.
 
-## 136. Restart server, tab reloads
+## 141. Restart server, tab reloads
 
 - **Scenario:** `restart-projects`, `start` = `up`, `gx` = the second build (version `fixture-next`); one reload allowed.
 - **Steps:** open the dialog; click Restart.
 - **Pass:** the dialog reads "Restarting..."; the tab reloads by itself; the menu build text now contains `fixture-next` (it did not before).
 
-## 137. Restart server, other tab
+## 142. Restart server, other tab
 
-- **Scenario:** as flow 136, plus an agents session in `demo`; two reloads allowed.
+- **Scenario:** as flow 141, plus an agents session in `demo`; two reloads allowed.
 - **Steps:** tab A opens the session and types "unsent words" into the composer; tab B restarts the server.
 - **Pass:** tab A shows a "New version, reload" strip with a Reload button and keeps "unsent words"; Reload makes the strip go.
 
-## 138. Restart server, server does not return
+## 143. Restart server, server does not return
 
 - **Scenario:** `restart-projects`, `start` unset (the fake refuses, so no new server comes up); one reload allowed; the test timeout is 180 s.
 - **Steps:** open the dialog; click Restart; wait for the 60 s timeout; set `start` = `up` and run `gx server restart --continue` by hand.
@@ -1613,19 +1613,19 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - The log path shown equals `restart_log` in the check and restart responses.
   - After the hand start the tab reloads by itself.
 
-## 139. Restart server, binary changed
+## 144. Restart server, binary changed
 
 - **Scenario:** `restart-projects`, `start` = `up`; no reload allowed.
 - **Steps:** open the dialog; rewrite `check.json` with another version; click Restart.
 - **Pass:** the dialog shows "Next version: fixture-newer", does not read "Restarting..." and keeps its Restart button; the pid is unchanged.
 
-## 140. Restart server, two tabs
+## 145. Restart server, two tabs
 
 - **Scenario:** `restart-projects`, `start` unset; three pages with an open dialog; no reload allowed.
 - **Steps:** page A clicks Restart; page B clicks Restart right after; the server is stopped; page C clicks Restart.
 - **Pass:** B and C both read "Restarting...".
 
-## 141. Restart dialog, launchd binary
+## 146. Restart dialog, launchd binary
 
 - **Scenario:** `restart-launchd`, `check.json` version `launchd-version`.
 - **Steps:** open the dialog.

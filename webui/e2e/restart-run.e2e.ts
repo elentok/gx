@@ -77,7 +77,7 @@ test("139. Restart with a failed migration", async ({ page, start }) => {
 
 const fixDialog = (page: Page) => page.getByRole("dialog", nav("Fix it with an agent"));
 
-test("135. Fix agent for a failed migration", async ({ page, context, start }) => {
+test("140. Fix agent for a failed migration", async ({ page, context, start }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const fixture = await startBroken(start, 1);
   await restartNow(page);
@@ -122,7 +122,7 @@ test("135. Fix agent for a failed migration", async ({ page, context, start }) =
   });
 });
 
-test("136. Restart server, tab reloads", async ({ page, start }) => {
+test("141. Restart server, tab reloads", async ({ page, start }) => {
   const fixture = await start("restart-projects", { reloads: 1 });
   await fixture.setRestartControl("check.json", passing("fixture-next"));
   await fixture.setRestartControl("start", "up");
@@ -137,7 +137,7 @@ test("136. Restart server, tab reloads", async ({ page, start }) => {
   await expect(async () => expect(await buildText(page)).toContain("fixture-next")).toPass({ timeout: 30_000 });
 });
 
-test("137. Restart server, other tab", async ({ page, context, start }) => {
+test("142. Restart server, other tab", async ({ page, context, start }) => {
   const fixture = await start("restart-projects", { reloads: 2 });
   await fixture.setRestartControl("check.json", passing("fixture-next"));
   await fixture.setRestartControl("start", "up");
@@ -160,7 +160,7 @@ test("137. Restart server, other tab", async ({ page, context, start }) => {
   await expect(newVersion).toHaveCount(0, { timeout: 30_000 });
 });
 
-test("138. Restart server, server does not return", async ({ page, start }) => {
+test("143. Restart server, server does not return", async ({ page, start }) => {
   test.setTimeout(180_000);
   const fixture = await start("restart-projects", { reloads: 1 });
   await fixture.setRestartControl("check.json", passing("fixture-next"));
@@ -187,7 +187,7 @@ test("138. Restart server, server does not return", async ({ page, start }) => {
   await expect(page.getByText("Restarting...")).toHaveCount(0);
 });
 
-test("139. Restart server, binary changed", async ({ page, start }) => {
+test("144. Restart server, binary changed", async ({ page, start }) => {
   const fixture = await start("restart-projects");
   await fixture.setRestartControl("check.json", passing("fixture-next"));
   await fixture.setRestartControl("start", "up");
@@ -204,7 +204,7 @@ test("139. Restart server, binary changed", async ({ page, start }) => {
   expect(await pidLine(fixture)).toBe(before);
 });
 
-test("140. Restart server, two tabs", async ({ page, context, start }) => {
+test("145. Restart server, two tabs", async ({ page, context, start }) => {
   const fixture = await start("restart-projects");
   await fixture.setRestartControl("check.json", passing("fixture-next"));
   const origin = new URL(page.url()).origin;
@@ -230,7 +230,7 @@ test("140. Restart server, two tabs", async ({ page, context, start }) => {
   await expect(dialog(after)).toContainText("Restarting...");
 });
 
-test("141. Restart dialog, launchd binary", async ({ page, start }) => {
+test("146. Restart dialog, launchd binary", async ({ page, start }) => {
   const fixture = await start("restart-launchd");
   await fixture.setRestartControl(
     "check.json",
