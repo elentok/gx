@@ -1,6 +1,8 @@
+import { realpath } from "node:fs/promises";
 import type { Page } from "@playwright/test";
-import { expect, test, type Fixture } from "./fixture";
-import { dialog, expectReloaded, openDialog, passing, pidLine, restartButton } from "./restart-helpers";
+import { composer, messageBox, sessions } from "./agentsKit";
+import { expect, nav, test, toasts, type Fixture } from "./fixture";
+import { buildText, dialog, expectReloaded, openDialog, passing, pidLine, restartButton } from "./restart-helpers";
 
 // Flows that run a restart for real: the fake gx binary hands `server restart --continue` to a real
 // gx (see testutil/gxfixture/restart.go), so the migration of every project in the store runs.
@@ -71,4 +73,171 @@ test("139. Restart with a failed migration", async ({ page, start }) => {
     await restartNow(page);
     await expect(strip(page)).toHaveCount(0, { timeout: 15_000 });
   });
+});
+
+const fixDialog = (page: Page) => page.getByRole("dialog", nav("Fix it with an agent"));
+
+test("135. Fix agent for a failed migration", async ({ page, context, start }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  const fixture = await startBroken(start, 1);
+  await restartNow(page);
+  await expect(strip(page)).toBeVisible();
+  const error = (await strip(page).locator("p").nth(1).textContent())!;
+  const before = (await sessions(fixture)).length;
+
+  await test.step("the strip button opens the dialog with the prompt and Copy", async () => {
+    await strip(page).getByRole("button", nav("Fix agent")).click();
+    await expect(fixDialog(page)).toBeVisible();
+    await expect(fixDialog(page)).toContainText("The migration of project broken failed with:");
+    await expect(fixDialog(page)).toContainText(error);
+    await fixDialog(page).getByRole("button", nav("Copy")).click();
+    await expect(fixDialog(page).getByRole("button", nav("Copied"))).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("The migration of project broken failed with:");
+  });
+
+  await test.step("Start runs the strongest tier in the trunk checkout", async () => {
+    await fixDialog(page).getByRole("button", nav("Start gx agent")).click();
+    await expect(fixDialog(page).getByText("Agent started. View it in the gx TUI Agents tab")).toBeVisible();
+    await expect.poll(async () => (await sessions(fixture)).length).toBe(before + 1);
+    const started = (await sessions(fixture)).at(-1)!;
+    const path = (await fixture.cli("tickets", "show", "broken:broken-epic/01")).match(/^path: (.+)$/m)![1];
+    expect(await realpath(started.dir)).toBe(await realpath(`${path.split("/data/gx/tickets")[0]}/broken-repo`));
+    expect(started.tier).toBe("strongest");
+    expect(started.project).toBe("broken");
+    await expect.poll(async () => (await fixture.launches()).at(-1)!.join(" ")).toContain("--model opus --effort high");
+  });
+
+  await test.step("the Agents tab lists it and a second start is refused", async () => {
+    const started = (await sessions(fixture)).at(-1)!;
+    // A hash change keeps the page: a reload would fail the test.
+    await page.evaluate(() => (location.hash = "#/agents"));
+    await expect(page.locator(`a[href$="/agents/${started.id}"]`)).toBeVisible();
+
+    const second = await context.newPage();
+    await second.goto(new URL(page.url()).origin);
+    await strip(second).getByRole("button", nav("Fix agent")).click();
+    await fixDialog(second).getByRole("button", nav("Start gx agent")).click();
+    await expect(toasts(second).filter({ hasText: "an agent is already fixing broken" })).toBeVisible();
+    expect((await sessions(fixture)).length).toBe(before + 1);
+  });
+});
+
+test("136. Restart server, tab reloads", async ({ page, start }) => {
+  const fixture = await start("restart-projects", { reloads: 1 });
+  await fixture.setRestartControl("check.json", passing("fixture-next"));
+  await fixture.setRestartControl("start", "up");
+  await fixture.setRestartControl("gx", process.env.GX_E2E_GX_NEXT!);
+  expect(await buildText(page)).not.toContain("fixture-next");
+
+  await openDialog(page);
+  await restartButton(page).click();
+  await expect(dialog(page)).toContainText("Restarting...");
+  await expect(dialog(page)).toHaveCount(0, { timeout: 45_000 });
+  // A fresh page can show the menu button before React attaches its handler, which drops a click.
+  await expect(async () => expect(await buildText(page)).toContain("fixture-next")).toPass({ timeout: 30_000 });
+});
+
+test("137. Restart server, other tab", async ({ page, context, start }) => {
+  const fixture = await start("restart-projects", { reloads: 2 });
+  await fixture.setRestartControl("check.json", passing("fixture-next"));
+  await fixture.setRestartControl("start", "up");
+  await fixture.setRestartControl("gx", process.env.GX_E2E_GX_NEXT!);
+  await fixture.cli("agents", "create", "--project", "demo", "--prompt", "hello");
+  const session = (await sessions(fixture)).at(-1)!;
+
+  await page.evaluate((h) => (location.hash = h), `#/agents/${session.id}`);
+  await messageBox(page).fill("unsent words");
+  await expect(composer(page)).toBeVisible();
+
+  const other = await context.newPage();
+  await other.goto(new URL(page.url()).origin);
+  await restartNow(other);
+
+  const newVersion = page.getByRole("status").filter({ hasText: "New version, reload" });
+  await expect(newVersion).toBeVisible({ timeout: 30_000 });
+  await expect(messageBox(page)).toHaveValue("unsent words");
+  await newVersion.getByRole("button", nav("Reload")).click();
+  await expect(newVersion).toHaveCount(0, { timeout: 30_000 });
+});
+
+test("138. Restart server, server does not return", async ({ page, start }) => {
+  test.setTimeout(180_000);
+  const fixture = await start("restart-projects", { reloads: 1 });
+  await fixture.setRestartControl("check.json", passing("fixture-next"));
+  const logs: string[] = [];
+  page.on("response", async (res) => {
+    if (!/\/v1\/restart(\/check)?$/.test(new URL(res.url()).pathname)) return;
+    const log = (await res.json().catch(() => ({})))?.restart_log;
+    if (log) logs.push(log);
+  });
+
+  await openDialog(page);
+  await restartButton(page).click();
+  await expect(dialog(page)).toContainText("Restarting...");
+  await expect(dialog(page)).toContainText("The server did not return. It may still be migrating.", { timeout: 75_000 });
+  await expect(dialog(page)).toContainText("gx server start");
+  expect(logs.length).toBeGreaterThan(0);
+  const shown = (await dialog(page).textContent())!.match(/restart log at (.+?), or run/)![1];
+  for (const log of logs) expect(log).toBe(shown);
+
+  await fixture.setRestartControl("start", "up");
+  // The fake start refused, so the old server still runs: start by hand brings up the new one.
+  await fixture.cli("server", "restart", "--continue");
+  await expect(dialog(page)).toHaveCount(0, { timeout: 45_000 });
+  await expect(page.getByText("Restarting...")).toHaveCount(0);
+});
+
+test("139. Restart server, binary changed", async ({ page, start }) => {
+  const fixture = await start("restart-projects");
+  await fixture.setRestartControl("check.json", passing("fixture-next"));
+  await fixture.setRestartControl("start", "up");
+  const before = await pidLine(fixture);
+
+  await openDialog(page);
+  await expect(dialog(page)).toContainText("Next version: fixture-next");
+  await fixture.setRestartControl("check.json", passing("fixture-newer"));
+  await restartButton(page).click();
+
+  await expect(dialog(page)).toContainText("Next version: fixture-newer");
+  await expect(dialog(page)).not.toContainText("Restarting...");
+  await expect(restartButton(page)).toBeVisible();
+  expect(await pidLine(fixture)).toBe(before);
+});
+
+test("140. Restart server, two tabs", async ({ page, context, start }) => {
+  const fixture = await start("restart-projects");
+  await fixture.setRestartControl("check.json", passing("fixture-next"));
+  const origin = new URL(page.url()).origin;
+  const open = async () => {
+    const tab = await context.newPage();
+    await tab.goto(origin);
+    await openDialog(tab);
+    await expect(restartButton(tab)).toBeEnabled();
+    return tab;
+  };
+  const during = await open();
+  const after = await open();
+  await openDialog(page);
+
+  await restartButton(page).click();
+  await expect(dialog(page)).toContainText("Restarting...");
+  await restartButton(during).click();
+  await expect(dialog(during)).toContainText("Restarting...");
+
+  // The fake start fails, so the old server stays up; stop it as a real restart would.
+  await fixture.stopServer();
+  await restartButton(after).click();
+  await expect(dialog(after)).toContainText("Restarting...");
+});
+
+test("141. Restart dialog, launchd binary", async ({ page, start }) => {
+  const fixture = await start("restart-launchd");
+  await fixture.setRestartControl(
+    "check.json",
+    JSON.stringify({ version: "launchd-version", config: { ok: true }, projects: [{ name: "demo", ok: true, files: [] }] }),
+  );
+
+  await openDialog(page);
+  await expect(dialog(page)).toContainText("Next version: launchd-version");
+  await expect(restartButton(page)).toBeEnabled();
 });

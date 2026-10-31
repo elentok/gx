@@ -23,8 +23,11 @@ export const buildText = async (page: Page) => {
   const build = menu(page).getByTestId("server-build");
   await expect(build).toBeVisible();
   const text = (await build.textContent())!.trim();
-  await page.keyboard.press("Escape");
-  await expect(menu(page)).toHaveCount(0);
+  // The first Escape can land before the menu takes focus.
+  await expect(async () => {
+    await page.keyboard.press("Escape");
+    await expect(menu(page)).toHaveCount(0, { timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
   return text;
 };
 
