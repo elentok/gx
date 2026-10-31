@@ -1,27 +1,8 @@
-import { Box, chakra, Text, Textarea } from "@chakra-ui/react";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { Button } from "../ui/button/Button";
-import { BottomSheet } from "../ui/modal/BottomSheet";
-import { useWide } from "../useWide";
+import { Box } from "@chakra-ui/react";
+import { useEffect, useRef } from "react";
+import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 
-const field = {
-  fontSize: "16px",
-  color: "text",
-  bg: "surface",
-  borderColor: "border",
-} as const;
-
-/** Runs `submit` on Cmd/Ctrl+Enter; plain Enter stays a newline. */
-export function submitOnCmdEnter(
-  e: KeyboardEvent<HTMLTextAreaElement>,
-  submit: () => void,
-) {
-  if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey)) return;
-  e.preventDefault();
-  submit();
-}
-
-/** A 5-row note that scrolls itself into view, with an expand button for a large editor. The change handler is the only save. */
+/** A 5-row note that scrolls itself into view when it mounts. */
 export function NoteBox({
   name,
   title,
@@ -48,106 +29,23 @@ export function NoteBox({
   /** Cmd/Ctrl+Enter in the box. */
   onSubmit?: () => void;
 }) {
-  const [editing, setEditing] = useState(false);
   const box = useRef<HTMLDivElement>(null);
-  const sheetMode = !useWide();
   useEffect(() => {
     box.current?.scrollIntoView?.({ block: "nearest" });
   }, []);
   return (
-    <Box ref={box} position="relative">
-      <Textarea
-        {...field}
-        borderRadius="12px"
-        autoFocus={autoFocus}
+    <Box ref={box}>
+      <ExpandableTextField
         rows={5}
-        lineHeight="1.5"
-        py="2.5"
-        ps="3"
-        pe="46px"
-        resize="none"
-        aria-label={label ?? `Note text for ${name}`}
-        placeholder={placeholder}
-        disabled={disabled}
+        label={label ?? `Note text for ${name}`}
+        title={title}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onSubmit && ((e) => submitOnCmdEnter(e, onSubmit))}
+        placeholder={placeholder}
+        onChange={onChange}
+        disabled={disabled}
+        autoFocus={autoFocus}
+        onSubmit={onSubmit}
       />
-      <chakra.button
-        type="button"
-        position="absolute"
-        top="1.5"
-        right="1.5"
-        w="36px"
-        h="36px"
-        borderRadius="8px"
-        bg="surface.raised"
-        color="text.muted"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        cursor="pointer"
-        aria-label="Open the note in a large editor"
-        title="Open the note in a large editor"
-        onClick={() => setEditing(true)}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M9.5 2.5h4v4M13.5 2.5L9 7M6.5 13.5h-4v-4M2.5 13.5L7 9" />
-        </svg>
-      </chakra.button>
-      {editing && (
-        <BottomSheet
-          label={title}
-          onClose={() => setEditing(false)}
-          belowTopBar
-          fillViewport
-          desktop={{ borderRadius: "12px", w: "860px", h: "680px", p: "5" }}
-          bg="surface.raised"
-          borderColor="border"
-          p="4"
-          gap="3"
-        >
-          <Box display="flex" alignItems="center" gap="2">
-            <Text flex="1" fontSize={sheetMode ? "title" : "xl"} fontWeight="700">
-              {title}
-            </Text>
-            <chakra.button
-              type="button"
-              aria-label="Close"
-              w="40px"
-              h="40px"
-              fontSize="xl"
-              lineHeight="1"
-              borderRadius="8px"
-              color="text"
-              cursor="pointer"
-              onClick={() => setEditing(false)}
-            >
-              ×
-            </chakra.button>
-          </Box>
-          <Textarea
-            autoFocus
-            flex="1"
-            minH="0"
-            {...field}
-            resize="none"
-            lineHeight="1.55"
-            p="3"
-            borderRadius="10px"
-            aria-label="Note text in the large editor"
-            placeholder={placeholder}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-          />
-          <Box display="flex" alignItems="center" gap="2">
-            <Text flex="1" fontSize="xs" color="text.dim">
-              Saved as you type
-            </Text>
-            <Button onClick={() => setEditing(false)}>Done</Button>
-          </Box>
-        </BottomSheet>
-      )}
     </Box>
   );
 }

@@ -166,7 +166,7 @@ test.describe("73. Note box", () => {
     await expect(message).toHaveAttribute("rows", "5");
     await expandNote(page.getByRole("form", nav("Composer"))).click();
     await expect(page.getByRole("dialog", nav("Note on this round"))).toBeVisible();
-    await page.getByRole("textbox", nav("Note text in the large editor")).fill("typed in the modal");
+    await page.getByRole("textbox", nav("Note on this round text")).fill("typed in the modal");
     await page.getByRole("button", nav("Done")).click();
     await expect(message).toHaveValue("typed in the modal");
 

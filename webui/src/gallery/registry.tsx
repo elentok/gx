@@ -23,6 +23,8 @@ import { DayChart } from "../ui/day-chart/DayChart";
 import { LineChart } from "../ui/day-chart/LineChart";
 import { EmptyState } from "../ui/empty-state/EmptyState";
 import { InfoTip } from "../ui/info-tip/InfoTip";
+import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
+import { LargeEditor } from "../ui/expandable-text/LargeEditor";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { BottomSheet } from "../ui/modal/BottomSheet";
 import { Modal } from "../ui/modal/Modal";
@@ -295,6 +297,27 @@ export const galleryEntries: GalleryEntry[] = [
     )),
   },
   { name: "Badge", cases: perTone((tone) => <Badge tone={tone}>{tone}</Badge>) },
+  {
+    name: "ExpandableTextField",
+    cases: [
+      { label: "closed", node: <ExpandableTextField label="Closed" title="Note" rows={3} placeholder="Note" value="" onChange={() => {}} /> },
+      { label: "disabled", node: <ExpandableTextField label="Disabled" title="Note" rows={3} placeholder="Note" disabled value="" onChange={() => {}} /> },
+      { label: "with text", node: <ExpandableTextField label="With text" title="Note" rows={3} value={"A note\nover two lines"} onChange={() => {}} /> },
+    ],
+  },
+  {
+    name: "LargeEditor",
+    cases: [
+      {
+        label: "with text",
+        node: (
+          <ModalFrame>
+            <LargeEditor title="Note" value={"A note\nover two lines"} placeholder="Note" selection={{ start: 0, end: 0 }} onChange={() => {}} onClose={() => {}} />
+          </ModalFrame>
+        ),
+      },
+    ],
+  },
   {
     name: "ProgressBar",
     cases: [

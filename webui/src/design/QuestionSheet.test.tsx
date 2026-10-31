@@ -2,6 +2,7 @@ import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, test } from "vitest";
 import type { SessionRoundCard } from "../generated/server";
+import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import { renderThemed } from "../ui/render";
 import { Question, QuestionSheet } from "./QuestionSheet";
 import type { Answers } from "./round";
@@ -76,9 +77,7 @@ test("the question note's large editor is titled with the question and its text 
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
     "Note on Q2 - Pick one",
   );
-  fireEvent.change(screen.getByLabelText("Note text in the large editor"), {
-    target: { value: "hello" },
-  });
+  typeInLargeEditor("Note on Q2 - Pick one", "hello");
   expect(seen.at(-1)?.["2"]?.note).toBe("hello");
 });
 

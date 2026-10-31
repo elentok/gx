@@ -20,7 +20,7 @@ import {
 } from "./open";
 import { codexSkillHint } from "./chat";
 import { InterruptPopover } from "./InterruptPopover";
-import { NoteBox, submitOnCmdEnter } from "./NoteBox";
+import { NoteBox } from "./NoteBox";
 import type { PostPrompt } from "./prompt";
 import { roundPrompt, unansweredOf, type Answers } from "./round";
 import { SendPopover } from "./SendPopover";

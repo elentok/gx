@@ -1,6 +1,6 @@
 import { Box, Spinner, Text, Textarea } from "@chakra-ui/react";
 import { codexSkillHint } from "../design/chat";
-import { submitOnCmdEnter } from "../design/NoteBox";
+import { submitOnCmdEnter } from "../ui/expandable-text/ExpandableTextField";
 import type { PostPrompt } from "../design/prompt";
 import { usePromptSend } from "../design/usePromptSend";
 import { useComposerDraft } from "../drafts";

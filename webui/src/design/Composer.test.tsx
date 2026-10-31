@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
+import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import {
   ConnectionContext,
   type Connection,
@@ -275,9 +276,7 @@ test("the box is 5 rows, scrolls into view and has the expand button; no round: 
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
     "Message to the agent",
   );
-  fireEvent.change(screen.getByLabelText("Note text in the large editor"), {
-    target: { value: "from the modal" },
-  });
+  typeInLargeEditor("Message to the agent", "from the modal");
   fireEvent.click(screen.getByText("Done"));
   expect(box.value).toBe("from the modal");
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
@@ -299,9 +298,7 @@ test("with a round the modal is Note on this round and its text goes in the Note
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
     "Note on this round",
   );
-  fireEvent.change(screen.getByLabelText("Note text in the large editor"), {
-    target: { value: "round note" },
-  });
+  typeInLargeEditor("Note on this round", "round note");
   fireEvent.click(screen.getByText("Done"));
   expect(box.value).toBe("round note");
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));

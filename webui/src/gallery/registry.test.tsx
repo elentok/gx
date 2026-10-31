@@ -24,7 +24,8 @@ it("shows every exported primitive in the gallery", () => {
 });
 
 // Coloured by harness, not by tone: its cases are the harness and the label states.
-const untoned = ["HarnessLabel", "InfoTip"];
+// The text fields have no tone: their cases are the closed, disabled and with-text states.
+const untoned = ["HarnessLabel", "InfoTip", "ExpandableTextField", "LargeEditor"];
 
 it("shows every primitive in every tone", () => {
   for (const name of primitiveNames.filter((n) => !untoned.includes(n))) {
