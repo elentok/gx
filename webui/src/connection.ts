@@ -62,7 +62,11 @@ function eventAddress(block: string): string | undefined {
   }
 }
 
-export type EventListener = (address: string | undefined) => void;
+function eventName(block: string): string {
+  return /^event: ?(.*)$/m.exec(block)?.[1] ?? "";
+}
+
+export type EventListener = (address: string | undefined, type: string) => void;
 
 export type Connection = ReturnType<typeof createConnection>;
 
@@ -181,7 +185,7 @@ export function createConnection(deps: ConnectionDeps = {}) {
         // there is one, only lets a ticket page tell whether the event is about it.
         const events = blocks.filter((b) => /^event:/m.test(b));
         if (events.length > 0) void refresh(g);
-        for (const b of events) eventListeners.forEach((l) => l(eventAddress(b)));
+        for (const b of events) eventListeners.forEach((l) => l(eventAddress(b), eventName(b)));
       }
       if (g === gen) fail();
     } catch {

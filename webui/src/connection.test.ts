@@ -103,6 +103,26 @@ test("an event frame refetches the snapshot without reconnecting", async () => {
   conn.stop();
 });
 
+test("listeners receive (address, type) for each event block", async () => {
+  const { conn, streams } = setup();
+  const seen: [string | undefined, string][] = [];
+  conn.onEvent((address, type) => seen.push([address, type]));
+  conn.start();
+  await vi.advanceTimersByTimeAsync(0);
+  streams[0].push(
+    'id: 2\nevent: ticket\ndata: {"type":"ticket","address":"gx:e/1"}\n\n' +
+      'id: 3\nevent: limits-changed\ndata: {"type":"limits-changed"}\n\n' +
+      "id: 4\nevent: budget-changed\ndata: not json\n\n",
+  );
+  await vi.advanceTimersByTimeAsync(0);
+  expect(seen).toEqual([
+    ["gx:e/1", "ticket"],
+    [undefined, "limits-changed"],
+    [undefined, "budget-changed"],
+  ]);
+  conn.stop();
+});
+
 test("a stream drop reconnects after 1s (a good snapshot clears backoff), snapshot before events", async () => {
   const { conn, log, streams } = setup();
   conn.start();
