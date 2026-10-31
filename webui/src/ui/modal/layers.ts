@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 // Mounted layers, oldest first. Module-level so a Modal and the editor's jump menu share one order.
 const stack: object[] = [];
@@ -20,5 +20,5 @@ export function useIsTopLayer(active = true): () => boolean {
       stack.splice(stack.indexOf(mine), 1);
     };
   }, [active]);
-  return () => stack[stack.length - 1] === token.current;
+  return useCallback(() => stack.at(-1) === token.current, []);
 }

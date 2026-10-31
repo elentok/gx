@@ -25,4 +25,14 @@ describe("useIsTopLayer", () => {
     rerender(<Layer name="a" tops={tops} />);
     expect(tops.a()).toBe(true);
   });
+
+  it("returns the same function across re-renders", () => {
+    const tops: Record<string, () => boolean> = {};
+    const seen: (() => boolean)[] = [];
+    const { rerender } = render(<Layer name="a" tops={tops} />);
+    seen.push(tops.a);
+    rerender(<Layer name="a" tops={tops} />);
+    seen.push(tops.a);
+    expect(seen[1]).toBe(seen[0]);
+  });
 });

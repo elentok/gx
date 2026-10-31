@@ -284,7 +284,7 @@ export function RowList({
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onDown);
     };
-  }, [phone, hotkey, open, isTop]);
+  }, [phone, hotkey, open]);
 
   return (
     <Box ref={root} position="relative" minW="0">

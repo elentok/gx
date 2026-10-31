@@ -15,7 +15,7 @@ interface ModalProps extends Omit<BoxProps, "children"> {
   children: ReactNode;
 }
 
-const FOCUSABLE = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE = 'a[href], button, input, select, textarea, [contenteditable="true"], [tabindex]:not([tabindex="-1"])';
 
 function focusables(panel: HTMLElement) {
   return [...panel.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(
@@ -32,33 +32,37 @@ function trapTab(e: ReactKeyboardEvent<HTMLElement>) {
   const last = items[items.length - 1];
   const active = document.activeElement;
   if (!first || !last) return e.preventDefault();
-  const wrapTo = !panel.contains(active) ? first : e.shiftKey && (active === first || active === panel) ? last : !e.shiftKey && active === last ? first : null;
-  if (!wrapTo) return;
+  const wrapTo = () => {
+    if (!panel.contains(active)) return first;
+    if (e.shiftKey) return active === first || active === panel ? last : null;
+    return active === last ? first : null;
+  };
+  const target = wrapTo();
+  if (!target) return;
   e.preventDefault();
-  wrapTo.focus();
+  target.focus();
 }
 
 /** A dialog over a dimmed backdrop. Escape (when topmost) and a press on the backdrop close it; the rest of the props style the panel. */
-export function Modal({ label, onClose, backdrop, closeOnEscape = true, closeOnBackdrop = true, children, ...panel }: ModalProps) {
+export function Modal({ label, onClose, backdrop, closeOnEscape = true, closeOnBackdrop = true, children, onKeyDown, ...panel }: ModalProps) {
   // A drag that starts in the panel and ends on the backdrop fires a click there; only a press on the backdrop closes.
   const pressedBackdrop = useRef(false);
   const close = useRef(onClose);
   close.current = onClose;
   const isTop = useIsTopLayer();
-  const top = useRef(isTop);
-  top.current = isTop;
   useEffect(() => {
     if (!closeOnEscape) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && top.current() && close.current();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && isTop() && close.current();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [closeOnEscape]);
+  }, [closeOnEscape, isTop]);
   const backdropRef = useRef<HTMLDivElement>(null);
   // Keep focus in the layer from the start, so the first Tab does not land on the page behind.
+  // The panel itself, not its first input: that would open the keyboard on a phone.
   useEffect(() => {
     const panelEl = backdropRef.current?.firstElementChild as HTMLElement | null;
     if (!panelEl || panelEl.contains(document.activeElement)) return;
-    (focusables(panelEl)[0] ?? panelEl).focus();
+    panelEl.focus();
   }, []);
   return (
     <Box
@@ -92,7 +96,10 @@ export function Modal({ label, onClose, backdrop, closeOnEscape = true, closeOnB
         tabIndex={-1}
         outline="none"
         {...panel}
-        onKeyDown={trapTab}
+        onKeyDown={(e) => {
+          onKeyDown?.(e);
+          trapTab(e);
+        }}
       >
         {children}
       </Box>

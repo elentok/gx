@@ -689,6 +689,18 @@ test.describe("126. Vi editor: layers and focus", () => {
       expect([...seen]).toEqual(expect.arrayContaining(["Done", "Esc"]));
       await expectFocusStays(page, dialog, "Shift+Tab", 6);
     });
+
+    test("Shift-Tab from the editor wraps to Done; Tab from Done returns to the editor", async ({ page, start }) => {
+      const fixture = await start("design-working");
+      await setViMode(fixture, page, true);
+      const dialog = await openEditor(page, 1280, 900);
+      const editable = dialog.getByRole("textbox", nav("Message to the agent text"));
+      await editable.focus();
+      await page.keyboard.press("Shift+Tab");
+      await expect(dialog.getByRole("button", { name: "Done" })).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(editable).toBeFocused();
+    });
   });
 
   test("the editor is a named dialog with a named editable area", async ({ page, start }) => {

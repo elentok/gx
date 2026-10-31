@@ -112,6 +112,35 @@ describe("Modal", () => {
       expect(fireEvent.keyDown(dialog, { key: "Tab" })).toBe(true);
     });
 
+    it("wraps Shift-Tab from a contenteditable that is the first element", () => {
+      renderThemed(
+        <Modal label="Thing" onClose={vi.fn()}>
+          <div contentEditable="true" role="textbox" aria-label="Editor" />
+          <button>Done</button>
+        </Modal>,
+      );
+      const editor = screen.getByRole("textbox", { name: "Editor" });
+      editor.focus();
+      expect(fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab", shiftKey: true })).toBe(false);
+      expect(document.activeElement).toBe(screen.getByText("Done"));
+    });
+
+    it("opens with focus on the panel, not the first input", () => {
+      const { dialog } = mountTrap();
+      expect(document.activeElement).toBe(dialog);
+    });
+
+    it("still runs a caller's onKeyDown", () => {
+      const onKeyDown = vi.fn();
+      renderThemed(
+        <Modal label="Thing" onClose={vi.fn()} onKeyDown={onKeyDown}>
+          <button>First</button>
+        </Modal>,
+      );
+      fireEvent.keyDown(screen.getByRole("dialog"), { key: "a" });
+      expect(onKeyDown).toHaveBeenCalledTimes(1);
+    });
+
     it("does not throw with nothing focusable inside", () => {
       renderThemed(
         <Modal label="Empty" onClose={vi.fn()}>
