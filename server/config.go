@@ -73,6 +73,10 @@ type Config struct {
 
 	BudgetPollInterval time.Duration // zero means the default
 
+	// LimitsEventInterval is the coalescing window of limits-changed and
+	// budget-changed; zero means DefaultLimitsEventInterval.
+	LimitsEventInterval time.Duration
+
 	// LookPath finds a harness's program; nil looks over Env's PATH.
 	LookPath func(file string) (string, error)
 	// FreeSpace reads the disk holding a path; nil reads the real one.

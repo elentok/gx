@@ -1483,6 +1483,17 @@ export interface Snapshot {
 }
 
 //////////
+// source: limitsevents.go
+
+export const EventLimitsChanged = "limits-changed";
+export const EventBudgetChanged = "budget-changed";
+/**
+ * EventLimitsChanged is emitted when a stored Claude limits window really
+ * changed. EventBudgetChanged is emitted when the budget summary changes.
+ */
+export type Event = typeof EventLimitsChanged | typeof EventBudgetChanged;
+
+//////////
 // source: limitsstore.go
 
 /**

@@ -50,9 +50,14 @@ func (s *Server) limitsReportWrite(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if _, err := s.limits.apply(req, time.Now().Unix()); err != nil {
+	now := time.Now().Unix()
+	res, err := s.limits.apply(req, now)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if limitsVisiblyChanged(res.FiveHour, now) || limitsVisiblyChanged(res.SevenDay, now) {
+		s.limitsEvents.trigger()
 	}
 	stored := s.limits.read()
 	writeJSON(w, LimitsReportResult{FiveHour: stored.FiveHour, SevenDay: stored.SevenDay})

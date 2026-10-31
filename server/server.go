@@ -298,6 +298,7 @@ type Server struct {
 	ledger       *budgetLedger
 	usage        *usageSamples // Claude's
 	limits       *limitsStore
+	limitsEvents *eventThrottle
 	usageCodex   *usageSamples
 	budgetNotes  budgetNotes
 	hardGrace    hardGrace
@@ -495,18 +496,19 @@ func New(cfg Config) (*Server, error) {
 		registry:  registry,
 		savedRuns: savedRuns,
 
-		queued:      queued,
-		pause:       pause,
-		afk:         afk,
-		ledger:      ledger,
-		usage:       openUsageSamples(cfg.StateDir),
-		limits:      openLimitsStore(cfg.StateDir),
-		usageCodex:  openUsageFiles(cfg.StateDir, usageSampleFileCodex, usageLiftFileCodex),
-		costOf:      iterationCostIn(cfg.Env),
-		mergeInto:   git.MergeBranchInto,
-		mergedProbe: git.IsAncestor,
-		events:      events,
-		kick:        make(chan struct{}, 1),
+		queued:       queued,
+		pause:        pause,
+		afk:          afk,
+		ledger:       ledger,
+		usage:        openUsageSamples(cfg.StateDir),
+		limits:       openLimitsStore(cfg.StateDir),
+		limitsEvents: newEventThrottle(cfg.LimitsEventInterval, func() { events.publish(EventLimitsChanged, "") }),
+		usageCodex:   openUsageFiles(cfg.StateDir, usageSampleFileCodex, usageLiftFileCodex),
+		costOf:       iterationCostIn(cfg.Env),
+		mergeInto:    git.MergeBranchInto,
+		mergedProbe:  git.IsAncestor,
+		events:       events,
+		kick:         make(chan struct{}, 1),
 
 		sessionWatches: newSessionWatches(),
 		focus:          newFocusReports(),
@@ -876,6 +878,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	// Stop claiming, let a merge in flight finish, then flush the store commit
 	// loop, and only then release the lock. Agents in their panes are not touched.
 	stopFresh()
+	s.limitsEvents.stop()
 	s.sessionWatches.close()
 	<-freshDone
 	<-herdrDone
