@@ -52,6 +52,20 @@ func codexHooks() string {
 	return "hooks.PreToolUse=[" + codexHookGroup("Bash", CodexGuardBashCommand) + "," + codexHookGroup(CodexQuestionTool, CodexGuardQuestionCommand) + "]"
 }
 
+// The PermissionRequest hook holds Codex's approval dialog until gx answers.
+// Its command is a constant too; the agent dir travels in the env.
+const (
+	CodexAgentDirEnv         = "GX_CODEX_AGENT_DIR"
+	CodexPermissionCommand   = "gx agent permission-request"
+	codexPermissionHookEvent = "hooks.PermissionRequest="
+)
+
+// codexPermissionHook is the -c value holding the PermissionRequest hook, for
+// every tool.
+func codexPermissionHook() string {
+	return codexPermissionHookEvent + "[" + codexHookGroup("", CodexPermissionCommand) + "]"
+}
+
 // codexSessionHook is the -c value holding the SessionStart hook.
 func codexSessionHook() string {
 	return "hooks.SessionStart=[" + codexHookGroup("", CodexSessionStartCommand) + "]"
@@ -167,6 +181,7 @@ func CodexArgs(in CodexArgsInput) []string {
 		"--dangerously-bypass-hook-trust",
 		"-c", codexHooks(),
 		"-c", codexSessionHook(),
+		"-c", codexPermissionHook(),
 	}
 	if roots := dedupe(in.WritableRoots); len(roots) > 0 {
 		args = append(args, "-c", "sandbox_workspace_write.writable_roots="+tomlStringArray(roots))

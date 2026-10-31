@@ -36,6 +36,7 @@ func TestCodexArgs_Shape(t *testing.T) {
 				"-c sandbox_workspace_write.network_access=true",
 				"-c disable_paste_burst=true",
 				"--dangerously-bypass-hook-trust",
+				`-c hooks.PermissionRequest=[{hooks=[{type="command",command="gx agent permission-request"}]}]`,
 			} {
 				if strings.Count(joined, want) != 1 {
 					t.Errorf("%q appears %d times in %q, want once", want, strings.Count(joined, want), joined)

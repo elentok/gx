@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/agentrunner/codexui"
 )
 
 // The four Codex startup dialogs a launch can show before it is ready. A knob
@@ -304,7 +306,23 @@ func (c *codexFake) permission(command string, allowed func()) error {
 		}
 	}
 	if len(c.hooks["PermissionRequest"]) == 0 {
-		c.onKey = func() error { resume(); return nil }
+		// The dialog Codex 0.166.0 draws when no hook answered, per the spec's
+		// text; the keys are codexui's, the one place that names them.
+		fmt.Fprint(c.out, "\r\n"+codexui.Title+"\r\n"+command+"\r\n")
+		var wait func(key byte) error
+		wait = func(key byte) error {
+			switch string(key) {
+			case codexui.AllowKey:
+				resume()
+				return nil
+			case codexui.DenyKey:
+				fmt.Fprint(c.out, "denied by the person\r\n")
+				return c.finishTurn()
+			}
+			c.onKey = wait
+			return nil
+		}
+		c.onKey = wait
 		return nil
 	}
 	runs, err := c.runHooks("PermissionRequest", "Bash", c.payload("PermissionRequest", "Bash", command))

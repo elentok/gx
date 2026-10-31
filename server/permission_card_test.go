@@ -279,3 +279,39 @@ func TestWeb_AgentAnswerNeedsRequestIDAndOrigin(t *testing.T) {
 		t.Errorf("with request_id = %d %q, want the verb's own refusal", code, reason)
 	}
 }
+
+// A Codex approval reaches the web as the same card, from the hook's request,
+// and Approve and Deny reach the runner.
+func TestPermissionCard_CodexHookRequestAllowAndDeny(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, decision, text string
+		want                 agentrunner.Decision
+	}{
+		{"approve", "allow", "", agentrunner.DecisionAllow},
+		{"deny with reason", "deny", "use fd instead", agentrunner.DecisionDeny},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			h, fake := startBlockedClaimed(t, false, &agentrunner.Pending{
+				ID: "codex-req-1", Tool: "Bash", Input: json.RawMessage(`{"command":"rg foo"}`), Description: "rg foo",
+			})
+			ctx := context.Background()
+			d, err := h.Client.Detail(ctx, answerAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := server.PermissionCard{RequestID: "codex-req-1", Tool: "Bash", Input: `{"command":"rg foo"}`, Description: "rg foo"}
+			if d.Permission == nil || *d.Permission != want || !slices.Contains(d.Actions, server.ActionApprove) {
+				t.Fatalf("permission = %+v, actions %v, want %+v with approve", d.Permission, d.Actions, want)
+			}
+			if res, err := h.Client.AgentAnswer(ctx, answerAddr, tc.decision, tc.text); err != nil || res.Refused {
+				t.Fatalf("answer = %+v, %v", res, err)
+			}
+			got := fake.Answers("epic-a-iter-01")
+			if len(got) != 1 || got[0].Decision != tc.want || got[0].Text != tc.text {
+				t.Errorf("answers = %+v", got)
+			}
+		})
+	}
+}

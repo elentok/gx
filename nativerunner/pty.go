@@ -401,7 +401,8 @@ func (p *Pty) launchCommand(opts agentrunner.StartOptions, dir, sessionID string
 	env := slices.Concat(p.Env, opts.Env)
 	if kind == harness.Codex {
 		// The SessionStart hook writes Codex's own session id here.
-		env = append(env, harness.CodexSessionFileEnv+"="+filepath.Join(dir, harness.CodexSessionFile))
+		env = append(env, harness.CodexSessionFileEnv+"="+filepath.Join(dir, harness.CodexSessionFile),
+			harness.CodexAgentDirEnv+"="+dir)
 	}
 	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: args, Env: env, Cwd: opts.Cwd}
 	var launch harness.Command
@@ -560,7 +561,13 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	claude := resp.Claude
 	st := agentrunner.Status{State: agentrunner.StateWorking, Turn: resp.Turn, SessionID: ss.session.SessionID}
 	if w := resp.watched(); w != nil {
-		return watchedStatus(st, *w), nil
+		st = watchedStatus(st, *w)
+		if st.State == agentrunner.StateBlocked && w.Status.Blocked == harness.BlockedPermission {
+			if st.Pending, err = p.codexPending(ss); err != nil {
+				return agentrunner.Status{}, err
+			}
+		}
+		return st, nil
 	}
 	if claude == nil {
 		return st, nil
@@ -924,6 +931,9 @@ func (p *Pty) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	ss, err := p.live(s)
 	if err != nil {
 		return err
+	}
+	if ss.kind == harness.Codex {
+		return p.answerCodex(ss, a)
 	}
 	claude, turn, err := ss.holder.Status()
 	if err != nil {

@@ -213,7 +213,7 @@ type codexFake struct {
 	dialogs []string
 	ctlPath string
 	// onKey, when set, takes the next key instead of the input box.
-	onKey func() error
+	onKey func(key byte) error
 	// resumeWork is a ticket whose first prompt ended in a rate-limit error; the
 	// next prompt does its work.
 	resumeWork *pendingWork
@@ -346,7 +346,7 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 		case c.onKey != nil:
 			next := c.onKey
 			c.onKey = nil
-			if err := next(); err != nil {
+			if err := next(ev.key); err != nil {
 				return 0, err
 			}
 		default:
