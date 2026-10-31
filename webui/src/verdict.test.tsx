@@ -1,11 +1,12 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VerdictUsagePrefixClaude } from "./generated/server";
+import { VerdictUsagePrefixClaude, VerdictUsagePrefixCodex } from "./generated/server";
 import { renderThemed } from "./ui/render";
 import { VerdictLine } from "./verdict";
 
 const gated = `${VerdictUsagePrefixClaude}99% of the weekly limit, resets 2026-11-02T00:00:00Z`;
+const gatedCodex = `${VerdictUsagePrefixCodex}99% of the weekly limit, resets 2026-11-02T00:00:00Z`;
 
 describe("VerdictLine usage override", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -15,14 +16,23 @@ describe("VerdictLine usage override", () => {
     expect(screen.queryByRole("button", { name: "Override" })).toBeNull();
   });
 
-  it("posts to the override route when clicked", async () => {
+  it("shows the button on a Codex reason", () => {
+    renderThemed(createElement(VerdictLine, { text: gatedCodex }));
+    expect(screen.getByRole("button", { name: "Override" })).toBeTruthy();
+  });
+
+  it.each([
+    ["claude", gated],
+    ["codex", gatedCodex],
+  ])("posts the %s harness to the override route when clicked", async (harness, text) => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ windows: ["weekly"] })));
     vi.stubGlobal("fetch", fetchMock);
-    renderThemed(createElement(VerdictLine, { text: gated }));
+    renderThemed(createElement(VerdictLine, { text }));
     fireEvent.click(screen.getByRole("button", { name: "Override" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchMock.mock.calls[0][0]).toBe("/v1/usage/override");
     expect(fetchMock.mock.calls[0][1].method).toBe("POST");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ harness });
   });
 
   it("shows a refusal inline", async () => {
