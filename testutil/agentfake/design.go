@@ -83,17 +83,41 @@ func DesignRoundText(turn string) string {
 // Without a script a /gx-design prompt gets the next round and any other text
 // the run-end message; a script that has run out falls back to the same.
 func (t *tui) designMessage(text string, script []string) string {
+	return t.design.message(text, script)
+}
+
+// turnScript is the turn script a prompt plays under. A design prompt naming a
+// map in WorkerConfig.DesignByMap pins that map's script for the session.
+func (d *designState) turnScript(cwd, text string) []string {
+	cfg, err := LoadWorkerConfig(cwd)
+	if err != nil {
+		return nil
+	}
+	if isDesignPrompt(text) {
+		for addr, s := range cfg.DesignByMap {
+			if strings.Contains(text, addr) {
+				d.script = s
+			}
+		}
+	}
+	if d.script != nil {
+		return d.script
+	}
+	return cfg.Design
+}
+
+func (d *designState) message(text string, script []string) string {
 	kind := ""
-	if t.design.turns < len(script) {
-		kind = script[t.design.turns]
+	if d.turns < len(script) {
+		kind = script[d.turns]
 	} else if isDesignPrompt(text) {
 		kind = DesignTurnRound
 	}
-	t.design.turns++
+	d.turns++
 	switch kind {
 	case DesignTurnRound:
-		msg := designRounds[min(t.design.rounds, len(designRounds)-1)]
-		t.design.rounds++
+		msg := designRounds[min(d.rounds, len(designRounds)-1)]
+		d.rounds++
 		return msg
 	case DesignTurnPlain:
 		return "Noted, I am thinking it over."
@@ -115,20 +139,7 @@ func (t *tui) designMessage(text string, script []string) string {
 // Actionable.
 func (t *tui) designTurn(text string) error {
 	t.prompt = text
-	var script []string
-	if cfg, err := LoadWorkerConfig(t.pid.Cwd); err == nil {
-		script = cfg.Design
-		if isDesignPrompt(text) {
-			for addr, s := range cfg.DesignByMap {
-				if strings.Contains(text, addr) {
-					t.design.script = s
-				}
-			}
-		}
-		if t.design.script != nil {
-			script = t.design.script
-		}
-	}
+	script := t.design.turnScript(t.pid.Cwd, text)
 	if isDesignPrompt(text) {
 		t.design.active = true
 	}
@@ -278,4 +289,10 @@ func writeEntry(path, role string, message, extra map[string]any) error {
 	return err
 }
 
-func isDesignPrompt(text string) bool { return strings.HasPrefix(text, DesignPromptPrefix) }
+// codexDesignPromptPrefix is the same prompt typed into Codex, which names a
+// skill with `$`.
+const codexDesignPromptPrefix = "$gx-design "
+
+func isDesignPrompt(text string) bool {
+	return strings.HasPrefix(text, DesignPromptPrefix) || strings.HasPrefix(text, codexDesignPromptPrefix)
+}

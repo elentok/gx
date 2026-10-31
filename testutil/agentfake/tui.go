@@ -608,6 +608,15 @@ func (t *tui) submit() error {
 			return t.designTurn(text)
 		case promptWorker:
 			t.prompt = text
+			if cfg.Transcript {
+				path, err := t.transcriptPath()
+				if err != nil {
+					return err
+				}
+				if err := appendMessage(path, "user", text); err != nil {
+					return err
+				}
+			}
 			switch cfg.Behaviour[address] {
 			case BehaviourPermission:
 				t.dialog = BashPermissionDialog(PermissionCommand)

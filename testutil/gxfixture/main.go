@@ -246,7 +246,7 @@ func run(args []string) (err error) {
 	if err := f.setupHealth(); err != nil {
 		return err
 	}
-	if err := f.writeConfig(port, sc.recentlyFinished, configs); err != nil {
+	if err := f.writeConfig(port, sc.recentlyFinished, append(slices.Clone(sc.config), configs...)); err != nil {
 		return err
 	}
 	if err := f.seed(sc); err != nil {
@@ -304,6 +304,12 @@ func run(args []string) (err error) {
 	if sc.web == webSignedOut {
 		in.cookieName, in.cookie = "", ""
 	}
+	// The earlier run goes first so no held worker holds its slot.
+	for _, addr := range sc.ranOnClaude {
+		if err := f.seedRanOnClaude(addr); err != nil {
+			return err
+		}
+	}
 	// --hold freezes every worker as running until the caller removes the hold file.
 	if hold || sc.hold {
 		if err := os.WriteFile(f.hold, nil, 0o644); err != nil {
@@ -311,7 +317,11 @@ func run(args []string) (err error) {
 		}
 	}
 	for _, addr := range sc.queue {
-		if out, err := f.cli("server", "queue", "add", addr); err != nil {
+		args := []string{"server", "queue", "add", addr}
+		if agent := sc.queueAgents[addr]; agent != "" {
+			args = append(args, "--agent", agent)
+		}
+		if out, err := f.cli(args...); err != nil {
 			return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
 		}
 	}
@@ -569,7 +579,7 @@ func (f *fixture) seed(sc scenario) error {
 	if sc.hold {
 		holdTimeout = "1h"
 	}
-	wcfg := agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.behaviour, Design: sc.design, DesignByMap: sc.designByMap, Chat: sc.chat}
+	wcfg := agentfake.WorkerConfig{Gx: f.gx, Env: f.cliEnv, Hold: f.hold, HoldTimeout: holdTimeout, Behaviour: sc.behaviour, Design: sc.design, DesignByMap: sc.designByMap, Chat: sc.chat, Transcript: sc.transcripts}
 	if sc.usage {
 		resets := time.Now().Add(72 * time.Hour).Unix()
 		wcfg.Usage = &agentfake.UsageConfig{

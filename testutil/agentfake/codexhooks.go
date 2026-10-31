@@ -407,6 +407,9 @@ func (c *codexFake) submit(text string) error {
 		go c.work(w.cfg, w.address)
 		return nil
 	}
+	if isDesignPrompt(text) || (c.design.active && !strings.HasPrefix(text, "$")) {
+		return c.designTurn(text)
+	}
 	address, cfg, ok := c.workerPrompt(text)
 	if !ok {
 		return c.startTurn(text)
@@ -429,6 +432,29 @@ func (c *codexFake) submit(text string) error {
 		return c.taskError("You've hit your usage limit.", "usage_limit_exceeded")
 	}
 	go c.work(cfg, address)
+	return nil
+}
+
+// designTurn plays the next scripted gx-design turn: its message is the reply
+// the turn ends with, a moment after it starts.
+func (c *codexFake) designTurn(text string) error {
+	script := c.design.turnScript(c.cwd, text)
+	if isDesignPrompt(text) {
+		c.design.active = true
+	}
+	busy := designTurnTime
+	if c.design.turns < len(script) && script[c.design.turns] == DesignTurnSlow {
+		busy = designSlowTime
+	}
+	reply := c.design.message(text, script)
+	if err := c.startTurn(text); err != nil {
+		return err
+	}
+	c.reply = reply
+	go func() {
+		time.Sleep(busy)
+		_ = SendControl(c.ctlPath, Control{Action: ActionFinish})
+	}()
 	return nil
 }
 

@@ -45,6 +45,17 @@ type scenario struct {
 	designByMap map[string][]string
 	// queue lists the epics put on the queue once the server is up.
 	queue []string
+	// queueAgents is the agent a queued address runs under (`queue add --agent`);
+	// an address missing here is queued with no agent, so it follows the default.
+	queueAgents map[string]string
+	// ranOnClaude lists tickets that get a real Claude run before the queue loop:
+	// the fake asks, the ticket is sent back to waiting, and it keeps its recorded
+	// session. Their epics are queued by the queue loop like any other.
+	ranOnClaude []string
+	// transcripts makes the fake Claude record a ticket prompt in its transcript.
+	transcripts bool
+	// config is --config style key=value overrides of the global config.
+	config []string
 	// epicMeta replaces an epic's ticket.md frontmatter (the lines between the
 	// "---" fences), by address, e.g. "status: draft\n".
 	epicMeta map[string]string
@@ -399,6 +410,12 @@ var scenarios = map[string]scenario{
 	// the Agents tab holds a Claude, a Codex and a model-switched Claude session.
 	// Start it with --fakecodex for codex on PATH. See defaultHarnessScenario.
 	"default-harness": defaultHarnessScenario(),
+	// codex-queue: Default harness claude; two running tickets (Codex, Claude) and
+	// three waiting (follows default, pinned to Codex, ran on Claude). See codexQueueScenario.
+	"codex-queue": codexQueueScenario(),
+	// codex-design: Default harness codex; one map whose design session starts on
+	// Codex. See codexDesignScenario.
+	"codex-design": codexDesignScenario(),
 	// queue-agents: one PTY Queue agent and one Design agent. See queueAgentsScenario.
 	"queue-agents": queueAgentsScenario(),
 	// agents-failures: four Claude sessions in demo, one per failure (stalled,

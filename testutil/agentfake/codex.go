@@ -217,6 +217,10 @@ type codexFake struct {
 	// resumeWork is a ticket whose first prompt ended in a rate-limit error; the
 	// next prompt does its work.
 	resumeWork *pendingWork
+	// design plays a gx-design session's scripted turns; reply is the assistant
+	// message the running turn ends with, empty for the default.
+	design designState
+	reply  string
 	// rollout is the session file; ordinal numbers its next line.
 	rollout string
 	ordinal int
@@ -399,7 +403,9 @@ func (c *codexFake) finishTurn() error {
 		return nil
 	}
 	c.working = false
-	if err := c.writeLine("response_item", c.message("assistant", "output_text", codexReply)); err != nil {
+	reply := cmp.Or(c.reply, codexReply)
+	c.reply = ""
+	if err := c.writeLine("response_item", c.message("assistant", "output_text", reply)); err != nil {
 		return err
 	}
 	input := codexTurnTokens * c.turns
@@ -425,7 +431,7 @@ func (c *codexFake) finishTurn() error {
 	}); err != nil {
 		return err
 	}
-	if err := c.writeLine("event_msg", map[string]any{"type": "task_complete", "turn_id": c.turnID(), "last_agent_message": codexReply}); err != nil {
+	if err := c.writeLine("event_msg", map[string]any{"type": "task_complete", "turn_id": c.turnID(), "last_agent_message": reply}); err != nil {
 		return err
 	}
 	if err := c.stopHooks(); err != nil {

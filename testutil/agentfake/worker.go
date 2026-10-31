@@ -50,6 +50,9 @@ type WorkerConfig struct {
 	// reply land in the transcript and the turn ends. Off, a plain prompt only
 	// sets the fake busy.
 	Chat bool `json:"chat,omitempty"`
+	// Transcript makes a ticket's skill prompt land in the session transcript, as
+	// real Claude records it, so the run counts as having a transcript.
+	Transcript bool `json:"transcript,omitempty"`
 	// Usage is the rate-limit usage the TUI fake reports to the statusLine
 	// command after each turn. Nil leaves rate_limits out, like an API-key account.
 	Usage *UsageConfig `json:"usage,omitempty"`

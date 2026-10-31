@@ -298,6 +298,83 @@ func defaultHarnessScenario() scenario {
 	}
 }
 
+// codexQueueScenario fills demo's two agent slots with held workers (one Codex,
+// one Claude) and leaves three tickets waiting. A queue item's agent covers its
+// whole root, so each ticket has an epic of its own.
+func codexQueueScenario() scenario {
+	addr := func(name string) string { return project + ":" + name }
+	one := func(opts servertest.TicketOpts) []ticket { return []ticket{{"01", "work", opts}} }
+	return scenario{
+		codex: true,
+		epics: []epic{
+			{project, "codex-running", one(servertest.TicketOpts{})},
+			{project, "claude-running", one(servertest.TicketOpts{})},
+			{project, "follows-default", one(servertest.TicketOpts{})},
+			{project, "pinned", one(servertest.TicketOpts{Agent: "codex"})},
+			{project, "ran-on-claude", one(servertest.TicketOpts{})},
+		},
+		projectExtra: map[string]string{project: `,"max-agents":2`},
+		hold:         true,
+		behaviour:    map[string]string{addr("ran-on-claude/01"): agentfake.BehaviourAsk},
+		ranOnClaude:  []string{addr("ran-on-claude/01")},
+		config:       []string{"execution-queue.waiting-slot-grace=1s"},
+		transcripts:  true,
+		queue: []string{
+			addr("codex-running"), addr("claude-running"),
+			addr("follows-default"), addr("pinned"), addr("ran-on-claude"),
+		},
+		queueAgents: map[string]string{addr("codex-running"): "codex", addr("claude-running"): "claude"},
+	}
+}
+
+// seedRanOnClaude gives the ticket a real Claude run: its epic is queued with no
+// agent, the fake worker asks, and once the ticket waits for the answer it is
+// taken off the queue and sent back to open. The run log keeps the session. The
+// asked run keeps its slot until the waiting-slot grace ends, which the scenario
+// sets short.
+func (f *fixture) seedRanOnClaude(addr string) error {
+	epicAddr, _, _ := strings.Cut(addr, "/")
+	if out, err := f.cli("server", "queue", "add", epicAddr); err != nil {
+		return fmt.Errorf("queue %s: %w\n%s", epicAddr, err, out)
+	}
+	deadline := time.Now().Add(sessionWaitTimeout * 3)
+	for {
+		out, _ := f.cli("server", "tickets", "detail", addr, "--json")
+		if strings.Contains(string(out), `"needs-answer"`) {
+			break
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("%s never asked its question:\n%s", addr, out)
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	// The queue loop adds the epic again. An epic that already left the queue
+	// makes remove fail, which is as good.
+	_, _ = f.cli("server", "queue", "remove", epicAddr)
+	// start-over finds the ticket's worktree from the working directory.
+	startOver := exec.Command(f.gx, "server", "tickets", "start-over", addr, "--reason", "fixture: seed a waiting ticket that ran on Claude")
+	startOver.Env = f.env
+	startOver.Dir = filepath.Join(f.root, "repo")
+	if out, err := startOver.CombinedOutput(); err != nil {
+		return fmt.Errorf("start over %s: %w\n%s", addr, err, out)
+	}
+	return nil
+}
+
+// codexDesignScenario opens a design session on a map while the global Default
+// harness is Codex, so the launch resolves to Codex.
+func codexDesignScenario() scenario {
+	const mapAddr = "design-epic"
+	return scenario{
+		codex:        true,
+		epics:        []epic{{project, mapAddr, nil}},
+		designSteps:  map[string]string{project + ":" + mapAddr: string(tickets.StepResolveTickets)},
+		projectExtra: map[string]string{project: `,"agents":{"default-harness":"codex"}`},
+		design:       []string{agentfake.DesignTurnRound, agentfake.DesignTurnRunEnd},
+		openDesigns:  []string{project + ":" + mapAddr},
+	}
+}
+
 // switchedModel is the model the switched session's later replies report; it
 // differs from the model its tier launched with.
 const switchedModel = "claude-haiku-5-5"
