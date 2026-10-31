@@ -170,7 +170,7 @@ func (s *Server) lastChatMessageID(id string, meta sessionMeta) (string, error) 
 		return "", nil
 	}
 	final := s.designFinal(meta.Ticket)
-	chat, err := s.chats.read(path, final, chatLoader(kind, meta.Ticket, final))
+	chat, err := s.chats.read(path, kind, final, chatLoader(kind, meta.Ticket, final))
 	if os.IsNotExist(err) || len(chat.msgs) == 0 {
 		return "", nil
 	}

@@ -17,6 +17,21 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+func TestSkillPrompt_MatchesTheHarnessSkillCommand(t *testing.T) {
+	t.Parallel()
+	for _, agent := range []AgentKind{AgentClaude, AgentCodex, "fake"} {
+		for _, addr := range []string{"", "gx:epic/01"} {
+			want := harness.SkillCommand(string(agent), "gx-implement", addr)
+			if got := skillPrompt(agent, "gx-implement", addr); got != want {
+				t.Errorf("skillPrompt(%q, %q) = %q, want %q", agent, addr, got, want)
+			}
+		}
+	}
+	if got := skillPrompt(AgentCodex, "gx-implement", "gx:epic/01"); got != "$gx-implement gx:epic/01" {
+		t.Errorf("codex prompt = %q", got)
+	}
+}
+
 func TestRun_CodexLaunchPreflight(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {

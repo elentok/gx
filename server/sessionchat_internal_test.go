@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/elentok/gx/harness"
 )
 
 func TestChatCache_RereadsOnlyWhenTheFileChanged(t *testing.T) {
@@ -19,7 +21,7 @@ func TestChatCache_RereadsOnlyWhenTheFileChanged(t *testing.T) {
 	}
 	var c chatCache
 	for range 2 {
-		if _, err := c.read(path, false, load); err != nil {
+		if _, err := c.read(path, harness.Claude, false, load); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -29,16 +31,22 @@ func TestChatCache_RereadsOnlyWhenTheFileChanged(t *testing.T) {
 	if err := os.WriteFile(path, []byte("a\nbb\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.read(path, false, load); err != nil {
+	if _, err := c.read(path, harness.Claude, false, load); err != nil {
 		t.Fatal(err)
 	}
 	if loads != 2 {
 		t.Errorf("loads = %d after the file grew, want 2", loads)
 	}
-	if _, err := c.read(path, true, load); err != nil {
+	if _, err := c.read(path, harness.Claude, true, load); err != nil {
 		t.Fatal(err)
 	}
 	if loads != 3 {
 		t.Errorf("loads = %d after the final flag flipped, want 3", loads)
+	}
+	if _, err := c.read(path, harness.Codex, true, load); err != nil {
+		t.Fatal(err)
+	}
+	if loads != 4 {
+		t.Errorf("loads = %d after the harness changed, want 4", loads)
 	}
 }

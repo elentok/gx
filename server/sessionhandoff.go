@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 )
@@ -104,7 +105,7 @@ func (s *Server) restartOnWorker(dir string, meta *sessionMeta, old string) erro
 	meta.ConversationID = conv
 	s.applyTier(meta, ralphloop.TierWorker)
 	meta.HandoffTier = true
-	meta.FirstPrompt = "/gx-design " + ticketEpic(meta.Ticket)
+	meta.FirstPrompt = harness.SkillCommand(meta.Harness, "gx-design", ticketEpic(meta.Ticket))
 	meta.Actionable = SessionActionable{}
 	s.recordConversation(*meta)
 	if err := clearOldHolder(dir); err != nil {

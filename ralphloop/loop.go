@@ -190,14 +190,7 @@ func AgentArgs(agent AgentKind, cwd, scratchDir, epicName, model, effort string,
 }
 
 func skillPrompt(agent AgentKind, skill, ticketAddr string) string {
-	prefix := "/"
-	if agent == AgentCodex {
-		prefix = "$"
-	}
-	if ticketAddr == "" {
-		return prefix + skill
-	}
-	return fmt.Sprintf("%s%s %s", prefix, skill, ticketAddr)
+	return harness.SkillCommand(string(agent), skill, ticketAddr)
 }
 
 // claudeGuardSettings adds a PreToolUse hook that rejects shell file edits

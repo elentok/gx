@@ -14,8 +14,9 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-// designCommand opens the command message of a Design session.
-const designCommand = "/gx-design"
+// designCommand opens the command message of a Design session. The migration
+// matches Claude transcripts only.
+var designCommand = harness.SkillCommand(string(harness.Claude), "gx-design", "")
 
 // backfillGrilling counts the Grilling rounds of the ticket-store project at
 // root (see grillround.Recount): the Design conversation records with no counts

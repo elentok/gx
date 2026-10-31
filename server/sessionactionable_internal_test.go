@@ -4,11 +4,15 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -145,9 +149,41 @@ func TestSessionInfoModel_CodexKeepsSavedValues(t *testing.T) {
 
 func TestDesignContinueAction_ResetsEachHarnessItsOwnWay(t *testing.T) {
 	t.Parallel()
-	for agent, want := range map[string]string{"claude": "/clear", "codex": "/new"} {
-		if got := designContinueAction("gx:epic/03", agent)[0]; got != want {
-			t.Errorf("%s reset = %q, want %q", agent, got, want)
+	for agent, want := range map[string][]string{
+		"claude": {"/clear", "/gx-design epic"},
+		"codex":  {"/new", "$gx-design epic"},
+		"fake":   {"/clear", "/gx-design epic"},
+	} {
+		if got := designContinueAction("gx:epic/03", agent); !slices.Equal(got, want) {
+			t.Errorf("%s action = %q, want %q", agent, got, want)
+		}
+	}
+}
+
+// The run-end line raises the session's own harness command.
+func TestChatNext_NamesTheSessionsHarnessCommand(t *testing.T) {
+	t.Parallel()
+	msgs := []transcript.ChatMessage{{Role: transcript.ChatRoleAgent, Kind: transcript.ChatKindText, Text: agentfake.DesignRunEnd}}
+	for kind, want := range map[agentrunner.Kind][]string{
+		harness.Claude: {"/clear", "/gx-design epic"},
+		harness.Codex:  {"/new", "$gx-design epic"},
+	} {
+		next := chatNext(msgs, kind, "gx:epic/03", false)
+		if next == nil || !slices.Equal(next.Action.Action, want) {
+			t.Errorf("%s next = %+v, want action %q", kind, next, want)
+		}
+	}
+}
+
+func TestFixAgentPrompt_TypesTheSessionsPrefix(t *testing.T) {
+	t.Parallel()
+	var tk tickets.Ticket
+	for agent, want := range map[string]string{
+		"claude": "/gx-investigate gx:e/01 is in error",
+		"codex":  "$gx-investigate gx:e/01 is in error",
+	} {
+		if got := fixAgentPrompt(agent, "gx:e/01", tk); got != want {
+			t.Errorf("%s prompt = %q, want %q", agent, got, want)
 		}
 	}
 }

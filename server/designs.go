@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -352,10 +353,11 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 	if d.Clash != "" {
 		return sessionRefusal(ReasonDesignBranchClash, d.Clash), nil
 	}
-	prompt := "/gx-design " + epicAddr
+	target := epicAddr
 	if ticket != "" {
-		prompt += "/" + ticket
+		target += "/" + ticket
 	}
+	prompt := harness.SkillCommand(s.launchHarness(project), "gx-design", target)
 	return s.createSession(CreateSessionRequest{
 		Project:      project,
 		Dir:          d.Path,
@@ -400,9 +402,12 @@ type DesignWorktreeResult struct {
 	Path        string `json:"path,omitempty"`
 	Note        string `json:"note,omitempty"`
 	AfterBranch bool   `json:"after_branch"`
-	Refused     bool   `json:"refused,omitempty"`
-	Reason      string `json:"reason,omitempty"`
-	Message     string `json:"message,omitempty"`
+	// Harness is the one a session started in the project runs on, so the
+	// caller types its skill prefix.
+	Harness string `json:"harness,omitempty"`
+	Refused bool   `json:"refused,omitempty"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 func designWorktreeRefusal(reason, msg string) DesignWorktreeResult {
@@ -447,7 +452,7 @@ func (s *Server) designWorktree(req DesignWorktreeRequest) (DesignWorktreeResult
 	if d.Clash != "" {
 		return designWorktreeRefusal(ReasonDesignBranchClash, d.Clash), nil
 	}
-	return DesignWorktreeResult{Path: d.Path, Note: d.Note, AfterBranch: d.Past}, nil
+	return DesignWorktreeResult{Path: d.Path, Note: d.Note, AfterBranch: d.Past, Harness: s.launchHarness(project)}, nil
 }
 
 // openNewDesign starts a design session for an idea with no map yet: Epic is
@@ -512,7 +517,7 @@ func (s *Server) startSession(project, slug, worktree, rebaseNote string) Sessio
 		MadeWorktree: true,
 		Name:         slug,
 		Ticket:       addr,
-		Prompt:       "/gx-design " + addr,
+		Prompt:       harness.SkillCommand(s.launchHarness(project), "gx-design", addr),
 		RebaseNote:   rebaseNote,
 		launchDesign: true,
 	})

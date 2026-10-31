@@ -60,7 +60,9 @@ type SessionChatResponse struct {
 
 // chatCache keeps each transcript's parsed chat until its size or mtime
 // changes, so polling a quiet session never rereads the file. The design's
-// final-step flag is part of the key: a step change alone must refresh Next.
+// final-step flag and the harness are part of the key: a step change alone
+// must refresh Next, and the same path read as another harness builds a
+// different Next.
 type chatCache struct {
 	mu      sync.Mutex
 	entries map[string]chatCacheEntry
@@ -69,6 +71,7 @@ type chatCache struct {
 type chatCacheEntry struct {
 	size  int64
 	mtime time.Time
+	kind  agentrunner.Kind
 	final bool
 	chat  chatSnapshot
 }
@@ -86,14 +89,14 @@ type chatSnapshot struct {
 	codexVersion string
 }
 
-func (c *chatCache) read(path string, final bool, load func(string) (chatSnapshot, error)) (chatSnapshot, error) {
+func (c *chatCache) read(path string, kind agentrunner.Kind, final bool, load func(string) (chatSnapshot, error)) (chatSnapshot, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return chatSnapshot{}, err
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if e, ok := c.entries[path]; ok && e.size == info.Size() && e.mtime.Equal(info.ModTime()) && e.final == final {
+	if e, ok := c.entries[path]; ok && e.size == info.Size() && e.mtime.Equal(info.ModTime()) && e.kind == kind && e.final == final {
 		return e.chat, nil
 	}
 	chat, err := load(path)
@@ -103,7 +106,7 @@ func (c *chatCache) read(path string, final bool, load func(string) (chatSnapsho
 	if c.entries == nil {
 		c.entries = map[string]chatCacheEntry{}
 	}
-	c.entries[path] = chatCacheEntry{size: info.Size(), mtime: info.ModTime(), final: final, chat: chat}
+	c.entries[path] = chatCacheEntry{size: info.Size(), mtime: info.ModTime(), kind: kind, final: final, chat: chat}
 	return chat, nil
 }
 
@@ -115,7 +118,7 @@ func chatLoader(kind agentrunner.Kind, ticket string, final bool) func(string) (
 		if err != nil {
 			return chatSnapshot{}, err
 		}
-		snap := snapshotOf(read, ticket, final)
+		snap := snapshotOf(read, kind, ticket, final)
 		// Codex has no background markers: its Background flag comes from the status.
 		if kind == harness.Codex {
 			return snap, nil
@@ -136,13 +139,13 @@ func chatLoader(kind agentrunner.Kind, ticket string, final bool) func(string) (
 }
 
 // snapshotOf turns one read of a conversation into what the chat serves.
-func snapshotOf(read chatreader.Result, ticket string, final bool) chatSnapshot {
+func snapshotOf(read chatreader.Result, kind agentrunner.Kind, ticket string, final bool) chatSnapshot {
 	loaded := read.Messages
 	// Read before the cap and the fence strip: both cut what the parsers need.
 	// An open round wins over the run-end line, as in designActionable.
 	snap := chatSnapshot{round: chatRound(loaded), unreadable: read.Unreadable, codexVersion: read.CodexVersion}
 	if snap.round == nil {
-		snap.next = chatNext(loaded, ticket, final)
+		snap.next = chatNext(loaded, kind, ticket, final)
 	}
 	if len(loaded) > maxChatMessages {
 		loaded, snap.truncated = loaded[len(loaded)-maxChatMessages:], true
@@ -204,7 +207,7 @@ func (s *Server) sessionChatArchiveRead(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "cannot decode the archived rollout: "+err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
-	snap := snapshotOf(read, meta.Ticket, s.designFinal(meta.Ticket))
+	snap := snapshotOf(read, harness.Codex, meta.Ticket, s.designFinal(meta.Ticket))
 	writeJSON(w, SessionChatResponse{
 		ConversationID: meta.ConversationID, Messages: snap.msgs, Truncated: snap.truncated,
 		Round: snap.round, Next: snap.next, Background: []SessionBackgroundTask{},
@@ -297,7 +300,7 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 	}
 	if found {
 		final := s.designFinal(meta.Ticket)
-		chat, err := s.chats.read(path, final, chatLoader(kind, meta.Ticket, final))
+		chat, err := s.chats.read(path, kind, final, chatLoader(kind, meta.Ticket, final))
 		switch {
 		case os.IsNotExist(err): // vanished since the lookup: no chat yet
 		case err != nil:

@@ -105,7 +105,7 @@ func designContinueAction(ticket, agent string) []string {
 	if agent == string(harness.Codex) {
 		reset = "/new"
 	}
-	return []string{reset, "/gx-design " + ticketEpic(ticket)}
+	return []string{reset, harness.SkillCommand(agent, "gx-design", ticketEpic(ticket))}
 }
 
 // ticketEpic is the epic of a ticket address like "project:epic" or

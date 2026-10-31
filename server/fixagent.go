@@ -80,7 +80,7 @@ func FixAgentName(addr string) string {
 
 // fixAgentPrompt is the prompt the fix agent starts from; a pause label
 // follows the colon, none leaves the sentence at the state name.
-func fixAgentPrompt(addr string, t tickets.Ticket) string {
+func fixAgentPrompt(agent, addr string, t tickets.Ticket) string {
 	state := "paused for repair"
 	switch t.RawStatus() {
 	case tickets.StatusPausedAnswer:
@@ -88,7 +88,7 @@ func fixAgentPrompt(addr string, t tickets.Ticket) string {
 	case tickets.StatusError:
 		state = "in error"
 	}
-	prompt := "/gx-investigate " + addr + " is " + state
+	prompt := harness.SkillCommand(agent, "gx-investigate", addr+" is "+state)
 	if label := t.PauseReason.Label(); label != "" {
 		prompt += ": " + label
 	}
@@ -139,7 +139,7 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 		Dir:        checkout,
 		Name:       FixAgentName(addr),
 		UniqueName: true,
-		Prompt:     fixAgentPrompt(addr, t),
+		Prompt:     fixAgentPrompt(s.launchHarness(ref.addr.Project), addr, t),
 		Tier:       ralphloop.TierStrongest,
 	}
 	remote := settings.AgentsFixAgentRemoteControl && s.launchHarness(cs.Project) == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))

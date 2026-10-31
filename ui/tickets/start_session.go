@@ -7,6 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/contextmenu"
@@ -95,7 +96,7 @@ func startSessionCmd(api ServerAPI, storePath, address string) tea.Cmd {
 	project, short, _ := strings.Cut(address, ":")
 	epic, _, _ := strings.Cut(address, "/")
 	return func() tea.Msg {
-		var dir, note string
+		var dir, note, agent string
 		madeWorktree := false
 		if api != nil {
 			res, err := api.DesignWorktree(context.Background(), server.DesignWorktreeRequest{Epic: epic})
@@ -103,7 +104,7 @@ func startSessionCmd(api ServerAPI, storePath, address string) tea.Cmd {
 			case err == nil && res.Refused:
 				return notify.Error("start session refused: " + res.Message)()
 			case err == nil:
-				dir, note, madeWorktree = res.Path, res.Note, res.Path != ""
+				dir, note, agent, madeWorktree = res.Path, res.Note, res.Harness, res.Path != ""
 			case !apiclient.IsNotRunning(err):
 				return notify.Error("start session: " + err.Error())()
 			}
@@ -115,7 +116,7 @@ func startSessionCmd(api ServerAPI, storePath, address string) tea.Cmd {
 			Project:      project,
 			Dir:          dir,
 			Name:         short,
-			Prompt:       "/gx-design " + address,
+			Prompt:       harness.SkillCommand(agent, "gx-design", address),
 			Ticket:       address,
 			RebaseNote:   note,
 			MadeWorktree: madeWorktree,
