@@ -21,9 +21,9 @@ Under ralph-loop, a frontier ticket with `type: code-review` never reaches this 
 scheduler launches the iteration with `/gx-code-review` directly instead of `/gx-implement`
 (see `ralphloop.codeReviewSkill`), since [gx-code-review](../gx-code-review/SKILL.md) sets
 `disable-model-invocation: true` and can only be entered via an explicit `/command`, not a
-Skill-tool call from inside a running session. If you're reading this document against a
+skill-loading call from inside a running session. If you're reading this document against a
 `type: code-review` ticket anyway (e.g. invoked by hand), stop — don't implement it and don't
-try to invoke gx-code-review yourself via the Skill tool; ask the user to run
+try to invoke gx-code-review yourself; ask the user to run
 `/gx-code-review <addr>` instead.
 
 Before starting work on the ticket you're about to claim, run `gx tickets validate <addr>` on it. If
@@ -50,45 +50,44 @@ user may prefer a fork.
 
 Then, while working:
 
-- **Read a file once.** After an `Edit` succeeds the file in context is current - never re-read to
+- **Read a file once.** After a file edit (Edit) succeeds the file in context is current - never re-read to
   verify. Repeat reads are the largest leak. The one exception: re-read the exact range (`offset`/
-  `limit`) after an `Edit` fails with `String to replace not found`.
-- **Never edit code you have not read, and copy indentation exactly from the Read.** Don't guess
-  tabs or spaces. Read the exact lines you will edit, in full: a Read that says "(N lines omitted)"
+  `limit`) after a file edit fails with `String to replace not found`.
+- **Never edit code you have not read, and copy indentation exactly from the file read.** Don't guess
+  tabs or spaces. Read the exact lines you will edit, in full: a read that says "(N lines omitted)"
   over them does not count - re-read that range with `offset`/`limit`.
-- **Send Edits to one file one after another, never in parallel.** One failed Edit makes the rest of
-  the batch fail, and a later Edit may depend on text an earlier one changed.
-- **Never run a test in the same batch as the Edits it should cover.** It can return green before
-  the Edits apply, so the result covers only some of them.
+- **Send file edits to one file one after another, never in parallel.** One failed edit makes the rest of
+  the batch fail, and a later edit may depend on text an earlier one changed.
+- **Never run a test in the same batch as the edits it should cover.** It can return green before
+  the edits apply, so the result covers only some of them.
 - **Never read source through a shell command** (`cat`, `sed -n`, `head`, `tail`). Same tokens as a
   direct file read, no benefit.
 - **Prefer the project's LSP tooling to grepping**. A references lookup answers in 3 lines what a
   grep returns kilobytes for.
 - **Delegate any survey wider than ~3 files** to a subagent - you keep the conclusion, not the file
   dumps.
-- **Change any file with `Edit`/`Write`, never a shell command** (python/sed heredocs, `cat >`,
-  `cat >>`, `sed -i`). This covers scratch files and ticket bodies too: Write the file first, then
+- **Change any file with a file edit (Edit) or file write (Write), never a shell command** (python/sed heredocs, `cat >`,
+  `cat >>`, `sed -i`). This covers scratch files and ticket bodies too: write the file first, then
   use it. The guard hook rejects these calls, and a batched call may be half-applied by then. A
-  heredoc that hangs is invisible; an `Edit` that fails says why.
+  heredoc that hangs is invisible; a file edit that fails says why.
 - **Never run a command that can read stdin**: give `rg`/`grep` an explicit path (`rg foo .`),
   never a bare `cat`. Stdin never closes here, so it hangs forever.
 - **Finish with zero background shells.** If a call was moved to the background, read its output,
-  then stop it (TaskStop) before reporting finished. `TaskStop` is a deferred tool: if it isn't
-  callable, load it first with `ToolSearch` query `select:TaskStop`. ralph-loop will not merge a
-  ticket while one is open.
-- **One check per Bash call.** A chained call (`rg ...; go test; tsc`) can return the output
+  then stop it (see the Tool names table in [gx-local-tracker](../gx-local-tracker.md)) before
+  reporting finished. ralph-loop will not merge a ticket while one is open.
+- **One check per shell call (Bash).** A chained call (`rg ...; go test; tsc`) can return the output
   of one segment only. Run each check in its own call.
 - **Never leave the worktree root with a bare `cd`.** The shell keeps the new directory, so the
   next command runs in the wrong place. Use a subshell, `(cd webui && npx vitest ...)`, or absolute
-  paths. Use the same worktree root for Bash and for Read/Edit paths.
+  paths. Use the same worktree root for shell calls and for Read/Edit paths (file read and file edit).
 - **When a test fails, decide why before you fix anything.** If it caught a real bug, fix the
   code. If it checks behaviour the ticket changed on purpose, fix the test: a flaky test waits for
   the event (poll with a timeout), never a fixed sleep. Never weaken, skip or delete an assertion
   just to get green. For any other failing test, follow [gx-failing-tests](../gx-failing-tests.md).
 - **Never report a result you did not see.** If a check's output is missing or cut off, re-run it.
   Do not claim "no remaining imports" or "gofmt is clean" from silence.
-- **Read files with the `Read` tool, not a shell command.** If a read ends in "(exporter
-  truncated)" or has lost its indentation, read it again with `Read`.
+- **Read files with a file read (Read), not a shell command.** If a read ends in "(exporter
+  truncated)" or has lost its indentation, read it again with a file read.
 
 ## Forking when the ticket outgrows budget
 
@@ -156,7 +155,7 @@ heading. It lists the mock file, the states with their widths, the parts and the
   width, part by part, by the part selector. Do not copy the steps here.
 - Check only the parts the ticket built.
 - Every listed state needs a result line (`pass`, `fail`, `unchecked`) in your report. A state that
-  is `unchecked` (skipped, out of time or tools, or its PNG `Read` came back blank) blocks
+  is `unchecked` (skipped, out of time or tools, or its PNG read came back blank) blocks
   `finished`: never report `finished`.
 - Skipping the check is never a question to ask a person: "OK to finish without it?" has one
   answer, run it. Only a tool failure you cannot get past (after the MOCK-CHECK.md setup steps)
@@ -212,7 +211,8 @@ Run Go tests with `gx brief go-test`, not raw `go test`. While iterating, always
 
 Before every commit, and before `--iteration-status finished`, run `gx check` once (changed files).
 It is the only package-wide run. Run it in the foreground, unpiped: no `tail`, no background.
-Pass Bash `timeout: 600000`: the default 120s moves it to the background. The `./server` tests alone
+Set the shell call's time limit to 600000 ms (see the Tool names table in
+[gx-local-tracker](../gx-local-tracker.md)): the default 120s moves it to the background. The `./server` tests alone
 take about 4 minutes. Iterate with `gx brief go-test -run <Test>`, then run `gx check` once at the
 end. It already runs the full suite, so do not run the package separately first.
 

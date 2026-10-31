@@ -87,7 +87,7 @@ asks for in passing, and other skills must be able to call it.
 The vendored skills keep their upstream policy. `gx-wayfinder`, `gx-to-spec` and
 `gx-thermo-nuclear-code-quality-review` set `disable-model-invocation: true`, as upstream does: a
 person starts a map, a spec or a harsh review, and other skills reach them by reading their
-`SKILL.md` by relative link, not through the Skill tool. `gx-research`, `gx-prototype`,
+`SKILL.md` by relative link, not through a skill-loading call. `gx-research`, `gx-prototype`,
 `gx-grilling`, `gx-domain-modeling`, `gx-unslop` and `gx-verify` carry no flag, so the model and
 other skills can call them.
 

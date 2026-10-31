@@ -28,8 +28,9 @@ go run ./testutil/gxfixture [--hold] <scenario>
 - Do not run `go build` by hand. The fixture builds `gx` with `-tags gxfixture` (the `agents`
   scenario needs it for `fakecodex`) and `fakeclaude` into its own temp dir, so sibling worktree
   sessions never overwrite each other's binaries or kill each other's fixtures.
-- Run it with `run_in_background`. It prints one JSON line, then keeps running until SIGTERM.
-- Never start it with `nohup` or `&`. Only `run_in_background` lets the harness track and stop it; a
+- Run it as a background shell call (see the Tool names table in
+  [gx-local-tracker](../gx-local-tracker.md)). It prints one JSON line, then keeps running until SIGTERM.
+- Never start it with `nohup` or `&`. Only a background shell call lets the harness track and stop it; a
   fixture started any other way keeps running after you finish, with its `gx server` and fake agents.
   As a backstop it exits when its parent process dies or after 2 hours.
 - The scenario names are in the catalog (`empty`, `ready`, `mixed`, `finishing`, `paused`, `united`,

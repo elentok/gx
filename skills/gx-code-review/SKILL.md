@@ -21,7 +21,7 @@ This skill never edits code. Its only output is new tickets — each one carryin
 ticket's id>`, the sole edge between them — plus its own ticket's body and closing status. Nothing
 about the tickets it opens is recorded on this ticket.
 
-Change files with `Edit`/`Write` only, never `sed -i`, `cat >` or a heredoc. Write the file first
+Change files with a file edit (Edit) or file write (Write) only, never `sed -i`, `cat >` or a heredoc. Write the file first
 (a scratch body, say), then use it. The guard hook rejects shell file writes.
 
 Before starting, run `gx tickets validate <addr>` on the ticket you're about to claim. If it fails,
@@ -55,8 +55,8 @@ stop and fix the ticket's frontmatter before doing anything else.
 empty or the field is absent, fall back to a single-element list: `["gx-thermo-nuclear-code-quality-review"]`.
 
 Resolve each name to a `SKILL.md` path, taking the first that exists: `skills/<name>/SKILL.md` from
-the reviewed repo's root, then `../<name>/SKILL.md` relative to this file. Subagents Read that file
-rather than call the Skill tool, because a skill with `disable-model-invocation: true` (the vendored
+the reviewed repo's root, then `../<name>/SKILL.md` relative to this file. Subagents read that file
+by path rather than load the skill through a skill-loading call, because a skill with `disable-model-invocation: true` (the vendored
 default one keeps upstream's flag) is not listed there, and the quality axis used to degrade silently
 into a manual review.
 
@@ -76,7 +76,7 @@ step 7.
 ### Shared review file
 
 Reviewers must not each re-run the diff and the same searches. Write one file in your scratchpad
-directory (with `Write`) holding the fixed point, the commit list, the changed-file list, the full
+directory (with a file write) holding the fixed point, the commit list, the changed-file list, the full
 diff, and the output of any search you already ran (say, a `rg` for a symbol the diff changes). Pass
 its path to every subagent; they read that file instead of running `git diff` themselves. They may
 Read a changed file for more context, but not re-run the diff or a search the file already holds.
@@ -87,7 +87,7 @@ confirm it."
 
 ### Launch
 
-Send **one message** carrying every `Agent` tool call — one per configured skill name (none when the
+Send **one message** carrying every start-a-subagent call (Agent tool) — one per configured skill name (none when the
 size gate tripped), plus the one Spec call below (`general-purpose` subagents, run in the foreground
 since the next step needs every result back before it can start). Running them in the same message
 is what makes the passes independent instead of serialized, and it is what puts the Spec axis
@@ -122,7 +122,7 @@ Collect every subagent's raw findings verbatim; don't summarize or filter them y
 
 Once every review subagent has returned, start **one** fresh-context, read-only consultant subagent
 (same pattern as `~/.dotfiles/core/ai/skills/consult`'s consultant-selection step: request the
-strongest tier — pass the output of `gx agent model strongest` as the `Agent` call's model; a second word is its `reasoning_effort`, see
+strongest tier — pass the output of `gx agent model strongest` as the subagent call's model; a second word is its `reasoning_effort`, see
 [Skill conventions](../gx-local-tracker.md#skill-conventions)).
 
 Brief it with every subagent's raw findings joined into one list, each labeled by the axis and skill

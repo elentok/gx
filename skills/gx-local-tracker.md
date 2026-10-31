@@ -154,10 +154,10 @@ conversation history.
   (empty content is refused; `--clear` blanks a section; without content it prints the section),
   change fields with `gx tickets set <addr>`. Never read or write a ticket file by path —
   `gx tickets root` / `gx tickets epics` are for humans and scripts.
-- **Write a body once**: write the text to a scratchpad file with the Write tool, then pipe it in:
+- **Write a body once**: write the text to a scratchpad file with a file write (Write), then pipe it in:
   `gx tickets add ... --body - < <file>`, `gx tickets section <addr> <heading> - < <file>` or
   `gx tickets follow-up add ... --body - < <file>`. Never build a body with `cat > file <<'EOF'`:
-  the guard-bash hook rejects it and you would write the text twice. Never Read or Edit the ticket
+  the guard-bash hook rejects it and you would write the text twice. Never file-read or file-edit the ticket
   file by path, even to append a section.
 - **Allocate an ID atomically**: `gx tickets add <epic> [--parent <id>] --slug <descriptive-slug>` —
   picks the next free identifier under a filesystem lock (safe against a concurrent fork) and writes
@@ -334,6 +334,29 @@ Rules every gx skill follows when it names a model or launches a sub-agent:
 - **On empty output, leave out the `model` field** and the `reasoning_effort` field.
 - **On Codex**, if the spawn call has no model or effort field, the subagent runs on the session model
   and effort, and the step goes on.
+- **Start every subagent in one turn, then wait.** Launch all independent subagents together, then
+  collect their results.
+- **On a tier override, use `fork_turns: none`** so the subagent starts without the parent's turns.
+- **Parallel cap:** 3 subagents on Codex v2, 6 on v1. A larger fan-out runs in waves.
+- **Never use worktree isolation for a subagent** (the `isolation` field with value `worktree`).
+- **Read a callee skill's `SKILL.md` by path** instead of calling a skill-loading tool.
+
+## Tool names
+
+Skills name tools by plain phrase, with the Claude tool in parentheses. Codex maps each phrase to
+its own tool.
+
+| Phrase | Claude | Codex |
+| --- | --- | --- |
+| file read | Read | the shell-based file read tool |
+| file edit | Edit | the patch-apply tool |
+| file write | Write | the patch-apply tool (add file) |
+| shell call | Bash (time limit field: `timeout`, in ms) | the shell tool (time limit field: `timeout_ms`) |
+| start a subagent | Agent tool | the spawn-agent tool |
+| stop a background shell | TaskStop | none: a step that asks for it waits or runs inline |
+| load a deferred tool | ToolSearch | none: every tool is already loaded |
+| run in the background | `run_in_background` | none: a step that asks for it waits or runs inline |
+| ask a person | `gx tickets ask` | `gx tickets ask` |
 
 ## Claiming
 

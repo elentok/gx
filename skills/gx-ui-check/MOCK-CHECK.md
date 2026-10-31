@@ -16,7 +16,7 @@ steps. The browser commands come from the `playwright-cli` skill.
    (its fonts and images may never settle).
 3. Run every `playwright-cli` call from inside the repo worktree. Outside a git repo it fails with
    "not inside a git repo". Never `cd $TMPDIR &&` before a call. Give `--filename` an absolute path in
-   your scratchpad directory, and `Read` the PNG from that same path. Pass the fixture's
+   your scratchpad directory, and file-read (Read) the PNG from that same path. Pass the fixture's
    `browser_session` as `-s=<browser_session>` on every call.
 4. Pick the state and the part you compare. The mock marks them:
    - Part selector: `[data-mock-state=<s>] [data-mock-part=<p>]`
@@ -27,7 +27,7 @@ steps. The browser commands come from the `playwright-cli` skill.
 6. Resize the viewport to the state's width before each state. Screenshot the mock and the built
    page at that width, at device scale factor 1, cropped to the selector. Never take a full page at retina scale.
    Save one crop per part and state, named `<state>-<part>-mock.png` and `<state>-<part>-built.png`.
-7. `Read` both PNGs and compare them side by side by eye. List each difference. A `Read` that returns
+7. File-read (Read) both PNGs and compare them side by side by eye. List each difference. A read that returns
    an empty result means the state is unchecked: do not infer the look from computed styles.
 8. Give every listed state one result line: `pass`, `fail` (with the differences) or `unchecked`
    (with the reason).

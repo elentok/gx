@@ -707,6 +707,73 @@ func TestCodeReviewReadsQualitySkillsByPath(t *testing.T) {
 	}
 }
 
+// neutralFiles lists the skill files whose prose names tools by plain phrase,
+// with the Claude tool only inside parentheses or the tracker's tool table.
+var neutralFiles = []string{
+	"gx-local-tracker.md",
+	"gx-implement/SKILL.md",
+	"gx-code-review/SKILL.md",
+	"gx-ui-check/SKILL.md",
+	"gx-ui-check/MOCK-CHECK.md",
+	"gx.md",
+}
+
+var (
+	parenText       = regexp.MustCompile(`\([^()]*\)`)
+	bashTimeoutText = regexp.MustCompile(`Bash\s+` + "`" + `timeout:`)
+)
+
+// stripToolNames drops the "## Tool names" section and parenthesised text.
+func stripToolNames(raw string) string {
+	if i := strings.Index(raw, "## Tool names"); i >= 0 {
+		rest := raw[i+len("## Tool names"):]
+		if j := strings.Index(rest, "\n## "); j >= 0 {
+			raw = raw[:i] + rest[j:]
+		} else {
+			raw = raw[:i]
+		}
+	}
+	return parenText.ReplaceAllString(raw, "")
+}
+
+// TestBundleToolWording pins that skill prose uses neutral tool phrases, and
+// that the tracker holds the one table mapping each phrase to a tool.
+func TestBundleToolWording(t *testing.T) {
+	banned := []string{"`Read`", "`Edit`", "`Write`", "TaskStop", "ToolSearch",
+		"run_in_background", `isolation: "worktree"`, "Skill tool", "`Agent`"}
+	for _, rel := range neutralFiles {
+		got := stripToolNames(readFile(t, rel))
+		for _, b := range banned {
+			if strings.Contains(got, b) {
+				t.Errorf("%s names %s outside parentheses and the Tool names table", rel, b)
+			}
+		}
+		if bashTimeoutText.MatchString(got) {
+			t.Errorf("%s names the Bash timeout field outside parentheses", rel)
+		}
+	}
+
+	tracker := readFile(t, "gx-local-tracker.md")
+	i := strings.Index(tracker, "\n## Tool names")
+	if i < 0 {
+		t.Fatal("gx-local-tracker.md needs a ## Tool names section")
+	}
+	if b := strings.Index(tracker, "<!-- gx-system-prompt:begin -->"); i > b {
+		t.Error("## Tool names must sit before the system-prompt block")
+	}
+	section := tracker[i+1:]
+	if j := strings.Index(section[3:], "\n## "); j >= 0 {
+		section = section[:j+3]
+	}
+	for _, phrase := range []string{"file read", "file edit", "file write", "shell call",
+		"start a subagent", "stop a background shell", "load a deferred tool",
+		"run in the background", "ask a person"} {
+		if !strings.Contains(section, "| "+phrase+" |") {
+			t.Errorf("Tool names table needs a row for %q", phrase)
+		}
+	}
+}
+
 // TestFollowUpAddHasOneRoute pins gx-follow-up as the only skill that files a
 // follow-up: any other caller naming the verb would skip its dedupe.
 func TestFollowUpAddHasOneRoute(t *testing.T) {
