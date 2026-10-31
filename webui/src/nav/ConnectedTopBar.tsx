@@ -2,10 +2,12 @@ import { useActionableCount } from "../agents/useActionableCount";
 import { toggleAfk } from "../afk";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { TopBar, type TopBarTab } from "../ui/top-bar/TopBar";
+import { UsageMenuBlock } from "../usage/UsageMenuBlock";
 
 // The top bar for pages that do not receive the connection state as a prop.
 export function ConnectedTopBar({ active, waiting }: { active?: TopBarTab; waiting?: number }) {
-  const { snapshot, connected } = useConnectionState(useConnectionContext());
+  const conn = useConnectionContext();
+  const { snapshot, connected } = useConnectionState(conn);
   const actionable = useActionableCount();
   return (
     <TopBar
@@ -18,6 +20,7 @@ export function ConnectedTopBar({ active, waiting }: { active?: TopBarTab; waiti
       afk={snapshot?.afk}
       health={snapshot?.health}
       onToggleAfk={() => toggleAfk(snapshot?.afk)}
+      menuBlock={<UsageMenuBlock conn={conn} />}
     />
   );
 }
