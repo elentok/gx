@@ -157,7 +157,7 @@ func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
 	r.write("a", usageRecord(now, 99, now.Add(time.Hour)))
 	s.scanUsage()
 
-	h, held := s.claimHold("proj", tickets.Ticket{}, ralphloop.AgentClaude)
+	h, held := s.claimHold("proj", tickets.Ticket{}, ResolvedHarness{Harness: ralphloop.AgentClaude})
 	if !held || !strings.HasPrefix(h.Verdict, "usage at 99% of the 5-hour limit") {
 		t.Fatalf("gate alone = %+v, %v", h, held)
 	}
@@ -165,7 +165,7 @@ func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
 	reset := now.Add(2 * time.Hour)
 	s.registry.runs["proj:e/01"] = trackedRun{Run: Run{Address: "proj:e/01", Agent: string(ralphloop.AgentClaude)}}
 	s.registry.markRateLimit("proj:e/01", true, reset)
-	h, held = s.claimHold("proj", tickets.Ticket{}, ralphloop.AgentClaude)
+	h, held = s.claimHold("proj", tickets.Ticket{}, ResolvedHarness{Harness: ralphloop.AgentClaude})
 	if !held || h.Verdict != rateLimitVerdict(reset) {
 		t.Errorf("hold and gate = %+v, %v; want the hold's verdict", h, held)
 	}

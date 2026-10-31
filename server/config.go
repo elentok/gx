@@ -73,6 +73,8 @@ type Config struct {
 
 	BudgetPollInterval time.Duration // zero means the default
 
+	// LookPath finds a harness's program; nil looks over Env's PATH.
+	LookPath func(file string) (string, error)
 	// FreeSpace reads the disk holding a path; nil reads the real one.
 	FreeSpace func(path string) (DiskReading, error)
 	// GoCacheDir finds the Go build cache; nil runs `go env GOCACHE`.

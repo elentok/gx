@@ -37,6 +37,7 @@ const EventSessionChanged = "session-changed"
 const (
 	ReasonSessionBadRequest     = "bad-request"
 	ReasonSessionUnknownHarness = "unknown-harness"
+	ReasonHarnessMissing        = "harness-missing"
 	ReasonSessionUnknown        = "unknown-session"
 	ReasonSessionLive           = "session-live"
 	ReasonSessionNotLive        = "session-not-live"
@@ -138,11 +139,16 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 	if req.Tier != "" && !req.Tier.Valid() {
 		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("unknown tier %q (want light, worker or strongest)", req.Tier)), nil
 	}
+	from := "the request"
 	if req.Harness == "" {
 		req.Harness = s.launchHarness(req.Project)
+		from = s.defaultHarnessSource(req.Project)
 	}
 	if _, err := harness.Lookup(agentrunner.Kind(req.Harness)); err != nil {
 		return sessionRefusal(ReasonSessionUnknownHarness, err.Error()), nil
+	}
+	if msg := s.interactiveMissingReason(req.Harness, from); msg != "" {
+		return sessionRefusal(ReasonHarnessMissing, msg), nil
 	}
 	conv, err := nativerunner.NewUUID()
 	if err != nil {

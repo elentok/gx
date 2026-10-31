@@ -31,6 +31,20 @@ func (s *Server) chartingHandoffDue(meta sessionMeta, action []string) bool {
 		s.designLaunchTier(meta.Ticket) == ralphloop.TierWorker
 }
 
+// handoffRefusal is why a Continue of action must not start: it is a charting
+// handoff whose worker-tier harness is not on PATH. It runs before the run-end
+// line is cleared and the old agent stopped, so the session stays as it was.
+func (s *Server) handoffRefusal(meta sessionMeta, action []string) (SessionResult, bool) {
+	if !s.chartingHandoffDue(meta, action) {
+		return SessionResult{}, false
+	}
+	msg := s.interactiveMissingReason(meta.Harness, "the session's harness")
+	if msg == "" {
+		return SessionResult{}, false
+	}
+	return sessionRefusal(ReasonHarnessMissing, msg), true
+}
+
 // chartingHandoff ends the session's strongest-tier conversation and starts a
 // fresh one under the worker tier in the same gx session, which then types
 // /gx-design as its first prompt. Bumping Run first makes the old watch's

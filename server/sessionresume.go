@@ -33,7 +33,7 @@ func (s *Server) resumeSession(req SessionRequest) (SessionResult, error) {
 	if meta.Status.State != SessionExited {
 		return sessionRefusal(ReasonSessionLive, fmt.Sprintf("session %s is live", req.ID)), nil
 	}
-	if res := resumeRefusal(meta); res.Refused {
+	if res := s.resumeRefusal(meta); res.Refused {
 		return res, nil
 	}
 	meta.RestoredAt = time.Now()
@@ -49,7 +49,7 @@ func (s *Server) resumeSession(req SessionRequest) (SessionResult, error) {
 }
 
 // resumeRefusal is why meta's session cannot be resumed, if it cannot.
-func resumeRefusal(meta sessionMeta) SessionResult {
+func (s *Server) resumeRefusal(meta sessionMeta) SessionResult {
 	if fi, err := os.Stat(meta.Dir); err != nil || !fi.IsDir() {
 		return sessionRefusal(ReasonSessionDirGone, "dir is gone")
 	}
@@ -59,6 +59,9 @@ func resumeRefusal(meta sessionMeta) SessionResult {
 	}
 	if _, ok := h.Resume(meta.ConversationID, harness.LaunchOptions{}); !ok {
 		return sessionRefusal(ReasonSessionNoResume, fmt.Sprintf("harness %s cannot resume", meta.Harness))
+	}
+	if msg := s.interactiveMissingReason(meta.Harness, "the session's harness"); msg != "" {
+		return sessionRefusal(ReasonHarnessMissing, msg)
 	}
 	return SessionResult{}
 }
@@ -168,7 +171,7 @@ func (s *Server) autoResumeSession(id string) {
 	}
 	reason := "auto-resume is off"
 	if s.settings.Load().AgentsResumeOnStart {
-		reason = resumeRefusal(meta).Message
+		reason = s.resumeRefusal(meta).Message
 	}
 	if reason == "" {
 		ended := meta

@@ -370,11 +370,11 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 			return false, nil
 		}
 		s.refused.set(ticketAddr, false)
-		agent := s.resolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t).Harness
-		if _, held := s.claimHold(addr.Project, t, agent); held {
+		resolved := s.resolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t)
+		if _, held := s.claimHold(addr.Project, t, resolved.ResolvedHarness); held {
 			return false, nil
 		}
-		return s.claimAndLaunch(root, addr, t, repo, agent, loaded)
+		return s.claimAndLaunch(root, addr, t, repo, resolved.Harness, loaded)
 	}
 	return false, nil
 }

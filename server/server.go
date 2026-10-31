@@ -339,6 +339,9 @@ func New(cfg Config) (*Server, error) {
 	if cfg.Env == nil {
 		cfg.Env = os.Environ()
 	}
+	if cfg.LookPath == nil {
+		cfg.LookPath = defaultLookPath(cfg.Env)
+	}
 	if cfg.Runner == nil {
 		return nil, errors.New("server: Config.Runner is required: the server builds no default runner")
 	}

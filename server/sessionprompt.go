@@ -125,6 +125,9 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		// The server builds the slash commands, so the prefix rule stays closed
 		// to the page.
 		action := designContinueAction(meta.Ticket, meta.Harness)
+		if res, refused := s.handoffRefusal(meta, action); refused {
+			return res, nil
+		}
 		s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you continued")
 		meta.Actionable = SessionActionable{}
 		meta.AutoSends = 0

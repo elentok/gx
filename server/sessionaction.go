@@ -35,6 +35,9 @@ func (s *Server) sendSessionAction(req SessionRequest, auto bool) (SessionResult
 	if len(action) == 0 {
 		return sessionRefusal(ReasonSessionNoAction, fmt.Sprintf("session %s has no action", req.ID)), nil
 	}
+	if res, refused := s.handoffRefusal(meta, action); refused {
+		return res, nil
+	}
 	meta.Actionable = SessionActionable{}
 	if auto {
 		meta.AutoSends++

@@ -58,6 +58,8 @@ type Harness struct {
 	Herdr  *herdrfake.State
 	// Disks is the free-space source, unless an option set its own FreeSpace.
 	Disks *FakeDisks
+	// Programs is the PATH lookup, unless an option set its own LookPath.
+	Programs *Programs
 	// System is the CPU and memory source, unless an option set its own SystemHealth.
 	System *FakeSystem
 	// Processes is the process table source, unless an option set its own ProcessSource.
@@ -862,6 +864,12 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h.Disks = &FakeDisks{}
 	if h.cfg.FreeSpace == nil {
 		h.cfg.FreeSpace = h.Disks.Read
+	}
+	// Every program is on PATH unless a test marks it missing: the suites run
+	// a fake in place of claude, and the machine may have no claude at all.
+	h.Programs = &Programs{}
+	if h.cfg.LookPath == nil {
+		h.cfg.LookPath = h.Programs.LookPath
 	}
 	// The real source reads the test machine's CPU and memory.
 	h.System = NewFakeSystem()
