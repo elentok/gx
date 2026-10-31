@@ -9,6 +9,7 @@ import { isCurrent } from "../epics/list";
 import { isLive, RING_KIND, ringProgress, ringTone } from "../epics/ring";
 import { sectionsOf } from "../epics/view";
 import { Button } from "../ui/button/Button";
+import { hasLayer, useIsTopLayer } from "../ui/modal/layers";
 import { titleSize } from "./titleSize";
 import { ProgressRing } from "../ui/progress-ring/ProgressRing";
 
@@ -265,12 +266,14 @@ export function RowList({
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
+  const isTop = useIsTopLayer(open);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (hotkey && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setOpen((o) => !o);
-      } else if (e.key === "Escape") setOpen(false);
+        if (open ? isTop() : !hasLayer()) setOpen((o) => !o);
+      } else if (e.key === "Escape" && isTop()) setOpen(false);
     };
     const onDown = (e: MouseEvent) => {
       if (!phone && root.current && !root.current.contains(e.target as Node)) setOpen(false);
@@ -281,7 +284,7 @@ export function RowList({
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onDown);
     };
-  }, [phone, hotkey]);
+  }, [phone, hotkey, open, isTop]);
 
   return (
     <Box ref={root} position="relative" minW="0">

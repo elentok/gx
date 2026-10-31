@@ -141,6 +141,7 @@ test("a few hundred finished epics load, show the cap, and filter past it", asyn
   fireEvent.click(toggle("Finished"));
   expect(screen.getAllByRole("link", { name: /^done-/ })).toHaveLength(20);
 
+  expect(screen.queryByLabelText(/large editor/i)).toBeNull();
   fireEvent.change(await filterBox(), { target: { value: "done-29" } });
   expect(screen.getAllByRole("link", { name: /^done-/ })).toHaveLength(11);
 });
