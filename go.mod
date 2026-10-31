@@ -27,6 +27,8 @@ require (
 	rsc.io/qr v0.2.0
 )
 
+require github.com/klauspost/compress v1.18.6
+
 require (
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect

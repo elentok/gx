@@ -703,6 +703,13 @@ func (c *Client) SessionChat(ctx context.Context, id string) (server.SessionChat
 	return res, err
 }
 
+// SessionChatArchive decodes a session's archived rollout and reads its chat.
+func (c *Client) SessionChatArchive(ctx context.Context, id string) (server.SessionChatResponse, error) {
+	var res server.SessionChatResponse
+	err := c.get(ctx, "/v1/sessions/chat/archive?session="+url.QueryEscape(id), &res)
+	return res, err
+}
+
 // SessionScreen reads a session's screen as plain text rows.
 func (c *Client) SessionScreen(ctx context.Context, id string) (server.SessionScreenResponse, error) {
 	var res server.SessionScreenResponse

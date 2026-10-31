@@ -3,9 +3,11 @@ package codexsession
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,19 +26,46 @@ type Chat struct {
 // the line shapes changed under it.
 func (c Chat) Unreadable() bool { return c.Turns > 0 && len(c.Messages) == 0 }
 
-// RolloutPathIn returns the rollout file of sessionID under the Codex home.
+// RolloutPathIn returns the plain rollout file of sessionID under the Codex
+// home. A live rollout in sessions wins over a plain one in archived_sessions.
 func RolloutPathIn(home, sessionID string) (path string, ok bool, err error) {
 	if sessionID == "" {
 		return "", false, nil
 	}
-	err = walkSessionFiles(home, sessionID, func(p string) error {
+	if path, ok, err = findRollout(filepath.Join(home, "sessions"), sessionID, ".jsonl"); ok || err != nil {
+		return path, ok, err
+	}
+	return findRollout(filepath.Join(home, "archived_sessions"), sessionID, ".jsonl")
+}
+
+// ArchivedRolloutIn returns the zstd-compressed rollout of sessionID: Codex
+// compresses old rollouts to .jsonl.zst. It is only the file's path; nothing is
+// decoded here.
+func ArchivedRolloutIn(home, sessionID string) (path string, ok bool, err error) {
+	if sessionID == "" {
+		return "", false, nil
+	}
+	if path, ok, err = findRollout(filepath.Join(home, "archived_sessions"), sessionID, ".jsonl.zst"); ok || err != nil {
+		return path, ok, err
+	}
+	return findRollout(filepath.Join(home, "sessions"), sessionID, ".jsonl.zst")
+}
+
+func findRollout(dir, sessionID, suffix string) (path string, ok bool, err error) {
+	err = filepath.WalkDir(dir, func(p string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), suffix) || !strings.Contains(entry.Name(), sessionID) {
+			return nil
+		}
 		path, ok = p, true
 		return fs.SkipAll
 	})
-	if err != nil {
-		return "", false, err
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", false, nil
 	}
-	return path, ok, nil
+	return path, ok, err
 }
 
 type chatRolloutLine struct {

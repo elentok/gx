@@ -1557,6 +1557,11 @@ export interface SessionChatResponse {
    */
   unreadable?: boolean;
   codex_version?: string;
+  /**
+   * Archived marks a Codex conversation whose rollout is a .jsonl.zst: the
+   * messages stay empty until the archive route decodes it.
+   */
+  archived?: boolean;
 }
 
 //////////

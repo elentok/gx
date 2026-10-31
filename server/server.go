@@ -596,6 +596,7 @@ var routeTable = []struct {
 	// Interactive sessions; /v1/agents/* is the loop agents'.
 	{"GET /v1/sessions", (*Server).sessionsRead},
 	{"GET /v1/sessions/chat", (*Server).sessionChatRead},
+	{"GET /v1/sessions/chat/archive", (*Server).sessionChatArchiveRead},
 	{"GET /v1/sessions/screen", (*Server).sessionScreenRead},
 	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
 	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.stopSession)(w, r) }},

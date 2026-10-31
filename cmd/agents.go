@@ -349,7 +349,7 @@ func printSessionResult(w io.Writer, jsonOut bool, res server.SessionResult, err
 }
 
 func newAgentsChatCmd(d deps) *cobra.Command {
-	var jsonOut bool
+	var jsonOut, archive bool
 	cmd := &cobra.Command{
 		Use:   "chat <session>",
 		Short: "show a session's chat: the visible messages of its newest conversation",
@@ -359,18 +359,23 @@ func newAgentsChatCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runAgentsChat(c.Context(), cl, c.OutOrStdout(), jsonOut, args[0])
+			return runAgentsChat(c.Context(), cl, c.OutOrStdout(), jsonOut, archive, args[0])
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.Flags().BoolVar(&archive, "archive", false, "decode the session's archived Codex rollout (.jsonl.zst)")
 	return cmd
 }
 
-func runAgentsChat(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool, id string) error {
+func runAgentsChat(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut, archive bool, id string) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	chat, err := cl.SessionChat(ctx, id)
+	read := cl.SessionChat
+	if archive {
+		read = cl.SessionChatArchive
+	}
+	chat, err := read(ctx, id)
 	if err != nil {
 		return fmt.Errorf("server read failed (is `gx server` running?): %w", err)
 	}

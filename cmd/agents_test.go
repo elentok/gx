@@ -67,7 +67,7 @@ func TestAgentsChat_JSON(t *testing.T) {
 		t.Fatalf("create = %+v, %v", res, err)
 	}
 	var out bytes.Buffer
-	if err := runAgentsChat(ctx, h.Client, &out, true, res.Session.ID); err != nil {
+	if err := runAgentsChat(ctx, h.Client, &out, true, false, res.Session.ID); err != nil {
 		t.Fatal(err)
 	}
 	var chat server.SessionChatResponse

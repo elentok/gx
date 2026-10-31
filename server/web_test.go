@@ -310,7 +310,7 @@ func TestWeb_EverythingElseIs404(t *testing.T) {
 		method, path, _ := strings.Cut(pattern, " ")
 		if pattern == "GET /v1/snapshot" || pattern == "GET /v1/events" || pattern == "GET /v1/tickets/detail" ||
 			pattern == "GET /v1/epics/detail" || pattern == "GET /v1/epics" || pattern == "GET /v1/stats" || pattern == "GET /v1/health" || pattern == "GET /v1/projects/worktrees" ||
-			pattern == "GET /v1/checks/status" || pattern == "GET /v1/sessions" || pattern == "GET /v1/sessions/chat" || pattern == "GET /v1/sessions/screen" ||
+			pattern == "GET /v1/checks/status" || pattern == "GET /v1/sessions" || pattern == "GET /v1/sessions/chat" || pattern == "GET /v1/sessions/chat/archive" || pattern == "GET /v1/sessions/screen" ||
 			pattern == "POST /v1/tickets/answer" || pattern == "POST /v1/tickets/unpark" || pattern == "POST /v1/tickets/resume" || pattern == "POST /v1/agents/answer" ||
 			pattern == "POST /v1/tickets/retry" || pattern == "POST /v1/tickets/merge" || pattern == "POST /v1/tickets/start-over" ||
 			pattern == "POST /v1/sessions/stop" || pattern == "POST /v1/sessions/resume" || pattern == "POST /v1/designs/open" || pattern == "POST /v1/designs/delete" || pattern == "POST /v1/tickets/fix-agent" || pattern == "POST /v1/sessions/prompt" || pattern == "POST /v1/sessions/create" || pattern == "POST /v1/sessions/interrupt" || pattern == "POST /v1/sessions/auto-advance" || pattern == "POST /v1/sessions/auto-advance/cancel" || pattern == "POST /v1/sessions/focus" ||

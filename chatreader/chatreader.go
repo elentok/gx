@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/klauspost/compress/zstd"
+
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
@@ -34,6 +36,25 @@ func Read(kind agentrunner.Kind, r io.Reader) (Result, error) {
 	}
 	msgs, err := transcript.ReadChatFrom(r)
 	return Result{Messages: msgs}, err
+}
+
+// maxArchiveBytes caps how far a decoded archive may expand.
+const maxArchiveBytes = 256 << 20
+
+// ReadZstdFile decodes the zstd file at path in memory and reads it as Read
+// does. A corrupt file is an error; a decode stops at maxArchiveBytes.
+func ReadZstdFile(kind agentrunner.Kind, path string) (Result, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return Result{}, err
+	}
+	defer f.Close()
+	dec, err := zstd.NewReader(f, zstd.WithDecoderMaxMemory(maxArchiveBytes))
+	if err != nil {
+		return Result{}, err
+	}
+	defer dec.Close()
+	return Read(kind, io.LimitReader(dec, maxArchiveBytes))
 }
 
 // ReadFile is Read over the file at path. ok is false if the file doesn't

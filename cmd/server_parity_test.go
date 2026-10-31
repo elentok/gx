@@ -78,6 +78,7 @@ var routeVerbs = map[string]string{
 	"POST /v1/epics/stash-merge":            "server epics stash-merge",
 	"GET /v1/sessions":                      "agents list",
 	"GET /v1/sessions/chat":                 "agents chat",
+	"GET /v1/sessions/chat/archive":         "agents chat",
 	"GET /v1/sessions/screen":               "agents screen",
 	"POST /v1/sessions/create":              "agents create",
 	"POST /v1/sessions/stop":                "agents stop",

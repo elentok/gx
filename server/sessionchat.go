@@ -53,6 +53,9 @@ type SessionChatResponse struct {
 	// could read; CodexVersion is the Codex that wrote it.
 	Unreadable   bool   `json:"unreadable,omitempty"`
 	CodexVersion string `json:"codex_version,omitempty"`
+	// Archived marks a Codex conversation whose rollout is a .jsonl.zst: the
+	// messages stay empty until the archive route decodes it.
+	Archived bool `json:"archived,omitempty"`
 }
 
 // chatCache keeps each transcript's parsed chat until its size or mtime
@@ -112,24 +115,7 @@ func chatLoader(kind agentrunner.Kind, ticket string, final bool) func(string) (
 		if err != nil {
 			return chatSnapshot{}, err
 		}
-		loaded := read.Messages
-		// Read before the cap and the fence strip: both cut what the parsers need.
-		// An open round wins over the run-end line, as in designActionable.
-		snap := chatSnapshot{round: chatRound(loaded), unreadable: read.Unreadable, codexVersion: read.CodexVersion}
-		if snap.round == nil {
-			snap.next = chatNext(loaded, ticket, final)
-		}
-		if len(loaded) > maxChatMessages {
-			loaded, snap.truncated = loaded[len(loaded)-maxChatMessages:], true
-		}
-		snap.msgs = make([]SessionChatMessage, 0, len(loaded))
-		for _, m := range loaded {
-			text := m.Text
-			if m.Role == transcript.ChatRoleAgent {
-				text, _ = grillround.SplitFences(text)
-			}
-			snap.msgs = append(snap.msgs, SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool})
-		}
+		snap := snapshotOf(read, ticket, final)
 		// Codex has no background markers: its Background flag comes from the status.
 		if kind == harness.Codex {
 			return snap, nil
@@ -147,6 +133,84 @@ func chatLoader(kind agentrunner.Kind, ticket string, final bool) func(string) (
 		}
 		return snap, nil
 	}
+}
+
+// snapshotOf turns one read of a conversation into what the chat serves.
+func snapshotOf(read chatreader.Result, ticket string, final bool) chatSnapshot {
+	loaded := read.Messages
+	// Read before the cap and the fence strip: both cut what the parsers need.
+	// An open round wins over the run-end line, as in designActionable.
+	snap := chatSnapshot{round: chatRound(loaded), unreadable: read.Unreadable, codexVersion: read.CodexVersion}
+	if snap.round == nil {
+		snap.next = chatNext(loaded, ticket, final)
+	}
+	if len(loaded) > maxChatMessages {
+		loaded, snap.truncated = loaded[len(loaded)-maxChatMessages:], true
+	}
+	snap.msgs = make([]SessionChatMessage, 0, len(loaded))
+	for _, m := range loaded {
+		text := m.Text
+		if m.Role == transcript.ChatRoleAgent {
+			text, _ = grillround.SplitFences(text)
+		}
+		snap.msgs = append(snap.msgs, SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool})
+	}
+	return snap
+}
+
+// codexArchive finds the zstd rollout of a Codex session whose plain rollout is
+// gone. It only looks for the file; nothing is decoded.
+func (s *Server) codexArchive(id string, meta sessionMeta) (string, bool) {
+	if meta.Harness != string(harness.Codex) || meta.ConversationID == "" {
+		return "", false
+	}
+	home, err := s.codexHome()
+	if err != nil {
+		s.log.Warn("codex home", "session", id, "err", err)
+		return "", false
+	}
+	path, ok, err := codexsession.ArchivedRolloutIn(home, meta.ConversationID)
+	if err != nil {
+		s.log.Warn("find archived rollout", "session", id, "err", err)
+		return "", false
+	}
+	return path, ok
+}
+
+// sessionChatArchiveRead decodes a session's archived rollout on demand and
+// answers like a plain chat read would.
+func (s *Server) sessionChatArchiveRead(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("session")
+	_, meta, res, err := s.readableSession(id)
+	if res.Refused {
+		status := http.StatusBadRequest
+		if res.Reason == ReasonSessionUnknown {
+			status = http.StatusNotFound
+		}
+		http.Error(w, res.Message, status)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	path, ok := s.codexArchive(id, meta)
+	if !ok {
+		http.Error(w, "no archived rollout for this session", http.StatusNotFound)
+		return
+	}
+	read, err := chatreader.ReadZstdFile(harness.Codex, path)
+	if err != nil {
+		http.Error(w, "cannot decode the archived rollout: "+err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	snap := snapshotOf(read, meta.Ticket, s.designFinal(meta.Ticket))
+	writeJSON(w, SessionChatResponse{
+		ConversationID: meta.ConversationID, Messages: snap.msgs, Truncated: snap.truncated,
+		Round: snap.round, Next: snap.next, Background: []SessionBackgroundTask{},
+		Failure:    s.sessionInfo(meta).Failure,
+		Unreadable: snap.unreadable, CodexVersion: snap.codexVersion,
+	})
 }
 
 // background lists the tasks still within their cap at now.
@@ -227,7 +291,11 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 	// The page reads only on an event, so a remembered miss from before the
 	// transcript existed would hide the message the event announces.
 	s.transcripts.forgetMiss(meta.ConversationID)
-	if path, kind, ok := s.chatTranscript(id, meta); ok {
+	path, kind, found := s.chatTranscript(id, meta)
+	if !found {
+		_, out.Archived = s.codexArchive(id, meta)
+	}
+	if found {
 		final := s.designFinal(meta.Ticket)
 		chat, err := s.chats.read(path, final, chatLoader(kind, meta.Ticket, final))
 		switch {
