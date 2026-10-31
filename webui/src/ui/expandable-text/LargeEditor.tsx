@@ -1,5 +1,7 @@
 import { Box, Text } from "@chakra-ui/react";
-import { lazy, Suspense, useRef } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
+import type { CodeEditorHandle, ViMode } from "./CodeEditor";
+import { keepFocus, ModeText } from "./ModeText";
 import { useViMode } from "../../vimode";
 import { useCoarsePointer, useWide } from "../../useWide";
 import { Button } from "../button/Button";
@@ -32,6 +34,8 @@ export function LargeEditor({
   const viMode = useViMode();
   const wide = useWide();
   const coarse = useCoarsePointer();
+  const [mode, setMode] = useState<ViMode>("INSERT");
+  const editor = useRef<CodeEditorHandle>(null);
   const current = useRef(selection);
   const close = () => onClose(current.current);
   // Layout follows the width, the bar follows the pointer. A phone's touch bar replaces the header and footer.
@@ -73,17 +77,29 @@ export function LargeEditor({
             current.current = s;
           }}
           viMode={viMode}
+          onModeChange={setMode}
+          handle={editor}
           onZZ={close}
         />
       </Suspense>
       {coarse ? (
-        <Box data-testid="editor-bar" display="flex" alignItems="center" justifyContent="flex-end" gap="2">
+        <Box data-testid="editor-bar" display="flex" alignItems="center" gap="2">
+          {viMode && (
+            <>
+              <ModeText mode={mode} pill />
+              <Button emphasis="main" tone="running" h="44px" onMouseDown={keepFocus} onClick={() => editor.current?.escape()}>
+                Esc
+              </Button>
+            </>
+          )}
+          <Box flex="1" />
           <Button h="44px" onClick={close}>
             Done
           </Button>
         </Box>
       ) : (
         <Box display="flex" alignItems="center" gap="2">
+          {viMode && <ModeText mode={mode} />}
           <Text flex="1" fontSize="xs" color="text.dim">
             Saved as you type
           </Text>

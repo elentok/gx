@@ -25,6 +25,7 @@ import { EmptyState } from "../ui/empty-state/EmptyState";
 import { InfoTip } from "../ui/info-tip/InfoTip";
 import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import { LargeEditor } from "../ui/expandable-text/LargeEditor";
+import { ModeText } from "../ui/expandable-text/ModeText";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { BottomSheet } from "../ui/modal/BottomSheet";
 import { Modal } from "../ui/modal/Modal";
@@ -324,6 +325,13 @@ export const galleryEntries: GalleryEntry[] = [
         </WideContext.Provider>
       ),
     })),
+  },
+  {
+    name: "ModeText",
+    cases: (["INSERT", "NORMAL", "VISUAL"] as const).flatMap((mode) => [
+      { label: `${mode} pill`, node: <ModeText mode={mode} pill /> },
+      { label: `${mode} footer`, node: <ModeText mode={mode} /> },
+    ]),
   },
   {
     name: "ProgressBar",
