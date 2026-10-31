@@ -555,7 +555,7 @@ an exited session.
 - **Steps:**
   1. Start the session. Pick SQLite.
   2. Press Chat, fold and open ▾, press Questions. Press Escape.
-  3. In the Questions view, open the Send popover, the jump menu (Ctrl+K), the `Q8b` note modal and the ⋯ menu in turn. Press Escape twice each time.
+  3. In the Questions view, open the Send popover, the jump menu (Ctrl+K) and the ⋯ menu in turn. Press Escape twice each time. Then open the `Q8b` note editor, press Escape, and press Done.
   4. Type a composer note, switch Chat, Questions, Chat, Questions.
   5. Resize to 1440px, then to 375px; open the steps sheet from the step line and press Escape twice.
   6. In a second test: press Chat, answer both questions, press Send, then Continue.
@@ -564,6 +564,7 @@ an exited session.
   - After Start the View toggle reads Questions (pressed) with "0 of 2"; the sheet is taller than half the viewport; "Two questions before the spec." is hidden. After SQLite it reads "1 of 2".
   - In Chat the chat shows and ▾ folds and opens the sheet; in Questions there is no ▾. Escape in Questions shows the chat.
   - With a layer open, the first Escape closes only the layer and the second shows the chat; at 375px the same for the steps sheet.
+  - The note editor ignores Escape and stays open; Done closes it.
   - SQLite, `Q8b` as the current dot and the composer note survive two switches. No "Enter focus mode" or "Leave focus mode" button exists.
   - At 1440px the question title is at most 820px wide.
   - Sending from Chat shows the answers in Chat; Continue brings the `Q9` round with Questions pressed.

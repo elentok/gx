@@ -6,7 +6,7 @@ import canned from "../canned-snapshot.json";
 import { authEntries } from "./authEntries";
 import { ConnectionContext, type Connection } from "../connection";
 import { NewDesignForm } from "../design/NewDesignForm";
-import { WideContext } from "../useWide";
+import { CoarsePointerContext, WideContext } from "../useWide";
 import { EpicPage } from "../epic/EpicPage";
 import { ErrorCard } from "../ErrorBoundary";
 import { EpicCard } from "../epics/EpicCard";
@@ -308,15 +308,22 @@ export const galleryEntries: GalleryEntry[] = [
   {
     name: "LargeEditor",
     cases: [
-      {
-        label: "with text",
-        node: (
-          <ModalFrame>
-            <LargeEditor title="Note" value={"A note\nover two lines"} placeholder="Note" selection={{ start: 0, end: 0 }} onChange={() => {}} onClose={() => {}} />
-          </ModalFrame>
-        ),
-      },
-    ],
+      { wide: true, coarse: false, label: "wide, mouse" },
+      { wide: true, coarse: true, label: "wide, touch" },
+      { wide: false, coarse: false, label: "narrow, mouse" },
+      { wide: false, coarse: true, label: "narrow, touch" },
+    ].map(({ wide, coarse, label }) => ({
+      label,
+      node: (
+        <WideContext.Provider value={wide}>
+          <CoarsePointerContext.Provider value={coarse}>
+            <ModalFrame>
+              <LargeEditor title="Note" value={"A note\nover two lines"} placeholder="Note" selection={{ start: 0, end: 0 }} onChange={() => {}} onClose={() => {}} />
+            </ModalFrame>
+          </CoarsePointerContext.Provider>
+        </WideContext.Provider>
+      ),
+    })),
   },
   {
     name: "ProgressBar",

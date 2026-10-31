@@ -149,9 +149,9 @@ test("the selection goes to the editor on open and back to the field on close", 
   expect([field().selectionStart, field().selectionEnd]).toEqual([1, 4]);
 });
 
-test("Escape closes the editor", () => {
+test("Escape does not close the editor", () => {
   renderThemed(<Harness />);
   fireEvent.click(expand());
   fireEvent.keyDown(window, { key: "Escape" });
-  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.getByRole("dialog")).toBeTruthy();
 });

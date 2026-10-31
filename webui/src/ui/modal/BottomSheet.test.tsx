@@ -66,6 +66,14 @@ describe("BottomSheet", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it("followViewport sets a wide screen's overlay to the visual viewport and caps the panel at 680px", () => {
+    vi.stubGlobal("visualViewport", { addEventListener() {}, removeEventListener() {}, offsetTop: 10, height: 500 });
+    const { dialog, backdrop } = mount({ followViewport: true });
+    expect(getComputedStyle(backdrop).top).toBe("10px");
+    expect(getComputedStyle(backdrop).height).toBe("500px");
+    expect(getComputedStyle(dialog).maxHeight).toBe("680px");
+  });
+
   it("still closes on a backdrop press on a wide screen with closeOnNarrowBackdrop off", () => {
     const onClose = vi.fn();
     press(mount({ closeOnNarrowBackdrop: false }, onClose).backdrop);

@@ -27,3 +27,22 @@ export const useWide = () => {
   }, [query]);
   return forced ?? wide;
 };
+
+/** Overrides the primary pointer, so the gallery and tests can show the touch layout with a mouse. */
+export const CoarsePointerContext = createContext<boolean | undefined>(undefined);
+
+/** True when the primary pointer is touch. Without matchMedia (tests) it is false. */
+export const useCoarsePointer = () => {
+  const forced = useContext(CoarsePointerContext);
+  const mq = () => (typeof window.matchMedia === "function" ? window.matchMedia("(pointer: coarse)") : undefined);
+  const [coarse, setCoarse] = useState(() => mq()?.matches ?? false);
+  useEffect(() => {
+    const m = mq();
+    if (!m) return;
+    const on = () => setCoarse(m.matches);
+    setCoarse(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return forced ?? coarse;
+};

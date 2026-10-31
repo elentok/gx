@@ -254,13 +254,6 @@ test.describe("49. Questions and Chat views", () => {
     const layers = [
       { layer: popover, open: () => send.click() },
       { layer: jump, open: () => page.keyboard.press("Control+k") },
-      {
-        layer: noteModal,
-        open: async () => {
-          await questions.getByRole("button", nav("Note on question 8b")).click();
-          await questions.getByRole("button", nav("Open the note in a large editor")).click();
-        },
-      },
       { layer: menu, open: () => page.getByRole("button", nav("More actions")).click() },
     ];
     for (const { layer, open } of layers) {
@@ -276,6 +269,16 @@ test.describe("49. Questions and Chat views", () => {
       await page.keyboard.press("Escape");
       await expect(chat).toBeVisible();
     }
+
+    // The note editor ignores Escape; only Done closes it.
+    await questionsTab.click();
+    await questions.getByRole("button", nav("Note on question 8b")).click();
+    await questions.getByRole("button", nav("Open the note in a large editor")).click();
+    await expect(noteModal).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(noteModal).toBeVisible();
+    await noteModal.getByRole("button", nav("Done")).click();
+    await expect(noteModal).toHaveCount(0);
 
     // The round survives two switches: an answer, the current question and the composer note.
     await expect(questions.getByText("Q8b - Migrate at startup?")).toBeVisible();

@@ -21,6 +21,10 @@ interface BottomSheetProps extends Omit<BoxProps, "children"> {
   fillViewport?: boolean;
   /** The panel's props on a wide screen, where this is a centered Modal and not a sheet. */
   desktop?: BoxProps;
+  /** On a wide screen, follow the visual viewport like a filling sheet; the panel is at most 680px tall. */
+  followViewport?: boolean;
+  /** Escape closes the topmost layer; false to ignore it. */
+  closeOnEscape?: boolean;
   /** A press on the backdrop closes the sheet on a phone; false to ignore it. A wide screen's backdrop always closes. */
   closeOnNarrowBackdrop?: boolean;
   ref?: Ref<HTMLDivElement>;
@@ -28,10 +32,13 @@ interface BottomSheetProps extends Omit<BoxProps, "children"> {
 }
 
 /** A Modal that is a bottom sheet on a phone, with a grab handle, and a centered dialog on a wide screen. */
-export function BottomSheet({ belowTopBar, fillViewport, desktop, closeOnNarrowBackdrop = true, children, ...modal }: BottomSheetProps) {
+export function BottomSheet({ belowTopBar, fillViewport, desktop, followViewport, closeOnNarrowBackdrop = true, children, ...modal }: BottomSheetProps) {
   const sheetMode = !useWide();
   const viewport = useVisualViewportHeight(belowTopBar);
-  if (!sheetMode) return <Modal {...modal} {...desktop}>{children}</Modal>;
+  if (!sheetMode) {
+    const follow = followViewport ? { backdrop: { inset: undefined, ...viewport.overlay }, h: viewport.sheetHeight, maxH: "680px" } : {};
+    return <Modal {...modal} {...desktop} {...follow}>{children}</Modal>;
+  }
   return (
     <Modal
       {...modal}
