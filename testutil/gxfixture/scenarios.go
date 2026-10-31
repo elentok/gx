@@ -329,6 +329,8 @@ var scenarios = map[string]scenario{
 	"design-mixed": designScript(tickets.StepResolveTickets, agentfake.DesignTurnMixed),
 	// design-defaulted: every question of the round is defaulted.
 	"design-defaulted": designScript(tickets.StepResolveTickets, agentfake.DesignTurnDefaulted),
+	// design-text: one free-text question, so the sheet shows an answer textarea.
+	"design-text": designScript(tickets.StepResolveTickets, agentfake.DesignTurnText),
 	// design-working: a long busy turn, for the Working row.
 	"design-working": designScript(tickets.StepResolveTickets, agentfake.DesignTurnSlow),
 	// design-model-tiers: four design sessions, one per launch tier rule. See

@@ -18,6 +18,14 @@ func TestDesignMessage_NoScriptKeepsTheDefault(t *testing.T) {
 	}
 }
 
+func TestDesignMessage_TextTurnIsATextQuestion(t *testing.T) {
+	var tu tui
+	got := tu.designMessage("text", []string{DesignTurnText})
+	if !strings.Contains(got, "Q13") || !strings.Contains(got, "type: text") {
+		t.Errorf("text turn = %q, want Q13 and a type: text block", got)
+	}
+}
+
 func TestDesignMessage_ScriptPlaysInOrderThenFallsBack(t *testing.T) {
 	var tu tui
 	script := []string{DesignTurnRound, DesignTurnPlain, DesignTurnError, DesignTurnDefaulted, DesignTurnRunEnd}

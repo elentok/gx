@@ -146,6 +146,17 @@ func TestAgentfakeDefaultedRounds_UseTheRealFormat(t *testing.T) {
 	}
 }
 
+func TestAgentfakeTextRound_ParsesToOneTextCard(t *testing.T) {
+	t.Parallel()
+	cards := roundCards(agentfake.DesignRoundText(agentfake.DesignTurnText))
+	if len(cards) != 1 {
+		t.Fatalf("text round cards = %+v, want 1", cards)
+	}
+	if c := cards[0]; c.Kind != "text" || c.Label != "13" || len(c.Options) != 0 || c.Note != "" {
+		t.Errorf("text round card = %+v, want a text card Q13 with no options and no note", c)
+	}
+}
+
 func TestGxGrillingAllDefaultedTemplate_IsGrilling(t *testing.T) {
 	t.Parallel()
 	var found string

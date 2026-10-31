@@ -53,6 +53,8 @@ const (
 	DesignTurnDefaulted = "defaulted"
 	// DesignTurnMixed is a round with one asked question and two defaulted ones.
 	DesignTurnMixed = "mixed"
+	// DesignTurnText is a round with one free-text question.
+	DesignTurnText = "text"
 	// DesignTurnSlow is a plain-text turn that stays busy for designSlowTime.
 	DesignTurnSlow = "slow"
 )
@@ -70,11 +72,21 @@ const mixedRound = "One question needs you.\n\n" +
 	"❓ **Q12** - **Keep going?**: Ready for the next step?\n\n" + yesNoBlock +
 	defaultsSection
 
-// DesignRoundText is the scripted text of a DesignTurnDefaulted or
-// DesignTurnMixed turn, for tests that check it against the server's parser.
+// A text question carries neither options nor a recommendation: the parser
+// rejects both.
+const textRound = "One question needs a typed answer.\n\n" +
+	"❓ **Q13** - **Name the migration**: What should the migration be called?\n\n" +
+	"```gx-question\ntype: text\n```"
+
+// DesignRoundText is the scripted text of a DesignTurnDefaulted,
+// DesignTurnMixed or DesignTurnText turn, for tests that check it against the
+// server's parser.
 func DesignRoundText(turn string) string {
-	if turn == DesignTurnMixed {
+	switch turn {
+	case DesignTurnMixed:
 		return mixedRound
+	case DesignTurnText:
+		return textRound
 	}
 	return defaultedRound
 }
@@ -127,6 +139,8 @@ func (d *designState) message(text string, script []string) string {
 		return defaultedRound
 	case DesignTurnMixed:
 		return mixedRound
+	case DesignTurnText:
+		return textRound
 	case DesignTurnSlow:
 		return "Working through the tickets."
 	}
