@@ -580,6 +580,21 @@ func TestUsageGatedScenario_ServerSeesTheUsageSample(t *testing.T) {
 	r.stop(t)
 }
 
+func TestCodexRateLimitedScenario_ServerSeesTheCodexSampleAndGatesOnlyCodex(t *testing.T) {
+	t.Parallel()
+	r := start(t, "codex-rate-limited")
+	const gated = "demo:codex-waiting-epic/01"
+	if !testutil.Poll(60*time.Second, time.Second, func() bool {
+		return strings.Contains(r.gx(t, "server", "tickets", "explain", gated), "Codex usage: 99%")
+	}) {
+		t.Fatalf("explain %s = %q, want the Codex usage gate", gated, r.gx(t, "server", "tickets", "explain", gated))
+	}
+	if out := r.gx(t, "server", "tickets", "explain", "demo:claude-running-epic/01"); strings.Contains(out, "usage:") {
+		t.Errorf("Claude ticket explain = %q, want no usage gate", out)
+	}
+	r.stop(t)
+}
+
 // web is a client of the fixture's web server, signed in with the fixture's cookie.
 type web struct {
 	client *http.Client

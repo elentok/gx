@@ -155,6 +155,34 @@ test("118. Codex queue rows, codex missing from PATH", async ({ page, start }) =
   expect(explained).toContain(text.replace(/^.*?(codex is not on PATH)/s, "$1"));
 });
 
+test("120. Codex rate-limit wait", async ({ page, start }) => {
+  await start("codex-rate-limited");
+  const reason = /Codex usage: 99% of the (5h|5-hour|weekly) limit, resets /;
+
+  await go(page, "#/e/demo:codex-waiting-epic");
+  await expect(verdict(page, "codex-waiting-epic")).toContainText(reason, { timeout: 30_000 });
+
+  const meta = (epic: string) => page.locator(`a[href$="/t/demo:${epic}/01"] [data-meta]`).first();
+
+  await go(page, "#/e/demo:codex-running-epic");
+  await expect(meta("codex-running-epic")).toHaveText(/^running · /);
+  await expect(page.getByText("Paused")).toHaveCount(0);
+  await go(page, "#/e/demo:claude-running-epic");
+  await expect(meta("claude-running-epic")).toHaveText(/^running · /);
+  await expect(verdict(page, "claude-running-epic")).toHaveCount(0);
+
+  await go(page, "#/e/demo:codex-waiting-epic");
+  await verdict(page, "codex-waiting-epic").locator("..").getByRole("button", { name: "Override" }).click();
+  await expect(verdict(page, "codex-waiting-epic")).toHaveCount(0);
+  // The click also opens the ticket page, where the run shows as it starts.
+  await expect(page.getByRole("img", { name: "Running" })).toBeVisible({ timeout: 30_000 });
+  await go(page, "#/e/demo:codex-waiting-epic");
+  await expect(meta("codex-waiting-epic")).toHaveText(/^running · /);
+
+  await go(page, "#/e/demo:claude-running-epic");
+  await expect(meta("claude-running-epic")).toHaveText(/^running · /);
+});
+
 const dwell = { timeout: 30_000 };
 const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: true });
 

@@ -272,6 +272,31 @@ func TestCodexDialogs_BlockReadyUntilAKeyArrives(t *testing.T) {
 	}
 }
 
+func TestCodexWorker_CodexUsageConfigWritesARateLimitSampleTheProductionReaderSees(t *testing.T) {
+	cfg, _ := workerEnv(t)
+	resetsAt := time.Now().Add(72 * time.Hour).Unix()
+	cfg.CodexUsage = &UsageWindow{UsedPercentage: 99, ResetsAt: resetsAt}
+	repo, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, WorkerConfigFile), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	p := startCodexIn(t, repo, home, "usage1")
+	p.startTurn("$gx-implement gx:epic/01")
+	p.waitFor(func() bool {
+		sample, ok, err := codexsession.LatestUsageIn(home, p.cwd, "usage1")
+		return err == nil && ok && len(sample.Windows) == 1 &&
+			sample.Windows[0].UsedPercent == 99 && sample.Windows[0].ResetsAt.Unix() == resetsAt
+	}, "the 99% sample")
+}
+
 func TestCodexWorker_FinishFromAGxPromptDrivesWorkTicket(t *testing.T) {
 	cfg, gxLog := workerEnv(t)
 	repo, err := os.Getwd()

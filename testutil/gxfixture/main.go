@@ -339,7 +339,11 @@ func run(args []string) (err error) {
 		}
 	}
 	if len(sc.queueAfterUsage) > 0 {
-		sample := filepath.Join(f.root, "state", "gx", "usage-sample.json")
+		sampleFile := "usage-sample.json"
+		if sc.codexUsage {
+			sampleFile = "usage-sample-codex.json"
+		}
+		sample := filepath.Join(f.root, "state", "gx", sampleFile)
 		deadline := time.Now().Add(30 * time.Second)
 		for _, err := os.Stat(sample); err != nil; _, err = os.Stat(sample) {
 			if time.Now().After(deadline) {
@@ -348,7 +352,11 @@ func run(args []string) (err error) {
 			time.Sleep(100 * time.Millisecond)
 		}
 		for _, addr := range sc.queueAfterUsage {
-			if out, err := f.cli("server", "queue", "add", addr); err != nil {
+			args := []string{"server", "queue", "add", addr}
+			if agent := sc.queueAgents[addr]; agent != "" {
+				args = append(args, "--agent", agent)
+			}
+			if out, err := f.cli(args...); err != nil {
 				return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
 			}
 		}
@@ -628,6 +636,9 @@ func (f *fixture) seed(sc scenario) error {
 			FiveHour: agentfake.UsageWindow{UsedPercentage: 10, ResetsAt: resets},
 			SevenDay: agentfake.UsageWindow{UsedPercentage: 99, ResetsAt: resets},
 		}
+	}
+	if sc.codexUsage {
+		wcfg.CodexUsage = &agentfake.UsageWindow{UsedPercentage: 99, ResetsAt: time.Now().Add(72 * time.Hour).Unix()}
 	}
 	cfg, err := json.Marshal(wcfg)
 	if err != nil {

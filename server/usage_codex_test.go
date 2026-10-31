@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/testutil/runnerfake"
@@ -100,6 +101,31 @@ func TestUsageGate_CodexWindowsGateCodexOnly(t *testing.T) {
 				t.Errorf("a Codex sample gated Claude: %q", v)
 			}
 		})
+	}
+}
+
+// A live Codex agent's meta holds gx's own start id; the rollout is named by the
+// id the SessionStart hook saved in codex-session.json.
+func TestUsageGate_CodexRolloutIsFoundByTheHookSessionID(t *testing.T) {
+	t.Parallel()
+	now := time.Unix(1_000_000, 0)
+	r := newCodexUsageRig(t)
+	s := r.server()
+	r.writeCodexAgent("a", now, codexWindowJSON(99, 10080, now.Add(time.Hour)), "")
+	dir := filepath.Join(nativerunner.AgentsRoot(r.stateDir, "proj"), "a")
+	meta, err := json.Marshal(nativerunner.Meta{Runner: "pty", Harness: "codex", SessionID: "gx-start-id", Cwd: "/repo/a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hook := `{"session_id":"sess-a","cwd":"/repo/a"}`
+	for name, data := range map[string]string{nativerunner.MetaFile: string(meta), harness.CodexSessionFile: hook} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s.scanUsage()
+	if _, held := s.usageGate(ralphloop.AgentCodex, now); !held {
+		t.Fatal("codex gate not held: the rollout was not found by the hook's session id")
 	}
 }
 

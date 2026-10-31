@@ -311,7 +311,17 @@ func (s *Server) readCodexUsage(agentDir string) (nativerunner.UsageRecord, bool
 	if err != nil {
 		return nativerunner.UsageRecord{}, false
 	}
-	sample, ok, err := codexsession.LatestUsageIn(home, d.Meta.Cwd, d.Meta.SessionID)
+	// Meta holds gx's start id; Codex names its rollout by the id the hook saved.
+	sessionID := d.Meta.SessionID
+	if data, err := os.ReadFile(filepath.Join(agentDir, harness.CodexSessionFile)); err == nil {
+		var saved struct {
+			SessionID string `json:"session_id"`
+		}
+		if json.Unmarshal(data, &saved) == nil && saved.SessionID != "" {
+			sessionID = saved.SessionID
+		}
+	}
+	sample, ok, err := codexsession.LatestUsageIn(home, d.Meta.Cwd, sessionID)
 	if err != nil || !ok || sample.SeenAt.IsZero() {
 		return nativerunner.UsageRecord{}, false
 	}

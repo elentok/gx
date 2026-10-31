@@ -431,6 +431,11 @@ func (c *codexFake) submit(text string) error {
 		}
 		return c.taskError("You've hit your usage limit.", "usage_limit_exceeded")
 	}
+	if u := cfg.CodexUsage; u != nil {
+		if err := c.tokenCount(u.UsedPercentage, u.ResetsAt); err != nil {
+			return err
+		}
+	}
 	go c.work(cfg, address)
 	return nil
 }

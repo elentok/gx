@@ -56,6 +56,9 @@ type WorkerConfig struct {
 	// Usage is the rate-limit usage the TUI fake reports to the statusLine
 	// command after each turn. Nil leaves rate_limits out, like an API-key account.
 	Usage *UsageConfig `json:"usage,omitempty"`
+	// CodexUsage is the weekly window the Codex fake writes into its rollout as a
+	// token_count sample when it gets a ticket prompt. Nil writes none.
+	CodexUsage *UsageWindow `json:"codex_usage,omitempty"`
 }
 
 // UsageConfig is one account's rate-limit windows. ResetsAt is Unix seconds.

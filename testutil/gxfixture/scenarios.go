@@ -98,6 +98,8 @@ type scenario struct {
 	queueAfterUsage []string
 	// usage makes the fake workers report the weekly window at 99%.
 	usage bool
+	// codexUsage makes the fake Codex workers write a weekly sample at 99% into their rollout.
+	codexUsage bool
 	// diskLow gives each project a cleanup command that follows the disk's clean file.
 	diskLow bool
 	// chat turns the fake's chat knob on, so a plain prompt is a chat turn.
@@ -426,6 +428,27 @@ var scenarios = map[string]scenario{
 		behaviour:   map[string]string{project + ":codex-blocked-epic/01": agentfake.BehaviourPermission},
 		queue:       []string{project + ":codex-blocked-epic"},
 		queueAgents: map[string]string{project + ":codex-blocked-epic": "codex"},
+	},
+	// codex-rate-limited: a held Codex ticket whose rollout shows the weekly window at
+	// 99%, a Codex ticket queued after the sample is stored (so it waits on the Codex
+	// gate), and a held Claude ticket the gate leaves running.
+	"codex-rate-limited": {
+		codex: true,
+		epics: []epic{
+			{project, "codex-running-epic", []ticket{{"01", "running", servertest.TicketOpts{}}}},
+			{project, "codex-waiting-epic", []ticket{{"01", "waiting", servertest.TicketOpts{}}}},
+			{project, "claude-running-epic", []ticket{{"01", "running", servertest.TicketOpts{}}}},
+		},
+		queue:           []string{project + ":codex-running-epic", project + ":claude-running-epic"},
+		queueAfterUsage: []string{project + ":codex-waiting-epic"},
+		queueAgents: map[string]string{
+			project + ":codex-running-epic": "codex", project + ":codex-waiting-epic": "codex",
+			project + ":claude-running-epic": "claude",
+		},
+		// Room for all three, so only the Codex gate keeps the waiting ticket queued.
+		projectExtra: map[string]string{project: `,"max-agents":3`},
+		hold:         true,
+		codexUsage:   true,
 	},
 	// queue-agents: one PTY Queue agent and one Design agent. See queueAgentsScenario.
 	"queue-agents": queueAgentsScenario(),
