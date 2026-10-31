@@ -119,6 +119,9 @@ type scenario struct {
 	// limits seeds the limits state file before the server starts, in the
 	// shape the --shape flag names (default fresh).
 	limits bool
+	// spend seeds the budget ledger before the server starts, in the shape the
+	// --shape flag names (default normal), and prints the held agent's transcript path.
+	spend bool
 }
 
 // webMode is how far the fixture takes the web setup and sign-in.
@@ -172,6 +175,16 @@ var scenarios = map[string]scenario{
 		hold:       true,
 		diskLow:    true,
 		agentProcs: true,
+	},
+	// spend: a seeded budget ledger (--shape) and one fake agent held running, so a
+	// flow can add spend by appending a usage line to the agent's transcript.
+	"spend": {
+		epics: []epic{{project, "spend-epic", []ticket{
+			{"01", "held", servertest.TicketOpts{}},
+		}}},
+		queue: []string{project + ":spend-epic"},
+		hold:  true,
+		spend: true,
 	},
 	// mixed: tickets in several states, and a worker that asks and fails.
 	"mixed": {

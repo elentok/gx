@@ -9,6 +9,7 @@
 // --auto-advance-delay shortens the server's run-end countdown (default 10s).
 // --stall-threshold shortens how long a Working session's transcript may stay untouched before it counts as stalled (default 15m).
 // --shape <fresh|stale|past-reset|one-window> picks the seeded limits state of the limits scenario (default fresh).
+// --shape <normal|short|empty> picks the seeded budget ledger of the spend scenario (default normal).
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 // --mock-dir <path> serves that directory over loopback HTTP and reports its base URL as mock_url.
@@ -78,6 +79,9 @@ type Output struct {
 	// LogFile is the server's combined stdout and stderr, which carries the cleanup
 	// command's output tail ("disk cleanup command failed") and every server warning.
 	LogFile string `json:"log_file"`
+	// AgentTranscript is the held fake agent's transcript path in the spend
+	// scenario; the directory may not exist yet.
+	AgentTranscript string `json:"agent_transcript,omitempty"`
 	// MockURL is the base URL serving --mock-dir; empty without the flag.
 	MockURL string `json:"mock_url,omitempty"`
 	// BrowserSession names this worktree's playwright-cli session (`-s=<name>`): the
@@ -105,6 +109,9 @@ func (o Output) ShellEnv() string {
 	export("GXF_SOCKET", o.Socket)
 	if o.LogFile != "" {
 		export("GXF_LOG_FILE", o.LogFile)
+	}
+	if o.AgentTranscript != "" {
+		export("GXF_AGENT_TRANSCRIPT", o.AgentTranscript)
 	}
 	if o.MockURL != "" {
 		export("GXF_MOCK_URL", o.MockURL)
@@ -180,7 +187,7 @@ func run(args []string) (err error) {
 	if !ok {
 		return fmt.Errorf("unknown scenario %q; known: %s", name, strings.Join(scenarioNames(), ", "))
 	}
-	if shape, err = checkLimitShape(sc, shape); err != nil {
+	if shape, err = checkShape(sc, shape); err != nil {
 		return err
 	}
 
@@ -289,6 +296,12 @@ func run(args []string) (err error) {
 			return fmt.Errorf("seed limits: %w", err)
 		}
 	}
+	if sc.spend {
+		if err := f.seedSpend(shape); err != nil {
+			return fmt.Errorf("seed spend: %w", err)
+		}
+		f.env = append(f.env, "GX_BUDGET_POLL_INTERVAL="+spendPollInterval)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -379,6 +392,12 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
+	agentTranscript := ""
+	if sc.spend {
+		if agentTranscript, err = f.agentTranscript(ctx); err != nil {
+			return err
+		}
+	}
 	if err := f.seedSessions(sc); err != nil {
 		return err
 	}
@@ -419,7 +438,7 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
-	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath}
+	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath, AgentTranscript: agentTranscript}
 	if cwd, err := os.Getwd(); err == nil {
 		o.BrowserSession = filepath.Base(cwd)
 	}

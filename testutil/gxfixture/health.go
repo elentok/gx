@@ -81,22 +81,31 @@ func writeHealthFile(path, body string) error {
 // tieAgentProcesses waits for the fake agent's meta.json, then writes its real
 // pids into the process table.
 func (f *fixture) tieAgentProcesses(ctx context.Context) error {
+	m, err := f.waitAgentMeta(ctx)
+	if err != nil {
+		return err
+	}
+	body, err := agentProcesses(m)
+	if err != nil {
+		return err
+	}
+	return writeHealthFile(filepath.Join(f.healthDir(), "processes"), body)
+}
+
+// waitAgentMeta waits up to 30 seconds for a running fake agent's meta.json.
+func (f *fixture) waitAgentMeta(ctx context.Context) (nativerunner.Meta, error) {
 	root := nativerunner.AgentsRoot(f.stateD, project)
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return nativerunner.Meta{}, ctx.Err()
 		}
 		if m, ok := readAnyMeta(root); ok {
-			body, err := agentProcesses(m)
-			if err != nil {
-				return err
-			}
-			return writeHealthFile(filepath.Join(f.healthDir(), "processes"), body)
+			return m, nil
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	return fmt.Errorf("no agent meta.json under %s", root)
+	return nativerunner.Meta{}, fmt.Errorf("no agent meta.json under %s", root)
 }
 
 // readAnyMeta is the first agent meta under root that names a claude pid, its

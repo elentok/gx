@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -62,19 +63,27 @@ func limitShapeNames() []string {
 	return names
 }
 
-// checkLimitShape resolves the --shape value ("" is fresh) before anything starts.
-func checkLimitShape(sc scenario, shape string) (string, error) {
-	if !sc.limits {
+// checkShape resolves the --shape value before anything starts: "" is fresh
+// for the limits scenario and normal for the spend one.
+func checkShape(sc scenario, shape string) (string, error) {
+	var def string
+	var names []string
+	switch {
+	case sc.limits:
+		def, names = "fresh", limitShapeNames()
+	case sc.spend:
+		def, names = "normal", spendShapeNames()
+	default:
 		if shape != "" {
-			return "", fmt.Errorf("--shape only applies to the limits scenario")
+			return "", fmt.Errorf("--shape only applies to the limits and spend scenarios")
 		}
 		return "", nil
 	}
 	if shape == "" {
-		return "fresh", nil
+		return def, nil
 	}
-	if _, ok := limitShapes[shape]; !ok {
-		return "", fmt.Errorf("unknown shape %q; known: %s", shape, strings.Join(limitShapeNames(), ", "))
+	if !slices.Contains(names, shape) {
+		return "", fmt.Errorf("unknown shape %q; known: %s", shape, strings.Join(names, ", "))
 	}
 	return shape, nil
 }

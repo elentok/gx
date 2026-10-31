@@ -42,6 +42,8 @@ interface FixtureOutput {
   hold_file: string;
   disk_dir: string;
   health_dir: string;
+  /** The held fake agent's transcript path; only the `spend` scenario prints it. */
+  agent_transcript?: string;
 }
 
 export interface Fixture {
@@ -86,6 +88,8 @@ export interface Fixture {
   readonly password: string;
   /** The TOTP secret; empty when the server runs with `server.web.totp=false`. */
   readonly totpSecret: string;
+  /** The `spend` scenario's held agent transcript; append a usage line (create its directory first) to add spend. Empty elsewhere. */
+  readonly agentTranscript: string;
 }
 
 /** The value after `--name` in an argv, or undefined. */
@@ -167,6 +171,7 @@ async function startFixture(
   const fixture: Fixture = {
     password: out.password ?? "",
     totpSecret: out.totp_secret ?? "",
+    agentTranscript: out.agent_transcript ?? "",
     async cli(...args) {
       const { stdout } = await run(out.gx, args, { env, cwd: tmpdir() });
       return stdout;

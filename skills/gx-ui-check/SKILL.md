@@ -34,7 +34,7 @@ go run ./testutil/gxfixture [--hold] <scenario>
   fixture started any other way keeps running after you finish, with its `gx server` and fake agents.
   As a backstop it exits when its parent process dies or after 2 hours.
 - The scenario names are in the catalog (`empty`, `ready`, `mixed`, `finishing`, `paused`, `united`,
-  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`, `disk-low`, `health`, `agents`, `agents-failures`, `limits` (pick its seeded state with `--shape fresh|stale|past-reset|one-window`), and the sign-in scenarios `web-setup`, `web-login`
+  `dirty-trunk`, `design`, `design-*`, `many-done`, `edge`, `disk-low`, `health`, `agents`, `agents-failures`, `limits` (pick its seeded state with `--shape fresh|stale|past-reset|one-window`), `spend` (seeded budget ledger, `--shape normal|short|empty`, one held agent; its `agent_transcript` takes appended usage lines), and the sign-in scenarios `web-setup`, `web-login`
   and `web-logins`). An unknown name makes the command list
   the known ones.
 - Pass `--hold` only for a flow that says so (flow 7, and the Stash flow on `dirty-trunk`). It

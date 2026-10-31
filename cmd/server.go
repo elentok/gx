@@ -205,6 +205,13 @@ func runServer(ctx context.Context, d deps) error {
 			return fmt.Errorf("GX_USAGE_POLL_INTERVAL: %w", err)
 		}
 	}
+	// Test hook: gxfixture shortens the budget ledger poll, so a flow sees new spend within seconds.
+	var budgetPollInterval time.Duration
+	if v := os.Getenv("GX_BUDGET_POLL_INTERVAL"); v != "" {
+		if budgetPollInterval, err = time.ParseDuration(v); err != nil {
+			return fmt.Errorf("GX_BUDGET_POLL_INTERVAL: %w", err)
+		}
+	}
 	// Test hook: gxfixture reads CPU and memory from a control file and shortens the
 	// health read interval, so a flow can steer the Tray meters from outside the process.
 	var systemHealth syshealth.Reader
@@ -228,7 +235,7 @@ func runServer(ctx context.Context, d deps) error {
 	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
-		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval,
+		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval,
 		ProcessSource: processSource})
 	if err != nil {
 		return err
