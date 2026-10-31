@@ -194,7 +194,8 @@ approved look is the stored mock
   not on this branch's older copy.
 - `TopBar` stays presentational and takes a menu block slot. A connected child component renders
   inside `Menu.Content` (main's menu mounts its content lazily and unmounts on close). The child
-  fetches on mount with `useFetched`, so it fetches on open and costs nothing while closed. It
+  fetches on mount through its own small hook (not `useFetched`, which keeps old data after a
+  failure and repaints from a stored copy), so it fetches on open and costs nothing while closed. It
   draws its own two separators, so with no data to show it renders nothing and adds none.
 - The child refetches every 60 seconds while open, and on the two events. It does not fetch while
   closed.
@@ -291,7 +292,9 @@ Seams:
 ## Verification
 
 A verify ticket runs these against a temporary gx server from `gxfixture`. "Go test" and "Vitest"
-name the seam from Testing Decisions that covers the story; the verify part reruns it. New flows take
+name the seam from Testing Decisions that covers the story. A story that a flow, a CLI check or a mock
+state already covers has no Go test or Vitest entry: the implement tickets ran those through `gx check`,
+and the verify part does not rerun them. New flows take
 the next free numbers in `webui/e2e/CATALOG.md`; the implementer assigns them.
 
 New scenarios to write: `limits` and `spend` (Testing seam 5). New flows to write:
@@ -320,52 +323,40 @@ Story entries:
 
 1. Flow A. Mock state limits-fresh.
 2. Flow A. Mock state limits-fresh.
-3. Flow A. Vitest (seam 4): the relative time text. Mock state limits-fresh.
-4. Flow A (tooltip, hover and tap). Vitest (seam 4): the tooltip holds the exact local time and
-   opens on focus.
-5. Vitest (seam 4): amber at 80, red at 95, neither at 79 and 94. Mock state limits-fresh (amber
-   weekly row).
+3. Flow A. Mock state limits-fresh.
+4. Flow A (tooltip, hover and tap).
+5. Mock state limits-fresh (amber weekly row).
 6. Vitest (seam 4): a fractional percentage renders as a whole number.
 7. Flow A. Mock state limits-fresh.
-8. Flow B. Vitest (seam 4): no "seen" at 10 minutes, "seen" past it. Mock state limits-stale.
+8. Flow B. Mock state limits-stale.
 9. Flow B. Mock state limits-past-reset.
-10. Flow B. Go test (seam 1): a report with one window stores one window. Mock state
-    limits-one-window.
+10. Flow B. Mock state limits-one-window.
 11. Go test (seam 1): the restart check.
-12. Go test (seam 1): the first report flips the mode; a later report with no windows does not flip
-    it back; a restart keeps it. Flow E.
-13. Flow C. Go test (seam 1): with no report ever, the read route says spending. Mock state
-    spend-normal.
-14. Flow A (updates without reload). Go test (seam 1): a report publishes `limits-changed`, a
-    report that confirms a stale window publishes it too, and many reports in a short burst publish
-    few. Go test (seam 1): out-of-order reports (see the merge rule) leave the stored window
-    unchanged.
+12. Flow E.
+13. Flow C. Mock state spend-normal.
+14. Flow A (updates without reload).
 15. CLI check: pipe a payload into `gx claude statusline` against the fixture; the read route then
-    shows its percentages. Go test (seam 3).
-16. Go test (seam 3): printed line and exit code are the same with and without a server, and the
-    line prints before the report. A slow server delays the command by at most the hook timeout.
-    Flow E.
+    shows its percentages.
+16. Flow E.
 17. Go test (seam 3): server down, slow, or refusing leaves output and exit code unchanged and the
     command ends within its timeout.
-18. Go test (seam 1): a report made after a server start is stored and read back. Flow E (pipe a
-    payload after the server is up).
+18. Flow E (pipe a payload after the server is up).
 19. Go test (seam 1): the web listener answers 404 for the report route; the socket accepts it.
     `TestWeb_EverythingElseIs404` passes.
-20. Flow C. Go test (seam 1): today's total. Mock state spend-normal.
-21. Flow C. Go test (seam 2): Sunday window, including today a Sunday. Mock state spend-normal.
-22. Flow C. Go test (seam 2): the 1st window, including today the 1st. Mock state spend-normal.
-23. Flow C (tooltip, hover and tap). Vitest (seam 4): the tooltip text. Mock state spend-normal.
+20. Flow C. Mock state spend-normal.
+21. Flow C. Mock state spend-normal.
+22. Flow C. Mock state spend-normal.
+23. Flow C (tooltip, hover and tap). Mock state spend-normal.
 24. Mock state spend-normal.
-25. Flow C (short shape). Go test (seam 2): the first day is returned when later than the window
-    start and absent otherwise. Mock state spend-short-ledger.
+25. Flow C (short shape). Mock state spend-short-ledger.
 26. Flow C (empty shape). Mock state spend-empty.
 27. Go test (seam 2): a ledger day at 23:59 and one at 00:01 fall on different days; the daylight
     saving week.
-28. Flow D. Go test (seam 1): a ledger poll publishes a throttled `budget-changed`.
-29. Flow A and Flow C. Vitest (seam 4): order Settings, AFK, separator, block, separator, build.
-30. Flow D. Vitest (seam 4): the open menu fetches on open.
-31. Flow D. Vitest (seam 4): a 60-second tick refetches while open (fake timers).
-32. Flow D (closed step). Vitest (seam 4): no fetch while closed.
+28. Flow D.
+29. Flow A and Flow C.
+30. Flow D.
+31. Flow D.
+32. Flow D (closed step).
 33. Flow A and Flow C, in a 320px viewport: the menu does not overflow (jsdom does no layout, so
     Vitest cannot check this).
 34. Vitest (seam 4): the spending and limits blocks hold no budget limit text. Go test (seam 1):
