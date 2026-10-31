@@ -1,57 +1,5 @@
-import type { Page } from "@playwright/test";
-import { expect, nav, test, type Fixture } from "./fixture";
-
-// The restart flows run on the restart-* scenarios, whose server path is a fake gx binary. A flow
-// steers the fake through its control files (check.json, slow, old, start).
-
-const menuButton = (page: Page) => page.getByRole("button", nav("Menu"));
-const menu = (page: Page) => page.getByRole("menu", nav("Menu"));
-const restartItem = (page: Page) => menu(page).getByRole("menuitem", nav("Restart server"));
-const dialog = (page: Page) => page.getByRole("dialog", nav("Restart server"));
-const restartButton = (page: Page) => dialog(page).getByRole("button", { name: /^Restart( anyway)?$/ });
-
-const openDialog = async (page: Page) => {
-  await menuButton(page).click();
-  await restartItem(page).click();
-  await expect(dialog(page)).toBeVisible();
-};
-
-/** The build text in the menu, e.g. what the dialog calls the running version. */
-const buildText = async (page: Page) => {
-  await menuButton(page).click();
-  const build = menu(page).getByTestId("server-build");
-  await expect(build).toBeVisible();
-  const text = (await build.textContent())!.trim();
-  await page.keyboard.press("Escape");
-  await expect(menu(page)).toHaveCount(0);
-  return text;
-};
-
-/** What `restart-check` prints when every project passes, on restart-projects (projects demo and broken). */
-const passing = (version: string, config: { ok: boolean; error?: string } = { ok: true }) =>
-  JSON.stringify({
-    version,
-    config,
-    projects: [
-      { name: "demo", ok: true, files: [] },
-      { name: "broken", ok: true, files: [] },
-    ],
-  });
-
-/** The pid line of `gx server status` (it has no start time): it changes on every restart. */
-const pidLine = async (fixture: Fixture) => {
-  const status = await fixture.cli("server", "status");
-  const line = status.split("\n").find((l) => l.startsWith("pid:"));
-  expect(line, `no pid in:\n${status}`).toBeTruthy();
-  return line!;
-};
-
-/** Waits for the dialog to go away on its own (the tab reloaded onto the new server). */
-const expectReloaded = async (page: Page) => {
-  await expect(page.getByText("Restarting...")).toBeVisible();
-  await expect(dialog(page)).toHaveCount(0, { timeout: 45_000 });
-  await expect(menuButton(page)).toBeVisible();
-};
+import { expect, nav, test } from "./fixture";
+import { buildText, dialog, expectReloaded, menu, menuButton, openDialog, passing, pidLine, restartButton, restartItem } from "./restart-helpers";
 
 test("128. Restart server in the menu", async ({ page, start }) => {
   await start("restart-projects");

@@ -117,6 +117,21 @@ func TestRestartMissing_TheBinaryIsUnreadable(t *testing.T) {
 	}
 }
 
+func TestRestartFake_GxFileNamesTheBuildTheRestartRuns(t *testing.T) {
+	r := start(t, "restart-projects")
+	defer r.stop(t)
+	next := filepath.Join(t.TempDir(), "next-gx")
+	if err := os.WriteFile(next, []byte("#!/bin/sh\necho next build \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r.setRestart(t, "start", "up")
+	r.setRestart(t, "gx", next)
+	out, err := exec.Command(r.restartCheck(t).Binary, "server", "restart", "--continue").CombinedOutput()
+	if err != nil || strings.TrimSpace(string(out)) != "next build server restart --continue" {
+		t.Errorf("restart: err=%v out=%q, want the next build to run", err, out)
+	}
+}
+
 func TestRestartFake_StartFollowsTheStartFile(t *testing.T) {
 	r := start(t, "restart-projects") // startsUp is false
 	defer r.stop(t)

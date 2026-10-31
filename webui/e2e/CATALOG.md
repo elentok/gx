@@ -1496,7 +1496,7 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   3. Turn vi on, wait out the first turn, fill `hello` with the caret after `he` and press Cmd-G. Read the mode text, text and caret. Run `gx vimode off`; read them again; press Escape and `x`. Run `gx vimode on`; press Escape and `x`.
 - **Pass:** the item is a checkbox, unchecked, then `aria-checked` is true after the click. The second page shows it checked. With the editor open the mode text reads INSERT, goes away on `off` and returns on `on`; the text stays `hello` and the caret stays at 2 throughout. With vi off Escape does nothing and `x` types (`hexllo`). With vi on Escape gives NORMAL and `x` deletes (`hllo`). The restart half of the check is a Go test.
 
-The restart flows (128-138, `restart.e2e.ts`) run on the `restart-*` scenarios, whose server path is a fake `gx` binary. A flow steers it through `setRestartControl` (`check.json`, `slow`, `old`, `start`). `restart-projects` has two projects, `demo` and `broken`, and no agents; its check file is rewritten to pass unless the flow wants the dry run to fail. `start` = `up` lets the restart bring the server back; the fixture stays up across that restart. A flow that restarts allows one reload (`reloads: 1`).
+The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, which restart for real) run on the `restart-*` scenarios, whose server path is a fake `gx` binary. A flow steers it through `setRestartControl` (`check.json`, `slow`, `old`, `start`, `gx`). `gx` names another gx build for the restart to run, for example `GX_E2E_GX_NEXT`, which reports version `fixture-next`. The shared helpers are in `restart-helpers.ts`. `restart-projects` has two projects, `demo` and `broken`, and no agents; its check file is rewritten to pass unless the flow wants the dry run to fail. `start` = `up` lets the restart bring the server back; the fixture stays up across that restart. A flow that restarts allows one reload (`reloads: 1`).
 
 ## 128. Restart server in the menu
 
@@ -1567,3 +1567,17 @@ The restart flows (128-138, `restart.e2e.ts`) run on the `restart-*` scenarios, 
 - **Scenario:** `restart-projects` (project `broken` fails its dry run), `start` = `up`; one reload allowed.
 - **Steps:** open the dialog; click "Restart anyway".
 - **Pass:** the alert shows "broken: fixture migration failed"; the button reads "Restart anyway" (no plain "Restart"); the click restarts (reload, new pid).
+
+## 139. Restart with a failed migration
+
+- **Scenario:** `restart-projects`, `start` = `up`; three reloads allowed (three restarts). The flow writes a ticket with `status: bogus` into `broken`'s epic, so the real migration of `broken` fails, and `provisional_destination` into `demo`'s epic ticket.md.
+- **Steps:**
+  1. Restart; wait for the reload.
+  2. On the Epics page and on the demo-epic page, read the strip.
+  3. Rewrite the bad ticket to valid and run `gx tickets migrate '<dir from the strip>'`.
+  4. Break it again and restart; then fix it and restart again.
+- **Pass:**
+  - The pid changes and `gx server status` says running although `broken` failed.
+  - `demo`'s epic ticket.md now has `destination_unconfirmed` and no `provisional_destination`.
+  - On both pages a strip reads "broken: migration failed" with the error and a `gx tickets migrate` command.
+  - The strip is gone after the manual migrate, shows again after the failing restart, and is gone after the passing restart.

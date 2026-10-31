@@ -1,8 +1,8 @@
 import { execFile, spawn } from "node:child_process";
 import { createHmac } from "node:crypto";
-import { readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { expect, test as base, type Page } from "@playwright/test";
 
@@ -82,6 +82,10 @@ export interface Fixture {
   globalConfig(): Promise<Record<string, any>>;
   /** The parsed `project.json` of `project` in the fixture's ticket store, read fresh on every call. */
   projectConfig(project: string): Promise<Record<string, any>>;
+  /** Writes `content` to `path` under the fixture's ticket store (`<project>/<epic>/issues/x.md`), creating dirs. */
+  writeStoreFile(path: string, content: string): Promise<void>;
+  /** Reads a file under the fixture's ticket store. */
+  readStoreFile(path: string): Promise<string>;
   /** Merges `patch` into the top-level keys of `project`'s `project.json`. */
   patchProjectConfig(project: string, patch: Record<string, unknown>): Promise<void>;
   /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
@@ -214,6 +218,12 @@ async function startFixture(
     async projectConfig(project) {
       return JSON.parse(await readFile(join(env.XDG_DATA_HOME!, "gx", "tickets", project, "project.json"), "utf8"));
     },
+    async writeStoreFile(path, content) {
+      const file = join(env.XDG_DATA_HOME!, "gx", "tickets", path);
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(file, content);
+    },
+    readStoreFile: (path) => readFile(join(env.XDG_DATA_HOME!, "gx", "tickets", path), "utf8"),
     async patchProjectConfig(project, patch) {
       const path = join(env.XDG_DATA_HOME!, "gx", "tickets", project, "project.json");
       const next = { ...JSON.parse(await readFile(path, "utf8")), ...patch };

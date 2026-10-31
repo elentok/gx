@@ -19,6 +19,8 @@ import (
 //	slow        seconds `restart-check` sleeps before answering.
 //	start       "up": `server restart --continue` runs the real gx, which brings the
 //	            server back; anything else: it exits non-zero and the server stays down.
+//	gx          optional path of another gx build that `server restart --continue` runs
+//	            instead of the real one, so a restart can land on a new build.
 //
 // Scenarios: restart-agents (a running agent), restart-projects (two projects, one
 // failing its migration), restart-launchd (the binary sits at a launchd-style path
@@ -71,7 +73,8 @@ restart-check)
 	;;
 server)
 	if [ "$(cat "$ctl/start" 2>/dev/null)" = up ]; then
-		exec %[2]q "$@"
+		next=$(cat "$ctl/gx" 2>/dev/null)
+		exec "${next:-%[2]s}" "$@"
 	fi
 	echo "fake gx: start refused" >&2
 	exit 1
