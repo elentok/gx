@@ -32,7 +32,7 @@ predates the format: infer `bug` or `idea` from its body, and read its sections 
 
 ## 1. Verify
 
-Send one message with one `Agent` call per item (`general-purpose`, model from `gx agent model worker`, foreground; a second word is its `reasoning_effort`, see
+Start one subagent (Agent tool) per item in one turn, then wait for all of them (`general-purpose`, model from `gx agent model worker`; a second word is its `reasoning_effort`, see
 [Skill conventions](../gx-local-tracker.md#skill-conventions)),
 about 8 in parallel; start the next batch as each finishes. Each gets the ticket address and this
 brief:

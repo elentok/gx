@@ -22,7 +22,7 @@ return" step differs.
 
 ## Workflow
 
-1. **Summarize the commits.** Dispatch a cheap sub-agent (via the `Agent` tool) to:
+1. **Summarize the commits.** Start a cheap subagent (Agent tool) to:
    1. List every commit from `HEAD` back to the last version tag (`git log <last-tag>..HEAD`).
    2. Summarize the changes in those commits.
    3. Return the summary as its result.

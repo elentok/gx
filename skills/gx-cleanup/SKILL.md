@@ -102,8 +102,8 @@ other shared/pre-existing worktree. Say so explicitly in every investigation pro
 apply cleanly" checks (cherry-pick/merge dry-runs), use `git merge-tree` — it computes the result
 without touching any working tree or HEAD, so there's nothing to leave dirty or forget to undo. If
 an agent genuinely needs a real working tree (e.g. to run a build/test after a hypothetical apply),
-spawn it with `isolation: "worktree"` on the `Agent` tool call instead of pointing it at an existing
-worktree — that gives it an auto-created, auto-cleaned-up worktree of its own.
+add a fresh worktree by hand and point it there, instead of at an existing worktree; remove that
+worktree when the agent is done. Or run the check inline.
 
 ## Step 4: two-way choice for case-2.2 epics
 

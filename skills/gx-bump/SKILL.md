@@ -34,8 +34,7 @@ to find out what they're choosing between.
 
 Drafting and testing are both slow and don't depend on each other, so run them at the same time.
 
-First, start [gx-changelog](../gx-changelog/SKILL.md) as a background sub-agent (via the `Agent`
-tool), passing it the target version/bump type resolved in Step 1. Per its "sub-agent invocation"
+First, start [gx-changelog](../gx-changelog/SKILL.md) as a subagent (Agent tool), passing it the target version/bump type resolved in Step 1. Per its "sub-agent invocation"
 call shape, it returns the drafted entry text instead of writing it to disk.
 
 Then, while it drafts, run the test suite. Skip the tests if the args contain "skip tests" or

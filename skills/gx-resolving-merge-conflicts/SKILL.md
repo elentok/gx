@@ -13,7 +13,7 @@ description: "Use when you need to resolve an in-progress git merge/rebase confl
 
 3. **Resolve each hunk.** Preserve both intents where possible. Where incompatible, pick the one
    matching the merge's stated goal and note the trade-off. Do **not** invent new behaviour. Always
-   resolve; never `--abort`. Resolve each hunk with `Edit` on the marker block, never a scripted
+   resolve; never `--abort`. Resolve each hunk with a file edit (Edit) on the marker block, never a scripted
    splice (python/sed heredocs, `cat >`).
 
 4. Run only the checks that touch the conflicted files: build and vet the packages they sit in, then
@@ -35,5 +35,6 @@ description: "Use when you need to resolve an in-progress git merge/rebase confl
    absolute paths. Use the same worktree root for Bash and for Read/Edit paths.
 
 8. **Finish with zero background shells.** If a call was moved to the background, read its output,
-   then stop it (TaskStop). `TaskStop` is a deferred tool: if it isn't callable, load it first with
-   `ToolSearch` query `select:TaskStop`. ralph-loop will not merge a ticket while one is open.
+   then stop that background shell (TaskStop), as the Tool names table in
+   [gx-local-tracker.md](../gx-local-tracker.md) says. ralph-loop will not merge a ticket while one is
+   open.

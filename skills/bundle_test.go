@@ -716,6 +716,23 @@ var neutralFiles = []string{
 	"gx-ui-check/SKILL.md",
 	"gx-ui-check/MOCK-CHECK.md",
 	"gx.md",
+	"gx-resolving-merge-conflicts/SKILL.md",
+	"gx-merge/SKILL.md",
+	"gx-cleanup/SKILL.md",
+	"gx-changelog/SKILL.md",
+	"gx-bump/SKILL.md",
+	"gx-triage-follow-ups/SKILL.md",
+	"gx-verify/SKILL.md",
+	"gx-follow-up/SKILL.md",
+	"gx-wayfinder/SKILL.md",
+	"gx-research/SKILL.md",
+	"gx-to-spec/SKILL.md",
+	"gx-tdd/SKILL.md",
+	"gx-grilling/SKILL.md",
+	"gx-unslop/SKILL.md",
+	"gx-one-off/SKILL.md",
+	"gx-prototype/UI.md",
+	"gx-prototype/LOGIC.md",
 }
 
 var (
