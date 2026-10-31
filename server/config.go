@@ -89,6 +89,9 @@ type Config struct {
 	GoCacheDir func() (string, error)
 	// DiskPollInterval is how often the disk watcher reads; zero means one minute.
 	DiskPollInterval time.Duration
+	// MigrationFailurePollInterval is how often the server checks the migration
+	// failure record for a change; zero means 2 seconds.
+	MigrationFailurePollInterval time.Duration
 
 	// SystemHealth takes one CPU and memory reading; nil reads the real machine.
 	SystemHealth syshealth.Reader

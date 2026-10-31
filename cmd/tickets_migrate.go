@@ -13,6 +13,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
@@ -73,6 +74,11 @@ func runTicketsMigrate(dirs config.Dirs, scratchRoot string, dryRun bool, w io.W
 		return runTicketsMigrateDry(dirs, scratchRoot, w)
 	}
 	changes, early, err := migrateTracker(dirs, scratchRoot, scratchRoot, false)
+	if err == nil {
+		if clearErr := clearMigrationFailure(dirs, scratchRoot); clearErr != nil {
+			return clearErr
+		}
+	}
 	if early {
 		return err
 	}
@@ -84,6 +90,16 @@ func runTicketsMigrate(dirs config.Dirs, scratchRoot string, dryRun bool, w io.W
 	printChanges(w, changes)
 	fmt.Fprintf(w, "%d file(s) changed\n", len(changes))
 	return err
+}
+
+// clearMigrationFailure drops the project's saved failure once its migration
+// has passed.
+func clearMigrationFailure(dirs config.Dirs, projectDir string) error {
+	state, err := dirs.StateDir()
+	if err != nil {
+		return err
+	}
+	return migratefail.Clear(state, tickets.ProjectName(projectDir))
 }
 
 // runTicketsMigrateDry runs the whole migration chain on a scratch copy of the

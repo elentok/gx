@@ -866,6 +866,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	go func() { defer close(cpuDone); s.keepCPUWatched(freshCtx) }()
 	disksDone := make(chan struct{})
 	go func() { defer close(disksDone); s.keepDisksWatched(freshCtx) }()
+	migFailDone := make(chan struct{})
+	go func() { defer close(migFailDone); s.keepMigrationFailuresWatched(freshCtx) }()
 	healthDone := make(chan struct{})
 	go func() { defer close(healthDone); s.keepHealthWatched(freshCtx) }()
 	usageDone := make(chan struct{})
@@ -900,6 +902,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	<-gatesDone
 	<-cpuDone
 	<-disksDone
+	<-migFailDone
 	<-healthDone
 	<-usageDone
 	<-sweepDone
