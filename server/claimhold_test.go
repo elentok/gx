@@ -81,10 +81,8 @@ func TestClaimHold_HerdrOutageHoldsHerdrTickets(t *testing.T) {
 				t.Errorf("snapshot banner = %v %q, want it on, naming both tickets and %q", snap.HerdrUnavailable, snap.HerdrText, tc.wantReason)
 			}
 
-			herdr.SetHealthErr(nil)
-			servertest.WaitFor(t, 10*time.Second, "tickets launch once herdr answers", func() bool {
-				return len(herdr.Prompts("epic-a-iter-01")) > 0 && len(herdr.Prompts("epic-b-iter-01")) > 0
-			})
+			// The event follows the next banner sync, so recover only after it
+			// arrives; recovering first can hide the banner before it streams.
 			for sawDown := false; !sawDown; {
 				select {
 				case ev := <-evs:
@@ -93,6 +91,10 @@ func TestClaimHold_HerdrOutageHoldsHerdrTickets(t *testing.T) {
 					t.Fatal("no herdr-unavailable event for the waiting codex ticket")
 				}
 			}
+			herdr.SetHealthErr(nil)
+			servertest.WaitFor(t, 10*time.Second, "tickets launch once herdr answers", func() bool {
+				return len(herdr.Prompts("epic-a-iter-01")) > 0 && len(herdr.Prompts("epic-b-iter-01")) > 0
+			})
 		})
 	}
 }
