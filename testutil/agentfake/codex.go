@@ -75,6 +75,8 @@ func TUICodex() {
 type codexOptions struct {
 	// resume is the id after "resume"; empty for a fresh launch.
 	resume string
+	// hooks are the inline `-c hooks.<Event>=...` commands by event.
+	hooks map[string][]codexHook
 }
 
 // parseCodexArgs accepts exactly the launch flags the Codex harness passes, so
@@ -94,7 +96,19 @@ func parseCodexArgs(args []string) (codexOptions, error) {
 	for _, name := range []string{"approve-for-me", "dangerously-bypass-hook-trust"} {
 		flags.Bool(name, false, "")
 	}
-	flags.Func("c", "", func(string) error { return nil })
+	flags.Func("c", "", func(setting string) error {
+		key, value, _ := strings.Cut(setting, "=")
+		event, isHook := strings.CutPrefix(key, "hooks.")
+		if !isHook {
+			return nil
+		}
+		hooks, err := parseCodexHooks(value)
+		if opts.hooks == nil {
+			opts.hooks = map[string][]codexHook{}
+		}
+		opts.hooks[event] = append(opts.hooks[event], hooks...)
+		return err
+	})
 	if err := flags.Parse(args); err != nil {
 		return opts, err
 	}
@@ -169,11 +183,15 @@ func runCodex() (int, error) {
 	defer closeCtl()
 
 	c := &codexFake{
-		out:   os.Stdout,
-		id:    id,
-		cwd:   cwd,
-		title: filepath.Base(cwd),
-		box:   newInputBox(os.Stdout, ""),
+		out:     os.Stdout,
+		id:      id,
+		home:    home,
+		cwd:     cwd,
+		title:   filepath.Base(cwd),
+		box:     newInputBox(os.Stdout, ""),
+		hooks:   opts.hooks,
+		dialogs: codexDialogs(),
+		ctlPath: filepath.Join(dir, id+".ctl"),
 	}
 	c.box.marker = codexMarker
 	if err := c.openRollout(home, opts.resume != ""); err != nil {
@@ -185,9 +203,20 @@ func runCodex() (int, error) {
 type codexFake struct {
 	out   io.Writer
 	id    string
+	home  string
 	cwd   string
 	title string
 	box   *inputBox
+	hooks map[string][]codexHook
+	// dialogs are the startup dialogs still waiting for a key; ctlPath is this
+	// fake's own control channel, for work that runs off the input loop.
+	dialogs []string
+	ctlPath string
+	// onKey, when set, takes the next key instead of the input box.
+	onKey func() error
+	// resumeWork is a ticket whose first prompt ended in a rate-limit error; the
+	// next prompt does its work.
+	resumeWork *pendingWork
 	// rollout is the session file; ordinal numbers its next line.
 	rollout string
 	ordinal int
@@ -282,8 +311,10 @@ func (c *codexFake) report(state string) { writeAppReport(c.out, codexAppName, s
 func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 	events := tuiEvents(in, ctl)
 	c.setTitle(c.title)
-	c.report("idle")
-	c.box.draw()
+	if err := c.sessionStart(); err != nil {
+		return 0, err
+	}
+	c.showNext()
 	for ev := range events {
 		switch {
 		case ev.err != nil:
@@ -293,7 +324,9 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 			}
 			return 0, ev.err
 		case ev.resized:
-			c.box.draw()
+			if len(c.dialogs) == 0 {
+				c.box.draw()
+			}
 		case ev.control != nil:
 			if ev.control.Action == ActionExit {
 				c.exit()
@@ -302,17 +335,37 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 			if err := c.control(*ev.control); err != nil {
 				return 0, err
 			}
+		case len(c.dialogs) > 0:
+			c.dialogs = c.dialogs[1:]
+			c.showNext()
+		case c.onKey != nil:
+			next := c.onKey
+			c.onKey = nil
+			if err := next(); err != nil {
+				return 0, err
+			}
 		default:
 			text, submitted := c.box.key(ev.key)
 			// Real Codex queues a prompt typed mid-turn; the fake drops it.
 			if submitted && text != "" && !c.working {
-				if err := c.startTurn(text); err != nil {
+				if err := c.submit(text); err != nil {
 					return 0, err
 				}
 			}
 		}
 	}
 	return 0, nil
+}
+
+// showNext shows the first startup dialog still waiting, or, with none left,
+// the idle prompt: Ready comes only after every dialog is answered.
+func (c *codexFake) showNext() {
+	if len(c.dialogs) > 0 {
+		fmt.Fprint(c.out, c.dialogs[0]+"\r\n")
+		return
+	}
+	c.report("idle")
+	c.box.draw()
 }
 
 func (c *codexFake) exit() {
@@ -371,6 +424,9 @@ func (c *codexFake) finishTurn() error {
 	if err := c.writeLine("event_msg", map[string]any{"type": "task_complete", "last_agent_message": codexReply}); err != nil {
 		return err
 	}
+	if err := c.stopHooks(); err != nil {
+		return err
+	}
 	c.setTitle(c.title)
 	c.report("done")
 	c.setTitle(c.prompt + " | " + c.title)
@@ -386,6 +442,16 @@ func (c *codexFake) control(ctl Control) error {
 		writeAppReport(c.out, codexAppName, ctl.State, ctl.Kind, ctl.Message)
 	case ActionTitle:
 		c.setTitle(ctl.Title)
+	case ActionToolCall:
+		return c.toolCall(ctl.Tool, ctl.Command)
+	case ActionPermission:
+		return c.permission(ctl.Command, nil)
+	case ActionTokenCount:
+		return c.tokenCount(ctl.UsedPercent, ctl.ResetsAt)
+	case ActionCompact:
+		return c.compact()
+	case ActionTaskError:
+		return c.taskError(ctl.Message, ctl.Error)
 	default:
 		return fmt.Errorf("unknown codex control action %q", ctl.Action)
 	}

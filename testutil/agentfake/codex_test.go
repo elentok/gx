@@ -43,7 +43,13 @@ type codexProc struct {
 // startCodex runs the fake as a plain process, as the PTY runner would.
 func startCodex(t *testing.T, home, id string, args ...string) *codexProc {
 	t.Helper()
-	cwd, err := filepath.EvalSymlinks(t.TempDir())
+	return startCodexIn(t, t.TempDir(), home, id, args...)
+}
+
+// startCodexIn is startCodex in a given working directory.
+func startCodexIn(t *testing.T, dir, home, id string, args ...string) *codexProc {
+	t.Helper()
+	cwd, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

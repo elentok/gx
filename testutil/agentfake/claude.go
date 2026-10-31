@@ -44,6 +44,16 @@ const (
 	// ActionAPIError makes the TUI fake append the transcript line claude
 	// writes for a failed API call: Error, Status and Message say which.
 	ActionAPIError = "apierror"
+	// The Codex fake's scripted events. ActionToolCall runs Tool (default
+	// "Bash") with Command through its PreToolUse hooks; ActionPermission asks
+	// approval for Command through its PermissionRequest hooks; ActionTokenCount
+	// writes a rate-limit sample at UsedPercent; ActionCompact writes a compacted
+	// line; ActionTaskError ends the turn with the error Message and Error.
+	ActionToolCall   = "toolcall"
+	ActionPermission = "permission"
+	ActionTokenCount = "tokencount"
+	ActionCompact    = "compact"
+	ActionTaskError  = "taskerror"
 )
 
 // Control stands in for what real claude does on its own. It travels on the
@@ -79,6 +89,12 @@ type Control struct {
 	// text is Message.
 	Error  string `json:"error,omitempty"`
 	Status int    `json:"status,omitempty"`
+	// Tool and Command describe an ActionToolCall or ActionPermission of the
+	// Codex fake.
+	Tool    string `json:"tool,omitempty"`
+	Command string `json:"command,omitempty"`
+	// UsedPercent is the primary rate-limit use an ActionTokenCount writes.
+	UsedPercent float64 `json:"used_percent,omitempty"`
 }
 
 const controlType = "agentfake_control"
