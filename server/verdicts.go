@@ -134,7 +134,7 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 		ex.Verdict, ex.Reason = VerdictDiskLow, diskLowReason(d)
 		return ex
 	}
-	if h, held := s.claimHold(addr.Project, t, ticketAgent(t, s.queuedAgent(root))); held {
+	if h, held := s.claimHold(addr.Project, t, s.resolveTicket(addr, t).Harness); held {
 		ex.Verdict, ex.Reason = h.Verdict, h.Reason
 		return ex
 	}

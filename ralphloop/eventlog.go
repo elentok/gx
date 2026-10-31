@@ -601,18 +601,36 @@ func sanitizeSendError(err error) error {
 // Agent defaults to AgentClaude for historical logs that omitted it (see
 // Event.Agent).
 func lastIterationSession(evs []Event, identifier string) (agentSession, cwd string, agent AgentKind, ok bool) {
+	all := IterationSessions(evs, identifier)
+	if len(all) == 0 {
+		return "", "", "", false
+	}
+	return all[0].Session, all[0].Cwd, all[0].Agent, true
+}
+
+// IterationSession is the session one iteration-started event recorded.
+type IterationSession struct {
+	Session string
+	Cwd     string
+	Agent   AgentKind
+}
+
+// IterationSessions lists identifier's recorded iteration sessions, newest
+// first. Agent defaults to AgentClaude for historical logs that omitted it.
+func IterationSessions(evs []Event, identifier string) []IterationSession {
+	var out []IterationSession
 	for i := len(evs) - 1; i >= 0; i-- {
 		ev := evs[i]
 		if ev.Ticket != identifier || ev.Type != string(events.IterationStarted) || ev.AgentSession == "" {
 			continue
 		}
-		agent = ev.Agent
+		agent := ev.Agent
 		if agent == "" {
 			agent = AgentClaude
 		}
-		return ev.AgentSession, ev.Cwd, agent, true
+		out = append(out, IterationSession{Session: ev.AgentSession, Cwd: ev.Cwd, Agent: agent})
 	}
-	return "", "", "", false
+	return out
 }
 
 // ReadEvents reads and parses every line of epicName's run-log.jsonl under

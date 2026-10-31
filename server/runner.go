@@ -370,7 +370,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 			return false, nil
 		}
 		s.refused.set(ticketAddr, false)
-		agent := ticketAgent(t, cmp.Or(ralphloop.AgentKind(item.Agent), s.defaultHarness(addr.Project)))
+		agent := s.resolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t).Harness
 		if _, held := s.claimHold(addr.Project, t, agent); held {
 			return false, nil
 		}
@@ -501,8 +501,12 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	}
 	deps := s.depsWith(s.launchRunner(ticket.Project, agent))
 	deps.GateReleased = s.registry.gateReleased(ticketAddr)
-	// Only Claude on the pty runner resumes; every other claim starts cold.
-	if agent == ralphloop.AgentClaude && deps.Runner.Name() == string(agentrunner.ChoicePTY) {
+	// Only Claude on the pty runner resumes; every other claim starts cold, and so
+	// does one under another harness than the answered session's: the Handoff
+	// carries it over.
+	earlier := s.earlierRunHarness(ticket)
+	switchedHarness := earlier != "" && earlier != string(agent)
+	if agent == ralphloop.AgentClaude && deps.Runner.Name() == string(agentrunner.ChoicePTY) && !switchedHarness {
 		one.ResumeSessionID = answered
 	}
 	mode := s.iterationModeFor(ticket, t)
@@ -954,9 +958,9 @@ func (s *Server) iterationRunner(addr tickets.Address) (agentrunner.Runner, erro
 	if run, ok := s.registry.runOf(addr.String()); ok {
 		return s.runnerOf(run)
 	}
-	agent := ralphloop.AgentClaude
+	agent := s.defaultHarness(addr.Project)
 	if _, t, ok := s.freshTicket(addr); ok {
-		agent = ticketAgent(t, agent)
+		agent = s.resolveTicket(addr, t).Harness
 	}
 	return s.launchRunner(addr.Project, agent), nil
 }

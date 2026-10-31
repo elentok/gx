@@ -218,7 +218,7 @@ func (s *Server) promptsOnRetry(address string) bool {
 }
 
 // ticketRelaunch starts a fresh iteration of a ticket outside the queue order,
-// under the agent it is queued with (claude otherwise). An idle or done
+// under the harness the resolver picks for it. An idle or done
 // leftover pane is left to the launch, which closes a stale label holder. A
 // person's relaunch logs human-relaunch, which resets the recovery budget. A
 // late finish is adopted instead, with no launch.
@@ -248,14 +248,15 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if s.adoptFirst(ref.projectDir, ref.addr, ref.ticket.Path) {
 			return QueueResult{}, nil
 		}
-		if reason, held := s.herdrHolds(s.launchRunner(ref.addr.Project, ticketAgent(ref.ticket, ralphloop.AgentClaude))); held {
+		agent := s.resolveTicket(ref.addr, ref.ticket).Harness
+		if reason, held := s.herdrHolds(s.launchRunner(ref.addr.Project, agent)); held {
 			return refusal(ReasonHerdrUnavailable, reason), nil
 		}
 		if res, refused := s.budgetRefusal(); refused {
 			return res, nil
 		}
 		if req.actor != "" {
-			if v, held := s.usageGate(ticketAgent(ref.ticket, ralphloop.AgentClaude), time.Now()); held {
+			if v, held := s.usageGate(agent, time.Now()); held {
 				return refusal(ReasonUsageLimit, v), nil
 			}
 		}
@@ -287,7 +288,7 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		if err != nil {
 			return QueueResult{}, err
 		}
-		if _, err := s.claimAndLaunch(ref.root(), ref.addr, ref.ticket, ref.repo, ticketAgent(ref.ticket, s.queuedAgent(ref.addr.String())), epics); err != nil {
+		if _, err := s.claimAndLaunch(ref.root(), ref.addr, ref.ticket, ref.repo, agent, epics); err != nil {
 			return QueueResult{}, err
 		}
 		if applied != nil {
@@ -298,16 +299,6 @@ func (s *Server) ticketRelaunch(req QueueRequest) (QueueResult, error) {
 		}
 		return QueueResult{}, nil
 	})
-}
-
-// ticketAgent is the agent the ticket's own frontmatter names, fallback when it
-// names none or one that is not a known agent.
-func ticketAgent(t tickets.Ticket, fallback ralphloop.AgentKind) ralphloop.AgentKind {
-	agent := ralphloop.AgentKind(t.Agent)
-	if t.Agent == "" || ralphloop.ValidateAgentKind(agent) != nil {
-		return fallback
-	}
-	return agent
 }
 
 // ticketCancel withdraws a ticket and every non-terminal ticket forked from it.

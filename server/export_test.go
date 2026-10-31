@@ -21,7 +21,6 @@ var (
 	RecoveryState  = recoveryState
 	GuardRailStop  = guardRailStop
 	HardGraceTitle = hardGraceTitle
-	TicketAgent    = ticketAgent
 )
 
 // DefaultHarness is the project's Default harness.

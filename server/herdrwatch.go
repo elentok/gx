@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/runnerbuild"
+	"github.com/elentok/gx/tickets"
 )
 
 const (
@@ -99,7 +100,7 @@ func (s *Server) herdrWaiting() []string {
 		if !ok {
 			continue
 		}
-		agent := ticketAgent(t, s.queuedAgent(item.Address))
+		agent := s.resolveTicket(tickets.Address{Project: addr.Project, Epic: addr.Epic, ID: t.Identifier}, t).Harness
 		if r := s.launchRunner(addr.Project, agent); r != nil && r.Name() == runnerHerdr {
 			out = append(out, item.Address)
 		}

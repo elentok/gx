@@ -10,7 +10,6 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/git"
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -147,21 +146,6 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 	for name, kind := range waitForAgentKinds(t, fake, "01", "02") {
 		if kind != "codex" {
 			t.Errorf("%s started as %q, want the queue item's codex", name, kind)
-		}
-	}
-}
-
-func TestTicketAgent(t *testing.T) {
-	t.Parallel()
-	for _, tc := range []struct{ field, fallback, want string }{
-		{"", "claude", "claude"},
-		{"nonsense", "codex", "codex"},
-		{"codex", "claude", "codex"},
-		{"claude", "codex", "claude"},
-	} {
-		got := server.TicketAgent(tickets.Ticket{Agent: tc.field}, ralphloop.AgentKind(tc.fallback))
-		if string(got) != tc.want {
-			t.Errorf("ticketAgent(field %q, fallback %q) = %q, want %q", tc.field, tc.fallback, got, tc.want)
 		}
 	}
 }

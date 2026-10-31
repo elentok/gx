@@ -46,19 +46,3 @@ func (s *Server) herdrHolds(r agentrunner.Runner) (string, bool) {
 	}
 	return s.herdr.holdReason()
 }
-
-// queuedAgent is the default agent of the queue entry for address's root (a
-// ticket address or "project:epic"), the project's Default harness when none
-// names one.
-func (s *Server) queuedAgent(address string) ralphloop.AgentKind {
-	want, err := parseQueuedAddress(address)
-	if err != nil {
-		return s.defaultHarness(projectOfAddress(address))
-	}
-	for _, item := range s.queued.list() {
-		if a, err := parseQueuedAddress(item.Address); err == nil && rootOf(a) == rootOf(want) && item.Agent != "" {
-			return ralphloop.AgentKind(item.Agent)
-		}
-	}
-	return s.defaultHarness(want.Project)
-}

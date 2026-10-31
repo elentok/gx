@@ -732,7 +732,7 @@ func (v recoveryVerbs) LaunchPrompt(address string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("no ticket %s", address)
 	}
-	return launchPrompt(v.s.queuedAgent(address), launchSkill(ref.ticket), investigatePrompt(ref.ticket), address), nil
+	return launchPrompt(v.s.resolveTicket(ref.addr, ref.ticket).Harness, launchSkill(ref.ticket), investigatePrompt(ref.ticket), address), nil
 }
 
 // ticketCommitlessDone marks a ticket done with no commits of its own, for work
