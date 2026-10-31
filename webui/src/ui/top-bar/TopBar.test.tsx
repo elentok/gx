@@ -134,6 +134,24 @@ describe("TopBar", () => {
     expect(menu.children.length).toBe(1);
   });
 
+  it("lists Restart server after AFK and above the build, and calls onRestart", async () => {
+    const onRestart = vi.fn();
+    const { getByRole, findByRole, findByTestId, queryByRole, unmount } = renderThemed(<TopBar connected build="v1" onToggleAfk={() => {}} onRestart={onRestart} />);
+    fireEvent.click(getByRole("button", { name: "Menu" }));
+    const item = await findByRole("menuitem", { name: "Restart server" });
+    const afk = await findByRole("menuitemcheckbox", { name: "AFK" });
+    const build = await findByTestId("server-build");
+    expect(afk.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(item.compareDocumentPosition(build) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(item);
+    await waitFor(() => expect(onRestart).toHaveBeenCalledOnce());
+    unmount();
+    const none = renderThemed(<TopBar connected />);
+    fireEvent.click(none.getByRole("button", { name: "Menu" }));
+    await none.findByRole("menuitem", { name: "Settings" });
+    expect(queryByRole("menuitem", { name: "Restart server" })).toBeNull();
+  });
+
   it("marks no tab without an active one", () => {
     const { container } = renderThemed(<TopBar connected />);
     expect(container.querySelector("[aria-current]")).toBeNull();

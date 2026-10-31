@@ -1631,6 +1631,87 @@ export interface FinishedEpic {
 }
 
 //////////
+// source: restart.go
+
+export const ReasonRestartChanged = "changed";
+export const ReasonRestartInProgress = "in_progress";
+export const ReasonRestartCheck = "check_failed";
+/**
+ * Restart refusal reasons.
+ */
+export type ReasonRestart = typeof ReasonRestartChanged | typeof ReasonRestartInProgress | typeof ReasonRestartCheck;
+/**
+ * RestartRequest carries the values the dialog confirmed. Only these decide
+ * whether the check changed: a new file list or error text does not.
+ */
+export interface RestartRequest {
+  new_version: string;
+  config_ok: boolean;
+  failing_projects: string[];
+}
+/**
+ * RestartResult is the restart route's answer. A refusal is a result, not an
+ * error. Report is the fresh check when the confirmed values went stale.
+ */
+export interface RestartResult {
+  started: boolean;
+  refused: boolean;
+  reason?: string;
+  message?: string;
+  restarting?: boolean;
+  report?: RestartCheckReport;
+  restart_log?: string;
+}
+
+//////////
+// source: restartcheck.go
+
+/**
+ * RestartCheckOutput is what `gx restart-check` prints. A binary without the
+ * command exits non-zero with an unknown-command error; one that ran exits zero
+ * even when the config or a dry run failed (the failure is in the JSON).
+ */
+export interface RestartCheckOutput {
+  version: string;
+  config: RestartCheckConfig;
+  projects: RestartCheckProject[];
+}
+export interface RestartCheckConfig {
+  ok: boolean;
+  error?: string;
+}
+export interface RestartCheckProject {
+  name: string;
+  ok: boolean;
+  error?: string;
+  files: string[];
+}
+export const RestartCheckOK = "ok";
+export const RestartCheckUnreadable = "unreadable";
+export const RestartCheckTooOld = "too_old";
+/**
+ * Restart check statuses.
+ */
+export type RestartCheck = typeof RestartCheckOK | typeof RestartCheckUnreadable | typeof RestartCheckTooOld;
+/**
+ * RestartCheckReport is the restart check route's answer. Config and Projects
+ * are set only when Status is "ok".
+ */
+export interface RestartCheckReport {
+  status: string;
+  error?: string;
+  hint?: string;
+  binary: string;
+  running_version: string;
+  new_version?: string;
+  config: RestartCheckConfig;
+  projects: RestartCheckProject[];
+  agents: number /* int */;
+  instance: string;
+  restart_log: string;
+}
+
+//////////
 // source: sessionautoadvance.go
 
 /**

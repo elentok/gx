@@ -23,6 +23,8 @@ packages:
       - pause.go
       - projectworktrees.go
       - recentlyfinished.go
+      - restart.go
+      - restartcheck.go
       - sessionautoadvance.go
       - sessionchat.go
       - sessionfailure.go

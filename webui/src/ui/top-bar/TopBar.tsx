@@ -40,10 +40,12 @@ interface Props {
   viMode?: boolean;
   // The Vi mode item shows only when the page can switch it.
   onToggleViMode?: () => void;
+  // The item shows only when the page can host the restart dialog.
+  onRestart?: () => void;
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk, viMode = false, onToggleViMode, menuBlock, menuBlockShown }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk, viMode = false, onToggleViMode, onRestart, menuBlock, menuBlockShown }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
   const nav = useRef<HTMLElement>(null);
   // Sheets that sit below the bar read its real height from the root.
@@ -153,6 +155,11 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
                   Vi mode
                   <MenuSwitch on={viMode} tone={tone} />
                 </Menu.CheckboxItem>
+              )}
+              {onRestart && (
+                <Menu.Item value="restart" closeOnSelect onClick={onRestart} cursor="pointer" color="text" ps="3" _highlighted={{ bg: "surface" }}>
+                  Restart server
+                </Menu.Item>
               )}
               {menuBlock}
               {build && (
