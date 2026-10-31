@@ -16,15 +16,17 @@ import (
 func newAgentModelCmd(d deps) *cobra.Command {
 	return &cobra.Command{
 		Use:   "model <light|worker|strongest>",
-		Short: "print the model configured for the current agent's tier",
-		Long: "Print the model configured for a tier (light, worker or strongest) of the current agent.\n\n" +
+		Short: "print the model (and Codex effort) configured for the current agent's tier",
+		Long: "Print the model configured for a tier (light, worker or strongest) of the current agent.\n" +
+			"Claude prints the model alone. Codex prints \"model effort\" on one line, or the model\n" +
+			"alone when its effort is empty.\n\n" +
 			"The agent is found in this order:\n" +
 			"  1. " + nativerunner.AgentSessionEnv + ": the harness of that gx server session\n" +
 			"  2. " + server.AgentEnv + ": set by ralph-loop to the run's agent\n" +
 			"  3. claude\n\n" +
 			"The value comes from the config agents.* section with the current directory's project\n" +
 			"overrides on top, and falls back to the built-in default. It is printed as written,\n" +
-			"without validation. An empty model prints nothing.",
+			"without validation. An empty model prints nothing, even when an effort is set.",
 		Args:      cobra.ExactArgs(1),
 		ValidArgs: tierNames(),
 		RunE: func(c *cobra.Command, args []string) error {
@@ -57,9 +59,14 @@ func runAgentModel(d deps, out io.Writer, tierName string) error {
 			}
 		}
 	}
-	model, _ := ralphloop.ResolveTier(cfg.Agents, currentAgent(d), tier)
-	if model != "" {
+	agent := currentAgent(d)
+	model, effort := ralphloop.ResolveTier(cfg.Agents, agent, tier)
+	switch {
+	case model == "":
+	case effort == "" || agent != ralphloop.AgentCodex:
 		fmt.Fprintln(out, model)
+	default:
+		fmt.Fprintln(out, model, effort)
 	}
 	return nil
 }

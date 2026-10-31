@@ -53,6 +53,24 @@ func TestSkillConventionModelTier(t *testing.T) {
 	}
 }
 
+func TestSkillConventionReasoningEffort(t *testing.T) {
+	tracker := collapseSpace(readFile(t, "gx-local-tracker.md"))
+	for _, want := range []string{"first word", "second", "`reasoning_effort`"} {
+		if !strings.Contains(tracker, want) {
+			t.Errorf("gx-local-tracker.md lacks %q", want)
+		}
+	}
+	for _, path := range bundleMarkdownFiles(t) {
+		text := readFile(t, path)
+		if !strings.Contains(text, "gx agent model") {
+			continue
+		}
+		if !strings.Contains(text, "reasoning_effort") && !strings.Contains(text, "gx-local-tracker.md#skill-conventions") {
+			t.Errorf("%s reads `gx agent model` but never says how to pass the effort", path)
+		}
+	}
+}
+
 func TestGxDesignEndsRunAfterChartAndDestination(t *testing.T) {
 	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
 	for _, want := range []string{

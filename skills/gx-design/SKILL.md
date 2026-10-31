@@ -104,7 +104,8 @@ the ticket title during `resolve-tickets`.
    - **Tiers.** The charting session runs on the strongest tier. Its subagents follow the tier list,
      not the session: `gx agent model strongest` for the design reviews, `gx agent model worker`
      for gx-to-spec, gx-to-tickets and gx-research. Research tickets spawned while charting also use
-     `gx agent model worker`.
+     `gx agent model worker`. Pass the output's first word as `model` and its second word, if any, as
+     `reasoning_effort` (see [Skill conventions](../gx-local-tracker.md#skill-conventions)).
    - **No map epic** (`gx tickets epics --maps` doesn't list it): a direct invocation. Text after the
      epic address in `/gx-design <epic> <idea>` is the idea; without it, ask for the idea first.
      Write the map as the tracker's "Chart" operation says (`kind: map`, `design_step: chart`, body

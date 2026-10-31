@@ -329,8 +329,11 @@ Rules every gx skill follows when it names a model or launches a sub-agent:
 - **Ask for a tier, never a model.** Before a subagent call, run `gx agent model <tier>` and pass
   its output as the call's `model` field. Tiers: `light`, `worker`, `strongest`. Never write a
   model alias or ID in a skill.
-- **On empty output, leave out the `model` field.**
-- **On Codex**, if the spawn call has no model field, the subagent runs on the session model.
+- **Effort.** The output is `model` or `model effort`. Pass the first word as `model` and the
+  second word, if present, as `reasoning_effort`.
+- **On empty output, leave out the `model` field** and the `reasoning_effort` field.
+- **On Codex**, if the spawn call has no model or effort field, the subagent runs on the session model
+  and effort, and the step goes on.
 
 ## Claiming
 

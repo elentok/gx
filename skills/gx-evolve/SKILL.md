@@ -42,7 +42,7 @@ Pick tickets from the flag table. A ticket with no flags is **never** read.
 - Tickets flagged past the cap are not read; they appear as rows in step 4.
 
 Send **one message** with one `Agent` call per picked ticket (`general-purpose`, model from `gx agent model worker`,
-foreground). Each gets the ticket id, its flag row, and the digest paths for its sessions. Brief:
+foreground; a second word is its `reasoning_effort`, see [Skill conventions](../gx-local-tracker.md#skill-conventions)). Each gets the ticket id, its flag row, and the digest paths for its sessions. Brief:
 "Read these digests. Report what in the tooling or process cost time, tokens or correctness —
 prompts, skills, agent docs, gx/ralph-loop behaviour — each with a quoted line or ticket id as
 evidence. Also list loud or hand-built shell commands: one that printed far more output than the

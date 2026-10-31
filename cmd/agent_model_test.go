@@ -46,7 +46,7 @@ func TestAgentModel_GXAgentCodexPrintsCodexSlug(t *testing.T) {
 	t.Parallel()
 	cfg := config.Default()
 	got := runAgentModelCmd(t, cfg, map[string]string{"GX_AGENT": "codex"}, t.TempDir(), "light")
-	if want := cfg.Agents.Codex.Light.Model + "\n"; got != want {
+	if want := cfg.Agents.Codex.Light.Model + " " + cfg.Agents.Codex.Light.Effort + "\n"; got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
@@ -57,6 +57,40 @@ func TestAgentModel_EmptyModelPrintsNothing(t *testing.T) {
 	cfg.Agents.Claude.Light.Model = ""
 	if got := runAgentModelCmd(t, cfg, nil, t.TempDir(), "light"); got != "" {
 		t.Errorf("got %q, want nothing", got)
+	}
+}
+
+func TestAgentModel_CodexPrintsModelAndEffort(t *testing.T) {
+	t.Parallel()
+	cfg := config.Default()
+	env := map[string]string{"GX_AGENT": "codex"}
+	got := runAgentModelCmd(t, cfg, env, t.TempDir(), "worker")
+	w := cfg.Agents.Codex
+	if w.Effort == "" {
+		t.Fatal("default codex worker has no effort")
+	}
+	if want := w.Model + " " + w.Effort + "\n"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+
+	cfg.Agents.Codex.Effort = ""
+	if got := runAgentModelCmd(t, cfg, env, t.TempDir(), "worker"); got != w.Model+"\n" {
+		t.Errorf("empty effort: got %q, want the model alone", got)
+	}
+
+	cfg.Agents.Codex.Model = ""
+	cfg.Agents.Codex.Effort = "high"
+	if got := runAgentModelCmd(t, cfg, env, t.TempDir(), "worker"); got != "" {
+		t.Errorf("empty model: got %q, want nothing", got)
+	}
+}
+
+func TestAgentModel_ClaudePrintsModelOnlyEvenWithEffort(t *testing.T) {
+	t.Parallel()
+	cfg := config.Default()
+	cfg.Agents.Claude.Effort = "high"
+	if got := runAgentModelCmd(t, cfg, nil, t.TempDir(), "worker"); got != "sonnet\n" {
+		t.Errorf("got %q, want the model alone", got)
 	}
 }
 
