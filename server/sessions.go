@@ -373,8 +373,7 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 	if meta.Harness == string(harness.Codex) {
 		// The SessionStart hook writes Codex's own session id here; without it
 		// the meta keeps gx's UUID and the chat misses the rollout.
-		env = append(slices.Clone(env), harness.CodexSessionFileEnv+"="+filepath.Join(dir, harness.CodexSessionFile),
-			harness.CodexAgentDirEnv+"="+dir)
+		env = append(slices.Clone(env), harness.CodexSessionEnv(dir)...)
 	}
 	opts := harness.LaunchOptions{
 		SessionID: meta.ConversationID,
@@ -454,14 +453,11 @@ func (s *Server) codexRoots(meta *sessionMeta) []string {
 	if meta.Harness != string(harness.Codex) {
 		return nil
 	}
-	var roots []string
-	if gitDir, commonDir, err := git.GitDirs(meta.Dir); err == nil {
-		roots = append(roots, gitDir, commonDir)
-	}
+	var extra []string
 	if d, err := s.projectDir(meta.Project); err == nil {
-		roots = append(roots, d)
+		extra = append(extra, d)
 	}
-	return roots
+	return harness.CodexWritableRoots(meta.Dir, extra...)
 }
 
 // hasFlag reports whether args hold flag, bare or as flag=value.

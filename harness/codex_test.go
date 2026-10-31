@@ -1,6 +1,9 @@
 package harness_test
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -8,6 +11,58 @@ import (
 
 	"github.com/elentok/gx/harness"
 )
+
+func TestCodexSessionEnv(t *testing.T) {
+	t.Parallel()
+	got := harness.CodexSessionEnv("/a/dir")
+	want := []string{
+		"GX_CODEX_SESSION_FILE=/a/dir/codex-session.json",
+		"GX_CODEX_AGENT_DIR=/a/dir",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("CodexSessionEnv = %v, want %v", got, want)
+	}
+}
+
+func TestCodexReadSessionID(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if got := harness.ReadCodexSessionID(dir); got != "" {
+		t.Errorf("missing file: got %q, want empty", got)
+	}
+	file := filepath.Join(dir, harness.CodexSessionFile)
+	if err := os.WriteFile(file, []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := harness.ReadCodexSessionID(dir); got != "" {
+		t.Errorf("malformed file: got %q, want empty", got)
+	}
+	if err := os.WriteFile(file, []byte(`{"session_id":"abc-123","cwd":"/x"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := harness.ReadCodexSessionID(dir); got != "abc-123" {
+		t.Errorf("saved id: got %q, want abc-123", got)
+	}
+}
+
+func TestCodexWritableRoots(t *testing.T) {
+	t.Parallel()
+	plain := t.TempDir()
+	if got := harness.CodexWritableRoots(plain, "/x", "/y"); !slices.Equal(got, []string{"/x", "/y"}) {
+		t.Errorf("non-repo: got %v, want extras only", got)
+	}
+	repo := t.TempDir()
+	if out, err := exec.Command("git", "-C", repo, "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	got := harness.CodexWritableRoots(repo, "/x", "/y")
+	if len(got) != 4 || !slices.Equal(got[2:], []string{"/x", "/y"}) {
+		t.Fatalf("repo: got %v, want two git dirs then extras", got)
+	}
+	if !strings.HasSuffix(got[0], ".git") || !strings.HasSuffix(got[1], ".git") {
+		t.Errorf("git dirs = %v", got[:2])
+	}
+}
 
 func TestCodexArgs_Shape(t *testing.T) {
 	t.Parallel()

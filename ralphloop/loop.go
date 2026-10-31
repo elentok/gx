@@ -14,7 +14,6 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/storecommit"
@@ -200,15 +199,10 @@ const claudeGuardSettings = `{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[
 
 func agentArgs(agent AgentKind, cwd, scratchDir, epicName, model, effort string, extraDirs ...string) []string {
 	if agent == AgentCodex {
-		// A cwd that is not a repo adds no git roots: the sandbox still starts.
-		var roots []string
-		if gitDir, commonDir, err := git.GitDirs(cwd); err == nil {
-			roots = append(roots, gitDir, commonDir)
-		}
-		roots = append(roots, scratchDir, filepath.Join(scratchDir, epicName))
+		extra := append([]string{scratchDir, filepath.Join(scratchDir, epicName)}, extraDirs...)
 		return harness.CodexArgs(harness.CodexArgsInput{
 			Model: model, Effort: effort,
-			WritableRoots: append(roots, extraDirs...),
+			WritableRoots: harness.CodexWritableRoots(cwd, extra...),
 		})
 	}
 	args := []string{

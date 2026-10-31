@@ -313,13 +313,8 @@ func (s *Server) readCodexUsage(agentDir string) (nativerunner.UsageRecord, bool
 	}
 	// Meta holds gx's start id; Codex names its rollout by the id the hook saved.
 	sessionID := d.Meta.SessionID
-	if data, err := os.ReadFile(filepath.Join(agentDir, harness.CodexSessionFile)); err == nil {
-		var saved struct {
-			SessionID string `json:"session_id"`
-		}
-		if json.Unmarshal(data, &saved) == nil && saved.SessionID != "" {
-			sessionID = saved.SessionID
-		}
+	if saved := harness.ReadCodexSessionID(agentDir); saved != "" {
+		sessionID = saved
 	}
 	sample, ok, err := codexsession.LatestUsageIn(home, d.Meta.Cwd, sessionID)
 	if err != nil || !ok || sample.SeenAt.IsZero() {

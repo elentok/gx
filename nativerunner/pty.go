@@ -401,8 +401,7 @@ func (p *Pty) launchCommand(opts agentrunner.StartOptions, dir, sessionID string
 	env := slices.Concat(p.Env, opts.Env)
 	if kind == harness.Codex {
 		// The SessionStart hook writes Codex's own session id here.
-		env = append(env, harness.CodexSessionFileEnv+"="+filepath.Join(dir, harness.CodexSessionFile),
-			harness.CodexAgentDirEnv+"="+dir)
+		env = append(env, harness.CodexSessionEnv(dir)...)
 	}
 	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: args, Env: env, Cwd: opts.Cwd}
 	var launch harness.Command

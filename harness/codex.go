@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"unicode"
 
 	"github.com/elentok/gx/agentrunner/screen"
+	"github.com/elentok/gx/git"
 )
 
 // codexHarness is the codex executable's side of a session. Codex has no
@@ -38,6 +40,41 @@ const (
 	// The temp file and rename keep the watcher from reading half a payload.
 	CodexSessionStartCommand = `[ -n "$GX_CODEX_SESSION_FILE" ] && cat > "$GX_CODEX_SESSION_FILE.tmp" && mv "$GX_CODEX_SESSION_FILE.tmp" "$GX_CODEX_SESSION_FILE"`
 )
+
+// CodexSessionEnv is the env a Codex launch carries so the hooks find the agent
+// dir. Every launch path takes it from here.
+func CodexSessionEnv(agentDir string) []string {
+	return []string{
+		CodexSessionFileEnv + "=" + filepath.Join(agentDir, CodexSessionFile),
+		CodexAgentDirEnv + "=" + agentDir,
+	}
+}
+
+// ReadCodexSessionID is the session_id the SessionStart hook saved in agentDir;
+// "" when the file is missing or malformed.
+func ReadCodexSessionID(agentDir string) string {
+	data, err := os.ReadFile(filepath.Join(agentDir, CodexSessionFile))
+	if err != nil {
+		return ""
+	}
+	var saved struct {
+		SessionID string `json:"session_id"`
+	}
+	if json.Unmarshal(data, &saved) != nil {
+		return ""
+	}
+	return saved.SessionID
+}
+
+// CodexWritableRoots are the git dirs of cwd, then extra. A cwd that is not a
+// repo adds no git roots: the sandbox still starts.
+func CodexWritableRoots(cwd string, extra ...string) []string {
+	var roots []string
+	if gitDir, commonDir, err := git.GitDirs(cwd); err == nil {
+		roots = append(roots, gitDir, commonDir)
+	}
+	return append(roots, extra...)
+}
 
 func codexHookGroup(matcher, command string) string {
 	m := ""
