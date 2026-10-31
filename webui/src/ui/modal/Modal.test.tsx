@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { ChakraProvider } from "@chakra-ui/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderThemed } from "../render";
+import { system } from "../theme";
 import { Modal } from "./Modal";
 
 afterEach(cleanup);
@@ -41,6 +43,46 @@ describe("Modal", () => {
   it("closes on Escape", () => {
     const { onClose } = mount();
     fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes only the topmost Modal on Escape", () => {
+    const under = vi.fn();
+    const over = vi.fn();
+    const ui = (showOver: boolean) => (
+      <ChakraProvider value={system}>
+        <Modal label="Under" onClose={under}>
+          <p>under</p>
+        </Modal>
+        {showOver && (
+          <Modal label="Over" onClose={over}>
+            <p>over</p>
+          </Modal>
+        )}
+      </ChakraProvider>
+    );
+    const { rerender } = render(ui(false));
+    rerender(ui(true));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(over).toHaveBeenCalledTimes(1);
+    expect(under).not.toHaveBeenCalled();
+    rerender(ui(false));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(under).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores Escape with closeOnEscape off, but still closes on the backdrop", () => {
+    const onClose = vi.fn();
+    renderThemed(
+      <Modal label="Thing" onClose={onClose} closeOnEscape={false}>
+        <p>body</p>
+      </Modal>,
+    );
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(onClose).not.toHaveBeenCalled();
+    const backdrop = screen.getByRole("dialog").parentElement!;
+    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

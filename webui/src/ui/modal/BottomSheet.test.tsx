@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderThemed } from "../render";
 import { BottomSheet } from "./BottomSheet";
@@ -13,9 +13,9 @@ const phone = (vv?: object) => {
   if (vv) vi.stubGlobal("visualViewport", { addEventListener() {}, removeEventListener() {}, ...vv });
 };
 
-const mount = (props: object = {}) => {
+const mount = (props: object = {}, onClose = () => {}) => {
   renderThemed(
-    <BottomSheet label="Thing" onClose={() => {}} {...props}>
+    <BottomSheet label="Thing" onClose={onClose} {...props}>
       <p>body</p>
     </BottomSheet>,
   );
@@ -45,5 +45,30 @@ describe("BottomSheet", () => {
     phone();
     const { backdrop } = mount();
     expect(getComputedStyle(backdrop).top).not.toContain("--top-bar-height");
+  });
+
+  const press = (backdrop: HTMLElement) => {
+    fireEvent.mouseDown(backdrop);
+    fireEvent.click(backdrop);
+  };
+
+  it("closes on a backdrop press on a phone by default", () => {
+    phone();
+    const onClose = vi.fn();
+    press(mount({}, onClose).backdrop);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a backdrop press on a phone with closeOnNarrowBackdrop off", () => {
+    phone();
+    const onClose = vi.fn();
+    press(mount({ closeOnNarrowBackdrop: false }, onClose).backdrop);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("still closes on a backdrop press on a wide screen with closeOnNarrowBackdrop off", () => {
+    const onClose = vi.fn();
+    press(mount({ closeOnNarrowBackdrop: false }, onClose).backdrop);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
