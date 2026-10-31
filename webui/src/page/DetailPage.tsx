@@ -4,6 +4,7 @@ import { useActionableCount } from "../agents/useActionableCount";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { type PageMode, PageModeContext } from "../useWide";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
+import { FailedMigrationStrip } from "../restart/FailedMigrationStrip";
 import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
 import type { TopBarTab } from "../ui/top-bar/TopBar";
@@ -48,6 +49,7 @@ export function DetailPage({
         <DiskStrips />
         <PageContainer fill={fill}>
           <ConnectedTopBar active={active} waiting={waiting} />
+          <FailedMigrationStrip />
           {children}
         </PageContainer>
       </Box>

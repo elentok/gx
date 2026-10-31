@@ -327,7 +327,8 @@ function NoteCard({
       </Box>
       {fixing && (
         <FixAgentDialog
-          row={row}
+          prompt={row.fix_prompt ?? ""}
+          request={{ address: row.address, state: row.state }}
           fixAgent={fixAgent}
           onClose={() => setFixing(false)}
         />

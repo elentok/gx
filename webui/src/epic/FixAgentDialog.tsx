@@ -4,15 +4,17 @@ import { copyText } from "../clipboard";
 import { useDesignWrite } from "../design/SessionControls";
 import { Button } from "../ui/button/Button";
 import { postFixAgent, type FixAgent } from "./fixAgent";
-import type { EpicDetailRow } from "./detail";
+import type { FixAgentRequest } from "../generated/server";
 
-/** Shows the investigate prompt to copy, or starts a gx agent on it. */
+/** Shows a fix prompt to copy, or starts a gx agent with the request. */
 export function FixAgentDialog({
-  row,
+  prompt,
+  request,
   fixAgent = postFixAgent,
   onClose,
 }: {
-  row: EpicDetailRow;
+  prompt: string;
+  request: FixAgentRequest;
   fixAgent?: FixAgent;
   onClose: () => void;
 }) {
@@ -20,7 +22,6 @@ export function FixAgentDialog({
   const [started, setStarted] = useState<{ remote: boolean }>();
   const { run, pending } = useDesignWrite();
   const promptRef = useRef<HTMLElement>(null);
-  const prompt = row.fix_prompt ?? "";
 
   return (
     <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4" onClick={onClose}>
@@ -56,7 +57,7 @@ export function FixAgentDialog({
             <Button
               tone="running"
               disabled={pending}
-              onClick={() => run(() => fixAgent({ address: row.address, state: row.state }), { onDone: (res) => setStarted({ remote: res.remote_control }) })}
+              onClick={() => run(() => fixAgent(request), { onDone: (res) => setStarted({ remote: res.remote_control }) })}
             >
               {pending && <Spinner size="sm" />}
               Start gx agent
