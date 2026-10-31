@@ -1,5 +1,5 @@
 import { RoundOpen, type TicketDetail } from "../generated/server";
-import { formatCost, formatDuration, toneOfStatus } from "../epic/rows";
+import { NO_COST, formatCost, formatDuration, toneOfStatus } from "../epic/rows";
 import type { Tone } from "../ui/tone";
 
 export const isRunning = (d: TicketDetail) => d.status === "claimed";
@@ -29,11 +29,11 @@ function elapsedOf(d: TicketDetail, now: number): number | undefined {
 export function statValues(d: TicketDetail, now: number): string[] {
   if (d.map_epic || d.parse_error) return [];
   const elapsed = elapsedOf(d, now);
-  const { cost, context_window: ctx } = d.stats ?? {};
+  const { cost, had_codex: hadCodex, context_window: ctx } = d.stats ?? {};
   return [
     d.type,
     elapsed !== undefined && formatDuration(elapsed),
-    cost !== undefined && formatCost(cost),
+    hadCodex ? `Cost ${NO_COST}` : cost !== undefined && formatCost(cost),
     ctx !== undefined && `${Math.round(ctx / 1000)}K context`,
   ].filter((v): v is string => !!v);
 }

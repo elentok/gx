@@ -924,7 +924,7 @@ func TestRenderQueueTicketRow_DoneMetricsLineMatchesTitleColor(t *testing.T) {
 	}}
 
 	line := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
-	wantSuffix := " " + statusDoneStyle.Italic(true).Render(formatMetricsLine(5, 100, 0))
+	wantSuffix := " " + statusDoneStyle.Italic(true).Render(formatMetricsLine(5, 100, 0, false))
 	if !strings.HasSuffix(line, wantSuffix) {
 		t.Fatalf("row line = %q, want it to end with %q", line, wantSuffix)
 	}
@@ -942,8 +942,8 @@ func TestRenderQueueTicketRow_NonDoneWithMetricsShowsLine(t *testing.T) {
 	}}
 
 	line := m.renderQueueTicketRow(queueRow{epic: epic, ticket: epic.Tickets[0]}, 0)
-	if !strings.Contains(line, formatMetricsLine(5, 100, 0)) {
-		t.Fatalf("row line = %q, want it to contain metrics %q", line, formatMetricsLine(5, 100, 0))
+	if !strings.Contains(line, formatMetricsLine(5, 100, 0, false)) {
+		t.Fatalf("row line = %q, want it to contain metrics %q", line, formatMetricsLine(5, 100, 0, false))
 	}
 }
 

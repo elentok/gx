@@ -213,7 +213,7 @@ func (m Model) renderTicketRow(epic tickets.Epic, r row, rowIdx int) []string {
 	if t.ElapsedTime <= 0 && t.ActualContextWindow <= 0 && t.ActualCost <= 0 {
 		return []string{line}
 	}
-	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost)
+	metrics := formatMetricsLine(t.ElapsedTime, t.ActualContextWindow, t.ActualCost, t.HadCodex)
 	if searchDim {
 		return []string{appendRowMetrics(line, metrics, ui.StyleDim)}
 	}

@@ -36,12 +36,13 @@ type DetailStats struct {
 	Elapsed       int       `json:"elapsed,omitempty"`
 	ClaimedAt     time.Time `json:"claimed_at,omitzero"`
 	Cost          float64   `json:"cost,omitempty"`
+	HadCodex      bool      `json:"had_codex,omitempty"`
 	ContextWindow int       `json:"context_window,omitempty"`
 }
 
 func (s *Server) detailStats(ref ticketRef) *DetailStats {
 	t := ref.ticket
-	st := &DetailStats{Elapsed: t.ElapsedTime, Cost: t.ActualCost, ContextWindow: t.ActualContextWindow}
+	st := &DetailStats{Elapsed: t.ElapsedTime, Cost: t.ActualCost, HadCodex: t.HadCodex, ContextWindow: t.ActualContextWindow}
 	if at, ok := s.registry.startedAtOf(ref.addr.String()); ok && ref.epic.RenderedStatus(t) == tickets.StatusClaimed {
 		st.ClaimedAt = at
 	}

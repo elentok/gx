@@ -529,8 +529,12 @@ func TestEpicDetail_CodexTicketAddsTokensNotDollars(t *testing.T) {
 		t.Errorf("cost_total = %v, want only the Claude ticket's 2", d.CostTotal)
 	}
 	for _, r := range d.Rows {
-		if strings.HasSuffix(r.Address, "/02") && r.Cost != 0 {
+		isCodex := strings.HasSuffix(r.Address, "/02")
+		if isCodex && r.Cost != 0 {
 			t.Errorf("codex row cost = %v, want 0", r.Cost)
+		}
+		if r.HadCodex != isCodex {
+			t.Errorf("row %s had_codex = %v, want %v", r.Address, r.HadCodex, isCodex)
 		}
 	}
 }

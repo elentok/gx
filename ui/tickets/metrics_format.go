@@ -77,7 +77,9 @@ func formatDuration(d time.Duration) string {
 // when zero — a live row's cost isn't known until the iteration lands, and a
 // ticket that only recorded one or two of the three fields (or none at all)
 // shouldn't render a misleading "0s"/"0 tok" for the ones it never landed.
-func formatMetricsLine(elapsedSeconds, tokens int, cost float64) string {
+// hadCodex prints a dash in the cost place: Codex has no dollar cost, and a
+// ticket's cost then holds only its Claude part.
+func formatMetricsLine(elapsedSeconds, tokens int, cost float64, hadCodex bool) string {
 	var parts []string
 	if elapsedSeconds > 0 {
 		parts = append(parts, formatElapsed(elapsedSeconds))
@@ -85,7 +87,9 @@ func formatMetricsLine(elapsedSeconds, tokens int, cost float64) string {
 	if tokens > 0 {
 		parts = append(parts, formatTokenCount(tokens))
 	}
-	if cost > 0 {
+	if hadCodex {
+		parts = append(parts, "—")
+	} else if cost > 0 {
 		parts = append(parts, tickets.FormatCost(cost))
 	}
 	return strings.Join(parts, " · ")

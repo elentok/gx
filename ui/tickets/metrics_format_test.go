@@ -5,6 +5,16 @@ import (
 	"time"
 )
 
+func TestFormatMetricsLine_HadCodexPrintsDashForCost(t *testing.T) {
+	t.Parallel()
+	if got, want := formatMetricsLine(5, 100, 0.42, true), formatMetricsLine(5, 100, 0, false)+" · —"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	if got := formatMetricsLine(5, 100, 0.42, false); got == formatMetricsLine(5, 100, 0.42, true) {
+		t.Fatalf("Claude row must keep its dollars, got %q", got)
+	}
+}
+
 func TestFormatTokenCount(t *testing.T) {
 	t.Parallel()
 	cases := []struct {

@@ -40,7 +40,9 @@ func (m QueueModel) applyServerState(st *viewmodel.State) (QueueModel, tea.Cmd) 
 		m.summaries[sum.Address] = sum
 	}
 	m.harnessLabels = make(map[string]string, len(st.Tickets))
+	m.codexRows = make(map[string]bool)
 	for _, t := range st.Tickets {
+		m.codexRows[t.Address] = t.Harness == "codex"
 		if l := ui.QueueHarnessLabel(t.Harness, t.Tier, t.Model, t.Effort, t.HarnessNote); l != "" {
 			m.harnessLabels[t.Address] = l
 		}

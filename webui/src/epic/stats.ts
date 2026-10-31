@@ -1,5 +1,5 @@
 import type { EpicDetail } from "./detail";
-import { formatCost, formatDuration } from "./rows";
+import { NO_COST, formatCost, formatDuration } from "./rows";
 
 export interface StatRow {
   label: string;
@@ -54,7 +54,9 @@ export function statRows(d: EpicDetail): StatRow[] {
   const rows: StatRow[] = [];
   if (lines) rows.push({ label: "Lines", value: lines });
   if (tokens) rows.push({ label: "Tokens", value: tokens });
+  // The server drops the cost of a Codex epic, so tokens without a cost means a dash.
   if (s.cost !== undefined) rows.push({ label: "Cost", value: formatCost(s.cost) });
+  else if (tokens) rows.push({ label: "Cost", value: NO_COST });
   if (lead) {
     rows.push({
       label: "Lead time",

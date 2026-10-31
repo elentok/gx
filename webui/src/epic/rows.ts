@@ -45,6 +45,8 @@ export function formatDuration(seconds: number): string {
 }
 
 export const formatCost = (dollars: number) => `$${dollars.toFixed(2)}`;
+// Shown where the dollars would be for a Codex run.
+export const NO_COST = "—";
 
 export interface StatPart {
   text: string;
@@ -157,7 +159,10 @@ const joinDot = (...parts: (string | undefined)[]) => parts.filter((p): p is str
 // A map epic's rows carry the status only, so only a loop epic has elapsed time and cost to show.
 function elapsedAndCost(row: EpicDetailRow, elapsed: number | undefined, ctx: RowContext): (string | undefined)[] {
   if (ctx.detail.kind === "map") return [];
-  return [elapsed === undefined ? undefined : formatDuration(elapsed), row.cost === undefined ? undefined : formatCost(row.cost)];
+  // Codex has no dollar cost: the dash stands in for it, even though a Codex ticket's cost holds its Claude part.
+  const noDollars = row.had_codex || (isRunning(row) && row.harness === "codex");
+  const cost = noDollars ? NO_COST : row.cost === undefined ? undefined : formatCost(row.cost);
+  return [elapsed === undefined ? undefined : formatDuration(elapsed), cost];
 }
 
 export type CardLook = { kind: "link" } | { kind: "note"; text?: string; answerPath?: string; fix?: boolean };

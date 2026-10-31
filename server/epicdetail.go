@@ -27,8 +27,10 @@ type EpicDetailRow struct {
 	// Elapsed is in seconds and set once the ticket merges; a running row ticks
 	// on the client from ClaimedAt. On a map row it is the done time minus the
 	// claim time, absent when either is unset.
-	Elapsed   int       `json:"elapsed,omitempty"`
-	Cost      float64   `json:"cost,omitempty"`
+	Elapsed int     `json:"elapsed,omitempty"`
+	Cost    float64 `json:"cost,omitempty"`
+	// HadCodex marks a ticket with a Codex session; its Cost covers only the Claude part.
+	HadCodex  bool      `json:"had_codex,omitempty"`
 	ClaimedAt time.Time `json:"claimed_at,omitzero"`
 	// ClosedAt is when the ticket was done, else cancelled; the page sorts the done group by it.
 	ClosedAt time.Time `json:"closed_at,omitzero"`
@@ -314,7 +316,7 @@ func webShare(endings map[string]int) *float64 {
 func baseRow(root rootRef, e tickets.Epic, t tickets.Ticket, status tickets.RenderedStatus) EpicDetailRow {
 	return EpicDetailRow{
 		Address: ticketAddress(root, t.DisplayNumber()), Title: t.Title, RenderedStatus: status.Word(),
-		Type: t.Type, Blockers: e.UnresolvedBlockers(t), ClosedAt: t.FinishedAt(),
+		Type: t.Type, Blockers: e.UnresolvedBlockers(t), ClosedAt: t.FinishedAt(), HadCodex: t.HadCodex,
 	}
 }
 

@@ -413,6 +413,7 @@ export interface DetailStats {
   elapsed?: number /* int */;
   claimed_at?: string;
   cost?: number /* float64 */;
+  had_codex?: boolean;
   context_window?: number /* int */;
 }
 
@@ -682,6 +683,10 @@ export interface EpicDetailRow extends HarnessLabel {
    */
   elapsed?: number /* int */;
   cost?: number /* float64 */;
+  /**
+   * HadCodex marks a ticket with a Codex session; its Cost covers only the Claude part.
+   */
+  had_codex?: boolean;
   claimed_at?: string;
   /**
    * ClosedAt is when the ticket was done, else cancelled; the page sorts the done group by it.
@@ -1370,6 +1375,7 @@ export interface TicketInfo extends HarnessLabel {
   expected_context_window?: number /* int */;
   elapsed_time?: number /* int */;
   actual_cost?: number /* float64 */;
+  had_codex?: boolean;
   compactions?: number /* int */;
   category?: string;
   exported_at?: string;

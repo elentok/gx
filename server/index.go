@@ -47,6 +47,7 @@ type TicketInfo struct {
 	ExpectedContextWindow int     `json:"expected_context_window,omitempty"`
 	ElapsedTime           int     `json:"elapsed_time,omitempty"`
 	ActualCost            float64 `json:"actual_cost,omitempty"`
+	HadCodex              bool    `json:"had_codex,omitempty"`
 	Compactions           int     `json:"compactions,omitempty"`
 
 	// HarnessLabel is filled by the snapshot handler for open, blocked and claimed tickets.
@@ -303,6 +304,7 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 		ExpectedContextWindow: t.ExpectedContextWindow,
 		ElapsedTime:           t.ElapsedTime,
 		ActualCost:            t.ActualCost,
+		HadCodex:              t.HadCodex,
 		Compactions:           t.Compactions,
 
 		Category:   t.Category,

@@ -216,6 +216,7 @@ func ticketFromInfo(info server.TicketInfo, id string) gxtickets.Ticket {
 		ExpectedContextWindow: info.ExpectedContextWindow,
 		ElapsedTime:           info.ElapsedTime,
 		ActualCost:            info.ActualCost,
+		HadCodex:              info.HadCodex,
 		Compactions:           info.Compactions,
 
 		Category:   info.Category,
