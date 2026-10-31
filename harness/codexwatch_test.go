@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/harness"
@@ -46,7 +48,7 @@ func TestCodexWatcher_ReportsMapToStatus(t *testing.T) {
 		{"working with title Ready is background", "Ready", osc("working", "", ""), harness.Status{State: harness.Working, Background: true}},
 		{"permission", "dir", osc("blocked", "permission", "run ls"), harness.Status{State: harness.Blocked, Blocked: harness.BlockedPermission, Message: "run ls"}},
 		{"question", "dir", osc("blocked", "question", "which?"), harness.Status{State: harness.Blocked, Blocked: harness.BlockedQuestion, Message: "which?"}},
-		{"error", "dir", osc("error", "", "bad model"), harness.Status{State: harness.Blocked, Blocked: harness.BlockedDialog, Message: "bad model"}},
+		{"error", "dir", osc("error", "", "bad model"), harness.Status{State: harness.Blocked, Blocked: harness.BlockedError, Message: "bad model"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -124,6 +126,57 @@ func TestCodexWatcher_ReadyAfterFirstIdleOnly(t *testing.T) {
 	w.Program(osc("blocked", "permission", ""))
 	if got := w.Ready(); got != "" {
 		t.Fatalf("Ready while blocked = %q, want none", got)
+	}
+}
+
+// errorRollout writes a session file and a rollout whose turn ended in an
+// error, with an optional 100% sample resetting at resetsAt first.
+func errorRollout(t *testing.T, kind string, resetsAt int64) (sessionFile, codexHome string) {
+	t.Helper()
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	sessionFile = filepath.Join(dir, "codex-session.json")
+	if err := os.WriteFile(sessionFile, []byte(`{"session_id":"s1","cwd":"/repo"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rollout := `{"type":"session_meta","payload":{"id":"s1","cwd":"/repo"}}` + "\n"
+	if resetsAt != 0 {
+		rollout += fmt.Sprintf(`{"type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":100,"resets_at":%d}}}}`+"\n", resetsAt)
+	}
+	rollout += fmt.Sprintf(`{"type":"event_msg","payload":{"type":"task_complete","error":{"message":"codex says no","codex_error_info":%q}}}`+"\n", kind)
+	codexHome = filepath.Join(dir, "codex")
+	path := filepath.Join(codexHome, "sessions", "2026", "01", "01", "rollout-s1.jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(rollout), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return sessionFile, codexHome
+}
+
+func TestCodexWatcher_ErrorShowsTheRolloutsText(t *testing.T) {
+	t.Parallel()
+	sessionFile, home := errorRollout(t, "model_not_found", 0)
+	w := harness.NewCodexWatcherIn(sessionFile, home, func() bool { return false })
+	w.Program(osc("error", "", "osc text"))
+	want := harness.Status{State: harness.Blocked, Blocked: harness.BlockedError, Message: "codex says no"}
+	if got := w.Status(); got != want {
+		t.Fatalf("Status = %+v, want %+v", got, want)
+	}
+}
+
+func TestCodexWatcher_UsageLimitErrorIsRateLimitedWithItsReset(t *testing.T) {
+	t.Parallel()
+	resetsAt := time.Now().Add(time.Hour).Unix()
+	sessionFile, home := errorRollout(t, "other", resetsAt)
+	w := harness.NewCodexWatcherIn(sessionFile, home, func() bool { return false })
+	w.Program(osc("error", "", ""))
+	got := w.Status()
+	if got.State != harness.RateLimited || got.ResetAt.Unix() != resetsAt || !strings.HasPrefix(got.Message, "resets ") {
+		t.Fatalf("Status = %+v, want RateLimited resetting at %d", got, resetsAt)
 	}
 }
 

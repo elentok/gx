@@ -52,6 +52,9 @@ func (m sessionMeta) statusFailure() *SessionFailure {
 	case SessionRateLimited:
 		return &SessionFailure{Kind: FailureKindRateLimit, Label: "Rate limited", Text: m.Status.Message}
 	case SessionBlocked:
+		if m.Status.Kind == string(harness.BlockedError) {
+			return &SessionFailure{Kind: FailureKindBlocked, Label: "Agent hit an error", Text: m.Status.Message}
+		}
 		return &SessionFailure{Kind: FailureKindBlocked, Label: "Waiting at a prompt in the terminal"}
 	}
 	return nil

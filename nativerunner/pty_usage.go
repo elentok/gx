@@ -8,6 +8,7 @@ import (
 
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/harness"
 )
 
 // RateLimit reads the limit from the transcript fact the holder reports, not
@@ -16,6 +17,9 @@ func (p *Pty) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 	ss, err := p.live(s)
 	if err != nil {
 		return time.Time{}, false, err
+	}
+	if ss.kind == harness.Codex {
+		return p.codexRateLimit(ss)
 	}
 	message, limited, err := ss.holder.RateLimitMessage()
 	if err != nil {
@@ -29,6 +33,20 @@ func (p *Pty) RateLimit(s agentrunner.Session) (time.Time, bool, error) {
 		return now.Add(d), true, nil
 	}
 	return p.usageRecordReset(ss.session.Label), true, nil
+}
+
+// codexRateLimit reads the limit off the watcher, which sorts a turn error by
+// its rollout: only a usage-limit error reports limited, with its reset (zero
+// when unknown).
+func (p *Pty) codexRateLimit(ss *ptySession) (time.Time, bool, error) {
+	w, err := ss.holder.Watched()
+	if err != nil {
+		return time.Time{}, false, p.died(ss, err)
+	}
+	if w == nil || w.Status.State != harness.RateLimited {
+		return time.Time{}, false, nil
+	}
+	return w.Status.ResetAt, true, nil
 }
 
 // usageRecordReset is the latest resets_at among label's record windows at

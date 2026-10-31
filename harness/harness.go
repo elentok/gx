@@ -134,6 +134,9 @@ const (
 	BlockedQuestion   BlockedKind = "question"
 	// BlockedDialog is a pre-session dialog.
 	BlockedDialog BlockedKind = "dialog"
+	// BlockedError is a turn that ended in an error other than a usage limit.
+	// Its input is ready: a prompt starts the next turn.
+	BlockedError BlockedKind = "error"
 )
 
 // Status is a Session status as a harness reports it.
@@ -147,6 +150,8 @@ type Status struct {
 	// Blocked and Message are set while Blocked.
 	Blocked BlockedKind
 	Message string
+	// ResetAt is when a RateLimited session's limit lifts; zero when unknown.
+	ResetAt time.Time
 }
 
 // Dialog is a pre-session dialog a harness can answer by key.

@@ -69,6 +69,10 @@ type Status struct {
 	Turn          int
 	SessionID     string
 	BlockedReason string
+	// Error is the agent's own text for a turn that ended in an error, set
+	// with StateBlocked in place of BlockedReason: nothing is waiting for an
+	// answer, the next prompt starts a new turn.
+	Error string
 	// Pending is the open tool-permission request, for runners that can name
 	// it (headless). Nil when none is open.
 	Pending *Pending

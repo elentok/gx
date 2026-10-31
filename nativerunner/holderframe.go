@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/elentok/gx/agentrunner/screen"
 	"github.com/elentok/gx/harness"
@@ -89,6 +90,7 @@ type streamStatus struct {
 	Cancelled      bool                `json:"cancelled,omitempty"`
 	Blocked        harness.BlockedKind `json:"blocked,omitempty"`
 	Message        string              `json:"message,omitempty"`
+	ResetAt        time.Time           `json:"reset_at,omitzero"`
 	ConversationID string              `json:"conversation_id,omitempty"`
 	DisplayName    string              `json:"display_name,omitempty"`
 	// Ready names the signal that showed the input ready, "" until one has.
@@ -103,6 +105,7 @@ func newStreamStatus(s harness.Status, conversationID, displayName string, ready
 		Cancelled:      s.Cancelled,
 		Blocked:        s.Blocked,
 		Message:        s.Message,
+		ResetAt:        s.ResetAt,
 		ConversationID: conversationID,
 		DisplayName:    displayName,
 		Ready:          ready,
@@ -110,7 +113,7 @@ func newStreamStatus(s harness.Status, conversationID, displayName string, ready
 }
 
 func (s streamStatus) status() harness.Status {
-	return harness.Status{State: s.State, Background: s.Background, Cancelled: s.Cancelled, Blocked: s.Blocked, Message: s.Message}
+	return harness.Status{State: s.State, Background: s.Background, Cancelled: s.Cancelled, Blocked: s.Blocked, Message: s.Message, ResetAt: s.ResetAt}
 }
 
 // streamExit is StreamExit's payload. Code is -1 for a child killed by a

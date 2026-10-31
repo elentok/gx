@@ -348,7 +348,8 @@ func (c *codexFake) compact() error {
 }
 
 // taskError ends the turn with an error, as Codex does for a bad model or a
-// hit limit.
+// hit limit. The error state stays until the next turn, as in the recorded
+// stream: there is no idle report after it.
 func (c *codexFake) taskError(message, info string) error {
 	c.working = false
 	if err := c.writeLine("event_msg", map[string]any{
@@ -359,7 +360,6 @@ func (c *codexFake) taskError(message, info string) error {
 	}
 	c.setTitle(c.title)
 	writeAppReport(c.out, codexAppName, "error", "", "")
-	c.report("idle")
 	return nil
 }
 

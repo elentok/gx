@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"os"
 	"sync"
+	"time"
+
+	"github.com/elentok/gx/codexsession"
 )
 
 // codexBackgroundTitle is the title Codex shows while it works with nothing
@@ -19,6 +22,8 @@ func isSpinner(r rune) bool { return r >= 0x2800 && r <= 0x28FF }
 // last report and the title, so the order they arrive in does not matter.
 type codexWatcher struct {
 	sessionFile string
+	// home is the Codex home the rollouts live under; "" reads none.
+	home string
 	// startup reports a startup dialog on screen.
 	startup func() bool
 
@@ -62,29 +67,59 @@ func (w *codexWatcher) Status() Status {
 		}
 		return Status{State: Blocked, Blocked: kind, Message: w.message}
 	case "error":
-		// The server reads any Blocked status as a blocked pane.
-		return Status{State: Blocked, Blocked: BlockedDialog, Message: w.message}
+		return w.errorStatus()
 	}
 	return Status{State: Idle}
 }
 
-// ConversationID is the session_id the SessionStart hook saved. It rereads the
-// file each time, so a resumed session replaces a stale id.
-func (w *codexWatcher) ConversationID() string {
+// errorStatus sorts a turn error by its cause: a usage limit is RateLimited
+// with its reset, any other error (or one the rollout cannot show) is Blocked
+// with Codex's own text. The server reads any Blocked status as a blocked pane.
+func (w *codexWatcher) errorStatus() Status {
+	status := Status{State: Blocked, Blocked: BlockedError, Message: w.message}
+	payload := w.sessionPayload()
+	if w.home == "" || payload.SessionID == "" {
+		return status
+	}
+	reading, ok, err := codexsession.LastTurnErrorIn(w.home, payload.Cwd, payload.SessionID)
+	if err != nil || !ok {
+		return status
+	}
+	if limit, isLimit := reading.UsageLimit(time.Now()); isLimit {
+		return Status{State: RateLimited, Message: rateLimitMessage(limit.ResetAt), ResetAt: limit.ResetAt}
+	}
+	if reading.Error.Message != "" {
+		status.Message = reading.Error.Message
+	}
+	return status
+}
+
+func rateLimitMessage(resetAt time.Time) string {
+	if resetAt.IsZero() {
+		return "usage limit reached"
+	}
+	return "resets " + resetAt.Local().Format("Mon Jan 2 15:04")
+}
+
+// sessionPayload is the SessionStart hook's saved payload. It rereads the file
+// each time, so a resumed session replaces a stale id.
+func (w *codexWatcher) sessionPayload() (payload struct {
+	SessionID string `json:"session_id"`
+	Cwd       string `json:"cwd"`
+}) {
 	if w.sessionFile == "" {
-		return ""
+		return payload
 	}
 	data, err := os.ReadFile(w.sessionFile)
-	if err != nil {
-		return ""
+	if err != nil || json.Unmarshal(data, &payload) != nil {
+		return payload
 	}
-	var payload struct {
-		SessionID string `json:"session_id"`
-	}
-	if json.Unmarshal(data, &payload) != nil {
-		return ""
-	}
-	return payload.SessionID
+	return payload
+}
+
+// ConversationID is the session_id the SessionStart hook saved.
+func (w *codexWatcher) ConversationID() string {
+	return w.sessionPayload().SessionID
 }
 
 // Program ignores clear: Codex sends it on exit, and Exited comes from the

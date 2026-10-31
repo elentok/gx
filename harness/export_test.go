@@ -8,3 +8,10 @@ var TOMLString = tomlString
 func NewCodexWatcher(sessionFile string, startup func() bool) TitleWatcher {
 	return newCodexWatcher(sessionFile, startup)
 }
+
+// NewCodexWatcherIn is NewCodexWatcher reading rollouts under codexHome.
+func NewCodexWatcherIn(sessionFile, codexHome string, startup func() bool) TitleWatcher {
+	w := newCodexWatcher(sessionFile, startup)
+	w.home = codexHome
+	return w
+}

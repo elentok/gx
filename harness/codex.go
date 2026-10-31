@@ -3,6 +3,7 @@ package harness
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -80,9 +81,23 @@ func codexCommand(args, env []string) Command {
 // Watch reads the session file from the env of this process, which is the
 // child's env: the PTY runner sets it on the holder.
 func (h codexHarness) Watch(_ int, _ time.Time, scr Screen, _ <-chan struct{}) (Watcher, error) {
-	return newCodexWatcher(os.Getenv(CodexSessionFileEnv), func() bool {
+	w := newCodexWatcher(os.Getenv(CodexSessionFileEnv), func() bool {
 		return scr != nil && h.StartupScreen(scr.ScrollbackTail(startupScrollback), scr.Rows()).Dialog != NoDialog
-	}), nil
+	})
+	w.home = codexHomeFrom(os.Environ())
+	return w, nil
+}
+
+// codexHomeFrom is Codex's home as the child reads it: CODEX_HOME, else
+// ~/.codex; "" with neither set.
+func codexHomeFrom(env []string) string {
+	if dir := LookupEnv(env, "CODEX_HOME"); dir != "" {
+		return dir
+	}
+	if home := LookupEnv(env, "HOME"); home != "" {
+		return filepath.Join(home, ".codex")
+	}
+	return ""
 }
 
 // codexDialogs holds the text that names each startup dialog, lowercase. Only

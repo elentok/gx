@@ -159,6 +159,10 @@ type sessionLine struct {
 			Primary   quotaWindow `json:"primary"`
 			Secondary quotaWindow `json:"secondary"`
 		} `json:"rate_limits"`
+		Error struct {
+			Message string          `json:"message"`
+			Info    json.RawMessage `json:"codex_error_info"`
+		} `json:"error"`
 	} `json:"payload"`
 }
 

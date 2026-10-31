@@ -128,3 +128,61 @@ func TestPtyCodex_WorkingWithReadyTitleIsBackground(t *testing.T) {
 		t.Fatalf("Status = %+v, %v; a session with a background task is not idle", st, err)
 	}
 }
+
+// codexAfterError starts a codex session, sends controls then a turn error of
+// the given message and kind, and returns once the runner sees it blocked.
+func codexAfterError(t *testing.T, id, message, kind string, controls ...agentfake.Control) (*nativerunner.Pty, agentrunner.Session) {
+	t.Helper()
+	p, _ := codexRunner(t, agentfake.CodexIDEnv+"="+id)
+	s := startCodex(t, p, realDir(t))
+	if _, err := p.Wait(s, []agentrunner.State{agentrunner.StateIdle}, 5*time.Second); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range append(controls, agentfake.Control{Action: agentfake.ActionTaskError, Message: message, Error: kind}) {
+		if err := agentfake.SendProgramControl(id, c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return p, s
+}
+
+// eventually polls cond for up to 5 seconds.
+func eventually(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(5 * time.Second); !cond(); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("timed out waiting for %s", what)
+		}
+	}
+}
+
+func TestPtyCodex_TurnErrorIsBlockedWithTheRolloutsText(t *testing.T) {
+	t.Parallel()
+	p, s := codexAfterError(t, "thread-err", "model gone", "model_not_found")
+	eventually(t, "the blocked status", func() bool {
+		st, err := p.Status(s)
+		return err == nil && st.State == agentrunner.StateBlocked
+	})
+	st, _ := p.Status(s)
+	if st.Error != "model gone" || st.BlockedReason != "" {
+		t.Fatalf("Status = %+v; want Error %q and no BlockedReason", st, "model gone")
+	}
+	if _, limited, err := p.RateLimit(s); err != nil || limited {
+		t.Fatalf("RateLimit limited = %v, %v; a model error is not a limit", limited, err)
+	}
+}
+
+func TestPtyCodex_UsageLimitErrorIsLimitedWithItsReset(t *testing.T) {
+	t.Parallel()
+	resetsAt := time.Now().Add(time.Hour).Unix()
+	p, s := codexAfterError(t, "thread-limit", "You've hit your usage limit.", "usage_limit_exceeded",
+		agentfake.Control{Action: agentfake.ActionTokenCount, UsedPercent: 100, ResetsAt: resetsAt})
+	eventually(t, "the limit", func() bool {
+		_, limited, err := p.RateLimit(s)
+		return err == nil && limited
+	})
+	resetAt, _, _ := p.RateLimit(s)
+	if resetAt.Unix() != resetsAt {
+		t.Fatalf("RateLimit reset = %v, want %d", resetAt, resetsAt)
+	}
+}

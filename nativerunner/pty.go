@@ -599,7 +599,12 @@ func watchedStatus(st agentrunner.Status, w WatchedStatus) agentrunner.Status {
 	case harness.Idle:
 		st.State = agentrunner.StateIdle
 	case harness.Blocked:
-		st.State, st.BlockedReason = agentrunner.StateBlocked, w.Status.Message
+		st.State = agentrunner.StateBlocked
+		if w.Status.Blocked == harness.BlockedError {
+			st.Error = w.Status.Message
+		} else {
+			st.BlockedReason = w.Status.Message
+		}
 	}
 	return st
 }
@@ -793,7 +798,8 @@ func (p *Pty) awaitNotBusy(ss *ptySession) (int, error) {
 		// background terminal takes a prompt, a running turn does not.
 		if w := resp.watched(); w != nil {
 			switch {
-			case w.Status.State == harness.Blocked:
+			// After an error the input is ready: a prompt starts the next turn.
+			case w.Status.State == harness.Blocked && w.Status.Blocked != harness.BlockedError:
 				return 0, fmt.Errorf("%w: blocked on %s", agentrunner.ErrNotReady, w.Status.Message)
 			case w.Status.State != harness.Working || w.Status.Background:
 				return turn, nil

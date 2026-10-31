@@ -102,6 +102,12 @@ func dwellThenPauseBlocked(d Deps, p launchAndPromptParams, runner, sessionID st
 		return "", false, nil
 	}
 
+	if st.Error != "" {
+		reason = errorPauseReason(p.Label, st.Error)
+		p.pauseBlockedPane(sessionID, reason)
+		return reason, true, nil
+	}
+
 	how := "answer it in the pane"
 	if st.BlockedReason != "" {
 		how = "answer it with `gx server agents answer`, or in the pane"
@@ -117,6 +123,12 @@ func dwellThenPauseBlocked(d Deps, p launchAndPromptParams, runner, sessionID st
 	return reason, true, nil
 }
 
+// errorPauseReason is the pause reason for a turn that ended in an error:
+// nothing waits for an answer, so the only way on is Retry.
+func errorPauseReason(label, text string) string {
+	return fmt.Sprintf("%s hit an error: %s; press Retry to prompt it again", label, text)
+}
+
 // pauseBlockedAtOnce is dwellThenPauseBlocked without the dwell, for a headless
 // agent whose block st the tracker reported. The reason names the tool and its
 // input, with the verb that exits that block: a permission request is answered,
@@ -127,6 +139,9 @@ func pauseBlockedAtOnce(d Deps, p launchAndPromptParams, ticketPath string, st a
 		hint = "answer with `gx server agents answer`"
 	}
 	reason := fmt.Sprintf("%s is blocked: %s; %s", p.Label, st.BlockedReason, hint)
+	if st.Error != "" {
+		reason = errorPauseReason(p.Label, st.Error)
+	}
 	p.pauseBlockedPane(recordLiveSession(d, p.Label, ticketPath), reason)
 	return &BlockedPausedError{Reason: reason}
 }

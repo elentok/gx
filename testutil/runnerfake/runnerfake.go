@@ -383,11 +383,23 @@ func (r *Runner) SetState(label string, state agentrunner.State, reason string) 
 	defer r.mu.Unlock()
 	ss := r.byLabel(label)
 	ss.status.State = state
-	ss.status.BlockedReason = ""
+	ss.status.BlockedReason, ss.status.Error = "", ""
 	ss.status.Pending = nil
 	if state == agentrunner.StateBlocked {
 		ss.status.BlockedReason = reason
 	}
+	r.notify()
+}
+
+// SetErrored makes label blocked on an agent error: Status reports
+// StateBlocked with Error text and no BlockedReason, as a Codex turn that
+// ended in an error does. SetState clears it.
+func (r *Runner) SetErrored(label, text string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ss := r.byLabel(label)
+	ss.status.State = agentrunner.StateBlocked
+	ss.status.BlockedReason, ss.status.Pending, ss.status.Error = "", nil, text
 	r.notify()
 }
 

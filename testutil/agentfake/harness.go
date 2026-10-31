@@ -157,6 +157,8 @@ func (w *programWatcher) Program(r harness.ProgramReport) {
 		w.status = harness.Status{State: harness.Idle, Cancelled: cancelled}
 	case "ratelimited":
 		w.status = harness.Status{State: harness.RateLimited, Message: r.Message}
+	case "error":
+		w.status = harness.Status{State: harness.Blocked, Blocked: harness.BlockedError, Message: r.Message}
 	case "blocked":
 		kind := harness.BlockedQuestion
 		if r.Kind == string(harness.BlockedPermission) {
