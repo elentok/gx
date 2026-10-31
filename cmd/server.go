@@ -18,6 +18,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/syshealth"
@@ -50,7 +51,7 @@ func newServerCmd(d deps) *cobra.Command {
 		},
 	}
 	status.Flags().BoolVar(&statusJSON, "json", false, "emit structured JSON instead of human-readable text")
-	var restartMigrate bool
+	var restartMigrate, restartContinue bool
 	restartCmd := &cobra.Command{
 		Use:   "restart",
 		Short: "stop the server, install the skill bundle and start it again (use after upgrading gx)",
@@ -62,9 +63,14 @@ between the stop and the start. The stop does not wait for running tickets. If
 a migration fails, the failed store is named and the server stays stopped.`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
+			if restartContinue {
+				return runServerRestartContinue(c.Context(), d, c.OutOrStdout())
+			}
 			return runServerRestart(c.Context(), d, c.OutOrStdout(), restartMigrate)
 		},
 	}
+	restartCmd.Flags().BoolVar(&restartContinue, "continue", false, "migrate every project, save failures and start anyway; log to restart.log (used by the web UI)")
+	_ = restartCmd.Flags().MarkHidden("continue")
 	restartCmd.Flags().BoolVar(&restartMigrate, "migrate", false, "migrate every project's ticket store while the server is stopped")
 	cmd.AddCommand(status, &cobra.Command{
 		Use:   "install",
@@ -559,6 +565,55 @@ func runServerRestart(ctx context.Context, d deps, w io.Writer, migrate bool) er
 		},
 		func() error { return runServerStartCmd(ctx, d, w) },
 	)
+}
+
+// runServerRestartContinue is the restart the web UI runs: it migrates every
+// project, saves each failure and starts the server anyway. Output goes to w
+// and to the fixed restart log.
+func runServerRestartContinue(ctx context.Context, d deps, w io.Writer) error {
+	dirs := d.dirs()
+	stateDir, err := dirs.StateDir()
+	if err != nil {
+		return err
+	}
+	logf, err := os.OpenFile(migratefail.RestartLogPath(stateDir), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return err
+	}
+	defer logf.Close()
+	w = io.MultiWriter(w, logf)
+	return restartSteps(true,
+		func() error { return runServerStop(ctx, dirs, w) },
+		func() error {
+			cfg, err := dirs.Load()
+			if err != nil {
+				return err
+			}
+			return migrateAllProjectsContinue(dirs, stateDir, cfg.TicketStore.Path, w)
+		},
+		func() error { return runServerStartCmd(ctx, d, w) },
+	)
+}
+
+// migrateAllProjectsContinue migrates every project, saving each failure to
+// the failure record instead of stopping. Only a failure to list projects or
+// to save a record is returned.
+func migrateAllProjectsContinue(cfgDirs config.Dirs, stateDir, storePath string, w io.Writer) error {
+	dirs, err := tickets.ProjectDirs(storePath)
+	if err != nil {
+		return err
+	}
+	for _, dir := range dirs {
+		name := filepath.Base(dir)
+		fmt.Fprintf(w, "migrating %s\n", name)
+		if err := runTicketsMigrate(cfgDirs, dir, false, w); err != nil {
+			fmt.Fprintf(w, "migrate %s failed: %v\n", name, err)
+			if recErr := migratefail.Record(stateDir, tickets.ProjectName(dir), err.Error()); recErr != nil {
+				return recErr
+			}
+		}
+	}
+	return nil
 }
 
 // restartSteps stops, optionally migrates, then starts. A failed migration

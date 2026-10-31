@@ -21,6 +21,13 @@ type Failure struct {
 	Error   string `json:"error"`
 }
 
+// RestartLogName is the file `gx server restart --continue` writes its output
+// to, next to the server's own stderr file.
+const RestartLogName = "restart.log"
+
+// RestartLogPath is the continue-mode restart log under stateDir.
+func RestartLogPath(stateDir string) string { return filepath.Join(stateDir, RestartLogName) }
+
 // Path is the record's file under stateDir.
 func Path(stateDir string) string { return filepath.Join(stateDir, FileName) }
 

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/migratefail"
 )
 
 // writeStoreProject makes <store>/<name> a project holding one epic with the
@@ -69,6 +70,45 @@ func TestMigrateAllProjects_FailureNamesTheStore(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "broken") {
 		t.Errorf("error does not name the failed store: %v", err)
+	}
+}
+
+func TestMigrateAllProjectsContinue_RecordsFailureAndMigratesTheRest(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	state := t.TempDir()
+	writeStoreProject(t, store, "alpha", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nparent: \"02\"\n---\nBody.\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
+	})
+	good := writeStoreProject(t, store, "beta", map[string]string{"01-a.md": legacyNeedsAnswer})
+
+	var out bytes.Buffer
+	if err := migrateAllProjectsContinue(config.DirsFrom(tempEnv(t)), state, store, &out); err != nil {
+		t.Fatalf("want nil after a failed project, got %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(good, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "status: paused") {
+		t.Errorf("beta not migrated after alpha failed:\n%s", got)
+	}
+	fails, err := migratefail.Read(state, []string{"alpha", "beta"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fails) != 1 || fails[0].Project != "alpha" || fails[0].Error == "" {
+		t.Errorf("failures = %+v, want one for alpha", fails)
+	}
+}
+
+func TestRestartLogPath_IsFixedFileInStateDir(t *testing.T) {
+	t.Parallel()
+	state := t.TempDir()
+	if got, want := migratefail.RestartLogPath(state), filepath.Join(state, "restart.log"); got != want {
+		t.Errorf("RestartLogPath = %s, want %s", got, want)
 	}
 }
 
