@@ -936,10 +936,11 @@ bare "rule".
 `--front`, and is commitless by type, so nothing it commits can merge. Its report is its `## Result`.
 It is never itself recovered; any other ticket opts out with `recover: false`.
 
-**Fix agent** — an interactive session a person starts to run `gx-investigate` on one ticket that is
-paused or in error: the web "Fix agent" button, the TUI's Investigate item, or `gx agents fix`. One
-per ticket. Not an **Investigate ticket**, which the server queues by itself and runs unattended.
-_Avoid_: investigate session, investigate tab.
+**Fix agent** — an interactive session a person starts to fix one thing gx could not: a ticket that
+is paused or in error (it runs `gx-investigate`, from the web "Fix agent" button, the TUI's
+Investigate item, or `gx agents fix`), or a project whose ticket migration failed in a web restart
+(from the web "Fix agent" button). One per ticket or project. Not an **Investigate ticket**, which
+the server queues by itself and runs unattended. _Avoid_: investigate session, investigate tab.
 
 **Authority** — how far recovery may act on a matched entry. `low` and `medium` apply on their own.
 `high` never does: recovery writes the remedy it would run as a `## Proposed Remedy` section and a
