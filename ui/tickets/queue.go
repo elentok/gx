@@ -93,6 +93,9 @@ type QueueModel struct {
 	// so this is the only modal this tab opens outside the agent-picker menu.
 	confirm confirm.Model
 
+	// harnessPicker is the "H" Default harness modal.
+	harnessPicker harnessPicker
+
 	// hideComplete backs the "tc" chord (ticket 09): when true,
 	// buildQueueEntries omits StatusDone tickets from the rendered row list,
 	// independent of the "c"/"C" clear keymaps (which mutate the queue store,
@@ -219,6 +222,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if next, cmd, ok := m.updateServerKeys(msg); ok {
 		return next, cmd
 	}
+	if next, cmd, ok := m.updateDefaultHarness(msg); ok {
+		return next, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -290,6 +296,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.confirm.IsOpen {
 			return m.handleQueueConfirmUpdate(msg)
 		}
+		if m.harnessPicker.open {
+			return m.updateHarnessPickerKey(msg)
+		}
 		if msg.String() == "esc" {
 			m.ticketMenuPending = ""
 		}
@@ -318,6 +327,9 @@ func (m QueueModel) updateInner(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.confirm.IsOpen {
 			return m.handleQueueConfirmMouseUpdate(msg)
+		}
+		if m.harnessPicker.open {
+			return m, nil
 		}
 		return m.handleQueueMouseClick(msg)
 	}
@@ -492,6 +504,7 @@ const (
 	bindingQueueTicketMenu       keys.BindingID = "ticket-menu"
 	bindingQueueStartServer      keys.BindingID = "start-server"
 	bindingQueueApprove          keys.BindingID = "approve-proposal"
+	bindingQueueDefaultHarness   keys.BindingID = "default-harness"
 )
 
 func newQueueKeysManager() keys.Manager {
@@ -520,6 +533,7 @@ func newQueueKeysManager() keys.Manager {
 		{ID: bindingQueueTicketMenu, Seq: []string{"m"}, Categories: []string{"Other"}, Title: "ticket actions"},
 		{ID: bindingQueueStartServer, Seq: []string{"s"}, Categories: []string{"Other"}, Title: "start server (when down)"},
 		{ID: bindingQueueApprove, Seq: []string{"A"}, Categories: []string{"Other"}, Title: "approve recovery proposal"},
+		{ID: bindingQueueDefaultHarness, Seq: []string{"H"}, Categories: []string{"Other"}, Title: "Default harness..."},
 	})
 }
 
@@ -598,6 +612,8 @@ func (m QueueModel) handleQueueKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m.handleQueueTicketMenuKey()
 		case bindingQueueApprove:
 			return m.handleServerApproveKey()
+		case bindingQueueDefaultHarness:
+			return m.handleDefaultHarnessKey()
 		case bindingQueueStartServer:
 			return m.openServerStartConfirm(), nil
 		}

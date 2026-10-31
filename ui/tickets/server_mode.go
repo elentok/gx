@@ -41,6 +41,8 @@ type ServerAPI interface {
 	Iterations(ctx context.Context) ([]server.IterationInfo, error)
 	TicketChanged(ctx context.Context, address string) error
 	FixAgent(ctx context.Context, req server.FixAgentRequest) (server.FixAgentResult, error)
+	DefaultHarness(ctx context.Context) (server.DefaultHarnessStatus, error)
+	SetDefaultHarness(ctx context.Context, req server.SetDefaultHarnessRequest) (server.SetDefaultHarnessResult, error)
 }
 
 // showQueueIfAdded follows an add-to-queue toast with a switch to the Queue

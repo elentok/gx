@@ -44,6 +44,22 @@ type fakeServerAPI struct {
 	// snap and queue are what Snapshot and QueueItems return.
 	snap  server.Snapshot
 	queue []server.QueueItem
+	// harness is what DefaultHarness returns; harnessSets records the
+	// SetDefaultHarness requests and harnessRes is what it returns.
+	harness     server.DefaultHarnessStatus
+	harnessSets *[]server.SetDefaultHarnessRequest
+	harnessRes  server.SetDefaultHarnessResult
+}
+
+func (f fakeServerAPI) DefaultHarness(context.Context) (server.DefaultHarnessStatus, error) {
+	return f.harness, nil
+}
+
+func (f fakeServerAPI) SetDefaultHarness(_ context.Context, req server.SetDefaultHarnessRequest) (server.SetDefaultHarnessResult, error) {
+	if f.harnessSets != nil {
+		*f.harnessSets = append(*f.harnessSets, req)
+	}
+	return f.harnessRes, nil
 }
 
 // verb records the maintenance verbs ("pause", "resume", "override",
