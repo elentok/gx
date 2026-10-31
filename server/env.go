@@ -3,8 +3,11 @@ package server
 import (
 	"errors"
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/chatreader"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
@@ -32,13 +35,29 @@ func (s *Server) codexHome() (string, error) {
 	return filepath.Join(home, ".codex"), nil
 }
 
-// lastCodexText is the last assistant text of a codex conversation.
+// lastCodexText is the text of the agent's last turn in a codex conversation:
+// every agent message after the person's last one, oldest first. A Codex turn
+// can hold several messages, so a round in an earlier one still counts. Without
+// a turn it is the last assistant text of the rollout.
 func (s *Server) lastCodexText(id string) (string, bool, error) {
 	home, err := s.codexHome()
 	if err != nil {
 		return "", false, err
 	}
-	return codexsession.LastAssistantTextIn(home, id)
+	path, ok, err := codexsession.RolloutPathIn(home, id)
+	if err != nil || !ok {
+		return "", false, err
+	}
+	res, _, err := chatreader.ReadFile(harness.Codex, path)
+	if err != nil {
+		return "", false, err
+	}
+	texts := trailingAgentTexts(res.Messages)
+	if len(texts) == 0 {
+		return codexsession.LastAssistantTextIn(home, id)
+	}
+	slices.Reverse(texts)
+	return strings.Join(texts, "\n\n"), true, nil
 }
 
 // transcriptPath is the claude transcript path of a session run in cwd.

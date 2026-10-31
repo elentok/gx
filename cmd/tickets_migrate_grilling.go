@@ -53,7 +53,7 @@ func backfillGrilling(dirs config.Dirs, root string, dryRun bool) ([]tickets.Mig
 			continue
 		}
 		if !dryRun {
-			if err := grillround.Recount(dir, home, r.ID, r.Dir); err != nil {
+			if err := grillround.Recount(dir, grillround.Homes{Claude: home}, harness.Claude, r.ID, r.Dir); err != nil {
 				return changes, err
 			}
 		}
@@ -132,7 +132,7 @@ func saveBackfilledDesign(dir, home, cwd, id, ticket string, at time.Time) error
 	if err := conversations.Save(dir, rec); err != nil {
 		return err
 	}
-	return grillround.Recount(dir, home, rec.ID, rec.Dir)
+	return grillround.Recount(dir, grillround.Homes{Claude: home}, harness.Claude, rec.ID, rec.Dir)
 }
 
 func grillingChange(dir, id string) tickets.MigrationChange {

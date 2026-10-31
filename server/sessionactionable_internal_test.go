@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/grillround"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/testutil/agentfake"
 	"github.com/elentok/gx/tickets"
@@ -60,6 +61,29 @@ func TestLastAssistantText_ReadsACodexRollout(t *testing.T) {
 	a, matched := designActionable(text, "gx:epic/03", meta.Harness, false)
 	if !matched || len(a.Action) != 2 || a.Action[0] != "/new" {
 		t.Errorf("actionable = %+v, matched %v, want a Continue starting with /new", a, matched)
+	}
+}
+
+// A Codex turn with several agent messages keeps a round raised in an earlier one.
+func TestLastAssistantText_CodexTurnKeepsARoundFromAnEarlierMessage(t *testing.T) {
+	t.Parallel()
+	home := t.TempDir()
+	path := filepath.Join(home, "sessions", "2026", "10", "25", "rollout-2026-10-25T10-00-00-conv.jsonl")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	msg := func(role, text string) string {
+		return `{"type":"response_item","payload":{"type":"message","role":"` + role + `","content":[{"text":` + strconv.Quote(text) + `}]}}` + "\n"
+	}
+	rollout := msg("assistant", "old turn") + msg("user", "go") + msg("assistant", "❓ **Q1** - **Alpha**: one two") + msg("assistant", "Waiting for you.")
+	if err := os.WriteFile(path, []byte(rollout), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{log: slog.New(slog.DiscardHandler), cfg: Config{Env: []string{"CODEX_HOME=" + home}}}
+
+	text, ok := s.lastAssistantText("s1", sessionMeta{Harness: "codex", ConversationID: "conv"})
+	if !ok || !grillround.HasMarker(text) || strings.Contains(text, "old turn") {
+		t.Errorf("text = %q, ok %v; want the last turn's round", text, ok)
 	}
 }
 
