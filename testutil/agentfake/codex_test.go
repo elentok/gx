@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/codexdoctor"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
@@ -241,6 +242,24 @@ func TestCodex_RolloutIsReadByProductionReaders(t *testing.T) {
 	}
 	if ok, err := codexsession.VerifyIdentityIn(home, t.TempDir(), p.id); err != nil || ok {
 		t.Errorf("VerifyIdentityIn for another cwd = %v, %v; want false", ok, err)
+	}
+}
+
+func TestCodex_RolloutPassesTheDoctorRolloutCheck(t *testing.T) {
+	home := t.TempDir()
+	p := startCodex(t, home, "doctor-1", codexLaunchArgs...)
+	p.turnAndExit("hello")
+
+	files := rolloutFiles(t, home)
+	if len(files) != 1 {
+		t.Fatalf("rollouts = %v; want one", files)
+	}
+	data, err := os.ReadFile(files[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if problem := codexdoctor.CheckRollout(data); problem != "" {
+		t.Errorf("CheckRollout on the fake's rollout: %s", problem)
 	}
 }
 

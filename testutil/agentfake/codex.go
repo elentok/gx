@@ -274,6 +274,9 @@ func (c *codexFake) openRollout(home string, resume bool) error {
 	})
 }
 
+// turnID names the turn in progress, as Codex's task_complete lines do.
+func (c *codexFake) turnID() string { return fmt.Sprintf("%s-turn-%d", c.id, c.turns) }
+
 func timestamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000Z") }
 
 // writeLine appends one rollout line.
@@ -422,7 +425,7 @@ func (c *codexFake) finishTurn() error {
 	}); err != nil {
 		return err
 	}
-	if err := c.writeLine("event_msg", map[string]any{"type": "task_complete", "last_agent_message": codexReply}); err != nil {
+	if err := c.writeLine("event_msg", map[string]any{"type": "task_complete", "turn_id": c.turnID(), "last_agent_message": codexReply}); err != nil {
 		return err
 	}
 	if err := c.stopHooks(); err != nil {

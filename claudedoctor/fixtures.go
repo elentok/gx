@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/elentok/gx/nativerunner"
 )
 
 // The fixtures are embedded so the doctor can warn when installed claude is
@@ -60,7 +62,7 @@ func LoadFixtures(fsys fs.FS) (Source, error) {
 		if err != nil {
 			return Source{}, fmt.Errorf("fixture %s: %w", p, err)
 		}
-		if oldest == "" || compareVersions(version, oldest) < 0 {
+		if oldest == "" || nativerunner.CompareVersions(version, oldest) < 0 {
 			oldest = version
 		}
 		sessions[name] = rec

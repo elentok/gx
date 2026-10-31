@@ -371,8 +371,9 @@ func (c *codexFake) compact() error {
 func (c *codexFake) taskError(message, info string) error {
 	c.working = false
 	if err := c.writeLine("event_msg", map[string]any{
-		"type":  "task_complete",
-		"error": map[string]any{"message": message, "codex_error_info": info},
+		"type":    "task_complete",
+		"turn_id": c.turnID(),
+		"error":   map[string]any{"message": message, "codex_error_info": info},
 	}); err != nil {
 		return err
 	}

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/elentok/gx/nativerunner"
@@ -167,7 +166,7 @@ func checkClaudeVersion(in Input) (string, bool) {
 	if in.ClaudeVersion == "" {
 		return "could not read claude --version", false
 	}
-	if compareVersions(in.ClaudeVersion, nativerunner.MinClaudeVersion) < 0 {
+	if nativerunner.CompareVersions(in.ClaudeVersion, nativerunner.MinClaudeVersion) < 0 {
 		return fmt.Sprintf("%s is older than %s", in.ClaudeVersion, nativerunner.MinClaudeVersion), false
 	}
 	return fmt.Sprintf("%s >= %s", in.ClaudeVersion, nativerunner.MinClaudeVersion), true
@@ -185,29 +184,5 @@ func ParseVersion(out string) string {
 // NewerThanFixtures reports whether installed claude is newer than the
 // claude that recorded the fixtures, i.e. the fixtures may be stale.
 func NewerThanFixtures(installed, fixtures string) bool {
-	return installed != "" && fixtures != "" && compareVersions(installed, fixtures) > 0
-}
-
-// compareVersions compares dotted numeric versions; a non-numeric part
-// counts as 0.
-func compareVersions(a, b string) int {
-	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
-	for i := 0; i < max(len(pa), len(pb)); i++ {
-		na, nb := versionPart(pa, i), versionPart(pb, i)
-		if na != nb {
-			if na < nb {
-				return -1
-			}
-			return 1
-		}
-	}
-	return 0
-}
-
-func versionPart(parts []string, i int) int {
-	if i >= len(parts) {
-		return 0
-	}
-	n, _ := strconv.Atoi(parts[i])
-	return n
+	return installed != "" && fixtures != "" && nativerunner.CompareVersions(installed, fixtures) > 0
 }
