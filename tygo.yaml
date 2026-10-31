@@ -35,7 +35,9 @@ packages:
       - sessiontypes.go
       - stats.go
       - statsgrilling.go
+      - limitsstore.go
       - usagesample.go
+      - usagesummary.go
       - verdicts.go
     type_mappings:
       time.Time: "string"

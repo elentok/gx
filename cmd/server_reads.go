@@ -263,7 +263,45 @@ func newUsageCmd(d deps) *cobra.Command {
 	}
 	override.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
 	cmd.AddCommand(override)
+
+	var summaryJSON bool
+	summary := &cobra.Command{
+		Use:   "summary",
+		Short: "show the usage mode, the Claude limit windows and the spend totals (asks the server)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, _ []string) error {
+			return serverRead(d.dial(), c.Context(), summaryJSON, c.OutOrStdout(),
+				func(ctx context.Context, cl *apiclient.Client) (server.UsageSummary, error) {
+					return cl.UsageSummary(ctx)
+				},
+				printUsageSummary)
+		},
+	}
+	summary.Flags().BoolVar(&summaryJSON, "json", false, "emit structured JSON instead of human-readable text")
+	cmd.AddCommand(summary)
 	return cmd
+}
+
+func printUsageSummary(w io.Writer, u server.UsageSummary) error {
+	fmt.Fprintf(w, "mode: %s\n", u.Mode)
+	for _, row := range []struct {
+		name string
+		win  *server.LimitWindow
+	}{{"five_hour", u.Limits.FiveHour}, {"seven_day", u.Limits.SevenDay}} {
+		if row.win != nil {
+			fmt.Fprintf(w, "%s: %.0f%% used, resets at %d\n", row.name, row.win.UsedPercentage, row.win.ResetsAt)
+		}
+	}
+	s := u.Spend
+	since := func(short bool) string {
+		if short {
+			return " (since " + s.FirstDay + ")"
+		}
+		return ""
+	}
+	fmt.Fprintf(w, "today: $%.2f\nsince sunday: $%.2f%s\nsince the 1st: $%.2f%s\n",
+		s.Today, s.SinceSunday, since(s.SinceSundayShort), s.SinceFirst, since(s.SinceFirstShort))
+	return nil
 }
 
 // runUsageOverride mirrors runBudgetWrite.

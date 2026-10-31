@@ -302,6 +302,14 @@ func TestWeb_HealthReadIsServed(t *testing.T) {
 	}
 }
 
+func TestUsageSummary_WebServesRead(t *testing.T) {
+	t.Parallel()
+	h, base := startWeb(t)
+	if code, _ := webDo(t, h, http.MethodGet, base+"/v1/usage/summary"); code != http.StatusOK {
+		t.Errorf("GET /v1/usage/summary = %d", code)
+	}
+}
+
 func TestWeb_EverythingElseIs404(t *testing.T) {
 	t.Parallel()
 	h, base := startWeb(t)
@@ -309,7 +317,7 @@ func TestWeb_EverythingElseIs404(t *testing.T) {
 	for _, pattern := range server.RoutePatterns() {
 		method, path, _ := strings.Cut(pattern, " ")
 		if pattern == "GET /v1/snapshot" || pattern == "GET /v1/events" || pattern == "GET /v1/tickets/detail" ||
-			pattern == "GET /v1/epics/detail" || pattern == "GET /v1/epics" || pattern == "GET /v1/stats" || pattern == "GET /v1/health" || pattern == "GET /v1/projects/worktrees" ||
+			pattern == "GET /v1/epics/detail" || pattern == "GET /v1/epics" || pattern == "GET /v1/stats" || pattern == "GET /v1/health" || pattern == "GET /v1/usage/summary" || pattern == "GET /v1/projects/worktrees" ||
 			pattern == "GET /v1/checks/status" || pattern == "GET /v1/settings/agents" || pattern == "POST /v1/settings/agents" || pattern == "GET /v1/sessions" || pattern == "GET /v1/sessions/chat" || pattern == "GET /v1/sessions/chat/archive" || pattern == "GET /v1/sessions/screen" ||
 			pattern == "POST /v1/tickets/answer" || pattern == "POST /v1/tickets/unpark" || pattern == "POST /v1/tickets/resume" || pattern == "POST /v1/agents/answer" ||
 			pattern == "POST /v1/tickets/retry" || pattern == "POST /v1/tickets/merge" || pattern == "POST /v1/tickets/start-over" ||

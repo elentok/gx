@@ -287,6 +287,13 @@ func (c *Client) Budget(ctx context.Context) (server.BudgetStatus, error) {
 	return b, err
 }
 
+// UsageSummary returns the usage mode, the stored limit windows and the spend totals.
+func (c *Client) UsageSummary(ctx context.Context) (server.UsageSummary, error) {
+	var u server.UsageSummary
+	err := c.get(ctx, "/v1/usage/summary", &u)
+	return u, err
+}
+
 // History returns the events logged for one ticket, by its full address.
 func (c *Client) History(ctx context.Context, address string) (server.History, error) {
 	var h server.History

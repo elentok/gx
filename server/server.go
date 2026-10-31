@@ -562,6 +562,7 @@ var routeTable = []struct {
 	{"GET /v1/config/status", (*Server).configStatusRead},
 	{"GET /v1/disk/status", (*Server).diskStatusRead},
 	{"GET /v1/health", (*Server).healthRead},
+	{"GET /v1/usage/summary", (*Server).usageSummaryRead},
 	{"POST /v1/disk/clean", (*Server).diskCleanWrite},
 	{"GET /v1/checks/status", (*Server).checksStatusRead},
 	{"POST /v1/budget/increase", (*Server).budgetIncreaseWrite},

@@ -1483,6 +1483,69 @@ export interface Snapshot {
 }
 
 //////////
+// source: limitsstore.go
+
+/**
+ * LimitsStaleAfterSeconds is how old a window's received-at may get before the
+ * web client shows it as stale.
+ */
+export const LimitsStaleAfterSeconds = 600;
+/**
+ * LimitWindow is one rate-limit window; all times are epoch seconds.
+ * ReceivedAt is set by the server, never taken from a report.
+ */
+export interface LimitWindow {
+  used_percentage: number /* float64 */;
+  resets_at: number /* int64 */;
+  received_at: number /* int64 */;
+}
+/**
+ * LimitsReport is a report or the stored state: the windows it carries.
+ */
+export interface LimitsReport {
+  five_hour?: LimitWindow;
+  seven_day?: LimitWindow;
+}
+/**
+ * LimitOutcome says what a report did to one window.
+ */
+export type LimitOutcome = string;
+/**
+ * LimitNew filled a window that was empty.
+ */
+export const LimitNew: LimitOutcome = "new";
+/**
+ * LimitChanged moved the whole-number percentage or the reset time.
+ */
+export const LimitChanged: LimitOutcome = "changed";
+/**
+ * LimitConfirmed refreshed received-at without a visible change.
+ */
+export const LimitConfirmed: LimitOutcome = "confirmed";
+/**
+ * LimitDropped left the window alone.
+ */
+export const LimitDropped: LimitOutcome = "dropped";
+/**
+ * LimitResult is the outcome for one window the report carried.
+ */
+export interface LimitResult {
+  Outcome: LimitOutcome;
+  /**
+   * PrevReceivedAt is the stored received-at before the report; 0 when none.
+   */
+  PrevReceivedAt: number /* int64 */;
+}
+/**
+ * LimitsApplyResult has one result per window the report carried; the others
+ * are nil.
+ */
+export interface LimitsApplyResult {
+  FiveHour?: LimitResult;
+  SevenDay?: LimitResult;
+}
+
+//////////
 // source: pause.go
 
 /**
@@ -2115,6 +2178,39 @@ export const ReasonNotGated = "not-gated";
  */
 export interface UsageOverrideRequest {
   harness?: string;
+}
+
+//////////
+// source: usagesummary.go
+
+export const UsageModeLimits = "limits";
+export const UsageModeSpending = "spending";
+/**
+ * Usage modes: limits once the limits store holds any window, else spending.
+ * The store never expires a window, so the mode never goes back.
+ */
+export type UsageMode = typeof UsageModeLimits | typeof UsageModeSpending;
+/**
+ * UsageSpend is the spend block of the usage summary, in dollars. A *Short
+ * flag is set when the ledger starts after that window's start day, so the
+ * client writes "since <FirstDay>". FirstDay is omitted for an empty ledger.
+ */
+export interface UsageSpend {
+  today: number /* float64 */;
+  since_sunday: number /* float64 */;
+  since_sunday_short?: boolean;
+  since_first: number /* float64 */;
+  since_first_short?: boolean;
+  first_day?: string;
+}
+/**
+ * UsageSummary is the one read the web menu fetches. The spend block is always
+ * filled; the client picks the block to show by Mode.
+ */
+export interface UsageSummary {
+  mode: string;
+  limits: LimitsReport;
+  spend: UsageSpend;
 }
 
 //////////
