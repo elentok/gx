@@ -787,6 +787,22 @@ func (c *Client) SaveChecks(ctx context.Context, req server.SaveChecksRequest) (
 	return res, err
 }
 
+// DefaultHarness is the global Default harness, the agent runner and each
+// project's override.
+func (c *Client) DefaultHarness(ctx context.Context) (server.DefaultHarnessStatus, error) {
+	var st server.DefaultHarnessStatus
+	err := c.get(ctx, "/v1/settings/agents", &st)
+	return st, err
+}
+
+// SetDefaultHarness writes the Default harness. A refusal is a result (Refused
+// set), not an error.
+func (c *Client) SetDefaultHarness(ctx context.Context, req server.SetDefaultHarnessRequest) (server.SetDefaultHarnessResult, error) {
+	var res server.SetDefaultHarnessResult
+	err := c.post(ctx, "/v1/settings/agents", req, &res)
+	return res, err
+}
+
 // ChecksStatus is each project's check config and detected commands. An empty
 // project means every registered project.
 func (c *Client) ChecksStatus(ctx context.Context, project string) (server.ChecksStatus, error) {

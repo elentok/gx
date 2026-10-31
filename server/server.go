@@ -629,6 +629,8 @@ var routeTable = []struct {
 	{"POST /v1/tickets/fix-agent", (*Server).fixAgentWrite},
 	{"POST /v1/afk", (*Server).afkWrite},
 	{"POST /v1/checks/save", (*Server).checksSaveWrite},
+	{"GET /v1/settings/agents", (*Server).defaultHarnessRead},
+	{"POST /v1/settings/agents", (*Server).defaultHarnessWrite},
 }
 
 // RoutePatterns lists every registered "METHOD /path" pattern.
