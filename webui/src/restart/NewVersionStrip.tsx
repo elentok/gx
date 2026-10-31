@@ -1,12 +1,18 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useRef } from "react";
 import { Button } from "../ui/button/Button";
 
-/** True once the server's build differs from the first one this page saw. */
+// Module level: each page mounts its own top bar, so a per-mount baseline
+// would reset on navigation and hide the strip.
+let firstBuild: string | undefined;
+
+export function resetBuildBaseline() {
+  firstBuild = undefined;
+}
+
+/** True once the server's build differs from the first one this page load saw. */
 export function useBuildChanged(build?: string): boolean {
-  const first = useRef<string | undefined>(undefined);
-  if (build && first.current === undefined) first.current = build;
-  return !!build && first.current !== undefined && build !== first.current;
+  if (build && firstBuild === undefined) firstBuild = build;
+  return !!build && firstBuild !== undefined && build !== firstBuild;
 }
 
 export function NewVersionStrip({ reload = () => window.location.reload() }: { reload?: () => void }) {
