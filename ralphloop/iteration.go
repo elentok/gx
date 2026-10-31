@@ -82,7 +82,7 @@ func runIteration(d Deps, p iterationParams) error {
 		Epic:  p.FeatureBranch,
 		Cwd:   path,
 		Kind:  agentrunner.Kind(p.Agent),
-		Args:  agentArgs(p.Agent, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
+		Args:  agentArgs(p.Agent, path, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
 	}, prompt, func(attempt int, kind events.Kind, err error) {
 		p.logLaunchFailed(label, attempt, kind, err)
 	}, func(attempt int, decision string) {
@@ -1020,7 +1020,7 @@ func resolveCherryPickConflict(d Deps, p iterationParams) (sessionID string, res
 		Epic:  p.FeatureBranch,
 		Cwd:   p.FeatureWorktree,
 		Kind:  agentrunner.Kind(p.Agent),
-		Args:  agentArgs(p.Agent, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
+		Args:  agentArgs(p.Agent, p.FeatureWorktree, p.ScratchDir, p.FeatureBranch, p.Model, p.Effort),
 	}, prompt, func(attempt int, kind events.Kind, err error) {
 		p.logLaunchFailed(label, attempt, kind, err)
 	}, func(attempt int, decision string) {

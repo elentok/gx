@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -379,7 +380,7 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 			name:       "codex",
 			agent:      AgentCodex,
 			wantKind:   "codex",
-			wantArgs:   []string{"--sandbox", "workspace-write", "--ask-for-approval", "on-request"},
+			wantArgs:   harness.CodexArgs(harness.CodexArgsInput{}),
 			wantPrefix: "$implement ",
 		},
 		{
@@ -398,10 +399,8 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 			agents: config.AgentsConfig{
 				Codex: config.AgentConfig{Model: "gpt-5.6-sol", Effort: "medium"},
 			},
-			wantKind: "codex",
-			wantArgs: []string{
-				"--sandbox", "workspace-write", "--ask-for-approval", "on-request",
-			},
+			wantKind:   "codex",
+			wantArgs:   harness.CodexArgs(harness.CodexArgsInput{}),
 			wantPrefix: "$implement ",
 		},
 	} {
@@ -429,8 +428,11 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 			}
 			if tc.agent == AgentCodex {
 				wantScratch := filepath.Join(scratchDir, "my-epic")
-				if !slices.Contains(start.Args, wantScratch) {
-					t.Errorf("Start Args = %v, want epic scratch directory %q", start.Args, wantScratch)
+				if !strings.Contains(strings.Join(start.Args, " "), strconv.Quote(wantScratch)) {
+					t.Errorf("Start Args = %v, want epic scratch directory %q in writable_roots", start.Args, wantScratch)
+				}
+				if slices.Contains(start.Args, "--add-dir") {
+					t.Errorf("Start Args = %v, want no --add-dir", start.Args)
 				}
 				codexCfg := tc.agents.Codex
 				if codexCfg.Model != "" && !slices.Contains(start.Args, "--model") {
@@ -459,6 +461,11 @@ func TestRun_AgentSelection_ConfiguresLaunchAndPrompt(t *testing.T) {
 		})
 	}
 }
+
+// notARepo is a cwd git cannot read, so agentArgs adds no git roots.
+const notARepo = "/nonexistent/not-a-repo"
+
+var codexTestRoots = []string{"scratch", filepath.Join("scratch", "epic")}
 
 func TestAgentArgs_ModelAndEffort(t *testing.T) {
 	t.Parallel()
@@ -496,51 +503,31 @@ func TestAgentArgs_ModelAndEffort(t *testing.T) {
 		{
 			name:  "codex both empty unchanged",
 			agent: AgentCodex,
-			want: []string{
-				"--sandbox", "workspace-write",
-				"--ask-for-approval", "on-request",
-				"--add-dir", filepath.Join("scratch", "epic"),
-			},
+			want:  harness.CodexArgs(harness.CodexArgsInput{WritableRoots: codexTestRoots}),
 		},
 		{
 			name:   "codex both set",
 			agent:  AgentCodex,
 			model:  "gpt-5.6-sol",
 			effort: "medium",
-			want: []string{
-				"--sandbox", "workspace-write",
-				"--ask-for-approval", "on-request",
-				"--add-dir", filepath.Join("scratch", "epic"),
-				"--model", "gpt-5.6-sol",
-				"-c", `model_reasoning_effort="medium"`,
-			},
+			want:   harness.CodexArgs(harness.CodexArgsInput{Model: "gpt-5.6-sol", Effort: "medium", WritableRoots: codexTestRoots}),
 		},
 		{
 			name:  "codex model only",
 			agent: AgentCodex,
 			model: "gpt-5.6-sol",
-			want: []string{
-				"--sandbox", "workspace-write",
-				"--ask-for-approval", "on-request",
-				"--add-dir", filepath.Join("scratch", "epic"),
-				"--model", "gpt-5.6-sol",
-			},
+			want:  harness.CodexArgs(harness.CodexArgsInput{Model: "gpt-5.6-sol", WritableRoots: codexTestRoots}),
 		},
 		{
 			name:   "codex effort only",
 			agent:  AgentCodex,
 			effort: "medium",
-			want: []string{
-				"--sandbox", "workspace-write",
-				"--ask-for-approval", "on-request",
-				"--add-dir", filepath.Join("scratch", "epic"),
-				"-c", `model_reasoning_effort="medium"`,
-			},
+			want:   harness.CodexArgs(harness.CodexArgsInput{Effort: "medium", WritableRoots: codexTestRoots}),
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := agentArgs(tc.agent, "scratch", "epic", tc.model, tc.effort)
+			got := agentArgs(tc.agent, notARepo, "scratch", "epic", tc.model, tc.effort)
 			if !slices.Equal(got, tc.want) {
 				t.Errorf("agentArgs() = %v, want %v", got, tc.want)
 			}

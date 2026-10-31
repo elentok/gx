@@ -166,6 +166,8 @@ func Lookup(kind agentrunner.Kind) (Harness, error) {
 	switch kind {
 	case Claude:
 		return claudeHarness{}, nil
+	case Codex:
+		return codexHarness{}, nil
 	}
 	if h, ok := registered[kind]; ok {
 		return h, nil

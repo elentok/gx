@@ -31,7 +31,7 @@ func TestResolveTier(t *testing.T) {
 			if model != tc.wantModel || effort != tc.wantEffort {
 				t.Fatalf("ResolveTier = %q, %q; want %q, %q", model, effort, tc.wantModel, tc.wantEffort)
 			}
-			args := agentArgs(tc.agent, "scratch", "epic", model, effort)
+			args := agentArgs(tc.agent, notARepo, "scratch", "epic", model, effort)
 			if !slices.Equal(args[len(args)-len(tc.wantFlagTail):], tc.wantFlagTail) {
 				t.Errorf("args = %v, want tail %v", args, tc.wantFlagTail)
 			}
@@ -44,7 +44,7 @@ func TestResolveTier(t *testing.T) {
 		if model != "" || effort != "" {
 			t.Fatalf("ResolveTier = %q, %q; want empty", model, effort)
 		}
-		args := agentArgs(AgentClaude, "scratch", "epic", model, effort)
+		args := agentArgs(AgentClaude, notARepo, "scratch", "epic", model, effort)
 		if slices.Contains(args, "--model") || slices.Contains(args, "--effort") {
 			t.Errorf("args = %v, want no model or effort flag", args)
 		}

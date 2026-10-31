@@ -379,7 +379,7 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 	}
 	opts := harness.LaunchOptions{
 		SessionID: meta.ConversationID,
-		Args:      launchArgs(meta, s.settings.Load().AgentsClaudeArgs),
+		Args:      launchArgs(meta, s.settings.Load().AgentsClaudeArgs, s.codexRoots(meta)),
 		Env:       s.cfg.Env,
 	}
 	launch := h.Launch(opts)
@@ -422,17 +422,10 @@ func (s *Server) startSessionHolder(dir string, meta *sessionMeta, cols, rows in
 // launchArgs is the extra harness args of a launch or resume. Only Claude and
 // Codex get any. The model, effort and remote-control name come from the meta,
 // never the settings, so a resume keeps what the launch used.
-func launchArgs(meta *sessionMeta, claudeArgs []string) []string {
+func launchArgs(meta *sessionMeta, claudeArgs, codexRoots []string) []string {
 	switch meta.Harness {
 	case string(harness.Codex):
-		var args []string
-		if meta.Model != "" {
-			args = append(args, "--model", meta.Model)
-		}
-		if meta.Effort != "" {
-			args = append(args, "-c", fmt.Sprintf("model_reasoning_effort=%q", meta.Effort))
-		}
-		return args
+		return harness.CodexArgs(harness.CodexArgsInput{Model: meta.Model, Effort: meta.Effort, WritableRoots: codexRoots})
 	case string(harness.Claude):
 	default:
 		return nil
@@ -452,6 +445,23 @@ func launchArgs(meta *sessionMeta, claudeArgs []string) []string {
 		args = append(args, "--remote-control", meta.RemoteControl)
 	}
 	return args
+}
+
+// codexRoots are the writable roots of a Codex session: its dir's git dirs and
+// the project's ticket-store dir, which holds every epic dir. Other harnesses
+// get none.
+func (s *Server) codexRoots(meta *sessionMeta) []string {
+	if meta.Harness != string(harness.Codex) {
+		return nil
+	}
+	var roots []string
+	if gitDir, commonDir, err := git.GitDirs(meta.Dir); err == nil {
+		roots = append(roots, gitDir, commonDir)
+	}
+	if d, err := s.projectDir(meta.Project); err == nil {
+		roots = append(roots, d)
+	}
+	return roots
 }
 
 // hasFlag reports whether args hold flag, bare or as flag=value.

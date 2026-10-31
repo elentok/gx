@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/storecommit"
@@ -182,16 +183,10 @@ func SkillPrompt(agent AgentKind, skill, ticketAddr string) string {
 	return skillPrompt(agent, skill, ticketAddr)
 }
 
-// extraDirs are further writable dirs for a Codex sandbox; Claude ignores them.
-func AgentArgs(agent AgentKind, scratchDir, epicName, model, effort string, extraDirs ...string) []string {
-	args := agentArgs(agent, scratchDir, epicName, model, effort)
-	if agent != AgentCodex {
-		return args
-	}
-	for _, d := range extraDirs {
-		args = append(args, "--add-dir", d)
-	}
-	return args
+// cwd is the agent's worktree; extraDirs are further writable dirs for a Codex
+// sandbox. Claude ignores both.
+func AgentArgs(agent AgentKind, cwd, scratchDir, epicName, model, effort string, extraDirs ...string) []string {
+	return agentArgs(agent, cwd, scratchDir, epicName, model, effort, extraDirs...)
 }
 
 func skillPrompt(agent AgentKind, skill, ticketAddr string) string {
@@ -210,23 +205,18 @@ func skillPrompt(agent AgentKind, skill, ticketAddr string) string {
 // skill forbidding them. See `gx agent guard-bash`.
 const claudeGuardSettings = `{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"gx agent guard-bash"}]}]}}`
 
-func agentArgs(agent AgentKind, scratchDir, epicName, model, effort string) []string {
+func agentArgs(agent AgentKind, cwd, scratchDir, epicName, model, effort string, extraDirs ...string) []string {
 	if agent == AgentCodex {
-		args := []string{
-			"--sandbox", "workspace-write",
-			"--ask-for-approval", "on-request",
-			"--add-dir", filepath.Join(scratchDir, epicName),
+		// A cwd that is not a repo adds no git roots: the sandbox still starts.
+		var roots []string
+		if gitDir, commonDir, err := git.GitDirs(cwd); err == nil {
+			roots = append(roots, gitDir, commonDir)
 		}
-		if model != "" {
-			args = append(args, "--model", model)
-		}
-		if effort != "" {
-			// Codex has no dedicated effort flag; -c is the only route it
-			// offers, and gx deliberately does not manage a codex profile
-			// file to get one.
-			args = append(args, "-c", fmt.Sprintf("model_reasoning_effort=%q", effort))
-		}
-		return args
+		roots = append(roots, scratchDir, filepath.Join(scratchDir, epicName))
+		return harness.CodexArgs(harness.CodexArgsInput{
+			Model: model, Effort: effort,
+			WritableRoots: append(roots, extraDirs...),
+		})
 	}
 	args := []string{
 		"--permission-mode", "auto", "--settings", claudeGuardSettings,

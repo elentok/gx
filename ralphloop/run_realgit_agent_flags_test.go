@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +33,8 @@ func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
 		agent         AgentKind
 		agents        config.AgentsConfig
 		wantAgentArgs func(scratchDir string) []string
+		// wantRoots: the launch carries writable_roots from the real worktree.
+		wantRoots bool
 	}{
 		{
 			name:  "claude",
@@ -49,14 +52,10 @@ func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
 			agents: config.AgentsConfig{
 				Codex: config.AgentConfig{Model: "gpt-6.1-sol", Effort: "medium"},
 			},
-			wantAgentArgs: func(scratchDir string) []string {
-				return []string{
-					"--sandbox", "workspace-write", "--ask-for-approval", "on-request",
-					"--add-dir", filepath.Join(scratchDir, epicName),
-					"--model", "gpt-6.1-sol",
-					"-c", `model_reasoning_effort="medium"`,
-				}
+			wantAgentArgs: func(string) []string {
+				return harness.CodexArgs(harness.CodexArgsInput{Model: "gpt-6.1-sol", Effort: "medium"})
 			},
+			wantRoots: true,
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -109,6 +108,22 @@ func TestRun_ProductionRealGit_AgentStartCarriesModelAndEffort(t *testing.T) {
 				t.Fatalf("herdr agent start argv = %v, want a -- separator before the agent's own flags", startArgv)
 			}
 			got := startArgv[idx+1:]
+			if tc.wantRoots {
+				i := slices.IndexFunc(got, func(a string) bool { return strings.HasPrefix(a, "sandbox_workspace_write.writable_roots=") })
+				if i < 1 {
+					t.Fatalf("argv = %v, want a writable_roots flag", got)
+				}
+				common, err := filepath.EvalSymlinks(filepath.Join(repoDir, ".git"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, root := range []string{filepath.Join(common, "worktrees"), common, scratchDir, filepath.Join(scratchDir, epicName)} {
+					if !strings.Contains(got[i], root) {
+						t.Errorf("writable_roots %s lacks %s", got[i], root)
+					}
+				}
+				got = slices.Delete(slices.Clone(got), i-1, i+1)
+			}
 			want := tc.wantAgentArgs(scratchDir)
 			if !slices.Equal(got, want) {
 				t.Errorf("herdr agent start argv after -- = %v, want %v", got, want)

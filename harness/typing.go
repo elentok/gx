@@ -9,8 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 )
 
-// Codex is the codex harness's name. It has a typing part only: the herdr
-// runner still launches it through its kind switch.
+// Codex is the codex harness's name (see codexHarness and LookupTyping).
 const Codex agentrunner.Kind = "codex"
 
 // InputState is what a screen read says about the agent's input box.

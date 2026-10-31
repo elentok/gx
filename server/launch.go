@@ -122,7 +122,7 @@ func (s *Server) launch(deps ralphloop.Deps, ticket tickets.Address, one ralphlo
 			Epic:            ticket.Epic,
 			Cwd:             cwd,
 			Kind:            agentrunner.Kind(agent),
-			Args:            ralphloop.AgentArgs(agent, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
+			Args:            ralphloop.AgentArgs(agent, cwd, one.ScratchDir, ticket.Epic, one.Model, one.Effort, extraDirs...),
 			Env:             agentEnv(s.settings.Load().TabEnv, t, ticket, agent),
 			ResumeSessionID: resumeID,
 		}, launchPrompt(agent, launchSkill(t), launchNote(t), ticket.String()), func(attempt int, decision string) {
