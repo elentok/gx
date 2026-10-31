@@ -50,6 +50,50 @@ func TestGuardBashCommand(t *testing.T) {
 	}
 }
 
+func TestAgentGuardBash_CodexHarness(t *testing.T) {
+	t.Parallel()
+	run := func(stdin string) (string, error) {
+		c := newAgentGuardBashCmd()
+		var stderr bytes.Buffer
+		c.SetArgs([]string{"--harness", "codex"})
+		c.SetIn(strings.NewReader(stdin))
+		c.SetErr(&stderr)
+		err := c.Execute()
+		return stderr.String(), err
+	}
+	stderr, err := run(`{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"sed -i s/a/b/ x.go"}}`)
+	var exitErr *ExitError
+	if !errors.As(err, &exitErr) || exitErr.Code != guardBashExitCode {
+		t.Fatalf("err = %v, want ExitError{%d}", err, guardBashExitCode)
+	}
+	if !strings.Contains(stderr, "apply_patch") || strings.Contains(stderr, "Edit or Write") {
+		t.Errorf("stderr = %q, want apply_patch and not Edit or Write", stderr)
+	}
+	for name, in := range map[string]string{
+		"allowed command": `{"tool_name":"Bash","tool_input":{"command":"git status"}}`,
+		"unreadable json": `not json`,
+	} {
+		if _, err := run(in); err != nil {
+			t.Errorf("%s: err = %v, want nil", name, err)
+		}
+	}
+}
+
+func TestAgentGuardQuestion_Blocks(t *testing.T) {
+	t.Parallel()
+	c := newAgentGuardQuestionCmd()
+	var stderr bytes.Buffer
+	c.SetIn(strings.NewReader(`{"hook_event_name":"PreToolUse","tool_name":"request_user_input","tool_input":{}}`))
+	c.SetErr(&stderr)
+	var exitErr *ExitError
+	if err := c.Execute(); !errors.As(err, &exitErr) || exitErr.Code != guardBashExitCode {
+		t.Fatalf("err = %v, want ExitError{%d}", err, guardBashExitCode)
+	}
+	if !strings.Contains(stderr.String(), "gx tickets ask") || !strings.Contains(stderr.String(), "request_user_input") {
+		t.Errorf("stderr = %q, want the gx tickets ask pointer", stderr.String())
+	}
+}
+
 func TestAgentGuardBash_ExitCodes(t *testing.T) {
 	t.Parallel()
 	run := func(stdin string) (string, error) {

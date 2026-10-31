@@ -71,6 +71,22 @@ func TestCodexArgs_Shape(t *testing.T) {
 	}
 }
 
+func TestCodexArgs_HookSet(t *testing.T) {
+	t.Parallel()
+	args := harness.CodexArgs(harness.CodexArgsInput{})
+	want := `hooks.PreToolUse=[` +
+		`{matcher="Bash",hooks=[{type="command",command="gx agent guard-bash --harness codex"}]},` +
+		`{matcher="request_user_input",hooks=[{type="command",command="gx agent guard-question"}]}]`
+	i := slices.Index(args, want)
+	if i < 1 || args[i-1] != "-c" {
+		t.Errorf("args %q lack -c %s", args, want)
+	}
+	// The prompt belongs to a fresh Launch, never the shared args Resume reuses.
+	if strings.Contains(strings.Join(args, " "), "developer_instructions") {
+		t.Errorf("CodexArgs carries developer_instructions: %q", args)
+	}
+}
+
 func TestCodexArgs_RootsAreDeduped(t *testing.T) {
 	t.Parallel()
 	args := strings.Join(harness.CodexArgs(harness.CodexArgsInput{WritableRoots: []string{"/a/.git", "/a/.git", "/b"}}), " ")
@@ -87,8 +103,9 @@ func TestCodexHarness_LaunchAndResume(t *testing.T) {
 	}
 	opts := harness.LaunchOptions{SessionID: "ignored", Args: []string{"--model", "m"}}
 	launch := h.Launch(opts)
-	if launch.Name != "codex" || !slices.Equal(launch.Args, []string{"--model", "m"}) {
-		t.Errorf("Launch = %+v, want codex --model m with no session-id flag", launch)
+	wantPrompt := "developer_instructions=" + harness.TOMLString(harness.GXSystemPromptFor(harness.Codex))
+	if launch.Name != "codex" || !slices.Equal(launch.Args, []string{"--model", "m", "-c", wantPrompt}) {
+		t.Errorf("Launch = %+v, want codex --model m plus the developer_instructions flag, no session-id flag", launch)
 	}
 	if strings.Contains(strings.Join(launch.Args, " "), "ignored") {
 		t.Errorf("Launch passed the session id: %v", launch.Args)

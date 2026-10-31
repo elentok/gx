@@ -73,7 +73,12 @@ func withoutQuotedText(command string) string {
 // It blocks the ways agents edit files that bypass Edit's staleness check:
 // sed -i, heredocs redirected into a file, and interpreter heredoc scripts.
 func guardBashCommand(command string) string {
-	const hint = "Use the Edit or Write tool instead: it fails loudly on a stale read, a shell edit does not."
+	return guardBashReason(command, "the Edit or Write tool")
+}
+
+// guardBashReason is guardBashCommand with the harness's edit tool named in the hint.
+func guardBashReason(command, editTool string) string {
+	hint := "Use " + editTool + " instead: it fails loudly on a stale read, a shell edit does not."
 	switch {
 	case sedInPlace.MatchString(command):
 		return "sed -i edits files behind Edit's back. " + hint
@@ -86,7 +91,8 @@ func guardBashCommand(command string) string {
 }
 
 func newAgentGuardBashCmd() *cobra.Command {
-	return &cobra.Command{
+	var harnessName string
+	cmd := &cobra.Command{
 		Use:   "guard-bash",
 		Short: "PreToolUse hook: reject shell file edits (sed -i, heredoc writes) in ralph-loop agent sessions",
 		Args:  cobra.NoArgs,
@@ -94,6 +100,10 @@ func newAgentGuardBashCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(c *cobra.Command, _ []string) error {
+			editTool := "the Edit or Write tool"
+			if harnessName == agentCodex {
+				editTool = "apply_patch"
+			}
 			raw, err := io.ReadAll(c.InOrStdin())
 			if err != nil {
 				return err
@@ -107,11 +117,29 @@ func newAgentGuardBashCmd() *cobra.Command {
 			if json.Unmarshal(raw, &in) != nil {
 				return nil
 			}
-			reason := guardBashCommand(strings.TrimSpace(in.ToolInput.Command))
+			reason := guardBashReason(strings.TrimSpace(in.ToolInput.Command), editTool)
 			if reason == "" {
 				return nil
 			}
 			fmt.Fprintln(c.ErrOrStderr(), reason)
+			return &ExitError{Code: guardBashExitCode}
+		},
+	}
+	cmd.Flags().StringVar(&harnessName, "harness", agentClaude, `the harness running the hook: "claude" or "codex"`)
+	return cmd
+}
+
+// newAgentGuardQuestionCmd is the Codex PreToolUse hook for request_user_input.
+// A hook cannot tell Plan mode from any other, so it always blocks.
+func newAgentGuardQuestionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:           "guard-question",
+		Short:         "PreToolUse hook: reject Codex's request_user_input in favour of gx tickets ask",
+		Args:          cobra.NoArgs,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(c *cobra.Command, _ []string) error {
+			fmt.Fprintln(c.ErrOrStderr(), "Do not use request_user_input. To ask a person, run `gx tickets ask <addr> --body -` (a `## Question` and a `## Handoff` section on stdin), then end your turn.")
 			return &ExitError{Code: guardBashExitCode}
 		},
 	}

@@ -14,8 +14,30 @@ import (
 // until the Codex watch lands.
 type codexHarness struct{}
 
+// CodexQuestionTool is Codex's tool for asking a person, which gx blocks in
+// favour of `gx tickets ask`.
+const CodexQuestionTool = "request_user_input"
+
+// The hook commands are constants: Codex trusts a hook by its hash, so a
+// command that varies per launch would need a fresh review each time.
+const (
+	CodexGuardBashCommand     = "gx agent guard-bash --harness codex"
+	CodexGuardQuestionCommand = "gx agent guard-question"
+)
+
+// codexHooks is the -c value holding gx's PreToolUse hooks.
+func codexHooks() string {
+	group := func(matcher, command string) string {
+		return "{matcher=" + tomlString(matcher) + ",hooks=[{type=\"command\",command=" + tomlString(command) + "}]}"
+	}
+	return "hooks.PreToolUse=[" + group("Bash", CodexGuardBashCommand) + "," + group(CodexQuestionTool, CodexGuardQuestionCommand) + "]"
+}
+
+// Launch adds the GX system prompt, on a fresh session only: Resume must not
+// carry it again (an instruction survives a resume).
 func (codexHarness) Launch(opts LaunchOptions) Command {
-	return codexCommand(opts.Args, opts.Env)
+	args := append(slices.Clone(opts.Args), "-c", "developer_instructions="+tomlString(GXSystemPromptFor(Codex)))
+	return codexCommand(args, opts.Env)
 }
 
 // Resume takes no rollout check or --cd yet.
@@ -61,6 +83,7 @@ func CodexArgs(in CodexArgsInput) []string {
 		"-c", "sandbox_workspace_write.network_access=true",
 		"-c", "disable_paste_burst=true",
 		"--dangerously-bypass-hook-trust",
+		"-c", codexHooks(),
 	}
 	if roots := dedupe(in.WritableRoots); len(roots) > 0 {
 		args = append(args, "-c", "sandbox_workspace_write.writable_roots="+tomlStringArray(roots))
