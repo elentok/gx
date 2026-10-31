@@ -1405,6 +1405,17 @@ export interface TicketInfo extends HarnessLabel {
   epic_merge_target?: string;
 }
 /**
+ * MigrationFailure is a saved failed migration as the live state reports it.
+ */
+export interface MigrationFailure {
+  project: string;
+  error: string;
+  /**
+   * RetryCommand is the shell command that migrates the project again.
+   */
+  retry_command: string;
+}
+/**
  * Snapshot is the /v1/snapshot payload: tickets sorted by address (so each
  * epic's fork tree reads top-down via Parent) and the sequence number of the
  * index state they were read at.
@@ -1416,6 +1427,16 @@ export interface Snapshot {
    * server that predates it.
    */
   build?: string;
+  /**
+   * Instance is new on every server start; a restart is done when it changes.
+   * Filled in by the handler.
+   */
+  instance?: string;
+  /**
+   * MigrationFailures are the saved failed migrations; filled in by the
+   * handler, so a change to the record shows without a restart.
+   */
+  migration_failures?: MigrationFailure[];
   /**
    * HerdrUnavailable is set while herdr isn't answering and a ticket needs it;
    * the server's own view, filled in by the handler rather than the index.

@@ -78,6 +78,14 @@ type TicketInfo struct {
 	sum string
 }
 
+// MigrationFailure is a saved failed migration as the live state reports it.
+type MigrationFailure struct {
+	Project string `json:"project"`
+	Error   string `json:"error"`
+	// RetryCommand is the shell command that migrates the project again.
+	RetryCommand string `json:"retry_command"`
+}
+
 // Snapshot is the /v1/snapshot payload: tickets sorted by address (so each
 // epic's fork tree reads top-down via Parent) and the sequence number of the
 // index state they were read at.
@@ -86,6 +94,12 @@ type Snapshot struct {
 	// Build is the server's own version, filled in by the handler. Empty from a
 	// server that predates it.
 	Build string `json:"build,omitempty"`
+	// Instance is new on every server start; a restart is done when it changes.
+	// Filled in by the handler.
+	Instance string `json:"instance,omitempty"`
+	// MigrationFailures are the saved failed migrations; filled in by the
+	// handler, so a change to the record shows without a restart.
+	MigrationFailures []MigrationFailure `json:"migration_failures,omitempty"`
 	// HerdrUnavailable is set while herdr isn't answering and a ticket needs it;
 	// the server's own view, filled in by the handler rather than the index.
 	// HerdrText says which tickets wait.

@@ -705,6 +705,8 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	}
 	s.fillEpicMergeTargets(snap.Tickets)
 	snap.Build = s.cfg.Build
+	snap.Instance = s.instanceID
+	snap.MigrationFailures = s.MigrationFailures()
 	snap.Budget = s.budgetStatus(time.Now())
 	snap.ExtraUsage = s.extraUsageOn()
 	snap.Disks = s.listedDisks()
