@@ -1,10 +1,43 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { EditorState } from "@codemirror/state";
+import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap, placeholder as placeholderExt } from "@codemirror/view";
+import { getCM, vim, Vim } from "@replit/codemirror-vim";
 import { Box } from "@chakra-ui/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useImperativeHandle, useRef, type Ref } from "react";
 import type { Selection } from "./LargeEditor";
 import { fieldLook } from "./look";
+
+export type ViMode = "INSERT" | "NORMAL" | "VISUAL";
+
+/** What the host can ask of the editor. */
+export type CodeEditorHandle = {
+  /** Sends vi Escape and keeps focus in the editor. */
+  escape: () => void;
+};
+
+// The vim registry is module-level, so ZZ finds its editor's callback through the view it fires in.
+const closers = new WeakMap<object, () => void>();
+let mapped = false;
+
+function mapOnce() {
+  if (mapped) return;
+  mapped = true;
+  for (const ctx of ["normal", "visual"]) {
+    // Screen lines, not paragraphs.
+    Vim.map("j", "gj", ctx);
+    Vim.map("k", "gk", ctx);
+    Vim.map("gs", "0", ctx);
+    // Replaces vim's "end of previous word".
+    Vim.map("ge", "$", ctx);
+  }
+  Vim.defineAction("closeEditor", (cm: object) => closers.get(cm)?.());
+  Vim.mapCommand("ZZ", "action", "closeEditor", {}, { context: "normal" });
+}
+
+function modeOf(mode: string): ViMode {
+  if (mode === "visual") return "VISUAL";
+  return mode === "insert" || mode === "replace" ? "INSERT" : "NORMAL";
+}
 
 const theme = EditorView.theme({
   "&": { height: "100%", fontSize: fieldLook.fontSize, color: "inherit", backgroundColor: "transparent" },
@@ -37,6 +70,10 @@ export default function CodeEditor({
   placeholder,
   selection,
   onSelectionChange,
+  viMode,
+  onModeChange,
+  onZZ,
+  handle,
 }: {
   label: string;
   value: string;
@@ -45,12 +82,53 @@ export default function CodeEditor({
   /** The selection to open with. Read once. */
   selection: Selection;
   onSelectionChange: (selection: Selection) => void;
+  /** Vi keys on or off. Applies live. */
+  viMode: boolean;
+  /** The vi mode, on every change. Not called with vi mode off. */
+  onModeChange?: (mode: ViMode) => void;
+  /** ZZ in normal mode. */
+  onZZ?: () => void;
+  handle?: Ref<CodeEditorHandle>;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
-  const callbacks = useRef({ onChange, onSelectionChange });
-  callbacks.current = { onChange, onSelectionChange };
+  const callbacks = useRef({ onChange, onSelectionChange, onModeChange, onZZ });
+  callbacks.current = { onChange, onSelectionChange, onModeChange, onZZ };
   const external = useRef(false);
+  const viSlot = useRef(new Compartment());
+  const stopVi = useRef<(() => void) | null>(null);
+
+  // Turns the engine on: it starts in insert mode and reports every mode change.
+  const startVi = (v: EditorView) => {
+    mapOnce();
+    const cm = getCM(v);
+    if (!cm) return;
+    const onMode = (e: { mode: string }) => callbacks.current.onModeChange?.(modeOf(e.mode));
+    cm.on("vim-mode-change", onMode);
+    closers.set(cm, () => callbacks.current.onZZ?.());
+    // Entering insert mode with i collapses the selection; put it back.
+    const { anchor, head } = v.state.selection.main;
+    Vim.handleKey(cm, "i", "mapping");
+    v.dispatch({ selection: { anchor, head } });
+    callbacks.current.onModeChange?.("INSERT");
+    stopVi.current = () => {
+      cm.off("vim-mode-change", onMode);
+      closers.delete(cm);
+    };
+  };
+
+  useImperativeHandle(
+    handle,
+    () => ({
+      escape() {
+        const v = view.current;
+        const cm = v && getCM(v);
+        if (cm) Vim.handleKey(cm, "<Esc>", "user");
+        v?.focus();
+      },
+    }),
+    [],
+  );
 
   useEffect(() => {
     const clamp = (n: number) => Math.min(n, value.length);
@@ -60,6 +138,7 @@ export default function CodeEditor({
         doc: value,
         selection: { anchor: clamp(selection.start), head: clamp(selection.end) },
         extensions: [
+          viSlot.current.of(viMode ? vim() : []),
           history(),
           // No indentWithTab: Tab and Shift-Tab keep moving focus.
           keymap.of([...defaultKeymap, ...historyKeymap]),
@@ -67,6 +146,13 @@ export default function CodeEditor({
           placeholderExt(placeholder ?? ""),
           EditorView.contentAttributes.of({ "aria-label": label, "aria-multiline": "true" }),
           theme,
+          // A click or tap forgets the stored column, so the next j starts from the clicked spot.
+          EditorView.domEventHandlers({
+            pointerdown: (_e, v) => {
+              const vimState = getCM(v)?.state.vim;
+              if (vimState) vimState.lastMotion = null;
+            },
+          }),
           EditorView.updateListener.of((u) => {
             if (u.docChanged && !external.current) callbacks.current.onChange(u.state.doc.toString());
             if (u.selectionSet || u.docChanged) {
@@ -78,11 +164,32 @@ export default function CodeEditor({
       }),
     });
     view.current = v;
+    if (viMode) startVi(v);
     v.focus();
-    // The editor is created once; later props are applied by the effect below.
+    // The editor is created once; later props are applied by the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    return () => v.destroy();
+    return () => {
+      stopVi.current?.();
+      stopVi.current = null;
+      v.destroy();
+    };
   }, []);
+
+  const firstVi = useRef(true);
+  useEffect(() => {
+    // The first run is the creation above.
+    if (firstVi.current) {
+      firstVi.current = false;
+      return;
+    }
+    const v = view.current;
+    if (!v) return;
+    stopVi.current?.();
+    stopVi.current = null;
+    v.dispatch({ effects: viSlot.current.reconfigure(viMode ? vim() : []) });
+    if (viMode) startVi(v);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viMode]);
 
   useEffect(() => {
     const v = view.current;

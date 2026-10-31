@@ -1,5 +1,6 @@
 import { Box, Text } from "@chakra-ui/react";
 import { lazy, Suspense, useRef } from "react";
+import { useViMode } from "../../vimode";
 import { useCoarsePointer, useWide } from "../../useWide";
 import { Button } from "../button/Button";
 import { BottomSheet } from "../modal/BottomSheet";
@@ -28,6 +29,7 @@ export function LargeEditor({
   /** Called with the editor's selection when it closes. */
   onClose: (selection: Selection) => void;
 }) {
+  const viMode = useViMode();
   const wide = useWide();
   const coarse = useCoarsePointer();
   const current = useRef(selection);
@@ -70,6 +72,8 @@ export function LargeEditor({
           onSelectionChange={(s) => {
             current.current = s;
           }}
+          viMode={viMode}
+          onZZ={close}
         />
       </Suspense>
       {coarse ? (

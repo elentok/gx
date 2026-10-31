@@ -16,6 +16,7 @@
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.15",
     "@emotion/react": "^11.14.0",
+    "@replit/codemirror-vim": "^6.4.0",
     "qrcode-generator": "1.4.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
