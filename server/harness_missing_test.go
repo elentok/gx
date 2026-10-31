@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -67,6 +68,59 @@ func TestClaimHold_HarnessMissingHoldsTicket(t *testing.T) {
 			servertest.WaitFor(t, 10*time.Second, "ticket launches once installed", func() bool {
 				return len(pty.Prompts("epic-a-iter-01")) > 0
 			})
+		})
+	}
+}
+
+// A queued follows-default ticket waits with the reason when the default comes
+// from a project override, or from a config reload, and points at a missing
+// harness.
+func TestClaimHold_DefaultChangedToMissingHarnessHoldsTicket(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name     string
+		change   func(t *testing.T, h *servertest.Harness, path, store string)
+		wantFrom string
+	}{
+		{"project override", func(t *testing.T, h *servertest.Harness, _, _ string) {
+			setHarness(t, h, server.SetDefaultHarnessRequest{Scope: "project", Project: "proj", Harness: "codex"})
+		}, "the project default"},
+		{"reload", func(t *testing.T, h *servertest.Harness, path, store string) {
+			switchDefaultHarness(t, h, path, store, "codex")
+		}, "the global default"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			store, repo := t.TempDir(), testutil.TempRepo(t)
+			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "one", "")
+			servertest.SetProjectRepo(t, store, "proj", repo)
+			path := filepath.Join(t.TempDir(), "config.json")
+			servertest.WriteConfig(t, path, store, nil)
+			pty := namedFake{runnerfake.NewRunner(), "pty"}
+			h := servertest.StartWithStore(t, store, servertest.WithRunner(pty), servertest.WithConfigFile(path))
+			tc.change(t, h, path, store)
+			h.Programs.Missing("codex")
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", ""); err != nil || res.Refused {
+				t.Fatalf("add: %+v, %v", res, err)
+			}
+
+			var ex server.Explanation
+			var err error
+			servertest.WaitFor(t, 10*time.Second, "ticket held", func() bool {
+				ex, err = h.Client.Explain(ctx, "proj:epic-a/01")
+				return err == nil && ex.Verdict == server.VerdictHarnessMissing
+			})
+			for _, want := range []string{"codex is not on PATH", tc.wantFrom, "requeue with --agent <other>"} {
+				if !strings.Contains(ex.Reason, want) {
+					t.Errorf("reason = %q, want it to contain %q", ex.Reason, want)
+				}
+			}
+			if got := pty.Prompts("epic-a-iter-01"); len(got) != 0 {
+				t.Errorf("held ticket launched: %v", got)
+			}
 		})
 	}
 }

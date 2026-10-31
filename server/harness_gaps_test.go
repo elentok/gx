@@ -111,7 +111,7 @@ func TestHarnessMissing_EveryLaunchPathRefuses(t *testing.T) {
 			if !res.Refused || res.Reason != server.ReasonSessionHarnessMissing {
 				t.Fatalf("result = %+v, want a harness-missing refusal", res)
 			}
-			for _, want := range []string{"codex is not on PATH", tc.from} {
+			for _, want := range []string{"codex is not on PATH", tc.from, "Install it or change the default harness"} {
 				if !strings.Contains(res.Message, want) {
 					t.Errorf("message = %q, want it to contain %q", res.Message, want)
 				}
@@ -136,7 +136,7 @@ func TestHarnessMissing_RestoreRefuses(t *testing.T) {
 	if err != nil || !res.Refused || res.Reason != server.ReasonSessionHarnessMissing {
 		t.Fatalf("resume = %+v, %v; want a harness-missing refusal", res, err)
 	}
-	for _, want := range []string{"codex is not on PATH", "the session's harness"} {
+	for _, want := range []string{"codex is not on PATH", "the session's harness", "Install it or change the default harness"} {
 		if !strings.Contains(res.Message, want) {
 			t.Errorf("message = %q, want it to contain %q", res.Message, want)
 		}
