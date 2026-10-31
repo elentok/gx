@@ -245,6 +245,7 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 		Agents *struct {
 			Claude          *rawAgentConfig `json:"claude"`
 			Codex           *rawAgentConfig `json:"codex"`
+			DefaultHarness  *string         `json:"default-harness"`
 			LeaderKey       json.RawMessage `json:"leader-key"`
 			FocusSidebarKey json.RawMessage `json:"focus-sidebar-key"`
 			ResumeOnStart   *bool           `json:"restore-sessions-on-start"`
@@ -410,6 +411,12 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 		}
 		if raw.Agents.Codex != nil {
 			applyAgentConfig(&cfg.Agents.Codex, raw.Agents.Codex)
+		}
+		if h := raw.Agents.DefaultHarness; h != nil && *h != "" {
+			if err := validateDefaultHarness(*h); err != nil {
+				return cfg, err
+			}
+			cfg.Agents.DefaultHarness = *h
 		}
 		if keys, ok := parseKeys(raw.Agents.LeaderKey); ok {
 			cfg.Agents.LeaderKey = keys

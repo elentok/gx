@@ -42,9 +42,10 @@ func TestConfigReload_AgentsSessionKeysApply(t *testing.T) {
 		"sounds":                    map[string]any{"enabled": false, "done": "done.aiff"},
 		"claude-args":               []string{"--verbose"},
 		"fix-agent-remote-control":  true,
+		"default-harness":           "codex",
 	}})
 	res := reload(t, h)
-	want := []string{"agents.restore-sessions-on-start", "agents.banners.enabled", "agents.sounds", "agents.claude-args", "agents.fix-agent-remote-control"}
+	want := []string{"agents.restore-sessions-on-start", "agents.banners.enabled", "agents.sounds", "agents.claude-args", "agents.fix-agent-remote-control", "agents.default-harness"}
 	for _, key := range want {
 		if !slices.Contains(res.Changed, key) {
 			t.Errorf("reload = %+v, want %s changed", res, key)

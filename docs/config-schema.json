@@ -499,6 +499,12 @@
             "effort": "medium"
           }
         },
+        "default-harness": {
+          "type": "string",
+          "enum": ["claude", "codex"],
+          "description": "The harness new sessions use. The server will not start when its program is not on PATH (under agent-runner auto or pty). A project's project.json can override it. Default: claude.",
+          "default": "claude"
+        },
         "leader-key": {
           "description": "Key (or list of keys) that starts a leader sequence in the Agents tab. A malformed or blank value falls back to the default. Default: ctrl+a.",
           "oneOf": [

@@ -360,6 +360,7 @@ Optional config file at `~/.config/gx/config.json` (run `gx config edit` to open
 | `disk-space.cleanup-command` | array of strings (argv)       | `["go", "clean", "-cache"]` | The cleanup command, not a shell string. `[]` turns cleanup off. A project's `project.json` can replace it (`[]` turns it off for that project). |
 | `server.web.allowed-hosts` | array of strings | `[]` | Host names the web listener accepts besides IP literals and `localhost` (e.g. a MagicDNS name). Any other Host gets a 403. Reloads without a restart. |
 | `server.web.totp`          | boolean | `true` | Whether web login asks for an authenticator code besides the password. Reloads without a restart. |
+| `agents.default-harness` | `"claude"` \| `"codex"` | `"claude"` | The harness new sessions use. The server will not start when its program is not on PATH (under `agent-runner` `auto` or `pty`). A project's `project.json` can override it. Reloads without a restart. |
 | `log.important-refs`       | array                           | see below | Rules for highlighting important refs in the log view. Refs matching a rule get a bright colored badge and are sorted to the front; all others get a dim surface badge.                      |
 | `log.hide-refs`            | array of strings                | `[]`      | Regular expressions matched against full ref names. Matching refs are hidden from the log view entirely. Takes priority over `important-refs`.                                               |
 

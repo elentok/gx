@@ -80,6 +80,7 @@ func (c Config) WithProject(pf ProjectFile) Config {
 	if a := pf.Agents; a != nil {
 		c.Agents.Claude = overlayAgent(c.Agents.Claude, a.Claude)
 		c.Agents.Codex = overlayAgent(c.Agents.Codex, a.Codex)
+		c.Agents.DefaultHarness = firstNonEmpty(a.DefaultHarness, c.Agents.DefaultHarness)
 	}
 	if s := pf.Skills; s != nil {
 		c.Skills.Implement = firstNonEmpty(s.Implement, c.Skills.Implement)

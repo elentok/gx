@@ -2,6 +2,7 @@ package config
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -19,6 +20,20 @@ func TestParseAgentsSessionKeysDefaultWhenAbsent(t *testing.T) {
 	}
 	if a.Sounds.Done != "" || a.Sounds.Attention != "" || a.ClaudeArgs != nil {
 		t.Errorf("Sounds/ClaudeArgs = %+v/%v, want built-in sounds and no args", a.Sounds, a.ClaudeArgs)
+	}
+}
+
+func TestParseAgentsDefaultHarness(t *testing.T) {
+	cfg, err := Parse([]byte(`{}`))
+	if err != nil || cfg.Agents.DefaultHarness != "claude" {
+		t.Fatalf("unset = %q, %v; want claude", cfg.Agents.DefaultHarness, err)
+	}
+	cfg, err = Parse([]byte(`{"agents":{"default-harness":"codex"}}`))
+	if err != nil || cfg.Agents.DefaultHarness != "codex" {
+		t.Fatalf("codex = %q, %v", cfg.Agents.DefaultHarness, err)
+	}
+	if _, err := Parse([]byte(`{"agents":{"default-harness":"gemini"}}`)); err == nil || !strings.Contains(err.Error(), "agents.default-harness") {
+		t.Fatalf("bad value err = %v, want one naming the key", err)
 	}
 }
 

@@ -55,6 +55,7 @@ func TestParseErrors(t *testing.T) {
 	for name, tc := range map[string]struct{ data, want string }{
 		"malformed":   {`{"evolve":`, "parse"},
 		"bad evolve":  {`{"evolve":"sometimes"}`, "evolve must be"},
+		"bad harness": {`{"agents":{"default-harness":"x"}}`, "agents.default-harness must be"},
 		"wrong types": {`{"budget":{"soft-limit":"x"}}`, "parse"},
 	} {
 		t.Run(name, func(t *testing.T) {

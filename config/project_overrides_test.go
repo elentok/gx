@@ -141,6 +141,41 @@ func TestWithProject_TierOverlayMergesPerField(t *testing.T) {
 	}
 }
 
+func TestWithProject_DefaultHarnessProjectWins(t *testing.T) {
+	global := Config{Agents: DefaultAgentsConfig()}
+	pf, err := ReadProjectFile(writeProjectJSON(t, `{"agents": {"default-harness": "codex"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := global.WithProject(pf).Agents.DefaultHarness; got != "codex" {
+		t.Errorf("project default-harness = %q, want codex", got)
+	}
+	if global.Agents.DefaultHarness != "claude" {
+		t.Errorf("global copy changed to %q", global.Agents.DefaultHarness)
+	}
+	pf, err = ReadProjectFile(writeProjectJSON(t, `{"agents": {"claude": {"model": "m"}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := global.WithProject(pf).Agents.DefaultHarness; got != "claude" {
+		t.Errorf("unset project value = %q, want the global claude", got)
+	}
+}
+
+func TestValidateProjectFile_DefaultHarness(t *testing.T) {
+	pf, err := ReadProjectFile(writeProjectJSON(t, `{"agents": {"default-harness": "codex"}}`))
+	if err != nil || ValidateProjectFile(pf) != nil {
+		t.Fatalf("codex rejected: %v / %v", err, ValidateProjectFile(pf))
+	}
+	pf, err = ReadProjectFile(writeProjectJSON(t, `{"agents": {"default-harness": "gemini"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateProjectFile(pf); err == nil || !strings.Contains(err.Error(), "agents.default-harness") {
+		t.Errorf("bad value err = %v, want one naming the key", err)
+	}
+}
+
 func TestWithProject_OverridesOnlyThatCopy(t *testing.T) {
 	global := Config{
 		ExecutionQueue: DefaultExecutionQueueConfig(),

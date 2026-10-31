@@ -21,20 +21,29 @@ func TestPreflightAgentRunner(t *testing.T) {
 	tests := []struct {
 		name      string
 		setting   string
+		harness   string
 		probe     agentrunner.Probe
 		wantErr   string
 		wantLevel string
 	}{
-		{"bad value", "tmux", agentrunner.Probe{LookPath: found, PingHerdr: up}, `invalid agent-runner "tmux"`, "ERROR"},
-		{"explicit herdr down", "herdr", agentrunner.Probe{LookPath: found, PingHerdr: down}, "herdr is unavailable", "ERROR"},
-		{"headless without claude", "headless", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "needs claude on PATH", "ERROR"},
-		{"auto picks pty", "auto", agentrunner.Probe{LookPath: found, PingHerdr: up}, "", "INFO"},
-		{"auto without claude", "auto", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "agent-runner: herdr", "ERROR"},
+		{"bad value", "tmux", "", agentrunner.Probe{LookPath: found, PingHerdr: up}, `invalid agent-runner "tmux"`, "ERROR"},
+		{"explicit herdr down", "herdr", "", agentrunner.Probe{LookPath: found, PingHerdr: down}, "herdr is unavailable", "ERROR"},
+		{"headless without claude", "headless", "", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "claude is not on PATH", "ERROR"},
+		{"auto picks pty", "auto", "", agentrunner.Probe{LookPath: found, PingHerdr: up}, "", "INFO"},
+		{"auto without claude", "auto", "", agentrunner.Probe{LookPath: missing, PingHerdr: up}, "agent-runner: herdr", "ERROR"},
+		{"codex default without codex", "auto", "codex", agentrunner.Probe{LookPath: missing, PingHerdr: up},
+			`the default harness "codex" is not on PATH. Install codex or set the default to claude in ~/.config/gx/config.json.`, "ERROR"},
+		{"codex-only machine starts", "auto", "codex", agentrunner.Probe{LookPath: func(f string) (string, error) {
+			if f == "codex" {
+				return "/bin/codex", nil
+			}
+			return "", errors.New("not found")
+		}, PingHerdr: up}, "", "INFO"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logPath := filepath.Join(t.TempDir(), "state", "server.log")
-			_, err := preflightAgentRunner(tt.setting, tt.probe, logPath)
+			_, err := preflightAgentRunner(tt.setting, tt.harness, tt.probe, logPath)
 			if tt.wantErr == "" {
 				if err != nil {
 					t.Fatalf("err = %v, want nil", err)

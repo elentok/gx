@@ -194,6 +194,7 @@ func changedKeys(old, next Settings) []string {
 		{"agents.fix-agent-remote-control", old.AgentsFixAgentRemoteControl, next.AgentsFixAgentRemoteControl},
 		{"agents.claude", old.AgentsClaude, next.AgentsClaude},
 		{"agents.codex", old.AgentsCodex, next.AgentsCodex},
+		{"agents.default-harness", old.AgentsDefaultHarness, next.AgentsDefaultHarness},
 	}
 	var keys []string
 	for _, f := range fields {

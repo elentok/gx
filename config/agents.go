@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -43,6 +44,10 @@ type AgentsConfig struct {
 	Claude AgentConfig `json:"claude"`
 	Codex  AgentConfig `json:"codex"`
 
+	// DefaultHarness is the harness new sessions use: claude or codex. Empty
+	// means claude.
+	DefaultHarness string `json:"default-harness,omitempty"`
+
 	// LeaderKey lists the keys that start a leader sequence in the Agents tab.
 	// The file accepts one key string or a list.
 	LeaderKey []string `json:"leader-key"`
@@ -78,9 +83,25 @@ const DefaultLeaderKey = "ctrl+a"
 // configured.
 const DefaultFocusSidebarKey = "ctrl+q"
 
+// Harness names accepted by agents.default-harness.
+const (
+	HarnessClaude = "claude"
+	HarnessCodex  = "codex"
+)
+
+// validateDefaultHarness accepts "" (unset), claude and codex.
+func validateDefaultHarness(v string) error {
+	switch v {
+	case "", HarnessClaude, HarnessCodex:
+		return nil
+	}
+	return fmt.Errorf("agents.default-harness must be %s or %s, got %q", HarnessClaude, HarnessCodex, v)
+}
+
 // DefaultAgentsConfig returns the agents defaults.
 func DefaultAgentsConfig() AgentsConfig {
 	return AgentsConfig{
+		DefaultHarness: HarnessClaude,
 		Claude: AgentConfig{
 			Model: defaultClaudeModel, Effort: defaultClaudeEffort,
 			Light:     TierConfig{Model: defaultClaudeLightModel},

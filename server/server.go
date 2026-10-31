@@ -145,6 +145,8 @@ type Settings struct {
 	// agents.*, before a project's overrides.
 	AgentsClaude config.AgentConfig
 	AgentsCodex  config.AgentConfig
+	// AgentsDefaultHarness is config agents.default-harness; empty means claude.
+	AgentsDefaultHarness string
 
 	// WebAllowedHosts is config server.web.allowed-hosts: names, besides IP
 	// literals and localhost, that the web listener accepts in Host.
@@ -205,6 +207,7 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		RecentlyFinished:            cfg.Server.RecentlyFinished,
 		AgentsClaude:                cfg.Agents.Claude,
 		AgentsCodex:                 cfg.Agents.Codex,
+		AgentsDefaultHarness:        cfg.Agents.DefaultHarness,
 		WebAllowedHosts:             cfg.Server.Web.AllowedHosts,
 		WebTOTPOff:                  !cfg.Server.Web.TOTP,
 	}

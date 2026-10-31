@@ -137,5 +137,10 @@ func ValidateProjectFile(pf ProjectFile) error {
 	if pf.Landing != nil && *pf.Landing != "" && *pf.Landing != LandingOnLanded && *pf.Landing != LandingOnDone {
 		return fmt.Errorf("landing: %q is not allowed (want %q or %q)", *pf.Landing, LandingOnLanded, LandingOnDone)
 	}
+	if pf.Agents != nil {
+		if err := validateDefaultHarness(pf.Agents.DefaultHarness); err != nil {
+			return err
+		}
+	}
 	return nil
 }

@@ -77,7 +77,7 @@ func (s *Server) evolveDirs(ticket tickets.Address) []string {
 // top.
 func (s *Server) agentsConfig(project string) config.AgentsConfig {
 	set := s.settings.Load()
-	cfg := config.Config{Agents: config.AgentsConfig{Claude: set.AgentsClaude, Codex: set.AgentsCodex}}
+	cfg := config.Config{Agents: config.AgentsConfig{Claude: set.AgentsClaude, Codex: set.AgentsCodex, DefaultHarness: set.AgentsDefaultHarness}}
 	if dir, err := s.projectDir(project); err == nil {
 		if pf, err := config.ReadProjectFile(dir); err == nil {
 			cfg = cfg.WithProject(pf)

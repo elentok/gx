@@ -153,7 +153,7 @@ func runServer(ctx context.Context, d deps) error {
 	if err != nil {
 		return err
 	}
-	choice, err := preflightAgentRunner(cfg.AgentRunner, liveProbe, server.LogPath(stateDir))
+	choice, err := preflightAgentRunner(cfg.AgentRunner, cfg.Agents.DefaultHarness, liveProbe, server.LogPath(stateDir))
 	if err != nil {
 		return err
 	}
