@@ -106,33 +106,43 @@ func clearMigrationFailure(dirs config.Dirs, projectDir string) error {
 // tracker root, so each step reads the previous step's output and the real
 // files are never written. Any failure is returned with the real paths in it.
 func runTicketsMigrateDry(dirs config.Dirs, scratchRoot string, w io.Writer) error {
-	tmp, err := os.MkdirTemp("", "gx-migrate-dry-")
+	changes, err := dryRunChanges(dirs, scratchRoot)
 	if err != nil {
 		return err
-	}
-	defer os.RemoveAll(tmp)
-	work := filepath.Join(tmp, filepath.Base(scratchRoot))
-	if err := copyTracker(scratchRoot, work); err != nil {
-		return err
-	}
-	// The creation step reads the store's git history by path under the store root.
-	if _, err := os.Stat(filepath.Join(filepath.Dir(scratchRoot), ".git")); err == nil {
-		if err := os.Symlink(filepath.Join(filepath.Dir(scratchRoot), ".git"), filepath.Join(tmp, ".git")); err != nil {
-			return err
-		}
-	}
-
-	changes, _, err := migrateTracker(dirs, work, scratchRoot, true)
-	if err != nil {
-		return errors.New(strings.ReplaceAll(err.Error(), work, scratchRoot))
-	}
-	for i := range changes {
-		changes[i].Path = scratchRoot + strings.TrimPrefix(changes[i].Path, work)
 	}
 	fmt.Fprintln(w, "dry run: every migration step run on a copy, nothing written")
 	printChanges(w, changes)
 	fmt.Fprintf(w, "%d file(s) would change\n", len(changes))
 	return nil
+}
+
+// dryRunChanges runs the migration chain on a scratch copy of scratchRoot and
+// returns the files it would change, with real paths.
+func dryRunChanges(dirs config.Dirs, scratchRoot string) ([]tickets.MigrationChange, error) {
+	tmp, err := os.MkdirTemp("", "gx-migrate-dry-")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmp)
+	work := filepath.Join(tmp, filepath.Base(scratchRoot))
+	if err := copyTracker(scratchRoot, work); err != nil {
+		return nil, err
+	}
+	// The creation step reads the store's git history by path under the store root.
+	if _, err := os.Stat(filepath.Join(filepath.Dir(scratchRoot), ".git")); err == nil {
+		if err := os.Symlink(filepath.Join(filepath.Dir(scratchRoot), ".git"), filepath.Join(tmp, ".git")); err != nil {
+			return nil, err
+		}
+	}
+
+	changes, _, err := migrateTracker(dirs, work, scratchRoot, true)
+	if err != nil {
+		return nil, errors.New(strings.ReplaceAll(err.Error(), work, scratchRoot))
+	}
+	for i := range changes {
+		changes[i].Path = scratchRoot + strings.TrimPrefix(changes[i].Path, work)
+	}
+	return changes, nil
 }
 
 // copyTracker copies the regular files under src into dst, keeping modes and

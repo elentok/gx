@@ -261,6 +261,7 @@ Run without a command to open the status UI.`,
 		newCheckCmd(d),
 		newDoctorCmd(d),
 		newVersionCmd(d),
+		newRestartCheckCmd(d),
 	)
 
 	root.AddGroup(
