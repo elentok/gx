@@ -1,4 +1,4 @@
-import { Box, Text } from "@chakra-ui/react";
+import { Box, Menu, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router";
 import { AgentSidebar } from "../agents/AgentSidebar";
@@ -369,6 +369,26 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "menu closed", node: <TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} /> },
       { label: "menu open, AFK off", node: <OpenMenu><TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} /></OpenMenu> },
       { label: "menu open, AFK on", node: <OpenMenu><TopBar active="epics" build="v1.2.3" connected afk onToggleAfk={() => {}} /></OpenMenu> },
+      {
+        label: "menu open, with block",
+        node: (
+          <OpenMenu>
+            <TopBar
+              active="epics"
+              build="v1.2.3"
+              connected
+              onToggleAfk={() => {}}
+              menuBlock={
+                <>
+                  <Menu.Separator />
+                  <Text px="3" py="1.5" fontSize="xs" color="text.muted">Placeholder block</Text>
+                  <Menu.Separator />
+                </>
+              }
+            />
+          </OpenMenu>
+        ),
+      },
       { label: "no build string", node: <TopBar active="epics" connected /> },
     ],
   },

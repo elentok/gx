@@ -1,5 +1,5 @@
 import { Box, Button, chakra, Image, Menu, Text } from "@chakra-ui/react";
-import { useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import type { Health } from "../../generated/server";
 import { AGENTS_HREF, SETTINGS_HREF, STATS_HREF } from "../../hrefs";
 import type { QueueMode } from "../../snapshot";
@@ -33,10 +33,12 @@ interface Props {
   health?: Health;
   // The toggle shows only when the page can switch AFK mode.
   onToggleAfk?: () => void;
+  /** Sits between the AFK item and the build line. It draws its own two separators, so an empty block adds none. */
+  menuBlock?: ReactNode;
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk, menuBlock }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
   const nav = useRef<HTMLElement>(null);
   // Sheets that sit below the bar read its real height from the root.
@@ -113,7 +115,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
             </Button>
           </Menu.Trigger>
           <Menu.Positioner>
-            <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40">
+            <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40" {...(menuBlock ? { w: "280px", maxW: "calc(100vw - 2rem)" } : {})}>
               <Menu.Item value="settings" asChild cursor="pointer" color="text" ps="3" _highlighted={{ bg: "surface" }}>
                 <a href={SETTINGS_HREF}>Settings</a>
               </Menu.Item>
@@ -132,6 +134,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
                   <AfkSwitch on={afk} tone={tone} />
                 </Menu.CheckboxItem>
               )}
+              {menuBlock}
               {build && (
                 <Text px="3" py="1.5" fontSize="xs" color="text.muted" data-testid="server-build">
                   {build}

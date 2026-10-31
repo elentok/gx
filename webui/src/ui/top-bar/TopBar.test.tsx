@@ -1,4 +1,5 @@
 import { fireEvent, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderThemed } from "../render";
 import { TopBar } from "./TopBar";
@@ -62,6 +63,44 @@ describe("TopBar", () => {
     expect(build.textContent).toBe("v1.2.3");
     expect(build.closest("[role=menu]")).not.toBeNull();
     expect(build.getAttribute("role")).toBeNull();
+  });
+
+  it("renders the menu block between the AFK item and the build line, 280px wide", async () => {
+    const { getByRole, findByTestId, findByRole } = renderThemed(
+      <TopBar active="epics" build="v1.2.3" connected onToggleAfk={() => {}} menuBlock={<div data-testid="block" />} />,
+    );
+    fireEvent.click(getByRole("button", { name: "Menu" }));
+    const block = await findByTestId("block");
+    const settings = await findByRole("menuitem", { name: "Settings" });
+    const afk = await findByRole("menuitemcheckbox", { name: "AFK" });
+    const build = await findByTestId("server-build");
+    const before = (a: Node, b: Node) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(before(settings, afk)).toBe(true);
+    expect(before(afk, block)).toBe(true);
+    expect(before(block, build)).toBe(true);
+    expect(block.closest("[role=menu]")?.querySelector("[role=separator]")).toBeNull();
+    expect(getComputedStyle(block.closest("[role=menu]")!).width).toBe("280px");
+  });
+
+  it("adds nothing to the menu without a block and does not mount the block while closed", async () => {
+    let mounts = 0;
+    function Counter() {
+      useEffect(() => {
+        mounts++;
+      }, []);
+      return <div data-testid="block" />;
+    }
+    const { getByRole, findByTestId, queryByTestId, unmount } = renderThemed(<TopBar connected menuBlock={<Counter />} />);
+    expect(mounts).toBe(0);
+    expect(queryByTestId("block")).toBeNull();
+    fireEvent.click(getByRole("button", { name: "Menu" }));
+    await findByTestId("block");
+    expect(mounts).toBe(1);
+    unmount();
+    const plain = renderThemed(<TopBar connected />);
+    fireEvent.click(plain.getByRole("button", { name: "Menu" }));
+    const menu = (await plain.findByRole("menuitem", { name: "Settings" })).closest("[role=menu]")!;
+    expect(menu.children.length).toBe(1);
   });
 
   it("marks no tab without an active one", () => {
