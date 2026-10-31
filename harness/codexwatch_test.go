@@ -245,3 +245,20 @@ func TestCodexWatcher_PlainTurnStream(t *testing.T) {
 		t.Fatalf("states = %v, want %v", got, want)
 	}
 }
+
+func TestCodexWatcher_CountsEveryWorkingReportAsATurn(t *testing.T) {
+	t.Parallel()
+	w := watchCodex(t, "", nil)
+	tw, ok := w.(harness.TurnWatcher)
+	if !ok {
+		t.Fatal("codex watcher is no TurnWatcher")
+	}
+	// A second working report with no change of state is a prompt sent to a
+	// Background agent.
+	for _, state := range []string{"idle", "working", "working", "idle", "working"} {
+		w.Program(osc(state, "", ""))
+	}
+	if got := tw.Turns(); got != 3 {
+		t.Errorf("Turns = %d, want 3", got)
+	}
+}

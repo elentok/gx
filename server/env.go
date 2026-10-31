@@ -4,6 +4,7 @@ import (
 	"errors"
 	"path/filepath"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
@@ -82,3 +83,24 @@ func (s *Server) mergeLockDir(epicPath string) (string, error) {
 // typing is the typing rules for the claude sessions this server runs, reading
 // claude's config from Config.Env.
 func (s *Server) typing() harness.Typing { return harness.ClaudeTypingIn(s.cfg.Env) }
+
+// sessionTyping is the typing rules of the session in dir, claude's when its
+// meta can't be read.
+func (s *Server) sessionTyping(dir string) harness.Typing {
+	meta, err := readSessionMeta(dir)
+	if err != nil {
+		return s.typing()
+	}
+	return s.typingFor(meta.Harness)
+}
+
+// typingFor is the typing rules of a session's harness kind; an empty or
+// unknown kind types as claude.
+func (s *Server) typingFor(kind string) harness.Typing {
+	if kind != "" && kind != string(harness.Claude) {
+		if t, err := harness.LookupTyping(agentrunner.Kind(kind)); err == nil {
+			return t
+		}
+	}
+	return s.typing()
+}

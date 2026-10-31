@@ -40,7 +40,7 @@ func (s *Server) nudgePrompt(dir, text string) error {
 	run.personTyped = false
 	caps := claudeui.DefaultNudgeCaps
 	caps.Grace = cmp.Or(s.cfg.PromptGrace, caps.Grace)
-	p := &runPrompter{holderPrompter: holderPrompter{c: run.holder, typing: run.s.typing()}, run: run}
+	p := &runPrompter{holderPrompter: holderPrompter{c: run.holder, typing: s.sessionTyping(dir)}, run: run}
 	report := func(d claudeui.NudgeDecision) {
 		s.log.Info("send nudge", "session", filepath.Base(dir), "decision", string(d))
 	}

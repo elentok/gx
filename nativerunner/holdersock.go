@@ -234,7 +234,11 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		}
 		if h.pid == nil {
 			cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID(), h.name.get(), h.watcher.Ready())
-			return holderResponse{Watched: &cur}, nil
+			turn := 0
+			if tw, ok := h.watcher.(harness.TurnWatcher); ok {
+				turn = tw.Turns()
+			}
+			return holderResponse{Watched: &cur, Turn: turn}, nil
 		}
 		claude, turn := h.pid.PidState()
 		message, limited := h.pid.RateLimitMessage()

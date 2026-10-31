@@ -29,6 +29,9 @@ type codexWatcher struct {
 	title                string
 	haveTitle            bool
 	idleSeen             bool
+	// turns counts working reports, so a task that starts while a background
+	// terminal already holds the state at working still counts.
+	turns int
 }
 
 func newCodexWatcher(sessionFile string, startup func() bool) *codexWatcher {
@@ -96,7 +99,17 @@ func (w *codexWatcher) Program(r ProgramReport) {
 	default:
 		return
 	}
+	if r.State == "working" {
+		w.turns++
+	}
 	w.state, w.kind, w.message = r.State, r.Kind, r.Message
+}
+
+// Turns is the number of working reports seen.
+func (w *codexWatcher) Turns() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.turns
 }
 
 func (w *codexWatcher) Title(title string) {
@@ -123,7 +136,10 @@ func (w *codexWatcher) Ready() ReadySignal {
 	return ""
 }
 
-var _ TitleWatcher = (*codexWatcher)(nil)
+var (
+	_ TitleWatcher = (*codexWatcher)(nil)
+	_ TurnWatcher  = (*codexWatcher)(nil)
+)
 
 // spinnerPrefix reports whether title starts with a spinner glyph.
 func spinnerPrefix(title string) bool {

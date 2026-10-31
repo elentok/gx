@@ -249,7 +249,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 	}
 	// Before the draft clear: vim NORMAL has to reach INSERT first. The nudge
 	// runs the same step again, which presses nothing once in INSERT.
-	if !f.s.typing().ReadyToType(nativerunner.HolderTypingIO(c)) {
+	if !f.typing().ReadyToType(nativerunner.HolderTypingIO(c)) {
 		return claudeui.ErrNotReadyToType
 	}
 	if err := f.s.clearDraft(f.dir, c); err != nil {
@@ -323,27 +323,41 @@ func (p *holderPrompter) Submit(text string) error {
 	if err := p.cancelled(); err != nil {
 		return err
 	}
-	if err := p.c.TypeText(text); err != nil {
+	if err := p.c.TypeTextBy(text, p.typing.PastesText(text)); err != nil {
 		return err
 	}
 	if p.onTyped != nil {
 		p.onTyped()
 	}
-	return p.c.SendKeys("\r")
+	return p.submitKey()
+}
+
+// submitKey presses the harness submit key. Codex queues text with Tab while a
+// turn runs; a background terminal alone is no turn.
+func (p *holderPrompter) submitKey() error {
+	working := false
+	w, err := p.c.Watched()
+	if err != nil {
+		return err
+	}
+	if w != nil {
+		working = w.Status.State == harness.Working && !w.Status.Background
+	}
+	return p.c.SendKeys(p.typing.SubmitKey(working))
 }
 
 func (p *holderPrompter) Clear() error {
 	if err := p.cancelled(); err != nil {
 		return err
 	}
-	return p.c.SendKeys(sessionTyping.ClearKey())
+	return p.c.SendKeys(p.typing.ClearKey())
 }
 
 func (p *holderPrompter) SendEnter() error {
 	if err := p.cancelled(); err != nil {
 		return err
 	}
-	return p.c.SendKeys("\r")
+	return p.submitKey()
 }
 
 // firstPrompter is the first prompt's Prompter. A turn has started once the
@@ -354,8 +368,13 @@ type firstPrompter struct {
 	turn int
 }
 
+// typing is the typing rules of the session's harness.
+func (f *firstPrompt) typing() harness.Typing {
+	return f.s.sessionTyping(f.dir)
+}
+
 func (f *firstPrompt) prompter(c *nativerunner.HolderClient, turn int) *firstPrompter {
-	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.s.typing(), cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
+	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
 }
 
 func (p *firstPrompter) WaitStart(timeout time.Duration) (bool, error) {

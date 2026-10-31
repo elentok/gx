@@ -833,9 +833,14 @@ func (p *Pty) Interrupt(s agentrunner.Session) error {
 	if err != nil {
 		return err
 	}
-	claude, _, program, err := ss.holder.statusWithProgram()
+	resp, err := ss.holder.statusReply()
 	if err != nil {
 		return p.died(ss, err)
+	}
+	claude, program := resp.Claude, resp.Program
+	w := resp.watched()
+	if w != nil {
+		program = watchedProgram(w.Status)
 	}
 	var key string
 	switch {
@@ -852,16 +857,36 @@ func (p *Pty) Interrupt(s agentrunner.Session) error {
 	if err := p.awaitIdle(ss); err != nil {
 		return err
 	}
+	if w != nil {
+		// A second Ctrl+C would quit Codex.
+		return nil
+	}
 	return p.died(ss, ss.holder.SendKeys("\x03"))
+}
+
+// watchedProgram maps a watched harness's status to the OSC state names the
+// pid-file paths use: a background terminal alone is idle.
+func watchedProgram(st harness.Status) string {
+	switch {
+	case st.State == harness.Blocked:
+		return "blocked"
+	case st.State == harness.Working && !st.Background:
+		return "working"
+	}
+	return "idle"
 }
 
 // awaitIdle waits up to N for claude to be neither busy nor blocked.
 func (p *Pty) awaitIdle(ss *ptySession) error {
 	deadline := time.Now().Add(p.WaitN())
 	for {
-		claude, _, program, err := ss.holder.statusWithProgram()
+		resp, err := ss.holder.statusReply()
 		if err != nil {
 			return p.died(ss, err)
+		}
+		claude, program := resp.Claude, resp.Program
+		if w := resp.watched(); w != nil {
+			program = watchedProgram(w.Status)
 		}
 		busy := program == "working" || program == "blocked" ||
 			(program == "" && claude != nil && (claude.Status == ClaudeBusy || claude.Status == ClaudeWaiting))

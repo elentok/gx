@@ -224,6 +224,9 @@ type codexFake struct {
 	turns   int
 	working bool
 	prompt  string
+	// background is a background terminal still running; input is the key layer.
+	background bool
+	input      codexInput
 }
 
 // openRollout finds the session's rollout under home, or creates it with its
@@ -311,6 +314,8 @@ func (c *codexFake) report(state string) { writeAppReport(c.out, codexAppName, s
 func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 	events := tuiEvents(in, ctl)
 	c.setTitle(c.title)
+	// Codex turns bracketed paste on, so a paste keeps its newlines.
+	fmt.Fprint(c.out, "\x1b[?2004h")
 	if err := c.sessionStart(); err != nil {
 		return 0, err
 	}
@@ -345,12 +350,8 @@ func (c *codexFake) run(in io.Reader, ctl io.Reader) (int, error) {
 				return 0, err
 			}
 		default:
-			text, submitted := c.box.key(ev.key)
-			// Real Codex queues a prompt typed mid-turn; the fake drops it.
-			if submitted && text != "" && !c.working {
-				if err := c.submit(text); err != nil {
-					return 0, err
-				}
+			if err := c.key(ev.key); err != nil {
+				return 0, err
 			}
 		}
 	}
@@ -427,11 +428,15 @@ func (c *codexFake) finishTurn() error {
 	if err := c.stopHooks(); err != nil {
 		return err
 	}
+	if c.background {
+		c.showResting()
+		return c.runQueued()
+	}
 	c.setTitle(c.title)
 	c.report("done")
 	c.setTitle(c.prompt + " | " + c.title)
 	c.report("idle")
-	return nil
+	return c.runQueued()
 }
 
 func (c *codexFake) control(ctl Control) error {
@@ -442,6 +447,10 @@ func (c *codexFake) control(ctl Control) error {
 		writeAppReport(c.out, codexAppName, ctl.State, ctl.Kind, ctl.Message)
 	case ActionTitle:
 		c.setTitle(ctl.Title)
+	case ActionBackground:
+		c.backgroundControl(ctl.Running)
+	case actionInterrupt:
+		return c.interrupt()
 	case ActionToolCall:
 		return c.toolCall(ctl.Tool, ctl.Command)
 	case ActionPermission:

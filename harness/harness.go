@@ -85,6 +85,13 @@ type TitleWatcher interface {
 	Title(title string)
 }
 
+// TurnWatcher is a Watcher with no pid status file that counts task starts,
+// for a prompt to see its task begin.
+type TurnWatcher interface {
+	Watcher
+	Turns() int
+}
+
 // PidStatusWatcher is a Watcher that follows a claude-style pid status file
 // and can freeze it. A host checks Watch's result for it: only such a watcher
 // backs the frozen status and deny-reason ops.
