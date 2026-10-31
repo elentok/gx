@@ -23,10 +23,15 @@ type eventThrottle struct {
 	stopped bool
 }
 
-func newEventThrottle(interval time.Duration, fire func()) *eventThrottle {
-	if interval <= 0 {
-		interval = DefaultLimitsEventInterval
+// limitsEventInterval is the limits-changed window, defaulted when unset.
+func limitsEventInterval(cfg Config) time.Duration {
+	if cfg.LimitsEventInterval <= 0 {
+		return DefaultLimitsEventInterval
 	}
+	return cfg.LimitsEventInterval
+}
+
+func newEventThrottle(interval time.Duration, fire func()) *eventThrottle {
 	return &eventThrottle{interval: interval, fire: fire}
 }
 

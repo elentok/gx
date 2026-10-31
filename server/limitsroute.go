@@ -44,8 +44,11 @@ func (s *Server) limitsReportWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	for name, win := range map[string]*LimitWindow{"five_hour": req.FiveHour, "seven_day": req.SevenDay} {
-		if err := validLimitWindow(name, win); err != nil {
+	for _, c := range []struct {
+		name string
+		win  *LimitWindow
+	}{{"five_hour", req.FiveHour}, {"seven_day", req.SevenDay}} {
+		if err := validLimitWindow(c.name, c.win); err != nil {
 			writeJSON(w, LimitsReportResult{Refused: true, Reason: ReasonInvalidReport, Message: err.Error()})
 			return
 		}

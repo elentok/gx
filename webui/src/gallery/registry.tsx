@@ -446,7 +446,7 @@ export const galleryEntries: GalleryEntry[] = [
               menuBlock={
                 <>
                   <Menu.Separator />
-                  <SpendBlock summary={{ mode: UsageModeSpending, limits: {}, spend }} now={limitsNow} />
+                  <SpendBlock summary={{ mode: UsageModeSpending, limits: {}, spend }} />
                   <Menu.Separator />
                 </>
               }

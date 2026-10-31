@@ -136,4 +136,29 @@ describe("UsageMenuBlock", () => {
     expect(screen.getByText("gx spend (est.)")).toBeTruthy();
     expect(screen.queryByText("Claude limits")).toBeNull();
   });
+
+  function shownCalls(fetcher: FetchSummary) {
+    const calls: boolean[] = [];
+    renderThemed(
+      <TopBar connected menuBlock={<UsageMenuBlock conn={fakeConn().conn} fetcher={fetcher} onShownChange={(s) => calls.push(s)} />} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
+    return calls;
+  }
+
+  it("reports shown once a block renders", async () => {
+    const calls = shownCalls(async () => summary(UsageModeLimits));
+    await screen.findByText("Claude limits");
+    expect(calls[0]).toBe(false);
+    expect(calls.at(-1)).toBe(true);
+  });
+
+  it("never reports shown when the fetch fails", async () => {
+    const calls = shownCalls(async () => {
+      throw new Error("down");
+    });
+    await act(async () => {});
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((s) => !s)).toBe(true);
+  });
 });

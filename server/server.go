@@ -503,7 +503,7 @@ func New(cfg Config) (*Server, error) {
 		ledger:       ledger,
 		usage:        openUsageSamples(cfg.StateDir),
 		limits:       openLimitsStore(cfg.StateDir),
-		limitsEvents: newEventThrottle(cfg.LimitsEventInterval, func() { events.publish(EventLimitsChanged, "") }),
+		limitsEvents: newEventThrottle(limitsEventInterval(cfg), func() { events.publish(EventLimitsChanged, "") }),
 		budgetEvents: newBudgetEvents(cfg.BudgetEventInterval, func() { events.publish(EventBudgetChanged, "") }),
 		usageCodex:   openUsageFiles(cfg.StateDir, usageSampleFileCodex, usageLiftFileCodex),
 		costOf:       iterationCostIn(cfg.Env),

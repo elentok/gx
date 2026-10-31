@@ -7,7 +7,7 @@ import { SpendBlock, spendCaveat } from "./SpendBlock";
 
 const show = (spend: UsageSpend) =>
   renderThemed(
-    <SpendBlock summary={{ mode: UsageModeSpending, limits: {}, spend } as UsageSummary} now={0} />,
+    <SpendBlock summary={{ mode: UsageModeSpending, limits: {}, spend } as UsageSummary} />,
   );
 
 const normal: UsageSpend = { today: 4.82, since_sunday: 21.5, since_first: 96.1, first_day: "2026-09-01" };

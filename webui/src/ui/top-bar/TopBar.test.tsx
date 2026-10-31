@@ -82,6 +82,15 @@ describe("TopBar", () => {
     expect(getComputedStyle(block.closest("[role=menu]")!).width).toBe("280px");
   });
 
+  it("keeps the menu narrow when the block renders nothing", async () => {
+    const { getByRole, findByRole } = renderThemed(
+      <TopBar connected build="v1" onToggleAfk={() => {}} menuBlock={null} menuBlockShown={false} />,
+    );
+    fireEvent.click(getByRole("button", { name: "Menu" }));
+    const menu = (await findByRole("menuitem", { name: "Settings" })).closest("[role=menu]")!;
+    expect(getComputedStyle(menu).width).not.toBe("280px");
+  });
+
   it("adds nothing to the menu without a block and does not mount the block while closed", async () => {
     let mounts = 0;
     function Counter() {

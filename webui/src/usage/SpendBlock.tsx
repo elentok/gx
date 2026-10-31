@@ -24,7 +24,7 @@ function SpendRow({ name, amount, note }: { name: string; amount: number; note?:
   );
 }
 
-export function SpendBlock({ summary }: { summary: UsageSummary; now: number }) {
+export function SpendBlock({ summary }: { summary: UsageSummary }) {
   const { today, since_sunday, since_sunday_short, since_first, since_first_short, first_day } = summary.spend;
   const note = (short?: boolean) => (short && first_day ? sinceLabel(first_day) : undefined);
   return (

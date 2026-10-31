@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/server"
@@ -84,6 +85,16 @@ func TestLimitsReport_ReportAfterStartIsStored(t *testing.T) {
 	sendLimits(t, h, server.LimitsReport{SevenDay: limitWin(7, 4_000_000_000)})
 	if got := sendLimits(t, h, server.LimitsReport{}); got.SevenDay == nil || got.SevenDay.UsedPercentage != 7 {
 		t.Errorf("stored = %+v, want the seven_day report", got)
+	}
+}
+
+func TestLimitsReport_BothInvalidNamesFiveHour(t *testing.T) {
+	h := limitsHarness(t)
+	for range 20 {
+		res := sendLimits(t, h, server.LimitsReport{FiveHour: limitWin(101, 4_000_000_000), SevenDay: limitWin(-1, 4_000_000_000)})
+		if !res.Refused || !strings.HasPrefix(res.Message, "five_hour") {
+			t.Fatalf("res = %+v, want a five_hour refusal", res)
+		}
 	}
 }
 

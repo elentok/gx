@@ -35,10 +35,12 @@ interface Props {
   onToggleAfk?: () => void;
   /** Sits between the AFK item and the build line. It draws its own two separators, so an empty block adds none. */
   menuBlock?: ReactNode;
+  // Whether menuBlock renders anything; the menu is wide only then. Defaults to whether menuBlock is set.
+  menuBlockShown?: boolean;
 }
 
 // Plain anchors, not router links, so the gallery can render it without a router.
-export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk, menuBlock }: Props) {
+export function TopBar({ active, tone = "running", build, mode, connected, waiting = 0, actionable = 0, afk = false, health, onToggleAfk, menuBlock, menuBlockShown }: Props) {
   const queueChip = mode === "paused" ? "Paused" : null;
   const nav = useRef<HTMLElement>(null);
   // Sheets that sit below the bar read its real height from the root.
@@ -115,7 +117,7 @@ export function TopBar({ active, tone = "running", build, mode, connected, waiti
             </Button>
           </Menu.Trigger>
           <Menu.Positioner>
-            <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40" {...(menuBlock ? { w: "280px", maxW: "calc(100vw - 2rem)" } : {})}>
+            <Menu.Content bg="surface.raised" borderWidth="1px" borderColor="border" minW="40" {...((menuBlockShown ?? !!menuBlock) ? { w: "280px", maxW: "calc(100vw - 2rem)" } : {})}>
               <Menu.Item value="settings" asChild cursor="pointer" color="text" ps="3" _highlighted={{ bg: "surface" }}>
                 <a href={SETTINGS_HREF}>Settings</a>
               </Menu.Item>
