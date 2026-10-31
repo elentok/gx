@@ -49,6 +49,10 @@ export interface Fixture {
   cli(...args: string[]): Promise<string>;
   /** Like `cli`, with extra environment variables. */
   cliEnv(extra: Record<string, string>, ...args: string[]): Promise<string>;
+  /** Like `cli`, with `input` written to the command's stdin. */
+  cliInput(input: string, ...args: string[]): Promise<string>;
+  /** Like `cliEnv`, with `input` written to the command's stdin. */
+  cliEnvInput(extra: Record<string, string>, input: string, ...args: string[]): Promise<string>;
   /** Lets the workers frozen by `start(scenario, { hold: true })` finish. */
   release(): Promise<void>;
   /** Sets the free space the server reads from the fake disk, a size string such as `15G`. */
@@ -97,6 +101,20 @@ async function writeControl(dir: string, name: string, value: string): Promise<v
   await rename(tmp, join(dir, name));
 }
 
+/** Runs `bin` with `input` on stdin and returns its stdout; a non-zero exit rejects. */
+function runWithInput(bin: string, args: string[], env: NodeJS.ProcessEnv, input: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(bin, args, { env, cwd: tmpdir(), stdio: ["pipe", "pipe", "pipe"] });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (chunk: Buffer) => (stdout += chunk));
+    proc.stderr.on("data", (chunk: Buffer) => (stderr += chunk));
+    proc.once("error", reject);
+    proc.once("close", (code) => (code === 0 ? resolve(stdout) : reject(new Error(`gx ${args.join(" ")} exited with ${code}: ${stderr}`))));
+    proc.stdin.end(input);
+  });
+}
+
 /** Starts a fresh fixture server for `scenario` and signs the page in. */
 async function startFixture(
   scenario: string,
@@ -106,6 +124,7 @@ async function startFixture(
   config: Record<string, string> = {},
   stallThreshold?: string,
   fakecodex = true,
+  shape?: string,
 ): Promise<{ fixture: Fixture; stop: () => Promise<void> }> {
   const proc = spawn(
     process.env.GX_E2E_GXFIXTURE!,
@@ -118,6 +137,7 @@ async function startFixture(
       ...(hold ? ["--hold"] : []),
       ...(autoAdvanceDelay ? ["--auto-advance-delay", autoAdvanceDelay] : []),
       ...(stallThreshold ? ["--stall-threshold", stallThreshold] : []),
+      ...(shape ? ["--shape", shape] : []),
       ...Object.entries(config).flatMap(([key, value]) => ["--config", `${key}=${value}`]),
       scenario,
     ],
@@ -155,6 +175,8 @@ async function startFixture(
       const { stdout } = await run(out.gx, args, { env: { ...env, ...extra }, cwd: tmpdir() });
       return stdout;
     },
+    cliInput: (input, ...args) => runWithInput(out.gx, args, env, input),
+    cliEnvInput: (extra, input, ...args) => runWithInput(out.gx, args, { ...env, ...extra }, input),
     async release() {
       await rm(out.hold_file, { force: true });
     },
@@ -234,13 +256,13 @@ async function startFixture(
 export const test = base.extend<{
   start: (
     scenario: string,
-    opts?: { hold?: boolean; autoAdvanceDelay?: string; stallThreshold?: string; config?: Record<string, string>; fakecodex?: boolean },
+    opts?: { hold?: boolean; autoAdvanceDelay?: string; stallThreshold?: string; config?: Record<string, string>; fakecodex?: boolean; shape?: string },
   ) => Promise<Fixture>;
 }>({
   start: async ({ page }, use) => {
     const stops: Array<() => Promise<void>> = [];
     await use(async (scenario, opts) => {
-      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config, opts?.stallThreshold, opts?.fakecodex);
+      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config, opts?.stallThreshold, opts?.fakecodex, opts?.shape);
       stops.push(stop);
       return fixture;
     });

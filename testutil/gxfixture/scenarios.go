@@ -116,6 +116,9 @@ type scenario struct {
 	web webMode
 	// extraLogins seeds web logins before the server starts, as how long ago each was last used.
 	extraLogins []time.Duration
+	// limits seeds the limits state file before the server starts, in the
+	// shape the --shape flag names (default fresh).
+	limits bool
 }
 
 // webMode is how far the fixture takes the web setup and sign-in.
@@ -141,6 +144,8 @@ var scenarios = map[string]scenario{
 	"web-login": {projects: []string{project}, web: webSignedOut},
 	// web-logins: signed in, with three more web logins, one idle for 70 days.
 	"web-logins": {projects: []string{project}, extraLogins: []time.Duration{time.Hour, 3 * 24 * time.Hour, 70 * 24 * time.Hour}},
+	// limits: a project with no epics and a seeded limits state, shaped by --shape.
+	"limits": {projects: []string{project}, limits: true},
 	// ready: an epic that is not queued yet.
 	"ready": {
 		epics: []epic{{project, "ready-epic", []ticket{

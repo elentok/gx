@@ -8,6 +8,7 @@
 //
 // --auto-advance-delay shortens the server's run-end countdown (default 10s).
 // --stall-threshold shortens how long a Working session's transcript may stay untouched before it counts as stalled (default 15m).
+// --shape <fresh|stale|past-reset|one-window> picks the seeded limits state of the limits scenario (default fresh).
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 // --mock-dir <path> serves that directory over loopback HTTP and reports its base URL as mock_url.
@@ -122,7 +123,7 @@ func main() {
 }
 
 func run(args []string) (err error) {
-	var gxBin, fakeBin, fakeCodexBin, name, autoAdvance, stallThreshold, mockDir string
+	var gxBin, fakeBin, fakeCodexBin, name, autoAdvance, stallThreshold, mockDir, shape string
 	var configs []string
 	var hold, shellEnv, hideCodex bool
 	for i := 0; i < len(args); i++ {
@@ -145,13 +146,16 @@ func run(args []string) (err error) {
 			}
 			stallThreshold = args[i+1]
 			i++
-		case "--config", "--mock-dir":
+		case "--config", "--mock-dir", "--shape":
 			if i+1 == len(args) {
 				return fmt.Errorf("%s needs a value", args[i])
 			}
-			if args[i] == "--config" {
+			switch args[i] {
+			case "--config":
 				configs = append(configs, args[i+1])
-			} else {
+			case "--shape":
+				shape = args[i+1]
+			default:
 				mockDir = args[i+1]
 			}
 			i++
@@ -175,6 +179,9 @@ func run(args []string) (err error) {
 	sc, ok := scenarios[name]
 	if !ok {
 		return fmt.Errorf("unknown scenario %q; known: %s", name, strings.Join(scenarioNames(), ", "))
+	}
+	if shape, err = checkLimitShape(sc, shape); err != nil {
+		return err
 	}
 
 	// Unix socket paths are capped near 100 bytes, and a holder's socket sits
@@ -274,6 +281,12 @@ func run(args []string) (err error) {
 	for i, ago := range sc.extraLogins {
 		if _, err := server.SeedWebLogin(f.stateD, fmt.Sprintf("gxfixture browser %d", i+1), time.Now().Add(-ago)); err != nil {
 			return fmt.Errorf("seed web login: %w", err)
+		}
+	}
+
+	if sc.limits {
+		if err := f.seedLimits(shape); err != nil {
+			return fmt.Errorf("seed limits: %w", err)
 		}
 	}
 

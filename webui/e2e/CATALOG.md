@@ -5,6 +5,9 @@ Run with `make web-e2e`. Each flow starts its own fixture server (`testutil/gxfi
 `cookie_name` cookie to the browser. The `web-setup`, `web-login` and `web-logins` scenarios start
 signed out or with extra web logins. `nextTotpCode()` returns a code for a new TOTP step, and
 `start(scenario, { config: { "server.web.totp": "false" } })` runs without TOTP. It never reloads the page. The suite fails if a page reloads.
+The `limits` scenario seeds the limits state: `start("limits", { shape })` takes `fresh` (default),
+`stale`, `past-reset` or `one-window`. `fixture.cliInput(input, ...args)` and
+`fixture.cliEnvInput(extra, input, ...args)` are `cli`/`cliEnv` with `input` on stdin.
 Retries are off. Locators use roles and visible text, plus `data-testid` `pill` and `reason` on
 Epics page cards. The helpers `section` and `card` in `fixture.ts` find a section (expanding it) and a card.
 
