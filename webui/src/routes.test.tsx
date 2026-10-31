@@ -84,6 +84,14 @@ test.each([
   await waitFor(() => expect(title()).toBe(expected));
 });
 
+test("/settings/agents renders the Agents page with the Default harness control", async () => {
+  renderAt("/settings/agents", okFor, undefined, undefined, {
+    agentSettings: async () => ({ default: "claude", runner: "auto", projects: [] }),
+  });
+  await screen.findByText("Default harness");
+  expect(screen.getByRole("button", { name: "Codex" })).toBeTruthy();
+});
+
 test("the epic page titles the tab by its slug while loading", async () => {
   renderAt("/e/gx:e", okFor, undefined, () => pending());
   await waitFor(() => expect(title()).toBe("e · Epic · gx"));

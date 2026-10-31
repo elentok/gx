@@ -51,6 +51,19 @@ describe("SettingsHomeView", () => {
     expect(onSignOut).toHaveBeenCalledOnce();
   });
 
+  it("shows the Agents row with the Default harness, bold, and links to the page", () => {
+    const { getByRole } = renderThemed(<SettingsHomeView loginCount={1} totpOn defaultHarness="claude" onSignOut={() => {}} />);
+    const row = getByRole("link", { name: /Agents/ });
+    expect(row.getAttribute("href")).toBe("#/settings/agents");
+    expect(row.textContent).toContain("Default: Claude");
+    expect(row.querySelector("b")?.textContent).toBe("Claude");
+  });
+
+  it("shows no Agents detail until the settings load", () => {
+    const { getByRole } = renderThemed(<SettingsHomeView totpOn onSignOut={() => {}} />);
+    expect(getByRole("link", { name: /Agents/ }).textContent).not.toContain("Default");
+  });
+
   it("reads Add authenticator when TOTP is on and the saved secret was cleared", () => {
     const { getByRole, queryByRole } = renderThemed(<SettingsHomeView loginCount={1} totpOn authenticatorMissing onSignOut={() => {}} />);
     expect(getByRole("link", { name: "Add authenticator" }).getAttribute("href")).toBe("#/settings/authenticator");

@@ -22,39 +22,12 @@ import {
   type LoginWrite,
   type WebLoginEntry,
 } from "./logins";
-import { BackLink, Frame } from "./parts";
+import { harnessName, fetchAgentSettings, type FetchAgentSettings } from "./agents";
+import { BackLink, Frame, Group, rowProps } from "./parts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const LOGINS_HREF = `${SETTINGS_HREF}/logins`;
-
-const Group = ({ label, children }: { label?: string; children: ReactNode }) => (
-  <Box mt="6">
-    {label && (
-      <Text fontSize="xs" letterSpacing="0.08em" textTransform="uppercase" color="text.muted" mb="2" px="3">
-        {label}
-      </Text>
-    )}
-    <Box borderWidth="1px" borderColor="border" borderRadius="lg" bg="surface.raised" overflow="hidden">
-      {children}
-    </Box>
-  </Box>
-);
-
-const rowProps = {
-  display: "flex",
-  alignItems: "center",
-  gap: "3",
-  px: "4",
-  py: "3",
-  minH: "52px",
-  color: "text",
-  textAlign: "left",
-  width: "100%",
-  cursor: "pointer",
-  bg: "transparent",
-  _notFirst: { borderTopWidth: "1px", borderTopColor: "hairline" },
-  _hover: { bg: "surface" },
-} as const;
+const AGENTS_HREF = `${SETTINGS_HREF}/agents`;
 
 const Chevron = () => (
   <Text aria-hidden color="text.dim">
@@ -62,7 +35,7 @@ const Chevron = () => (
   </Text>
 );
 
-function LinkRow({ href, label, detail }: { href: string; label: string; detail?: string }) {
+function LinkRow({ href, label, detail }: { href: string; label: string; detail?: ReactNode }) {
   return (
     <chakra.a href={href} {...rowProps}>
       <Box flex="1">{label}</Box>
@@ -80,9 +53,12 @@ export function SettingsHomeView({
   loginCount,
   totpOn,
   authenticatorMissing = false,
+  defaultHarness,
   onSignOut,
 }: {
   loginCount?: number;
+  /** The global Default harness; the Agents row shows no detail until it loads. */
+  defaultHarness?: string;
   totpOn: boolean;
   /** TOTP is on but the saved secret was cleared, so the row adds one instead of resetting it. */
   authenticatorMissing?: boolean;
@@ -100,6 +76,19 @@ export function SettingsHomeView({
         <LinkRow href={`${SETTINGS_HREF}/password`} label="Change password" />
         {totpOn && <LinkRow href={`${SETTINGS_HREF}/authenticator`} label={authenticatorMissing ? "Add authenticator" : "Reset authenticator"} />}
         <LinkRow href={`${SETTINGS_HREF}/certificate`} label="Certificate" />
+      </Group>
+      <Group>
+        <LinkRow
+          href={AGENTS_HREF}
+          label="Agents"
+          detail={
+            defaultHarness === undefined ? undefined : (
+              <>
+                Default: <b>{harnessName(defaultHarness)}</b>
+              </>
+            )
+          }
+        />
       </Group>
       <Group>
         <chakra.button type="button" onClick={onSignOut} {...rowProps} color="tone.deadlocked.fg">
@@ -273,19 +262,23 @@ export function CertificatePage({ fetchAuth = fetchAuthState }: { fetchAuth?: ()
 export function SettingsPage({
   fetchAuth = fetchAuthState,
   fetchList = fetchLogins,
+  fetchAgents = fetchAgentSettings,
   signOut = signOutThisDevice,
 }: {
   fetchAuth?: () => Promise<AuthState>;
   fetchList?: FetchLogins;
+  fetchAgents?: FetchAgentSettings;
   signOut?: () => void | Promise<void>;
 }) {
   const auth = useFetched("settings-auth", fetchAuth);
   const logins = useFetched("settings-logins", fetchList);
+  const agents = useFetched("settings-agents", fetchAgents);
   return (
     <DetailPage mode="narrow" title={{ kind: "Settings" }}>
       {auth.data ? (
         <SettingsHomeView
           loginCount={logins.data?.length}
+          defaultHarness={agents.data?.default}
           totpOn={auth.data.totp_on}
           authenticatorMissing={auth.data.setup_code_required}
           onSignOut={() => void signOut()}

@@ -58,6 +58,7 @@ export const authEntries: GalleryEntry[] = [
     name: "SettingsHome",
     cases: [
       { label: "default", node: <SettingsHomeView loginCount={4} totpOn onSignOut={() => {}} /> },
+      { label: "with Agents row", node: <SettingsHomeView loginCount={4} totpOn defaultHarness="codex" onSignOut={() => {}} /> },
       { label: "TOTP off", node: <SettingsHomeView loginCount={1} totpOn={false} onSignOut={() => {}} /> },
       { label: "no saved authenticator", node: <SettingsHomeView loginCount={1} totpOn authenticatorMissing onSignOut={() => {}} /> },
     ],
