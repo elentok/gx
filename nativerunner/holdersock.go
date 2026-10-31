@@ -118,6 +118,9 @@ type holderResponse struct {
 	RateLimitMessage string `json:"rate_limit_message,omitempty"`
 	// Exited is claude's exit code, reported by status once claude exits.
 	Exited *int `json:"exited,omitempty"`
+	// Watched is the watcher's status for a harness with no pid status file,
+	// such as Codex. A holder without it reads as none.
+	Watched *streamStatus `json:"watched,omitempty"`
 }
 
 // denyBusyMessage is the keys error while a deny-reason step runs. The
@@ -230,7 +233,8 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		default:
 		}
 		if h.pid == nil {
-			return holderResponse{}, nil
+			cur := newStreamStatus(h.watcher.Status(), h.watcher.ConversationID(), h.name.get(), h.watcher.Ready())
+			return holderResponse{Watched: &cur}, nil
 		}
 		claude, turn := h.pid.PidState()
 		message, limited := h.pid.RateLimitMessage()
@@ -511,11 +515,38 @@ func (c *HolderClient) Status() (*PidStatus, int, error) {
 // statusWithProgram is Status plus the OSC state from the same reply, so the
 // two never come from different moments.
 func (c *HolderClient) statusWithProgram() (*PidStatus, int, string, error) {
+	resp, err := c.statusReply()
+	return resp.Claude, resp.Turn, resp.Program, err
+}
+
+func (c *HolderClient) statusReply() (holderResponse, error) {
 	resp, err := c.call(holderRequest{Op: opStatus})
 	if resp.Exited != nil {
-		return nil, 0, "", &ClaudeExitedError{Code: *resp.Exited}
+		return holderResponse{}, &ClaudeExitedError{Code: *resp.Exited}
 	}
-	return resp.Claude, resp.Turn, resp.Program, err
+	return resp, err
+}
+
+// WatchedStatus is what the watcher of a harness with no pid status file
+// reports.
+type WatchedStatus struct {
+	Status         harness.Status
+	ConversationID string
+	Ready          harness.ReadySignal
+}
+
+// Watched is the watcher's status, nil from a holder that serves a pid status
+// file instead.
+func (c *HolderClient) Watched() (*WatchedStatus, error) {
+	resp, err := c.statusReply()
+	return resp.watched(), err
+}
+
+func (r holderResponse) watched() *WatchedStatus {
+	if r.Watched == nil {
+		return nil
+	}
+	return &WatchedStatus{Status: r.Watched.status(), ConversationID: r.Watched.ConversationID, Ready: r.Watched.Ready}
 }
 
 // RateLimitMessage returns the message of the transcript's rate-limit API

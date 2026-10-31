@@ -209,10 +209,11 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) err
 	}
 	var nextTrustKey time.Time
 	for {
-		claude, _, err := ss.holder.Status()
+		resp, err := ss.holder.statusReply()
 		if err != nil {
 			return err
 		}
+		claude := resp.Claude
 		if !watchReady && claude != nil && claude.Status == ClaudeIdle {
 			return nil
 		}
@@ -221,7 +222,11 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) err
 			return nil
 		default:
 		}
-		if claude == nil && !time.Now().Before(nextTrustKey) {
+		// A watcher with no pid file says when a dialog is up: its text can
+		// stay on screen after it is answered, and a key then would reach the
+		// prompt.
+		dialogUp := resp.Watched == nil || resp.Watched.State == harness.Blocked && resp.Watched.Blocked == harness.BlockedDialog
+		if claude == nil && dialogUp && !time.Now().Before(nextTrustKey) {
 			// The trust dialog shows before claude writes its pid file, so
 			// no holder rule can see it. Claude drops a key typed before it
 			// reads input, so keys repeat while the dialog stays up.
@@ -229,7 +234,7 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) err
 			if err != nil {
 				return err
 			}
-			if startup := h.StartupScreen(scrolled, rows); startup.Dialog == harness.TrustDialog {
+			if startup := h.StartupScreen(scrolled, rows); startup.Dialog != harness.NoDialog {
 				if err := ss.holder.SendKeys(startup.Key); err != nil {
 					return err
 				}
@@ -390,7 +395,12 @@ func (p *Pty) launchCommand(opts agentrunner.StartOptions, dir, sessionID string
 			return harness.Command{}, err
 		}
 	}
-	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: args, Env: slices.Concat(p.Env, opts.Env)}
+	env := slices.Concat(p.Env, opts.Env)
+	if kind == harness.Codex {
+		// The SessionStart hook writes Codex's own session id here.
+		env = append(env, harness.CodexSessionFileEnv+"="+filepath.Join(dir, harness.CodexSessionFile))
+	}
+	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: args, Env: env}
 	var launch harness.Command
 	if opts.ResumeSessionID != "" {
 		// --resume and --session-id fail together, so the agent gets only
@@ -540,11 +550,15 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 	if err != nil {
 		return agentrunner.Status{}, err
 	}
-	claude, turn, err := ss.holder.Status()
+	resp, err := ss.holder.statusReply()
 	if err != nil {
 		return agentrunner.Status{}, p.died(ss, err)
 	}
-	st := agentrunner.Status{State: agentrunner.StateWorking, Turn: turn, SessionID: ss.session.SessionID}
+	claude := resp.Claude
+	st := agentrunner.Status{State: agentrunner.StateWorking, Turn: resp.Turn, SessionID: ss.session.SessionID}
+	if w := resp.watched(); w != nil {
+		return watchedStatus(st, *w), nil
+	}
 	if claude == nil {
 		return st, nil
 	}
@@ -568,6 +582,23 @@ func (p *Pty) Status(s agentrunner.Session) (agentrunner.Status, error) {
 		}
 	}
 	return st, nil
+}
+
+// watchedStatus maps a harness watcher's status, for a harness with no pid
+// status file. Working with a background task stays Working: the server reads
+// Background off the holder's watch stream. The session id is the one the
+// harness reports, not gx's start id, until the harness reports one.
+func watchedStatus(st agentrunner.Status, w WatchedStatus) agentrunner.Status {
+	if w.ConversationID != "" {
+		st.SessionID = w.ConversationID
+	}
+	switch w.Status.State {
+	case harness.Idle:
+		st.State = agentrunner.StateIdle
+	case harness.Blocked:
+		st.State, st.BlockedReason = agentrunner.StateBlocked, w.Status.Message
+	}
+	return st
 }
 
 // screenDialog parses the dialog on the holder's screen right now.

@@ -77,6 +77,14 @@ const (
 	ReadyScreen  ReadySignal = "screen"
 )
 
+// TitleWatcher is a Watcher that also reads the child's OSC 0 window title,
+// raw and whole. A host checks Watch's result for it.
+type TitleWatcher interface {
+	Watcher
+	// Title takes each new title, in order.
+	Title(title string)
+}
+
 // PidStatusWatcher is a Watcher that follows a claude-style pid status file
 // and can freeze it. A host checks Watch's result for it: only such a watcher
 // backs the frozen status and deny-reason ops.
@@ -140,6 +148,9 @@ type Dialog int
 const (
 	NoDialog Dialog = iota
 	TrustDialog
+	HooksReviewDialog
+	UpdateDialog
+	ModelNudgeDialog
 )
 
 // Startup is a classified pre-session screen; Key answers Dialog.

@@ -127,11 +127,14 @@ func TestCodexHarness_LaunchAndResume(t *testing.T) {
 	if !ok || resume.Name != "codex" || !slices.Equal(resume.Args, []string{"resume", "abc", "--model", "m"}) {
 		t.Errorf("Resume = %+v, %v, want codex resume abc --model m", resume, ok)
 	}
-	if _, err := h.Watch(0, time.Time{}, nil, nil); err == nil {
-		t.Error("Watch error = nil, want a not-built-yet error")
+	if _, err := h.Watch(0, time.Time{}, nil, nil); err != nil {
+		t.Errorf("Watch error = %v, want a watcher", err)
 	}
 	if name, ok := h.DisplayName([]byte("x")); ok || name != "" {
-		t.Errorf("DisplayName = %q, %v, want none", name, ok)
+		t.Errorf("DisplayName without a title = %q, %v, want none", name, ok)
+	}
+	if name, ok := h.DisplayName([]byte("\x1b]0;⠋ Run tests | gx\a")); !ok || name != "Run tests | gx" {
+		t.Errorf("DisplayName = %q, %v, want the title without its spinner", name, ok)
 	}
 	if got := h.StartupScreen(nil, nil); got != (harness.Startup{}) {
 		t.Errorf("StartupScreen = %+v, want zero", got)

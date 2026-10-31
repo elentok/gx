@@ -1,17 +1,18 @@
 package harness
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"slices"
 	"strings"
 	"time"
+	"unicode"
+
+	"github.com/elentok/gx/agentrunner/screen"
 )
 
 // codexHarness is the codex executable's side of a session. Codex has no
-// session-id flag, so Launch passes none; the PTY runner starts only Claude
-// until the Codex watch lands.
+// session-id flag, so Launch passes none.
 type codexHarness struct{}
 
 // CodexQuestionTool is Codex's tool for asking a person, which gx blocks in
@@ -25,12 +26,34 @@ const (
 	CodexGuardQuestionCommand = "gx agent guard-question"
 )
 
+// Codex has no session-id flag, so a SessionStart hook hands gx the id: it
+// copies the hook payload (JSON with session_id) to the file CodexSessionFileEnv
+// names. The command is a constant, like the guards, and the path travels in
+// the env.
+const (
+	CodexSessionFileEnv = "GX_CODEX_SESSION_FILE"
+	// CodexSessionFile is the file's name in the agent dir.
+	CodexSessionFile = "codex-session.json"
+	// The temp file and rename keep the watcher from reading half a payload.
+	CodexSessionStartCommand = `[ -n "$GX_CODEX_SESSION_FILE" ] && cat > "$GX_CODEX_SESSION_FILE.tmp" && mv "$GX_CODEX_SESSION_FILE.tmp" "$GX_CODEX_SESSION_FILE"`
+)
+
+func codexHookGroup(matcher, command string) string {
+	m := ""
+	if matcher != "" {
+		m = "matcher=" + tomlString(matcher) + ","
+	}
+	return "{" + m + "hooks=[{type=\"command\",command=" + tomlString(command) + "}]}"
+}
+
 // codexHooks is the -c value holding gx's PreToolUse hooks.
 func codexHooks() string {
-	group := func(matcher, command string) string {
-		return "{matcher=" + tomlString(matcher) + ",hooks=[{type=\"command\",command=" + tomlString(command) + "}]}"
-	}
-	return "hooks.PreToolUse=[" + group("Bash", CodexGuardBashCommand) + "," + group(CodexQuestionTool, CodexGuardQuestionCommand) + "]"
+	return "hooks.PreToolUse=[" + codexHookGroup("Bash", CodexGuardBashCommand) + "," + codexHookGroup(CodexQuestionTool, CodexGuardQuestionCommand) + "]"
+}
+
+// codexSessionHook is the -c value holding the SessionStart hook.
+func codexSessionHook() string {
+	return "hooks.SessionStart=[" + codexHookGroup("", CodexSessionStartCommand) + "]"
 }
 
 // Launch adds the GX system prompt, on a fresh session only: Resume must not
@@ -54,13 +77,48 @@ func codexCommand(args, env []string) Command {
 	return Command{Name: "codex", Args: slices.Clone(args), Env: append(launch, env...)}
 }
 
-func (codexHarness) Watch(int, time.Time, Screen, <-chan struct{}) (Watcher, error) {
-	return nil, errors.New("codex session watching is not built yet")
+// Watch reads the session file from the env of this process, which is the
+// child's env: the PTY runner sets it on the holder.
+func (h codexHarness) Watch(_ int, _ time.Time, scr Screen, _ <-chan struct{}) (Watcher, error) {
+	return newCodexWatcher(os.Getenv(CodexSessionFileEnv), func() bool {
+		return scr != nil && h.StartupScreen(scr.ScrollbackTail(startupScrollback), scr.Rows()).Dialog != NoDialog
+	}), nil
 }
 
-func (codexHarness) StartupScreen(scrolled, rows []string) Startup { return Startup{} }
+// codexDialogs holds the text that names each startup dialog, lowercase. Only
+// the trust wording is from real Codex; the rest is what the fake shows, since
+// no recorded stream has a dialog. Update and model nudge are also switched
+// off by flag. Every dialog is answered with Enter.
+var codexDialogs = []struct {
+	dialog Dialog
+	text   []string
+}{
+	{TrustDialog, []string{"do you trust the contents", "trust this directory"}},
+	{HooksReviewDialog, []string{"hooks review"}},
+	{UpdateDialog, []string{"update available"}},
+	{ModelNudgeDialog, []string{"model nudge"}},
+}
 
-func (codexHarness) DisplayName([]byte) (string, bool) { return "", false }
+func (codexHarness) StartupScreen(scrolled, rows []string) Startup {
+	screenText := strings.ToLower(strings.Join(slices.Concat(scrolled, rows), "\n"))
+	for _, d := range codexDialogs {
+		if slices.ContainsFunc(d.text, func(t string) bool { return strings.Contains(screenText, t) }) {
+			return Startup{Dialog: d.dialog, Key: "\r"}
+		}
+	}
+	return Startup{}
+}
+
+// DisplayName drops the braille spinner Codex prefixes its title with while
+// working.
+func (codexHarness) DisplayName(raw []byte) (string, bool) {
+	title, ok := screen.Title(raw)
+	if !ok {
+		return "", false
+	}
+	name := strings.TrimLeftFunc(title, func(r rune) bool { return isSpinner(r) || unicode.IsSpace(r) })
+	return name, name != ""
+}
 
 // CodexArgsInput is what varies between Codex launches.
 type CodexArgsInput struct {
@@ -89,6 +147,7 @@ func CodexArgs(in CodexArgsInput) []string {
 		"-c", "disable_paste_burst=true",
 		"--dangerously-bypass-hook-trust",
 		"-c", codexHooks(),
+		"-c", codexSessionHook(),
 	}
 	if roots := dedupe(in.WritableRoots); len(roots) > 0 {
 		args = append(args, "-c", "sandbox_workspace_write.writable_roots="+tomlStringArray(roots))

@@ -164,7 +164,7 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		childStart:  childStart,
 		pid:         pid,
 		watcher:     watcher,
-		name:        &displayName{read: h.DisplayName},
+		name:        newDisplayName(h, watcher),
 		frames: newFrameHub(scr, cols, rows, func(cols, rows int) error {
 			// The screen first, so it already has the new size when the child
 			// redraws for it.
@@ -267,7 +267,7 @@ func answerTrust(h harness.Harness, scr *screen.Screen, keys io.Writer, watcher 
 			return
 		}
 		if !time.Now().Before(next) {
-			if startup := h.StartupScreen(scr.ScrollbackTail(startupScrollback), scr.Rows()); startup.Dialog == harness.TrustDialog {
+			if startup := h.StartupScreen(scr.ScrollbackTail(startupScrollback), scr.Rows()); startup.Dialog != harness.NoDialog {
 				if _, err := io.WriteString(keys, startup.Key); err != nil {
 					return
 				}
@@ -306,12 +306,23 @@ func (s *programStatus) Write(p []byte) (int, error) {
 // split across two reads is still seen whole.
 const displayNameTail = 1024
 
+func newDisplayName(h harness.Harness, watcher harness.Watcher) *displayName {
+	d := &displayName{read: h.DisplayName}
+	if tw, ok := watcher.(harness.TitleWatcher); ok {
+		d.onTitle = tw.Title
+	}
+	return d
+}
+
 // displayName keeps the harness's Display name of the child's output.
 type displayName struct {
 	read func(raw []byte) (string, bool)
-	mu   sync.Mutex
-	tail []byte
-	name string
+	// onTitle, when set, takes each new raw title, for a watcher that reads it.
+	onTitle func(title string)
+	mu      sync.Mutex
+	tail    []byte
+	name    string
+	title   string
 }
 
 func (d *displayName) Write(p []byte) (int, error) {
@@ -320,6 +331,10 @@ func (d *displayName) Write(p []byte) (int, error) {
 	buf := append(d.tail, p...)
 	if name, ok := d.read(buf); ok {
 		d.name = name
+	}
+	if title, ok := screen.Title(buf); ok && d.onTitle != nil && title != d.title {
+		d.title = title
+		d.onTitle(title)
 	}
 	d.tail = bytes.Clone(buf[max(len(buf)-displayNameTail, 0):])
 	return len(p), nil
