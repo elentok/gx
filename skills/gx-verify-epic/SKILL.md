@@ -100,7 +100,7 @@ the epic's other tickets stand in for the spec.
 Start the temporary gx server on the fixture, using the build-and-start steps in section 1 of the
 `gx-ui-check` skill. A part uses the fixture scenario named in its ticket. Every part session starts
 its own server; never share one. The fixture is isolated: it uses temp state dirs and never touches
-real gx state. Start it with `run_in_background`, never `nohup` or `&`. Stop it before you finish.
+real gx state. Start it in the background (`run_in_background`), never `nohup` or `&`. Stop it before you finish.
 
 If the fixture does not start, that is a finding. A part records it under its results. A lone ticket
 decides it like any finding (steps 5 and 6).

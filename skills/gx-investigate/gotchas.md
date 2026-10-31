@@ -5,17 +5,17 @@ fixing commit whenever a bug diagnosed via [gx-investigate](SKILL.md) gets fixed
 re-explain what the linked commit already documents. Never cite a ticket or epic: they get
 archived and renumbered, and the tracker isn't on every machine.
 
-- **A blocking `TaskOutput`/`TaskStop` retrieval never resolves the background-task gate, stalling
+- **A blocking task-output retrieval or a stop-background-shell call (`TaskOutput`/`TaskStop`) never resolves the background-task gate, stalling
   a ticket `claimed` ("implementing...") until the 2h aged-out cap.**
   `transcript.ReadBackgroundTasks` (`transcript/background_task.go`) only recognized resolution
   via a `task-notification`-origin transcript line carrying `<task-id>`. An agent that instead
   calls `TaskOutput` to block on the same task id gets its result inline as `toolUseResult:
-  {retrieval_status, task: {task_id, ...}}` (nested); one that calls `TaskStop` to kill it outright
+  {retrieval_status, task: {task_id, ...}}` (nested); one that stops it outright (`TaskStop`)
   gets `toolUseResult: {task_id, message, ...}` (flat) — two more shapes, neither producing a
   `task-notification` line, so the marker reads `outstanding-fresh` forever even though the agent
   plainly saw the result (or killed the task itself) and finished for real. Found live twice: the
   `TaskOutput` shape (commit made, worktree clean, pane idle, `run-log.jsonl` shows only
-  `background-task-gate-held`, no release) and the `TaskStop` shape (same symptom, found right
+  `background-task-gate-held`, no release) and the stop shape (same symptom, found right
   after the `TaskOutput` fix shipped — proof there wasn't just one gap).
   Distinct failure mode from the entry below (that one resolves too eagerly; this one never
   resolves at all) in the same new gate. Fixed same session, in two passes:
@@ -117,7 +117,7 @@ archived and renumbered, and the tracker isn't on every machine.
   pane/tab-leak-on-reclaim part is still open.
 - **`type: code-review` tickets always stall as Paused (`pause_reason: zero-commit`)
   under ralph-loop.** `gx-implement/SKILL.md` told the agent to "follow the gx-code-review
-  skill instead," which the agent read as invoking the Skill tool — but `gx-code-review` sets
+  skill instead," which the agent read as invoking a skill by name (Skill tool) — but `gx-code-review` sets
   `disable-model-invocation: true`, so the call is refused and the iteration ends with zero
   commits every time. Fixed at the scheduler, not in-session: `runIteration`
   (`ralphloop/iteration.go`) now launches a `type: code-review` frontier ticket with
@@ -290,7 +290,7 @@ kept as history of what the code did at the time, not as a description of today'
   fixed later (see the epic-complete entry above); the token leak was not fixed as of this entry.
 - **Spurious "iterN paused" / `agent_name_taken` notification for a ticket that then finishes
   fine.** A parent ticket doing a mid-flight fork (e.g. `06` → `06b`) can still be actively
-  authoring the child ticket's file (full-content `Write`, not `gx tickets set`) *after* the
+  authoring the child ticket's file (full-content file write (`Write`), not `gx tickets set`) *after* the
   scheduler has already claimed and launched an independent iteration for that child — the
   child's own agent was already running under a live herdr session. The parent's plain-file
   overwrite of `06b.md` clobbers the `status: claimed` the scheduler had just set, reverting it to
@@ -301,7 +301,7 @@ kept as history of what the code did at the time, not as a description of today'
   (`"{label} paused"` notification quoting the herdr error) but keeps scheduling. Harmless when
   the original iteration finishes normally afterward (its `done` write overwrites the spurious
   pause), but the underlying race — two unsynchronized writers (ralph-loop's
-  `Claim()`/`SetStatus()` vs. an agent's raw file `Write`) sharing one ticket file with no locking
+  `Claim()`/`SetStatus()` vs. an agent's raw file write (`Write`)) sharing one ticket file with no locking
   — is real and not yet fixed.
 - **A ticket `blocked_by` on a specific mid-flight-fork sibling isn't actually enforced.**
   `tickets/status.go`'s `UnresolvedBlockers`/`isSelfOrForkSibling` excludes any candidate blocker
@@ -313,14 +313,14 @@ kept as history of what the code did at the time, not as a description of today'
   reloads fresh per claim. Not fixed as of this entry.
 - **A stuck `claimed` ticket had no recovery path but hand-run git.** Commits were often already merged with a stale status, and the resume gesture existed but was hidden in the `m` menu. Now `gx tickets merge|verify|start-over|resume` plus this skill's recovery section.
 - **Ticket sits `claimed` with `background-task-gate-held`, agent idle, code uncommitted.** The `/gx-implement` prompt arrived as `"\n/gx-implement …"`, so Claude Code (seen on 2.1.290) did not expand the slash command; the agent worked without the skill and never committed. A stray backgrounded Bash call then held the finish gate. Not fixed as of this entry.
-- **Ticket paused `zero-commit` but the agent commits minutes later.** The background-task gate treats any transcript line containing the task id as "resolved", including the agent's own `tail .../<id>.output`/`Read`/`Monitor`. Monitor waits are not gated either. Assistant-line mentions were fixed later (see the `WaitIterationFinished` entries below); Monitor waits were not gated as of this entry.
+- **Ticket paused `zero-commit` but the agent commits minutes later.** The background-task gate treats any transcript line containing the task id as "resolved", including the agent's own `tail .../<id>.output`, file read (`Read`) or `Monitor`. Monitor waits are not gated either. Assistant-line mentions were fixed later (see the `WaitIterationFinished` entries below); Monitor waits were not gated as of this entry.
 - **Server stopped while starting tickets → they come back Paused (repair, reason `handle-mismatch`, herdr `agent_not_found`), some with no leftovers at all.** No commits, so `gx server tickets start-over gx:<epic>/<id> --reason ...` is the recovery. Not fixed as of this entry.
 - **Notification `🛑 needs repair: iteration ended without merging the ticket` (blank reason), ticket still `claimed` with `iteration_status: finished`.** The merge conflicted (`gx server tickets merge` → `outcome: conflicted`, `UU` files in the feature worktree) and the conflict outcome is swallowed instead of reported. Resolve in the feature worktree, then `merge --continue`/`--abort`. Not fixed as of this entry.
 - **Large epic (~50+ tickets) fails on its first claim: `logging scheduler scan: event line is N bytes, over the 4096 cap`.** `events.Fit` can't shorten `Scan`, and `claimNext` treats the log error as fatal, stranding the ticket `claimed`. Fixed: `logSchedulerScan` splits a pass across lines sharing one `time`; a failed scan log is debug-only.
 - **`paused-rate-limit` right as an agent finishes, "resets" = the pane's `done H:MM PM`, pause lasts ~3h.** A near-limit warning matches the detector, the token is the first clock time in the pane, and it's read as UTC. Restarting gx to escape it can then re-merge a conflict-resolved ticket and fail the epic. Not fixed as of this entry.
 - **Server names the herdr agent after the queue item id, not the ticket id (`server/runner.go` `launch`, `addr.ID`).** Every ticket from queue item `01` gets `…-iter-01`; a second ticket collides (`agent_name_taken`) and restart reclaim finds a handle mismatch. Fixed in `5c4a4c59`: `launch` now takes the ticket address.
 - **Server pauses tickets that are not stuck: `zero-commit` while the agent waits on a background test run, and a repair pause "merge deferred: merge lock held" while another merge holds the lock.** `server/runner.go` `finishRun` took the first idle as a finish and failed on a deferred merge; the in-process loop debounces, gates on background tasks and retries. Fixed in `ab11215b` (`ralphloop.WaitIterationFinished`, the built-merge retry). To recover an old false pause: `gx server tickets pause <addr> --reason …` (gets it to a repair pause; `tickets set` refuses that status), then `gx server tickets merge`; a conflict leaves a cherry-pick in the feature worktree, so resolve, `git cherry-pick --continue`, then `merge --continue`.
-- **Server pauses zero-commit although `WaitIterationFinished` is in place: the background-task gate saw the task as resolved.** `transcript.ReadBackgroundTasks` resolved a task when its id appeared on *any* later line, including the agent's own `Monitor`/`Read` of `…/tasks/<id>.output`. Assistant lines no longer resolve (fix in the `transcript:` commit after `2c6d0ea9`). Recover with a repair pause + `gx server tickets merge`.
+- **Server pauses zero-commit although `WaitIterationFinished` is in place: the background-task gate saw the task as resolved.** `transcript.ReadBackgroundTasks` resolved a task when its id appeared on *any* later line, including the agent's own `Monitor` or file read (`Read`) of `…/tasks/<id>.output`. Assistant lines no longer resolve (fix in the `transcript:` commit after `2c6d0ea9`). Recover with a repair pause + `gx server tickets merge`.
 - **Server pauses with `zero-commit` while an async subagent is still working.** The agent launched an async Agent and idled; the subagent's own background run produced an interim `task-notification` ("the result below may be interim"). The gate had no Agent marker, and an interim notice would have resolved one anyway. Fixed: `agentId` from an `async_launched` result is a marker, and interim notices don't resolve it.
 - **Server-mode Queue tab: a parent shows `waiting-for-children` but no children, and every fork in the epic is gone (Tickets tab is fine).** `ticketFromInfo` parses `27a1` as `Number: 0`, so parent/blocker lookups miss, `PlanWaves` returns `StuckPlanError`, and the Queue falls back to queue items only. Only while a multi-level fork (`NNaN`) is open. Fixed in `f5b8780d`.
 - **Server pauses a ticket with `zero-commit` right when the agent hits "You've hit your session limit".** The server finish path has no rate-limit detection; the agent's later commitless/finished self-report is never adopted, and `merge`/`resume` don't fit a commitless ticket. Not fixed as of this entry.
@@ -331,7 +331,7 @@ kept as history of what the code did at the time, not as a description of today'
 - **Ticket pauses `zero-commit` while an async subagent is still working.** The background-task gate has no marker for async Agent launches (`isAsync`/`agentId`), and a subagent that waits on its own background run sends an *interim* "completed" task-notification; the parent idles and gx pauses it. Recovery: let the agent finish and commit, then `gx server tickets pause <addr> --reason …` (gets it to a repair pause; `tickets set` can't) + `gx server tickets merge`. Fixed later (see the async-subagent entry above).
 - **A fork child marked "do this LAST" in its body runs in parallel with its siblings and is Paused.** Fork instructions never say to put sibling ordering in `blocked_by`, and `gx tickets add` has no `--blocked-by`. Not fixed as of this entry.
 - **Epic finishes but no "epic done" notification, and its tickets stay in `gx server queue items`.** A done ticket with a cross-epic `blocked_by` renders `error` under plain `tickets.Load` (`BlockedByErr` beats `status`), so `completeRootIfDone`'s `AllDone` is never true. Not fixed as of this entry.
-- **Merge (or any) ticket pauses while the agent waits on a background test run, though the TaskOutput/TaskStop-only fix is in.** Claude Code now writes `api-request-blob` lines that echo the agent's own assistant message; the gate only skips `type: assistant`, and `reportsOnTasks` defaults to true without a tool_result, so a `cat …/tasks/<id>.output` echo resolves the task. Not fixed as of this entry.
+- **Merge (or any) ticket pauses while the agent waits on a background test run, though the task-output-and-stop-only fix is in.** Claude Code now writes `api-request-blob` lines that echo the agent's own assistant message; the gate only skips `type: assistant`, and `reportsOnTasks` defaults to true without a tool_result, so a `cat …/tasks/<id>.output` echo resolves the task. Not fixed as of this entry.
 - **Diagnose/investigate ticket pauses with `zero-commit` "no result reported" though the agent did its work (filed a follow-up, paused the failed ticket).** The skill had no finish-report step, so the server adopted nothing. Fixed in 55db4356. Recovery for pauses from before the fix: `gx tickets set <addr> --iteration-status finished --commitless true`; the server's late-finish scan then closes the ticket `done`.
 - **Merge ticket pauses (repair) "main is not an ancestor … rebase it onto main" after a clean rebase.** Another epic merged into trunk during the merge agent's test run. `ralphloop/feature.go` `MergeFinishFault` pauses before done, so the spec'd retry merge ticket (auto-merge.md stories 10–12) never runs. Recovery: rebase the epic onto trunk in the feature worktree, then `gx server tickets resume <addr>` (or `start-over --force` for a fresh merge agent). Not fixed as of this entry.
 - **Last ticket of an epic pauses → two investigate tickets (`NNa` and an epic-level one) start together.** `checkDeadlock` sees an all-paused epic before the ticket's async recovery creates `NNa`, and spends the epic's one all-paused recovery on a duplicate. Not fixed as of this entry.

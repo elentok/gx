@@ -40,10 +40,10 @@ then record the reason in the spec.
 
 ## Calling other skills
 
-Every call between bundled skills is a relative link to the callee's `SKILL.md`: `Read` it and
+Every call between bundled skills is a relative link to the callee's `SKILL.md`: read it (file read) and
 follow it inline, or hand a subagent the same link. Wherever a step says "follow gx-wayfinder's…"
 or "follow gx-to-spec's…", that means [gx-wayfinder](../gx-wayfinder/SKILL.md) and
-[gx-to-spec](../gx-to-spec/SKILL.md). Never call the Skill tool for them.
+[gx-to-spec](../gx-to-spec/SKILL.md). Never invoke them as skills by name (Skill tool).
 
 ## Asking questions
 
@@ -203,7 +203,7 @@ the ticket title during `resolve-tickets`.
 
 When a map ticket or the spec depends on how the web UI behaves today, read
 [gx-ui-check](../gx-ui-check/SKILL.md) and follow it inline to see it in a running fixture. Don't
-guess from the source, and don't call the Skill tool for it.
+guess from the source, and don't invoke it as a skill by name (Skill tool).
 
 ## Design-review rubric (step 5)
 
@@ -255,7 +255,7 @@ End with one line:
 Examples:
 
 ```
-✅ Resolve tickets: resolved ticket 04-foo. Next: start a fresh session (/clear in Claude, /new in Codex), run /gx-design <epic>
+✅ Resolve tickets: resolved ticket 04-foo. Next: start a fresh session (/clear in Claude, /new in Codex), run /gx-design <epic> in Claude or $gx-design <epic> in Codex
 ✅ Create tickets: epic <epic>-impl created. Next: launch it from the TUI Queue tab
 ```
 

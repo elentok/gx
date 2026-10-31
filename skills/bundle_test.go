@@ -707,32 +707,12 @@ func TestCodeReviewReadsQualitySkillsByPath(t *testing.T) {
 	}
 }
 
-// neutralFiles lists the skill files whose prose names tools by plain phrase,
-// with the Claude tool only inside parentheses or the tracker's tool table.
-var neutralFiles = []string{
-	"gx-local-tracker.md",
-	"gx-implement/SKILL.md",
-	"gx-code-review/SKILL.md",
-	"gx-ui-check/SKILL.md",
-	"gx-ui-check/MOCK-CHECK.md",
-	"gx.md",
-	"gx-resolving-merge-conflicts/SKILL.md",
-	"gx-merge/SKILL.md",
-	"gx-cleanup/SKILL.md",
-	"gx-changelog/SKILL.md",
-	"gx-bump/SKILL.md",
-	"gx-triage-follow-ups/SKILL.md",
-	"gx-verify/SKILL.md",
-	"gx-follow-up/SKILL.md",
-	"gx-wayfinder/SKILL.md",
-	"gx-research/SKILL.md",
-	"gx-to-spec/SKILL.md",
-	"gx-tdd/SKILL.md",
-	"gx-grilling/SKILL.md",
-	"gx-unslop/SKILL.md",
-	"gx-one-off/SKILL.md",
-	"gx-prototype/UI.md",
-	"gx-prototype/LOGIC.md",
+// toolWordingExempt names the top-level files TestBundleToolWording skips, with
+// the reason. Every other markdown file in the bundle names tools by plain
+// phrase, with the Claude tool only inside parentheses or the tool table.
+var toolWordingExempt = map[string]string{
+	"LICENSE":   "licence text, not agent instructions",
+	"README.md": "human-facing bundle readme",
 }
 
 var (
@@ -758,7 +738,10 @@ func stripToolNames(raw string) string {
 func TestBundleToolWording(t *testing.T) {
 	banned := []string{"`Read`", "`Edit`", "`Write`", "TaskStop", "ToolSearch",
 		"run_in_background", `isolation: "worktree"`, "Skill tool", "`Agent`"}
-	for _, rel := range neutralFiles {
+	for _, rel := range bundleMarkdownFiles(t) {
+		if toolWordingExempt[filepath.Base(rel)] != "" && filepath.Dir(rel) == "." {
+			continue
+		}
 		got := stripToolNames(readFile(t, rel))
 		for _, b := range banned {
 			if strings.Contains(got, b) {
@@ -787,6 +770,17 @@ func TestBundleToolWording(t *testing.T) {
 		"run in the background", "ask a person"} {
 		if !strings.Contains(section, "| "+phrase+" |") {
 			t.Errorf("Tool names table needs a row for %q", phrase)
+		}
+	}
+}
+
+// TestInvestigateNamesCodexSessionLookup pins that gx-investigate points at the
+// Codex rollout path and the doctor command, not only Claude's transcripts.
+func TestInvestigateNamesCodexSessionLookup(t *testing.T) {
+	raw := readFile(t, "gx-investigate/SKILL.md")
+	for _, want := range []string{"gx codex doctor", "sessions/", "rollout-"} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("gx-investigate/SKILL.md must name %q", want)
 		}
 	}
 }

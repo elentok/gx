@@ -41,7 +41,7 @@ Pick tickets from the flag table. A ticket with no flags is **never** read.
   `gx config show` prints the effective config as JSON; read `.["evolve.deep-read-cap"]`.
 - Tickets flagged past the cap are not read; they appear as rows in step 4.
 
-Send **one message** with one `Agent` call per picked ticket (`general-purpose`, model from `gx agent model worker`,
+Start every subagent in one turn, one per picked ticket, then wait for all of them (`general-purpose`, model from `gx agent model worker`,
 foreground; a second word is its `reasoning_effort`, see [Skill conventions](../gx-local-tracker.md#skill-conventions)). Each gets the ticket id, its flag row, and the digest paths for its sessions. Brief:
 "Read these digests. Report what in the tooling or process cost time, tokens or correctness —
 prompts, skills, agent docs, gx/ralph-loop behaviour — each with a quoted line or ticket id as

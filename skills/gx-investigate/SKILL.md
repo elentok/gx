@@ -57,7 +57,10 @@ bare-repo checkout with linked worktrees keeps one shared root at the bare repo'
   `gx claude session-path <session-id> [--grep <pattern>]` instead of a manual `fd` search — it
   scans every project directory for you, so you don't need to slugify the cwd by hand; `--grep`
   prints only the transcript's matching lines instead of the path. Use it to see what the agent
-  actually did inside one iteration.
+  actually did inside one iteration. A Codex session has no such verb yet: its rollout is
+  `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl` (default `~/.codex/sessions`); find it by the
+  session id. If you suspect a Codex format mismatch, run `gx codex doctor`: its rollout-format
+  check names the missing field.
 - **`herdr`** (pane/session driver) is an external binary gx shells out to — its own pane/session
   state isn't a file in this repo and isn't readable through gx. If the symptom is at the
   tmux-pane level (hung pane, wrong agent launched), you're debugging herdr's process, not gx's
