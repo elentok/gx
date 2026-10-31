@@ -64,7 +64,7 @@ func (s *Server) resumeRefusal(meta sessionMeta) SessionResult {
 		return sessionRefusal(ReasonSessionNoResume, fmt.Sprintf("no Codex rollout for conversation %q in %s", meta.ConversationID, meta.Dir))
 	}
 	if msg := s.interactiveMissingReason(meta.Harness, "the session's harness"); msg != "" {
-		return sessionRefusal(ReasonHarnessMissing, msg)
+		return sessionRefusal(ReasonSessionHarnessMissing, msg)
 	}
 	return SessionResult{}
 }

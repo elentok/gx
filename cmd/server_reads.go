@@ -249,11 +249,16 @@ func newUsageCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "usage", Short: "usage gate", Args: cobra.NoArgs}
 	var jsonOut bool
 	override := &cobra.Command{
-		Use:   "override",
-		Short: "let new Claude claims start until the gating usage window resets (asks the server)",
-		Args:  cobra.NoArgs,
-		RunE: func(c *cobra.Command, _ []string) error {
-			return runUsageOverride(d.dial(), c, jsonOut)
+		Use:       "override [claude|codex]",
+		Short:     "let new claims of a harness start until its gating usage window resets (asks the server; default harness when none named)",
+		Args:      cobra.MatchAll(cobra.MaximumNArgs(1), cobra.OnlyValidArgs),
+		ValidArgs: []string{"claude", "codex"},
+		RunE: func(c *cobra.Command, args []string) error {
+			harness := ""
+			if len(args) > 0 {
+				harness = args[0]
+			}
+			return runUsageOverride(d.dial(), c, harness, jsonOut)
 		},
 	}
 	override.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result (or refusal) as JSON")
@@ -262,7 +267,7 @@ func newUsageCmd(d deps) *cobra.Command {
 }
 
 // runUsageOverride mirrors runBudgetWrite.
-func runUsageOverride(dial func() (*apiclient.Client, error), c *cobra.Command, jsonOut bool) error {
+func runUsageOverride(dial func() (*apiclient.Client, error), c *cobra.Command, harness string, jsonOut bool) error {
 	ctx := c.Context()
 	if ctx == nil {
 		ctx = context.Background()
@@ -271,7 +276,7 @@ func runUsageOverride(dial func() (*apiclient.Client, error), c *cobra.Command, 
 	if err != nil {
 		return err
 	}
-	res, err := cl.UsageOverride(ctx)
+	res, err := cl.UsageOverride(ctx, harness)
 	switch {
 	case apiclient.IsNotRunning(err):
 		res = server.UsageOverrideResult{Refused: true, Reason: server.ReasonServerNotRunning, Message: "no server is running; start it with `gx server start`"}

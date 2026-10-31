@@ -123,6 +123,83 @@ func LastRateLimitIn(home, cwd, sessionID string) (limit RateLimit, ok bool, err
 	return limit, ok, nil
 }
 
+// UsageWindow is one rate-limit window of a Codex sample at any percentage.
+type UsageWindow struct {
+	Minutes     int
+	UsedPercent float64
+	ResetsAt    time.Time
+}
+
+// UsageSample is the newest rate-limit reading of a rollout. A window the
+// reading lacked (null) is absent from Windows.
+type UsageSample struct {
+	SeenAt  time.Time
+	Windows []UsageWindow
+}
+
+// LatestUsageIn returns the newest rate-limit sample for sessionID launched in
+// cwd, read from the Codex home directory, whatever the used percentage. Unlike
+// LastRateLimitIn it is not limited to exhausted windows. Missing, partial and
+// malformed session data return ok=false.
+func LatestUsageIn(home, cwd, sessionID string) (sample UsageSample, ok bool, err error) {
+	if cwd == "" || sessionID == "" {
+		return UsageSample{}, false, nil
+	}
+	err = walkSessionFiles(home, sessionID, func(path string) error {
+		value, valid, readErr := readUsageSample(path, cwd, sessionID)
+		if readErr != nil {
+			return readErr
+		}
+		if valid && (!ok || value.SeenAt.After(sample.SeenAt)) {
+			sample, ok = value, true
+		}
+		return nil
+	})
+	if err != nil {
+		return UsageSample{}, false, err
+	}
+	return sample, ok, nil
+}
+
+func readUsageSample(path, cwd, sessionID string) (sample UsageSample, ok bool, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return UsageSample{}, false, err
+	}
+	defer f.Close()
+
+	matchingSession := false
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	for scanner.Scan() {
+		var line sessionLine
+		if json.Unmarshal(scanner.Bytes(), &line) != nil {
+			continue
+		}
+		if line.Type == "session_meta" {
+			matchingSession = line.Payload.ID == sessionID && sameDir(line.Payload.Cwd, cwd)
+			continue
+		}
+		if !matchingSession || line.Type != "event_msg" || line.Payload.Type != "token_count" {
+			continue
+		}
+		var windows []UsageWindow
+		for _, q := range []quotaWindow{line.Payload.RateLimits.Primary, line.Payload.RateLimits.Secondary} {
+			if hasQuotaData(q) && q.WindowMinutes > 0 && q.ResetsAt > 0 {
+				windows = append(windows, UsageWindow{Minutes: q.WindowMinutes, UsedPercent: q.UsedPercent, ResetsAt: time.Unix(q.ResetsAt, 0)})
+			}
+		}
+		if len(windows) == 0 {
+			continue
+		}
+		sample, ok = UsageSample{SeenAt: line.Timestamp, Windows: windows}, true
+	}
+	if err := scanner.Err(); err != nil {
+		return UsageSample{}, false, err
+	}
+	return sample, ok, nil
+}
+
 func walkSessionFiles(home, sessionID string, visit func(path string) error) error {
 	sessionsDir := filepath.Join(home, "sessions")
 	err := filepath.WalkDir(sessionsDir, func(path string, entry fs.DirEntry, walkErr error) error {
@@ -228,8 +305,9 @@ func readStats(path, cwd, sessionID string) (stats Stats, ok bool, err error) {
 }
 
 type quotaWindow struct {
-	UsedPercent float64 `json:"used_percent"`
-	ResetsAt    int64   `json:"resets_at"`
+	UsedPercent   float64 `json:"used_percent"`
+	WindowMinutes int     `json:"window_minutes"`
+	ResetsAt      int64   `json:"resets_at"`
 }
 
 func readContextTokens(path, cwd, sessionID string) (tokens int, ok bool, err error) {

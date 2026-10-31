@@ -15,6 +15,10 @@ const UsageLimitPercent = 98
 type UsageWindow struct {
 	UsedPercentage float64 `json:"used_percentage"`
 	ResetsAt       int64   `json:"resets_at"`
+	// Name is the window as the gate wording calls it. Claude's statusline
+	// payload has none (the slot names it); a Codex sample sets it from its
+	// window length.
+	Name string `json:"name,omitempty"`
 }
 
 // UsageRecord is the last rate_limits payload a pty agent's statusline saw.

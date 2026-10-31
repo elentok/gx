@@ -1,7 +1,7 @@
 import { Box, Text } from "@chakra-ui/react";
 import { postJson } from "./design/open";
 import type { PendingRow, UsageOverrideResult } from "./generated/server";
-import { VerdictUsagePrefix } from "./generated/server";
+import { VerdictUsagePrefixClaude, VerdictUsagePrefixCodex } from "./generated/server";
 import { Button } from "./ui/button/Button";
 import { refusalText, useWrite } from "./useWrite";
 
@@ -50,7 +50,7 @@ export function VerdictLine({
       <Text data-verdict fontSize="13px" color="text.dim" overflowWrap="anywhere">
         {text}
       </Text>
-      {text.startsWith(VerdictUsagePrefix) && <UsageOverrideButton override={overrideUsage} />}
+      {(text.startsWith(VerdictUsagePrefixClaude) || text.startsWith(VerdictUsagePrefixCodex)) &&<UsageOverrideButton override={overrideUsage} />}
     </Box>
   );
 }

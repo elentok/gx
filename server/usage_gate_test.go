@@ -45,8 +45,8 @@ func TestUsageGate_HoldsClaudeClaimsOnly(t *testing.T) {
 		rec  nativerunner.UsageRecord
 		want string // "" means not gated
 	}{
-		{"five-hour at 98", nativerunner.UsageRecord{SeenAt: time.Now(), FiveHour: window(98)}, "usage at 98% of the 5-hour limit, resets " + resets.UTC().Format(time.RFC3339)},
-		{"weekly at 98", nativerunner.UsageRecord{SeenAt: time.Now(), FiveHour: window(10), SevenDay: window(98)}, "usage at 98% of the weekly limit, resets " + resets.UTC().Format(time.RFC3339)},
+		{"five-hour at 98", nativerunner.UsageRecord{SeenAt: time.Now(), FiveHour: window(98)}, "Claude usage: 98% of the 5-hour limit, resets " + resets.UTC().Format(time.RFC3339)},
+		{"weekly at 98", nativerunner.UsageRecord{SeenAt: time.Now(), FiveHour: window(10), SevenDay: window(98)}, "Claude usage: 98% of the weekly limit, resets " + resets.UTC().Format(time.RFC3339)},
 		{"97 does not gate", nativerunner.UsageRecord{SeenAt: time.Now(), FiveHour: window(97), SevenDay: window(97)}, ""},
 	}
 	for _, c := range cases {
@@ -115,12 +115,12 @@ func TestUsageGate_OverrideLetsAClaudeTicketClaim(t *testing.T) {
 	if n := len(pty.Prompts("epic-a-iter-01")); n != 0 {
 		t.Fatalf("claimed %d prompts while gated", n)
 	}
-	res, err := h.Client.UsageOverride(ctx)
+	res, err := h.Client.UsageOverride(ctx, "")
 	if err != nil || res.Refused {
 		t.Fatalf("override: %+v, %v", res, err)
 	}
 	servertest.WaitFor(t, 10*time.Second, "the claim lands after the override", func() bool { return len(pty.Prompts("epic-a-iter-01")) > 0 })
-	res, err = h.Client.UsageOverride(ctx)
+	res, err = h.Client.UsageOverride(ctx, "")
 	if err != nil || !res.Refused || res.Reason != server.ReasonNotGated {
 		t.Errorf("second override = %+v, %v; want refused %s", res, err, server.ReasonNotGated)
 	}

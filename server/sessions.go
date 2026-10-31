@@ -37,7 +37,7 @@ const EventSessionChanged = "session-changed"
 const (
 	ReasonSessionBadRequest     = "bad-request"
 	ReasonSessionUnknownHarness = "unknown-harness"
-	ReasonHarnessMissing        = "harness-missing"
+	ReasonSessionHarnessMissing = "harness-missing"
 	ReasonSessionUnknown        = "unknown-session"
 	ReasonSessionLive           = "session-live"
 	ReasonSessionNotLive        = "session-not-live"
@@ -148,7 +148,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		return sessionRefusal(ReasonSessionUnknownHarness, err.Error()), nil
 	}
 	if msg := s.interactiveMissingReason(req.Harness, from); msg != "" {
-		return sessionRefusal(ReasonHarnessMissing, msg), nil
+		return sessionRefusal(ReasonSessionHarnessMissing, msg), nil
 	}
 	conv, err := nativerunner.NewUUID()
 	if err != nil {

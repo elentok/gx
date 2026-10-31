@@ -158,7 +158,7 @@ func TestClaimHold_RateLimitHoldReasonWinsOverUsageGate(t *testing.T) {
 	s.scanUsage()
 
 	h, held := s.claimHold("proj", tickets.Ticket{}, ResolvedHarness{Harness: ralphloop.AgentClaude})
-	if !held || !strings.HasPrefix(h.Verdict, "usage at 99% of the 5-hour limit") {
+	if !held || !strings.HasPrefix(h.Verdict, "Claude usage: 99% of the 5-hour limit") {
 		t.Fatalf("gate alone = %+v, %v", h, held)
 	}
 

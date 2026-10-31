@@ -1,11 +1,11 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VerdictUsagePrefix } from "./generated/server";
+import { VerdictUsagePrefixClaude } from "./generated/server";
 import { renderThemed } from "./ui/render";
 import { VerdictLine } from "./verdict";
 
-const gated = `${VerdictUsagePrefix}99% of the weekly limit, resets 2026-11-02T00:00:00Z`;
+const gated = `${VerdictUsagePrefixClaude}99% of the weekly limit, resets 2026-11-02T00:00:00Z`;
 
 describe("VerdictLine usage override", () => {
   afterEach(() => vi.unstubAllGlobals());

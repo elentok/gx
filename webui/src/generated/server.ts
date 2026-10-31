@@ -1692,6 +1692,7 @@ export interface SessionBackgroundTask {
 export const EventSessionChanged = "session-changed";
 export const ReasonSessionBadRequest = "bad-request";
 export const ReasonSessionUnknownHarness = "unknown-harness";
+export const ReasonSessionHarnessMissing = "harness-missing";
 export const ReasonSessionUnknown = "unknown-session";
 export const ReasonSessionLive = "session-live";
 export const ReasonSessionNotLive = "session-not-live";
@@ -1704,7 +1705,7 @@ export const ReasonSessionNameTaken = "name-taken";
 /**
  * Refusal reasons of the interactive-session writes.
  */
-export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken;
+export type ReasonSession = typeof ReasonSessionBadRequest | typeof ReasonSessionUnknownHarness | typeof ReasonSessionHarnessMissing | typeof ReasonSessionUnknown | typeof ReasonSessionLive | typeof ReasonSessionNotLive | typeof ReasonSessionNotIdle | typeof ReasonSessionNoAction | typeof ReasonSessionDirGone | typeof ReasonSessionNoResume | typeof ReasonSessionNotDesign | typeof ReasonSessionNameTaken;
 export const SessionStarting = "starting";
 export const SessionWorking = "working";
 export const SessionIdle = "idle";
@@ -2073,6 +2074,13 @@ export interface UsageOverrideResult {
  * ReasonNotGated refuses a usage override when no window is gating.
  */
 export const ReasonNotGated = "not-gated";
+/**
+ * UsageOverrideRequest names the harness whose gate to lift; empty means the
+ * Default harness.
+ */
+export interface UsageOverrideRequest {
+  harness?: string;
+}
 
 //////////
 // source: verdicts.go
@@ -2088,10 +2096,11 @@ export const VerdictConcurrencyCap = "concurrency cap";
 export const VerdictNotQueued = "not queued";
 export const VerdictRateLimited = "rate-limited";
 /**
- * VerdictUsagePrefix starts every usage-gate verdict (the rest is the
- * window and its reset); the web shows its override button on it.
+ * These start every usage-gate verdict, one per harness (the rest is the
+ * window and its reset); the web shows its override button on them.
  */
-export const VerdictUsagePrefix = "usage at ";
+export const VerdictUsagePrefixClaude = "Claude usage: ";
+export const VerdictUsagePrefixCodex = "Codex usage: ";
 export const VerdictWaitingOnAnswer = "waiting on answer";
 export const VerdictWaitingReleased = "waiting (slot released)";
 export const VerdictWaitingReleaseCapd = "waiting (slot held, release cap reached)";
@@ -2099,7 +2108,7 @@ export const VerdictWaitingReleaseCapd = "waiting (slot held, release cap reache
  * Verdicts only the server's queue and slot state can give. The rest are the
  * scheduler's own decision words (blocked, stalled, done, error, claimed, ...).
  */
-export type Verdict = typeof VerdictEligible | typeof VerdictWaitingInQueue | typeof VerdictConcurrencyCap | typeof VerdictNotQueued | typeof VerdictRateLimited | typeof VerdictUsagePrefix | typeof VerdictWaitingOnAnswer | typeof VerdictWaitingReleased | typeof VerdictWaitingReleaseCapd;
+export type Verdict = typeof VerdictEligible | typeof VerdictWaitingInQueue | typeof VerdictConcurrencyCap | typeof VerdictNotQueued | typeof VerdictRateLimited | typeof VerdictUsagePrefixClaude | typeof VerdictUsagePrefixCodex | typeof VerdictWaitingOnAnswer | typeof VerdictWaitingReleased | typeof VerdictWaitingReleaseCapd;
 /**
  * PendingRow is one queue entry with its explain verdict.
  */

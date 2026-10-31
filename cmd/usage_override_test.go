@@ -20,13 +20,13 @@ func TestRunUsageOverride_RefusesWhenNothingGates(t *testing.T) {
 	var out bytes.Buffer
 	c.SetOut(&out)
 
-	err := runUsageOverride(dial, c, false)
+	err := runUsageOverride(dial, c, "", false)
 	if err == nil || !strings.Contains(err.Error(), server.ReasonNotGated) {
 		t.Fatalf("err = %v, want a %s refusal", err, server.ReasonNotGated)
 	}
 
 	out.Reset()
-	if err := runUsageOverride(dial, c, true); err != nil {
+	if err := runUsageOverride(dial, c, "", true); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), `"reason": "`+server.ReasonNotGated+`"`) && !strings.Contains(out.String(), `"reason":"`+server.ReasonNotGated+`"`) {

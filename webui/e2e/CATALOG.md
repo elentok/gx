@@ -1317,4 +1317,4 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
 - **Steps:**
   1. Open the `gated-epic` page.
   2. Click "Override" on the ticket's verdict line.
-- **Pass:** the ticket reads "usage at 99% of the weekly limit, resets <time>" with an Override button. After the click the verdict is gone and the ticket starts, without a reload.
+- **Pass:** the ticket reads "Claude usage: 99% of the weekly limit, resets <time>" with an Override button. After the click the verdict is gone and the ticket starts, without a reload.

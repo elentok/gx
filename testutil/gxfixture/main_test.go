@@ -561,7 +561,7 @@ func TestUsageGatedScenario_ServerSeesTheUsageSample(t *testing.T) {
 	r := start(t, "usage-gated")
 	const gated = "demo:gated-epic/01"
 	if !testutil.Poll(60*time.Second, time.Second, func() bool {
-		return strings.Contains(r.gx(t, "server", "tickets", "explain", gated), "usage at 99% of the weekly limit")
+		return strings.Contains(r.gx(t, "server", "tickets", "explain", gated), "Claude usage: 99% of the weekly limit")
 	}) {
 		t.Fatalf("explain %s = %q, want the usage gate", gated, r.gx(t, "server", "tickets", "explain", gated))
 	}

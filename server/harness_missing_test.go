@@ -86,7 +86,7 @@ func TestCreateSession_HarnessMissingRefused(t *testing.T) {
 	defer cancel()
 
 	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Worktree: "feature"})
-	if err != nil || !res.Refused || res.Reason != server.ReasonHarnessMissing {
+	if err != nil || !res.Refused || res.Reason != server.ReasonSessionHarnessMissing {
 		t.Fatalf("create = %+v, %v; want a harness-missing refusal", res, err)
 	}
 	for _, want := range []string{"codex is not on PATH", "the global default", "Install it or change the default harness"} {

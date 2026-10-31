@@ -43,7 +43,7 @@ func (s *Server) handoffRefusal(meta sessionMeta, action []string) (SessionResul
 	if msg == "" {
 		return SessionResult{}, false
 	}
-	return sessionRefusal(ReasonHarnessMissing, msg), true
+	return sessionRefusal(ReasonSessionHarnessMissing, msg), true
 }
 
 // chartingHandoff ends the session's strongest-tier conversation and starts a

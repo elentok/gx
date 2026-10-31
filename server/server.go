@@ -291,7 +291,8 @@ type Server struct {
 	pause        *pauseState
 	afk          *afkState
 	ledger       *budgetLedger
-	usage        *usageSamples
+	usage        *usageSamples // Claude's
+	usageCodex   *usageSamples
 	budgetNotes  budgetNotes
 	hardGrace    hardGrace
 	extraUsage   extraUsageNotes
@@ -493,6 +494,7 @@ func New(cfg Config) (*Server, error) {
 		afk:         afk,
 		ledger:      ledger,
 		usage:       openUsageSamples(cfg.StateDir),
+		usageCodex:  openUsageFiles(cfg.StateDir, usageSampleFileCodex, usageLiftFileCodex),
 		costOf:      iterationCostIn(cfg.Env),
 		mergeInto:   git.MergeBranchInto,
 		mergedProbe: git.IsAncestor,
