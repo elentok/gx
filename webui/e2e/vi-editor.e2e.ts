@@ -338,6 +338,76 @@ test.describe("123. Vi editor: layouts and touch bar", () => {
       await expect(dialog.getByRole("button", nav("Done"))).toBeVisible();
       await expect(dialog.getByRole("button")).toHaveCount(1);
     });
+
+    test("390px mouse, vi on: title header, footer with Done and mode text, no bar and no x button", async ({ page, start }) => {
+      const fixture = await start("design-working");
+      await setViMode(fixture, page, true);
+      const dialog = await openEditor(page, 390, 800);
+      await expect(dialog.getByText("Message to the agent", { exact: true })).toBeVisible();
+      await expect(dialog.getByTestId("editor-bar")).toHaveCount(0);
+      await expect(dialog.getByRole("status")).toHaveText("INSERT");
+      await expect(dialog.getByRole("button")).toHaveCount(1);
+      await expect(dialog.getByRole("button", nav("Done"))).toBeVisible();
+    });
+
+    test("1280px mouse: the mode text sits left of the footer and follows the mode; vi off has none", async ({ page, start }) => {
+      const fixture = await start("design-working");
+      await setViMode(fixture, page, true);
+      const dialog = await openEditor(page, 1280, 900);
+      const text = dialog.getByRole("status");
+      await expect(text).toHaveText("INSERT");
+      const saved = (await dialog.getByText("Saved as you type").boundingBox())!;
+      expect((await text.boundingBox())!.x).toBeLessThan(saved.x);
+      const editable = dialog.getByRole("textbox", nav("Message to the agent text"));
+      await editable.click();
+      await page.keyboard.press("Escape");
+      await expect(text).toHaveText("NORMAL");
+      await page.keyboard.press("i");
+      await expect(text).toHaveText("INSERT");
+      await expectDoneCloses(page, dialog);
+    });
+
+    test("1280px mouse, vi off: no mode text", async ({ page, start }) => {
+      await start("design-working");
+      const dialog = await openEditor(page, 1280, 900);
+      await expect(dialog.getByRole("status")).toHaveCount(0);
+    });
+  });
+
+  test.describe("touch, vi on", () => {
+    test.use(touch);
+
+    test("390px touch, vi on: the bar has the mode text, Esc and Done; Esc leaves insert; Done closes", async ({ page, start }) => {
+      const fixture = await start("design-working");
+      await setViMode(fixture, page, true);
+      const dialog = await openEditor(page, 390, 800);
+      const bar = dialog.getByTestId("editor-bar");
+      const pill = bar.getByTestId("vi-mode-pill");
+      const esc = bar.getByRole("button", nav("Esc"));
+      const done = bar.getByRole("button", nav("Done"));
+      await expect(pill).toHaveText("INSERT");
+      await expect(bar.getByRole("button")).toHaveCount(2);
+      await expect(esc).toBeVisible();
+      await expect(done).toBeVisible();
+      for (const target of [pill, esc, done]) {
+        const box = (await target.boundingBox())!;
+        expect(Math.abs(box.height - 44)).toBeLessThanOrEqual(TOLERANCE);
+      }
+      await esc.click();
+      await expect(pill).toHaveText("NORMAL");
+      await expectDoneCloses(page, dialog);
+    });
+
+    test("1280px touch, vi on: title header and bar, no footer, one Done and one mode text", async ({ page, start }) => {
+      const fixture = await start("design-working");
+      await setViMode(fixture, page, true);
+      const dialog = await openEditor(page, 1280, 900);
+      await expect(dialog.getByText("Message to the agent", { exact: true })).toBeVisible();
+      await expect(dialog.getByTestId("editor-bar")).toBeVisible();
+      await expect(dialog.getByText("Saved as you type")).toHaveCount(0);
+      await expect(dialog.getByRole("button", nav("Done"))).toHaveCount(1);
+      await expect(dialog.getByRole("status")).toHaveCount(1);
+    });
   });
 });
 

@@ -1439,6 +1439,12 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   2. Touch at 390 px: read the bar, click Done. Touch at 1280 px: read the modal height.
   3. Mouse at 1280 px: read the modal size, header and footer; click Done.
 - **Pass:** a touch device reports `(pointer: coarse)`. At 390 px with touch the bar holds Done only (no pill, no Esc) and Done closes the editor. At 1280 px with touch the bar shows and the modal is at most 680 px high. At 1280 px with a mouse there is no bar; the modal is 860 by 680 with the title, "Saved as you type", Done and no x button; Done closes it.
+- **Vi on** (`gx vimode on`, wait for the menu's "Vi mode" item to be checked):
+  1. Touch at 390 px: read the bar, the heights of the pill, Esc and Done; click Esc, then Done.
+  2. Touch at 1280 px: read the header, bar, footer, Done buttons and status text.
+  3. Mouse at 390 px: read the header, footer and buttons.
+  4. Mouse at 1280 px: read the mode text position; click the editor, press Esc, then `i`; click Done. With vi off, open the editor and read the status text.
+- **Pass (vi on):** at 390 px with touch the bar holds the mode text pill, Esc and Done, each 44 px high; Esc turns INSERT into NORMAL; Done closes. At 1280 px with touch there is the title header and the bar, no "Saved as you type" footer, one Done and one `role="status"` mode text. At 390 px with a mouse there is the title header and a footer with Done and the mode text, no bar and no x button. At 1280 px with a mouse the mode text is left of "Saved as you type", reads INSERT, NORMAL after Esc, INSERT after `i`; with vi off there is no mode text.
 
 ## 124. Vi editor: open, close and submit
 
