@@ -150,6 +150,34 @@ func TestRunner_OneOffWithoutAKnownAgentUsesTheQueueItemAgent(t *testing.T) {
 	}
 }
 
+// A plain one-off and the evolve retro pin no harness, so with the default on
+// codex both claim on codex.
+func TestRunner_UnpinnedOneOffAndRetroClaimOnTheDefaultHarness(t *testing.T) {
+	t.Parallel()
+	retro := server.RetroSubmit("proj", "epic-a", time.Date(2026, 10, 10, 14, 5, 0, 0, time.UTC))
+	for name, req := range map[string]server.OneOffRequest{
+		"plain": {Prompt: "plain job", Name: "plain-job", Project: "proj"},
+		"retro": retro,
+	} {
+		// A harness per request: the epic's root runs one ticket at a time.
+		store := t.TempDir()
+		servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
+		fake := runnerfake.NewRunner()
+		h := startOneOffsHarness(t, store, servertest.WithRunner(fake), func(c *server.Config) { c.AgentsDefaultHarness = "codex" })
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		res, err := h.Client.OneOff(ctx, req)
+		if err != nil || res.Refused {
+			t.Fatalf("%s: %+v, %v", name, res, err)
+		}
+		for label, kind := range waitForAgentKinds(t, fake, "01") {
+			if kind != "codex" {
+				t.Errorf("%s: %s started as %q, want the default codex", name, label, kind)
+			}
+		}
+		cancel()
+	}
+}
+
 // The one-offs epic is a standing inbox: with every ticket done it is not
 // stamped, merged or retro'd.
 func TestCompleteRootIfDone_AllDoneOneOffsEpicNeverMerges(t *testing.T) {

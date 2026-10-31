@@ -43,7 +43,7 @@ func (f *schedFixture) pauseRoot(t *testing.T) server.Event {
 // assertRootQueued checks the paused root was not dequeued.
 func (f *schedFixture) assertRootQueued(t *testing.T) {
 	t.Helper()
-	q, err := f.h.Client.Queue(context.Background())
+	q, err := f.h.Client.QueueItems(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -316,6 +316,34 @@ func TestEpicMerge_DirtyTrunkPausesTheRootAndLeavesItQueued(t *testing.T) {
 	f.assertStamps(t, false)
 }
 
+// The root a merge re-queues pins no harness: its item has an empty agent, so
+// the merge's code-review, verify and evolve tickets follow the Default harness.
+func TestEpicMerge_RequeuedRootHasNoAgent(t *testing.T) {
+	t.Parallel()
+	f := newFFFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	completedUnmerged(ctx, t, f)
+	root := "proj:" + schedEpic + "/01"
+	testutil.WriteFile(t, f.repo, "01.txt", "local")
+	if _, err := f.h.Client.EpicMerge(ctx, "proj:"+schedEpic); err != nil {
+		t.Fatal(err)
+	}
+	q, err := f.h.Client.QueueItems(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range q {
+		if it.Address == root {
+			if it.Agent != "" {
+				t.Errorf("re-queued root agent = %q, want empty", it.Agent)
+			}
+			return
+		}
+	}
+	t.Errorf("root %s was not re-queued: %+v", root, q)
+}
+
 func TestEpicMerge_MergeErrorReturnsAMergeErrorPause(t *testing.T) {
 	t.Parallel()
 	f := newFFFixture(t)

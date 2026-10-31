@@ -56,6 +56,9 @@ func TestCPUSpike_MaintainerFilesOneTicketThenCoolsDown(t *testing.T) {
 			t.Errorf("ticket lacks %q:\n%s", want, body)
 		}
 	}
+	if strings.Contains(string(body), "agent:") {
+		t.Errorf("diagnose ticket pins an agent:\n%s", body)
+	}
 
 	again, err := h.Client.CPUSpike(ctx, testSpike)
 	if err != nil || again.Address != "" || !strings.Contains(again.Message, "cooling down") {

@@ -68,6 +68,43 @@ func TestServerOneOff_TypeFlagReachesTheServerRequest(t *testing.T) {
 	}
 }
 
+// Only --agent sends an agent; without it the request names none, so the
+// ticket follows the Default harness.
+func TestServerOneOff_AgentFlagIsSentOnlyWhenGiven(t *testing.T) {
+	sock := filepath.Join(shortTempDir(t), "a.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got server.OneOffRequest
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/oneoff", func(w http.ResponseWriter, r *http.Request) {
+		got = server.OneOffRequest{}
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_ = json.NewEncoder(w).Encode(server.OneOffResult{Address: "gx:p/01", Status: server.OneOffStatusQueued})
+	})
+	srv := &http.Server{Handler: mux}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{{[]string{"a prompt"}, ""}, {[]string{"a prompt", "--agent", "codex"}, "codex"}} {
+		cmd := newServerOneOffCmd(deps{env: envFor(t), serverClient: func() (*apiclient.Client, error) { return apiclient.New(sock), nil }})
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetArgs(tc.args)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("%v: %v", tc.args, err)
+		}
+		if got.Agent != tc.want {
+			t.Errorf("%v sent agent %q, want %q", tc.args, got.Agent, tc.want)
+		}
+	}
+}
+
 func TestServerOneOff_NameFlagPrintsTheSharedEpicAddress(t *testing.T) {
 	sock := filepath.Join(shortTempDir(t), "a.sock")
 	ln, err := net.Listen("unix", sock)

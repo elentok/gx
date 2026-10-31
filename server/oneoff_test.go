@@ -15,14 +15,14 @@ import (
 	"github.com/elentok/gx/tickets"
 )
 
-func startOneOffHarness(t *testing.T) (*servertest.Harness, string) {
+func startOneOffHarness(t *testing.T, opts ...func(*server.Config)) (*servertest.Harness, string) {
 	t.Helper()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "epic-a", "01", "root", "")
 	servertest.SetProjectRepo(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, func(c *server.Config) {
+	h := servertest.StartWithStore(t, store, append(opts, func(c *server.Config) {
 		c.PollInterval = 50 * time.Millisecond
-	})
+	})...)
 	if _, err := h.Client.QueuePause(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -216,6 +216,52 @@ func TestOneOff_FilePayloadSetsFieldsAndFlagsOverride(t *testing.T) {
 	}
 }
 
+// Only an explicit choice (request or payload frontmatter) pins an agent; with
+// the default on codex a plain submit pins nothing and queues an empty agent.
+func TestOneOff_AgentIsPinnedOnlyByAnExplicitChoice(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	payload := filepath.Join(t.TempDir(), "payload.md")
+	if err := os.WriteFile(payload, []byte("---\nagent: codex\n---\nfrom the file\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name      string
+		req       server.OneOffRequest
+		wantAgent string
+	}{
+		{"plain", server.OneOffRequest{Prompt: "plain job", Name: "plain-job"}, ""},
+		{"flag", server.OneOffRequest{Prompt: "flag job", Name: "flag-job", Agent: "claude"}, "claude"},
+		{"payload", server.OneOffRequest{File: payload, Name: "payload-job"}, "codex"},
+	}
+	for _, c := range cases {
+		// A harness per case: the epic's root is queued once, by its first one-off.
+		h, repo := startOneOffHarness(t, func(c *server.Config) { c.AgentsDefaultHarness = "codex" })
+		c.req.Cwd = repo
+		res, err := h.Client.OneOff(ctx, c.req)
+		if err != nil || res.Refused {
+			t.Fatalf("%s: %+v, %v", c.name, res, err)
+		}
+		raw := readOneOffTicket(t, h, res.Address)
+		if c.wantAgent == "" && strings.Contains(raw, "agent:") {
+			t.Errorf("%s: ticket pins an agent:\n%s", c.name, raw)
+		}
+		if c.wantAgent != "" && !strings.Contains(raw, "agent: "+c.wantAgent+"\n") {
+			t.Errorf("%s: ticket lacks agent: %s:\n%s", c.name, c.wantAgent, raw)
+		}
+		q, _ := h.Client.QueueItems(ctx)
+		var got *server.QueueItem
+		for i := range q {
+			if q[i].Address == res.Address {
+				got = &q[i]
+			}
+		}
+		if got == nil || got.Agent != c.wantAgent {
+			t.Errorf("%s: queue item = %+v, want agent %q", c.name, got, c.wantAgent)
+		}
+	}
+}
+
 func TestOneOff_RefusesBadOptionsAndCreatesNothing(t *testing.T) {
 	t.Parallel()
 	h, repo := startOneOffHarness(t)
@@ -289,6 +335,9 @@ func TestOneOff_RetroSubmitCreatesEvolveTicketAndRefusesALiveDuplicate(t *testin
 		if !strings.Contains(string(raw), want) {
 			t.Errorf("ticket lacks %q:\n%s", want, raw)
 		}
+	}
+	if strings.Contains(string(raw), "agent:") {
+		t.Errorf("retro ticket pins an agent:\n%s", raw)
 	}
 
 	again := server.RetroSubmit("proj", "epic-a", at.Add(time.Hour))
