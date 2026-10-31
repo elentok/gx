@@ -33,6 +33,8 @@ type Pty struct {
 	Holder []string
 	// Claude is the claude executable; defaults to "claude" on PATH.
 	Claude string
+	// Codex is the codex executable; defaults to "codex" on PATH.
+	Codex string
 	// PollInterval is how often the holder is asked for claude's state.
 	PollInterval time.Duration
 	// StartTimeout bounds Start's wait for claude to turn idle.
@@ -128,7 +130,7 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 		_ = cmd.Wait()
 		close(ss.exited)
 	}()
-	if err := p.launch(ss, dir, opts.Cwd); err != nil {
+	if err := p.launch(ss, dir, opts.Cwd, ptyKind(opts)); err != nil {
 		killLaunch(ss.claudePID, ss.holderPID)
 		<-ss.exited
 		return agentrunner.Session{}, err
@@ -144,7 +146,11 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 
 // launch connects to the holder ss started, records meta.json and waits for
 // claude to turn idle.
-func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
+func (p *Pty) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) error {
+	h, err := harness.Lookup(kind)
+	if err != nil {
+		return err
+	}
 	deadline := time.Now().Add(p.startTimeout())
 	for {
 		holder, err := DialHolder(dir)
@@ -223,7 +229,7 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string) error {
 			if err != nil {
 				return err
 			}
-			if startup := ptyHarness.StartupScreen(scrolled, rows); startup.Dialog == harness.TrustDialog {
+			if startup := h.StartupScreen(scrolled, rows); startup.Dialog == harness.TrustDialog {
 				if err := ss.holder.SendKeys(startup.Key); err != nil {
 					return err
 				}
@@ -342,26 +348,15 @@ func (p *Pty) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec
 		}
 		holder = []string{exe, "agent-holder"}
 	}
-	claudeArgs, err := ptyLaunchArgs(opts.Args, dir)
+	kind := ptyKind(opts)
+	launch, err := p.launchCommand(opts, dir, sessionID)
 	if err != nil {
 		return nil, err
 	}
-	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: claudeArgs, Env: slices.Concat(p.Env, opts.Env)}
-	var launch harness.Command
-	if opts.ResumeSessionID != "" {
-		// --resume and --session-id fail together, so claude gets only --resume.
-		// The holder still takes --session-id below.
-		launch, _ = ptyHarness.Resume(opts.ResumeSessionID, launchOpts)
-	} else {
-		launch = ptyHarness.Launch(launchOpts)
-	}
-	if p.Claude != "" {
-		launch.Name = p.Claude
-	}
 	args := slices.Concat(holder[1:],
 		// The holder takes the session id too, so its cmdline passes the
-		// liveness check like claude's.
-		[]string{"--session-id", sessionID, "--harness", string(harness.Claude), "--dir", dir, "--", launch.Name},
+		// liveness check like the agent's.
+		[]string{"--session-id", sessionID, "--harness", string(kind), "--dir", dir, "--", launch.Name},
 		launch.Args)
 	cmd := exec.Command(holder[0], args...)
 	cmd.Dir = opts.Cwd
@@ -372,14 +367,50 @@ func (p *Pty) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec
 	return cmd, nil
 }
 
-// ptyHarness is the loop's harness: always claude.
-var ptyHarness = func() harness.Harness {
-	h, err := harness.Lookup(harness.Claude)
-	if err != nil {
-		panic(err)
+// ptyKind is the harness a launch runs; an empty Kind means claude.
+func ptyKind(opts agentrunner.StartOptions) agentrunner.Kind {
+	if opts.Kind == "" {
+		return harness.Claude
 	}
-	return h
-}()
+	return opts.Kind
+}
+
+// launchCommand is the command that runs the agent for opts in its pty.
+func (p *Pty) launchCommand(opts agentrunner.StartOptions, dir, sessionID string) (harness.Command, error) {
+	kind := ptyKind(opts)
+	h, err := harness.Lookup(kind)
+	if err != nil {
+		return harness.Command{}, err
+	}
+	args := opts.Args
+	if kind == harness.Claude {
+		// Only claude takes the statusline settings; another harness's args
+		// come from the caller whole.
+		if args, err = ptyLaunchArgs(opts.Args, dir); err != nil {
+			return harness.Command{}, err
+		}
+	}
+	launchOpts := harness.LaunchOptions{SessionID: sessionID, Args: args, Env: slices.Concat(p.Env, opts.Env)}
+	var launch harness.Command
+	if opts.ResumeSessionID != "" {
+		// --resume and --session-id fail together, so the agent gets only
+		// --resume. The holder still takes --session-id.
+		launch, _ = h.Resume(opts.ResumeSessionID, launchOpts)
+	} else {
+		launch = h.Launch(launchOpts)
+	}
+	switch kind {
+	case harness.Claude:
+		if p.Claude != "" {
+			launch.Name = p.Claude
+		}
+	case harness.Codex:
+		if p.Codex != "" {
+			launch.Name = p.Codex
+		}
+	}
+	return launch, nil
+}
 
 func ptyLaunchArgs(extra []string, dir string) ([]string, error) {
 	exe, err := os.Executable()

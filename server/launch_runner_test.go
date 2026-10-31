@@ -13,28 +13,34 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
-func TestLaunchRunner_CodexGoesToHerdrWhateverNativeRunnerIsConfigured(t *testing.T) {
+// Codex runs on pty under every config but herdr, which hosts it only when
+// configured; Claude stays on the configured runner.
+func TestLaunchRunner_CodexRunsOnPtyUnlessHerdrIsConfigured(t *testing.T) {
 	t.Parallel()
-	for _, native := range []string{"pty", "headless"} {
-		t.Run(native, func(t *testing.T) {
+	for _, tc := range []struct{ configured, codexOn string }{
+		{"pty", "pty"},
+		{"headless", "pty"},
+		{"herdr", "herdr"},
+	} {
+		t.Run(tc.configured, func(t *testing.T) {
 			t.Parallel()
 			store, repo := t.TempDir(), testutil.TempRepo(t)
 			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "codex one", "")
 			servertest.WriteTicket(t, store, "proj", "epic-b", "01", "claude one", "")
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			configured := namedFake{runnerfake.NewRunner(), native}
-			herdr := namedFake{runnerfake.NewRunner(), "herdr"}
+			fakes := map[string]namedFake{}
+			for _, name := range []string{"pty", "headless", "herdr"} {
+				fakes[name] = namedFake{runnerfake.NewRunner(), name}
+			}
+			configured := fakes[tc.configured]
 			h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(configured, func(name, _ string) agentrunner.Runner {
-				switch name {
-				case native:
-					return configured
-				case "herdr":
-					return herdr
+				if f, ok := fakes[name]; ok {
+					return f
 				}
 				return nil
 			}))
 			t.Cleanup(func() {
-				herdr.SetState("epic-a-iter-01", agentrunner.StateDone, "")
+				fakes[tc.codexOn].SetState("epic-a-iter-01", agentrunner.StateDone, "")
 				configured.SetState("epic-b-iter-01", agentrunner.StateDone, "")
 			})
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -63,11 +69,11 @@ func TestLaunchRunner_CodexGoesToHerdrWhateverNativeRunnerIsConfigured(t *testin
 			for _, r := range h.Server.Runs() {
 				runners[r.Address] = r.Runner
 			}
-			if runners["proj:epic-a/01"] != "herdr" || runners["proj:epic-b/01"] != native {
-				t.Errorf("run runners = %v, want codex on herdr and claude on %s", runners, native)
+			if runners["proj:epic-a/01"] != tc.codexOn || runners["proj:epic-b/01"] != tc.configured {
+				t.Errorf("run runners = %v, want codex on %s and claude on %s", runners, tc.codexOn, tc.configured)
 			}
-			if got := strings.Join(herdr.Prompts("epic-a-iter-01"), " "); !strings.HasPrefix(got, "$gx-") {
-				t.Errorf("codex prompt on herdr = %q, want a $gx- prefix", got)
+			if got := strings.Join(fakes[tc.codexOn].Prompts("epic-a-iter-01"), " "); !strings.HasPrefix(got, "$gx-") {
+				t.Errorf("codex prompt on %s = %q, want a $gx- prefix", tc.codexOn, got)
 			}
 			if got := configured.Prompts("epic-b-iter-01"); len(got) == 0 {
 				t.Error("claude ticket did not run on the configured runner")

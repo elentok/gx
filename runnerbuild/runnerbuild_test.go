@@ -116,6 +116,7 @@ func TestNew_PtyOverrideReachesThePty(t *testing.T) {
 	override := &PtyOverride{
 		Holder:       []string{"gx", "agent-holder"},
 		Claude:       "/bin/fake-claude",
+		Codex:        "/bin/fake-codex",
 		Procs:        fakeProcs{},
 		PollInterval: time.Millisecond,
 		StartTimeout: 2 * time.Millisecond,
@@ -124,8 +125,8 @@ func TestNew_PtyOverrideReachesThePty(t *testing.T) {
 	}
 	_, runnerFor := New(agentrunner.ChoicePTY, testEnv(t), t.TempDir(), 0, override)
 	p := runnerFor("pty", "proj").(*nativerunner.Pty)
-	if !reflect.DeepEqual(p.Holder, override.Holder) || p.Claude != override.Claude || p.Procs != override.Procs {
-		t.Errorf("holder/claude/procs = %v %q %v, want the override's", p.Holder, p.Claude, p.Procs)
+	if !reflect.DeepEqual(p.Holder, override.Holder) || p.Claude != override.Claude || p.Codex != override.Codex || p.Procs != override.Procs {
+		t.Errorf("holder/claude/codex/procs = %v %q %q %v, want the override's", p.Holder, p.Claude, p.Codex, p.Procs)
 	}
 	if p.PollInterval != time.Millisecond || p.StartTimeout != 2*time.Millisecond ||
 		p.PromptGrace != 3*time.Millisecond || p.StopGrace != 4*time.Millisecond {
@@ -136,7 +137,7 @@ func TestNew_PtyOverrideReachesThePty(t *testing.T) {
 func TestNew_NoPtyOverrideLeavesThePtyFieldsEmpty(t *testing.T) {
 	_, runnerFor := New(agentrunner.ChoicePTY, testEnv(t), t.TempDir(), 0, nil)
 	p := runnerFor("pty", "proj").(*nativerunner.Pty)
-	if p.Holder != nil || p.Claude != "" || p.Procs != nil ||
+	if p.Holder != nil || p.Claude != "" || p.Codex != "" || p.Procs != nil ||
 		p.PollInterval != 0 || p.StartTimeout != 0 || p.PromptGrace != 0 || p.StopGrace != 0 {
 		t.Errorf("pty = %+v, want holder, agent, procs and timings unset", p)
 	}

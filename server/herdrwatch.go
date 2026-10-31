@@ -114,8 +114,12 @@ func (s *Server) herdrWaiting() []string {
 }
 
 // herdrBanner is the text of the "herdr down" banner, and whether it shows: herdr
-// is down or missing and a ticket needs it.
+// is down or missing and a ticket needs it. Only a herdr config shows it: a
+// session herdr left behind reclaims without a banner.
 func (s *Server) herdrBanner() (string, bool) {
+	if s.cfg.Runner.Name() != runnerHerdr {
+		return "", false
+	}
 	reason, down := s.herdr.holdReason()
 	if !down {
 		return "", false

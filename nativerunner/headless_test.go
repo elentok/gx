@@ -29,6 +29,7 @@ const (
 )
 
 func TestMain(m *testing.M) {
+	agentfake.RegisterHarness()
 	// The TUI fake runs the pty's statusline command, which names this binary;
 	// without this it would run the whole suite until the fake's timeout.
 	if len(os.Args) > 2 && os.Args[1] == "claude" && os.Args[2] == "statusline" {
@@ -45,6 +46,10 @@ func TestMain(m *testing.M) {
 	if os.Getenv(holderEnv) == "1" {
 		testHolder()
 		return
+	}
+	// After the holder check: the holder's env carries the program's marker.
+	if os.Getenv(agentfake.ProgramEnv) == "1" {
+		agentfake.Program()
 	}
 	if os.Getenv(agentfake.TUIEnv) == "1" {
 		agentfake.TUIClaude()

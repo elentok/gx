@@ -904,11 +904,12 @@ func (s *Server) runnerFor(project string) agentrunner.Runner {
 	return s.runnerNamed(s.cfg.Runner.Name(), project)
 }
 
-// launchRunner is the runner a new launch of agent in project uses. Only herdr
-// hosts Codex, so a native configured runner hands Codex to herdr.
+// launchRunner is the runner a new launch of agent in project uses. The
+// headless runner hosts only Claude, so Codex runs on pty unless herdr is
+// configured.
 func (s *Server) launchRunner(project string, agent ralphloop.AgentKind) agentrunner.Runner {
 	if agent == ralphloop.AgentCodex && s.cfg.Runner.Name() != runnerHerdr {
-		return s.runnerNamed(runnerHerdr, project)
+		return s.runnerNamed(string(agentrunner.ChoicePTY), project)
 	}
 	return s.runnerFor(project)
 }

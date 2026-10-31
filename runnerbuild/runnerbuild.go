@@ -22,6 +22,7 @@ const FallbackProject = "_default"
 type PtyOverride struct {
 	Holder       []string
 	Claude       string
+	Codex        string
 	Procs        nativerunner.ProcessTable
 	PollInterval time.Duration
 	StartTimeout time.Duration
@@ -61,6 +62,7 @@ func New(c agentrunner.Choice, env []string, stateDir string, n time.Duration, p
 			if pty != nil {
 				p.Holder = pty.Holder
 				p.Claude = pty.Claude
+				p.Codex = pty.Codex
 				p.Procs = pty.Procs
 				p.PollInterval = pty.PollInterval
 				p.StartTimeout = pty.StartTimeout

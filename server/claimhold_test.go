@@ -16,8 +16,8 @@ import (
 	"github.com/elentok/gx/testutil/runnerfake"
 )
 
-// A herdr outage holds the tickets that launch on herdr (Codex) and nobody else.
-func TestClaimHold_HerdrOutageHoldsOnlyHerdrTickets(t *testing.T) {
+// Under agent-runner: herdr, a herdr outage holds every ticket, whatever its agent.
+func TestClaimHold_HerdrOutageHoldsHerdrTickets(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name       string
@@ -34,21 +34,17 @@ func TestClaimHold_HerdrOutageHoldsOnlyHerdrTickets(t *testing.T) {
 			servertest.WriteTicket(t, store, "proj", "epic-a", "01", "codex one", "")
 			servertest.WriteTicket(t, store, "proj", "epic-b", "01", "claude one", "")
 			servertest.SetProjectRepo(t, store, "proj", repo)
-			pty := namedFake{runnerfake.NewRunner(), "pty"}
 			herdr := namedFake{runnerfake.NewRunner(), "herdr"}
 			herdr.SetHealthErr(tc.err)
-			h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(name, _ string) agentrunner.Runner {
-				switch name {
-				case "pty":
-					return pty
-				case "herdr":
+			h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(herdr, func(name, _ string) agentrunner.Runner {
+				if name == "herdr" {
 					return herdr
 				}
 				return nil
 			}), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
 			t.Cleanup(func() {
 				herdr.SetState("epic-a-iter-01", agentrunner.StateDone, "")
-				pty.SetState("epic-b-iter-01", agentrunner.StateDone, "")
+				herdr.SetState("epic-b-iter-01", agentrunner.StateDone, "")
 			})
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
@@ -63,9 +59,6 @@ func TestClaimHold_HerdrOutageHoldsOnlyHerdrTickets(t *testing.T) {
 				t.Fatalf("add claude: %+v, %v", res, err)
 			}
 
-			servertest.WaitFor(t, 10*time.Second, "claude ticket launches on pty", func() bool {
-				return len(pty.Prompts("epic-b-iter-01")) > 0
-			})
 			var ex server.Explanation
 			servertest.WaitFor(t, 10*time.Second, "codex ticket held", func() bool {
 				ex, err = h.Client.Explain(ctx, "proj:epic-a/01")
@@ -77,17 +70,20 @@ func TestClaimHold_HerdrOutageHoldsOnlyHerdrTickets(t *testing.T) {
 			if got := herdr.Prompts("epic-a-iter-01"); len(got) != 0 {
 				t.Errorf("held codex ticket launched: %v", got)
 			}
+			if got := herdr.Prompts("epic-b-iter-01"); len(got) != 0 {
+				t.Errorf("held claude ticket launched: %v", got)
+			}
 			snap, err := h.Client.Snapshot(ctx)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !snap.HerdrUnavailable || !strings.Contains(snap.HerdrText, tc.wantReason) || !strings.Contains(snap.HerdrText, "proj:epic-a/01") || strings.Contains(snap.HerdrText, "epic-b") {
-				t.Errorf("snapshot banner = %v %q, want it on, naming the codex ticket only and %q", snap.HerdrUnavailable, snap.HerdrText, tc.wantReason)
+			if !snap.HerdrUnavailable || !strings.Contains(snap.HerdrText, tc.wantReason) || !strings.Contains(snap.HerdrText, "proj:epic-a/01") || !strings.Contains(snap.HerdrText, "proj:epic-b/01") {
+				t.Errorf("snapshot banner = %v %q, want it on, naming both tickets and %q", snap.HerdrUnavailable, snap.HerdrText, tc.wantReason)
 			}
 
 			herdr.SetHealthErr(nil)
-			servertest.WaitFor(t, 10*time.Second, "codex ticket launches once herdr answers", func() bool {
-				return len(herdr.Prompts("epic-a-iter-01")) > 0
+			servertest.WaitFor(t, 10*time.Second, "tickets launch once herdr answers", func() bool {
+				return len(herdr.Prompts("epic-a-iter-01")) > 0 && len(herdr.Prompts("epic-b-iter-01")) > 0
 			})
 			for sawDown := false; !sawDown; {
 				select {
@@ -101,62 +97,40 @@ func TestClaimHold_HerdrOutageHoldsOnlyHerdrTickets(t *testing.T) {
 	}
 }
 
-// The banner and the claim hold pick a ticket's agent the same way: the ticket's
-// own agent: field wins over the queued agent.
-func TestHerdrBanner_FollowsTicketAgentLikeClaimHold(t *testing.T) {
+// Under agent-runner: pty, a Codex ticket launches on pty and herdr being down
+// is no business of anyone's: no hold, no banner.
+func TestHerdrBanner_HiddenForCodexTicketOnPty(t *testing.T) {
 	t.Parallel()
-	cases := []struct {
-		name         string
-		queuedAgent  string
-		ticketAgent  string
-		wantBanner   bool
-		wantVerdict  string
-		launchesOnPT bool
-	}{
-		{"claude queue, codex ticket", "claude", "codex", true, server.VerdictHerdrDown, false},
-		{"codex queue, claude ticket", "codex", "claude", false, "", true},
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{Agent: "codex"})
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	pty := namedFake{runnerfake.NewRunner(), "pty"}
+	herdr := namedFake{runnerfake.NewRunner(), "herdr"}
+	herdr.SetHealthErr(errors.New("socket closed"))
+	h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(name, _ string) agentrunner.Runner {
+		if name == "herdr" {
+			return herdr
+		}
+		return pty
+	}), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
+	t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "codex"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			store, repo := t.TempDir(), testutil.TempRepo(t)
-			servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "one", servertest.TicketOpts{Agent: tc.ticketAgent})
-			servertest.SetProjectRepo(t, store, "proj", repo)
-			pty := namedFake{runnerfake.NewRunner(), "pty"}
-			herdr := namedFake{runnerfake.NewRunner(), "herdr"}
-			herdr.SetHealthErr(errors.New("socket closed"))
-			h := servertest.StartWithStore(t, store, servertest.WithRunnerFor(pty, func(name, _ string) agentrunner.Runner {
-				if name == "herdr" {
-					return herdr
-				}
-				return pty
-			}), func(c *server.Config) { c.HerdrRetryInterval = 20 * time.Millisecond })
-			if tc.launchesOnPT {
-				t.Cleanup(func() { pty.SetState("epic-a-iter-01", agentrunner.StateDone, "") })
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-			defer cancel()
-			if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", tc.queuedAgent); err != nil || res.Refused {
-				t.Fatalf("add: %+v, %v", res, err)
-			}
-			if tc.launchesOnPT {
-				servertest.WaitFor(t, 10*time.Second, "ticket launches on pty", func() bool {
-					return len(pty.Prompts("epic-a-iter-01")) > 0
-				})
-			} else {
-				servertest.WaitFor(t, 10*time.Second, "ticket held for herdr", func() bool {
-					ex, err := h.Client.Explain(ctx, "proj:epic-a/01")
-					return err == nil && ex.Verdict == tc.wantVerdict
-				})
-			}
-			snap, err := h.Client.Snapshot(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if snap.HerdrUnavailable != tc.wantBanner {
-				t.Errorf("banner = %v %q, want shown = %v", snap.HerdrUnavailable, snap.HerdrText, tc.wantBanner)
-			}
-		})
+	servertest.WaitFor(t, 10*time.Second, "codex ticket launches on pty", func() bool {
+		return len(pty.Prompts("epic-a-iter-01")) > 0
+	})
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.HerdrUnavailable || snap.HerdrText != "" {
+		t.Errorf("banner = %v %q, want none", snap.HerdrUnavailable, snap.HerdrText)
+	}
+	if got := herdr.Prompts("epic-a-iter-01"); len(got) != 0 {
+		t.Errorf("codex ticket reached herdr: %v", got)
 	}
 }
 

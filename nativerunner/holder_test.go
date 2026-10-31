@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
 	agentharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"golang.org/x/sys/unix"
@@ -41,7 +42,11 @@ func testHolder() {
 	if d, err := time.ParseDuration(os.Getenv(holderDenyTimeoutEnv)); err == nil {
 		*nativerunner.HolderDenyTimeout = d
 	}
-	if err := nativerunner.RunHolder(dir, args[slices.Index(args, "--")+1:]); err != nil {
+	kind := agentharness.Claude
+	if i := slices.Index(args, "--harness"); i >= 0 {
+		kind = agentrunner.Kind(args[i+1])
+	}
+	if err := nativerunner.RunHarnessHolder(dir, kind, nativerunner.HolderOptions{}, args[slices.Index(args, "--")+1:]); err != nil {
 		os.Exit(1)
 	}
 }
