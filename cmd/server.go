@@ -238,7 +238,12 @@ func runServer(ctx context.Context, d deps) error {
 			return fmt.Errorf("GX_HEALTH_INTERVAL: %w", err)
 		}
 	}
-	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: func() string { return restartBinary(d.dirs(), stateDir) },
+	// Test hook: gxfixture points the restart at a fake gx binary.
+	restartBin := func() string { return restartBinary(d.dirs(), stateDir) }
+	if v := os.Getenv("GX_RESTART_BINARY"); v != "" {
+		restartBin = func() string { return v }
+	}
+	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: restartBin,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval,

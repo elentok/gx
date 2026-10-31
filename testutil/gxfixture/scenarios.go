@@ -102,6 +102,8 @@ type scenario struct {
 	codexUsage bool
 	// diskLow gives each project a cleanup command that follows the disk's clean file.
 	diskLow bool
+	// restart points the server's restart at a fake gx binary (see restart.go).
+	restart *restartSpec
 	// chat turns the fake's chat knob on, so a plain prompt is a chat turn.
 	chat bool
 	// sessions are created in order once the server is up, as `gx agents create` makes them.
@@ -136,6 +138,17 @@ const (
 	webSignedOut
 )
 
+// projectNames is every project the scenario creates, in first-seen order.
+func (sc scenario) projectNames() []string {
+	names := slices.Clone(sc.projects)
+	for _, e := range sc.epics {
+		if !slices.Contains(names, e.project) {
+			names = append(names, e.project)
+		}
+	}
+	return names
+}
+
 type recommendation struct{ verb, diagnosis string }
 
 var scenarios = map[string]scenario{
@@ -163,6 +176,35 @@ var scenarios = map[string]scenario{
 			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
 		}}},
 		diskLow: true,
+	},
+	// restart-agents: a running agent on a queued epic, and a restart binary that passes its checks.
+	"restart-agents": {
+		epics: []epic{{project, "restart-epic", []ticket{
+			{"01", "held", servertest.TicketOpts{}},
+			{"02", "second", servertest.TicketOpts{BlockedBy: []string{"01"}}},
+		}}},
+		queue:   []string{project + ":restart-epic"},
+		hold:    true,
+		restart: &restartSpec{startsUp: true},
+	},
+	// restart-projects: two projects, "broken" failing its migration dry run and "demo" passing.
+	"restart-projects": {
+		epics: []epic{
+			{project, "demo-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}},
+			{"broken", "broken-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}},
+		},
+		ownRepos: []string{"broken"},
+		restart:  &restartSpec{failing: map[string]string{"broken": "fixture migration failed"}},
+	},
+	// restart-launchd: the restart binary sits at a launchd-style path, not the server's own.
+	"restart-launchd": {
+		epics:   []epic{{project, "restart-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}}},
+		restart: &restartSpec{path: restartAtLaunchd},
+	},
+	// restart-missing: the restart binary's path has no file behind it.
+	"restart-missing": {
+		epics:   []epic{{project, "restart-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}}},
+		restart: &restartSpec{path: restartMissing},
 	},
 	// health: disk-low plus one fake agent held running on a queued epic, so the
 	// busy state can pause the queue and a process table has an agent to tie to.

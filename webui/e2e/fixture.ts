@@ -8,8 +8,10 @@ import { expect, test as base, type Page } from "@playwright/test";
 
 const run = promisify(execFile);
 
-// A reload drops this window property, so a flow that reloads fails its test.
-const NO_RELOAD = "__gxE2eNoReload";
+// Every document load of the page adds one to this sessionStorage count, which survives a reload
+// where a window property would not. A test ends with a failure when it counted more reloads than
+// `reloads` allowed (none by default).
+const LOADS = "__gxE2eLoads";
 
 const TOTP_PERIOD_S = 30;
 const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -44,6 +46,8 @@ interface FixtureOutput {
   health_dir: string;
   /** The held fake agent's transcript path; only the `spend` scenario prints it. */
   agent_transcript?: string;
+  /** Only the restart scenarios have the fake restart binary's control dir. */
+  restart_dir?: string;
 }
 
 export interface Fixture {
@@ -65,6 +69,13 @@ export interface Fixture {
   setHealth(values: string): Promise<void>;
   /** Replaces the fake process table the popover's cause lists read: `proc`, `hidden` and `busy` lines. */
   setProcesses(lines: string): Promise<void>;
+  /**
+   * Writes a control file of the fake restart binary (restart scenarios only): `check.json`, `slow`
+   * (seconds), `start` (`up` brings the server back) or `old` (present: no restart-check command).
+   * `clearRestartControl` removes one.
+   */
+  setRestartControl(name: string, value: string): Promise<void>;
+  clearRestartControl(name: string): Promise<void>;
   /** Stops the fixture server mid-flow. Teardown skips a server that is already stopped. */
   stopServer(): Promise<void>;
   /** The parsed `$HOME/.config/gx/config.json`, read fresh on every call. */
@@ -117,6 +128,11 @@ function runWithInput(bin: string, args: string[], env: NodeJS.ProcessEnv, input
     proc.once("close", (code) => (code === 0 ? resolve(stdout) : reject(new Error(`gx ${args.join(" ")} exited with ${code}: ${stderr}`))));
     proc.stdin.end(input);
   });
+}
+
+function restartDir(out: FixtureOutput): string {
+  if (!out.restart_dir) throw new Error("this scenario has no fake restart binary");
+  return out.restart_dir;
 }
 
 /** Starts a fresh fixture server for `scenario` and signs the page in. */
@@ -189,6 +205,8 @@ async function startFixture(
     setDiskClean: (behaviour) => writeControl(out.disk_dir, "clean", behaviour),
     setHealth: (values) => writeControl(out.health_dir, "system", values),
     setProcesses: (lines) => writeControl(out.health_dir, "processes", lines),
+    setRestartControl: (name, value) => writeControl(restartDir(out), name, value),
+    clearRestartControl: (name) => rm(join(restartDir(out), name), { force: true }),
     stopServer: stop,
     async globalConfig() {
       return JSON.parse(await readFile(join(env.HOME!, ".config", "gx", "config.json"), "utf8"));
@@ -249,8 +267,16 @@ async function startFixture(
   if (out.cookie) {
     await page.context().addCookies([{ name: out.cookie_name, value: out.cookie, url: out.web_url, secure: true }]);
   }
+  await page.addInitScript((key) => {
+    try {
+      const n = sessionStorage.getItem(key);
+      if (n !== null) sessionStorage.setItem(key, String(Number(n) + 1));
+    } catch {
+      // Storage off: the count stays unset and the test fails at the end.
+    }
+  }, LOADS);
   await page.goto(out.web_url);
-  await page.evaluate((key) => ((window as unknown as Record<string, unknown>)[key] = true), NO_RELOAD);
+  await page.evaluate((key) => sessionStorage.setItem(key, "0"), LOADS);
   return { fixture, stop };
 }
 
@@ -261,19 +287,31 @@ async function startFixture(
 export const test = base.extend<{
   start: (
     scenario: string,
-    opts?: { hold?: boolean; autoAdvanceDelay?: string; stallThreshold?: string; config?: Record<string, string>; fakecodex?: boolean; shape?: string },
+    opts?: {
+      hold?: boolean;
+      autoAdvanceDelay?: string;
+      stallThreshold?: string;
+      config?: Record<string, string>;
+      fakecodex?: boolean;
+      shape?: string;
+      /** How many page reloads the flow expects (a restart reloads the tab once); more fail the test. */
+      reloads?: number;
+    },
   ) => Promise<Fixture>;
 }>({
   start: async ({ page }, use) => {
     const stops: Array<() => Promise<void>> = [];
+    let allowedReloads = 0;
     await use(async (scenario, opts) => {
+      allowedReloads = opts?.reloads ?? 0;
       const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config, opts?.stallThreshold, opts?.fakecodex, opts?.shape);
       stops.push(stop);
       return fixture;
     });
-    const survived = await page.evaluate((key) => (window as unknown as Record<string, unknown>)[key] === true, NO_RELOAD);
+    const loads = await page.evaluate((key) => sessionStorage.getItem(key), LOADS);
     await Promise.all(stops.map((stop) => stop()));
-    expect(survived, "the page was reloaded during the flow").toBe(true);
+    expect(loads, "no reload count: the page left its origin").not.toBeNull();
+    expect(Number(loads), `the page was reloaded more than the ${allowedReloads} allowed during the flow`).toBeLessThanOrEqual(allowedReloads);
   },
 });
 

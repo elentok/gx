@@ -76,6 +76,8 @@ type Output struct {
 	DiskDir string `json:"disk_dir"`
 	// HealthDir holds the fake CPU and memory control file: system.
 	HealthDir string `json:"health_dir"`
+	// RestartDir holds the fake restart binary's control files; empty outside the restart scenarios.
+	RestartDir string `json:"restart_dir,omitempty"`
 	// LogFile is the server's combined stdout and stderr, which carries the cleanup
 	// command's output tail ("disk cleanup command failed") and every server warning.
 	LogFile string `json:"log_file"`
@@ -107,6 +109,9 @@ func (o Output) ShellEnv() string {
 	export("GXF_HOLD_FILE", o.HoldFile)
 	export("GXF_STATE_DIR", o.StateDir)
 	export("GXF_SOCKET", o.Socket)
+	if o.RestartDir != "" {
+		export("GXF_RESTART_DIR", o.RestartDir)
+	}
 	if o.LogFile != "" {
 		export("GXF_LOG_FILE", o.LogFile)
 	}
@@ -267,6 +272,11 @@ func run(args []string) (err error) {
 	}
 	if err := f.setupHealth(); err != nil {
 		return err
+	}
+	if sc.restart != nil {
+		if err := f.setupRestart(*sc.restart, sc.projectNames()); err != nil {
+			return err
+		}
 	}
 	if err := f.writeConfig(port, sc.recentlyFinished, append(slices.Clone(sc.config), configs...)); err != nil {
 		return err
@@ -439,6 +449,9 @@ func run(args []string) (err error) {
 		}
 	}
 	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath, AgentTranscript: agentTranscript}
+	if sc.restart != nil {
+		o.RestartDir = f.restartDir()
+	}
 	if cwd, err := os.Getwd(); err == nil {
 		o.BrowserSession = filepath.Base(cwd)
 	}
