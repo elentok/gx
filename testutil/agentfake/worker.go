@@ -93,7 +93,15 @@ const (
 	// BehaviourQuestionMenu blocks the TUI fake on a question menu, which is not
 	// an approvable dialog; Esc leaves it and the next prompt finishes the ticket.
 	BehaviourQuestionMenu = "question-menu"
+	// BehaviourError makes the Codex fake end its first prompt with a non-usage
+	// error (a model Codex rejects) and no rate-limit sample; the next prompt
+	// finishes the ticket.
+	BehaviourError = "error"
 )
+
+// CodexModelError is the message the Codex fake ends a BehaviourError turn with,
+// as recorded in docs/specs/codex-support-fixtures/rollouts/error-bad-model.jsonl.
+const CodexModelError = "The 'gx-no-such-model' model is not supported when using Codex with a ChatGPT account."
 
 // DefaultRateLimitReset is how far ahead a BehaviourRateLimit error puts the
 // reset clock when WorkerConfig.RateLimitReset is empty.

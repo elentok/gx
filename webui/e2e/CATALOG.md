@@ -15,7 +15,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -1356,3 +1356,12 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   2. Open the `codex-running-epic` and `claude-running-epic` pages.
   3. Back on the waiting epic, click "Override" on the ticket's verdict line.
 - **Pass:** the waiting ticket reads "Codex usage: 99% of the <window> limit, resets <time>" with an Override button. The Codex ticket is not paused and its row starts with "running · "; the Claude ticket's row starts with "running · " and has no verdict. After the click the verdict is gone and the ticket starts, without a reload; the Claude ticket still runs.
+
+## 121. Codex error pause
+
+- **Scenario:** `codex-error` (one ticket queued with agent `codex`; its first turn ends in a model error with no usage-limit signal, and the next prompt finishes it)
+- **Steps:**
+  1. Open the `codex-error-epic` card and wait up to 30 s (the dwell) for "needs answer".
+  2. Open ticket 01.
+  3. Click Retry in "Recovery actions".
+- **Pass:** the ticket page reads "Paused · Agent stuck" and shows Codex's error text ("The 'gx-no-such-model' model is not supported ..."), with no "Allow once". Retry lifts the pause without a reload.

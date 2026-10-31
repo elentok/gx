@@ -430,6 +430,9 @@ func (c *codexFake) submit(text string) error {
 			return err
 		}
 		return c.taskError("You've hit your usage limit.", "usage_limit_exceeded")
+	case BehaviourError:
+		c.resumeWork = &pendingWork{cfg, address}
+		return c.taskError(CodexModelError, "model_not_found")
 	}
 	if u := cfg.CodexUsage; u != nil {
 		if err := c.tokenCount(u.UsedPercentage, u.ResetsAt); err != nil {

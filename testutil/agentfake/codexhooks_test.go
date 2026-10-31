@@ -297,6 +297,48 @@ func TestCodexWorker_CodexUsageConfigWritesARateLimitSampleTheProductionReaderSe
 	}, "the 99% sample")
 }
 
+func TestCodexWorker_ErrorBehaviourEndsTheFirstPromptWithAModelErrorAndFinishesOnTheNext(t *testing.T) {
+	cfg, gxLog := workerEnv(t)
+	cfg.Behaviour = map[string]string{"gx:epic/01": BehaviourError}
+	repo, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(repo, WorkerConfigFile), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	p := startCodexIn(t, repo, home, "error1")
+	p.startTurn("$gx-implement gx:epic/01")
+	p.waitOut("state=error:app=codex")
+	data, err := os.ReadFile(rolloutFiles(t, home)[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"codex_error_info":"model_not_found"`) || !strings.Contains(string(data), CodexModelError) {
+		t.Errorf("no task_complete model error:\n%s", data)
+	}
+	if strings.Contains(string(data), "rate_limits") {
+		t.Errorf("a model error must carry no rate-limit sample:\n%s", data)
+	}
+	if log, _ := os.ReadFile(gxLog); strings.Contains(string(log), "--iteration-status finished") {
+		t.Fatalf("the ticket finished on the error turn: %q", log)
+	}
+	p.startTurn("$gx-implement gx:epic/01")
+	p.waitOut("state=done")
+	log, err := os.ReadFile(gxLog)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(log), "tickets set gx:epic/01 --iteration-status finished") {
+		t.Errorf("gx log = %q", log)
+	}
+}
+
 func TestCodexWorker_FinishFromAGxPromptDrivesWorkTicket(t *testing.T) {
 	cfg, gxLog := workerEnv(t)
 	repo, err := os.Getwd()

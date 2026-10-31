@@ -429,6 +429,18 @@ var scenarios = map[string]scenario{
 		queue:       []string{project + ":codex-blocked-epic"},
 		queueAgents: map[string]string{project + ":codex-blocked-epic": "codex"},
 	},
+	// codex-error: one Codex ticket whose first turn ends in a model error with no
+	// usage-limit signal, so the ticket pauses after the dwell. The Retry prompt
+	// finishes it.
+	"codex-error": {
+		codex: true,
+		epics: []epic{
+			{project, "codex-error-epic", []ticket{{"01", "fail", servertest.TicketOpts{}}}},
+		},
+		behaviour:   map[string]string{project + ":codex-error-epic/01": agentfake.BehaviourError},
+		queue:       []string{project + ":codex-error-epic"},
+		queueAgents: map[string]string{project + ":codex-error-epic": "codex"},
+	},
 	// codex-rate-limited: a held Codex ticket whose rollout shows the weekly window at
 	// 99%, a Codex ticket queued after the sample is stored (so it waits on the Codex
 	// gate), and a held Claude ticket the gate leaves running.

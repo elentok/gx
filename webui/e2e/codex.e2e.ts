@@ -194,6 +194,20 @@ async function openBlockedTicket(page: Page) {
   await expect(page.getByRole("group", { name: "Permission request" })).toBeVisible();
 }
 
+test("121. Codex error pause", async ({ page, start }) => {
+  await start("codex-error");
+  await page.getByRole("link", { name: "codex-error-epic" }).click();
+  await expect(page.getByText("needs answer").first()).toBeVisible(dwell);
+  await page.locator('a[href$="/t/demo:codex-error-epic/01"]').filter({ hasNotText: "→" }).click();
+
+  await expect(stuck(page)).toBeVisible();
+  await expect(page.getByText(/The 'gx-no-such-model' model is not supported/).first()).toBeVisible();
+  await expect(page.getByRole("button", nav("Allow once"))).toHaveCount(0);
+  await page.getByRole("form", { name: "Recovery actions" }).getByRole("button", nav("Retry")).click();
+  await expect(stuck(page)).toHaveCount(0);
+  await expect(page.getByText(/^(Paused|needs-answer)/)).toHaveCount(0);
+});
+
 test.describe("119. Codex approval card", () => {
   test("Allow once answers the hook with allow", async ({ page, start }) => {
     const fixture = await start("codex-blocked");
