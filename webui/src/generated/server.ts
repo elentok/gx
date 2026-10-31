@@ -1457,6 +1457,11 @@ export interface Snapshot {
    */
   afk?: boolean;
   /**
+   * ViMode is set while the web UI's vi mode is on; filled in by the handler.
+   * Missing means off.
+   */
+  vi_mode?: boolean;
+  /**
    * SkillsInstallProblem is why the skill install `gx server start` ran
    * last did not finish; empty when it did. Filled in by the handler.
    */

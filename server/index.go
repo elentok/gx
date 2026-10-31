@@ -110,6 +110,9 @@ type Snapshot struct {
 	// AFK is set while AFK mode sends session banners to chat too; filled in by
 	// the handler.
 	AFK bool `json:"afk,omitempty"`
+	// ViMode is set while the web UI's vi mode is on; filled in by the handler.
+	// Missing means off.
+	ViMode bool `json:"vi_mode,omitempty"`
 	// SkillsInstallProblem is why the skill install `gx server start` ran
 	// last did not finish; empty when it did. Filled in by the handler.
 	SkillsInstallProblem string `json:"skills_install_problem,omitempty"`

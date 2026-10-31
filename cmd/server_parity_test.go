@@ -40,6 +40,7 @@ var routeVerbs = map[string]string{
 	"GET /v1/health":                        "server health",
 	"POST /v1/budget/increase":              "budget increase",
 	"POST /v1/afk":                          "afk",
+	"POST /v1/vimode":                       "vimode",
 	"POST /v1/checks/save":                  "server checks-save",
 	"GET /v1/settings/agents":               "server default-harness",
 	"POST /v1/settings/agents":              "server default-harness-set",

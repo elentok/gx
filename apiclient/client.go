@@ -738,6 +738,13 @@ func (c *Client) SetAFK(ctx context.Context, on *bool) (server.AFKResult, error)
 	return res, err
 }
 
+// SetViMode sets the web UI's vi mode; a nil on toggles it.
+func (c *Client) SetViMode(ctx context.Context, on *bool) (server.ViModeResult, error) {
+	var res server.ViModeResult
+	err := c.post(ctx, "/v1/vimode", server.ViModeRequest{On: on}, &res)
+	return res, err
+}
+
 // BudgetOverride lifts the budget latches. A refusal is a result (Refused set),
 // not an error.
 func (c *Client) BudgetOverride(ctx context.Context) (server.BudgetResult, error) {

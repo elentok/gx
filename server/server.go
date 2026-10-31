@@ -295,6 +295,7 @@ type Server struct {
 	queued       *queueStore
 	pause        *pauseState
 	afk          *afkState
+	viMode       *viModeState
 	ledger       *budgetLedger
 	usage        *usageSamples // Claude's
 	limits       *limitsStore
@@ -438,6 +439,11 @@ func New(cfg Config) (*Server, error) {
 		lock.release()
 		return nil, fmt.Errorf("load afk mode: %w", err)
 	}
+	viMode, err := openViMode(cfg.StateDir)
+	if err != nil {
+		lock.release()
+		return nil, fmt.Errorf("load vi mode: %w", err)
+	}
 	ledger, err := openLedger(cfg.StateDir, cfg.BudgetSoftLimit, cfg.BudgetHardLimit)
 	if err != nil {
 		lock.release()
@@ -500,6 +506,7 @@ func New(cfg Config) (*Server, error) {
 		queued:       queued,
 		pause:        pause,
 		afk:          afk,
+		viMode:       viMode,
 		ledger:       ledger,
 		usage:        openUsageSamples(cfg.StateDir),
 		limits:       openLimitsStore(cfg.StateDir),
@@ -636,6 +643,7 @@ var routeTable = []struct {
 	{"POST /v1/designs/worktree", (*Server).designWorktreeWrite},
 	{"POST /v1/tickets/fix-agent", (*Server).fixAgentWrite},
 	{"POST /v1/afk", (*Server).afkWrite},
+	{"POST /v1/vimode", (*Server).viModeWrite},
 	{"POST /v1/checks/save", (*Server).checksSaveWrite},
 	{"GET /v1/settings/agents", (*Server).defaultHarnessRead},
 	{"POST /v1/settings/agents", (*Server).defaultHarnessWrite},
@@ -697,6 +705,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.RecentlyFinished = s.idx.recentlyFinished(s.settings.Load().RecentlyFinished)
 	snap.Mode = s.pause.currentMode()
 	snap.AFK = s.afk.isOn()
+	snap.ViMode = s.viMode.isOn()
 	snap.SkillsInstallProblem = skills.ReadProblem(skills.StatusPath(s.cfg.StateDir))
 	// Checked on every snapshot: a PATH entry can vanish while the server
 	// runs, like an fnm per-shell dir once its shell exits.
