@@ -18,12 +18,16 @@ const (
 	ReasonFixUnknownTicket = "unknown-ticket"
 	ReasonFixNotRepair     = "not-paused-for-repair"
 	ReasonFixInvestigating = "investigating"
+	ReasonFixNoFailure     = "no-migration-failure"
 )
 
 // FixAgentRequest is the body of POST /v1/tickets/fix-agent. State is the
 // token of the row paused for repair the web saw, required on the web mux.
+// Project instead of Address asks for an agent fixing that project's saved
+// failed migration.
 type FixAgentRequest struct {
-	Address string `json:"address"`
+	Address string `json:"address,omitempty"`
+	Project string `json:"project,omitempty"`
 	State   string `json:"state,omitempty"`
 }
 
@@ -95,9 +99,51 @@ func fixAgentPrompt(agent, addr string, t tickets.Ticket) string {
 	return prompt
 }
 
+// fixProjectPrompt is the prompt of an agent fixing a project's failed migration.
+func fixProjectPrompt(agent string, f MigrationFailure) string {
+	return harness.SkillCommand(agent, "gx-investigate", fmt.Sprintf(
+		"the migration of project %s failed with: %s\nAfter fixing it, run `gx tickets migrate` in the trunk checkout to retry.",
+		f.Project, f.Error))
+}
+
+// startFixProjectAgent starts the agent fixing a project's saved failed migration.
+func (s *Server) startFixProjectAgent(project string) (FixAgentResult, error) {
+	var failure *MigrationFailure
+	for _, f := range s.MigrationFailures() {
+		if f.Project == project {
+			failure = &f
+			break
+		}
+	}
+	if failure == nil {
+		return fixAgentRefusal(ReasonFixNoFailure, fmt.Sprintf("project %s has no saved migration failure", project)), nil
+	}
+	checkout := tickets.TrunkCheckout(s.cfg.TicketStore, project)
+	if checkout == "" {
+		return fixAgentRefusal(ReasonSessionBadRequest, fmt.Sprintf("project %s has no trunk checkout", project)), nil
+	}
+	cs := CreateSessionRequest{
+		Project:    project,
+		Dir:        checkout,
+		Name:       FixAgentName(project),
+		UniqueName: true,
+		Prompt:     fixProjectPrompt(s.launchHarness(project), *failure),
+		Tier:       ralphloop.TierStrongest,
+	}
+	res, err := s.createSession(cs)
+	if res.Refused && res.Reason == ReasonSessionNameTaken {
+		return fixAgentRefusal(ReasonSessionNameTaken, "an agent is already fixing "+project), nil
+	}
+	return FixAgentResult{SessionResult: res}, err
+}
+
 // startFixAgent starts a /gx-investigate session in the project's trunk
-// checkout for a ticket paused for an answer or repair, or in error (web: repair only).
+// checkout for a ticket paused for an answer or repair, or in error (web: repair only),
+// or for a project's failed migration.
 func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, error) {
+	if req.Project != "" {
+		return s.startFixProjectAgent(req.Project)
+	}
 	if web && req.State == "" {
 		return fixAgentRefusal(ReasonStale, "a state token is required; review the current pause"), nil
 	}

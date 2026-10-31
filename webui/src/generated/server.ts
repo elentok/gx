@@ -1125,16 +1125,20 @@ export interface EpicSummary {
 export const ReasonFixUnknownTicket = "unknown-ticket";
 export const ReasonFixNotRepair = "not-paused-for-repair";
 export const ReasonFixInvestigating = "investigating";
+export const ReasonFixNoFailure = "no-migration-failure";
 /**
  * Refusal reasons of the fix-agent route, beside the session ones.
  */
-export type ReasonFix = typeof ReasonFixUnknownTicket | typeof ReasonFixNotRepair | typeof ReasonFixInvestigating;
+export type ReasonFix = typeof ReasonFixUnknownTicket | typeof ReasonFixNotRepair | typeof ReasonFixInvestigating | typeof ReasonFixNoFailure;
 /**
  * FixAgentRequest is the body of POST /v1/tickets/fix-agent. State is the
  * token of the row paused for repair the web saw, required on the web mux.
+ * Project instead of Address asks for an agent fixing that project's saved
+ * failed migration.
  */
 export interface FixAgentRequest {
-  address: string;
+  address?: string;
+  project?: string;
   state?: string;
 }
 /**

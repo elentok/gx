@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -185,6 +186,50 @@ func TestFixAgent_ConcurrentStartsCreateOneSession(t *testing.T) {
 	if started != 1 || len(f.live(t)) != 1 {
 		t.Errorf("started %d, live %d, want 1 and 1", started, len(f.live(t)))
 	}
+}
+
+func TestFixAgent_ProjectStartsOnFailedMigration(t *testing.T) {
+	t.Parallel()
+	f := startFixAgent(t, nil)
+	if err := migratefail.Record(f.h.StateDir, "proj", "boom"); err != nil {
+		t.Fatal(err)
+	}
+	res := f.fixProject(t, "proj")
+	if res.Refused || res.Session == nil {
+		t.Fatalf("fix = %+v", res)
+	}
+	meta := readMeta(t, f.h, res.Session.ID)
+	if meta["dir"] != f.repo || meta["name"] != server.FixAgentName("proj") || meta["tier"] != "strongest" {
+		t.Errorf("meta = %v", meta)
+	}
+	prompt, _ := meta["first_prompt"].(string)
+	for _, want := range []string{"/gx-investigate", "proj", "boom", "gx tickets migrate"} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("prompt %q lacks %q", prompt, want)
+		}
+	}
+	again := f.fixProject(t, "proj")
+	if !again.Refused || again.Reason != server.ReasonSessionNameTaken || again.Message != "an agent is already fixing proj" {
+		t.Errorf("second start = %+v", again)
+	}
+}
+
+func TestFixAgent_ProjectWithoutFailureIsRefused(t *testing.T) {
+	t.Parallel()
+	f := startFixAgent(t, nil)
+	res := f.fixProject(t, "proj")
+	if !res.Refused || res.Reason != server.ReasonFixNoFailure {
+		t.Errorf("fix = %+v", res)
+	}
+}
+
+func (f designsFixture) fixProject(t *testing.T, project string) server.FixAgentResult {
+	t.Helper()
+	res, err := f.h.Client.FixAgent(f.ctx, server.FixAgentRequest{Project: project})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
 }
 
 func TestFixAgent_WebNeedsTheStateToken(t *testing.T) {
