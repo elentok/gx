@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -85,6 +86,26 @@ func TestRunCodexDoctor_WarnsWhenLiveCodexIsNewerThanFixtures(t *testing.T) {
 	}
 }
 
+func TestRunCodexDoctor_RecordedSessionsLoadBack(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	frames := []codexdoctor.Frame{{T: 0.5, Data: []byte("\x1b]7501;state=idle:app=codex\a")}}
+	src := codexdoctor.Record(codexdoctor.Source{
+		Session: func(string) (codexdoctor.Recording, error) { return codexdoctor.Recording{Frames: frames}, nil },
+	}, dir)
+	opts := codexDoctorOptions{table: []codexdoctor.Check{
+		{Name: "turny", Mode: codexdoctor.Fixture, Session: codexdoctor.TurnSession, Run: func(in codexdoctor.Input) (string, bool) { return "", len(in.Frames) == 1 }},
+	}}
+	d := deps{stdout: &strings.Builder{}, stderr: &strings.Builder{}}
+	if err := runCodexDoctor(d, opts, src, ""); err != nil {
+		t.Fatal(err)
+	}
+	got, err := codexdoctor.ReadStream(dir + "/streams/turn.jsonl")
+	if err != nil || len(got) != 1 || got[0].T != 0.5 || !bytes.Equal(got[0].Data, frames[0].Data) {
+		t.Errorf("ReadStream = %v, %v, want the recorded frame", got, err)
+	}
+}
+
 func helpOf(t *testing.T, args ...string) string {
 	t.Helper()
 	var out bytes.Buffer
@@ -99,19 +120,21 @@ func TestCodexDoctor_HelpListsJSONLikeClaudeDoctor(t *testing.T) {
 	t.Parallel()
 	codex := helpOf(t, "codex", "doctor")
 	claude := helpOf(t, "claude", "doctor")
-	flagLine := func(help string) string {
+	flagLine := func(help, flag string) string {
 		for _, l := range strings.Split(help, "\n") {
-			if strings.Contains(l, "--json") {
+			if strings.Contains(l, flag) {
 				return strings.Join(strings.Fields(l), " ")
 			}
 		}
 		return ""
 	}
-	if flagLine(codex) == "" {
-		t.Fatalf("codex doctor --help lists no --json:\n%s", codex)
-	}
-	if got, want := strings.Fields(flagLine(codex))[0], strings.Fields(flagLine(claude))[0]; got != want {
-		t.Errorf("--json flag column = %q, want %q like claude doctor", got, want)
+	for _, flag := range []string{"--json", "--record"} {
+		if flagLine(codex, flag) == "" {
+			t.Fatalf("codex doctor --help lists no %s:\n%s", flag, codex)
+		}
+		if got, want := strings.Fields(flagLine(codex, flag))[:2], strings.Fields(flagLine(claude, flag))[:2]; !slices.Equal(got, want) {
+			t.Errorf("%s flag columns = %q, want %q like claude doctor", flag, got, want)
+		}
 	}
 	if !strings.Contains(codex, "Usage:\n  gx codex doctor [flags]") && !strings.Contains(codex, "codex doctor [flags]") {
 		t.Errorf("usage line missing:\n%s", codex)

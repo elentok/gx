@@ -168,6 +168,9 @@ type CodexArgsInput struct {
 	// the worktree's git dir, the common git dir, the ticket store and the
 	// epic dir, plus an evolve ticket's extra dirs.
 	WritableRoots []string
+	// Hooks replaces DefaultCodexHookCommands; `gx codex doctor` passes a
+	// recording script. Nil means the defaults.
+	Hooks *CodexHookCommands
 }
 
 // CodexArgs is the one launch shape every Codex launch uses (queue, Agents
@@ -187,7 +190,11 @@ func CodexArgs(in CodexArgsInput) []string {
 		"-c", "disable_paste_burst=true",
 		"--dangerously-bypass-hook-trust",
 	}
-	args = append(args, CodexHookArgs(DefaultCodexHookCommands)...)
+	hooks := DefaultCodexHookCommands
+	if in.Hooks != nil {
+		hooks = *in.Hooks
+	}
+	args = append(args, CodexHookArgs(hooks)...)
 	if roots := dedupe(in.WritableRoots); len(roots) > 0 {
 		args = append(args, "-c", "sandbox_workspace_write.writable_roots="+tomlStringArray(roots))
 	}

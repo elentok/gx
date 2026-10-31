@@ -13,7 +13,8 @@ import (
 )
 
 type codexDoctorOptions struct {
-	json bool
+	json   bool
+	record string
 	// table overrides codexdoctor.Table so tests never run live checks.
 	table []codexdoctor.Check
 }
@@ -26,7 +27,7 @@ func newCodexDoctorCmd(d deps) *cobra.Command {
 		Short: "check the Codex features gx relies on",
 		Long: `Check the Codex features gx relies on.
 
-Prints one PASS|FAIL|SKIP line per check and exits 1 on any FAIL. A check
+Prints one PASS|FAIL|WARN|SKIP line per check and exits 1 on any FAIL. A check
 whose dependency did not pass is skipped.`,
 		Args: cobra.NoArgs,
 		RunE: func(_ *cobra.Command, _ []string) error {
@@ -34,23 +35,28 @@ whose dependency did not pass is skipped.`,
 			if err != nil {
 				return err
 			}
-			return runCodexDoctor(d, opts, liveCodexDoctorSource(d, fixtures), fixtures.CodexVersion)
+			src := liveCodexDoctorSource(d, fixtures)
+			if opts.record != "" {
+				src = codexdoctor.Record(src, opts.record)
+			}
+			return runCodexDoctor(d, opts, src, fixtures.CodexVersion)
 		},
 	}
 	cmd.Flags().BoolVar(&opts.json, "json", false, "print results as a JSON array of {name,mode,status,detail}")
+	cmd.Flags().StringVar(&opts.record, "record", "", "save each canned session's raw PTY frames and rollouts to this directory, in test-fixture format")
 	return cmd
 }
 
 // liveCodexDoctorSource runs checks against the installed Codex. The rollout
 // check reads the newest rollout under $CODEX_HOME plus the fixtures.
 func liveCodexDoctorSource(d deps, fixtures codexdoctor.Source) codexdoctor.Source {
+	drivers := codexdoctor.NewDrivers(d.env)
 	src := codexdoctor.Source{
 		Live: true,
 		Env:  d.env,
 		Session: func(name string) (codexdoctor.Recording, error) {
 			if name != codexdoctor.RolloutsSession {
-				// The live session drivers are not built yet; skip, don't fail.
-				return codexdoctor.Recording{}, codexdoctor.ErrNoSession
+				return drivers.Session(name)
 			}
 			base, err := fixtures.Session(name)
 			if err != nil {
