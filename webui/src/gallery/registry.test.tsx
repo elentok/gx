@@ -11,7 +11,10 @@ import { TONES } from "../ui/tone";
 import { galleryEntries } from "./registry";
 
 // Every primitive is src/ui/<folder>/<Name>.tsx; tests and non-component files don't match.
-const primitiveFiles = Object.keys(import.meta.glob("../ui/*/[A-Z]*.tsx")).filter((f) => !f.endsWith(".test.tsx"));
+// CodeEditor is LargeEditor's lazy chunk, shown through LargeEditor.
+const primitiveFiles = Object.keys(import.meta.glob("../ui/*/[A-Z]*.tsx")).filter(
+  (f) => !f.endsWith(".test.tsx") && !f.endsWith("/CodeEditor.tsx"),
+);
 const primitiveNames = primitiveFiles.map((f) => f.split("/").pop()?.replace(".tsx", "") ?? f);
 
 it("finds the primitives on disk", () => {

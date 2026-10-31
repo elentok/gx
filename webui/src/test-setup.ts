@@ -21,6 +21,15 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 };
 
+// jsdom has no layout; CodeMirror measures with these.
+const emptyRects = () => ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList;
+const zeroRect = () => ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, toJSON() {} }) as DOMRect;
+// Some test files run in the node environment, which has no Range.
+if (typeof Range !== "undefined") {
+  Range.prototype.getClientRects ??= emptyRects;
+  Range.prototype.getBoundingClientRect ??= zeroRect;
+}
+
 // A page cache entry or a stored filter must never leak into the next test.
 afterEach(() => {
   globalThis.sessionStorage?.clear();

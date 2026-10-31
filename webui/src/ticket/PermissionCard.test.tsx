@@ -32,7 +32,7 @@ test("the deny note has an expand button; its editor shares the text and pending
   const post = vi.fn<(b: DecisionBody) => ReturnType<PostDecision>>(() => new Promise((r) => (release = () => r({}))));
   renderThemed(<PermissionCard detail={withCard(card)} post={post} />);
   fireEvent.click(screen.getByRole("button", { name: EXPAND }));
-  typeInLargeEditor("Note for Deny", "from editor");
+  await typeInLargeEditor("Note for Deny", "from editor");
   expect((screen.getByLabelText("Note for Deny (optional)") as HTMLTextAreaElement).value).toBe("from editor");
   fireEvent.click(screen.getByRole("button", { name: "Deny" }));
   await waitFor(() => expect(post).toHaveBeenCalled());

@@ -1,9 +1,12 @@
-import { Box, chakra, Text, Textarea } from "@chakra-ui/react";
-import { useEffect, useRef } from "react";
+import { Box, chakra, Text } from "@chakra-ui/react";
+import { lazy, Suspense, useRef } from "react";
 import { useWide } from "../../useWide";
 import { Button } from "../button/Button";
 import { BottomSheet } from "../modal/BottomSheet";
-import { fieldLook } from "./look";
+import { Spinner } from "../spinner/Spinner";
+
+// Its own chunk: only this import pulls @codemirror/*.
+const CodeEditor = lazy(() => import("./CodeEditor"));
 
 export type Selection = { start: number; end: number };
 
@@ -26,17 +29,8 @@ export function LargeEditor({
   onClose: (selection: Selection) => void;
 }) {
   const sheetMode = !useWide();
-  const area = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    area.current?.setSelectionRange(selection.start, selection.end);
-    // Only the selection at open time matters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const close = () =>
-    onClose({
-      start: area.current?.selectionStart ?? 0,
-      end: area.current?.selectionEnd ?? 0,
-    });
+  const current = useRef(selection);
+  const close = () => onClose(current.current);
   return (
     <BottomSheet
       label={title}
@@ -68,21 +62,24 @@ export function LargeEditor({
           ×
         </chakra.button>
       </Box>
-      <Textarea
-        ref={area}
-        autoFocus
-        flex="1"
-        minH="0"
-        {...fieldLook}
-        resize="none"
-        lineHeight="1.55"
-        p="3"
-        borderRadius="10px"
-        aria-label={`${title} text`}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
+      <Suspense
+        fallback={
+          <Box flex="1" display="flex" alignItems="center" justifyContent="center">
+            <Spinner label="Loading editor" />
+          </Box>
+        }
+      >
+        <CodeEditor
+          label={`${title} text`}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          selection={selection}
+          onSelectionChange={(s) => {
+            current.current = s;
+          }}
+        />
+      </Suspense>
       <Box display="flex" alignItems="center" gap="2">
         <Text flex="1" fontSize="xs" color="text.dim">
           Saved as you type

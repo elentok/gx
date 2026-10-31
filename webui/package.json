@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@chakra-ui/react": "^3.0.0",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
     "@emotion/react": "^11.14.0",
     "qrcode-generator": "1.4.4",
     "react": "^19.0.0",

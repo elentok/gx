@@ -36,7 +36,7 @@ test.each([
   );
 });
 
-test("the text answer's large editor is titled with the question and its text reaches onAnswers; choice questions have no answer field", () => {
+test("the text answer's large editor is titled with the question and its text reaches onAnswers; choice questions have no answer field", async () => {
   const seen: Answers[] = [];
   function Harness({ kind }: { kind: string }) {
     const [answers, setAnswers] = useState<Answers>({});
@@ -59,7 +59,7 @@ test("the text answer's large editor is titled with the question and its text re
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
     "Answer to Q2 - Pick one",
   );
-  typeInLargeEditor("Answer to Q2 - Pick one", "yes please");
+  await typeInLargeEditor("Answer to Q2 - Pick one", "yes please");
   expect(seen.at(-1)?.["2"]?.text).toBe("yes please");
   cleanup();
   renderThemed(<Harness kind="yes-no" />);
@@ -83,7 +83,7 @@ test.each([false, true])("note opens five rows tall (big=%s)", (big) => {
   );
 });
 
-test("the question note's large editor is titled with the question and its text reaches onAnswers", () => {
+test("the question note's large editor is titled with the question and its text reaches onAnswers", async () => {
   const seen: Answers[] = [];
   function Harness() {
     const [answers, setAnswers] = useState<Answers>({});
@@ -108,7 +108,7 @@ test("the question note's large editor is titled with the question and its text 
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
     "Note on Q2 - Pick one",
   );
-  typeInLargeEditor("Note on Q2 - Pick one", "hello");
+  await typeInLargeEditor("Note on Q2 - Pick one", "hello");
   expect(seen.at(-1)?.["2"]?.note).toBe("hello");
 });
 

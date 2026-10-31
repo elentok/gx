@@ -78,7 +78,7 @@ test("the answer field has an expand button; its editor shares the text and the 
   const field = screen.getByLabelText("Your answer") as HTMLTextAreaElement;
   expect(field.placeholder).toBe("Your answer");
   fireEvent.click(screen.getByRole("button", { name: EXPAND }));
-  typeInLargeEditor("Your answer", "from editor");
+  await typeInLargeEditor("Your answer", "from editor");
   expect(field.value).toBe("from editor");
   fireEvent.click(screen.getByRole("button", { name: "Send answer" }));
   await waitFor(() => expect(post).toHaveBeenCalled());
@@ -91,7 +91,7 @@ test("the note has an expand button; its editor shares the text and the sent bod
   const field = screen.getByLabelText("Note (optional)") as HTMLTextAreaElement;
   expect(field.placeholder).toBe("Note (optional)");
   fireEvent.click(screen.getByRole("button", { name: EXPAND }));
-  typeInLargeEditor("Note on your answer", "from editor");
+  await typeInLargeEditor("Note on your answer", "from editor");
   expect(field.value).toBe("from editor");
   fireEvent.click(screen.getByRole("button", { name: "Yes" }));
   fireEvent.click(screen.getByRole("button", { name: "Send answer" }));

@@ -276,7 +276,7 @@ test("the box is 5 rows, scrolls into view and has the expand button; no round: 
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
     "Message to the agent",
   );
-  typeInLargeEditor("Message to the agent", "from the modal");
+  await typeInLargeEditor("Message to the agent", "from the modal");
   fireEvent.click(screen.getByText("Done"));
   expect(box.value).toBe("from the modal");
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
@@ -299,7 +299,7 @@ test("with a round the modal is Note on this round and its text goes in the Note
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(
     "Note on this round",
   );
-  typeInLargeEditor("Note on this round", "round note");
+  await typeInLargeEditor("Note on this round", "round note");
   fireEvent.click(screen.getByText("Done"));
   expect(box.value).toBe("round note");
   fireEvent.click(screen.getByRole("button", { name: "Send answers" }));

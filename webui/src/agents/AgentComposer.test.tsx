@@ -175,11 +175,11 @@ test("plain Enter adds a newline and does not send", async () => {
   expect(post).not.toHaveBeenCalled();
 });
 
-test("the Message field has an expand button and its editor is titled for the session", () => {
+test("the Message field has an expand button and its editor is titled for the session", async () => {
   render();
   fireEvent.click(screen.getByRole("button", { name: "Open the note in a large editor" }));
   expect(screen.getByRole("dialog").getAttribute("aria-label")).toBe(`Message to ${session().id}`);
-  typeInLargeEditor(`Message to ${session().id}`, "from editor");
+  await typeInLargeEditor(`Message to ${session().id}`, "from editor");
   expect((box() as HTMLTextAreaElement).value).toBe("from editor");
 });
 
