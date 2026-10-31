@@ -113,7 +113,7 @@ func dwellThenPauseBlocked(d Deps, p launchAndPromptParams, runner, sessionID st
 		how = "answer it with `gx server agents answer`, or in the pane"
 	}
 	if runner == string(agentrunner.ChoicePTY) {
-		how = "answer it with the web answer button, `gx server agents answer`, or by typing in the Agents tab live panel"
+		how = "press Approve or Deny on the card, press Retry when it has no card, answer with `gx server agents answer`, or type in the Agents tab live panel"
 	}
 	reason = fmt.Sprintf("%s is blocked on a prompt gx did not send; %s", p.Label, how)
 	if st.BlockedReason != "" {

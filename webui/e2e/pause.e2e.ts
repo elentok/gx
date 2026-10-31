@@ -265,7 +265,7 @@ test.describe("115. Blocked pause on PTY", () => {
     await page.locator('a[href$="/t/demo:approve-epic/01"]').filter({ hasNotText: "→" }).click();
 
     await expect(stuck(page)).toBeVisible();
-    await expect(page.getByText(/answer it with the web answer button/)).toBeVisible();
+    await expect(page.getByText(/press Approve or Deny on the card/)).toBeVisible();
     await page.getByRole("button", nav("Allow once")).click();
     await expect(stuck(page)).toHaveCount(0);
   });

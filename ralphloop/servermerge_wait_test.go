@@ -406,8 +406,8 @@ func TestWaitIterationFinished_DwellingRunnersPauseOnlyIfStillBlocked(t *testing
 		runner string
 		want   []string
 	}{
-		{"pty claude", AgentClaude, "pty", []string{"web answer button", "gx server agents answer", "Agents tab live panel"}},
-		{"pty codex", AgentCodex, "pty", []string{"web answer button", "gx server agents answer", "Agents tab live panel"}},
+		{"pty claude", AgentClaude, "pty", []string{"Approve", "Retry", "gx server agents answer", "Agents tab live panel"}},
+		{"pty codex", AgentCodex, "pty", []string{"Approve", "Retry", "gx server agents answer", "Agents tab live panel"}},
 		{"herdr claude", AgentClaude, "herdr", []string{"gx server agents answer", "or in the pane"}},
 		{"herdr codex", AgentCodex, "herdr", []string{"gx server agents answer", "or in the pane"}},
 	}
@@ -426,7 +426,7 @@ func TestWaitIterationFinished_DwellingRunnersPauseOnlyIfStillBlocked(t *testing
 					t.Errorf("reason %q lacks %q", paused.Reason, w)
 				}
 			}
-			if c.runner != "pty" && strings.Contains(paused.Reason, "web answer button") {
+			if c.runner != "pty" && strings.Contains(paused.Reason, "Retry") {
 				t.Errorf("reason %q names the web button on %s", paused.Reason, c.runner)
 			}
 		})

@@ -46,6 +46,68 @@ func TestBlockedPause_AgentErrorPausesWithItsTextAndOffersRetry(t *testing.T) {
 	}
 }
 
+// gateDwell returns a Config option that parks the 15-second dwell until the
+// returned release is called, so "under 15 seconds" is not a timing race.
+func gateDwell() (func(*server.Config), func()) {
+	gate := make(chan struct{})
+	opt := func(c *server.Config) {
+		pace := c.Sleep
+		c.Sleep = func(d time.Duration) {
+			if d == 15*time.Second {
+				<-gate
+				return
+			}
+			pace(d)
+		}
+	}
+	return opt, func() { close(gate) }
+}
+
+// A block still there when the 15-second dwell ends pauses the ticket and the
+// reason names the buttons the web offers; one that clears inside it pauses
+// nothing.
+func TestBlockedPause_PTYDwellPausesOnlyIfStillBlocked(t *testing.T) {
+	t.Parallel()
+	t.Run("still blocked", func(t *testing.T) {
+		gate, release := gateDwell()
+		h, ticketPath, turn := startBlockable(t, "pty", gate)
+		turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
+		time.Sleep(200 * time.Millisecond) // negative wait: the dwell has not ended
+		if tk, err := schema.ParseTicket(ticketPath); err != nil || tk.Status != schema.StatusClaimed {
+			t.Fatalf("ticket = %+v, %v; want claimed before the dwell ends", tk.Status, err)
+		}
+		release()
+		waitStatus(t, ticketPath, schema.StatusLegacyAnswer)
+		var reason string
+		waitFor(t, func() bool {
+			log, _, _ := ralphloop.ReadEvents(filepath.Join(h.TicketStore, "proj"), "epic-a")
+			for _, ev := range log {
+				if events.Type(ev.Type) == events.Paused && ev.Kind == string(events.BlockedPane) {
+					reason = ev.Reason
+				}
+			}
+			return reason != ""
+		})
+		for _, want := range []string{"Approve", "Retry"} {
+			if !strings.Contains(reason, want) {
+				t.Errorf("reason %q lacks %q", reason, want)
+			}
+		}
+	})
+	t.Run("clears inside the dwell", func(t *testing.T) {
+		gate, release := gateDwell()
+		_, ticketPath, turn := startBlockable(t, "pty", gate)
+		turn.SetState("epic-a-iter-01", agentrunner.StateBlocked, "waiting on a prompt")
+		turn.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
+		release()
+		// Negative wait: a pause would show once the re-check has run.
+		time.Sleep(300 * time.Millisecond)
+		if tk, err := schema.ParseTicket(ticketPath); err != nil || tk.Status != schema.StatusClaimed {
+			t.Errorf("ticket = %v, %v; want claimed", tk.Status, err)
+		}
+	})
+}
+
 // A usage-limit error holds the run: the limit is read before the blocked
 // state, so the ticket never pauses.
 func TestBlockedPause_UsageLimitErrorHoldsInsteadOfPausing(t *testing.T) {

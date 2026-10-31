@@ -1290,7 +1290,7 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   1. Open the Epics page and the `approve-epic` card; wait up to 30 s (the 15 s dwell).
   2. Open ticket 01.
   3. Click "Allow once".
-- **Pass:** the epic page reads "needs answer" after the dwell. The ticket page reads "Paused · Agent stuck", and its action card names the web answer button. "Allow once" clears the pause without a reload.
+- **Pass:** the epic page reads "needs answer" after the dwell. The ticket page reads "Paused · Agent stuck", and its action card names the Approve, Deny and Retry buttons. "Allow once" clears the pause without a reload.
 
 ## 116. Retry on a question menu
 
