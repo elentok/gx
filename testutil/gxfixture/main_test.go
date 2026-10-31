@@ -28,7 +28,7 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-var gxBin, fixtureBin, fakeBin string
+var gxBin, fixtureBin, fakeBin, fakeCodexBin string
 
 func TestMain(m *testing.M) {
 	os.Exit(func() int {
@@ -39,10 +39,12 @@ func TestMain(m *testing.M) {
 		}
 		defer os.RemoveAll(dir)
 		gxBin, fixtureBin, fakeBin = filepath.Join(dir, "gx"), filepath.Join(dir, "gxfixture"), filepath.Join(dir, "claude")
+		fakeCodexBin = filepath.Join(dir, "codex")
 		for out, pkg := range map[string]string{
-			gxBin:      "github.com/elentok/gx",
-			fixtureBin: "github.com/elentok/gx/testutil/gxfixture",
-			fakeBin:    "github.com/elentok/gx/testutil/agentfake/cmd/fakeclaude",
+			gxBin:        "github.com/elentok/gx",
+			fixtureBin:   "github.com/elentok/gx/testutil/gxfixture",
+			fakeBin:      "github.com/elentok/gx/testutil/agentfake/cmd/fakeclaude",
+			fakeCodexBin: "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex",
 		} {
 			if b, err := exec.Command("go", "build", "-tags", "gxfixture", "-o", out, pkg).CombinedOutput(); err != nil {
 				fmt.Fprintf(os.Stderr, "go build %s: %v\n%s", pkg, err, b)
@@ -1407,7 +1409,7 @@ func TestAgentsScenario_EightSessionsInThreeProjectsAndAWorktree(t *testing.T) {
 		{"demo", "claude", server.SessionIdle, false, false, ""},
 		{"demo", "claude", server.SessionWorking, false, false, ""},
 		{"demo", "claude", server.SessionIdle, true, false, "needs a decision"},
-		{"demo", fakeHarness, server.SessionIdle, false, false, ""},
+		{"demo", "codex", server.SessionIdle, false, false, ""},
 		{"other", "claude", server.SessionIdle, false, true, ""},
 		{"other", "claude", server.SessionIdle, false, false, "needs a decision"},
 		{"site", "claude", server.SessionIdle, true, false, ""},

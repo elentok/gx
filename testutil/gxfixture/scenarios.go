@@ -93,6 +93,9 @@ type scenario struct {
 	chat bool
 	// sessions are created in order once the server is up, as `gx agents create` makes them.
 	sessions []sessionSpec
+	// codex installs the fake codex on PATH without the --fakecodex flag, for a
+	// scenario that runs a Codex session.
+	codex bool
 	// stallThreshold is how long a Working session's transcript may stay untouched
 	// before it counts as stalled; the --stall-threshold flag overrides it.
 	stallThreshold string
@@ -391,6 +394,11 @@ var scenarios = map[string]scenario{
 	// agents: eight sessions in demo (4), other (2) and site (2), one per row of
 	// the Agents mock, and a worktree in demo. See agentsScenario.
 	"agents": agentsScenario(),
+	// default-harness: the global Default harness is claude; gx overrides to codex,
+	// demo and dotfiles inherit. One ticket waits behind a held Claude worker, and
+	// the Agents tab holds a Claude, a Codex and a model-switched Claude session.
+	// Start it with --fakecodex for codex on PATH. See defaultHarnessScenario.
+	"default-harness": defaultHarnessScenario(),
 	// queue-agents: one PTY Queue agent and one Design agent. See queueAgentsScenario.
 	"queue-agents": queueAgentsScenario(),
 	// agents-failures: four Claude sessions in demo, one per failure (stalled,

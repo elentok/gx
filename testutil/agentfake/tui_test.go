@@ -273,6 +273,21 @@ func TestTUIClaude_RepliesReportTheModelItWasStartedWith(t *testing.T) {
 	}
 }
 
+func TestTUIClaude_ModelControlChangesTheNextReplysModel(t *testing.T) {
+	f := startTUIFake(t, append([]string{"--model", "opus"}, tuiLaunchArgs...))
+	path := f.transcriptPath()
+	f.writeWorkerConfig(WorkerConfig{Chat: true})
+
+	f.control(Control{Action: ActionModel, Model: "claude-other-1"})
+	f.typeLine("hello there")
+	f.waitStatus(StatusBusy, "")
+	f.waitStatus(StatusIdle, "")
+	usage, ok, err := transcript.LastAssistantUsage(path)
+	if err != nil || !ok || usage.Model != "claude-other-1" {
+		t.Fatalf("reported model = %q, %v, %v; want claude-other-1", usage.Model, ok, err)
+	}
+}
+
 func TestTUIClaude_StaleModelExitsAtStart(t *testing.T) {
 	f := startTUIFake(t, append([]string{"--model", StaleModel}, tuiLaunchArgs...))
 

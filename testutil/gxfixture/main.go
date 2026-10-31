@@ -4,13 +4,15 @@
 // after two hours, and it runs the server with OS notifications off. It never reads or writes the real HOME, config
 // or state: the server and every CLI verb run in a temp HOME and temp XDG dirs.
 //
-//	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] [--auto-advance-delay <duration>] [--stall-threshold <duration>] <scenario>
+//	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] [--fakecodex <binary>] [--auto-advance-delay <duration>] [--stall-threshold <duration>] <scenario>
 //
 // --auto-advance-delay shortens the server's run-end countdown (default 10s).
 // --stall-threshold shortens how long a Working session's transcript may stay untouched before it counts as stalled (default 15m).
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 // --mock-dir <path> serves that directory over loopback HTTP and reports its base URL as mock_url.
+//
+// --fakecodex installs that binary as `codex` next to `claude`; without it codex is not on PATH.
 //
 // A binary left out is built with `go build -tags gxfixture` into the fixture's own temp dir, which
 // needs the module as the working directory. So `go run ./testutil/gxfixture <scenario>` is the
@@ -119,7 +121,7 @@ func main() {
 }
 
 func run(args []string) (err error) {
-	var gxBin, fakeBin, name, autoAdvance, stallThreshold, mockDir string
+	var gxBin, fakeBin, fakeCodexBin, name, autoAdvance, stallThreshold, mockDir string
 	var configs []string
 	var hold, shellEnv bool
 	for i := 0; i < len(args); i++ {
@@ -150,14 +152,17 @@ func run(args []string) (err error) {
 				mockDir = args[i+1]
 			}
 			i++
-		case "--gx", "--fakeclaude":
+		case "--gx", "--fakeclaude", "--fakecodex":
 			if i+1 == len(args) {
 				return fmt.Errorf("%s needs a value", args[i])
 			}
-			if args[i] == "--gx" {
+			switch args[i] {
+			case "--gx":
 				gxBin = args[i+1]
-			} else {
+			case "--fakeclaude":
 				fakeBin = args[i+1]
+			default:
+				fakeCodexBin = args[i+1]
 			}
 			i++
 		default:
@@ -196,6 +201,16 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
+	// Without the flag codex stays off PATH, which is how a host without Codex looks.
+	if fakeCodexBin != "" || sc.codex {
+		if fakeCodexBin, err = binary(fakeCodexBin, filepath.Join(root, "codex"), "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex"); err != nil {
+			return err
+		}
+		if err := os.Symlink(fakeCodexBin, filepath.Join(binDir, "codex")); err != nil {
+			return err
+		}
+	}
+	installedCodex := fakeCodexBin != ""
 
 	port, err := freePort()
 	if err != nil {
@@ -207,6 +222,7 @@ func run(args []string) (err error) {
 		hold:   filepath.Join(root, "hold"),
 		store:  filepath.Join(root, "data", "gx", "tickets"),
 		stateD: filepath.Join(root, "state", "gx"),
+		codex:  installedCodex,
 	}
 	f.env, f.cliEnv = isolatedEnv(root, binDir)
 	if autoAdvance != "" {
@@ -446,6 +462,8 @@ type fixture struct {
 	// env is what the server and its agents run with; cliEnv is the part a
 	// CLI verb needs to reach the same server, which is all the output names.
 	env, cliEnv []string
+	// codex is true when the fake codex is on the fixture PATH.
+	codex bool
 }
 
 // isolatedEnv is the process environment with every variable that could reach

@@ -17,9 +17,6 @@ import (
 	"github.com/elentok/gx/transcript"
 )
 
-// fakeHarness is the non-Claude harness the gxfixture build of gx registers.
-const fakeHarness = "fakecodex"
-
 // sessionSpec is one interactive session a scenario creates once the server is
 // up, in order. A prompt makes a chat turn (the scenario turns the fake's chat
 // knob on); with the agentfake.ChatSlowMarker the turn never ends.
@@ -40,6 +37,9 @@ type sessionSpec struct {
 	// Failure.Kind the session must then show.
 	control *agentfake.Control
 	failure string
+	// thenPrompt is one more chat turn sent after the control, so a reply
+	// carries what the control changed.
+	thenPrompt string
 }
 
 const sessionWaitTimeout = 20 * time.Second
@@ -48,6 +48,11 @@ const sessionWaitTimeout = 20 * time.Second
 // before the next so the list keeps creation order.
 func (f *fixture) seedSessions(sc scenario) error {
 	for _, s := range sc.sessions {
+		// A Codex session cannot start while codex is off PATH, which is the
+		// state the missing-harness flows need.
+		if s.harness == "codex" && !f.codex {
+			continue
+		}
 		if err := f.seedSession(sc, s); err != nil {
 			return fmt.Errorf("session in %s: %w", s.project, err)
 		}
@@ -108,6 +113,11 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 			return err
 		}
 	}
+	if s.thenPrompt != "" {
+		if err := f.promptAgain(id, s.thenPrompt); err != nil {
+			return err
+		}
+	}
 	if s.crash {
 		if err := f.waitFor(id, server.SessionExited, func(si server.SessionInfo, _ server.SessionChatResponse) bool {
 			return si.Status.State == server.SessionExited
@@ -133,6 +143,27 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 		}
 	}
 	return nil
+}
+
+// promptAgain sends text as another chat turn and waits for its reply.
+func (f *fixture) promptAgain(id, text string) error {
+	agentMessages := func(chat server.SessionChatResponse) int {
+		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m server.SessionChatMessage) bool {
+			return m.Role != transcript.ChatRoleAgent
+		}))
+	}
+	var before server.SessionChatResponse
+	if out, err := f.cli("agents", "chat", id, "--json"); err == nil {
+		_ = json.Unmarshal(out, &before)
+	}
+	// The control travels on its own FIFO; give it time to land before the turn.
+	time.Sleep(300 * time.Millisecond)
+	if out, err := f.cli("agents", "prompt", id, text); err != nil {
+		return fmt.Errorf("prompt %s: %w\n%s", id, err, out)
+	}
+	return f.waitFor(id, "a reply to "+text, func(si server.SessionInfo, chat server.SessionChatResponse) bool {
+		return si.Status.State == server.SessionIdle && agentMessages(chat) > agentMessages(before)
+	})
 }
 
 // controlFiles lists the control FIFOs of the TUI fakes started so far.
@@ -239,11 +270,44 @@ func queueAgentsScenario() scenario {
 	}
 }
 
+// defaultHarnessScenario is the Settings and Agents fixture for the Default
+// harness. The global default is Claude. gx overrides to Codex; demo and
+// dotfiles inherit. demo's cap of one agent keeps the second epic's ticket
+// waiting behind the held worker of the first.
+func defaultHarnessScenario() scenario {
+	const codexOverride = `,"agents":{"default-harness":"codex"}`
+	return scenario{
+		epics: []epic{
+			{project, "running-epic", []ticket{{"01", "running", servertest.TicketOpts{}}}},
+			{project, "waiting-epic", []ticket{{"01", "waiting", servertest.TicketOpts{}}}},
+			{"dotfiles", "dotfiles-epic", nil},
+			{"gx", "gx-epic", nil},
+		},
+		projectExtra: map[string]string{project: `,"max-agents":1`, "gx": codexOverride},
+		ownRepos:     []string{"dotfiles", "gx"},
+		queue:        []string{project + ":running-epic", project + ":waiting-epic"},
+		hold:         true,
+		chat:         true,
+		sessions: []sessionSpec{
+			{project: project, prompt: "hello", read: true},
+			{project: "gx", harness: "codex"},
+			{project: "dotfiles", prompt: "hello", read: true,
+				control:    &agentfake.Control{Action: agentfake.ActionModel, Model: switchedModel},
+				thenPrompt: "and again"},
+		},
+	}
+}
+
+// switchedModel is the model the switched session's later replies report; it
+// differs from the model its tier launched with.
+const switchedModel = "claude-haiku-5-5"
+
 // agentsScenario is the Agents page fixture: eight sessions in three
 // projects, one per row of the mock, and a worktree in demo.
 func agentsScenario() scenario {
 	const mapAddr = "design-epic"
 	return scenario{
+		codex:    true,
 		projects: []string{"other"},
 		epics: []epic{
 			{project, mapAddr, nil},
@@ -262,7 +326,7 @@ func agentsScenario() scenario {
 			{project: project, prompt: "hello", read: true},
 			{project: project, prompt: agentfake.ChatSlowMarker + " a long turn"},
 			{project: project, prompt: "hello", link: project + ":" + mapAddr, read: true, actionable: "needs a decision"},
-			{project: project, harness: fakeHarness},
+			{project: project, harness: "codex"},
 			{project: "other", prompt: "hello"},
 			{project: "other", actionable: "needs a decision"},
 			{project: "site", prompt: "hello", link: "site:" + mapAddr, read: true},

@@ -821,6 +821,9 @@ func (t *tui) handleControl(c Control) error {
 		return t.writePid()
 	case ActionAPIError:
 		return t.apiError(c)
+	case ActionModel:
+		t.opts.model = c.Model
+		return nil
 	default:
 		return fmt.Errorf("unknown control action %q", c.Action)
 	}

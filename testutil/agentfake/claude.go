@@ -44,6 +44,9 @@ const (
 	// ActionAPIError makes the TUI fake append the transcript line claude
 	// writes for a failed API call: Error, Status and Message say which.
 	ActionAPIError = "apierror"
+	// ActionModel makes the TUI fake report Model on every later reply, as a
+	// session does after the user switches model with /model.
+	ActionModel = "model"
 	// The Codex fake's scripted events. ActionToolCall runs Tool (default
 	// "Bash") with Command through its PreToolUse hooks; ActionPermission asks
 	// approval for Command through its PermissionRequest hooks; ActionTokenCount
@@ -89,6 +92,8 @@ type Control struct {
 	// text is Message.
 	Error  string `json:"error,omitempty"`
 	Status int    `json:"status,omitempty"`
+	// Model is the model an ActionModel makes the TUI fake report.
+	Model string `json:"model,omitempty"`
 	// Tool and Command describe an ActionToolCall or ActionPermission of the
 	// Codex fake.
 	Tool    string `json:"tool,omitempty"`
