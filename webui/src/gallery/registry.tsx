@@ -18,6 +18,7 @@ import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
 import { Card } from "../ui/card/Card";
 import { Chip } from "../ui/chip/Chip";
+import { HarnessLabel } from "../ui/harness-label/HarnessLabel";
 import { DayChart } from "../ui/day-chart/DayChart";
 import { LineChart } from "../ui/day-chart/LineChart";
 import { EmptyState } from "../ui/empty-state/EmptyState";
@@ -453,6 +454,15 @@ export const galleryEntries: GalleryEntry[] = [
     ],
   },
   { name: "Chip", cases: perTone((tone) => <Chip tone={tone}>{tone}</Chip>) },
+  {
+    name: "HarnessLabel",
+    cases: [
+      { label: "claude full", node: <HarnessLabel harness="claude" tierLabel="Worker" model="sonnet-4.6" effort="high" switched={false} /> },
+      { label: "codex full", node: <HarnessLabel harness="codex" tierLabel="Strongest" model="gpt-5.5" effort="xhigh" switched={false} /> },
+      { label: "no reply yet", node: <HarnessLabel harness="codex" tierLabel="Worker" model="" effort="" switched={false} /> },
+      { label: "switched", node: <HarnessLabel harness="claude" tierLabel="Worker" model="opus-4.7" effort="high" switched /> },
+    ],
+  },
   { name: "LiveDot", cases: perTone((tone) => <LiveDot tone={tone} label={tone} />) },
   { name: "Strip", cases: perTone((tone) => <Strip tone={tone}>{tone}</Strip>) },
   {

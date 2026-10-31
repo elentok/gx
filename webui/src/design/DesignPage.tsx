@@ -1,6 +1,7 @@
 import { Box, Text, chakra } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { SessionHarnessLabel } from "../agents/SessionHarnessLabel";
 import { useConnectionContext, useConnectionState } from "../connection";
 import { useEpicDetail, type FetchEpicDetail } from "../epic/detail";
 import { EpicRing } from "../epic/EpicRing";
@@ -155,7 +156,7 @@ function DesignBody({
         gap="4"
         flex="none"
       >
-        <Box minW="0">
+        <Box minW="0" display="flex" flexWrap="wrap" alignItems="center" columnGap="3" rowGap="2">
           <PageHeader
             title={name}
             lead={
@@ -175,6 +176,7 @@ function DesignBody({
               </>
             }
           />
+          {session && <SessionHarnessLabel session={session} />}
         </Box>
         <SessionStrip
           address={address}

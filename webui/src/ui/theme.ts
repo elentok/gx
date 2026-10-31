@@ -68,6 +68,7 @@ export const themeConfig = defineConfig({
         },
         tone: toneTokens,
         kind: kindTokens,
+        harness: { claude: { value: "#c2622d" }, codex: { value: "#2a8a6a" } },
       },
       fonts: {
         condensed: { value: "'Saira Condensed', sans-serif" },

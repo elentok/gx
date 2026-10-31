@@ -14,8 +14,8 @@ import { Chip } from "../ui/chip/Chip";
 import { Modal } from "../ui/modal/Modal";
 import { AgentChat } from "./AgentChat";
 import { AgentComposer } from "./AgentComposer";
-import { TIERS } from "./NewSessionForm";
 import { stateLabel, statusMark } from "./rules";
+import { SessionHarnessLabel } from "./SessionHarnessLabel";
 import { StatusMark } from "./SessionGlyphs";
 import { SessionSwitcher } from "./SessionSwitcher";
 
@@ -24,24 +24,6 @@ function DesignLink({ map, ml }: { map: string; ml?: string }) {
     <Link fontSize="sm" ml={ml} color="tone.running.fg" href={designHref(map)}>
       Open design page →
     </Link>
-  );
-}
-
-/** `<model> · <effort>`; a tier without a model shows `<Tier> · CLI default` until a reply reports one. Empty when nothing is known. */
-function modelLabel(s: SessionInfo): { text: string; tier: string } | undefined {
-  const tier = TIERS.find((t) => t.id === (s.tier || "worker"))?.label ?? "";
-  if (!s.model && !s.effort && !s.tier) return undefined;
-  const model = s.model || `${tier} · CLI default`;
-  return { text: s.effort ? `${model} · ${s.effort}` : model, tier: s.tier ? tier : "" };
-}
-
-function ModelLabel({ session }: { session: SessionInfo }) {
-  const label = modelLabel(session);
-  if (!label) return null;
-  return (
-    <Text as="span" fontSize="sm" color="text.dim" title={label.tier ? `${label.tier} tier` : undefined}>
-      {label.text}
-    </Text>
   );
 }
 
@@ -61,6 +43,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
           <Text as="span" fontSize="sm" color="text.dim">
             {s.project} · {stateLabel(s)}
           </Text>
+          <SessionHarnessLabel session={s} />
         </Box>
         {map && <DesignLink map={map} ml="auto" />}
       </Box>
@@ -73,8 +56,7 @@ function SessionHeader({ session: s, sessions, onNew }: { session: SessionInfo; 
       <Chip tone={tone} fontSize="12.5px" outlined={false}>
         {stateLabel(s)}
       </Chip>
-      <ModelLabel session={s} />
-      {s.harness !== "claude" && <Chip>{s.harness}</Chip>}
+      <SessionHarnessLabel session={s} />
       <Text as="span" fontSize="sm" color="text.dim">
         {s.dir}
       </Text>

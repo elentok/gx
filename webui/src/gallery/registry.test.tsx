@@ -23,8 +23,11 @@ it("shows every exported primitive in the gallery", () => {
   for (const name of primitiveNames) expect(shown, name).toContain(name);
 });
 
+// Coloured by harness, not by tone: its cases are the harness and the label states.
+const untoned = ["HarnessLabel"];
+
 it("shows every primitive in every tone", () => {
-  for (const name of primitiveNames) {
+  for (const name of primitiveNames.filter((n) => !untoned.includes(n))) {
     const labels = galleryEntries.find((e) => e.name === name)?.cases.map((c) => c.label) ?? [];
     for (const tone of TONES) expect(labels, `${name} ${tone}`).toContain(tone);
   }

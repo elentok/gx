@@ -118,6 +118,18 @@ test("the Epics tab counts the other Needs-you cards from the loaded list", asyn
   expect(await screen.findByRole("link", { name: "Epics · 1 needs you" })).toBeTruthy();
 });
 
+test("the header shows the harness, tier and model of a Codex session, and nothing without a session", async () => {
+  render([map("a")], [session("a", { harness: "codex", tier: "worker", model: "gpt-5.3-codex", effort: "medium" })]);
+  expect(await screen.findByText("Codex")).toBeTruthy();
+  expect(screen.getByText("Worker")).toBeTruthy();
+  expect(screen.getByText("gpt-5.3-codex · medium")).toBeTruthy();
+  cleanup();
+  render([map("a")], []);
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByText("Codex")).toBeNull();
+  expect(screen.queryByText("Claude")).toBeNull();
+});
+
 test("the title row holds the Design name and More actions, with no picker or state label", async () => {
   render([map("a"), map("b")], [session("a", { status: { state: "working" } })]);
   const title = await screen.findByRole("heading", { level: 1 });

@@ -5,16 +5,17 @@ import { chat, chatOf, render, session, useAgentsPageHooks } from "./agentsTestK
 
 useAgentsPageHooks();
 
-test("the header names the session, status, dir and ticket, with a harness chip only for non-Claude", async () => {
+test("the header names the session, status, dir and ticket, with a harness chip for Claude and Codex", async () => {
   render([session("s-1", "p", { name: "one", dir: "/work/one", ticket: "gx:m/01" })], "/agents/s-1", true, chatOf(chat()));
   const header = within((await screen.findByRole("heading", { name: /one/ })).closest("header")!);
   expect(header.getByText("Idle")).toBeTruthy();
   expect(header.getByText("/work/one")).toBeTruthy();
   expect(header.getByText("gx:m/01")).toBeTruthy();
-  expect(header.queryByText("codex")).toBeNull();
+  expect(header.getByText("Claude")).toBeTruthy();
+  expect(header.queryByText("Codex")).toBeNull();
   cleanup();
   render([session("s-2", "p", { name: "two", harness: "codex" })], "/agents/s-2", true, chatOf(chat()));
-  expect(await screen.findByText("codex")).toBeTruthy();
+  expect(await screen.findByText("Codex")).toBeTruthy();
 });
 
 test("renders messages, the truncation note and the background strip", async () => {
@@ -45,16 +46,25 @@ test("a round in the chat shows no question sheet", async () => {
   expect(screen.queryByRole("group", { name: "View" })).toBeNull();
 });
 
-test("the header shows model and effort with a tier tooltip, and CLI default until a model is reported", async () => {
+test("the header shows tier and model chips with a tier tooltip, and CLI default until a model is reported", async () => {
   render([session("s-1", "p", { name: "one", tier: "strongest", model: "claude-opus-5", effort: "high" })], "/agents/s-1", true, chatOf(chat()));
   const label = await screen.findByText("claude-opus-5 · high");
   expect(label.getAttribute("title")).toBe("Strongest tier");
+  expect(screen.getByText("Strongest")).toBeTruthy();
+  expect(screen.queryByText("switched by hand")).toBeNull();
   cleanup();
   render([session("s-1", "p", { name: "one", tier: "strongest", model: "claude-opus-5" })], "/agents/s-1", true, chatOf(chat()));
   expect(await screen.findByText("claude-opus-5")).toBeTruthy();
   cleanup();
   render([session("s-1", "p", { name: "one", tier: "worker" })], "/agents/s-1", true, chatOf(chat()));
   expect(await screen.findByText("Worker · CLI default")).toBeTruthy();
+});
+
+test("the header of a Codex session with a hand-switched model says so", async () => {
+  render([session("s-1", "p", { name: "one", harness: "codex", tier: "worker", model: "gpt-5.5", effort: "xhigh", model_switched: true })], "/agents/s-1", true, chatOf(chat()));
+  expect(await screen.findByText("Codex")).toBeTruthy();
+  expect(screen.getByText("gpt-5.5 · xhigh")).toBeTruthy();
+  expect(screen.getByText("switched by hand")).toBeTruthy();
 });
 
 test("a session with a model and no tier has a tooltip that names no tier", async () => {
@@ -66,6 +76,7 @@ test("a session with a model and no tier has a tooltip that names no tier", asyn
 test("the header shows no model label when tier, model and effort are all empty", async () => {
   render([session("s-1", "p", { name: "one" })], "/agents/s-1", true, chatOf(chat()));
   const header = within((await screen.findByRole("heading", { name: /one/ })).closest("header")!);
+  expect(header.getByText("Claude")).toBeTruthy();
   expect(header.queryByText(/CLI default|·/)).toBeNull();
 });
 
