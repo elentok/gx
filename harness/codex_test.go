@@ -95,6 +95,19 @@ func TestCodexArgs_RootsAreDeduped(t *testing.T) {
 	}
 }
 
+func TestCodexHarness_LaunchDropsTheStaleClaudeSessionID(t *testing.T) {
+	t.Setenv("CLAUDE_CODE_SESSION_ID", "stale")
+	h, err := harness.Lookup(harness.Codex)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kv := range h.Launch(harness.LaunchOptions{}).Env {
+		if strings.HasPrefix(kv, "CLAUDE_CODE_SESSION_ID=") {
+			t.Errorf("Codex launch env carries %q", kv)
+		}
+	}
+}
+
 func TestCodexHarness_LaunchAndResume(t *testing.T) {
 	t.Parallel()
 	h, err := harness.Lookup(harness.Codex)

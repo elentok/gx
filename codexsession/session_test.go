@@ -154,6 +154,30 @@ func TestReadStatsInAndLastRateLimitIn_ReadTheSameHome(t *testing.T) {
 	}
 }
 
+func TestReaders_MatchARolloutThroughASymlinkedCwd(t *testing.T) {
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatalf("Symlink: %v", err)
+	}
+	home := writeCodexHome(t, "rollout-session-1.jsonl", `{"type":"session_meta","timestamp":"2026-08-01T10:00:00Z","payload":{"id":"session-1","cwd":"`+real+`"}}
+{"type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":151000},"total_token_usage":{"total_tokens":300000}},"rate_limits":{"primary":{"used_percent":100,"resets_at":1786170140}}}}
+`)
+
+	if tokens, ok, err := LastContextTokensIn(home, link, "session-1"); err != nil || !ok || tokens != 151000 {
+		t.Errorf("LastContextTokensIn = (%d, %t, %v), want 151000", tokens, ok, err)
+	}
+	if ok, err := VerifyIdentityIn(home, link, "session-1"); err != nil || !ok {
+		t.Errorf("VerifyIdentityIn = (%t, %v), want true", ok, err)
+	}
+	if stats, ok, err := ReadStatsIn(home, link, "session-1"); err != nil || !ok || stats.TotalTokens != 300000 {
+		t.Errorf("ReadStatsIn = (%+v, %t, %v), want TotalTokens 300000", stats, ok, err)
+	}
+	if limit, ok, err := LastRateLimitIn(home, link, "session-1"); err != nil || !ok || limit.Quota != "primary" {
+		t.Errorf("LastRateLimitIn = (%+v, %t, %v), want primary", limit, ok, err)
+	}
+}
+
 func TestLastContextTokensIn_MissingHomeDirFailsSafe(t *testing.T) {
 	got, ok, err := LastContextTokensIn(filepath.Join(t.TempDir(), "does-not-exist"), "/repo/iter-01", "session-1")
 	if err != nil {

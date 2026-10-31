@@ -162,6 +162,23 @@ type sessionLine struct {
 	} `json:"payload"`
 }
 
+// sameDir compares two directories after resolving symlinks: Codex records the
+// real path, while the caller may hold a symlink to it (macOS /var -> /private/var).
+// A path that does not resolve compares as given.
+func sameDir(a, b string) bool {
+	if a == b {
+		return true
+	}
+	return resolveDir(a) == resolveDir(b)
+}
+
+func resolveDir(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return p
+}
+
 func readStats(path, cwd, sessionID string) (stats Stats, ok bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -178,7 +195,7 @@ func readStats(path, cwd, sessionID string) (stats Stats, ok bool, err error) {
 			continue
 		}
 		if line.Type == "session_meta" {
-			matchingSession = line.Payload.ID == sessionID && line.Payload.Cwd == cwd
+			matchingSession = line.Payload.ID == sessionID && sameDir(line.Payload.Cwd, cwd)
 			if matchingSession && !line.Timestamp.IsZero() {
 				stats.Start, stats.End, ok = line.Timestamp, line.Timestamp, true
 			}
@@ -227,7 +244,7 @@ func readContextTokens(path, cwd, sessionID string) (tokens int, ok bool, err er
 			continue
 		}
 		if line.Type == "session_meta" {
-			matchingSession = line.Payload.ID == sessionID && line.Payload.Cwd == cwd
+			matchingSession = line.Payload.ID == sessionID && sameDir(line.Payload.Cwd, cwd)
 			continue
 		}
 		if matchingSession && line.Type == "event_msg" && line.Payload.Type == "token_count" && line.Payload.Info.LastTokenUsage.InputTokens > 0 {
@@ -251,7 +268,7 @@ func readIdentity(path, cwd, sessionID string) (bool, error) {
 	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
 	for scanner.Scan() {
 		var line sessionLine
-		if json.Unmarshal(scanner.Bytes(), &line) == nil && line.Type == "session_meta" && line.Payload.ID == sessionID && line.Payload.Cwd == cwd {
+		if json.Unmarshal(scanner.Bytes(), &line) == nil && line.Type == "session_meta" && line.Payload.ID == sessionID && sameDir(line.Payload.Cwd, cwd) {
 			return true, nil
 		}
 	}
@@ -278,7 +295,7 @@ func readRateLimit(path, cwd, sessionID string) (limit RateLimit, ok bool, err e
 			continue
 		}
 		if line.Type == "session_meta" {
-			matchingSession = line.Payload.ID == sessionID && line.Payload.Cwd == cwd
+			matchingSession = line.Payload.ID == sessionID && sameDir(line.Payload.Cwd, cwd)
 			continue
 		}
 		if !matchingSession || line.Type != "event_msg" || line.Payload.Type != "token_count" {

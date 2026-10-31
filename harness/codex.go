@@ -46,7 +46,12 @@ func (codexHarness) Resume(conversationID string, opts LaunchOptions) (Command, 
 }
 
 func codexCommand(args, env []string) Command {
-	return Command{Name: "codex", Args: slices.Clone(args), Env: LaunchEnv(os.Environ(), env)}
+	// A server started inside a Claude shell carries a stale Claude session id,
+	// which would make `gx agent context-window` see two harnesses.
+	launch := slices.DeleteFunc(LaunchEnv(os.Environ(), nil), func(kv string) bool {
+		return strings.HasPrefix(kv, "CLAUDE_CODE_SESSION_ID=")
+	})
+	return Command{Name: "codex", Args: slices.Clone(args), Env: append(launch, env...)}
 }
 
 func (codexHarness) Watch(int, time.Time, Screen, <-chan struct{}) (Watcher, error) {

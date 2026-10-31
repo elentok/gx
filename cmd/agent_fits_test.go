@@ -150,6 +150,71 @@ func TestExecute_AgentContextWindow_FitsCodexSwitchOffStops(t *testing.T) {
 	}
 }
 
+func freshCodexDeps(stdout *bytes.Buffer, env map[string]string) deps {
+	d := agentTestDeps(stdout, env)
+	d.verifyCodexSession = func(string, string) (bool, error) { return true, nil }
+	d.readCodexContext = func(string, string) (int, bool, error) { return 0, false, nil }
+	return d
+}
+
+func TestExecute_AgentContextWindow_FitsFreshCodexSessionUsesZero(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := freshCodexDeps(&stdout, nil)
+	code, err := fitsExit(t, []string{"agent", "context-window", "--agent", "codex", "--session", "c-1", "--fits", "spec"}, d)
+	if err != nil || code != 0 || !strings.Contains(stdout.String(), "used=0 ") {
+		t.Fatalf("code=%d err=%v out=%q, want exit 0 with used=0", code, err, stdout.String())
+	}
+	stdout.Reset()
+	code, err = fitsExit(t, []string{"agent", "context-window", "--agent", "codex", "--session", "c-1", "--fits", "grill-findings"}, d)
+	if err != nil || code != 1 {
+		t.Fatalf("grill-findings: code=%d err=%v, want the growth table to say exit 1", code, err)
+	}
+}
+
+func TestExecute_AgentContextWindow_PlainFreshCodexSessionStillErrors(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	err := execute([]string{"agent", "context-window", "--agent", "codex", "--session", "c-1"}, freshCodexDeps(&stdout, nil))
+	if err == nil || !strings.Contains(err.Error(), "no context usage yet") {
+		t.Fatalf("err = %v, want the no-context-usage error", err)
+	}
+}
+
+func TestExecute_AgentContextWindow_FitsClaudeMissingTranscriptIsAnError(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := fitsDeps(&stdout, 0)
+	d.readClaudeOccupancy = func(string, string) (int, bool, error) { return 0, false, nil }
+	code, err := fitsExit(t, []string{"agent", "context-window", "--fits", "spec"}, d)
+	if err == nil || code != 0 {
+		t.Fatalf("code=%d err=%v, want a plain error", code, err)
+	}
+}
+
+func TestExecute_AgentContextWindow_BothEnvVarsPickTheGXSessionHarness(t *testing.T) {
+	t.Parallel()
+	env := map[string]string{"CLAUDE_CODE_SESSION_ID": "sess-1", "CODEX_THREAD_ID": "c-1", nativerunner.AgentSessionEnv: "gx-1"}
+	var stdout bytes.Buffer
+	d := freshCodexDeps(&stdout, env)
+	d.readCodexContext = func(string, string) (int, bool, error) { return 42, true, nil }
+	d.readSessionHarness = func(id string) (string, error) {
+		if id != "gx-1" {
+			t.Errorf("harness read for %q, want gx-1", id)
+		}
+		return "codex", nil
+	}
+	if err := execute([]string{"agent", "context-window"}, d); err != nil || strings.TrimSpace(stdout.String()) != "42" {
+		t.Fatalf("out=%q err=%v, want the Codex count 42", stdout.String(), err)
+	}
+
+	// Without a gx session the ambiguity stays.
+	delete(env, nativerunner.AgentSessionEnv)
+	if err := execute([]string{"agent", "context-window"}, d); err == nil || !strings.Contains(err.Error(), "ambiguous") {
+		t.Fatalf("err = %v, want the ambiguity error", err)
+	}
+}
+
 func TestExecute_AgentContextWindow_FitsReadErrorIsNotChain(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer

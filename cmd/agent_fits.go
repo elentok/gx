@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -43,6 +45,10 @@ func runAgentFits(d deps, out io.Writer, agent, session, cwd, stepName string) e
 		}
 	}
 	used, err := runAgentContextWindow(d, agent, session, cwd)
+	if errors.Is(err, errCodexNoUsage) {
+		// A fresh Codex session has made no model call yet: it has used nothing.
+		used, err = 0, nil
+	}
 	if err != nil {
 		return err
 	}
@@ -58,18 +64,35 @@ func runAgentFits(d deps, out io.Writer, agent, session, cwd, stepName string) e
 // readServerAutoAdvance reads the switch live from the server. A session the
 // server does not list is an error, so the caller stops instead of chaining.
 func readServerAutoAdvance(dirs config.Dirs, sessionID string) (bool, error) {
-	cl, err := serverClient(dirs)
+	s, err := findServerSession(dirs, sessionID)
 	if err != nil {
 		return false, err
 	}
+	return s.AutoAdvance, nil
+}
+
+// readServerHarness reads a gx session's harness name from the server.
+func readServerHarness(dirs config.Dirs, sessionID string) (string, error) {
+	s, err := findServerSession(dirs, sessionID)
+	if err != nil {
+		return "", err
+	}
+	return s.Harness, nil
+}
+
+func findServerSession(dirs config.Dirs, sessionID string) (server.SessionInfo, error) {
+	cl, err := serverClient(dirs)
+	if err != nil {
+		return server.SessionInfo{}, err
+	}
 	sessions, err := cl.Sessions(context.Background())
 	if err != nil {
-		return false, fmt.Errorf("reading auto-advance for gx session %s: %w", sessionID, err)
+		return server.SessionInfo{}, fmt.Errorf("reading gx session %s: %w", sessionID, err)
 	}
 	for _, s := range sessions {
 		if s.ID == sessionID {
-			return s.AutoAdvance, nil
+			return s, nil
 		}
 	}
-	return false, fmt.Errorf("gx session %s not found on the server", sessionID)
+	return server.SessionInfo{}, fmt.Errorf("gx session %s not found on the server", sessionID)
 }

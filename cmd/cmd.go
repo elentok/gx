@@ -56,7 +56,9 @@ type deps struct {
 	verifyCodexSession   func(cwd, sessionID string) (ok bool, err error)
 	readCodexContext     func(cwd, sessionID string) (tokens int, ok bool, err error)
 	// readAutoAdvance reads a gx session's auto-advance switch from the server.
-	readAutoAdvance    func(sessionID string) (bool, error)
+	readAutoAdvance func(sessionID string) (bool, error)
+	// readSessionHarness reads a gx session's harness name from the server.
+	readSessionHarness func(sessionID string) (string, error)
 	skillsAgentRoots   func() ([]string, error)
 	skillsManifestPath func() (string, error)
 	// skillsStatusPath is where `gx server start` records a skill install
@@ -125,6 +127,7 @@ func defaultDeps() deps {
 			return codexsession.LastContextTokensIn(roots.CodexHome, cwd, sessionID)
 		},
 		readAutoAdvance:    func(sessionID string) (bool, error) { return readServerAutoAdvance(dirs, sessionID) },
+		readSessionHarness: func(sessionID string) (string, error) { return readServerHarness(dirs, sessionID) },
 		skillsAgentRoots:   func() ([]string, error) { return defaultSkillsAgentRoots(dirs) },
 		skillsManifestPath: func() (string, error) { return defaultSkillsManifestPath(dirs) },
 		skillsStatusPath:   func() (string, error) { return defaultSkillsStatusPath(dirs) },

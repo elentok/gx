@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/elentok/gx/agentrunner"
@@ -143,6 +144,12 @@ func runAgentContextWindow(d deps, agent, session, cwdOverride string) (int, err
 	if err != nil {
 		return 0, err
 	}
+	if len(candidates) > 1 {
+		candidates, err = pickByGXSession(d, candidates)
+		if err != nil {
+			return 0, err
+		}
+	}
 	switch len(candidates) {
 	case 0:
 		return 0, fmt.Errorf("no agent session detected: set %s or %s, or pass --agent/--session", claudeSessionEnvVar, codexThreadEnvVar)
@@ -159,6 +166,33 @@ func runAgentContextWindow(d deps, agent, session, cwdOverride string) (int, err
 	default:
 		return readCodexContextWindow(d, cwd, c.sessionID)
 	}
+}
+
+// errCodexNoUsage marks a verified Codex session with no token_count yet;
+// only --fits maps it to 0 used tokens.
+var errCodexNoUsage = errors.New("no context usage yet")
+
+// pickByGXSession settles both-variables-set by the harness of the gx session
+// the command runs in. Without GX_AGENT_SESSION it keeps the ambiguity.
+func pickByGXSession(d deps, candidates []agentCandidate) ([]agentCandidate, error) {
+	id := d.getenv(nativerunner.AgentSessionEnv)
+	if id == "" || d.readSessionHarness == nil {
+		return candidates, nil
+	}
+	name, err := d.readSessionHarness(id)
+	if err != nil {
+		return nil, err
+	}
+	want := agentClaude
+	if name == string(harness.Codex) {
+		want = agentCodex
+	}
+	for _, c := range candidates {
+		if c.agent == want {
+			return []agentCandidate{c}, nil
+		}
+	}
+	return candidates, nil
 }
 
 func readClaudeContextWindow(d deps, cwd, sessionID string) (int, error) {
@@ -185,7 +219,7 @@ func readCodexContextWindow(d deps, cwd, sessionID string) (int, error) {
 		return 0, fmt.Errorf("reading codex session %s: %w", sessionID, err)
 	}
 	if !ok {
-		return 0, fmt.Errorf("codex session %s has no context usage yet", sessionID)
+		return 0, fmt.Errorf("codex session %s has no context usage yet: %w", sessionID, errCodexNoUsage)
 	}
 	return tokens, nil
 }

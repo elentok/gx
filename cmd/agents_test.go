@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/elentok/gx/apiclient"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -261,6 +263,22 @@ func TestPrintSessionResult_PrintsTheRebaseNoteOnlyWhenSet(t *testing.T) {
 	out.Reset()
 	if err := printSessionResult(&out, true, res, nil); err != nil || !strings.Contains(out.String(), `"rebase_note"`) {
 		t.Errorf("json = %q, %v; want rebase_note", out.String(), err)
+	}
+}
+
+func TestAgentLinkAndStep_IgnoreTheClaudeSessionVariable(t *testing.T) {
+	t.Setenv("CLAUDE_CODE_SESSION_ID", "claude-1")
+	t.Setenv(nativerunner.AgentSessionEnv, "")
+	for _, args := range [][]string{{"agent", "link", "auth/03"}, {"agent", "step", "spec"}} {
+		var out bytes.Buffer
+		d := agentTestDeps(&out, nil)
+		d.serverClient = func() (*apiclient.Client, error) {
+			t.Errorf("%v: a Claude variable alone reached the server", args)
+			return nil, errors.New("unexpected dial")
+		}
+		if err := execute(args, d); err != nil || !strings.Contains(out.String(), "not in a gx session") {
+			t.Errorf("%v = %q, %v; want the outside-a-session note", args, out.String(), err)
+		}
 	}
 }
 
