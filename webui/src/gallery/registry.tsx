@@ -22,6 +22,7 @@ import { HarnessLabel } from "../ui/harness-label/HarnessLabel";
 import { DayChart } from "../ui/day-chart/DayChart";
 import { LineChart } from "../ui/day-chart/LineChart";
 import { EmptyState } from "../ui/empty-state/EmptyState";
+import { InfoTip } from "../ui/info-tip/InfoTip";
 import { LiveDot } from "../ui/live-dot/LiveDot";
 import { BottomSheet } from "../ui/modal/BottomSheet";
 import { Modal } from "../ui/modal/Modal";
@@ -89,6 +90,13 @@ const ModalFrame = ({ children, h = "600px", w = "800px" }: { children: ReactNod
 const OpenMenu = ({ children }: { children: ReactNode }) => {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => root.current?.querySelector<HTMLElement>("button[aria-label=Menu]")?.click(), []);
+  return <div ref={root}>{children}</div>;
+};
+
+// Opens a tooltip the way a user does, by clicking its marker once mounted.
+const OpenTip = ({ children }: { children: ReactNode }) => {
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => root.current?.querySelector<HTMLElement>("button")?.click(), []);
   return <div ref={root}>{children}</div>;
 };
 
@@ -461,6 +469,20 @@ export const galleryEntries: GalleryEntry[] = [
       { label: "codex full", node: <HarnessLabel harness="codex" tierLabel="Strongest" model="gpt-5.5" effort="xhigh" switched={false} /> },
       { label: "no reply yet", node: <HarnessLabel harness="codex" tierLabel="Worker" model="" effort="" switched={false} /> },
       { label: "switched", node: <HarnessLabel harness="claude" tierLabel="Worker" model="opus-4.7" effort="high" switched /> },
+    ],
+  },
+  {
+    name: "InfoTip",
+    cases: [
+      { label: "closed", node: <InfoTip label="Reset time" content="Resets Friday 09:00" /> },
+      {
+        label: "open",
+        node: (
+          <OpenTip>
+            <InfoTip label="Reset time" content="Resets Friday 09:00" />
+          </OpenTip>
+        ),
+      },
     ],
   },
   { name: "LiveDot", cases: perTone((tone) => <LiveDot tone={tone} label={tone} />) },

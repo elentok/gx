@@ -24,7 +24,7 @@ it("shows every exported primitive in the gallery", () => {
 });
 
 // Coloured by harness, not by tone: its cases are the harness and the label states.
-const untoned = ["HarnessLabel"];
+const untoned = ["HarnessLabel", "InfoTip"];
 
 it("shows every primitive in every tone", () => {
   for (const name of primitiveNames.filter((n) => !untoned.includes(n))) {
@@ -49,6 +49,11 @@ it("shows the TopBar in every state the spec lists", () => {
   for (const label of ["Epics active", "Stats active", "none active", "Paused", "Offline", "no build string", "menu closed", "menu open, AFK off", "menu open, AFK on"]) {
     expect(labels, label).toContain(label);
   }
+});
+
+it("shows the InfoTip closed and open", () => {
+  const labels = galleryEntries.find((e) => e.name === "InfoTip")?.cases.map((c) => c.label) ?? [];
+  expect(labels).toEqual(["closed", "open"]);
 });
 
 it("shows the EpicCard in every state the spec lists", () => {
