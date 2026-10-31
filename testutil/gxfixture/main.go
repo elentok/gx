@@ -215,6 +215,10 @@ func run(args []string) (err error) {
 		}
 	}
 	installedCodex := fakeCodexBin != ""
+	// Agent hooks run a bare `gx`; it must be the build under test, not the host's.
+	if err := os.Symlink(gxBin, filepath.Join(binDir, "gx")); err != nil {
+		return err
+	}
 
 	port, err := freePort()
 	if err != nil {

@@ -154,3 +154,33 @@ test("118. Codex queue rows, codex missing from PATH", async ({ page, start }) =
   expect(explained).toContain("codex is not on PATH");
   expect(explained).toContain(text.replace(/^.*?(codex is not on PATH)/s, "$1"));
 });
+
+const dwell = { timeout: 30_000 };
+const stuck = (page: Page) => page.getByText("Paused · Agent stuck", { exact: true });
+
+async function openBlockedTicket(page: Page) {
+  await page.getByRole("link", { name: "codex-blocked-epic" }).click();
+  await expect(page.getByText("needs answer").first()).toBeVisible(dwell);
+  await page.locator('a[href$="/t/demo:codex-blocked-epic/01"]').filter({ hasNotText: "→" }).click();
+  await expect(stuck(page)).toBeVisible();
+  await expect(page.getByRole("group", { name: "Permission request" })).toBeVisible();
+}
+
+test.describe("119. Codex approval card", () => {
+  test("Allow once answers the hook with allow", async ({ page, start }) => {
+    const fixture = await start("codex-blocked");
+    await openBlockedTicket(page);
+    await page.getByRole("button", nav("Allow once")).click();
+    await expect(stuck(page)).toHaveCount(0);
+    await expect.poll(() => fixture.codexDecisions()).toEqual([{ behavior: "allow", message: "" }]);
+  });
+
+  test("Deny sends the note as the reason", async ({ page, start }) => {
+    const fixture = await start("codex-blocked");
+    await openBlockedTicket(page);
+    await page.getByRole("textbox", nav("Note for Deny (optional)")).fill("not on my machine");
+    await page.getByRole("button", nav("Deny")).click();
+    await expect(stuck(page)).toHaveCount(0);
+    await expect.poll(() => fixture.codexDecisions()).toEqual([{ behavior: "deny", message: "not on my machine" }]);
+  });
+});

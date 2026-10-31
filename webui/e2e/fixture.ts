@@ -69,6 +69,8 @@ export interface Fixture {
   patchProjectConfig(project: string, patch: Record<string, unknown>): Promise<void>;
   /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
   launches(): Promise<string[][]>;
+  /** What each fake codex PermissionRequest hook answered, oldest first: the decision and the deny reason. */
+  codexDecisions(): Promise<{ behavior: string; message: string }[]>;
   /**
    * A TOTP code for the fixture's secret, returned only once a step later than the last one used has
    * begun (up to 30 seconds), since the server takes each step once. Every flow that needs a code uses it.
@@ -178,6 +180,25 @@ async function startFixture(
       const stamped = await Promise.all(files.map(async (n) => ({ n, at: (await stat(join(dir, n))).mtimeMs })));
       const ordered = stamped.sort((a, b) => a.at - b.at);
       return Promise.all(ordered.map(async ({ n }) => JSON.parse(await readFile(join(dir, n), "utf8")) as string[]));
+    },
+    async codexDecisions() {
+      const dir = join(env.HOME!, ".codex", "agentfake");
+      const files = (await readdir(dir).catch(() => [] as string[])).filter((n) => n.endsWith(".hooks"));
+      const out: { behavior: string; message: string }[] = [];
+      for (const n of files) {
+        for (const line of (await readFile(join(dir, n), "utf8")).split("\n").filter(Boolean)) {
+          const run = JSON.parse(line) as { event: string; stdout: string };
+          if (run.event !== "PermissionRequest") continue;
+          let decision: { behavior?: string; message?: string } = {};
+          try {
+            decision = JSON.parse(run.stdout).hookSpecificOutput?.decision ?? {};
+          } catch {
+            // A hook that printed no JSON answered nothing.
+          }
+          out.push({ behavior: decision.behavior ?? "", message: decision.message ?? "" });
+        }
+      }
+      return out;
     },
     async nextTotpCode() {
       if (!totpSecret) throw new Error("this fixture runs without TOTP");

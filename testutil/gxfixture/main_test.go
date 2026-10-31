@@ -540,6 +540,16 @@ func TestBlockedMenuScenario_QuestionMenuPausesBlockedPaneAfterTheDwell(t *testi
 	r.stop(t)
 }
 
+func TestCodexBlockedScenario_PermissionRequestPausesBlockedPaneAfterTheDwell(t *testing.T) {
+	t.Parallel()
+	r := start(t, "codex-blocked")
+	const addr = "demo:codex-blocked-epic/01"
+	if !testutil.Poll(60*time.Second, time.Second, func() bool { return r.detail(t, addr).PauseReason == "blocked-pane" }) {
+		t.Fatalf("ticket %s pause_reason = %q, want blocked-pane", addr, r.detail(t, addr).PauseReason)
+	}
+	r.stop(t)
+}
+
 func TestRateLimitedScenario_StartsAndQueuesBothTickets(t *testing.T) {
 	t.Parallel()
 	r := start(t, "rate-limited")

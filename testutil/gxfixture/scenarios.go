@@ -416,6 +416,17 @@ var scenarios = map[string]scenario{
 	// codex-design: Default harness codex; one map whose design session starts on
 	// Codex. See codexDesignScenario.
 	"codex-design": codexDesignScenario(),
+	// codex-blocked: one Codex ticket whose worker raises a PermissionRequest hook and
+	// stays blocked, so the ticket pauses on the approval card after the dwell.
+	"codex-blocked": {
+		codex: true,
+		epics: []epic{
+			{project, "codex-blocked-epic", []ticket{{"01", "approve", servertest.TicketOpts{}}}},
+		},
+		behaviour:   map[string]string{project + ":codex-blocked-epic/01": agentfake.BehaviourPermission},
+		queue:       []string{project + ":codex-blocked-epic"},
+		queueAgents: map[string]string{project + ":codex-blocked-epic": "codex"},
+	},
 	// queue-agents: one PTY Queue agent and one Design agent. See queueAgentsScenario.
 	"queue-agents": queueAgentsScenario(),
 	// agents-failures: four Claude sessions in demo, one per failure (stalled,
