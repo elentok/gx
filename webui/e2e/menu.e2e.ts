@@ -1,3 +1,6 @@
+import { appendFile, mkdir, mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { expect, test, type Fixture } from "./fixture";
 import type { Page } from "@playwright/test";
 
@@ -178,6 +181,60 @@ test.describe("119. Spending block", () => {
       expect(box.x + box.width).toBeLessThanOrEqual(320);
       expect(await scrollWidth()).toBeLessThanOrEqual(before);
     });
+  });
+});
+
+const amount = async (page: Page, name: string) => {
+  const text = (await row(page, name).textContent()) ?? "";
+  return Number(/\$(\d+\.\d{2})/.exec(text)?.[1]);
+};
+
+test.describe("120. Menu refresh", () => {
+  // The ledger event is throttled to once per 60 s; the menu's own 60 s tick is the backstop.
+  test("amount rises while open; closed menu stops fetching", async ({ page, start }) => {
+    test.setTimeout(180_000);
+    const fixture = await start("spend", { shape: "normal" });
+    await openMenu(page);
+    await expect(row(page, "Today").getByText(/\$\d+\.\d{2}/)).toBeVisible();
+    const before = await amount(page, "Today");
+
+    await mkdir(dirname(fixture.agentTranscript), { recursive: true });
+    const line = {
+      type: "assistant",
+      timestamp: new Date().toISOString(),
+      message: { model: "claude-sonnet-4-5", usage: { input_tokens: 1_000_000, output_tokens: 0 } },
+    };
+    await appendFile(fixture.agentTranscript, JSON.stringify(line) + "\n");
+
+    await expect(row(page, "Today").getByText(dollars(before + 3))).toBeVisible({ timeout: 120_000 });
+
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toBeHidden();
+    let summaries = 0;
+    page.on("request", (req) => {
+      if (req.url().includes("/v1/usage/summary")) summaries++;
+    });
+    await report(fixture, payload(40, 50));
+    await page.waitForTimeout(4000);
+    expect(summaries).toBe(0);
+  });
+});
+
+test.describe("121. Hook report", () => {
+  test("open menu flips to limits; output matches the no-server run", async ({ page, start }) => {
+    const fixture = await start("spend", { shape: "normal" });
+    const menu = await openMenu(page);
+    await expect(menu.getByText("gx spend (est.)")).toBeVisible();
+
+    const body = payload(34, 81);
+    const withServer = await report(fixture, body);
+    await expect(menu.getByText("Claude limits")).toBeVisible();
+    await expect(row(page, "5h limit").getByText("34%")).toBeVisible();
+    await expect(row(page, "Weekly limit").getByText("81%")).toBeVisible();
+
+    const emptyState = await mkdtemp(join(tmpdir(), "gx-no-server-"));
+    const withoutServer = await fixture.cliEnvInput({ XDG_STATE_HOME: emptyState }, body, "claude", "statusline");
+    expect(withServer).toBe(withoutServer);
   });
 });
 
