@@ -34,7 +34,7 @@ func (s *Server) projectWorktrees(w http.ResponseWriter, _ *http.Request) {
 // launches.
 func (s *Server) tierModels(project string) map[string]string {
 	agents := s.agentsConfig(project)
-	agent := ralphloop.AgentFor(s.settings.Load().chatHarness())
+	agent := ralphloop.AgentFor(s.launchHarness(project))
 	out := map[string]string{}
 	for _, t := range ralphloop.AllTiers {
 		out[string(t)], _ = ralphloop.ResolveTier(agents, agent, t)

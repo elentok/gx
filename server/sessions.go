@@ -139,7 +139,7 @@ func (s *Server) createSession(req CreateSessionRequest) (SessionResult, error) 
 		return sessionRefusal(ReasonSessionBadRequest, fmt.Sprintf("unknown tier %q (want light, worker or strongest)", req.Tier)), nil
 	}
 	if req.Harness == "" {
-		req.Harness = string(harness.Claude)
+		req.Harness = s.launchHarness(req.Project)
 	}
 	if _, err := harness.Lookup(agentrunner.Kind(req.Harness)); err != nil {
 		return sessionRefusal(ReasonSessionUnknownHarness, err.Error()), nil

@@ -173,6 +173,42 @@ func TestAgentsCreateCmd_Tier(t *testing.T) {
 	if !strings.Contains(help.String(), "--tier") {
 		t.Errorf("help = %q, want --tier", help.String())
 	}
+	if strings.Contains(help.String(), "default claude") || !strings.Contains(help.String(), "Default harness") {
+		t.Errorf("help = %q, want --harness to name the Default harness", help.String())
+	}
+}
+
+func TestAgentsCreateCmd_HarnessIsEmptyUnlessGiven(t *testing.T) {
+	sock := filepath.Join(shortTempDir(t), "a.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got server.CreateSessionRequest
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Error(err)
+		}
+		_ = json.NewEncoder(w).Encode(server.SessionResult{Session: &server.SessionInfo{ID: "s1"}})
+	})}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	run := func(args ...string) string {
+		cmd := newAgentsCreateCmd(func() (*apiclient.Client, error) { return apiclient.New(sock), nil })
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetArgs(append([]string{"--project", "proj", "--json"}, args...))
+		if err := cmd.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		return got.Harness
+	}
+	if h := run(); h != "" {
+		t.Errorf("harness = %q, want empty so the server resolves the default", h)
+	}
+	if h := run("--harness", "codex"); h != "codex" {
+		t.Errorf("harness = %q, want codex", h)
+	}
 }
 
 func TestAgentActionable(t *testing.T) {

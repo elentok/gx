@@ -36,7 +36,7 @@ func startFailureBannerSession(t *testing.T, web bool, opts ...func(*server.Conf
 		t.Fatal(err)
 	}
 	all := []func(*server.Config){
-		servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)),
+		servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)),
 		servertest.WithStallThreshold(time.Minute), servertest.WithChatPollInterval(20 * time.Millisecond), withAlerts(true, true),
 		servertest.WithEnv("CLAUDE_CONFIG_DIR=" + cfg),
 		func(c *server.Config) {

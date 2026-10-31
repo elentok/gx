@@ -71,6 +71,5 @@ func (s *Server) createWebSession(req WebCreateSessionRequest) (SessionResult, e
 		Name:     req.Name,
 		Prompt:   prompt,
 		Tier:     req.Tier,
-		Harness:  s.settings.Load().chatHarness(),
 	})
 }

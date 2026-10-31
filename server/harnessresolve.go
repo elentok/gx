@@ -1,6 +1,8 @@
 package server
 
 import (
+	"cmp"
+
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -69,6 +71,13 @@ func defaultOrClaude(name string) ralphloop.AgentKind {
 // over the global one, claude when neither is set.
 func (s *Server) defaultHarness(project string) ralphloop.AgentKind {
 	return defaultOrClaude(s.agentsConfig(project).DefaultHarness)
+}
+
+// launchHarness is the harness a new interactive session in project starts on
+// when its request names none. Unlike defaultHarness it keeps an unregistered
+// name, so createSession refuses it instead of silently running Claude.
+func (s *Server) launchHarness(project string) string {
+	return cmp.Or(s.agentsConfig(project).DefaultHarness, string(ralphloop.AgentClaude))
 }
 
 // ticketHarness is a ticket's resolved harness and the harness of its earlier

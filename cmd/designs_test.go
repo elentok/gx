@@ -46,7 +46,7 @@ func TestDesignsOpen_NewDesignJSON(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
-	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)))
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
 
 	for name, tc := range map[string]struct {
 		slug   string
@@ -84,7 +84,7 @@ func TestDesignsDelete_RefusalIsAnErrorAndSuccessDeletes(t *testing.T) {
 		t.Fatal(err)
 	}
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
-	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)))
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
 
 	var out bytes.Buffer
 	err := runDesignsDelete(context.Background(), h.Client, &out, false, "proj:plain")
@@ -155,7 +155,7 @@ func TestDesignsOpen_JSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
-	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)))
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
 
 	var first, second server.SessionResult
 	for _, res := range []*server.SessionResult{&first, &second} {

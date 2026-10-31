@@ -38,7 +38,7 @@ func startGrillingSessionIn(t *testing.T, ticket, store string, opts ...func(*se
 			t.Fatal(err)
 		}
 	}
-	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), withAlerts(true, true), servertest.WithEnv("CLAUDE_CONFIG_DIR=" + cfg)}, opts...)
+	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)), withAlerts(true, true), servertest.WithEnv("CLAUDE_CONFIG_DIR=" + cfg)}, opts...)
 	h := servertest.StartWithStore(t, store, opts...)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)

@@ -149,6 +149,11 @@ func (s *Server) applyBudgetLimits(old, next Settings) {
 // keys, carried over from the live settings.
 func reloadableSettings(old, next Settings) Settings {
 	next.ChatHarness, next.RemoteControlHarness = old.ChatHarness, old.RemoteControlHarness
+	// Config only holds claude or codex, so any other default is a test's fake
+	// harness and survives a reload like the other seams.
+	if old.AgentsDefaultHarness != "" && string(defaultOrClaude(old.AgentsDefaultHarness)) != old.AgentsDefaultHarness {
+		next.AgentsDefaultHarness = old.AgentsDefaultHarness
+	}
 	next.Chat.TelegramBaseURL, next.Chat.GateStatePath, next.Chat.FlushInterval = old.Chat.TelegramBaseURL, old.Chat.GateStatePath, old.Chat.FlushInterval
 	return next
 }

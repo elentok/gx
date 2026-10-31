@@ -141,7 +141,7 @@ func TestFixAgent_NoTrunkCheckout(t *testing.T) {
 	store := t.TempDir()
 	servertest.WriteTicketWith(t, store, "proj", "loop", "01", "broken", servertest.TicketOpts{PauseReason: "merge-conflict"})
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", t.TempDir()) // not a git repo, so no trunk
-	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)))
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
 	res, err := h.Client.FixAgent(context.Background(), server.FixAgentRequest{Address: "proj:loop/01"})
 	if err != nil {
 		t.Fatal(err)

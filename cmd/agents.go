@@ -271,7 +271,7 @@ func newAgentsCreateCmd(client func() (*apiclient.Client, error)) *cobra.Command
 	cmd.MarkFlagsMutuallyExclusive("dir", "worktree")
 	cmd.Flags().StringVar(&req.Name, "name", "", "the session's name")
 	cmd.Flags().StringVar(&req.Ticket, "ticket", "", "the Session ticket's address")
-	cmd.Flags().StringVar(&req.Harness, "harness", "", "the harness to run (default claude)")
+	cmd.Flags().StringVar(&req.Harness, "harness", "", "the harness for this session (default: the configured Default harness)")
 	cmd.Flags().StringVar(&tier, "tier", string(ralphloop.TierWorker), "the model tier: light, worker or strongest")
 	cmd.Flags().IntVar(&req.Cols, "cols", 0, "the terminal's width (default the loop's)")
 	cmd.Flags().IntVar(&req.Rows, "rows", 0, "the terminal's height (default the loop's)")

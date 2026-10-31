@@ -140,10 +140,9 @@ func (s *Server) startFixAgent(req FixAgentRequest, web bool) (FixAgentResult, e
 		Name:       FixAgentName(addr),
 		UniqueName: true,
 		Prompt:     fixAgentPrompt(addr, t),
-		Harness:    settings.chatHarness(),
 		Tier:       ralphloop.TierStrongest,
 	}
-	remote := settings.AgentsFixAgentRemoteControl && cs.Harness == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
+	remote := settings.AgentsFixAgentRemoteControl && s.launchHarness(cs.Project) == cmp.Or(settings.RemoteControlHarness, string(harness.Claude))
 	if remote {
 		cs.remoteControl = addr
 	}

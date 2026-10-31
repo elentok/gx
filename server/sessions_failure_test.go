@@ -24,7 +24,7 @@ func startFailureSession(t *testing.T, chat bool, stall time.Duration) (*servert
 	cfg := t.TempDir()
 	opts := []func(*server.Config){servertest.WithStallThreshold(stall), servertest.WithEnv("CLAUDE_CONFIG_DIR=" + cfg)}
 	if chat {
-		opts = append(opts, servertest.WithChatHarness(string(agentfake.HarnessKind)))
+		opts = append(opts, servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)))
 	}
 	h, ctx, evs, id, conv := startFakeSessionWith(t, server.CreateSessionRequest{}, opts...)
 	return h, ctx, evs, id, conv, filepath.Join(cfg, "projects", "-repo", conv+".jsonl")

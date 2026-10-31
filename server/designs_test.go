@@ -45,7 +45,7 @@ func startDesignsIn(t *testing.T, store string, opts ...func(*server.Config)) de
 	t.Helper()
 	repo := testutil.TempRepo(t)
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
-	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)),
+	opts = append([]func(*server.Config){servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)),
 		func(c *server.Config) { c.WebAddr = "127.0.0.1:0" }}, opts...)
 	h := servertest.StartWithStore(t, store, opts...)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

@@ -363,7 +363,6 @@ func (s *Server) openDesign(req DesignOpenRequest, web bool) (SessionResult, err
 		Name:         epic,
 		Ticket:       epicAddr,
 		Prompt:       prompt,
-		Harness:      s.settings.Load().chatHarness(),
 		RebaseNote:   d.Note,
 		launchDesign: true,
 	})
@@ -514,7 +513,6 @@ func (s *Server) startSession(project, slug, worktree, rebaseNote string) Sessio
 		Name:         slug,
 		Ticket:       addr,
 		Prompt:       "/gx-design " + addr,
-		Harness:      s.settings.Load().chatHarness(),
 		RebaseNote:   rebaseNote,
 		launchDesign: true,
 	})

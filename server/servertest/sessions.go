@@ -44,6 +44,11 @@ func WithChatHarness(kind string) func(*server.Config) {
 	return func(c *server.Config) { c.ChatHarness = kind }
 }
 
+// WithDefaultHarness sets the Default harness new sessions start on.
+func WithDefaultHarness(kind string) func(*server.Config) {
+	return func(c *server.Config) { c.AgentsDefaultHarness = kind }
+}
+
 // WithRemoteControlHarness lets fix-agent sessions of kind take the
 // remote-control setting, as claude's do.
 func WithRemoteControlHarness(kind string) func(*server.Config) {

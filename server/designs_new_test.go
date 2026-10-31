@@ -130,7 +130,7 @@ func TestDesignsOpenNew_StartFailureIsOneResultWithStartError(t *testing.T) {
 	repo := testutil.TempRepo(t)
 	servertest.WriteTicket(t, store, "proj", "plain", "01", "first", "")
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", repo)
-	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness("no-such-harness"))
+	h := servertest.StartWithStore(t, store, servertest.WithTestHolder(), servertest.WithChatHarness("no-such-harness"), servertest.WithDefaultHarness("no-such-harness"))
 	res, err := h.Client.OpenDesign(context.Background(), server.DesignOpenRequest{Epic: "fresh-idea", NewDesign: true, Idea: "idea", Project: "proj"})
 	if err != nil {
 		t.Fatal(err)

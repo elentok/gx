@@ -21,7 +21,7 @@ func startRemoteFix(t *testing.T, on bool) (*servertest.Harness, string, func(bo
 	servertest.SetProjectRepoNoAutoMerge(t, store, "proj", testutil.TempRepo(t))
 	path := filepath.Join(t.TempDir(), "config.json")
 	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path), servertest.WithTestHolder(),
-		servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithRemoteControlHarness(string(agentfake.HarnessKind)))
+		servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)), servertest.WithRemoteControlHarness(string(agentfake.HarnessKind)))
 	set := func(on bool) {
 		t.Helper()
 		servertest.WriteConfig(t, path, store, map[string]any{"agents": map[string]any{"fix-agent-remote-control": on}})
