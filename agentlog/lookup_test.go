@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/elentok/gx/agentlog"
@@ -131,6 +132,46 @@ func TestAgentLog_PtyReadsTheTranscript(t *testing.T) {
 	delete(procs, 41)
 	if !l.Ended() {
 		t.Error("pty agent with its holder gone not reported ended")
+	}
+}
+
+func TestAgentLog_CodexPtyReadsTheRollout(t *testing.T) {
+	codexHome := t.TempDir()
+	stateDir := t.TempDir()
+	dir := writeRunnerDir(t, stateDir, "pty", nativerunner.RawLogFile)
+	d, err := nativerunner.OpenDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta := d.Meta
+	meta.Harness = "codex"
+	raw, _ := json.Marshal(meta)
+	if err := os.WriteFile(filepath.Join(dir, nativerunner.MetaFile), raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	locate := func() (agentlog.Log, error) {
+		procs := fakeProcs{41: {Start: "t0", Cmdline: "gx agent-holder --session-id " + session}, 42: liveProcs[42]}
+		return agentlog.Locator{StateDir: stateDir, CodexHome: codexHome, Procs: procs, Herdr: noHerdr(t)}.AgentLog(context.Background(), addr)
+	}
+	if _, err := locate(); !errors.Is(err, agentlog.ErrNoAgent) {
+		t.Fatalf("no rollout yet: got %v, want ErrNoAgent", err)
+	}
+	rollout := filepath.Join(codexHome, "sessions", "2026", "10", "30", "rollout-2026-10-30T20-26-22-"+session+".jsonl")
+	if err := os.MkdirAll(filepath.Dir(rollout), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rollout, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	l, err := locate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.Path != rollout || l.PtyDir != dir || l.Render == nil || l.Ended == nil || l.Ended() {
+		t.Errorf("got %+v, want live rollout %s", l, rollout)
+	}
+	if got := l.Render([]byte(`{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"text":"hi"}]}}`)); !reflect.DeepEqual(got, []string{"[text] hi"}) {
+		t.Errorf("render got %q", got)
 	}
 }
 

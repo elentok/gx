@@ -379,6 +379,31 @@ func TestWatch_EndedAgentOpensNotLive(t *testing.T) {
 	}
 }
 
+func TestWatch_CodexPtyFollowsTheRollout(t *testing.T) {
+	rollout := filepath.Join(t.TempDir(), "rollout.jsonl")
+	line := `{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"text":"codex says hi"}]}}` + "\n" +
+		`{"type":"response_item","payload":{"type":"message","role":"developer","content":[{"text":"hidden developer text"}]}}` + "\n"
+	if err := os.WriteFile(rollout, []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]struct {
+		ended  bool
+		marker string
+	}{
+		"live":  {false, "· live"},
+		"ended": {true, "· not live"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			fakeNativeLog(t, agentlog.Log{Path: rollout, PtyDir: "/pty/dir", Ended: endedFunc(c.ended), Render: agentlog.RenderCodex}, nil)
+			m := openWatchFromMenu(t, watchTicketTab(t, "claimed"))
+			view := m.watch.View()
+			if !m.watch.open || !strings.Contains(view, c.marker) || !strings.Contains(view, "[text] codex says hi") || strings.Contains(view, "hidden developer") {
+				t.Errorf("Watch on a codex pty agent (%s):\n%s", name, view)
+			}
+		})
+	}
+}
+
 func TestWatch_NoServerOpensHeadlessAndPty(t *testing.T) {
 	for name, log := range map[string]agentlog.Log{
 		"headless": {Ended: endedFunc(false)},
@@ -485,6 +510,9 @@ func TestWatch_HerdrDimReasons(t *testing.T) {
 		_, ready := requestTicketMenu(t, m)
 		if got := itemByLabel(t, ready.items, "Watch").Disabled; got != notForCodex {
 			t.Errorf("Watch disabled = %q, want %q", got, notForCodex)
+		}
+		if got := itemByLabel(t, ready.items, "Go to pane").Disabled; got != "" {
+			t.Errorf("Go to pane disabled = %q, want enabled", got)
 		}
 	})
 	t.Run("no server", func(t *testing.T) {

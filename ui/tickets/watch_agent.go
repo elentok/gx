@@ -46,7 +46,7 @@ var agentLog = func(ctx context.Context, dirs config.Dirs, address string, herdr
 		return agentlog.Log{}, err
 	}
 	home, _ := dirs.Home()
-	return agentlog.Locator{StateDir: stateDir, Home: home, Herdr: herdr}.AgentLog(ctx, a)
+	return agentlog.Locator{StateDir: stateDir, Home: home, CodexHome: dirs.CodexHome(), Herdr: herdr}.AgentLog(ctx, a)
 }
 
 // errServerDown marks a herdr lookup whose server didn't answer.

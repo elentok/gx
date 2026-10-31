@@ -18,7 +18,7 @@ type Tail struct {
 	ended   bool
 }
 
-// OpenTail opens log at its offset. A nil render means Render.
+// OpenTail opens log at its offset. A nil render means the log's own, else Render.
 func OpenTail(log Log, render func([]byte) []string) (*Tail, error) {
 	f, err := os.Open(log.Path)
 	if err != nil {
@@ -27,6 +27,9 @@ func OpenTail(log Log, render func([]byte) []string) (*Tail, error) {
 	if _, err := f.Seek(log.Offset, io.SeekStart); err != nil {
 		f.Close()
 		return nil, err
+	}
+	if render == nil {
+		render = log.Render
 	}
 	if render == nil {
 		render = Render

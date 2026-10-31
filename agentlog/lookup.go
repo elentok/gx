@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
@@ -48,6 +49,8 @@ type Log struct {
 	// PtyDir is a pty agent's directory, which holds its holder.sock,
 	// screen.txt and raw.log. Empty for any other agent.
 	PtyDir string
+	// Render renders this log's lines; nil means Render.
+	Render func([]byte) []string
 }
 
 // HerdrIteration is what Locator needs from a live herdr iteration.
@@ -63,6 +66,8 @@ type Locator struct {
 	// Home is the user's home, where claude keeps its transcripts. Empty means
 	// unknown: a native claude agent then has no transcript path.
 	Home string
+	// CodexHome is where Codex keeps its rollouts. Empty means unknown.
+	CodexHome string
 	// Procs overrides the process table native liveness checks use.
 	Procs nativerunner.ProcessTable
 	// Herdr looks up a live herdr iteration by full ticket address. Nil
@@ -91,6 +96,19 @@ func (l Locator) AgentLog(ctx context.Context, a tickets.Address) (Log, error) {
 			}
 			live, err := d.Alive(l.Procs)
 			return err == nil && !live
+		}
+		if d.ReadsTranscript() && string(d.Meta.Harness) == string(ralphloop.AgentCodex) {
+			if l.CodexHome == "" {
+				return Log{}, errNoHome
+			}
+			p, ok, err := codexsession.RolloutPathIn(l.CodexHome, d.Meta.SessionID)
+			if err != nil {
+				return Log{}, err
+			}
+			if !ok {
+				return Log{}, fmt.Errorf("%w for %s: codex has no rollout yet", ErrNoAgent, a)
+			}
+			return Log{Path: p, Ended: ended, PtyDir: ptyDir, Render: RenderCodex}, nil
 		}
 		if d.ReadsTranscript() {
 			if l.Home == "" {

@@ -132,7 +132,7 @@ func ReadChat(r io.Reader) (Chat, error) {
 		case p.Type == "message" && (p.Role == "assistant" || p.Role == "user"):
 			var texts []string
 			for _, c := range p.Content {
-				if t := strings.TrimSpace(c.Text); t != "" && (p.Role == "assistant" || !isInjected(t)) {
+				if t := strings.TrimSpace(c.Text); t != "" && (p.Role == "assistant" || !IsInjected(t)) {
 					texts = append(texts, t)
 				}
 			}
@@ -159,7 +159,9 @@ func ReadChat(r io.Reader) (Chat, error) {
 	return chat, nil
 }
 
-func isInjected(text string) bool {
+// IsInjected reports a user message Codex injected (AGENTS.md, environment),
+// which no reader shows.
+func IsInjected(text string) bool {
 	for _, p := range injectedPrefixes {
 		if strings.HasPrefix(text, p) {
 			return true

@@ -39,6 +39,17 @@ func (d Dirs) Home() (string, error) {
 	return home, nil
 }
 
+// CodexHome is the env's CODEX_HOME, else ~/.codex; "" when neither is known.
+func (d Dirs) CodexHome() string {
+	if v := d.lookup("CODEX_HOME"); v != "" {
+		return v
+	}
+	if home, err := d.Home(); err == nil {
+		return filepath.Join(home, ".codex")
+	}
+	return ""
+}
+
 // Environ is the env entries d resolves from, for a child process's Env.
 func (d Dirs) Environ() []string { return d.env }
 
