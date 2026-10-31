@@ -94,6 +94,93 @@ test.describe("117. Limits block", () => {
   });
 });
 
+const caveat =
+  "Estimated cost of Claude runs started by gx. Not the bill. Codex runs and Claude sessions outside gx are not counted.";
+const dollars = (n: number) => `$${n.toFixed(2)}`;
+const sinceToday = () =>
+  `since ${new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}`;
+
+test.describe("119. Spending block", () => {
+  test("normal", async ({ page, start }) => {
+    await start("spend", { shape: "normal" });
+    const menu = await openMenu(page);
+    await expect(menu.getByText("gx spend (est.)")).toBeVisible();
+
+    const now = new Date();
+    await expect(row(page, "Today").getByText(dollars(4.82))).toBeVisible();
+    await expect(row(page, "Since Sunday").getByText(dollars(4.82 + 3 * now.getDay()))).toBeVisible();
+    await expect(row(page, "Since the 1st").getByText(dollars(4.82 + 3 * (now.getDate() - 1)))).toBeVisible();
+    await expect(menu.getByText(/^since /)).toHaveCount(0);
+
+    const y = async (loc: ReturnType<Page["locator"]>) => (await loc.boundingBox())!.y;
+    const ys = [
+      await y(menu.getByRole("menuitem", { name: "Settings" })),
+      await y(menu.getByRole("menuitemcheckbox", { name: "AFK" })),
+      await y(menu.getByText("gx spend (est.)")),
+      await y(row(page, "Today")),
+      await y(row(page, "Since Sunday")),
+      await y(row(page, "Since the 1st")),
+      await y(menu.getByTestId("server-build")),
+    ];
+    expect(ys).toEqual([...ys].sort((a, b) => a - b));
+
+    await menu.getByRole("button", { name: "About gx spend" }).hover();
+    await expect(page.getByRole("tooltip")).toHaveText(caveat);
+    await page.mouse.move(0, 0);
+    await expect(page.getByRole("tooltip")).toBeHidden();
+  });
+
+  test.describe("tap", () => {
+    test.use({ hasTouch: true });
+    test("tooltip opens on tap", async ({ page, start }) => {
+      await start("spend", { shape: "normal" });
+      const menu = await openMenu(page);
+      await menu.getByRole("button", { name: "About gx spend" }).tap();
+      await expect(page.getByRole("tooltip")).toHaveText(caveat);
+    });
+  });
+
+  test("short", async ({ page, start }) => {
+    await start("spend", { shape: "short" });
+    await openMenu(page);
+    const now = new Date();
+    const note = sinceToday();
+    await expect(row(page, "Today").getByText(/^since /)).toHaveCount(0);
+    for (const [name, startsToday] of [
+      ["Since Sunday", now.getDay() === 0],
+      ["Since the 1st", now.getDate() === 1],
+    ] as const) {
+      const notes = row(page, name).getByText(/^since /);
+      if (startsToday) await expect(notes).toHaveCount(0);
+      else await expect(notes).toHaveText(note);
+    }
+  });
+
+  test("empty", async ({ page, start }) => {
+    await start("spend", { shape: "empty" });
+    const menu = await openMenu(page);
+    for (const name of ["Today", "Since Sunday", "Since the 1st"]) {
+      await expect(row(page, name).getByText("$0.00")).toBeVisible();
+    }
+    await expect(menu.getByText(/^since /)).toHaveCount(0);
+  });
+
+  test.describe("narrow", () => {
+    test.use({ viewport: { width: 320, height: 700 } });
+    test("320px menu stays inside the viewport", async ({ page, start }) => {
+      await start("spend", { shape: "normal" });
+      const scrollWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
+      const before = await scrollWidth();
+      const menu = await openMenu(page);
+      await expect(menu.getByText("gx spend (est.)")).toBeVisible();
+      const box = (await menu.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(320);
+      expect(await scrollWidth()).toBeLessThanOrEqual(before);
+    });
+  });
+});
+
 test.describe("118. Limits states", () => {
   test("stale", async ({ page, start }) => {
     await start("limits", { shape: "stale" });

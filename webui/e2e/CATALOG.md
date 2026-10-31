@@ -21,7 +21,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118), with shared helpers in `agentsKit.ts`. The numbers 72 to 74, 117 and 118 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118, 119), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 and 117 to 119 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -1397,3 +1397,13 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
 - **Scenario:** `limits`, three tests with shape `stale`, `past-reset` and `one-window`.
 - **Steps:** open the menu in each.
 - **Pass:** `stale`: both rows show "seen ... ago". `past-reset`: the 5h row reads "waiting" and "reset passed", has no bar and no "seen"; the weekly row is live with a bar. `one-window`: a single row, "Weekly limit".
+
+## 119. Spending block
+
+- **Scenario:** `spend`, tests with shape `normal`, `short` and `empty`, plus a touch context and a 320px viewport on `normal`. The seed is $3.00 for each of the last 40 days and $4.82 today.
+- **Steps:**
+  1. Open the menu and read the "gx spend (est.)" block.
+  2. Hover the "i" marker; in a touch context tap it.
+  3. Repeat the read for `short` and `empty`.
+  4. At 320px wide open the menu.
+- **Pass:** `normal`: Today $4.82; Since Sunday is 4.82 + 3 x days since Sunday; Since the 1st is 4.82 + 3 x (day of month - 1); no "since" note; the order is Settings, AFK, the block, the build line. The tooltip reads "Estimated cost of Claude runs started by gx. Not the bill. Codex runs and Claude sessions outside gx are not counted." by hover and by tap. `short`: Today has no note; each longer row has "since <weekday>, <month> <day>" (today's date) unless its window starts today (Sunday for Since Sunday, the 1st for Since the 1st). `empty`: `$0.00` on all three rows and no notes. At 320px the menu stays inside the viewport and adds no horizontal scroll.
