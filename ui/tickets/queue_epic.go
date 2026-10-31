@@ -17,7 +17,7 @@ type QueueAddFunc func(ctx context.Context, address, agent string) (server.Queue
 // took and the refusals as "address: reason".
 func QueueAddresses(ctx context.Context, add QueueAddFunc, addrs []string) (queued int, refusals []string) {
 	for _, addr := range addrs {
-		res, err := add(ctx, addr, string(serverEnqueueDefaultAgent))
+		res, err := add(ctx, addr, "")
 		switch {
 		case err != nil:
 			refusals = append(refusals, addr+": "+err.Error())

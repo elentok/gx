@@ -59,6 +59,11 @@ func TestQueueReplace_SwapsOnlyOneProjectsEntries(t *testing.T) {
 		t.Fatalf("queue = %+v, want other kept and proj swapped", res.Queue)
 	}
 
+	res, err = h.Client.QueueReplace(ctx, "proj", []server.QueueItem{{Address: "proj:epic-a/01"}})
+	if err != nil || res.Refused || res.Queue[len(res.Queue)-1].Agent != "" {
+		t.Fatalf("replace with no agent = %+v, %v; want an empty agent", res, err)
+	}
+
 	res, err = h.Client.QueueReplace(ctx, "proj", []server.QueueItem{{Address: "other:epic-b/01"}})
 	if err != nil || !res.Refused || res.Reason != server.ReasonInvalidAddress {
 		t.Fatalf("replace with a foreign ticket = %+v, %v", res, err)

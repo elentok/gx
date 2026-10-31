@@ -8,7 +8,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/server"
 	gxtickets "github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/ui/nav"
@@ -43,10 +42,6 @@ type ServerAPI interface {
 	TicketChanged(ctx context.Context, address string) error
 	FixAgent(ctx context.Context, req server.FixAgentRequest) (server.FixAgentResult, error)
 }
-
-// serverEnqueueDefaultAgent is the agent a queue add sends; it matches the
-// server's own default for an empty agent.
-const serverEnqueueDefaultAgent = ralphloop.AgentClaude
 
 // showQueueIfAdded follows an add-to-queue toast with a switch to the Queue
 // tab, so the new item is on screen. A total failure stays on the Tickets tab.

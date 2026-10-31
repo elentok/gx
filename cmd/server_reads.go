@@ -480,7 +480,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 			})
 		},
 	}
-	add.Flags().StringVar(&agent, "agent", "", `agent to run the ticket under: "claude" or "codex" (default claude)`)
+	add.Flags().StringVar(&agent, "agent", "", `agent to run the ticket under: "claude" or "codex" (default: the Default harness)`)
 	remove := &cobra.Command{
 		Use:   "remove <project:epic/NN>",
 		Short: "remove a ticket from the server-wide queue",
@@ -506,7 +506,7 @@ func newServerQueueCmd(d deps) *cobra.Command {
 			})
 		},
 	}
-	replace.Flags().StringVar(&replaceAgent, "agent", "", `agent to run the tickets under: "claude" or "codex" (default claude)`)
+	replace.Flags().StringVar(&replaceAgent, "agent", "", `agent to run the tickets under: "claude" or "codex" (default: the Default harness)`)
 	move := &cobra.Command{
 		Use:   "move <project:epic/NN> <position>",
 		Short: "move a queued ticket to a 1-based position",

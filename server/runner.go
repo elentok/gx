@@ -370,7 +370,7 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 			return false, nil
 		}
 		s.refused.set(ticketAddr, false)
-		agent := ticketAgent(t, ralphloop.AgentKind(item.Agent))
+		agent := ticketAgent(t, cmp.Or(ralphloop.AgentKind(item.Agent), s.defaultHarness(addr.Project)))
 		if _, held := s.claimHold(addr.Project, t, agent); held {
 			return false, nil
 		}

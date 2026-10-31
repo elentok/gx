@@ -258,11 +258,12 @@ func (s *Server) queueAdd(req QueueRequest) (QueueResult, error) {
 	return s.withExtraUsage(s.queueAddItem(req))
 }
 
-// resolveAgent defaults an empty agent to claude and refuses an unknown one.
+// resolveAgent keeps an empty agent empty (it follows the Default harness) and
+// refuses an unknown one.
 func resolveAgent(name string) (ralphloop.AgentKind, *QueueResult) {
 	agent := ralphloop.AgentKind(name)
 	if name == "" {
-		agent = ralphloop.AgentClaude
+		return "", nil
 	}
 	if err := ralphloop.ValidateAgentKind(agent); err != nil {
 		r := refusal(ReasonInvalidAgent, err.Error())
@@ -413,12 +414,9 @@ func (s *Server) queueReplaceItems(req QueueRequest) (QueueResult, error) {
 		if bad != nil {
 			return *bad, nil
 		}
-		agent := ralphloop.AgentKind(it.Agent)
-		if it.Agent == "" {
-			agent = ralphloop.AgentClaude
-		}
-		if err := ralphloop.ValidateAgentKind(agent); err != nil {
-			return refusal(ReasonInvalidAgent, err.Error()), nil
+		agent, badAgent := resolveAgent(it.Agent)
+		if badAgent != nil {
+			return *badAgent, nil
 		}
 		if projectOfAddress(addr) != req.Project {
 			return refusal(ReasonInvalidAddress, addr+" is not in project "+req.Project), nil

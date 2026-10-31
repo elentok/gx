@@ -45,8 +45,8 @@ func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 		t.Fatalf("address = %q, want proj:one-offs/01", res.Address)
 	}
 	q, err := h.Client.QueueItems(ctx)
-	if err != nil || len(q) != 2 || q[1].Address != res.Address || q[1].Agent != "claude" {
-		t.Fatalf("queue = %+v, %v; want the one-off last under claude", q, err)
+	if err != nil || len(q) != 2 || q[1].Address != res.Address || q[1].Agent != "" {
+		t.Fatalf("queue = %+v, %v; want the one-off last with an empty agent", q, err)
 	}
 
 	a, err := tickets.ParseAddress(res.Address, tickets.AddressContext{})
@@ -59,7 +59,7 @@ func TestOneOff_FromProjectRepoCreatesPromptTicketAtQueueTail(t *testing.T) {
 		t.Fatalf("ticket files = %v", files)
 	}
 	raw, _ := os.ReadFile(files[0])
-	if !strings.Contains(string(raw), "type: prompt") || !strings.Contains(string(raw), "fix the flaky test please") || !strings.Contains(string(raw), "agent: claude") {
+	if !strings.Contains(string(raw), "type: prompt") || !strings.Contains(string(raw), "fix the flaky test please") || strings.Contains(string(raw), "agent:") {
 		t.Fatalf("ticket = %s", raw)
 	}
 	if !strings.Contains(string(raw), "created_at:") || !strings.Contains(string(raw), "original_address: "+res.Address+"\n") {

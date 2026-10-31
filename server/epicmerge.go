@@ -341,7 +341,7 @@ func (s *Server) ensureRootQueued(root rootRef, first tickets.Ticket) error {
 				return nil, &r
 			}
 		}
-		return append(items, newQueueItem(addr, ralphloop.AgentClaude)), nil
+		return append(items, newQueueItem(addr, "")), nil
 	})
 	return err
 }

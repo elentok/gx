@@ -60,7 +60,7 @@ func newServerOneOffCmd(d deps) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&req.Project, "project", "", "project to create the ticket in (default: the project owning the current directory, else scratch)")
 	cmd.Flags().StringVar(&req.Name, "name", "", "epic name (default: the prompt's first words plus a short unique suffix)")
-	cmd.Flags().StringVar(&req.Agent, "agent", "", `agent to run the ticket under: "claude" or "codex" (default claude)`)
+	cmd.Flags().StringVar(&req.Agent, "agent", "", `agent to run the ticket under: "claude" or "codex" (default: the Default harness)`)
 	cmd.Flags().StringVar(&req.Type, "type", "", `ticket type: "prompt" (default), "evolve" or "diagnose"; a one-off never commits`)
 	cmd.Flags().StringArrayVar(&req.BlockedBy, "blocked-by", nil, "address of a ticket in the same project that must merge first (repeatable)")
 	cmd.Flags().IntVar(&req.ExpectedContextWindow, "expected-context-window", 0, "expected context window in tokens")

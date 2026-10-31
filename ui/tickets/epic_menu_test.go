@@ -129,6 +129,11 @@ func TestEpicMenu_AddEpicToQueueSendsTheEpicAddressOnce(t *testing.T) {
 	if want := []string{"gx:alpha"}; !slices.Equal(got, want) {
 		t.Errorf("queue-adds = %v, want %v", got, want)
 	}
+	for _, a := range adds {
+		if a.Agent != "" {
+			t.Errorf("queue-add agent = %q, want empty (follows the default)", a.Agent)
+		}
+	}
 	var toast notify.NotifyMsg
 	var switched bool
 	for _, c := range toastCmd().(tea.BatchMsg) {

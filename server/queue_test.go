@@ -60,8 +60,8 @@ func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
 		t.Errorf("queue = %v, want %v", got, want)
 	}
 	items, _ := h.Client.QueueItems(ctx)
-	if items[0].Agent != "claude" || items[1].Agent != "codex" {
-		t.Errorf("agents = %+v, want default claude then codex", items)
+	if items[0].Agent != "" || items[1].Agent != "codex" {
+		t.Errorf("agents = %+v, want empty (follows the default) then codex", items)
 	}
 
 	for i := 0; i < 5; i++ {
@@ -78,6 +78,39 @@ func TestQueue_WritesChangeReadStreamAndSurviveRestart(t *testing.T) {
 	h.Restart(t)
 	if got := queueAddresses(t, h); !reflect.DeepEqual(got, want) {
 		t.Errorf("queue after restart = %v, want %v", got, want)
+	}
+}
+
+// Story 17: a stored claude stays claude, an empty agent follows the default.
+func TestQueue_StoredAgentSurvivesDefaultSwitch(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	for _, id := range []string{"01", "02"} {
+		servertest.WriteTicket(t, store, "proj", "epic-a", id, "t"+id, "")
+	}
+	path := filepath.Join(t.TempDir(), "config.json")
+	h := servertest.StartWithStore(t, store, servertest.WithConfigFile(path))
+	servertest.WriteConfig(t, path, store, nil)
+	ctx := context.Background()
+	if got := h.Server.DefaultHarness("proj"); got != "claude" {
+		t.Fatalf("default = %q, want claude", got)
+	}
+	for _, w := range []struct{ addr, agent string }{{"proj:epic-a/01", "claude"}, {"proj:epic-a/02", ""}} {
+		if res, err := h.Client.QueueAdd(ctx, w.addr, w.agent); err != nil || res.Refused {
+			t.Fatalf("add %s: %+v, %v", w.addr, res, err)
+		}
+	}
+
+	servertest.WriteConfig(t, path, store, map[string]any{"agents": map[string]any{"default-harness": "codex"}})
+	if res, err := h.Client.ReloadConfig(ctx); err != nil || res.Refused {
+		t.Fatalf("reload: %+v, %v", res, err)
+	}
+	if got := h.Server.DefaultHarness("proj"); got != "codex" {
+		t.Errorf("default after reload = %q, want codex", got)
+	}
+	items, _ := h.Client.QueueItems(ctx)
+	if len(items) != 2 || items[0].Agent != "claude" || items[1].Agent != "" {
+		t.Errorf("items = %+v, want claude kept and the empty one still empty", items)
 	}
 }
 

@@ -3,6 +3,9 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,6 +24,40 @@ func TestServerQueueAdd_RefusesWhenNoServerRunning(t *testing.T) {
 		})
 	if err == nil || !strings.Contains(err.Error(), server.ReasonServerNotRunning) || !strings.Contains(err.Error(), "gx server start") {
 		t.Errorf("err = %v; want server-not-running with the start hint", err)
+	}
+}
+
+// Story 18: --agent overrides for one launch; no flag sends an empty agent.
+func TestServerQueueAdd_AgentFlagReachesTheServerRequest(t *testing.T) {
+	sock := filepath.Join(shortTempDir(t), "a.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got server.QueueRequest
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/queue/add", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_ = json.NewEncoder(w).Encode(server.QueueResult{})
+	})
+	srv := &http.Server{Handler: mux}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{{[]string{"add", "proj:epic/01", "--agent", "codex"}, "codex"}, {[]string{"add", "proj:epic/01"}, ""}} {
+		got = server.QueueRequest{}
+		c := newServerQueueCmd(deps{env: envFor(t), serverClient: func() (*apiclient.Client, error) { return apiclient.New(sock), nil }})
+		c.SetArgs(tc.args)
+		c.SetOut(&bytes.Buffer{})
+		if err := c.Execute(); err != nil {
+			t.Fatal(err)
+		}
+		if got.Agent != tc.want {
+			t.Errorf("%v sent agent %q, want %q", tc.args, got.Agent, tc.want)
+		}
 	}
 }
 
