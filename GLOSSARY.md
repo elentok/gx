@@ -336,10 +336,13 @@ takes its prompts, and reports whether it is working, idle or blocked. herdr is 
 An iteration keeps the agent runner that started it; changing the setting affects only new launches.
 _Avoid_: "runner" alone, "backend", "run".
 
-**Harness** — the agent program a session runs: claude today; codex or opencode later. Separate
+**Harness** — the agent program a session runs: claude or codex. Separate
 from the agent runner that hosts it: the runner decides how a session is hosted, the harness decides
 what runs inside it. Say "agent harness" in full where "test harness" could be meant. _Avoid_:
 "kind", "agent kind", "provider".
+
+**Default harness** — the harness every new agent runs unless one launch names another. It has a
+global value and an optional value per project. A running session keeps the harness it started with.
 
 **Native agent runner** — any agent runner that `gx server` hosts itself, with no external
 multiplexer. There are two: the headless runner and the PTY runner. A person can watch a native
