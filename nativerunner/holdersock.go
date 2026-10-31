@@ -593,8 +593,12 @@ func (c *HolderClient) Paste(text string) error {
 // TypeText writes text to the child's input box. Text over typedTextMax goes
 // as a paste when the holder serves it, so the child reads all of it; an
 // older holder gets plain keys.
-func (c *HolderClient) TypeText(text string) error {
-	if len(text) > typedTextMax && c.Supports(OpPaste) {
+func (c *HolderClient) TypeText(text string) error { return c.TypeTextBy(text, false) }
+
+// TypeTextBy is TypeText, going by paste whatever the length when paste is
+// set (a harness whose newline typed as a key would submit).
+func (c *HolderClient) TypeTextBy(text string, paste bool) error {
+	if (paste || len(text) > typedTextMax) && c.Supports(OpPaste) {
 		if err := c.Paste(text); err != nil {
 			return err
 		}

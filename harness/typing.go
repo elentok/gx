@@ -34,6 +34,11 @@ type Typing interface {
 	// ReadyToType runs before any typed text and reports whether typing can
 	// start; false means give up. It may press keys and re-read through io.
 	ReadyToType(io TypingIO) bool
+	// SubmitKey is the key that sends typed text; working says a turn runs.
+	SubmitKey(working bool) string
+	// PastesText reports whether text goes in as one paste whatever its
+	// length, because typed keys would split it.
+	PastesText(text string) bool
 }
 
 // TypingIO is how a ready-to-type step reads the agent's screen and presses
@@ -88,9 +93,25 @@ func (claudeHarness) InputIsEmpty(styledRows []string) InputState {
 
 func (claudeHarness) ClearKey() string { return claudeInput.ClearKey() }
 
+func (claudeHarness) SubmitKey(bool) string { return "\r" }
+
+func (claudeHarness) PastesText(string) bool { return false }
+
 type codexTyping struct{ markerTyping }
 
 func (codexTyping) ReadyToType(TypingIO) bool { return true }
+
+// SubmitKey is Tab while a turn runs, which queues the text until it ends.
+func (codexTyping) SubmitKey(working bool) string {
+	if working {
+		return "\t"
+	}
+	return "\r"
+}
+
+// PastesText: Codex runs with paste-burst detection off, so a newline typed as
+// a key would submit.
+func (codexTyping) PastesText(text string) bool { return strings.Contains(text, "\n") }
 
 // lastInputRow is the index of the last row that starts with the marker (bold
 // when m.bold), or -1.

@@ -75,6 +75,7 @@ var (
 type ptySession struct {
 	session   agentrunner.Session
 	epic      string
+	kind      agentrunner.Kind
 	holder    *HolderClient
 	holderPID int
 	claudePID int
@@ -123,6 +124,7 @@ func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) 
 	ss := &ptySession{
 		session:   agentrunner.Session{Label: opts.Label, ID: opts.Label, SessionID: sessionID},
 		epic:      opts.Epic,
+		kind:      ptyKind(opts),
 		holderPID: cmd.Process.Pid,
 		exited:    make(chan struct{}),
 	}
@@ -172,6 +174,7 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) err
 	}
 	meta := Meta{
 		Runner:         ptyRunnerName,
+		Harness:        kind,
 		PID:            ss.claudePID,
 		HolderPID:      ss.holderPID,
 		HolderPIDStart: holderProc.Start,
@@ -781,9 +784,21 @@ func (p *Pty) promptSlash(pr *ptyPrompter, text string) error {
 func (p *Pty) awaitNotBusy(ss *ptySession) (int, error) {
 	deadline := time.Now().Add(p.WaitN())
 	for {
-		claude, turn, program, err := ss.holder.statusWithProgram()
+		resp, err := ss.holder.statusReply()
 		if err != nil {
 			return 0, p.died(ss, err)
+		}
+		claude, turn, program := resp.Claude, resp.Turn, resp.Program
+		// A watched harness (Codex) reports Background itself: working with a
+		// background terminal takes a prompt, a running turn does not.
+		if w := resp.watched(); w != nil {
+			switch {
+			case w.Status.State == harness.Blocked:
+				return 0, fmt.Errorf("%w: blocked on %s", agentrunner.ErrNotReady, w.Status.Message)
+			case w.Status.State != harness.Working || w.Status.Background:
+				return turn, nil
+			}
+			claude, program = nil, "working"
 		}
 		// Enter on a dialog would pick its first option, allowing a permission
 		// prompt nobody answered.

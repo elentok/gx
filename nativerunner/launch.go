@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/harness"
 )
 
@@ -20,6 +21,8 @@ const MetaFile = "meta.json"
 // Meta is what meta.json records about a launched agent.
 type Meta struct {
 	Runner string `json:"runner"`
+	// Harness is the agent kind the session runs; empty means claude.
+	Harness agentrunner.Kind `json:"harness,omitempty"`
 	// PID is the agent's own pid, claude on every runner.
 	PID      int    `json:"pid"`
 	PIDStart string `json:"pid_start"`

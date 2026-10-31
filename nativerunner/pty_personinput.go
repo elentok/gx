@@ -116,7 +116,7 @@ func (pr *ptyPrompter) Submit(text string) error {
 		default:
 		}
 	}
-	if err := pr.ss.holder.TypeText(text); err != nil {
+	if err := pr.ss.holder.TypeTextBy(text, pr.p.typing(pr.ss).PastesText(text)); err != nil {
 		return pr.p.died(pr.ss, err)
 	}
 	pr.typed = true
@@ -128,7 +128,7 @@ func (pr *ptyPrompter) Clear() error {
 	if err := pr.cancelled(); err != nil {
 		return err
 	}
-	return pr.p.died(pr.ss, pr.ss.holder.SendKeys(pr.p.typing().ClearKey()))
+	return pr.p.died(pr.ss, pr.ss.holder.SendKeys(pr.p.typing(pr.ss).ClearKey()))
 }
 
 // InputEmpty runs the harness empty check when the holder serves styled rows.
@@ -140,7 +140,7 @@ func (pr *ptyPrompter) InputEmpty() (bool, bool, error) {
 	if err != nil {
 		return false, false, pr.p.died(pr.ss, err)
 	}
-	switch pr.p.typing().InputIsEmpty(rows) {
+	switch pr.p.typing(pr.ss).InputIsEmpty(rows) {
 	case harness.InputEmpty:
 		return true, true, nil
 	case harness.InputNotEmpty:
@@ -151,7 +151,7 @@ func (pr *ptyPrompter) InputEmpty() (bool, bool, error) {
 
 // ReadyToType runs claude's ready-to-type step over the holder.
 func (pr *ptyPrompter) ReadyToType() bool {
-	return pr.p.typing().ReadyToType(HolderTypingIO(pr.ss.holder))
+	return pr.p.typing(pr.ss).ReadyToType(HolderTypingIO(pr.ss.holder))
 }
 
 // HolderTypingIO reads styled rows when the holder serves them, plain rows
@@ -173,9 +173,15 @@ func HolderTypingIO(h *HolderClient) harness.TypingIO {
 // parent gave that child.
 var claudeTyping = harness.ClaudeTyping()
 
-// typing is claude's typing rules reading its config from p.Env. A nil Env
-// becomes an empty one, which harness would read as the process env.
-func (p *Pty) typing() harness.Typing {
+// typing is the typing rules of ss's harness. Claude reads its config from
+// p.Env; a nil Env becomes an empty one, which harness would read as the
+// process env.
+func (p *Pty) typing(ss *ptySession) harness.Typing {
+	if ss.kind != "" && ss.kind != harness.Claude {
+		if t, err := harness.LookupTyping(ss.kind); err == nil {
+			return t
+		}
+	}
 	env := p.Env
 	if env == nil {
 		env = []string{}
@@ -183,11 +189,20 @@ func (p *Pty) typing() harness.Typing {
 	return harness.ClaudeTypingIn(env)
 }
 
+// SendEnter presses the harness submit key. Codex queues text with Tab while a
+// turn runs.
 func (pr *ptyPrompter) SendEnter() error {
 	if err := pr.cancelled(); err != nil {
 		return err
 	}
-	return pr.p.died(pr.ss, pr.ss.holder.SendKeys("\r"))
+	working := false
+	if w, err := pr.ss.holder.Watched(); err != nil {
+		return pr.p.died(pr.ss, err)
+	} else if w != nil {
+		// A background terminal alone is no turn: Enter sends.
+		working = w.Status.State == harness.Working && !w.Status.Background
+	}
+	return pr.p.died(pr.ss, pr.ss.holder.SendKeys(pr.p.typing(pr.ss).SubmitKey(working)))
 }
 
 func (pr *ptyPrompter) WaitStart(timeout time.Duration) (bool, error) {

@@ -74,6 +74,7 @@ func (p *Pty) newSession(label string, meta Meta) *ptySession {
 	return &ptySession{
 		session:     agentrunner.Session{Label: label, ID: label, SessionID: meta.SessionID},
 		epic:        meta.Epic,
+		kind:        meta.Harness,
 		holderPID:   meta.HolderPID,
 		claudePID:   meta.PID,
 		holderStart: meta.HolderPIDStart,

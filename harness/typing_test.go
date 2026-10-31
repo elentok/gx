@@ -251,6 +251,38 @@ func TestCodexReadyToType_IsANoOp(t *testing.T) {
 	}
 }
 
+func TestTyping_SubmitKeyAndPasteRule(t *testing.T) {
+	tests := []struct {
+		name      string
+		kind      agentrunner.Kind
+		working   bool
+		text      string
+		wantKey   string
+		wantPaste bool
+	}{
+		{"claude idle", harness.Claude, false, "one\ntwo", "\r", false},
+		{"claude working", harness.Claude, true, "one", "\r", false},
+		{"codex idle single line", harness.Codex, false, "one", "\r", false},
+		{"codex working queues with tab", harness.Codex, true, "one", "\t", false},
+		{"codex multi-line pastes", harness.Codex, false, "one\ntwo", "\r", true},
+		{"codex working multi-line", harness.Codex, true, "one\ntwo", "\t", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ty, err := harness.LookupTyping(tt.kind)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := ty.SubmitKey(tt.working); got != tt.wantKey {
+				t.Errorf("SubmitKey(%v) = %q, want %q", tt.working, got, tt.wantKey)
+			}
+			if got := ty.PastesText(tt.text); got != tt.wantPaste {
+				t.Errorf("PastesText(%q) = %v, want %v", tt.text, got, tt.wantPaste)
+			}
+		})
+	}
+}
+
 func TestLookupTyping_UnknownKindIsAnError(t *testing.T) {
 	if _, err := harness.LookupTyping("nope"); err == nil {
 		t.Fatal("LookupTyping(nope) succeeded")
