@@ -299,6 +299,7 @@ type Server struct {
 	usage        *usageSamples // Claude's
 	limits       *limitsStore
 	limitsEvents *eventThrottle
+	budgetEvents *budgetEvents
 	usageCodex   *usageSamples
 	budgetNotes  budgetNotes
 	hardGrace    hardGrace
@@ -503,6 +504,7 @@ func New(cfg Config) (*Server, error) {
 		usage:        openUsageSamples(cfg.StateDir),
 		limits:       openLimitsStore(cfg.StateDir),
 		limitsEvents: newEventThrottle(cfg.LimitsEventInterval, func() { events.publish(EventLimitsChanged, "") }),
+		budgetEvents: newBudgetEvents(cfg.BudgetEventInterval, func() { events.publish(EventBudgetChanged, "") }),
 		usageCodex:   openUsageFiles(cfg.StateDir, usageSampleFileCodex, usageLiftFileCodex),
 		costOf:       iterationCostIn(cfg.Env),
 		mergeInto:    git.MergeBranchInto,
@@ -879,6 +881,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	// loop, and only then release the lock. Agents in their panes are not touched.
 	stopFresh()
 	s.limitsEvents.stop()
+	s.budgetEvents.stop()
 	s.sessionWatches.close()
 	<-freshDone
 	<-herdrDone

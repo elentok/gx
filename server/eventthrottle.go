@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// DefaultLimitsEventInterval is the coalescing window for limits-changed and
-// budget-changed when Config.LimitsEventInterval is zero.
+// DefaultLimitsEventInterval is the coalescing window for limits-changed when
+// Config.LimitsEventInterval is zero.
 const DefaultLimitsEventInterval = 2 * time.Second
 
 // eventThrottle coalesces bursts: the first trigger fires at once, triggers

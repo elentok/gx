@@ -73,9 +73,13 @@ type Config struct {
 
 	BudgetPollInterval time.Duration // zero means the default
 
-	// LimitsEventInterval is the coalescing window of limits-changed and
-	// budget-changed; zero means DefaultLimitsEventInterval.
+	// LimitsEventInterval is the coalescing window of limits-changed; zero
+	// means DefaultLimitsEventInterval.
 	LimitsEventInterval time.Duration
+
+	// BudgetEventInterval is the coalescing window of budget-changed; zero
+	// means DefaultBudgetEventInterval.
+	BudgetEventInterval time.Duration
 
 	// LookPath finds a harness's program; nil looks over Env's PATH.
 	LookPath func(file string) (string, error)

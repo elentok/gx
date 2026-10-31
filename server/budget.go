@@ -502,6 +502,7 @@ func (s *Server) pollBudget(now time.Time) {
 	if err := s.ledger.save(now); err != nil {
 		s.log.Error("save budget ledger", "err", err)
 	}
+	s.budgetEvents.observe(s.ledger.today(now))
 	s.notifyBudget(now)
 	if hard {
 		s.killForBudget(now)
