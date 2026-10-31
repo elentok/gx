@@ -47,21 +47,34 @@ func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
 		return stdout.String()
 	}
 
+	// The dry run runs the full rewrite too, so an unparseable ticket fails it
+	// just as it fails the real run.
+	var failed bytes.Buffer
+	failArgs := []string{"tickets", "migrate", root, "--dry-run"}
+	if err := execute(failArgs, deps{stdout: &failed, stderr: &bytes.Buffer{}, env: envFor(t)}); err == nil {
+		t.Fatalf("dry run passed an unparseable ticket:\n%s", failed.String())
+	}
+	if err := os.Remove(path("08-broken.md")); err != nil {
+		t.Fatal(err)
+	}
+
 	dry := run("--dry-run")
 	for _, want := range []string{
-		"01-answer-kind.md: status -> paused (pause_reason: self-reported)",
-		"02-answer-none.md: status -> paused (pause_reason: zero-commit)",
-		"03-repair-kind.md: status -> paused (pause_reason: merge-conflict)",
-		"04-repair-log.md: status -> paused (pause_reason: spinning)",
-		"05-repair-none.md: status -> paused (pause_reason: iteration-error)",
-		"06-mismatch.md: status -> paused (pause_reason: zero-commit); recorded reason \"spinning\" does not fit status needs-answer",
+		"01-answer-kind.md: claimed_at backfilled, status -> paused (pause_reason: self-reported)",
+		"02-answer-none.md: claimed_at backfilled, status -> paused (pause_reason: zero-commit)",
+		"03-repair-kind.md: claimed_at backfilled, status -> paused (pause_reason: merge-conflict)",
+		"04-repair-log.md: claimed_at backfilled, status -> paused (pause_reason: spinning)",
+		"05-repair-none.md: claimed_at backfilled, status -> paused (pause_reason: iteration-error)",
+		"06-mismatch.md: claimed_at backfilled, status -> paused (pause_reason: zero-commit); recorded reason \"spinning\" does not fit status needs-answer",
 	} {
 		if !strings.Contains(dry, want) {
 			t.Errorf("dry run missing %q:\n%s", want, dry)
 		}
 	}
-	if strings.Contains(dry, "01-map.md") || strings.Contains(dry, "08-broken.md") {
-		t.Errorf("dry run lists a skipped ticket:\n%s", dry)
+	for _, l := range strings.Split(dry, "\n") {
+		if strings.Contains(l, "01-map.md") && strings.Contains(l, "paused") {
+			t.Errorf("dry run pauses a map ticket: %s", l)
+		}
 	}
 	if b, _ := os.ReadFile(path("02-answer-none.md")); !strings.Contains(string(b), "needs-answer") {
 		t.Errorf("dry run wrote a file:\n%s", b)
@@ -82,9 +95,6 @@ func TestExecute_TicketsMigrate_RewritesOldStatusesToPaused(t *testing.T) {
 		}
 	}
 
-	if err := os.Remove(path("08-broken.md")); err != nil {
-		t.Fatal(err)
-	}
 	run()
 
 	want := map[string]schema.PauseReason{

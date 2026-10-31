@@ -69,101 +69,13 @@ func runTicketsMigrateToStore(dirs config.Dirs, cwd, oldRoot, projectFlag string
 // needs-repair tickets to paused (see tickets.PlanPauseMigration); with dryRun
 // it only prints that plan.
 func runTicketsMigrate(dirs config.Dirs, scratchRoot string, dryRun bool, w io.Writer) error {
-	steps, err := tickets.PlanPauseMigration(scratchRoot)
-	if err != nil {
-		return err
-	}
 	if dryRun {
-		mapsDone, err := tickets.MigrateMapDone(scratchRoot, true)
-		if err != nil {
-			return err
-		}
-		created, err := backfillTicketCreation(scratchRoot, true)
-		if err != nil {
-			return err
-		}
-		grilling, err := backfillGrilling(dirs, scratchRoot, true)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintln(w, "dry run: pause, map-done, ticket-creation and grilling migration only, nothing written")
-		var changes []tickets.MigrationChange
-		for _, s := range steps {
-			changes = append(changes, tickets.MigrationChange{Path: s.Path, Notes: []string{s.Note()}})
-		}
-		changes = mergeChanges(changes, mapsDone)
-		changes = mergeChanges(changes, created)
-		changes = mergeChanges(changes, grilling)
-		printChanges(w, changes)
-		fmt.Fprintf(w, "%d file(s) would change\n", len(changes))
-		return nil
+		return runTicketsMigrateDry(dirs, scratchRoot, w)
 	}
-	result, err := tickets.Migrate(scratchRoot)
-	if err != nil {
+	changes, early, err := migrateTracker(dirs, scratchRoot, scratchRoot, false)
+	if early {
 		return err
 	}
-	backfilled, err := tickets.BackfillMergedAt(scratchRoot, epicLandedUnder(dirs, scratchRoot))
-	changes := append(result.Changes, backfilled...)
-	if err == nil {
-		var timed []tickets.MigrationChange
-		timed, err = tickets.BackfillEpicTimes(scratchRoot)
-		changes = append(changes, timed...)
-	}
-	if err == nil {
-		var stamped []tickets.MigrationChange
-		var home string
-		if home, err = dirs.Home(); err == nil {
-			totals := func(ids []string) (int64, float64, error) { return ralphloop.SessionIDsTotals(home, ids) }
-			stamped, err = tickets.BackfillTicketTotals(scratchRoot, totals, conflictSessionsUnder(scratchRoot))
-			changes = mergeChanges(changes, stamped)
-		}
-	}
-	if err == nil {
-		var frictions []tickets.MigrationChange
-		frictions, err = tickets.BackfillFriction(scratchRoot, ticketFrictionUnder(scratchRoot))
-		changes = mergeChanges(changes, frictions)
-	}
-	if err == nil {
-		var totals []tickets.MigrationChange
-		totals, err = tickets.BackfillEpicTotals(scratchRoot, epicTrailerLinesUnder(dirs, scratchRoot))
-		changes = mergeChanges(changes, totals)
-	}
-	if err == nil {
-		var renamed []tickets.MigrationChange
-		renamed, err = tickets.MigrateDestinationUnconfirmed(scratchRoot)
-		changes = mergeChanges(changes, renamed)
-	}
-	if err == nil {
-		var steps []tickets.MigrationChange
-		steps, err = tickets.MigrateDesignStep(scratchRoot, designProbeUnder(scratchRoot))
-		changes = mergeChanges(changes, steps)
-	}
-	if err == nil {
-		var done []tickets.MigrationChange
-		done, err = tickets.MigrateMapDone(scratchRoot, false)
-		changes = mergeChanges(changes, done)
-	}
-	if err == nil {
-		var created []tickets.MigrationChange
-		created, err = backfillTicketCreation(scratchRoot, false)
-		changes = mergeChanges(changes, created)
-	}
-	if err == nil {
-		var grilling []tickets.MigrationChange
-		grilling, err = backfillGrilling(dirs, scratchRoot, false)
-		changes = mergeChanges(changes, grilling)
-	}
-	if err == nil {
-		var moved []tickets.MigrationChange
-		moved, err = tickets.MigrateQuestionSections(scratchRoot, time.Now())
-		changes = append(changes, moved...)
-	}
-	if err == nil {
-		var paused []tickets.MigrationChange
-		paused, err = tickets.ApplyPauseMigration(steps)
-		changes = mergeChanges(changes, paused)
-	}
-
 	if len(changes) == 0 && err == nil {
 		fmt.Fprintln(w, "no changes")
 		return nil
@@ -172,6 +84,153 @@ func runTicketsMigrate(dirs config.Dirs, scratchRoot string, dryRun bool, w io.W
 	printChanges(w, changes)
 	fmt.Fprintf(w, "%d file(s) changed\n", len(changes))
 	return err
+}
+
+// runTicketsMigrateDry runs the whole migration chain on a scratch copy of the
+// tracker root, so each step reads the previous step's output and the real
+// files are never written. Any failure is returned with the real paths in it.
+func runTicketsMigrateDry(dirs config.Dirs, scratchRoot string, w io.Writer) error {
+	tmp, err := os.MkdirTemp("", "gx-migrate-dry-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(tmp)
+	work := filepath.Join(tmp, filepath.Base(scratchRoot))
+	if err := copyTracker(scratchRoot, work); err != nil {
+		return err
+	}
+	// The creation step reads the store's git history by path under the store root.
+	if _, err := os.Stat(filepath.Join(filepath.Dir(scratchRoot), ".git")); err == nil {
+		if err := os.Symlink(filepath.Join(filepath.Dir(scratchRoot), ".git"), filepath.Join(tmp, ".git")); err != nil {
+			return err
+		}
+	}
+
+	changes, _, err := migrateTracker(dirs, work, scratchRoot, true)
+	if err != nil {
+		return errors.New(strings.ReplaceAll(err.Error(), work, scratchRoot))
+	}
+	for i := range changes {
+		changes[i].Path = scratchRoot + strings.TrimPrefix(changes[i].Path, work)
+	}
+	fmt.Fprintln(w, "dry run: every migration step run on a copy, nothing written")
+	printChanges(w, changes)
+	fmt.Fprintf(w, "%d file(s) would change\n", len(changes))
+	return nil
+}
+
+// copyTracker copies the regular files under src into dst, keeping modes and
+// modification times (the migration reads mtimes). Symlinks and .git are skipped.
+func copyTracker(src, dst string) error {
+	return filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, p)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		if d.IsDir() {
+			if d.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return os.MkdirAll(target, 0o755)
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(target, data, info.Mode().Perm()); err != nil {
+			return err
+		}
+		return os.Chtimes(target, info.ModTime(), info.ModTime())
+	})
+}
+
+// migrateTracker runs every migration step on the tracker at root. lookupRoot
+// is the tracker the repo, run-log and conversation lookups resolve against:
+// root itself, except in a dry run on a copy. early reports a failure before
+// any step ran, where nothing is printed. dryRun keeps the steps that write
+// outside root report-only.
+func migrateTracker(dirs config.Dirs, root, lookupRoot string, dryRun bool) (changes []tickets.MigrationChange, early bool, err error) {
+	pause, err := tickets.PlanPauseMigration(root)
+	if err != nil {
+		return nil, true, err
+	}
+	result, err := tickets.Migrate(root)
+	if err != nil {
+		return nil, true, err
+	}
+	backfilled, err := tickets.BackfillMergedAt(root, epicLandedUnder(dirs, lookupRoot))
+	changes = append(result.Changes, backfilled...)
+	if err == nil {
+		var timed []tickets.MigrationChange
+		timed, err = tickets.BackfillEpicTimes(root)
+		changes = append(changes, timed...)
+	}
+	if err == nil {
+		var stamped []tickets.MigrationChange
+		var home string
+		if home, err = dirs.Home(); err == nil {
+			totals := func(ids []string) (int64, float64, error) { return ralphloop.SessionIDsTotals(home, ids) }
+			stamped, err = tickets.BackfillTicketTotals(root, totals, conflictSessionsUnder(lookupRoot))
+			changes = mergeChanges(changes, stamped)
+		}
+	}
+	if err == nil {
+		var frictions []tickets.MigrationChange
+		frictions, err = tickets.BackfillFriction(root, ticketFrictionUnder(lookupRoot))
+		changes = mergeChanges(changes, frictions)
+	}
+	if err == nil {
+		var totals []tickets.MigrationChange
+		totals, err = tickets.BackfillEpicTotals(root, epicTrailerLinesUnder(dirs, lookupRoot))
+		changes = mergeChanges(changes, totals)
+	}
+	if err == nil {
+		var renamed []tickets.MigrationChange
+		renamed, err = tickets.MigrateDestinationUnconfirmed(root)
+		changes = mergeChanges(changes, renamed)
+	}
+	if err == nil {
+		var steps []tickets.MigrationChange
+		steps, err = tickets.MigrateDesignStep(root, designProbeUnder(lookupRoot))
+		changes = mergeChanges(changes, steps)
+	}
+	if err == nil {
+		var done []tickets.MigrationChange
+		done, err = tickets.MigrateMapDone(root, false)
+		changes = mergeChanges(changes, done)
+	}
+	if err == nil {
+		var created []tickets.MigrationChange
+		created, err = backfillTicketCreation(root, false)
+		changes = mergeChanges(changes, created)
+	}
+	if err == nil {
+		var grilling []tickets.MigrationChange
+		grilling, err = backfillGrilling(dirs, lookupRoot, dryRun)
+		changes = mergeChanges(changes, grilling)
+	}
+	if err == nil {
+		var moved []tickets.MigrationChange
+		moved, err = tickets.MigrateQuestionSections(root, time.Now())
+		changes = append(changes, moved...)
+	}
+	if err == nil {
+		var paused []tickets.MigrationChange
+		paused, err = tickets.ApplyPauseMigration(pause)
+		changes = mergeChanges(changes, paused)
+	}
+	return changes, false, err
 }
 
 // printChanges writes one "<path>: <notes>" line per change.
