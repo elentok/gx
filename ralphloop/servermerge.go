@@ -433,6 +433,12 @@ func nudgeIfStalled(d Deps, in *personInput, o OneIteration, w IterationWorktree
 		return false, false, err
 	}
 	if err := d.Runner.Prompt(s, StallNudgeText); err != nil {
+		// A refusal means the agent went back to work after the wait: skip the nudge.
+		if errors.Is(err, agentrunner.ErrNotReady) {
+			if st, statusErr := d.Runner.Status(s); statusErr == nil && st.State == agentrunner.StateWorking {
+				return false, true, nil
+			}
+		}
 		return false, false, fmt.Errorf("stall nudge for %s: %w", w.Label, err)
 	}
 	err = logEvent(o.ScratchDir, o.Epic, Event{

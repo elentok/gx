@@ -137,6 +137,60 @@ func TestWaitIterationFinished_NoNudgeWhileQuestionOpenOrFinished(t *testing.T) 
 	}
 }
 
+// A silent Codex agent reaches the same nudge as a Claude one.
+func TestWaitIterationFinished_NudgesIdleCodexAgentOnce(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	one.Agent = AgentCodex
+	waitStallFixture(t, d, one)
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+		t.Errorf("prompts = %q, want exactly the stall nudge", got)
+	}
+	if evs := stallNudgeEvents(t, one); len(evs) != 1 {
+		t.Errorf("stall-nudged events = %+v, want one", evs)
+	}
+}
+
+// busyAfterWaitRunner refuses its first Prompt as a Codex agent does when it
+// went back to work after the idle wait, and reads working once.
+type busyAfterWaitRunner struct {
+	*runnerfake.Runner
+	refused, reportedWorking bool
+}
+
+func (r *busyAfterWaitRunner) Prompt(s agentrunner.Session, text string) error {
+	if !r.refused {
+		r.refused = true
+		return fmt.Errorf("%w: busy", agentrunner.ErrNotReady)
+	}
+	return r.Runner.Prompt(s, text)
+}
+
+func (r *busyAfterWaitRunner) Status(s agentrunner.Session) (agentrunner.Status, error) {
+	st, err := r.Runner.Status(s)
+	if r.refused && !r.reportedWorking {
+		r.reportedWorking = true
+		st.State = agentrunner.StateWorking
+	}
+	return st, err
+}
+
+// A refused nudge to an agent that is working again is skipped, not failed;
+// the nudge comes once the agent settles.
+func TestWaitIterationFinished_CodexBackToWorkDuringDelayGetsNoErrorAndOneNudge(t *testing.T) {
+	t.Parallel()
+	d, r, one, _ := stallNudgeFixture(t, "", 2*time.Minute)
+	one.Agent = AgentCodex
+	d.Runner = &busyAfterWaitRunner{Runner: r}
+	waitStallFixture(t, d, one)
+	if got := r.Prompts("iter-01"); len(got) != 1 || got[0] != StallNudgeText {
+		t.Errorf("prompts = %q, want one stall nudge after the agent settled", got)
+	}
+	if evs := stallNudgeEvents(t, one); len(evs) != 1 {
+		t.Errorf("stall-nudged events = %+v, want one (the skipped try is not logged)", evs)
+	}
+}
+
 func TestWaitIterationFinished_ZeroDelayDisablesNudge(t *testing.T) {
 	t.Parallel()
 	d, r, one, _ := stallNudgeFixture(t, "", 0)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/ralphloop"
@@ -489,9 +490,17 @@ func (s *Server) failureSequence(log []ralphloop.Event, f recovery.Failure) []re
 }
 
 // lastAssistantText is the last assistant text of the session a logged event
-// names, or "" when it names none or the transcript cannot be read. Only
-// Claude transcripts are read.
+// names, or "" when it names none or the transcript cannot be read. A Codex
+// agent that died before its first prompt has no rollout, which also reads "".
 func (s *Server) lastLoggedAssistantText(ev ralphloop.Event) string {
+	if ev.AgentSession != "" && ev.Agent == ralphloop.AgentCodex {
+		home, err := s.codexHome()
+		if err != nil {
+			return ""
+		}
+		text, _, _ := codexsession.LastAssistantTextIn(home, ev.AgentSession)
+		return text
+	}
 	if ev.AgentSession == "" || ev.Cwd == "" || (ev.Agent != "" && ev.Agent != ralphloop.AgentClaude) {
 		return ""
 	}
