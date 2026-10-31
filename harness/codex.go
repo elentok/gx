@@ -47,9 +47,27 @@ func codexHookGroup(matcher, command string) string {
 	return "{" + m + "hooks=[{type=\"command\",command=" + tomlString(command) + "}]}"
 }
 
-// codexHooks is the -c value holding gx's PreToolUse hooks.
-func codexHooks() string {
-	return "hooks.PreToolUse=[" + codexHookGroup("Bash", CodexGuardBashCommand) + "," + codexHookGroup(CodexQuestionTool, CodexGuardQuestionCommand) + "]"
+// CodexHookCommands are the commands the inline hooks run. CodexArgs uses
+// DefaultCodexHookCommands; `gx codex doctor` swaps in a recording script.
+type CodexHookCommands struct {
+	Session, GuardBash, GuardQuestion, Permission string
+}
+
+var DefaultCodexHookCommands = CodexHookCommands{
+	Session:       CodexSessionStartCommand,
+	GuardBash:     CodexGuardBashCommand,
+	GuardQuestion: CodexGuardQuestionCommand,
+	Permission:    CodexPermissionCommand,
+}
+
+// CodexHookArgs is the -c pairs that install the PreToolUse, SessionStart and
+// PermissionRequest hooks.
+func CodexHookArgs(c CodexHookCommands) []string {
+	return []string{
+		"-c", "hooks.PreToolUse=[" + codexHookGroup("Bash", c.GuardBash) + "," + codexHookGroup(CodexQuestionTool, c.GuardQuestion) + "]",
+		"-c", "hooks.SessionStart=[" + codexHookGroup("", c.Session) + "]",
+		"-c", codexPermissionHookEvent + "[" + codexHookGroup("", c.Permission) + "]",
+	}
 }
 
 // The PermissionRequest hook holds Codex's approval dialog until gx answers.
@@ -59,17 +77,6 @@ const (
 	CodexPermissionCommand   = "gx agent permission-request"
 	codexPermissionHookEvent = "hooks.PermissionRequest="
 )
-
-// codexPermissionHook is the -c value holding the PermissionRequest hook, for
-// every tool.
-func codexPermissionHook() string {
-	return codexPermissionHookEvent + "[" + codexHookGroup("", CodexPermissionCommand) + "]"
-}
-
-// codexSessionHook is the -c value holding the SessionStart hook.
-func codexSessionHook() string {
-	return "hooks.SessionStart=[" + codexHookGroup("", CodexSessionStartCommand) + "]"
-}
 
 // Launch adds the GX system prompt, on a fresh session only: Resume must not
 // carry it again (an instruction survives a resume).
@@ -179,10 +186,8 @@ func CodexArgs(in CodexArgsInput) []string {
 		"-c", "sandbox_workspace_write.network_access=true",
 		"-c", "disable_paste_burst=true",
 		"--dangerously-bypass-hook-trust",
-		"-c", codexHooks(),
-		"-c", codexSessionHook(),
-		"-c", codexPermissionHook(),
 	}
+	args = append(args, CodexHookArgs(DefaultCodexHookCommands)...)
 	if roots := dedupe(in.WritableRoots); len(roots) > 0 {
 		args = append(args, "-c", "sandbox_workspace_write.writable_roots="+tomlStringArray(roots))
 	}
