@@ -1,0 +1,5 @@
+interface:
+  display_name: "Thermo-nuclear Review"
+  short_description: "Run a very strict maintainability review"
+policy:
+  allow_implicit_invocation: false

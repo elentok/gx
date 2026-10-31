@@ -1,0 +1,5 @@
+interface:
+  display_name: "Cleanup"
+  short_description: "Clean up finished gx worktrees and branches"
+policy:
+  allow_implicit_invocation: false

@@ -105,6 +105,68 @@ func TestExecute_SkillsInstall_CopiesBundleIntoBothAgentRoots(t *testing.T) {
 	}
 }
 
+func codexHomeWithDuplicate(t *testing.T, d *deps, withDup bool) string {
+	t.Helper()
+	home := t.TempDir()
+	dup := filepath.Join(home, "skills", "gx-design")
+	if withDup {
+		if err := os.MkdirAll(dup, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d.skillsCodexHome = func() string { return home }
+	return dup
+}
+
+func TestExecute_SkillsInstall_WarnsAboutCodexHomeDuplicate(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := fakeSkillsDeps(t, &stdout)
+	dup := codexHomeWithDuplicate(t, &d, true)
+
+	if err := execute([]string{"skills", "install"}, d); err != nil {
+		t.Fatalf("install must not fail on a duplicate: %v", err)
+	}
+
+	out := stdout.String()
+	if !strings.Contains(out, "warning: skills: "+dup) || !strings.Contains(out, "twice") {
+		t.Errorf("output = %q, want a duplicate warning naming %s", out, dup)
+	}
+	if _, err := os.Stat(dup); err != nil {
+		t.Errorf("duplicate must not be deleted: %v", err)
+	}
+}
+
+func TestExecute_SkillsInstall_NoWarningWithoutDuplicate(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	d := fakeSkillsDeps(t, &stdout)
+	codexHomeWithDuplicate(t, &d, false)
+
+	if err := execute([]string{"skills", "install"}, d); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(stdout.String(), "warning:") {
+		t.Errorf("output = %q, want no warning", stdout.String())
+	}
+}
+
+func TestRefreshSkills_WarnsAboutCodexHomeDuplicateWithoutRecordingProblem(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	d := fakeSkillsDeps(t, &out)
+	dup := codexHomeWithDuplicate(t, &d, true)
+
+	refreshSkills(d, &out)
+
+	if !strings.Contains(out.String(), "warning: skills: "+dup) {
+		t.Errorf("output = %q, want a duplicate warning", out.String())
+	}
+	if p := skills.ReadProblem(statusPathOf(t, d)); p != "" {
+		t.Errorf("recorded problem = %q, want none", p)
+	}
+}
+
 func TestExecute_SkillsInstall_ReinstallReportsSkipped(t *testing.T) {
 	t.Parallel()
 	var stdout bytes.Buffer

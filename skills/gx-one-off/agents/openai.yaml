@@ -1,0 +1,5 @@
+interface:
+  display_name: "One-off"
+  short_description: "Run a small one-off task outside the ticket flow"
+policy:
+  allow_implicit_invocation: false

@@ -41,15 +41,24 @@ var requiredFiles = []string{
 	"gx-resolving-merge-conflicts/README.md",
 	"gx-investigate/SKILL.md",
 	"gx-investigate/gotchas.md",
+	"gx-implement/agents/openai.yaml",
 	"gx-cleanup/SKILL.md",
+	"gx-cleanup/agents/openai.yaml",
 	"gx-merge/SKILL.md",
+	"gx-merge/agents/openai.yaml",
 	"gx-code-review/SKILL.md",
+	"gx-code-review/agents/openai.yaml",
 	"gx-changelog/SKILL.md",
 	"gx-bump/SKILL.md",
+	"gx-bump/agents/openai.yaml",
 	"gx-one-off/SKILL.md",
+	"gx-one-off/agents/openai.yaml",
 	"gx-evolve/SKILL.md",
+	"gx-evolve/agents/openai.yaml",
 	"gx-triage-follow-ups/SKILL.md",
+	"gx-triage-follow-ups/agents/openai.yaml",
 	"gx-design/SKILL.md",
+	"gx-design/agents/openai.yaml",
 	"gx-follow-up/SKILL.md",
 	"gx-grilling/SKILL.md",
 	"gx-grilling/LICENSE",
@@ -85,8 +94,10 @@ var requiredFiles = []string{
 	"gx-thermo-nuclear-code-quality-review/SKILL.md",
 	"gx-thermo-nuclear-code-quality-review/LICENSE",
 	"gx-thermo-nuclear-code-quality-review/README.md",
+	"gx-thermo-nuclear-code-quality-review/agents/openai.yaml",
 	"gx-verify/SKILL.md",
 	"gx-verify-epic/SKILL.md",
+	"gx-verify-epic/agents/openai.yaml",
 	"gx-ui-check/SKILL.md",
 	"gx-ui-check/MOCK-CHECK.md",
 }
@@ -236,6 +247,38 @@ func TestSkillMetadataAndInvocationPolicy(t *testing.T) {
 			}
 			if fm.DisableModelInvocation != wantDisabled {
 				t.Errorf("disable-model-invocation = %v, want %v", fm.DisableModelInvocation, wantDisabled)
+			}
+		})
+	}
+}
+
+// TestManualSkillsHaveCodexInvocationPolicy: Codex ignores
+// disable-model-invocation and reads agents/openai.yaml instead, so every
+// manual skill needs that file and no model-invocable skill may disable it.
+func TestManualSkillsHaveCodexInvocationPolicy(t *testing.T) {
+	for name, disabled := range wantInvocationPolicy {
+		t.Run(name, func(t *testing.T) {
+			data, err := os.ReadFile(filepath.Join(name, "agents", "openai.yaml"))
+			if os.IsNotExist(err) && !disabled {
+				return
+			}
+			if err != nil {
+				t.Fatalf("read agents/openai.yaml: %v", err)
+			}
+			var cfg struct {
+				Policy struct {
+					AllowImplicitInvocation *bool `yaml:"allow_implicit_invocation"`
+				} `yaml:"policy"`
+			}
+			if err := yaml.Unmarshal(data, &cfg); err != nil {
+				t.Fatalf("parse agents/openai.yaml: %v", err)
+			}
+			got := cfg.Policy.AllowImplicitInvocation
+			if disabled && (got == nil || *got) {
+				t.Errorf("allow_implicit_invocation = %v, want false", got)
+			}
+			if !disabled && got != nil && !*got {
+				t.Errorf("allow_implicit_invocation = false on a model-invocable skill")
 			}
 		})
 	}

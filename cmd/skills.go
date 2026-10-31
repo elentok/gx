@@ -142,6 +142,9 @@ func resolveDevRoot(dir string) (string, error) {
 func installSkills(d deps, force skills.ForcePolicy, out io.Writer, source string, sources []skills.SourceFile, mode skills.InstallMode) error {
 	targets, installErr := installSkillTargets(d, force, source, sources, mode)
 	printTargetReport(out, targets, installErr == nil)
+	if installErr == nil {
+		warnCodexHomeDuplicates(d, out, sources)
+	}
 
 	var conflictErr *skills.ConflictError
 	if errors.As(installErr, &conflictErr) {
@@ -236,7 +239,20 @@ func refreshSkillsProblem(d deps, out io.Writer) string {
 	}
 	printSkillsBackup(out, targets)
 	fmt.Fprintf(out, "skills: %s\n", summarizeTargets(targets))
+	warnCodexHomeDuplicates(d, out, sources)
 	return ""
+}
+
+// warnCodexHomeDuplicates prints a warning for each gx skill that also sits
+// under $CODEX_HOME/skills. It is informational only: it never fails the
+// install, never deletes, and is not recorded as a server problem.
+func warnCodexHomeDuplicates(d deps, out io.Writer, sources []skills.SourceFile) {
+	if d.skillsCodexHome == nil {
+		return
+	}
+	for _, path := range skills.CodexHomeDuplicates(d.skillsCodexHome(), sources) {
+		fmt.Fprintf(out, "warning: skills: %s duplicates a gx skill installed under ~/.agents/skills; Codex would find the skill twice\n", path)
+	}
 }
 
 // installProblem describes a failed install, naming its conflicted paths and

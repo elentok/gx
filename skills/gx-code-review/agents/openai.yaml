@@ -1,0 +1,5 @@
+interface:
+  display_name: "Code Review"
+  short_description: "Review an epic's changes against its spec"
+policy:
+  allow_implicit_invocation: false

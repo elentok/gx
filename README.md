@@ -329,7 +329,8 @@ Each target is reported as `installed`, `updated`, `skipped` (already up to date
 override), or `removed`. `gx server start` and `gx server restart` run this install for you and
 keep a `--dev` install linked to its recorded checkout. Claude discovers skills under
 `~/.claude/skills`; Codex uses `~/.agents/skills`. Switching mode or checkout requires force.
-Changes retain recovery backups under gx's data directory. See [skills/gx.md](skills/gx.md) for
+If a gx skill also exists under `$CODEX_HOME/skills`, install prints a `warning: skills:` line,
+because Codex would find it twice; gx never deletes it. Changes retain recovery backups under gx's data directory. See [skills/gx.md](skills/gx.md) for
 migration, ownership and recovery details.
 
 ## Configuration

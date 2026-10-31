@@ -1,0 +1,5 @@
+interface:
+  display_name: "Merge"
+  short_description: "Merge a finished branch into main"
+policy:
+  allow_implicit_invocation: false

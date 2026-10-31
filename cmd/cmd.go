@@ -63,8 +63,10 @@ type deps struct {
 	// problem for the server to show.
 	skillsStatusPath func() (string, error)
 	skillsBackupDir  func() (string, error)
-	explainAgent     func(target string) (herdr.AgentExplainResult, error)
-	probeGhostty     func() error
+	// skillsCodexHome is $CODEX_HOME; nil skips the duplicate-skill warning.
+	skillsCodexHome func() string
+	explainAgent    func(target string) (herdr.AgentExplainResult, error)
+	probeGhostty    func() error
 	// serverClient dials the server; nil means the real one (tests inject a fake).
 	serverClient func() (*apiclient.Client, error)
 	// env is the process environment every config dir is resolved from.
@@ -133,8 +135,9 @@ func defaultDeps() deps {
 			}
 			return filepath.Join(base, "skills-backups"), nil
 		},
-		explainAgent: herdr.AgentExplain,
-		probeGhostty: terminalrun.ProbeGhostty,
+		skillsCodexHome: func() string { return roots.CodexHome },
+		explainAgent:    herdr.AgentExplain,
+		probeGhostty:    terminalrun.ProbeGhostty,
 	}
 }
 

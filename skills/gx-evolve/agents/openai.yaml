@@ -1,0 +1,5 @@
+interface:
+  display_name: "Evolve"
+  short_description: "Improve gx's skills from past sessions"
+policy:
+  allow_implicit_invocation: false

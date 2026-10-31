@@ -1,0 +1,5 @@
+interface:
+  display_name: "Design"
+  short_description: "Design a feature before it is planned"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Bump"
+  short_description: "Bump the gx version and cut a release"
+policy:
+  allow_implicit_invocation: false

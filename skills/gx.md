@@ -92,8 +92,16 @@ person starts a map, a spec or a harsh review, and other skills reach them by re
 other skills can call them.
 
 Codex discovers these as skills under `~/.agents/skills`. Both agents receive the same directory
-layout and relative references. Invocation metadata is consumed according to each agent's skill
-support.
+layout and relative references. The invocation rule differs per harness:
+
+- Claude reads `disable-model-invocation` from `SKILL.md`.
+- Codex ignores that key. It reads `policy.allow_implicit_invocation` from `agents/openai.yaml`.
+- Every skill with `disable-model-invocation: true` also has `agents/openai.yaml` with
+  `allow_implicit_invocation: false`, so neither agent starts it on its own.
+
+If a gx skill also sits under `$CODEX_HOME/skills`, Codex finds it twice. `gx skills install` and
+the refresh in `gx server start` print a `warning: skills:` line naming each such path. They never
+delete it and never fail on it.
 
 ## Installation
 
@@ -181,6 +189,7 @@ skills/
     mocking.md
   gx-implement/
     SKILL.md
+    agents/openai.yaml  — Codex invocation policy; every skill with disable-model-invocation has one
   gx-resolving-merge-conflicts/
     SKILL.md
   gx-investigate/
@@ -188,22 +197,30 @@ skills/
     gotchas.md
   gx-cleanup/
     SKILL.md
+    agents/openai.yaml
   gx-merge/
     SKILL.md
+    agents/openai.yaml
   gx-code-review/
     SKILL.md
+    agents/openai.yaml
   gx-changelog/
     SKILL.md
   gx-bump/
     SKILL.md
+    agents/openai.yaml
   gx-one-off/
     SKILL.md
+    agents/openai.yaml
   gx-evolve/
     SKILL.md
+    agents/openai.yaml
   gx-triage-follow-ups/
     SKILL.md
+    agents/openai.yaml
   gx-design/
     SKILL.md
+    agents/openai.yaml
   gx-follow-up/
     SKILL.md
   gx-grilling/            — vendored; each vendored directory also has LICENSE and README.md
@@ -230,16 +247,22 @@ skills/
     SKILL.md
     LICENSE
     README.md
+    agents/openai.yaml
   gx-to-spec/
     SKILL.md
     LICENSE
     README.md
+    agents/openai.yaml
   gx-thermo-nuclear-code-quality-review/
     SKILL.md
     LICENSE
     README.md
+    agents/openai.yaml
   gx-verify/
     SKILL.md
+  gx-verify-epic/
+    SKILL.md
+    agents/openai.yaml
 ```
 
 Every skill references `gx-local-tracker.md` with a relative path (`../gx-local-tracker.md`), so it

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Triage Follow-ups"
+  short_description: "Triage filed follow-ups into plans or closures"
+policy:
+  allow_implicit_invocation: false
