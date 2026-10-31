@@ -61,6 +61,10 @@ export interface Fixture {
   setProcesses(lines: string): Promise<void>;
   /** Stops the fixture server mid-flow. Teardown skips a server that is already stopped. */
   stopServer(): Promise<void>;
+  /** The parsed `$HOME/.config/gx/config.json`, read fresh on every call. */
+  globalConfig(): Promise<Record<string, any>>;
+  /** The parsed `project.json` of `project` in the fixture's ticket store, read fresh on every call. */
+  projectConfig(project: string): Promise<Record<string, any>>;
   /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
   launches(): Promise<string[][]>;
   /**
@@ -97,6 +101,7 @@ async function startFixture(
   autoAdvanceDelay?: string,
   config: Record<string, string> = {},
   stallThreshold?: string,
+  fakecodex = true,
 ): Promise<{ fixture: Fixture; stop: () => Promise<void> }> {
   const proc = spawn(
     process.env.GX_E2E_GXFIXTURE!,
@@ -105,6 +110,7 @@ async function startFixture(
       process.env.GX_E2E_GX!,
       "--fakeclaude",
       process.env.GX_E2E_FAKECLAUDE!,
+      ...(fakecodex ? ["--fakecodex", process.env.GX_E2E_FAKECODEX!] : []),
       ...(hold ? ["--hold"] : []),
       ...(autoAdvanceDelay ? ["--auto-advance-delay", autoAdvanceDelay] : []),
       ...(stallThreshold ? ["--stall-threshold", stallThreshold] : []),
@@ -153,6 +159,12 @@ async function startFixture(
     setHealth: (values) => writeControl(out.health_dir, "system", values),
     setProcesses: (lines) => writeControl(out.health_dir, "processes", lines),
     stopServer: stop,
+    async globalConfig() {
+      return JSON.parse(await readFile(join(env.HOME!, ".config", "gx", "config.json"), "utf8"));
+    },
+    async projectConfig(project) {
+      return JSON.parse(await readFile(join(env.XDG_DATA_HOME!, "gx", "tickets", project, "project.json"), "utf8"));
+    },
     async launches() {
       const dir = join(env.HOME!, ".claude", "agentfake");
       const files = (await readdir(dir).catch(() => [] as string[])).filter((n) => n.endsWith(".args"));
@@ -194,13 +206,13 @@ async function startFixture(
 export const test = base.extend<{
   start: (
     scenario: string,
-    opts?: { hold?: boolean; autoAdvanceDelay?: string; stallThreshold?: string; config?: Record<string, string> },
+    opts?: { hold?: boolean; autoAdvanceDelay?: string; stallThreshold?: string; config?: Record<string, string>; fakecodex?: boolean },
   ) => Promise<Fixture>;
 }>({
   start: async ({ page }, use) => {
     const stops: Array<() => Promise<void>> = [];
     await use(async (scenario, opts) => {
-      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config, opts?.stallThreshold);
+      const { fixture, stop } = await startFixture(scenario, page, opts?.hold ?? false, opts?.autoAdvanceDelay, opts?.config, opts?.stallThreshold, opts?.fakecodex);
       stops.push(stop);
       return fixture;
     });

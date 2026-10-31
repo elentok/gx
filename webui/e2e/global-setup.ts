@@ -43,5 +43,6 @@ export default function globalSetup() {
   };
   process.env.GX_E2E_GX = build("gx", "github.com/elentok/gx", ["-tags", "gxfixture"]);
   process.env.GX_E2E_FAKECLAUDE = build("claude", "github.com/elentok/gx/testutil/agentfake/cmd/fakeclaude");
+  process.env.GX_E2E_FAKECODEX = build("codex", "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex");
   process.env.GX_E2E_GXFIXTURE = build("gxfixture", "github.com/elentok/gx/testutil/gxfixture");
 }
