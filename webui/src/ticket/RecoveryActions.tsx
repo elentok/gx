@@ -1,7 +1,9 @@
-import { Box, Spinner, Text, Textarea } from "@chakra-ui/react";
+import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { ActionChooseBase, ActionResume, ActionRetry, ActionStartOver, type TicketDetail } from "../generated/server";
 import { Button } from "../ui/button/Button";
+import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
+import { Modal } from "../ui/modal/Modal";
 import { useWrite, type Refusable } from "../useWrite";
 import { ReasonStale } from "./answer";
 import { isRecoverAction, postRecover, ReasonAgentWorking, type PostRecover, type RecoverBody } from "./recover";
@@ -153,41 +155,25 @@ function StartOverDialog({
 }) {
   const [reason, setReason] = useState("");
   return (
-    <Box position="fixed" inset="0" zIndex="modal" bg="overlay" display="flex" alignItems="center" justifyContent="center" p="4" onClick={onClose}>
-      <Box
-        role="dialog"
-        aria-modal="true"
-        aria-label={label}
-        bg="surface"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="md"
-        p="4"
-        maxW="full"
-        w="md"
-        display="flex"
-        flexDirection="column"
-        gap="3"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {tooltip && <Text>{tooltip}</Text>}
-        <Textarea
-          aria-label="Reason"
-          placeholder="Why start over?"
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
-        />
-        <Box display="flex" gap="2" justifyContent="flex-end">
-          <Button emphasis="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button tone="deadlocked" disabled={pending || !reason.trim()} onClick={() => onConfirm(reason.trim())}>
-            {pending && <Spinner size="sm" />}
-            {label}
-          </Button>
-        </Box>
+    <Modal label={label} onClose={onClose} p="4" w="md" gap="3">
+      {tooltip && <Text>{tooltip}</Text>}
+      <ExpandableTextField
+        label="Reason"
+        title="Start over reason"
+        placeholder="Why start over?"
+        value={reason}
+        onChange={setReason}
+        rows={3}
+      />
+      <Box display="flex" gap="2" justifyContent="flex-end">
+        <Button emphasis="ghost" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button tone="deadlocked" disabled={pending || !reason.trim()} onClick={() => onConfirm(reason.trim())}>
+          {pending && <Spinner size="sm" />}
+          {label}
+        </Button>
       </Box>
-    </Box>
+    </Modal>
   );
 }

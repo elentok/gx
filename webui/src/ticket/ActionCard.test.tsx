@@ -163,6 +163,24 @@ test("Start over asks for a reason first and never sends branch deletion", async
   expect(body).not.toHaveProperty("delete_branch");
 });
 
+test("Start over closes on Escape and drops the reason; Cancel closes; the field expands", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })));
+  vi.stubGlobal("fetch", fetchMock);
+  renderTicket(() => repair(["retry", "start-over"]));
+  fireEvent.click(await screen.findByRole("button", { name: "Start over" }));
+  let dialog = screen.getByRole("dialog", { name: "Start over" });
+  expect(within(dialog).getByRole("button", { name: "Open the note in a large editor" })).toBeTruthy();
+  fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "typed" } });
+  fireEvent.keyDown(within(dialog).getByLabelText("Reason"), { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Start over" }));
+  dialog = screen.getByRole("dialog", { name: "Start over" });
+  expect((within(dialog).getByLabelText("Reason") as HTMLTextAreaElement).value).toBe("");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
 test("Start over's Confirm is disabled until a reason is typed", async () => {
   const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: {} })));
   vi.stubGlobal("fetch", fetchMock);

@@ -71,6 +71,57 @@ describe("Modal", () => {
     expect(under).toHaveBeenCalledTimes(1);
   });
 
+  describe("focus trap", () => {
+    function mountTrap() {
+      renderThemed(
+        <>
+          <button>Outside</button>
+          <Modal label="Thing" onClose={vi.fn()}>
+            <button>First</button>
+            <button>Last</button>
+          </Modal>
+        </>,
+      );
+      return { dialog: screen.getByRole("dialog"), first: screen.getByText("First"), last: screen.getByText("Last") };
+    }
+
+    it("moves Tab from the last element to the first", () => {
+      const { dialog, first, last } = mountTrap();
+      last.focus();
+      expect(fireEvent.keyDown(dialog, { key: "Tab" })).toBe(false);
+      expect(document.activeElement).toBe(first);
+    });
+
+    it("moves Shift-Tab from the first element to the last", () => {
+      const { dialog, first, last } = mountTrap();
+      first.focus();
+      expect(fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true })).toBe(false);
+      expect(document.activeElement).toBe(last);
+    });
+
+    it("pulls Tab back in when focus is outside the dialog", () => {
+      const { dialog, first } = mountTrap();
+      screen.getByText("Outside").focus();
+      fireEvent.keyDown(dialog, { key: "Tab" });
+      expect(document.activeElement).toBe(first);
+    });
+
+    it("leaves Tab between inner elements to the browser", () => {
+      const { dialog, first } = mountTrap();
+      first.focus();
+      expect(fireEvent.keyDown(dialog, { key: "Tab" })).toBe(true);
+    });
+
+    it("does not throw with nothing focusable inside", () => {
+      renderThemed(
+        <Modal label="Empty" onClose={vi.fn()}>
+          <p>body</p>
+        </Modal>,
+      );
+      expect(() => fireEvent.keyDown(screen.getByRole("dialog"), { key: "Tab" })).not.toThrow();
+    });
+  });
+
   it("ignores Escape with closeOnEscape off, but still closes on the backdrop", () => {
     const onClose = vi.fn();
     renderThemed(
