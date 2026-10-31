@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"time"
 
@@ -38,6 +39,18 @@ func newClaudeHistoryCmd(d deps) *cobra.Command {
 	}
 }
 
+// statuslineReportTimeout bounds dial plus request, so a slow server never
+// holds up Claude Code's statusline.
+const statuslineReportTimeout = 500 * time.Millisecond
+
+// reportStatuslineLimits is best effort: the hook never starts the server and
+// never retries, so every error is dropped.
+func reportStatuslineLimits(d deps, payload []byte) {
+	ctx, cancel := context.WithTimeout(context.Background(), statuslineReportTimeout)
+	defer cancel()
+	_, _, _ = reportLimits(ctx, d.dial(), payload)
+}
+
 func newClaudeStatuslineCmd(d deps) *cobra.Command {
 	var silent, demo, install bool
 	var agentDir string
@@ -50,14 +63,18 @@ func newClaudeStatuslineCmd(d deps) *cobra.Command {
 			if install {
 				return installClaudeStatusline(d)
 			}
-			if agentDir == "" || demo {
+			if demo {
 				return runClaudeStatusline(d, silent, demo)
 			}
 			var payload bytes.Buffer
 			d.stdin = io.TeeReader(d.stdin, &payload)
 			err := runClaudeStatusline(d, silent, demo)
-			// A failed record write never changes the line or the exit code.
-			_ = recordStatuslineUsage(agentDir, payload.Bytes(), time.Now())
+			// Neither a failed record write nor a failed report changes the
+			// line or the exit code.
+			if agentDir != "" {
+				_ = recordStatuslineUsage(agentDir, payload.Bytes(), time.Now())
+			}
+			reportStatuslineLimits(d, payload.Bytes())
 			return err
 		},
 	}
