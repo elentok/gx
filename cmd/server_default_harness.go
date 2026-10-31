@@ -25,18 +25,11 @@ func newServerDefaultHarnessCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runServerDefaultHarness(cmdContext(c), cl, c.OutOrStdout(), jsonOut)
+			return runServerDefaultHarness(c.Context(), cl, c.OutOrStdout(), jsonOut)
 		},
 	}
 	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")
 	return c
-}
-
-func cmdContext(c *cobra.Command) context.Context {
-	if ctx := c.Context(); ctx != nil {
-		return ctx
-	}
-	return context.Background()
 }
 
 func runServerDefaultHarness(ctx context.Context, cl *apiclient.Client, w io.Writer, jsonOut bool) error {
@@ -78,7 +71,7 @@ func newServerDefaultHarnessSetCmd(d deps) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return runServerDefaultHarnessSet(cmdContext(c), cl, c.OutOrStdout(), req, jsonOut)
+			return runServerDefaultHarnessSet(c.Context(), cl, c.OutOrStdout(), req, jsonOut)
 		},
 	}
 	c.Flags().BoolVar(&jsonOut, "json", false, "emit the structured result as JSON")

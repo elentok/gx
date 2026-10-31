@@ -256,7 +256,7 @@ func (s *Server) switchCounts(project string, now ralphloop.AgentKind) (waiting,
 		waiting += s.waitingOnDefault(addr)
 	}
 	for _, t := range s.registry.list() {
-		if a, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil && inScope(a.Project) && string(t.Agent) != string(now) {
+		if a, err := tickets.ParseAddress(t.Address, tickets.AddressContext{}); err == nil && inScope(a.Project) && t.Agent != string(now) {
 			running++
 		}
 	}
@@ -297,9 +297,9 @@ func (s *Server) waitingOnDefault(epic tickets.Address) int {
 
 // defaultHarnessNotice is the one sentence web, TUI and CLI show after a switch.
 func defaultHarnessNotice(project string, now ralphloop.AgentKind, waiting, running int) string {
-	head := "Default is now " + harnessLabel(now) + "."
+	head := "Default is now " + harnessDisplayName(now) + "."
 	if project != "" {
-		head = "Default for " + project + " is now " + harnessLabel(now) + "."
+		head = "Default for " + project + " is now " + harnessDisplayName(now) + "."
 	}
 	use := "The next design step will use it."
 	if waiting > 0 {
@@ -311,7 +311,7 @@ func defaultHarnessNotice(project string, now ralphloop.AgentKind, waiting, runn
 		if now == ralphloop.AgentClaude {
 			other = ralphloop.AgentCodex
 		}
-		notice += fmt.Sprintf(" %d running %s %s %s.", running, plural(running, "agent", "agents"), plural(running, "keeps", "keep"), harnessLabel(other))
+		notice += fmt.Sprintf(" %d running %s %s %s.", running, plural(running, "agent", "agents"), plural(running, "keeps", "keep"), harnessDisplayName(other))
 	}
 	return notice
 }
@@ -321,11 +321,4 @@ func plural(n int, one, many string) string {
 		return one
 	}
 	return many
-}
-
-func harnessLabel(k ralphloop.AgentKind) string {
-	if k == ralphloop.AgentCodex {
-		return "Codex"
-	}
-	return "Claude"
 }

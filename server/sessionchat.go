@@ -297,8 +297,7 @@ func (s *Server) sessionChatRead(w http.ResponseWriter, r *http.Request) {
 	path, kind, found := s.chatTranscript(id, meta)
 	if !found {
 		_, out.Archived = s.codexArchive(id, meta)
-	}
-	if found {
+	} else {
 		final := s.designFinal(meta.Ticket)
 		chat, err := s.chats.read(path, kind, final, chatLoader(kind, meta.Ticket, final))
 		switch {
