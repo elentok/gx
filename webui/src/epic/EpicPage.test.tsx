@@ -201,6 +201,25 @@ test("a queued ticket's row shows its verdict and reason, and the other rows sho
   expect((await cardOf("02")).querySelector("[data-verdict]")).toBeNull();
 });
 
+test("loop rows show harness chips and queue notes; done rows and map rows show none", async () => {
+  live([
+    tk("01", { harness_note: "follows default" }),
+    tk("02", { harness: "codex", harness_note: "pinned" }),
+    tk("03", { harness: "claude", harness_note: "keeps Claude (ran before)" }),
+    tk("04", { rendered_status: "claimed", harness: "codex", tier: "strongest", model: "gpt-x", effort: "high" }),
+    tk("05", { rendered_status: "done", harness: "codex", harness_note: "pinned" }),
+  ]);
+  const chips = async (id: string) => (await cardOf(id)).querySelector("[data-chips]")?.textContent;
+  expect(await chips("01")).toBe("follows default");
+  expect(await chips("02")).toBe("Codexpinned");
+  expect(await chips("03")).toBe("Claudekeeps Claude (ran before)");
+  expect(await chips("04")).toBe("CodexStrongestgpt-x · high");
+  expect(await chips("05")).toBeUndefined();
+  cleanup();
+  live([tk("01")], "map");
+  expect((await cardOf("01")).querySelector("[data-chips]")).toBeNull();
+});
+
 test("a claimed row shows no verdict line", async () => {
   liveWith([pend("01", "claimed")], [tk("01")]);
   expect((await cardOf("01")).querySelector("[data-verdict]")).toBeNull();

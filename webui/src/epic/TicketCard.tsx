@@ -5,6 +5,7 @@ import { ticketHref } from "../hrefs";
 import { useWide } from "../useWide";
 import { VerdictLine } from "../verdict";
 import { Button } from "../ui/button/Button";
+import { HarnessLabel } from "../ui/harness-label/HarnessLabel";
 import { type EpicDetailRow } from "./detail";
 import { FixAgentDialog } from "./FixAgentDialog";
 import type { FixAgent } from "./fixAgent";
@@ -15,6 +16,7 @@ import {
   isCancelled,
   isFolded,
   isRunning,
+  rowChips,
   toneOf,
 } from "./rows";
 
@@ -129,6 +131,7 @@ function Line({
   titleLink?: boolean;
   bold?: boolean;
 }) {
+  const chips = rowChips(row);
   const title = titleLink ? (
     <Link href={ticketHref(row.address)} color="inherit" display="inline">
       {row.title}
@@ -203,6 +206,11 @@ function Line({
           {title}
         </Text>
       </Box>
+      {chips && (
+        <Box data-chips pl={wide ? undefined : "80px"} flexShrink={0} minW="0">
+          <HarnessLabel {...chips} switched={false} />
+        </Box>
+      )}
       {metaNode}
     </Box>
   );

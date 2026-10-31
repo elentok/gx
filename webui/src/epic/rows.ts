@@ -208,6 +208,27 @@ export function cardMeta(row: EpicDetailRow, ctx: RowContext): string {
 const designDoneTime = (row: EpicDetailRow) =>
   row.elapsed !== undefined && row.elapsed >= 60 ? formatDuration(row.elapsed) : undefined;
 
+export type RowChips = { harness: string; tierLabel: string; model: string; effort: string; note: string };
+
+const TIER_LABELS: Record<string, string> = { light: "Light", worker: "Worker", strongest: "Strongest" };
+
+// What a loop row shows after its title: a running row its harness, tier and model; a waiting row the
+// server's note (and its harness when it has one). Any other row, and a map row, shows nothing.
+export function rowChips(row: EpicDetailRow): RowChips | undefined {
+  if (isRunning(row)) {
+    if (!row.harness) return undefined;
+    return {
+      harness: row.harness,
+      tierLabel: TIER_LABELS[row.tier ?? ""] ?? "",
+      model: row.model ?? "",
+      effort: row.effort ?? "",
+      note: "",
+    };
+  }
+  if (bucketOf(row) !== "waiting" || !row.harness_note) return undefined;
+  return { harness: row.harness ?? "", tierLabel: "", model: "", effort: "", note: row.harness_note };
+}
+
 // A done row's dim meta: elapsed time (or "cancelled"), then cost for a loop row, then the fork note.
 export function doneMeta(row: EpicDetailRow, ctx: RowContext): string {
   const [elapsed, cost] = elapsedAndCost(row, row.elapsed, ctx);

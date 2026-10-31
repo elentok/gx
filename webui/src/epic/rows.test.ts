@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { EpicDetail, EpicDetailRow } from "./detail";
-import { cardLook, type CardLook, cardMeta, designStatParts, loopStatParts, nestLive, rowContext } from "./rows";
+import { cardLook, type CardLook, cardMeta, designStatParts, loopStatParts, nestLive, rowChips, rowContext } from "./rows";
 
 const detailOf = (kind: EpicDetail["kind"], rows: EpicDetailRow[]): EpicDetail => ({
   address: "gx:e",
@@ -18,6 +18,20 @@ const detailOf = (kind: EpicDetail["kind"], rows: EpicDetailRow[]): EpicDetail =
 
 const row = (over: Partial<EpicDetailRow>): EpicDetailRow => ({ address: "gx:e/03", title: "t", rendered_status: "open", ...over });
 const NOW = Date.parse("2026-01-01T00:10:00Z");
+
+test.each([
+  ["waiting, follows the default", { harness_note: "follows default" }, { harness: "", tierLabel: "", model: "", effort: "", note: "follows default" }],
+  ["waiting, pinned", { harness: "codex", harness_note: "pinned" }, { harness: "codex", tierLabel: "", model: "", effort: "", note: "pinned" }],
+  [
+    "running",
+    { rendered_status: "claimed", harness: "codex", tier: "strongest", model: "gpt-x", effort: "high" },
+    { harness: "codex", tierLabel: "Strongest", model: "gpt-x", effort: "high", note: "" },
+  ],
+  ["a done row", { rendered_status: "done", harness: "codex", harness_note: "pinned" }, undefined],
+  ["a map row with no fields", {}, undefined],
+])("rowChips: %s", (_name, over, want) => {
+  expect(rowChips(row(over))).toEqual(want);
+});
 
 test.each([
   ["an open row with no blockers", { rendered_status: "open" }, "ready"],

@@ -37,25 +37,31 @@ export function HarnessLabel({
   model,
   effort,
   switched,
+  note,
 }: {
   harness: string;
   tierLabel: string;
   model: string;
   effort: string;
   switched: boolean;
+  /** Server text for a queue row, as one more dim chip (`pinned`, `follows default`). */
+  note?: string;
 }) {
   const tierTitle = tierLabel ? `${tierLabel} tier` : undefined;
   const modelText = [model, effort].filter(Boolean).join(" · ");
   const known = tierLabel || model || effort;
   return (
     <Box as="span" display="inline-flex" flexWrap="wrap" alignItems="center" gap="2">
-      <Pill>
-        <Box as="i" w="7px" h="7px" borderRadius="full" bg={`harness.${harness}`} />
-        {NAMES[harness] ?? harness}
-      </Pill>
+      {harness && (
+        <Pill>
+          <Box as="i" w="7px" h="7px" borderRadius="full" bg={`harness.${harness}`} />
+          {NAMES[harness] ?? harness}
+        </Pill>
+      )}
       {known && model && tierLabel && <Pill title={tierTitle}>{tierLabel}</Pill>}
       {known && model && <Pill title={tierTitle}>{modelText}</Pill>}
       {known && !model && <Pill title={tierTitle}>{[tierLabel, "CLI default", effort].filter(Boolean).join(" · ")}</Pill>}
+      {note && <Pill>{note}</Pill>}
       {switched && (
         <Text as="span" fontSize="sm" color="text.dim">
           switched by hand

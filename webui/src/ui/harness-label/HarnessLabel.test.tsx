@@ -30,6 +30,11 @@ describe("HarnessLabel", () => {
     expect(container.textContent).toBe("Claude");
   });
 
+  it("shows a note as its own chip, alone when there is no harness", () => {
+    const { container } = renderThemed(<HarnessLabel harness="" tierLabel="" model="" effort="" switched={false} note="follows default" />);
+    expect(container.textContent).toBe("follows default");
+  });
+
   it("notes a hand switch only when switched", () => {
     const on = renderThemed(<HarnessLabel {...full} switched />);
     expect(on.getByText("switched by hand")).toBeTruthy();
