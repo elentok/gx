@@ -1439,3 +1439,13 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   2. Touch at 390 px: read the bar, click Done. Touch at 1280 px: read the modal height.
   3. Mouse at 1280 px: read the modal size, header and footer; click Done.
 - **Pass:** a touch device reports `(pointer: coarse)`. At 390 px with touch the bar holds Done only (no pill, no Esc) and Done closes the editor. At 1280 px with touch the bar shows and the modal is at most 680 px high. At 1280 px with a mouse there is no bar; the modal is 860 by 680 with the title, "Saved as you type", Done and no x button; Done closes it.
+
+## 124. Vi editor: open and close
+
+- **Scenario:** `design-working` (the message box with no round). Vi mode is set with `gx vimode on|off`, then confirmed on the "Vi mode" menu item.
+- **Steps:**
+  1. At 390 px, start the design session and click "Note".
+  2. Vi on: focus the message box and press Cmd-G (Ctrl-G off a Mac). Again with focus on the page body.
+  3. Vi off: press Cmd-G in the field, with a `window` keydown listener that records `defaultPrevented`.
+  4. Vi on: fill `hello world`, put the caret after `hello`, press Cmd-G, type `X`.
+- **Pass:** at 390 px the expand button shows. Vi on, Cmd-G in the field opens the editor; on the page body it opens nothing. Vi off, Cmd-G opens nothing and the keydown is not cancelled. The editor opens in INSERT and the typed `X` lands at the caret: the editor text reads `helloX world`.
