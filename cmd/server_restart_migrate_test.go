@@ -104,6 +104,56 @@ func TestMigrateAllProjectsContinue_RecordsFailureAndMigratesTheRest(t *testing.
 	}
 }
 
+func TestMigrateAllProjectsContinue_RecordWriteFailureDoesNotStopLaterProjects(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	// A regular file as the state dir makes every migratefail.Record fail.
+	state := filepath.Join(t.TempDir(), "state-is-a-file")
+	if err := os.WriteFile(state, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeStoreProject(t, store, "alpha", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nparent: \"02\"\n---\nBody.\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
+	})
+	good := writeStoreProject(t, store, "beta", map[string]string{"01-a.md": legacyNeedsAnswer})
+
+	var out bytes.Buffer
+	if err := migrateAllProjectsContinue(config.DirsFrom(tempEnv(t)), state, store, &out); err != nil {
+		t.Fatalf("want nil when the record cannot be saved, got %v", err)
+	}
+
+	got, err := os.ReadFile(filepath.Join(good, "epic", "issues", "01-a.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(got), "status: paused") {
+		t.Errorf("beta not migrated after the record write failed:\n%s", got)
+	}
+}
+
+func TestMigrateAllProjectsContinue_NamesProjectByProjectJSON(t *testing.T) {
+	t.Parallel()
+	store := t.TempDir()
+	state := t.TempDir()
+	dir := writeStoreProject(t, store, "alpha-dir", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\nparent: \"02\"\n---\nBody.\n",
+		"02-b.md": "---\nid: \"02\"\nstatus: open\ntype: implement\nparent: \"01\"\n---\nBody.\n",
+	})
+	if err := os.WriteFile(filepath.Join(dir, "project.json"), []byte(`{"name":"pretty"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := migrateAllProjectsContinue(config.DirsFrom(tempEnv(t)), state, store, &out); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out.String(), "migrating pretty\n") || !strings.Contains(out.String(), "migrate pretty failed:") {
+		t.Errorf("progress lines do not use the project.json name:\n%s", out.String())
+	}
+}
+
 func TestRestartLogPath_IsFixedFileInStateDir(t *testing.T) {
 	t.Parallel()
 	state := t.TempDir()

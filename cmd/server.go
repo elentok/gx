@@ -601,20 +601,20 @@ func runServerRestartContinue(ctx context.Context, d deps, w io.Writer) error {
 }
 
 // migrateAllProjectsContinue migrates every project, saving each failure to
-// the failure record instead of stopping. Only a failure to list projects or
-// to save a record is returned.
+// the failure record instead of stopping. Only a failure to list projects is
+// returned; a record that cannot be saved is printed and the restart goes on.
 func migrateAllProjectsContinue(cfgDirs config.Dirs, stateDir, storePath string, w io.Writer) error {
 	dirs, err := tickets.ProjectDirs(storePath)
 	if err != nil {
 		return err
 	}
 	for _, dir := range dirs {
-		name := filepath.Base(dir)
+		name := tickets.ProjectName(dir)
 		fmt.Fprintf(w, "migrating %s\n", name)
 		if err := runTicketsMigrate(cfgDirs, dir, false, w); err != nil {
 			fmt.Fprintf(w, "migrate %s failed: %v\n", name, err)
-			if recErr := migratefail.Record(stateDir, tickets.ProjectName(dir), err.Error()); recErr != nil {
-				return recErr
+			if recErr := migratefail.Record(stateDir, name, err.Error()); recErr != nil {
+				fmt.Fprintf(w, "could not save the failure record for %s: %v\n", name, recErr)
 			}
 		}
 	}

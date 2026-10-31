@@ -61,6 +61,23 @@ func TestRestartCheck_ValidConfigReportsVersionConfigAndProjects(t *testing.T) {
 	}
 }
 
+func TestRestartCheck_NamesProjectByProjectJSON(t *testing.T) {
+	t.Parallel()
+	dirs := config.DirsFrom(tempEnv(t))
+	store := t.TempDir()
+	dir := writeStoreProject(t, store, "alpha-dir", map[string]string{"01-a.md": legacyNeedsAnswer})
+	if err := os.WriteFile(filepath.Join(dir, "project.json"), []byte(`{"name":"pretty"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeRestartCheckConfig(t, dirs, `{"ticket-store": {"path": "`+store+`"}}`)
+
+	got := runRestartCheckJSON(t, dirs)
+
+	if len(got.Projects) != 1 || got.Projects[0].Name != "pretty" {
+		t.Errorf("projects = %+v, want one named pretty", got.Projects)
+	}
+}
+
 func TestRestartCheck_BrokenConfigReportsStartupErrorText(t *testing.T) {
 	t.Parallel()
 	dirs := config.DirsFrom(tempEnv(t))

@@ -66,7 +66,7 @@ func dryRunProjects(dirs config.Dirs, storePath string) []restartCheckProject {
 		return append(projects, restartCheckProject{Name: filepath.Base(storePath), Error: err.Error(), Files: []string{}})
 	}
 	for _, dir := range dirList {
-		p := restartCheckProject{Name: filepath.Base(dir), Files: []string{}}
+		p := restartCheckProject{Name: tickets.ProjectName(dir), Files: []string{}}
 		changes, err := dryRunChanges(dirs, dir)
 		if err != nil {
 			p.Error = err.Error()

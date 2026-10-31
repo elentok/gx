@@ -203,7 +203,8 @@ func TestFixAgent_ProjectStartsOnFailedMigration(t *testing.T) {
 		t.Errorf("meta = %v", meta)
 	}
 	prompt, _ := meta["first_prompt"].(string)
-	for _, want := range []string{"/gx-investigate", "proj", "boom", "gx tickets migrate"} {
+	// The retry command carries the project dir in quotes; the bare command does not.
+	for _, want := range []string{"/gx-investigate", "proj", "boom", "gx tickets migrate '"} {
 		if !strings.Contains(prompt, want) {
 			t.Errorf("prompt %q lacks %q", prompt, want)
 		}
