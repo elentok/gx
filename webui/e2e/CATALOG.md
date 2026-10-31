@@ -1440,12 +1440,18 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   3. Mouse at 1280 px: read the modal size, header and footer; click Done.
 - **Pass:** a touch device reports `(pointer: coarse)`. At 390 px with touch the bar holds Done only (no pill, no Esc) and Done closes the editor. At 1280 px with touch the bar shows and the modal is at most 680 px high. At 1280 px with a mouse there is no bar; the modal is 860 by 680 with the title, "Saved as you type", Done and no x button; Done closes it.
 
-## 124. Vi editor: open and close
+## 124. Vi editor: open, close and submit
 
-- **Scenario:** `design-working` (the message box with no round). Vi mode is set with `gx vimode on|off`, then confirmed on the "Vi mode" menu item.
+- **Scenario:** `design-working` (the message box with no round). Vi mode is set with `gx vimode on|off`, then confirmed on the "Vi mode" menu item. The close tests start with `autoAdvanceDelay: "1h"` and wait for the 20 s first turn to end, because a working session disables the field. Two more tests start their own fixture: `agents` (the agent composer) and `design-text` (one free-text question, answer textarea "Answer to question 13").
 - **Steps:**
   1. At 390 px, start the design session and click "Note".
   2. Vi on: focus the message box and press Cmd-G (Ctrl-G off a Mac). Again with focus on the page body.
   3. Vi off: press Cmd-G in the field, with a `window` keydown listener that records `defaultPrevented`.
   4. Vi on: fill `hello world`, put the caret after `hello`, press Cmd-G, type `X`.
-- **Pass:** at 390 px the expand button shows. Vi on, Cmd-G in the field opens the editor; on the page body it opens nothing. Vi off, Cmd-G opens nothing and the keydown is not cancelled. The editor opens in INSERT and the typed `X` lands at the caret: the editor text reads `helloX world`.
+  5. At 1280 px, vi on: type text, press Escape then `ZZ`. Open again and press Cmd-G. Press the backdrop at 1280 px, then at 390 px.
+  6. Vi on and off at 1280 px with a mouse: click Done. In the editor press Escape in insert and in normal mode.
+  7. Fill `hello world`, open with the caret after `hello`, press End, then close by Done, Cmd-G, Escape then `ZZ`, and the backdrop.
+  8. Type in the editor, close it, press Send and read the `POST /v1/sessions/prompt` body.
+  9. On `agents` at 1280 px, fill the composer, open its editor, press Cmd-Enter.
+  10. On `design-text` start the design session, open the editor of "Answer to question 13", press Cmd-Enter. At 390 px on `design-working` press Cmd-Enter in the composer's editor.
+- **Pass:** at 390 px the expand button shows. Vi on, Cmd-G in the field opens the editor; on the page body it opens nothing. Vi off, Cmd-G opens nothing and the keydown is not cancelled. The editor opens in INSERT and the typed `X` lands at the caret: the editor text reads `helloX world`. `ZZ` in normal mode closes the editor and the field keeps the text; Cmd-G inside the editor closes it. A backdrop press closes at 1280 px and does nothing at 390 px. With a mouse at 1280 px, vi on and off, Done is visible and closes. Escape leaves the editor open in insert and in normal mode. After closing by Done, Cmd-G, `ZZ` or the backdrop the field has focus and its caret is the editor's (after the last character, or on it after `ZZ`, because Escape steps back). The field follows typing in the editor, and Send posts a body holding the text. In the agent composer Cmd-Enter closes the editor and sends the message. On a question's answer editor, and at 390 px in the composer's editor, Cmd-Enter does nothing: the editor stays open and no prompt is posted.
