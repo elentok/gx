@@ -480,8 +480,23 @@ func TestReadCompactBoundaries_ClassifiesEachState(t *testing.T) {
 		want      compactBoundarySnapshot
 	}{
 		{
-			name:  "Codex has no boundary signal",
+			name:  "Codex read count is confirmed",
 			agent: AgentCodex, sessionID: "sess-19", read: reads(4, true, nil),
+			want: compactBoundarySnapshot{state: compactBoundaryConfirmed, count: 4},
+		},
+		{
+			name:  "Codex read error is unavailable",
+			agent: AgentCodex, sessionID: "sess-19", read: reads(0, false, errors.New("read failed")),
+			want: compactBoundarySnapshot{state: compactBoundaryUnavailable},
+		},
+		{
+			name:  "Codex empty session id is unavailable",
+			agent: AgentCodex, sessionID: "", read: reads(4, true, nil),
+			want: compactBoundarySnapshot{state: compactBoundaryUnavailable},
+		},
+		{
+			name:  "Codex nil read dependency is unsupported",
+			agent: AgentCodex, sessionID: "sess-19", read: nil,
 			want: compactBoundarySnapshot{state: compactBoundaryUnsupported},
 		},
 		{
@@ -514,7 +529,11 @@ func TestReadCompactBoundaries_ClassifiesEachState(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := readCompactBoundaries(Deps{ReadCompactions: tc.read}, tc.agent, "/repo/iter-19", tc.sessionID)
+			d := Deps{ReadCompactions: tc.read}
+			if tc.agent == AgentCodex {
+				d = Deps{ReadCodexCompactions: tc.read}
+			}
+			got := readCompactBoundaries(d, tc.agent, "/repo/iter-19", tc.sessionID)
 			if got != tc.want {
 				t.Errorf("readCompactBoundaries() = %+v, want %+v", got, tc.want)
 			}
@@ -1494,11 +1513,11 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 		}
 	})
 
-	t.Run("Codex has no boundary signal and fails open", func(t *testing.T) {
+	t.Run("an agent with no boundary read wired fails open", func(t *testing.T) {
 		t.Parallel()
-		var sleeps int
 		r := breachRunner(nil)
-		d := stickyBaselineDeps(r, &sleeps, missing, noBoundarySinceSubmission)
+		var sleeps int
+		d := Deps{Runner: r, Sleep: func(time.Duration) { sleeps++ }}
 		p := gatedBreachParams(t.TempDir())
 		p.Agent = AgentCodex
 		recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
@@ -1510,6 +1529,59 @@ func TestRecoverSmartZoneBreach_MissingTranscriptVersusUnsupportedAgent(t *testi
 		}
 		if r.waits != 1 || sleeps != 0 {
 			t.Errorf("Runner.Wait calls = %d, gated sleeps = %d; want 1 and 0: an unsupported agent trusts the first idle tick", r.waits, sleeps)
+		}
+	})
+
+	t.Run("Codex rollout not written yet holds the gate closed", func(t *testing.T) {
+		t.Parallel()
+		var sleeps int
+		r := breachRunner(nil)
+		d := Deps{
+			Runner:                    r,
+			ReadCodexCompactions:      missing,
+			ReadCodexCompactionsAfter: func(string, string, time.Time) (int, bool, error) { return 0, false, nil },
+			Sleep:                     func(time.Duration) { sleeps++ },
+		}
+		p := gatedBreachParams(t.TempDir())
+		p.Agent = AgentCodex
+		recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+		if !errors.Is(err, errCompactNeverConfirmed) {
+			t.Fatalf("recoverSmartZoneBreach error = %v, want one wrapping errCompactNeverConfirmed", err)
+		}
+		if recovered {
+			t.Error("recovered = true, want false: an unreadable rollout confirms nothing")
+		}
+		if want := smartZoneCompactExtendedTimeoutMs / smartZonePollMs; sleeps != want {
+			t.Errorf("gated sleeps = %d, want %d: same extended bound as Claude", sleeps, want)
+		}
+	})
+
+	t.Run("Codex gate holds until the rollout shows a compacted item", func(t *testing.T) {
+		t.Parallel()
+		var sleeps, reads int
+		r := breachRunner(nil)
+		d := Deps{
+			Runner: r,
+			ReadCodexCompactions: func(string, string) (int, bool, error) {
+				reads++
+				if reads == 1 {
+					return 2, true, nil // baseline
+				}
+				if sleeps >= 3 {
+					return 3, true, nil
+				}
+				return 2, true, nil
+			},
+			Sleep: func(time.Duration) { sleeps++ },
+		}
+		p := gatedBreachParams(t.TempDir())
+		p.Agent = AgentCodex
+		recovered, err := recoverSmartZoneBreach(d, p, "sess-19", "smart-zone breach", 100)
+		if err != nil || !recovered {
+			t.Fatalf("recovered = %v, err = %v; want true, nil", recovered, err)
+		}
+		if sleeps < 3 {
+			t.Errorf("gated sleeps = %d, want >= 3: an idle pane must not end the wait before the boundary", sleeps)
 		}
 	})
 }

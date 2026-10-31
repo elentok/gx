@@ -368,17 +368,35 @@ type compactBoundarySnapshot struct {
 // would fail a Claude agent open — the single most likely way one merges in the
 // trust-the-pane bucket by accident.
 func readCompactBoundaries(d Deps, agent AgentKind, cwd, sessionID string) compactBoundarySnapshot {
-	if agent == AgentCodex || d.ReadCompactions == nil {
+	read := compactionReader(d, agent)
+	if read == nil {
 		return compactBoundarySnapshot{state: compactBoundaryUnsupported}
 	}
 	if sessionID == "" {
 		return compactBoundarySnapshot{state: compactBoundaryUnavailable}
 	}
-	count, ok, err := d.ReadCompactions(cwd, sessionID)
+	count, ok, err := read(cwd, sessionID)
 	if err != nil || !ok {
 		return compactBoundarySnapshot{state: compactBoundaryUnavailable}
 	}
 	return compactBoundarySnapshot{state: compactBoundaryConfirmed, count: count}
+}
+
+// compactionReader picks the agent's own boundary-count read; nil means the
+// agent has no boundary signal wired.
+func compactionReader(d Deps, agent AgentKind) func(cwd, sessionID string) (int, bool, error) {
+	if agent == AgentCodex {
+		return d.ReadCodexCompactions
+	}
+	return d.ReadCompactions
+}
+
+// compactionAfterReader is compactionReader for the "written since" read.
+func compactionAfterReader(d Deps, agent AgentKind) func(cwd, sessionID string, since time.Time) (int, bool, error) {
+	if agent == AgentCodex {
+		return d.ReadCodexCompactionsAfter
+	}
+	return d.ReadCompactionsAfter
 }
 
 // gates reports whether the boundary count is authoritative for this agent,
@@ -466,10 +484,11 @@ func (b *stickyBaseline) advancedPast(d Deps, p launchAndPromptParams, sessionID
 // that fails proves nothing and holds the gate closed, like every other
 // unconfirmed observation.
 func (b *stickyBaseline) boundaryMergedSince(d Deps, p launchAndPromptParams, sessionID string) bool {
-	if p.Agent == AgentCodex || d.ReadCompactionsAfter == nil || sessionID == "" {
+	read := compactionAfterReader(d, p.Agent)
+	if read == nil || sessionID == "" {
 		return false
 	}
-	count, ok, err := d.ReadCompactionsAfter(p.SessionCwd, sessionID, b.since)
+	count, ok, err := read(p.SessionCwd, sessionID, b.since)
 	return err == nil && ok && count > 0
 }
 
@@ -737,16 +756,15 @@ func emitContextOccupancy(d Deps, sink EventSink, agent AgentKind, identifier, c
 }
 
 // sessionCompactions reads how many compaction boundaries the selected
-// agent's transcript recorded. Codex sessions have no equivalent local
-// signal today, so a Codex agent always reports ok=false rather than
-// guessing; a missing observer or read failure is likewise treated as
-// "unknown" (count 0, omitted from frontmatter) rather than blocking the
+// agent's transcript recorded. A missing observer or read failure is treated
+// as "unknown" (count 0, omitted from frontmatter) rather than blocking the
 // ticket close it's stamped alongside.
 func sessionCompactions(d Deps, agent AgentKind, cwd, sessionID string) (int, bool, error) {
-	if sessionID == "" || agent == AgentCodex || d.ReadCompactions == nil {
+	read := compactionReader(d, agent)
+	if sessionID == "" || read == nil {
 		return 0, false, nil
 	}
-	return d.ReadCompactions(cwd, sessionID)
+	return read(cwd, sessionID)
 }
 
 // runnerRateLimit asks the runner whether p's agent is rate limited.

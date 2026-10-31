@@ -256,6 +256,17 @@ func TestDefaultDepsWithOverrides_CodexHomeOverridesContextAndRateLimitReads(t *
 		t.Errorf("ReadCodexContext() = (%d, %t), want (151000, true)", tokens, ok)
 	}
 
+	if n, ok, err := deps.ReadCodexCompactions("/repo/iter-01", "session-1"); err != nil || !ok || n != 0 {
+		t.Errorf("ReadCodexCompactions() = (%d, %t, %v), want (0, true, nil)", n, ok, err)
+	}
+	if n, ok, err := deps.ReadCodexCompactionsAfter("/repo/iter-01", "session-1", time.Time{}); err != nil || !ok || n != 0 {
+		t.Errorf("ReadCodexCompactionsAfter() = (%d, %t, %v), want (0, true, nil)", n, ok, err)
+	}
+	empty := DefaultDepsWithOverrides(DepsOverrides{})
+	if _, ok, err := empty.ReadCodexCompactions("/repo/iter-01", "session-1"); err != nil || ok {
+		t.Errorf("empty Codex home: ReadCodexCompactions ok=%t err=%v, want unavailable", ok, err)
+	}
+
 	limit, ok, err := deps.Runner.(*herdrrunner.Runner).CodexQuota("/repo/iter-01", "session-1")
 	if err != nil {
 		t.Fatalf("CodexQuota() error = %v", err)

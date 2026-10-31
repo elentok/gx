@@ -175,7 +175,7 @@ func TestCodexRolloutCommandsDriveDistinctPersistentTransitions(t *testing.T) {
 		t.Fatalf("trace snapshots do not expose post-interrupt idle, continuation, and final states: %+v", trace)
 	}
 	stats, ok, err := codexsession.ReadStatsIn(codexHome, cwd, rollout.SessionID())
-	if err != nil || !ok || stats.TotalTokens != 260_000 || stats.PeakContext != 180_001 || !stats.Start.Equal(codexRolloutEpoch) || !stats.End.Equal(codexRolloutEpoch.Add(3*time.Millisecond)) {
+	if err != nil || !ok || stats.TotalTokens != 260_000 || stats.PeakContext != 180_001 || !stats.Start.Equal(codexRolloutEpoch) || !stats.End.Equal(codexRolloutEpoch.Add(4*time.Millisecond)) {
 		t.Fatalf("final ReadStats = %+v, %v, %v; want deterministic complete rollout", stats, ok, err)
 	}
 }

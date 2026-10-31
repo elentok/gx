@@ -166,6 +166,10 @@ func (c *CodexRollout) wait(state *State, argv []string) (any, Identities, error
 		c.setStatus(state, "working")
 		return c.agentResult("working"), c.identities(), nil
 	case codexPhaseCompactContinuation:
+		// Real Codex records the boundary as a top-level `compacted` item.
+		if err := c.appendLine(map[string]any{"type": "compacted", "payload": map[string]any{}}); err != nil {
+			return nil, c.identities(), err
+		}
 		if err := c.writeUsage(c.opts.CompactedUsage); err != nil {
 			return nil, c.identities(), err
 		}

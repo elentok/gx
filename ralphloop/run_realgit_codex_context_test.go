@@ -19,6 +19,24 @@ import (
 	"github.com/elentok/gx/tickets/schema"
 )
 
+// appendCompactedItem appends the top-level `compacted` item Codex writes to a
+// rollout when /compact finishes, so the compaction gate can confirm it.
+func appendCompactedItem(t *testing.T, codexHome, sessionID string) {
+	t.Helper()
+	matches, err := filepath.Glob(filepath.Join(codexHome, "sessions", "*", "*", "*", "*"+sessionID+"*.jsonl"))
+	if err != nil || len(matches) != 1 {
+		t.Fatalf("rollout for %s under %s: %v, %v", sessionID, codexHome, matches, err)
+	}
+	f, err := os.OpenFile(matches[0], os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatalf("open rollout: %v", err)
+	}
+	defer f.Close()
+	if _, err := fmt.Fprintf(f, "{\"timestamp\":%q,\"type\":\"compacted\",\"payload\":{}}\n", time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+		t.Fatalf("append compacted item: %v", err)
+	}
+}
+
 // TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp drives
 // ticket 27's full Codex context-recovery E2E: one real-Git ticket through
 // production Run, with a real Codex rollout (ticket 26's herdrfake
@@ -201,8 +219,7 @@ func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.
 	}
 
 	// Acceptance criterion: ticket frontmatter and lifecycle events are
-	// correct, with compactions omitted (Codex has no reliable persisted
-	// compaction-count signal).
+	// correct, with the one compaction stamped.
 	ticketPath := filepath.Join(scratchDir, epicName, "issues", "01-context.md")
 	raw, err := os.ReadFile(ticketPath)
 	if err != nil {
@@ -218,8 +235,8 @@ func TestRun_ProductionRealGit_CodexContextRecoveryMergesAndCleansUp(t *testing.
 	if fmt.Sprint(frontmatter.Status) != "done" {
 		t.Errorf("ticket status = %v, want done", frontmatter.Status)
 	}
-	if strings.Contains(string(raw), "compactions:") {
-		t.Errorf("completed Codex ticket unexpectedly persisted compactions: %s", raw)
+	if !strings.Contains(string(raw), "compactions: 1") {
+		t.Errorf("completed Codex ticket did not stamp compactions: 1: %s", raw)
 	}
 
 	events, ok, err := ReadEvents(scratchDir, epicName)
@@ -387,6 +404,7 @@ func TestRun_ProductionRealGit_CodexNativeContextExhaustionRecovers(t *testing.T
 			return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "working", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
 		case "compacting":
 			phase = "compacted"
+			appendCompactedItem(t, codexHome, sessionID)
 			return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
 		case "done":
 			return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil

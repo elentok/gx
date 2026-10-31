@@ -159,6 +159,12 @@ type Deps struct {
 	// session launched in cwd, or ok=false until its local session data is
 	// complete enough to identify that worktree and session.
 	ReadCodexContext func(cwd, sessionID string) (tokens int, ok bool, err error)
+	// ReadCodexCompactions and ReadCodexCompactionsAfter are ReadCompactions and
+	// ReadCompactionsAfter for a Codex session, counting `compacted` rollout
+	// items. Nil means Codex has no boundary signal (unsupported); an unreadable
+	// rollout is ok=false (unavailable).
+	ReadCodexCompactions      func(cwd, sessionID string) (count int, ok bool, err error)
+	ReadCodexCompactionsAfter func(cwd, sessionID string, since time.Time) (count int, ok bool, err error)
 	// VerifyCodexSession confirms that sessionID's rollout metadata belongs to cwd.
 	VerifyCodexSession func(cwd, sessionID string) (ok bool, err error)
 	// Sleep is how a paused loop waits between poll checks.
@@ -322,6 +328,18 @@ func DefaultDepsWithOverrides(overrides DepsOverrides) Deps {
 				return 0, false, nil
 			}
 			return codexsession.LastContextTokensIn(overrides.CodexHome, cwd, sessionID)
+		},
+		ReadCodexCompactions: func(cwd, sessionID string) (int, bool, error) {
+			if overrides.CodexHome == "" {
+				return 0, false, nil
+			}
+			return codexsession.CountCompactionsIn(overrides.CodexHome, cwd, sessionID)
+		},
+		ReadCodexCompactionsAfter: func(cwd, sessionID string, since time.Time) (int, bool, error) {
+			if overrides.CodexHome == "" {
+				return 0, false, nil
+			}
+			return codexsession.CountCompactionsAfterIn(overrides.CodexHome, cwd, sessionID, since)
 		},
 		Sleep:      time.Sleep,
 		Now:        time.Now,

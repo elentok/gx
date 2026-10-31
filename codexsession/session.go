@@ -161,6 +161,69 @@ func LatestUsageIn(home, cwd, sessionID string) (sample UsageSample, ok bool, er
 	return sample, ok, nil
 }
 
+// CountCompactionsIn returns how many `compacted` items the rollout of
+// sessionID launched in cwd holds. A missing rollout, or one for another cwd,
+// returns ok=false.
+func CountCompactionsIn(home, cwd, sessionID string) (count int, ok bool, err error) {
+	return countCompactions(home, cwd, sessionID, time.Time{})
+}
+
+// CountCompactionsAfterIn counts the `compacted` items written at or after
+// since. Same ok rules as CountCompactionsIn.
+func CountCompactionsAfterIn(home, cwd, sessionID string, since time.Time) (count int, ok bool, err error) {
+	return countCompactions(home, cwd, sessionID, since)
+}
+
+func countCompactions(home, cwd, sessionID string, since time.Time) (count int, ok bool, err error) {
+	if cwd == "" || sessionID == "" {
+		return 0, false, nil
+	}
+	err = walkSessionFiles(home, sessionID, func(path string) error {
+		n, valid, readErr := readCompactions(path, cwd, sessionID, since)
+		if readErr != nil {
+			return readErr
+		}
+		if valid {
+			count, ok = count+n, true
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, false, err
+	}
+	return count, ok, nil
+}
+
+func readCompactions(path, cwd, sessionID string, since time.Time) (count int, ok bool, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, false, err
+	}
+	defer f.Close()
+
+	matchingSession := false
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	for scanner.Scan() {
+		var line sessionLine
+		if json.Unmarshal(scanner.Bytes(), &line) != nil {
+			continue
+		}
+		if line.Type == "session_meta" {
+			matchingSession = line.Payload.ID == sessionID && sameDir(line.Payload.Cwd, cwd)
+			ok = ok || matchingSession
+			continue
+		}
+		if matchingSession && line.Type == "compacted" && !line.Timestamp.Before(since) {
+			count++
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, false, err
+	}
+	return count, ok, nil
+}
+
 func readUsageSample(path, cwd, sessionID string) (sample UsageSample, ok bool, err error) {
 	f, err := os.Open(path)
 	if err != nil {

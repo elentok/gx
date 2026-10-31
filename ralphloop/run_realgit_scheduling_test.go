@@ -667,6 +667,7 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 			assertClaimed("compact completion")
 			compactComplete = true
 			phase = "compacted"
+			appendCompactedItem(t, filepath.Join(home, ".codex"), sessionID)
 			return map[string]any{"agent": map[string]any{"pane_id": "pane-01", "agent_status": "idle", "agent_session": map[string]any{"value": sessionID}}}, herdrfake.Identities{PaneID: "pane-01", SessionID: sessionID}, nil
 		case "finishing-up":
 			assertClaimed("post-compact occupancy")
@@ -736,8 +737,8 @@ func TestRun_ProductionRealGit_CodexCompactsThenCompletes(t *testing.T) {
 	if !strings.Contains(string(rawTicket), "status: done") {
 		t.Errorf("completed ticket = %s, want done", rawTicket)
 	}
-	if strings.Contains(string(rawTicket), "compactions:") {
-		t.Errorf("completed Codex ticket unexpectedly persisted compactions: %s", rawTicket)
+	if !strings.Contains(string(rawTicket), "compactions: 1") {
+		t.Errorf("completed Codex ticket did not stamp compactions: 1: %s", rawTicket)
 	}
 	if closedTabs != 1 {
 		t.Errorf("closed tabs = %d, want exactly one", closedTabs)
