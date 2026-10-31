@@ -1486,3 +1486,12 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   5. On `united` open Ready to design, click Triage on the first card, press Tab and Shift-Tab eight times each.
   6. On `paused` open the start-over dialog, press Tab and Shift-Tab eight times, press Escape. Open it again, open the Reason editor, press Escape.
 - **Pass:** Escape in the editor closes neither the editor nor the question sheet. The backdrop press closes only the editor; the start-over dialog stays. Cmd-K over the editor opens no Jump menu; after Done it opens "Jump to epic". Focus stays inside the editor on every Tab and Shift-Tab; with touch the cycle reaches Esc and Done. The text stays `ab` (no tab character). The editor is a dialog named "Message to the agent" with a textbox "Message to the agent text". In the Triage dialog and the start-over dialog focus never leaves. Escape closes the start-over dialog; with the editor open over it, Escape closes neither.
+
+## 127. Vi editor: setting
+
+- **Scenario:** `design-working`. The numbers in the flow list (121 in the ticket) were taken, so this flow is 127. Vi mode is flipped with `gx vimode on|off`.
+- **Steps:**
+  1. Open the top-right menu; read the "Vi mode" item; click it.
+  2. With it on, open a second page of the same browser context on the same URL; open its menu.
+  3. Turn vi on, wait out the first turn, fill `hello` with the caret after `he` and press Cmd-G. Read the mode text, text and caret. Run `gx vimode off`; read them again; press Escape and `x`. Run `gx vimode on`; press Escape and `x`.
+- **Pass:** the item is a checkbox, unchecked, then `aria-checked` is true after the click. The second page shows it checked. With the editor open the mode text reads INSERT, goes away on `off` and returns on `on`; the text stays `hello` and the caret stays at 2 throughout. With vi off Escape does nothing and `x` types (`hexllo`). With vi on Escape gives NORMAL and `x` deletes (`hllo`). The restart half of the check is a Go test.

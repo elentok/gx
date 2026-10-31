@@ -729,3 +729,69 @@ test.describe("126. Vi editor: layers and focus", () => {
     await expect(again).toBeVisible();
   });
 });
+
+const menuSwitch = (page: Page) => page.getByRole("menu", nav("Menu")).getByRole("menuitemcheckbox", nav("Vi mode"));
+
+test.describe("127. Vi editor: setting", () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test("the menu has a Vi mode switch that turns on", async ({ page, start }) => {
+    await start("design-working");
+    await expect(card(page, "design-epic")).toBeVisible();
+    await page.getByRole("button", nav("Menu")).click();
+    const item = menuSwitch(page);
+    await expect(item).toBeVisible();
+    await expect(item).toHaveAttribute("aria-checked", "false");
+    await item.click();
+    await expect(item).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("a second page of the same login shows the switch on", async ({ page, start }) => {
+    await start("design-working");
+    await expect(card(page, "design-epic")).toBeVisible();
+    await page.getByRole("button", nav("Menu")).click();
+    await menuSwitch(page).click();
+    await expect(menuSwitch(page)).toHaveAttribute("aria-checked", "true");
+
+    const second = await page.context().newPage();
+    await second.goto(page.url());
+    await expect(card(second, "design-epic")).toBeVisible();
+    await second.getByRole("button", nav("Menu")).click();
+    await expect(menuSwitch(second)).toHaveAttribute("aria-checked", "true");
+    await second.close();
+  });
+
+  test("flipping the setting with the editor open shows and hides vi at once", async ({ page, start }) => {
+    const fixture = await start("design-working");
+    await setViMode(fixture, page, true);
+    const { dialog } = await openWith(page, "hello", 2);
+    const editable = dialog.getByRole("textbox", nav(`${MESSAGE} text`));
+    const mode = dialog.getByTestId("vi-mode-text");
+    const same = async () => {
+      expect(await editorText(editable)).toBe("hello");
+      expect(await editorSelection(editable)).toEqual([2, 2]);
+    };
+    await expect(mode).toHaveText("INSERT");
+    await same();
+
+    await fixture.cli("vimode", "off");
+    await expect(mode).toHaveCount(0);
+    await same();
+    // Without vi, Escape does nothing and `x` types a letter.
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("x");
+    await expect(dialog).toBeVisible();
+    expect(await editorText(editable)).toBe("hexllo");
+    await page.keyboard.press("Backspace");
+    await same();
+
+    await fixture.cli("vimode", "on");
+    await expect(mode).toHaveText("INSERT");
+    await same();
+    await page.keyboard.press("Escape");
+    await expect(mode).toHaveText("NORMAL");
+    await page.keyboard.press("x");
+    // Vi `x` deletes the character under the caret instead of typing.
+    expect(await editorText(editable)).toBe("hllo");
+  });
+});
