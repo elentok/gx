@@ -65,6 +65,8 @@ export interface Fixture {
   globalConfig(): Promise<Record<string, any>>;
   /** The parsed `project.json` of `project` in the fixture's ticket store, read fresh on every call. */
   projectConfig(project: string): Promise<Record<string, any>>;
+  /** Merges `patch` into the top-level keys of `project`'s `project.json`. */
+  patchProjectConfig(project: string, patch: Record<string, unknown>): Promise<void>;
   /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
   launches(): Promise<string[][]>;
   /**
@@ -110,7 +112,7 @@ async function startFixture(
       process.env.GX_E2E_GX!,
       "--fakeclaude",
       process.env.GX_E2E_FAKECLAUDE!,
-      ...(fakecodex ? ["--fakecodex", process.env.GX_E2E_FAKECODEX!] : []),
+      ...(fakecodex ? ["--fakecodex", process.env.GX_E2E_FAKECODEX!] : ["--hide-codex"]),
       ...(hold ? ["--hold"] : []),
       ...(autoAdvanceDelay ? ["--auto-advance-delay", autoAdvanceDelay] : []),
       ...(stallThreshold ? ["--stall-threshold", stallThreshold] : []),
@@ -164,6 +166,11 @@ async function startFixture(
     },
     async projectConfig(project) {
       return JSON.parse(await readFile(join(env.XDG_DATA_HOME!, "gx", "tickets", project, "project.json"), "utf8"));
+    },
+    async patchProjectConfig(project, patch) {
+      const path = join(env.XDG_DATA_HOME!, "gx", "tickets", project, "project.json");
+      const next = { ...JSON.parse(await readFile(path, "utf8")), ...patch };
+      await writeFile(path, JSON.stringify(next, null, 2));
     },
     async launches() {
       const dir = join(env.HOME!, ".claude", "agentfake");

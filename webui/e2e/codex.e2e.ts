@@ -95,3 +95,62 @@ test("117. Default harness setting, headless note", async ({ page, start }) => {
   await go(page, "#/settings/agents");
   await expect(page.getByText("Codex runs on PTY")).toBeVisible();
 });
+
+const chips = (page: Page, epic: string) =>
+  page.locator(`a[href$="/t/demo:${epic}/01"]`).filter({ hasNotText: "→" }).locator("[data-chips]");
+const verdict = (page: Page, epic: string) =>
+  page.locator(`a[href$="/t/demo:${epic}/01"]`).filter({ hasNotText: "→" }).locator("[data-verdict]");
+
+test("118. Codex queue rows", async ({ page, start }) => {
+  test.setTimeout(240_000);
+  const fixture = await start("codex-queue");
+  await page.setViewportSize({ width: 640, height: 900 });
+
+  const expectRows = async () => {
+    await go(page, "#/e/demo:codex-running");
+    await expect(chips(page, "codex-running")).toContainText("Codex");
+    await expect(chips(page, "codex-running")).toContainText("Worker");
+    await go(page, "#/e/demo:claude-running");
+    await expect(chips(page, "claude-running")).toContainText("Claude");
+    await go(page, "#/e/demo:pinned");
+    await expect(chips(page, "pinned")).toContainText("Codex");
+    await expect(chips(page, "pinned")).toContainText("pinned");
+    await go(page, "#/e/demo:ran-on-claude");
+    await expect(chips(page, "ran-on-claude")).toContainText("Claude");
+    await expect(chips(page, "ran-on-claude")).toContainText("keeps Claude (ran before)");
+  };
+
+  await go(page, "#/e/demo:follows-default");
+  await expect(chips(page, "follows-default")).toContainText("follows default");
+  await expectRows();
+
+  await openAgentsSettings(page);
+  await control(page).getByRole("button", { name: "Codex" }).click();
+  await expect(control(page).getByRole("button", { name: "Codex" })).toHaveAttribute("aria-pressed", "true");
+
+  // The scenario's cap holds all three waiting tickets. One free slot goes to the first in queue order.
+  await fixture.patchProjectConfig("demo", { "max-agents": 3 });
+  await expect
+    .poll(async () => (await sessions(fixture)).filter((s) => (s.ticket ?? "").includes("follows-default")).map((s) => s.harness), {
+      timeout: 90_000,
+    })
+    .toEqual(["codex"]);
+  const all = await sessions(fixture);
+  const other = all.filter((s) => /pinned|ran-on-claude/.test(s.ticket ?? ""));
+  expect(other.map((s) => s.harness)).not.toContain("codex");
+  await expectRows();
+});
+
+test("118. Codex queue rows, codex missing from PATH", async ({ page, start }) => {
+  const fixture = await start("codex-queue", { fakecodex: false });
+  // The global cap is 4: take the other waiting tickets off the queue so the pinned one is judged on its harness.
+  await fixture.patchProjectConfig("demo", { "max-agents": 5 });
+  await fixture.cli("server", "queue", "remove", "demo:follows-default");
+  await fixture.cli("server", "queue", "remove", "demo:ran-on-claude");
+  await go(page, "#/e/demo:pinned");
+  await expect(verdict(page, "pinned")).toContainText("codex is not on PATH");
+  const text = (await verdict(page, "pinned").innerText()).trim();
+  const explained = await fixture.cli("server", "tickets", "explain", "demo:pinned/01");
+  expect(explained).toContain("codex is not on PATH");
+  expect(explained).toContain(text.replace(/^.*?(codex is not on PATH)/s, "$1"));
+});

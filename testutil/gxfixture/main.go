@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -123,9 +124,11 @@ func main() {
 func run(args []string) (err error) {
 	var gxBin, fakeBin, fakeCodexBin, name, autoAdvance, stallThreshold, mockDir string
 	var configs []string
-	var hold, shellEnv bool
+	var hold, shellEnv, hideCodex bool
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
+		case "--hide-codex":
+			hideCodex = true
 		case "--hold":
 			hold = true
 		case "--env":
@@ -201,7 +204,8 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
-	// Without the flag codex stays off PATH, which is how a host without Codex looks.
+	// Without the flag codex stays off PATH, which is how a host without Codex looks. A scenario that
+	// needs codex has it anyway; --hide-codex takes it off PATH once the scenario is seeded.
 	if fakeCodexBin != "" || sc.codex {
 		if fakeCodexBin, err = binary(fakeCodexBin, filepath.Join(root, "codex"), "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex"); err != nil {
 			return err
@@ -251,6 +255,11 @@ func run(args []string) (err error) {
 	}
 	if err := f.seed(sc); err != nil {
 		return err
+	}
+	if hideCodex {
+		if err := os.Remove(filepath.Join(binDir, "codex")); err != nil {
+			return err
+		}
 	}
 	// The running server has no test clock, so the old logins are written first.
 	if len(sc.extraLogins) > 0 {
@@ -476,6 +485,35 @@ type fixture struct {
 	codex bool
 }
 
+// hostPathWithoutCodex is the caller's PATH with a real codex hidden, so a fixture
+// without --fakecodex looks like a host without Codex. A directory that holds
+// codex is replaced by a directory of symlinks to everything else in it, which
+// keeps git and the other tools beside it reachable.
+func hostPathWithoutCodex(root string) string {
+	var out []string
+	for i, dir := range filepath.SplitList(os.Getenv("PATH")) {
+		if _, err := os.Lstat(filepath.Join(dir, "codex")); err != nil {
+			out = append(out, dir)
+			continue
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		shadow := filepath.Join(root, "hostbin", strconv.Itoa(i))
+		if os.MkdirAll(shadow, 0o755) != nil {
+			continue
+		}
+		for _, e := range entries {
+			if e.Name() != "codex" {
+				_ = os.Symlink(filepath.Join(dir, e.Name()), filepath.Join(shadow, e.Name()))
+			}
+		}
+		out = append(out, shadow)
+	}
+	return strings.Join(out, string(os.PathListSeparator))
+}
+
 // isolatedEnv is the process environment with every variable that could reach
 // the real HOME, config, state or Claude config replaced, and the ones that
 // make a nested agent act differently dropped.
@@ -501,7 +539,7 @@ func isolatedEnv(root, binDir string) (env, cliEnv []string) {
 	}
 	env = append(env, cliEnv...)
 	env = append(env,
-		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"PATH="+binDir+string(os.PathListSeparator)+hostPathWithoutCodex(root),
 		"GIT_CONFIG_GLOBAL="+os.DevNull,
 		osnotify.OffEnv+"=off",
 		"GIT_AUTHOR_NAME=gxfixture", "GIT_AUTHOR_EMAIL=gxfixture@example.com",

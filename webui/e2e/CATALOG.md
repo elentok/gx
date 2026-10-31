@@ -15,7 +15,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, ...), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -1329,3 +1329,12 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
   4. On the Agents tab, create a session with "+ New session" (the form has no harness picker).
   5. Open a Claude, the new Codex and the switched session.
 - **Pass:** the control shows Claude selected, `gx` has an override chip with Remove override, `demo` and `dotfiles` inherit with Override. The notice reads "Default is now Codex. 1 waiting ticket and the next design step will use it. N running agents keep Claude." The global config has `agents.default-harness` `codex` and keeps `agent-runner` and `server`. `dotfiles` gets the key `agents.default-harness`, then loses it, and keeps its other keys. The new session lists `harness` `codex`. Session headers read harness, tier and `model · effort`; the switched one adds "switched by hand". Under `headless` the page notes "Codex runs on PTY". With no model for the tier a session reads "Worker · CLI default". The herdr note is a vitest check.
+
+## 118. Codex queue rows
+
+- **Scenario:** `codex-queue` (one running Codex ticket, one running Claude ticket, and three waiting: no pin, pinned to Codex, ran before on Claude). A second test starts it with `fakecodex: false`.
+- **Steps:**
+  1. Open each ticket's epic page and read the row chips.
+  2. Switch the Default harness to Codex in Settings, Agents. Raise the `demo` cap by one so a single waiting ticket can claim.
+  3. Second test: raise the cap, take the unpinned and ran-before tickets off the queue, open the `pinned` epic, and run `gx server tickets explain demo:pinned/01`.
+- **Pass:** the Codex running row reads `Codex` and `Worker`; the unpinned waiting row reads `follows default`; the pinned row reads `Codex` and `pinned`; the ran-before row reads `Claude` and `keeps Claude (ran before)`. After the switch only the unpinned ticket gets a Codex session; the other rows are unchanged. With Codex off PATH the pinned ticket's verdict reads `codex is not on PATH ...` and `explain` shows the same text.
