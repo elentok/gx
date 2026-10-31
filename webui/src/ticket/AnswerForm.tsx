@@ -1,8 +1,9 @@
-import { Box, Text, Textarea } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { ActionAnswer, type DetailOption, type TicketDetail } from "../generated/server";
 import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
+import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import { postAnswer, ReasonStale, sentOf, type PostAnswer, type Sent } from "./answer";
 
 interface Choice {
@@ -96,12 +97,13 @@ export function AnswerForm({
       role="form"
     >
       {isText ? (
-        <Textarea
-          aria-label="Your answer"
+        <ExpandableTextField
+          label="Your answer"
+          title="Your answer"
           placeholder="Your answer"
           value={text}
           disabled={pending}
-          onChange={(e) => setText(e.target.value)}
+          onChange={setText}
         />
       ) : (
         choicesOf(latest).map((c) => (
@@ -137,12 +139,13 @@ export function AnswerForm({
       )}
       {/* A free-text answer is the note already. */}
       {!isText && (
-        <Textarea
-          aria-label="Note (optional)"
+        <ExpandableTextField
+          label="Note (optional)"
+          title="Note on your answer"
           placeholder="Note (optional)"
           value={note}
           disabled={pending}
-          onChange={(e) => setNote(e.target.value)}
+          onChange={setNote}
         />
       )}
       {error && <Text role="alert">{error}</Text>}

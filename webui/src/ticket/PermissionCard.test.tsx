@@ -3,12 +3,15 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import canned from "../canned-detail.json";
 import type { PermissionCard as Card, TicketDetail } from "../generated/server";
+import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import { renderThemed } from "../ui/render";
 import { system } from "../ui/theme";
 import { PermissionCard } from "./PermissionCard";
 import type { DecisionBody, PostDecision } from "./permission";
 
 afterEach(cleanup);
+
+const EXPAND = "Open the note in a large editor";
 
 const base = canned as TicketDetail;
 const card: Card = { request_id: "req-1", tool: "Bash", description: "Run a command", input: "rm -rf build" };
@@ -21,7 +24,22 @@ test("renders the tool, description and input with only Allow once and Deny", ()
   expect(screen.getByText("Run a command")).toBeTruthy();
   expect(screen.getByLabelText("Tool input").textContent).toBe("rm -rf build");
   const buttons = screen.getAllByRole("button").map((b) => b.textContent);
-  expect(buttons).toEqual(["Allow once", "Deny"]);
+  expect(buttons).toEqual(["", "Allow once", "Deny"]);
+});
+
+test("the deny note has an expand button; its editor shares the text and pending disables both", async () => {
+  let release: () => void = () => {};
+  const post = vi.fn<(b: DecisionBody) => ReturnType<PostDecision>>(() => new Promise((r) => (release = () => r({}))));
+  renderThemed(<PermissionCard detail={withCard(card)} post={post} />);
+  fireEvent.click(screen.getByRole("button", { name: EXPAND }));
+  typeInLargeEditor("Note for Deny", "from editor");
+  expect((screen.getByLabelText("Note for Deny (optional)") as HTMLTextAreaElement).value).toBe("from editor");
+  fireEvent.click(screen.getByRole("button", { name: "Deny" }));
+  await waitFor(() => expect(post).toHaveBeenCalled());
+  expect(post).toHaveBeenCalledWith({ address: "gx:demo/12", decision: "deny", request_id: "req-1", text: "from editor" });
+  expect((screen.getByLabelText("Note for Deny (optional)") as HTMLTextAreaElement).disabled).toBe(true);
+  expect((screen.getAllByRole("button", { name: EXPAND })[0] as HTMLButtonElement).disabled).toBe(true);
+  release();
 });
 
 test("renders nothing without a pending prompt", () => {
@@ -84,4 +102,5 @@ test("an unsupported dialog shows the TUI hint with no buttons", () => {
   renderThemed(<PermissionCard detail={withCard(hinted)} post={ok} />);
   expect(screen.getByText("Approve it in the TUI")).toBeTruthy();
   expect(screen.queryAllByRole("button")).toHaveLength(0);
+  expect(screen.queryByLabelText("Note for Deny (optional)")).toBeNull();
 });

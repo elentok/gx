@@ -3,6 +3,7 @@ import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import canned from "../canned-detail.json";
 import type { DetailRound, TicketDetail } from "../generated/server";
+import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import { renderThemed } from "../ui/render";
 import { system } from "../ui/theme";
 import { AppToaster } from "../ui/toaster";
@@ -10,6 +11,8 @@ import type { AnswerBody, PostAnswer } from "./answer";
 import { AnswerForm } from "./AnswerForm";
 
 afterEach(cleanup);
+
+const EXPAND = "Open the note in a large editor";
 
 const base = canned as TicketDetail;
 const withLatest = (latest: Partial<DetailRound>): TicketDetail => ({
@@ -69,6 +72,38 @@ test("text posts the typed text", async () => {
   expect(post).toHaveBeenCalledWith({ address: "gx:demo/12", state: "tok-1", text: "Redis" });
 });
 
+test("the answer field has an expand button; its editor shares the text and the sent body", async () => {
+  const post = vi.fn<(b: AnswerBody) => ReturnType<PostAnswer>>(ok);
+  renderThemed(<AnswerForm detail={withLatest({ kind: "text" })} post={post} />);
+  const field = screen.getByLabelText("Your answer") as HTMLTextAreaElement;
+  expect(field.placeholder).toBe("Your answer");
+  fireEvent.click(screen.getByRole("button", { name: EXPAND }));
+  typeInLargeEditor("Your answer", "from editor");
+  expect(field.value).toBe("from editor");
+  fireEvent.click(screen.getByRole("button", { name: "Send answer" }));
+  await waitFor(() => expect(post).toHaveBeenCalled());
+  expect(post).toHaveBeenCalledWith({ address: "gx:demo/12", state: "tok-1", text: "from editor" });
+});
+
+test("the note has an expand button; its editor shares the text and the sent body", async () => {
+  const post = vi.fn<(b: AnswerBody) => ReturnType<PostAnswer>>(ok);
+  renderThemed(<AnswerForm detail={withLatest({ kind: "yes-no" })} post={post} />);
+  const field = screen.getByLabelText("Note (optional)") as HTMLTextAreaElement;
+  expect(field.placeholder).toBe("Note (optional)");
+  fireEvent.click(screen.getByRole("button", { name: EXPAND }));
+  typeInLargeEditor("Note on your answer", "from editor");
+  expect(field.value).toBe("from editor");
+  fireEvent.click(screen.getByRole("button", { name: "Yes" }));
+  fireEvent.click(screen.getByRole("button", { name: "Send answer" }));
+  await waitFor(() => expect(post).toHaveBeenCalled());
+  expect(post).toHaveBeenCalledWith({ address: "gx:demo/12", state: "tok-1", choice: "yes", note: "from editor" });
+});
+
+test("choice questions show no answer field", () => {
+  renderThemed(<AnswerForm detail={withLatest({ kind: "yes-no" })} post={vi.fn(ok)} />);
+  expect(screen.queryByLabelText("Your answer")).toBeNull();
+});
+
 test("controls are disabled while the request runs", async () => {
   let release: () => void = () => {};
   const post: PostAnswer = () => new Promise((r) => (release = () => r({ outcome: "answered" })));
@@ -78,6 +113,7 @@ test("controls are disabled while the request runs", async () => {
   await waitFor(() => expect((screen.getByRole("button", { name: "No" }) as HTMLButtonElement).disabled).toBe(true));
   expect((screen.getByRole("button", { name: "Send answer" }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByLabelText("Note (optional)") as HTMLTextAreaElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: EXPAND }) as HTMLButtonElement).disabled).toBe(true);
   release();
   await waitFor(() => expect(screen.queryByRole("button", { name: "Send answer" })).toBeNull());
 });

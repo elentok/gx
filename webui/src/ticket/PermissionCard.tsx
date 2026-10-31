@@ -1,8 +1,9 @@
-import { Box, Code, Text, Textarea } from "@chakra-ui/react";
+import { Box, Code, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import type { TicketDetail } from "../generated/server";
 import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
+import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import { postDecision, type Decision, type PostDecision } from "./permission";
 
 // The pending permission prompt of a blocked agent. Only Allow once and Deny: a standing
@@ -86,12 +87,13 @@ export function PermissionCard({
         <Text color="fg.muted">{card.hint}</Text>
       ) : (
         <>
-          <Textarea
-            aria-label="Note for Deny (optional)"
+          <ExpandableTextField
+            label="Note for Deny (optional)"
+            title="Note for Deny"
             placeholder="Note for Deny (optional)"
             value={note}
             disabled={pending}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={setNote}
           />
           <Box display="flex" gap="2">
             <Button disabled={pending} onClick={() => decide("allow")}>
