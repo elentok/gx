@@ -4,6 +4,9 @@ import (
 	"os"
 	"time"
 
+	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/codexsession"
+	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -17,16 +20,26 @@ const turnSettlePoll = 50 * time.Millisecond
 type turnMark struct {
 	path string
 	size int64
+	kind agentrunner.Kind
+}
+
+// turnEnded says whether the transcript at path holds its turn's end line, by
+// the format kind of the session.
+func (m turnMark) turnEnded() (bool, error) {
+	if m.kind == harness.Codex {
+		return codexsession.TurnEnded(m.path)
+	}
+	return transcript.TurnEnded(m.path)
 }
 
 // markTurn records the transcript of a session that just went idle. A session
 // whose harness has no chat, or no transcript yet, is not marked.
 func (s *Server) markTurn(dir, id string) (turnMark, bool) {
 	meta, err := readSessionMeta(dir)
-	if err != nil || meta.Harness != s.settings.Load().chatHarness() {
+	if err != nil || !s.settings.Load().hasChatReader(meta.Harness) {
 		return turnMark{}, false
 	}
-	path, ok := s.claudeTranscript(id, meta)
+	path, kind, ok := s.chatTranscript(id, meta)
 	if !ok {
 		return turnMark{}, false
 	}
@@ -34,7 +47,7 @@ func (s *Server) markTurn(dir, id string) (turnMark, bool) {
 	if err != nil {
 		return turnMark{}, false
 	}
-	return turnMark{path: path, size: info.Size()}, true
+	return turnMark{path: path, size: info.Size(), kind: kind}, true
 }
 
 // settleTurn waits for claude to finish writing the turn that just ended.
@@ -50,7 +63,7 @@ func (s *Server) settleTurn(dir, id string, mark turnMark, design designRef, can
 	defer tick.Stop()
 wait:
 	for {
-		if ended, err := transcript.TurnEnded(mark.path); err != nil || ended {
+		if ended, err := mark.turnEnded(); err != nil || ended {
 			break
 		}
 		select {

@@ -165,7 +165,7 @@ func TestSessionChat_NonChatHarnessIsUnsupported(t *testing.T) {
 func startCodexChatSession(t *testing.T) (*servertest.Harness, context.Context, string, string) {
 	t.Helper()
 	codexHome := t.TempDir()
-	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)), servertest.WithEnv("CODEX_HOME="+codexHome))
+	h := servertest.StartWithStore(t, t.TempDir(), servertest.WithTestHolder(), servertest.WithChatHarness(string(agentfake.HarnessKind)), servertest.WithDefaultHarness(string(agentfake.HarnessKind)), servertest.WithChatPollInterval(chatPollTestInterval), servertest.WithEnv("CODEX_HOME="+codexHome))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	t.Cleanup(cancel)
 	res, err := h.Client.CreateSession(ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind)})

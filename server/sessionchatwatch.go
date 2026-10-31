@@ -93,9 +93,9 @@ func (p *chatPoll) run(stop <-chan struct{}, done chan<- struct{}) {
 
 func (p *chatPoll) transcript() string {
 	meta, err := readSessionMeta(p.dir)
-	if err != nil || meta.Harness != p.s.settings.Load().chatHarness() {
+	if err != nil || !p.s.settings.Load().hasChatReader(meta.Harness) {
 		return ""
 	}
-	path, _ := p.s.claudeTranscript(p.id, meta)
+	path, _, _ := p.s.chatTranscript(p.id, meta)
 	return path
 }

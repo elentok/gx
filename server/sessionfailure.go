@@ -96,11 +96,12 @@ func (s *Server) sessionInfo(m sessionMeta) SessionInfo {
 	return info
 }
 
-// transcriptFailure is the auth or stalled failure of a session of the chat
-// harness, the only one whose transcript is claude's.
+// transcriptFailure is the auth or stalled failure of a session on the Claude
+// transcript format (Claude, or the chat-harness test seam). Codex errors and
+// stalls are read elsewhere.
 func (s *Server) transcriptFailure(m sessionMeta) *SessionFailure {
 	state := m.Status.State
-	if state != SessionIdle && state != SessionWorking || m.Harness != s.settings.Load().chatHarness() {
+	if state != SessionIdle && state != SessionWorking || m.Harness == string(harness.Codex) || !s.settings.Load().hasChatReader(m.Harness) {
 		return nil
 	}
 	path, ok := s.claudeTranscript(m.ID, m)

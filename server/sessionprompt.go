@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/elentok/gx/events"
-	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/ralphloop"
 )
 
@@ -93,7 +92,7 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 	if req.Continue && !meta.Design {
 		return sessionRefusal(ReasonSessionNotDesign, fmt.Sprintf("session %s is not a design session", req.ID)), nil
 	}
-	if meta.Harness != s.settings.Load().chatHarness() {
+	if !s.settings.Load().hasChatReader(meta.Harness) {
 		return sessionRefusal(ReasonPromptHarnessNotSupported, fmt.Sprintf("session %s runs a harness with no chat", req.ID)), nil
 	}
 	text, refusal := validatePromptText(req.Text, "text")
@@ -166,12 +165,12 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 // lastChatMessageID is the id of the newest visible message of the session's
 // chat, or "" with none.
 func (s *Server) lastChatMessageID(id string, meta sessionMeta) (string, error) {
-	path, ok := s.claudeTranscript(id, meta)
+	path, kind, ok := s.chatTranscript(id, meta)
 	if !ok {
 		return "", nil
 	}
 	final := s.designFinal(meta.Ticket)
-	chat, err := s.chats.read(path, final, chatLoader(harness.Claude, meta.Ticket, final))
+	chat, err := s.chats.read(path, final, chatLoader(kind, meta.Ticket, final))
 	if os.IsNotExist(err) || len(chat.msgs) == 0 {
 		return "", nil
 	}
