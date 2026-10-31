@@ -6,7 +6,15 @@ import (
 	"time"
 )
 
-const ticketLockTimeout = 10 * time.Second
+// ticketLockTimeout is a var so tests can shorten it.
+var ticketLockTimeout = 10 * time.Second
+
+// SetLockTimeoutForTest shortens the lock wait and returns a restore func.
+func SetLockTimeoutForTest(d time.Duration) (restore func()) {
+	old := ticketLockTimeout
+	ticketLockTimeout = d
+	return func() { ticketLockTimeout = old }
+}
 
 // LockTicket takes an exclusive per-ticket lock (a sidecar "<path>.lock" file,
 // same O_EXCL scheme as tickets.LockEpic) and returns its unlock func. Every

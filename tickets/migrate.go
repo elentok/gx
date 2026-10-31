@@ -36,6 +36,9 @@ type migratedTicketFile struct {
 	notes     []string
 	// inMapEpic keeps an old needs-answer / needs-repair status as stored.
 	inMapEpic bool
+	// mtime is the collect-time fallback for claimed_at and done_at, kept so
+	// the locked re-run uses the same value.
+	mtime time.Time
 }
 
 // Migrate rewrites every ticket under scratchRoot into the post-refactor
@@ -138,6 +141,7 @@ func collectMigration(root string, archived bool, epics *[]Epic, files *[]migrat
 				newTicket: newTicket,
 				notes:     notes,
 				inMapEpic: isMap,
+				mtime:     mtime,
 			})
 
 			epic.Tickets = append(epic.Tickets, Ticket{
@@ -176,29 +180,89 @@ func validateMigration(files []migratedTicketFile, epics []Epic) error {
 	return errors.Join(errs...)
 }
 
+// beforeMigrationWrite runs between the collect/validate pass and the locked
+// write pass. Tests use it to land a concurrent write in that window.
+var beforeMigrationWrite func()
+
 // writeMigration writes only the files that actually changed (non-empty
 // notes) — a file migrateTicket left untouched keeps its exact original
 // bytes rather than being rewritten to a byte-identical copy.
+//
+// The collect pass read the files without a lock, so by now they may be
+// stale. Every changed file is locked in path order (a lock timeout fails
+// the run before anything is written), then re-read, re-migrated and
+// re-validated under its lock, and only then are all of them written.
 func writeMigration(files []migratedTicketFile) (MigrationResult, error) {
-	var result MigrationResult
+	if beforeMigrationWrite != nil {
+		beforeMigrationWrite()
+	}
+	var changed []migratedTicketFile
 	for _, f := range files {
-		if len(f.notes) == 0 {
+		if len(f.notes) > 0 {
+			changed = append(changed, f)
+		}
+	}
+	sort.Slice(changed, func(i, j int) bool { return changed[i].path < changed[j].path })
+
+	var unlocks []func()
+	defer func() {
+		for _, unlock := range unlocks {
+			unlock()
+		}
+	}()
+	for _, f := range changed {
+		unlock, err := schema.LockTicket(f.path)
+		if err != nil {
+			return MigrationResult{}, err
+		}
+		unlocks = append(unlocks, unlock)
+	}
+
+	type pendingWrite struct {
+		path  string
+		out   []byte
+		notes []string
+	}
+	var pending []pendingWrite
+	var errs []error
+	for _, f := range changed {
+		raw, err := os.ReadFile(f.path)
+		if err != nil {
+			return MigrationResult{}, fmt.Errorf("reading %s: %w", f.path, err)
+		}
+		old, err := schema.ParseTicketRaw(string(raw), f.path)
+		if err != nil {
+			return MigrationResult{}, fmt.Errorf("parsing %s: %w", f.path, err)
+		}
+		fresh, notes := migrateTicket(old, f.mtime)
+		if err := schema.Validate(fresh); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", f.path, err))
+			continue
+		}
+		if len(notes) == 0 {
 			continue
 		}
 		marshal := schema.MarshalTicket
 		if f.inMapEpic {
 			marshal = schema.MarshalTicketUnshimmed
 		}
-		out, err := marshal(f.newTicket, f.body)
+		out, err := marshal(fresh, schema.ParseBody(string(raw)))
 		if err != nil {
 			return MigrationResult{}, fmt.Errorf("marshaling %s: %w", f.path, err)
 		}
-		if err := fsutil.WriteFileAtomic(f.path, out); err != nil {
-			return MigrationResult{}, fmt.Errorf("writing %s: %w", f.path, err)
-		}
-		result.Changes = append(result.Changes, MigrationChange{Path: f.path, Notes: f.notes})
+		pending = append(pending, pendingWrite{path: f.path, out: out, notes: notes})
 	}
-	sort.Slice(result.Changes, func(i, j int) bool { return result.Changes[i].Path < result.Changes[j].Path })
+	if err := errors.Join(errs...); err != nil {
+		return MigrationResult{}, err
+	}
+
+	var result MigrationResult
+	for _, p := range pending {
+		if err := fsutil.WriteFileAtomic(p.path, p.out); err != nil {
+			return MigrationResult{}, fmt.Errorf("writing %s: %w", p.path, err)
+		}
+		result.Changes = append(result.Changes, MigrationChange{Path: p.path, Notes: p.notes})
+	}
 	return result, nil
 }
 
