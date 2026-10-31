@@ -53,3 +53,30 @@ func TestSessionPrompt_CodexIsRefusedWhileWorkingAndTypedAtIdle(t *testing.T) {
 		t.Fatalf("prompt while working = %+v, want %s", res, server.ReasonSessionNotIdle)
 	}
 }
+
+// A Codex turn that leaves a background terminal reaches the snapshot as
+// Working with Background (the Agents row shows +bg from that), and it takes a
+// prompt.
+func TestSessionPrompt_CodexBackgroundAgentIsMarkedAndTakesAPrompt(t *testing.T) {
+	t.Parallel()
+	f := startCodexPromptSession(t)
+	if res := f.prompt(t, "start it"); res.Refused {
+		t.Fatalf("prompt at idle = %+v", res)
+	}
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	for _, c := range []agentfake.Control{
+		{Action: agentfake.ActionBackground, Running: true},
+		{Action: agentfake.ActionFinish},
+	} {
+		if err := agentfake.SendProgramControl(f.conv, c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	s := waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.Background })
+	if s.Status.State != server.SessionWorking {
+		t.Errorf("state = %s, want working with the background mark", s.Status.State)
+	}
+	if res := f.prompt(t, "and then"); res.Refused {
+		t.Fatalf("prompt to a background agent = %+v", res)
+	}
+}

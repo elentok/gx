@@ -1781,6 +1781,39 @@ func TestWaitForFinish_BackgroundTaskAgesOutAndFallsThrough(t *testing.T) {
 	}
 }
 
+// A Codex agent has no transcript marker, so the Claude gate never reads or
+// holds: a Codex turn that ends with a terminal running finishes at turn end.
+func TestWaitForFinish_BackgroundTaskGateDoesNotHoldACodexAgent(t *testing.T) {
+	t.Parallel()
+	scratchDir := epicScratchDir(t, "epic")
+	var sleeps, reads int
+	readBackgroundTasks := func(string, string) (transcript.BackgroundTaskReading, error) {
+		reads++
+		return transcript.BackgroundTaskReading{
+			Markers: []transcript.BackgroundTaskMarker{{TaskID: "task-1", Status: transcript.BackgroundTaskOutstandingFresh}},
+		}, nil
+	}
+	d := idleBackgroundTaskDeps(readBackgroundTasks, &sleeps)
+	p := backgroundTaskGateParams(scratchDir)
+	p.Agent = AgentCodex
+
+	if err := waitForFinish(d, p, "sess-30"); err != nil {
+		t.Fatalf("waitForFinish: %v, want a plain finish", err)
+	}
+	if reads != 0 {
+		t.Errorf("ReadBackgroundTasks calls = %d, want 0 for Codex", reads)
+	}
+	events, _, err := ReadEvents(scratchDir, "epic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ev := range events {
+		if ev.Type == string(eventsc.BackgroundTaskGateHeld) {
+			t.Errorf("got a %s event for a Codex agent", ev.Type)
+		}
+	}
+}
+
 // TestWaitForFinish_BackgroundTaskGateReleaseRechecksIdle covers the false-
 // finish this gate can otherwise produce: a background task resolving only
 // proves that one task's own notification merged, not that the agent's
