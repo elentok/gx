@@ -76,6 +76,23 @@ func ParseDialog(rows []string) Dialog {
 		return Dialog{}
 	}
 
+	header, body := headerAndBody(rows, q)
+	d := Dialog{
+		Header:   header,
+		Body:     body,
+		Question: Normalize(rows[q]),
+		Options:  options,
+	}
+	if approvableHeaders[header] && options[0] == "Yes" {
+		d.Approvable = true
+		d.ID = dialogID(header, body)
+	}
+	return d
+}
+
+// headerAndBody reads the title and body between the last rule above the
+// question row q and the question.
+func headerAndBody(rows []string, q int) (header, body string) {
 	start := 0
 	for i := q - 1; i >= 0; i-- {
 		if isRule(rows[i]) {
@@ -83,8 +100,7 @@ func ParseDialog(rows []string) Dialog {
 			break
 		}
 	}
-	var header string
-	var body []string
+	var lines []string
 	for _, row := range rows[start:q] {
 		t := strings.TrimSpace(row)
 		switch {
@@ -92,22 +108,99 @@ func ParseDialog(rows []string) Dialog {
 		case header == "":
 			header = Normalize(t)
 		default:
-			body = append(body, t)
+			lines = append(lines, t)
 		}
 	}
+	return header, Normalize(lines...)
+}
 
-	d := Dialog{
+func dialogID(header, body string) string {
+	sum := sha256.Sum256([]byte(header + "\n" + body))
+	return hex.EncodeToString(sum[:8])
+}
+
+// DialogKind says what a dialog read by ReadDialog asks.
+type DialogKind string
+
+const (
+	DialogUnreadable DialogKind = ""
+	DialogPermission DialogKind = "permission"
+	DialogPlan       DialogKind = "plan"
+)
+
+// DialogView is any numbered-option dialog on screen, whatever its header.
+// The zero value (Kind DialogUnreadable) means no such dialog was found.
+type DialogView struct {
+	Kind     DialogKind
+	Header   string
+	Body     string
+	Question string
+	Options  []string
+	// Cursor is the 0-based index of the option the ❯ cursor is on, or -1.
+	Cursor int
+	// PlainYes is true when option 1 is exactly "Yes".
+	PlainYes bool
+	// ID hashes Header and Body, like Dialog.ID. Empty when unreadable.
+	ID string
+}
+
+const planQuestionPrefix = "Claude has written up a plan"
+
+func isQuestionRow(t string) bool {
+	return (strings.HasPrefix(t, "Do you want") && strings.HasSuffix(t, "?")) ||
+		(strings.HasPrefix(t, planQuestionPrefix) && strings.HasSuffix(t, "?"))
+}
+
+// ReadDialog reads the last question line on screen plus the numbered options
+// under it. Unlike ParseDialog it needs no "Esc to cancel" row and applies no
+// header limit; it never decides whether a dialog may be approved.
+func ReadDialog(rows []string) DialogView {
+	q := -1
+	for i := len(rows) - 1; i >= 0; i-- {
+		if isQuestionRow(strings.TrimSpace(rows[i])) {
+			q = i
+			break
+		}
+	}
+	if q < 0 {
+		return DialogView{}
+	}
+
+	var options []string
+	cursor := -1
+	for _, row := range rows[q+1:] {
+		t := strings.TrimSpace(row)
+		if t == "" {
+			continue
+		}
+		m := optionRow.FindStringSubmatch(t)
+		if m == nil || m[1] != strconv.Itoa(len(options)+1) {
+			break
+		}
+		if strings.HasPrefix(t, "❯") {
+			cursor = len(options)
+		}
+		options = append(options, strings.TrimSpace(m[2]))
+	}
+	if len(options) == 0 {
+		return DialogView{}
+	}
+
+	header, body := headerAndBody(rows, q)
+	kind := DialogPermission
+	if strings.HasPrefix(strings.TrimSpace(rows[q]), planQuestionPrefix) {
+		kind = DialogPlan
+	}
+	return DialogView{
+		Kind:     kind,
 		Header:   header,
-		Body:     Normalize(body...),
+		Body:     body,
 		Question: Normalize(rows[q]),
 		Options:  options,
+		Cursor:   cursor,
+		PlainYes: options[0] == "Yes",
+		ID:       dialogID(header, body),
 	}
-	if approvableHeaders[header] && options[0] == "Yes" {
-		d.Approvable = true
-		sum := sha256.Sum256([]byte(d.Header + "\n" + d.Body))
-		d.ID = hex.EncodeToString(sum[:8])
-	}
-	return d
 }
 
 // isDashRule reports whether row is a ╌ separator around a diff or command.

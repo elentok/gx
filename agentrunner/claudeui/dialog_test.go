@@ -44,6 +44,61 @@ func TestParseDialog_Goldens(t *testing.T) {
 	}
 }
 
+func TestReadDialog_Goldens(t *testing.T) {
+	tests := []struct {
+		file     string
+		kind     DialogKind
+		header   string
+		options  int
+		plainYes bool
+	}{
+		{"permission-w160.screen.txt", DialogPermission, "Bash command", 4, true},
+		{"dialog-edit.screen.txt", DialogPermission, "Edit file", 3, true},
+		{"dialog-create.screen.txt", DialogPermission, "Create file", 3, true},
+		{"dialog-read.screen.txt", DialogPermission, "Read file", 3, true},
+		{"dialog-unknown.screen.txt", DialogPermission, "Frobnicate widget", 2, true},
+		{"dialog-askuserquestion.screen.txt", DialogUnreadable, "", 0, false},
+		{"plan-approval.screen.txt", DialogPlan, "", 3, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.file, func(t *testing.T) {
+			d := ReadDialog(dialogRows(t, tt.file))
+			if d.Kind != tt.kind || d.Header != tt.header || len(d.Options) != tt.options || d.PlainYes != tt.plainYes {
+				t.Fatalf("got kind=%q header=%q options=%d plainYes=%v, want %q %q %d %v",
+					d.Kind, d.Header, len(d.Options), d.PlainYes, tt.kind, tt.header, tt.options, tt.plainYes)
+			}
+			if (d.ID != "") != (tt.kind != DialogUnreadable) {
+				t.Fatalf("ID %q does not match kind %q", d.ID, d.Kind)
+			}
+			if tt.kind != DialogUnreadable && d.Cursor != 0 {
+				t.Fatalf("cursor = %d, want 0", d.Cursor)
+			}
+		})
+	}
+}
+
+func TestReadDialog_CursorOnOptionTwo(t *testing.T) {
+	rows := dialogRows(t, "permission-w160.screen.txt")
+	for i, r := range rows {
+		switch {
+		case strings.Contains(r, "❯ 1."):
+			rows[i] = strings.Replace(r, "❯ 1.", "  1.", 1)
+		case strings.Contains(r, "2."):
+			rows[i] = strings.Replace(r, "  2.", "❯ 2.", 1)
+		}
+	}
+	if d := ReadDialog(rows); d.Cursor != 1 {
+		t.Fatalf("cursor = %d, want 1", d.Cursor)
+	}
+}
+
+func TestReadDialog_IDMatchesParseDialog(t *testing.T) {
+	rows := dialogRows(t, "permission-w160.screen.txt")
+	if got, want := ReadDialog(rows).ID, ParseDialog(rows).ID; got != want {
+		t.Fatalf("ID = %q, want %q", got, want)
+	}
+}
+
 func TestParseDialog_BashBody(t *testing.T) {
 	d := ParseDialog(dialogRows(t, "permission-w160.screen.txt"))
 	want := "Remove nonexistent file if present and echo marker rm -f gxwf-nonexistent.txt && echo gxwf-done"
