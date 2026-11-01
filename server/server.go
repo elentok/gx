@@ -84,6 +84,10 @@ type Settings struct {
 	BudgetSoftLimit float64
 	BudgetHardLimit float64
 
+	// LongTicketTurns is config.Budget's long-ticket alert threshold in
+	// assistant turns; zero means off.
+	LongTicketTurns int
+
 	// Recovery is the catalog with the user's kill switch and disables applied.
 	// The zero value is off.
 	Recovery recovery.Catalog
@@ -183,6 +187,7 @@ func SettingsFromConfig(cfg config.Config) Settings {
 		LogRetention:        cfg.Server.LogRetention,
 		BudgetSoftLimit:     cfg.Budget.SoftLimit,
 		BudgetHardLimit:     cfg.Budget.HardLimit,
+		LongTicketTurns:     cfg.Budget.LongTicketTurns,
 		Recovery:            recovery.Default().WithConfig(cfg.Recovery.Enabled, cfg.Recovery.Disabled),
 		RecoverySettings:    cfg.Recovery,
 		StoreCommitDebounce: time.Duration(cfg.TicketStore.CommitDebounce) * time.Second,

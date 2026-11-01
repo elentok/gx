@@ -228,6 +228,7 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 			SoftLimit              *float64  `json:"soft-limit"`
 			HardLimit              *float64  `json:"hard-limit"`
 			NotificationThresholds []float64 `json:"notification-thresholds"`
+			LongTicketTurns        *int      `json:"long-ticket-turns"`
 		} `json:"budget"`
 		Notifications *struct {
 			Telegram *struct {
@@ -381,6 +382,9 @@ func parseWith(data []byte, dataDir func() (string, error)) (Config, error) {
 		}
 		if raw.Budget.NotificationThresholds != nil {
 			cfg.Budget.NotificationThresholds = raw.Budget.NotificationThresholds
+		}
+		if raw.Budget.LongTicketTurns != nil {
+			cfg.Budget.LongTicketTurns = *raw.Budget.LongTicketTurns
 		}
 		cfg.Budget = clampBudget(cfg.Budget)
 	}

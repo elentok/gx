@@ -5,6 +5,7 @@ import "sort"
 const (
 	defaultBudgetSoftLimit = 300.0
 	defaultBudgetHardLimit = 350.0
+	defaultLongTicketTurns = 100
 )
 
 // BudgetConfig controls estimated API-equivalent-cost soft/hard limits and
@@ -13,6 +14,9 @@ type BudgetConfig struct {
 	SoftLimit              float64   `json:"soft-limit"`
 	HardLimit              float64   `json:"hard-limit"`
 	NotificationThresholds []float64 `json:"notification-thresholds"`
+	// LongTicketTurns is the assistant-turn count at which the long-ticket
+	// alert fires. 0 turns it off.
+	LongTicketTurns int `json:"long-ticket-turns"`
 }
 
 // DefaultBudgetConfig returns the budget defaults.
@@ -21,13 +25,16 @@ func DefaultBudgetConfig() BudgetConfig {
 		SoftLimit:              defaultBudgetSoftLimit,
 		HardLimit:              defaultBudgetHardLimit,
 		NotificationThresholds: []float64{50, 100, 150, 200, 250},
+		LongTicketTurns:        defaultLongTicketTurns,
 	}
 }
 
 // clampBudget sorts/dedupes thresholds and, when both limits are nonzero,
 // bumps the hard limit up to the soft limit if it's at or below it.
 // Thresholds have no enforced ordering relationship with either limit.
+// A negative long-ticket-turns becomes 0 (alert off).
 func clampBudget(cfg BudgetConfig) BudgetConfig {
+	cfg.LongTicketTurns = max(cfg.LongTicketTurns, 0)
 	cfg.NotificationThresholds = sortDedupeFloats(cfg.NotificationThresholds)
 	if cfg.SoftLimit != 0 && cfg.HardLimit != 0 && cfg.HardLimit <= cfg.SoftLimit {
 		cfg.HardLimit = cfg.SoftLimit

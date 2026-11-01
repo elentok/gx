@@ -148,6 +148,12 @@
             "minimum": 0
           },
           "default": [50, 100, 150, 200, 250]
+        },
+        "long-ticket-turns": {
+          "type": "integer",
+          "description": "Assistant-turn count at which the long-ticket alert fires. 0 turns it off. Negative values are treated as 0. Default: 100.",
+          "minimum": 0,
+          "default": 100
         }
       },
       "default": {
