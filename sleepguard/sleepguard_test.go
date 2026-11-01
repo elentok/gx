@@ -88,7 +88,7 @@ var allowed = map[string]int{
 	"server/server_test.go":                         1,
 	"server/sessionchatwatch_test.go":               2,
 	"server/sessionkeys_test.go":                    2, // negative waits: no nudge follows a person's key; a guarded key keeps the countdown
-	"server/sessionprompt_test.go":                  1,
+	"server/sessionprompt_test.go":                  5, // four negative waits: no nudge or Continue follows a typed / command; a failure is not raised within the grace window
 	"server/sessions_action_test.go":                7,
 	"server/sessions_afk_test.go":                   1,
 	"server/sessions_autoadvance_countdown_test.go": 6,
@@ -106,7 +106,7 @@ var allowed = map[string]int{
 	"server/unavailable_test.go":                    1,
 	"storecommit/storecommit_test.go":               3,
 	"testutil/agentfake/harness_test.go":            1,
-	"testutil/agentfake/tui_test.go":                6, // two are negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn
+	"testutil/agentfake/tui_test.go":                7, // negative waits: a slow-marker status must stay busy; an unarmed slash prompt starts no turn; an ignored Allow keeps the dialog open
 	"testutil/agentfake/worker_test.go":             1,
 	"testutil/gxfixture/disk_test.go":               2,
 	"testutil/gxfixture/main_test.go":               8,

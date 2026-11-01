@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -253,12 +254,10 @@ func TestCodex_SlashCommandWritesAUserMessageAndNoTurn(t *testing.T) {
 		t.Fatal(err)
 	}
 	var files []string
-	for deadline := time.Now().Add(5 * time.Second); len(files) == 0 || !bytes.Contains(mustRead(t, files[0]), []byte("/status")); time.Sleep(10 * time.Millisecond) {
-		if time.Now().After(deadline) {
-			t.Fatalf("no /status line in the rollout: %v", files)
-		}
+	testutil.WaitFor(t, 5*time.Second, "a /status line in the rollout", func() bool {
 		files = rolloutFiles(t, home)
-	}
+		return len(files) > 0 && bytes.Contains(mustRead(t, files[0]), []byte("/status"))
+	})
 	f, err := os.Open(files[0])
 	if err != nil {
 		t.Fatal(err)
