@@ -407,6 +407,11 @@ func (c *codexFake) submit(text string) error {
 		go c.work(w.cfg, w.address)
 		return nil
 	}
+	if strings.HasPrefix(text, "/") {
+		// A "/" command is no turn and has no output in the rollout, only the
+		// user message.
+		return c.writeLine("response_item", c.message("user", "input_text", text))
+	}
 	if isDesignPrompt(text) || (c.design.active && !strings.HasPrefix(text, "$")) {
 		return c.designTurn(text)
 	}

@@ -383,6 +383,13 @@ type tui struct {
 	// busyNext makes the next "/" command start a turn that stays busy until a
 	// control ends it.
 	busyNext bool
+	// commandOutput is the stdout the next "/" command writes, set by
+	// ActionCommandOutput.
+	commandOutput *string
+	// ignoreAllow makes Enter leave a dialog open.
+	ignoreAllow bool
+	// quit ends the fake cleanly after the current input, as /exit does.
+	quit bool
 	// dialog replaces the default waiting rows while set by ActionBlock.
 	dialog []string
 	// trustYes is whether the trust dialog's cursor is on "Yes"; arrow
@@ -467,6 +474,9 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			// A raw LF is a line break in the input, as in claude, not Enter.
 			if err := t.submit(); err != nil {
 				return 0, err
+			}
+			if t.quit {
+				return 0, t.exit(0)
 			}
 		case ev.key == escKey:
 			if err := t.interrupt(); err != nil {
@@ -650,6 +660,9 @@ func (t *tui) submit() error {
 		}
 		return t.setStatus(StatusBusy, "")
 	case StatusWaiting:
+		if t.ignoreAllow {
+			return nil
+		}
 		// Enter picks the dialog's first option, "Yes".
 		return t.setStatus(StatusBusy, "")
 	}
@@ -742,6 +755,13 @@ func (t *tui) slashCommand(text string) error {
 	case text == "/clear":
 		t.pid.SessionID += "-cleared"
 		return t.writePid()
+	case text == "/exit":
+		t.quit = true
+		return nil
+	case t.commandOutput != nil:
+		stdout := *t.commandOutput
+		t.commandOutput = nil
+		return t.writeCommandOutput(text, stdout)
 	case t.fast:
 		return t.fastTurn()
 	case t.busyNext:
@@ -824,6 +844,12 @@ func (t *tui) handleControl(c Control) error {
 		return nil
 	case ActionBusy:
 		t.busyNext = true
+		return nil
+	case ActionCommandOutput:
+		t.commandOutput = &c.Message
+		return nil
+	case ActionIgnoreAllow:
+		t.ignoreAllow = true
 		return nil
 	case ActionReport:
 		writeReport(t.out, c.State, c.Kind, c.Message)

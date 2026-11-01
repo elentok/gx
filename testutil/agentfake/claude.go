@@ -47,6 +47,13 @@ const (
 	// ActionModel makes the TUI fake report Model on every later reply, as a
 	// session does after the user switches model with /model.
 	ActionModel = "model"
+	// ActionCommandOutput makes the TUI fake answer the next "/" command as a
+	// built-in one: it writes the command line, claude's caveat line and a
+	// stdout line holding Message (empty for a command with no output).
+	ActionCommandOutput = "commandoutput"
+	// ActionIgnoreAllow makes the TUI fake ignore Enter on a dialog, so the
+	// dialog stays open.
+	ActionIgnoreAllow = "ignoreallow"
 	// The Codex fake's scripted events. ActionToolCall runs Tool (default
 	// "Bash") with Command through its PreToolUse hooks; ActionPermission asks
 	// approval for Command through its PermissionRequest hooks; ActionTokenCount

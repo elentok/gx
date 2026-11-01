@@ -16,6 +16,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/transcript"
 )
 
 const codexFixtureRollout = "../../docs/specs/codex-support-fixtures/rollouts/plain-turn.jsonl"
@@ -242,6 +243,46 @@ func TestCodex_RolloutIsReadByProductionReaders(t *testing.T) {
 	if ok, err := codexsession.VerifyIdentityIn(home, t.TempDir(), p.id); err != nil || ok {
 		t.Errorf("VerifyIdentityIn for another cwd = %v, %v; want false", ok, err)
 	}
+}
+
+func TestCodex_SlashCommandWritesAUserMessageAndNoTurn(t *testing.T) {
+	home := t.TempDir()
+	p := startCodex(t, home, "slash-1", codexLaunchArgs...)
+	p.waitOut("state=idle")
+	if _, err := io.WriteString(p.stdin, "/status\r"); err != nil {
+		t.Fatal(err)
+	}
+	var files []string
+	for deadline := time.Now().Add(5 * time.Second); len(files) == 0 || !bytes.Contains(mustRead(t, files[0]), []byte("/status")); time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatalf("no /status line in the rollout: %v", files)
+		}
+		files = rolloutFiles(t, home)
+	}
+	f, err := os.Open(files[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	chat, err := codexsession.ReadChat(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chat.Messages) != 1 || chat.Messages[0].Kind != transcript.ChatKindCommand || chat.Messages[0].Text != "/status" {
+		t.Fatalf("messages = %+v, want one /status command", chat.Messages)
+	}
+	if strings.Contains(p.out.String(), "state=working") {
+		t.Errorf("a / command started a turn: %q", p.out.String())
+	}
+}
+
+func mustRead(t *testing.T, path string) []byte {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
 }
 
 func TestCodex_RolloutPassesTheDoctorRolloutCheck(t *testing.T) {

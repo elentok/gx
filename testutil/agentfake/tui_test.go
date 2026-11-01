@@ -413,6 +413,77 @@ func TestTUIClaude_ClearStillChangesTheSessionIDWhenArmed(t *testing.T) {
 	}
 }
 
+func TestTUIClaude_CommandOutputControlWritesCaveatAndStdout(t *testing.T) {
+	cases := []struct {
+		name, stdout, want string
+	}{
+		{"lines", "Total cost: $1.20\nTotal duration: 5m\nUsage: 3 models", "Total cost: $1.20\nTotal duration: 5m\nUsage: 3 models"},
+		{"ansi", "\x1b[1mTotal cost:\x1b[0m $1.20", "Total cost: $1.20"},
+		{"empty", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := startTUIFake(t, tuiLaunchArgs)
+			path := f.transcriptPath()
+			f.control(Control{Action: ActionCommandOutput, Message: tc.stdout})
+			f.typeLine("/cost")
+			f.waitFor("the stdout line", func() bool {
+				data, _ := os.ReadFile(path)
+				return strings.Contains(string(data), "local-command-stdout")
+			})
+			data, _ := os.ReadFile(path)
+			if !strings.Contains(string(data), "local-command-caveat") {
+				t.Errorf("transcript lacks the caveat line: %s", data)
+			}
+			msgs, ok, err := transcript.ReadChat(path)
+			if err != nil || !ok {
+				t.Fatalf("ReadChat = %v, %v", ok, err)
+			}
+			if len(msgs) == 0 || msgs[0].Kind != transcript.ChatKindCommand || msgs[0].Text != "/cost" {
+				t.Fatalf("first entry = %+v, want the /cost command", msgs)
+			}
+			if tc.want == "" {
+				if len(msgs) != 1 {
+					t.Errorf("empty output made entries: %+v", msgs)
+				}
+			} else if len(msgs) != 2 || msgs[1].Kind != transcript.ChatKindOutput || msgs[1].Text != tc.want {
+				t.Errorf("output entry = %+v, want %q", msgs, tc.want)
+			}
+			if m := f.pidFile(); m["status"] != StatusIdle {
+				t.Errorf("status after a built-in command = %v, want idle", m["status"])
+			}
+		})
+	}
+}
+
+func TestTUIClaude_ExitCommandExitsCleanly(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	f.typeLine("/exit")
+	if code := f.waitExit(); code != 0 {
+		t.Fatalf("exit code = %d, want 0; screen: %q", code, f.screen.String())
+	}
+	if _, err := os.Stat(PidFilePath(f.home, f.cmd.Process.Pid)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("pid file after /exit: %v", err)
+	}
+}
+
+func TestTUIClaude_IgnoreAllowKeepsTheDialogOpen(t *testing.T) {
+	f := startTUIFake(t, tuiLaunchArgs)
+	f.waitStatus(StatusIdle, "")
+	f.control(Control{Action: ActionIgnoreAllow})
+	f.control(Control{Action: ActionBlock, Dialog: BashPermissionDialog("ls")})
+	f.waitStatus(StatusWaiting, "permission prompt")
+	f.typeLine("")
+	time.Sleep(200 * time.Millisecond)
+	if m := f.pidFile(); m["status"] != StatusWaiting {
+		t.Fatalf("status after an ignored Allow = %v, want waiting", m["status"])
+	}
+	if !strings.Contains(f.screen.String(), "ls") {
+		t.Errorf("dialog left the screen: %q", f.screen.String())
+	}
+}
+
 func TestTUIClaude_CtrlCEndsTheTurnAndRestoresThePrompt(t *testing.T) {
 	f := startTUIFake(t, tuiLaunchArgs)
 	f.waitStatus(StatusIdle, "")
