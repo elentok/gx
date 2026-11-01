@@ -72,6 +72,13 @@ func (r *Registry) Register(s Step) {
 	r.steps = append(r.steps, s)
 }
 
+// Extend registers every step of other after the steps already registered.
+func (r *Registry) Extend(other *Registry) {
+	for _, s := range other.steps {
+		r.Register(s)
+	}
+}
+
 // Names lists the step names in run order.
 func (r *Registry) Names() []string {
 	names := make([]string, len(r.steps))

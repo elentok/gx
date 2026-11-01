@@ -19,6 +19,10 @@ import (
 
 const project = "demo"
 
+// oldShapeStatus is a pause status of the old shape: the strict ticket scan
+// rejects it until the migration rewrites it.
+const oldShapeStatus = "needs-answer"
+
 type ticket struct {
 	id, slug string
 	opts     servertest.TicketOpts
@@ -124,6 +128,10 @@ type scenario struct {
 	// spend seeds the budget ledger before the server starts, in the shape the
 	// --shape flag names (default normal), and prints the held agent's transcript path.
 	spend bool
+	// migrate turns on the migration test hooks and the bare-server control script (see migrate.go).
+	migrate bool
+	// migrateHold also holds the start-up migration open until the hold file is removed.
+	migrateHold bool
 }
 
 // webMode is how far the fixture takes the web setup and sign-in.
@@ -195,6 +203,37 @@ var scenarios = map[string]scenario{
 		},
 		ownRepos: []string{"broken"},
 		restart:  &restartSpec{failing: map[string]string{"broken": "fixture migration failed"}},
+	},
+	// migrate-pending: a project with no applied list and a ticket in the old shape.
+	"migrate-pending": {
+		epics: []epic{{project, "demo-epic", []ticket{
+			{"01", "broken-shape", servertest.TicketOpts{Status: oldShapeStatus}},
+		}}},
+		migrate: true,
+	},
+	// migrate-held: migrate-pending with the migration held open. demo also holds an
+	// old-shape ticket the strict index scan rejects, and a ready queued ticket.
+	"migrate-held": {
+		epics: []epic{
+			{project, "ready-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}},
+			{project, "old-epic", []ticket{{"01", "broken-shape", servertest.TicketOpts{Status: oldShapeStatus}}}},
+		},
+		queue:       []string{project + ":ready-epic"},
+		migrate:     true,
+		migrateHold: true,
+	},
+	// migrate-broken: project broken fails its migration (a ticket the schema rejects), demo is fine.
+	"migrate-broken": {
+		epics: []epic{
+			{project, "demo-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}},
+			{"broken", "broken-epic", []ticket{
+				{"01", "first", servertest.TicketOpts{}},
+				{"90", "bad", servertest.TicketOpts{Status: "bogus"}},
+			}},
+		},
+		ownRepos: []string{"broken"},
+		queue:    []string{project + ":demo-epic", "broken:broken-epic"},
+		migrate:  true,
 	},
 	// restart-launchd: the restart binary sits at a launchd-style path, not the server's own.
 	"restart-launchd": {

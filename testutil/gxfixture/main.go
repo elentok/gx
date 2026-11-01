@@ -78,6 +78,8 @@ type Output struct {
 	HealthDir string `json:"health_dir"`
 	// RestartDir holds the fake restart binary's control files; empty outside the restart scenarios.
 	RestartDir string `json:"restart_dir,omitempty"`
+	// MigrateDir holds the migrate scenarios' control files and server script (see migrate.go); empty elsewhere.
+	MigrateDir string `json:"migrate_dir,omitempty"`
 	// LogFile is the server's combined stdout and stderr, which carries the cleanup
 	// command's output tail ("disk cleanup command failed") and every server warning.
 	LogFile string `json:"log_file"`
@@ -111,6 +113,9 @@ func (o Output) ShellEnv() string {
 	export("GXF_SOCKET", o.Socket)
 	if o.RestartDir != "" {
 		export("GXF_RESTART_DIR", o.RestartDir)
+	}
+	if o.MigrateDir != "" {
+		export("GXF_MIGRATE_DIR", o.MigrateDir)
 	}
 	if o.LogFile != "" {
 		export("GXF_LOG_FILE", o.LogFile)
@@ -278,11 +283,21 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
+	if sc.migrate {
+		if err := f.setupMigrate(sc.migrateHold); err != nil {
+			return err
+		}
+	}
 	if err := f.writeConfig(port, sc.recentlyFinished, append(slices.Clone(sc.config), configs...)); err != nil {
 		return err
 	}
 	if err := f.seed(sc); err != nil {
 		return err
+	}
+	if sc.migrate {
+		if err := f.commitStore(); err != nil {
+			return fmt.Errorf("commit store: %w", err)
+		}
 	}
 	if hideCodex {
 		if err := os.Remove(filepath.Join(binDir, "codex")); err != nil {
@@ -327,6 +342,12 @@ func run(args []string) (err error) {
 	if err := srv.Start(); err != nil {
 		return err
 	}
+	if sc.migrate {
+		if err := f.writeServerControl(srv.Process.Pid, logPath); err != nil {
+			_ = srv.Process.Kill()
+			return err
+		}
+	}
 	exited := make(chan error, 1)
 	go func() {
 		defer close(exited)
@@ -369,6 +390,16 @@ func run(args []string) (err error) {
 		args := []string{"server", "queue", "add", addr}
 		if agent := sc.queueAgents[addr]; agent != "" {
 			args = append(args, "--agent", agent)
+		}
+		// A held migration holds the queue verb too; it finishes once the hold is released.
+		if sc.migrateHold {
+			cmd := exec.CommandContext(ctx, f.gx, args...)
+			cmd.Env = f.env
+			if err := cmd.Start(); err != nil {
+				return fmt.Errorf("queue %s: %w", addr, err)
+			}
+			go func() { _ = cmd.Wait() }()
+			continue
 		}
 		if out, err := f.cli(args...); err != nil {
 			return fmt.Errorf("queue %s: %w\n%s", addr, err, out)
@@ -452,6 +483,9 @@ func run(args []string) (err error) {
 	if sc.restart != nil {
 		o.RestartDir = f.restartDir()
 	}
+	if sc.migrate {
+		o.MigrateDir = f.migrateDir()
+	}
 	if cwd, err := os.Getwd(); err == nil {
 		o.BrowserSession = filepath.Base(cwd)
 	}
@@ -484,7 +518,8 @@ func run(args []string) (err error) {
 	case <-ended:
 		return nil
 	case err := <-exited:
-		if sc.restart == nil {
+		// A migrate scenario's flow kills and starts the server itself (migrate.go).
+		if sc.restart == nil && !sc.migrate {
 			return fmt.Errorf("server exited: %v\n%s", err, f.serverOutput())
 		}
 		f.restarted = true

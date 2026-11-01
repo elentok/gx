@@ -245,7 +245,12 @@ func runServer(ctx context.Context, d deps) error {
 	if v := os.Getenv("GX_RESTART_BINARY"); v != "" {
 		restartBin = func() string { return v }
 	}
-	srv, err := server.New(server.Config{Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: restartBin,
+	// Test hooks: gxfixture holds the start-up migration open and adds failing or noting steps.
+	migrationReg, err := migrationHooks(os.Getenv)
+	if err != nil {
+		return err
+	}
+	srv, err := server.New(server.Config{Migrations: migrationReg, Settings: server.SettingsFromConfig(cfg), StateDir: stateDir, Build: getVersion(), Runner: runner, RunnerFor: runnerFor, RestartBinary: restartBin,
 		TicketStore: cfg.TicketStore.Path, ConfigPath: configPath, AgentRunner: cfg.AgentRunner, TCPAddr: tcpAddr, WebAddr: cfg.Server.Web.Listen, WebDevURL: cfg.Server.Web.DevFrontendURL(), LogLevel: logLevel,
 		AutoAdvanceDelay: autoAdvanceDelay, StallThreshold: stallThreshold, FreeSpace: freeSpace, DiskPollInterval: diskPollInterval, Env: d.env,
 		SystemHealth: systemHealth, HealthPollInterval: healthPollInterval, UsagePollInterval: usagePollInterval, BudgetPollInterval: budgetPollInterval,
