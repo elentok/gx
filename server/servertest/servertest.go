@@ -40,6 +40,7 @@ import (
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
@@ -805,6 +806,9 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
 	// The production defaults: an implement launch with no model is refused.
 	h.cfg.AgentsClaude, h.cfg.AgentsCodex = config.DefaultAgentsConfig().Claude, config.DefaultAgentsConfig().Codex
+	// An empty registry, so a harness server never runs the real steps over a
+	// seeded store. A test that wants migrations sets Config.Migrations.
+	h.cfg.Migrations = &migrations.Registry{}
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
 	// The herdr runner's wait N defaults to 5s, which every launch's slash
 	// command prompt would sit out: the fake agent starts no turn.

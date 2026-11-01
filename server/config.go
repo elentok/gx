@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/osnotify"
 	"github.com/elentok/gx/sound"
 	"github.com/elentok/gx/subscription"
@@ -32,6 +33,9 @@ type Config struct {
 	StateDir    string
 	Build       string
 	TicketStore string // ticket-store root; kept fresh by watch + poll
+	// Migrations is the registry the start-up migration runs; nil means
+	// migrations.Default. Tests inject one; the release binary leaves it nil.
+	Migrations *migrations.Registry
 	// ConfigPath is the config file a reload reads; empty means reload is
 	// unavailable.
 	ConfigPath string

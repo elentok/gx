@@ -24,6 +24,8 @@ func TestMigrationFailures_FileChangeIsSeenWithoutRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.MigrationFailurePollInterval = 10 * time.Millisecond })
+	// A passing start clears the record, so seed it after the start-up run ends.
+	<-h.Server.MigrationsDone()
 
 	if got := h.Server.MigrationFailures(); len(got) != 0 {
 		t.Fatalf("failures at start: %v", got)
@@ -71,6 +73,8 @@ func TestLiveSnapshot_ListsAndDropsMigrationFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := servertest.StartWithStore(t, store)
+	// A passing start clears the record, so seed it after the start-up run ends.
+	<-h.Server.MigrationsDone()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

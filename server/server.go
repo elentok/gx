@@ -301,6 +301,8 @@ type Server struct {
 	logf           *rotatingFile
 	log            *slog.Logger
 	idx            *index
+	// migrationsDone closes when the start-up migration run ends.
+	migrationsDone chan struct{}
 
 	queued       *queueStore
 	pause        *pauseState
@@ -501,13 +503,14 @@ func New(cfg Config) (*Server, error) {
 		return nil, fmt.Errorf("load runs: %w", err)
 	}
 	s := &Server{
-		cfg:  cfg,
-		lock: lock,
-		ln:   ln,
-		tcp:  tcp,
-		logf: logf,
-		log:  log,
-		idx:  idx,
+		migrationsDone: make(chan struct{}),
+		cfg:            cfg,
+		lock:           lock,
+		ln:             ln,
+		tcp:            tcp,
+		logf:           logf,
+		log:            log,
+		idx:            idx,
 
 		chat:      ralphloop.NewServerChat(cfg.Chat),
 		registry:  registry,
@@ -853,6 +856,7 @@ func (s *Server) Serve(ctx context.Context) error {
 		lns = append(lns, s.web)
 		go func() { errc <- s.webHTTP.Serve(s.web) }()
 	}
+	go s.migrateAll(ctx)
 	s.recoverMerges()
 	s.reclaimRuns()
 	s.logFlushingRunners()
