@@ -106,6 +106,8 @@ type scenario struct {
 	codexUsage bool
 	// diskLow gives each project a cleanup command that follows the disk's clean file.
 	diskLow bool
+	// fakeGo writes the gate dir's fake go (see cachegate.go).
+	fakeGo bool
 	// restart points the server's restart at a fake gx binary (see restart.go).
 	restart *restartSpec
 	// chat turns the fake's chat knob on, so a plain prompt is a chat turn.
@@ -187,6 +189,8 @@ var scenarios = map[string]scenario{
 		}}},
 		diskLow: true,
 	},
+	"cache-gate":        cacheGate,
+	"cache-gate-custom": cacheGateCustom,
 	// restart-agents: a running agent on a queued epic, and a restart binary that passes its checks.
 	"restart-agents": {
 		epics: []epic{{project, "restart-epic", []ticket{

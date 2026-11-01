@@ -121,7 +121,9 @@ There is no `internal/` directory. Top-level packages live at the repo root:
   isolated real `gx server` (pty runner, `fakeclaude` as `claude`) and prints JSON with `web_url`,
   socket, state dir, hold file and `log_file` (the server's stdout+stderr, which holds the cleanup
   command's output tail); SIGTERM stops it. Per-ticket worker behaviour
-  (finish/ask/fail) lives in `.agentfake-worker.json`, see `scenarios.go`.
+  (finish/ask/fail) lives in `.agentfake-worker.json`, see `scenarios.go`. The `cache-gate` and
+  `cache-gate-custom` scenarios (`cachegate.go`) output `gate_dir`: a fake `go` and `ps` in
+  `bin/` (put it first on PATH), `go-hold` to hold a fake build, and `go-clean.log`.
 
 Run `go list ./...` for the full list.
 

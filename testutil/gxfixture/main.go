@@ -78,6 +78,8 @@ type Output struct {
 	DiskDir string `json:"disk_dir"`
 	// HealthDir holds the fake CPU and memory control file: system.
 	HealthDir string `json:"health_dir"`
+	// GateDir holds the cache-gate scenarios' fake go (bin/go) and its control files; empty elsewhere.
+	GateDir string `json:"gate_dir,omitempty"`
 	// RestartDir holds the fake restart binary's control files; empty outside the restart scenarios.
 	RestartDir string `json:"restart_dir,omitempty"`
 	// MigrateDir holds the migrate scenarios' control files and server script (see migrate.go); empty elsewhere.
@@ -115,6 +117,9 @@ func (o Output) ShellEnv() string {
 	export("GXF_HOLD_FILE", o.HoldFile)
 	export("GXF_STATE_DIR", o.StateDir)
 	export("GXF_SOCKET", o.Socket)
+	if o.GateDir != "" {
+		export("GXF_GATE_DIR", o.GateDir)
+	}
 	if o.RestartDir != "" {
 		export("GXF_RESTART_DIR", o.RestartDir)
 	}
@@ -307,6 +312,12 @@ func run(args []string) (err error) {
 	}
 	if err := f.setupHealth(); err != nil {
 		return err
+	}
+	// Any scenario that cleans needs the fake ps: the real one sees the `go test` running this fixture.
+	if sc.fakeGo || sc.diskLow {
+		if err := f.setupFakeGo(); err != nil {
+			return err
+		}
 	}
 	if sc.restart != nil {
 		if err := f.setupRestart(*sc.restart, sc.projectNames()); err != nil {
@@ -518,6 +529,9 @@ func run(args []string) (err error) {
 		}
 	}
 	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath, AgentTranscript: agentTranscript}
+	if sc.fakeGo {
+		o.GateDir = f.gateDir()
+	}
 	if sc.restart != nil {
 		o.RestartDir = f.restartDir()
 	}
@@ -559,8 +573,9 @@ func run(args []string) (err error) {
 	case <-ended:
 		return nil
 	case err := <-exited:
-		// A migrate scenario's flow kills and starts the server itself (migrate.go).
-		if sc.restart == nil && !sc.migrate {
+		// A migrate scenario's flow kills and starts the server itself (migrate.go);
+		// a cache-gate flow stops it to run gx brief go-clean-cache without one.
+		if sc.restart == nil && !sc.migrate && !sc.fakeGo {
 			return fmt.Errorf("server exited: %v\n%s", err, f.serverOutput())
 		}
 		f.restarted = true
