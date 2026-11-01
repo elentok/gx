@@ -43,7 +43,7 @@ import { Strip } from "../ui/strip/Strip";
 import { TicketLine } from "../ui/ticket-line/TicketLine";
 import { TopBar } from "../ui/top-bar/TopBar";
 import { Tray } from "../ui/tray/Tray";
-import type { Health, HealthState, LimitsReport, LimitWindow, UsageSpend, UsageSummary } from "../generated/server";
+import type { Health, HealthState, LimitWindow, UsageLimits, UsageLimitWindow, UsageSpend, UsageSummary } from "../generated/server";
 import { UsageModeLimits, UsageModeSpending } from "../generated/server";
 import { LimitsBlock } from "../usage/LimitsBlock";
 import { SpendBlock } from "../usage/SpendBlock";
@@ -106,8 +106,27 @@ const limitWin = (pct: number, resetsInSec: number, seenAgoSec: number): LimitWi
   resets_at: limitsNow / 1000 + resetsInSec,
   received_at: limitsNow / 1000 - seenAgoSec,
 });
-const limitsStates: [string, LimitsReport][] = [
+const weeklyWin = (pct: number, extra: Partial<UsageLimitWindow>): UsageLimitWindow => ({ ...limitWin(pct, 187200, 60), ...extra });
+const limitsStates: [string, UsageLimits, UsageLimits?][] = [
   ["limits fresh", { five_hour: limitWin(34, 7800, 60), seven_day: limitWin(81, 187200, 60) }],
+  [
+    "limits weekly delta + Codex",
+    {
+      five_hour: limitWin(34, 7800, 60),
+      seven_day: weeklyWin(81, {
+        chip: { today: 7, yesterday: 5, direction: "up" },
+        forecast: { status: "projected", pace: 30, at_reset: 130, runs_out_at: limitsNow / 1000 + 86400 },
+      }),
+    },
+    {
+      five_hour: limitWin(12, 13200, 60),
+      seven_day: weeklyWin(40, {
+        chip: { today: 3, yesterday: 4, direction: "down" },
+        forecast: { status: "projected", pace: 10, at_reset: 72 },
+      }),
+    },
+  ],
+  ["limits few days", { seven_day: weeklyWin(22, { forecast: { status: "needs_data", pace: 0, at_reset: 0 } }) }],
   ["limits stale", { five_hour: limitWin(34, 7800, 10800), seven_day: limitWin(52, 187200, 10800) }],
   ["limits past reset", { five_hour: limitWin(34, -60, 21600), seven_day: limitWin(52, 187200, 21600) }],
   ["limits one window", { seven_day: limitWin(12, 464400, 60) }],
@@ -466,7 +485,7 @@ export const galleryEntries: GalleryEntry[] = [
         ),
       },
       { label: "no build string", node: <TopBar active="epics" connected /> },
-      ...limitsStates.map(([label, limits]) => ({
+      ...limitsStates.map(([label, limits, codex]) => ({
         label,
         node: (
           <OpenMenu>
@@ -478,7 +497,7 @@ export const galleryEntries: GalleryEntry[] = [
               menuBlock={
                 <>
                   <Menu.Separator />
-                  <LimitsBlock summary={{ mode: UsageModeLimits, limits, spend: {} as UsageSummary["spend"] }} now={limitsNow} />
+                  <LimitsBlock summary={{ mode: UsageModeLimits, limits, codex, spend: {} as UsageSummary["spend"] }} now={limitsNow} />
                   <Menu.Separator />
                 </>
               }
@@ -624,6 +643,14 @@ export const galleryEntries: GalleryEntry[] = [
   {
     name: "InfoTip",
     cases: [
+      {
+        label: "chip",
+        node: (
+          <InfoTip variant="chip" chipColor="tone.waiting.fg" label="Burn" content="Burn today 7 pts so far, yesterday 5">
+            ▲ 7 vs 5 pts
+          </InfoTip>
+        ),
+      },
       { label: "closed", node: <InfoTip label="Reset time" content="Resets Friday 09:00" /> },
       {
         label: "open",

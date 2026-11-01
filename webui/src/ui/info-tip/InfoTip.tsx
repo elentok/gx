@@ -8,10 +8,24 @@ interface Props {
   content: ReactNode;
   /** The trigger face. It defaults to the "i" marker. */
   children?: ReactNode;
+  /** "marker" is the 14px circle; "chip" is a text pill that takes its colour from `chipColor`. */
+  variant?: "marker" | "chip";
+  /** The chip's border and text colour (a Chakra token). */
+  chipColor?: string;
 }
 
+const markerStyle = {
+  w: "14px",
+  h: "14px",
+  borderRadius: "full",
+  borderColor: "text.muted",
+  color: "text.muted",
+  fontSize: "10px",
+  fontStyle: "italic",
+} as const;
+
 // Controlled, because the installed Chakra Tooltip has no open-on-click prop. A tap toggles it.
-export function InfoTip({ label, content, children = "i" }: Props) {
+export function InfoTip({ label, content, children = "i", variant = "marker", chipColor = "text.muted" }: Props) {
   const [open, setOpen] = useState(false);
   const marker = useRef<HTMLButtonElement>(null);
   // Native listeners, because the menu listens natively and React's synthetic stopPropagation
@@ -58,17 +72,13 @@ export function InfoTip({ label, content, children = "i" }: Props) {
           display="inline-flex"
           alignItems="center"
           justifyContent="center"
-          w="14px"
-          h="14px"
           flexShrink={0}
           borderWidth="1px"
-          borderColor="text.muted"
-          borderRadius="full"
-          color="text.muted"
-          fontSize="10px"
           lineHeight="1"
-          fontStyle="italic"
           cursor="pointer"
+          {...(variant === "chip"
+            ? { px: "7px", py: "1px", borderRadius: "full", borderColor: chipColor, color: chipColor, fontSize: "12px", style: { fontVariantNumeric: "tabular-nums" } }
+            : markerStyle)}
         >
           {children}
         </chakra.button>

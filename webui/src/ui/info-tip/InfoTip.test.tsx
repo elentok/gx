@@ -13,6 +13,20 @@ function setup() {
   return { ...view, trigger, shown };
 }
 
+describe("InfoTip chip variant", () => {
+  it("shows its text, not the 14px circle, and opens on focus", async () => {
+    const v = renderThemed(
+      <InfoTip variant="chip" label="Burn" content={TEXT}>
+        ▲ 7 vs 5 pts
+      </InfoTip>,
+    );
+    const trigger = v.getByRole("button", { name: "Burn" });
+    expect(trigger.textContent).toBe("▲ 7 vs 5 pts");
+    fireEvent.focus(trigger);
+    expect(await v.findByText(TEXT)).toBeTruthy();
+  });
+});
+
 describe("InfoTip", () => {
   it("is closed at rest and names the trigger from label", () => {
     const { shown, trigger } = setup();

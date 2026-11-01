@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { exactTime, isPastReset, isStale, limitTone, resetsIn, seenAgo, sinceLabel, wholePercent } from "./format";
+import { chipText, chipTooltip, exactTime, forecastLine, isPastReset, isStale, limitTone, resetsIn, seenAgo, sinceLabel, wholePercent } from "./format";
+
+describe("forecastLine and chip text", () => {
+  it("formats each forecast", () => {
+    expect(forecastLine(undefined)).toBeUndefined();
+    expect(forecastLine({ status: "none", pace: 0, at_reset: 0 })).toBeUndefined();
+    expect(forecastLine({ status: "needs_data", pace: 0, at_reset: 0 })).toEqual({ text: "Forecast needs 3 days of data", warn: false });
+    expect(forecastLine({ status: "projected", pace: 5, at_reset: 72 })).toEqual({ text: "~72% at reset", warn: false });
+    const at = Math.floor(new Date(2026, 10, 5, 14, 0).getTime() / 1000);
+    expect(forecastLine({ status: "projected", pace: 5, at_reset: 130, runs_out_at: at })).toEqual({
+      text: "Runs out ~Thu 14:00, before the reset",
+      warn: true,
+    });
+  });
+
+  it("formats the chip and its tooltip", () => {
+    expect(chipText({ today: 7, yesterday: 5, direction: "up" })).toBe("▲ 7 vs 5 pts");
+    expect(chipText({ today: 3, yesterday: 4, direction: "down" })).toBe("▼ 3 vs 4 pts");
+    expect(chipText({ today: 4, yesterday: 4, direction: "equal" })).toBe("= 4 vs 4 pts");
+    expect(chipTooltip({ today: 7, yesterday: 5, direction: "up" })).toBe("Burn today 7 pts so far, yesterday 5");
+  });
+});
 
 const MIN = 60;
 const HOUR = 60 * MIN;
