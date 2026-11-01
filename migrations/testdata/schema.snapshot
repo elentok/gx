@@ -1,0 +1,85 @@
+struct schema.Ticket
+  ID schema.TicketID 
+  Status schema.Status 
+  BlockedBy []schema.TicketID 
+  Parent *schema.TicketID 
+  Type schema.TicketType 
+  ExpectedContextWindow int 
+  ActualContextWindow int 
+  ElapsedTime int 
+  ActualCost float64 
+  Compactions int 
+  SessionIDs []string 
+  Commitless bool 
+  Notify bool 
+  Manual bool 
+  NoRecover bool 
+  Unique string 
+  Agent string 
+  IterationStatus schema.IterationStatus 
+  IterationFinishedAt time.Time 
+  ClaimedAt time.Time 
+  DoneAt time.Time 
+  CompletedAt time.Time 
+  PauseKind schema.PauseKind 
+  PauseReason schema.PauseReason 
+  Mutes []schema.MuteRecord 
+  Base string 
+  ResolvedBase string 
+  Category schema.Category 
+  ExportedAt time.Time 
+  CreatedAt time.Time 
+  OriginalAddress string 
+  CancelledAt time.Time 
+  TotalTokens *int64 
+  HadCodex bool 
+  Friction *schema.FrictionSummary 
+struct tickets.Epic
+  Name string 
+  Path string 
+  IsMap bool 
+  Body string 
+  Tickets []tickets.Ticket 
+  HasTicketMD bool 
+  Status string 
+  BlockedBy []string 
+  Base string 
+  StartedAt time.Time 
+  CompletedAt time.Time 
+  CreatedAt time.Time 
+  MergedAt time.Time 
+  QueuedAt time.Time 
+  DesignStartedAt time.Time 
+  LinesAdded *int 
+  LinesRemoved *int 
+  TotalTokens *int64 
+  ActualCost float64 
+  HadCodex bool 
+  Friction *schema.FrictionSummary 
+  MergeBlockKind string 
+  MergeBlockReason string 
+  MergeBlockFiles []string 
+  TrunkFastForwardedAt time.Time 
+  TrunkConflictBackup string 
+  TrunkConflictFiles []string 
+  MergeTarget string 
+  EvolvedAt time.Time 
+  EvolveSkipped bool 
+  EvolveTicket string 
+  DestinationUnconfirmed bool 
+  DesignStep string 
+  FrontmatterErrs []string 
+  forks *tickets.forkCache 
+struct tickets.EpicFields
+  Kind string yaml:"kind,omitempty"
+  Status string yaml:"status,omitempty"
+  DestinationUnconfirmed bool yaml:"destination_unconfirmed,omitempty"
+  CreatedAt time.Time yaml:"created_at,omitempty"
+enum category: bug idea
+enum iteration_status:  asking finished working
+enum pause_kind: agent_name_taken agent_pane_busy agent_prompt_stalled all-paused ambiguous-base ambiguous-merge background-task-gate blocked-cycle blocked-pane budget-killed conflict-markers dirty-trunk duplicate-live handle-mismatch iteration-error manual merge-conflict merge-error merge-unreported needs-rebase parent-defect retry-exhausted self-reported spinning stranded-commits trunk-missing zero-commit
+enum pause_reason: agent_name_taken agent_pane_busy agent_prompt_stalled ambiguous-base ambiguous-merge background-task-gate blocked-cycle blocked-pane budget-killed conflict-markers dirty-trunk duplicate-live handle-mismatch iteration-error manual merge-conflict merge-error merge-unreported needs-rebase parent-defect retry-exhausted self-reported spinning stranded-commits trunk-missing zero-commit
+enum status: cancelled claimed done draft needs-answer needs-repair open paused
+enum type: code-review conflict-resolution diagnose evolve grilling implement investigate merge prompt prototype research trunk-conflict verify
+epic server-stamped: created_at completed_at merged_at queued_at design_started_at land_block_kind land_block_reason land_block_files trunk_fast_forwarded_at trunk_conflict_backup trunk_conflict_files evolved_at evolve_skipped evolve_ticket lines_added lines_removed total_tokens actual_cost had_codex friction
+sections: ## Paused | ## Needs Answer | ## Needs Repair

@@ -24,6 +24,14 @@ See `~/.dotfiles/core/ai/skills/setup-elentok-skills/issue-tracker-local.md`.
 
 Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+## Adding a Migration step
+
+- A change to the ticket or epic schema (field, enum value, section name) needs a new named step
+  in `migrations/steps.go`. Add one; never rename or reuse a released step name.
+- Then update `migrations/testdata/schema.snapshot`:
+  `go test ./migrations -run TestSchemaSnapshot -update-schema-snapshot`. The guard test fails
+  until you do.
+
 ## Testing
 
 - Test the packages you touched plus their direct importers (find importers with the gopls-mcp

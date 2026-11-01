@@ -206,6 +206,16 @@ func Kinds() []Kind {
 // Valid reports whether k is in the closed enum.
 func (k Kind) Valid() bool { return kinds[k] }
 
+// KindNames is the closed enum, sorted.
+func KindNames() []string {
+	out := make([]string, 0, len(kinds))
+	for k := range kinds {
+		out = append(out, string(k))
+	}
+	slices.Sort(out)
+	return out
+}
+
 // kindAwaitsAnswer lists the kinds that pause a ticket as a question for a
 // person; every other kind is a fault to repair. schema's class table is the
 // same decision, and a test there keeps the two equal (events cannot import

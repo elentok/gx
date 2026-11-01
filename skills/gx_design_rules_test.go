@@ -104,6 +104,18 @@ func TestGxDesignChartingSessionSubagentTiers(t *testing.T) {
 	}
 }
 
+func TestGxDesignRubricFlagsSchemaChangeWithoutMigrationStep(t *testing.T) {
+	text := collapseSpace(readFile(t, "gx-design/SKILL.md"))
+	start := strings.Index(text, "## Design-review rubric (step 5)")
+	end := strings.Index(text, "## After every run")
+	if start < 0 || end < start {
+		t.Fatal("gx-design/SKILL.md lacks the rubric section")
+	}
+	if !strings.Contains(text[start:end], "without a new migration step") {
+		t.Error("rubric lacks the migration step line")
+	}
+}
+
 func TestGxResearchRunsOnWorkerTier(t *testing.T) {
 	for _, f := range []string{"gx-research/SKILL.md", "gx-wayfinder/SKILL.md"} {
 		if !strings.Contains(readFile(t, f), "`gx agent model worker`") {
