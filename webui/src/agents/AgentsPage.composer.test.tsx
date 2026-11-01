@@ -1,5 +1,6 @@
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
-import { expect, test, vi } from "vitest";
+import { cleanup, createEvent, fireEvent, screen, within } from "@testing-library/react";
+import { describe, expect, test, vi } from "vitest";
+import { clearCommandListCache } from "../commands/useCommandList";
 import type { SessionChatResponse, SessionInfo } from "../generated/server";
 import { accepted, chat, chatOf, composerBox, prompts, refused, render, sendButton, session, stubPrompt, type, useAgentsPageHooks } from "./agentsTestKit";
 
@@ -262,4 +263,97 @@ test("a plain session shows no driven line", async () => {
   render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
   await composerBox();
   expect(screen.queryByRole("button", { name: "Turn on composer" })).toBeNull();
+});
+
+const canned = {
+  degraded: false,
+  entries: [
+    { name: "compact", aliases: [], arg_hint: "", description: "Compact", source: "built-in" },
+    { name: "context", aliases: [], arg_hint: "", description: "Context", source: "built-in" },
+    { name: "help", aliases: [], arg_hint: "", description: "Help", source: "built-in" },
+  ],
+};
+
+function stubCommands() {
+  clearCommandListCache();
+  prompts.length = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init: { body: string }) => {
+      if (url.startsWith("/v1/sessions/commands")) return new Response(JSON.stringify(canned));
+      if (url === "/v1/sessions/prompt") {
+        prompts.push(JSON.parse(init.body));
+        return accepted();
+      }
+      return new Response("{}");
+    }),
+  );
+}
+
+const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
+
+describe("completion menu", () => {
+  test("/ opens, /co filters, a space closes, Escape closes", async () => {
+    stubCommands();
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await type("/");
+    await vi.waitFor(() => expect(options()).toHaveLength(3));
+    await type("/co");
+    expect(options()).toHaveLength(2);
+    await type("/co ");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    await type("/co");
+    expect(screen.queryByRole("listbox")).not.toBeNull();
+    fireEvent.keyDown(await composerBox(), { key: "Escape" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  test("Down then Enter fills and sends nothing; Cmd+Enter sends the typed text", async () => {
+    stubCommands();
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await type("/co");
+    await vi.waitFor(() => expect(options()).toHaveLength(2));
+    const box = await composerBox();
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(box.value).toBe("/context ");
+    expect(prompts).toEqual([]);
+    await type("/co");
+    fireEvent.keyDown(box, { key: "Enter", metaKey: true });
+    await vi.waitFor(() => expect(prompts).toEqual([expect.objectContaining({ text: "/co" })]));
+  });
+
+  test("a click fills the row", async () => {
+    stubCommands();
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await type("/h");
+    fireEvent.click(await screen.findByRole("option"));
+    expect((await composerBox()).value).toBe("/help ");
+  });
+
+  test("with no match Enter is not taken", async () => {
+    stubCommands();
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await type("/zzz");
+    expect(await screen.findByText(/No command matches \/zzz/)).toBeTruthy();
+    const box = await composerBox();
+    const ev = createEvent.keyDown(box, { key: "Enter" });
+    fireEvent(box, ev);
+    expect(ev.defaultPrevented).toBe(false);
+  });
+
+  test("a composer that cannot send shows no menu", async () => {
+    stubCommands();
+    render([session("s-1", "p", { status: { state: "working" } })], "/agents/s-1", true, chatOf(chat()), true);
+    await type("/co");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  test("$ opens nothing for a Claude session", async () => {
+    stubCommands();
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await type("$ab");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.queryByText(/Loading commands/)).toBeNull();
+  });
 });

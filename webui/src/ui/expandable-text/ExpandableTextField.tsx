@@ -1,5 +1,6 @@
 import { Box, chakra, Textarea } from "@chakra-ui/react";
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MutableRefObject, type ReactNode } from "react";
+import { useCompletion, type CompletionConfig } from "../../commands/useCompletion";
 import { LargeEditor, type Selection } from "./LargeEditor";
 import { fieldLook } from "./look";
 import { isMac } from "../../platform";
@@ -15,20 +16,7 @@ export function submitOnCmdEnter(
   submit();
 }
 
-/** A textarea with an expand button that opens a large editor on the same text. The parent owns the text; there is no copy and no save step. */
-export function ExpandableTextField({
-  value,
-  onChange,
-  rows,
-  label,
-  title,
-  placeholder,
-  disabled,
-  autoFocus,
-  onSubmit,
-  size,
-  radius = "12px",
-}: {
+interface FieldProps {
   value: string;
   onChange: (text: string) => void;
   rows?: number;
@@ -43,8 +31,56 @@ export function ExpandableTextField({
   onSubmit?: () => void;
   size?: "sm" | "md";
   radius?: string;
-}) {
+  /** Opt in to the command completion menu in the inline textarea. */
+  completion?: CompletionConfig;
+}
+
+/** A textarea with an expand button that opens a large editor on the same text. The parent owns the text; there is no copy and no save step. */
+export function ExpandableTextField(props: FieldProps) {
+  const { completion, ...rest } = props;
+  return completion ? <Completing {...rest} config={completion} /> : <Field {...rest} />;
+}
+
+interface Menu {
+  node: ReactNode;
+  onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => boolean;
+  onCursor: (cursor: number) => void;
+  /** Where the cursor goes once the filled text has rendered. */
+  pending: MutableRefObject<number | null>;
+}
+
+function Completing({ config, ...rest }: Omit<FieldProps, "completion"> & { config: CompletionConfig }) {
+  const [cursor, setCursor] = useState(0);
+  const pending = useRef<number | null>(null);
+  const c = useCompletion(config, rest.value, cursor, rest.disabled, (text, at) => {
+    pending.current = at;
+    rest.onChange(text);
+    setCursor(at);
+  });
+  return <Field {...rest} menu={{ node: c.menu, onKeyDown: c.onKeyDown, onCursor: setCursor, pending }} />;
+}
+
+function Field({
+  value,
+  onChange,
+  rows,
+  label,
+  title,
+  placeholder,
+  disabled,
+  autoFocus,
+  onSubmit,
+  size,
+  radius = "12px",
+  menu,
+}: Omit<FieldProps, "completion"> & { menu?: Menu }) {
   const area = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const at = menu?.pending.current;
+    if (at == null) return;
+    menu!.pending.current = null;
+    area.current?.setSelectionRange(at, at);
+  }, [value, menu]);
   const [selection, setSelection] = useState<Selection | null>(null);
   const open = () =>
     setSelection({
@@ -66,6 +102,7 @@ export function ExpandableTextField({
       open();
       return;
     }
+    if (menu?.onKeyDown(e)) return;
     if (onSubmit) submitOnCmdEnter(e, onSubmit);
   };
   return (
@@ -86,9 +123,14 @@ export function ExpandableTextField({
         placeholder={placeholder}
         disabled={disabled}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          menu?.onCursor(e.target.selectionStart);
+          onChange(e.target.value);
+        }}
+        onSelect={menu ? (e) => menu.onCursor(e.currentTarget.selectionStart) : undefined}
         onKeyDown={onKeyDown}
       />
+      {menu?.node}
       <chakra.button
         type="button"
         position="absolute"

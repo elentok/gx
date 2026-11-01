@@ -79,6 +79,7 @@ export function AgentComposer({
             value={text}
             onChange={setText}
             onSubmit={onSubmit}
+            completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}
           />
         </Box>
         <Button disabled={!enabled || text.trim() === ""} onClick={sendText}>
