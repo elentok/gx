@@ -83,7 +83,7 @@ The same flow has command-line verbs:
 ## Upgrade note: run migrate
 
 The person who runs the gx server runs `gx tickets migrate <path>` once after you upgrade. Pass the
-tracker root as `<path>`. gx does not run it at server start.
+tracker root as `<path>`. The server also runs the steps it has not applied yet at start-up.
 
 The step moves each live `## Needs Answer` and `## Handoff` section into the ticket log as a question
 (and an answer, if you answered by hand and the ticket is open again). A second run changes nothing.

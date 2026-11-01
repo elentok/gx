@@ -55,6 +55,7 @@ func (s *Server) migrateAll(ctx context.Context) {
 	} else if len(unknown) > 0 {
 		s.log.Warn("applied migrations unknown to this gx (a newer version ran them)", "names", strings.Join(unknown, ", "))
 	}
+	pass := &migrations.Pass{}
 	for _, dir := range dirs {
 		if ctx.Err() != nil {
 			return
@@ -63,7 +64,7 @@ func (s *Server) migrateAll(ctx context.Context) {
 		s.migratingMu.Lock()
 		s.markMigrationLocked(name, 1)
 		s.migratingMu.Unlock()
-		s.migrateProject(reg, dir)
+		s.migrateProject(reg, dir, pass)
 		s.endMigration(name)
 	}
 }
@@ -116,7 +117,7 @@ func (s *Server) retryMigration(project string) RetryMigrationResult {
 	}
 	go func() {
 		defer s.endMigration(project)
-		s.migrateProject(s.migrationRegistry(), dir)
+		s.migrateProject(s.migrationRegistry(), dir, &migrations.Pass{})
 	}()
 	return RetryMigrationResult{Started: true}
 }
@@ -153,7 +154,7 @@ func (s *Server) markMigrationLocked(project string, delta int) {
 	s.migratingNow[project] += delta
 }
 
-func (s *Server) migrateProject(reg *migrations.Registry, dir string) {
+func (s *Server) migrateProject(reg *migrations.Registry, dir string, pass *migrations.Pass) {
 	name := tickets.ProjectName(dir)
 	unlock, err := projectlock.Exclusive(dir)
 	if err != nil {
@@ -165,6 +166,7 @@ func (s *Server) migrateProject(reg *migrations.Registry, dir string) {
 		Dirs: config.DirsFrom(s.cfg.Env), Root: dir, LookupRoot: dir,
 		AppliedPath: filepath.Join(dir, migrations.AppliedFile),
 		SkipApplied: true,
+		StateDir:    s.cfg.StateDir, Pass: pass,
 	})
 	for _, c := range changes {
 		for _, note := range c.Notes {

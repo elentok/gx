@@ -71,9 +71,14 @@ func runTicketsMigrate(dirs config.Dirs, scratchRoot string, dryRun bool, w io.W
 	}
 	defer unlock()
 	// By hand every step reruns, so SkipApplied stays false; the run still records.
+	state, err := dirs.StateDir()
+	if err != nil {
+		return err
+	}
 	changes, early, err := migrations.Run(migrations.Env{
 		Dirs: dirs, Root: scratchRoot, LookupRoot: scratchRoot,
 		AppliedPath: filepath.Join(scratchRoot, migrations.AppliedFile),
+		StateDir:    state, Pass: &migrations.Pass{},
 	})
 	if err == nil {
 		if clearErr := clearMigrationFailure(dirs, scratchRoot); clearErr != nil {
@@ -149,7 +154,11 @@ func dryRunChanges(dirs config.Dirs, scratchRoot string, skipApplied bool) ([]ti
 		}
 	}
 
-	env := migrations.Env{Dirs: dirs, Root: work, LookupRoot: scratchRoot, DryRun: true}
+	state, err := dirs.StateDir()
+	if err != nil {
+		return nil, err
+	}
+	env := migrations.Env{Dirs: dirs, Root: work, LookupRoot: scratchRoot, DryRun: true, StateDir: state, Pass: &migrations.Pass{}}
 	if skipApplied {
 		env.SkipApplied, env.AppliedPath = true, filepath.Join(work, migrations.AppliedFile)
 	}
