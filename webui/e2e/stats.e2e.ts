@@ -1,3 +1,5 @@
+import { appendFile, mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import type { Locator, Page } from "@playwright/test";
 import { expect, nav, test } from "./fixture";
 
@@ -175,6 +177,57 @@ test("183. Stats tokens and spend by group", async ({ page, start }) => {
   expect(await tokens.innerText()).not.toBe(allTotal);
   expect(await tokens.locator("[data-bar]").count()).toBeLessThan(allBars);
   expect(await spend.innerText()).not.toBe(allSpend);
+});
+
+test("184. Live token ledger", async ({ page, start }) => {
+  test.setTimeout(120_000);
+  const fixture = await start("limit-burn", { shape: "live" });
+  const groups = { queue: "Queue", design: "Design", one_off: "One-off", other: "Other" };
+  const append = async (tokens: number) => {
+    for (const path of Object.values(fixture.transcripts)) {
+      await mkdir(dirname(path), { recursive: true });
+      const line = { type: "assistant", timestamp: new Date().toISOString(), message: { model: "claude-sonnet-4-5", usage: { input_tokens: tokens, output_tokens: 0 } } };
+      await appendFile(path, JSON.stringify(line) + "\n");
+    }
+  };
+  // Today's tokens per group from the CLI, the same numbers the page reads.
+  const today = async () => {
+    const stats = JSON.parse(await fixture.cli("server", "stats", "--json", "--range", "7"));
+    return Object.fromEntries(stats.cost.groups.map((g: { group: string; tokens: { value: number }[] }) => [g.group, g.tokens[g.tokens.length - 1].value])) as Record<string, number>;
+  };
+  const waitFor = async (want: (t: Record<string, number>) => boolean) => {
+    await expect.poll(async () => want(await today()), { timeout: 60_000 }).toBe(true);
+    return today();
+  };
+  expect(Object.keys(fixture.transcripts).sort()).toEqual(Object.keys(groups).sort());
+
+  // The first poll that sees a transcript only stores its total, so a baseline line goes in first.
+  await append(1000);
+  await new Promise((r) => setTimeout(r, 3000));
+  const before = await today();
+
+  await append(250_000);
+  const afterFirst = await waitFor((t) => Object.values(groups).every((g) => t[g] - before[g] === 250_000));
+
+  // Navigate by hash: a page reload fails the suite.
+  await page.evaluate(() => (location.hash = "#/stats"));
+  const tokens = costCard(page, /^Tokens/);
+  await tokens.waitFor();
+  const check = async (totals: Record<string, number>) => {
+    const tooltip = await tip(tokens, 29);
+    for (const g of Object.values(groups)) expect(tooltip).toMatch(new RegExp(`${g}: ${totals[g]}(?!\\d)`));
+  };
+  await check(afterFirst);
+
+  // Only the delta is added.
+  await append(100_000);
+  const afterSecond = await waitFor((t) => Object.values(groups).every((g) => t[g] - afterFirst[g] === 100_000));
+  await page.evaluate(() => (location.hash = "#/"));
+  await page.evaluate(() => (location.hash = "#/stats"));
+  await tokens.waitFor();
+  // The pointer still rests on the old bar; move it off so the new bar sees a fresh hover.
+  await page.mouse.move(0, 0);
+  await check(afterSecond);
 });
 
 test.describe("phone", () => {

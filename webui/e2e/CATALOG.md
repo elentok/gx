@@ -25,7 +25,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118, 119, 120, 121, 180, 181), `stats.e2e.ts` (flows 57, 182, 183), `migration.e2e.ts` (flows 161, 163, 168, 169, 170, 171), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 and 117 to 121 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118, 119, 120, 121, 180, 181), `stats.e2e.ts` (flows 57, 182, 183, 184), `migration.e2e.ts` (flows 161, 163, 168, 169, 170, 171), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 and 117 to 121 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -676,6 +676,14 @@ an exited session.
   - A finished ticket without a stamp is one hatched "no data" day; the quiet live day is a zero day, not hatched.
   - A Codex day shows Codex tokens but "Codex: $0" on Spend.
   - Project `demo` lowers the Tokens total and bar count (the "no project" rows drop out) and changes Spend.
+
+## 184. Live token ledger
+
+- **Scenario:** `limit-burn` (shape `live`: one held Claude agent each for Queue, Design, One-off and Other). `stats.e2e.ts`; run with `-g "Live token ledger"`.
+- **Steps:** append a baseline usage line to each agent's transcript; append 250,000 tokens to each; open `#/stats` by hash; append 100,000 more to each; reopen `#/stats` by hash.
+- **Pass:**
+  - After the first append every group gained exactly 250,000 tokens today in `gx server stats --json`, and today's Tokens bar tooltip lists all four groups with those numbers.
+  - After the second append every group gained exactly 100,000 more (only the delta is added), and the tooltip matches `gx server stats --json` again.
 
 ## 58. Dirty trunk on the Epic page
 

@@ -46,6 +46,8 @@ interface FixtureOutput {
   health_dir: string;
   /** The held fake agent's transcript path; only the `spend` scenario prints it. */
   agent_transcript?: string;
+  /** The `limit-burn` live shape's four Claude transcript paths, keyed queue, one_off, design and other. */
+  transcripts?: Record<string, string>;
   /** The held Codex worker's sessions dir; only the `limit-burn` scenario prints it. */
   codex_sessions_dir?: string;
   /** Only the restart scenarios have the fake restart binary's control dir. */
@@ -127,6 +129,8 @@ export interface Fixture {
   readonly totpSecret: string;
   /** The `spend` scenario's held agent transcript; append a usage line (create its directory first) to add spend. Empty elsewhere. */
   readonly agentTranscript: string;
+  /** The `limit-burn` live shape's transcript paths by cost group (queue, one_off, design, other); append usage lines to them. Empty elsewhere. */
+  readonly transcripts: Record<string, string>;
   /** The `limit-burn` scenario's Codex sessions dir; append a `token_count` line to its rollout to make the usage scan save a Codex sample. Empty elsewhere. */
   readonly codexSessionsDir: string;
 }
@@ -223,6 +227,7 @@ async function startFixture(
     password: out.password ?? "",
     totpSecret: out.totp_secret ?? "",
     agentTranscript: out.agent_transcript ?? "",
+    transcripts: out.transcripts ?? {},
     codexSessionsDir: out.codex_sessions_dir ?? "",
     async cli(...args) {
       const { stdout } = await run(out.gx, args, { env, cwd: tmpdir() });
