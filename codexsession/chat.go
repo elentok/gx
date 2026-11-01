@@ -144,7 +144,7 @@ func ReadChat(r io.Reader) (Chat, error) {
 			switch {
 			case p.Role == "assistant":
 				msg.Role, msg.Kind = transcript.ChatRoleAgent, transcript.ChatKindText
-			case strings.HasPrefix(msg.Text, gxCommandPrefix):
+			case strings.HasPrefix(msg.Text, gxCommandPrefix), strings.HasPrefix(msg.Text, "/"):
 				msg.Role, msg.Kind = transcript.ChatRolePerson, transcript.ChatKindCommand
 			default:
 				msg.Role, msg.Kind = transcript.ChatRolePerson, transcript.ChatKindPrompt
