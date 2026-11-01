@@ -66,14 +66,45 @@ function Entry({ m }: { m: SessionChatMessage }) {
       </Text>
     );
   }
-  if (m.kind === "output") {
-    return (
-      <Text as="pre" fontFamily="mono" fontSize="xs" color="text.muted" whiteSpace="pre-wrap">
-        {m.text}
-      </Text>
-    );
-  }
+  if (m.kind === "output") return <CommandOutput text={m.text} />;
   return <Markdown fontSize="base">{m.text}</Markdown>;
+}
+
+const OUTPUT_LINE_LIMIT = 12;
+
+// Plain text on purpose: command output is not Markdown, so `*` and `#` must stay literal.
+function CommandOutput({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const lines = text.split("\n");
+  const cut = !expanded && lines.length > OUTPUT_LINE_LIMIT;
+  return (
+    <Box alignSelf="flex-end" maxW="85%" display="flex" flexDirection="column" alignItems="flex-end" gap="1.5">
+      <Text
+        as="pre"
+        data-testid="command-output"
+        w="max-content"
+        maxW="100%"
+        borderInlineStart="2px solid"
+        borderColor="border"
+        px="2.5"
+        py="0.5"
+        fontFamily="mono"
+        fontSize="xs"
+        lineHeight="1.5"
+        color="text.dim"
+        textAlign="left"
+        whiteSpace="pre"
+        overflow="hidden"
+      >
+        {cut ? `${lines.slice(0, OUTPUT_LINE_LIMIT).join("\n")}\n…` : text}
+      </Text>
+      {cut && (
+        <Button size="sm" emphasis="ghost" tone="running" onClick={() => setExpanded(true)}>
+          {`Show all (${lines.length} lines)`}
+        </Button>
+      )}
+    </Box>
+  );
 }
 
 function BackgroundStrip({ tasks }: { tasks: SessionBackgroundTask[] }) {

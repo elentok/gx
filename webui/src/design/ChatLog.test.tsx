@@ -135,6 +135,31 @@ test("each entry kind renders", async () => {
   expect(screen.getByText("Earlier messages hidden")).toBeTruthy();
 });
 
+const outputLines = (n: number) => Array.from({ length: n }, (_, i) => `line ${i + 1}`).join("\n");
+
+test("long command output is cut at 12 lines until Show all", async () => {
+  renderChat([session()], okChat(chatOf([msg({ role: "person", kind: "command", text: "/cost" }), msg({ kind: "output", text: outputLines(14) })])));
+  const out = await screen.findByTestId("command-output");
+  expect(out.textContent).toContain("line 12");
+  expect(out.textContent).not.toContain("line 13");
+  fireEvent.click(screen.getByRole("button", { name: "Show all (14 lines)" }));
+  expect(screen.getByTestId("command-output").textContent).toContain("line 14");
+});
+
+test("command output keeps Markdown characters literal", async () => {
+  renderChat([session()], okChat(chatOf([msg({ kind: "output", text: "**not bold**\n# not a heading" })])));
+  const out = await screen.findByTestId("command-output");
+  expect(out.textContent).toBe("**not bold**\n# not a heading");
+  expect(out.querySelector("strong")).toBeNull();
+});
+
+test("a command without output shows only the pill", async () => {
+  renderChat([session()], okChat(chatOf([msg({ role: "person", kind: "command", text: "/clear" })])));
+  await screen.findByText("/clear");
+  expect(screen.queryByTestId("command-output")).toBeNull();
+  expect(screen.queryByRole("button", { name: /Show all/ })).toBeNull();
+});
+
 test("tool messages render nothing, busy or idle", async () => {
   const chat = okChat(chatOf([msg({ text: "hi" }), msg({ kind: "tools", tool_count: 3, last_tool: "Grep" })]));
   renderChat([session({ status: { state: "working" } })], chat);
