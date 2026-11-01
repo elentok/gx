@@ -146,6 +146,17 @@ test("long command output is cut at 12 lines until Show all", async () => {
   expect(screen.getByTestId("command-output").textContent).toContain("line 14");
 });
 
+test("on a phone the output, its pill and Show all share one right-aligned block capped at 85%", async () => {
+  renderChat([session()], okChat(chatOf([msg({ role: "person", kind: "command", text: "/cost" }), msg({ kind: "output", text: outputLines(14) })])));
+  const out = await screen.findByTestId("command-output");
+  const block = out.parentElement as HTMLElement;
+  expect(block.contains(screen.getByRole("button", { name: "Show all (14 lines)" }))).toBe(true);
+  const style = getComputedStyle(block);
+  expect(style.alignSelf).toBe("flex-end");
+  expect(style.maxWidth).toBe("85%");
+  expect(getComputedStyle(out).overflow).toBe("hidden");
+});
+
 test("command output keeps Markdown characters literal", async () => {
   renderChat([session()], okChat(chatOf([msg({ kind: "output", text: "**not bold**\n# not a heading" })])));
   const out = await screen.findByTestId("command-output");

@@ -55,11 +55,13 @@ function Entry({ m }: { m: SessionChatMessage }) {
       <Text
         as="span"
         alignSelf="flex-end"
+        fontFamily="mono"
         fontSize="xs"
-        color="text.muted"
+        color="text"
+        bg="surface.raised"
         border="1px solid"
         borderColor="border"
-        borderRadius="full"
+        borderRadius="md"
         px="2"
       >
         {m.text}
