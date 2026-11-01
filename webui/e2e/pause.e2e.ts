@@ -193,6 +193,20 @@ test.describe("3. Pause reasons and recovery", () => {
   });
 });
 
+test.describe("147. Resume on worker", () => {
+  test("a model-mismatch pause resumes on the worker tier", async ({ page, start }) => {
+    await start("model-mismatch");
+    await page.evaluate((hash) => (location.hash = hash), "#/t/demo:mismatch-epic/01");
+
+    await expect(page.getByText("Wrong model").first()).toBeVisible();
+    await expect(recovery(page).getByText("Ran on claude-opus-4, expected claude-sonnet-4.")).toBeVisible();
+    await expect(recovery(page).getByRole("button")).toHaveText([/^Resume on worker$/]);
+
+    await recovery(page).getByRole("button", nav("Resume on worker")).click();
+    await expect(page.getByText("Wrong model")).toHaveCount(0);
+  });
+});
+
 const fixDialog = (page: Page) => page.getByRole("dialog", { name: "Fix it with an agent" });
 const fixPrompt = "/gx-investigate demo:paused-epic/07 is paused for repair: Run failed";
 

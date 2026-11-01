@@ -20,6 +20,8 @@ const (
 	ActionChooseBase     = "choose-base"
 	ActionReopenAndRetry = "reopen-and-retry"
 	ActionStashMerge     = "stash-merge"
+	// ActionResumeOnWorker ends a model-mismatch pause; the web posts a resume with tier=worker.
+	ActionResumeOnWorker = "resume-on-worker"
 )
 
 // Outcomes of a pause round.
@@ -124,6 +126,9 @@ type TicketDetail struct {
 	PauseReason string `json:"pause_reason,omitempty"`
 	// PauseLabel is PauseReason in the plain words the summaries and Queue show.
 	PauseLabel string `json:"pause_label,omitempty"`
+	// ModelRan and ModelExpected are the two models a model-mismatch pause shows.
+	ModelRan      string `json:"model_ran,omitempty"`
+	ModelExpected string `json:"model_expected,omitempty"`
 	// PauseText is the body's "## Paused" section; the body keeps it too, so the
 	// client leaves it out of the description.
 	PauseText string `json:"pause_text,omitempty"`
@@ -298,6 +303,9 @@ func fillHeader(d *TicketDetail, ref ticketRef, t schema.Ticket) {
 	d.Status = string(storedStatus(t))
 	d.PauseReason = string(t.PauseReason)
 	d.PauseLabel = t.PauseReason.Label()
+	if t.PauseReason == schema.PauseModelMismatch {
+		d.ModelRan, d.ModelExpected = t.ModelRan, t.ModelExpected
+	}
 	d.Type = ref.ticket.Type
 	d.Body = ref.ticket.Body
 	if ref.epic.RenderedStatus(ref.ticket) == tickets.StatusError {

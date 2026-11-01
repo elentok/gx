@@ -3,6 +3,7 @@ import {
   ActionMerge,
   ActionReopenAndRetry,
   ActionResume,
+  ActionResumeOnWorker,
   ActionRetry,
   ActionStartOver,
   type Action,
@@ -22,6 +23,8 @@ export interface RecoverBody {
   stop?: boolean;
   /** Start over only: why the work is thrown away. */
   reason?: string;
+  /** Resume only: a one-time tier for the ticket's next launch. */
+  tier?: string;
 }
 
 export type PostRecover = (action: string, body: RecoverBody) => Promise<Refusable>;
@@ -30,6 +33,7 @@ export type PostRecover = (action: string, body: RecoverBody) => Promise<Refusab
 // stash-merge has no route here yet, so the map is partial over the Action union.
 const ROUTES: Partial<Record<Action, string>> = {
   [ActionResume]: "/v1/tickets/resume",
+  [ActionResumeOnWorker]: "/v1/tickets/resume",
   [ActionChooseBase]: "/v1/tickets/resume",
   [ActionReopenAndRetry]: "/v1/tickets/resume",
   [ActionRetry]: "/v1/tickets/retry",

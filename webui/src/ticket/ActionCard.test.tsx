@@ -88,6 +88,7 @@ const info = {
   "start-over": { label: "Start over", tooltip: "Throw away the work and run again." },
   merge: { label: "Merge again", tooltip: "Merge the commits again." },
   resume: { label: "Resume", tooltip: "Lift the pause." },
+  "resume-on-worker": { label: "Resume on worker", tooltip: "Run the ticket again on its tier's model." },
   "reopen-and-retry": { label: "Reopen and retry", tooltip: "Reopen the ticket." },
 };
 const repair = (actions: (keyof typeof info)[], extra: Partial<TicketDetail> = {}): TicketDetail => ({
@@ -136,6 +137,34 @@ test("Resume posts to the resume route and shows a success toast", async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
   expect(await screen.findByText("Resumed")).toBeTruthy();
   expect(posted(fetchMock)[0]).toEqual(["/v1/tickets/resume", { address: "gx:demo/12", state: "tok-3" }]);
+});
+
+test("a model-mismatch pause shows both models and one Resume on worker button that posts tier=worker", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify({ data: { ticket: "12", status: "open" } })));
+  vi.stubGlobal("fetch", fetchMock);
+  renderTicket(() =>
+    repair(["resume-on-worker"], {
+      pause_reason: "model-mismatch",
+      model_ran: "claude-opus-4",
+      model_expected: "claude-sonnet-4",
+    }),
+  );
+  const c = await screen.findByRole("group", { name: "Action card" });
+  expect(c.textContent).toContain("claude-opus-4");
+  expect(c.textContent).toContain("claude-sonnet-4");
+  expect(screen.queryByRole("button", { name: "Resume" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Resume on worker" }));
+  await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+  expect(posted(fetchMock)[0]).toEqual([
+    "/v1/tickets/resume",
+    { address: "gx:demo/12", state: "tok-3", tier: "worker" },
+  ]);
+});
+
+test("other pauses show no Resume on worker button", async () => {
+  renderTicket(() => repair(["resume", "start-over"], { pause_reason: "manual" }));
+  await screen.findByRole("button", { name: "Resume" });
+  expect(screen.queryByRole("button", { name: "Resume on worker" })).toBeNull();
 });
 
 test("Merge again posts to the merge route", async () => {

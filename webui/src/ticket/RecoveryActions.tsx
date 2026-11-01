@@ -1,6 +1,13 @@
 import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useState } from "react";
-import { ActionChooseBase, ActionResume, ActionRetry, ActionStartOver, type TicketDetail } from "../generated/server";
+import {
+  ActionChooseBase,
+  ActionResume,
+  ActionResumeOnWorker,
+  ActionRetry,
+  ActionStartOver,
+  type TicketDetail,
+} from "../generated/server";
 import { Button } from "../ui/button/Button";
 import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import { Modal } from "../ui/modal/Modal";
@@ -8,7 +15,10 @@ import { useWrite, type Refusable } from "../useWrite";
 import { ReasonStale } from "./answer";
 import { isRecoverAction, postRecover, ReasonAgentWorking, type PostRecover, type RecoverBody } from "./recover";
 
-const SUCCESS_TOASTS: Record<string, string> = { [ActionRetry]: "Retry started", [ActionResume]: "Resumed" };
+const SUCCESS_TOASTS: Record<string, string> = { [ActionRetry]: "Retry started", [ActionResume]: "Resumed", [ActionResumeOnWorker]: "Resumed" };
+
+// The web verb resume-on-worker is a resume whose next launch uses the worker tier.
+const WORKER_TIER = "worker";
 
 // A resume of a zero-commit pause with a live agent prompts it and leaves the pause in place.
 const PROMPTED_TOAST = "Sent to the running agent. The ticket stays paused until it finishes.";
@@ -46,7 +56,8 @@ export function RecoveryActions({
   const send = (action: string, extra: Partial<RecoverBody> = {}) =>
     run(
       async () => {
-        const res = await post(action, { address: detail.address, state: detail.state ?? "", ...extra });
+        const tier = action === ActionResumeOnWorker ? { tier: WORKER_TIER } : {};
+        const res = await post(action, { address: detail.address, state: detail.state ?? "", ...tier, ...extra });
         if (res.refused && res.reason === ReasonStale) onStale?.();
         return res;
       },
@@ -78,6 +89,11 @@ export function RecoveryActions({
       role="form"
     >
       {detail.recommendation && <Text whiteSpace="pre-wrap">{detail.recommendation.diagnosis}</Text>}
+      {detail.model_ran && detail.model_expected && (
+        <Text>
+          Ran on {detail.model_ran}, expected {detail.model_expected}.
+        </Text>
+      )}
       {bases.length > 0 && actions.includes(ActionChooseBase) && (
         <>
           <Text>Choose the base branch:</Text>

@@ -329,6 +329,15 @@ var scenarios = map[string]scenario{
 			return f.commitOnBranch(repo, "ralph-loop/paused-epic-item-05", "conflict.txt", "branch")
 		},
 	},
+	// model-mismatch: one ticket paused because its session ran on a model other
+	// than its tier's. The epic is not queued, so nothing launches under it.
+	"model-mismatch": {
+		epics: []epic{
+			{project, "mismatch-epic", []ticket{
+				{"01", "mismatch", servertest.TicketOpts{PauseReason: "model-mismatch", ModelRan: "claude-opus-4", ModelExpected: "claude-sonnet-4"}},
+			}},
+		},
+	},
 	// design: a map epic at the Resolve tickets step, with open tickets. Its
 	// design session replays fakeclaude's scripted chat. Its implementation
 	// epic exists, so Progress links to it at Branch and Done.

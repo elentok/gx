@@ -149,6 +149,9 @@ type TicketOpts struct {
 	Agent     string // the ticket's agent: frontmatter field, omitted when empty
 	// PauseReason writes status: paused with this pause_reason; Status is ignored.
 	PauseReason string
+	// ModelRan and ModelExpected are the model_ran and model_expected fields of a
+	// model-mismatch pause, omitted when empty.
+	ModelRan, ModelExpected string
 	// Category is the ticket's category: frontmatter field ("bug", "idea"), omitted when empty.
 	Category string
 	// ClaimedAt, DoneAt and CancelledAt are RFC 3339 stamps, omitted when empty.
@@ -206,6 +209,12 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 	fm := "---\nid: \"" + id + "\"\nstatus: " + opts.Status + "\ntype: " + opts.Type + "\n"
 	if opts.PauseReason != "" {
 		fm = "---\nid: \"" + id + "\"\nstatus: paused\npause_reason: " + opts.PauseReason + "\ntype: " + opts.Type + "\n"
+	}
+	if opts.ModelRan != "" {
+		fm += "model_ran: " + opts.ModelRan + "\n"
+	}
+	if opts.ModelExpected != "" {
+		fm += "model_expected: " + opts.ModelExpected + "\n"
 	}
 	if opts.Parent != "" {
 		fm += "parent: \"" + opts.Parent + "\"\n"

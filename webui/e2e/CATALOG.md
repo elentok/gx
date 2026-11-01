@@ -1630,3 +1630,12 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 - **Scenario:** `restart-launchd`, `check.json` version `launchd-version`.
 - **Steps:** open the dialog.
 - **Pass:** it reads "Next version: launchd-version" and Restart is enabled.
+
+## 147. Resume on worker
+
+- **Scenario:** `model-mismatch`, one ticket `demo:mismatch-epic/01` paused as `model-mismatch` (ran on `claude-opus-4`, expected `claude-sonnet-4`); no reload allowed.
+- **Steps:** open the ticket page; click Resume on worker.
+- **Pass:**
+  - The page reads "Wrong model" and "Ran on claude-opus-4, expected claude-sonnet-4."
+  - Resume on worker is the only recovery button.
+  - After the click the pause label is gone.

@@ -191,9 +191,13 @@ export const ActionChooseBase = "choose-base";
 export const ActionReopenAndRetry = "reopen-and-retry";
 export const ActionStashMerge = "stash-merge";
 /**
+ * ActionResumeOnWorker ends a model-mismatch pause; the web posts a resume with tier=worker.
+ */
+export const ActionResumeOnWorker = "resume-on-worker";
+/**
  * Actions the detail route offers. The server decides them; the UI renders them.
  */
-export type Action = typeof ActionAnswer | typeof ActionApprove | typeof ActionResume | typeof ActionRetry | typeof ActionStartOver | typeof ActionMerge | typeof ActionChooseBase | typeof ActionReopenAndRetry | typeof ActionStashMerge;
+export type Action = typeof ActionAnswer | typeof ActionApprove | typeof ActionResume | typeof ActionRetry | typeof ActionStartOver | typeof ActionMerge | typeof ActionChooseBase | typeof ActionReopenAndRetry | typeof ActionStashMerge | typeof ActionResumeOnWorker;
 export const RoundOpen = "open";
 export const RoundAnswered = "answered";
 export const RoundClosed = "closed";
@@ -301,6 +305,11 @@ export interface TicketDetail {
    * PauseLabel is PauseReason in the plain words the summaries and Queue show.
    */
   pause_label?: string;
+  /**
+   * ModelRan and ModelExpected are the two models a model-mismatch pause shows.
+   */
+  model_ran?: string;
+  model_expected?: string;
   /**
    * PauseText is the body's "## Paused" section; the body keeps it too, so the
    * client leaves it out of the description.
