@@ -9,6 +9,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/transcript"
 )
 
 var _ agentrunner.LaunchPrompter = (*Pty)(nil)
@@ -36,6 +37,9 @@ func (p *Pty) PromptLaunch(s agentrunner.Session, text string, onNudge func(stri
 	if person, stop, err := p.PersonInput(s); err == nil {
 		defer stop()
 		pr.person = person
+	}
+	if err := pr.awaitReady(home); err != nil {
+		return err
 	}
 	if err := pr.awaitEmptyInput(p.promptGrace()); err != nil {
 		return notDelivered(err)
@@ -83,6 +87,41 @@ func (p *Pty) PromptLaunch(s agentrunner.Session, text string, onNudge func(stri
 		return fmt.Errorf("%w: %q started no turn", agentrunner.ErrNotDelivered, text)
 	}
 	return nil
+}
+
+// DefaultReadyWait caps the wait for a launch prompt's ready signal.
+const DefaultReadyWait = 30 * time.Second
+
+// awaitReady waits for claude's ready signal: the input box on screen and the
+// session transcript on disk. A missing signal is logged and the prompt goes
+// anyway: the resend loop in CheckLaunchDelivered backstops a wrong signal, and
+// a claude that never shows it must still get its prompt.
+func (pr *ptyPrompter) awaitReady(home string) error {
+	p := pr.p
+	wait := cmp.Or(p.ReadyWait, DefaultReadyWait)
+	deadline := time.Now().Add(wait)
+	rows := HolderTypingIO(pr.ss.holder).Rows
+	for {
+		screen, err := rows()
+		if err != nil {
+			return p.died(pr.ss, err)
+		}
+		files, err := transcript.FindByID(home, pr.ss.session.SessionID)
+		if err == nil && len(files) == 1 && claudeui.InputBox(screen) {
+			return nil
+		}
+		if !time.Now().Before(deadline) {
+			if p.log != nil {
+				p.log.Warn("ready signal missing, sending the launch prompt anyway", "session", pr.ss.session.SessionID, "waited", wait)
+			}
+			return nil
+		}
+		select {
+		case <-pr.ss.exited:
+			return p.died(pr.ss, errors.New("holder exited"))
+		case <-time.After(p.pollInterval()):
+		}
+	}
 }
 
 // launchCaps is the launch proof's caps with LaunchCaps' set fields applied.

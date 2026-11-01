@@ -62,6 +62,10 @@ const (
 	// TUILaunchRecordEnv, set to "1", makes a skill prompt's first transcript
 	// record the user record claude writes for the command.
 	TUILaunchRecordEnv = "GX_AGENTFAKE_TUI_LAUNCH_RECORD"
+	// TUIReadyDelayEnv, a Go duration ("0s" for none), makes the fake give the
+	// ready signal a launch prompt waits for: an input box and a transcript
+	// file, held back for that long after start. Unset, it gives neither.
+	TUIReadyDelayEnv = "GX_AGENTFAKE_TUI_READY_DELAY"
 )
 
 // UnknownCommandText is what claude draws, and records, for a skill it doesn't know.
@@ -260,6 +264,9 @@ type tuiOptions struct {
 	unknownSkill  bool
 	noTurn        bool
 	launchRecord  bool
+	// readySignal turns the ready signal on (see TUIReadyDelayEnv).
+	readySignal bool
+	readyDelay  time.Duration
 	// model is --model, reported on every reply.
 	model string
 	// settings is --settings: inline JSON or a path to a JSON file.
@@ -301,7 +308,10 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		return tuiOptions{}, errors.New("agentfake: --session-id or --resume is required")
 	}
 	registryDelay, _ := time.ParseDuration(os.Getenv(TUIRegistryDelayEnv))
+	readyDelay, _ := time.ParseDuration(os.Getenv(TUIReadyDelayEnv))
 	return tuiOptions{
+		readySignal:   os.Getenv(TUIReadyDelayEnv) != "",
+		readyDelay:    readyDelay,
 		sessionID:     *sessionID,
 		trust:         os.Getenv(TUITrustEnv) == "1",
 		dropKey:       os.Getenv(TUITrustDropKeyEnv) == "1",
@@ -634,8 +644,40 @@ func (t *tui) startSession() error {
 	if err := t.writePid(); err != nil {
 		return err
 	}
-	return t.setStatus(StatusIdle, "")
+	if err := t.setStatus(StatusIdle, ""); err != nil {
+		return err
+	}
+	// Claude has its transcript file once it is ready.
+	if !t.opts.readySignal {
+		return nil
+	}
+	if t.opts.readyDelay > 0 {
+		time.AfterFunc(t.opts.readyDelay, func() {
+			_ = t.touchTranscript()
+			t.draw()
+		})
+		return nil
+	}
+	return t.touchTranscript()
 }
+
+func (t *tui) touchTranscript() error {
+	path, err := t.transcriptPath()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+// ready is whether the input box shows yet.
+func (t *tui) ready() bool { return time.Since(t.started) >= t.opts.readyDelay }
 
 // submit is Enter. A stalled fake leaves the text unsent in the input box.
 func (t *tui) submit() error {
@@ -1052,6 +1094,12 @@ func (t *tui) draw() {
 			input = promptMarker + "\x1b[2m" + ProgramPlaceholder + "\x1b[0m"
 		}
 		rows = []string{colored("✻ Welcome to Claude Code"), "", input}
+	case t.opts.readySignal && t.typed.Len() == 0 && t.ready():
+		// The input box claudeui.InputBox recognises; typed text echoes as "> ".
+		const rule = "────────────────────"
+		rows = []string{colored("✻ Welcome to Claude Code"), "", rule, "❯ ", rule}
+	case t.opts.readySignal && t.typed.Len() == 0:
+		rows = []string{colored("✻ Welcome to Claude Code"), "", "Loading…"}
 	default:
 		rows = []string{colored("✻ Welcome to Claude Code"), "", "> " + t.typed.String()}
 	}

@@ -2,6 +2,7 @@ package nativerunner_test
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,6 +21,8 @@ import (
 func launchPty(t *testing.T, caps claudeui.LaunchProofCaps, env ...string) (*nativerunner.Pty, agentrunner.Session) {
 	t.Helper()
 	p := newPty(t)
+	// A later entry wins, so a test's own ready delay overrides the default.
+	p.Env = append(p.Env, agentfake.TUIReadyDelayEnv+"=0s")
 	p.Env = append(p.Env, env...)
 	p.LaunchCaps = caps
 	// A worker config makes "/gx-implement x/1" start a turn (it blocks on a
@@ -86,6 +89,40 @@ func TestPty_LaunchPromptLateRegistryIsResentThenStartsATurn(t *testing.T) {
 	}
 	if st.Turn < 1 {
 		t.Errorf("Turn = %d; want a started turn", st.Turn)
+	}
+}
+
+func TestPty_LaunchPromptWaitsForTheReadySignal(t *testing.T) {
+	t.Parallel()
+	start := time.Now()
+	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour},
+		agentfake.TUIReadyDelayEnv+"=1s", agentfake.TUILaunchRecordEnv+"=1")
+
+	if err := p.PromptLaunch(s, "/gx-implement x/1", nil); err != nil {
+		t.Fatalf("PromptLaunch = %v; want nil", err)
+	}
+	if elapsed := time.Since(start); elapsed < 900*time.Millisecond {
+		t.Errorf("PromptLaunch returned after %v; want it to wait for the ready signal", elapsed)
+	}
+}
+
+func TestPty_LaunchPromptSendsAnywayWhenNeverReady(t *testing.T) {
+	t.Parallel()
+	p, s := launchPty(t, claudeui.LaunchProofCaps{Grace: 30 * time.Second, ResendEvery: time.Hour},
+		agentfake.TUIReadyDelayEnv+"=1h", agentfake.TUILaunchRecordEnv+"=1")
+	p.ReadyWait = 400 * time.Millisecond
+	var logs strings.Builder
+	p.SetLog(slog.New(slog.NewTextHandler(&logs, nil)))
+
+	start := time.Now()
+	if err := p.PromptLaunch(s, "/gx-implement x/1", nil); err != nil {
+		t.Fatalf("PromptLaunch = %v; want nil", err)
+	}
+	if elapsed := time.Since(start); elapsed < p.ReadyWait {
+		t.Errorf("PromptLaunch returned after %v; want it to wait out %v", elapsed, p.ReadyWait)
+	}
+	if !strings.Contains(logs.String(), "ready signal missing") {
+		t.Errorf("log = %q; want it to say the ready signal was missing", logs.String())
 	}
 }
 
