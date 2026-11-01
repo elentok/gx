@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -47,7 +48,19 @@ const (
 	ActionConversation = "conversation"
 	// ActionSize writes the terminal's size as "size=<cols>x<rows>".
 	ActionSize = "size"
+	// ActionDialogBlock draws Control.Dialog and reports the program blocked on
+	// a permission. An Enter or a lone Esc closes it, logging ProgramEnterEntry
+	// or ProgramEscEntry and reporting idle. Without it, ActionWrite and
+	// ActionReport make a dialog no key closes.
+	ActionDialogBlock = "dialog-block"
 )
+
+// ProgramEnterEntry is what an Enter logs to ProgramSubmittedPath while a
+// dialog from ActionDialogBlock is open.
+const ProgramEnterEntry = "<enter>"
+
+// loneEscWait is how long an Esc waits for a byte that makes it a sequence.
+const loneEscWait = 50 * time.Millisecond
 
 // ProgramDirEnv is the dir of the fake program's side channels. The holder and
 // the program read it from the env the server hands them; NewProgramDir makes
@@ -248,6 +261,10 @@ type program struct {
 	ready      bool
 	readyDelay time.Duration
 	readyC     <-chan time.Time
+	// dialog is set while an ActionDialogBlock dialog is open; escC fires when
+	// an Esc in it stayed alone.
+	dialog bool
+	escC   <-chan time.Time
 }
 
 func (p *program) run(in, ctl io.Reader) (int, error) {
@@ -262,6 +279,12 @@ func (p *program) run(in, ctl io.Reader) (int, error) {
 		case <-p.readyC:
 			p.readyC = nil
 			p.becomeReady()
+		case <-p.escC:
+			p.escC = nil
+			p.esc = false
+			if err := p.closeDialog(ProgramEscEntry); err != nil {
+				return 0, err
+			}
 		case ev, ok := <-events:
 			if !ok {
 				return 0, nil
@@ -331,7 +354,7 @@ func (p *program) key(b byte) error {
 		}
 		return nil
 	case p.esc:
-		p.esc = false
+		p.esc, p.escC = false, nil
 		if b == ']' {
 			p.osc = true
 			return nil
@@ -348,7 +371,13 @@ func (p *program) key(b byte) error {
 		}
 	case b == escKey:
 		p.esc = true
+		if p.dialog {
+			p.escC = time.After(loneEscWait)
+		}
 		return nil
+	}
+	if p.dialog && b == '\r' {
+		return p.closeDialog(ProgramEnterEntry)
 	}
 	if p.box != nil {
 		if !p.ready {
@@ -411,6 +440,10 @@ func (p *program) control(c Control) error {
 		fmt.Fprint(p.out, "\x1b]0;"+c.Title+"\a")
 	case ActionWrite:
 		fmt.Fprint(p.out, c.Output)
+	case ActionDialogBlock:
+		p.dialog = true
+		fmt.Fprint(p.out, "\x1b[2J\x1b[H"+strings.Join(c.Dialog, "\r\n"))
+		p.report("blocked", "permission", c.Message)
 	case ActionConversation:
 		return p.setConversation(c.ConversationID)
 	case ActionSize:
@@ -423,6 +456,20 @@ func (p *program) control(c Control) error {
 		return fmt.Errorf("unknown program control action %q", c.Action)
 	}
 	return nil
+}
+
+// closeDialog ends an ActionDialogBlock dialog the way an answer does: it logs
+// the key, goes idle and brings the input box back.
+func (p *program) closeDialog(entry string) error {
+	if !p.dialog {
+		return nil
+	}
+	p.dialog = false
+	if p.box != nil {
+		p.box.draw()
+	}
+	p.report("idle", "", "")
+	return logSubmitted(p.convID, entry)
 }
 
 func (p *program) report(state, kind, msg string) {

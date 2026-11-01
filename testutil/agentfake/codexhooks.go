@@ -31,6 +31,10 @@ const (
 	CodexModelNudgeDialog  = "Model nudge: Press Enter to continue"
 )
 
+// CodexNoPermissionHookEnv, set to "1", makes the fake draw its approval dialog
+// as if no PermissionRequest hook were installed, whatever the launch args say.
+const CodexNoPermissionHookEnv = "GX_AGENTFAKE_CODEX_NO_PERMISSION_HOOK"
+
 // codexDialogs lists the dialogs the env asks for, in the order Codex shows them.
 func codexDialogs() []string {
 	var out []string
@@ -305,7 +309,7 @@ func (c *codexFake) permission(command string, allowed func()) error {
 			allowed()
 		}
 	}
-	if len(c.hooks["PermissionRequest"]) == 0 {
+	if len(c.hooks["PermissionRequest"]) == 0 || os.Getenv(CodexNoPermissionHookEnv) == "1" {
 		c.permissionScreen(command, nil, resume)
 		return nil
 	}

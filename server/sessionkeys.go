@@ -3,12 +3,14 @@ package server
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/elentok/gx/agentrunner"
 	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/nativerunner"
@@ -44,6 +46,11 @@ type SessionKeysRequest struct {
 	Key         string `json:"key,omitempty"`
 	Text        string `json:"text,omitempty"`
 	OnlyBlocked bool   `json:"only_blocked,omitempty"`
+	// Permission ("allow" or "deny") answers the permission dialog the session
+	// is Blocked on, by the answer logic the Queue uses. RequestID, when set,
+	// must be the dialog on screen.
+	Permission string `json:"permission,omitempty"`
+	RequestID  string `json:"request_id,omitempty"`
 }
 
 func (s *Server) sessionKeysWrite(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +83,9 @@ func (s *Server) keysSession(req SessionKeysRequest, source string) (SessionResu
 	if strings.HasPrefix(req.ID, queueAgentIDPrefix) {
 		return sessionRefusal(ReasonSessionReadOnly, fmt.Sprintf("%s is a Queue agent; its loop owns it", req.ID)), nil
 	}
+	if req.Permission != "" && refusal == nil {
+		return s.answerSessionPermission(req, source)
+	}
 	dir, res, err := s.sendSessionKeys(req, source, seq, n, refusal)
 	if res.Refused || err != nil || !req.OnlyBlocked {
 		return res, err
@@ -97,7 +107,7 @@ func (s *Server) sendSessionKeys(req SessionKeysRequest, source, seq string, n i
 	}
 	st := meta.info().Status
 	switch {
-	case st.State != SessionWorking && st.State != SessionIdle && st.State != SessionBlocked && st.State != SessionRateLimited:
+	case !acceptsKeys(st.State):
 		return dir, sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s is %s", req.ID, st.State)), nil
 	case req.OnlyBlocked && st.State != SessionBlocked:
 		return dir, sessionRefusal(ReasonNotBlocked, fmt.Sprintf("session %s is %s, not blocked", req.ID, st.State)), nil
@@ -134,6 +144,69 @@ func (s *Server) sendSessionKeys(req SessionKeysRequest, source, seq string, n i
 	return dir, SessionResult{Session: &info}, nil
 }
 
+func acceptsKeys(state string) bool {
+	return state == SessionWorking || state == SessionIdle || state == SessionBlocked || state == SessionRateLimited
+}
+
+// answerSessionPermission answers the permission dialog of a Blocked session.
+// It is guarded, so it leaves a Design session's countdown alone.
+func (s *Server) answerSessionPermission(req SessionKeysRequest, source string) (SessionResult, error) {
+	s.sessionWatches.metaMu.Lock()
+	dir, meta, res, err := s.sessionDir(req.ID)
+	if res.Refused || err != nil {
+		s.sessionWatches.metaMu.Unlock()
+		return res, err
+	}
+	st := meta.info().Status
+	switch {
+	case !acceptsKeys(st.State):
+		s.sessionWatches.metaMu.Unlock()
+		return sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s is %s", req.ID, st.State)), nil
+	case st.State != SessionBlocked || st.Kind != "permission":
+		s.sessionWatches.metaMu.Unlock()
+		return sessionRefusal(ReasonNotBlocked, fmt.Sprintf("session %s is not blocked on a permission", req.ID)), nil
+	}
+	c, err := nativerunner.DialHolder(dir)
+	// The answer waits for the agent to move on; the status update that ends the
+	// wait needs the lock.
+	s.sessionWatches.metaMu.Unlock()
+	if err != nil {
+		return sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s has no live holder", req.ID)), nil
+	}
+	grace := cmp.Or(s.cfg.PromptGrace, claudeui.DefaultNudgeCaps.Grace)
+	answer := agentrunner.Answer{Decision: agentrunner.Decision(req.Permission), RequestID: req.RequestID}
+	if err := nativerunner.AnswerSessionPermission(c, dir, agentrunner.Kind(meta.Harness), answer, 20*time.Millisecond, grace); err != nil {
+		return sessionAnswerRefusal(req.ID, err)
+	}
+	ev := ralphloop.Event{
+		Time: time.Now(), Type: string(events.SessionKeyed),
+		Session: req.ID, Source: source, Action: "permission", Bytes: 1,
+	}
+	if err := ralphloop.AppendServerEvent(s.cfg.TicketStore, ev); err != nil {
+		s.log.Warn("logging session permission", "session", req.ID, "err", err)
+	}
+	info := meta.info()
+	return SessionResult{Session: &info}, nil
+}
+
+// sessionAnswerRefusal maps a permission answer's error to its refusal; others
+// are errors.
+func sessionAnswerRefusal(id string, err error) (SessionResult, error) {
+	switch {
+	case errors.Is(err, agentrunner.ErrRequestMismatch):
+		return sessionRefusal(ReasonRequestChanged, err.Error()), nil
+	case errors.Is(err, nativerunner.ErrNotApprovable), errors.Is(err, agentrunner.ErrInvalidDecision):
+		return sessionRefusal(ReasonNotApprovable, err.Error()), nil
+	case errors.Is(err, agentrunner.ErrNotDelivered):
+		return sessionRefusal(ReasonKeysNotDelivered, err.Error()), nil
+	case errors.Is(err, agentrunner.ErrNotReady):
+		return sessionRefusal(ReasonNotBlocked, fmt.Sprintf("session %s is not blocked on a permission", id)), nil
+	case errors.Is(err, agentrunner.ErrNotFound), errors.Is(err, agentrunner.ErrSessionDied):
+		return sessionRefusal(ReasonSessionNotLive, err.Error()), nil
+	}
+	return SessionResult{}, fmt.Errorf("answer permission of session %s: %w", id, err)
+}
+
 // waitLeftBlocked waits up to the prompt grace for a guarded send to move the
 // session out of Blocked.
 func (s *Server) waitLeftBlocked(id, dir string) (SessionResult, error) {
@@ -164,9 +237,20 @@ func validateSessionKeys(req SessionKeysRequest) (string, int, *SessionResult) {
 		res := sessionRefusal(reason, msg)
 		return "", 0, &res
 	}
+	inputs := 0
+	for _, set := range []bool{req.Key != "", req.Text != "", req.Permission != ""} {
+		if set {
+			inputs++
+		}
+	}
 	switch {
-	case (req.Key == "") == (req.Text == ""):
-		return bad(ReasonSessionBadRequest, "want exactly one of key or text")
+	case inputs != 1:
+		return bad(ReasonSessionBadRequest, "want exactly one of key, text or permission")
+	case req.Permission != "":
+		if req.Permission != string(agentrunner.DecisionAllow) && req.Permission != string(agentrunner.DecisionDeny) {
+			return bad(ReasonSessionBadRequest, fmt.Sprintf("permission is %q, want allow or deny", req.Permission))
+		}
+		return "", 1, nil
 	case req.Key != "":
 		seq, ok := sessionKeyBytes[strings.ToLower(req.Key)]
 		if !ok {

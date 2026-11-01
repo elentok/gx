@@ -29,6 +29,11 @@ type holderAnswerer struct {
 	// hook request: Deny sends Esc, Allow is ErrNotApprovable. Off, both are
 	// ErrRequestMismatch.
 	UnreadableDeny bool
+	// StrictAllow makes a Claude Allow read the screen first and send Enter only
+	// when the cursor is on option 1 and option 1 is exactly "Yes". Anything
+	// else, unreadable included, is ErrNotApprovable, so Enter can never pick a
+	// standing permission. RequestID is matched against that read.
+	StrictAllow bool
 
 	// Died maps a failed holder call; nil keeps the error.
 	Died func(error) error
@@ -96,6 +101,9 @@ func (h holderAnswerer) waitTurn(turn int, timeout time.Duration, cancelled func
 // RequestID, the screen is re-read first and anything but that approvable
 // dialog is ErrRequestMismatch, before any key is sent.
 func (h holderAnswerer) AnswerClaude(a agentrunner.Answer) error {
+	if h.StrictAllow {
+		return h.answerClaudeStrict(a)
+	}
 	claude, turn, err := h.Holder.Status()
 	if err != nil {
 		return h.died(err)
@@ -139,6 +147,69 @@ func (h holderAnswerer) AnswerClaude(a agentrunner.Answer) error {
 		return fmt.Errorf("%w: %s left the dialog open", agentrunner.ErrNotDelivered, a.Decision)
 	}
 	return nil
+}
+
+// answerClaudeStrict is AnswerClaude for StrictAllow. It takes the block from
+// either status source, because a harness without a pid file reports through
+// its watcher. The screen is the authority: a RequestID that is not the dialog
+// on it is ErrRequestMismatch for either decision, and Allow needs the cursor
+// on a plain "Yes" first option. Deny is Esc whatever the screen shows.
+func (h holderAnswerer) answerClaudeStrict(a agentrunner.Answer) error {
+	if a.Decision != agentrunner.DecisionAllow && a.Decision != agentrunner.DecisionDeny {
+		return fmt.Errorf("%w: %q", agentrunner.ErrInvalidDecision, a.Decision)
+	}
+	resp, err := h.Holder.statusReply()
+	if err != nil {
+		return h.died(err)
+	}
+	w := resp.watched()
+	blocked := resp.Claude != nil && resp.Claude.Status == ClaudeWaiting
+	if w != nil {
+		blocked = w.Status.State == harness.Blocked && w.Status.Blocked == harness.BlockedPermission
+	}
+	if !blocked {
+		return fmt.Errorf("%w: answer on a session that is not blocked", agentrunner.ErrNotReady)
+	}
+	rows, _, err := h.Holder.Screen(0)
+	if err != nil {
+		return h.died(err)
+	}
+	v := claudeui.ReadDialog(rows)
+	if a.RequestID != "" && v.ID != a.RequestID {
+		return fmt.Errorf("%w: %s", agentrunner.ErrRequestMismatch, a.RequestID)
+	}
+	key := "\x1b"
+	if a.Decision == agentrunner.DecisionAllow {
+		if v.Kind != claudeui.DialogPermission || v.Cursor != 0 || !v.PlainYes {
+			return fmt.Errorf("%w: %s", ErrNotApprovable, a.Decision)
+		}
+		key = "\r"
+	}
+	if err := h.died(h.Holder.SendKeys(key)); err != nil {
+		return err
+	}
+	if w != nil {
+		return h.awaitNotBlocked(a.Decision)
+	}
+	moved, err := h.waitTurn(resp.Turn, h.Grace, nil)
+	if err != nil {
+		return err
+	}
+	if !moved {
+		return fmt.Errorf("%w: %s left the dialog open", agentrunner.ErrNotDelivered, a.Decision)
+	}
+	return nil
+}
+
+// AnswerSessionPermission answers the permission dialog of a gx session for
+// the keys route: the shared answer logic with the strict Claude Allow and the
+// Codex policy for an unreadable screen.
+func AnswerSessionPermission(c *HolderClient, dir string, kind agentrunner.Kind, a agentrunner.Answer, poll, grace time.Duration) error {
+	h := holderAnswerer{Holder: c, Dir: dir, Poll: poll, Grace: grace, UnreadableDeny: true, StrictAllow: true}
+	if kind == harness.Codex {
+		return h.AnswerCodex(a)
+	}
+	return h.AnswerClaude(a)
 }
 
 // denyWithReason prefers the holder's deny-reason op, which keeps Status

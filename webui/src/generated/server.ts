@@ -1929,6 +1929,13 @@ export interface SessionKeysRequest {
   key?: string;
   text?: string;
   only_blocked?: boolean;
+  /**
+   * Permission ("allow" or "deny") answers the permission dialog the session
+   * is Blocked on, by the answer logic the Queue uses. RequestID, when set,
+   * must be the dialog on screen.
+   */
+  permission?: string;
+  request_id?: string;
 }
 
 //////////

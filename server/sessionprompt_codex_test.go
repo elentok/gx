@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
@@ -14,23 +15,31 @@ import (
 
 const codexPromptConv = "thread-server-prompt"
 
-// startCodexPromptSession runs a session on the fake Codex, Idle.
-func startCodexPromptSession(t *testing.T) promptFixture {
+// startCodexPromptSession runs a session on the fake Codex, Idle, with extraEnv
+// added to the env it runs in.
+func startCodexPromptSession(t *testing.T, extraEnv ...string) promptFixture {
+	t.Helper()
+	return startCodexPromptSessionWithGrace(t, firstPromptGrace, extraEnv...)
+}
+
+// startCodexPromptSessionWithGrace is startCodexPromptSession with a longer
+// wait for an answer to take effect, for a test whose fake does real work first.
+func startCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEnv ...string) promptFixture {
 	t.Helper()
 	bin := t.TempDir()
 	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "codex"), "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex").CombinedOutput(); err != nil {
 		t.Fatalf("build fakecodex: %v\n%s", err, out)
 	}
 	home := t.TempDir()
-	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = firstPromptGrace },
+	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = grace },
 		servertest.WithChatHarness("codex"),
-		servertest.WithEnv(
-			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
-			"HOME="+home,
-			"CODEX_HOME="+filepath.Join(home, ".codex"),
-			agentfake.CodexIDEnv+"="+codexPromptConv,
-			agentfake.ProgramDirEnv+"="+agentfake.NewProgramDir(t),
-		))
+		servertest.WithEnv(append([]string{
+			"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
+			"HOME=" + home,
+			"CODEX_HOME=" + filepath.Join(home, ".codex"),
+			agentfake.CodexIDEnv + "=" + codexPromptConv,
+			agentfake.ProgramDirEnv + "=" + agentfake.NewProgramDir(t),
+		}, extraEnv...)...))
 	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: "codex"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)

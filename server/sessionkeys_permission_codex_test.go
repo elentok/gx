@@ -1,0 +1,116 @@
+package server_test
+
+import (
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil/agentfake"
+)
+
+// startCodexPermissionSession is a Codex session with its own conversation id,
+// because the fake's control channel is named by it and these tests run in
+// parallel. withDialog makes the fake draw its own approval dialog.
+func startCodexPermissionSession(t *testing.T, withDialog bool) promptFixture {
+	t.Helper()
+	conv := "thread-perm-" + strings.ReplaceAll(t.Name(), "/", "-")
+	env := []string{agentfake.CodexIDEnv + "=" + conv}
+	grace := firstPromptGrace
+	if withDialog {
+		// An answer ends the fake's turn, which runs its hooks first.
+		env = append(env, agentfake.CodexNoPermissionHookEnv+"=1")
+		grace = 10 * time.Second
+	}
+	f := startCodexPromptSessionWithGrace(t, grace, env...)
+	f.conv = conv
+	if withDialog {
+		// A deny ends a turn, so there must be one.
+		if res := f.prompt(t, "run it"); res.Refused {
+			t.Fatalf("prompt = %+v", res)
+		}
+		waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+	}
+	return f
+}
+
+// blockCodex opens Codex's approval dialog for command, which nothing but a
+// key answers. An empty command leaves a dialog gx cannot read.
+func (f promptFixture) blockCodex(t *testing.T, command string) {
+	t.Helper()
+	f.block(t, agentfake.Control{Action: agentfake.ActionPermission, Command: command})
+	// The fake reports Blocked before it draws the dialog.
+	waitForScreen(t, waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id)), "Blocked by hook")
+}
+
+func TestSessionKeys_CodexScreenDialogTakesYAndEsc(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		decision string
+		want     func(server.SessionInfo) bool
+	}{
+		"allow": {"allow", func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking }},
+		"deny":  {"deny", func(s server.SessionInfo) bool { return s.Status.State != server.SessionBlocked }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := startCodexPermissionSession(t, true)
+			f.blockCodex(t, "rg foo")
+			if res := f.permission(t, tc.decision, ""); res.Refused {
+				t.Fatalf("%s = %+v", tc.decision, res)
+			}
+			waitForSession(f.ctx, t, f.h, f.evs, f.id, tc.want)
+		})
+	}
+}
+
+// Without a hook request and without a dialog gx can read, Esc is still sent
+// but Allow has no key to press.
+func TestSessionKeys_CodexUnreadableScreenDeniesButNeverApproves(t *testing.T) {
+	t.Parallel()
+	f := startCodexPermissionSession(t, true)
+	// A dialog with no command under its title is not one gx answers.
+	f.blockCodex(t, "")
+	if res := f.permission(t, "allow", ""); !res.Refused || res.Reason != server.ReasonNotApprovable {
+		t.Fatalf("allow = %+v, want %s", res, server.ReasonNotApprovable)
+	}
+	// The refused Allow sent no y: the fake is still blocked, and Esc ends it.
+	if got := sessionSnapshotOf(t, f.designsFixture, f.id).Status.State; got != server.SessionBlocked {
+		t.Fatalf("state after the refusal = %s, want blocked", got)
+	}
+	if res := f.permission(t, "deny", ""); res.Refused {
+		t.Fatalf("deny = %+v", res)
+	}
+}
+
+func TestSessionKeys_CodexHookRequestIsAnsweredByTheDecisionFile(t *testing.T) {
+	t.Parallel()
+	f := startCodexPermissionSession(t, false)
+	dir := filepath.Join(f.h.SessionsDir, f.id)
+	if err := nativerunner.WritePermissionRequest(dir, nativerunner.PermissionRequest{ID: "req-1", Tool: "Bash", Description: "rg foo"}); err != nil {
+		t.Fatal(err)
+	}
+	f.block(t, agentfake.Control{Action: agentfake.ActionReport, State: "blocked", Kind: "permission"})
+
+	if res := f.permission(t, "allow", "req-0"); !res.Refused || res.Reason != server.ReasonRequestChanged {
+		t.Fatalf("allow of another request = %+v, want %s", res, server.ReasonRequestChanged)
+	}
+	if _, ok, err := nativerunner.ReadPermissionDecision(dir); err != nil || ok {
+		t.Fatalf("decision after a mismatch = %v, %v; want none", ok, err)
+	}
+
+	// Nothing here plays the hook, which would read the file and let the agent
+	// go on, so the session stays Blocked: the answer is written, not delivered.
+	if res := f.permission(t, "allow", "req-1"); !res.Refused || res.Reason != server.ReasonKeysNotDelivered {
+		t.Fatalf("allow = %+v, want %s", res, server.ReasonKeysNotDelivered)
+	}
+	d, ok, err := nativerunner.ReadPermissionDecision(dir)
+	if err != nil || !ok || d.ID != "req-1" || !d.Allow {
+		t.Errorf("decision = %+v, %v, %v; want req-1 allowed", d, ok, err)
+	}
+	if got := submitted(t, f.conv); got != "" {
+		t.Errorf("submitted = %q, want no key with a hook request", got)
+	}
+}
