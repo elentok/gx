@@ -1675,12 +1675,15 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 
 ## 169. Migrating state holds scheduling
 
-- **Scenario:** `migrate-held` (hold file in the migrate dir; a ready ticket `demo:ready-epic/01` queued; an old-shape ticket in `old-epic`).
-- **Steps:** read `gx server status --json` and the page. Run `gx server status` and `gx server start`. Wait 2 s and read the ready ticket, the server log and the old ticket. Remove the hold file.
+- **Scenario:** `migrate-held` (hold file in the migrate dir; workers held; a ready ticket `demo:ready-epic/01` queued; an old-shape ticket in `old-epic`; `stuck-epic` with its only ticket paused and queued, which is a deadlock once claimed; `merge-epic` with ticket `01` done and `02` queued, whose finish merges the epic).
+- **Steps:** read `gx server status --json` and the page. Run `gx server status` and `gx server start`. Create a manual agent with `gx agents create`. Wait 2 s and read the ready ticket, `merge-epic/02`, `stuck-epic`, the server log and the old ticket. Remove the hold file. Then release the workers.
 - **Pass:**
   - Status says migrating; the page shows the plain "Migrating tickets" line.
-  - `gx server start` exits 0 within 10 s. The ready ticket is not claimed, the log holds no start-up step and the old ticket is not migrated.
+  - `gx server start` exits 0 within 10 s. The manual agent is created and listed although the migration is held.
+  - The ready ticket and `merge-epic/02` are not claimed, `stuck-epic` gets no recovery ticket (`02`), the log holds no start-up step and the old ticket is not migrated.
   - After the release the line goes, the log holds `first-rescan`, `recover-merges` and `reclaim-runs` once each in that order, the old ticket is `paused` and the ready ticket is claimed.
+  - After the release `stuck-epic` gets its recovery ticket `02` and `merge-epic/02` is claimed. The manual agent is still listed.
+  - When the workers are released `merge-epic` is merged, and the manual agent is still listed.
 
 ## 170. A failed project is rescanned after the migration
 

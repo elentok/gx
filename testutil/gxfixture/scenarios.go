@@ -213,12 +213,23 @@ var scenarios = map[string]scenario{
 	},
 	// migrate-held: migrate-pending with the migration held open. demo also holds an
 	// old-shape ticket the strict index scan rejects, and a ready queued ticket.
+	// stuck-epic (every ticket paused) is deadlocked once it is claimed, so it
+	// needs a recovery, and merge-epic's last ticket merges the epic when it
+	// finishes. Both are queued; the workers are held so a started agent stays
+	// running until a flow releases it.
 	"migrate-held": {
 		epics: []epic{
 			{project, "ready-epic", []ticket{{"01", "first", servertest.TicketOpts{}}}},
 			{project, "old-epic", []ticket{{"01", "broken-shape", servertest.TicketOpts{Status: oldShapeStatus}}}},
+			{project, "stuck-epic", []ticket{{"01", "paused", servertest.TicketOpts{PauseReason: "iteration-error"}}}},
+			{project, "merge-epic", []ticket{
+				{"01", "merged", servertest.TicketOpts{Status: "done"}},
+				{"02", "last", servertest.TicketOpts{BlockedBy: []string{"01"}}},
+			}},
 		},
-		queue:       []string{project + ":ready-epic"},
+		// A queue add of the whole stuck-epic is refused (no open ticket), so its ticket is queued.
+		queue:       []string{project + ":ready-epic", project + ":stuck-epic/01", project + ":merge-epic"},
+		hold:        true,
 		migrate:     true,
 		migrateHold: true,
 	},

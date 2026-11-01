@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test, type Fixture } from "./fixture";
+import { expect, sessionRows, test, type Fixture } from "./fixture";
 import { dialog, openDialog, passing, restartButton } from "./restart-helpers";
 
 // Flows for the migration the server runs when it starts (no flag, no command code). They run on the
@@ -42,6 +42,11 @@ const startupSteps = async (fixture: Fixture) =>
     .filter(Boolean);
 
 const ready = "demo:ready-epic/01";
+const stuckEpic = "demo:stuck-epic";
+const mergeEpic = "demo:merge-epic";
+const mergeLast = "demo:merge-epic/02";
+const manual = "manual-agent";
+const agentLines = (fixture: Fixture, slug: string) => sessionRows(fixture, slug);
 const oldTicket = "demo/old-epic/issues/01-broken-shape.md";
 
 test("169. Migrating state holds scheduling", async ({ start, page }) => {
@@ -59,9 +64,16 @@ test("169. Migrating state holds scheduling", async ({ start, page }) => {
     expect(Date.now() - began).toBeLessThan(10_000);
   });
 
-  await test.step("nothing is claimed, and no start-up step ran", async () => {
+  await test.step("a manual agent is not blocked by the hold", async () => {
+    await fixture.cli("agents", "create", "--project", "demo", "--name", manual, "--prompt", "hello");
+    await expect.poll(() => agentLines(fixture, manual), { timeout: 30_000 }).not.toHaveLength(0);
+  });
+
+  await test.step("nothing is claimed, no recovery or merge starts, and no start-up step ran", async () => {
     await page.waitForTimeout(2000);
     expect(await fixture.cli("tickets", "show", ready)).not.toContain("claimed");
+    expect(await fixture.cli("tickets", "show", mergeLast)).not.toContain("claimed");
+    expect(await fixture.cli("tickets", "show", stuckEpic)).not.toMatch(/^02 /m);
     expect(await startupSteps(fixture)).toEqual([]);
     expect(await fixture.readStoreFile(oldTicket)).not.toContain("status: paused");
   });
@@ -73,6 +85,18 @@ test("169. Migrating state holds scheduling", async ({ start, page }) => {
     await expect.poll(() => startupSteps(fixture), { timeout: 30_000 }).toEqual(["first-rescan", "recover-merges", "reclaim-runs"]);
     expect(await fixture.readStoreFile(oldTicket)).toContain("status: paused");
     await expect.poll(() => fixture.cli("tickets", "show", ready), { timeout: 30_000 }).toContain("claimed");
+  });
+
+  await test.step("the recovery starts, the last ticket of merge-epic is claimed and the manual agent still runs", async () => {
+    await expect.poll(() => fixture.cli("tickets", "show", stuckEpic), { timeout: 30_000 }).toMatch(/^02 /m);
+    await expect.poll(() => fixture.cli("tickets", "show", mergeLast), { timeout: 30_000 }).toContain("claimed");
+    expect(await agentLines(fixture, manual)).not.toHaveLength(0);
+  });
+
+  await test.step("the merge starts when the held worker finishes, and the manual agent is still running", async () => {
+    await fixture.release();
+    await expect.poll(() => fixture.cli("tickets", "show", mergeEpic), { timeout: 30_000 }).toContain("merged");
+    expect(await agentLines(fixture, manual)).not.toHaveLength(0);
   });
 });
 
