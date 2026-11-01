@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/elentok/gx/tickets/schema"
 )
 
 // BundledThreshold is the pair a ticket must reach on both counts to get the
@@ -27,8 +29,7 @@ var bulletRe = regexp.MustCompile(`^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?(.*)
 // items under `## Acceptance criteria`, minus boilerplate) and the number of
 // distinct file paths named in `## Where to look` and `## Test seams`.
 func BundledCounts(body string, topDirs []string) (criteria, files int) {
-	section, _ := sectionContent(body, "Acceptance criteria")
-	for line := range strings.SplitSeq(section, "\n") {
+	for line := range strings.SplitSeq(schema.Section(body, "Acceptance criteria"), "\n") {
 		m := bulletRe.FindStringSubmatch(line)
 		if m == nil {
 			continue

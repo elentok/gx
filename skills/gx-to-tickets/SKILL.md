@@ -252,6 +252,9 @@ cite the file (`file:func`) in the ticket next to the claim:
 - **Helper prerequisites**: for each helper or fixture a ticket cites, name its prerequisites (e.g.
   `StartWithStore` needs a seeded project via `servertest.WriteTicket`) and its return value (e.g.
   `CreateEpic` returns the epic dir).
+- **Names a seam or hint relies on**: for a fake, helper or generated type that a seam or hint
+  names, run the `rg` the implementing agent would run and confirm it hits. A seam that finds
+  nothing is not a seam.
 - **Wiring**: name the hidden registration points (route tables, allowlists, parity tests, the
   query-and-prop path that feeds a page) and give `file:func` for anything the ticket says only by
   line number or role. For a new server route, point at `.ai/index.md` "Adding a server route".
@@ -349,7 +352,7 @@ The manifest is a YAML list with one entry per ticket. Each entry has these fiel
 - `body`: the ticket body, from the per-ticket template below.
 
 To refer to another ticket from a body, write `{{slug}}`. `publish` replaces it with that ticket's
-address. To write a literal placeholder, quote it as `\{{`. Write the manifest to a scratchpad file
+ID. To write a literal placeholder, quote it as `\{{`. Write the manifest to a scratchpad file
 with Write; never a heredoc, never edit a ticket file by path (see "Write a body once" in the
 tracker).
 

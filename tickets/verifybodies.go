@@ -101,8 +101,41 @@ func BuildVerifyTickets(plan VerifyPlan, spec, specPath string) ([]VerifyTicket,
 	return out, nil
 }
 
+// isVerifySlug reports whether slug is one of the rows verify-plan owns.
+func isVerifySlug(slug string) bool {
+	return slug == "verify" || slug == "verify-collect" || strings.HasPrefix(slug, "verify-part-")
+}
+
+// dropVerifyRows removes the verify, verify-part-N and verify-collect rows from
+// manifest, so a re-run replaces them instead of duplicating them.
+func dropVerifyRows(manifest []byte) ([]byte, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(manifest, &doc); err != nil {
+		return nil, err
+	}
+	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.SequenceNode {
+		return manifest, nil
+	}
+	seq := doc.Content[0]
+	seq.Content = slices.DeleteFunc(seq.Content, func(item *yaml.Node) bool {
+		if item.Kind != yaml.MappingNode {
+			return false
+		}
+		for i := 0; i+1 < len(item.Content); i += 2 {
+			if item.Content[i].Value == "slug" {
+				return isVerifySlug(item.Content[i+1].Value)
+			}
+		}
+		return false
+	})
+	if len(seq.Content) == 0 {
+		return nil, nil
+	}
+	return yaml.Marshal(&doc)
+}
+
 // AppendManifest returns manifest (possibly empty) with one entry per ticket
-// added at the end.
+// added at the end. Existing verify rows are dropped first.
 func AppendManifest(manifest []byte, ts []VerifyTicket) ([]byte, error) {
 	type row struct {
 		Slug      string   `yaml:"slug"`
@@ -119,7 +152,10 @@ func AppendManifest(manifest []byte, ts []VerifyTicket) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := manifest
+	out, err := dropVerifyRows(manifest)
+	if err != nil {
+		return nil, err
+	}
 	if len(out) > 0 && out[len(out)-1] != '\n' {
 		out = append(out, '\n')
 	}

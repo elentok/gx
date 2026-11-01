@@ -17,7 +17,7 @@ const (
 	VerifyCollectTokens  = 30_000
 )
 
-// FallbackPrefixTokensstands in for a ticket's prefix when none was stamped.
+// FallbackPrefixTokens stands in for a ticket's prefix when none was stamped.
 const FallbackPrefixTokens = 48_000
 
 // Work returns the ticket's own work: its actual context window minus the
