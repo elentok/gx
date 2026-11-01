@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner/screen"
+	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/syshealth"
 )
@@ -21,12 +22,19 @@ const echoChild = `printf 'ready\n'; while read -r l; do printf 'got:%s\n' "$l";
 // startHolder runs a holder over child in-process and dials it.
 func startHolder(t *testing.T, child string) (dir string, c *nativerunner.HolderClient, done <-chan error) {
 	t.Helper()
+	return startHolderWith(t, nativerunner.HolderOptions{}, child)
+}
+
+// startHolderWith is startHolder with holder options and extra args after the
+// script, as a launch's flags follow claude's command.
+func startHolderWith(t *testing.T, opts nativerunner.HolderOptions, child string, args ...string) (dir string, c *nativerunner.HolderClient, done <-chan error) {
+	t.Helper()
 	dir = shortTempDir(t)
 	errc := make(chan error, 1)
 	finished := make(chan struct{})
 	go func() {
 		defer close(finished)
-		errc <- nativerunner.RunHolder(dir, []string{"sh", "-c", child})
+		errc <- nativerunner.RunHarnessHolder(dir, gxharness.Claude, opts, append([]string{"sh", "-c", child, "sh"}, args...))
 	}()
 	waitFor(t, "holder.sock answers", func() bool {
 		var err error
@@ -335,6 +343,28 @@ func TestHolderSocket_DenyReason_VimGiveUpFailsTheDenyWithoutTyping(t *testing.T
 	screen, _, _ := c.Screen(0)
 	if strings.Contains(strings.Join(screen, "\n"), "got:use rg") {
 		t.Errorf("reason was typed into NORMAL mode: %q", screen)
+	}
+}
+
+// With the launch override in effect the person's vim files do not make the
+// holder press `i`: the child would read it as the start of the reason.
+func TestHolderSocket_DenyReason_OverrideSendsNoStrayI(t *testing.T) {
+	vimConfigHome(t)
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	opts := nativerunner.HolderOptions{SessionID: "deny-override-no-i"}
+	dir, c, _ := startHolderWith(t, opts, denyChild+denyGoesIdle, "--settings", `{"editorMode":"normal"}`)
+	waitForScreen(t, c, "ready")
+	waitForStatus(t, c, nativerunner.PidStatus{Status: nativerunner.ClaudeWaiting, WaitingFor: "permission prompt"}, 1)
+	if err := c.DenyWithReason("use rg"); err != nil {
+		t.Fatal(err)
+	}
+	waitForScreen(t, c, "got:use rg")
+	data, err := os.ReadFile(filepath.Join(dir, nativerunner.HolderLogFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "vim probe: unknown") {
+		t.Errorf("holder log = %s; want no unknown result", data)
 	}
 }
 

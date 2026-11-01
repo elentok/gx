@@ -28,7 +28,7 @@ func newAgentCmd(d deps) *cobra.Command {
 }
 
 func newAgentHolderCmd() *cobra.Command {
-	var sessionID, dir, kind string
+	var dir, kind string
 	var opts nativerunner.HolderOptions
 	cmd := &cobra.Command{
 		Use:   "agent-holder --session-id <uuid> [--harness <name>] [--gx-session <id>] [--cols N --rows N] [--trust] --dir <agent-dir> -- <cmd...>",
@@ -42,9 +42,8 @@ func newAgentHolderCmd() *cobra.Command {
 	}
 	cmd.Flags().IntVar(&opts.Cols, "cols", 0, "the pty's width (default the loop's)")
 	cmd.Flags().IntVar(&opts.Rows, "rows", 0, "the pty's height (default the loop's)")
-	// The session id is unused here: it only puts the id in the holder's
-	// cmdline, which the liveness check requires.
-	cmd.Flags().StringVar(&sessionID, "session-id", "", "the agent's session id")
+	// The id also sits in the holder's cmdline, which the liveness check requires.
+	cmd.Flags().StringVar(&opts.SessionID, "session-id", "", "the agent's session id")
 	cmd.Flags().StringVar(&kind, "harness", string(harness.Claude), "the harness that watches the agent")
 	cmd.Flags().StringVar(&opts.GXSession, "gx-session", "", "the gx session id, set as "+nativerunner.AgentSessionEnv+" in the agent's env")
 	cmd.Flags().StringVar(&dir, "dir", "", "the agent directory")

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -58,6 +59,9 @@ type Pty struct {
 	// config, never the process env.
 	Env []string
 
+	// log receives the vim probe's decisions (see SetLog); nil logs nothing.
+	log *slog.Logger
+
 	mu       sync.Mutex
 	sessions map[string]*ptySession
 	// starting holds labels whose Start is still launching.
@@ -91,6 +95,11 @@ type ptySession struct {
 }
 
 func (p *Pty) Name() string { return ptyRunnerName }
+
+// SetLog names the logger for the vim probe's decisions. The server owns the
+// logger and builds its runners before it exists, so it is set after, before
+// the runner's first use.
+func (p *Pty) SetLog(l *slog.Logger) { p.log = l }
 
 func (p *Pty) Start(opts agentrunner.StartOptions) (agentrunner.Session, error) {
 	if err := p.reserve(opts.Label); err != nil {

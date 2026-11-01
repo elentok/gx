@@ -114,7 +114,7 @@ func runTestHolder(args []string) error {
 	fs := flag.NewFlagSet(holderArg, flag.ContinueOnError)
 	var dir, kind string
 	var opts nativerunner.HolderOptions
-	fs.String("session-id", "", "")
+	fs.StringVar(&opts.SessionID, "session-id", "", "")
 	fs.StringVar(&kind, "harness", "", "")
 	fs.StringVar(&opts.GXSession, "gx-session", "", "")
 	fs.IntVar(&opts.Cols, "cols", 0, "")

@@ -306,6 +306,7 @@ type Server struct {
 	webRenewed     sync.Map // map web login id -> time its cookie was last renewed
 	logf           *rotatingFile
 	log            *slog.Logger
+	logGiven       sync.Mutex // see giveLog
 	idx            *index
 	// migrationsDone closes when the start-up migration run ends.
 	migrationsDone chan struct{}
@@ -552,6 +553,7 @@ func New(cfg Config) (*Server, error) {
 		sessionWatches: newSessionWatches(),
 		focus:          newFocusReports(),
 	}
+	s.giveLog(cfg.Runner)
 	if h, ok := cfg.Runner.(*herdrrunner.Runner); ok {
 		h.Finished = s.sessionFinished
 	}

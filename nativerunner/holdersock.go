@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -156,6 +157,9 @@ type holderServer struct {
 	pid     harness.PidStatusWatcher
 	watcher harness.Watcher
 	name    *displayName
+	// session and log key and receive the vim probe's decisions.
+	session string
+	log     *slog.Logger
 	frames  *frameHub
 	// inputs wakes the watch streams when a client types on an attach.
 	inputs signalHub
@@ -333,6 +337,9 @@ func (h *holderServer) denyReason(reason string) error {
 	ready := claudeTyping.ReadyToType(harness.TypingIO{
 		Rows:     func() ([]string, error) { return h.scr.StyledRows(), nil },
 		SendKeys: func(keys string) error { _, err := h.ptmx.Write([]byte(keys)); return err },
+		Session:  h.session,
+		Log:      h.log,
+		Caller:   "deny-reason",
 	})
 	if !ready {
 		return errors.New("claude input not ready to type the reason")

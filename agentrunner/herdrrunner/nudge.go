@@ -22,6 +22,7 @@ import (
 // may be nil.
 func promptWithNudge(
 	typing harness.Typing,
+	probe harness.TypingIO,
 	prompt func(herdr.AgentPromptOptions) (herdr.Agent, error),
 	sendKeys func(target string, keys ...string) error,
 	wait func(herdr.AgentWaitOptions) (herdr.Agent, error),
@@ -43,7 +44,7 @@ func promptWithNudge(
 		if !ok {
 			return herdr.Agent{}, fmt.Errorf("no herdr key name for clear key %q", typing.ClearKey())
 		}
-		p := &herdrPrompter{opts: opts, prompt: prompt, sendKeys: sendKeys, wait: wait, read: read, typing: typing, clearKey: clearKey}
+		p := &herdrPrompter{opts: opts, prompt: prompt, sendKeys: sendKeys, wait: wait, read: read, typing: typing, clearKey: clearKey, probe: probe}
 		p.startUntil = opts.Until
 		if !slices.Contains(p.startUntil, "working") {
 			p.startUntil = append([]string{"working"}, p.startUntil...)
@@ -81,6 +82,9 @@ type herdrPrompter struct {
 
 	typing   harness.Typing
 	clearKey string
+	// probe carries the session, logger and caller label of the probe; its
+	// Rows and SendKeys are set per call.
+	probe harness.TypingIO
 
 	pending bool
 	agent   herdr.Agent
@@ -118,18 +122,20 @@ func (p *herdrPrompter) InputEmpty() (bool, bool, error) {
 // ReadyToType runs the harness's ready-to-type step over herdr's text read and
 // key presses.
 func (p *herdrPrompter) ReadyToType() bool {
-	return p.typing.ReadyToType(harness.TypingIO{
-		Rows: func() ([]string, error) {
-			screen, err := p.Screen()
-			return strings.Split(screen, "\n"), err
-		},
-		SendKeys: func(keys string) error {
-			if name, ok := herdrKeyNames[keys]; ok {
-				keys = name
-			}
-			return p.sendKeys(p.opts.Target, keys)
-		},
-	})
+	io := p.probe
+	// Styled: a plain recent-unwrapped read can pick a scrollback row for the
+	// input, which the probe's before/after comparison would misread.
+	io.Rows = func() ([]string, error) {
+		screen, err := p.StyledScreen()
+		return strings.Split(screen, "\n"), err
+	}
+	io.SendKeys = func(keys string) error {
+		if name, ok := herdrKeyNames[keys]; ok {
+			keys = name
+		}
+		return p.sendKeys(p.opts.Target, keys)
+	}
+	return p.typing.ReadyToType(io)
 }
 
 // herdrKeyNames maps the raw clear keys harness rules use to herdr's key names.

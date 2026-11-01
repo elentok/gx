@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"os"
 	"os/exec"
@@ -28,7 +29,10 @@ import (
 // Files the holder keeps in a pty agent directory.
 const (
 	RawLogFile = "raw.log"
-	ScreenFile = "screen.txt"
+	// HolderLogFile is the holder's own log (JSON lines): the vim probe's
+	// decisions while it types a deny reason.
+	HolderLogFile = "holder.log"
+	ScreenFile    = "screen.txt"
 	// LastScreenFile is the last screen as styled ANSI rows.
 	LastScreenFile = "last-screen.ansi"
 	ExitCodeFile   = "exit-code"
@@ -60,6 +64,9 @@ func RunHolder(dir string, argv []string) error {
 type HolderOptions struct {
 	// GXSession, when set, goes into the child's env as AgentSessionEnv.
 	GXSession string
+	// SessionID is the agent's session id, the key of the vim probe's memory
+	// of the launch.
+	SessionID string
 	// Cols and Rows size the pty; zero means HolderCols and HolderRows.
 	Cols, Rows int
 	// Trust answers the harness's trust dialog while the child starts.
@@ -101,6 +108,13 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		return err
 	}
 	defer rawLog.Close()
+	logFile, err := os.OpenFile(filepath.Join(dir, HolderLogFile), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	defer logFile.Close()
+	// The probe reads the holder's own env, which is the child's.
+	harness.NoteLaunchedArgs(opts.SessionID, argv[1:], nil)
 
 	cols, rows := opts.size()
 	ptmx, tty, err := pty.Open()
@@ -165,6 +179,8 @@ func runHolder(dir string, h harness.Harness, opts HolderOptions, argv []string)
 		pid:         pid,
 		watcher:     watcher,
 		name:        newDisplayName(h, watcher),
+		session:     opts.SessionID,
+		log:         slog.New(slog.NewJSONHandler(logFile, nil)),
 		frames: newFrameHub(scr, cols, rows, func(cols, rows int) error {
 			// The screen first, so it already has the new size when the child
 			// redraws for it.

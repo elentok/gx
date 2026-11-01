@@ -151,7 +151,11 @@ func (pr *ptyPrompter) InputEmpty() (bool, bool, error) {
 
 // ReadyToType runs claude's ready-to-type step over the holder.
 func (pr *ptyPrompter) ReadyToType() bool {
-	return pr.p.typing(pr.ss).ReadyToType(HolderTypingIO(pr.ss.holder))
+	io := HolderTypingIO(pr.ss.holder)
+	io.Session = pr.ss.session.SessionID
+	io.Log = pr.p.log
+	io.Caller = "pty-nudge"
+	return pr.p.typing(pr.ss).ReadyToType(io)
 }
 
 // HolderTypingIO reads styled rows when the holder serves them, plain rows

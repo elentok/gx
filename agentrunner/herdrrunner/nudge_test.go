@@ -2,6 +2,7 @@ package herdrrunner
 
 import (
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"slices"
@@ -116,7 +117,7 @@ func TestPromptWithNudge_SucceedsWithoutTimeout_NeverNudges(t *testing.T) {
 		return herdr.Agent{}, nil
 	}
 
-	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -154,7 +155,7 @@ func TestPromptWithNudge_TimesOutThenNudgeSucceeds(t *testing.T) {
 
 	// The pane's text changed since the initial submit (changingRead), so
 	// this reads as "typed but not submitted" and should nudge, not retype.
-	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -193,7 +194,7 @@ exit status 1
 		return herdr.Agent{AgentStatus: "working"}, nil
 	}
 
-	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -226,7 +227,7 @@ func TestPromptWithNudge_ExhaustsNudges_ReturnsTimeoutError(t *testing.T) {
 		return herdr.Agent{}, pollTimeoutErr
 	}
 
-	_, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -275,7 +276,7 @@ func TestPromptWithNudge_UnchangedPane_ExhaustsRetypes_ReturnsStuckSubmission(t 
 
 	var decisions []claudeui.NudgeDecision
 	report := func(d claudeui.NudgeDecision) { decisions = append(decisions, d) }
-	_, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, read, fixedNow(), report)(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, read, fixedNow(), report)(herdr.AgentPromptOptions{
 		Target: "pane-1",
 		Text:   "hello",
 		Wait:   true,
@@ -316,7 +317,7 @@ func TestPromptWithNudge_MultiLineRetype_ClearsWholeInputForEveryKind(t *testing
 			wait := func(opts herdr.AgentWaitOptions) (herdr.Agent, error) { return herdr.Agent{}, pollTimeoutErr }
 			read := func(target string, opts herdr.AgentReadOptions) (string, error) { return "empty pane", nil }
 
-			_, err := promptWithNudge(kindTyping(kind), prompt, sendKeys, wait, read, fixedNow(), nil)(herdr.AgentPromptOptions{
+			_, err := promptWithNudge(kindTyping(kind), harness.TypingIO{}, prompt, sendKeys, wait, read, fixedNow(), nil)(herdr.AgentPromptOptions{
 				Target: "pane-1", Text: "a\nb", Wait: true, Until: []string{"working"},
 			})
 			if !errors.Is(err, claudeui.ErrStuckSubmission) {
@@ -351,7 +352,7 @@ func TestPromptWithNudge_StyledNotEmptyAfterClear_IsStuckWithoutRetyping(t *test
 		return "empty pane", nil
 	}
 
-	_, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, read, fixedNow(), nil)(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, read, fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target: "pane-1", Text: "hello", Wait: true, Until: []string{"working"},
 	})
 	if !errors.Is(err, claudeui.ErrStuckSubmission) {
@@ -381,7 +382,7 @@ func TestPromptWithNudge_FastCompletionBeforeWorking_ReturnsSuccessImmediately(t
 		return herdr.Agent{}, nil
 	}
 
-	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "hello",
 		Wait:      true,
@@ -421,7 +422,7 @@ func TestPromptWithNudge_StartConfirmed_WaitsForCompletionWithCallersTimeout(t *
 		return herdr.Agent{AgentStatus: "done"}, nil
 	}
 
-	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -473,7 +474,7 @@ func TestPromptWithNudge_SlowStart_CompletionGetsRemainingBudget(t *testing.T) {
 	// 3s elapses between the deadline being captured and the first
 	// start/nudge attempt (simulating a slow submit); the clock holds
 	// steady after that.
-	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), stepNow(3_000*time.Millisecond), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, changingRead(), stepNow(3_000*time.Millisecond), nil)(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -517,7 +518,7 @@ func TestPromptWithNudge_CompletionDeadlineAlreadyExpired_ReturnsTimeoutWithoutW
 
 	// 1s elapses before the start attempt, then a further 5s before the
 	// completion-budget check, exhausting the caller's 5s deadline.
-	_, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), stepNow(1_000*time.Millisecond, 5_000*time.Millisecond), nil)(herdr.AgentPromptOptions{
+	_, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, changingRead(), stepNow(1_000*time.Millisecond, 5_000*time.Millisecond), nil)(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -551,7 +552,7 @@ func TestPromptWithNudge_ZeroTimeout_BoundedStartThenUnlimitedCompletion(t *test
 		return herdr.Agent{AgentStatus: "done"}, nil
 	}
 
-	agent, err := promptWithNudge(claudeTyping(), prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
+	agent, err := promptWithNudge(claudeTyping(), harness.TypingIO{}, prompt, sendKeys, wait, changingRead(), fixedNow(), nil)(herdr.AgentPromptOptions{
 		Target:    "pane-1",
 		Text:      "/compact",
 		Wait:      true,
@@ -569,5 +570,40 @@ func TestPromptWithNudge_ZeroTimeout_BoundedStartThenUnlimitedCompletion(t *test
 	}
 	if completionWaitOpts.TimeoutMs != 0 {
 		t.Errorf("completion wait TimeoutMs = %d, want 0 (unlimited: a zero caller timeout means no deadline)", completionWaitOpts.TimeoutMs)
+	}
+}
+
+// The vim probe reads herdr's styled rows (a plain read can pick a scrollback
+// row for the input), presses nothing in INSERT and logs its caller.
+func TestHerdrPrompter_ReadyToTypeProbesStyledRowsAndLogs(t *testing.T) {
+	cfg := t.TempDir()
+	if err := os.WriteFile(filepath.Join(cfg, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var logs strings.Builder
+	var keys []string
+	p := &herdrPrompter{
+		opts:   herdr.AgentPromptOptions{Target: "pane"},
+		typing: harness.ClaudeTypingIn([]string{"HOME=" + cfg, "CLAUDE_CONFIG_DIR=" + cfg}),
+		probe:  harness.TypingIO{Session: "herdr-probe-styled", Log: slog.New(slog.NewJSONHandler(&logs, nil)), Caller: "herdr-nudge"},
+		sendKeys: func(_ string, k ...string) error {
+			keys = append(keys, k...)
+			return nil
+		},
+		read: func(_ string, opts herdr.AgentReadOptions) (string, error) {
+			if opts.Format != "ansi" {
+				return "scrollback row\nno input here", nil
+			}
+			return "❯ \n-- INSERT --", nil
+		},
+	}
+	if !p.ReadyToType() {
+		t.Fatalf("ReadyToType = false; logs = %s", logs.String())
+	}
+	if len(keys) != 0 {
+		t.Errorf("keys = %q; want none in INSERT", keys)
+	}
+	if got := logs.String(); !strings.Contains(got, `"caller":"herdr-nudge"`) || !strings.Contains(got, "vim probe") {
+		t.Errorf("log = %s; want the probe's decision with caller herdr-nudge", got)
 	}
 }

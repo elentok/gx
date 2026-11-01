@@ -52,6 +52,32 @@ func MergeClaudeSettings(args []string) []string {
 	return slices.Insert(out, at, flag...)
 }
 
+// NoteLaunchedArgs is for a process that runs a launch command another process
+// built (the pty holder): the editor-mode override lives in the args, but the
+// probe's memory of it is per process, so the runner of the command records it.
+// env is the claude config env the probe reads, nil for the process's own.
+func NoteLaunchedArgs(session string, args, env []string) {
+	normal := false
+	for i := 0; i < len(args); i++ {
+		value := ""
+		switch {
+		case args[i] == settingsFlag && i+1 < len(args):
+			i++
+			value = args[i]
+		case strings.HasPrefix(args[i], settingsFlag+"="):
+			value = strings.TrimPrefix(args[i], settingsFlag+"=")
+		default:
+			continue
+		}
+		if m := readSettings(value); m != nil {
+			normal = m["editorMode"] == EditorModeNormal
+		}
+	}
+	if normal {
+		markEditorOverride(session, env)
+	}
+}
+
 func readSettings(value string) map[string]any {
 	raw := strings.TrimSpace(value)
 	if !strings.HasPrefix(raw, "{") {

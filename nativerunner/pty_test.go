@@ -1,9 +1,11 @@
 package nativerunner_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -79,7 +81,9 @@ func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
 			t.Fatalf("Prompt = %v, keys = %q; want typed with no i", err, in)
 		}
 	})
-	t.Run("vim mode in the config dir", func(t *testing.T) {
+	// The launch forces normal mode, so the person's vim files do not make the
+	// nudge press `i`.
+	t.Run("vim mode in the config dir before launch", func(t *testing.T) {
 		p := newPty(t)
 		p.Env = append(claudeenv.In(t.TempDir()), holderEnv+"=1", agentfake.TUIEnv+"=1")
 		cfg, _ := envValue(p.Env, "CLAUDE_CONFIG_DIR")
@@ -87,12 +91,42 @@ func TestPty_VimModeComesFromTheConfigDirInEnv(t *testing.T) {
 			t.Fatal(err)
 		}
 		in, err := ptyKeysTyped(t, p, "do it")
-		// The TUI fake has no `❯` input box, so the probe cannot find the input:
-		// it presses nothing and the prompt is not typed.
-		if !errors.Is(err, claudeui.ErrNotReadyToType) || in != "" {
-			t.Fatalf("Prompt = %v, keys = %q; want not ready to type, nothing typed", err, in)
+		if err != nil || in != "do it\r" {
+			t.Fatalf("Prompt = %v, keys = %q; want typed with no i", err, in)
 		}
 	})
+}
+
+// A /config toggle to vim after launch is probed. The TUI fake has no vim input
+// row the probe can read, so the result is unknown: the nudge logs it with its
+// caller and a capture of the screen, and types nothing.
+func TestPty_NudgeAfterVimToggleLogsUnknownWithCaptureAndTypesNothing(t *testing.T) {
+	t.Parallel()
+	p := newPty(t)
+	p.Env = append(claudeenv.In(t.TempDir()), holderEnv+"=1", agentfake.TUIEnv+"=1")
+	var logs bytes.Buffer
+	p.SetLog(slog.New(slog.NewJSONHandler(&logs, nil)))
+	s, err := p.Start(agentrunner.StartOptions{Label: "e-01", Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Stop(s)
+	cfg, _ := envValue(p.Env, "CLAUDE_CONFIG_DIR")
+	if err := os.WriteFile(filepath.Join(cfg, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Prompt(s, "do it"); !errors.Is(err, claudeui.ErrNotReadyToType) {
+		t.Fatalf("Prompt = %v; want ErrNotReadyToType", err)
+	}
+	if in, err := os.ReadFile(agentfake.TUIInputPath(ptyHome(p), s.SessionID)); err == nil && strings.Contains(string(in), "do it") {
+		t.Errorf("keys = %q; the prompt was typed", in)
+	}
+	got := logs.String()
+	for _, want := range []string{`"caller":"pty-nudge"`, "vim probe: unknown", `"screen":`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("log = %s; want %s", got, want)
+		}
+	}
 }
 
 // With BackgroundTasks nil, a Pty reads the transcript under the HOME in its

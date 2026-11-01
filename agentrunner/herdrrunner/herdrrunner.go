@@ -6,6 +6,7 @@ package herdrrunner
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -55,6 +56,9 @@ type Runner struct {
 	// cleanup of a closed pane's leftovers. Nil means the real ones.
 	Procs  func() ([]syshealth.Process, error)
 	Signal func(pid int, sig syscall.Signal) error
+
+	// log receives the vim probe's decisions (see SetLog); nil logs nothing.
+	log *slog.Logger
 
 	mu sync.Mutex
 	// shells caches each pane's shell pid with its start time, keyed by pane id.
@@ -180,7 +184,8 @@ func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(s
 	if kind == harness.Claude {
 		typing = harness.ClaudeTypingIn(r.CLI.Env)
 	}
-	prompt := promptWithNudge(typing, r.submitSince(s, turn), r.CLI.AgentSendKeys, r.CLI.AgentWait, r.CLI.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
+	probe := harness.TypingIO{Session: s.SessionID, Log: r.log, Caller: "herdr-nudge"}
+	prompt := promptWithNudge(typing, probe, r.submitSince(s, turn), r.CLI.AgentSendKeys, r.CLI.AgentWait, r.CLI.AgentRead, time.Now, claudeui.ReportDecisions(onNudge))
 	agent, err := prompt(herdr.AgentPromptOptions{Target: s.ID, Text: text, Wait: true, Until: until})
 	var blocked *herdr.AgentBlockedError
 	switch {
@@ -525,6 +530,10 @@ func (r *Runner) codexRateLimit(s agentrunner.Session, cwd string, now time.Time
 }
 
 func (r *Runner) Name() string { return string(agentrunner.ChoiceHerdr) }
+
+// SetLog names the logger for the vim probe's decisions, set by the server
+// after it builds the runner and before the runner's first use.
+func (r *Runner) SetLog(l *slog.Logger) { r.log = l }
 
 func (r *Runner) Answer(s agentrunner.Session, a agentrunner.Answer) error {
 	if a.Decision == agentrunner.DecisionDeny && a.Text != "" {
