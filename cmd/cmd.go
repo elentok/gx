@@ -74,6 +74,9 @@ type deps struct {
 	serverClient func() (*apiclient.Client, error)
 	// env is the process environment every config dir is resolved from.
 	env []string
+	// writeFile writes ticket files in `tickets publish`; nil means os.WriteFile
+	// (tests inject a faulty one).
+	writeFile func(path string, data []byte, perm os.FileMode) error
 }
 
 // dirs resolves the config, data and state directories from the deps env.
