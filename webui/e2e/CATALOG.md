@@ -1812,3 +1812,32 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - `use $htm` lists `$html-skill`; Tab fills `use $html-skill ` and closes the menu.
   - `$re` in the Claude session opens no menu and no "No command matches" line.
   - The `/gx-` draft shows "Codex skills start with $. Type $gx-... instead."
+
+## 151. Command menu on the design page and First prompt
+
+- **Scenario:** `agents-commands` at 1280px: the Claude design page `demo:design-auto`, the Codex design page `gx:design-codex`, and the New session form.
+- **Steps:**
+  1. On the Claude design page open Note and type `/co`, then `/`.
+  2. On the Codex design page open Note and type `/`, then `$html`.
+  3. In the New session form type `/` in First prompt, choose the `feature` worktree and type `/` again.
+  4. Type `/feature-o` and press Enter.
+  5. Choose "+ Create worktree" and type `/`.
+- **Pass:**
+  - The Claude design menu lists `/compact`, `/cost` and `/html-skill`.
+  - The Codex design menu lists `/status` and no skill for `/`; `$html` lists `$html-skill`.
+  - First prompt lists `/feature-only-skill` for the `feature` worktree only; Enter fills `/feature-only-skill ` and the form stays open.
+  - "+ Create worktree" lists the base worktree's commands, without `/feature-only-skill`.
+
+## 152. Phone, command menu
+
+- **Scenario:** `agents-commands` at 390px on the design page `demo:design-auto` and the New session sheet.
+- **Steps:**
+  1. Open Note and type `/`.
+  2. Type `/mo` and tap "Switch model".
+  3. Shrink the viewport to 390x420 and type `/`.
+  4. Open the New session sheet, type `/` in First prompt and tap the first row.
+- **Pass:**
+  - Rows take two lines, stay inside 390px and the menu has no footer.
+  - The tap fills `/model ` and closes the menu.
+  - At 420px high the menu sits inside the viewport.
+  - First prompt's menu opens below the field; a tap fills `/name `.

@@ -1,7 +1,8 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { Page } from "@playwright/test";
 import { expect, holdRoute, nav, test } from "./fixture";
-import { chatOf, commandMenu, commandNames, commandRows, go, messageBox, sendButton, sessions, setViMode } from "./agentsKit";
+import { chatOf, commandMenu, commandNames, commandRows, go, messageBox, newForm, promptBox, sendButton, sessions, setViMode, sidebar, worktreeBox } from "./agentsKit";
 
 /** The nth idle Claude session; a sent slash command keeps its session busy, so a later step takes another. */
 const claudeIdle = async (fixture: Parameters<typeof sessions>[0], n = 0) =>
@@ -264,4 +265,114 @@ test("150. Codex command menu", async ({ page, start }) => {
   await go(page, `#/agents/${codex.id}`);
   await box.fill("/gx-triage");
   await expect(page.getByText("Codex skills start with $. Type $gx-... instead.")).toBeVisible();
+});
+
+/** The design page composer's box, opened with the Note button. */
+const openNote = async (page: Page) => {
+  await page.getByRole("button", nav("Note")).click();
+  const box = messageBox(page);
+  await expect(box).toBeEnabled();
+  return box;
+};
+
+const openNewForm = async (page: Page) => {
+  await go(page, "#/agents");
+  const phone = (page.viewportSize()?.width ?? 0) < 600;
+  if (phone) await page.getByRole("button", { name: "+ New session", exact: true }).click();
+  else await sidebar(page).getByRole("button", { name: "New session in demo" }).click();
+  await expect(newForm(page)).toBeVisible();
+};
+
+test("151. Command menu on the design page and First prompt", async ({ page, start }) => {
+  await start("agents-commands");
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  // The design composer opens the menu for a Claude design session...
+  await go(page, "#/d/demo:design-auto");
+  let box = await openNote(page);
+  await box.fill("/co");
+  await expect(commandMenu(page)).toBeVisible();
+  await expect.poll(() => commandNames(page)).toEqual(expect.arrayContaining(["/compact", "/cost"]));
+  await box.fill("/");
+  await expect.poll(() => hasName(page, "/html-skill")).toBe(true);
+  await box.press("Escape");
+
+  // ...and a Codex design session lists built-ins and `$` skills.
+  await go(page, "#/d/gx:design-codex");
+  box = await openNote(page);
+  await box.fill("/");
+  await expect.poll(() => hasName(page, "/status")).toBe(true);
+  expect(await hasName(page, "/html-skill")).toBe(false);
+  await box.fill("$html");
+  await expect.poll(() => commandNames(page)).toEqual(["$html-skill"]);
+
+  // First prompt lists the chosen worktree's commands: `feature` only in the feature worktree.
+  await openNewForm(page);
+  const prompt = promptBox(page);
+  await prompt.fill("/");
+  await expect.poll(() => hasName(page, "/html-skill")).toBe(true);
+  expect(await hasName(page, "/feature-only-skill")).toBe(false);
+  await prompt.fill("");
+  await worktreeBox(page).fill("feature");
+  await page.getByRole("option", { name: /feature/ }).first().click();
+  await prompt.fill("/");
+  await expect.poll(() => hasName(page, "/feature-only-skill")).toBe(true);
+
+  // A pick fills the field and creates nothing.
+  await prompt.fill("/feature-o");
+  await prompt.press("Enter");
+  await expect(prompt).toHaveValue("/feature-only-skill ");
+  await expect(newForm(page)).toBeVisible();
+
+  // "+ Create worktree" lists the project's base worktree commands.
+  await prompt.fill("");
+  await worktreeBox(page).fill("fresh-tree");
+  await page.getByRole("option", { name: /Create worktree/ }).click();
+  await prompt.fill("/");
+  await expect.poll(() => hasName(page, "/html-skill")).toBe(true);
+  expect(await hasName(page, "/feature-only-skill")).toBe(false);
+});
+
+test("152. Phone, command menu", async ({ page, start }) => {
+  await start("agents-commands");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await go(page, "#/d/demo:design-auto");
+  const box = await openNote(page);
+  const menu = commandMenu(page);
+
+  // Two-line rows, no footer.
+  await box.fill("/");
+  await expect(menu).toBeVisible();
+  const clear = commandRows(page).filter({ hasText: "Clear the conversation" });
+  await expect(clear).toBeVisible();
+  await expect(page.getByText("↑↓ select")).toHaveCount(0);
+  await expect(page.getByText("Esc closes")).toHaveCount(0);
+  const rowBox = (await clear.boundingBox())!;
+  expect(rowBox.height).toBeGreaterThan(36);
+  expect(rowBox.x + rowBox.width).toBeLessThanOrEqual(390);
+
+  // A tap fills.
+  await box.fill("/mo");
+  await commandRows(page).filter({ hasText: "Switch model" }).click();
+  await expect(box).toHaveValue("/model ");
+  await expect(menu).toHaveCount(0);
+
+  // The short viewport stands in for the on-screen keyboard: the menu scrolls inside the room left.
+  await page.setViewportSize({ width: 390, height: 420 });
+  await box.fill("/");
+  await expect(menu).toBeVisible();
+  const frame = (await menu.boundingBox())!;
+  expect(frame.y).toBeGreaterThanOrEqual(0);
+  expect(frame.y + frame.height).toBeLessThanOrEqual(420);
+
+  // First prompt opens below the field.
+  await openNewForm(page);
+  const prompt = promptBox(page);
+  await prompt.fill("/");
+  await expect(menu).toBeVisible();
+  const field = (await prompt.boundingBox())!;
+  const below = (await menu.boundingBox())!;
+  expect(below.y).toBeGreaterThanOrEqual(field.y + field.height - 1);
+  await commandRows(page).first().click();
+  await expect(prompt).toHaveValue(/^\/\S+ $/);
 });
