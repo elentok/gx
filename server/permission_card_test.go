@@ -65,6 +65,9 @@ func startBlockedClaimed(t *testing.T, herdr bool, p *agentrunner.Pending) (*ser
 	if _, err := fake.Start(agentrunner.StartOptions{Label: "epic-a-iter-01", Cwd: wtPath}); err != nil {
 		t.Fatal(err)
 	}
+	// A new fake session is idle, which the restarted server reads as a finished
+	// agent: it merges the ticket and stops the session before SetPending.
+	fake.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
 	asHeadlessRun(t, h)
 	markStarted(t, h)
 	h.Restart(t)
@@ -218,11 +221,15 @@ func TestPermissionCard_NotApprovablePromptShowsTheHint(t *testing.T) {
 func TestPermissionCard_HerdrHostedShowsTheHint(t *testing.T) {
 	t.Parallel()
 	h, _ := startBlockedClaimed(t, true, &agentrunner.Pending{ID: "req-3", Tool: "Bash"})
-	d, err := h.Client.Detail(context.Background(), answerAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if d.Permission == nil || d.Permission.Hint != "Approve it in the TUI" || d.Permission.RequestID != "" {
+	var d server.TicketDetail
+	waitFor(t, func() bool {
+		var err error
+		if d, err = h.Client.Detail(context.Background(), answerAddr); err != nil {
+			t.Fatal(err)
+		}
+		return d.Permission != nil
+	})
+	if d.Permission.Hint != "Approve it in the TUI" || d.Permission.RequestID != "" {
 		t.Errorf("permission = %+v", d.Permission)
 	}
 	if slices.Contains(d.Actions, server.ActionApprove) {
