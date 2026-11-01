@@ -56,6 +56,9 @@ Then, while working:
 - **Never edit code you have not read, and copy indentation exactly from the file read.** Don't guess
   tabs or spaces. Read the exact lines you will edit, in full: a read that says "(N lines omitted)"
   over them does not count - re-read that range with `offset`/`limit`.
+- **Make one Edit per contiguous region, not one per line.** Costly tickets averaged about 59 Edit
+  calls, and each call is a turn that re-reads the whole context. Where several changes sit close
+  together in a file, replace the whole block in a single Edit.
 - **Send file edits to one file one after another, never in parallel.** One failed edit makes the rest of
   the batch fail, and a later edit may depend on text an earlier one changed.
 - **Never run a test in the same batch as the edits it should cover.** It can return green before
@@ -98,6 +101,11 @@ transcript format. Trigger a fork at **90K** — that leaves headroom under the 
 budget for growth the check can't see (mid-turn, between checkpoints). If the check itself fails
 (the command errors or can't identify the session), treat that as over-budget — fail toward
 forking, not past it.
+
+Cost grows with turns as well as with context size, because the whole context is re-read on every
+turn. In one sample, the tickets in the costliest decile ran about 180 turns against about 40 for a
+median ticket, and most stayed under 90K. So also fork at about **100 tool calls** with work left,
+even if the token check passes.
 
 Also fork, independent of token count, on a **kind-mismatch**: if mid-implementation you discover
 the ticket actually needs new plumbing/infra the original ticket didn't scope for (not just an
