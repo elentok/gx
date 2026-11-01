@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/fsutil"
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
 )
@@ -168,6 +169,11 @@ func SetEpicSection(ticketPath, heading, content string) error {
 // the ticket lock, then writes the result atomically. The YAML node tree is
 // edited in place so keys the edit does not name survive untouched.
 func editEpicTicketMD(ticketPath string, edit func(mapping *yaml.Node, body *string) error) error {
+	unlockProject, err := projectlock.SharedEpic(filepath.Dir(ticketPath))
+	if err != nil {
+		return err
+	}
+	defer unlockProject()
 	unlock, err := schema.LockTicket(ticketPath)
 	if err != nil {
 		return err

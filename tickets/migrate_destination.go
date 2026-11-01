@@ -29,7 +29,7 @@ func MigrateDestinationUnconfirmed(root string) ([]MigrationChange, error) {
 			continue
 		}
 		renamed := false
-		err := editEpicFrontmatter(epicPath, func(mapping *yaml.Node) (bool, error) {
+		err := editEpicFrontmatterInner(epicPath, func(mapping *yaml.Node) (bool, error) {
 			old := mappingKeyIndex(mapping, legacyProvisionalDestinationKey)
 			if old < 0 {
 				return false, nil

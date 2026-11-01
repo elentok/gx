@@ -44,7 +44,7 @@ func BackfillMergedAt(root string, isMerged func(Epic) (bool, error)) ([]Migrati
 		if !ok {
 			continue
 		}
-		if err := StampEpicFields(epic.Path, map[string]any{"merged_at": mergedAt}); err != nil {
+		if err := StampEpicFieldsInner(epic.Path, map[string]any{"merged_at": mergedAt}); err != nil {
 			return changes, err
 		}
 		changes = append(changes, MigrationChange{

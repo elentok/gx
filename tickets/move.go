@@ -11,6 +11,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -388,6 +389,11 @@ func (p MovePlan) proseMentions(root string, after map[string]string) []string {
 // both epics rather than a dangling ref or a lost ticket. The old file's
 // ticket lock is held throughout.
 func ApplyMove(p MovePlan) error {
+	unlockProject, err := projectlock.Shared(p.OldPath)
+	if err != nil {
+		return err
+	}
+	defer unlockProject()
 	unlock, err := schema.LockTicket(p.OldPath)
 	if err != nil {
 		return err
@@ -411,6 +417,11 @@ func ApplyMove(p MovePlan) error {
 // still there (a crash between the two): it re-plans the inbound refs against
 // the existing new file, rewrites them and removes the old file.
 func ResumeMove(root string, from, to Address, oldPath, newPath string) error {
+	unlockProject, err := projectlock.Shared(oldPath)
+	if err != nil {
+		return err
+	}
+	defer unlockProject()
 	unlock, err := schema.LockTicket(oldPath)
 	if err != nil {
 		return err
@@ -442,7 +453,7 @@ func ResumeMove(root string, from, to Address, oldPath, newPath string) error {
 // skipped.
 func (p MovePlan) finish() error {
 	for _, e := range p.inbound {
-		if _, err := RewriteRefsInFile(e.path, e.fn); err != nil {
+		if _, err := rewriteRefsInFileInner(e.path, e.fn); err != nil {
 			return err
 		}
 	}

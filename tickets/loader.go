@@ -15,6 +15,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/elentok/gx/fsutil"
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
 )
@@ -316,6 +317,11 @@ type ticketMDYAML struct {
 // the given status and the directory name as its heading. An existing
 // ticket.md is left alone: it carries the epic's own fields and body.
 func WriteEpicTicketMD(epicPath string, status schema.Status) error {
+	unlockProject, err := projectlock.SharedEpic(epicPath)
+	if err != nil {
+		return err
+	}
+	defer unlockProject()
 	f, err := os.OpenFile(filepath.Join(epicPath, "ticket.md"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if errors.Is(err, os.ErrExist) {
 		return nil
@@ -468,13 +474,24 @@ func StampEpicMerged(epicPath string, now time.Time) error {
 // every other key and the body are kept. Retro stamping and `gx evolve skip`
 // reuse it for their own keys.
 func StampEpicFields(epicPath string, fields map[string]any) error {
-	return stampEpicFields(epicPath, fields, false)
+	return stampEpicFields(editEpicFrontmatter, epicPath, fields, false)
+}
+
+// StampEpicFieldsInner is StampEpicFields without the project's migration lock,
+// for migration steps, which run while their migration holds it exclusive.
+func StampEpicFieldsInner(epicPath string, fields map[string]any) error {
+	return stampEpicFields(editEpicFrontmatterInner, epicPath, fields, false)
 }
 
 // OverwriteEpicFields is StampEpicFields for keys a later run legitimately
 // replaces (a forced re-run's evolve_ticket): an existing value is rewritten.
 func OverwriteEpicFields(epicPath string, fields map[string]any) error {
-	return stampEpicFields(epicPath, fields, true)
+	return stampEpicFields(editEpicFrontmatter, epicPath, fields, true)
+}
+
+// OverwriteEpicFieldsInner is OverwriteEpicFields without the migration lock.
+func OverwriteEpicFieldsInner(epicPath string, fields map[string]any) error {
+	return stampEpicFields(editEpicFrontmatterInner, epicPath, fields, true)
 }
 
 // ClearEpicFields removes each key from the epic's ticket.md frontmatter. A key
@@ -492,8 +509,8 @@ func ClearEpicFields(epicPath string, keys ...string) error {
 	})
 }
 
-func stampEpicFields(epicPath string, fields map[string]any, overwrite bool) error {
-	return editEpicFrontmatter(epicPath, func(mapping *yaml.Node) (bool, error) {
+func stampEpicFields(edit epicFrontmatterEditor, epicPath string, fields map[string]any, overwrite bool) error {
+	return edit(epicPath, func(mapping *yaml.Node) (bool, error) {
 		changed := false
 		for key, value := range fields {
 			idx := mappingKeyIndex(mapping, key)
@@ -515,9 +532,24 @@ func stampEpicFields(epicPath string, fields map[string]any, overwrite bool) err
 	})
 }
 
-// editEpicFrontmatter runs edit on the epic's ticket.md frontmatter mapping
-// under the ticket lock, and writes the file back only when edit reports a change.
+// epicFrontmatterEditor is editEpicFrontmatter or its Inner variant.
+type epicFrontmatterEditor func(epicPath string, edit func(mapping *yaml.Node) (bool, error)) error
+
+// editEpicFrontmatter is editEpicFrontmatterInner under the project's shared
+// migration lock. Every public epic stamp goes through it.
 func editEpicFrontmatter(epicPath string, edit func(mapping *yaml.Node) (bool, error)) error {
+	unlock, err := projectlock.SharedEpic(epicPath)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return editEpicFrontmatterInner(epicPath, edit)
+}
+
+// editEpicFrontmatterInner runs edit on the epic's ticket.md frontmatter mapping
+// under the ticket lock, and writes the file back only when edit reports a
+// change. Migration steps call it directly: they hold the migration lock.
+func editEpicFrontmatterInner(epicPath string, edit func(mapping *yaml.Node) (bool, error)) error {
 	ticketPath := filepath.Join(epicPath, "ticket.md")
 	if _, err := os.Stat(ticketPath); err != nil {
 		return fmt.Errorf("epic %s has no ticket.md: %w", epicPath, err)
@@ -577,6 +609,11 @@ func stampEpicTiming(scratchDir, epicName string, mutate func(*epicTiming) bool)
 	if _, err := os.Stat(ticketPath); err != nil {
 		return fmt.Errorf("epic %s has no ticket.md: %w", epicPath, err)
 	}
+	unlockProject, err := projectlock.SharedEpic(epicPath)
+	if err != nil {
+		return err
+	}
+	defer unlockProject()
 	// The lock spans the read inside stampTicketMDTiming too, or a
 	// concurrent `set`/`section` write between read and write is lost.
 	unlock, err := schema.LockTicket(ticketPath)

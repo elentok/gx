@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/conversations"
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
 )
@@ -138,6 +139,13 @@ func CreateEpic(conversationsDir, projectDir, name string, fields EpicFields, bo
 	if text == "" {
 		text = "# " + name
 	}
+	// The map stamp above locked and released on its own; this lock covers the
+	// directory and ticket.md creation.
+	unlockProject, err := projectlock.SharedProject(projectDir)
+	if err != nil {
+		return "", err
+	}
+	defer unlockProject()
 	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0o755); err != nil {
 		return "", err
 	}

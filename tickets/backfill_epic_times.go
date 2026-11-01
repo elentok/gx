@@ -52,7 +52,7 @@ func backfillCreatedAt(epicPath string, epic Epic) (*MigrationChange, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := StampEpicFields(epicPath, map[string]any{"created_at": created}); err != nil {
+	if err := StampEpicFieldsInner(epicPath, map[string]any{"created_at": created}); err != nil {
 		return nil, err
 	}
 	return &MigrationChange{
@@ -80,7 +80,7 @@ func backfillMapCompletedAt(root, name string, epic Epic) (*MigrationChange, err
 		}
 	}
 	epicPath := filepath.Join(root, name)
-	if err := StampEpicFields(epicPath, map[string]any{"completed_at": completed}); err != nil {
+	if err := StampEpicFieldsInner(epicPath, map[string]any{"completed_at": completed}); err != nil {
 		return nil, err
 	}
 	return &MigrationChange{

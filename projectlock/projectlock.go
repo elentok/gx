@@ -76,6 +76,26 @@ func Shared(ticketPath string) (unlock func(), err error) {
 	return acquire(dir, syscall.LOCK_SH)
 }
 
+// SharedProject takes the shared lock of projectDir itself, for writers that
+// work on a project directory rather than one ticket path (epic creation). A
+// directory that is not a store project takes no lock.
+func SharedProject(projectDir string) (unlock func(), err error) {
+	if _, err := os.Stat(filepath.Join(projectDir, projectFile)); err != nil {
+		return func() {}, nil
+	}
+	return acquire(projectDir, syscall.LOCK_SH)
+}
+
+// SharedEpic takes the shared lock of the project holding epicDir, laid out as
+// <store>/<project>/<epic>. An epic outside a store project takes no lock.
+func SharedEpic(epicDir string) (unlock func(), err error) {
+	abs, err := filepath.Abs(epicDir)
+	if err != nil {
+		return func() {}, nil
+	}
+	return SharedProject(filepath.Dir(abs))
+}
+
 // Exclusive takes projectDir's exclusive lock, waiting without a time limit.
 func Exclusive(projectDir string) (unlock func(), err error) {
 	return acquire(projectDir, syscall.LOCK_EX)

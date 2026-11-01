@@ -28,10 +28,10 @@ func MarkMapDone(implPath string, dryRun bool) (*MigrationChange, error) {
 		return nil, nil
 	}
 	if !dryRun {
-		if err := StampEpicFields(mapPath, map[string]any{"merged_at": impl.MergedAt}); err != nil {
+		if err := StampEpicFieldsInner(mapPath, map[string]any{"merged_at": impl.MergedAt}); err != nil {
 			return nil, err
 		}
-		if err := OverwriteEpicFields(mapPath, map[string]any{"status": string(schema.StatusDone)}); err != nil {
+		if err := OverwriteEpicFieldsInner(mapPath, map[string]any{"status": string(schema.StatusDone)}); err != nil {
 			return nil, err
 		}
 	}

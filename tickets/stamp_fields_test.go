@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/projectlock"
 )
 
 func TestStampEpicFields_KeepsOtherKeysAndNeverOverwrites(t *testing.T) {
@@ -36,6 +38,34 @@ func TestStampEpicFields_KeepsOtherKeysAndNeverOverwrites(t *testing.T) {
 	}
 	if strings.Contains(got, "2030") {
 		t.Errorf("existing completed_at was overwritten:\n%s", got)
+	}
+}
+
+func TestStampEpicFields_WaitsForProjectMigration(t *testing.T) {
+	requireWaitsForProjectMigration(t, func(t *testing.T, root string) (string, func() error) {
+		project, epic := storeProjectWithEpic(t, root, "status: open\n")
+		return project, func() error {
+			return StampEpicFields(epic, map[string]any{"completed_at": time.Now().UTC()})
+		}
+	})
+}
+
+func TestStampEpicFieldsInner_RunsWhileProjectLockHeld(t *testing.T) {
+	project, epic := storeProjectWithEpic(t, t.TempDir(), "status: open\n")
+	unlock, err := projectlock.Exclusive(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	done := make(chan error, 1)
+	go func() { done <- StampEpicFieldsInner(epic, map[string]any{"merged_at": time.Now().UTC()}) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("inner stamp waited for the migration lock")
 	}
 }
 

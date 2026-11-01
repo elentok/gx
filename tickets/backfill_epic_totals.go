@@ -36,7 +36,7 @@ func BackfillEpicTotals(root string, lines func(Epic) (added, removed int, ok bo
 		if len(fields) == 0 {
 			return nil, nil
 		}
-		if err := StampEpicFields(epic.Path, fields); err != nil {
+		if err := StampEpicFieldsInner(epic.Path, fields); err != nil {
 			return nil, err
 		}
 		return []MigrationChange{{Path: filepath.Join(epic.Path, "ticket.md"), Notes: notes}}, nil

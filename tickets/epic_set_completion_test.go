@@ -2,6 +2,7 @@ package tickets
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -53,6 +54,15 @@ func TestUpdateEpicFields_DesignStepChecksTheKindTheCallLeavesBehind(t *testing.
 	if after, _ := os.ReadFile(m); string(after) != string(before) {
 		t.Errorf("a refused update changed the file:\n%s", after)
 	}
+}
+
+func TestSetEpicSection_WaitsForProjectMigration(t *testing.T) {
+	requireWaitsForProjectMigration(t, func(t *testing.T, root string) (string, func() error) {
+		project, epic := storeProjectWithEpic(t, root, "status: open\n")
+		return project, func() error {
+			return SetEpicSection(filepath.Join(epic, "ticket.md"), "## Note", "x")
+		}
+	})
 }
 
 func TestUpdateEpicFields_CompletedAtRefusesLoopEpicBeforeWriting(t *testing.T) {

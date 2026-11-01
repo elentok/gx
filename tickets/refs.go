@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/elentok/gx/fsutil"
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/tickets/schema"
 	"gopkg.in/yaml.v3"
 )
@@ -64,8 +66,26 @@ func RewriteFrontmatterRefs(raw string, fn func(ref string) string) (string, boo
 }
 
 // RewriteRefsInFile applies RewriteFrontmatterRefs to the file at path, under
-// its ticket lock, and reports whether it wrote.
+// the project's shared migration lock and its ticket lock, and reports whether
+// it wrote. path is a ticket or an epic's ticket.md.
 func RewriteRefsInFile(path string, fn func(ref string) string) (bool, error) {
+	var unlockProject func()
+	var err error
+	if filepath.Base(path) == "ticket.md" {
+		unlockProject, err = projectlock.SharedEpic(filepath.Dir(path))
+	} else {
+		unlockProject, err = projectlock.Shared(path)
+	}
+	if err != nil {
+		return false, err
+	}
+	defer unlockProject()
+	return rewriteRefsInFileInner(path, fn)
+}
+
+// rewriteRefsInFileInner is RewriteRefsInFile without the migration lock, for
+// callers that already hold it (ApplyMove, ResumeMove).
+func rewriteRefsInFileInner(path string, fn func(ref string) string) (bool, error) {
 	unlock, err := schema.LockTicket(path)
 	if err != nil {
 		return false, err

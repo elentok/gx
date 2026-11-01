@@ -33,7 +33,7 @@ func BackfillFriction(root string, friction func(epicName string, t Ticket) (sch
 		if !epic.HasTicketMD || epic.MergedAt.IsZero() || epic.Friction != nil {
 			return changes, nil
 		}
-		if err := StampEpicFields(epic.Path, map[string]any{"friction": SumEpicStats(epic.Tickets).Friction}); err != nil {
+		if err := StampEpicFieldsInner(epic.Path, map[string]any{"friction": SumEpicStats(epic.Tickets).Friction}); err != nil {
 			return changes, err
 		}
 		return append(changes, MigrationChange{

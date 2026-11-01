@@ -41,6 +41,39 @@ func TestApplyMove_CarriesLogAndToleratesNone(t *testing.T) {
 	}
 }
 
+func TestApplyMove_WaitsForProjectMigration(t *testing.T) {
+	requireWaitsForProjectMigration(t, func(t *testing.T, root string) (string, func() error) {
+		project := filepath.Join(root, "proj")
+		oldPath := filepath.Join(project, "src", "issues", "01-one.md")
+		writeFile(t, filepath.Join(project, "project.json"), "{}")
+		writeFile(t, oldPath, movedTicket)
+		writeFile(t, filepath.Join(project, "dst", "issues", ".keep"), "")
+		return project, func() error {
+			p, err := PlanMove(project, Address{Project: "p", Epic: "src", ID: "01"}, Ticket{Identifier: "01", Path: oldPath}, "dst", "", MoveOpts{})
+			if err != nil {
+				return err
+			}
+			return ApplyMove(p)
+		}
+	})
+}
+
+func TestRewriteRefsInFile_WaitsForProjectMigration(t *testing.T) {
+	requireWaitsForProjectMigration(t, func(t *testing.T, root string) (string, func() error) {
+		project := filepath.Join(root, "proj")
+		path := filepath.Join(project, "epic", "issues", "02-two.md")
+		writeFile(t, filepath.Join(project, "project.json"), "{}")
+		writeFile(t, path, "---\nid: \"02\"\nstatus: open\ntype: implement\nblocked_by:\n  - \"01\"\n---\n\n# 02\n")
+		return project, func() error {
+			changed, err := RewriteRefsInFile(path, func(ref string) string { return "epic/" + ref })
+			if err == nil && !changed {
+				err = os.ErrInvalid
+			}
+			return err
+		}
+	})
+}
+
 func TestPlanMove_ArchivedBlockerIsNotABreak(t *testing.T) {
 	root := t.TempDir()
 	oldPath := filepath.Join(root, "src", "issues", "01-one.md")

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/fsutil"
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/storecommit"
 	"github.com/elentok/gx/tickets/schema"
 )
@@ -204,6 +205,11 @@ func MarkChildDone(path, sessionID string) error {
 // status is tolerated on read (mutate is expected to fix it) and the ticket is
 // validated after mutate; otherwise the ticket must already be valid.
 func rewriteTicket(path string, repair bool, mutate func(*schema.Ticket, *string) error) error {
+	unlockProject, err := projectlock.Shared(path)
+	if err != nil {
+		return err
+	}
+	defer unlockProject()
 	unlock, err := schema.LockTicket(path)
 	if err != nil {
 		return err
