@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elentok/gx/migrations"
 	"github.com/elentok/gx/testutil"
 )
 
@@ -84,6 +85,10 @@ func TestExecute_TicketsMigrateToStore_CopiesTreeAndCreatesProject(t *testing.T)
 	}
 	if !strings.Contains(string(pf), `"name": "mine"`) || !strings.Contains(string(pf), filepath.Base(repo)) {
 		t.Errorf("project.json = %s", pf)
+	}
+
+	if _, err := os.Stat(filepath.Join(project, migrations.AppliedFile)); !os.IsNotExist(err) {
+		t.Errorf("--to-store wrote an applied list (stat err %v)", err)
 	}
 
 	// The project is now what `tickets root` resolves for the repo.

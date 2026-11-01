@@ -4,6 +4,11 @@
 //
 // Contract for contributors: a released step name is never reused or renamed.
 // To change a step's behaviour, add a new step.
+//
+// Each project keeps an applied list (AppliedFile) of the step names that
+// returned without error for it. A run with Env.SkipApplied skips the listed
+// names; a failed step is not listed and ends the run, so the next run starts
+// there. Names in the list that no step has are left alone (UnknownApplied).
 package migrations
 
 import (
@@ -25,8 +30,13 @@ type Env struct {
 	LookupRoot string
 	// DryRun keeps the steps that write outside Root report-only.
 	DryRun bool
-	// Skip reports whether the named step is to be skipped. Nil skips nothing.
-	Skip func(name string) bool
+	// AppliedPath is the project's applied list (see AppliedFile). A step that
+	// returns without error is recorded there. Empty records nothing, which is
+	// what a dry run wants.
+	AppliedPath string
+	// SkipApplied skips the steps named in the list at AppliedPath. The manual
+	// `gx tickets migrate` leaves it false and reruns every step.
+	SkipApplied bool
 }
 
 // StepFunc runs one step and returns the files it changed.
@@ -81,8 +91,14 @@ func (e earlyError) Unwrap() error { return e.err }
 // up to it are returned with the error. early reports a failure before any step
 // ran, where nothing is printed.
 func (r *Registry) Run(env Env) (changes []tickets.MigrationChange, early bool, err error) {
+	var applied []string
+	if env.SkipApplied && env.AppliedPath != "" {
+		if applied, err = readApplied(env.AppliedPath); err != nil {
+			return nil, true, err
+		}
+	}
 	for _, s := range r.steps {
-		if env.Skip != nil && env.Skip(s.Name) {
+		if slices.Contains(applied, s.Name) {
 			continue
 		}
 		got, err := s.Run(env)
@@ -97,6 +113,11 @@ func (r *Registry) Run(env Env) (changes []tickets.MigrationChange, early bool, 
 				return changes, true, e.err
 			}
 			return changes, false, err
+		}
+		if env.AppliedPath != "" {
+			if err := recordApplied(env.AppliedPath, s.Name); err != nil {
+				return changes, false, err
+			}
 		}
 	}
 	return changes, false, nil

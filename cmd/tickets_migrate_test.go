@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/elentok/gx/migrations"
 )
 
 func writeMigrateFixtureEpic(t *testing.T, root, epicName string, files map[string]string) string {
@@ -18,6 +20,36 @@ func writeMigrateFixtureEpic(t *testing.T, root, epicName string, files map[stri
 		writeTicketFile(t, filepath.Join(issuesDir, name), content)
 	}
 	return issuesDir
+}
+
+func TestExecute_TicketsMigrate_RecordsAppliedStepsAndRerunsAll(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	writeMigrateFixtureEpic(t, root, "widget-epic", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n",
+	})
+	list := filepath.Join(root, migrations.AppliedFile)
+	names := migrations.Default.Names()
+	// A full list does not make the manual run skip anything; a missing name is
+	// appended and unknown names stay.
+	if err := os.WriteFile(list, []byte(strings.Join(names[1:], "\n")+"\nfuture-step\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		d := deps{stdout: bytes.NewBuffer(nil), stderr: bytes.NewBuffer(nil), env: envFor(t)}
+		if err := execute([]string{"tickets", "migrate", root}, d); err != nil {
+			t.Fatalf("run %d: %v", i, err)
+		}
+	}
+	raw, err := os.ReadFile(list)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Fields(string(raw))
+	want := append(append([]string{}, names[1:]...), "future-step", names[0])
+	if strings.Join(lines, ",") != strings.Join(want, ",") {
+		t.Errorf("list = %v, want %v", lines, want)
+	}
 }
 
 func TestExecute_TicketsMigrate_Success(t *testing.T) {

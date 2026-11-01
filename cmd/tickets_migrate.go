@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/migrations"
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/tickets"
 )
 
@@ -63,7 +64,17 @@ func runTicketsMigrate(dirs config.Dirs, scratchRoot string, dryRun bool, w io.W
 	if dryRun {
 		return runTicketsMigrateDry(dirs, scratchRoot, w)
 	}
-	changes, early, err := migrations.Run(migrations.Env{Dirs: dirs, Root: scratchRoot, LookupRoot: scratchRoot})
+	// Waits for a running migration of the project; the wait hook prints why.
+	unlock, err := projectlock.Exclusive(scratchRoot)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	// By hand every step reruns, so SkipApplied stays false; the run still records.
+	changes, early, err := migrations.Run(migrations.Env{
+		Dirs: dirs, Root: scratchRoot, LookupRoot: scratchRoot,
+		AppliedPath: filepath.Join(scratchRoot, migrations.AppliedFile),
+	})
 	if err == nil {
 		if clearErr := clearMigrationFailure(dirs, scratchRoot); clearErr != nil {
 			return clearErr
@@ -80,6 +91,17 @@ func runTicketsMigrate(dirs config.Dirs, scratchRoot string, dryRun bool, w io.W
 	printChanges(w, changes)
 	fmt.Fprintf(w, "%d file(s) changed\n", len(changes))
 	return err
+}
+
+// warnUnknownApplied prints one warning naming the applied-list entries, across
+// the given projects, that this binary has no step for. It is advisory: a
+// list that cannot be read is left for the run itself to report.
+func warnUnknownApplied(w io.Writer, projectDirs ...string) {
+	unknown, err := migrations.Default.UnknownApplied(projectDirs...)
+	if err != nil || len(unknown) == 0 {
+		return
+	}
+	fmt.Fprintf(w, "warning: applied migrations unknown to this gx (a newer version ran them): %s\n", strings.Join(unknown, ", "))
 }
 
 // clearMigrationFailure drops the project's saved failure once its migration

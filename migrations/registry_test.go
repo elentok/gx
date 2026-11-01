@@ -2,6 +2,8 @@ package migrations
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -47,20 +49,117 @@ func TestRun_KeepsRegistrationOrder(t *testing.T) {
 	}
 }
 
-func TestRun_SkipsByName(t *testing.T) {
+func appliedRegistry(ran *[]string, failB bool) *Registry {
 	r := &Registry{}
-	var ran []string
-	for _, n := range []string{"a", "b"} {
+	for _, n := range []string{"a", "b", "c"} {
 		r.Register(Step{Name: n, Run: func(Env) ([]tickets.MigrationChange, error) {
-			ran = append(ran, n)
+			*ran = append(*ran, n)
+			if failB && n == "b" {
+				return nil, errors.New("boom")
+			}
 			return nil, nil
 		}})
 	}
-	if _, _, err := r.Run(Env{Skip: func(n string) bool { return n == "a" }}); err != nil {
+	return r
+}
+
+func readLines(t *testing.T, path string) []string {
+	t.Helper()
+	got, err := readApplied(path)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(ran, []string{"b"}) {
-		t.Errorf("ran %v, want [b]", ran)
+	return got
+}
+
+func TestRun_SkipsListedNamesAndRecordsTheRest(t *testing.T) {
+	path := filepath.Join(t.TempDir(), AppliedFile)
+	if err := os.WriteFile(path, []byte("# note\n\na\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var ran []string
+	r := appliedRegistry(&ran, false)
+	if _, _, err := r.Run(Env{AppliedPath: path, SkipApplied: true}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(ran, []string{"b", "c"}) {
+		t.Errorf("ran %v, want [b c]", ran)
+	}
+	if got := readLines(t, path); !slices.Equal(got, []string{"a", "b", "c"}) {
+		t.Errorf("list %v", got)
+	}
+	ran = nil
+	if _, _, err := r.Run(Env{AppliedPath: path, SkipApplied: true}); err != nil {
+		t.Fatal(err)
+	}
+	if len(ran) != 0 {
+		t.Errorf("second run ran %v", ran)
+	}
+}
+
+func TestRun_NoListRunsEverythingThenRecords(t *testing.T) {
+	path := filepath.Join(t.TempDir(), AppliedFile)
+	var ran []string
+	if _, _, err := appliedRegistry(&ran, false).Run(Env{AppliedPath: path, SkipApplied: true}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(ran, []string{"a", "b", "c"}) || !slices.Equal(readLines(t, path), ran) {
+		t.Errorf("ran %v, list %v", ran, readLines(t, path))
+	}
+}
+
+func TestRun_FailedStepIsNotRecordedAndLaterRunResumesThere(t *testing.T) {
+	path := filepath.Join(t.TempDir(), AppliedFile)
+	var ran []string
+	if _, _, err := appliedRegistry(&ran, true).Run(Env{AppliedPath: path, SkipApplied: true}); err == nil {
+		t.Fatal("want an error")
+	}
+	if !slices.Equal(ran, []string{"a", "b"}) || !slices.Equal(readLines(t, path), []string{"a"}) {
+		t.Errorf("ran %v, list %v", ran, readLines(t, path))
+	}
+	ran = nil
+	if _, _, err := appliedRegistry(&ran, false).Run(Env{AppliedPath: path, SkipApplied: true}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(ran, []string{"b", "c"}) {
+		t.Errorf("resumed run ran %v", ran)
+	}
+}
+
+func TestRun_ManualRunSkipsNothingAndAddsNoDuplicates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), AppliedFile)
+	if err := os.WriteFile(path, []byte("a\nb\nc"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var ran []string
+	if _, _, err := appliedRegistry(&ran, false).Run(Env{AppliedPath: path}); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(ran, []string{"a", "b", "c"}) || !slices.Equal(readLines(t, path), ran) {
+		t.Errorf("ran %v, list %v", ran, readLines(t, path))
+	}
+}
+
+func TestRun_NoAppliedPathWritesNoList(t *testing.T) {
+	dir := t.TempDir()
+	var ran []string
+	if _, _, err := appliedRegistry(&ran, false).Run(Env{Root: dir}); err != nil {
+		t.Fatal(err)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("dir has %v", entries)
+	}
+}
+
+func TestUnknownApplied_OneSortedSetAcrossProjects(t *testing.T) {
+	var ran []string
+	r := appliedRegistry(&ran, false)
+	d1, d2 := t.TempDir(), t.TempDir()
+	os.WriteFile(filepath.Join(d1, AppliedFile), []byte("a\nz-new\nm-new\n"), 0o644)
+	os.WriteFile(filepath.Join(d2, AppliedFile), []byte("z-new\nb\n"), 0o644)
+	got, err := r.UnknownApplied(d1, d2, t.TempDir())
+	if err != nil || !slices.Equal(got, []string{"m-new", "z-new"}) {
+		t.Errorf("got %v, err %v", got, err)
 	}
 }
 

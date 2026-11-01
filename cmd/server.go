@@ -622,6 +622,7 @@ func migrateAllProjectsContinue(cfgDirs config.Dirs, stateDir, storePath string,
 	if err != nil {
 		return err
 	}
+	warnUnknownApplied(w, dirs...)
 	for _, dir := range dirs {
 		name := tickets.ProjectName(dir)
 		fmt.Fprintf(w, "migrating %s\n", name)
@@ -656,6 +657,7 @@ func migrateAllProjects(cfgDirs config.Dirs, storePath string, w io.Writer) erro
 	if err != nil {
 		return err
 	}
+	warnUnknownApplied(w, dirs...)
 	for _, dir := range dirs {
 		name := filepath.Base(dir)
 		fmt.Fprintf(w, "migrating %s\n", name)
