@@ -13,6 +13,7 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -202,13 +203,11 @@ func TestSessionCommands_ConfiguredAgeShortensTheCache(t *testing.T) {
 	t.Parallel()
 	f := startCommands(t, agentfake.ProbeConfig{Entries: []agentfake.ProbeEntry{{Name: "myskill"}}},
 		func(c *server.Config) { c.CommandListAge = 50 * time.Millisecond })
-	deadline := time.Now().Add(10 * time.Second)
-	for f.probes(t) < 2 {
-		if time.Now().After(deadline) {
-			t.Fatalf("probes = %d after the age passed, want 2", f.probes(t))
-		}
+	if !testutil.Poll(10*time.Second, 20*time.Millisecond, func() bool {
 		f.get(t, f.projectQuery(""))
-		time.Sleep(20 * time.Millisecond)
+		return f.probes(t) >= 2
+	}) {
+		t.Fatalf("probes = %d after the age passed, want 2", f.probes(t))
 	}
 }
 

@@ -46,7 +46,7 @@ func TestBlockedPause_AgentErrorPausesWithItsTextAndOffersRetry(t *testing.T) {
 	}
 }
 
-// gateDwell returns a Config option that parks the 15-second dwell until the
+// gateDwell returns a Config option that holds the 15-second dwell until the
 // returned release is called, so "under 15 seconds" is not a timing race.
 func gateDwell() (func(*server.Config), func()) {
 	gate := make(chan struct{})

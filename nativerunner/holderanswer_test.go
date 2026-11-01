@@ -11,6 +11,7 @@ import (
 	"github.com/elentok/gx/agentrunner"
 	agentharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/testutil"
 )
 
 // keyChild sits at a permission prompt and records the first key as hex in
@@ -98,12 +99,8 @@ func codexHolder(t *testing.T, screen string) (c *nativerunner.HolderClient, dir
 		<-finished
 	})
 	go func() {
-		for i := 0; i < 500; i++ {
-			if _, err := os.Stat(keyFile); err == nil {
-				w.set(agentharness.Status{State: agentharness.Idle}, "")
-				return
-			}
-			time.Sleep(10 * time.Millisecond)
+		if testutil.Poll(5*time.Second, 10*time.Millisecond, func() bool { _, err := os.Stat(keyFile); return err == nil }) {
+			w.set(agentharness.Status{State: agentharness.Idle}, "")
 		}
 	}()
 	return c, dir, keyFile
@@ -118,7 +115,10 @@ func TestHolderAnswer_CodexHookWritesTheDecisionFile(t *testing.T) {
 	}
 	// A decision file does not move the fake watcher; the answer waits for it.
 	go func() {
-		time.Sleep(100 * time.Millisecond)
+		testutil.Poll(5*time.Second, 10*time.Millisecond, func() bool {
+			_, ok, _ := nativerunner.ReadPermissionDecision(dir)
+			return ok
+		})
 		_ = c.SendKeys("x")
 	}()
 	err := nativerunner.AnswerCodex(c, dir, agentrunner.Answer{Decision: agentrunner.DecisionDeny, RequestID: "r1", Text: "no"}, false)

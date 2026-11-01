@@ -427,7 +427,7 @@ func (f *fixture) seedRanOnClaude(addr string) error {
 	deadline := time.Now().Add(sessionWaitTimeout * 3)
 	for {
 		out, _ := f.cli("server", "tickets", "detail", addr, "--json")
-		if strings.Contains(string(out), `"needs-answer"`) {
+		if strings.Contains(string(out), `"needs-answer"`) { // oldword:ok the kept legacy wire status
 			break
 		}
 		if time.Now().After(deadline) {

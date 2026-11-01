@@ -26,7 +26,7 @@ const featureSkill = "feature-only-skill"
 // does not list it.
 func commandEntries() []agentfake.ProbeEntry {
 	return []agentfake.ProbeEntry{
-		{Name: "clear", Description: "Clear the conversation", ArgumentHint: "[name]", Aliases: []string{"reset", "new"}, Builtin: true},
+		{Name: "clear", Description: "Clear the conversation", ArgumentHint: "[name]", Aliases: []string{"reset", "new"}, Builtin: true}, // oldword:ok /clear's real alias in Claude
 		{Name: "cost", Description: "Show the session cost", Builtin: true},
 		{Name: "model", Description: "Switch model", ArgumentHint: "[model]", Builtin: true},
 		{Name: "compact", Description: "Compact the conversation", ArgumentHint: "[instructions]", Builtin: true},

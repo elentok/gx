@@ -38,6 +38,7 @@ var allowed = map[string]int{
 	"nativerunner/conformance_test.go":              1,
 	"nativerunner/headless_test.go":                 3,
 	"nativerunner/holder_test.go":                   1,
+	"nativerunner/holderanswer_test.go":             1, // negative wait: a request mismatch sends no key
 	"nativerunner/holderattach_test.go":             1,
 	"nativerunner/holderwatch_test.go":              1,
 	"nativerunner/pty_pending_test.go":              1,
@@ -86,6 +87,7 @@ var allowed = map[string]int{
 	"server/server_notify_test.go":                  1,
 	"server/server_test.go":                         1,
 	"server/sessionchatwatch_test.go":               2,
+	"server/sessionkeys_test.go":                    2, // negative waits: no nudge follows a person's key; a guarded key keeps the countdown
 	"server/sessionprompt_test.go":                  1,
 	"server/sessions_action_test.go":                7,
 	"server/sessions_afk_test.go":                   1,

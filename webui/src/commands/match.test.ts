@@ -34,7 +34,7 @@ describe("openToken", () => {
 });
 
 describe("matchCommands", () => {
-  const all = [entry("review"), entry("clear", ["reset"]), entry("compact"), entry("preview"), entry("agents")];
+  const all = [entry("review"), entry("clear", ["restart"]), entry("compact"), entry("preview"), entry("agents")];
 
   it("lists prefix matches, then substring matches, alphabetical in each", () => {
     expect(matchCommands(all, "re").map((m) => m.entry.name)).toEqual(["clear", "review", "preview"]);
@@ -43,10 +43,10 @@ describe("matchCommands", () => {
   it("matches aliases and highlights the alias", () => {
     const [m] = matchCommands(all, "res");
     expect(m.entry.name).toBe("clear");
-    expect(m.matched).toBe("reset");
+    expect(m.matched).toBe("restart");
     expect(m.segments).toEqual([
       { text: "res", match: true },
-      { text: "et", match: false },
+      { text: "tart", match: false },
     ]);
   });
 

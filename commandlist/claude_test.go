@@ -49,7 +49,7 @@ func TestParseClaudeReply_Recorded(t *testing.T) {
 	}
 
 	clear, _ := find(got, "clear")
-	if clear.Source != commandlist.SourceBuiltIn || !slices.Equal(clear.Aliases, []string{"reset", "new"}) || clear.ArgHint != "[name]" {
+	if clear.Source != commandlist.SourceBuiltIn || !slices.Equal(clear.Aliases, []string{"reset", "new"}) || clear.ArgHint != "[name]" { // oldword:ok /clear's real alias in Claude
 		t.Errorf("clear = %+v", clear)
 	}
 
