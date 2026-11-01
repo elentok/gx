@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { ticketHref } from "../hrefs";
 import { useWide } from "../useWide";
 import { VerdictLine } from "../verdict";
+import { LongRunningBadge } from "../page/LongRunningBadge";
 import { Button } from "../ui/button/Button";
 import { HarnessLabel } from "../ui/harness-label/HarnessLabel";
 import { type EpicDetailRow } from "./detail";
@@ -205,6 +206,7 @@ function Line({
         >
           {title}
         </Text>
+        <LongRunningBadge of={row} />
       </Box>
       {chips && (
         <Box data-chips pl={wide ? "88px" : "80px"} minW="0">

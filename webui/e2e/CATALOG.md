@@ -1639,3 +1639,11 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - The page reads "Wrong model" and "Ran on claude-opus-4, expected claude-sonnet-4."
   - Resume on worker is the only recovery button.
   - After the click the pause label is gone.
+
+## 148. Long-running badge
+
+- **Scenario:** `long-running`: ticket 01 carries the long-ticket mark (120 turns), ticket 02 does not.
+- **Steps:** open the epic page; open ticket 01; open ticket 02.
+- **Pass:**
+  - The epic page shows one "Long-running" badge; its tooltip reads "120 assistant turns (threshold N)".
+  - Ticket 01's page shows the badge; ticket 02's page shows none.

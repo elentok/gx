@@ -24,6 +24,9 @@ type EpicDetailRow struct {
 	RenderedStatus string `json:"rendered_status"`
 	Type           string `json:"type,omitempty"`
 	Parent         string `json:"parent,omitempty"`
+	// LongTicketTurns and LongTicketThreshold feed the Long-running badge; both are 0 when unmarked.
+	LongTicketTurns     int `json:"long_ticket_turns,omitempty"`
+	LongTicketThreshold int `json:"long_ticket_threshold,omitempty"`
 	// Elapsed is in seconds and set once the ticket merges; a running row ticks
 	// on the client from ClaimedAt. On a map row it is the done time minus the
 	// claim time, absent when either is unset.
@@ -325,6 +328,9 @@ func (s *Server) rowFor(root rootRef, e tickets.Epic, t tickets.Ticket) EpicDeta
 	status := e.RenderedStatus(t)
 	row := baseRow(root, e, t, status)
 	row.Elapsed, row.Cost = t.ElapsedTime, t.ActualCost
+	if t.LongTicketTurns > 0 {
+		row.LongTicketTurns, row.LongTicketThreshold = t.LongTicketTurns, s.settings.Load().LongTicketTurns
+	}
 	row.HarnessLabel = s.harnessLabelFor(tickets.Address{Project: root.Project, Epic: root.Epic, ID: t.DisplayNumber()}, t.Agent, row.RenderedStatus)
 	if t.Parent != nil {
 		row.Parent = ticketAddress(root, *t.Parent)

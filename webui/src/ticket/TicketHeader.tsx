@@ -5,6 +5,7 @@ import { slugOf } from "../slug";
 import { StatLine } from "../page/StatLine";
 import { Arc } from "../ui/arc/Arc";
 import { Badge } from "../ui/badge/Badge";
+import { LongRunningBadge } from "../page/LongRunningBadge";
 import { Button } from "../ui/button/Button";
 import { badgeOf, isRunning, statValues } from "./header";
 
@@ -19,6 +20,7 @@ export function TicketHeader({ detail, now }: { detail: TicketDetail; now: numbe
           <a href={epicHref(detail.epic)}>Epic: {slugOf(detail.epic)}</a>
         </Button>
         <Badge tone={tone}>{label}</Badge>
+        <LongRunningBadge of={detail} />
         {isRunning(detail) && <Arc label="Running" />}
       </Box>
       {values.length > 0 && <StatLine values={values} />}

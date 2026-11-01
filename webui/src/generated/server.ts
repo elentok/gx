@@ -311,6 +311,12 @@ export interface TicketDetail {
   model_ran?: string;
   model_expected?: string;
   /**
+   * LongTicketTurns and LongTicketThreshold feed the Long-running badge: the turn
+   * count stored by the alert, and budget.long-ticket-turns. Both are 0 when unmarked.
+   */
+  long_ticket_turns?: number /* int */;
+  long_ticket_threshold?: number /* int */;
+  /**
    * PauseText is the body's "## Paused" section; the body keeps it too, so the
    * client leaves it out of the description.
    */
@@ -685,6 +691,11 @@ export interface EpicDetailRow extends HarnessLabel {
   rendered_status: string;
   type?: string;
   parent?: string;
+  /**
+   * LongTicketTurns and LongTicketThreshold feed the Long-running badge; both are 0 when unmarked.
+   */
+  long_ticket_turns?: number /* int */;
+  long_ticket_threshold?: number /* int */;
   /**
    * Elapsed is in seconds and set once the ticket merges; a running row ticks
    * on the client from ClaimedAt. On a map row it is the done time minus the

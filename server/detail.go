@@ -129,6 +129,10 @@ type TicketDetail struct {
 	// ModelRan and ModelExpected are the two models a model-mismatch pause shows.
 	ModelRan      string `json:"model_ran,omitempty"`
 	ModelExpected string `json:"model_expected,omitempty"`
+	// LongTicketTurns and LongTicketThreshold feed the Long-running badge: the turn
+	// count stored by the alert, and budget.long-ticket-turns. Both are 0 when unmarked.
+	LongTicketTurns     int `json:"long_ticket_turns,omitempty"`
+	LongTicketThreshold int `json:"long_ticket_threshold,omitempty"`
 	// PauseText is the body's "## Paused" section; the body keeps it too, so the
 	// client leaves it out of the description.
 	PauseText string `json:"pause_text,omitempty"`
@@ -208,6 +212,9 @@ func (s *Server) ticketDetail(ref ticketRef) (TicketDetail, error) {
 	}
 	d := newTicketDetail(ref)
 	fillHeader(&d, ref, t)
+	if t.LongTicketTurns > 0 {
+		d.LongTicketTurns, d.LongTicketThreshold = t.LongTicketTurns, s.settings.Load().LongTicketTurns
+	}
 	if !ref.epic.IsMap {
 		d.Stats = s.detailStats(ref)
 		_, d.HasScreen = s.ticketPtyDir(ref.addr)
