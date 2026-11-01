@@ -97,12 +97,17 @@ func (c *Cache) Get(ctx context.Context, key Key, probe Probe) Result {
 	c.mu.Unlock()
 
 	reply, err := probe(ctx, key.Dir)
+	// Codex's "$" menu is skills only; its built-ins are the "/" list.
+	var builtins []Entry
+	if key.Kind != "$" {
+		builtins = BuiltinsFor(key.Harness, runtime.GOOS).Entries
+	}
 
 	c.mu.Lock()
 	if err != nil {
-		f.res = Result{Entries: BuiltinsFor(key.Harness, runtime.GOOS).Entries, Degraded: true}
+		f.res = Result{Entries: builtins, Degraded: true}
 	} else {
-		f.res = Result{Entries: Merge(reply, BuiltinsFor(key.Harness, runtime.GOOS).Entries)}
+		f.res = Result{Entries: Merge(reply, builtins)}
 		c.entries[key] = cacheEntry{entries: f.res.Entries, at: c.now()}
 	}
 	delete(c.flights, key)

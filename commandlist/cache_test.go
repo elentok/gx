@@ -135,6 +135,22 @@ func TestCache_FailureReturnsBuiltinsDegradedAndIsNotCached(t *testing.T) {
 	}
 }
 
+// Codex's "$" menu is skills only; its built-ins belong to "/".
+func TestCache_DollarListHasNoBuiltins(t *testing.T) {
+	c := NewCache(0, time.Now)
+	key := Key{Harness: "codex", Dir: "/a", Kind: "$"}
+	var calls atomic.Int32
+
+	ok := c.Get(context.Background(), key, countingProbe(&calls, nil))
+	if len(ok.Entries) != 1 || ok.Entries[0].Name != "probed-/a" {
+		t.Fatalf("ok $ entries = %+v, want only the probed skill", ok.Entries)
+	}
+	failed := c.Get(context.Background(), Key{Harness: "codex", Dir: "/b", Kind: "$"}, countingProbe(&calls, errors.New("boom")))
+	if !failed.Degraded || len(failed.Entries) != 0 {
+		t.Fatalf("failed $ = %+v, want degraded with no entries", failed)
+	}
+}
+
 func TestCache_KeysDoNotShare(t *testing.T) {
 	c := NewCache(0, nil)
 	var calls atomic.Int32

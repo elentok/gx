@@ -395,4 +395,58 @@ describe("completion menu", () => {
     expect(screen.queryByRole("listbox")).toBeNull();
     expect(screen.queryByText(/Loading commands/)).toBeNull();
   });
+
+  describe("Codex", () => {
+    const builtIns = { degraded: false, entries: [{ name: "compact", aliases: [], arg_hint: "", description: "Compact", source: "built-in" }] };
+    const skills = {
+      degraded: false,
+      entries: [
+        { name: "gx-implement", aliases: [], arg_hint: "", description: "Implement", source: "skill" },
+        { name: "gx-tdd", aliases: [], arg_hint: "", description: "TDD", source: "skill" },
+      ],
+    };
+    const kinds: string[] = [];
+    const codex = () => {
+      kinds.length = 0;
+      stubCommands(async () => new Response("{}"));
+      const base = globalThis.fetch as unknown as (url: string, init: { body: string }) => Promise<Response>;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string, init: { body: string }) => {
+          if (!url.startsWith("/v1/sessions/commands")) return base(url, init);
+          const kind = new URL(url, "http://x").searchParams.get("kind") ?? "";
+          kinds.push(kind);
+          return new Response(JSON.stringify(kind === "$" ? skills : builtIns));
+        }),
+      );
+      render([session("s-1", "p", { harness: "codex" })], "/agents/s-1", true, chatOf(chat()), true);
+    };
+
+    test("/ lists built-ins only", async () => {
+      codex();
+      await type("/");
+      await vi.waitFor(() => expect(options()).toHaveLength(1));
+      expect(options()[0]).toContain("/compact");
+      expect(kinds).toEqual(["/"]);
+    });
+
+    test("$ in a later word lists skills, and a click replaces only that word", async () => {
+      codex();
+      await type("use $gx-t");
+      await vi.waitFor(() => expect(options()).toHaveLength(1));
+      expect(options()[0]).toContain("$gx-tdd");
+      fireEvent.click(screen.getByRole("option"));
+      const box = await composerBox();
+      expect(box.value).toBe("use $gx-tdd ");
+      expect(box.selectionStart).toBe("use $gx-tdd ".length);
+      expect(screen.queryByRole("listbox")).toBeNull();
+      expect(prompts).toEqual([]);
+    });
+
+    test("a draft starting with /gx- keeps the $ hint", async () => {
+      codex();
+      await type("/gx-tdd");
+      expect(screen.getByText("Codex skills start with $. Type $gx-... instead.")).toBeTruthy();
+    });
+  });
 });

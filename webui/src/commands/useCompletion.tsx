@@ -39,12 +39,14 @@ export function useCompletion(
 
   const open = token !== null && dismissed !== value;
   const matches = token ? matchCommands(list.entries, token.query) : [];
+  // Rows show the sigil the fill will write: the menu takes names and segments as displayed.
+  const sigil = token?.kind ?? "/";
   const rows: CommandMenuRow[] = matches.map((m) => ({
-    name: m.entry.name,
+    name: `${sigil}${m.entry.name}`,
     hint: m.entry.arg_hint || undefined,
     description: m.entry.description,
     source: m.entry.source,
-    segments: m.segments,
+    segments: m.segments.map((s, i) => (i === 0 ? { ...s, text: sigil + s.text } : s)),
   }));
   const selected = token && pick.query === token.query ? Math.min(pick.index, Math.max(rows.length - 1, 0)) : 0;
   // A degraded list (built-ins only) warns like a failed one, and still lists its rows.
