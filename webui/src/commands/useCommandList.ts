@@ -45,8 +45,8 @@ const keyOf = (target: CommandTarget, kind: string) =>
 const fromCache = (c: Cached | undefined): CommandList =>
   c ? { entries: c.entries, status: "ready", degraded: c.degraded } : { entries: [], status: "loading", degraded: false };
 
-/** Shows the last list at once and re-reads it on mount when it is older than a minute. A failed refresh keeps the last list. */
-export function useCommandList(target: CommandTarget, kind: "/" | "$", fetcher: FetchCommands = fetchCommands): CommandList {
+/** Shows the last list at once and re-reads it when it is older than a minute, each time `enabled` turns on (a menu opens). A failed refresh keeps the last list. */
+export function useCommandList(target: CommandTarget, kind: "/" | "$", fetcher: FetchCommands = fetchCommands, enabled = true): CommandList {
   const key = keyOf(target, kind);
   const [state, setState] = useState<{ key: string; list: CommandList }>(() => ({ key, list: fromCache(cache.get(key)) }));
   // Switching key shows that key's cache on the same render, not one render late.
@@ -55,7 +55,8 @@ export function useCommandList(target: CommandTarget, kind: "/" | "$", fetcher: 
   useEffect(() => {
     const cached = cache.get(key);
     setState({ key, list: fromCache(cached) });
-    if (cached && Date.now() - cached.at < COMMAND_LIST_MAX_AGE_MS) return;
+    if (!enabled) return;
+    if (cached &&Date.now() - cached.at < COMMAND_LIST_MAX_AGE_MS) return;
     let live = true;
     fetcher(target, kind).then(
       (res) => {
@@ -72,7 +73,7 @@ export function useCommandList(target: CommandTarget, kind: "/" | "$", fetcher: 
     };
     // target is rebuilt each render by callers; key is its identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, kind, fetcher]);
+  }, [key, kind, fetcher, enabled]);
 
   return list;
 }

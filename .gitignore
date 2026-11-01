@@ -12,3 +12,4 @@ webui/dist/*
 /gx
 **/node_modules/
 *.tsbuildinfo
+/gxfixture

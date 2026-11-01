@@ -180,6 +180,17 @@ test("/ opens the menu for the chosen worktree and fills on Enter", async () => 
   expect(prompt().value).toMatch(/^\/feature /);
 });
 
+test("picking a worktree makes no read; typing / reads the current dir once", async () => {
+  const { fetchCommands, targets } = commandsFor();
+  mount({ fetchCommands });
+  typeWorktree(await ready(), "gx-stats");
+  fireEvent.click(list().getByRole("option", { name: /^gx-stats \/dev\/gx-stats$/ }));
+  expect(targets).toEqual([]);
+  prompt().focus();
+  typeAt("/");
+  await waitFor(() => expect(targets).toEqual([{ project: "gx", dir: "/dev/gx-stats" }]));
+});
+
 test("a created worktree reads the project root's list", async () => {
   const { fetchCommands, targets } = commandsFor();
   mount({ fetchCommands });

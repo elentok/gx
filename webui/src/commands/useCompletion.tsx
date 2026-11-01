@@ -38,7 +38,7 @@ export function useCompletion(
 ): Completion {
   const wide = useWide();
   const token = openToken(value, cursor, { harness: config.harness, disabled: disabled || config.off });
-  const list = useCommandList(config.target, token?.kind ?? "/", config.fetcher);
+  const list = useCommandList(config.target, token?.kind ?? "/", config.fetcher, token !== null);
   // Escape hides the menu until the text changes; the selection restarts when the query does.
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [pick, setPick] = useState({ query: "", index: 0 });

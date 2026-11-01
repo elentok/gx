@@ -294,7 +294,26 @@ const noMatchLine = (typed: string) => screen.findByText((_, el) => el?.tagName 
 
 const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
 
+const commandReads = () => vi.mocked(globalThis.fetch).mock.calls.filter(([url]) => String(url).startsWith("/v1/sessions/commands")).length;
+
 describe("completion menu", () => {
+  test("no command read while the composer cannot send", async () => {
+    stubCommands();
+    render([session("s-1", "p", { status: { state: "working" } })], "/agents/s-1", true, chatOf(chat()), true);
+    await composerBox();
+    await type("/co");
+    expect(commandReads()).toBe(0);
+  });
+
+  test("no command read on mount, one on the first /", async () => {
+    stubCommands();
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await composerBox();
+    expect(commandReads()).toBe(0);
+    await type("/");
+    await vi.waitFor(() => expect(commandReads()).toBe(1));
+  });
+
   test("/ opens, /co filters, a space closes, Escape closes", async () => {
     stubCommands();
     render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);

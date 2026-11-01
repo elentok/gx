@@ -1055,6 +1055,17 @@ test("/ opens the command menu in the Note box and Escape closes it", async () =
   spy.mockRestore();
 });
 
+test("the Note box makes no command read on mount, one on the first /", async () => {
+  const spy = stubCommands();
+  render({});
+  const box = await openNote();
+  const reads = () => spy.mock.calls.filter(([url]) => String(url).startsWith("/v1/sessions/commands")).length;
+  expect(reads()).toBe(0);
+  typeInto(box, "/");
+  await waitFor(() => expect(reads()).toBe(1));
+  spy.mockRestore();
+});
+
 test("$ opens the menu for a Codex design session", async () => {
   const spy = stubCommands();
   render({ auto: { harness: "codex" } });

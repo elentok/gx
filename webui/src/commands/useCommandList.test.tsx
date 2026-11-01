@@ -15,6 +15,37 @@ function Probe({ id, fetcher }: { id: string; fetcher: FetchCommands }) {
 }
 const names = () => last.entries.map((e) => e.name);
 
+function Gated({ fetcher, enabled }: { fetcher: FetchCommands; enabled: boolean }) {
+  last = useCommandList({ sessionId: "a" }, "/", fetcher, enabled);
+  return null;
+}
+
+it("makes no read while disabled, then reads when it turns on", async () => {
+  const fetcher = vi.fn<FetchCommands>().mockResolvedValue(resp(["help"]));
+  const view = render(<Gated fetcher={fetcher} enabled={false} />);
+  await act(async () => {});
+  expect(fetcher).not.toHaveBeenCalled();
+  view.rerender(<Gated fetcher={fetcher} enabled />);
+  await act(async () => {});
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect(names()).toEqual(["help"]);
+});
+
+it("re-checks staleness on each open: inside 60 seconds no read, after it a read", async () => {
+  const fetcher = vi.fn<FetchCommands>().mockResolvedValue(resp(["help"]));
+  const view = render(<Gated fetcher={fetcher} enabled />);
+  await act(async () => {});
+  view.rerender(<Gated fetcher={fetcher} enabled={false} />);
+  view.rerender(<Gated fetcher={fetcher} enabled />);
+  await act(async () => {});
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  view.rerender(<Gated fetcher={fetcher} enabled={false} />);
+  vi.setSystemTime(Date.now() + 61_000);
+  view.rerender(<Gated fetcher={fetcher} enabled />);
+  await act(async () => {});
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
 beforeEach(() => {
   vi.useFakeTimers();
   clearCommandListCache();
