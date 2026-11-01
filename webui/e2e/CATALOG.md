@@ -21,7 +21,7 @@ and "read `test-results/**/error-context.md` first on a locator failure".
 Flows keep the numbers of the e2e plan, so a gap in the numbering is a flow not written yet.
 Code: `epics.e2e.ts` (flows 1, 2, 6, 7, 8, 54), `pause.e2e.ts` (flows 3, 55, 56), `design.e2e.ts` (flows 4, 5, 9, 10, 11, 12, 13, 14, 42, 43, 44, 45, 46, 50),
 `united.e2e.ts` (flows 15, 16, 17, 18, 19, 28, 29, 30, 31, 32, 33, 51, 52), `jump.e2e.ts` (flows 20, 21, 22), `phone.e2e.ts` (flows 23, 24, 41, 53),
-`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118, 119, 120, 121), `migration.e2e.ts` (flows 161, 163, 168), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 and 117 to 121 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
+`newdesign.e2e.ts` (flows 25, 26, 27, 34, 35, 36, 37, 38, 39, 40), `dirty-trunk.e2e.ts` (flows 57, 58, 59), `design-page.e2e.ts` (flows 71, 72, 73, 74, 75), `disk.e2e.ts` (flows 76, 77, 78), `agents-sidebar.e2e.ts` (flows 72 "Agents tab", 73 "Agents sidebar", 74 "Design sessions toggle", 89, 92, 113), `agents-session.e2e.ts` (flows 75, 77, 80, 81, 82, 83, 103, 104), `agents-composer.e2e.ts` (flows 76 "Send and draft", 78 "Send refused", 79 "Keyboard send", 91, 93, 114), `agents-switcher.e2e.ts` (flow 84), `agents-create.e2e.ts` (flows 85, 86, 87, 88, 90), `codex.e2e.ts` (flows 117, 118, 119, 120, 121, 122), `menu.e2e.ts` (flows 117, 118, 119, 120, 121), `migration.e2e.ts` (flows 161, 163, 168, 169, 170, 171), with shared helpers in `agentsKit.ts`. The numbers 72 to 74 and 117 to 121 are also used by other files, so run these with `-g "^72\. Agents tab"` and so on.
 
 ## 1. Queue an epic
 
@@ -1665,3 +1665,28 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 - **Scenario:** `migrate-pending`, started as a bare `gx server` process (no `start` or `restart` command code, as launchd does).
 - **Steps:** wait for the first migration. Add a notes step through inject-step. Kill the process and start it again the same way.
 - **Pass:** the first start migrated the ticket. After the second start every list is the earlier list plus the added name, and the server log holds that step's note once per project and no other new note.
+
+## 169. Migrating state holds scheduling
+
+- **Scenario:** `migrate-held` (hold file in the migrate dir; a ready ticket `demo:ready-epic/01` queued; an old-shape ticket in `old-epic`).
+- **Steps:** read `gx server status --json` and the page. Run `gx server status` and `gx server start`. Wait 2 s and read the ready ticket, the server log and the old ticket. Remove the hold file.
+- **Pass:**
+  - Status says migrating; the page shows the plain "Migrating tickets" line.
+  - `gx server start` exits 0 within 10 s. The ready ticket is not claimed, the log holds no start-up step and the old ticket is not migrated.
+  - After the release the line goes, the log holds `first-rescan`, `recover-merges` and `reclaim-runs` once each in that order, the old ticket is `paused` and the ready ticket is claimed.
+
+## 170. A failed project is rescanned after the migration
+
+- **Scenario:** `migrate-broken` (project `broken` fails its migration).
+- **Steps:** wait until the handshake stops saying migrating. Read the server log and a ticket of `broken`.
+- **Pass:** the log holds the three start-up steps once each, and `broken`'s ticket shows (it was scanned although its migration failed).
+
+## 171. Writes wait for the migration
+
+- **Scenario:** `migrate-held`.
+- **Steps:** create and open an epic in project `scratch`. Read the old ticket with `gx tickets show`. Start five writes to `demo` without waiting: answer, ask (a log append), epic setting, move and epic creation. After 2.5 s check each, then remove the hold file.
+- **Pass:**
+  - The `scratch` writes return at once; the read returns the ticket.
+  - No `demo` write ends during the hold. The CLI-side writes (epic setting, move, epic creation) print "waiting for the migration of demo"; answer and ask wait in the server and print nothing.
+  - After the release every write ends, the old ticket is `paused` and the new epic exists.
+- **Not covered:** the write during Retry migration, and a migration with the pause unit (no hook to hold either one).

@@ -85,6 +85,13 @@ export interface Fixture {
    * or `start` (a new bare process, as launchd starts one). Returns the script's output.
    */
   serverCtl(verb: "pid" | "kill" | "start"): Promise<string>;
+  /** Ends the hold of the `migrate-held` scenario: the migration runs once the hold file is gone. */
+  releaseMigration(): Promise<void>;
+  /**
+   * Starts a gx CLI verb without waiting for it. `stderr()` is what it printed so far; `done` resolves
+   * with its exit code and stdout once it ends, so a test can see a write that waits.
+   */
+  cliStart(...args: string[]): { stderr(): string; done: Promise<{ code: number | null; stdout: string }> };
   /** Writes the migrate scenarios' inject.json (extra test steps), read when the server starts. */
   setInject(steps: Array<{ name: string; fail?: string; notes?: string[] }>): Promise<void>;
   /** The parsed `$HOME/.config/gx/config.json`, read fresh on every call. */
@@ -229,6 +236,16 @@ async function startFixture(
     async serverCtl(verb) {
       const { stdout } = await run(join(migrateDir(out), "server"), [verb]);
       return stdout.trim();
+    },
+    releaseMigration: () => rm(join(migrateDir(out), "hold"), { force: true }),
+    cliStart(...args) {
+      const proc = spawn(out.gx, args, { env, cwd: tmpdir(), stdio: ["ignore", "pipe", "pipe"] });
+      let stdout = "";
+      let stderr = "";
+      proc.stdout.on("data", (chunk: Buffer) => (stdout += chunk));
+      proc.stderr.on("data", (chunk: Buffer) => (stderr += chunk));
+      const done = new Promise<{ code: number | null; stdout: string }>((resolve) => proc.once("close", (code) => resolve({ code, stdout })));
+      return { stderr: () => stderr, done };
     },
     setInject: (steps) => writeControl(migrateDir(out), "inject.json", JSON.stringify(steps)),
     async globalConfig() {

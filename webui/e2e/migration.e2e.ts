@@ -32,6 +32,99 @@ const restartBare = async (fixture: Fixture) => {
   await migrated(fixture);
 };
 
+/** The startup steps the server log holds, in order. */
+const startupSteps = async (fixture: Fixture) =>
+  (await serverLog(fixture))
+    .split("\n")
+    .map((l) => /startup step.*step=(\S+)/.exec(l)?.[1])
+    .filter(Boolean);
+
+const ready = "demo:ready-epic/01";
+const oldTicket = "demo/old-epic/issues/01-broken-shape.md";
+
+test("169. Migrating state holds scheduling", async ({ start, page }) => {
+  const fixture = await start("migrate-held");
+
+  await test.step("the handshake and snapshot say migrating, and the page shows one plain line", async () => {
+    expect(JSON.parse(await fixture.cli("server", "status", "--json")).migrating).toBe(true);
+    await expect(page.getByText("Migrating tickets", { exact: true })).toBeVisible();
+  });
+
+  await test.step("the server says migrating, and `gx server start` returns fast with exit 0", async () => {
+    expect(await fixture.cli("server", "status")).toMatch(/migrating/i);
+    const began = Date.now();
+    await fixture.cli("server", "start");
+    expect(Date.now() - began).toBeLessThan(10_000);
+  });
+
+  await test.step("nothing is claimed, and no start-up step ran", async () => {
+    await page.waitForTimeout(2000);
+    expect(await fixture.cli("tickets", "show", ready)).not.toContain("claimed");
+    expect(await startupSteps(fixture)).toEqual([]);
+    expect(await fixture.readStoreFile(oldTicket)).not.toContain("status: paused");
+  });
+
+  await test.step("when the hold ends the line goes, each step runs once and the ticket is claimed", async () => {
+    await fixture.releaseMigration();
+    await expect(page.getByText("Migrating tickets", { exact: true })).toBeHidden({ timeout: 30_000 });
+    await migrated(fixture);
+    await expect.poll(() => startupSteps(fixture), { timeout: 30_000 }).toEqual(["first-rescan", "recover-merges", "reclaim-runs"]);
+    expect(await fixture.readStoreFile(oldTicket)).toContain("status: paused");
+    await expect.poll(() => fixture.cli("tickets", "show", ready), { timeout: 30_000 }).toContain("claimed");
+  });
+});
+
+test("170. A failed project is rescanned after the migration", async ({ start }) => {
+  const fixture = await start("migrate-broken");
+  await migrated(fixture);
+  await expect.poll(() => startupSteps(fixture), { timeout: 30_000 }).toEqual(["first-rescan", "recover-merges", "reclaim-runs"]);
+  expect(await fixture.cli("tickets", "show", "broken:broken-epic/01")).toContain("first");
+});
+
+/** Whether a started CLI verb has ended. */
+const ended = async (run: { done: Promise<unknown> }) => (await Promise.race([run.done.then(() => true), new Promise((r) => setTimeout(() => r(false), 100))])) as boolean;
+
+test("171. Writes wait for the migration", async ({ start }) => {
+  const fixture = await start("migrate-held");
+
+  await test.step("a write to another project returns at once", async () => {
+    await fixture.cli("tickets", "epic", "add", "scratch:other-epic", "--kind", "loop");
+    await fixture.cli("tickets", "epic", "set", "scratch:other-epic", "--status", "open");
+  });
+
+  await test.step("a read during the hold returns a whole old or whole new ticket", async () => {
+    const shown = await fixture.cli("tickets", "show", "demo:old-epic/01");
+    expect(shown).toContain("old-epic");
+  });
+
+  const writes = {
+    answer: ["tickets", "answer", "demo:old-epic/01", "--body", "yes"],
+    log: ["tickets", "ask", "demo:ready-epic/01", "--body", "## Question\nq\n\n## Handoff\nh\n"],
+    "epic setting": ["tickets", "epic", "set", "demo:ready-epic", "--destination-unconfirmed", "true"],
+    move: ["tickets", "move", "demo:ready-epic/01", "old-epic"],
+    "epic creation": ["tickets", "epic", "add", "demo:new-epic", "--kind", "loop"],
+  };
+  const serverSide = new Set(["answer", "log"]);
+  const runs = Object.entries(writes).map(([name, args]) => ({ name, run: fixture.cliStart(...args) }));
+
+  await test.step("each write to demo waits and says so after one second", async () => {
+    await new Promise((r) => setTimeout(r, 2500));
+    for (const { name, run } of runs) {
+      expect(await ended(run), `${name} ended during the hold`).toBe(false);
+      // answer and ask go through the server, which waits without a CLI notice.
+      if (!serverSide.has(name)) expect(run.stderr(), name).toContain("waiting for the migration of demo");
+    }
+  });
+
+  await test.step("when the hold ends the writes land on the new shape", async () => {
+    await fixture.releaseMigration();
+    await Promise.all(runs.map(({ run }) => run.done));
+    await migrated(fixture);
+    expect(await fixture.readStoreFile(oldTicket)).toContain("status: paused");
+    expect(await fixture.cli("tickets", "show", "demo:new-epic")).toContain("new-epic");
+  });
+});
+
 test("161. Server migrates on start", async ({ start }) => {
   const fixture = await start("migrate-pending");
   await migrated(fixture);
