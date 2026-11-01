@@ -47,6 +47,12 @@ func init() {
 	Default.Register(Step{Name: "grilling", Run: func(e Env) ([]tickets.MigrationChange, error) {
 		return backfillGrilling(e.Dirs, e.LookupRoot, e.DryRun)
 	}})
+	// model-fields: ModelRan, ModelExpected, TierOverride, LongTicketTurns and the
+	// model-mismatch pause are all optional. An older ticket reads as the zero
+	// value, so there is nothing to rewrite.
+	Default.Register(Step{Name: "model-fields", Run: func(e Env) ([]tickets.MigrationChange, error) {
+		return nil, nil
+	}})
 }
 
 // pauseUnit plans the pause migration, runs the frontmatter migration and the

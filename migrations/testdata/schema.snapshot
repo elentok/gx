@@ -16,6 +16,10 @@ struct schema.Ticket
   NoRecover bool 
   Unique string 
   Agent string 
+  ModelRan string 
+  ModelExpected string 
+  TierOverride string 
+  LongTicketTurns int 
   IterationStatus schema.IterationStatus 
   IterationFinishedAt time.Time 
   ClaimedAt time.Time 
@@ -77,8 +81,8 @@ struct tickets.EpicFields
   CreatedAt time.Time yaml:"created_at,omitempty"
 enum category: bug idea
 enum iteration_status:  asking finished working
-enum pause_kind: agent_name_taken agent_pane_busy agent_prompt_stalled all-paused ambiguous-base ambiguous-merge background-task-gate blocked-cycle blocked-pane budget-killed conflict-markers dirty-trunk duplicate-live handle-mismatch iteration-error manual merge-conflict merge-error merge-unreported needs-rebase parent-defect retry-exhausted self-reported spinning stranded-commits trunk-missing zero-commit
-enum pause_reason: agent_name_taken agent_pane_busy agent_prompt_stalled ambiguous-base ambiguous-merge background-task-gate blocked-cycle blocked-pane budget-killed conflict-markers dirty-trunk duplicate-live handle-mismatch iteration-error manual merge-conflict merge-error merge-unreported needs-rebase parent-defect retry-exhausted self-reported spinning stranded-commits trunk-missing zero-commit
+enum pause_kind: agent_name_taken agent_pane_busy agent_prompt_stalled all-paused ambiguous-base ambiguous-merge background-task-gate blocked-cycle blocked-pane budget-killed conflict-markers dirty-trunk duplicate-live handle-mismatch iteration-error manual merge-conflict merge-error merge-unreported model-mismatch needs-rebase parent-defect retry-exhausted self-reported spinning stranded-commits trunk-missing zero-commit
+enum pause_reason: agent_name_taken agent_pane_busy agent_prompt_stalled ambiguous-base ambiguous-merge background-task-gate blocked-cycle blocked-pane budget-killed conflict-markers dirty-trunk duplicate-live handle-mismatch iteration-error manual merge-conflict merge-error merge-unreported model-mismatch needs-rebase parent-defect retry-exhausted self-reported spinning stranded-commits trunk-missing zero-commit
 enum status: cancelled claimed done draft needs-answer needs-repair open paused
 enum type: code-review conflict-resolution diagnose evolve grilling implement investigate merge prompt prototype research trunk-conflict verify
 epic server-stamped: created_at completed_at merged_at queued_at design_started_at land_block_kind land_block_reason land_block_files trunk_fast_forwarded_at trunk_conflict_backup trunk_conflict_files evolved_at evolve_skipped evolve_ticket lines_added lines_removed total_tokens actual_cost had_codex friction
