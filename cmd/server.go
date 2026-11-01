@@ -275,6 +275,8 @@ type StatusInfo struct {
 	Pid     int    `json:"pid,omitempty"`
 	Build   string `json:"build,omitempty"`
 	Paused  bool   `json:"paused,omitempty"`
+	// Migrating: the start-up migration of the projects is still running.
+	Migrating bool `json:"migrating,omitempty"`
 	// WebURL is the plain web UI URL; empty when the web listener is off.
 	WebURL string `json:"web_url,omitempty"`
 	// WebSetupCode and WebSetupExpires are set only while the web Setup code exists.
@@ -321,7 +323,7 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 		if perr != nil {
 			return perr
 		}
-		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Paused: paused, Warnings: statusWarnings(n, cfg.TicketStore.Path)}
+		info = StatusInfo{Running: true, Pid: n.Pid, Build: n.Build, Paused: paused, Migrating: n.Migrating, Warnings: statusWarnings(n, cfg.TicketStore.Path)}
 		if n.WebURL != "" {
 			info.WebURL = n.WebURL
 			if wi, werr := c.WebInfo(ctx); werr == nil && !wi.Refused {
@@ -386,6 +388,11 @@ func runServerStatusWith(ctx context.Context, dirs config.Dirs, c *apiclient.Cli
 	}
 	if info.WebFingerprint != "" {
 		if _, err = fmt.Fprintln(w, "fingerprint: "+info.WebFingerprint); err != nil {
+			return err
+		}
+	}
+	if info.Migrating {
+		if _, err = fmt.Fprintln(w, "migrating: updating the ticket store, new tickets wait"); err != nil {
 			return err
 		}
 	}

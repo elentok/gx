@@ -105,6 +105,8 @@ type Snapshot struct {
 	// HerdrText says which tickets wait.
 	HerdrUnavailable bool   `json:"herdr_unavailable,omitempty"`
 	HerdrText        string `json:"herdr_text,omitempty"`
+	// Migrating is set until the start-up migration run ends; filled in by the handler.
+	Migrating bool `json:"migrating,omitempty"`
 	// Budget is today's spend, filled in by the handler like HerdrUnavailable.
 	Budget BudgetStatus `json:"budget"`
 	// ExtraUsage is set while the account auto-purchases extra usage, so the

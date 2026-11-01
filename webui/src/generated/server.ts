@@ -1469,6 +1469,10 @@ export interface Snapshot {
   herdr_unavailable?: boolean;
   herdr_text?: string;
   /**
+   * Migrating is set until the start-up migration run ends; filled in by the handler.
+   */
+  migrating?: boolean;
+  /**
    * Budget is today's spend, filled in by the handler like HerdrUnavailable.
    */
   budget: BudgetStatus;

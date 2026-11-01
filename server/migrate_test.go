@@ -238,6 +238,52 @@ func TestMigrate_StartupStepsWaitForMigrations(t *testing.T) {
 	}
 }
 
+// Seam: the handshake and the snapshot say migrating while a step is held, and
+// stop saying it once the run ends, even when a project failed.
+func TestMigrate_HandshakeAndSnapshotReportMigratingUntilTheRunEnds(t *testing.T) {
+	t.Parallel()
+	store := migrateStore(t, "proj")
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var enteredOnce sync.Once
+	reg := &migrations.Registry{}
+	reg.Register(migrations.Step{Name: "hold", Run: func(env migrations.Env) ([]tickets.MigrationChange, error) {
+		enteredOnce.Do(func() { close(entered) })
+		<-release
+		if filepath.Base(env.Root) == "proj" {
+			return nil, errors.New("exploded")
+		}
+		return nil, nil
+	}})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Migrations = reg })
+	<-entered
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	hs, err := h.Client.Handshake(ctx)
+	if err != nil || !hs.Migrating {
+		t.Fatalf("handshake while held = %+v, %v; want migrating", hs, err)
+	}
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil || !snap.Migrating {
+		t.Fatalf("snapshot while held: migrating=%v err=%v", snap.Migrating, err)
+	}
+	close(release)
+	waitMigrations(t, h)
+	if hs, err = h.Client.Handshake(ctx); err != nil || hs.Migrating {
+		t.Errorf("handshake after the run = %+v, %v; want not migrating", hs, err)
+	}
+	if snap, err = h.Client.Snapshot(ctx); err != nil || snap.Migrating {
+		t.Errorf("snapshot after the run: migrating=%v err=%v", snap.Migrating, err)
+	}
+}
+
 // Seam: unknown names in lists give one warning for the whole set.
 func TestMigrate_UnknownAppliedNamesWarnOnce(t *testing.T) {
 	t.Parallel()

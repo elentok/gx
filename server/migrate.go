@@ -17,6 +17,16 @@ import (
 // no ticket store.
 func (s *Server) MigrationsDone() <-chan struct{} { return s.migrationsDone }
 
+// migrating reports whether the start-up migration run is still going.
+func (s *Server) migrating() bool {
+	select {
+	case <-s.migrationsDone:
+		return false
+	default:
+		return true
+	}
+}
+
 func (s *Server) migrationRegistry() *migrations.Registry {
 	if s.cfg.Migrations != nil {
 		return s.cfg.Migrations

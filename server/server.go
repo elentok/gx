@@ -66,6 +66,9 @@ type Handshake struct {
 	// so a client can say why nothing starts. HerdrText names what waits.
 	HerdrUnavailable bool   `json:"herdr_unavailable,omitempty"`
 	HerdrText        string `json:"herdr_text,omitempty"`
+	// Migrating is set from the moment the server listens until the start-up
+	// migration of every project has ended, pass or fail.
+	Migrating bool `json:"migrating,omitempty"`
 }
 
 // Settings are the Config fields a config reload may change. The server reads
@@ -719,6 +722,7 @@ func (s *Server) snapshot(w http.ResponseWriter, _ *http.Request) {
 	snap.Build = s.cfg.Build
 	snap.Instance = s.instanceID
 	snap.MigrationFailures = s.MigrationFailures()
+	snap.Migrating = s.migrating()
 	snap.Budget = s.budgetStatus(time.Now())
 	snap.ExtraUsage = s.extraUsageOn()
 	snap.Disks = s.listedDisks()
@@ -819,6 +823,7 @@ func (s *Server) handshake(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	h := Handshake{APIVersion: APIVersion, Build: s.cfg.Build, Pid: os.Getpid(), TCPAddr: s.TCPAddr(), WebURL: s.WebURL(), WebError: s.webErr}
 	h.HerdrText, h.HerdrUnavailable = s.herdrBanner()
+	h.Migrating = s.migrating()
 	if s.web != nil {
 		var err error
 		if h.WebSetupPending, _, err = s.webAuth.SetupState(); err != nil {
