@@ -26,7 +26,20 @@ const selfFile = "sleepguard/sleepguard_test.go"
 var allowed = map[string]int{
 	"agentrunner/herdrrunner/conformance_test.go":   1,
 	"brief/brief_test.go":                           1,
+	"cmd/agent_permission_request_test.go":          3, // one poll loop with a deadline; negative waits: no request is filed; a stale decision is ignored
 	"cmd/brief_retention_test.go":                   1,
+	"codexdoctor/session_test.go":                   1, // poll loop with a deadline waiting on the rollout
+	"codexsetup/setup_test.go":                      1, // negative wait: a rerun leaves the files' mtimes alone
+	"nativerunner/pty_codex_prompt_test.go":         3, // two poll loops with a deadline; negative wait: a queued prompt is not submitted
+	"nativerunner/pty_codex_test.go":                2, // poll loops with a deadline
+	"nativerunner/pty_codexapproval_test.go":        2, // poll loops with a deadline
+	"server/blocked_pause_test.go":                  3, // negative waits: no pause before the dwell ends, after a re-check, or on a usage limit
+	"server/servertest/longticket_test.go":          3, // negative waits: no mark within the first 30s guard tick; a delayed transcript write
+	"server/startincident_test.go":                  2, // poll loops with a deadline
+	"testutil/agentfake/codex_test.go":              1, // poll loop with a deadline
+	"testutil/agentfake/codexdesign_test.go":        1, // poll loop with a deadline
+	"testutil/agentfake/codexhooks_test.go":         4, // poll loops with a deadline; negative waits: a held hook keeps the dialog open
+	"testutil/gxfixture/spend_test.go":              1, // poll loop with a deadline
 	"cmd/server_agents_test.go":                     1,
 	"cmd/server_disk_status_test.go":                1,
 	"cmd/server_logs_test.go":                       1,

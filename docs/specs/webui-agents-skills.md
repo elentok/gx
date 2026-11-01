@@ -237,8 +237,8 @@ New scenarios to write (each becomes an implementation ticket). All three extend
 
 New flows to write, numbered after flow 146 (the catalog repeats some numbers; the implementer gives these unique ones, and the file names are the implementer's choice):
 
-- 147 "Command menu opens and filters". `agents-commands`, Claude session. Type `/`: the menu opens with name, hint, description and source on each row, footer on desktop. Type `/co`: prefix matches first, then substring, alphabetical, typed part highlighted. A space and Escape close it. A no-match keeps the menu open with one line ("No command matches /x. Cmd/Ctrl+Enter sends it as typed.") and the text kept. A `/` after other text opens nothing.
-- 148 "Command menu keys". Down, Up, Enter and Tab fill `/name ` and send nothing (`gx agents chat` shows no new message). A click on a row fills. Cmd/Ctrl+Enter sends the typed text with the menu open or closed. Enter with no match adds a newline. With vi mode on, typing in insert mode opens the menu and a normal-mode key does not. A disabled composer (the Exited session) shows no menu.
+- 180 "Command menu opens and filters". `agents-commands`, Claude session. Type `/`: the menu opens with name, hint, description and source on each row, footer on desktop. Type `/co`: prefix matches first, then substring, alphabetical, typed part highlighted. A space and Escape close it. A no-match keeps the menu open with one line ("No command matches /x. Cmd/Ctrl+Enter sends it as typed.") and the text kept. A `/` after other text opens nothing.
+- 181 "Command menu keys". Down, Up, Enter and Tab fill `/name ` and send nothing (`gx agents chat` shows no new message). A click on a row fills. Cmd/Ctrl+Enter sends the typed text with the menu open or closed. Enter with no match adds a newline. With vi mode on, typing in insert mode opens the menu and a normal-mode key does not. A disabled composer (the Exited session) shows no menu.
 - 149 "Command list freshness and failure". The first open on `agents-commands-slow` shows the loading line. On `agents-commands-failed` the menu shows built-ins and "Skills could not load", and a typed command still sends. On `agents-commands`, add a skill file to the worktree, then reopen the menu after the (flag-shortened) cache age: the new skill shows after the refresh and the cached rows showed at once. Escaped text shows plain, a skill with `user-invocable: false` does not show, one with `disable-model-invocation` does.
 - 150 "Codex command menu". `/` lists only built-ins, no skills. `$` at the start and in the second word lists skills, a doubled name once, and filling puts `$name ` at that word. `$` in a Claude session opens nothing. A Codex draft starting with `/gx-` shows the Codex hint.
 - 151 "Command menu on the design page and First prompt". The design composer opens the same menu for a Claude and a Codex design session. In the New session form, First prompt lists the chosen worktree's commands (the `feature` skill shows only for `feature`), and the project's base worktree for "+ Create worktree".
@@ -266,33 +266,33 @@ CLI and server verb checks (on `agents-commands`):
 
 Story entries:
 
-1. Flow 147. Mock state agents-open.
+1. Flow 180. Mock state agents-open.
 2. Flow 151. Mock state design-open.
 3. Flow 151. Mock state first-prompt-open.
-4. Flow 147. Mock state agents-open.
-5. Flow 147, and the CLI command list check for a Claude session.
+4. Flow 180. Mock state agents-open.
+5. Flow 180, and the CLI command list check for a Claude session.
 6. Flow 150. Mock state agents-codex-slash.
 7. Flow 150. Mock state agents-codex-dollar.
-8. Flow 147. Mock state agents-filtered.
-9. Flow 147. Mock state agents-filtered.
-10. Flow 147.
-11. Flow 147. Mock states agents-no-match, design-no-match and phone-no-match.
-12. Flow 148. Mock state agents-keyboard.
-13. Flow 148.
-14. Flow 148. Mock state agents-after-fill.
-15. Flows 147 and 150.
-16. Flow 148, and flows 76 and 79 rerun.
+8. Flow 180. Mock state agents-filtered.
+9. Flow 180. Mock state agents-filtered.
+10. Flow 180.
+11. Flow 180. Mock states agents-no-match, design-no-match and phone-no-match.
+12. Flow 181. Mock state agents-keyboard.
+13. Flow 181.
+14. Flow 181. Mock state agents-after-fill.
+15. Flows 180 and 150.
+16. Flow 181, and flows 76 and 79 rerun.
 17. Flow 149.
 18. Flow 149. Mock state agents-loading.
 19. Flow 149. Mock states agents-list-failed, first-prompt-failed and phone-list-failed.
 20. Flow 151.
 21. Flow 151.
 22. Flows 149 and 150.
-23. Flow 147. Mock state agents-open.
+23. Flow 180. Mock state agents-open.
 24. Flow 152. Mock states phone-open and phone-keyboard.
 25. Flow 152. Mock state phone-first-prompt.
-26. Flow 148, and flows 123 to 127 rerun.
-27. Flow 148.
+26. Flow 181, and flows 123 to 127 rerun.
+27. Flow 181.
 28. Flow 153, and the CLI `/cost` and `/clear` checks.
 29. Flow 153, and the CLI `!ls` check.
 30. Flow 153, and the CLI create check. The web create refusal is in the server tests.

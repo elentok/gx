@@ -1749,7 +1749,7 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - With a pending step the alert names "broken: fixture migration failed" and the button reads "Restart anyway".
   - With nothing pending the check answers at once, there is no alert and the button reads "Restart".
   - The line "A migration runs while the agents work." shows only when an agent runs and some project has pending steps (flow 137).
-## 147. Command menu opens and filters
+## 180. Command menu opens and filters
 
 - **Scenario:** `agents-commands`, an idle Claude session at 1280px.
 - **Steps:**
@@ -1765,7 +1765,7 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - `/zzq` keeps the menu open with "No command matches /zzq. Cmd/Ctrl+Enter sends it as typed." and no rows; the text stays.
   - `hello /co` opens no menu.
 
-## 148. Command menu keys
+## 181. Command menu keys
 
 - **Scenario:** `agents-commands`, idle Claude sessions at 1280px (a sent slash command keeps its session busy, so the send steps use different sessions) and the Exited session.
 - **Steps:**

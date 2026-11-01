@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { expect, holdRoute, nav, test, touch } from "./fixture";
 import { chatOf, claudeIdle, codexIdle, commandMenu, commandNames, commandRows, go, messageBox, newForm, promptBox, sendButton, sessions, setViMode, sidebar, worktreeBox } from "./agentsKit";
 
-test("147. Command menu opens and filters", async ({ page, start }) => {
+test("180. Command menu opens and filters", async ({ page, start }) => {
   const fixture = await start("agents-commands");
   const session = await claudeIdle(fixture);
   await page.setViewportSize({ width: 1280, height: 800 });
@@ -56,7 +56,7 @@ test("147. Command menu opens and filters", async ({ page, start }) => {
   await expect(page.getByText("No command matches")).toHaveCount(0);
 });
 
-test("148. Command menu keys", async ({ page, start }) => {
+test("181. Command menu keys", async ({ page, start }) => {
   const fixture = await start("agents-commands");
   const session = await claudeIdle(fixture);
   await page.setViewportSize({ width: 1280, height: 800 });
