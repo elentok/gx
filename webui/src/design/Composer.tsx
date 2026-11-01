@@ -215,6 +215,7 @@ export function Composer({
           autoFocus
           onChange={setText}
           onSubmit={onSubmit}
+          completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}
         />
       )}
       {open && codexSkillHint(session.harness, text) && (

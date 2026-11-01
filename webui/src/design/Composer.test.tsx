@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, expect, test, vi } from "vitest";
+import { clearCommandListCache } from "../commands/useCommandList";
 import { typeInLargeEditor } from "../ui/expandable-text/testing";
 import { WideContext } from "../useWide";
 import {
@@ -1018,4 +1019,66 @@ test("design page: the key does nothing with the Note box closed", async () => {
   cmdEnter(document.body);
   await new Promise((r) => setTimeout(r, 20));
   expect(post).not.toHaveBeenCalled();
+});
+
+const menuEntries = ["compact", "context", "help"].map((name) => ({
+  name,
+  aliases: [],
+  arg_hint: "",
+  description: name,
+  source: "built-in",
+}));
+
+function stubCommands() {
+  clearCommandListCache();
+  return vi.spyOn(globalThis, "fetch").mockImplementation(async (url) =>
+    String(url).startsWith("/v1/sessions/commands")
+      ? new Response(JSON.stringify({ degraded: false, entries: menuEntries }), { status: 200 })
+      : new Response(JSON.stringify(ok), { status: 200 }),
+  );
+}
+
+const typeInto = (box: HTMLTextAreaElement, text: string) => {
+  fireEvent.change(box, { target: { value: text } });
+  box.setSelectionRange(text.length, text.length);
+  fireEvent.select(box);
+};
+
+test("/ opens the command menu in the Note box and Escape closes it", async () => {
+  const spy = stubCommands();
+  render({});
+  const box = await openNote();
+  typeInto(box, "/co");
+  await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
+  fireEvent.keyDown(box, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  spy.mockRestore();
+});
+
+test("$ opens the menu for a Codex design session", async () => {
+  const spy = stubCommands();
+  render({ auto: { harness: "codex" } });
+  typeInto(await openNote(), "$co");
+  await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
+  spy.mockRestore();
+});
+
+test("$ does not open the menu for a Claude design session", async () => {
+  const spy = stubCommands();
+  render({});
+  typeInto(await openNote(), "$co");
+  expect(screen.queryByRole("listbox")).toBeNull();
+  spy.mockRestore();
+});
+
+test("Cmd+Enter still sends with the menu open", async () => {
+  const spy = stubCommands();
+  const post = vi.fn<PostPrompt>(async () => ok);
+  render({ post });
+  const box = await openNote();
+  typeInto(box, "/co");
+  await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
+  fireEvent.keyDown(box, { key: "Enter", metaKey: true });
+  await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+  spy.mockRestore();
 });

@@ -1,5 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import { useEffect, useRef } from "react";
+import type { CompletionConfig } from "../commands/useCompletion";
 import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 
 /** A 5-row note that scrolls itself into view when it mounts. */
@@ -13,6 +14,7 @@ export function NoteBox({
   disabled,
   autoFocus = false,
   onSubmit,
+  completion,
 }: {
   /** What the note is on, for its labels: "question 2". */
   name: string;
@@ -28,6 +30,8 @@ export function NoteBox({
   autoFocus?: boolean;
   /** Cmd/Ctrl+Enter in the box. */
   onSubmit?: () => void;
+  /** Opt in to the command completion menu. */
+  completion?: CompletionConfig;
 }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -45,6 +49,7 @@ export function NoteBox({
         disabled={disabled}
         autoFocus={autoFocus}
         onSubmit={onSubmit}
+        completion={completion}
       />
     </Box>
   );
