@@ -59,8 +59,13 @@ const OpScreenStyled = "screen-styled"
 // turned bracketed paste on.
 const OpPaste = "paste"
 
+// OpPersonKeys writes keys (or, with Paste set, a paste) to the child like
+// keys, then wakes the watch streams with StreamInput, so gx's own nudges treat
+// it as a person's input. Plain keys stay silent.
+const OpPersonKeys = "person-keys"
+
 // holderOptionalOps are the optional ops this holder serves.
-var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC, OpScreenStyled, OpPaste}
+var holderOptionalOps = []string{OpDenyReason, OpWatch, OpAttach, OpTurnOSC, OpScreenStyled, OpPaste, OpPersonKeys}
 
 // typedTextMax is the longest text that goes to the child as plain keys. A
 // tty read takes at most about 1 KB on macOS, and Claude Code keeps only the
@@ -90,6 +95,8 @@ type holderRequest struct {
 	Keys       string `json:"keys,omitempty"`
 	Scrollback int    `json:"scrollback,omitempty"`
 	Reason     string `json:"reason,omitempty"`
+	// Paste makes person-keys send Keys as a paste.
+	Paste bool `json:"paste,omitempty"`
 }
 
 type holderResponse struct {
@@ -269,6 +276,20 @@ func (h *holderServer) answer(req holderRequest) (holderResponse, func()) {
 		if _, err := h.ptmx.Write(h.pasted(req.Keys)); err != nil {
 			return holderResponse{Error: err.Error()}, nil
 		}
+		return holderResponse{}, nil
+	}
+	if req.Op == OpPersonKeys && slices.Contains(h.ops, OpPersonKeys) {
+		if h.denying.Load() {
+			return holderResponse{Error: denyBusyMessage}, nil
+		}
+		data := []byte(req.Keys)
+		if req.Paste {
+			data = h.pasted(req.Keys)
+		}
+		if _, err := h.ptmx.Write(data); err != nil {
+			return holderResponse{Error: err.Error()}, nil
+		}
+		h.inputs.notify()
 		return holderResponse{}, nil
 	}
 	if req.Op == OpDenyReason && slices.Contains(h.ops, OpDenyReason) {
@@ -602,14 +623,39 @@ func (c *HolderClient) TypeText(text string) error { return c.TypeTextBy(text, f
 // TypeTextBy is TypeText, going by paste whatever the length when paste is
 // set (a harness whose newline typed as a key would submit).
 func (c *HolderClient) TypeTextBy(text string, paste bool) error {
+	return c.typeText(text, paste, c.SendKeys, c.Paste)
+}
+
+// SendPersonKeys is SendKeys that counts as a person's input: watchers get
+// StreamInput. A holder without OpPersonKeys gets plain keys.
+func (c *HolderClient) SendPersonKeys(keys string) error {
+	if !c.Supports(OpPersonKeys) {
+		return c.SendKeys(keys)
+	}
+	_, err := c.call(holderRequest{Op: OpPersonKeys, Keys: keys})
+	return err
+}
+
+// TypePersonTextBy is TypeTextBy that counts as a person's input.
+func (c *HolderClient) TypePersonTextBy(text string, paste bool) error {
+	if !c.Supports(OpPersonKeys) {
+		return c.TypeTextBy(text, paste)
+	}
+	return c.typeText(text, paste, c.SendPersonKeys, func(t string) error {
+		_, err := c.call(holderRequest{Op: OpPersonKeys, Keys: t, Paste: true})
+		return err
+	})
+}
+
+func (c *HolderClient) typeText(text string, paste bool, keys, pasteText func(string) error) error {
 	if (paste || len(text) > typedTextMax) && c.Supports(OpPaste) {
-		if err := c.Paste(text); err != nil {
+		if err := pasteText(text); err != nil {
 			return err
 		}
 		time.Sleep(pasteSettle)
 		return nil
 	}
-	return c.SendKeys(text)
+	return keys(text)
 }
 
 // Stop ends the child; the holder then records its exit and exits.

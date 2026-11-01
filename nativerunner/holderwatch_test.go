@@ -88,6 +88,63 @@ func TestHolderWatch_StreamsStatusConversationAndExit(t *testing.T) {
 	}
 }
 
+func TestHolderWatch_PersonKeysWakeWatchersPlainKeysDoNot(t *testing.T) {
+	dir := shortTempDir(t)
+	c, finished := startTestHolder(t, dir, settableHarness{w: &settableWatcher{}}, []string{"sh", "-c", echoChild})
+	t.Cleanup(func() {
+		_ = c.Stop()
+		<-finished
+	})
+	watch, err := c.Watch()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = watch.Close() })
+	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamStatus {
+		t.Fatalf("first message = %+v, %v; want the status", m, err)
+	}
+
+	// Plain keys come first: if they woke the stream, StreamInput would
+	// arrive before the one the person keys send.
+	if err := c.SendKeys("a\r"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SendPersonKeys("b\r"); err != nil {
+		t.Fatal(err)
+	}
+	if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamInput {
+		t.Fatalf("after person keys = %+v, %v; want StreamInput", m, err)
+	}
+	waitForScreen(t, c, "got:b")
+
+	// A person's text counts too, pasted or not.
+	for _, paste := range []bool{false, true} {
+		if err := c.TypePersonTextBy("c\r", paste); err != nil {
+			t.Fatal(err)
+		}
+		if m, err := watch.Next(); err != nil || m.Type != nativerunner.StreamInput {
+			t.Fatalf("after person text (paste=%v) = %+v, %v; want StreamInput", paste, m, err)
+		}
+	}
+}
+
+func TestHolderClient_PersonKeysWithoutTheOpFallBackToKeys(t *testing.T) {
+	nativerunner.SetHolderOptionalOps(t, []string{nativerunner.OpWatch})
+	_, c, _ := startHolder(t, echoChild)
+	if c.Supports(nativerunner.OpPersonKeys) {
+		t.Fatal("holder lists person-keys")
+	}
+	waitForScreen(t, c, "ready")
+	if err := c.SendPersonKeys("k\r"); err != nil {
+		t.Fatal(err)
+	}
+	waitForScreen(t, c, "got:k")
+	if err := c.TypePersonTextBy("t\r", false); err != nil {
+		t.Fatal(err)
+	}
+	waitForScreen(t, c, "got:t")
+}
+
 func TestHolderWatch_IdleStreamDoesNoPeriodicWork(t *testing.T) {
 	dir := shortTempDir(t)
 	w := &settableWatcher{}
