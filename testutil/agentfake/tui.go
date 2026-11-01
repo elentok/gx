@@ -46,6 +46,9 @@ const (
 	// the input row as claude does: a styled marker, and a dim placeholder while
 	// empty, so a draft check can decide.
 	TUIDraftEnv = "GX_AGENTFAKE_TUI_DRAFT"
+	// TUIClearLeavesIEnv, set to "1", makes the first clear key leave a lone "i"
+	// in the input; the second clears it.
+	TUIClearLeavesIEnv = "GX_AGENTFAKE_TUI_CLEAR_LEAVES_I"
 	// TUIRegistryDelayEnv, a Go duration, keeps the skill registry empty for
 	// that long after start: a skill prompt typed earlier is an unknown command.
 	TUIRegistryDelayEnv = "GX_AGENTFAKE_TUI_REGISTRY_DELAY"
@@ -249,6 +252,8 @@ type tuiOptions struct {
 	mouse     bool
 	// draft seeds the input; a non-empty one also styles the input row.
 	draft string
+	// clearLeavesI makes the first Ctrl+U leave "i" (see TUIClearLeavesIEnv).
+	clearLeavesI bool
 	// registryDelay, unknownSkill, noTurn and launchRecord are the skill-prompt
 	// knobs; see the TUI...Env consts.
 	registryDelay time.Duration
@@ -303,6 +308,7 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 		noPidFile:     os.Getenv(TUINoPidFileEnv) == "1",
 		mouse:         os.Getenv(TUIMouseEnv) == "1",
 		draft:         os.Getenv(TUIDraftEnv),
+		clearLeavesI:  os.Getenv(TUIClearLeavesIEnv) == "1",
 		registryDelay: registryDelay,
 		unknownSkill:  os.Getenv(TUIUnknownSkillEnv) == "1",
 		noTurn:        os.Getenv(TUINoTurnEnv) == "1",
@@ -519,6 +525,10 @@ func (t *tui) run(in io.Reader, ctl io.Reader) (int, error) {
 			}
 		case ev.key == ctrlU:
 			t.typed.Reset()
+			if t.opts.clearLeavesI {
+				t.opts.clearLeavesI = false
+				t.typed.WriteByte('i')
+			}
 			t.draw()
 		default:
 			t.typed.WriteByte(ev.key)

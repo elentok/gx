@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -89,6 +90,9 @@ type ptySession struct {
 	// exited closes once the holder process is gone.
 	exited  chan struct{}
 	stopped bool
+	// sentPresses is the probe's `i` count at the last send: an `i` pressed
+	// after it may still sit in the input.
+	sentPresses atomic.Int64
 	// died is set once a step left claude in a state gx can't trust; every
 	// later call fails with it, so the loop pauses the ticket for repair.
 	died error

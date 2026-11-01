@@ -71,6 +71,14 @@ func InputPresses(session string) int {
 	return 0
 }
 
+// InputText is the plain text of the claude input box in styled or plain rows;
+// false means no input box was found.
+func InputText(rows []string) (string, bool) { return inputText(rows) }
+
+// RecordInputPress counts an `i` gx pressed in session. The probe calls it; a
+// test calls it to stand for a stray `i` the probe left.
+func RecordInputPress(session string) { recordIPress(session) }
+
 func recordIPress(session string) {
 	vimSessions.Lock()
 	defer vimSessions.Unlock()

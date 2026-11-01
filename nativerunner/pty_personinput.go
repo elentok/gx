@@ -85,17 +85,61 @@ func (pr *ptyPrompter) cancelled() error {
 	return nil
 }
 
+// inputNotEmpty is claudeui.ErrInputNotEmpty with wording that claims no clear:
+// most drafts are a person's and stay.
+type inputNotEmpty struct{}
+
+func (inputNotEmpty) Error() string { return "input not empty, only a lone i that gx typed is cleared" }
+
+func (inputNotEmpty) Is(target error) bool { return target == claudeui.ErrInputNotEmpty }
+
+// clearGxI presses the clear key when the input is exactly `i` and the probe
+// pressed an `i` since the last send. Any other content, a one-letter draft
+// included, stays. It reports whether it cleared.
+func (pr *ptyPrompter) clearGxI() (bool, error) {
+	if !pr.ss.holder.Supports(OpScreenStyled) {
+		return false, nil
+	}
+	rows, err := pr.ss.holder.StyledScreen()
+	if err != nil {
+		return false, pr.p.died(pr.ss, err)
+	}
+	t := pr.p.typing(pr.ss)
+	if text, ok := harness.InputText(rows); !ok || text != "i" || int64(t.InputPresses(pr.ss.session.SessionID)) <= pr.ss.sentPresses.Load() {
+		return false, nil
+	}
+	return true, pr.p.died(pr.ss, pr.ss.holder.SendKeys(t.ClearKey()))
+}
+
 // awaitEmptyInput waits up to wait for a person's draft to go, so gx never
-// types over it. A check that can't decide types as before.
+// types over it. It first clears a lone `i` gx typed, and does so once more
+// before giving up. A check that can't decide types as before.
 func (pr *ptyPrompter) awaitEmptyInput(wait time.Duration) error {
+	if _, err := pr.clearGxI(); err != nil {
+		return err
+	}
 	deadline := time.Now().Add(wait)
+	extraRound := false
 	for {
 		empty, known, err := pr.InputEmpty()
 		if err != nil || empty || !known {
 			return err
 		}
 		if !time.Now().Before(deadline) {
-			return fmt.Errorf("%w: %w", claudeui.ErrStuckSubmission, claudeui.ErrInputNotEmpty)
+			if extraRound {
+				return fmt.Errorf("%w: %w", claudeui.ErrStuckSubmission, inputNotEmpty{})
+			}
+			extraRound = true
+			cleared, err := pr.clearGxI()
+			if err != nil {
+				return err
+			}
+			if pr.p.log != nil {
+				screen, _ := pr.Screen()
+				pr.p.log.Info("input not empty, extra clear round", "session", pr.ss.session.SessionID, "cleared", cleared, "screen", screen)
+			}
+			deadline = time.Now().Add(5 * pr.p.pollInterval())
+			continue
 		}
 		select {
 		case <-pr.ss.exited:
@@ -120,6 +164,7 @@ func (pr *ptyPrompter) Submit(text string) error {
 		return pr.p.died(pr.ss, err)
 	}
 	pr.typed = true
+	pr.ss.sentPresses.Store(int64(pr.p.typing(pr.ss).InputPresses(pr.ss.session.SessionID)))
 	return pr.SendEnter()
 }
 

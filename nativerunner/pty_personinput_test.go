@@ -1,7 +1,9 @@
 package nativerunner_test
 
 import (
+	"bytes"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,7 +11,9 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/agentrunner/claudeui"
 	"github.com/elentok/gx/agentrunner/screen"
+	gxharness "github.com/elentok/gx/harness"
 	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/testutil/agentfake"
@@ -168,6 +172,73 @@ func TestPty_PromptWaitsForDraftToGo(t *testing.T) {
 	}
 	if got := fakeKeysTyped(t, p, s); !strings.HasSuffix(got, "do it\r") {
 		t.Errorf("keys typed = %q; want the prompt typed after the draft went", got)
+	}
+}
+
+// promptWithDraft starts a session whose input holds draft, records whether gx
+// pressed an `i` in it, and prompts. It returns the keys the fake read.
+func promptWithDraft(t *testing.T, draft string, gxTypedI bool) (string, error) {
+	t.Helper()
+	p := newPty(t)
+	p.Env = append(p.Env, agentfake.TUIDraftEnv+"="+draft)
+	p.PromptGrace = 200 * time.Millisecond
+	s := startPersonInputPty(t, p)
+	if gxTypedI {
+		gxharness.RecordInputPress(s.SessionID)
+	}
+	err := p.Prompt(s, "do it")
+	return fakeKeysTyped(t, p, s), err
+}
+
+func TestPty_LoneIGxTypedIsClearedBeforeThePrompt(t *testing.T) {
+	t.Parallel()
+	keys, err := promptWithDraft(t, "i", true)
+	if err != nil || !strings.HasSuffix(keys, "do it\r") || !strings.HasPrefix(keys, "\x15") {
+		t.Fatalf("Prompt = %v, keys = %q; want one Ctrl+U then the prompt", err, keys)
+	}
+}
+
+func TestPty_DraftsGxDidNotTypeStay(t *testing.T) {
+	t.Parallel()
+	for name, tc := range map[string]struct {
+		draft    string
+		gxTypedI bool
+	}{
+		"longer draft after an i press": {"ix", true},
+		"one-letter i gx did not type":  {"i", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			keys, err := promptWithDraft(t, tc.draft, tc.gxTypedI)
+			if !errors.Is(err, claudeui.ErrInputNotEmpty) || !errors.Is(err, agentrunner.ErrNotDelivered) {
+				t.Fatalf("Prompt = %v; want ErrNotDelivered holding ErrInputNotEmpty", err)
+			}
+			if strings.Contains(err.Error(), "after clearing") {
+				t.Errorf("error = %q; want wording that claims no clear", err)
+			}
+			if keys != "" {
+				t.Errorf("keys = %q; want nothing typed", keys)
+			}
+		})
+	}
+}
+
+// A clear that leaves one `i` gets one more round, logged with a capture.
+func TestPty_ExtraClearRoundRemovesTheILeftByTheFirst(t *testing.T) {
+	t.Parallel()
+	p := newPty(t)
+	p.Env = append(p.Env, agentfake.TUIDraftEnv+"=i", agentfake.TUIClearLeavesIEnv+"=1")
+	p.PromptGrace = 200 * time.Millisecond
+	var logs bytes.Buffer
+	p.SetLog(slog.New(slog.NewJSONHandler(&logs, nil)))
+	s := startPersonInputPty(t, p)
+	gxharness.RecordInputPress(s.SessionID)
+
+	if err := p.Prompt(s, "do it"); err != nil {
+		t.Fatalf("Prompt = %v; want delivered after the extra round", err)
+	}
+	if got := logs.String(); !strings.Contains(got, "extra clear round") || !strings.Contains(got, `"screen":`) {
+		t.Errorf("log = %s; want the extra round with a capture", got)
 	}
 }
 
