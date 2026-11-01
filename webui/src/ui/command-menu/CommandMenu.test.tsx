@@ -49,7 +49,9 @@ describe("CommandMenu", () => {
 
   it("shows the no-match line with the typed token", () => {
     const { getByText, queryByRole } = renderThemed(<CommandMenu {...base} rows={[]} status="no-match" typed="/zz" />);
-    expect(getByText("No command matches /zz. Cmd/Ctrl+Enter sends it as typed.")).toBeTruthy();
+    expect(getByText((_, el) => el?.tagName === "P" && el.textContent === "No command matches /zz. Cmd/Ctrl+Enter sends it as typed.")).toBeTruthy();
+    expect(getByText("/zz").tagName).toBe("SPAN");
+    expect(getByText("Esc closes")).toBeTruthy();
     expect(queryByRole("listbox")).toBeNull();
   });
 
@@ -60,7 +62,7 @@ describe("CommandMenu", () => {
 
   it("shows one loading line", () => {
     const { getByText, queryByRole } = renderThemed(<CommandMenu {...base} rows={[]} status="loading" />);
-    expect(getByText("Loading commands")).toBeTruthy();
+    expect(getByText("Loading commands…")).toBeTruthy();
     expect(queryByRole("listbox")).toBeNull();
   });
 

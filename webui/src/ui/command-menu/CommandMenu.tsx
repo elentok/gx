@@ -1,5 +1,5 @@
-import { Box, Text } from "@chakra-ui/react";
-import { useEffect, useRef } from "react";
+import { Box, Spinner, Text } from "@chakra-ui/react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { Tone } from "../tone";
 
 export interface CommandMenuSegment {
@@ -51,9 +51,29 @@ export function CommandMenu({ rows, selected, status, typed, compact = false, pl
       overflow="hidden"
     >
       {status === "failed" && <Note warn>Skills could not load</Note>}
-      {status === "loading" && <Note>Loading commands</Note>}
+      {status === "loading" && (
+        <Note>
+          <Spinner size="xs" mr="2" verticalAlign="middle" color={`tone.${tone}.fg`} />
+          Loading commands…
+        </Note>
+      )}
       {status === "no-match" && (
-        <Note>{compact ? "Send sends it as typed." : `No command matches ${typed}. Cmd/Ctrl+Enter sends it as typed.`}</Note>
+        <>
+          <Note>
+            {compact ? (
+              "Send sends it as typed."
+            ) : (
+              <>
+                No command matches{" "}
+                <Text as="span" fontFamily="mono">
+                  {typed}
+                </Text>
+                . Cmd/Ctrl+Enter sends it as typed.
+              </>
+            )}
+          </Note>
+          {!compact && <Footer>Esc closes</Footer>}
+        </>
       )}
       {showRows && rows.length > 0 && (
         <Box role="listbox" aria-label="Commands" display="flex" flexDirection="column" p="1.5" gap="1px" maxH="352px" overflowY="auto">
@@ -63,18 +83,26 @@ export function CommandMenu({ rows, selected, status, typed, compact = false, pl
         </Box>
       )}
       {showRows && !compact && (
-        <Box display="flex" gap="3.5" alignItems="center" px="3" py="1.5" borderTopWidth="1px" borderColor="hairline" fontSize="xs" color="text.dim">
+        <Footer>
           <span>↑↓ select</span>
           <span>Enter fills</span>
           <span>Cmd/Ctrl+Enter sends</span>
           <span>Esc closes</span>
-        </Box>
+        </Footer>
       )}
     </Box>
   );
 }
 
-function Note({ warn = false, children }: { warn?: boolean; children: string }) {
+function Footer({ children }: { children: ReactNode }) {
+  return (
+    <Box display="flex" gap="3.5" alignItems="center" px="3" py="1.5" borderTopWidth="1px" borderColor="hairline" fontSize="xs" color="text.dim">
+      {children}
+    </Box>
+  );
+}
+
+function Note({ warn = false, children }: { warn?: boolean; children: ReactNode }) {
   return (
     <Text px="3.5" py="2" fontSize="xs" color={warn ? "tone.waiting.fg" : "text.muted"} borderBottomWidth={warn ? "1px" : "0"} borderColor="hairline">
       {children}

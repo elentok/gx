@@ -274,13 +274,13 @@ const canned = {
   ],
 };
 
-function stubCommands() {
+function stubCommands(commandsReply: () => Promise<Response> = async () => new Response(JSON.stringify(canned))) {
   clearCommandListCache();
   prompts.length = 0;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init: { body: string }) => {
-      if (url.startsWith("/v1/sessions/commands")) return new Response(JSON.stringify(canned));
+      if (url.startsWith("/v1/sessions/commands")) return commandsReply();
       if (url === "/v1/sessions/prompt") {
         prompts.push(JSON.parse(init.body));
         return accepted();
@@ -289,6 +289,8 @@ function stubCommands() {
     }),
   );
 }
+
+const noMatchLine = (typed: string) => screen.findByText((_, el) => el?.tagName === "P" && (el.textContent ?? "").startsWith(`No command matches ${typed}.`));
 
 const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
 
@@ -335,11 +337,48 @@ describe("completion menu", () => {
     stubCommands();
     render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
     await type("/zzz");
-    expect(await screen.findByText(/No command matches \/zzz/)).toBeTruthy();
+    expect(await noMatchLine("/zzz")).toBeTruthy();
     const box = await composerBox();
     const ev = createEvent.keyDown(box, { key: "Enter" });
     fireEvent(box, ev);
     expect(ev.defaultPrevented).toBe(false);
+  });
+
+  test("no match keeps the menu open with the text, until a space", async () => {
+    stubCommands();
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await type("/zzz");
+    await noMatchLine("/zzz");
+    expect((await composerBox()).value).toBe("/zzz");
+    await type("/zzz ");
+    expect(screen.queryByText("Esc closes")).toBeNull();
+  });
+
+  test("loading shows one line while the list never arrives, and Send still posts the text", async () => {
+    stubCommands(() => new Promise<Response>(() => {}));
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await type("/co");
+    await screen.findByText("Loading commands…");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    fireEvent.keyDown(await composerBox(), { key: "Enter", metaKey: true });
+    await vi.waitFor(() => expect(prompts).toEqual([expect.objectContaining({ text: "/co" })]));
+  });
+
+  test("a failing list shows the notice, and Send still posts the text", async () => {
+    stubCommands(async () => new Response("{}", { status: 500 }));
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await type("/co");
+    await screen.findByText("Skills could not load");
+    fireEvent.keyDown(await composerBox(), { key: "Enter", metaKey: true });
+    await vi.waitFor(() => expect(prompts).toEqual([expect.objectContaining({ text: "/co" })]));
+  });
+
+  test("a degraded list shows the built-ins under the notice", async () => {
+    stubCommands(async () => new Response(JSON.stringify({ ...canned, degraded: true })));
+    render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()), true);
+    await type("/co");
+    await screen.findByText("Skills could not load");
+    await vi.waitFor(() => expect(options()).toHaveLength(2));
   });
 
   test("a composer that cannot send shows no menu", async () => {

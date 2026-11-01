@@ -47,7 +47,9 @@ export function useCompletion(
     segments: m.segments,
   }));
   const selected = token && pick.query === token.query ? Math.min(pick.index, Math.max(rows.length - 1, 0)) : 0;
-  const status: CommandMenuStatus = list.status === "loading" ? "loading" : rows.length === 0 && list.status === "ready" ? "no-match" : list.status;
+  // A degraded list (built-ins only) warns like a failed one, and still lists its rows.
+  const status: CommandMenuStatus =
+    list.status === "loading" ? "loading" : list.degraded ? "failed" : rows.length === 0 && list.status === "ready" ? "no-match" : list.status;
 
   const choose = (i: number) => {
     if (!token || !matches[i]) return;
