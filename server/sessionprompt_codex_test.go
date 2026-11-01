@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,10 +14,10 @@ import (
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
-const codexPromptConv = "thread-server-prompt"
-
 // startCodexPromptSession runs a session on the fake Codex, Idle, with extraEnv
-// added to the env it runs in.
+// added to the env it runs in. The conversation id is per test: the fake's
+// control FIFO is keyed by it, so parallel tests sharing one id would steal
+// each other's controls.
 func startCodexPromptSession(t *testing.T, extraEnv ...string) promptFixture {
 	t.Helper()
 	return startCodexPromptSessionWithGrace(t, firstPromptGrace, extraEnv...)
@@ -26,6 +27,7 @@ func startCodexPromptSession(t *testing.T, extraEnv ...string) promptFixture {
 // wait for an answer to take effect, for a test whose fake does real work first.
 func startCodexPromptSessionWithGrace(t *testing.T, grace time.Duration, extraEnv ...string) promptFixture {
 	t.Helper()
+	codexPromptConv := "thread-server-prompt-" + strings.ReplaceAll(t.Name(), "/", "-")
 	bin := t.TempDir()
 	if out, err := exec.Command("go", "build", "-o", filepath.Join(bin, "codex"), "github.com/elentok/gx/testutil/agentfake/cmd/fakecodex").CombinedOutput(); err != nil {
 		t.Fatalf("build fakecodex: %v\n%s", err, out)
