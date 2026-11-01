@@ -3,10 +3,13 @@ package main
 import (
 	"encoding/json"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/transcript"
 )
 
@@ -17,6 +20,17 @@ func (r *running) sessionsOf(t *testing.T) []server.SessionInfo {
 		t.Fatal(err)
 	}
 	return list
+}
+
+// commandSessionCount is the sessions of agents-commands but the Queue agent,
+// whose place in the list depends on when the worker starts: the eight of
+// agents, three, eight Blocked, three in other states, and two design sessions.
+const commandSessionCount = 24
+
+// seededSessions is the list without the Queue agent, in creation order.
+func (r *running) seededSessions(t *testing.T) []server.SessionInfo {
+	t.Helper()
+	return slices.DeleteFunc(r.sessionsOf(t), func(s server.SessionInfo) bool { return s.Queue })
 }
 
 func (r *running) commandNames(t *testing.T, args ...string) (names []string, degraded bool) {
@@ -35,9 +49,9 @@ func (r *running) commandNames(t *testing.T, args ...string) (names []string, de
 func TestCommandsScenario_ListsSessionsAndFeatureSkill(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents-commands")
-	list := r.sessionsOf(t)
-	if len(list) != 19 {
-		t.Fatalf("%d sessions, want the eight of agents, three, and eight Blocked", len(list))
+	list := r.seededSessions(t)
+	if len(list) != commandSessionCount {
+		t.Fatalf("%d sessions, want %d", len(list), commandSessionCount)
 	}
 	claude, codex, exited := list[8], list[9], list[10]
 	if claude.Status.State != server.SessionIdle || codex.Harness != "codex" || codex.Status.State != server.SessionIdle || exited.Status.State != server.SessionExited {
@@ -73,9 +87,9 @@ func TestCommandsScenario_ListsSessionsAndFeatureSkill(t *testing.T) {
 func TestCommandsScenario_BlockedSessionsSettleBlocked(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents-commands")
-	list := r.sessionsOf(t)
-	if len(list) != 19 {
-		t.Fatalf("%d sessions, want 11 plus eight Blocked", len(list))
+	list := r.seededSessions(t)
+	if len(list) != commandSessionCount {
+		t.Fatalf("%d sessions, want %d", len(list), commandSessionCount)
 	}
 	for i, want := range []string{"claude", "claude", "claude", "claude", "claude", "codex", "codex", "codex"} {
 		si := list[11+i]
@@ -90,10 +104,47 @@ func TestCommandsScenario_BlockedSessionsSettleBlocked(t *testing.T) {
 	r.stop(t)
 }
 
+func TestCommandsScenario_RemainingStatesExist(t *testing.T) {
+	t.Parallel()
+	r := start(t, "agents-commands")
+	list := r.seededSessions(t)
+	if len(list) != commandSessionCount {
+		t.Fatalf("%d sessions, want %d", len(list), commandSessionCount)
+	}
+	for i, want := range []struct{ state, label string }{
+		{server.SessionBlocked, "Agent hit an error"},
+		{server.SessionRateLimited, "Rate limited"},
+		{server.SessionWorking, ""},
+	} {
+		si := list[19+i]
+		if si.Status.State != want.state || (want.label != "" && (si.Failure == nil || si.Failure.Label != want.label)) {
+			t.Errorf("session %d = %s failure=%+v, want %s %q", 19+i, si.Status.State, si.Failure, want.state, want.label)
+		}
+	}
+	if list[1].Status.State != server.SessionWorking {
+		t.Errorf("the first Working session = %s", list[7].Status.State)
+	}
+	var queue []server.SessionInfo
+	if !testutil.Poll(30*time.Second, 200*time.Millisecond, func() bool {
+		queue = slices.DeleteFunc(r.sessionsOf(t), func(s server.SessionInfo) bool { return !s.Queue })
+		return len(queue) == 1
+	}) {
+		t.Fatalf("queue agents = %+v, want one", queue)
+	}
+	claudeDesign, codexDesign := list[22], list[23]
+	if !claudeDesign.Design || claudeDesign.Harness == "codex" || !claudeDesign.AutoAdvance {
+		t.Errorf("Claude design = harness %q design %v auto-advance %v", claudeDesign.Harness, claudeDesign.Design, claudeDesign.AutoAdvance)
+	}
+	if !codexDesign.Design || codexDesign.Harness != "codex" {
+		t.Errorf("Codex design = harness %q design %v", codexDesign.Harness, codexDesign.Design)
+	}
+	r.stop(t)
+}
+
 func TestCommandsScenario_ChatsHoldThePillsAndOutput(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents-commands")
-	list := r.sessionsOf(t)
+	list := r.seededSessions(t)
 	var chat server.SessionChatResponse
 	if err := json.Unmarshal([]byte(r.gx(t, "agents", "chat", list[8].ID, "--json")), &chat); err != nil {
 		t.Fatal(err)
@@ -127,9 +178,9 @@ func TestCommandsScenario_ChatsHoldThePillsAndOutput(t *testing.T) {
 func TestCommandsScenario_FailedProbesAreDegraded(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents-commands-failed")
-	list := r.sessionsOf(t)
-	if len(list) != 19 {
-		t.Fatalf("%d sessions, want 19", len(list))
+	list := r.seededSessions(t)
+	if len(list) != commandSessionCount {
+		t.Fatalf("%d sessions, want %d", len(list), commandSessionCount)
 	}
 	if _, degraded := r.commandNames(t, list[8].ID); !degraded {
 		t.Error("claude list is not degraded")
@@ -140,7 +191,7 @@ func TestCommandsScenario_FailedProbesAreDegraded(t *testing.T) {
 func TestCommandsScenario_SlowStartsAndFlagIsChecked(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "agents-commands-slow", nil, "--command-list-age", "1s")
-	if len(r.sessionsOf(t)) != 19 {
+	if len(r.seededSessions(t)) != commandSessionCount {
 		t.Error("slow scenario lacks the sessions")
 	}
 	r.stop(t)

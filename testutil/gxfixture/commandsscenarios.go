@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets"
 )
 
 // slowProbeDelay is longer than any flow waits for a command list (flow 149
@@ -74,7 +76,43 @@ func commandsScenario(delay string, fail bool) scenario {
 		sessionSpec{project: "site", prompt: "hello", crash: true, read: true},
 	)
 	sc.sessions = append(sc.sessions, blockedCommandSessions()...)
+	sc.sessions = append(sc.sessions, stateCommandSessions()...)
+	addQueueAndDesignAgents(&sc)
 	return sc
+}
+
+// stateCommandSessions are the plain sessions in the remaining states: Blocked
+// on an error (Codex), Rate limited, and a second Working session, so a flow can send
+// keys to one while the first stays untouched.
+func stateCommandSessions() []sessionSpec {
+	return []sessionSpec{
+		// Only Codex reaches "Agent hit an error": Claude's status has no error kind.
+		{project: project, harness: "codex", failure: server.FailureKindBlocked,
+			control: &agentfake.Control{Action: agentfake.ActionTaskError, Message: agentfake.CodexModelError, Error: "model_not_found"}},
+		{project: project, prompt: "hello", read: true, failure: server.FailureKindRateLimit,
+			control: &agentfake.Control{Action: agentfake.ActionAPIError, Error: "rate_limit", Status: 429, Message: "You've hit your limit · resets at 3pm"}},
+		{project: project, prompt: agentfake.ChatSlowMarker + " a second long turn"},
+	}
+}
+
+// addQueueAndDesignAgents adds a held Queue agent, a Claude design session with
+// auto-advance on, and a Codex design session. The Codex one lives in gx, whose
+// project config defaults to Codex, so no seeded Claude session changes harness.
+func addQueueAndDesignAgents(sc *scenario) {
+	const queueEpic, autoMap, codexMap = "queue-epic", "design-auto", "design-codex"
+	step := string(tickets.StepResolveTickets)
+	sc.epics = append(sc.epics,
+		epic{project, queueEpic, []ticket{{"01", "held", servertest.TicketOpts{}}}},
+		epic{project, autoMap, nil},
+		epic{"gx", codexMap, nil},
+	)
+	sc.designSteps[project+":"+autoMap] = step
+	sc.designSteps["gx:"+codexMap] = step
+	sc.ownRepos = append(sc.ownRepos, "gx")
+	sc.projectExtra = map[string]string{"gx": `,"agents":{"default-harness":"codex"}`}
+	sc.queue = []string{project + ":" + queueEpic}
+	sc.hold = true
+	sc.openDesigns = []string{project + ":" + autoMap, "gx:" + codexMap}
 }
 
 // blockedCommandSessions are the sessions Blocked at a dialog or a permission
