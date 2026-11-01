@@ -168,12 +168,12 @@ function Line({
       gap={wide ? "12px" : "2px"}
       minW="0"
     >
+      <Box display="flex" flexDirection="column" gap="2px" minW="0" flex={wide ? "1 1 0" : undefined}>
       <Box
         display="flex"
         alignItems="center"
         gap={wide ? "12px" : "10px"}
         minW="0"
-        flex={wide ? "1 1 0" : undefined}
       >
         <Dot row={row} />
         <Text
@@ -207,10 +207,11 @@ function Line({
         </Text>
       </Box>
       {chips && (
-        <Box data-chips pl={wide ? undefined : "80px"} flexShrink={0} minW="0">
-          <HarnessLabel {...chips} switched={false} />
+        <Box data-chips pl={wide ? "88px" : "80px"} minW="0">
+          <HarnessLabel {...chips} switched={false} plain />
         </Box>
       )}
+      </Box>
       {metaNode}
     </Box>
   );

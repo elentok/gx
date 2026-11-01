@@ -38,6 +38,7 @@ export function HarnessLabel({
   effort,
   switched,
   note,
+  plain,
 }: {
   harness: string;
   tierLabel: string;
@@ -46,10 +47,31 @@ export function HarnessLabel({
   switched: boolean;
   /** Server text for a queue row, as one more dim chip (`pinned`, `follows default`). */
   note?: string;
+  /** One dim line of text joined by `·` instead of pills, for dense lists. */
+  plain?: boolean;
 }) {
   const tierTitle = tierLabel ? `${tierLabel} tier` : undefined;
   const modelText = [model, effort].filter(Boolean).join(" · ");
   const known = tierLabel || model || effort;
+  if (plain) {
+    const parts = [
+      known && model && tierLabel ? tierLabel : "",
+      known && model ? modelText : "",
+      known && !model ? [tierLabel, "CLI default", effort].filter(Boolean).join(" · ") : "",
+      note ?? "",
+    ].filter(Boolean);
+    return (
+      <Text as="span" display="inline-flex" alignItems="center" gap="2" fontFamily="mono" fontSize="12px" color="text.dim">
+        {harness && (
+          <Box as="span" display="inline-flex" alignItems="center" gap="5px">
+            <Box as="i" w="7px" h="7px" borderRadius="full" bg={`harness.${harness}`} />
+            {NAMES[harness] ?? harness}
+          </Box>
+        )}
+        {parts.length > 0 && <span>{parts.join(" · ")}</span>}
+      </Text>
+    );
+  }
   return (
     <Box as="span" display="inline-flex" flexWrap="wrap" alignItems="center" gap="2">
       {harness && (

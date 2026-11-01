@@ -213,7 +213,7 @@ test("loop rows show harness chips and queue notes; done rows and map rows show 
   expect(await chips("01")).toBe("follows default");
   expect(await chips("02")).toBe("Codexpinned");
   expect(await chips("03")).toBe("Claudekeeps Claude (ran before)");
-  expect(await chips("04")).toBe("CodexStrongestgpt-x · high");
+  expect(await chips("04")).toBe("CodexStrongest · gpt-x · high");
   expect(await chips("05")).toBeUndefined();
   cleanup();
   live([tk("01")], "map");
