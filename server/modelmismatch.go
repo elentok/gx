@@ -49,6 +49,22 @@ func (s *Server) pauseModelMismatch(rc runContext, addr tickets.Address, m *ralp
 	s.recordModelMismatch(rc.one.ScratchDir, rc.one.Ticket.Path, addr, rc.run, m, stopErr)
 }
 
+// launchModel resolves the model and effort a launch runs on, honouring a
+// one-shot tier override. ok is false when an implement launch resolved to no
+// model: it is refused and paused, and no agent may start.
+func (s *Server) launchModel(scratchDir string, t tickets.Ticket, addr tickets.Address, agent ralphloop.AgentKind) (model, effort string, ok bool) {
+	var tierRun Run
+	if tier := takeTierOverride(t.Path); tier != "" {
+		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(s.agentsConfig(addr.Project), agent, tier)
+	}
+	model, effort = s.runAgentConfig(addr.Project, agent, tierRun)
+	if model == "" && ralphloop.IsImplementType(t.Type) {
+		s.refuseEmptyModel(scratchDir, t.Path, addr)
+		return "", "", false
+	}
+	return model, effort, true
+}
+
 // refuseEmptyModel refuses an implement launch whose tier resolved to no model:
 // the CLI would pick a default gx does not know. No session started, so there
 // is nothing to stop.

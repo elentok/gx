@@ -68,8 +68,13 @@ func clockOf(d Deps) time.Time {
 }
 
 func isImplementTicket(p launchAndPromptParams) bool {
-	t := p.TicketData.Type
-	return t == "" || t == string(schema.TypeImplement)
+	return IsImplementType(p.TicketData.Type)
+}
+
+// IsImplementType reports whether a ticket's type is an implement ticket; an
+// unset type counts as one.
+func IsImplementType(ticketType string) bool {
+	return ticketType == "" || ticketType == string(schema.TypeImplement)
 }
 
 // tick compares the launch's first assistant turn with the expected model. It

@@ -352,8 +352,9 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 	defer in.close()
 	p.input = in
 	vcap := newVerifyCap(p, p.SmartZone)
-	mguard := newModelGuard(d, p, clockOf(d))
-	lguard := newLongTicketGuard(d, p, clockOf(d))
+	now := clockOf(d)
+	mguard := newModelGuard(d, p, now)
+	lguard := newLongTicketGuard(d, p, now)
 	elapsedMs := 0
 	nudged := false
 	for {

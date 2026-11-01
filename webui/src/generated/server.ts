@@ -1401,15 +1401,6 @@ export interface TicketInfo extends HarnessLabel {
   actual_cost?: number /* float64 */;
   had_codex?: boolean;
   compactions?: number /* int */;
-  /**
-   * ModelRan and ModelExpected are the two model names a model-mismatch pause shows.
-   */
-  model_ran?: string;
-  model_expected?: string;
-  /**
-   * LongTicketTurns is the turn count at which the long-ticket alert fired; the web UI badges it.
-   */
-  long_ticket_turns?: number /* int */;
   category?: string;
   exported_at?: string;
   /**

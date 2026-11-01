@@ -497,13 +497,8 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	if err := clearLongTicketMark(t.Path); err != nil {
 		s.log.Warn("clear long-ticket mark", "ticket", ticketAddr, "err", err)
 	}
-	var tierRun Run
-	if tier := takeTierOverride(t.Path); tier != "" {
-		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(s.agentsConfig(queued.Project), agent, tier)
-	}
-	model, effort := s.runAgentConfig(queued.Project, agent, tierRun)
-	if model == "" && (t.Type == "" || t.Type == string(schema.TypeImplement)) {
-		s.refuseEmptyModel(dir, t.Path, ticket)
+	model, effort, ok := s.launchModel(dir, t, ticket, agent)
+	if !ok {
 		return false, nil
 	}
 	one := ralphloop.OneIteration{
@@ -748,10 +743,8 @@ func (s *Server) finishRun(rc runContext) {
 	rc.one.OnRateLimit = func(limited bool, resetAt time.Time) {
 		s.registry.markRateLimit(rc.ticketAddr, limited, resetAt)
 	}
-	if addr, err := tickets.ParseAddress(rc.ticketAddr, tickets.AddressContext{}); err == nil {
-		rc.one.LongTicketTurns = s.settings.Load().LongTicketTurns
-		rc.one.OnLongTicket = func(turns int) { s.alertLongTicket(addr, rc.one.Ticket.Path, turns) }
-	}
+	addr, _ := tickets.ParseAddress(rc.ticketAddr, tickets.AddressContext{}) // built by claimAndLaunch, always parses
+	s.guardCallbacks(addr, &rc.one)
 	stop := make(chan struct{})
 	if !rc.one.PausesAtOnce() {
 		go s.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)
@@ -924,85 +917,6 @@ func (s *Server) notifyDone(addr tickets.Address, ticketPath string) {
 	if e, t, ok := s.freshTicket(addr); ok && !IsOneOffEpic(e) {
 		s.chat.TicketDone(addr.Project, s.chatOverride(addr.Project), addr.Epic, t, ralphloop.CountsOf(e))
 	}
-}
-
-// runnerFor is the configured runner for project: the one new launches use.
-func (s *Server) runnerFor(project string) agentrunner.Runner {
-	return s.runnerNamed(s.cfg.Runner.Name(), project)
-}
-
-// launchRunner is the runner a new launch of agent in project uses. The
-// headless runner hosts only Claude, so Codex runs on pty unless herdr is
-// configured.
-func (s *Server) launchRunner(project string, agent ralphloop.AgentKind) agentrunner.Runner {
-	if agent == ralphloop.AgentCodex && s.cfg.Runner.Name() != runnerHerdr {
-		return s.runnerNamed(string(agentrunner.ChoicePTY), project)
-	}
-	return s.runnerFor(project)
-}
-
-// runnerForRun is the runner that started run, whatever the configured one is.
-// It is nil when that runner cannot be built.
-func (s *Server) runnerForRun(run Run) agentrunner.Runner {
-	name := run.Runner
-	if name == "" {
-		name = runnerHerdr
-	}
-	project := ""
-	if addr, err := tickets.ParseAddress(run.Address, tickets.AddressContext{}); err == nil {
-		project = addr.Project
-	}
-	return s.runnerNamed(name, project)
-}
-
-// runnerOf is runnerForRun, failing when the run's runner cannot be built.
-func (s *Server) runnerOf(run Run) (agentrunner.Runner, error) {
-	if r := s.runnerForRun(run); r != nil {
-		return r, nil
-	}
-	name := run.Runner
-	if name == "" {
-		name = runnerHerdr
-	}
-	return nil, fmt.Errorf("started by %s; %s unavailable", name, name)
-}
-
-// liveSession is the session of address's live iteration and the runner
-// hosting it: a tracked run's own runner, else the configured one (a paused
-// ticket's agent can outlive its run).
-func (s *Server) liveSession(addr tickets.Address) (agentrunner.Runner, agentrunner.Session, bool, error) {
-	runner, err := s.iterationRunner(addr)
-	if err != nil {
-		return nil, agentrunner.Session{}, false, err
-	}
-	label, _, _ := ralphloop.IterationIdentity(addr.Epic, addr.ID, "")
-	sess, ok, err := runner.Find(label)
-	return runner, sess, ok, err
-}
-
-// iterationRunner is the runner hosting address's iteration: a tracked run's
-// own runner, else the configured one.
-func (s *Server) iterationRunner(addr tickets.Address) (agentrunner.Runner, error) {
-	if run, ok := s.registry.runOf(addr.String()); ok {
-		return s.runnerOf(run)
-	}
-	agent := s.defaultHarness(addr.Project)
-	if _, t, ok := s.freshTicket(addr); ok {
-		agent = s.resolveTicket(addr, t).Harness
-	}
-	return s.launchRunner(addr.Project, agent), nil
-}
-
-func (s *Server) runnerNamed(name, project string) agentrunner.Runner {
-	if s.cfg.RunnerFor != nil {
-		if r := s.cfg.RunnerFor(name, project); r != nil {
-			return r
-		}
-	}
-	if name == s.cfg.Runner.Name() {
-		return s.cfg.Runner
-	}
-	return nil
 }
 
 // depsWith is the default deps talking to runner.

@@ -28,6 +28,12 @@ func longTicketFollowUp(from tickets.Address, turns int) followUp {
 	}
 }
 
+// guardCallbacks wires the long-ticket alert into one iteration.
+func (s *Server) guardCallbacks(addr tickets.Address, one *ralphloop.OneIteration) {
+	one.LongTicketTurns = s.settings.Load().LongTicketTurns
+	one.OnLongTicket = func(turns int) { s.alertLongTicket(addr, one.Ticket.Path, turns) }
+}
+
 // clearLongTicketMark drops the previous launch's mark: each launch counts its
 // turns anew, so a restarted or resumed ticket must not keep a stale badge.
 func clearLongTicketMark(ticketPath string) error {

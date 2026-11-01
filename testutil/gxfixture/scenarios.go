@@ -244,7 +244,6 @@ var scenarios = map[string]scenario{
 			project + ":mixed-epic/07": agentfake.BehaviourFail,
 		},
 	},
-	// finishing: queued, and its last ticket can finish and merge.
 	// long-running: one ticket carries the long-ticket mark, one does not.
 	"long-running": {
 		epics: []epic{{project, "long-epic", []ticket{
@@ -252,6 +251,7 @@ var scenarios = map[string]scenario{
 			{"02", "plain", servertest.TicketOpts{}},
 		}}},
 	},
+	// finishing: queued, and its last ticket can finish and merge.
 	"finishing": {
 		epics: []epic{{project, "finishing-epic", []ticket{
 			{"01", "merged", servertest.TicketOpts{Status: "done"}},
