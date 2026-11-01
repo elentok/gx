@@ -1,8 +1,11 @@
 package claudeui
 
 import (
+	"bytes"
 	"errors"
+	"log/slog"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -227,8 +230,41 @@ func TestPromptWithNudge_NotEmptyAfterClear_IsStuck(t *testing.T) {
 	}
 	want := append([]string{"submit:hi", "wait"}, clears(3)...)
 	want = append(want, "check")
+	want = append(want, clears(3)...)
+	want = append(want, "check")
 	assertCalls(t, f.calls, want...)
 	assertDecisions(t, f.decisions, NudgeRetype, NudgeStuck)
+}
+
+// logPrompter is a checkingPrompter that names its logger.
+type logPrompter struct {
+	*checkingPrompter
+	log *slog.Logger
+}
+
+func (l *logPrompter) Log() *slog.Logger { return l.log }
+
+func TestClearInput_NeverEmpty_LogsTheCaptureAndIsInputNotEmpty(t *testing.T) {
+	noInputSettle(t)
+	var buf bytes.Buffer
+	log := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	f := &logPrompter{checkingPrompter: &checkingPrompter{fakePrompter: &fakePrompter{screens: []string{"STUCK-DRAFT"}}, known: true}, log: log}
+	err := ClearInput(f, "hi")
+	if !errors.Is(err, ErrInputNotEmpty) {
+		t.Fatalf("ClearInput() error = %v, want ErrInputNotEmpty", err)
+	}
+	if out := buf.String(); !strings.Contains(out, "STUCK-DRAFT") {
+		t.Fatalf("log = %q, want the pane capture", out)
+	}
+}
+
+func TestClearInput_EmptyOnTheExtraRound_Succeeds(t *testing.T) {
+	noInputSettle(t)
+	f := &lateClearPrompter{fakePrompter: &fakePrompter{}, emptyFrom: 2}
+	if err := ClearInput(f, "hi"); err != nil {
+		t.Fatalf("ClearInput() error = %v, want the extra round to clear it", err)
+	}
+	assertCalls(t, f.calls, clears(6)...)
 }
 
 func TestPromptWithNudge_UnstyledRead_CountAloneDecides(t *testing.T) {

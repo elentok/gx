@@ -106,31 +106,50 @@ var (
 	inputSettlePoll = 25 * time.Millisecond
 )
 
+// LogProvider is the optional part of a Prompter that names the logger for
+// clearWhole's pane capture; without it the default logger is used.
+type LogProvider interface {
+	Log() *slog.Logger
+}
+
+// clearRounds is how many times clearWhole presses the clear keys before it
+// gives up: one more round covers a redraw that lagged past the settle wait.
+const clearRounds = 2
+
 // clearWhole empties the whole input, not just its current line, then checks
 // it when the Prompter can.
 func clearWhole(p Prompter, text string) error {
-	for range clearPresses(text) {
-		if err := p.Clear(); err != nil {
-			return fmt.Errorf("clearing input before retype: %w", err)
+	c, checks := p.(InputChecker)
+	for round := range clearRounds {
+		for range clearPresses(text) {
+			if err := p.Clear(); err != nil {
+				return fmt.Errorf("clearing input before retype: %w", err)
+			}
+		}
+		if !checks {
+			return nil
+		}
+		// The agent redraws a moment after the keys land, so a read right away
+		// can still show the text.
+		settle := time.Now().Add(inputSettleWait)
+		empty, known, err := c.InputEmpty()
+		for err == nil && known && !empty && time.Now().Before(settle) {
+			time.Sleep(inputSettlePoll)
+			empty, known, err = c.InputEmpty()
+		}
+		if err != nil || !known || empty {
+			return nil
+		}
+		if round == clearRounds-1 {
+			break
 		}
 	}
-	c, ok := p.(InputChecker)
-	if !ok {
-		return nil
-	}
-	// The agent redraws a moment after the keys land, so a read right away
-	// can still show the text.
-	settle := time.Now().Add(inputSettleWait)
-	empty, known, err := c.InputEmpty()
-	for err == nil && known && !empty && time.Now().Before(settle) {
-		time.Sleep(inputSettlePoll)
-		empty, known, err = c.InputEmpty()
-	}
-	if err != nil || !known || empty {
-		return nil
-	}
 	screen, _ := p.Screen()
-	slog.Debug("input not empty after full clear", "screen", screen)
+	log := slog.Default()
+	if lp, ok := p.(LogProvider); ok && lp.Log() != nil {
+		log = lp.Log()
+	}
+	log.Info("input not empty after full clear", "screen", screen)
 	return fmt.Errorf("%w: %w", ErrStuckSubmission, ErrInputNotEmpty)
 }
 

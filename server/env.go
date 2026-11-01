@@ -10,6 +10,7 @@ import (
 	"github.com/elentok/gx/chatreader"
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/harness"
+	"github.com/elentok/gx/nativerunner"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/transcript"
 )
@@ -102,6 +103,19 @@ func (s *Server) mergeLockDir(epicPath string) (string, error) {
 // typing is the typing rules for the claude sessions this server runs, reading
 // claude's config from Config.Env.
 func (s *Server) typing() harness.Typing { return harness.ClaudeTypingIn(s.cfg.Env) }
+
+// typingIO is the ready-to-type step's view of the session in dir. It carries
+// the session id the probe keys its memory by, the server logger and the
+// caller's label, so the probe's decisions reach server.log.
+func (s *Server) typingIO(dir string, c *nativerunner.HolderClient, caller string) harness.TypingIO {
+	io := nativerunner.HolderTypingIO(c)
+	if meta, err := readSessionMeta(dir); err == nil {
+		io.Session = meta.ConversationID
+	}
+	io.Log = s.log.With("gx_session", filepath.Base(dir))
+	io.Caller = caller
+	return io
+}
 
 // sessionTyping is the typing rules of the session in dir, claude's when its
 // meta can't be read.

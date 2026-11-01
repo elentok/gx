@@ -35,20 +35,26 @@ type Harness struct {
 }
 
 func (Harness) Launch(opts harness.LaunchOptions) harness.Command {
-	return programCommand("--session-id", opts.SessionID, opts)
+	claude, _ := harness.Lookup(harness.Claude)
+	return programCommand(claude.Launch(opts), opts)
 }
 
 func (h Harness) Resume(conversationID string, opts harness.LaunchOptions) (harness.Command, bool) {
 	if h.NoResume {
 		return harness.Command{}, false
 	}
-	return programCommand("--resume", conversationID, opts), true
+	claude, _ := harness.Lookup(harness.Claude)
+	cmd, _ := claude.Resume(conversationID, opts)
+	return programCommand(cmd, opts), true
 }
 
-func programCommand(flag, conversationID string, opts harness.LaunchOptions) harness.Command {
+// programCommand runs the fake with the arguments claude's own launch would
+// get, so the normal-editor-mode override reaches it and the probe's memory of
+// the session is the real one.
+func programCommand(claude harness.Command, opts harness.LaunchOptions) harness.Command {
 	return harness.Command{
 		Name: os.Args[0],
-		Args: append([]string{flag, conversationID}, opts.Args...),
+		Args: claude.Args,
 		Env:  append(os.Environ(), append([]string{ProgramEnv + "=1"}, opts.Env...)...),
 	}
 }

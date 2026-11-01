@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -36,18 +37,24 @@ func TestFirstPrompt_TypedWhenTheAgentEnvAndConfigDirComeFromServerEnv(t *testin
 	waitForSubmitted(t, conv, "\"fix the bug\"\n")
 }
 
+// toVimNormal is a mid-session /config toggle to vim followed by NORMAL: the
+// launch had set normal editing, so only a toggle makes the probe run.
+func toVimNormal(t *testing.T, conv string) {
+	t.Helper()
+	for _, action := range []string{agentfake.ActionVimToggle, agentfake.ActionVimNormal} {
+		if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: action}); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestFirstPrompt_RealPromptInVimNormalIsDeliveredWithTheConfigDirFromServerEnv(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	_, _, _, _, conv := startFakeSessionWith(t, server.CreateSessionRequest{Prompt: "fix the bug"}, func(c *server.Config) {
 		c.PromptGrace = firstPromptGrace
 	}, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+dir))
-	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionVimNormal}); err != nil {
-		t.Fatal(err)
-	}
+	toVimNormal(t, conv)
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSubmitted(t, conv, "\"fix the bug\"\n")
 }
@@ -69,15 +76,42 @@ func TestFirstPrompt_TypedOnReadyReportAndSubmittedOnce(t *testing.T) {
 func TestFirstPrompt_RealPromptInVimNormalIsDeliveredAfterTheInsertSwitch(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
+	_, _, _, _, conv := startFirstPromptSession(t, "fix the bug", "CLAUDE_CONFIG_DIR="+dir)
+	toVimNormal(t, conv)
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSubmitted(t, conv, "\"fix the bug\"\n")
+}
+
+// A vim INSERT box that draws no marker must not make the probe press `i`: the
+// prompt arrives with no stray character.
+func TestFirstPrompt_InsertWithoutMarkerGetsTheCleanPrompt(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, ".claude.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, _, _, _, conv := startFirstPromptSession(t, "fix the bug", "CLAUDE_CONFIG_DIR="+dir)
-	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionVimNormal}); err != nil {
+	_, _, _, _, conv := startFirstPromptSession(t, "fix the bug", "CLAUDE_CONFIG_DIR="+dir, agentfake.ProgramInsertNoMarkerEnv+"=1")
+	report(t, conv, agentfake.Control{State: "idle"})
+	waitForSubmitted(t, conv, "\"fix the bug\"\n")
+}
+
+// After a mid-session toggle to vim the probe runs, and its decision reaches
+// server.log under the first prompt's caller label.
+func TestFirstPrompt_ToggleToVimIsProbedAndLogged(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	h, _, _, _, conv := startFirstPromptSession(t, "fix the bug", "CLAUDE_CONFIG_DIR="+dir)
+	if err := agentfake.SendProgramControl(conv, agentfake.Control{Action: agentfake.ActionVimToggle}); err != nil {
 		t.Fatal(err)
 	}
 	report(t, conv, agentfake.Control{State: "idle"})
 	waitForSubmitted(t, conv, "\"fix the bug\"\n")
+	logs, _ := os.ReadFile(server.LogPath(h.StateDir))
+	for _, want := range []string{"vim probe", `"caller":"first-prompt"`} {
+		if !strings.Contains(string(logs), want) {
+			t.Errorf("server log lacks %q:\n%s", want, logs)
+		}
+	}
 }
 
 func TestFirstPrompt_RealPromptWithSwallowedEnterIsNudged(t *testing.T) {

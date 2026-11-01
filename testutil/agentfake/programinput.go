@@ -168,6 +168,10 @@ func (b *inputBox) key(k byte) (submitted string, ok bool) {
 		case last > 0:
 			b.lines = b.lines[:last]
 		}
+	case k == 0x7f:
+		if line := b.lines[last]; line != "" {
+			b.lines[last] = line[:len(line)-1]
+		}
 	case k >= ' ' && k != 0x7f:
 		// Appended bytewise, so a multi-byte rune is whole once its last byte lands.
 		b.lines[last] += string([]byte{k})

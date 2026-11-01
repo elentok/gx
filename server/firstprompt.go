@@ -249,7 +249,7 @@ func (f *firstPrompt) deliver(prompt string) error {
 	}
 	// Before the draft clear: vim NORMAL has to reach INSERT first. The nudge
 	// runs the same step again, which presses nothing once in INSERT.
-	if !f.typing().ReadyToType(nativerunner.HolderTypingIO(c)) {
+	if !f.typing().ReadyToType(f.s.typingIO(f.dir, c, "first-prompt")) {
 		return claudeui.ErrNotReadyToType
 	}
 	if err := f.s.clearDraft(f.dir, c); err != nil {
@@ -306,6 +306,7 @@ func (f *firstPrompt) deliverSlash(prompt string) error {
 type holderPrompter struct {
 	c       *nativerunner.HolderClient
 	typing  harness.Typing
+	io      harness.TypingIO
 	cancel  <-chan struct{}
 	onTyped func()
 }
@@ -374,7 +375,7 @@ func (f *firstPrompt) typing() harness.Typing {
 }
 
 func (f *firstPrompt) prompter(c *nativerunner.HolderClient, turn int) *firstPrompter {
-	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
+	return &firstPrompter{holderPrompter: holderPrompter{c: c, typing: f.typing(), io: f.s.typingIO(f.dir, c, "first-prompt-nudge"), cancel: f.cancel, onTyped: f.markTyped}, f: f, turn: turn}
 }
 
 func (p *firstPrompter) WaitStart(timeout time.Duration) (bool, error) {
@@ -406,8 +407,11 @@ func (p *holderPrompter) Screen() (string, error) {
 	return strings.Join(rows, "\n"), err
 }
 
+// Log is the server logger the clear's pane capture goes to.
+func (p *holderPrompter) Log() *slog.Logger { return p.io.Log }
+
 func (p *holderPrompter) ReadyToType() bool {
-	return p.typing.ReadyToType(nativerunner.HolderTypingIO(p.c))
+	return p.typing.ReadyToType(p.io)
 }
 
 // InputEmpty runs the harness empty check when the holder serves styled rows.

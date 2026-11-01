@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/harness"
@@ -64,6 +65,8 @@ func (s *Server) clearDraft(dir string, c *nativerunner.HolderClient) error {
 			time.Sleep(draftSettlePoll)
 		}
 	}
+	rows, _ := c.StyledScreen()
+	log.Info("draft would not clear", "screen", strings.Join(rows, "\n"))
 	return errDraft
 }
 

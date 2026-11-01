@@ -120,6 +120,11 @@ func inputText(rows []string) (string, bool) {
 	if start < 0 {
 		return "", false
 	}
+	// The placeholder is not text: typing replaces it, so it must not count as
+	// a before-state the typed key "changed".
+	if inputState(rows, claudeInput) == InputEmpty {
+		return "", true
+	}
 	cells := parseCells(rows[start])
 	var sb strings.Builder
 	for _, c := range cells[1:] {
@@ -210,7 +215,9 @@ func probeVim(session string, io TypingIO) bool {
 	case !ok:
 		io.logUnknown("input never settled after pressing i")
 		return false
-	case after == before && footerHasInsert(rows):
+	case footerHasInsert(rows) && !grewByI(before, after):
+		// The marker appearing is the proof: the box was not in INSERT before, so
+		// the `i` was a command, not text.
 		io.log("was NORMAL, now INSERT")
 		return true
 	case grewByI(before, after):
