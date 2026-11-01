@@ -23,7 +23,7 @@ func BackfillFriction(root string, friction func(epicName string, t Ticket) (sch
 			if err != nil {
 				return changes, err
 			}
-			if err := schema.UpdateTicket(t.FilePath(), func(st *schema.Ticket) { st.Friction = &f }); err != nil {
+			if err := schema.UpdateTicketInner(t.FilePath(), func(st *schema.Ticket) { st.Friction = &f }); err != nil {
 				return changes, err
 			}
 			t.Friction = &f

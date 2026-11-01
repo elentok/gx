@@ -86,7 +86,7 @@ func migrateQuestionSection(path string, now time.Time) (bool, error) {
 		by = "agent"
 	}
 	summary, _, _ := strings.Cut(text, "\n")
-	q, err := AppendLog(path, LogEvent{
+	q, err := AppendLogInner(path, LogEvent{
 		Type:      EventPauseQuestion,
 		By:        by,
 		PauseKind: string(kind),
@@ -98,13 +98,13 @@ func migrateQuestionSection(path string, now time.Time) (bool, error) {
 		return false, err
 	}
 	if t.Status == schema.StatusOpen {
-		_, err = AppendLog(path, LogEvent{Type: EventPauseAnswer, Question: q.Seq, Source: "cli", Note: handAnsweredNote})
+		_, err = AppendLogInner(path, LogEvent{Type: EventPauseAnswer, Question: q.Seq, Source: "cli", Note: handAnsweredNote})
 		if err != nil {
 			return false, err
 		}
 	}
 
-	err = schema.UpdateTicketWithBody(path, func(_ *schema.Ticket, body *string) {
+	err = schema.UpdateTicketWithBodyInner(path, func(_ *schema.Ticket, body *string) {
 		*body = schema.DemoteSection(*body, LegacyAnswerHeading, now)
 		*body = schema.DemoteSection(*body, "## Handoff", now)
 	})

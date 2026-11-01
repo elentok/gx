@@ -133,7 +133,7 @@ func latestLoggedReason(path string, class schema.PauseClass) (schema.PauseReaso
 func ApplyPauseMigration(steps []PauseStep) ([]MigrationChange, error) {
 	var changes []MigrationChange
 	for _, s := range steps {
-		err := schema.UpdateTicketWithBody(s.Path, func(t *schema.Ticket, body *string) {
+		err := schema.UpdateTicketWithBodyInner(s.Path, func(t *schema.Ticket, body *string) {
 			t.Status = schema.StatusPaused
 			t.PauseReason = s.Reason
 			t.PauseKind = ""

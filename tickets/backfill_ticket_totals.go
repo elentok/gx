@@ -60,7 +60,7 @@ func BackfillTicketTotals(
 			} else if err != nil {
 				return changes, fmt.Errorf("totals of %s: %w", t.FilePath(), err)
 			}
-			err = schema.UpdateTicket(t.FilePath(), func(st *schema.Ticket) {
+			err = schema.UpdateTicketInner(t.FilePath(), func(st *schema.Ticket) {
 				st.TotalTokens = &tokens
 				st.ActualCost = cost
 			})

@@ -127,7 +127,7 @@ func backfillFromHistory(
 				continue
 			}
 			if !dryRun {
-				if err := schema.UpdateTicket(t.FilePath(), stamp); err != nil {
+				if err := schema.UpdateTicketInner(t.FilePath(), stamp); err != nil {
 					return changes, err
 				}
 			}

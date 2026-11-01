@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/fsutil"
+	"github.com/elentok/gx/projectlock"
 )
 
 // UpdateTicket reads path's frontmatter ticket, applies mutate to it,
@@ -14,6 +15,8 @@ import (
 // counterpart to ralphloop's private updateTicket, exported so cmd (the
 // `gx tickets set` CLI) doesn't need to import ralphloop just to reuse its
 // write path.
+//
+// It waits while the ticket's project migrates (see projectlock).
 func UpdateTicket(path string, mutate func(*Ticket)) error {
 	return UpdateTicketWithBody(path, func(t *Ticket, _ *string) { mutate(t) })
 }
@@ -22,6 +25,22 @@ func UpdateTicket(path string, mutate func(*Ticket)) error {
 // rewrite the ticket's markdown body, with the same validate-then-atomic-write
 // guarantees.
 func UpdateTicketWithBody(path string, mutate func(*Ticket, *string)) error {
+	unlock, err := projectlock.Shared(path)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return UpdateTicketWithBodyInner(path, mutate)
+}
+
+// UpdateTicketInner is UpdateTicket without the project's migration lock, for
+// migration steps, which run while their migration holds it exclusive.
+func UpdateTicketInner(path string, mutate func(*Ticket)) error {
+	return UpdateTicketWithBodyInner(path, func(t *Ticket, _ *string) { mutate(t) })
+}
+
+// UpdateTicketWithBodyInner is UpdateTicketWithBody without the migration lock.
+func UpdateTicketWithBodyInner(path string, mutate func(*Ticket, *string)) error {
 	unlock, err := LockTicket(path)
 	if err != nil {
 		return err

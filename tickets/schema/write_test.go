@@ -3,10 +3,107 @@ package schema
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/elentok/gx/projectlock"
 )
+
+// lockedProjectTicket makes <store>/proj/epic/issues/01-a.md, a path inside a
+// store project, and returns the project dir and ticket path.
+func lockedProjectTicket(t *testing.T) (projectDir, path string) {
+	t.Helper()
+	projectDir = filepath.Join(t.TempDir(), "proj")
+	issues := filepath.Join(projectDir, "epic", "issues")
+	if err := os.MkdirAll(issues, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(projectDir, "project.json"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path = filepath.Join(issues, "01-a.md")
+	if err := os.WriteFile(path, []byte("---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return projectDir, path
+}
+
+func TestUpdateTicket_WaitsForProjectMigrationThenWritesNewContent(t *testing.T) {
+	dir, path := lockedProjectTicket(t)
+	unlock, err := projectlock.Exclusive(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		done <- UpdateTicket(path, func(tk *Ticket) { tk.Status = StatusClaimed })
+	}()
+	select {
+	case err := <-done:
+		t.Fatalf("UpdateTicket returned while the project migrated: %v", err)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	// The migration rewrites the file, then releases.
+	if err := os.WriteFile(path, []byte("---\nid: \"01\"\nstatus: open\ntype: implement\n---\nMigrated.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	unlock()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("UpdateTicket did not proceed after release")
+	}
+	raw, _ := os.ReadFile(path)
+	if !strings.Contains(string(raw), "Migrated.") || !strings.Contains(string(raw), "status: claimed") {
+		t.Errorf("ticket = %q, want the migrated body with status claimed", raw)
+	}
+}
+
+func TestUpdateTicket_OtherProjectDoesNotWait(t *testing.T) {
+	dirA, _ := lockedProjectTicket(t)
+	_, pathB := lockedProjectTicket(t)
+	unlock, err := projectlock.Exclusive(dirA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	done := make(chan error, 1)
+	go func() { done <- UpdateTicket(pathB, func(tk *Ticket) { tk.Status = StatusClaimed }) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("write to another project waited")
+	}
+}
+
+func TestUpdateTicketInner_DoesNotWaitForProjectMigration(t *testing.T) {
+	dir, path := lockedProjectTicket(t)
+	unlock, err := projectlock.Exclusive(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	done := make(chan error, 1)
+	go func() { done <- UpdateTicketInner(path, func(tk *Ticket) { tk.Status = StatusClaimed }) }()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("inner update waited for its own migration")
+	}
+}
 
 func TestUpdateTicket_MutatesAndWrites(t *testing.T) {
 	path := writeTemp(t, "04b-ticket.md", "---\nid: \"04b\"\nstatus: open\ntype: implement\n---\nBody.\n")

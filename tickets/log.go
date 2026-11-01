@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/elentok/gx/events"
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/tickets/schema"
 )
 
@@ -139,9 +140,25 @@ func AppendLogFrom(ticketPath string, mk func([]LogEvent) (LogEvent, error)) (Lo
 	return appendLogWith(ticketPath, mk)
 }
 
+// AppendLogInner is AppendLog without the project's migration lock, for
+// migration steps, which run while their migration holds it exclusive.
+func AppendLogInner(ticketPath string, ev LogEvent) (LogEvent, error) {
+	return appendLogInner(ticketPath, func([]LogEvent) (LogEvent, error) { return ev, nil })
+}
+
 // appendLogWith appends the event mk builds from the existing events, all under
-// the ticket lock.
+// the project's shared migration lock and the ticket lock.
 func appendLogWith(ticketPath string, mk func([]LogEvent) (LogEvent, error)) (LogEvent, error) {
+	unlockProject, err := projectlock.Shared(ticketPath)
+	if err != nil {
+		return LogEvent{}, err
+	}
+	defer unlockProject()
+	return appendLogInner(ticketPath, mk)
+}
+
+// appendLogInner is appendLogWith without the migration lock.
+func appendLogInner(ticketPath string, mk func([]LogEvent) (LogEvent, error)) (LogEvent, error) {
 	unlock, err := schema.LockTicket(ticketPath)
 	if err != nil {
 		return LogEvent{}, err
