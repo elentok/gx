@@ -65,9 +65,8 @@ func TestRun_AskingReport_PausesWithoutCherryPickEvenWithCommits(t *testing.T) {
 	if cherryPickCalled {
 		t.Errorf("CherryPickRange called, want no cherry-pick for an adopted asking report")
 	}
-	wantRemoved := []string{"ralph-loop/epic-item-01"}
-	if len(*removed) != 1 || (*removed)[0] != wantRemoved[0] {
-		t.Errorf("removed worktree branches = %v, want %v (worktree/tab dropped across the pause)", *removed, wantRemoved)
+	if len(*removed) != 0 {
+		t.Errorf("removed worktree branches = %v, want the worktree kept across the pause", *removed)
 	}
 	if branchDeleted {
 		t.Errorf("DeleteBranch called, want the iteration branch to survive the pause for a later resume")

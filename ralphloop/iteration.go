@@ -308,9 +308,10 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 	if adopted {
 		// The branch is what makes a later resume able to merge both sides of
 		// the answer boundary in one pick (see runIteration's branch-reuse
-		// base computation); only the worktree/tab/permit are redundant while
-		// the ticket waits on an answer.
-		return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), false)
+		// base computation). The worktree stays too, so the relaunch finds the
+		// agent's uncommitted work; only the session and tab are redundant
+		// while the ticket waits on an answer.
+		return stopAskedSession(d, p, pane)
 	}
 
 	ahead, err := iterationCommitsAhead(d, path, base, branch)
@@ -382,7 +383,7 @@ func finishIteration(d Deps, p iterationParams, path, pane, base, branch, sessio
 				return nil
 			}
 			if adopted {
-				return finishCleanup(d, p.WorktreeLock, p.RepoDir, p.FeatureWorktree, path, branch, iterationSession(p, pane), false)
+				return stopAskedSession(d, p, pane)
 			}
 
 			if ahead == 0 {
@@ -683,6 +684,20 @@ func mergeCherryPick(d Deps, p iterationParams, base, branch, sessionID, pane st
 		p.logTicketEventSHA(string(events.ConflictResolved), "", resolutionSessionID, p.FeatureWorktree, "", res.SHA)
 	}
 	return res.SHA, nil
+}
+
+// stopAskedSession ends the agent session of an iteration that asked on a
+// non-keeping run. The worktree and branch stay: the relaunch after the
+// answer reuses them as they are, uncommitted files included.
+func stopAskedSession(d Deps, p iterationParams, pane string) error {
+	s := iterationSession(p, pane)
+	if s == (agentrunner.Session{}) {
+		return nil
+	}
+	if err := d.Runner.Stop(s); err != nil {
+		return fmt.Errorf("stopping iteration session: %w", err)
+	}
+	return nil
 }
 
 // finishCleanup removes an iteration's now-redundant worktree and tab, and —
