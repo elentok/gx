@@ -5,6 +5,8 @@ import { ConnectionContext, type Connection, type ConnectionState } from "../con
 import type { MapStep, SessionChatResponse, SessionFailure, SessionInfo, SessionResult } from "../generated/server";
 import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
+import { FailureBanner } from "./FailureBanner";
+import type { PostKeys } from "./keys";
 import type { OpenDesign, ResumeSession } from "./open";
 import type { PostPrompt } from "./prompt";
 import type { FetchScreen } from "./screen";
@@ -224,6 +226,45 @@ test("the Screen of a Blocked session has the key bar; a Queue agent's Screen ha
   const dialog = await screen.findByRole("dialog", { name: "Screen" });
   expect(within(dialog).getByRole("button", { name: "Refresh" })).toBeTruthy();
   expect(within(dialog).queryByRole("button", { name: "Esc" })).toBeNull();
+});
+
+function renderBanner(s: SessionInfo, keys: PostKeys) {
+  const state = { snapshot: { sessions: [s] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {}, refresh: () => {} } as unknown as Connection;
+  renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <FailureBanner failure={s.failure!} session={s} address="" restore={false} keys={keys} />
+    </ConnectionContext.Provider>,
+  );
+}
+
+const blockedOn = (why: string, queue = false): SessionInfo => ({
+  ...session("blocked", { kind: "blocked", why, label: "Waiting at a prompt in the terminal" }),
+  queue,
+});
+
+test.each([
+  ["dialog", false, ["Screen", "Close dialog"]],
+  ["question", false, ["Screen", "Close dialog"]],
+  ["permission", false, ["Screen"]],
+  ["error", false, ["Screen"]],
+  ["dialog", true, ["Screen"]],
+])("a Blocked %s (queue %s) shows %j", (why, queue, buttons) => {
+  renderBanner(blockedOn(why, queue), vi.fn<PostKeys>(async () => ({})));
+  expect(buttonsOf(screen.getByRole("region", { name: "Session failure" }))).toEqual(buttons);
+});
+
+test("Close dialog posts Esc only while Blocked", async () => {
+  const keys = vi.fn<PostKeys>(async () => ({}));
+  renderBanner(blockedOn("dialog"), keys);
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  await waitFor(() => expect(keys).toHaveBeenCalledWith({ id: "s-a", key: "esc", only_blocked: true }));
+});
+
+test.each(["not-blocked", "not-delivered"])("Close dialog shows the %s refusal", async (reason) => {
+  renderBanner(blockedOn("dialog"), async () => ({ refused: true, reason, message: `refused ${reason}` }));
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  expect((await screen.findByRole("alert")).textContent).toBe(`refused ${reason}`);
 });
 
 test("a gx-raised Actionable shows why gx stopped, above the composer", async () => {

@@ -3,6 +3,8 @@ import { useState } from "react";
 import type { SessionFailure, SessionInfo } from "../generated/server";
 import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
+import { refusalText, useWrite } from "../useWrite";
+import { postKeys, type PostKeys } from "./keys";
 import { postResumeSession, stateToken, type OpenDesign, type ResumeSession } from "./open";
 import { postPrompt, type PostPrompt } from "./prompt";
 import type { FetchScreen } from "./screen";
@@ -27,7 +29,7 @@ export const visibleFailure = (f?: SessionFailure, done?: boolean) => (done && f
 /** Auth and stalled are read from the transcript, which only Claude sessions have. */
 export const needsTranscript = (f: SessionFailure) => f.kind === AUTH || f.kind === STALLED;
 
-type ButtonName = "Restore" | "New session" | "Screen" | "Retry";
+type ButtonName = "Restore" | "New session" | "Screen" | "Retry" | "Close dialog";
 
 const BUTTONS: Record<string, ButtonName[]> = {
   [CRASHED]: ["Restore", "New session"],
@@ -36,6 +38,10 @@ const BUTTONS: Record<string, ButtonName[]> = {
   [STALLED]: ["Screen", "New session"],
   [BLOCKED]: ["Screen"],
 };
+
+/** Esc closes a dialog or cancels a question. A permission prompt has its own answers, an error has nothing to close. */
+const CLOSABLE = new Set(["dialog", "question"]);
+const canCloseDialog = (f: SessionFailure, s: SessionInfo) => f.kind === BLOCKED && CLOSABLE.has(f.why ?? "") && !s.queue;
 
 export interface FailureActions {
   /** The Design's epic address, for New session. */
@@ -57,6 +63,7 @@ export function FailureBanner({
   address,
   open,
   restore: canRestore = true,
+  keys = postKeys,
 }: {
   failure: SessionFailure;
   session: SessionInfo;
@@ -66,8 +73,12 @@ export function FailureBanner({
   lastMessage?: string;
   post?: PostPrompt;
   onStale?: () => void;
+  keys?: PostKeys;
 } & FailureActions) {
   const { run, pending } = useDesignWrite();
+  // Close dialog changes no Design state, so it skips the refresh and shows its refusal inline.
+  const close = useWrite({ toastRefusal: false });
+  const closeProblem = close.refusal ? refusalText(close.refusal) : close.error;
   const [clicked, setClicked] = useState<ButtonName>();
   const [screen, setScreen] = useState(false);
   // A refusal that no retry can fix: the page stops offering Restore, as it does after a quick re-crash.
@@ -94,10 +105,13 @@ export function FailureBanner({
     "New session": () => (setClicked("New session"), startNew(run, address, session, open)),
     Screen: () => setScreen(true),
     Retry: () => (setClicked("Retry"), retry()),
+    "Close dialog": () => close.run(() => keys({ id: sessionId, key: "esc", only_blocked: true })),
   };
-  const buttons = (BUTTONS[failure.kind] ?? []).filter(
+  const closable = canCloseDialog(failure, session);
+  const buttons = [...(BUTTONS[failure.kind] ?? []), ...(closable ? (["Close dialog"] as const) : [])].filter(
     (name) => (canRestore || (name !== "Restore" && name !== "New session")) && !(name === "Restore" && restoreHidden),
   );
+  const busy = (name: ButtonName) => (name === "Close dialog" ? close.pending : pending);
 
   return (
     <Box
@@ -105,36 +119,64 @@ export function FailureBanner({
       aria-label="Session failure"
       data-kind={failure.kind}
       borderWidth="1px"
-      borderColor="tone.deadlocked.fg"
+      borderColor={closable ? "tone.waiting.fg" : "tone.deadlocked.fg"}
       borderRadius="md"
       p="3"
       display="flex"
-      flexDirection="column"
-      gap="2"
+      // The mock puts a Blocked dialog's text and buttons in one row on a wide screen.
+      flexDirection={closable ? { base: "column", md: "row" } : "column"}
+      alignItems={closable ? { base: "stretch", md: "center" } : undefined}
+      justifyContent="space-between"
+      gap={closable ? "3" : "2"}
     >
-      <Text fontWeight="700" color="tone.deadlocked.fg">
-        {failure.label}
-      </Text>
-      {failure.text && <Text fontSize="sm">{failure.text}</Text>}
-      {failure.kind === BLOCKED && (
-        <Text fontSize="sm" color="text.muted">
-          Open it in gx, Agents tab.
-        </Text>
-      )}
+      <Box display="flex" flexDirection="column" gap="1" minW="0">
+        {closable ? (
+          <Text fontWeight="600">
+            <Text as="span" color="tone.waiting.fg">
+              Blocked.
+            </Text>{" "}
+            {failure.why === "question" ? "The session asks a question and waits for a key." : "The session shows a dialog and waits for a key."}
+          </Text>
+        ) : (
+          <Text fontWeight="700" color="tone.deadlocked.fg">
+            {failure.label}
+          </Text>
+        )}
+        {failure.text && <Text fontSize="sm">{failure.text}</Text>}
+        {failure.kind === BLOCKED && (
+          <Text fontSize="sm" color="text.muted">
+            {closable ? "Close dialog sends Esc. Use Screen to pick an option instead." : "Open it in gx, Agents tab."}
+          </Text>
+        )}
+        {closeProblem && (
+          <Text role="alert" fontSize="sm" color="tone.deadlocked.fg">
+            {closeProblem}
+          </Text>
+        )}
+      </Box>
       {buttons.length > 0 && (
-        <Box display="flex" gap="2">
-          {buttons.map((name) => (
-            <Button
-              key={name}
-              emphasis={name === "New session" && restoreHidden ? "main" : "secondary"}
-              tone={name === "New session" && restoreHidden ? "running" : undefined}
-              disabled={pending}
-              onClick={onClick[name]}
-            >
-              {pending && clicked === name && <Spinner size="sm" />}
-              {name}
-            </Button>
-          ))}
+        <Box
+          display="flex"
+          gap="2"
+          flex="none"
+          // The mock stretches a Blocked dialog's buttons to a 44px row on a phone.
+          css={closable ? { "@media (max-width: 47.99em)": { "& > button": { flex: 1, height: "44px", justifyContent: "center" } } } : undefined}
+        >
+          {buttons.map((name) => {
+            const main = name === "Close dialog" || (name === "New session" && restoreHidden);
+            return (
+              <Button
+                key={name}
+                emphasis={main ? "main" : "secondary"}
+                tone={name === "New session" && restoreHidden ? "running" : undefined}
+                disabled={busy(name)}
+                onClick={onClick[name]}
+              >
+                {busy(name) && (clicked === name || name === "Close dialog") && <Spinner size="sm" />}
+                {name}
+              </Button>
+            );
+          })}
         </Box>
       )}
       {screen && <ScreenModal target={sessionId} fetcher={fetchScreen} keys={!session.queue} onClose={() => setScreen(false)} />}

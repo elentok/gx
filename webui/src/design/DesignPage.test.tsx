@@ -181,6 +181,28 @@ test("the ring leads the header at 64px, and at 52px on a phone", async () => {
   }
 });
 
+test("the countdown keeps running after Close dialog", async () => {
+  const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+  render(
+    [map("a")],
+    [
+      session("a", {
+        status: { state: "blocked" },
+        failure: { kind: "blocked", why: "dialog", label: "Waiting at a prompt in the terminal" },
+        auto_advance_at: new Date(Date.now() + 30000).toISOString(),
+      }),
+    ],
+    "/d/gx:a",
+    detailOf(),
+    { chat: async () => ({ kind: "ok", detail: { conversation_id: "c1", messages: [], round: null, background: [] } }) },
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Close dialog" }));
+  await waitFor(() => expect(fetchSpy).toHaveBeenCalledWith("/v1/sessions/keys", expect.objectContaining({ method: "POST" })));
+  expect(fetchSpy).not.toHaveBeenCalledWith("/v1/sessions/auto-advance/cancel", expect.anything());
+  expect(await screen.findByText(/Continuing in \d+s/)).toBeTruthy();
+  fetchSpy.mockRestore();
+});
+
 test("without a session the title row offers to start one", async () => {
   render([map("a")], []);
   expect(await screen.findByRole("button", { name: "Start design session" })).toBeTruthy();
