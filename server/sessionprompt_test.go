@@ -25,8 +25,15 @@ type promptFixture struct {
 
 func startPromptSession(t *testing.T) promptFixture {
 	t.Helper()
+	return startPromptSessionWithGrace(t, firstPromptGrace)
+}
+
+// startPromptSessionWithGrace is startPromptSession with a longer wait for a
+// typed prompt's turn to start, for a test that must act inside it.
+func startPromptSessionWithGrace(t *testing.T, grace time.Duration) promptFixture {
+	t.Helper()
 	cfg := t.TempDir()
-	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = firstPromptGrace }, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg))
+	f := startDesigns(t, func(c *server.Config) { c.PromptGrace = grace }, servertest.WithEnv(agentfake.ProgramInputEnv+"=1", "CLAUDE_CONFIG_DIR="+cfg))
 	res, err := f.h.Client.CreateSession(f.ctx, server.CreateSessionRequest{Project: "proj", Dir: t.TempDir(), Harness: string(agentfake.HarnessKind), Ticket: "proj:map"})
 	if err != nil || res.Session == nil {
 		t.Fatalf("create = %+v, %v", res, err)

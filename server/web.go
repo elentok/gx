@@ -178,6 +178,7 @@ var webWrites = map[string]func(*Server) http.HandlerFunc{
 	"POST /v1/sessions/stop":      func(s *Server) http.HandlerFunc { return s.sessionWriteDesignWeb(s.stopSession) },
 	"POST /v1/sessions/resume":    func(s *Server) http.HandlerFunc { return s.sessionWriteDesignWeb(s.resumeSession) },
 	"POST /v1/sessions/prompt":    func(s *Server) http.HandlerFunc { return s.sessionPromptWeb() },
+	"POST /v1/sessions/keys":      func(s *Server) http.HandlerFunc { return s.sessionKeysWeb() },
 	"POST /v1/sessions/create":    func(s *Server) http.HandlerFunc { return s.sessionCreateWeb },
 	"POST /v1/sessions/interrupt": func(s *Server) http.HandlerFunc {
 		return s.sessionWriteDesignWeb(s.interruptSession)

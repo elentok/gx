@@ -240,9 +240,9 @@ type program struct {
 	convPath string
 	// convID is the id the program launched with, which names its side channels.
 	convID string
-	// esc and osc track an escape sequence on input, so the terminal's
+	// esc, osc and csi track an escape sequence on input, so the terminal's
 	// reply to the probe is not echoed as typed text.
-	esc, osc bool
+	esc, osc, csi bool
 	// box is nil unless ProgramInputEnv is set. It takes keys once ready.
 	box        *inputBox
 	ready      bool
@@ -324,11 +324,27 @@ func (p *program) key(b byte) error {
 	case p.osc:
 		p.osc = b != '\a'
 		return nil
+	case p.csi:
+		if b >= 0x40 && b <= 0x7e {
+			p.csi = false
+			return p.logNamedKey(fmt.Sprintf("<csi %c>", b))
+		}
+		return nil
 	case p.esc:
 		p.esc = false
 		if b == ']' {
 			p.osc = true
 			return nil
+		}
+		if p.box != nil {
+			if b == '[' {
+				p.csi = true
+				return nil
+			}
+			// A lone Esc shows up with the next key, as a terminal sends them.
+			if err := p.logNamedKey(ProgramEscEntry); err != nil {
+				return err
+			}
 		}
 	case b == escKey:
 		p.esc = true
@@ -338,8 +354,13 @@ func (p *program) key(b byte) error {
 		if !p.ready {
 			return nil
 		}
-		if b == ctrlC {
+		switch b {
+		case ctrlC:
 			return logSubmitted(p.convID, ProgramInterruptEntry)
+		case '\t':
+			return logSubmitted(p.convID, "<tab>")
+		case 0x7f:
+			return logSubmitted(p.convID, "<backspace>")
 		}
 		text, submitted := p.box.key(b)
 		if !submitted {
@@ -359,6 +380,14 @@ func (p *program) key(b byte) error {
 	}
 	_, _ = p.out.Write([]byte{b})
 	return nil
+}
+
+// logNamedKey logs a key the input box has no text for, once it is ready.
+func (p *program) logNamedKey(entry string) error {
+	if p.box == nil || !p.ready {
+		return nil
+	}
+	return logSubmitted(p.convID, entry)
 }
 
 func (p *program) setConversation(id string) error {

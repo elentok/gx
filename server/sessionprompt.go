@@ -141,18 +141,8 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		}
 	} else {
 		s.sessionWatches.start(func() { s.sendPrompt(dir, text) })
-		stopped := s.cancelAutoAdvance(req.ID, "Auto-advance stopped: you typed")
-		changed := meta.AutoSends != 0
-		meta.AutoSends = 0
-		if !stopped && !meta.Actionable.GxRaised && meta.Actionable.Reason != "" {
-			meta.Actionable = SessionActionable{}
-			changed = true
-		}
-		if changed {
-			if err := writeSessionMeta(dir, meta); err != nil {
-				return SessionResult{}, err
-			}
-			s.events.publish(EventSessionChanged, req.ID)
+		if err := s.notePersonTyped(dir, meta, "Auto-advance stopped: you typed"); err != nil {
+			return SessionResult{}, err
 		}
 	}
 	if err := ralphloop.AppendServerEvent(s.cfg.TicketStore, ev); err != nil {
@@ -160,6 +150,27 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 	}
 	info := meta.info()
 	return SessionResult{Session: &info}, nil
+}
+
+// notePersonTyped records a person's input on a session: it stops a running
+// auto-advance countdown, resets the auto-send count and clears a derived
+// Continue. The caller holds metaMu.
+func (s *Server) notePersonTyped(dir string, meta sessionMeta, why string) error {
+	stopped := s.cancelAutoAdvance(meta.ID, why)
+	changed := meta.AutoSends != 0
+	meta.AutoSends = 0
+	if !stopped && !meta.Actionable.GxRaised && meta.Actionable.Reason != "" {
+		meta.Actionable = SessionActionable{}
+		changed = true
+	}
+	if !changed {
+		return nil
+	}
+	if err := writeSessionMeta(dir, meta); err != nil {
+		return err
+	}
+	s.events.publish(EventSessionChanged, meta.ID)
+	return nil
 }
 
 // lastChatMessageID is the id of the newest visible message of the session's

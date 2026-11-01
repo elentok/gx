@@ -1909,6 +1909,29 @@ export interface FocusReport {
 }
 
 //////////
+// source: sessionkeys.go
+
+/**
+ * ReasonSessionReadOnly refuses input to a Queue agent: its loop owns it.
+ */
+export const ReasonSessionReadOnly = "session-read-only";
+/**
+ * ReasonKeysNotDelivered: a guarded send left the session Blocked.
+ */
+export const ReasonKeysNotDelivered = "not-delivered";
+/**
+ * SessionKeysRequest is the body of POST /v1/sessions/keys. Exactly one input
+ * is set: Key (a named key) or Text (typed without Enter). OnlyBlocked sends
+ * only while the session is Blocked, and waits for it to leave Blocked.
+ */
+export interface SessionKeysRequest {
+  id: string;
+  key?: string;
+  text?: string;
+  only_blocked?: boolean;
+}
+
+//////////
 // source: sessionprompt.go
 
 export const ReasonPromptHarnessNotSupported = "harness-not-supported";

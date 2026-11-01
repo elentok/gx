@@ -56,6 +56,12 @@ func programSubmittedPath(conversationID string) string {
 // test sees the key reach the program.
 const ProgramInterruptEntry = "<ctrl-c>"
 
+// ProgramEscEntry is what an Esc logs to ProgramSubmittedPath. It is logged
+// once the next key arrives, so a test sends a second key after it. The other
+// non-text keys log "<tab>", "<backspace>" and "<csi X>" for an arrow or
+// Shift+Tab with final byte X.
+const ProgramEscEntry = "<esc>"
+
 // promptMarker is colored like claude's, so even a plain draft has an SGR on
 // screen: a read with no styling at all cannot tell a draft from a placeholder.
 const promptMarker = "\x1b[35m❯\x1b[0m "

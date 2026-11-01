@@ -672,6 +672,14 @@ func (c *Client) PromptSession(ctx context.Context, req server.SessionPromptRequ
 	return res, err
 }
 
+// KeysSession sends a named key or literal text to a live session. A refusal
+// is a result (Refused set), not an error.
+func (c *Client) KeysSession(ctx context.Context, req server.SessionKeysRequest) (server.SessionResult, error) {
+	var res server.SessionResult
+	err := c.post(ctx, "/v1/sessions/keys", req, &res)
+	return res, err
+}
+
 // MarkSessionActionable raises an agent's Actionable on its session. A
 // refusal is a result (Refused set), not an error.
 func (c *Client) MarkSessionActionable(ctx context.Context, req server.MarkActionableRequest) (server.SessionResult, error) {

@@ -30,6 +30,7 @@ packages:
       - sessioncommands.go
       - sessionfailure.go
       - sessionfocus.go
+      - sessionkeys.go
       - sessionprompt.go
       - sessionround.go
       - sessionscreen.go

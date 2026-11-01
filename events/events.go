@@ -59,6 +59,9 @@ const (
 	// SessionPrompted is a person's text typed into a design session; the
 	// server log records its size, never the text.
 	SessionPrompted Type = "session-prompted"
+	// SessionKeyed is a person's keys or literal text sent to a session; the
+	// server log records the count, never the text.
+	SessionKeyed Type = "session-keyed"
 	// DirtyTrunkLanded is an epic landed over uncommitted files in the target's
 	// checkout: set aside, fast-forwarded and restored with no pause. Reason
 	// lists the files; the event names the backup ref that held them.
