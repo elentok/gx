@@ -52,6 +52,10 @@ type commandStep struct {
 	prompt string
 	output *string
 	turn   bool
+	// control is sent before the prompt. blocks says the command leaves the
+	// session waiting at a dialog, so the step does not wait for it to idle.
+	control *agentfake.Control
+	blocks  bool
 }
 
 const sessionWaitTimeout = 20 * time.Second
@@ -73,7 +77,7 @@ func (f *fixture) seedSessions(sc scenario) error {
 }
 
 func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
-	before := f.controlFiles()
+	before, codexBefore := f.controlFiles(), f.codexIDs()
 	id, err := f.createSession(s.project, f.repoDir(sc, s.project), s.prompt, s.harness)
 	if err != nil {
 		return err
@@ -116,6 +120,15 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 	// The fake's control FIFO is named by Claude's session id, which gx's
 	// session id is not; the one new file is this session's.
 	sendControl := func(c agentfake.Control) error {
+		if s.harness == "codex" {
+			// The Codex fake's FIFO is named by its own id, which it logs with
+			// its argv under the Codex home.
+			fresh := slices.DeleteFunc(f.codexIDs(), func(name string) bool { return slices.Contains(codexBefore, name) })
+			if len(fresh) != 1 {
+				return fmt.Errorf("session %s: want one new codex fake, got %v", id, fresh)
+			}
+			return agentfake.SendProgramControl(fresh[0], c)
+		}
 		fresh := slices.DeleteFunc(f.controlFiles(), func(name string) bool { return slices.Contains(before, name) })
 		if len(fresh) != 1 {
 			return fmt.Errorf("session %s: want one new control file, got %v", id, fresh)
@@ -198,6 +211,18 @@ func (f *fixture) runCommandStep(id string, st commandStep, sendControl func(age
 		// The control travels on its own FIFO; give it time to land.
 		time.Sleep(300 * time.Millisecond)
 	}
+	if st.control != nil {
+		if err := sendControl(*st.control); err != nil {
+			return err
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	if st.blocks {
+		if out, err := f.cli("agents", "prompt", id, st.prompt); err != nil {
+			return fmt.Errorf("prompt %s: %w\n%s", id, err, out)
+		}
+		return nil
+	}
 	count := func(chat server.SessionChatResponse, kind string) int {
 		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m server.SessionChatMessage) bool {
 			return m.Kind != kind || (kind == transcript.ChatKindCommand && m.Text != st.prompt)
@@ -226,6 +251,16 @@ func (f *fixture) controlFiles() []string {
 		names[i] = filepath.Base(p)
 	}
 	return names
+}
+
+// codexIDs lists the ids of the Codex fakes started so far.
+func (f *fixture) codexIDs() []string {
+	paths, _ := filepath.Glob(agentfake.CodexArgsPath(filepath.Join(f.root, "home", ".codex"), "*"))
+	ids := make([]string, len(paths))
+	for i, p := range paths {
+		ids[i] = strings.TrimSuffix(filepath.Base(p), ".args")
+	}
+	return ids
 }
 
 // repoDir is the repo root the project's sessions run in.

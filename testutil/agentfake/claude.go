@@ -61,9 +61,12 @@ const (
 	// line; ActionTaskError ends the turn with the error Message and Error.
 	ActionToolCall   = "toolcall"
 	ActionPermission = "permission"
-	ActionTokenCount = "tokencount"
-	ActionCompact    = "compact"
-	ActionTaskError  = "taskerror"
+	// ActionPermissionScreen is ActionPermission with no hook run: only the
+	// screen dialog shows, the rows of Dialog when set (a dialog gx cannot read).
+	ActionPermissionScreen = "permissionscreen"
+	ActionTokenCount       = "tokencount"
+	ActionCompact          = "compact"
+	ActionTaskError        = "taskerror"
 )
 
 // Control stands in for what real claude does on its own. It travels on the

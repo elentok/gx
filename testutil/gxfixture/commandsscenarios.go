@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/testutil/agentfake"
 )
 
@@ -72,5 +73,44 @@ func commandsScenario(delay string, fail bool) scenario {
 		sessionSpec{project: project, harness: "codex", steps: []commandStep{{prompt: "/status"}}},
 		sessionSpec{project: "site", prompt: "hello", crash: true, read: true},
 	)
+	sc.sessions = append(sc.sessions, blockedCommandSessions()...)
 	return sc
+}
+
+// blockedCommandSessions are the sessions Blocked at a dialog or a permission
+// prompt, one per way gx reads (or fails to read) what they wait on. Each ends
+// as a Blocked failure.
+func blockedCommandSessions() []sessionSpec {
+	block := func(c agentfake.Control) *agentfake.Control {
+		c.Action = agentfake.ActionBlock
+		return &c
+	}
+	// dontAsk is a Bash prompt whose first option is not a plain Yes.
+	dontAsk := agentfake.BashPermissionDialog("rg --files")
+	dontAsk[4] = "❯ 1. Yes, and don't ask again for rg commands"
+	blocked := func(s sessionSpec) sessionSpec {
+		s.failure = server.FailureKindBlocked
+		return s
+	}
+	codexBlock := func(c agentfake.Control) sessionSpec {
+		return blocked(sessionSpec{project: project, harness: "codex", control: &c})
+	}
+	return []sessionSpec{
+		// A dialog /model opened.
+		blocked(sessionSpec{project: project, prompt: "hello", read: true, steps: []commandStep{
+			{prompt: "/model", control: &agentfake.Control{Action: agentfake.ActionDialog}, blocks: true},
+		}}),
+		blocked(sessionSpec{project: project, prompt: "hello", read: true,
+			control: block(agentfake.Control{Dialog: agentfake.BashPermissionDialog("rg readable-command")})}),
+		blocked(sessionSpec{project: project, prompt: "hello", read: true,
+			control: block(agentfake.Control{Dialog: []string{"▒▒▒▒ nothing gx can read ▒▒▒▒"}})}),
+		blocked(sessionSpec{project: project, prompt: "hello", read: true, control: block(agentfake.Control{Dialog: dontAsk})}),
+		// Enter leaves the dialog open, so Allow once never lands.
+		blocked(sessionSpec{project: project, prompt: "hello", read: true,
+			control: &agentfake.Control{Action: agentfake.ActionIgnoreAllow},
+			steps:   []commandStep{{prompt: agentfake.PermissionPromptPrefix + "rg ignores-allow", blocks: true}}}),
+		codexBlock(agentfake.Control{Action: agentfake.ActionPermission, Command: "rg codex-hook"}),
+		codexBlock(agentfake.Control{Action: agentfake.ActionPermissionScreen, Command: "rg codex-screen"}),
+		codexBlock(agentfake.Control{Action: agentfake.ActionPermissionScreen, Dialog: []string{"▒▒▒▒ nothing gx can read ▒▒▒▒"}}),
+	}
 }

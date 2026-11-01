@@ -36,8 +36,8 @@ func TestCommandsScenario_ListsSessionsAndFeatureSkill(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents-commands")
 	list := r.sessionsOf(t)
-	if len(list) != 11 {
-		t.Fatalf("%d sessions, want the eight of agents plus three", len(list))
+	if len(list) != 19 {
+		t.Fatalf("%d sessions, want the eight of agents, three, and eight Blocked", len(list))
 	}
 	claude, codex, exited := list[8], list[9], list[10]
 	if claude.Status.State != server.SessionIdle || codex.Harness != "codex" || codex.Status.State != server.SessionIdle || exited.Status.State != server.SessionExited {
@@ -66,6 +66,26 @@ func TestCommandsScenario_ListsSessionsAndFeatureSkill(t *testing.T) {
 	without, _ := r.commandNames(t, "--project", "demo", "--dir", repo)
 	if strings.Contains(strings.Join(without, " "), featureSkill) {
 		t.Errorf("base list %v holds %s", without, featureSkill)
+	}
+	r.stop(t)
+}
+
+func TestCommandsScenario_BlockedSessionsSettleBlocked(t *testing.T) {
+	t.Parallel()
+	r := start(t, "agents-commands")
+	list := r.sessionsOf(t)
+	if len(list) != 19 {
+		t.Fatalf("%d sessions, want 11 plus eight Blocked", len(list))
+	}
+	for i, want := range []string{"claude", "claude", "claude", "claude", "claude", "codex", "codex", "codex"} {
+		si := list[11+i]
+		harness := si.Harness
+		if harness == "" {
+			harness = "claude"
+		}
+		if harness != want || si.Status.State != server.SessionBlocked || si.Failure == nil || si.Failure.Kind != server.FailureKindBlocked {
+			t.Errorf("session %d = %s/%s failure=%+v, want a Blocked %s session", 11+i, harness, si.Status.State, si.Failure, want)
+		}
 	}
 	r.stop(t)
 }
@@ -108,8 +128,8 @@ func TestCommandsScenario_FailedProbesAreDegraded(t *testing.T) {
 	t.Parallel()
 	r := start(t, "agents-commands-failed")
 	list := r.sessionsOf(t)
-	if len(list) != 11 {
-		t.Fatalf("%d sessions, want 11", len(list))
+	if len(list) != 19 {
+		t.Fatalf("%d sessions, want 19", len(list))
 	}
 	if _, degraded := r.commandNames(t, list[8].ID); !degraded {
 		t.Error("claude list is not degraded")
@@ -120,7 +140,7 @@ func TestCommandsScenario_FailedProbesAreDegraded(t *testing.T) {
 func TestCommandsScenario_SlowStartsAndFlagIsChecked(t *testing.T) {
 	t.Parallel()
 	r := startWith(t, "agents-commands-slow", nil, "--command-list-age", "1s")
-	if len(r.sessionsOf(t)) != 11 {
+	if len(r.sessionsOf(t)) != 19 {
 		t.Error("slow scenario lacks the sessions")
 	}
 	r.stop(t)

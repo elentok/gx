@@ -306,23 +306,7 @@ func (c *codexFake) permission(command string, allowed func()) error {
 		}
 	}
 	if len(c.hooks["PermissionRequest"]) == 0 {
-		// The dialog Codex 0.166.0 draws when no hook answered, per the spec's
-		// text; the keys are codexui's, the one place that names them.
-		fmt.Fprint(c.out, "\r\n"+codexui.Title+"\r\n"+command+"\r\n")
-		var wait func(key byte) error
-		wait = func(key byte) error {
-			switch string(key) {
-			case codexui.AllowKey:
-				resume()
-				return nil
-			case codexui.DenyKey:
-				fmt.Fprint(c.out, "denied by the person\r\n")
-				return c.finishTurn()
-			}
-			c.onKey = wait
-			return nil
-		}
-		c.onKey = wait
+		c.permissionScreen(command, nil, resume)
 		return nil
 	}
 	runs, err := c.runHooks("PermissionRequest", "Bash", c.payload("PermissionRequest", "Bash", command))
@@ -335,6 +319,38 @@ func (c *codexFake) permission(command string, allowed func()) error {
 	}
 	resume()
 	return nil
+}
+
+// permissionScreen draws the dialog Codex 0.166.0 draws when no hook answered,
+// per the spec's text (the keys are codexui's, the one place that names them),
+// and waits for a key. rows, when set, replace the dialog text, so a screen gx
+// cannot read can be shown.
+func (c *codexFake) permissionScreen(command string, rows []string, resume func()) {
+	if len(rows) == 0 {
+		rows = []string{codexui.Title, command}
+	}
+	fmt.Fprint(c.out, "\r\n"+strings.Join(rows, "\r\n")+"\r\n")
+	var wait func(key byte) error
+	wait = func(key byte) error {
+		switch string(key) {
+		case codexui.AllowKey:
+			resume()
+			return nil
+		case codexui.DenyKey:
+			fmt.Fprint(c.out, "denied by the person\r\n")
+			return c.finishTurn()
+		}
+		c.onKey = wait
+		return nil
+	}
+	c.onKey = wait
+}
+
+// screenPermission is ActionPermissionScreen: the permission dialog with no
+// PermissionRequest hook run, even where hooks are configured.
+func (c *codexFake) screenPermission(ctl Control) {
+	writeAppReport(c.out, codexAppName, "blocked", "permission", "")
+	c.permissionScreen(ctl.Command, ctl.Dialog, func() { c.report("working") })
 }
 
 func (c *codexFake) stopHooks() error {

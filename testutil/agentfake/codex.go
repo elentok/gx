@@ -478,6 +478,8 @@ func (c *codexFake) control(ctl Control) error {
 		return c.toolCall(ctl.Tool, ctl.Command)
 	case ActionPermission:
 		return c.permission(ctl.Command, nil)
+	case ActionPermissionScreen:
+		c.screenPermission(ctl)
 	case ActionTokenCount:
 		return c.tokenCount(ctl.UsedPercent, ctl.ResetsAt)
 	case ActionCompact:

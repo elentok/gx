@@ -188,6 +188,17 @@ func TestCodexHooks_PermissionRequestHoldsBlockedUntilTheHookReturns(t *testing.
 	}
 }
 
+func TestCodexHooks_PermissionScreenRunsNoHookAndDrawsTheRows(t *testing.T) {
+	p := startCodex(t, t.TempDir(), "hooks6", hookArg("PermissionRequest", "Bash", "echo should-not-run >&2")...)
+	p.startTurn("fix it")
+	p.send(Control{Action: ActionPermissionScreen, Dialog: []string{"unreadable rows"}})
+	p.waitOut("state=blocked:app=codex:kind=permission")
+	p.waitOut("unreadable rows")
+	if runs := p.hookRuns(); len(runs) != 0 {
+		t.Fatalf("a PermissionRequest hook ran: %+v", runs)
+	}
+}
+
 func TestCodexHooks_PermissionRequestDenyEndsTheTurnWithTheReason(t *testing.T) {
 	for name, command := range map[string]string{
 		"exit 2": "echo too risky >&2; exit 2",
