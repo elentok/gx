@@ -91,7 +91,14 @@ type Ledger struct {
 
 // Open loads the ledger in stateDir. A missing file is an empty ledger.
 func Open(stateDir string) (*Ledger, error) {
-	l := &Ledger{dir: stateDir, path: filepath.Join(stateDir, FileName), now: time.Now}
+	return OpenWithClock(stateDir, time.Now)
+}
+
+// OpenWithClock is Open with a clock, which decides the first live day and the
+// rebuilt cutoff. Fixtures use it to seed a ledger whose live range started in
+// the past.
+func OpenWithClock(stateDir string, now func() time.Time) (*Ledger, error) {
+	l := &Ledger{dir: stateDir, path: filepath.Join(stateDir, FileName), now: now}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if err := l.reload(); err != nil {

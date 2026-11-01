@@ -11,7 +11,7 @@
 // --stall-threshold shortens how long a Working session's transcript may stay untouched before it counts as stalled (default 15m).
 // --shape <fresh|stale|past-reset|one-window> picks the seeded limits state of the limits scenario (default fresh).
 // --shape <normal|short|empty> picks the seeded budget ledger of the spend scenario (default normal).
-// --shape <menu|few-days|stale|past-reset> picks the seeded limit history of the limit-burn scenario (default menu).
+// --shape <menu|few-days|stale|past-reset|stats> picks the seeded limit history of the limit-burn scenario (default menu).
 // --env prints `export` lines (see Output.ShellEnv) instead of the JSON, so a shell can source them.
 // --config <dotted.key>=<json> sets a config key, e.g. --config server.web.foo=true; repeatable.
 // --mock-dir <path> serves that directory over loopback HTTP and reports its base URL as mock_url.

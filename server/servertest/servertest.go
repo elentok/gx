@@ -159,6 +159,10 @@ type TicketOpts struct {
 	ClaimedAt, DoneAt, CancelledAt string
 	// LongTicketTurns is the turn count the long-ticket alert marked the ticket with; omitted when 0.
 	LongTicketTurns int
+	// TotalTokens and ActualCost are the ticket's total_tokens and actual_cost
+	// stamps; both are omitted when TotalTokens is 0.
+	TotalTokens int64
+	ActualCost  float64
 }
 
 // WriteTicketWith is WriteTicket with a type, a parent and several blockers. Unlike
@@ -241,6 +245,9 @@ func WriteTicketFile(store, project, epic, id, slug string, opts TicketOpts) err
 	}
 	if opts.LongTicketTurns > 0 {
 		fm += "long_ticket_turns: " + strconv.Itoa(opts.LongTicketTurns) + "\n"
+	}
+	if opts.TotalTokens > 0 {
+		fm += "total_tokens: " + strconv.FormatInt(opts.TotalTokens, 10) + "\nactual_cost: " + strconv.FormatFloat(opts.ActualCost, 'f', -1, 64) + "\n"
 	}
 	fm += "---\n\n# " + slug + "\n"
 	return os.WriteFile(filepath.Join(issues, id+"-"+slug+".md"), []byte(fm), 0o644)

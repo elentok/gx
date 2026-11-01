@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elentok/gx/apiclient"
 	"github.com/elentok/gx/server"
 )
 
@@ -60,14 +62,14 @@ func daysCovered(samples []server.LimitSample, now time.Time) int {
 func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 	for _, tc := range []struct {
 		shape string
-		check func(t *testing.T, now time.Time, l server.LimitsReport, h seededHistory)
+		check func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory)
 	}{
-		{"", func(t *testing.T, now time.Time, l server.LimitsReport, h seededHistory) {
+		{"", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
 			if l.SevenDay == nil || l.SevenDay.UsedPercentage != 81 {
 				t.Errorf("default shape is not menu: %+v", l)
 			}
 		}},
-		{"menu", func(t *testing.T, now time.Time, l server.LimitsReport, h seededHistory) {
+		{"menu", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
 			if l.FiveHour == nil || l.SevenDay == nil || l.SevenDay.UsedPercentage != 81 {
 				t.Fatalf("want Claude 5h and weekly at 81%%: %+v", l)
 			}
@@ -87,7 +89,7 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 				}
 			}
 		}},
-		{"few-days", func(t *testing.T, now time.Time, l server.LimitsReport, h seededHistory) {
+		{"few-days", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
 			if l.SevenDay == nil || l.SevenDay.UsedPercentage != 22 {
 				t.Fatalf("want Claude weekly at 22%%: %+v", l)
 			}
@@ -99,7 +101,7 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 				t.Errorf("Codex data seeded: %+v", h.Samples)
 			}
 		}},
-		{"stale", func(t *testing.T, now time.Time, l server.LimitsReport, h seededHistory) {
+		{"stale", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
 			for _, id := range []string{server.LimitIDClaudeWeekly, server.LimitIDCodexWeekly} {
 				samples := h.Samples[id]
 				if got := daysCovered(samples, now); got < 7 {
@@ -114,7 +116,7 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 				}
 			}
 		}},
-		{"past-reset", func(t *testing.T, now time.Time, l server.LimitsReport, h seededHistory) {
+		{"past-reset", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
 			if l.SevenDay == nil || l.SevenDay.ResetsAt >= now.Unix() {
 				t.Errorf("weekly reset is not in the past: %+v", l.SevenDay)
 			}
@@ -133,6 +135,92 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 			}
 			tc.check(t, time.Now(), sum.Limits, readSeededHistory(t, r.StateDir))
 		})
+	}
+}
+
+func TestLimitBurnFixture_StatsShape(t *testing.T) {
+	r := startWith(t, "limit-burn", nil, "--shape", "stats")
+	defer r.stop(t)
+	st, err := apiclient.New(r.Socket).Stats(context.Background(), 30, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for name, b := range map[string]server.StatsLimitBurn{
+		"claude_5h": st.LimitBurn.Claude5h, "claude_weekly": st.LimitBurn.ClaudeWeekly,
+		"codex_5h": st.LimitBurn.Codex5h, "codex_weekly": st.LimitBurn.CodexWeekly,
+	} {
+		if len(b.Days) != 30 {
+			t.Fatalf("%s has %d days, want 30", name, len(b.Days))
+		}
+		head, resets := 0, 0
+		for i, d := range b.Days {
+			if d.NoData != (i < 7) {
+				t.Errorf("%s day %d (%s) no_data = %v", name, i, d.Date, d.NoData)
+			}
+			if d.NoData {
+				head++
+			}
+			if d.ResetDay {
+				resets++
+			}
+		}
+		if head != 7 || resets == 0 {
+			t.Errorf("%s: %d no-data days and %d reset days, want 7 and some", name, head, resets)
+		}
+		if b.StartDay != b.Days[7].Date {
+			t.Errorf("%s start_day = %q, want %q", name, b.StartDay, b.Days[7].Date)
+		}
+	}
+
+	// Days 0-8 are stamp-only (day 4 has no ticket), 9-18 rebuilt, 19-29 live
+	// (day 24 is the quiet one).
+	for i, src := range st.Cost.Sources {
+		want := "live"
+		switch {
+		case i < 9:
+			want = "stamp"
+		case i < 19:
+			want = "rebuilt"
+		}
+		if src != want {
+			t.Errorf("source of day %d = %q, want %q", i, src, want)
+		}
+	}
+	groups := map[string]server.StatsCostGroup{}
+	for _, g := range st.Cost.Groups {
+		groups[g.Group] = g
+	}
+	harnesses := map[string]bool{}
+	for _, name := range []string{"Queue", "Design", "One-off", "Other"} {
+		g := groups[name]
+		total := 0.0
+		for i, v := range g.Tokens {
+			total += v.Value
+			if i >= 9 {
+				for h := range g.Harness[i] {
+					harnesses[h] = true
+				}
+			}
+		}
+		if total == 0 {
+			t.Errorf("group %s has no tokens", name)
+		}
+	}
+	if len(harnesses) != 2 {
+		t.Errorf("harnesses in the ledger days = %v, want claude and codex", harnesses)
+	}
+	if q := groups["Queue"].Tokens; q[0].Value == 0 || q[4].Value != 0 {
+		t.Errorf("stamp days: day 0 = %v (want stamped), day 4 = %v (want none)", q[0], q[4])
+	}
+	for _, g := range st.Cost.Groups {
+		var sum float64
+		for _, v := range g.Tokens[24:25] {
+			sum += v.Value
+		}
+		if sum != 0 {
+			t.Errorf("group %s has tokens on the quiet live day", g.Group)
+		}
 	}
 }
 

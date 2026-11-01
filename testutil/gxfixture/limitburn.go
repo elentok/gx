@@ -2,12 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"time"
 
 	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/tokenledger"
 )
 
 // limitBurnSeed is the state of a limit-burn shape: the Claude limits file and
@@ -15,7 +19,22 @@ import (
 type limitBurnSeed struct {
 	report  server.LimitsReport
 	samples map[string][]server.LimitSample
+	// ledger is the token ledger and the stamped tickets behind it; nil leaves
+	// both empty.
+	ledger *ledgerSeed
 }
+
+// ledgerSeed is the cost data of a shape. Rebuilt rows are written first, as
+// the backfill would; live rows are written with the clock at liveSince, so the
+// ledger's first live day is that day. Stamped tickets feed the days before the
+// first rebuilt day.
+type ledgerSeed struct {
+	rebuilt, live []tokenledger.Row
+	liveSince     time.Time
+	stamped       []ticket
+}
+
+const statsHistoryEpic = "stats-history"
 
 // limitBurnShapes are the --shape values of the limit-burn scenario. Every time
 // is built from the real clock, and the daily steps sit on local midnights, so
@@ -81,6 +100,122 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 			}},
 		}
 	},
+	// stats: 30 days of cost data and 23 days (22 days ago to today) of history
+	// for all four limits, so the head of a 30-day range has no limit data. Each
+	// history has reset days. The ledger has stamp-only days (29 to 21 days ago,
+	// one with no ticket), rebuilt days (20 to 11) and live days (10 to today,
+	// 5 days ago quiet), across four groups, both harnesses and two projects.
+	"stats": func(now time.Time) limitBurnSeed {
+		const historyDays = 22
+		weekly := []int{17, 10, 3}
+		fiveHour := []int{14, 6, 0}
+		s := limitBurnSeed{
+			samples: map[string][]server.LimitSample{
+				server.LimitIDClaudeWeekly: burnHistory(server.LimitIDClaudeWeekly, now, historyDays, 7*24*time.Hour, weekly, 3),
+				server.LimitIDCodexWeekly:  burnHistory(server.LimitIDCodexWeekly, now, historyDays, 7*24*time.Hour, weekly, 5),
+				server.LimitIDClaude5h:     burnHistory(server.LimitIDClaude5h, now, historyDays, 5*time.Hour, fiveHour, 2),
+				server.LimitIDCodex5h:      burnHistory(server.LimitIDCodex5h, now, historyDays, 5*time.Hour, fiveHour, 4),
+			},
+			ledger: statsLedger(now),
+		}
+		last := func(id string) server.LimitSample { v := s.samples[id]; return v[len(v)-1] }
+		window := func(id string) *server.LimitWindow {
+			l := last(id)
+			return &server.LimitWindow{UsedPercentage: l.UsedPercentage, ResetsAt: l.ResetsAt, ReceivedAt: l.ReceivedAt}
+		}
+		s.report = server.LimitsReport{FiveHour: window(server.LimitIDClaude5h), SevenDay: window(server.LimitIDClaudeWeekly)}
+		return s
+	},
+}
+
+// Harness names in ledger rows.
+const (
+	ledgerClaude = "claude"
+	ledgerCodex  = "codex"
+)
+
+// burnHistory is one sample a day from daysAgo days ago to today, each at local
+// noon (today's just before now). The limit rises by a few points a day, with
+// quiet days, and starts a new window on each reset day: the reset time moves
+// forward and the percentage starts again. period is the window length; the last
+// window ends after now. step shifts the daily rise per limit.
+func burnHistory(id string, now time.Time, daysAgo int, period time.Duration, resetDays []int, step int) []server.LimitSample {
+	var out []server.LimitSample
+	used := float64(step * 3)
+	var resetsAt time.Time
+	for ago := daysAgo; ago >= 0; ago-- {
+		at := localMidnight(now).AddDate(0, 0, -ago).Add(12 * time.Hour)
+		if ago == 0 && at.After(now) {
+			at = now.Add(-time.Minute)
+		}
+		rise := float64((ago*7+step)%5 + 1)
+		if ago%6 == 4 {
+			rise = 0
+		}
+		switch {
+		case slices.Contains(resetDays, ago):
+			used = rise + 1
+			resetsAt = at.Add(period)
+			if ago == 0 {
+				resetsAt = now.Add(period / 3)
+			}
+		case resetsAt.IsZero():
+			resetsAt = at.Add(period / 2)
+			used += rise
+		default:
+			used += rise
+		}
+		out = append(out, limitSample(id, used, resetsAt, at))
+	}
+	return out
+}
+
+// statsLedger builds the cost data of the stats shape (see its comment).
+func statsLedger(now time.Time) *ledgerSeed {
+	day := func(ago int) string { return localMidnight(now).AddDate(0, 0, -ago).Format(tokenledger.DayLayout) }
+	other := "docs-site"
+	combos := []tokenledger.Key{
+		{Project: project, Group: tokenledger.GroupQueue, Harness: ledgerClaude},
+		{Project: project, Group: tokenledger.GroupDesign, Harness: ledgerClaude},
+		{Project: other, Group: tokenledger.GroupQueue, Harness: ledgerCodex},
+		{Project: project, Group: tokenledger.GroupOneOff, Harness: ledgerCodex},
+		{Project: other, Group: tokenledger.GroupOther, Harness: ledgerClaude},
+	}
+	rows := func(from, to int, quiet int) []tokenledger.Row {
+		var out []tokenledger.Row
+		for ago := from; ago >= to; ago-- {
+			if ago == quiet {
+				continue
+			}
+			for i, k := range combos {
+				if (ago+i)%2 != 0 {
+					continue
+				}
+				k.Day = day(ago)
+				tokens := int64(40_000 + ago*3_100 + i*17_000)
+				out = append(out, tokenledger.Row{Key: k, Tokens: tokens, Dollars: float64(tokens) / 80_000})
+			}
+		}
+		return out
+	}
+	l := &ledgerSeed{
+		rebuilt:   rows(20, 11, -1),
+		live:      rows(10, 0, 5),
+		liveSince: localMidnight(now).AddDate(0, 0, -10).Add(time.Hour),
+	}
+	for ago := 29; ago >= 21; ago-- {
+		if ago == 25 {
+			continue
+		}
+		tokens := int64(60_000 + ago*2_300)
+		l.stamped = append(l.stamped, ticket{fmt.Sprintf("%02d", 30-ago), fmt.Sprintf("stamped-%d-days-ago", ago), servertest.TicketOpts{
+			Status:      "done",
+			DoneAt:      localMidnight(now).AddDate(0, 0, -ago).Add(14 * time.Hour).Format(time.RFC3339),
+			TotalTokens: tokens,
+			ActualCost:  float64(tokens) / 80_000,
+		}})
+	}
+	return l
 }
 
 func limitBurnShapeNames() []string {
@@ -160,6 +295,36 @@ func (f *fixture) seedLimitBurn(shape string) error {
 			return err
 		}
 		if err := os.WriteFile(filepath.Join(f.stateD, name), data, 0o600); err != nil {
+			return err
+		}
+	}
+	if seed.ledger != nil {
+		return f.seedLedger(seed.ledger)
+	}
+	return nil
+}
+
+// seedLedger writes the token ledger through the tokenledger package, rebuilt
+// rows first (they stop at the first live day), and the stamped tickets.
+func (f *fixture) seedLedger(l *ledgerSeed) error {
+	rebuilt, err := tokenledger.Open(f.stateD)
+	if err != nil {
+		return err
+	}
+	if _, _, err := rebuilt.ApplyRebuilt(l.rebuilt); err != nil {
+		return err
+	}
+	live, err := tokenledger.OpenWithClock(f.stateD, func() time.Time { return l.liveSince })
+	if err != nil {
+		return err
+	}
+	for _, r := range l.live {
+		if err := live.Add(tokenledger.Delta{Key: r.Key, Tokens: r.Tokens, Dollars: r.Dollars}); err != nil {
+			return err
+		}
+	}
+	for _, tk := range l.stamped {
+		if err := servertest.WriteTicketFile(f.store, project, statsHistoryEpic, tk.id, tk.slug, tk.opts); err != nil {
 			return err
 		}
 	}
