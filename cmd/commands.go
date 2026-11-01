@@ -330,6 +330,7 @@ log shows no open question on the web. A second run changes nothing.`,
 		}))
 	cmd.AddCommand(newTicketsPublishCmd(d))
 	cmd.AddCommand(newTicketsLintClaimsCmd(d))
+	cmd.AddCommand(newTicketsVerifyPlanCmd())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "schema",
 		Short: "print the ticket frontmatter schema (settable and read-only fields)",
