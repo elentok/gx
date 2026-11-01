@@ -9,10 +9,13 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/elentok/gx/config"
 )
 
 func makeProject(t *testing.T) (projectDir, ticketPath string) {
 	t.Helper()
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	projectDir = filepath.Join(t.TempDir(), "proj")
 	issues := filepath.Join(projectDir, "epic", "issues")
 	if err := os.MkdirAll(issues, 0o755); err != nil {
@@ -84,8 +87,12 @@ func TestLockFileStaysOutOfProjectDir(t *testing.T) {
 		t.Fatal(err)
 	}
 	u()
-	if rel, err := filepath.Rel(dir, lockPath(dir)); err == nil && !strings.HasPrefix(rel, "..") {
-		t.Fatalf("lock file %s is inside the project dir", lockPath(dir))
+	lp, err := lockPath(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rel, err := filepath.Rel(dir, lp); err == nil && !strings.HasPrefix(rel, "..") {
+		t.Fatalf("lock file %s is inside the project dir", lp)
 	}
 	var found []string
 	_ = filepath.WalkDir(dir, func(p string, d os.DirEntry, _ error) error {
@@ -96,6 +103,42 @@ func TestLockFileStaysOutOfProjectDir(t *testing.T) {
 	})
 	if len(found) > 0 {
 		t.Fatalf("lock files in project dir: %v", found)
+	}
+}
+
+func TestLockPathIgnoresTMPDIR(t *testing.T) {
+	dir, _ := makeProject(t)
+	t.Setenv("TMPDIR", t.TempDir())
+	a, err := lockPath(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TMPDIR", t.TempDir())
+	b, err := lockPath(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != b {
+		t.Fatalf("lock path follows TMPDIR: %s vs %s", a, b)
+	}
+	state, err := config.StateDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Dir(a) != state {
+		t.Fatalf("lock %s is not directly under state dir %s", a, state)
+	}
+}
+
+func TestLockPathStateDirErrorIsReturned(t *testing.T) {
+	dir, _ := makeProject(t)
+	blocker := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocker, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_STATE_HOME", blocker)
+	if _, err := Exclusive(dir); err == nil {
+		t.Fatal("expected an error when the state dir cannot be created")
 	}
 }
 

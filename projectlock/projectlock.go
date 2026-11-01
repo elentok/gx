@@ -14,6 +14,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/elentok/gx/config"
 )
 
 // projectFile marks a directory as a ticket-store project.
@@ -102,18 +104,31 @@ func Exclusive(projectDir string) (unlock func(), err error) {
 }
 
 // lockPath keeps the lock file out of the project dir: storecommit runs
-// `git add -A` over the store, so a file there would be committed.
-func lockPath(projectDir string) string {
+// `git add -A` over the store, so a file there would be committed. It lives in
+// the state dir, not os.TempDir(): a process with another $TMPDIR would open a
+// different file, and macOS deletes old temp files under a live lock.
+func lockPath(projectDir string) (string, error) {
+	stateDir, err := config.StateDir()
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		return "", err
+	}
 	if resolved, err := filepath.EvalSymlinks(projectDir); err == nil {
 		projectDir = resolved
 	}
 	sum := sha1.Sum([]byte(filepath.Clean(projectDir)))
-	return filepath.Join(os.TempDir(), "gx-project-"+hex.EncodeToString(sum[:8])+".lock")
+	return filepath.Join(stateDir, "gx-project-"+hex.EncodeToString(sum[:8])+".lock"), nil
 }
 
 // acquire takes a flock, so the kernel drops it when the holder dies.
 func acquire(projectDir string, how int) (func(), error) {
-	f, err := os.OpenFile(lockPath(projectDir), os.O_CREATE|os.O_RDWR, 0o600)
+	path, err := lockPath(projectDir)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
 	}
