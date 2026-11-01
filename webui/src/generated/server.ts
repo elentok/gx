@@ -1878,6 +1878,11 @@ export type FailureKind = typeof FailureKindCrashed | typeof FailureKindEnded | 
  */
 export interface SessionFailure {
   kind: string;
+  /**
+   * Why says what a blocked session waits on: permission, dialog, question or
+   * error (a harness.BlockedKind).
+   */
+  why?: string;
   label: string;
   text?: string;
   recrashed?: boolean;

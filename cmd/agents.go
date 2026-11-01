@@ -21,7 +21,7 @@ import (
 func newAgentsCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{Use: "agents", Short: "interactive agent sessions owned by the server", Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error { return d.runTab(nav.TabAgents) }}
-	cmd.AddCommand(newAgentsCreateCmd(d.dial()), newAgentsListCmd(d), newAgentsChatCmd(d), newAgentsScreenCmd(d), newAgentsCommandsCmd(d), newAgentsKeysCmd(d),
+	cmd.AddCommand(newAgentsCreateCmd(d.dial()), newAgentsListCmd(d), newAgentsChatCmd(d), newAgentsScreenCmd(d), newAgentsCommandsCmd(d), newAgentsPermissionCmd(d), newAgentsKeysCmd(d),
 		newAgentsSessionCmd(d, "stop", "end a live session's agent (it stays, Exited)", (*apiclient.Client).StopSession),
 		newAgentsSessionCmd(d, "interrupt", "end a Working session's current turn (the session stays)", (*apiclient.Client).InterruptSession),
 		newAgentsSessionCmd(d, "remove", "delete an Exited session", (*apiclient.Client).RemoveSession),

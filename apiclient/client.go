@@ -759,6 +759,13 @@ func (c *Client) SessionCommands(ctx context.Context, id, project, dir, kind str
 	return res, err
 }
 
+// SessionPermission reads the dialog a Blocked session waits on.
+func (c *Client) SessionPermission(ctx context.Context, id string) (server.SessionPermissionResponse, error) {
+	var res server.SessionPermissionResponse
+	err := c.get(ctx, "/v1/sessions/permission?session="+url.QueryEscape(id), &res)
+	return res, err
+}
+
 // TicketScreen reads a loop ticket agent's screen as plain text rows.
 func (c *Client) TicketScreen(ctx context.Context, address string) (server.SessionScreenResponse, error) {
 	var res server.SessionScreenResponse

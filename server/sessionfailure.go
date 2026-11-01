@@ -27,7 +27,10 @@ const (
 // condition. Recrashed marks a crashed session whose Restore crashed again
 // within restoreCrashWindow, so the page can stop offering Restore.
 type SessionFailure struct {
-	Kind      string `json:"kind"`
+	Kind string `json:"kind"`
+	// Why says what a blocked session waits on: permission, dialog, question or
+	// error (a harness.BlockedKind).
+	Why       string `json:"why,omitempty"`
 	Label     string `json:"label"`
 	Text      string `json:"text,omitempty"`
 	Recrashed bool   `json:"recrashed,omitempty"`
@@ -55,9 +58,9 @@ func (m sessionMeta) statusFailure() *SessionFailure {
 		return &SessionFailure{Kind: FailureKindRateLimit, Label: "Rate limited", Text: m.Status.Message}
 	case SessionBlocked:
 		if m.Status.Kind == string(harness.BlockedError) {
-			return &SessionFailure{Kind: FailureKindBlocked, Label: "Agent hit an error", Text: m.Status.Message}
+			return &SessionFailure{Kind: FailureKindBlocked, Why: m.Status.Kind, Label: "Agent hit an error", Text: m.Status.Message}
 		}
-		return &SessionFailure{Kind: FailureKindBlocked, Label: "Waiting at a prompt in the terminal"}
+		return &SessionFailure{Kind: FailureKindBlocked, Why: m.Status.Kind, Label: "Waiting at a prompt in the terminal"}
 	}
 	return nil
 }

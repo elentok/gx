@@ -1,0 +1,112 @@
+package server_test
+
+import (
+	"encoding/json"
+	"net/http"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/elentok/gx/agentrunner/claudeui"
+	"github.com/elentok/gx/nativerunner"
+	"github.com/elentok/gx/server"
+	"github.com/elentok/gx/testutil/agentfake"
+)
+
+// permissionRead GETs the permission route on the web mux.
+func (f promptFixture) permissionRead(t *testing.T, id string) (int, string) {
+	t.Helper()
+	return webDoCookie(t, http.MethodGet, f.base+"/v1/sessions/permission?session="+id, f.ck)
+}
+
+func (f promptFixture) wantPermission(t *testing.T, want server.SessionPermissionResponse) {
+	t.Helper()
+	code, body := f.permissionRead(t, f.id)
+	var got server.SessionPermissionResponse
+	if err := json.Unmarshal([]byte(body), &got); err != nil || code != http.StatusOK {
+		t.Fatalf("permission = %d %q (%v)", code, body, err)
+	}
+	if got != want {
+		t.Errorf("permission = %+v, want %+v", got, want)
+	}
+}
+
+func TestSessionPermission_ClaudeDialogs(t *testing.T) {
+	t.Parallel()
+	plan := []string{
+		"────────────────────", "Ready to code?", "  the plan",
+		"Claude has written up a plan and is ready to execute. Would you like to proceed?",
+		"❯ 1. Yes, and use auto mode", "  2. No, keep planning",
+	}
+	bash := agentfake.BashPermissionDialog("ls")
+	for name, tc := range map[string]struct {
+		rows []string
+		want server.SessionPermissionResponse
+	}{
+		"bash": {bash, server.SessionPermissionResponse{Kind: "prompt", Text: "Bash command\nls", RequestID: claudeui.ReadDialog(bash).ID}},
+		"plan": {plan, server.SessionPermissionResponse{Kind: "plan", Text: "Ready to code?\nthe plan", RequestID: claudeui.ReadDialog(plan).ID}},
+		"unreadable": {
+			[]string{"something no one can read"},
+			server.SessionPermissionResponse{Kind: "unreadable"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			f := startPromptSession(t)
+			f.blockOn(t, tc.rows)
+			f.wantPermission(t, tc.want)
+		})
+	}
+}
+
+func TestSessionPermission_CodexHookRequestGivesItsText(t *testing.T) {
+	t.Parallel()
+	f := startCodexPermissionSession(t, false)
+	dir := filepath.Join(f.h.SessionsDir, f.id)
+	if err := nativerunner.WritePermissionRequest(dir, nativerunner.PermissionRequest{ID: "req-1", Tool: "Bash", Description: "rg foo"}); err != nil {
+		t.Fatal(err)
+	}
+	f.block(t, agentfake.Control{Action: agentfake.ActionReport, State: "blocked", Kind: "permission"})
+	f.wantPermission(t, server.SessionPermissionResponse{Kind: "prompt", Text: "rg foo", RequestID: "req-1"})
+}
+
+func TestSessionPermission_CodexScreenOnly(t *testing.T) {
+	t.Parallel()
+	f := startCodexPermissionSession(t, true)
+	f.blockCodex(t, "rg foo")
+	code, body := f.permissionRead(t, f.id)
+	var got server.SessionPermissionResponse
+	if err := json.Unmarshal([]byte(body), &got); err != nil || code != http.StatusOK {
+		t.Fatalf("permission = %d %q (%v)", code, body, err)
+	}
+	if got.Kind != "prompt" || !strings.Contains(got.Text, "rg foo") || got.RequestID == "" {
+		t.Errorf("permission = %+v, want a prompt with the command and an id", got)
+	}
+}
+
+func TestSessionPermission_Refusals(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	seedSession(t, f, "seeded-exited", server.SessionExited)
+	for name, tc := range map[string]struct{ id, want string }{
+		"not blocked": {f.id, server.ReasonNotBlocked},
+		"exited":      {"seeded-exited", server.ReasonSessionNotLive},
+		"unknown":     {"nope", server.ReasonSessionUnknown},
+	} {
+		t.Run(name, func(t *testing.T) {
+			code, body := f.permissionRead(t, tc.id)
+			if code == http.StatusOK || reasonOf(t, body) != tc.want {
+				t.Errorf("permission = %d %s, want refusal %s", code, body, tc.want)
+			}
+		})
+	}
+}
+
+func TestSessionPermission_QueueAgentIsReadOnly(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	code, body := f.permissionRead(t, "queue-agent-x")
+	if code == http.StatusOK || reasonOf(t, body) != server.ReasonSessionReadOnly {
+		t.Errorf("permission = %d %s, want refusal %s", code, body, server.ReasonSessionReadOnly)
+	}
+}

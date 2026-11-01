@@ -131,6 +131,8 @@ func (s *Server) webHandler() http.Handler {
 			s.sessionScreenRead(w, r)
 		case r.URL.Path == "/v1/sessions/commands":
 			s.sessionCommandsRead(w, r)
+		case r.URL.Path == "/v1/sessions/permission":
+			s.sessionPermissionRead(w, r)
 		case r.URL.Path == "/v1/epics":
 			s.epicList(w, r)
 		case r.URL.Path == "/v1/epics/detail":

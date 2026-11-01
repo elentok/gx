@@ -656,6 +656,7 @@ var routeTable = []struct {
 	{"GET /v1/sessions/chat/archive", (*Server).sessionChatArchiveRead},
 	{"GET /v1/sessions/screen", (*Server).sessionScreenRead},
 	{"GET /v1/sessions/commands", (*Server).sessionCommandsRead},
+	{"GET /v1/sessions/permission", (*Server).sessionPermissionRead},
 	{"POST /v1/sessions/create", (*Server).sessionCreateWrite},
 	{"POST /v1/sessions/stop", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.stopSession)(w, r) }},
 	{"POST /v1/sessions/remove", func(s *Server, w http.ResponseWriter, r *http.Request) { sessionWrite(s.removeSession)(w, r) }},

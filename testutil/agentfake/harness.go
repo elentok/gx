@@ -161,8 +161,9 @@ func (w *programWatcher) Program(r harness.ProgramReport) {
 		w.status = harness.Status{State: harness.Blocked, Blocked: harness.BlockedError, Message: r.Message}
 	case "blocked":
 		kind := harness.BlockedQuestion
-		if r.Kind == string(harness.BlockedPermission) {
-			kind = harness.BlockedPermission
+		switch harness.BlockedKind(r.Kind) {
+		case harness.BlockedPermission, harness.BlockedDialog:
+			kind = harness.BlockedKind(r.Kind)
 		}
 		w.status = harness.Status{State: harness.Blocked, Blocked: kind, Message: r.Message}
 	}

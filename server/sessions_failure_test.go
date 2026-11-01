@@ -94,10 +94,16 @@ func TestSessionFailure_Kinds(t *testing.T) {
 		}, server.SessionFailure{Kind: "rate-limit", Label: "Rate limited"}},
 		{"blocked", func(t *testing.T, conv string) {
 			report(t, conv, agentfake.Control{State: "blocked", Kind: "permission", Message: "run ls?"})
-		}, server.SessionFailure{Kind: "blocked", Label: "Waiting at a prompt in the terminal"}},
+		}, server.SessionFailure{Kind: "blocked", Why: "permission", Label: "Waiting at a prompt in the terminal"}},
+		{"blocked on a dialog", func(t *testing.T, conv string) {
+			report(t, conv, agentfake.Control{State: "blocked", Kind: "dialog"})
+		}, server.SessionFailure{Kind: "blocked", Why: "dialog", Label: "Waiting at a prompt in the terminal"}},
+		{"blocked on a question", func(t *testing.T, conv string) {
+			report(t, conv, agentfake.Control{State: "blocked", Kind: "question"})
+		}, server.SessionFailure{Kind: "blocked", Why: "question", Label: "Waiting at a prompt in the terminal"}},
 		{"agent error", func(t *testing.T, conv string) {
 			report(t, conv, agentfake.Control{State: "error", Message: "model gone"})
-		}, server.SessionFailure{Kind: "blocked", Label: "Agent hit an error", Text: "model gone"}},
+		}, server.SessionFailure{Kind: "blocked", Why: "error", Label: "Agent hit an error", Text: "model gone"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
