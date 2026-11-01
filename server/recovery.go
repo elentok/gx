@@ -129,7 +129,17 @@ func (s *Server) planEpicRecovery(f recovery.Failure, catalog recovery.Catalog) 
 // recoverAsync starts recovery for a failure that is already written. It runs
 // off the caller's goroutine: a remedy calls the same verbs the caller may be
 // inside of (claim, merge), which would otherwise wait on themselves.
+//
+// While the start-up migrations run, it waits for them first: planning reads
+// tickets and recovery starts agents, and neither may happen before they end.
 func (s *Server) recoverAsync(f recovery.Failure) {
+	if s.migrating() {
+		s.goSettle(func() {
+			<-s.migrationsDone
+			s.recoverAsync(f)
+		})
+		return
+	}
 	if plan, ok := s.planRecovery(f); ok {
 		s.goSettle(func() { s.recoverFrom(plan, f) })
 	}

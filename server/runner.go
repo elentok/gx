@@ -226,7 +226,7 @@ func (s *Server) keepClaiming(ctx context.Context) {
 // frontier tickets of each queued root, up to its per-root cap, until the concurrency limit is reached.
 // claimRoot skips a ticket the claim hold names: a claim without an agent behind it would only be rolled back.
 func (s *Server) claimNext() {
-	if s.pause.blocked() || s.budgetSoftReached(time.Now()) {
+	if s.migrating() || s.pause.blocked() || s.budgetSoftReached(time.Now()) {
 		return
 	}
 	limit := s.concurrencyLimit()
