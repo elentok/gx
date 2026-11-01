@@ -187,11 +187,13 @@ func scanStore(storePath string) ([]TicketInfo, map[string][]tickets.Epic, error
 	return list, loaded, nil
 }
 
-// buildIndex does the initial scan.
+// buildIndex does the initial scan. A store the strict scan cannot read yet
+// (old-shape tickets a migration is about to rewrite) gives an empty index and
+// no error: the scan is deferred to the first rescan after the migrations end.
 func buildIndex(storePath string, events *broker) (*index, error) {
 	list, loaded, err := scanStore(storePath)
 	if err != nil {
-		return nil, err
+		return &index{list: []TicketInfo{}, loaded: map[string][]tickets.Epic{}, events: events}, nil
 	}
 	return &index{list: list, loaded: loaded, events: events}, nil
 }

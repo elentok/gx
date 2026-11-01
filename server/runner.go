@@ -193,6 +193,12 @@ func (s *Server) kickRunner() {
 
 // keepClaiming launches queued roots. The tick is the guarantee; the kick from a queue write only makes it sooner.
 func (s *Server) keepClaiming(ctx context.Context) {
+	// Reclaim sets holds a claim must see, and the index is empty until then.
+	select {
+	case <-s.startupDone:
+	case <-ctx.Done():
+		return
+	}
 	poll := s.cfg.PollInterval
 	if poll <= 0 {
 		poll = defaultPollInterval

@@ -146,7 +146,10 @@ func (s *Server) ResumeAs(req RepairRequest, origin string) (RepairResult, error
 }
 
 // Rescan rescans the store now, as a ping or the watch would.
-func (s *Server) Rescan() { s.rescan() }
+func (s *Server) Rescan() {
+	<-s.migrationsDone // a rescan reads nothing until the migrations end
+	s.rescan()
+}
 
 // PollBudget runs one budget poll now.
 func (s *Server) PollBudget() { s.pollBudget(time.Now()) }

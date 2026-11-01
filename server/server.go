@@ -303,6 +303,9 @@ type Server struct {
 	idx            *index
 	// migrationsDone closes when the start-up migration run ends.
 	migrationsDone chan struct{}
+	// startupDone closes when the steps that run after the migrations (the
+	// first scan, merge recovery, run reclaim) have ended; claiming waits for it.
+	startupDone chan struct{}
 
 	queued       *queueStore
 	pause        *pauseState
@@ -504,6 +507,7 @@ func New(cfg Config) (*Server, error) {
 	}
 	s := &Server{
 		migrationsDone: make(chan struct{}),
+		startupDone:    make(chan struct{}),
 		cfg:            cfg,
 		lock:           lock,
 		ln:             ln,
@@ -857,11 +861,8 @@ func (s *Server) Serve(ctx context.Context) error {
 		go func() { errc <- s.webHTTP.Serve(s.web) }()
 	}
 	go s.migrateAll(ctx)
-	s.recoverMerges()
-	s.reclaimRuns()
-	s.logFlushingRunners()
-	s.pruneAgentLogs(time.Now())
-	s.scanParentDefects()
+	// recoverMerges, reclaimRuns, the log prune and the first scan run in
+	// keepFresh once the migrations end.
 	stopCommits := func() {}
 	if stop, err := s.startStoreCommits(); err != nil {
 		s.log.Error("store commit loop failed to start", "err", err)

@@ -26,6 +26,7 @@ const (
 // guarantee; the watch only makes updates arrive sooner.
 func (s *Server) keepFresh(ctx context.Context) {
 	if s.cfg.TicketStore == "" {
+		s.startAfterMigrations(ctx)
 		return
 	}
 	poll := s.cfg.PollInterval
@@ -54,8 +55,11 @@ func (s *Server) keepFresh(ctx context.Context) {
 		poll = watchedPollInterval
 	}
 
-	// Edits made before the watch was armed produced no event.
-	s.rescan()
+	// Edits made before the watch was armed produced no event; the first scan
+	// (inside) picks them up once the migrations end.
+	if !s.startAfterMigrations(ctx) {
+		return
+	}
 
 	ticker := time.NewTicker(poll)
 	defer ticker.Stop()
@@ -118,6 +122,13 @@ func (s *Server) ticketChanged(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Until the migrations end a rescan reads nothing, so the caller would
+	// not see its own write. The wait ends with the request.
+	select {
+	case <-s.migrationsDone:
+	case <-r.Context().Done():
+		return
+	}
 	s.rescan()
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -129,6 +140,10 @@ func (s *Server) rescan() {
 // rescanTree re-reads the store; walk also re-adds directories to the watch,
 // which only a directory creation or the backstop poll needs.
 func (s *Server) rescanTree(walk bool) {
+	// A migration is rewriting tickets; the first scan after it ends reads them.
+	if !s.migrationsEnded() {
+		return
+	}
 	if rewatch := s.rewatch.Load(); walk && rewatch != nil {
 		(*rewatch)() // pick up directories created since the last scan
 	}

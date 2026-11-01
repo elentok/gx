@@ -150,6 +150,94 @@ func TestMigrate_HandshakeAnswersWhileStepHeld(t *testing.T) {
 	}
 }
 
+// startupSteps counts the start-up step log lines by step name.
+func startupSteps(t *testing.T, stateDir string) map[string]int {
+	t.Helper()
+	data, err := os.ReadFile(server.LogPath(stateDir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts := map[string]int{}
+	for _, step := range []string{"first-rescan", "recover-merges", "reclaim-runs"} {
+		counts[step] = strings.Count(string(data), `"step":"`+step+`"`)
+	}
+	return counts
+}
+
+// Seam: a store the strict scan rejects still starts; while a migration is held
+// none of the start-up steps ran; after release each ran once and the ticket shows.
+func TestMigrate_StartupStepsWaitForMigrations(t *testing.T) {
+	t.Parallel()
+	store := migrateStore(t, "proj")
+	dir := filepath.Join(store, "proj")
+	if err := os.MkdirAll(filepath.Join(dir, "epic", "issues"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ticket := "---\nid: \"01\"\nstatus: open\ntype: implement\n---\nBody.\n"
+	if err := os.WriteFile(filepath.Join(dir, "epic", "issues", "01-old.md"), []byte(ticket), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Stands in for an old-shape ticket the strict scan rejects.
+	stray := filepath.Join(dir, ".archive")
+	if err := os.WriteFile(stray, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var enteredOnce sync.Once
+	reg := &migrations.Registry{}
+	reg.Register(migrations.Step{Name: "fix", Run: func(env migrations.Env) ([]tickets.MigrationChange, error) {
+		enteredOnce.Do(func() { close(entered) })
+		<-release
+		if filepath.Base(env.Root) == "proj" {
+			return nil, os.Remove(stray)
+		}
+		return nil, nil
+	}})
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	h := servertest.StartWithStore(t, store, func(c *server.Config) { c.Migrations = reg })
+	<-entered
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	snap, err := h.Client.Snapshot(ctx)
+	if err != nil {
+		t.Fatalf("snapshot while held: %v", err)
+	}
+	if len(snap.Tickets) != 0 {
+		t.Errorf("tickets while held = %v", snap.Tickets)
+	}
+	time.Sleep(300 * time.Millisecond) // a step that ignored the gate would have run by now
+	for step, n := range startupSteps(t, h.StateDir) {
+		if n != 0 {
+			t.Errorf("%s ran %d times while held", step, n)
+		}
+	}
+	close(release)
+	waitMigrations(t, h)
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		snap, err = h.Client.Snapshot(ctx)
+		if err == nil && len(snap.Tickets) > 0 && startupSteps(t, h.StateDir)["reclaim-runs"] > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("not ready: tickets=%v err=%v steps=%v", snap.Tickets, err, startupSteps(t, h.StateDir))
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	for step, n := range startupSteps(t, h.StateDir) {
+		if n != 1 {
+			t.Errorf("%s ran %d times, want 1", step, n)
+		}
+	}
+}
+
 // Seam: unknown names in lists give one warning for the whole set.
 func TestMigrate_UnknownAppliedNamesWarnOnce(t *testing.T) {
 	t.Parallel()
