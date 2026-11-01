@@ -1537,6 +1537,64 @@ export interface Snapshot {
 }
 
 //////////
+// source: limitburn.go
+
+/**
+ * LimitBurnDay is one local day of a limit's burn. NoData marks a day before the
+ * limit's first sample; ResetDay marks a day a new window started.
+ */
+export interface LimitBurnDay {
+  date: string;
+  burn: number /* float64 */;
+  no_data: boolean;
+  reset_day: boolean;
+}
+/**
+ * LimitChipDirection is how today so far compares with yesterday.
+ */
+export type LimitChipDirection = string;
+export const LimitChipUp: LimitChipDirection = "up";
+export const LimitChipDown: LimitChipDirection = "down";
+export const LimitChipEqual: LimitChipDirection = "equal";
+/**
+ * LimitBurnChip compares today's burn so far with yesterday's full day, in whole
+ * points.
+ */
+export interface LimitBurnChip {
+  today: number /* int */;
+  yesterday: number /* int */;
+  direction: LimitChipDirection;
+}
+/**
+ * LimitForecastStatus says which forecast line a row shows.
+ */
+export type LimitForecastStatus = string;
+/**
+ * LimitForecastNone shows no forecast line.
+ */
+export const LimitForecastNone: LimitForecastStatus = "none";
+/**
+ * LimitForecastNeedsData shows "Forecast needs 3 days of data".
+ */
+export const LimitForecastNeedsData: LimitForecastStatus = "needs_data";
+/**
+ * LimitForecastProjected shows the percentage at reset, and when the limit
+ * runs out if RunsOutAt is set.
+ */
+export const LimitForecastProjected: LimitForecastStatus = "projected";
+/**
+ * LimitForecast is the forecast line of a weekly limit. Pace is points per day.
+ * AtReset is rounded to whole points; RunsOutAt is epoch seconds and set only
+ * when the forecast passes 100.
+ */
+export interface LimitForecast {
+  status: LimitForecastStatus;
+  pace: number /* float64 */;
+  at_reset: number /* int */;
+  runs_out_at?: number /* int64 */;
+}
+
+//////////
 // source: limitsevents.go
 
 export const EventLimitsChanged = "limits-changed";
