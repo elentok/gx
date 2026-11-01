@@ -18,6 +18,7 @@ import { Badge } from "../ui/badge/Badge";
 import { Button } from "../ui/button/Button";
 import { Card } from "../ui/card/Card";
 import { Chip } from "../ui/chip/Chip";
+import { CommandMenu, type CommandMenuRow } from "../ui/command-menu/CommandMenu";
 import { HarnessLabel } from "../ui/harness-label/HarnessLabel";
 import { DayChart } from "../ui/day-chart/DayChart";
 import { LineChart } from "../ui/day-chart/LineChart";
@@ -257,6 +258,19 @@ const chartDays =["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const perTone =(render: (tone: Tone) => ReactNode): GalleryCase[] =>
   TONES.map((tone) => ({ label: tone, node: render(tone) }));
+
+const menuRows: CommandMenuRow[] = [
+  { name: "/clear", description: "Start a new conversation", source: "built-in", segments: [{ text: "/cl", match: true }, { text: "ear", match: false }] },
+  { name: "/compact", hint: "[instructions]", description: "Summarize the conversation to free context", source: "built-in", segments: [{ text: "/c", match: true }, { text: "ompact", match: false }] },
+  { name: "/review", description: "Review the current branch", source: "skill", segments: [{ text: "/review", match: false }] },
+];
+const menuBase = { rows: menuRows, selected: 0, status: "ready" as const, typed: "/c", onPick: () => {} };
+const MenuFrame = ({ children }: { children: ReactNode }) => (
+  <Box position="relative" w="480px" h="260px" pt="220px">
+    {children}
+    <Box borderWidth="1px" borderColor="border" borderRadius="md" px="3" py="2" color="text.dim">/c</Box>
+  </Box>
+);
 
 // Add one entry per primitive; the gallery page renders every case.
 export const galleryEntries: GalleryEntry[] = [
@@ -584,6 +598,20 @@ export const galleryEntries: GalleryEntry[] = [
     ],
   },
   { name: "Chip", cases: perTone((tone) => <Chip tone={tone}>{tone}</Chip>) },
+  {
+    name: "CommandMenu",
+    cases: [
+      ...perTone((tone) => <MenuFrame><CommandMenu {...menuBase} tone={tone} /></MenuFrame>),
+      { label: "filtered", node: <MenuFrame><CommandMenu {...menuBase} rows={menuRows.slice(0, 1)} typed="/cl" /></MenuFrame> },
+      { label: "keyboard selection", node: <MenuFrame><CommandMenu {...menuBase} selected={1} /></MenuFrame> },
+      { label: "no match", node: <MenuFrame><CommandMenu {...menuBase} rows={[]} status="no-match" typed="/zz" /></MenuFrame> },
+      { label: "no match phone", node: <MenuFrame><CommandMenu {...menuBase} rows={[]} status="no-match" typed="/zz" compact /></MenuFrame> },
+      { label: "loading", node: <MenuFrame><CommandMenu {...menuBase} rows={[]} status="loading" /></MenuFrame> },
+      { label: "list failed", node: <MenuFrame><CommandMenu {...menuBase} status="failed" /></MenuFrame> },
+      { label: "phone", node: <MenuFrame><CommandMenu {...menuBase} compact /></MenuFrame> },
+      { label: "below", node: <MenuFrame><CommandMenu {...menuBase} placement="below" /></MenuFrame> },
+    ],
+  },
   {
     name: "HarnessLabel",
     cases: [
