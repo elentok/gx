@@ -141,6 +141,15 @@ func (s *Server) promptSession(req SessionPromptRequest, source string) (Session
 		}
 	} else {
 		s.sessionWatches.start(func() { s.sendPrompt(dir, text) })
+		if name, ok := renameCommandArg(text); ok && name != meta.Name {
+			// The harness renames itself, but a typed name never follows the
+			// terminal title, so the Agents tab would keep the old one.
+			meta.Name, meta.AutoName = name, false
+			if err := writeSessionMeta(dir, meta); err != nil {
+				return SessionResult{}, err
+			}
+			s.events.publish(EventSessionChanged, req.ID)
+		}
 		if err := s.notePersonTyped(dir, meta, "Auto-advance stopped: you typed"); err != nil {
 			return SessionResult{}, err
 		}
@@ -189,4 +198,15 @@ func (s *Server) lastChatMessageID(id string, meta sessionMeta) (string, error) 
 		return "", err
 	}
 	return chat.msgs[len(chat.msgs)-1].ID, nil
+}
+
+// renameCommandArg is the new name in a "/rename <name>" or "/name <name>"
+// prompt. A bare command (which asks the harness to pick a name) has none.
+func renameCommandArg(text string) (string, bool) {
+	cmd, arg, _ := strings.Cut(strings.TrimSpace(text), " ")
+	if cmd != "/rename" && cmd != "/name" {
+		return "", false
+	}
+	arg = strings.TrimSpace(arg)
+	return arg, arg != "" && !strings.ContainsAny(arg, "\r\n")
 }
