@@ -61,12 +61,10 @@ a ticket both builds a new capability and builds the thing that uses it, not onl
 pre-existing file is threaded twice (e.g. "add the data/plumbing" ticket vs. "add the user-facing
 command" ticket; or "add a new backend control path" vs. "add the UI that calls it").
 
-If tickets earlier in the same epic are already implemented, check their actual cost
-(`gx tickets schema`'s `actual_context_window`/`elapsed_time` fields, handoff notes, session logs)
-before finalizing later estimates. A cold estimate is a guess; an earlier sibling ticket's actual is
-real data about how this epic's tickets run in practice, and should recalibrate the rest of the
-split — including retroactively splitting a not-yet-started ticket that now looks oversized in light
-of it.
+Before finalizing estimates in an epic that already has finished tickets, run
+`gx tickets calibration <project:epic>`. With 3 or more finished tickets, apply the epic's ratio
+instead of 0.83 to the tickets not yet started, and split any ticket that now looks oversized. With
+fewer, keep 0.83. The command never changes a number; you apply the ratio by hand.
 
 ## Process
 

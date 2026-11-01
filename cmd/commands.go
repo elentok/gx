@@ -260,6 +260,7 @@ func newTicketsCmd(d deps) *cobra.Command {
 	showCmd.MarkFlagsMutuallyExclusive("json", "section")
 	cmd.AddCommand(showCmd)
 	cmd.AddCommand(newTicketsLogCmd(d))
+	cmd.AddCommand(newTicketsCalibrationCmd(d))
 	cmd.AddCommand(newTicketsSetCmd(d))
 	var migrateToStore, migrateDryRun bool
 	var migrateProject string
