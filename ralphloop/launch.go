@@ -173,6 +173,9 @@ type launchAndPromptParams struct {
 	input *personInput
 	// SmartZone is the context-token ceiling before this agent gets paused.
 	SmartZone int
+	// LongTicketTurns and OnLongTicket: see OneIteration.
+	LongTicketTurns int
+	OnLongTicket    func(turns int)
 	// Gate is the pause/resume coordinator shared across the whole Run call.
 	Gate *Gate
 	// Sink receives this Run call's lifecycle events, safe to call

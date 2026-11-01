@@ -52,6 +52,8 @@ type TicketInfo struct {
 	// ModelRan and ModelExpected are the two model names a model-mismatch pause shows.
 	ModelRan      string `json:"model_ran,omitempty"`
 	ModelExpected string `json:"model_expected,omitempty"`
+	// LongTicketTurns is the turn count at which the long-ticket alert fired; the web UI badges it.
+	LongTicketTurns int `json:"long_ticket_turns,omitempty"`
 
 	// HarnessLabel is filled by the snapshot handler for open, blocked and claimed tickets.
 	HarnessLabel `tstype:",extends"`
@@ -328,6 +330,7 @@ func ticketInfo(project, epic string, t tickets.Ticket) TicketInfo {
 		Compactions:           t.Compactions,
 		ModelRan:              t.ModelRan,
 		ModelExpected:         t.ModelExpected,
+		LongTicketTurns:       t.LongTicketTurns,
 
 		Category:   t.Category,
 		ExportedAt: t.ExportedAt,

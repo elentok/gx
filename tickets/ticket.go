@@ -101,6 +101,9 @@ type Ticket struct {
 	ModelRan      string
 	ModelExpected string
 
+	// LongTicketTurns mirrors schema.Ticket.LongTicketTurns.
+	LongTicketTurns int
+
 	// PauseReason mirrors schema.Ticket.PauseReason: why a Paused ticket is
 	// paused.
 	PauseReason schema.PauseReason

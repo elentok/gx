@@ -741,6 +741,10 @@ func (s *Server) finishRun(rc runContext) {
 	rc.one.OnRateLimit = func(limited bool, resetAt time.Time) {
 		s.registry.markRateLimit(rc.ticketAddr, limited, resetAt)
 	}
+	if addr, err := tickets.ParseAddress(rc.ticketAddr, tickets.AddressContext{}); err == nil {
+		rc.one.LongTicketTurns = s.settings.Load().LongTicketTurns
+		rc.one.OnLongTicket = func(turns int) { s.alertLongTicket(addr, rc.one.Ticket.Path, turns) }
+	}
 	stop := make(chan struct{})
 	if !rc.one.PausesAtOnce() {
 		go s.watchBlocked(rc.deps.Runner, rc.run.Session, rc.ticketAddr, stop)

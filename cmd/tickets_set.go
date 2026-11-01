@@ -45,6 +45,8 @@ Settable fields:
   model_expected (string, --model-expected): the model the ticket's tier resolved to.
   tier_override (enum, --tier-override): light, worker, strongest. A one-time tier for the
     ticket's next launch, cleared when that launch starts. A resume with --tier sets it.
+  long_ticket_turns (non-negative int, --long-ticket-turns): the assistant-turn count at which
+    the long-ticket alert fired. Set by the server; 0 clears it.
   commitless (bool, --commitless): true/false. Set true when you intentionally finish an
     iteration with no commit (e.g. exploration concluded no code change was warranted) —
     pair it with a status that doesn't leave the ticket claimed (done),
@@ -155,6 +157,7 @@ func newTicketsSetCmd(d deps) *cobra.Command {
 	cmd.Flags().String("model-ran", "", "set model_ran")
 	cmd.Flags().String("model-expected", "", "set model_expected")
 	cmd.Flags().String("tier-override", "", "set tier_override (light, worker, strongest)")
+	cmd.Flags().String("long-ticket-turns", "", "set long_ticket_turns")
 	cmd.Flags().StringVar(&commitless, "commitless", "", "set commitless (true/false)")
 	cmd.Flags().StringVar(&iterationStatus, "iteration-status", "", "set the iteration_status field (working, asking, finished)")
 	cmd.Flags().String("check-failures", "", "with --iteration-status finished: follow-up addresses (comma-separated), one per failing test of the last `gx check` run")
@@ -298,6 +301,10 @@ var ticketSetFields = []ticketSetField{
 	{"model-ran", "model_ran", func(t *schema.Ticket, v string) { t.ModelRan = v }},
 	{"model-expected", "model_expected", func(t *schema.Ticket, v string) { t.ModelExpected = v }},
 	{"tier-override", "tier_override", func(t *schema.Ticket, v string) { t.TierOverride = v }},
+	{"long-ticket-turns", "long_ticket_turns", func(t *schema.Ticket, v string) {
+		n, _ := strconv.Atoi(v)
+		t.LongTicketTurns = max(n, 0)
+	}},
 	{"commitless", "commitless", func(t *schema.Ticket, v string) {
 		b, _ := strconv.ParseBool(v)
 		t.Commitless = b

@@ -1386,6 +1386,10 @@ export interface TicketInfo extends HarnessLabel {
    */
   model_ran?: string;
   model_expected?: string;
+  /**
+   * LongTicketTurns is the turn count at which the long-ticket alert fired; the web UI badges it.
+   */
+  long_ticket_turns?: number /* int */;
   category?: string;
   exported_at?: string;
   /**

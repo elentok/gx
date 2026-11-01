@@ -67,6 +67,10 @@ type OneIteration struct {
 	// starts or the reset changes (zero resetAt: no known reset), (false, zero)
 	// when it ends. Nil hears nothing.
 	OnRateLimit func(limited bool, resetAt time.Time)
+	// LongTicketTurns is the assistant-turn count at which OnLongTicket is
+	// called, once per launch; zero or a nil callback means no alert.
+	LongTicketTurns int
+	OnLongTicket    func(turns int)
 }
 
 // PausesAtOnce reports whether a block pauses the ticket with no dwell: a
@@ -342,12 +346,14 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 		Label: w.Label, Agent: o.Agent, Session: s, Pane: s.ID, SessionCwd: w.Path, Sink: o.sink(),
 		ScratchDir: o.ScratchDir, EpicName: o.Epic, Ticket: o.Ticket.Identifier, TicketPath: o.Ticket.Path,
 		TicketData: o.Ticket, SmartZone: o.smartZone(), verifyCap: new(verifyCapState), Model: o.Model,
+		LongTicketTurns: o.LongTicketTurns, OnLongTicket: o.OnLongTicket,
 	}
 	in := watchPersonInput(d.Runner, s)
 	defer in.close()
 	p.input = in
 	vcap := newVerifyCap(p, p.SmartZone)
 	mguard := newModelGuard(d, p, clockOf(d))
+	lguard := newLongTicketGuard(d, p, clockOf(d))
 	elapsedMs := 0
 	nudged := false
 	for {
@@ -361,6 +367,7 @@ func WaitIterationFinished(d Deps, o OneIteration, w IterationWorktree, s agentr
 				if err := mguard.tick(d, p, sessionID); err != nil {
 					return err
 				}
+				lguard.tick(d, p, sessionID)
 				if _, err := vcap.tick(d, p, sessionID); err != nil {
 					return err
 				}

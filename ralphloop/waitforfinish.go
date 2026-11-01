@@ -54,7 +54,9 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 	// own doc comment.
 	recovery := newSmartZoneRecovery(smartZone)
 	vcap := newVerifyCap(p, smartZone)
-	mguard := newModelGuard(d, p, clockOf(d))
+	now := clockOf(d)
+	mguard := newModelGuard(d, p, now)
+	lguard := newLongTicketGuard(d, p, now)
 	for {
 		pollMs := smartZonePollMs
 		if p.FinishTimeoutMs > 0 {
@@ -181,7 +183,7 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 			}
 		}
 
-		acted, err := guardTick(d, p, sessionID, vcap, recovery, mguard)
+		acted, err := guardTick(d, p, sessionID, vcap, recovery, mguard, lguard)
 		if err != nil {
 			return err
 		}
@@ -196,10 +198,11 @@ func waitForFinish(d Deps, p launchAndPromptParams, sessionID string) error {
 // reports that either of the first two interrupted the pane. The cap stop goes
 // first and takes the whole tick: if occupancy is also past the smart zone, the
 // next poll runs its recovery.
-func guardTick(d Deps, p launchAndPromptParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery, mguard *modelGuard) (acted bool, err error) {
+func guardTick(d Deps, p launchAndPromptParams, sessionID string, vcap *verifyCap, recovery *smartZoneRecovery, mguard *modelGuard, lguard *longTicketGuard) (acted bool, err error) {
 	if err := mguard.tick(d, p, sessionID); err != nil {
 		return false, err
 	}
+	lguard.tick(d, p, sessionID)
 	if stopped, err := vcap.tick(d, p, sessionID); err != nil || stopped {
 		return stopped, err
 	}
