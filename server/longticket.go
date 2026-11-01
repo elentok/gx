@@ -28,6 +28,12 @@ func longTicketFollowUp(from tickets.Address, turns int) followUp {
 	}
 }
 
+// clearLongTicketMark drops the previous launch's mark: each launch counts its
+// turns anew, so a restarted or resumed ticket must not keep a stale badge.
+func clearLongTicketMark(ticketPath string) error {
+	return schema.UpdateTicketWithBody(ticketPath, func(t *schema.Ticket, _ *string) { t.LongTicketTurns = 0 })
+}
+
 // alertLongTicket handles one launch's alert: it marks the ticket with the turn
 // count, sends the notification and files or updates the follow-up. The session
 // keeps running.

@@ -494,6 +494,9 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	s.rescan() // the claim must show now, not when the backstop poll comes
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
+	if err := clearLongTicketMark(t.Path); err != nil {
+		s.log.Warn("clear long-ticket mark", "ticket", ticketAddr, "err", err)
+	}
 	var tierRun Run
 	if tier := takeTierOverride(t.Path); tier != "" {
 		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(s.agentsConfig(queued.Project), agent, tier)

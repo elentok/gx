@@ -2,7 +2,9 @@ package server_test
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -109,7 +111,10 @@ func TestLaunch_EmptyTierModelPausesModelMismatchAndStartsNothing(t *testing.T) 
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	writeProjectAgents(t, store, repo, `,"agents":{"claude":{"effort":"low"}}`)
 	rec := &startRecorder{Runner: runnerfake.NewRunner()}
-	h := servertest.StartWithStore(t, store, servertest.WithRunner(rec), func(c *server.Config) { c.AgentsClaude = config.AgentConfig{} })
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(rec), func(c *server.Config) {
+		c.AgentsClaude = config.AgentConfig{}
+		c.RecoverySettings.FollowUps = "proj:follow-ups"
+	})
 
 	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
@@ -119,8 +124,20 @@ func TestLaunch_EmptyTierModelPausesModelMismatchAndStartsNothing(t *testing.T) 
 		return err == nil && tk.Status == schema.StatusPaused && tk.PauseReason == schema.PauseModelMismatch
 	})
 	tk, _ := schema.ParseTicket(path)
-	if tk.ModelRan != "none set" || tk.ModelExpected != "a tier model" {
-		t.Errorf("model fields = %q / %q, want none set / a tier model", tk.ModelRan, tk.ModelExpected)
+	if tk.ModelRan != "no model" || tk.ModelExpected != "a model from its tier" {
+		t.Errorf("model fields = %q / %q, want no model / a model from its tier", tk.ModelRan, tk.ModelExpected)
+	}
+	var drafts []string
+	servertest.WaitFor(t, 20*time.Second, "the banner and the follow-up draft", func() bool {
+		drafts, _ = filepath.Glob(filepath.Join(store, "proj", "follow-ups", "issues", "*model-mismatch*.md"))
+		return len(drafts) > 0
+	})
+	if len(drafts) != 1 {
+		t.Fatalf("follow-up drafts = %v, want 1", drafts)
+	}
+	draft, _ := os.ReadFile(drafts[0])
+	if !strings.Contains(string(draft), "its tier resolved to no model") {
+		t.Errorf("follow-up has no empty-model source:\n%s", draft)
 	}
 	if n := rec.count(); n != 0 {
 		t.Errorf("starts = %d, want 0", n)

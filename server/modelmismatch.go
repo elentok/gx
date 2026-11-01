@@ -14,11 +14,21 @@ import (
 // is the same problem, so a repeat adds a "Seen again" line to the open draft.
 const modelMismatchKey = "model-mismatch"
 
+// The model names recorded when a launch is refused for resolving to no model.
+const (
+	emptyModelRan      = "no model"
+	emptyModelExpected = "a model from its tier"
+)
+
 func modelMismatchFollowUp(from tickets.Address, m *ralphloop.ModelMismatchError) followUp {
+	source := fmt.Sprintf("Ticket %s ran on %s but its tier resolved to %s, and was paused.", from, m.Ran, m.Expected)
+	if m.Ran == emptyModelRan {
+		source = fmt.Sprintf("Ticket %s was paused before launch: its tier resolved to no model.", from)
+	}
 	return followUp{
 		Slug:    modelMismatchKey,
 		Title:   "Implement sessions run on the wrong model",
-		Source:  fmt.Sprintf("Ticket %s ran on %s but its tier resolved to %s, and was paused.", from, m.Ran, m.Expected),
+		Source:  source,
 		Problem: "An implement session's first assistant turn ran on a model other than the one gx launched it with.",
 		SuggestedFix: "Find out why the launch did not get the requested model (a settings override, " +
 			"an account default or a resumed session) and fix the cause, or drop the guard if the switch was deliberate.",
@@ -43,7 +53,7 @@ func (s *Server) pauseModelMismatch(rc runContext, addr tickets.Address, m *ralp
 // the CLI would pick a default gx does not know. No session started, so there
 // is nothing to stop.
 func (s *Server) refuseEmptyModel(scratchDir, path string, addr tickets.Address) {
-	m := &ralphloop.ModelMismatchError{Ran: "none set", Expected: "a tier model"}
+	m := &ralphloop.ModelMismatchError{Ran: emptyModelRan, Expected: emptyModelExpected}
 	s.recordModelMismatch(scratchDir, path, addr, Run{}, m, nil)
 }
 

@@ -296,8 +296,8 @@ type Ticket struct {
 	// TierOverride is a one-time tier (light, worker or strongest) for the
 	// ticket's next launch. A resume sets it; the launch reads and clears it.
 	TierOverride string
-	// LongTicketTurns is the assistant-turn count at which the long-ticket alert
-	// fired for the ticket's latest launch; zero means it did not.
+	// LongTicketTurns is the turn count of the current launch when the long-ticket
+	// alert fired; zero means it did not. Each launch clears it.
 	LongTicketTurns int
 	// IterationStatus is the agent's latest self-reported claim state (see
 	// the IterationStatus type doc). Never checked by Validate: the enum rule

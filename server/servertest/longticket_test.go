@@ -72,6 +72,22 @@ func TestLongTicket_AlertsOnceMarksTheTicketAndKeepsTheSessionRunning(t *testing
 	}
 }
 
+func TestLongTicket_ALaunchClearsTheMarkOfAnEarlierOne(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	WriteTicketWith(t, store, "proj", "epic-a", "01", "first", TicketOpts{LongTicketTurns: 5})
+	SetProjectRepo(t, store, "proj", repo)
+	h := StartWithStore(t, store, func(c *server.Config) { c.LongTicketTurns = 0 })
+	h.OnTurn(func(turn *Turn) { turn.Stall() })
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	WaitFor(t, 30*time.Second, "the launch to clear the mark", func() bool {
+		f := ticketFile(t, store, "epic-a")
+		return strings.Contains(f, "status: claimed") && !strings.Contains(f, "long_ticket_turns")
+	})
+}
+
 func TestLongTicket_ZeroThresholdProducesNoAlert(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
