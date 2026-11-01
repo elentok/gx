@@ -287,10 +287,20 @@ func printUsageSummary(w io.Writer, u server.UsageSummary) error {
 	fmt.Fprintf(w, "mode: %s\n", u.Mode)
 	for _, row := range []struct {
 		name string
-		win  *server.LimitWindow
+		win  *server.UsageLimitWindow
 	}{{"five_hour", u.Limits.FiveHour}, {"seven_day", u.Limits.SevenDay}} {
 		if row.win != nil {
 			fmt.Fprintf(w, "%s: %.0f%% used, resets at %d\n", row.name, row.win.UsedPercentage, row.win.ResetsAt)
+		}
+	}
+	if u.Codex != nil {
+		for _, row := range []struct {
+			name string
+			win  *server.UsageLimitWindow
+		}{{"codex_five_hour", u.Codex.FiveHour}, {"codex_seven_day", u.Codex.SevenDay}} {
+			if row.win != nil {
+				fmt.Fprintf(w, "%s: %.0f%% used, resets at %d\n", row.name, row.win.UsedPercentage, row.win.ResetsAt)
+			}
 		}
 	}
 	s := u.Spend

@@ -69,7 +69,14 @@ func TestLimitsFixture_ShapesShowInTheSummary(t *testing.T) {
 			if sum.Mode != server.UsageModeLimits {
 				t.Errorf("mode %q, want limits", sum.Mode)
 			}
-			tc.check(t, time.Now().Unix(), sum.Limits)
+			var report server.LimitsReport
+			if w := sum.Limits.FiveHour; w != nil {
+				report.FiveHour = &w.LimitWindow
+			}
+			if w := sum.Limits.SevenDay; w != nil {
+				report.SevenDay = &w.LimitWindow
+			}
+			tc.check(t, time.Now().Unix(), report)
 		})
 	}
 }

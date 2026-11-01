@@ -2518,12 +2518,30 @@ export interface UsageSpend {
   first_day?: string;
 }
 /**
+ * UsageLimitWindow is a limit window as the menu shows it. Chip and Forecast
+ * are set on weekly limits only; Chip is absent until a full day of history
+ * exists.
+ */
+export interface UsageLimitWindow extends LimitWindow {
+  chip?: LimitBurnChip;
+  forecast?: LimitForecast;
+}
+/**
+ * UsageLimits is the 5-hour and weekly window of one provider.
+ */
+export interface UsageLimits {
+  five_hour?: UsageLimitWindow;
+  seven_day?: UsageLimitWindow;
+}
+/**
  * UsageSummary is the one read the web menu fetches. The spend block is always
- * filled; the client picks the block to show by Mode.
+ * filled; the client picks the block to show by Mode. Codex is set only once
+ * the history holds a Codex sample.
  */
 export interface UsageSummary {
   mode: string;
-  limits: LimitsReport;
+  limits: UsageLimits;
+  codex?: UsageLimits;
   spend: UsageSpend;
 }
 
