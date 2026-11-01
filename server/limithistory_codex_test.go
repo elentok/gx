@@ -160,6 +160,7 @@ func TestLimitHistoryCodex_RestartKeepsSamples(t *testing.T) {
 	now := time.Now()
 	r.writeCodexAgent("a", now, codexWindowJSON(20, 300, now.Add(time.Hour)), "")
 	s.scanUsage()
+	s.lock.release() // New was never Run, so nothing else frees the state-dir lock
 	again := r.server()
 	if got := codexSamples(again, LimitIDCodex5h); len(got) != 1 || got[0].UsedPercentage != 20 {
 		t.Fatalf("after restart: %+v", got)
