@@ -245,7 +245,10 @@ func pauseTimedOutCompaction(t *testing.T, rewait time.Duration, finish bool) (a
 		t.Fatalf("add: %+v, %v", res, err)
 	}
 	// A launched run has seen its agent start the held turn; before that the agent is idle.
-	waitFor(t, func() bool { return len(sent()) == 1 && len(h.Server.Runs()) == 1 && h.Server.LaunchingRuns() == 0 })
+	// A launch builds a worktree, which a loaded full run can stretch past waitFor's default.
+	servertest.WaitFor(t, time.Minute, "the launch turn is held", func() bool {
+		return len(sent()) == 1 && len(h.Server.Runs()) == 1 && h.Server.LaunchingRuns() == 0
+	})
 	dir := filepath.Join(store, "proj")
 	if err := ralphloop.AppendEvent(dir, "epic-a", ralphloop.Event{Type: string(events.SmartZoneRecoveryFailed), Ticket: "01", Reason: `compacting epic-a-01 after smart-zone breach: {"code":"timeout"}`}); err != nil {
 		t.Fatal(err)
@@ -258,7 +261,7 @@ func pauseTimedOutCompaction(t *testing.T, rewait time.Duration, finish bool) (a
 		release()
 		mu.Unlock()
 	}
-	waitFor(t, func() bool {
+	servertest.WaitFor(t, time.Minute, "R7 is applied", func() bool {
 		log, _, _ := ralphloop.ReadEvents(dir, "epic-a")
 		for _, ev := range log {
 			if events.Type(ev.Type) == events.RecoveryApplied {

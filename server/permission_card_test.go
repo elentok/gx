@@ -66,7 +66,9 @@ func startBlockedClaimed(t *testing.T, herdr bool, p *agentrunner.Pending) (*ser
 		t.Fatal(err)
 	}
 	// A new fake session is idle, which the restarted server reads as a finished
-	// agent: it merges the ticket and stops the session before SetPending.
+	// agent: it merges the ticket and stops the session before SetPending. A
+	// restart also closes an idle (still launching) agent and reopens its claim,
+	// so the agent must already be mid-turn when the server comes back.
 	fake.SetState("epic-a-iter-01", agentrunner.StateWorking, "")
 	asHeadlessRun(t, h)
 	markStarted(t, h)
