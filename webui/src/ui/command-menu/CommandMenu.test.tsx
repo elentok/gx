@@ -1,5 +1,5 @@
 import { fireEvent } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderThemed } from "../render";
 import { TONES } from "../tone";
 import { CommandMenu, type CommandMenuRow } from "./CommandMenu";
@@ -45,6 +45,37 @@ describe("CommandMenu", () => {
     wide.unmount();
     const phone = renderThemed(<CommandMenu {...base} compact />);
     expect(phone.queryByText("Enter fills")).toBeNull();
+  });
+
+  describe("on a phone with an on-screen keyboard", () => {
+    const stub = (vv: object, fieldRect: object) => {
+      vi.stubGlobal("visualViewport", { addEventListener() {}, removeEventListener() {}, offsetTop: 0, ...vv });
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue(fieldRect as DOMRect);
+    };
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    it("caps an above menu at the room between the viewport top and the field", () => {
+      stub({ height: 400 }, { top: 200, bottom: 240 });
+      const { container } = renderThemed(<CommandMenu {...base} compact />);
+      const menu = container.querySelector<HTMLElement>("[data-placement]")!;
+      expect(getComputedStyle(menu).maxHeight).toBe("186px");
+    });
+
+    it("caps a below menu at the room between the field and the viewport bottom", () => {
+      stub({ height: 400 }, { top: 100, bottom: 140 });
+      const { container } = renderThemed(<CommandMenu {...base} compact placement="below" />);
+      const menu = container.querySelector<HTMLElement>("[data-placement]")!;
+      expect(getComputedStyle(menu).maxHeight).toBe("246px");
+    });
+
+    it("leaves the height alone when not compact", () => {
+      stub({ height: 400 }, { top: 200, bottom: 240 });
+      const { container } = renderThemed(<CommandMenu {...base} />);
+      expect(getComputedStyle(container.querySelector<HTMLElement>("[data-placement]")!).maxHeight).toBe("");
+    });
   });
 
   it("shows the no-match line with the typed token", () => {

@@ -1,6 +1,7 @@
 import { Box, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useRef, type ReactNode } from "react";
 import type { Tone } from "../tone";
+import { useMenuRoom } from "./useMenuRoom";
 
 export interface CommandMenuSegment {
   text: string;
@@ -36,8 +37,13 @@ interface CommandMenuProps {
 // Presentational only: the field keeps focus, so rows swallow mousedown instead of taking it.
 export function CommandMenu({ rows, selected, status, typed, compact = false, placement = "above", tone = "running", sends = true, listMaxH = "352px", onPick }: CommandMenuProps) {
   const showRows = status === "ready" || status === "failed";
+  const ref = useRef<HTMLDivElement>(null);
+  // Only the phone has an on-screen keyboard to make room for.
+  const room = useMenuRoom(ref, placement, compact);
   return (
     <Box
+      ref={ref}
+      maxH={room === undefined ? undefined : `${room}px`}
       data-tone={tone}
       data-placement={placement}
       position="absolute"
@@ -80,7 +86,7 @@ export function CommandMenu({ rows, selected, status, typed, compact = false, pl
         </>
       )}
       {showRows && rows.length > 0 && (
-        <Box role="listbox" aria-label="Commands" display="flex" flexDirection="column" p="1.5" gap="1px" maxH={listMaxH} overflowY="auto">
+        <Box role="listbox" aria-label="Commands" display="flex" flexDirection="column" p="1.5" gap="1px" maxH={listMaxH} minH="0" overflowY="auto">
           {rows.map((row, i) => (
             <Row key={`${row.source}:${row.name}`} row={row} active={i === selected} compact={compact} tone={tone} onPick={() => onPick(i)} />
           ))}
