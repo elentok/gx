@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -148,6 +149,27 @@ func TestPty_StartCleansDeadHolderDir(t *testing.T) {
 	}
 	if got.SessionID == first.SessionID {
 		t.Error("Start reused the dead session")
+	}
+}
+
+func TestPty_StartHolderThatCannotBindShowsItsStderr(t *testing.T) {
+	t.Parallel()
+	p := fakeclaudeRunner(t)
+	// A socket path over the unix limit makes the holder's listen fail.
+	label := strings.Repeat("l", 150)
+	_, err := p.Start(agentrunner.StartOptions{Label: label, Epic: "e", Cwd: t.TempDir(), Kind: "claude"})
+	if err == nil {
+		t.Fatal("Start = nil; want the holder's bind failure")
+	}
+	if strings.Contains(err.Error(), "holder.sock never answered") {
+		t.Errorf("error = %q; want the holder's own stderr", err)
+	}
+	stderr, rerr := os.ReadFile(filepath.Join(p.Root, label, nativerunner.HolderErrFile))
+	if rerr != nil {
+		t.Fatalf("holder.err: %v", rerr)
+	}
+	if len(stderr) == 0 || !strings.Contains(err.Error(), strings.TrimSpace(string(stderr))) {
+		t.Errorf("error = %q; want it to carry holder.err %q", err, stderr)
 	}
 }
 

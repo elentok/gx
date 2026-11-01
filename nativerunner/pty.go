@@ -179,7 +179,7 @@ func (p *Pty) launch(ss *ptySession, dir, cwd string, kind agentrunner.Kind) err
 			ss.holder, ss.claudePID = holder, holder.ChildPID()
 			break
 		}
-		if err := p.launchTick(ss, deadline, "holder.sock never answered"); err != nil {
+		if err := p.launchTick(ss, dir, deadline, "holder.sock never answered"); err != nil {
 			return err
 		}
 	}
@@ -355,9 +355,12 @@ func (p *Pty) noPidFileErr(ss *ptySession) error {
 
 // launchTick sleeps one poll, failing with what once the holder exited or
 // deadline passed.
-func (p *Pty) launchTick(ss *ptySession, deadline time.Time, what string) error {
+func (p *Pty) launchTick(ss *ptySession, dir string, deadline time.Time, what string) error {
 	select {
 	case <-ss.exited:
+		if text := holderErrText(dir); text != "" {
+			return fmt.Errorf("pty start: holder exited: %s", text)
+		}
 		return fmt.Errorf("pty start: holder exited: %s", what)
 	case <-time.After(p.pollInterval()):
 	}
@@ -390,6 +393,13 @@ func (p *Pty) spawn(opts agentrunner.StartOptions, dir, sessionID string) (*exec
 	cmd := exec.Command(holder[0], args...)
 	cmd.Dir = opts.Cwd
 	cmd.Env = launch.Env
+	errFile, err := createHolderErr(dir)
+	if err != nil {
+		return nil, err
+	}
+	// The child holds its own copy of the file once started.
+	defer errFile.Close()
+	cmd.Stderr = errFile
 	if err := StartDetached(cmd); err != nil {
 		return nil, err
 	}

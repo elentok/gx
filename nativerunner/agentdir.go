@@ -29,7 +29,7 @@ type layout struct {
 var layouts = map[string]layout{
 	runnerName: {logs: []string{OutFile, ErrFile}, transient: []string{StdinFile}, alive: headlessAlive},
 	ptyRunnerName: {
-		logs: []string{RawLogFile, ScreenFile}, transient: []string{HolderSocketFile},
+		logs: []string{RawLogFile, ScreenFile, HolderErrFile}, transient: []string{HolderSocketFile},
 		alive: ptyAlive, readsTranscript: true,
 	},
 }

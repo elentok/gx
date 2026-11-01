@@ -1,6 +1,7 @@
 package nativerunner_test
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -47,6 +48,8 @@ func testHolder() {
 		kind = agentrunner.Kind(args[i+1])
 	}
 	if err := nativerunner.RunHarnessHolder(dir, kind, nativerunner.HolderOptions{}, args[slices.Index(args, "--")+1:]); err != nil {
+		// Like the real command, whose error cobra prints.
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
 }

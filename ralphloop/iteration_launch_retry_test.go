@@ -297,6 +297,30 @@ func TestRunIteration_SessionDiedInWait_PausesRepairWithReason(t *testing.T) {
 	}
 }
 
+func TestRunIteration_HolderStartFailure_PausesIterationErrorWithStderr(t *testing.T) {
+	t.Parallel()
+	d, _, _ := fakeDeps()
+	r := fakeRunner(d)
+	r.SetStartErr(launchLabel, errors.New("pty start: holder exited: Error: listen unix: invalid argument"))
+
+	scratchDir := runLaunchEpic(t, d, true)
+
+	assertTicketPaused(t, scratchDir, schema.PauseClassRepair)
+	evs, _, err := ReadEvents(scratchDir, launchEpic)
+	if err != nil {
+		t.Fatalf("ReadEvents() error = %v", err)
+	}
+	for _, ev := range evs {
+		if ev.Type == string(events.Paused) {
+			if ev.Kind != string(events.IterationError) || !strings.Contains(ev.Reason, "listen unix: invalid argument") {
+				t.Errorf("paused event = %+v, want iteration_error carrying the holder's stderr", ev)
+			}
+			return
+		}
+	}
+	t.Error("no paused event")
+}
+
 func TestRunIteration_OtherPromptError_PausesWithoutRetry(t *testing.T) {
 	t.Parallel()
 	d, _, _ := fakeDeps()
