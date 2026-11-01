@@ -303,28 +303,31 @@ what was decided.
 
 ### 6. Publish the tickets
 
-Create a new implementation epic as a `draft` first, so the scheduler cannot queue it before its
-tickets exist:
+Write the whole breakdown as one manifest file and publish it with one call. `publish` creates the
+implementation epic as a `draft` when it does not exist, so the scheduler cannot queue it before its
+tickets exist. It also assigns the IDs, in dependency order:
 
 ```sh
-gx tickets epic add <project:epic> --kind loop --status draft
+gx tickets publish <project:epic> --manifest <file>
 ```
 
-Skip this when publishing into an epic that already exists. Opening the epic is the very last step,
-after the Summary and `ensure-code-review` (see the end of this step).
+Add `--dry-run` first to print the IDs it would assign without writing anything. Opening the epic is
+the very last step, after the Summary, `ensure-code-review` and `ensure-verify` (see the end of this
+step).
 
-Create one ticket per call (see [gx-local-tracker.md](../gx-local-tracker.md)), in dependency order
-(blockers first); it allocates the ID and prints the ticket's address:
+The manifest is a YAML list with one entry per ticket. Each entry has these fields:
 
-```sh
-gx tickets add <epic-slug> --slug <slug> --type implement --expected-context-window 20000 \
-  [--blocked-by 01,03] --body -
-```
+- `slug`: the ticket's slug.
+- `type`: the ticket type, for example `implement`.
+- `blocked_by`: the tickets it depends on. List slugs from this manifest, or a bare ID for a ticket
+  that already exists. Never put a `/` in it. Leave it out when nothing gates the ticket.
+- `expected_context_window`: the estimate from step 4.
+- `body`: the ticket body, from the per-ticket template below.
 
-`--blocked-by` lists the ticket IDs it depends on; leave it out when nothing gates the ticket. Use
-the per-ticket template below as the body — one ticket per call, never a single combined file. Write
-each body to a scratchpad file with Write and pipe it in; never a heredoc, never edit a ticket file
-by path (see "Write a body once" in the tracker).
+To refer to another ticket from a body, write `{{slug}}`. `publish` replaces it with that ticket's
+address. To write a literal placeholder, quote it as `\{{`. Write the manifest to a scratchpad file
+with Write; never a heredoc, never edit a ticket file by path (see "Write a body once" in the
+tracker).
 
 Always write a `## Summary` on the epic as part of publishing. Never skip it, never block publishing
 on it, and never copy a map Destination into it:
@@ -353,8 +356,9 @@ decisions its author resolves by hand, through `gx tickets set`; implementation 
 of `status` for the whole epic it runs. Putting both kinds in one directory puts two writers on the
 same status field.
 
-Before considering any ticket published, run `gx tickets validate <addr>` on it. Fix any reported
-error and re-validate until it passes — do not publish a ticket that fails validation.
+`publish` validates every ticket and prints the failures. For a ticket added with `gx tickets add`,
+run `gx tickets validate <addr>` on it before considering it published. Fix any reported error and
+re-validate until it passes. Do not publish a ticket that fails validation.
 
 Tickets can also be forked off **mid-flight**, by `gx-implement`, when a ticket outgrows its budget
 while in progress — same template, same publishing mechanics, just triggered from inside a running
