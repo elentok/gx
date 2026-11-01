@@ -985,8 +985,8 @@ Run with `-g "78\. Send refused"`: the number 78 is also used by the disk flow.
 - **Steps:**
   1. Open an idle Claude session. Hold `/v1/sessions/chat` to answer 500 and send a prompt with `gx agents prompt`.
   2. Type a draft, stop holding and press Send.
-  3. Type `/clear` and press Send.
-- **Pass:** the composer reads "the conversation moved; review it first" in a colour other than the draft note's. The chat reloads and shows the CLI prompt. The draft stays in the box and `gx agents chat` does not list it. The `/clear` send reads "text may not start with / or !" and keeps `/clear` in the box.
+  3. Type `!ls` and press Send.
+- **Pass:** the composer reads "the conversation moved; review it first" in a colour other than the draft note's. The chat reloads and shows the CLI prompt. The draft stays in the box and `gx agents chat` does not list it. The `!ls` send reads "text may not start with !" and keeps `!ls` in the box.
 
 ## 79. Keyboard send
 

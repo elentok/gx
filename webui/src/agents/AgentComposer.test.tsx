@@ -77,13 +77,13 @@ test("Send is off when the session is not promptable, but the box stays editable
 
 test("a refused send shows its reason inline only, no toast, and keeps the draft", async () => {
   const toast = vi.spyOn(toaster, "create");
-  const post = vi.fn(async () => ({ refused: true, message: "text may not start with / or !" })) as unknown as PostPrompt;
+  const post = vi.fn(async () => ({ refused: true, message: "text may not start with !" })) as unknown as PostPrompt;
   render({ post });
-  fireEvent.change(box(), { target: { value: "/x" } });
+  fireEvent.change(box(), { target: { value: "!ls" } });
   fireEvent.click(send());
-  expect(await screen.findByText("text may not start with / or !")).toBeTruthy();
+  expect(await screen.findByText("text may not start with !")).toBeTruthy();
   expect(toast).not.toHaveBeenCalled();
-  expect((box() as HTMLTextAreaElement).value).toBe("/x");
+  expect((box() as HTMLTextAreaElement).value).toBe("!ls");
   toast.mockRestore();
 });
 
@@ -106,11 +106,11 @@ test("the $ hint shows for a Codex /gx- draft, not for Claude or other drafts", 
 });
 
 test("the $ hint yields to a refusal line", async () => {
-  const post = vi.fn(async () => ({ refused: true, message: "text may not start with / or !" })) as unknown as PostPrompt;
+  const post = vi.fn(async () => ({ refused: true, message: "text may not start with !" })) as unknown as PostPrompt;
   render({ s: codex(), post });
   fireEvent.change(box(), { target: { value: "/gx-design x" } });
   fireEvent.click(send());
-  expect(await screen.findByText("text may not start with / or !")).toBeTruthy();
+  expect(await screen.findByText("text may not start with !")).toBeTruthy();
   expect(screen.queryByText(HINT)).toBeNull();
 });
 

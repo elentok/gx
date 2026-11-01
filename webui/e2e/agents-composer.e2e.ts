@@ -58,11 +58,11 @@ test("78. Send refused", async ({ page, start }) => {
   await expect(messageBox(page)).toHaveValue("my draft");
   expect(await fixture.cli("agents", "chat", idle.id)).not.toContain("my draft");
 
-  // A send that starts with / is refused by prefix and keeps the draft.
-  await messageBox(page).fill("/clear");
+  // A send that starts with ! is refused by prefix and keeps the draft.
+  await messageBox(page).fill("!ls");
   await sendButton(page).click();
-  await expect(composer(page).getByText("text may not start with / or !")).toBeVisible();
-  await expect(messageBox(page)).toHaveValue("/clear");
+  await expect(composer(page).getByText("text may not start with !")).toBeVisible();
+  await expect(messageBox(page)).toHaveValue("!ls");
 });
 
 test("79. Keyboard send", async ({ page, start }) => {

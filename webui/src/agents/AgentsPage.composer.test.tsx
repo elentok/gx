@@ -46,14 +46,14 @@ test("Idle with text enables Send; accept clears the draft and the box", async (
 });
 
 test("a refusal keeps the draft and shows its reason in red, inline", async () => {
-  stubPrompt(refused("prefix-not-allowed", "Messages starting with / or ! are not sent."));
+  stubPrompt(refused("prefix-not-allowed", "text may not start with !"));
   render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
-  await type("/clear");
+  await type("!ls");
   fireEvent.click(sendButton());
-  const line = await screen.findAllByText("Messages starting with / or ! are not sent.");
+  const line = await screen.findAllByText("text may not start with !");
   expect(getComputedStyle(line[0]).color).not.toBe(getComputedStyle(screen.getByText("hello there")).color);
-  expect((await composerBox()).value).toBe("/clear");
-  expect(localStorage.getItem("gx.draft.composer.s-1")).toBe("/clear");
+  expect((await composerBox()).value).toBe("!ls");
+  expect(localStorage.getItem("gx.draft.composer.s-1")).toBe("!ls");
 });
 
 test("stale refetches the chat and keeps the draft", async () => {
