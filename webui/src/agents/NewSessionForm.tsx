@@ -1,5 +1,8 @@
 import { Box, chakra, Spinner, Text } from "@chakra-ui/react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useCompletion } from "../commands/useCompletion";
+import type { CommandTarget, FetchCommands } from "../commands/useCommandList";
+import { useWide } from "../useWide";
 import { useConnectionContext, useConnectionState } from "../connection";
 import type { ProjectWorktrees } from "../generated/server";
 import { Button } from "../ui/button/Button";
@@ -16,11 +19,51 @@ export const TIERS = [
   { id: "strongest", label: "Strongest" },
 ];
 
+/** The First prompt textarea with the `/` menu. The session is always Claude; the list is read for the chosen worktree, or the project root when one is being created. */
+function PromptField({ value, onChange, target, fetcher }: { value: string; onChange: (text: string) => void; target: CommandTarget; fetcher?: FetchCommands }) {
+  const area = useRef<HTMLTextAreaElement>(null);
+  const [cursor, setCursor] = useState(0);
+  const pending = useRef<number | null>(null);
+  const wide = useWide();
+  const c = useCompletion({ target, harness: "claude", fetcher, sends: false, listMaxH: "250px", placement: wide ? "above" : "below" }, value, cursor, false, (text, at) => {
+    pending.current = at;
+    onChange(text);
+    setCursor(at);
+  });
+  useLayoutEffect(() => {
+    if (pending.current == null) return;
+    area.current?.setSelectionRange(pending.current, pending.current);
+    pending.current = null;
+  }, [value]);
+  return (
+    <Box position="relative">
+      <chakra.textarea
+        ref={area}
+        aria-label="First prompt"
+        {...field}
+        w="100%"
+        py="2"
+        minH="96px"
+        resize="vertical"
+        value={value}
+        onChange={(e) => {
+          setCursor(e.target.selectionStart);
+          onChange(e.target.value);
+        }}
+        onSelect={(e) => setCursor(e.currentTarget.selectionStart)}
+        onKeyDown={c.onKeyDown}
+      />
+      {c.menu}
+    </Box>
+  );
+}
+
 /** The New session form: Project, one Worktree picker, Name and First prompt. The draft lives in localStorage until create or discard. */
 export function NewSessionForm({
   prefillProject,
   fetchTrees = fetchWorktrees,
   create = postCreateSession,
+  fetchCommands,
   onCreated,
   onClose,
 }: {
@@ -28,6 +71,8 @@ export function NewSessionForm({
   prefillProject?: string;
   fetchTrees?: FetchWorktrees;
   create?: CreateSession;
+  /** Replaces the command-list fetch, for tests. */
+  fetchCommands?: FetchCommands;
   /** Runs with the new session's id once the server accepted the create. */
   onCreated: (id: string) => void;
   /** Closing keeps the draft. */
@@ -130,7 +175,7 @@ export function NewSessionForm({
               </chakra.select>
             </Field>
             <Field label="First prompt" optional>
-              <chakra.textarea aria-label="First prompt" {...field} py="2" minH="96px" resize="vertical" value={draft.prompt} onChange={(e) => patch({ prompt: e.target.value })} />
+              <PromptField fetcher={fetchCommands} value={draft.prompt} onChange={(prompt) => patch({ prompt })} target={{ project, dir: draft.create || !picked ? (current?.root ?? "") : picked.path }} />
             </Field>
           </>
         )}

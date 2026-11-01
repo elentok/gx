@@ -3,11 +3,15 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { ConnectionContext, type Connection, type ConnectionState } from "../connection";
 import type { ProjectWorktrees, SessionResult } from "../generated/server";
 import { renderThemed } from "../ui/render";
+import { clearCommandListCache, type FetchCommands } from "../commands/useCommandList";
 import type { CreateSession, NewSessionBody } from "./newSession";
 import { NewSessionForm } from "./NewSessionForm";
 
 afterEach(cleanup);
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  clearCommandListCache();
+});
 
 const KEY = "gx.newSession.draft";
 const saved = () => JSON.parse(localStorage.getItem(KEY) ?? "null");
@@ -17,7 +21,7 @@ const trees: ProjectWorktrees[] = [
 ];
 const accepted: SessionResult = { session: { id: "gx-7" } as never };
 
-function mount(over: { create?: CreateSession; connected?: boolean; prefillProject?: string } = {}) {
+function mount(over: { create?: CreateSession; connected?: boolean; prefillProject?: string; fetchCommands?: FetchCommands } = {}) {
   const posts: NewSessionBody[] = [];
   const create: CreateSession = over.create ?? (async (body) => (posts.push(body), accepted));
   const onCreated = vi.fn();
@@ -29,7 +33,7 @@ function mount(over: { create?: CreateSession; connected?: boolean; prefillProje
   } as unknown as Connection;
   renderThemed(
     <ConnectionContext.Provider value={conn}>
-      <NewSessionForm prefillProject={over.prefillProject} fetchTrees={async () => trees} create={create} onCreated={onCreated} onClose={onClose} />
+      <NewSessionForm prefillProject={over.prefillProject} fetchTrees={async () => trees} create={create} fetchCommands={over.fetchCommands} onCreated={onCreated} onClose={onClose} />
     </ConnectionContext.Provider>,
   );
   return { posts, onCreated, onClose };
@@ -143,6 +147,56 @@ test("a refusal shows in the form with input kept", async () => {
   expect((screen.getByRole("combobox", { name: "Worktree" }) as HTMLInputElement).value).toBe("bad name");
   expect(onCreated).not.toHaveBeenCalled();
   expect(saved().prompt).toBe("/x");
+});
+
+const entry = (name: string) => ({ name, arg_hint: "", description: "", source: "skill", aliases: [] });
+const commandsFor = () => {
+  const targets: unknown[] = [];
+  const fetchCommands: FetchCommands = async (target) => {
+    targets.push(target);
+    const dir = "dir" in target ? target.dir : "";
+    return { entries: dir === "/dev/gx-stats" ? [entry("feature")] : [entry("review")], degraded: false };
+  };
+  return { fetchCommands, targets };
+};
+const prompt = () => screen.getByRole("textbox", { name: "First prompt" }) as HTMLTextAreaElement;
+const typeAt = (text: string) => {
+  fireEvent.change(prompt(), { target: { value: text, selectionStart: text.length, selectionEnd: text.length } });
+};
+const menuRows = () => screen.queryAllByRole("option", { name: /^\// }).map((o) => o.textContent);
+
+test("/ opens the menu for the chosen worktree and fills on Enter", async () => {
+  const { fetchCommands } = commandsFor();
+  mount({ fetchCommands });
+  typeWorktree(await ready(), "gx-stats");
+  fireEvent.click(list().getByRole("option", { name: /^gx-stats \/dev\/gx-stats$/ }));
+  prompt().focus();
+  typeAt("/");
+  await waitFor(() => expect(menuRows().some((r) => r?.includes("/feature"))).toBe(true));
+  expect(menuRows().some((r) => r?.includes("/review"))).toBe(false);
+  expect(screen.queryByText("Cmd/Ctrl+Enter sends")).toBeNull();
+  expect(screen.getByText("fills the text, does not send")).toBeTruthy();
+  fireEvent.keyDown(prompt(), { key: "Enter" });
+  expect(prompt().value).toMatch(/^\/feature /);
+});
+
+test("a created worktree reads the project root's list", async () => {
+  const { fetchCommands, targets } = commandsFor();
+  mount({ fetchCommands });
+  typeWorktree(await ready(), "new-tree");
+  fireEvent.click(list().getByRole("option", { name: /Create worktree/ }));
+  typeAt("/");
+  await waitFor(() => expect(menuRows().some((r) => r?.includes("/review"))).toBe(true));
+  expect(targets).toEqual([{ project: "gx", dir: "/dev/gx" }]);
+});
+
+test("Cmd+Enter does not submit; Enter with the menu closed adds a newline", async () => {
+  const { posts } = mount({ fetchCommands: commandsFor().fetchCommands });
+  await ready();
+  typeAt("hello");
+  fireEvent.keyDown(prompt(), { key: "Enter", metaKey: true });
+  fireEvent.keyDown(prompt(), { key: "Enter", ctrlKey: true });
+  expect(posts).toEqual([]);
 });
 
 test("submit is disabled offline", async () => {

@@ -26,11 +26,15 @@ interface CommandMenuProps {
   compact?: boolean;
   placement?: "above" | "below";
   tone?: Tone;
+  /** False where the field has no send key (the New session form): the hints then say the menu only fills. */
+  sends?: boolean;
+  /** The row list's height cap. A field inside a scrolling dialog needs it short enough that the menu is not clipped. */
+  listMaxH?: string;
   onPick: (index: number) => void;
 }
 
 // Presentational only: the field keeps focus, so rows swallow mousedown instead of taking it.
-export function CommandMenu({ rows, selected, status, typed, compact = false, placement = "above", tone = "running", onPick }: CommandMenuProps) {
+export function CommandMenu({ rows, selected, status, typed, compact = false, placement = "above", tone = "running", sends = true, listMaxH = "352px", onPick }: CommandMenuProps) {
   const showRows = status === "ready" || status === "failed";
   return (
     <Box
@@ -60,7 +64,7 @@ export function CommandMenu({ rows, selected, status, typed, compact = false, pl
       {status === "no-match" && (
         <>
           <Note>
-            {compact ? (
+            {compact && sends ? (
               "Send sends it as typed."
             ) : (
               <>
@@ -68,7 +72,7 @@ export function CommandMenu({ rows, selected, status, typed, compact = false, pl
                 <Text as="span" fontFamily="mono">
                   {typed}
                 </Text>
-                . Cmd/Ctrl+Enter sends it as typed.
+                {sends ? ". Cmd/Ctrl+Enter sends it as typed." : "."}
               </>
             )}
           </Note>
@@ -76,7 +80,7 @@ export function CommandMenu({ rows, selected, status, typed, compact = false, pl
         </>
       )}
       {showRows && rows.length > 0 && (
-        <Box role="listbox" aria-label="Commands" display="flex" flexDirection="column" p="1.5" gap="1px" maxH="352px" overflowY="auto">
+        <Box role="listbox" aria-label="Commands" display="flex" flexDirection="column" p="1.5" gap="1px" maxH={listMaxH} overflowY="auto">
           {rows.map((row, i) => (
             <Row key={`${row.source}:${row.name}`} row={row} active={i === selected} compact={compact} tone={tone} onPick={() => onPick(i)} />
           ))}
@@ -86,7 +90,7 @@ export function CommandMenu({ rows, selected, status, typed, compact = false, pl
         <Footer>
           <span>↑↓ select</span>
           <span>Enter fills</span>
-          <span>Cmd/Ctrl+Enter sends</span>
+          <span>{sends ? "Cmd/Ctrl+Enter sends" : "fills the text, does not send"}</span>
           <span>Esc closes</span>
         </Footer>
       )}

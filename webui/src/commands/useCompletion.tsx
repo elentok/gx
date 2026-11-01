@@ -11,6 +11,12 @@ export interface CompletionConfig {
   fetcher?: FetchCommands;
   /** No menu while the field cannot send. Kept a flag, not a missing config, so the textarea is not remounted. */
   off?: boolean;
+  /** Which side of the field the menu opens on. Default above. */
+  placement?: "above" | "below";
+  /** False when the field has no send key; the menu hints then say it only fills. */
+  sends?: boolean;
+  /** Passed to the menu's row list. */
+  listMaxH?: string;
 }
 
 /** The part of a keydown the menu reads: React's and the DOM's both fit. */
@@ -81,6 +87,6 @@ export function useCompletion(
     return false;
   };
 
-  const menu = open && token ? <CommandMenu rows={rows} selected={selected} status={status} typed={value.slice(token.start, token.end)} compact={!wide} onPick={choose} /> : null;
+  const menu = open && token ? <CommandMenu rows={rows} selected={selected} status={status} typed={value.slice(token.start, token.end)} compact={!wide} placement={config.placement} sends={config.sends} listMaxH={config.listMaxH} onPick={choose} /> : null;
   return { menu, onKeyDown };
 }
