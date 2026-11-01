@@ -23,7 +23,6 @@ import (
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/syshealth"
-	"github.com/elentok/gx/tickets"
 	"github.com/spf13/cobra"
 )
 
@@ -52,27 +51,23 @@ func newServerCmd(d deps) *cobra.Command {
 		},
 	}
 	status.Flags().BoolVar(&statusJSON, "json", false, "emit structured JSON instead of human-readable text")
-	var restartMigrate, restartContinue bool
+	var restartContinue bool
 	restartCmd := &cobra.Command{
 		Use:   "restart",
 		Short: "stop the server, install the skill bundle and start it again (use after upgrading gx)",
 		Long: `Stop the server and start it again. The start installs gx's skill bundle
-first, like "gx server start".
-
-With --migrate, run "gx tickets migrate" on every project in the ticket store
-between the stop and the start. The stop does not wait for running tickets. If
-a migration fails, the failed store is named and the server stays stopped.`,
+first, like "gx server start". The new server migrates the ticket stores. The
+stop does not wait for running tickets.`,
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
 			if restartContinue {
 				return runServerRestartContinue(c.Context(), d, c.OutOrStdout())
 			}
-			return runServerRestart(c.Context(), d, c.OutOrStdout(), restartMigrate)
+			return runServerRestart(c.Context(), d, c.OutOrStdout())
 		},
 	}
-	restartCmd.Flags().BoolVar(&restartContinue, "continue", false, "migrate every project, save failures and start anyway; log to restart.log (used by the web UI)")
+	restartCmd.Flags().BoolVar(&restartContinue, "continue", false, "log to restart.log (used by the web UI)")
 	_ = restartCmd.Flags().MarkHidden("continue")
-	restartCmd.Flags().BoolVar(&restartMigrate, "migrate", false, "migrate every project's ticket store while the server is stopped")
 	cmd.AddCommand(status, &cobra.Command{
 		Use:   "install",
 		Short: "register a launchd agent that starts the server at login and after a crash (macOS)",
@@ -583,101 +578,39 @@ func serverStarter(dirs config.Dirs, c *apiclient.Client) func(context.Context) 
 	}
 }
 
-func runServerRestart(ctx context.Context, d deps, w io.Writer, migrate bool) error {
+func runServerRestart(ctx context.Context, d deps, w io.Writer) error {
 	dirs := d.dirs()
-	return restartSteps(migrate,
+	return restartSteps(
 		func() error { return runServerStop(ctx, dirs, w) },
-		func() error {
-			cfg, err := dirs.Load()
-			if err != nil {
-				return err
-			}
-			return migrateAllProjects(dirs, cfg.TicketStore.Path, w)
-		},
 		func() error { return runServerStartCmd(ctx, d, w) },
 	)
 }
 
-// runServerRestartContinue is the restart the web UI runs: it migrates every
-// project, saves each failure and starts the server anyway. Output goes to w
+// runServerRestartContinue is the restart the web UI runs. Output goes to w
 // and to the fixed restart log.
 func runServerRestartContinue(ctx context.Context, d deps, w io.Writer) error {
-	dirs := d.dirs()
-	stateDir, err := dirs.StateDir()
-	if err != nil {
-		return err
-	}
-	logf, err := os.OpenFile(migratefail.RestartLogPath(stateDir), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	logf, err := openRestartLog(d.dirs())
 	if err != nil {
 		return err
 	}
 	defer logf.Close()
-	w = io.MultiWriter(w, logf)
-	return restartSteps(true,
-		func() error { return runServerStop(ctx, dirs, w) },
-		func() error {
-			cfg, err := dirs.Load()
-			if err != nil {
-				return err
-			}
-			return migrateAllProjectsContinue(dirs, stateDir, cfg.TicketStore.Path, w)
-		},
-		func() error { return runServerStartCmd(ctx, d, w) },
-	)
+	return runServerRestart(ctx, d, io.MultiWriter(w, logf))
 }
 
-// migrateAllProjectsContinue migrates every project, saving each failure to
-// the failure record instead of stopping. Only a failure to list projects is
-// returned; a record that cannot be saved is printed and the restart goes on.
-func migrateAllProjectsContinue(cfgDirs config.Dirs, stateDir, storePath string, w io.Writer) error {
-	dirs, err := tickets.ProjectDirs(storePath)
+func openRestartLog(dirs config.Dirs) (*os.File, error) {
+	stateDir, err := dirs.StateDir()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	warnUnknownApplied(w, dirs...)
-	for _, dir := range dirs {
-		name := tickets.ProjectName(dir)
-		fmt.Fprintf(w, "migrating %s\n", name)
-		if err := runTicketsMigrate(cfgDirs, dir, false, w); err != nil {
-			fmt.Fprintf(w, "migrate %s failed: %v\n", name, err)
-			if recErr := migratefail.Record(stateDir, name, err.Error()); recErr != nil {
-				fmt.Fprintf(w, "could not save the failure record for %s: %v\n", name, recErr)
-			}
-		}
-	}
-	return nil
+	return os.OpenFile(migratefail.RestartLogPath(stateDir), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 }
 
-// restartSteps stops, optionally migrates, then starts. A failed migration
-// leaves the server stopped, so the person can retry or start without it.
-func restartSteps(migrate bool, stop, migrateStores, start func() error) error {
+// restartSteps stops, then starts. A failed stop does not start.
+func restartSteps(stop, start func() error) error {
 	if err := stop(); err != nil {
 		return err
 	}
-	if migrate {
-		if err := migrateStores(); err != nil {
-			return fmt.Errorf("%w (server left stopped: fix and retry, or run `gx server start` to skip migrating)", err)
-		}
-	}
 	return start()
-}
-
-// migrateAllProjects runs `gx tickets migrate` on every project in the store
-// and stops at the first failure.
-func migrateAllProjects(cfgDirs config.Dirs, storePath string, w io.Writer) error {
-	dirs, err := tickets.ProjectDirs(storePath)
-	if err != nil {
-		return err
-	}
-	warnUnknownApplied(w, dirs...)
-	for _, dir := range dirs {
-		name := filepath.Base(dir)
-		fmt.Fprintf(w, "migrating %s\n", name)
-		if err := runTicketsMigrate(cfgDirs, dir, false, w); err != nil {
-			return fmt.Errorf("migrate %s: %w", name, err)
-		}
-	}
-	return nil
 }
 
 func runServerStop(ctx context.Context, dirs config.Dirs, w io.Writer) error {
