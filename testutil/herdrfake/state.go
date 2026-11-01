@@ -66,6 +66,8 @@ type Agent struct {
 	Received   []string
 	FastNext   bool
 	DialogNext bool
+	// SlashTurnNext makes the next "/" command start a turn (see SlashStartsTurn).
+	SlashTurnNext bool
 	// PaneText is what "agent read" returns (see SetPaneText).
 	PaneText string
 	// Keys is every key the agent was sent, in order. Input is its input line

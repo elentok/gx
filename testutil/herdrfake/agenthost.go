@@ -265,6 +265,12 @@ func (s *State) FastTurn(name string) error {
 	return s.withAgent(name, func(a *Agent) { a.FastNext = true })
 }
 
+// SlashStartsTurn makes the next "/" command to the agent named name start a
+// turn, as a skill does.
+func (s *State) SlashStartsTurn(name string) error {
+	return s.withAgent(name, func(a *Agent) { a.SlashTurnNext = true })
+}
+
 // OpenDialogOnNextSlash makes the agent named name open a dialog on the next
 // "/" command it receives, as /help does.
 func (s *State) OpenDialogOnNextSlash(name string) error {
@@ -362,6 +368,9 @@ func (s *State) withAgent(name string, f func(*Agent)) error {
 // command leaves the agent blocked.
 func (a *Agent) slashCommand(text string) {
 	switch {
+	case a.SlashTurnNext:
+		a.SlashTurnNext = false
+		a.setStatus("working", "")
 	case a.DialogNext:
 		a.DialogNext = false
 		a.setStatus("blocked", "input_needed")

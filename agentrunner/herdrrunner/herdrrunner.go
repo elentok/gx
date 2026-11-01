@@ -4,6 +4,7 @@
 package herdrrunner
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -19,6 +20,7 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/syshealth"
+	"github.com/elentok/gx/transcript"
 )
 
 // pollInterval spaces AgentWait retries when herdr answers a wait with a
@@ -57,6 +59,12 @@ type Runner struct {
 	Procs  func() ([]syshealth.Process, error)
 	Signal func(pid int, sig syscall.Signal) error
 
+	// Home is the home of the Claude transcripts a launch prompt is proved
+	// against. Empty skips the transcript proof.
+	Home string
+	// LaunchCaps bound that proof; a zero field means the default.
+	LaunchCaps claudeui.LaunchProofCaps
+
 	// log receives the vim probe's decisions (see SetLog); nil logs nothing.
 	log *slog.Logger
 
@@ -78,7 +86,7 @@ var _ agentrunner.Nudger = (*Runner)(nil)
 // transcripts under home and reading Codex quotas from codexHome. An empty home
 // skips the gating.
 func NewIn(cli herdr.CLI, home, codexHome string) *Runner {
-	r := &Runner{CLI: cli, started: map[string]agentrunner.StartOptions{}}
+	r := &Runner{CLI: cli, Home: home, started: map[string]agentrunner.StartOptions{}}
 	r.CodexQuota = func(cwd, sessionID string) (codexsession.RateLimit, bool, error) {
 		return codexsession.LastRateLimitIn(codexHome, cwd, sessionID)
 	}
@@ -170,13 +178,7 @@ func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(s
 		// decide when compaction has really finished.
 		until = append(until, "blocked", "idle", "done")
 	}
-	// A session this runner did not start is read as Claude, as in RateLimit.
-	r.mu.Lock()
-	kind := r.started[s.Label].Kind
-	r.mu.Unlock()
-	if kind == "" {
-		kind = harness.Claude
-	}
+	kind := r.kindOf(s)
 	typing, err := harness.LookupTyping(kind)
 	if err != nil {
 		return err
@@ -207,7 +209,114 @@ func (r *Runner) promptNudged(s agentrunner.Session, text string, onNudge func(s
 	return nil
 }
 
+// kindOf is the harness behind s. A session this runner did not start is read
+// as Claude, as in RateLimit.
+func (r *Runner) kindOf(s agentrunner.Session) agentrunner.Kind {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if kind := r.started[s.Label].Kind; kind != "" {
+		return kind
+	}
+	return harness.Claude
+}
+
 var errTurnPassedUnseen = errors.New("turn started and ended between polls")
+
+var _ agentrunner.LaunchPrompter = (*Runner)(nil)
+
+// PromptLaunch is PromptNudged for a launch prompt, which must start a turn.
+// A Claude "/" command needs two agreeing proofs: herdr showed the agent
+// working or blocked (or its seq moved), and the transcript's first user
+// record is the command (see claudeui.CheckLaunchDelivered, which also owns
+// the resends). Other prompts, and runners without a Claude home, keep the
+// PromptNudged path.
+func (r *Runner) PromptLaunch(s agentrunner.Session, text string, onNudge func(string)) error {
+	if r.Home == "" || r.kindOf(s) != harness.Claude || !isSlashCommand(text) {
+		return r.PromptNudged(s, text, onNudge)
+	}
+	if err := r.guard(s); err != nil {
+		return err
+	}
+	turn, err := r.awaitNotBusy(s)
+	if err != nil {
+		return err
+	}
+	return r.launchSlash(s, text, turn, onNudge)
+}
+
+func (r *Runner) launchSlash(s agentrunner.Session, text string, turn int, onNudge func(string)) error {
+	agent, herdrErr := r.CLI.AgentPrompt(herdr.AgentPromptOptions{
+		Target: s.ID, Text: text, Wait: true, Until: []string{"working", "blocked"}, TimeoutMs: toMs(r.WaitN()),
+	})
+	var blocked *herdr.AgentBlockedError
+	switch {
+	case errors.As(herdrErr, &blocked):
+		return fmt.Errorf("%w: %s", agentrunner.ErrNotReady, blocked.Message)
+	case herdrErr != nil && !IsPollTimeout(herdrErr):
+		return mapNotFound(herdrErr)
+	}
+	seen := herdrErr == nil && (agent.AgentStatus == "working" || agent.AgentStatus == "blocked")
+
+	now, sleep := r.clock()
+	caps := claudeui.DefaultLaunchProofCaps
+	caps.Grace = cmp.Or(r.LaunchCaps.Grace, caps.Grace)
+	caps.UnknownGrace = cmp.Or(r.LaunchCaps.UnknownGrace, caps.UnknownGrace)
+	caps.Poll = cmp.Or(r.LaunchCaps.Poll, caps.Poll)
+	caps.ResendEvery = cmp.Or(r.LaunchCaps.ResendEvery, caps.ResendEvery)
+	proof := claudeui.LaunchProof{
+		FirstUser: func() (string, bool, error) { return r.firstUserRecord(s) },
+		Pane: func() (string, error) {
+			text, err := ReadPaneRecent(r.CLI)(s.ID)
+			return text, mapNotFound(err)
+		},
+		// Typed without a wait: the shared policy resends only while the
+		// transcript lacks the command.
+		Resend: func() error {
+			_, err := r.CLI.AgentPrompt(herdr.AgentPromptOptions{Target: s.ID, Text: text})
+			return mapNotFound(err)
+		},
+		Report: func(d claudeui.NudgeDecision) {
+			if onNudge != nil {
+				onNudge(string(d))
+			}
+		},
+		Now:   now,
+		Sleep: sleep,
+	}
+	if err := claudeui.CheckLaunchDelivered(proof, text, caps); err != nil {
+		return err
+	}
+	if seen {
+		return nil
+	}
+	// The turn may have passed between herdr's polls: the seq still moved.
+	if st, err := r.herdrStatus(s); err == nil && st.Turn > turn {
+		return nil
+	}
+	return fmt.Errorf("%w: %q: herdr never showed the agent working or blocked: %v", agentrunner.ErrNotDelivered, text, cmp.Or(herdrErr, errors.New("agent still idle")))
+}
+
+// firstUserRecord is the text of the first person message of s's transcript;
+// ok is false until the transcript exists and has one.
+func (r *Runner) firstUserRecord(s agentrunner.Session) (string, bool, error) {
+	if s.SessionID == "" {
+		return "", false, nil
+	}
+	paths, err := transcript.FindByID(r.Home, s.SessionID)
+	if err != nil || len(paths) != 1 {
+		return "", false, err
+	}
+	msgs, _, err := transcript.ReadChat(paths[0])
+	if err != nil {
+		return "", false, err
+	}
+	for _, m := range msgs {
+		if m.Role == transcript.ChatRolePerson {
+			return m.Text, true, nil
+		}
+	}
+	return "", false, nil
+}
 
 // submitSince sends a prompt against turn. A turn can start and end between
 // herdr's polls, so its wait reports a stall though the seq moved: that turn
