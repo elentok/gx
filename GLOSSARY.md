@@ -1017,6 +1017,27 @@ password and TOTP, or on the login card to add a new authenticator. It works onc
 an hour.
 _Avoid_: token, setup token, invite code
 
+## Commands and completion
+
+**Command** — text at the start of a session's prompt that the harness runs itself instead of sending
+it to the model: `/name` for Claude and Codex, `$name` for a Codex skill. A skill, a custom command
+file, a plugin command and an MCP prompt are commands too. _Avoid_: slash command alone (it misses
+the Codex `$` form).
+
+**Built-in command** — a command the harness ships. gx keeps its own list of them per harness,
+because neither harness can list them all. Not a **Bundled skill**, which gx ships.
+
+**Command list** — what the **Completion menu** shows for one harness in one worktree: the harness's
+own list merged with gx's built-in commands (Claude `/`), gx's built-in commands (Codex `/`) or
+Codex's skills (Codex `$`).
+
+**Completion menu** — the menu that opens over or under a text field while a person types a
+**Command**: the Agents composer, the design composer and the New session form's First prompt. It
+fills the text and never sends.
+
+**Key input** — the key bar and text field of the web screen view. They send keys or literal text to
+a live **Session** through the keys route.
+
 ## Skills
 
 **Bundled skill** — a skill that ships inside gx and is installed with it. Every bundled skill is
