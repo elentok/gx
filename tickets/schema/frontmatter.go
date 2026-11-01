@@ -33,6 +33,7 @@ type ticketYAML struct {
 	Agent                 string           `yaml:"agent,omitempty"`
 	ModelRan              string           `yaml:"model_ran,omitempty"`
 	ModelExpected         string           `yaml:"model_expected,omitempty"`
+	TierOverride          string           `yaml:"tier_override,omitempty"`
 	SessionIDs            []string         `yaml:"session_ids,omitempty"`
 	IterationStatus       string           `yaml:"iteration_status,omitempty"`
 	IterationFinishedAt   time.Time        `yaml:"iteration_finished_at,omitempty"`
@@ -98,6 +99,7 @@ func (w ticketYAML) toTicket() Ticket {
 		Agent:                 w.Agent,
 		ModelRan:              w.ModelRan,
 		ModelExpected:         w.ModelExpected,
+		TierOverride:          w.TierOverride,
 		SessionIDs:            copyStrings(w.SessionIDs),
 		IterationStatus:       normalizeIterationStatus(IterationStatus(w.IterationStatus)),
 		IterationFinishedAt:   w.IterationFinishedAt,
@@ -146,6 +148,7 @@ func ticketToYAML(t Ticket) ticketYAML {
 		Agent:                 t.Agent,
 		ModelRan:              t.ModelRan,
 		ModelExpected:         t.ModelExpected,
+		TierOverride:          t.TierOverride,
 		SessionIDs:            copyStrings(t.SessionIDs),
 		IterationStatus:       string(t.IterationStatus),
 		IterationFinishedAt:   t.IterationFinishedAt,

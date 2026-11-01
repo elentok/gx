@@ -494,7 +494,11 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 	s.rescan() // the claim must show now, not when the backstop poll comes
 	s.events.publish(EventTicketClaimed, ticketAddr)
 
-	model, effort := s.runAgentConfig(queued.Project, agent, Run{})
+	var tierRun Run
+	if tier := takeTierOverride(t.Path); tier != "" {
+		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(s.agentsConfig(queued.Project), agent, tier)
+	}
+	model, effort := s.runAgentConfig(queued.Project, agent, tierRun)
 	one := ralphloop.OneIteration{
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 		Model: model, Effort: effort, Sink: s.finishSink(ticket, t.Path), StallNudgeDelay: s.stalledNudgeDelay(),

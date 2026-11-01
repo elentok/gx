@@ -64,7 +64,9 @@ func addServerRepairCmds(parent *cobra.Command, d deps) {
 		c.Flags().BoolVar(&req.Force, "force", false, "allow starting over a done ticket")
 		c.Flags().BoolVar(&req.DeleteBranch, "delete-branch", false, "delete the backup branch instead of keeping it under ralph-loop/attic/")
 	})
-	verb("resume", "resume <project:epic/NN>", "reopen a paused ticket and retire its Paused section into Comments", cobra.ExactArgs(1), nil)
+	verb("resume", "resume <project:epic/NN>", "reopen a paused ticket and retire its Paused section into Comments", cobra.ExactArgs(1), func(c *cobra.Command) {
+		c.Flags().StringVar(&req.Tier, "tier", "", "run the next launch on this tier once (light, worker, strongest)")
+	})
 	verb("unpark", "unpark <project:epic/NN>", "alias of resume", cobra.ExactArgs(1), nil).Hidden = true
 	verb("verify", "verify <project:epic[/NN]>", "report whether each ticket's commits merged into the feature branch", cobra.ExactArgs(1), nil)
 }

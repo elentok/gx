@@ -43,6 +43,9 @@ type RepairRequest struct {
 	// resume
 	Base  string `json:"base,omitempty"`
 	State string `json:"state,omitempty"`
+	// Tier is a one-time tier (light, worker or strongest) for the ticket's next
+	// launch; empty leaves the launch as it was.
+	Tier string `json:"tier,omitempty"`
 	// RequireState is set by the web mux, never by a client: the resume then
 	// needs a State token that still matches the pause round.
 	RequireState bool `json:"-"`
@@ -55,6 +58,9 @@ type RepairRequest struct {
 
 // ReasonBadBase refuses an resume whose base is not one of the competing blockers.
 const ReasonBadBase = "bad-base"
+
+// ReasonBadTier refuses a resume whose tier is not one of ralphloop.AllTiers.
+const ReasonBadTier = "bad-tier"
 
 // zeroCommitPrompt is what a live agent receives when a person resumes its
 // zero-commit finish.
@@ -307,6 +313,10 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 	if err != nil {
 		return repairRefusal(err), nil
 	}
+	if req.Tier != "" && !ralphloop.Tier(req.Tier).Valid() {
+		msg := fmt.Sprintf("tier %q is not one of light, worker, strongest", req.Tier)
+		return repairRefusal(&repair.RefusalError{Reason: ReasonBadTier, Message: msg}), nil
+	}
 	dir := filepath.Dir(epicPath)
 	addr := tickets.Address{Project: tickets.ProjectName(dir), Epic: filepath.Base(epicPath), ID: id}
 	_, t, ferr := repair.FindEpicTicket(epicPath, id)
@@ -364,10 +374,20 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 			return repairOK(repair.ResumeResult{Ticket: id, Status: repair.ResumePrompted, Message: repair.MessagePrompted})
 		}
 	}
+	// The override lands before the reopen so a scheduler claim cannot beat it;
+	// a failed resume takes it back.
+	if req.Tier != "" {
+		if err := setTierOverride(t.Path, req.Tier); err != nil {
+			return RepairResult{}, fmt.Errorf("set tier of %s: %w", addr, err)
+		}
+	}
 	var res repair.ResumeResult
 	if paused && req.RequireState && tk.PauseReason != schema.PauseSelfReported {
 		var refused *RepairResult
 		res, refused, err = resumeAnswered(t.Path, id, req)
+		if refused != nil || err != nil {
+			clearTierOverride(t.Path, req.Tier)
+		}
 		if refused != nil {
 			return *refused, nil
 		}
@@ -377,6 +397,7 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 	} else {
 		res, err = repair.Resume(epicPath, id, time.Now(), req.Base)
 		if err != nil {
+			clearTierOverride(t.Path, req.Tier)
 			return repairRefusal(err), nil
 		}
 		if err := tickets.EndOpenRound(t.Path, req.origin, tickets.HowResume, ralphloop.CloseResumed); err != nil {
@@ -387,6 +408,31 @@ func (s *Server) repairResume(req RepairRequest) (RepairResult, error) {
 		res.Message = repair.MessageReopened
 	}
 	return repairOK(res)
+}
+
+func setTierOverride(ticketPath, tier string) error {
+	return schema.UpdateTicketWithBody(ticketPath, func(t *schema.Ticket, _ *string) { t.TierOverride = tier })
+}
+
+// clearTierOverride undoes setTierOverride for a resume that did not happen.
+// An empty tier means none was set.
+func clearTierOverride(ticketPath, tier string) {
+	if tier != "" {
+		_ = setTierOverride(ticketPath, "")
+	}
+}
+
+// takeTierOverride returns the ticket's one-time tier and clears it, so only
+// the launch that reads it runs on it. An unreadable ticket has none.
+func takeTierOverride(ticketPath string) ralphloop.Tier {
+	var tier string
+	err := schema.UpdateTicketWithBody(ticketPath, func(t *schema.Ticket, _ *string) {
+		tier, t.TierOverride = t.TierOverride, ""
+	})
+	if err != nil || !ralphloop.Tier(tier).Valid() {
+		return ""
+	}
+	return ralphloop.Tier(tier)
 }
 
 // webStale refuses a web verb whose token no longer names the ticket's open

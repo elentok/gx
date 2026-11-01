@@ -293,6 +293,9 @@ type Ticket struct {
 	// shows: the model the session ran on, and the one its tier resolved to.
 	ModelRan      string
 	ModelExpected string
+	// TierOverride is a one-time tier (light, worker or strongest) for the
+	// ticket's next launch. A resume sets it; the launch reads and clears it.
+	TierOverride string
 	// IterationStatus is the agent's latest self-reported claim state (see
 	// the IterationStatus type doc). Never checked by Validate: the enum rule
 	// is enforced only by the CLI write path that sets it.

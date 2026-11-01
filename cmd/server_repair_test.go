@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net"
+	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,6 +31,34 @@ func TestServerRepair_IgnoreLiveTabHelpNamesTheAgentSession(t *testing.T) {
 	}
 	if !strings.Contains(f.Usage, "agent session") || strings.Contains(f.Usage, "herdr") {
 		t.Errorf("--ignore-live-tab usage = %q; want it to say \"agent session\", not herdr", f.Usage)
+	}
+}
+
+func TestServerRepair_ResumeTierFlagReachesTheRequest(t *testing.T) {
+	sock := filepath.Join(shortTempDir(t), "a.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got server.RepairRequest
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/tickets/resume", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		_ = json.NewEncoder(w).Encode(server.RepairResult{Data: json.RawMessage(`{}`)})
+	})
+	srv := &http.Server{Handler: mux}
+	go func() { _ = srv.Serve(ln) }()
+	t.Cleanup(func() { _ = srv.Close() })
+
+	parent := &cobra.Command{Use: "tickets"}
+	addServerRepairCmds(parent, deps{env: envFor(t), serverClient: func() (*apiclient.Client, error) { return apiclient.New(sock), nil }})
+	parent.SetArgs([]string{"resume", "proj:epic-a/01", "--tier", "worker"})
+	parent.SetOut(&bytes.Buffer{})
+	if err := parent.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got.Tier != "worker" || got.Address != "proj:epic-a/01" {
+		t.Errorf("request = %+v; want tier worker for proj:epic-a/01", got)
 	}
 }
 
