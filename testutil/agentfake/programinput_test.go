@@ -2,6 +2,7 @@ package agentfake
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -132,6 +133,59 @@ func TestProgramInput_VimNormalIgnoresKeysUntilI(t *testing.T) {
 	p.waitScreen("❯ ok")
 	if screen := strings.Join(p.rows(), "\n"); strings.Contains(screen, "hello") {
 		t.Errorf("screen = %q; want NORMAL-mode keys not inserted", screen)
+	}
+}
+
+func TestProgramInput_InsertWithoutMarkerDrawsNoFooter(t *testing.T) {
+	p := holdInputProgram(t, ProgramInsertNoMarkerEnv+"=1")
+	p.waitScreen(ProgramPlaceholder)
+
+	p.keys("ok")
+	p.waitScreen("❯ ok")
+	if screen := strings.Join(p.rows(), "\n"); strings.Contains(screen, "INSERT") {
+		t.Errorf("screen = %q; want no INSERT marker", screen)
+	}
+}
+
+func TestProgramInput_PretypedLoneIAndDraft(t *testing.T) {
+	lone := holdInputProgram(t, ProgramDraftEnv+"=i")
+	lone.waitScreen("❯ i")
+	lone.waitInput(harness.InputNotEmpty)
+
+	draft := holdInputProgram(t, ProgramDraftEnv+"=half a thought")
+	draft.waitScreen("❯ half a thought")
+	draft.waitInput(harness.InputNotEmpty)
+}
+
+func TestProgramInput_ClearLeavesOneIThenSucceeds(t *testing.T) {
+	p := holdInputProgram(t, ProgramClearLeavesIEnv+"=1", ProgramDraftEnv+"=draft")
+	p.waitScreen("❯ draft")
+
+	p.keys(Harness{}.ClearKey())
+	p.waitScreen("❯ i")
+	p.keys(Harness{}.ClearKey())
+	p.waitInput(harness.InputEmpty)
+	p.waitFor("both clear keys logged", func() bool {
+		return p.submitted() == strings.Repeat("\""+ProgramClearEntry+"\"\n", 2)
+	})
+}
+
+func TestProgramInput_ToggleIntoVimChangesScreenAndSettingsFile(t *testing.T) {
+	cfg := t.TempDir()
+	p := holdInputProgram(t, "CLAUDE_CONFIG_DIR="+cfg)
+	p.waitScreen(ProgramPlaceholder)
+	if screen := strings.Join(p.rows(), "\n"); strings.Contains(screen, "INSERT") {
+		t.Fatalf("screen = %q; want normal editing before the toggle", screen)
+	}
+
+	p.control(Control{Action: ActionVimToggle})
+	p.waitScreen("-- INSERT --")
+	data, err := os.ReadFile(filepath.Join(cfg, "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"editorMode":"vim"`) {
+		t.Errorf("settings.json = %s; want editorMode vim", data)
 	}
 }
 

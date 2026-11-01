@@ -202,6 +202,12 @@ func runProgram() (int, error) {
 		// A person's vim mode starts in NORMAL unless the launch asked for normal editing.
 		p.box.vim = launchEditorMode(os.Args[1:]) == "vim"
 		p.box.normal = p.box.vim
+		if os.Getenv(ProgramInsertNoMarkerEnv) == "1" {
+			p.box.vim, p.box.normal, p.box.noMarker = true, false, true
+		}
+		p.box.leaveI = os.Getenv(ProgramClearLeavesIEnv) == "1"
+		p.box.logClear = p.box.leaveI || os.Getenv(ProgramLogClearEnv) == "1"
+		p.box.configPath = claudeSettingsPath()
 		if s := os.Getenv(ProgramReadyDelayEnv); s != "" {
 			if p.readyDelay, err = time.ParseDuration(s); err != nil {
 				return 0, err
@@ -393,6 +399,12 @@ func (p *program) key(b byte) error {
 			return logSubmitted(p.convID, "<tab>")
 		case 0x7f:
 			return logSubmitted(p.convID, "<backspace>")
+		case ctrlU:
+			if p.box.logClear {
+				if err := logSubmitted(p.convID, ProgramClearEntry); err != nil {
+					return err
+				}
+			}
 		}
 		text, submitted := p.box.key(b)
 		if !submitted {

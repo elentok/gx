@@ -1,6 +1,7 @@
 package agentfake
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -20,8 +21,29 @@ const ProgramDraftEnv = "GX_AGENTFAKE_PROGRAM_DRAFT"
 // typed before it are dropped, as claude drops them.
 const ProgramReadyDelayEnv = "GX_AGENTFAKE_PROGRAM_READY_DELAY"
 
+// ProgramInsertNoMarkerEnv, set to "1", puts the input box in vim INSERT mode
+// without drawing the "-- INSERT --" footer row.
+const ProgramInsertNoMarkerEnv = "GX_AGENTFAKE_PROGRAM_INSERT_NO_MARKER"
+
+// ProgramClearLeavesIEnv, set to "1", makes the first clear key leave a lone
+// "i" in the input; the second clears it. It also logs every clear key.
+const ProgramClearLeavesIEnv = "GX_AGENTFAKE_PROGRAM_CLEAR_LEAVES_I"
+
+// ProgramLogClearEnv, set to "1", logs every clear key (Ctrl+U) to
+// ProgramSubmittedPath as ProgramClearEntry, so a test counts them. It is off
+// by default because other tests compare that log exactly. Pre-typed text
+// needs no knob of its own: ProgramDraftEnv seeds a lone "i" or a draft.
+const ProgramLogClearEnv = "GX_AGENTFAKE_PROGRAM_LOG_CLEAR"
+
+// ProgramClearEntry is what a clear key logs under ProgramLogClearEnv.
+const ProgramClearEntry = "<ctrl-u>"
+
 // Actions only the fake program's input box takes.
 const (
+	// ActionVimToggle switches an input box in normal editing mode to vim INSERT,
+	// as a /config toggle would, and writes editorMode vim to the settings file
+	// of CLAUDE_CONFIG_DIR.
+	ActionVimToggle = "vim-toggle"
 	// ActionSwallowEnter makes one more Enter do nothing, draft kept; sending it
 	// twice swallows two.
 	ActionSwallowEnter = "swallow-enter"
@@ -78,6 +100,13 @@ type inputBox struct {
 	vim       bool
 	normal    bool
 	submitted string
+	// noMarker leaves the INSERT footer undrawn.
+	noMarker bool
+	// leaveI makes the next clear leave a lone "i"; logClear makes program log
+	// each clear key.
+	leaveI, logClear bool
+	// configPath is the settings file ActionVimToggle writes.
+	configPath string
 }
 
 func newInputBox(out io.Writer, draft string) *inputBox {
@@ -104,7 +133,7 @@ func (b *inputBox) draw() {
 			}
 		}
 	}
-	if b.vim && !b.normal {
+	if b.vim && !b.normal && !b.noMarker {
 		sb.WriteString("\r\n-- INSERT --")
 	}
 	fmt.Fprint(b.out, sb.String())
@@ -131,6 +160,9 @@ func (b *inputBox) key(k byte) (submitted string, ok bool) {
 	case k == 0x15:
 		// One press clears the line; the next removes the break before it.
 		switch {
+		case b.leaveI:
+			b.leaveI = false
+			b.lines = []string{"i"}
 		case b.lines[last] != "":
 			b.lines[last] = ""
 		case last > 0:
@@ -153,10 +185,34 @@ func (b *inputBox) control(c Control) bool {
 	case ActionVimNormal:
 		b.vim, b.normal = true, true
 		b.draw()
+	case ActionVimToggle:
+		b.vim, b.normal = true, false
+		if err := b.writeEditorMode(); err != nil {
+			fmt.Fprintln(os.Stderr, "fakeclaude:", err)
+		}
+		b.draw()
 	default:
 		return false
 	}
 	return true
+}
+
+// writeEditorMode records editorMode vim in the settings file, keeping its
+// other keys, where launchEditorMode (and gx's claudeVimMode) read it.
+func (b *inputBox) writeEditorMode() error {
+	settings := map[string]any{}
+	if data, err := os.ReadFile(b.configPath); err == nil {
+		_ = json.Unmarshal(data, &settings)
+	}
+	settings["editorMode"] = "vim"
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(b.configPath), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(b.configPath, data, 0o644)
 }
 
 func logSubmitted(conversationID, text string) error {

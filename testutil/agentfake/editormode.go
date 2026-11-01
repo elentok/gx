@@ -30,6 +30,16 @@ func editorModeOf(settings string) string {
 	return s.EditorMode
 }
 
+// claudeSettingsPath is CLAUDE_CONFIG_DIR's settings.json, or ~/.claude's.
+func claudeSettingsPath() string {
+	cfgDir := os.Getenv("CLAUDE_CONFIG_DIR")
+	if cfgDir == "" {
+		home, _ := os.UserHomeDir()
+		cfgDir = filepath.Join(home, ".claude")
+	}
+	return filepath.Join(cfgDir, "settings.json")
+}
+
 // launchEditorMode is the editor mode the fake starts in. Like claude, a
 // --settings flag beats the person's config; the last flag that sets one wins.
 // The config is HOME's .claude.json, then CLAUDE_CONFIG_DIR's settings.json.
