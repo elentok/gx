@@ -175,17 +175,12 @@ func (s *Server) pollSession(ts tokenSession, day string) {
 		s.log.Error("read token ledger", "err", err)
 		return
 	}
+	// A first-seen session adds nothing; it only sets its seen total.
+	d := tokenledger.Delta{Key: tokenledger.Key{Day: day, Project: ts.project, Group: ts.group, Harness: ts.harness}}
 	if seen {
-		d := tokenledger.Delta{
-			Key:    tokenledger.Key{Day: day, Project: ts.project, Group: ts.group, Harness: ts.harness},
-			Tokens: max(tokens-prev.Tokens, 0), Dollars: max(cost-prev.Dollars, 0),
-		}
-		if err := s.tokens.Add(d); err != nil {
-			s.log.Error("save token ledger", "err", err)
-			return
-		}
+		d.Tokens, d.Dollars = max(tokens-prev.Tokens, 0), max(cost-prev.Dollars, 0)
 	}
-	if err := s.tokens.SetSeen(ts.key, cur); err != nil {
+	if err := s.tokens.Record(d, ts.key, cur); err != nil {
 		s.log.Error("save token ledger", "err", err)
 	}
 }

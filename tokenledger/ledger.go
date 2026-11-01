@@ -255,6 +255,31 @@ func (l *Ledger) SetSeen(session string, s Seen) error {
 	})
 }
 
+// Record adds a live delta and sets the session's seen total in one locked
+// write, so a failure can't store one without the other. A zero delta adds
+// nothing; an unchanged seen total with a zero delta writes nothing.
+func (l *Ledger) Record(d Delta, session string, s Seen) error {
+	return l.mutate(func() bool {
+		changed := false
+		if d.Tokens != 0 || d.Dollars != 0 {
+			r := l.buckets[d.Key]
+			r.Key = d.Key
+			r.Tokens += d.Tokens
+			r.Dollars += d.Dollars
+			l.buckets[d.Key] = r
+			changed = true
+		}
+		if old, ok := l.data.Seen[session]; !ok || old != s {
+			l.data.Seen[session] = s
+			changed = true
+		}
+		if changed {
+			l.stampLive()
+		}
+		return changed
+	})
+}
+
 // Day returns the buckets of one local day, sorted by project, group, harness.
 func (l *Ledger) Day(day string) ([]Row, error) {
 	l.mu.Lock()

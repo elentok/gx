@@ -94,6 +94,60 @@ func TestTokenLedgerZeroDeltaWritesNothing(t *testing.T) {
 	}
 }
 
+func TestTokenLedgerRecordAppliesDeltaAndSeenInOneWrite(t *testing.T) {
+	dir := t.TempDir()
+	l := openAt(t, dir, "2026-05-10")
+	k := key("2026-05-10", "gx", GroupQueue, "claude")
+	if err := l.Record(Delta{Key: k, Tokens: 4, Dollars: 0.25}, "s1", Seen{Tokens: 9, Dollars: 0.5}); err != nil {
+		t.Fatal(err)
+	}
+	// A fresh handle reads only what the single save wrote.
+	l2 := openAt(t, dir, "2026-05-10")
+	rows := mustDay(t, l2, "2026-05-10")
+	if len(rows) != 1 || rows[0].Tokens != 4 || rows[0].Dollars != 0.25 {
+		t.Fatalf("delta not stored: %+v", rows)
+	}
+	if s, ok, err := l2.Seen("s1"); err != nil || !ok || s != (Seen{Tokens: 9, Dollars: 0.5}) {
+		t.Fatalf("seen = %+v %v %v", s, ok, err)
+	}
+}
+
+func TestTokenLedgerRecordZeroDeltaStillSetsSeen(t *testing.T) {
+	dir := t.TempDir()
+	l := openAt(t, dir, "2026-05-10")
+	k := key("2026-05-10", "gx", GroupQueue, "claude")
+	if err := l.Record(Delta{Key: k}, "s1", Seen{Tokens: 3}); err != nil {
+		t.Fatal(err)
+	}
+	if rows := mustDay(t, l, "2026-05-10"); len(rows) != 0 {
+		t.Fatalf("zero delta made a bucket: %+v", rows)
+	}
+	if s, ok, _ := openAt(t, dir, "2026-05-10").Seen("s1"); !ok || s.Tokens != 3 {
+		t.Fatalf("seen = %+v %v", s, ok)
+	}
+}
+
+func TestTokenLedgerRecordUnchangedWritesNothing(t *testing.T) {
+	dir := t.TempDir()
+	l := openAt(t, dir, "2026-05-10")
+	k := key("2026-05-10", "gx", GroupQueue, "claude")
+	if err := l.Record(Delta{Key: k, Tokens: 1}, "s1", Seen{Tokens: 1}); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, FileName)
+	before, _ := os.ReadFile(path)
+	fi1, _ := os.Stat(path)
+	time.Sleep(20 * time.Millisecond)
+	if err := l.Record(Delta{Key: k}, "s1", Seen{Tokens: 1}); err != nil {
+		t.Fatal(err)
+	}
+	after, _ := os.ReadFile(path)
+	fi2, _ := os.Stat(path)
+	if string(before) != string(after) || !fi1.ModTime().Equal(fi2.ModTime()) {
+		t.Fatal("file changed on a zero delta / unchanged seen")
+	}
+}
+
 func TestTokenLedgerFirstSeenWrites(t *testing.T) {
 	dir := t.TempDir()
 	l := openAt(t, dir, "2026-05-10")
