@@ -37,7 +37,19 @@ such as a real usage limit or a real reviewer denial. Use a scratch ticket on a 
 - Expect: the denial text appears and the ticket pauses with a clear reason.
 - Where gx shows it: the Action card.
 
-## 6. How often the reviewer escalates
+## 6. Web approval buttons: Allow once and Deny
+
+`agentrunner/codexui/dialog.go` says the Codex approval dialog text and keys were never captured
+from a real Codex. This step is the first check against one.
+
+- Steps: with a real Codex Blocked on an approval, open the Agents page. Click Allow once. Repeat
+  with a new approval and click Deny.
+- Expect: Allow once takes the hook decision (or sends `y` on the screen). Deny takes the deny
+  decision (or sends Esc). Either way the session leaves Blocked and carries on. If the keys do
+  nothing, note the dialog text and keys Codex shows, and fix `dialog.go`.
+- Where gx shows it: the permission notice on the Agents page, and the agent's row in the Queue tab.
+
+## 7. How often the reviewer escalates
 
 - Steps: run a normal ticket under `--approve-for-me` and count the escalations to a person.
 - Expect: escalations are rare. Note the count and the Codex version.
