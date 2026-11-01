@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { createHmac } from "node:crypto";
-import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
@@ -106,6 +106,10 @@ export interface Fixture {
   patchProjectConfig(project: string, patch: Record<string, unknown>): Promise<void>;
   /** The argv of every fake claude launch, oldest first. A relaunch of a session moves its entry to the end. */
   launches(): Promise<string[][]>;
+  /** Everything the fake claude of a conversation (the chat's `conversation_id`) read off its terminal, raw; empty before it read any. */
+  input(conversation: string): Promise<string>;
+  /** Sends a control (`agentfake.Control`, JSON field names) to the fake claude of a conversation and waits until it handled it. */
+  controlClaude(conversation: string, control: Record<string, unknown>): Promise<void>;
   /** What each fake codex PermissionRequest hook answered, oldest first: the decision and the deny reason. */
   codexDecisions(): Promise<{ behavior: string; message: string }[]>;
   /**
@@ -273,6 +277,19 @@ async function startFixture(
       const stamped = await Promise.all(files.map(async (n) => ({ n, at: (await stat(join(dir, n))).mtimeMs })));
       const ordered = stamped.sort((a, b) => a.at - b.at);
       return Promise.all(ordered.map(async ({ n }) => JSON.parse(await readFile(join(dir, n), "utf8")) as string[]));
+    },
+    async input(conversation) {
+      return readFile(join(env.HOME!, ".claude", "agentfake", `${conversation}.in`), "utf8").catch(() => "");
+    },
+    async controlClaude(conversation, control) {
+      const dir = join(env.HOME!, ".claude", "agentfake");
+      const ack = join(dir, `${conversation}.ack`);
+      const handled = (await stat(ack).catch(() => ({ size: 0 }))).size;
+      const fifo = await open(join(dir, `${conversation}.ctl`), "w");
+      await fifo.write(`${JSON.stringify({ type: "agentfake_control", ...control })}\n`);
+      await fifo.close();
+      // A key sent before the fake handled the control would beat it.
+      await expect.poll(async () => (await stat(ack).catch(() => ({ size: 0 }))).size).toBeGreaterThan(handled);
     },
     async codexDecisions() {
       const dir = join(env.HOME!, ".codex", "agentfake");

@@ -1841,3 +1841,37 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - The tap fills `/model ` and closes the menu.
   - At 420px high the menu sits inside the viewport.
   - First prompt's menu opens below the field; a tap fills `/name `.
+
+## 153. Send a command
+
+- **Scenario:** `agents-commands` at 1280px. File `agents-commands-send.e2e.ts`; the fake claude's input log is read with `fixture.input`, and `fixture.controlClaude` arms its command output.
+- **Steps:**
+  1. In an Idle Claude session arm the command output, type `/cost` and press Send. Leave the session and come back (a command that starts no turn changes no status, so the open chat gets no event).
+  2. In another Idle Claude session send `/compact foo`.
+  3. In the Idle Codex session send `$review-skill`.
+  4. Open an Idle session, make its chat read fail, move the chat with a CLI prompt, then send `/clear`. Send `!ls`.
+  5. In the New session form send `!ls` as First prompt, then `/cost`.
+  6. In the session that holds `/cost` output send `/clear` and type a draft.
+  7. Open the Working session and type in the box.
+- **Pass:**
+  - `/cost` reaches the fake once, shows the pill and the output, and raises no "Send failed".
+  - `/compact foo` reaches the fake once and the session goes Working.
+  - The Codex prompt `$review-skill` shows in the chat.
+  - The stale `/clear` reads "the conversation moved; review it first", stays in the box and never reaches the fake.
+  - `!ls` reads "text may not start with !" and stays in the box; First prompt reads "the first prompt may not start with !", keeps it and creates nothing; `/cost` as First prompt creates the session.
+  - After `/clear` the old output is gone and the draft stays.
+  - The Working session shows "Working. Send turns on when the session is idle." and Send is off.
+
+## 154. Commands in a design session
+
+- **Scenario:** `agents-commands` with `--auto-advance-delay 1h`, design page `demo:design-auto`. A CLI prompt ends the design agent's run, which starts the countdown.
+- **Steps:**
+  1. With the countdown running send `/clear`, then (after a new countdown) `/compact` from Note.
+  2. With the countdown running send a key, then typed text, through the keys route.
+  3. Block the session at a dialog and click Close dialog; at a Bash permission and click Deny, then Allow once.
+  4. Turn Auto-advance off, end a run and press Continue.
+- **Pass:**
+  - Each command moves the deadline on and leaves the run-end Continue raised (the server test `DesignSlashCommandStopsTheCountdown` pins this); the page's "Continuing in" line goes away for `/clear`.
+  - A key and typed text each stop the countdown and clear the Continue.
+  - Close dialog, Deny and Allow once leave the same deadline and "Continuing in" stays.
+  - With the countdown off no countdown shows and Continue still works.

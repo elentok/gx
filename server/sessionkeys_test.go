@@ -272,6 +272,24 @@ func TestSessionKeys_DesignKeyStopsTheCountdown(t *testing.T) {
 	}
 }
 
+func TestSessionKeys_GuardedKeyKeepsTheCountdown(t *testing.T) {
+	t.Parallel()
+	f := startKeysAdvancing(t)
+	rows := agentfake.BashPermissionDialog("ls")
+	if err := agentfake.SendProgramControl(f.conv, agentfake.Control{Action: agentfake.ActionDialogBlock, Dialog: rows, Message: "run ls?"}); err != nil {
+		t.Fatal(err)
+	}
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionBlocked })
+	// Close dialog's Esc: whether the fake leaves Blocked on it does not matter here.
+	if _, err := f.h.Client.KeysSession(f.ctx, server.SessionKeysRequest{ID: f.id, Key: "Esc", OnlyBlocked: true}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(time.Second) // negative wait: the holder wakes the session's stream within this window
+	if got := sessionSnapshot(t, f); got.AutoAdvanceAt == nil {
+		t.Errorf("session = %+v, want the countdown running after a guarded key", got)
+	}
+}
+
 func TestSessionKeys_GuardedRefusalKeepsTheCountdown(t *testing.T) {
 	t.Parallel()
 	f := startKeysAdvancing(t)

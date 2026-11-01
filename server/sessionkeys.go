@@ -116,7 +116,11 @@ func (s *Server) sendSessionKeys(req SessionKeysRequest, source, seq string, n i
 	if err != nil {
 		return dir, sessionRefusal(ReasonSessionNotLive, fmt.Sprintf("session %s has no live holder", req.ID)), nil
 	}
-	if req.Key != "" {
+	if req.Key != "" && req.OnlyBlocked {
+		// A guarded key (Close dialog) is no one typing into the session: a person's keys would wake
+		// its stream and stop a design session's countdown.
+		err = c.SendKeys(seq)
+	} else if req.Key != "" {
 		err = c.SendPersonKeys(seq)
 	} else {
 		err = c.TypePersonTextBy(seq, false)

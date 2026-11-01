@@ -2,11 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, holdRoute, nav, test } from "./fixture";
-import { chatOf, commandMenu, commandNames, commandRows, go, messageBox, newForm, promptBox, sendButton, sessions, setViMode, sidebar, worktreeBox } from "./agentsKit";
-
-/** The nth idle Claude session; a sent slash command keeps its session busy, so a later step takes another. */
-const claudeIdle = async (fixture: Parameters<typeof sessions>[0], n = 0) =>
-  (await sessions(fixture)).filter((s) => s.status.state === "idle" && s.harness !== "codex" && !s.design && !s.queue)[n];
+import { chatOf, claudeIdle, codexIdle, commandMenu, commandNames, commandRows, go, messageBox, newForm, promptBox, sendButton, sessions, setViMode, sidebar, worktreeBox } from "./agentsKit";
 
 test("147. Command menu opens and filters", async ({ page, start }) => {
   const fixture = await start("agents-commands");
@@ -156,9 +152,6 @@ test("148. Command menu keys", async ({ page, start }) => {
   await page.keyboard.press("i");
   await expect(mode).toHaveText("INSERT");
 });
-
-const codexIdle = async (fixture: Parameters<typeof sessions>[0]) =>
-  (await sessions(fixture)).find((s) => s.status.state === "idle" && s.harness === "codex" && !s.design && !s.queue)!;
 
 /** Whether a command of that name is in the open menu. */
 const hasName = (page: Parameters<typeof commandRows>[0], name: string) => commandNames(page).then((names) => names.includes(name));

@@ -7,6 +7,13 @@ export const sessions = async (fixture: Fixture) => JSON.parse(await fixture.cli
 /** Design and Queue agents never count: gx drives them. */
 export const isActionable = (s: SessionInfo) => !s.design && !s.queue && (!!s.actionable.reason || s.status.state === "blocked");
 
+/** The nth idle Claude session; a sent slash command keeps its session busy, so a later step takes another. */
+export const claudeIdle = async (fixture: Fixture, n = 0) =>
+  (await sessions(fixture)).filter((s) => s.status.state === "idle" && s.harness !== "codex" && !s.design && !s.queue)[n];
+
+export const codexIdle = async (fixture: Fixture) =>
+  (await sessions(fixture)).find((s) => s.status.state === "idle" && s.harness === "codex" && !s.design && !s.queue)!;
+
 export const row = (page: Page, s: SessionInfo) => page.locator(`a[href$="/agents/${s.id}"]`);
 
 export const sidebar = (page: Page) => page.getByRole("complementary");
@@ -24,7 +31,7 @@ export async function freshVisit(page: Page, hash: string) {
 export const REPLY = "Sure, here is a short answer.";
 
 export const chatOf = async (fixture: Fixture, id: string) =>
-  JSON.parse(await fixture.cli("agents", "chat", id, "--json")) as { messages: unknown[] };
+  JSON.parse(await fixture.cli("agents", "chat", id, "--json")) as { messages: unknown[]; conversation_id: string };
 
 /** Prompts a session and waits for the reply. A prompt is refused until the last turn ends, so it retries. */
 export async function ask(fixture: Fixture, id: string, text: string) {
