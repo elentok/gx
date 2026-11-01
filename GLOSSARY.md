@@ -600,6 +600,9 @@ server and resets at the start of each budget day.
 limits are checked against. It replaces the Attach baselines. One-offs and investigate tickets
 count. A hard kill pauses the ticket with reason `budget-killed`.
 
+**Limit burn** — the points of one usage limit used in one local day. A 5-hour limit's burn adds up
+every window of that day, so it can pass 100. _Avoid_: burn rate (the value is a daily amount).
+
 ## Ticket Forking
 
 **Fork** — dividing a ticket into new sibling tickets mid-flight, when it turns out to be larger
