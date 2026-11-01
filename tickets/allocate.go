@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/elentok/gx/projectlock"
 )
 
 // allocLockFileName is the per-epic ticket-ID allocation lock (see
@@ -23,7 +25,23 @@ const allocLockFileName = ".alloc.lock"
 // epicPath must already exist as a directory; LockEpic does not create it.
 // The returned unlock func must be called (typically via defer) to release
 // the lock.
+//
+// It first takes the project's shared migration lock, so a new ticket waits
+// while its project migrates; the order is migration lock, then this lock.
 func LockEpic(epicPath string) (unlock func(), err error) {
+	unlockProject, err := projectlock.SharedEpic(epicPath)
+	if err != nil {
+		return nil, err
+	}
+	unlockEpic, err := lockEpicFile(epicPath)
+	if err != nil {
+		unlockProject()
+		return nil, err
+	}
+	return func() { unlockEpic(); unlockProject() }, nil
+}
+
+func lockEpicFile(epicPath string) (unlock func(), err error) {
 	lockPath := filepath.Join(epicPath, allocLockFileName)
 	deadline := time.Now().Add(10 * time.Second)
 

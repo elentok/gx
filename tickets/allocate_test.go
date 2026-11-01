@@ -9,6 +9,19 @@ import (
 	"github.com/elentok/gx/testutil"
 )
 
+func TestLoadLockedEpic_WaitsForProjectMigration(t *testing.T) {
+	requireWaitsForProjectMigration(t, func(t *testing.T, root string) (string, func() error) {
+		project, epicDir := storeProjectWithEpic(t, root, "status: open\n")
+		return project, func() error {
+			_, unlock, err := LoadLockedEpic(epicDir)
+			if err == nil {
+				unlock()
+			}
+			return err
+		}
+	})
+}
+
 func TestNextTicketID_FlatSibling(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "my-epic", "issues", "01-first.md"),

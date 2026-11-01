@@ -14,6 +14,7 @@ import (
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/logger"
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/sessionlookup"
 	"github.com/elentok/gx/skills"
 	"github.com/elentok/gx/transcript"
@@ -171,9 +172,19 @@ func defaultSkillsStatusPath(dirs config.Dirs) (string, error) {
 	return skills.StatusPath(stateDir), nil
 }
 
+// registerMigrationWaitNotice prints a stderr line when a command waits on a
+// project migration. Stderr, because agents parse stdout. The server logs
+// instead, so runServer unregisters it.
+func registerMigrationWaitNotice(w io.Writer) (restore func()) {
+	return projectlock.SetWaitHook(func(project string) {
+		fmt.Fprintf(w, "waiting for the migration of %s\n", project)
+	})
+}
+
 // Execute runs gx with the provided arguments.
 func Execute(args []string) error {
 	config.WarnOnMigrateFailure(os.Stderr)
+	defer registerMigrationWaitNotice(os.Stderr)()
 	d := defaultDeps()
 	if dir, err := d.dirs().StateDir(); err == nil {
 		logger.SetDir(dir)

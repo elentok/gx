@@ -8,12 +8,57 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/repair"
 	"github.com/elentok/gx/testutil"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
 )
+
+func TestRunTicketsAdd_WaitsForProjectMigrationAndSaysSo(t *testing.T) {
+	project := filepath.Join(t.TempDir(), "proj")
+	epicPath := filepath.Join(project, "widget-epic")
+	if err := os.MkdirAll(filepath.Join(epicPath, "issues"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, "project.json"), []byte("{}"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	defer projectlock.SetWaitHookDelayForTest(50 * time.Millisecond)()
+	var notice syncBuffer
+	defer registerMigrationWaitNotice(&notice)()
+
+	unlock, err := projectlock.Exclusive(project)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	var stdout bytes.Buffer
+	go func() {
+		done <- runTicketsAdd(deps{env: envFor(t)}, epicPath, "", "new-thing", &stdout)
+	}()
+	deadline := time.Now().Add(3 * time.Second)
+	for notice.String() == "" && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("add returned while the project migrated: %v", err)
+	default:
+	}
+	unlock()
+	if err := <-done; err != nil {
+		t.Fatalf("add after release: %v", err)
+	}
+	if got, want := notice.String(), "waiting for the migration of proj\n"; got != want {
+		t.Errorf("notice = %q, want %q", got, want)
+	}
+	if _, err := os.Stat(filepath.Join(epicPath, "issues", "01-new-thing.md")); err != nil {
+		t.Errorf("ticket not written after release: %v", err)
+	}
+}
 
 func TestRunTicketsAdd_FlatSibling(t *testing.T) {
 	t.Parallel()

@@ -19,6 +19,7 @@ import (
 	"github.com/elentok/gx/events"
 	"github.com/elentok/gx/git"
 	"github.com/elentok/gx/migratefail"
+	"github.com/elentok/gx/projectlock"
 	"github.com/elentok/gx/runnerbuild"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/syshealth"
@@ -150,6 +151,7 @@ a migration fails, the failed store is named and the server stays stopped.`,
 
 // runServer runs the foreground server until interrupted.
 func runServer(ctx context.Context, d deps) error {
+	defer projectlock.SetWaitHook(nil)()
 	dirs := d.dirs()
 	stateDir, err := dirs.StateDir()
 	if err != nil {
