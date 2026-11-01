@@ -135,6 +135,9 @@ type scenario struct {
 	// limitBurn seeds the Claude limits file and the limit history before the
 	// server starts, in the shape the --shape flag names (default menu).
 	limitBurn bool
+	// tokenPoll shortens the token ledger poll and prints the four live
+	// transcripts (the limit-burn live shape).
+	tokenPoll bool
 	// migrate turns on the migration test hooks and the bare-server control script (see migrate.go).
 	migrate bool
 	// migrateHold also holds the start-up migration open until the hold file is removed.

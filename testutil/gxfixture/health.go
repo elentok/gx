@@ -94,24 +94,29 @@ func (f *fixture) tieAgentProcesses(ctx context.Context) error {
 
 // waitAgentMeta waits up to 30 seconds for a running fake agent's meta.json.
 func (f *fixture) waitAgentMeta(ctx context.Context) (nativerunner.Meta, error) {
+	return f.waitAgentMetaLabel(ctx, "*")
+}
+
+// waitAgentMetaLabel is waitAgentMeta for the agent dir named label.
+func (f *fixture) waitAgentMetaLabel(ctx context.Context, label string) (nativerunner.Meta, error) {
 	root := nativerunner.AgentsRoot(f.stateD, project)
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		if ctx.Err() != nil {
 			return nativerunner.Meta{}, ctx.Err()
 		}
-		if m, ok := readAnyMeta(root); ok {
+		if m, ok := readAnyMeta(root, label); ok {
 			return m, nil
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	return nativerunner.Meta{}, fmt.Errorf("no agent meta.json under %s", root)
+	return nativerunner.Meta{}, fmt.Errorf("no agent meta.json for %s under %s", label, root)
 }
 
-// readAnyMeta is the first agent meta under root that names a claude pid, its
-// holder and their start times.
-func readAnyMeta(root string) (nativerunner.Meta, bool) {
-	paths, _ := filepath.Glob(filepath.Join(root, "*", nativerunner.MetaFile))
+// readAnyMeta is the first agent meta under root/label (a glob) that names a
+// claude pid, its holder and their start times.
+func readAnyMeta(root, label string) (nativerunner.Meta, bool) {
+	paths, _ := filepath.Glob(filepath.Join(root, label, nativerunner.MetaFile))
 	for _, p := range paths {
 		b, err := os.ReadFile(p)
 		if err != nil {

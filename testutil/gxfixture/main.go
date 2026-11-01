@@ -91,6 +91,9 @@ type Output struct {
 	// AgentTranscript is the held fake agent's transcript path in the spend
 	// scenario; the directory may not exist yet.
 	AgentTranscript string `json:"agent_transcript,omitempty"`
+	// Transcripts are the limit-burn live shape's Claude transcript paths, keyed
+	// queue, one_off, design and other; the directories may not exist yet.
+	Transcripts map[string]string `json:"transcripts,omitempty"`
 	// CodexSessionsDir holds the held Codex worker's rollout in the limit-burn
 	// scenario; empty elsewhere.
 	CodexSessionsDir string `json:"codex_sessions_dir,omitempty"`
@@ -221,6 +224,9 @@ func run(args []string) (err error) {
 	}
 	if shape, err = checkShape(sc, shape); err != nil {
 		return err
+	}
+	if sc.limitBurn && shape == "live" {
+		sc = limitBurnLive()
 	}
 
 	// Unix socket paths are capped near 100 bytes, and a holder's socket sits
@@ -378,6 +384,9 @@ func run(args []string) (err error) {
 		if err := f.seedLimitBurn(shape); err != nil {
 			return fmt.Errorf("seed limit burn: %w", err)
 		}
+	}
+	if sc.tokenPoll {
+		f.env = append(f.env, "GX_TOKEN_POLL_INTERVAL="+liveTokenPollInterval)
 	}
 	if sc.spend {
 		if err := f.seedSpend(shape); err != nil {
@@ -537,10 +546,17 @@ func run(args []string) (err error) {
 			return err
 		}
 	}
+	var transcripts map[string]string
+	if sc.tokenPoll {
+		if transcripts, err = f.liveTranscripts(ctx); err != nil {
+			return err
+		}
+	}
 	o := Output{WebURL: webURL, CookieName: in.cookieName, Cookie: in.cookie, Password: password, TOTPSecret: in.totpSecret, TOTPStep: in.totpStep, StateDir: f.stateD, Socket: server.SocketPath(f.stateD), HoldFile: f.hold, Env: f.cliEnv, Gx: gxBin, DiskDir: f.diskDir(), HealthDir: f.healthDir(), LogFile: logPath, AgentTranscript: agentTranscript}
 	if sc.fakeGo {
 		o.GateDir = f.gateDir()
 	}
+	o.Transcripts = transcripts
 	if sc.limitBurn {
 		o.CodexSessionsDir = filepath.Join(root, "home", ".codex", "sessions")
 	}

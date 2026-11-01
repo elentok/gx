@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,7 +12,10 @@ import (
 
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
+	"github.com/elentok/gx/testutil/agentfake"
+	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tokenledger"
+	"github.com/elentok/gx/transcript"
 )
 
 // limitBurnSeed is the state of a limit-burn shape: the Claude limits file and
@@ -42,25 +46,10 @@ const statsHistoryEpic = "stats-history"
 var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 	// menu: Claude weekly at 81% (7 so far today, 5 yesterday, forecast over
 	// 100%), Codex weekly at 40%, both 5-hour rows.
-	"menu": func(now time.Time) limitBurnSeed {
-		m := localMidnight(now)
-		claudeReset := m.AddDate(0, 0, 2)
-		codexReset := m.AddDate(0, 0, 3)
-		s := limitBurnSeed{
-			report: server.LimitsReport{
-				FiveHour: limitWindow(now, 34, 2*time.Hour+10*time.Minute, 0),
-				SevenDay: limitWindow(now, 81, claudeReset.Sub(now), 0),
-			},
-			samples: map[string][]server.LimitSample{},
-		}
-		s.samples[server.LimitIDClaudeWeekly] = weeklyHistory(server.LimitIDClaudeWeekly, now, claudeReset, 0,
-			[]float64{20, 36, 52, 69, 74}, 81, []float64{60, 88})
-		s.samples[server.LimitIDCodexWeekly] = weeklyHistory(server.LimitIDCodexWeekly, now, codexReset, 0,
-			[]float64{5, 10, 17, 25}, 40, []float64{20, 33})
-		s.samples[server.LimitIDClaude5h] = fiveHourHistory(server.LimitIDClaude5h, now, 2*time.Hour+10*time.Minute, 10, 34)
-		s.samples[server.LimitIDCodex5h] = fiveHourHistory(server.LimitIDCodex5h, now, 3*time.Hour, 5, 12)
-		return s
-	},
+	"menu": menuSeed,
+	// live: the menu limits and an empty ledger, with one held agent per cost
+	// group (see limitBurnLive).
+	"live": menuSeed,
 	// few-days: Claude weekly at 22%, the first sample earlier today, no Codex data.
 	"few-days": func(now time.Time) limitBurnSeed {
 		reset := localMidnight(now).AddDate(0, 0, 4)
@@ -126,6 +115,103 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 		s.report = server.LimitsReport{FiveHour: window(server.LimitIDClaude5h), SevenDay: window(server.LimitIDClaudeWeekly)}
 		return s
 	},
+}
+
+func menuSeed(now time.Time) limitBurnSeed {
+	m := localMidnight(now)
+	claudeReset := m.AddDate(0, 0, 2)
+	codexReset := m.AddDate(0, 0, 3)
+	s := limitBurnSeed{
+		report: server.LimitsReport{
+			FiveHour: limitWindow(now, 34, 2*time.Hour+10*time.Minute, 0),
+			SevenDay: limitWindow(now, 81, claudeReset.Sub(now), 0),
+		},
+		samples: map[string][]server.LimitSample{},
+	}
+	s.samples[server.LimitIDClaudeWeekly] = weeklyHistory(server.LimitIDClaudeWeekly, now, claudeReset, 0,
+		[]float64{20, 36, 52, 69, 74}, 81, []float64{60, 88})
+	s.samples[server.LimitIDCodexWeekly] = weeklyHistory(server.LimitIDCodexWeekly, now, codexReset, 0,
+		[]float64{5, 10, 17, 25}, 40, []float64{20, 33})
+	s.samples[server.LimitIDClaude5h] = fiveHourHistory(server.LimitIDClaude5h, now, 2*time.Hour+10*time.Minute, 10, 34)
+	s.samples[server.LimitIDCodex5h] = fiveHourHistory(server.LimitIDCodex5h, now, 3*time.Hour, 5, 12)
+	return s
+}
+
+const (
+	liveQueueEpic = "limit-burn-epic"
+	liveMapEpic   = "design-epic"
+	// liveTokenPollInterval is short so a usage line appended by a flow shows within a second or two.
+	liveTokenPollInterval = "1s"
+)
+
+// limitBurnLive replaces the limit-burn scenario for --shape live: one held
+// Claude agent each for Queue (an implement ticket), One-off (a ticket in
+// one-offs), Design (a session linked to a map) and Other (a session with no
+// ticket). Their transcripts are printed (see liveTranscripts).
+func limitBurnLive() scenario {
+	return scenario{
+		limitBurn: true,
+		tokenPoll: true,
+		chat:      true,
+		hold:      true,
+		epics: []epic{
+			{project, liveQueueEpic, []ticket{{"01", "queue-held", servertest.TicketOpts{}}}},
+			{project, "one-offs", []ticket{{"01", "one-off-held", servertest.TicketOpts{}}}},
+			{project, liveMapEpic, nil},
+		},
+		designSteps: map[string]string{project + ":" + liveMapEpic: string(tickets.StepResolveTickets)},
+		queue:       []string{project + ":" + liveQueueEpic, project + ":one-offs/01"},
+		// The design session is opened on the map, not linked afterwards: the
+		// token poll fixes a session's group when it first sees it.
+		designByMap: map[string][]string{project + ":" + liveMapEpic: {agentfake.DesignTurnPlain}},
+		openDesigns: []string{project + ":" + liveMapEpic},
+		sessions:    []sessionSpec{{project: project, prompt: "hello", read: true}},
+	}
+}
+
+// liveTranscripts are the Claude transcript paths of the live shape's four
+// agents, keyed queue, one_off, design and other. The directories may not exist
+// yet.
+func (f *fixture) liveTranscripts(ctx context.Context) (map[string]string, error) {
+	home := filepath.Join(f.root, "home")
+	out := map[string]string{}
+	for key, label := range map[string]string{"queue": liveQueueEpic + "-iter-01", "one_off": "one-offs-iter-01"} {
+		m, err := f.waitAgentMetaLabel(ctx, label)
+		if err != nil {
+			return nil, err
+		}
+		out[key] = transcript.PathIn(home, m.Cwd, m.SessionID)
+	}
+	raw, err := f.cli("agents", "list", "--json")
+	if err != nil {
+		return nil, fmt.Errorf("list sessions: %w\n%s", err, raw)
+	}
+	var list []server.SessionInfo
+	if err := json.Unmarshal(raw, &list); err != nil {
+		return nil, err
+	}
+	for _, si := range list {
+		if si.Queue {
+			continue
+		}
+		key := "other"
+		if si.Ticket != "" {
+			key = "design"
+		}
+		raw, err := f.cli("agents", "chat", si.ID, "--json")
+		if err != nil {
+			return nil, fmt.Errorf("chat %s: %w\n%s", si.ID, err, raw)
+		}
+		var chat server.SessionChatResponse
+		if err := json.Unmarshal(raw, &chat); err != nil || chat.ConversationID == "" {
+			return nil, fmt.Errorf("session %s has no conversation id in %s", si.ID, raw)
+		}
+		out[key] = transcript.PathIn(home, si.Dir, chat.ConversationID)
+	}
+	if len(out) != 4 {
+		return nil, fmt.Errorf("want 4 live transcripts, got %v", out)
+	}
+	return out, nil
 }
 
 // Harness names in ledger rows.

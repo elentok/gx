@@ -277,3 +277,82 @@ func TestLimitBurnFixture_AppendedTokenCountSavesACodexSample(t *testing.T) {
 	}
 	t.Fatalf("no new Codex weekly sample after the appended line (had %d)", before)
 }
+
+// appendUsage adds one assistant line with the given input tokens to a transcript.
+func appendUsage(t *testing.T, path string, tokens int) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	line := fmt.Sprintf(`{"type":"assistant","timestamp":%q,"message":{"model":"claude-sonnet-4-5","usage":{"input_tokens":%d,"output_tokens":0}}}`+"\n",
+		time.Now().Format(time.RFC3339), tokens)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	if _, err := f.WriteString(line); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// todaysTokens is each cost group's tokens for today in /v1/stats.
+func todaysTokens(t *testing.T, socket string) map[string]float64 {
+	t.Helper()
+	st, err := apiclient.New(socket).Stats(context.Background(), 7, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]float64{}
+	for _, g := range st.Cost.Groups {
+		out[g.Group] = g.Tokens[len(g.Tokens)-1].Value
+	}
+	return out
+}
+
+func TestLimitBurnFixtureLive(t *testing.T) {
+	r := startWith(t, "limit-burn", nil, "--shape", "live")
+	defer r.stop(t)
+	groups := map[string]string{"queue": "Queue", "design": "Design", "one_off": "One-off", "other": "Other"}
+	for key := range groups {
+		if r.Transcripts[key] == "" {
+			t.Fatalf("no %s transcript in the output: %v", key, r.Transcripts)
+		}
+	}
+
+	// The first poll that finds a transcript only stores its total, so a baseline
+	// line goes in first and the poll gets time to see it.
+	for _, p := range r.Transcripts {
+		appendUsage(t, p, 1000)
+	}
+	time.Sleep(3 * time.Second)
+	before := todaysTokens(t, r.Socket)
+
+	// waitFor polls until every group has gained want tokens since the baseline.
+	waitFor := func(want float64, step string) {
+		t.Helper()
+		var got map[string]float64
+		deadline := time.Now().Add(30 * time.Second)
+		for time.Now().Before(deadline) {
+			got = todaysTokens(t, r.Socket)
+			ok := true
+			for _, name := range groups {
+				ok = ok && got[name]-before[name] == want
+			}
+			if ok {
+				return
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+		t.Fatalf("%s: tokens today = %v from %v, want +%v in every group", step, got, before, want)
+	}
+
+	for _, p := range r.Transcripts {
+		appendUsage(t, p, 250)
+	}
+	waitFor(250, "after the first append")
+	for _, p := range r.Transcripts {
+		appendUsage(t, p, 100)
+	}
+	waitFor(350, "after the second append")
+}

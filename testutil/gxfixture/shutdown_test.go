@@ -12,7 +12,7 @@ import (
 func TestShutdownStopsHolderAndChild(t *testing.T) {
 	t.Parallel()
 	r := start(t, "health")
-	meta, ok := readAnyMeta(nativerunner.AgentsRoot(r.StateDir, project))
+	meta, ok := readAnyMeta(nativerunner.AgentsRoot(r.StateDir, project), "*")
 	if !ok {
 		t.Fatal("fixture did not record its held agent")
 	}
