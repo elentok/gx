@@ -140,6 +140,38 @@ func TestRun_ManualRunSkipsNothingAndAddsNoDuplicates(t *testing.T) {
 	}
 }
 
+// Two steps X and Y that land in either order: a store holding only one of them
+// runs only the other, and both lists end holding both.
+func TestRun_StepsLandingInEitherOrderEachRunOnlyTheMissingOne(t *testing.T) {
+	r := &Registry{}
+	var ran []string
+	for _, n := range []string{"x", "y"} {
+		r.Register(Step{Name: n, Run: func(Env) ([]tickets.MigrationChange, error) {
+			ran = append(ran, n)
+			return nil, nil
+		}})
+	}
+	for _, listed := range []string{"x", "y"} {
+		path := filepath.Join(t.TempDir(), AppliedFile)
+		if err := os.WriteFile(path, []byte(listed+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		ran = nil
+		if _, _, err := r.Run(Env{AppliedPath: path, SkipApplied: true}); err != nil {
+			t.Fatal(err)
+		}
+		missing := map[string]string{"x": "y", "y": "x"}[listed]
+		if !slices.Equal(ran, []string{missing}) {
+			t.Errorf("store listing %s: ran %v, want [%s]", listed, ran, missing)
+		}
+		got := slices.Clone(readLines(t, path))
+		slices.Sort(got)
+		if !slices.Equal(got, []string{"x", "y"}) {
+			t.Errorf("store listing %s: list %v, want x and y", listed, got)
+		}
+	}
+}
+
 func TestRun_NoAppliedPathWritesNoList(t *testing.T) {
 	dir := t.TempDir()
 	var ran []string
