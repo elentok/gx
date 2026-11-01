@@ -111,6 +111,22 @@ func TestSessionChat_RoundBadOrMissingBlockGivesFreeTextCard(t *testing.T) {
 	}
 }
 
+func TestSessionChat_CommandOutputIsNotAnAgentReply(t *testing.T) {
+	t.Parallel()
+	out := personPrompt("o1", "<local-command-stdout>Total cost: $1.20</local-command-stdout>")
+	got := chatOf(t, assistantText("a1", goodRound), out)
+	if len(got.Round) != 2 {
+		t.Errorf("round = %+v, want the open round kept past the output entry", got.Round)
+	}
+	last := got.Messages[len(got.Messages)-1]
+	if last.ID != "o1" || last.Kind != "output" || last.Text != "Total cost: $1.20" {
+		t.Errorf("last message = %+v, want the output entry", last)
+	}
+	if strings.Contains(got.Messages[0].Text, "gx-question") {
+		t.Errorf("agent text kept its fence: %q", got.Messages[0].Text)
+	}
+}
+
 func TestSessionChat_RoundIsNullOnceThePersonAnswers(t *testing.T) {
 	t.Parallel()
 	got := chatOf(t, assistantText("a1", goodRound), personPrompt("u1", "yes to both"))

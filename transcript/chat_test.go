@@ -1,6 +1,7 @@
 package transcript
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -52,6 +53,42 @@ func TestReadChat_ShowsVisibleAndHidesTheRest(t *testing.T) {
 	}
 	if msgs[0].At.IsZero() {
 		t.Error("At not parsed")
+	}
+}
+
+func TestReadChat_CommandOutput(t *testing.T) {
+	line := func(id, content string) string {
+		b, _ := json.Marshal(map[string]any{"type": "user", "uuid": id, "timestamp": "2026-01-01T10:00:00Z", "message": map[string]any{"content": content}})
+		return string(b)
+	}
+	lines := []string{
+		line("c1", "<command-name>/cost</command-name><command-args></command-args>"),
+		line("o0", "<local-command-stdout></local-command-stdout>"),
+		line("o1", "<local-command-stdout>Total cost: $1.20\n\x1b[1mTotal duration:\x1b[0m 5m\nUsage: 3 models</local-command-stdout>"),
+		line("c2", "<command-name>/compact</command-name><command-args></command-args>"),
+		line("o2", "<local-command-stdout>Compacted </local-command-stdout>"),
+		line("c3", "<command-name>/big</command-name><command-args></command-args>"),
+		line("o3", "<local-command-stdout>"+strings.Repeat("x", MaxCommandOutputBytes+100)+"</local-command-stdout>"),
+	}
+	msgs, err := ReadChatFrom(strings.NewReader(strings.Join(lines, "\n") + "\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids, kinds []string
+	for _, m := range msgs {
+		ids, kinds = append(ids, m.ID), append(kinds, m.Kind)
+	}
+	if want := []string{"c1", "o1", "c2", "c3", "o3"}; !reflect.DeepEqual(ids, want) {
+		t.Fatalf("ids = %v, want %v", ids, want)
+	}
+	if msgs[1].Kind != ChatKindOutput || msgs[1].Role != ChatRoleAgent {
+		t.Errorf("o1 = %s/%s", msgs[1].Role, msgs[1].Kind)
+	}
+	if want := "Total cost: $1.20\nTotal duration: 5m\nUsage: 3 models"; msgs[1].Text != want {
+		t.Errorf("text = %q, want %q", msgs[1].Text, want)
+	}
+	if big := msgs[4].Text; !strings.HasSuffix(big, "\n"+commandOutputCutMarker) || len(big) > MaxCommandOutputBytes+len(commandOutputCutMarker)+1 {
+		t.Errorf("oversized output not cut with marker: len=%d", len(big))
 	}
 }
 

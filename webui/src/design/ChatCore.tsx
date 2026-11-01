@@ -66,6 +66,13 @@ function Entry({ m }: { m: SessionChatMessage }) {
       </Text>
     );
   }
+  if (m.kind === "output") {
+    return (
+      <Text as="pre" fontFamily="mono" fontSize="xs" color="text.muted" whiteSpace="pre-wrap">
+        {m.text}
+      </Text>
+    );
+  }
   return <Markdown fontSize="base">{m.text}</Markdown>;
 }
 

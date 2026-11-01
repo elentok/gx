@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Roles and kinds of a ChatMessage.
@@ -18,6 +20,11 @@ const (
 	ChatKindText    = "text"
 	ChatKindPrompt  = "prompt"
 	ChatKindCommand = "command"
+	// ChatKindOutput is the stdout of a built-in command. It has the agent
+	// role so the person-turn logic (rounds, grilling counts) ignores it, but
+	// it is not an agent reply: consumers that read agent text match
+	// ChatKindText.
+	ChatKindOutput = "output"
 	// ChatKindTools folds a run of tool calls; ChatKindCompacted marks a
 	// compaction.
 	ChatKindTools     = "tools"
@@ -52,7 +59,34 @@ type chatLine struct {
 var (
 	commandNameRE = regexp.MustCompile(`(?s)<command-name>(.*?)</command-name>`)
 	commandArgsRE = regexp.MustCompile(`(?s)<command-args>(.*?)</command-args>`)
+	// commandOutputRE matches the whole stdout line of a built-in command.
+	commandOutputRE = regexp.MustCompile(`(?s)^<local-command-stdout>(.*?)</local-command-stdout>$`)
 )
+
+// MaxCommandOutputBytes caps one output entry; a cut entry ends with
+// commandOutputCutMarker.
+const (
+	MaxCommandOutputBytes  = 8 * 1024
+	commandOutputCutMarker = "[output cut]"
+)
+
+// compactedOutputPrefix opens the line /compact writes; the compacted entry
+// already marks it.
+const compactedOutputPrefix = "Compacted"
+
+// commandOutput turns a command's stdout into an output entry, or drops it when
+// it is empty or the /compact line. ANSI codes are stripped and the size capped.
+func commandOutput(msg ChatMessage, stdout string) (ChatMessage, bool) {
+	text := strings.TrimSpace(ansi.Strip(stdout))
+	if text == "" || strings.HasPrefix(text, compactedOutputPrefix) {
+		return ChatMessage{}, false
+	}
+	if len(text) > MaxCommandOutputBytes {
+		text = strings.TrimRight(truncateText(text, MaxCommandOutputBytes), "…") + "\n" + commandOutputCutMarker
+	}
+	msg.Role, msg.Kind, msg.Text = ChatRoleAgent, ChatKindOutput, text
+	return msg, true
+}
 
 // localCommandPrefix opens the caveat and output lines Claude Code writes
 // around a built-in slash command; the person never typed them.
@@ -164,6 +198,9 @@ func (l chatLine) message() (ChatMessage, bool) {
 		return msg, true
 	}
 	msg.Role = ChatRolePerson
+	if out := commandOutputRE.FindStringSubmatch(text); out != nil {
+		return commandOutput(msg, out[1])
+	}
 	if strings.HasPrefix(text, localCommandPrefix) || strings.HasPrefix(text, taskNotificationPrefix) {
 		return ChatMessage{}, false
 	}

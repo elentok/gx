@@ -20,7 +20,7 @@ import (
 type SessionChatMessage struct {
 	ID   string    `json:"id"`
 	Role string    `json:"role"` // transcript.ChatRoleAgent or ChatRolePerson
-	Kind string    `json:"kind"` // text, prompt or command
+	Kind string    `json:"kind"` // text, prompt, command or output
 	Text string    `json:"text"`
 	At   time.Time `json:"at"`
 	// ToolCount and LastTool describe a tools entry, which folds a run of tool
@@ -153,7 +153,7 @@ func snapshotOf(read chatreader.Result, kind agentrunner.Kind, ticket string, fi
 	snap.msgs = make([]SessionChatMessage, 0, len(loaded))
 	for _, m := range loaded {
 		text := m.Text
-		if m.Role == transcript.ChatRoleAgent {
+		if m.Role == transcript.ChatRoleAgent && m.Kind == transcript.ChatKindText {
 			text, _ = grillround.SplitFences(text)
 		}
 		snap.msgs = append(snap.msgs, SessionChatMessage{ID: m.ID, Role: m.Role, Kind: m.Kind, Text: text, At: m.At, ToolCount: m.ToolCount, LastTool: m.LastTool})

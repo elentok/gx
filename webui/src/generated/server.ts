@@ -1789,7 +1789,7 @@ export interface AutoAdvanceRequest {
 export interface SessionChatMessage {
   id: string;
   role: string; // transcript.ChatRoleAgent or ChatRolePerson
-  kind: string; // text, prompt or command
+  kind: string; // text, prompt, command or output
   text: string;
   at: string;
   /**
