@@ -213,6 +213,19 @@ test("Screen shows the rows and Refresh fetches them again", async () => {
   expect(fetchRows).toHaveBeenCalledTimes(2);
 });
 
+test("the Screen of a Blocked session has the key bar; a Queue agent's Screen has none", async () => {
+  const blocked = session("blocked", { kind: "blocked", label: "Blocked" });
+  render(blocked, { screen: async () => ({ kind: "ok", detail: { rows: ["r"] } }) });
+  fireEvent.click(await screen.findByRole("button", { name: "Screen" }));
+  expect(within(await screen.findByRole("dialog", { name: "Screen" })).getByRole("button", { name: "Esc" })).toBeTruthy();
+  cleanup();
+  render({ ...blocked, queue: true }, { screen: async () => ({ kind: "ok", detail: { rows: ["r"] } }) });
+  fireEvent.click(await screen.findByRole("button", { name: "Screen" }));
+  const dialog = await screen.findByRole("dialog", { name: "Screen" });
+  expect(within(dialog).getByRole("button", { name: "Refresh" })).toBeTruthy();
+  expect(within(dialog).queryByRole("button", { name: "Esc" })).toBeNull();
+});
+
 test("a gx-raised Actionable shows why gx stopped, above the composer", async () => {
   render({ ...session("idle"), actionable: { reason: "Continue failed: step 0: prompt never went working", gx_raised: true } });
   const el = await screen.findByRole("region", { name: "gx stopped" });

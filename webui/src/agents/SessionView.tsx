@@ -86,7 +86,7 @@ function NoChat({ session, fetchScreen }: { session: SessionInfo; fetchScreen?: 
         <Button emphasis="secondary" onClick={() => setScreen(true)}>
           Show screen
         </Button>
-        {screen && <ScreenModal target={session.id} fetcher={fetchScreen} onClose={() => setScreen(false)} />}
+        {screen && <ScreenModal target={session.id} fetcher={fetchScreen} keys={!session.queue} onClose={() => setScreen(false)} />}
       </Box>
     </>
   );
