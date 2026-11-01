@@ -1,10 +1,16 @@
 import { Box, Text } from "@chakra-ui/react";
-import type { StatsLimitBurn, StatsLimitBurns } from "../generated/server";
+import {
+  LimitForecastProjected,
+  type StatsLimitBurn,
+  type StatsLimitBurns,
+} from "../generated/server";
 import { forecastLine } from "../usage/format";
 import { StatCard } from "../ui/stat-card/StatCard";
 
-const WEEK = 7;
-const monthDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+const monthDay = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+});
 
 // Built from parts in local time: Date.parse of a "2026-10-09" key would be UTC and shift the day west of UTC.
 function startLabel(dayKey: string): string {
@@ -14,12 +20,27 @@ function startLabel(dayKey: string): string {
 
 const points = (n: number) => String(Math.round(n));
 
-function LimitBurnCard({ title, color, burn, days, weekly, project }: { title: string; color: "claude" | "codex"; burn: StatsLimitBurn; days: string[]; weekly: boolean; project: string }) {
+function LimitBurnCard({
+  title,
+  color,
+  burn,
+  days,
+  weekly,
+  project,
+}: {
+  title: string;
+  color: "claude" | "codex";
+  burn: StatsLimitBurn;
+  days: string[];
+  weekly: boolean;
+  project: string;
+}) {
   const values = burn.days.map((d) => (d.no_data ? null : d.burn));
-  const recent = values.slice(-WEEK).filter((v): v is number => v !== null);
-  const pace = recent.length === 0 ? 0 : recent.reduce((a, v) => a + v, 0) / recent.length;
+  const showPace = weekly && burn.forecast?.status === LimitForecastProjected;
   const forecast = weekly ? forecastLine(burn.forecast) : undefined;
-  const dayNotes = burn.days.map((d) => (d.reset_day ? ["↺ window reset"] : undefined));
+  const dayNotes = burn.days.map((d) =>
+    d.reset_day ? ["↺ window reset"] : undefined,
+  );
   const partial = burn.start_day !== undefined;
 
   return (
@@ -34,9 +55,32 @@ function LimitBurnCard({ title, color, burn, days, weekly, project }: { title: s
       footer={
         <>
           {weekly ? (
-            <Box display="flex" justifyContent="space-between" gap="3" mt="1" fontSize="xs" color="text.muted">
-              <span>7-day average: {points(pace)} points a day</span>
-              {forecast && <span style={forecast.warn ? { color: "var(--chakra-colors-tone-deadlocked-fg)" } : undefined}>{forecast.text}</span>}
+            <Box
+              display="flex"
+              justifyContent="space-between"
+              gap="3"
+              mt="1"
+              fontSize="xs"
+              color="text.muted"
+            >
+              {showPace ? (
+                <span>
+                  7-day average: {points(burn.forecast!.pace)} points a day
+                </span>
+              ) : (
+                <span />
+              )}
+              {forecast && (
+                <span
+                  style={
+                    forecast.warn
+                      ? { color: "var(--chakra-colors-tone-deadlocked-fg)" }
+                      : undefined
+                  }
+                >
+                  {forecast.text}
+                </span>
+              )}
             </Box>
           ) : (
             <Text fontSize="xs" color="text.muted" mt="1">
@@ -45,7 +89,13 @@ function LimitBurnCard({ title, color, burn, days, weekly, project }: { title: s
           )}
           {project && (
             <>
-              <Text as="span" fontSize="xs" color="text.dim" display="block" mt="1">
+              <Text
+                as="span"
+                fontSize="xs"
+                color="text.dim"
+                display="block"
+                mt="1"
+              >
                 All projects
               </Text>
               <Text fontSize="xs" color="text.dim">
@@ -59,9 +109,29 @@ function LimitBurnCard({ title, color, burn, days, weekly, project }: { title: s
   );
 }
 
-export function LimitBurnCards({ days, burns, project }: { days: string[]; burns: StatsLimitBurns; project: string }) {
-  const card = (title: string, color: "claude" | "codex", burn: StatsLimitBurn, weekly: boolean) => (
-    <LimitBurnCard title={title} color={color} burn={burn} days={days} weekly={weekly} project={project} />
+export function LimitBurnCards({
+  days,
+  burns,
+  project,
+}: {
+  days: string[];
+  burns: StatsLimitBurns;
+  project: string;
+}) {
+  const card = (
+    title: string,
+    color: "claude" | "codex",
+    burn: StatsLimitBurn,
+    weekly: boolean,
+  ) => (
+    <LimitBurnCard
+      title={title}
+      color={color}
+      burn={burn}
+      days={days}
+      weekly={weekly}
+      project={project}
+    />
   );
   return (
     <>

@@ -78,12 +78,13 @@ var limitBurnShapes = map[string]func(now time.Time) limitBurnSeed{
 			},
 		}
 	},
-	// past-reset: Claude weekly whose reset time is two hours gone.
+	// past-reset: Claude weekly whose reset time is two hours gone, with history from three days ago so the row keeps its burn chip.
 	"past-reset": func(now time.Time) limitBurnSeed {
 		reset := now.Add(-2 * time.Hour)
 		return limitBurnSeed{
 			report: server.LimitsReport{SevenDay: limitWindow(now, 75, -2*time.Hour, 6*time.Hour)},
 			samples: map[string][]server.LimitSample{server.LimitIDClaudeWeekly: {
+				limitSample(server.LimitIDClaudeWeekly, 30, reset, now.Add(-72*time.Hour)),
 				limitSample(server.LimitIDClaudeWeekly, 60, reset, now.Add(-30*time.Hour)),
 				limitSample(server.LimitIDClaudeWeekly, 75, reset, now.Add(-6*time.Hour)),
 			}},

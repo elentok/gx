@@ -1489,7 +1489,7 @@ Run with `-g "80\. Failure"`: it matches two tests, and the number 80 is also us
 - **Pass:**
   - `few-days`: no chip, "Forecast needs 3 days of data", no Codex block.
   - `stale`: Claude and Codex weekly rows keep their last value, show "seen ... ago" and still show a forecast line.
-  - `past-reset`: "reset passed", no forecast line and no "Forecast needs 3 days of data".
+  - `past-reset`: "reset passed", no forecast line and no "Forecast needs 3 days of data"; the burn chip stays.
 
 ## 123. Vi editor: layouts and touch bar
 

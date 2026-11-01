@@ -16,7 +16,8 @@ const payload = (fiveHour: number, sevenDay: number) =>
     },
   });
 
-const report = (fixture: Fixture, body: string) => fixture.cliInput(body, "claude", "statusline");
+const report = (fixture: Fixture, body: string) =>
+  fixture.cliInput(body, "claude", "statusline");
 
 const openMenu = async (page: Page) => {
   await page.getByRole("button", { name: "Menu" }).click();
@@ -37,15 +38,22 @@ test.describe("117. Limits block", () => {
     const week = row(page, "Weekly limit");
     await expect(five.getByText("34%")).toBeVisible();
     await expect(week.getByText("81%")).toBeVisible();
-    await expect(five.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "34");
-    await expect(week.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "81");
+    await expect(five.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "34",
+    );
+    await expect(week.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuenow",
+      "81",
+    );
     await expect(week.getByText("81%")).toHaveAttribute("data-tone", "waiting");
     await expect(five.getByText("34%")).toHaveAttribute("data-tone", "running");
     await expect(five.getByText(/resets in \d+[dhm]/)).toBeVisible();
     await expect(week.getByText(/resets in \d+[dhm]/)).toBeVisible();
 
     // Menu order: Settings, AFK, block, build line.
-    const y = async (loc: ReturnType<Page["locator"]>) => (await loc.boundingBox())!.y;
+    const y = async (loc: ReturnType<Page["locator"]>) =>
+      (await loc.boundingBox())!.y;
     const ys = [
       await y(menu.getByRole("menuitem", { name: "Settings" })),
       await y(menu.getByRole("menuitemcheckbox", { name: "AFK" })),
@@ -60,7 +68,10 @@ test.describe("117. Limits block", () => {
     await report(fixture, payload(55, 96));
     await expect(five.getByText("55%")).toBeVisible();
     await expect(week.getByText("96%")).toBeVisible();
-    await expect(week.getByText("96%")).toHaveAttribute("data-tone", "deadlocked");
+    await expect(week.getByText("96%")).toHaveAttribute(
+      "data-tone",
+      "deadlocked",
+    );
 
     // Tooltip by hover.
     const tip = week.getByRole("button", { name: "Weekly limit reset time" });
@@ -75,7 +86,9 @@ test.describe("117. Limits block", () => {
     test("tooltip opens on tap", async ({ page, start }) => {
       await start("limits", { shape: "fresh" });
       await openMenu(page);
-      await row(page, "5h limit").getByRole("button", { name: "5h limit reset time" }).tap();
+      await row(page, "5h limit")
+        .getByRole("button", { name: "5h limit reset time" })
+        .tap();
       await expect(page.getByRole("tooltip")).toContainText(/\d{2}:\d{2}/);
     });
   });
@@ -84,7 +97,8 @@ test.describe("117. Limits block", () => {
     test.use({ viewport: { width: 320, height: 700 } });
     test("320px menu stays inside the viewport", async ({ page, start }) => {
       await start("limits", { shape: "fresh" });
-      const scrollWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
+      const scrollWidth = () =>
+        page.evaluate(() => document.documentElement.scrollWidth);
       // The page already scrolls sideways by a pixel at 320 before the menu opens, so the menu is held to adding none.
       const before = await scrollWidth();
       const menu = await openMenu(page);
@@ -111,11 +125,18 @@ test.describe("119. Spending block", () => {
 
     const now = new Date();
     await expect(row(page, "Today").getByText(dollars(4.82))).toBeVisible();
-    await expect(row(page, "Since Sunday").getByText(dollars(4.82 + 3 * now.getDay()))).toBeVisible();
-    await expect(row(page, "Since the 1st").getByText(dollars(4.82 + 3 * (now.getDate() - 1)))).toBeVisible();
+    await expect(
+      row(page, "Since Sunday").getByText(dollars(4.82 + 3 * now.getDay())),
+    ).toBeVisible();
+    await expect(
+      row(page, "Since the 1st").getByText(
+        dollars(4.82 + 3 * (now.getDate() - 1)),
+      ),
+    ).toBeVisible();
     await expect(menu.getByText(/^since /)).toHaveCount(0);
 
-    const y = async (loc: ReturnType<Page["locator"]>) => (await loc.boundingBox())!.y;
+    const y = async (loc: ReturnType<Page["locator"]>) =>
+      (await loc.boundingBox())!.y;
     const ys = [
       await y(menu.getByRole("menuitem", { name: "Settings" })),
       await y(menu.getByRole("menuitemcheckbox", { name: "AFK" })),
@@ -172,7 +193,8 @@ test.describe("119. Spending block", () => {
     test.use({ viewport: { width: 320, height: 700 } });
     test("320px menu stays inside the viewport", async ({ page, start }) => {
       await start("spend", { shape: "normal" });
-      const scrollWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
+      const scrollWidth = () =>
+        page.evaluate(() => document.documentElement.scrollWidth);
       const before = await scrollWidth();
       const menu = await openMenu(page);
       await expect(menu.getByText("gx spend (est.)")).toBeVisible();
@@ -191,7 +213,10 @@ const amount = async (page: Page, name: string) => {
 
 test.describe("120. Menu refresh", () => {
   // The ledger event is throttled to once per 60 s; the menu's own 60 s tick is the backstop.
-  test("amount rises while open; closed menu stops fetching", async ({ page, start }) => {
+  test("amount rises while open; closed menu stops fetching", async ({
+    page,
+    start,
+  }) => {
     test.setTimeout(180_000);
     const fixture = await start("spend", { shape: "normal" });
     await openMenu(page);
@@ -202,11 +227,16 @@ test.describe("120. Menu refresh", () => {
     const line = {
       type: "assistant",
       timestamp: new Date().toISOString(),
-      message: { model: "claude-sonnet-4-5", usage: { input_tokens: 1_000_000, output_tokens: 0 } },
+      message: {
+        model: "claude-sonnet-4-5",
+        usage: { input_tokens: 1_000_000, output_tokens: 0 },
+      },
     };
     await appendFile(fixture.agentTranscript, JSON.stringify(line) + "\n");
 
-    await expect(row(page, "Today").getByText(dollars(before + 3))).toBeVisible({ timeout: 120_000 });
+    await expect(row(page, "Today").getByText(dollars(before + 3))).toBeVisible(
+      { timeout: 120_000 },
+    );
 
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toBeHidden();
@@ -221,7 +251,10 @@ test.describe("120. Menu refresh", () => {
 });
 
 test.describe("121. Hook report", () => {
-  test("open menu flips to limits; output matches the no-server run", async ({ page, start }) => {
+  test("open menu flips to limits; output matches the no-server run", async ({
+    page,
+    start,
+  }) => {
     const fixture = await start("spend", { shape: "normal" });
     const menu = await openMenu(page);
     await expect(menu.getByText("gx spend (est.)")).toBeVisible();
@@ -233,22 +266,32 @@ test.describe("121. Hook report", () => {
     await expect(row(page, "Weekly limit").getByText("81%")).toBeVisible();
 
     const emptyState = await mkdtemp(join(tmpdir(), "gx-no-server-"));
-    const withoutServer = await fixture.cliEnvInput({ XDG_STATE_HOME: emptyState }, body, "claude", "statusline");
+    const withoutServer = await fixture.cliEnvInput(
+      { XDG_STATE_HOME: emptyState },
+      body,
+      "claude",
+      "statusline",
+    );
     expect(withServer).toBe(withoutServer);
   });
 });
 
 // `row` matches names by substring, so "Weekly limit" also matches "Codex Weekly limit".
-const exactRow = (page: Page, name: string) => page.getByRole("group", { name, exact: true });
+const exactRow = (page: Page, name: string) =>
+  page.getByRole("group", { name, exact: true });
 const codexRow = (page: Page, name: string) => exactRow(page, `Codex ${name}`);
 
-const color = (loc: ReturnType<Page["locator"]>) => loc.evaluate((el) => getComputedStyle(el).color);
+const color = (loc: ReturnType<Page["locator"]>) =>
+  loc.evaluate((el) => getComputedStyle(el).color);
 
 const appendCodexSample = async (fixture: Fixture, usedPercent: number) => {
   let rollout = "";
   await expect
     .poll(async () => {
-      for await (const f of glob("**/rollout-*.jsonl", { cwd: fixture.codexSessionsDir })) rollout = join(fixture.codexSessionsDir, f);
+      for await (const f of glob("**/rollout-*.jsonl", {
+        cwd: fixture.codexSessionsDir,
+      }))
+        rollout = join(fixture.codexSessionsDir, f);
       return rollout;
     })
     .not.toBe("");
@@ -258,7 +301,10 @@ const appendCodexSample = async (fixture: Fixture, usedPercent: number) => {
 };
 
 test.describe("180. Menu limit burn", () => {
-  test("chips, forecasts, Codex block, live updates", async ({ page, start }) => {
+  test("chips, forecasts, Codex block, live updates", async ({
+    page,
+    start,
+  }) => {
     const fixture = await start("limit-burn", { shape: "menu" });
     const menu = await openMenu(page);
 
@@ -266,13 +312,17 @@ test.describe("180. Menu limit burn", () => {
     const codexWeek = codexRow(page, "Weekly limit");
     await expect(menu.getByText("Claude limits")).toBeVisible();
     await expect(menu.getByText("Codex limits")).toBeVisible();
-    expect(await (await menu.getByText("Codex limits").boundingBox())!.y).toBeGreaterThan(
+    expect(
+      await (await menu.getByText("Codex limits").boundingBox())!.y,
+    ).toBeGreaterThan(
       await (await menu.getByText("Claude limits").boundingBox())!.y,
     );
 
     // Chips: amber up on Claude, green down on Codex.
     const claudeChip = week.getByRole("button", { name: "Weekly limit burn" });
-    const codexChip = codexWeek.getByRole("button", { name: "Codex Weekly limit burn" });
+    const codexChip = codexWeek.getByRole("button", {
+      name: "Codex Weekly limit burn",
+    });
     await expect(claudeChip).toHaveText("▲ 7 vs 5 pts");
     await expect(codexChip).toContainText("▼");
     expect(await color(claudeChip)).toBe(await color(week.getByText("81%")));
@@ -280,7 +330,9 @@ test.describe("180. Menu limit burn", () => {
 
     await expect(week.getByText("today so far")).toBeVisible();
     await expect(codexWeek.getByText("today so far")).toBeVisible();
-    await expect(week.getByText(/^Runs out ~.*, before the reset$/)).toBeVisible();
+    await expect(
+      week.getByText(/^Runs out ~.*, before the reset$/),
+    ).toBeVisible();
     // The projection depends on the hour (days left to the reset), so the percentage is not pinned.
     await expect(codexWeek.getByText(/^~\d+% at reset$/)).toBeVisible();
 
@@ -289,12 +341,16 @@ test.describe("180. Menu limit burn", () => {
       const five = exactRow(page, name);
       await expect(five).toBeVisible();
       await expect(five.getByRole("button", { name: /burn$/ })).toHaveCount(0);
-      await expect(five.getByText(/Runs out|at reset|Forecast needs|today so far/)).toHaveCount(0);
+      await expect(
+        five.getByText(/Runs out|at reset|Forecast needs|today so far/),
+      ).toHaveCount(0);
     }
 
     // Tooltip by hover.
     await claudeChip.hover();
-    await expect(page.getByRole("tooltip")).toContainText("Burn today 7 pts so far, yesterday 5");
+    await expect(page.getByRole("tooltip")).toContainText(
+      "Burn today 7 pts so far, yesterday 5",
+    );
     await page.mouse.move(0, 0);
     await expect(page.getByRole("tooltip")).toBeHidden();
 
@@ -313,8 +369,12 @@ test.describe("180. Menu limit burn", () => {
     test("chip tooltip opens on tap", async ({ page, start }) => {
       await start("limit-burn", { shape: "menu" });
       await openMenu(page);
-      await exactRow(page, "Weekly limit").getByRole("button", { name: "Weekly limit burn" }).tap();
-      await expect(page.getByRole("tooltip")).toContainText("Burn today 7 pts so far, yesterday 5");
+      await exactRow(page, "Weekly limit")
+        .getByRole("button", { name: "Weekly limit burn" })
+        .tap();
+      await expect(page.getByRole("tooltip")).toContainText(
+        "Burn today 7 pts so far, yesterday 5",
+      );
     });
   });
 
@@ -323,7 +383,8 @@ test.describe("180. Menu limit burn", () => {
     test("320px menu stays inside the viewport", async ({ page, start }) => {
       await start("limit-burn", { shape: "menu" });
       await expect(page.getByRole("button", { name: "Menu" })).toBeVisible();
-      const scrollWidth = () => page.evaluate(() => document.documentElement.scrollWidth);
+      const scrollWidth = () =>
+        page.evaluate(() => document.documentElement.scrollWidth);
       const before = await scrollWidth();
       const menu = await openMenu(page);
       await expect(menu.getByText("Codex limits")).toBeVisible();
@@ -364,7 +425,12 @@ test.describe("181. Menu limit burn states", () => {
     await openMenu(page);
     const week = exactRow(page, "Weekly limit");
     await expect(week.getByText(/reset passed/)).toBeVisible();
-    await expect(week.getByText(/Runs out|at reset|Forecast needs/)).toHaveCount(0);
+    await expect(
+      week.getByText(/Runs out|at reset|Forecast needs/),
+    ).toHaveCount(0);
+    await expect(
+      week.getByRole("button", { name: "Weekly limit burn" }),
+    ).toBeVisible();
   });
 });
 

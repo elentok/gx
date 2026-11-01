@@ -119,6 +119,8 @@ func TestLimitBurnFixture_ShapesSeedTheHistory(t *testing.T) {
 		{"past-reset", func(t *testing.T, now time.Time, l server.UsageLimits, h seededHistory) {
 			if l.SevenDay == nil || l.SevenDay.ResetsAt >= now.Unix() {
 				t.Errorf("weekly reset is not in the past: %+v", l.SevenDay)
+			} else if l.SevenDay.Chip == nil {
+				t.Error("past-reset weekly row has no chip")
 			}
 		}},
 	} {
