@@ -42,6 +42,29 @@ export const composer = (page: Page) => page.getByRole("form", { name: "Composer
 export const messageBox = (page: Page) => composer(page).getByRole("textbox", { name: "Message" });
 export const sendButton = (page: Page) => composer(page).getByRole("button", { name: "Send", exact: true });
 
+/** The completion menu under the composer and its rows. */
+export const commandMenu = (page: Page) => page.getByRole("listbox", { name: "Commands" });
+export const commandRows = (page: Page) => commandMenu(page).getByRole("option");
+/** Row names in menu order, without the argument hint. */
+export const commandNames = (page: Page) =>
+  commandRows(page).evaluateAll((rows) =>
+    rows.map((r) => {
+      const name = r.firstElementChild!.cloneNode(true) as HTMLElement;
+      name.querySelector("i")?.remove();
+      return name.textContent!.trim();
+    }),
+  );
+
+/** Turns the Vi mode setting on or off and checks the Menu shows it. */
+export async function setViMode(fixture: Fixture, page: Page, on: boolean) {
+  await fixture.cli("vimode", on ? "on" : "off");
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  const menu = page.getByRole("menu", { name: "Menu", exact: true });
+  await expect(menu.getByRole("menuitemcheckbox", { name: "Vi mode", exact: true })).toHaveAttribute("aria-checked", String(on));
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await expect(menu).toHaveCount(0);
+}
+
 export const titleButton = (page: Page) => page.getByRole("heading", { level: 1 }).getByRole("button");
 
 export const switcher = (page: Page) => page.getByRole("dialog", { name: "Switch session" });

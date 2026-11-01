@@ -1750,3 +1750,36 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - With a pending step the alert names "broken: fixture migration failed" and the button reads "Restart anyway".
   - With nothing pending the check answers at once, there is no alert and the button reads "Restart".
   - The line "A migration runs while the agents work." shows only when an agent runs and some project has pending steps (flow 137).
+## 147. Command menu opens and filters
+
+- **Scenario:** `agents-commands`, an idle Claude session at 1280px.
+- **Steps:**
+  1. Type `/` in the Message box.
+  2. Type `/co`.
+  3. Type `/co`, press Escape; type `/co ` (with a space).
+  4. Type `/zzq`.
+  5. Type `hello /co`.
+- **Pass:**
+  - `/` opens the menu. A row shows name, hint, description and source (`clear`, `[name]`, "Clear the conversation", `built-in`), and the footer reads "↑↓ select", "Enter fills", "Cmd/Ctrl+Enter sends" and "Esc closes".
+  - `/co` lists the prefix matches (including `compact` and `cost`) first, then the substring matches, alphabetical in each group, with `co` highlighted.
+  - Escape and a space close the menu; Escape keeps the text.
+  - `/zzq` keeps the menu open with "No command matches /zzq. Cmd/Ctrl+Enter sends it as typed." and no rows; the text stays.
+  - `hello /co` opens no menu.
+
+## 148. Command menu keys
+
+- **Scenario:** `agents-commands`, idle Claude sessions at 1280px (a sent slash command keeps its session busy, so the send steps use different sessions) and the Exited session.
+- **Steps:**
+  1. Type `/comp`; press Down, Up, Down, Enter. Type `/cost`; press Tab.
+  2. Type `/mo` and click the "Switch model" row.
+  3. Type `/zzq` and press Enter.
+  4. Type `/model fast` (menu closed) and press Cmd/Ctrl+Enter. In another session type `/cost` (menu open) and press Cmd/Ctrl+Enter.
+  5. Open the Exited session and type `/`.
+  6. Turn vi mode on, open the large editor (Cmd/Ctrl+G) in an idle session, type `/co`, press Escape twice, press `0`, then `i`.
+- **Pass:**
+  - Down and Up move the selected row. Enter fills `/autocompact `, Tab fills `/cost `; neither sends (`gx agents chat` shows no new message).
+  - The click fills `/model ` and the box keeps focus.
+  - Enter with no match adds a newline and sends nothing.
+  - Cmd/Ctrl+Enter posts the typed text, with the menu closed and with it open; the box empties.
+  - The Exited session shows no menu.
+  - In vi mode, typing in INSERT opens the menu; in NORMAL the menu is closed and `0` opens nothing; `i` returns to INSERT.
