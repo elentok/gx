@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"syscall"
 )
 
 // FileName is the record's name inside the state directory.
@@ -56,8 +57,34 @@ func Read(stateDir string, configured []string) ([]Failure, error) {
 	return out, nil
 }
 
+// lockName is the lock file inside the state directory. It is a separate file
+// because save replaces the record by rename, which would orphan a lock held
+// on the record itself.
+const lockName = FileName + ".lock"
+
+// withLock runs fn holding an exclusive flock. The kernel drops the flock when
+// the holder dies, so a crash never leaves a stale lock.
+func withLock(stateDir string, fn func() error) error {
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(filepath.Join(stateDir, lockName), os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		return err
+	}
+	return fn()
+}
+
 // Record sets project's entry, replacing any earlier one.
 func Record(stateDir, project, msg string) error {
+	return withLock(stateDir, func() error { return record(stateDir, project, msg) })
+}
+
+func record(stateDir, project, msg string) error {
 	all, err := load(stateDir)
 	if err != nil {
 		return err
@@ -68,6 +95,10 @@ func Record(stateDir, project, msg string) error {
 
 // Clear removes project's entry. It writes nothing when there is none.
 func Clear(stateDir, project string) error {
+	return withLock(stateDir, func() error { return clearEntry(stateDir, project) })
+}
+
+func clearEntry(stateDir, project string) error {
 	all, err := load(stateDir)
 	if err != nil {
 		return err
