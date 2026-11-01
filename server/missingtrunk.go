@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/elentok/gx/config"
+	"github.com/elentok/gx/migratefail"
 	"github.com/elentok/gx/ralphloop"
 	"github.com/elentok/gx/tickets"
 )
@@ -24,6 +25,10 @@ const (
 	// VerdictTrunkMissing is the explain verdict for a queued ticket of a
 	// project in Missing trunk.
 	VerdictTrunkMissing = "trunk missing"
+
+	// VerdictMigrationBlocked is the explain verdict for a queued ticket of a
+	// project whose migration failed.
+	VerdictMigrationBlocked = "Migration blocked"
 )
 
 // missingTrunks holds the projects in Missing trunk and why. Memory only: a
@@ -108,6 +113,17 @@ func (s *Server) enterTrunkMissing(project, reason string) {
 	s.events.publishEvent(Event{Type: EventTrunkMissing, Address: project, Level: EventLevelWarning, Message: reason})
 	s.chat.Notice(ralphloop.ServerNotice{Kind: NoticeTrunkMissing, Emoji: "🪵", Title: "project " + project + ": trunk missing",
 		Detail: reason + "; its tickets will not be claimed until it is fixed"})
+}
+
+// migrationBlock reports a project's saved migration failure: its tickets are
+// not claimed while the record stands. The record is read on every call so a
+// clear by the CLI or a Fix agent ends the block with no restart.
+func (s *Server) migrationBlock(project string) (string, bool) {
+	failed, err := migratefail.Read(s.cfg.StateDir, []string{project})
+	if err != nil || len(failed) == 0 {
+		return "", false
+	}
+	return failed[0].Error, true
 }
 
 // trunkProblem reports why project's trunk can't be used, if it can't. A

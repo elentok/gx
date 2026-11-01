@@ -341,6 +341,9 @@ func (s *Server) claimRoot(item QueueItem) (bool, error) {
 	if _, missing := s.trunkMissing.get(addr.Project); missing {
 		return false, nil
 	}
+	if _, blocked := s.migrationBlock(addr.Project); blocked {
+		return false, nil
+	}
 	projectDir, repo, err := s.projectOf(addr.Project)
 	if err != nil {
 		return false, err

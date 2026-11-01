@@ -131,6 +131,10 @@ func (s *Server) scheduleVerdict(e tickets.Epic, t tickets.Ticket, addr tickets.
 		ex.Verdict, ex.Reason = VerdictTrunkMissing, reason
 		return ex
 	}
+	if reason, blocked := s.migrationBlock(addr.Project); blocked {
+		ex.Verdict, ex.Reason = VerdictMigrationBlocked, reason
+		return ex
+	}
 	if d, held := s.heldDiskOf(addr.Project); held {
 		ex.Verdict, ex.Reason = VerdictDiskLow, diskLowReason(d)
 		return ex
