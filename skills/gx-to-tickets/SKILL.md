@@ -20,10 +20,10 @@ a ticket because its implementation won't fit one fresh context window, not beca
 take a while" to get through.
 
 Estimate the amount of tokens that will be needed for the implementation of each ticket; if a ticket
-will need more than 70K tokens, split it.
+will need more than 60K tokens, split it.
 
 Cold estimates run low. Across about 1,700 finished implement tickets, the actual context window
-had a median of 2 times `expected_context_window`. When a ticket sits close to the 70K limit, or
+had a median of 2 times `expected_context_window`. When a ticket sits close to the 60K limit, or
 its prose does not list the files it touches, split it instead of trusting the number. A ticket
 that runs long also costs more per token, since every turn re-reads the context.
 
