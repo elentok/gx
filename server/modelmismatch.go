@@ -30,13 +30,28 @@ func modelMismatchFollowUp(from tickets.Address, m *ralphloop.ModelMismatchError
 // stops the session, keeps the branch and commits, pauses the ticket with both
 // model names recorded, and files or updates the follow-up.
 func (s *Server) pauseModelMismatch(rc runContext, addr tickets.Address, m *ralphloop.ModelMismatchError) {
-	path, run := rc.one.Ticket.Path, rc.run
 	var stopErr error
-	if r, err := s.runnerOf(run); err != nil {
+	if r, err := s.runnerOf(rc.run); err != nil {
 		stopErr = err
 	} else {
-		stopErr = r.Stop(run.Session)
+		stopErr = r.Stop(rc.run.Session)
 	}
+	s.recordModelMismatch(rc.one.ScratchDir, rc.one.Ticket.Path, addr, rc.run, m, stopErr)
+}
+
+// refuseEmptyModel refuses an implement launch whose tier resolved to no model:
+// the CLI would pick a default gx does not know. No session started, so there
+// is nothing to stop.
+func (s *Server) refuseEmptyModel(scratchDir, path string, addr tickets.Address) {
+	m := &ralphloop.ModelMismatchError{Ran: "none set", Expected: "a tier model"}
+	s.recordModelMismatch(scratchDir, path, addr, Run{}, m, nil)
+}
+
+// recordModelMismatch pauses the ticket with both model names recorded, notifies
+// and files or updates the follow-up. stopErr is any error from stopping the
+// session, logged with the rest.
+func (s *Server) recordModelMismatch(scratchDir, path string, addr tickets.Address, run Run, m *ralphloop.ModelMismatchError, stopErr error) {
+	ticketAddr := addr.String()
 	if err := tickets.EndOpenRound(path, tickets.SourceGx, tickets.HowAuto, ralphloop.CloseModelMismatch); err != nil {
 		stopErr = errors.Join(stopErr, err)
 	}
@@ -46,13 +61,13 @@ func (s *Server) pauseModelMismatch(rc runContext, addr tickets.Address, m *ralp
 		stopErr = errors.Join(stopErr, err)
 	}
 	if stopErr != nil {
-		s.log.Warn("model mismatch stop", "ticket", rc.ticketAddr, "err", stopErr)
+		s.log.Warn("model mismatch stop", "ticket", ticketAddr, "err", stopErr)
 	}
-	if err := s.pauseTicket(rc.one.ScratchDir, addr, path, events.ModelMismatch, m.Error(), run); err != nil {
-		s.log.Warn("pause model mismatch", "ticket", rc.ticketAddr, "err", err)
+	if err := s.pauseTicket(scratchDir, addr, path, events.ModelMismatch, m.Error(), run); err != nil {
+		s.log.Warn("pause model mismatch", "ticket", ticketAddr, "err", err)
 	}
-	s.events.publish(EventIterationPaused, rc.ticketAddr)
+	s.events.publish(EventIterationPaused, ticketAddr)
 	if _, err := s.writeFollowUp(addr, modelMismatchFollowUp(addr, m)); err != nil {
-		s.log.Warn("file model-mismatch follow-up", "ticket", rc.ticketAddr, "err", err)
+		s.log.Warn("file model-mismatch follow-up", "ticket", ticketAddr, "err", err)
 	}
 }

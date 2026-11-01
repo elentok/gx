@@ -127,16 +127,3 @@ func TestConflictAgent_InheritsTheParentRunsModelAndEffort(t *testing.T) {
 		}
 	}
 }
-
-func TestConflictAgent_UsesTheProjectDefaultWhenTheParentRunHasNone(t *testing.T) {
-	t.Parallel()
-	iter, conflict := runToConflict(t, "", func(store, repo string) {
-		writeProjectAgents(t, store, repo, `,"agents":{"claude":{"model":"opus","effort":"high"}}`)
-	})
-	if slices.Contains(iter, "--model") {
-		t.Errorf("iteration args = %q, want no --model", iter)
-	}
-	if !hasFlag(conflict, "--model", "opus") || !hasFlag(conflict, "--effort", "high") {
-		t.Errorf("conflict agent args = %q, want --model opus --effort high", conflict)
-	}
-}

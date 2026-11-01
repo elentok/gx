@@ -499,6 +499,10 @@ func (s *Server) claimAndLaunch(root rootRef, queued tickets.Address, t tickets.
 		tierRun.Model, tierRun.Effort = ralphloop.ResolveTier(s.agentsConfig(queued.Project), agent, tier)
 	}
 	model, effort := s.runAgentConfig(queued.Project, agent, tierRun)
+	if model == "" && (t.Type == "" || t.Type == string(schema.TypeImplement)) {
+		s.refuseEmptyModel(dir, t.Path, ticket)
+		return false, nil
+	}
 	one := ralphloop.OneIteration{
 		RepoDir: repo, Epic: queued.Epic, ScratchDir: dir, Agent: agent, Ticket: t, RootBase: rootBase, LeafBase: leafBase,
 		Model: model, Effort: effort, Sink: s.finishSink(ticket, t.Path), StallNudgeDelay: s.stalledNudgeDelay(),

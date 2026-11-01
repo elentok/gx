@@ -798,6 +798,10 @@ func startWith(t *testing.T, store, tcpAddr string, herdrDown bool, opts ...func
 	_, herdrEnv := herdrfake.StartStateEnv(t, herdr)
 
 	h.cfg = server.Config{StateDir: h.StateDir, SessionsDir: h.SessionsDir, ConversationsDir: h.ConversationsDir, Build: "test-build", TicketStore: h.TicketStore, TCPAddr: tcpAddr}
+	// The production defaults: an implement launch with no model is refused.
+	// The production defaults: an implement launch with no model is refused.
+	// The production defaults: an implement launch with no model is refused.
+	h.cfg.AgentsClaude, h.cfg.AgentsCodex = config.DefaultAgentsConfig().Claude, config.DefaultAgentsConfig().Codex
 	h.cfg.RecentlyFinished = config.DefaultRecentlyFinished
 	// The herdr runner's wait N defaults to 5s, which every launch's slash
 	// command prompt would sit out: the fake agent starts no turn.

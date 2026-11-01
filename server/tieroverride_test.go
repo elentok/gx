@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/server"
 	"github.com/elentok/gx/server/servertest"
 	"github.com/elentok/gx/testutil"
@@ -98,6 +99,31 @@ func TestResume_WithoutTierLeavesTheWorkerModel(t *testing.T) {
 	servertest.WaitFor(t, 20*time.Second, "the launch", func() bool { return rec.count() >= 1 })
 	if !hasFlag(rec.args(0), "--model", "sonnet") {
 		t.Errorf("launch args = %q, want --model sonnet", rec.args(0))
+	}
+}
+
+func TestLaunch_EmptyTierModelPausesModelMismatchAndStartsNothing(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: string(schema.TypeImplement)})
+	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
+	writeProjectAgents(t, store, repo, `,"agents":{"claude":{"effort":"low"}}`)
+	rec := &startRecorder{Runner: runnerfake.NewRunner()}
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(rec), func(c *server.Config) { c.AgentsClaude = config.AgentConfig{} })
+
+	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	servertest.WaitFor(t, 20*time.Second, "the model-mismatch pause", func() bool {
+		tk, err := schema.ParseTicket(path)
+		return err == nil && tk.Status == schema.StatusPaused && tk.PauseReason == schema.PauseModelMismatch
+	})
+	tk, _ := schema.ParseTicket(path)
+	if tk.ModelRan != "none set" || tk.ModelExpected != "a tier model" {
+		t.Errorf("model fields = %q / %q, want none set / a tier model", tk.ModelRan, tk.ModelExpected)
+	}
+	if n := rec.count(); n != 0 {
+		t.Errorf("starts = %d, want 0", n)
 	}
 }
 
