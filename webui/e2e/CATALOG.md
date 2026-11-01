@@ -1891,6 +1891,23 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
   - `/model`, `/compact` and the Codex `/status` show the pill alone, with no output block.
   - The design page shows the same block, cut at 12 lines, expanded by Show all.
 
+## 156. Key bar and Type field
+
+- **Scenario:** `agents-failures` (the stalled session) and `agents-commands` at 1280px. File `agents-keys.e2e.ts`; the fake claude's input log is `fixture.input`.
+- **Steps:**
+  1. On the stalled session open Screen from the notice. Type `hello`, then press each key of the bar in order, Ctrl+C last.
+  2. Type `!x`.
+  3. Through `gx agents keys` send keys and text to a Working, an Idle, a Blocked and a Rate-limited Claude session.
+  4. Send a key to the Exited session, `!x` and text with a newline to the Idle one, and a key to the Queue agent. Open the Queue agent's page.
+  5. Open the Codex session that is Blocked on an error: read the notice and composer, then in Screen Type `go on` and press Enter.
+- **Pass:**
+  - Type reaches the fake as `hello` with no Enter; each key reaches it as its own sequence, and every send reads the screen again.
+  - `!x` shows "text may not start with !" and reaches nothing.
+  - Down, Up and typed text reach the session in all four states.
+  - The Exited session refuses with "is exited"; `!x` and the newline are refused; the Queue agent is refused (`session-read-only`) and its page has no Screen button or Type field.
+  - The error-blocked notice has Screen only and Send stays off ("Blocked."); Type plus Enter leaves Blocked.
+- **Reach:** only a Blocked or stalled session's notice opens Screen on the Agents page, so the other states are driven through the CLI route the buttons call.
+
 ## 159. Exit with /exit
 
 - **Scenario:** `agents-commands` at 1280px (the design page with `--auto-advance-delay 1h`). File `agents-commands-output.e2e.ts`.
@@ -1900,3 +1917,14 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 - **Pass:**
   - The Agents session turns Exited, keeps its chat, and shows "Exited. Restore it in gx, Agents tab." with Send off.
   - The design page keeps its chat and shows Restore and New session.
+
+## 160. Phone, key input and Blocked notices
+
+- **Scenario:** `agents-commands` at 390px. File `agents-keys.e2e.ts`; `fixture.controlClaude` blocks an Idle session at a dialog with a long row, then another at a Bash permission.
+- **Steps:**
+  1. Open the dialog session: read the notice, then Screen.
+  2. Close Screen and open the permission session.
+- **Pass:**
+  - The page never scrolls sideways; the notices and their buttons (Screen, Close dialog / Deny, Allow once) stay inside 390px.
+  - The screen rows scroll sideways.
+  - The eight key buttons and Type are at least 44px tall, stay inside 390px and wrap onto more than one line.
