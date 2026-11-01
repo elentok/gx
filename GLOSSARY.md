@@ -403,6 +403,11 @@ epic, or a joined Design and its `-impl` epic until Branch), **Implementation** 
 joined card from Branch on), **One-off** (one ticket of the `one-offs` epic) and **Follow-ups** (one
 per project with open follow-ups). _Avoid_: tile, row (a row is the data behind a card).
 
+**Command palette** — the web UI's centered, filterable list of actions a person runs from any page
+with the keyboard, such as starting a Design or going to the next Needs-you card. It runs actions
+and never searches epics or sessions, which is what the jump menu and the session switcher do.
+_Avoid_: switcher, jump menu.
+
 **Design session** — an interactive session with a **Session ticket**: where gx-design runs on a
 map. It runs in the map's **Design worktree**, and in the trunk checkout only after Branch. A map
 epic or map ticket can have more than one at a time. The Agents tab and page label them
