@@ -31,6 +31,7 @@ packages:
       - sessionfailure.go
       - sessionfocus.go
       - sessionkeys.go
+      - sessionpermission.go
       - sessionprompt.go
       - sessionround.go
       - sessionscreen.go

@@ -7,6 +7,7 @@ import { appRoutes } from "../routes";
 import { renderThemed } from "../ui/render";
 import { FailureBanner } from "./FailureBanner";
 import type { PostKeys } from "./keys";
+import type { FetchPermission } from "./permission";
 import type { OpenDesign, ResumeSession } from "./open";
 import type { PostPrompt } from "./prompt";
 import type { FetchScreen } from "./screen";
@@ -265,6 +266,67 @@ test.each(["not-blocked", "not-delivered"])("Close dialog shows the %s refusal",
   renderBanner(blockedOn("dialog"), async () => ({ refused: true, reason, message: `refused ${reason}` }));
   fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
   expect((await screen.findByRole("alert")).textContent).toBe(`refused ${reason}`);
+});
+
+function renderPermission(read: FetchPermission, keys: PostKeys = vi.fn<PostKeys>(async () => ({})), queue = false) {
+  const s = blockedOn("permission", queue);
+  const state = { snapshot: { sessions: [s] }, connected: true, loadedOnce: true, tick: 0 } as unknown as ConnectionState;
+  const conn = { getState: () => state, subscribe: () => () => {}, onEvent: () => () => {}, refresh: () => {} } as unknown as Connection;
+  renderThemed(
+    <ConnectionContext.Provider value={conn}>
+      <FailureBanner failure={s.failure!} session={s} address="" restore={false} keys={keys} readPermission={read} />
+    </ConnectionContext.Provider>,
+  );
+  return keys;
+}
+const region = () => screen.getByRole("region", { name: "Session failure" });
+const prompt = (kind = "prompt", request_id = "r1"): FetchPermission => vi.fn(async () => ({ kind, text: "Run rm -rf build?", request_id }));
+
+test("a permission notice shows the prompt text with Screen, Deny and Allow once", async () => {
+  const read = prompt();
+  renderPermission(read);
+  expect(await screen.findByText(/Run rm -rf build\?/)).toBeTruthy();
+  expect(buttonsOf(region())).toEqual(["Screen", "Deny", "Allow once"]);
+  expect(read).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  ["Allow once", "allow"],
+  ["Deny", "deny"],
+])("%s posts the answer with the request id, only while Blocked", async (name, permission) => {
+  const keys = renderPermission(prompt());
+  fireEvent.click(await screen.findByRole("button", { name }));
+  await waitFor(() => expect(keys).toHaveBeenCalledWith({ id: "s-a", only_blocked: true, permission, request_id: "r1" }));
+});
+
+test("an unreadable prompt shows a plain notice with the same buttons", async () => {
+  renderPermission(async () => ({ kind: "unreadable", text: "", request_id: "" }));
+  expect(await screen.findByText(/The session asks for permission/)).toBeTruthy();
+  expect(buttonsOf(region())).toEqual(["Screen", "Deny", "Allow once"]);
+});
+
+test("a plan approval offers Screen and Close dialog instead", async () => {
+  renderPermission(prompt("plan"));
+  await screen.findByRole("button", { name: "Close dialog" });
+  expect(buttonsOf(region())).toEqual(["Screen", "Close dialog"]);
+});
+
+test("a Queue agent keeps Screen only and reads nothing", () => {
+  const read = prompt();
+  renderPermission(read, undefined, true);
+  expect(buttonsOf(region())).toEqual(["Screen"]);
+  expect(read).not.toHaveBeenCalled();
+});
+
+test.each([
+  ["not-approvable", /key bar/],
+  ["not-delivered", /did not reach/],
+  ["request-changed", /something else/],
+  ["not-blocked", /not waiting/],
+])("an Allow once refused as %s shows its message", async (reason, text) => {
+  renderPermission(prompt(), async () => ({ refused: true, reason, message: "server text" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Allow once" }));
+  expect((await screen.findByRole("alert")).textContent).toMatch(text);
 });
 
 test("a gx-raised Actionable shows why gx stopped, above the composer", async () => {

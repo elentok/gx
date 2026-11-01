@@ -5,6 +5,7 @@ import { ReasonStale } from "../ticket/answer";
 import { Button } from "../ui/button/Button";
 import { refusalText, useWrite } from "../useWrite";
 import { postKeys, type PostKeys } from "./keys";
+import { fetchPermission, usePermission, type FetchPermission } from "./permission";
 import { postResumeSession, stateToken, type OpenDesign, type ResumeSession } from "./open";
 import { postPrompt, type PostPrompt } from "./prompt";
 import type { FetchScreen } from "./screen";
@@ -17,6 +18,7 @@ const ENDED = "ended";
 const AUTH = "auth";
 const STALLED = "stalled";
 const BLOCKED = "blocked";
+const PermissionKindPlan = "plan";
 const ReasonSessionDirGone = "dir-gone";
 const ReasonSessionNoResume = "no-resume";
 
@@ -29,7 +31,7 @@ export const visibleFailure = (f?: SessionFailure, done?: boolean) => (done && f
 /** Auth and stalled are read from the transcript, which only Claude sessions have. */
 export const needsTranscript = (f: SessionFailure) => f.kind === AUTH || f.kind === STALLED;
 
-type ButtonName = "Restore" | "New session" | "Screen" | "Retry" | "Close dialog";
+type ButtonName = "Restore" | "New session" | "Screen" | "Retry" | "Close dialog" | "Deny" | "Allow once";
 
 const BUTTONS: Record<string, ButtonName[]> = {
   [CRASHED]: ["Restore", "New session"],
@@ -42,6 +44,16 @@ const BUTTONS: Record<string, ButtonName[]> = {
 /** Esc closes a dialog or cancels a question. A permission prompt has its own answers, an error has nothing to close. */
 const CLOSABLE = new Set(["dialog", "question"]);
 const canCloseDialog = (f: SessionFailure, s: SessionInfo) => f.kind === BLOCKED && CLOSABLE.has(f.why ?? "") && !s.queue;
+
+const canAnswerPermission = (f: SessionFailure, s: SessionInfo) => f.kind === BLOCKED && f.why === "permission" && !s.queue;
+
+/** The server's refusal texts are generic; these say what to do instead. */
+const PERMISSION_REFUSALS: Record<string, string> = {
+  "not-approvable": "This request needs a real answer. Use the key bar in Screen.",
+  "not-delivered": "The answer did not reach the session. Check Screen.",
+  "request-changed": "The session asks for something else now. Read the new prompt, then answer.",
+  "not-blocked": "The session is not waiting for permission any more.",
+};
 
 export interface FailureActions {
   /** The Design's epic address, for New session. */
@@ -64,6 +76,7 @@ export function FailureBanner({
   open,
   restore: canRestore = true,
   keys = postKeys,
+  readPermission = fetchPermission,
 }: {
   failure: SessionFailure;
   session: SessionInfo;
@@ -74,11 +87,18 @@ export function FailureBanner({
   post?: PostPrompt;
   onStale?: () => void;
   keys?: PostKeys;
+  readPermission?: FetchPermission;
 } & FailureActions) {
   const { run, pending } = useDesignWrite();
-  // Close dialog changes no Design state, so it skips the refresh and shows its refusal inline.
+  // Close dialog and the permission answers change no Design state, so they skip the refresh and show their refusal inline.
   const close = useWrite({ toastRefusal: false });
+  const decide = useWrite({ toastRefusal: false });
   const closeProblem = close.refusal ? refusalText(close.refusal) : close.error;
+  const decideProblem = decide.refusal ? (PERMISSION_REFUSALS[decide.refusal.reason ?? ""] ?? refusalText(decide.refusal)) : decide.error;
+  const problem = decideProblem ?? closeProblem;
+  const answerable = canAnswerPermission(failure, session);
+  const { loaded, permission } = usePermission(session.id, answerable, readPermission);
+  const isPlan = permission?.kind === PermissionKindPlan;
   const [clicked, setClicked] = useState<ButtonName>();
   const [screen, setScreen] = useState(false);
   // A refusal that no retry can fix: the page stops offering Restore, as it does after a quick re-crash.
@@ -106,12 +126,27 @@ export function FailureBanner({
     Screen: () => setScreen(true),
     Retry: () => (setClicked("Retry"), retry()),
     "Close dialog": () => close.run(() => keys({ id: sessionId, key: "esc", only_blocked: true })),
+    Deny: () => decide.run(() => answer("deny")),
+    "Allow once": () => decide.run(() => answer("allow")),
   };
-  const closable = canCloseDialog(failure, session);
-  const buttons = [...(BUTTONS[failure.kind] ?? []), ...(closable ? (["Close dialog"] as const) : [])].filter(
+  const answer = (decision: "allow" | "deny") =>
+    keys({ id: sessionId, only_blocked: true, permission: decision, ...(permission?.request_id ? { request_id: permission.request_id } : {}) });
+  const closable = canCloseDialog(failure, session) || (answerable && isPlan);
+  // Until the prompt is read the buttons stay at Screen, so nothing answers a dialog the person has not seen.
+  const extra: ButtonName[] = answerable && loaded && !isPlan ? ["Deny", "Allow once"] : closable ? ["Close dialog"] : [];
+  const buttons = [...(BUTTONS[failure.kind] ?? []), ...extra].filter(
     (name) => (canRestore || (name !== "Restore" && name !== "New session")) && !(name === "Restore" && restoreHidden),
   );
-  const busy = (name: ButtonName) => (name === "Close dialog" ? close.pending : pending);
+  const inline = closable || answerable;
+  const ownWrite = (name: ButtonName) => name === "Close dialog" || name === "Deny" || name === "Allow once";
+  const busy = (name: ButtonName) => (ownWrite(name) ? close.pending || decide.pending : pending);
+  const headline = answerable
+    ? isPlan
+      ? "The session asks you to approve a plan."
+      : "The session asks for permission."
+    : failure.why === "question"
+      ? "The session asks a question and waits for a key."
+      : "The session shows a dialog and waits for a key.";
 
   return (
     <Box
@@ -119,38 +154,47 @@ export function FailureBanner({
       aria-label="Session failure"
       data-kind={failure.kind}
       borderWidth="1px"
-      borderColor={closable ? "tone.waiting.fg" : "tone.deadlocked.fg"}
+      borderColor={inline ? "tone.waiting.fg" : "tone.deadlocked.fg"}
       borderRadius="md"
       p="3"
       display="flex"
       // The mock puts a Blocked dialog's text and buttons in one row on a wide screen.
-      flexDirection={closable ? { base: "column", md: "row" } : "column"}
-      alignItems={closable ? { base: "stretch", md: "center" } : undefined}
+      flexDirection={inline ? { base: "column", md: "row" } : "column"}
+      alignItems={inline ? { base: "stretch", md: "center" } : undefined}
       justifyContent="space-between"
-      gap={closable ? "3" : "2"}
+      gap={inline ? "3" : "2"}
     >
       <Box display="flex" flexDirection="column" gap="1" minW="0">
-        {closable ? (
-          <Text fontWeight="600">
+        {inline ? (
+          <Text fontWeight="600" data-testid="blocked-notice-text">
             <Text as="span" color="tone.waiting.fg">
               Blocked.
             </Text>{" "}
-            {failure.why === "question" ? "The session asks a question and waits for a key." : "The session shows a dialog and waits for a key."}
+            {headline}
           </Text>
         ) : (
           <Text fontWeight="700" color="tone.deadlocked.fg">
             {failure.label}
           </Text>
         )}
+        {answerable && permission?.text && (
+          <Text fontFamily="mono" fontSize="12.5px" color="text.muted" whiteSpace="pre-wrap">
+            {permission.text}
+          </Text>
+        )}
         {failure.text && <Text fontSize="sm">{failure.text}</Text>}
         {failure.kind === BLOCKED && (
           <Text fontSize="sm" color="text.muted">
-            {closable ? "Close dialog sends Esc. Use Screen to pick an option instead." : "Open it in gx, Agents tab."}
+            {answerable && loaded && !isPlan
+              ? "Allow once answers yes this time only. Deny declines."
+              : closable
+                ? "Close dialog sends Esc. Use Screen to pick an option instead."
+                : "Open it in gx, Agents tab."}
           </Text>
         )}
-        {closeProblem && (
+        {problem && (
           <Text role="alert" fontSize="sm" color="tone.deadlocked.fg">
-            {closeProblem}
+            {problem}
           </Text>
         )}
       </Box>
@@ -160,19 +204,19 @@ export function FailureBanner({
           gap="2"
           flex="none"
           // The mock stretches a Blocked dialog's buttons to a 44px row on a phone.
-          css={closable ? { "@media (max-width: 47.99em)": { "& > button": { flex: 1, height: "44px", justifyContent: "center" } } } : undefined}
+          css={inline ? { "@media (max-width: 47.99em)": { "& > button": { flex: 1, height: "44px", justifyContent: "center" } } } : undefined}
         >
           {buttons.map((name) => {
-            const main = name === "Close dialog" || (name === "New session" && restoreHidden);
+            const main = name === "Close dialog" || name === "Allow once" || (name === "New session" && restoreHidden);
             return (
               <Button
                 key={name}
                 emphasis={main ? "main" : "secondary"}
-                tone={name === "New session" && restoreHidden ? "running" : undefined}
+                tone={name === "New session" && restoreHidden ? "running" : name === "Deny" ? "deadlocked" : undefined}
                 disabled={busy(name)}
                 onClick={onClick[name]}
               >
-                {busy(name) && (clicked === name || name === "Close dialog") && <Spinner size="sm" />}
+                {busy(name) && (clicked === name || ownWrite(name)) && <Spinner size="sm" />}
                 {name}
               </Button>
             );

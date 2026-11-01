@@ -1944,6 +1944,27 @@ export interface SessionKeysRequest {
 }
 
 //////////
+// source: sessionpermission.go
+
+export const PermissionKindPrompt = "prompt";
+export const PermissionKindPlan = "plan";
+export const PermissionKindUnreadable = "unreadable";
+/**
+ * Kinds of SessionPermissionResponse.
+ */
+export type PermissionKind = typeof PermissionKindPrompt | typeof PermissionKindPlan | typeof PermissionKindUnreadable;
+/**
+ * SessionPermissionResponse is the dialog a Blocked session waits on, read by
+ * the server so the page never parses a screen. RequestID is what a permission
+ * answer sends back; it is empty when Kind is unreadable.
+ */
+export interface SessionPermissionResponse {
+  kind: string;
+  text: string;
+  request_id: string;
+}
+
+//////////
 // source: sessionprompt.go
 
 export const ReasonPromptHarnessNotSupported = "harness-not-supported";
