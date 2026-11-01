@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
-import { expect, holdRoute, nav, test } from "./fixture";
+import { expect, holdRoute, nav, test, touch } from "./fixture";
 import { chatOf, claudeIdle, codexIdle, commandMenu, commandNames, commandRows, go, messageBox, newForm, promptBox, sendButton, sessions, setViMode, sidebar, worktreeBox } from "./agentsKit";
 
 test("147. Command menu opens and filters", async ({ page, start }) => {
@@ -327,8 +327,20 @@ test("151. Command menu on the design page and First prompt", async ({ page, sta
 });
 
 test("152. Phone, command menu", async ({ page, start }) => {
-  await start("agents-commands");
+  const fixture = await start("agents-commands");
   await page.setViewportSize({ width: 390, height: 844 });
+
+  // The very first `/` on a fresh phone Agents page opens the menu, with no prior typing.
+  const session = await claudeIdle(fixture);
+  const phone = await page.context().browser()!.newContext({ ...touch, viewport: { width: 390, height: 844 }, storageState: await page.context().storageState() });
+  const fresh = await phone.newPage();
+  await fresh.goto(new URL(page.url()).origin + `/#/agents/${session.id}`);
+  await messageBox(fresh).tap();
+  await fresh.keyboard.type("/");
+  await expect(commandMenu(fresh)).toBeVisible();
+  await expect(commandRows(fresh).filter({ hasText: "Clear the conversation" })).toBeVisible();
+  await phone.close();
+
   await go(page, "#/d/demo:design-auto");
   const box = await openNote(page);
   const menu = commandMenu(page);
