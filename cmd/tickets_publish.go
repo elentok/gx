@@ -161,7 +161,7 @@ func (d deps) fileWriter() func(string, []byte, os.FileMode) error {
 // every ticket is written as draft, checked, then all are opened in one pass at
 // the end. Any failure removes what this run wrote (and the epic, if it created
 // it), so a retry assigns the same IDs.
-func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut bool, w io.Writer) (err error) {
+func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut, allowClaimMisses bool, w io.Writer) (err error) {
 	cwd, err := d.getwd()
 	if err != nil {
 		return err
@@ -188,6 +188,19 @@ func runTicketsPublish(d deps, epicArg, manifestPath string, dryRun, jsonOut boo
 		}
 	} else if plan, err = planPublish(epicPath, manifestPath, tickets.Epic{}); err != nil {
 		return err
+	}
+
+	// The lint report goes to stderr when the table is JSON, so stdout stays parseable.
+	lintOut := w
+	if jsonOut && d.stderr != nil {
+		lintOut = d.stderr
+	}
+	report, err := lintEpicClaims(d, cwd, epicPath, manifestPath, lintOut)
+	if err != nil {
+		return err
+	}
+	if report.Refused() && !allowClaimMisses {
+		return &ExitError{Code: 1}
 	}
 
 	if dryRun {
@@ -280,18 +293,19 @@ func printPublished(w io.Writer, rows []publishedTicket, jsonOut bool) error {
 
 func newTicketsPublishCmd(d deps) *cobra.Command {
 	var manifest string
-	var dryRun, jsonOut bool
+	var dryRun, jsonOut, allowClaimMisses bool
 	cmd := &cobra.Command{
 		Use:   "publish <project:epic>",
 		Short: "write a manifest's tickets into an epic as draft, then open them all at once",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
-			return runTicketsPublish(d, args[0], manifest, dryRun, jsonOut, c.OutOrStdout())
+			return runTicketsPublish(d, args[0], manifest, dryRun, jsonOut, allowClaimMisses, c.OutOrStdout())
 		},
 	}
 	cmd.Flags().StringVar(&manifest, "manifest", "", "manifest file (YAML list of slug, type, blocked_by, expected_context_window, body)")
 	_ = cmd.MarkFlagRequired("manifest")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the IDs that would be assigned and write nothing")
+	cmd.Flags().BoolVar(&allowClaimMisses, "allow-claim-misses", false, "publish even when the claim lint finds a miss in an implement or research ticket")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "emit [{slug, address, window}] JSON instead of a table")
 	return cmd
 }

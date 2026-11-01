@@ -261,3 +261,73 @@ func TestPublishManifestRefusalsWriteNothing(t *testing.T) {
 		})
 	}
 }
+
+// publishLint publishes one ticket of type typ with the given body.
+func publishLint(t *testing.T, typ, body string, extra ...string) (d deps, project string, err error) {
+	t.Helper()
+	d, project, manifest := setupPublish(t)
+	dir := filepath.Dir(manifest)
+	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n"+body+"\n")
+	writeManifest(t, dir, "- {slug: a, type: "+typ+", body: a.md}\n")
+	err = execute(append([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, extra...), d)
+	return d, project, err
+}
+
+func TestPublishClaimMissRefusesAndWritesNothing(t *testing.T) {
+	d, project, err := publishLint(t, "implement", "see `docs/nowhere.md`")
+	var ee *ExitError
+	if !errors.As(err, &ee) || ee.Code != 1 {
+		t.Fatalf("err = %v, want exit 1", err)
+	}
+	if out := publishOut(d); !strings.Contains(out, "miss: a: docs/nowhere.md") || strings.Contains(out, "SLUG") {
+		t.Errorf("output:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(project, "e")); !os.IsNotExist(err) {
+		t.Errorf("epic left behind: %v", err)
+	}
+}
+
+func TestPublishAllowClaimMisses(t *testing.T) {
+	d, project, err := publishLint(t, "implement", "see `docs/nowhere.md`", "--allow-claim-misses")
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	out := publishOut(d)
+	if i, j := strings.Index(out, "miss: a:"), strings.Index(out, "SLUG"); i < 0 || j < i {
+		t.Errorf("lint output must print before the table:\n%s", out)
+	}
+	if got := strings.Join(issueNames(t, project, "e"), " "); got != "01-a.md" {
+		t.Errorf("issues = %s", got)
+	}
+}
+
+func TestPublishDryRunPrintsLintAndRefuses(t *testing.T) {
+	d, _, err := publishLint(t, "implement", "see `docs/nowhere.md`", "--dry-run")
+	if err == nil || !strings.Contains(publishOut(d), "miss: a:") {
+		t.Errorf("err = %v, out:\n%s", err, publishOut(d))
+	}
+}
+
+func TestPublishVerifyMissIsAWarning(t *testing.T) {
+	d, _, err := publishLint(t, "verify", "see `docs/nowhere.md`")
+	if err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	if !strings.Contains(publishOut(d), "warning: a: docs/nowhere.md") {
+		t.Errorf("output:\n%s", publishOut(d))
+	}
+}
+
+func TestPublishPlannedNameDoesNotRefuse(t *testing.T) {
+	d, project, manifest := setupPublish(t)
+	dir := filepath.Dir(manifest)
+	writeTicketFile(t, filepath.Join(dir, "a.md"), "# a\n\n## What to build\n\nAdd `docs/nowhere.md`.\n")
+	writeTicketFile(t, filepath.Join(dir, "b.md"), "# b\n\n## Test seams\n\nuse `docs/nowhere.md`\n")
+	writeManifest(t, dir, "- {slug: a, type: implement, body: a.md}\n- {slug: b, type: implement, blocked_by: [a], body: b.md}\n")
+	if err := execute([]string{"tickets", "publish", "mine:e", "--manifest", manifest}, d); err != nil {
+		t.Fatalf("publish: %v\n%s", err, publishOut(d))
+	}
+	if got := strings.Join(issueNames(t, project, "e"), " "); got != "01-a.md 02-b.md" {
+		t.Errorf("issues = %s", got)
+	}
+}

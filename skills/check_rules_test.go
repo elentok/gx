@@ -34,7 +34,8 @@ func TestCheckRulesAnchors(t *testing.T) {
 		}},
 		{"research", "gx-research/SKILL.md", []string{"`gx check`"}},
 		{"investigate", "gx-investigate/SKILL.md", []string{"`gx check`"}},
-		{"to-tickets", "gx-to-tickets/SKILL.md", []string{"iteration hint", "`gx brief`", "`go_symbol_references`", "verified at <commit>", "not verified", "CLI commands the ticket quotes", "`-run` patterns", "go test -list", "Generated files", "`make web-types`", "Test environment", "@vitest-environment", "Playwright filters", "Mock path", "must fail to compile or fail", "Examples against the helper"}},
+		{"to-tickets", "gx-to-tickets/SKILL.md", []string{"iteration hint", "`gx brief`", "`go_symbol_references`", "verified at <commit>", "not verified", "Generated files", "`make web-types`", "Test environment", "@vitest-environment", "Playwright filters", "Mock path", "must fail to compile or fail", "Examples against the helper"}},
+		{"to-tickets lint", "gx-to-tickets/SKILL.md", []string{"lint-claims", "--allow-claim-misses", "name a symbol"}},
 		{"to-tickets estimate", "gx-to-tickets/SKILL.md", []string{"1.12", "1.28", "0.83", "60K"}},
 		{"to-tickets calibration", "gx-to-tickets/SKILL.md", []string{"gx tickets calibration", "0.83"}},
 		{"to-tickets publish", "gx-to-tickets/SKILL.md", []string{"gx tickets publish", "--manifest", "--dry-run", "{{slug}}"}},
@@ -61,6 +62,7 @@ func TestCheckRulesAbsences(t *testing.T) {
 	}{
 		{"implement", "gx-implement/SKILL.md", []string{"whole package once at the end", "gofmt -l"}},
 		{"implement edit rules", "gx-implement/SKILL.md", []string{"each call is a turn", "one failed edit makes the rest of the batch fail"}},
+		{"to-tickets lint", "gx-to-tickets/SKILL.md", []string{"CLI commands the ticket quotes", "go test -list"}},
 		{"to-tickets estimate", "gx-to-tickets/SKILL.md", []string{"for the whole session", "median of 2 times", "check their actual cost"}},
 		{"to-tickets publish", "gx-to-tickets/SKILL.md", []string{
 			"gx tickets epic add <project:epic> --kind loop --status draft",

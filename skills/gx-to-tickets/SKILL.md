@@ -237,10 +237,8 @@ cite the file (`file:func`) in the ticket next to the claim:
   function that decides it (e.g. an `isMergeable` or `isExpanded` predicate), not just the label.
   If the code or an existing e2e flow disagrees with the spec, say so in the ticket and state which
   one wins.
-- **Reserved numbers**: catalog flow ids, ticket ids, migration numbers. Read the highest one now in
-  use; never write "from 50 up" from memory.
-- **Names a seam or hint relies on**: a fake, helper, package path or generated-type check. Run the
-  `rg` the implementing agent would run and confirm it hits. A seam that finds nothing is not a seam.
+- **Migration numbers**: read the highest one now in use; never write "from 50 up" from memory.
+  Ticket IDs are not written by hand: use `{{slug}}`.
 - **Where a value is set**: when a ticket changes a field's value, name the function that sets it
   (e.g. where a message id is assigned), not only the files that read it.
 - **Signature fallout**: when a hint says "do it as `other.ts` does", check that the pattern fits
@@ -253,13 +251,30 @@ cite the file (`file:func`) in the ticket next to the claim:
 - **Wiring**: name the hidden registration points (route tables, allowlists, parity tests, the
   query-and-prop path that feeds a page) and give `file:func` for anything the ticket says only by
   line number or role. For a new server route, point at `.ai/index.md` "Adding a server route".
-- **CLI commands the ticket quotes**: run `--help` on every `gx` command (and subcommand) written
-  into the ticket, and use the name and flags it prints. Never write a command from memory.
-- **`-run` patterns**: run the pattern with `go test -list '<pattern>'` and confirm it matches
-  exactly the intended tests. Keep it as narrow as the seams allow; a broad pattern can hit the
+- **Test patterns**: keep a `-run` pattern as narrow as the seams allow. A broad pattern can hit the
   test-run time cap.
 - **Behaviour that must not change**: list one seam per state or variant of that behaviour, not only
   the ones the ticket edits.
+- **Line numbers**: when a ticket points at code, name a symbol, not a line. Lines move; symbols
+  stay.
+
+A lint proves that a name exists, not that a setup works. A seam that names a real fake can still be
+wrong, so the judgment rules above stay your job.
+
+Before you publish, run `gx tickets lint-claims <project:epic> --manifest <file>` once. It checks
+the `gx` commands and flags, file paths, `-run` patterns and flow ids that the tickets quote. Fix
+each miss, or check that it is a false alarm. `gx tickets publish` runs the same lint again and
+refuses on a miss in an `implement` or `research` ticket. Misses in a `verify` ticket are only
+warnings. A name that an earlier ticket in the manifest creates is shown as planned and is fine.
+
+How to tell a real miss from a false alarm:
+
+- A miss in a path or command is real until you find a reason. A common reason is a file that an
+  earlier unpublished ticket creates.
+- Then rewrite the claim so the lint sees it as planned: say in that ticket's "What to build" that
+  it adds the file, and block on that ticket. Do not move the claim into a `verify` entry.
+- If a rewrite does not fit, pass `--allow-claim-misses` to `publish`. This flag covers claim misses
+  only.
 
 If no map applies, write an explicit `none — <rationale>`, as with test seams. Code-review fix
 tickets are out of scope here.
