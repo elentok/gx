@@ -36,6 +36,7 @@ import (
 	"github.com/elentok/gx/syshealth"
 	"github.com/elentok/gx/tickets"
 	"github.com/elentok/gx/tickets/schema"
+	"github.com/elentok/gx/tokenledger"
 )
 
 // APIVersion is bumped on any incompatible change to the /v1 wire contract.
@@ -323,6 +324,7 @@ type Server struct {
 	afk          *afkState
 	viMode       *viModeState
 	ledger       *budgetLedger
+	tokens       *tokenledger.Ledger
 	usage        *usageSamples // Claude's
 	limits       *limitsStore
 	limitHistory *limitHistory
@@ -476,6 +478,11 @@ func New(cfg Config) (*Server, error) {
 		lock.release()
 		return nil, fmt.Errorf("load budget ledger: %w", err)
 	}
+	tokens, err := tokenledger.Open(cfg.StateDir)
+	if err != nil {
+		lock.release()
+		return nil, fmt.Errorf("load token ledger: %w", err)
+	}
 	sock := SocketPath(cfg.StateDir)
 	// We hold the lock, so any socket file is stale from a crashed server.
 	_ = os.Remove(sock)
@@ -540,6 +547,7 @@ func New(cfg Config) (*Server, error) {
 		afk:          afk,
 		viMode:       viMode,
 		ledger:       ledger,
+		tokens:       tokens,
 		usage:        openUsageSamples(cfg.StateDir),
 		limits:       openLimitsStore(cfg.StateDir),
 		limitHistory: openLimitHistory(cfg.StateDir),
