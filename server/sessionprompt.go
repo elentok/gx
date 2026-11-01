@@ -23,13 +23,13 @@ const (
 const maxSessionPromptBytes = 32 * 1024
 
 // validatePromptText normalizes text typed into a session and refuses a
-// slash or bang prefix and an oversized text. Empty text passes: each route
+// bang prefix and an oversized text. Empty text passes: each route
 // decides whether that is allowed. what names the text in refusal messages.
 func validatePromptText(text, what string) (string, *SessionResult) {
 	text = strings.TrimSpace(normalizeAnswer(text))
 	switch {
-	case strings.HasPrefix(text, "/") || strings.HasPrefix(text, "!"):
-		res := sessionRefusal(ReasonPromptPrefixNotAllowed, what+" may not start with / or !")
+	case strings.HasPrefix(text, "!"):
+		res := sessionRefusal(ReasonPromptPrefixNotAllowed, what+" may not start with !")
 		return text, &res
 	case len(text) > maxSessionPromptBytes:
 		res := sessionRefusal(ReasonPromptTextTooLong, fmt.Sprintf("%s is over %d bytes", what, maxSessionPromptBytes))

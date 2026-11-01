@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/elentok/gx/agentrunner/claudeui"
@@ -16,7 +17,11 @@ import (
 // person can send it again.
 func (s *Server) sendPrompt(dir, text string) {
 	log := s.log.With("session", filepath.Base(dir))
-	err := s.nudgePrompt(dir, text)
+	send := s.nudgePrompt
+	if isSingleSendCommand(text) {
+		send = s.typeCommandOnce
+	}
+	err := send(dir, text)
 	switch {
 	case err == nil:
 	case errors.Is(err, errNudgeCancelled), errors.Is(err, errServerStopping):
@@ -25,6 +30,31 @@ func (s *Server) sendPrompt(dir, text string) {
 		log.Warn("send failed", "err", err)
 		s.raiseGxActionable(dir, fmt.Sprintf("Send failed: %v", err), []string{text})
 	}
+}
+
+// isSingleSendCommand reports whether text is a "/" command typed once.
+// /compact, with or without arguments, starts a turn and keeps the nudge path.
+// nativerunner/pty.go:isSlashCommand holds the runners' copy of this rule.
+func isSingleSendCommand(text string) bool {
+	if !strings.HasPrefix(text, "/") {
+		return false
+	}
+	return text != "/compact" && !strings.HasPrefix(text, "/compact ")
+}
+
+// typeCommandOnce types a "/" command and presses Enter once: most commands
+// start no turn, so a nudge would run them twice. A swallowed Enter leaves the
+// text in the input box.
+func (s *Server) typeCommandOnce(dir, text string) error {
+	run, closeRun, err := s.openActionRun(dir, actionRunOpts{})
+	if err != nil {
+		return err
+	}
+	defer closeRun()
+	if err := run.catchUp(); err != nil {
+		return err
+	}
+	return run.typeStep(0, text)
 }
 
 func (s *Server) nudgePrompt(dir, text string) error {

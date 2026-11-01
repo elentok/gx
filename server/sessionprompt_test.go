@@ -79,13 +79,99 @@ func TestSessionPrompt_Refusals(t *testing.T) {
 	f := startPromptSession(t)
 	for name, tc := range map[string]struct{ text, want string }{
 		"empty":    {"  \n", server.ReasonEmptyPrompt},
-		"slash":    {"/clear", server.ReasonPromptPrefixNotAllowed},
 		"bang":     {" !ls", server.ReasonPromptPrefixNotAllowed},
 		"too long": {strings.Repeat("a", 32*1024+1), server.ReasonPromptTextTooLong},
 	} {
-		if res := f.prompt(t, tc.text); !res.Refused || res.Reason != tc.want {
+		res := f.prompt(t, tc.text)
+		if !res.Refused || res.Reason != tc.want {
 			t.Errorf("%s: prompt = %+v, want reason %q", name, res, tc.want)
 		}
+		if tc.want == server.ReasonPromptPrefixNotAllowed && (!strings.Contains(res.Message, "!") || strings.Contains(res.Message, "/")) {
+			t.Errorf("%s: message %q should mention only !", name, res.Message)
+		}
+	}
+}
+
+func TestSessionPrompt_AcceptsSlashCommands(t *testing.T) {
+	t.Parallel()
+	for _, text := range []string{"/cost", "/clear", "/compact foo"} {
+		t.Run(text, func(t *testing.T) {
+			f := startPromptSession(t)
+			if res := f.prompt(t, text); res.Refused {
+				t.Fatalf("prompt %q = %+v, want accepted", text, res)
+			}
+			waitForSubmitted(t, f.conv, strconv.Quote(text)+"\n")
+		})
+	}
+}
+
+func TestSessionPrompt_SlashCommandIsTypedOnce(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	if err := agentfake.SendProgramControl(f.conv, agentfake.Control{Action: agentfake.ActionSwallowEnter}); err != nil {
+		t.Fatal(err)
+	}
+	if res := f.prompt(t, "/cost"); res.Refused {
+		t.Fatalf("prompt = %+v", res)
+	}
+	time.Sleep(2 * firstPromptGrace) // negative wait: a nudge's Enter would come within the grace window
+	if got := submitted(t, f.conv); got != "" {
+		t.Errorf("submitted = %q, want none: the one Enter was swallowed and not retried", got)
+	}
+}
+
+func TestSessionPrompt_CompactWithArgumentsIsNudged(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	if err := agentfake.SendProgramControl(f.conv, agentfake.Control{Action: agentfake.ActionSwallowEnter}); err != nil {
+		t.Fatal(err)
+	}
+	if res := f.prompt(t, "/compact foo"); res.Refused {
+		t.Fatalf("prompt = %+v", res)
+	}
+	waitForSubmitted(t, f.conv, strconv.Quote("/compact foo")+"\n")
+	report(t, f.conv, agentfake.Control{State: "working"})
+	time.Sleep(2 * firstPromptGrace)
+	if got := submitted(t, f.conv); got != strconv.Quote("/compact foo")+"\n" {
+		t.Errorf("submitted = %q, want one submission once the turn started", got)
+	}
+}
+
+func TestSessionPrompt_DesignSlashCommandStopsTheCountdown(t *testing.T) {
+	t.Parallel()
+	for _, text := range []string{"/clear", "/compact"} {
+		t.Run(text, func(t *testing.T) {
+			f := startAdvancing(t, storeWithMapStep(t, "spec"))
+			waitForHolder(t, filepath.Join(f.h.SessionsDir, f.id))
+			writeAssistantMessage(t, f.path, runEndText)
+			endTurn(t, f)
+			waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.AutoAdvanceAt != nil })
+			res, err := f.h.Client.PromptSession(f.ctx, server.SessionPromptRequest{ID: f.id, Text: text})
+			if err != nil || res.Refused {
+				t.Fatalf("prompt = %+v, %v", res, err)
+			}
+			waitUntil(t, "the countdown stopped", func() bool { return sessionSnapshot(t, f).AutoAdvanceAt == nil })
+			time.Sleep(2 * countdownDelay) // negative wait: a surviving countdown would send Continue within this window
+			// As typed text does, the command stops only the countdown: the
+			// run-end Continue stays raised for the person to press.
+			if got := sessionSnapshot(t, f); got.AutoAdvanceAt != nil || got.Actionable.Reason == "" || autoSends(t, f) != 0 {
+				t.Errorf("session = %+v, want no countdown, Continue still raised, no auto send", got)
+			}
+		})
+	}
+}
+
+func TestSessionPrompt_ASlashCommandThatStartsNoTurnRaisesNothing(t *testing.T) {
+	t.Parallel()
+	f := startPromptSession(t)
+	if res := f.prompt(t, "/cost"); res.Refused {
+		t.Fatalf("prompt = %+v", res)
+	}
+	waitForSubmitted(t, f.conv, strconv.Quote("/cost")+"\n")
+	time.Sleep(2 * firstPromptGrace) // negative wait: a failure would raise within this window
+	got := sessionSnapshotOf(t, f.designsFixture, f.id)
+	if got.Actionable.Reason != "" {
+		t.Errorf("actionable = %+v, want none", got.Actionable)
 	}
 }
 

@@ -54,6 +54,16 @@ func TestSessionPrompt_CodexIsRefusedWhileWorkingAndTypedAtIdle(t *testing.T) {
 	}
 }
 
+func TestSessionPrompt_CodexSkillTextKeepsTheNudgePath(t *testing.T) {
+	t.Parallel()
+	f := startCodexPromptSession(t)
+	if res := f.prompt(t, "$gx-x do it"); res.Refused {
+		t.Fatalf("prompt = %+v", res)
+	}
+	waitForSubmitted(t, f.conv, strconv.Quote("$gx-x do it")+"\n")
+	waitForSession(f.ctx, t, f.h, f.evs, f.id, func(s server.SessionInfo) bool { return s.Status.State == server.SessionWorking })
+}
+
 // A Codex turn that leaves a background terminal reaches the snapshot as
 // Working with Background (the Agents row shows +bg from that), and it takes a
 // prompt.

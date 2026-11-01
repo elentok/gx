@@ -173,8 +173,8 @@ func (s *Server) openActionRun(dir string, opts actionRunOpts) (*actionRun, func
 	}, nil
 }
 
-// step types one prompt and waits for it to end.
-func (r *actionRun) step(i int, prompt string) error {
+// typeStep types one prompt and presses its Enter, without waiting.
+func (r *actionRun) typeStep(i int, prompt string) error {
 	if !r.s.typing().ReadyToType(nativerunner.HolderTypingIO(r.holder)) {
 		return fmt.Errorf("step %d: %w", i, claudeui.ErrNotReadyToType)
 	}
@@ -182,7 +182,6 @@ func (r *actionRun) step(i int, prompt string) error {
 		return err
 	}
 	r.convChanged = false
-	begin := time.Now()
 	before, _ := inputState(r.holder)
 	r.s.log.Info("action step typing", "session", filepath.Base(r.dir), "step", i, "len", len(prompt), "head", promptHead(prompt), "input_before", before)
 	if err := typeSessionPrompt(r.dir, prompt); err != nil {
@@ -192,6 +191,15 @@ func (r *actionRun) step(i int, prompt string) error {
 		r.onTyped()
 	}
 	r.s.log.Info("action step typed", "session", filepath.Base(r.dir), "step", i)
+	return nil
+}
+
+// step types one prompt and waits for it to end.
+func (r *actionRun) step(i int, prompt string) error {
+	begin := time.Now()
+	if err := r.typeStep(i, prompt); err != nil {
+		return err
+	}
 	signal, err := r.waitForStep(strings.HasPrefix(prompt, "/"))
 	r.s.log.Info("action step done", "session", filepath.Base(r.dir), "step", i, "signal", signal, "elapsed", time.Since(begin))
 	if err != nil {

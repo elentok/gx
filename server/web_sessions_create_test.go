@@ -51,6 +51,16 @@ func TestWebSessionCreate_StartsASessionInTheProjectRoot(t *testing.T) {
 	}
 }
 
+func TestWebSessionCreate_AcceptsASlashPrompt(t *testing.T) {
+	t.Parallel()
+	f := startDesigns(t)
+	root := f.projectRoot(t)
+	code, res := f.webCreate(t, `{"project":"proj","dir":"`+root+`","prompt":"/clear"}`)
+	if code != http.StatusOK || res.Refused || res.Session == nil {
+		t.Errorf("create = %d %+v, want accepted", code, res)
+	}
+}
+
 func TestWebSessionCreate_Refusals(t *testing.T) {
 	t.Parallel()
 	f := startDesigns(t)
@@ -60,7 +70,6 @@ func TestWebSessionCreate_Refusals(t *testing.T) {
 		"harness":         {`{"project":"proj","dir":"` + root + `","harness":"claude"}`, server.ReasonSessionBadRequest},
 		"made worktree":   {`{"project":"proj","dir":"` + root + `","made_worktree":true}`, server.ReasonSessionBadRequest},
 		"not json":        {`nope`, server.ReasonSessionBadRequest},
-		"slash prompt":    {`{"project":"proj","dir":"` + root + `","prompt":"/clear"}`, server.ReasonPromptPrefixNotAllowed},
 		"bang prompt":     {`{"project":"proj","dir":"` + root + `","prompt":" !ls"}`, server.ReasonPromptPrefixNotAllowed},
 		"long prompt":     {`{"project":"proj","dir":"` + root + `","prompt":"` + strings.Repeat("a", 32*1024+1) + `"}`, server.ReasonPromptTextTooLong},
 		"unknown project": {`{"project":"nope","dir":"` + root + `"}`, server.ReasonSessionBadRequest},
