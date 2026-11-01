@@ -9,7 +9,7 @@ import { UsageMenuBlock } from "../usage/UsageMenuBlock";
 import { toggleViMode } from "../vimode";
 
 // The top bar for pages that do not receive the connection state as a prop.
-export function ConnectedTopBar({ active, waiting }: { active?: TopBarTab; waiting?: number }) {
+export function ConnectedTopBar({ active, waiting, ruled }: { active?: TopBarTab; waiting?: number; ruled?: boolean }) {
   const conn = useConnectionContext();
   const { snapshot, connected } = useConnectionState(conn);
   const actionable = useActionableCount();
@@ -25,6 +25,7 @@ export function ConnectedTopBar({ active, waiting }: { active?: TopBarTab; waiti
         mode={snapshot?.mode}
         connected={connected}
         waiting={waiting}
+        ruled={ruled}
         actionable={actionable}
         afk={snapshot?.afk}
         health={snapshot?.health}

@@ -50,7 +50,7 @@ export function DetailPage({
         <MigratingStrip />
         <DiskStrips />
         <PageContainer fill={fill}>
-          <ConnectedTopBar active={active} waiting={waiting} />
+          <ConnectedTopBar active={active} waiting={waiting} ruled={fill} />
           <FailedMigrationStrip />
           {children}
         </PageContainer>
