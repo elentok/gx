@@ -22,6 +22,8 @@ var briefTools = map[string]brief.Tool{
 	"playwright": brief.Playwright{},
 }
 
+const goCleanCache = "go-clean-cache"
+
 func newBriefCmd(d deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "brief [-C dir] <tool> [args...]",
@@ -29,7 +31,8 @@ func newBriefCmd(d deps) *cobra.Command {
 		Long: `Run a dev tool and print one result line and the log path (always the last
 line). Exit 0 means pass, 1 fail, 2 brief could not run the tool.
 
-Tools: go-test, go-build, go-vet, vitest, tsc, playwright, conflicts (the node
+Tools: go-test, go-build, go-vet, vitest, tsc, playwright, conflicts,
+go-clean-cache (the node
 tools run from the node_modules/.bin found walking up to the git root).
 go-build and go-vet print one line when clean and group errors by file.
 playwright needs -C webui:
@@ -39,6 +42,9 @@ the test file select flows (playwright disk.e2e.ts 76 77); -g is passed through.
 
 conflicts lists the unmerged files of an in-progress merge or rebase with the
 line numbers of their conflict markers (exit 1 while any remain, 0 when none).
+
+go-clean-cache waits until no Go build runs, then runs go clean -cache. Use it
+instead of calling go clean -cache, which breaks running builds.
 
 -C <dir> runs the tool in that directory. It must come before the tool name;
 everything after the tool name goes to the tool unchanged.`,
@@ -85,8 +91,8 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 		return c.Help()
 	}
 	tool, ok := briefTools[args[0]]
-	if !ok && args[0] != "conflicts" {
-		// conflicts is not a brief.Tool: it runs no child tool and keeps no log.
+	if !ok && args[0] != "conflicts" && args[0] != goCleanCache {
+		// conflicts and go-clean-cache are not brief.Tools: they keep no log.
 		return briefUsageError(c, fmt.Sprintf("unknown tool %q", args[0]))
 	}
 	cwd, err := d.getwd()
@@ -104,11 +110,17 @@ func runBrief(c *cobra.Command, d deps, args []string) error {
 		}
 		return nil
 	}
-	dataDir, err := d.dirs().DataDir()
+	stateDir, err := d.dirs().StateDir()
 	if err != nil {
 		return err
 	}
-	stateDir, err := d.dirs().StateDir()
+	if args[0] == goCleanCache {
+		if code := brief.GoCleanCache(dir, stateDir, d.env, d.cacheGate, c.OutOrStdout()); code != brief.ExitPass {
+			return &ExitError{Code: code}
+		}
+		return nil
+	}
+	dataDir, err := d.dirs().DataDir()
 	if err != nil {
 		return err
 	}

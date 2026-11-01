@@ -12,6 +12,7 @@ import (
 	"github.com/elentok/gx/codexsession"
 	"github.com/elentok/gx/config"
 	"github.com/elentok/gx/git"
+	"github.com/elentok/gx/gocachegate"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/logger"
 	"github.com/elentok/gx/projectlock"
@@ -74,6 +75,9 @@ type deps struct {
 	serverClient func() (*apiclient.Client, error)
 	// env is the process environment every config dir is resolved from.
 	env []string
+	// cacheGate holds the hooks of `brief go-clean-cache`; the zero value is
+	// production (tests shorten the cap).
+	cacheGate gocachegate.Deps
 	// writeFile writes ticket files in `tickets publish`; nil means os.WriteFile
 	// (tests inject a faulty one).
 	writeFile func(path string, data []byte, perm os.FileMode) error
