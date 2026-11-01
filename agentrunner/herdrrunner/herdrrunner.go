@@ -20,7 +20,6 @@ import (
 	"github.com/elentok/gx/harness"
 	"github.com/elentok/gx/herdr"
 	"github.com/elentok/gx/syshealth"
-	"github.com/elentok/gx/transcript"
 )
 
 // pollInterval spaces AgentWait retries when herdr answers a wait with a
@@ -264,7 +263,7 @@ func (r *Runner) launchSlash(s agentrunner.Session, text string, turn int, onNud
 	caps.Poll = cmp.Or(r.LaunchCaps.Poll, caps.Poll)
 	caps.ResendEvery = cmp.Or(r.LaunchCaps.ResendEvery, caps.ResendEvery)
 	proof := claudeui.LaunchProof{
-		FirstUser: func() (string, bool, error) { return r.firstUserRecord(s) },
+		FirstUser: func() (string, bool, error) { return claudeui.FirstUserRecord(r.Home, s.SessionID) },
 		Pane: func() (string, error) {
 			text, err := ReadPaneRecent(r.CLI)(s.ID)
 			return text, mapNotFound(err)
@@ -294,28 +293,6 @@ func (r *Runner) launchSlash(s agentrunner.Session, text string, turn int, onNud
 		return nil
 	}
 	return fmt.Errorf("%w: %q: herdr never showed the agent working or blocked: %v", agentrunner.ErrNotDelivered, text, cmp.Or(herdrErr, errors.New("agent still idle")))
-}
-
-// firstUserRecord is the text of the first person message of s's transcript;
-// ok is false until the transcript exists and has one.
-func (r *Runner) firstUserRecord(s agentrunner.Session) (string, bool, error) {
-	if s.SessionID == "" {
-		return "", false, nil
-	}
-	paths, err := transcript.FindByID(r.Home, s.SessionID)
-	if err != nil || len(paths) != 1 {
-		return "", false, err
-	}
-	msgs, _, err := transcript.ReadChat(paths[0])
-	if err != nil {
-		return "", false, err
-	}
-	for _, m := range msgs {
-		if m.Role == transcript.ChatRolePerson {
-			return m.Text, true, nil
-		}
-	}
-	return "", false, nil
 }
 
 // submitSince sends a prompt against turn. A turn can start and end between

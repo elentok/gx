@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/elentok/gx/agentrunner"
+	"github.com/elentok/gx/transcript"
 )
 
 // NudgePrompt is the decision logged for each resend of a launch prompt.
@@ -51,6 +52,35 @@ var DefaultLaunchProofCaps = LaunchProofCaps{
 	UnknownGrace: 5 * time.Second,
 	Poll:         500 * time.Millisecond,
 	ResendEvery:  3 * time.Second,
+}
+
+// FirstUserRecord is the text of the first person message of the transcript of
+// sessionID under home; ok is false until the transcript exists and has one.
+func FirstUserRecord(home, sessionID string) (string, bool, error) {
+	if sessionID == "" {
+		return "", false, nil
+	}
+	paths, err := transcript.FindByID(home, sessionID)
+	if err != nil || len(paths) != 1 {
+		return "", false, err
+	}
+	msgs, _, err := transcript.ReadChat(paths[0])
+	if err != nil {
+		return "", false, err
+	}
+	for _, m := range msgs {
+		if m.Role == transcript.ChatRolePerson {
+			return m.Text, true, nil
+		}
+	}
+	return "", false, nil
+}
+
+// LaunchRecorded reports whether the transcript of sessionID under home
+// already shows text as its first user record.
+func LaunchRecorded(home, sessionID, text string) (bool, error) {
+	content, ok, err := FirstUserRecord(home, sessionID)
+	return ok && launchedBy(content, text), err
 }
 
 // launchedBy reports whether a user record's content is the launch command:

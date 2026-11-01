@@ -59,6 +59,9 @@ type Pty struct {
 	// the typing check reads claude's config dir and home. Empty means no
 	// config, never the process env.
 	Env []string
+	// LaunchCaps bound a launch prompt's transcript proof; a zero field means
+	// the default.
+	LaunchCaps claudeui.LaunchProofCaps
 
 	// log receives the vim probe's decisions (see SetLog); nil logs nothing.
 	log *slog.Logger

@@ -192,6 +192,10 @@ var (
 	// ErrNotDelivered: Prompt could not get the agent to start a new turn.
 	// Callers start a fresh session rather than retrying.
 	ErrNotDelivered = errors.New("agentrunner: prompt not delivered")
+	// ErrDeliveryUnconfirmed: a launch prompt was typed but a person typed over
+	// it before any proof arrived. Not a success, and not a reason to start a
+	// fresh session: the person is in this one.
+	ErrDeliveryUnconfirmed = errors.New("agentrunner: prompt delivery unconfirmed")
 	// ErrNotReady: the session can't accept input (e.g. blocked on a dialog).
 	ErrNotReady = errors.New("agentrunner: session not ready")
 	// ErrTimeout: Wait gave up before the session reached a wanted state.

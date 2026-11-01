@@ -61,7 +61,16 @@ func (r *ptyRunner) Prompt(s agentrunner.Session, text string) error {
 // PromptNudged runs the turn hook, then arms the TUI fake's next turn to start
 // and end at once, which the typed prompt then runs. A turn control keeps the
 // turn open instead, and its follow-up goes in once the prompt is.
-func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) (err error) {
+func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge func(string)) error {
+	return r.prompt(s, text, onNudge, r.Pty.PromptNudged)
+}
+
+// PromptLaunch is PromptNudged for a launch prompt.
+func (r *ptyRunner) PromptLaunch(s agentrunner.Session, text string, onNudge func(string)) error {
+	return r.prompt(s, text, onNudge, r.Pty.PromptLaunch)
+}
+
+func (r *ptyRunner) prompt(s agentrunner.Session, text string, onNudge func(string), send func(agentrunner.Session, string, func(string)) error) (err error) {
 	home := r.h.Env("HOME")
 	if turn := r.h.turn.Load(); turn != nil {
 		r.mu.Lock()
@@ -84,7 +93,7 @@ func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge fun
 			}()
 		}
 	}
-	return r.Pty.PromptNudged(s, text, onNudge)
+	return send(s, text, onNudge)
 }
 
 // buildPty builds the harness's runners the way production does, over the
@@ -92,7 +101,9 @@ func (r *ptyRunner) PromptNudged(s agentrunner.Session, text string, onNudge fun
 // a Restart gets fresh runners that reattach to the live holders.
 func (h *Harness) buildPty() {
 	exe := os.Args[0]
-	env := append(h.cfg.Env[:len(h.cfg.Env):len(h.cfg.Env)], agentfake.TUIEnv+"=1")
+	// The launch record is the proof a launch prompt is delivered (see
+	// Pty.PromptLaunch), which real claude writes for every skill prompt.
+	env := append(h.cfg.Env[:len(h.cfg.Env):len(h.cfg.Env)], agentfake.TUIEnv+"=1", agentfake.TUILaunchRecordEnv+"=1")
 	_, runnerFor := runnerbuild.New("pty", env, h.StateDir, h.cfg.RunnerWait, &runnerbuild.PtyOverride{
 		Holder:       []string{exe, holderArg},
 		Claude:       exe,

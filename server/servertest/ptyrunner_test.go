@@ -474,8 +474,8 @@ func TestPty_RestartBuildsFreshRunnersAndReclaimsTheLiveRun(t *testing.T) {
 	t.Parallel()
 	store, repo := t.TempDir(), testutil.TempRepo(t)
 	h := startPty(t, store, repo)
-	// No OnTurn: the slash prompt starts no turn, so the agent stays live and
-	// Stop does not wait on a hook.
+	// A launch prompt must start a turn; a stalled one keeps the agent live.
+	h.OnTurn(func(turn *Turn) { turn.Stall() })
 	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
 		t.Fatalf("add: %+v, %v", res, err)
 	}
