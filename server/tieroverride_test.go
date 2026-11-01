@@ -2,6 +2,9 @@ package server_test
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,9 +114,30 @@ func TestLaunch_EmptyTierModelPausesModelMismatchAndStartsNothing(t *testing.T) 
 	path := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
 	writeProjectAgents(t, store, repo, `,"agents":{"claude":{"effort":"low"}}`)
 	rec := &startRecorder{Runner: runnerfake.NewRunner()}
+	// A model-mismatch pause reaches chat, not the OS banner, so a fake Slack
+	// webhook stands in for the banner.
+	var hookMu sync.Mutex
+	var hookBodies []string
+	hook := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		hookMu.Lock()
+		defer hookMu.Unlock()
+		if !strings.Contains(string(b), "server started") {
+			hookBodies = append(hookBodies, string(b))
+		}
+	}))
+	t.Cleanup(hook.Close)
+	hookCount := func() int {
+		hookMu.Lock()
+		defer hookMu.Unlock()
+		return len(hookBodies)
+	}
 	h := servertest.StartWithStore(t, store, servertest.WithRunner(rec), func(c *server.Config) {
 		c.AgentsClaude = config.AgentConfig{}
 		c.RecoverySettings.FollowUps = "proj:follow-ups"
+		c.Settings.Chat.SlackWebhookURL = hook.URL
+		c.Settings.Chat.GateStatePath = filepath.Join(t.TempDir(), "gate.json")
+		c.Settings.Chat.FlushInterval = 20 * time.Millisecond
 	})
 
 	if res, err := h.Client.QueueAdd(context.Background(), "proj:epic-a/01", "claude"); err != nil || res.Refused {
@@ -128,10 +152,15 @@ func TestLaunch_EmptyTierModelPausesModelMismatchAndStartsNothing(t *testing.T) 
 		t.Errorf("model fields = %q / %q, want no model / a model from its tier", tk.ModelRan, tk.ModelExpected)
 	}
 	var drafts []string
-	servertest.WaitFor(t, 20*time.Second, "the banner and the follow-up draft", func() bool {
+	servertest.WaitFor(t, 20*time.Second, "the pause message and the follow-up draft", func() bool {
 		drafts, _ = filepath.Glob(filepath.Join(store, "proj", "follow-ups", "issues", "*model-mismatch*.md"))
-		return len(drafts) > 0
+		return len(drafts) > 0 && hookCount() > 0
 	})
+	if n := hookCount(); n != 1 {
+		hookMu.Lock()
+		t.Errorf("chat pause messages = %d, want 1: %q", n, hookBodies)
+		hookMu.Unlock()
+	}
 	if len(drafts) != 1 {
 		t.Fatalf("follow-up drafts = %v, want 1", drafts)
 	}
