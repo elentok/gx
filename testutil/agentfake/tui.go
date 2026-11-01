@@ -286,6 +286,9 @@ func parseTUIArgs(args []string) (tuiOptions, error) {
 }
 
 func runTUIClaude() (int, error) {
+	if isClaudeProbe(os.Args[1:]) {
+		return runClaudeProbe()
+	}
 	opts, err := parseTUIArgs(os.Args[1:])
 	if err != nil {
 		return 0, err

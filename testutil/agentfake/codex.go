@@ -148,6 +148,9 @@ func runCodex() (int, error) {
 		fmt.Println("codex-cli " + CodexVersion)
 		return 0, nil
 	}
+	if len(args) == 1 && args[0] == "app-server" {
+		return runCodexProbe()
+	}
 	opts, err := parseCodexArgs(args)
 	if err != nil {
 		return 0, err
