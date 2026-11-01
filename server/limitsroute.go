@@ -59,6 +59,10 @@ func (s *Server) limitsReportWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if err := s.limitHistory.recordClaude(req, res, now); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if limitsVisiblyChanged(res.FiveHour, now) || limitsVisiblyChanged(res.SevenDay, now) {
 		s.limitsEvents.trigger()
 	}

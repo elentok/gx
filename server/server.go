@@ -325,6 +325,7 @@ type Server struct {
 	ledger       *budgetLedger
 	usage        *usageSamples // Claude's
 	limits       *limitsStore
+	limitHistory *limitHistory
 	limitsEvents *eventThrottle
 	budgetEvents *budgetEvents
 	usageCodex   *usageSamples
@@ -541,6 +542,7 @@ func New(cfg Config) (*Server, error) {
 		ledger:       ledger,
 		usage:        openUsageSamples(cfg.StateDir),
 		limits:       openLimitsStore(cfg.StateDir),
+		limitHistory: openLimitHistory(cfg.StateDir),
 		limitsEvents: newEventThrottle(limitsEventInterval(cfg), func() { events.publish(EventLimitsChanged, "") }),
 		budgetEvents: newBudgetEvents(cfg.BudgetEventInterval, func() { events.publish(EventBudgetChanged, "") }),
 		usageCodex:   openUsageFiles(cfg.StateDir, usageSampleFileCodex, usageLiftFileCodex),
