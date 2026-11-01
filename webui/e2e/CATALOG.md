@@ -1599,6 +1599,12 @@ The restart flows (128-138, `restart.e2e.ts`; 139 onward, `restart-run.e2e.ts`, 
 - **Steps:** open the dialog; click Restart.
 - **Pass:** the dialog reads "Restarting..."; the tab reloads by itself; the menu build text now contains `fixture-next` (it did not before).
 
+## 179. Restart from the web applies pending steps
+
+- **Scenario:** as flow 141 (`gx` = the second build); one reload allowed.
+- **Steps:** read `demo`'s list of applied steps; empty it (and `broken`'s) so every step is pending; open the dialog; click Restart; wait for the reload.
+- **Pass:** `demo`'s list holds the same names as before (the restarted server applied the pending steps).
+
 ## 142. Restart server, other tab
 
 - **Scenario:** as flow 141, plus an agents session in `demo`; two reloads allowed.

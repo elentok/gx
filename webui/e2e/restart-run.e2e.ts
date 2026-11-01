@@ -158,7 +158,24 @@ test("141. Restart server, tab reloads", async ({ page, start }) => {
   await expect(async () => expect(await buildText(page)).toContain("fixture-next")).toPass({ timeout: 30_000 });
 });
 
-test("142. Restart server, other tab", async ({ page, context, start }) => {
+test("179. Restart from the web applies pending steps", async ({ page, start }) => {
+  const fixture = await start("restart-projects", { reloads: 1 });
+  await fixture.setRestartControl("check.json", passing("fixture-next"));
+  await fixture.setRestartControl("start", "up");
+  await fixture.setRestartControl("gx", process.env.GX_E2E_GX_NEXT!);
+  const list = async () => (await fixture.readStoreFile("demo/applied-migrations.txt")).split("\n").filter(Boolean);
+  const full = await list();
+  expect(full.length).toBeGreaterThan(0);
+  // Empty lists make every step pending, as a new build with steps would.
+  await forgetApplied(fixture);
+  expect(await list()).toEqual([]);
+
+  await restartNow(page);
+
+  await expect.poll(list, { timeout: 30_000 }).toEqual(full);
+});
+
+test("142. Restart server, other tab",async ({ page, context, start }) => {
   const fixture = await start("restart-projects", { reloads: 2 });
   await fixture.setRestartControl("check.json", passing("fixture-next"));
   await fixture.setRestartControl("start", "up");
