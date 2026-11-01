@@ -108,6 +108,7 @@ var allowed = map[string]int{
 	"testutil/agentfake/worker_test.go":             1,
 	"testutil/gxfixture/disk_test.go":               2,
 	"testutil/gxfixture/main_test.go":               8,
+	"testutil/gxfixture/migrate_test.go":            2, // poll loop with a deadline; negative wait: the hold must keep the server migrating
 	"testutil/gxfixture/restart_test.go":            1, // poll loop with a deadline waiting on the running-agent count
 	"testutil/herdrfake/state_test.go":              2,
 	"testutil/runnerfake/runnerfake_test.go":        1,

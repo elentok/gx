@@ -156,7 +156,7 @@ func convertTicketFile(path string, raw []byte) []byte {
 	if len(notes) == 0 {
 		return raw
 	}
-	// Unshimmed: the pause shim would turn needs-repair into paused with the
+	// Unshimmed: the pause shim would turn a legacy repair status into paused with the
 	// default reason, losing the one the event log holds. The pause migration
 	// at the first server start does that properly.
 	out, err := schema.MarshalTicketUnshimmed(t, schema.ParseBody(string(raw)))

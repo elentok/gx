@@ -103,6 +103,7 @@ var allowed = map[string]allowance{
 	"cmd/tickets_migrate_test.go":              allow("migrate input uses the legacy statuses", "park", "needsanswer", "needsrepair"),
 	"cmd/tickets_migrate_pause_test.go":        allow("migrate input uses the legacy statuses, park_kind and headings", "park", "land", "needsanswer", "needsrepair"),
 	"cmd/tickets_migrate_question_test.go":     allow("migrates the legacy Needs Answer section", "park", "needsanswer"),
+	"cmd/tickets_migrate_store_start_test.go":  allow("imports old-shape tickets with the legacy statuses and Needs Answer heading", "needsanswer", "needsrepair"),
 	"config/agents_test.go":                    allow("tests the resume-on-start alias", "resumeonstart"),
 	"events/legacy_test.go":                    allow("tests the legacy event reader", "park", "needsanswer", "needsrepair", "land", "reset"),
 	"ralphloop/notification_text_test.go":      allow("chat headlines \"needs answer\" and \"needs repair\"", "needsanswer", "needsrepair"),
