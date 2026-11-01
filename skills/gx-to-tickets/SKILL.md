@@ -20,14 +20,15 @@ a ticket because its implementation won't fit one fresh context window, not beca
 take a while" to get through.
 
 Estimate the amount of tokens that will be needed for the implementation of each ticket; if a ticket
-will need more than 60K tokens, split it.
+will need more than 60K tokens of work, split it. The 60K counts the ticket's work only.
 
-Cold estimates run low. Across about 1,700 finished implement tickets, the actual context window
-had a median of 2 times `expected_context_window`. When a ticket sits close to the 60K limit, or
+The estimate is the ticket's work only. gx adds the start-up prefix itself. Cold estimates run 1.12
+to 1.28 times the real work. They look low only because the actual context window keeps the prefix.
+Estimate lower: multiply your first guess by 0.83. When a ticket sits close to the 60K limit, or
 its prose does not list the files it touches, split it instead of trusting the number. A ticket
 that runs long also costs more per token, since every turn re-reads the context.
 
-When estimating, budget for the whole session, not just the diff size. A ticket that only adds ~150
+When estimating, budget for the work, not just the diff size. A ticket that only adds ~150
 lines can still blow the budget once you add:
 
 - **Full reads of existing files it touches.** If a ticket requires wiring new behavior through an

@@ -56,11 +56,11 @@ Then, while working:
 - **Never edit code you have not read, and copy indentation exactly from the file read.** Don't guess
   tabs or spaces. Read the exact lines you will edit, in full: a read that says "(N lines omitted)"
   over them does not count - re-read that range with `offset`/`limit`.
-- **Make one Edit per contiguous region, not one per line.** Costly tickets averaged about 59 Edit
-  calls, and each call is a turn that re-reads the whole context. Where several changes sit close
-  together in a file, replace the whole block in a single Edit.
-- **Send file edits to one file one after another, never in parallel.** One failed edit makes the rest of
-  the batch fail, and a later edit may depend on text an earlier one changed.
+- **Make one Edit per contiguous region, not one per line.** Adjacent edits to one file cost extra
+  calls. Where several changes sit close together in a file, group them into a single Edit that
+  replaces the whole block.
+- **Send file edits to one file one after another, never in parallel.** A later edit may depend on
+  text an earlier one changed.
 - **Never run a test in the same batch as the edits it should cover.** It can return green before
   the edits apply, so the result covers only some of them.
 - **Never read source through a shell command** (`cat`, `sed -n`, `head`, `tail`). Same tokens as a
