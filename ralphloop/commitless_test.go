@@ -94,6 +94,42 @@ func TestFinishCommitless_NoCommitsMarksDoneAndRemovesWorktree(t *testing.T) {
 	}
 }
 
+func TestFinishCommitless_AskOnNonKeepingRunKeepsWorktreeAndStopsSession(t *testing.T) {
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-b", "main")
+	gitIn(t, repo, "commit", "--allow-empty", "-m", "root")
+	scratchDir := writeEpic(t, "fix-it", map[string]string{
+		"01-a.md": "---\nid: \"01\"\nstatus: claimed\ntype: investigate\niteration_status: asking\ncommitless: true\n---\n# A\n",
+	})
+	path := ticketPath(scratchDir, "fix-it", "01-a.md")
+	one := OneIteration{RepoDir: repo, Epic: "fix-it", ScratchDir: scratchDir, Ticket: tickets.Ticket{Identifier: "01", Path: path}}
+	d := DefaultDeps()
+	runner := runnerfake.NewRunner()
+	d.Runner = runner
+	wt, err := PrepareCommitless(d, one, "", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := runner.Start(agentrunner.StartOptions{Label: wt.Label, Epic: "fix-it", Cwd: wt.Path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	work := filepath.Join(wt.Path, "work.txt")
+	if err := os.WriteFile(work, []byte("wip"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := FinishCommitless(d, one, wt, s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(work); err != nil {
+		t.Errorf("uncommitted file gone after the ask: %v", err)
+	}
+	if _, found, _ := runner.Find(wt.Label); found {
+		t.Errorf("session still live after the ask")
+	}
+}
+
 func TestFinishCommitless_StrandedCommitsPauseAndKeepWorktree(t *testing.T) {
 	d, one, wt := finishedCommitlessOneOff(t)
 	gitIn(t, wt.Path, "commit", "--allow-empty", "-m", "the fix")

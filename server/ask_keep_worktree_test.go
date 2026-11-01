@@ -111,3 +111,64 @@ func TestAsk_NonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testing.T) {
 		}
 	}
 }
+
+// A commitless ticket on a non-keeping runner keeps its detached worktree when
+// it asks, the same as an implement ticket does.
+func TestAsk_CommitlessOnNonKeepingRunnerKeepsTheWorktreeForTheRelaunch(t *testing.T) {
+	t.Parallel()
+	store, repo := t.TempDir(), testutil.TempRepo(t)
+	servertest.WriteTicketWith(t, store, "proj", "epic-a", "01", "first", servertest.TicketOpts{Type: "investigate"})
+	servertest.SetProjectRepo(t, store, "proj", repo)
+	fake := runnerfake.NewRunner()
+	h := servertest.StartWithStore(t, store, servertest.WithRunner(unnamedRunner{fake}), func(c *server.Config) {
+		c.PollInterval = 50 * time.Millisecond
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	const label = "epic-a-iter-01"
+	t.Cleanup(func() { fake.StopAll() })
+
+	if res, err := h.Client.QueueAdd(ctx, "proj:epic-a/01", "claude"); err != nil || res.Refused {
+		t.Fatalf("add: %+v, %v", res, err)
+	}
+	waitFor(t, func() bool { return len(fake.Prompts(label)) > 0 })
+	list, err := exec.Command("git", "-C", repo, "worktree", "list", "--porcelain").CombinedOutput()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt := ""
+	for _, line := range strings.Split(string(list), "\n") {
+		if p, ok := strings.CutPrefix(line, "worktree "); ok && strings.Contains(p, "item-01") {
+			wt = p
+		}
+	}
+	if wt == "" {
+		t.Fatalf("no iteration worktree:\n%s", list)
+	}
+	testutil.WriteFile(t, wt, "wip.txt", "uncommitted")
+
+	ticketPath := filepath.Join(store, "proj", "epic-a", "issues", "01-first.md")
+	if res, err := h.Client.TicketAsk(ctx, "proj:epic-a/01", askBody); err != nil || res.Refused {
+		t.Fatalf("ask = %+v, %v", res, err)
+	}
+	fake.SetState(label, agentrunner.StateIdle, "")
+	waitFor(t, func() bool { _, ok, _ := fake.Find(label); return !ok })
+	if _, err := os.Stat(filepath.Join(wt, "wip.txt")); err != nil {
+		t.Fatalf("uncommitted file lost after the ask: %v", err)
+	}
+
+	state := pauseWithQuestion(t, ticketPath, optionsBlock)
+	if res, err := h.Client.TicketAnswer(ctx, server.QueueRequest{Address: answerAddr, State: state, Choice: "a"}); err != nil || res.Refused {
+		t.Fatalf("answer = %+v, %v", res, err)
+	}
+	waitFor(t, func() bool { _, ok, _ := fake.Find(label); return ok })
+	if data, err := os.ReadFile(filepath.Join(wt, "wip.txt")); err != nil || string(data) != "uncommitted" {
+		t.Errorf("wip.txt after relaunch = %q, %v; want it kept", data, err)
+	}
+	waitFor(t, func() bool { return len(fake.Prompts(label)) > 0 })
+	for _, p := range fake.Prompts(label) {
+		if strings.Contains(strings.ToLower(p), "uncommitted") {
+			t.Errorf("launch prompt mentions uncommitted work: %q", p)
+		}
+	}
+}

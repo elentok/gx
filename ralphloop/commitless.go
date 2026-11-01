@@ -64,8 +64,8 @@ func DiscardCommitless(d Deps, o OneIteration, w IterationWorktree) error {
 // FinishCommitless settles a commitless one-off whose agent has gone idle: a
 // detached worktree holding commits nothing else reaches pauses and stays, an
 // agent that reported finished is marked done, a paused (answer) report pauses, and
-// anything else pauses as a zero-commit finish. Both reports take the worktree
-// away; the tab always closes once the ticket is done.
+// anything else pauses as a zero-commit finish. A finish takes the worktree
+// away; an ask keeps it and stops only the session.
 func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) (FinishOutcome, error) {
 	p := iterationParams{
 		RepoDir: o.RepoDir, FeatureBranch: o.Epic, Agent: o.Agent, Runner: runnerName(d), Label: w.Label,
@@ -90,6 +90,11 @@ func FinishCommitless(d Deps, o OneIteration, w IterationWorktree, pane string) 
 	switch {
 	case stranded:
 	case asked && p.KeepAskedAgent:
+	case asked:
+		// The relaunch after the answer reuses the worktree as it is.
+		if err := stopAskedSession(d, p, pane); err != nil {
+			return FinishOutcome{}, err
+		}
 	case !adopted:
 		if _, err := p.pauseAsking(events.ZeroCommit, "no result reported", pane, sessionID, w.Path); err != nil {
 			return FinishOutcome{}, fmt.Errorf("pausing ticket to ask: %w", err)

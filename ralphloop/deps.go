@@ -554,6 +554,10 @@ func addDetachedWorktree(repoDir, path, ref string) error {
 	if err != nil {
 		return err
 	}
+	if _, err := os.Stat(path); err == nil {
+		// Kept across an ask: the relaunch reuses it as it is.
+		return nil
+	}
 	return git.AddDetachedWorktree(*repo, path, ref)
 }
 
