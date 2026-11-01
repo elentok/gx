@@ -129,9 +129,9 @@ func menuSeed(now time.Time) limitBurnSeed {
 		samples: map[string][]server.LimitSample{},
 	}
 	s.samples[server.LimitIDClaudeWeekly] = weeklyHistory(server.LimitIDClaudeWeekly, now, claudeReset, 0,
-		[]float64{20, 36, 52, 69, 74}, 81, []float64{60, 88})
+		[]float64{20, 36, 52, 69, 74}, 81, []float64{20, 99})
 	s.samples[server.LimitIDCodexWeekly] = weeklyHistory(server.LimitIDCodexWeekly, now, codexReset, 0,
-		[]float64{5, 10, 17, 25}, 40, []float64{20, 33})
+		[]float64{14, 20, 24, 36}, 40, []float64{2, 45})
 	s.samples[server.LimitIDClaude5h] = fiveHourHistory(server.LimitIDClaude5h, now, 2*time.Hour+10*time.Minute, 10, 34)
 	s.samples[server.LimitIDCodex5h] = fiveHourHistory(server.LimitIDCodex5h, now, 3*time.Hour, 5, 12)
 	return s
