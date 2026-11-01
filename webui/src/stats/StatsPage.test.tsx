@@ -127,11 +127,12 @@ test("the Cost cards hatch a no-data day and say partial", async () => {
   });
   renderStats(async () => statsOf({}, { cost }));
   const tokens = await cardText("Tokens");
-  expect(tokens).toContain("3,400");
+  expect(tokens).toContain("3K");
   expect(tokens).toContain("partial");
   expect((await cardEl("Tokens")).querySelectorAll("[data-nodata]")).toHaveLength(1);
-  const spend = await cardText("Spend");
-  expect(spend).toContain("$10.50");
+  const spend = await cardText("Spend (est.)");
+  expect(spend).toContain("$11");
+  expect(spend).toContain("Codex counts $0");
   expect(spend).toContain("Design");
   expect(spend).toContain("Queue");
 });
@@ -140,6 +141,34 @@ test("Cost cards with data on every day are not partial", async () => {
   const full = [amount(1), amount(1), amount(1)];
   renderStats(async () => statsOf({}, { cost: costOf({ Design: { tokens: full, spend: full }, Queue: { tokens: full, spend: full } }) }));
   expect(await cardText("Tokens")).not.toContain("partial");
+});
+
+test("the Cost cards draw rebuilt and stamp days lighter, say partial and split Claude and Codex in the tooltip", async () => {
+  const claudeCodex = { claude: { tokens: 700, dollars: 2 }, codex: { tokens: 300, dollars: 0 } };
+  const cost = {
+    groups: [
+      { group: "Queue", tokens: [amount(1000), amount(500), amount(0, true)], spend: [amount(2), amount(1), amount(0, true)], harness: [claudeCodex, {}, {}] },
+      { group: "Design", tokens: [amount(0), amount(0), amount(0, true)], spend: [amount(0), amount(0), amount(0, true)], harness: [{}, {}, {}] },
+    ],
+    sources: ["live", "rebuilt", "stamp"],
+    partial: true,
+  };
+  renderStats(async () => statsOf({}, { cost }));
+  expect(await cardText("Tokens")).toContain("partial");
+  const card = await cardEl("Tokens");
+  expect(card.querySelectorAll("[data-style='dim']").length).toBeGreaterThan(0);
+  expect(card.querySelectorAll("[data-bar='0'][data-style='dim']")).toHaveLength(0);
+  expect(card.querySelectorAll("[data-nodata]")).toHaveLength(1);
+  fireEvent.mouseEnter(card.querySelector("[data-hit='0']") as Element);
+  expect(within(card).getByRole("tooltip").textContent).toContain("Claude: 700");
+  expect(within(card).getByRole("tooltip").textContent).toContain("Codex: 300");
+  fireEvent.mouseEnter(card.querySelector("[data-hit='1']") as Element);
+  expect(within(card).getByRole("tooltip").textContent).toContain("rebuilt from transcripts");
+  fireEvent.mouseEnter(card.querySelector("[data-hit='2']") as Element);
+  expect(within(card).getByRole("tooltip").textContent).toContain("ticket stamps only");
+  const spend = await cardEl("Spend (est.)");
+  fireEvent.mouseEnter(spend.querySelector("[data-hit='0']") as Element);
+  expect(within(spend).getByRole("tooltip").textContent).toContain("Claude: $2");
 });
 
 test("the Grilling section sits between Cost and effort and Friction", async () => {
