@@ -4,9 +4,10 @@
 // after two hours, and it runs the server with OS notifications off. It never reads or writes the real HOME, config
 // or state: the server and every CLI verb run in a temp HOME and temp XDG dirs.
 //
-//	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] [--fakecodex <binary>] [--auto-advance-delay <duration>] [--stall-threshold <duration>] <scenario>
+//	gxfixture [--gx <gx binary>] [--fakeclaude <binary>] [--fakecodex <binary>] [--auto-advance-delay <duration>] [--command-list-age <duration>] [--stall-threshold <duration>] <scenario>
 //
 // --auto-advance-delay shortens the server's run-end countdown (default 10s).
+// --command-list-age sets how long the server serves a command list from its cache (GX_COMMAND_LIST_AGE).
 // --stall-threshold shortens how long a Working session's transcript may stay untouched before it counts as stalled (default 15m).
 // --shape <fresh|stale|past-reset|one-window> picks the seeded limits state of the limits scenario (default fresh).
 // --shape <normal|short|empty> picks the seeded budget ledger of the spend scenario (default normal).
@@ -93,6 +94,8 @@ type Output struct {
 	// worktree directory is unique per sibling session and stable across calls, so
 	// concurrent sessions never share a browser.
 	BrowserSession string `json:"browser_session,omitempty"`
+	// FeatureWorktree is demo's `feature` worktree, in scenarios that make one.
+	FeatureWorktree string `json:"feature_worktree,omitempty"`
 }
 
 // ShellEnv is the output as `export` lines a shell can source: the CLI env, then
@@ -130,6 +133,9 @@ func (o Output) ShellEnv() string {
 	if o.BrowserSession != "" {
 		export("GXF_BROWSER_SESSION", o.BrowserSession)
 	}
+	if o.FeatureWorktree != "" {
+		export("GXF_FEATURE_WORKTREE", o.FeatureWorktree)
+	}
 	return b.String()
 }
 
@@ -141,7 +147,7 @@ func main() {
 }
 
 func run(args []string) (err error) {
-	var gxBin, fakeBin, fakeCodexBin, name, autoAdvance, stallThreshold, mockDir, shape string
+	var gxBin, fakeBin, fakeCodexBin, name, autoAdvance, commandListAge, stallThreshold, mockDir, shape string
 	var configs []string
 	var hold, shellEnv, hideCodex bool
 	for i := 0; i < len(args); i++ {
@@ -157,6 +163,12 @@ func run(args []string) (err error) {
 				return fmt.Errorf("%s needs a value", args[i])
 			}
 			autoAdvance = args[i+1]
+			i++
+		case "--command-list-age":
+			if i+1 == len(args) {
+				return fmt.Errorf("%s needs a value", args[i])
+			}
+			commandListAge = args[i+1]
 			i++
 		case "--stall-threshold":
 			if i+1 == len(args) {
@@ -263,6 +275,23 @@ func run(args []string) (err error) {
 			return fmt.Errorf("--auto-advance-delay: %w", err)
 		}
 		f.env = append(f.env, "GX_AUTO_ADVANCE_DELAY="+autoAdvance)
+	}
+	if commandListAge != "" {
+		if _, err := time.ParseDuration(commandListAge); err != nil {
+			return fmt.Errorf("--command-list-age: %w", err)
+		}
+		f.env = append(f.env, "GX_COMMAND_LIST_AGE="+commandListAge)
+	}
+	if sc.commands != nil {
+		data, err := json.Marshal(sc.commands)
+		if err != nil {
+			return err
+		}
+		path := filepath.Join(root, "agentfake-commands.json")
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			return err
+		}
+		f.env = append(f.env, agentfake.CommandsFileEnv+"="+path)
 	}
 	if stallThreshold == "" {
 		stallThreshold = sc.stallThreshold
@@ -494,6 +523,9 @@ func run(args []string) (err error) {
 	}
 	if sc.migrate {
 		o.MigrateDir = f.migrateDir()
+	}
+	if sc.commands != nil {
+		o.FeatureWorktree = filepath.Join(f.root, "repo", ".worktrees", "feature")
 	}
 	if cwd, err := os.Getwd(); err == nil {
 		o.BrowserSession = filepath.Base(cwd)

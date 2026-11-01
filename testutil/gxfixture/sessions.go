@@ -40,6 +40,18 @@ type sessionSpec struct {
 	// thenPrompt is one more chat turn sent after the control, so a reply
 	// carries what the control changed.
 	thenPrompt string
+	// steps are "/" commands sent once the session is idle, in order.
+	steps []commandStep
+}
+
+// commandStep is one "/" command a seeded session runs. output is the stdout
+// the Claude fake writes for it (empty for a command with no output); nil
+// sends no control, as for Codex, which writes no output. turn sends a command
+// the fake treats as a chat turn (/compact) and waits for its reply.
+type commandStep struct {
+	prompt string
+	output *string
+	turn   bool
 }
 
 const sessionWaitTimeout = 20 * time.Second
@@ -101,20 +113,27 @@ func (f *fixture) seedSession(sc scenario, s sessionSpec) error {
 	if s.crash {
 		control = &agentfake.Control{Action: agentfake.ActionExit, Code: 1}
 	}
-	if control != nil {
-		// The fake's control FIFO is named by Claude's session id, which gx's
-		// session id is not; the one new file is this session's.
+	// The fake's control FIFO is named by Claude's session id, which gx's
+	// session id is not; the one new file is this session's.
+	sendControl := func(c agentfake.Control) error {
 		fresh := slices.DeleteFunc(f.controlFiles(), func(name string) bool { return slices.Contains(before, name) })
 		if len(fresh) != 1 {
 			return fmt.Errorf("session %s: want one new control file, got %v", id, fresh)
 		}
-		claudeID := strings.TrimSuffix(fresh[0], ".ctl")
-		if err := agentfake.SendTUIControl(filepath.Join(f.root, "home"), claudeID, *control); err != nil {
+		return agentfake.SendTUIControl(filepath.Join(f.root, "home"), strings.TrimSuffix(fresh[0], ".ctl"), c)
+	}
+	if control != nil {
+		if err := sendControl(*control); err != nil {
 			return err
 		}
 	}
 	if s.thenPrompt != "" {
 		if err := f.promptAgain(id, s.thenPrompt); err != nil {
+			return err
+		}
+	}
+	for _, st := range s.steps {
+		if err := f.runCommandStep(id, st, sendControl); err != nil {
 			return err
 		}
 	}
@@ -163,6 +182,39 @@ func (f *fixture) promptAgain(id, text string) error {
 	}
 	return f.waitFor(id, "a reply to "+text, func(si server.SessionInfo, chat server.SessionChatResponse) bool {
 		return si.Status.State == server.SessionIdle && agentMessages(chat) > agentMessages(before)
+	})
+}
+
+// runCommandStep sends one "/" command and waits until the chat shows it (and
+// its output entry, when the step has output).
+func (f *fixture) runCommandStep(id string, st commandStep, sendControl func(agentfake.Control) error) error {
+	if st.turn {
+		return f.promptAgain(id, st.prompt)
+	}
+	if st.output != nil {
+		if err := sendControl(agentfake.Control{Action: agentfake.ActionCommandOutput, Message: *st.output}); err != nil {
+			return err
+		}
+		// The control travels on its own FIFO; give it time to land.
+		time.Sleep(300 * time.Millisecond)
+	}
+	count := func(chat server.SessionChatResponse, kind string) int {
+		return len(slices.DeleteFunc(slices.Clone(chat.Messages), func(m server.SessionChatMessage) bool {
+			return m.Kind != kind || (kind == transcript.ChatKindCommand && m.Text != st.prompt)
+		}))
+	}
+	var before server.SessionChatResponse
+	if out, err := f.cli("agents", "chat", id, "--json"); err == nil {
+		_ = json.Unmarshal(out, &before)
+	}
+	if out, err := f.cli("agents", "prompt", id, st.prompt); err != nil {
+		return fmt.Errorf("prompt %s: %w\n%s", id, err, out)
+	}
+	wantOutput := st.output != nil && strings.TrimSpace(*st.output) != ""
+	return f.waitFor(id, "the "+st.prompt+" entries", func(si server.SessionInfo, chat server.SessionChatResponse) bool {
+		return si.Status.State == server.SessionIdle &&
+			count(chat, transcript.ChatKindCommand) > count(before, transcript.ChatKindCommand) &&
+			(!wantOutput || count(chat, transcript.ChatKindOutput) > count(before, transcript.ChatKindOutput))
 	})
 }
 

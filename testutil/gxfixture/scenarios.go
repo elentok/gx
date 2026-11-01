@@ -112,6 +112,8 @@ type scenario struct {
 	chat bool
 	// sessions are created in order once the server is up, as `gx agents create` makes them.
 	sessions []sessionSpec
+	// commands is what the fakes' list probes answer; nil leaves them empty.
+	commands *agentfake.ProbeConfig
 	// codex installs the fake codex on PATH without the --fakecodex flag, for a
 	// scenario that runs a Codex session.
 	codex bool
@@ -535,6 +537,12 @@ var scenarios = map[string]scenario{
 	// agents: eight sessions in demo (4), other (2) and site (2), one per row of
 	// the Agents mock, and a worktree in demo. See agentsScenario.
 	"agents": agentsScenario(),
+	// agents-commands: agents plus fixed command lists from both fakes, an extra
+	// skill in the feature worktree and three sessions with command entries.
+	// -slow delays the list probes past what a flow waits; -failed fails them.
+	"agents-commands":        commandsScenario("", false),
+	"agents-commands-slow":   commandsScenario(slowProbeDelay, false),
+	"agents-commands-failed": commandsScenario("", true),
 	// default-harness: the global Default harness is claude; gx overrides to codex,
 	// demo and dotfiles inherit. One ticket waits behind a held Claude worker, and
 	// the Agents tab holds a Claude, a Codex and a model-switched Claude session.
