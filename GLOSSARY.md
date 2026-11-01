@@ -393,6 +393,10 @@ map. It runs in the map's **Design worktree**, and in the trunk checkout only af
 epic or map ticket can have more than one at a time. The Agents tab and page label them
 **Design agents**. _Avoid_: planning session.
 
+**Promote to Design** — turning the topic of a plain agent chat into a new Design. The chat's agent
+drafts a brief, the person approves it, and a new Design session starts from that brief. The chat
+stays a plain session. _Avoid_: convert, upgrade (the chat session does not become a Design session).
+
 **Queue agent** — an agent session the server runs for a Server queue ticket: an implementation
 ticket, a one-off or an investigate ticket. The Agents tab and page list Queue agents in their own
 group, hidden by default, and open them read-only. _Avoid_: loop agent, implementation agent.
