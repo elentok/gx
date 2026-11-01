@@ -151,6 +151,26 @@ export function SessionView({
   const { kind, locked, unlock } = useComposerUnlock(session);
   const [confirming, setConfirming] = useState(false);
   const { detail: chat, refetch } = useSessionChat(chatty ? session.id : undefined, conn, fetchChat);
+  // Prompts the server took that the transcript has not shown yet; each leaves once the chat has one more copy of its text.
+  const [echoed, setEchoed] = useState<{ sessionId: string; text: string; seen: number }[]>([]);
+  const promptCount = (text: string) => chat?.messages.filter((m) => m.kind === "prompt" && m.text === text).length ?? 0;
+  const waiting = echoed.filter((e) => e.sessionId === session.id && promptCount(e.text) <= e.seen);
+  const shown =
+    chat && waiting.length > 0
+      ? {
+          ...chat,
+          messages: [
+            ...chat.messages,
+            ...waiting.map((e, i) => ({
+              id: `echo-${i}`,
+              role: "person",
+              kind: "prompt",
+              text: e.text,
+              at: "",
+            })),
+          ],
+        }
+      : chat;
   return (
     <Box display="flex" flexDirection="column" height="100%" minH="0">
       <SessionHeader session={session} sessions={sessions} onNew={onNew} />
@@ -160,7 +180,7 @@ export function SessionView({
         </Text>
       )}
       {chatty ? (
-        chat && <AgentChat session={session} chat={chat} refetch={refetch} />
+        shown && <AgentChat session={session} chat={shown} refetch={refetch} />
       ) : (
         <>
           <NoChat session={session} fetchScreen={fetchScreen} />
@@ -192,6 +212,7 @@ export function SessionView({
         connected={connected && chatty && !locked}
         lastMessage={chat?.messages.at(-1)?.id}
         onStale={refetch}
+        onSent={(text) => setEchoed((all) => [...all, { sessionId: session.id, text, seen: promptCount(text) }])}
         reason={locked ? undefined : sendReason(session, connected)}
       />
     </Box>

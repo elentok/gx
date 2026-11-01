@@ -1,4 +1,4 @@
-import { Box, Spinner, Text } from "@chakra-ui/react";
+import { Box, Spinner } from "@chakra-ui/react";
 import { codexSkillHint } from "../design/chat";
 import { ExpandableTextField } from "../ui/expandable-text/ExpandableTextField";
 import type { PostPrompt } from "../design/prompt";
@@ -17,6 +17,7 @@ export function AgentComposer({
   post,
   onStale,
   reason,
+  onSent,
 }: {
   session: SessionInfo;
   lastMessage?: string;
@@ -25,6 +26,8 @@ export function AgentComposer({
   onStale?: () => void;
   /** The line under the box; the caller decides the text. */
   reason?: string;
+  /** Called with the text once the server took the prompt, so the chat can show it before the transcript catches up. */
+  onSent?: (text: string) => void;
 }) {
   const wide = useWide();
   const [text, setText] = useComposerDraft(session.id);
@@ -36,7 +39,11 @@ export function AgentComposer({
     onStale,
     toastRefusal: false,
   });
-  const sendText = () => send({ text }, () => setText(""));
+  const sendText = () =>
+    send({ text }, () => {
+      onSent?.(text);
+      setText("");
+    });
   // A phone has no key send.
   const onSubmit = wide
     ? () => {
@@ -44,7 +51,7 @@ export function AgentComposer({
       }
     : undefined;
 
-  // The caller's reason comes first, then the last refusal in red, then the Codex `$` hint, else the draft note.
+  // Messages sit inside the box: the caller's reason first, then the last refusal in red, then the Codex `$` hint.
   const failure = refusal ? refusalText(refusal) : error;
   const hint = codexSkillHint(session.harness, text);
   const line = reason
@@ -53,9 +60,7 @@ export function AgentComposer({
       ? { text: failure, red: true }
       : hint
         ? { text: hint, red: false }
-        : text !== ""
-          ? { text: "Draft saved in this browser", red: false }
-          : undefined;
+        : undefined;
 
   return (
     <Box
@@ -69,7 +74,7 @@ export function AgentComposer({
       role="form"
       aria-label="Composer"
     >
-      <Box display="flex" gap="2" alignItems="flex-end">
+      <Box display="flex" gap="2" alignItems="stretch">
         <Box flex="1">
           <ExpandableTextField
             rows={3}
@@ -79,19 +84,15 @@ export function AgentComposer({
             value={text}
             onChange={setText}
             onSubmit={onSubmit}
+            note={line ?? null}
             completion={{ target: { sessionId: session.id }, harness: session.harness, off: !enabled }}
           />
         </Box>
-        <Button disabled={!enabled || text.trim() === ""} onClick={sendText}>
+        <Button h="auto" disabled={!enabled || text.trim() === ""} onClick={sendText}>
           {pending && <Spinner size="sm" />}
           Send
         </Button>
       </Box>
-      {line && (
-        <Text fontSize="xs" color={line.red ? "tone.deadlocked.fg" : "text.dim"}>
-          {line.text}
-        </Text>
-      )}
     </Box>
   );
 }

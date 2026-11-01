@@ -94,7 +94,6 @@ test("the $ hint shows for a Codex /gx- draft, not for Claude or other drafts", 
   render({ s: codex() });
   fireEvent.change(box(), { target: { value: "/gx-design x" } });
   expect(screen.getByText(HINT)).toBeTruthy();
-  expect(screen.queryByText("Draft saved in this browser")).toBeNull();
   fireEvent.change(box(), { target: { value: "/clear" } });
   expect(screen.queryByText(HINT)).toBeNull();
   fireEvent.change(box(), { target: { value: "$gx-design x" } });

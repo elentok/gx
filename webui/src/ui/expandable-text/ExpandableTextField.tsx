@@ -1,4 +1,4 @@
-import { Box, chakra, Textarea } from "@chakra-ui/react";
+import { Box, chakra, Text, Textarea } from "@chakra-ui/react";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { useCompletion, type CompletionConfig, type MenuKey } from "../../commands/useCompletion";
 import type { ViMode } from "./CodeEditor";
@@ -34,6 +34,8 @@ interface FieldProps {
   radius?: string;
   /** Opt in to the command completion menu in the inline textarea. */
   completion?: CompletionConfig;
+  /** A status line inside the box, under the text. `null` keeps its room with no text; leave it out for no line. */
+  note?: { text: string; red?: boolean } | null;
 }
 
 /** A textarea with an expand button that opens a large editor on the same text. The parent owns the text; there is no copy and no save step. */
@@ -73,6 +75,7 @@ function Field({
   size,
   radius = "12px",
   menu,
+  note,
 }: Omit<FieldProps, "completion"> & { menu?: Menu }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -117,7 +120,9 @@ function Field({
         autoFocus={autoFocus}
         rows={rows}
         lineHeight="1.5"
-        py="2.5"
+        display="block"
+        pt="2.5"
+        pb={note === undefined ? "2.5" : "7"}
         ps="3"
         pe="46px"
         resize="none"
@@ -132,6 +137,21 @@ function Field({
         onSelect={menu ? (e) => menu.onCursor(e.currentTarget.selectionStart) : undefined}
         onKeyDown={onKeyDown}
       />
+      {note !== undefined && (
+        <Text
+          position="absolute"
+          bottom="1.5"
+          left="3"
+          right="46px"
+          fontSize="xs"
+          lineHeight="1.5"
+          pointerEvents="none"
+          truncate
+          color={note?.red ? "tone.deadlocked.fg" : "text.dim"}
+        >
+          {note?.text}
+        </Text>
+      )}
       {!selection && menu?.node}
       <chakra.button
         type="button"

@@ -37,13 +37,11 @@ test("Idle with text enables Send; accept clears the draft and the box", async (
   render([session("s-1", "p")], "/agents/s-1", true, chatOf(chat()));
   expect(sendButton().disabled).toBe(true);
   await type("hello");
-  expect(screen.getByText("Draft saved in this browser")).toBeTruthy();
   expect(localStorage.getItem("gx.draft.composer.s-1")).toBe("hello");
   fireEvent.click(sendButton());
   await vi.waitFor(() => expect(localStorage.getItem("gx.draft.composer.s-1")).toBeNull());
   expect(prompts).toEqual([expect.objectContaining({ id: "s-1", text: "hello" })]);
   expect((await composerBox()).value).toBe("");
-  expect(screen.queryByText("Draft saved in this browser")).toBeNull();
 });
 
 test("a refusal keeps the draft and shows its reason in red, inline", async () => {
