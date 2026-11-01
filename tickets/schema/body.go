@@ -44,6 +44,22 @@ func splitBodySections(body string) (preamble string, sections []bodySection) {
 	return preamble, sections
 }
 
+// NamedSection is one "## Name" block of a ticket body, name without the "## ".
+type NamedSection struct {
+	Name    string
+	Content string
+}
+
+// SplitSections returns the text before the first "## " heading and the
+// ordered heading blocks after it.
+func SplitSections(body string) (preamble string, sections []NamedSection) {
+	pre, raw := splitBodySections(body)
+	for _, s := range raw {
+		sections = append(sections, NamedSection{Name: strings.TrimSpace(strings.TrimPrefix(s.heading, "## ")), Content: s.content})
+	}
+	return pre, sections
+}
+
 // Section returns the trimmed content under body's "## heading" (heading given
 // without the "## "), or "" when there is none.
 func Section(body, heading string) string {
