@@ -5,6 +5,7 @@ import { useConnectionContext, useConnectionState } from "../connection";
 import { type PageMode, PageModeContext } from "../useWide";
 import { ConnectedTopBar } from "../nav/ConnectedTopBar";
 import { FailedMigrationStrip } from "../restart/FailedMigrationStrip";
+import { MigratingStrip } from "../restart/MigratingStrip";
 import { PageContainer } from "../ui/PageContainer";
 import { Strip } from "../ui/strip/Strip";
 import type { TopBarTab } from "../ui/top-bar/TopBar";
@@ -46,6 +47,7 @@ export function DetailPage({
     <PageModeContext.Provider value={mode}>
       <Box {...(fill && { h: "100dvh", display: "flex", flexDirection: "column" })}>
         {!connected && <Strip tone="waiting">Offline, reconnecting…</Strip>}
+        <MigratingStrip />
         <DiskStrips />
         <PageContainer fill={fill}>
           <ConnectedTopBar active={active} waiting={waiting} />
