@@ -603,6 +603,14 @@ count. A hard kill pauses the ticket with reason `budget-killed`.
 **Limit burn** — the points of one usage limit used in one local day. A 5-hour limit's burn adds up
 every window of that day, so it can pass 100. _Avoid_: burn rate (the value is a daily amount).
 
+**Token ledger** — the persisted per-day record of the tokens and dollars each session used, split
+by Agent group. It feeds the Stats Tokens and Spend charts on live and rebuilt days. Unlike the
+Budget ledger it holds tokens as well as dollars, and its totals still differ from it. _Avoid_:
+usage table, token log.
+
+**Agent group** — the label that says what a session's work was for in the Token ledger: Queue,
+Design, One-off or Other. _Avoid_: kind, agent kind (**Harness** keeps those words), category.
+
 ## Ticket Forking
 
 **Fork** — dividing a ticket into new sibling tickets mid-flight, when it turns out to be larger

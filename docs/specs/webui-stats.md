@@ -105,16 +105,18 @@ Throughput
 
 Cost and effort
 
-31. As the person running gx, I want a "Tokens" chart with stacked Design and Implementation bars,
-    so that I see where the tokens go.
+31. As the person running gx, I want a "Tokens" chart with stacked Queue, Design, One-off and Other
+    bars from the token ledger on live and rebuilt days (Design and Queue from stamps on older
+    days), so that I see where the tokens go.
 32. As the person running gx, I want tokens to sum input, output, cache writes and cache reads, so
     that the number matches what the model processed.
 33. As the person running gx, I want subagent tokens included, so that work an agent hands to a
     subagent still counts.
 34. As the person running gx, I want Codex sessions to count toward tokens with Codex's own total,
     so that Codex work is not invisible.
-35. As the person running gx, I want a "Spend" chart with stacked Design and Implementation bars, so
-    that I see where the money goes.
+35. As the person running gx, I want a "Spend" chart with stacked Queue, Design, One-off and Other
+    bars from the token ledger on live and rebuilt days (Design and Queue from stamps on older
+    days), so that I see where the money goes.
 36. As the person running gx, I want spend summed over every session a ticket used, so that a ticket
     with several sessions shows its full cost.
 37. As the person running gx, I want Codex sessions to add nothing to spend, so that the chart never
@@ -294,6 +296,8 @@ never merged)
   status is `draft` is left out of every day.
 
 **Cost and effort counting rules**
+
+These rules apply to old days only. The token ledger feeds live and rebuilt days (ADR 0046).
 
 - The charts sum ticket stamps only. Epic stamps feed only the epic page.
 - Design is map epics and their tickets. Implementation is everything else: loop epics, follow-ups,
