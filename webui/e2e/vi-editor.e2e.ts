@@ -496,10 +496,12 @@ test.describe("125. Vi editor: commands", () => {
     const before = (await cursor.boundingBox())!;
     await page.keyboard.press("j");
     await expect.poll(() => head(editable)).toBeGreaterThan(0);
-    const after = (await cursor.boundingBox())!;
     expect(await head(editable)).toBeLessThan(text.length / 2);
     const lineHeight = await editable.locator(".cm-line").evaluate((l) => parseFloat(getComputedStyle(l).lineHeight));
-    expect(Math.abs(after.y - before.y - lineHeight)).toBeLessThanOrEqual(2);
+    // The cursor element repaints after the selection changes, so wait for it to move.
+    await expect
+      .poll(async () => Math.abs((await cursor.boundingBox())!.y - before.y - lineHeight))
+      .toBeLessThanOrEqual(2);
   });
 
   test("a click resets the column that j and k keep", async ({ page, start }) => {
