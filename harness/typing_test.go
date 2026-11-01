@@ -1,10 +1,13 @@
 package harness_test
 
 import (
+	"bytes"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/elentok/gx/agentrunner"
@@ -239,6 +242,100 @@ func TestClaudeReadyToType_SettingsJSONAlsoCounts(t *testing.T) {
 	s := &screenIO{rows: [][]string{normalRows, insertRows}}
 	if !ty.ReadyToType(s.io()) || !slices.Equal(s.keys, []string{"i"}) {
 		t.Fatalf("keys = %q", s.keys)
+	}
+}
+
+func inputRows(text, footer string) []string {
+	return []string{rule, "❯ " + text + rev + " " + rst, rule, dim + "  " + footer + rst}
+}
+
+func TestClaudeReadyToType_ProbeByEffect(t *testing.T) {
+	tests := []struct {
+		name     string
+		rows     [][]string
+		want     bool
+		wantKeys []string
+	}{
+		{name: "INSERT without marker: the i that appeared gets one Backspace",
+			rows: [][]string{inputRows("", "? for shortcuts"), inputRows("i", "? for shortcuts")},
+			want: true, wantKeys: []string{"i", "\x7f"}},
+		{name: "INSERT without marker keeps a draft",
+			rows: [][]string{inputRows("fix", "? for shortcuts"), inputRows("fixi", "? for shortcuts")},
+			want: true, wantKeys: []string{"i", "\x7f"}},
+		{name: "NORMAL with a draft: input unchanged, one i",
+			rows: [][]string{inputRows("fix", "? for shortcuts"), inputRows("fix", "-- INSERT --")},
+			want: true, wantKeys: []string{"i"}},
+		{name: "person input after the snapshot: no Backspace, unknown",
+			rows: [][]string{inputRows("fix", "? for shortcuts"), inputRows("fix the", "? for shortcuts")},
+			want: false, wantKeys: []string{"i"}},
+		{name: "no change and no marker: unknown, nothing more pressed",
+			rows: [][]string{inputRows("fix", "? for shortcuts")},
+			want: false, wantKeys: []string{"i"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vimConfig(t, "vim")
+			ty, _ := harness.LookupTyping(harness.Claude)
+			s := &screenIO{rows: tt.rows}
+			if got := ty.ReadyToType(s.io()); got != tt.want {
+				t.Errorf("ReadyToType = %v, want %v", got, tt.want)
+			}
+			if !slices.Equal(s.keys, tt.wantKeys) {
+				t.Errorf("keys = %q, want %q", s.keys, tt.wantKeys)
+			}
+		})
+	}
+}
+
+func TestClaudeReadyToType_UnreadableScreenLogsCapture(t *testing.T) {
+	vimConfig(t, "vim")
+	ty, _ := harness.LookupTyping(harness.Claude)
+	var buf bytes.Buffer
+	var keys []string
+	io := harness.TypingIO{
+		Rows:     func() ([]string, error) { return []string{"loading"}, nil },
+		SendKeys: func(k string) error { keys = append(keys, k); return nil },
+		Log:      slog.New(slog.NewTextHandler(&buf, nil)),
+		Caller:   "test",
+	}
+	if ty.ReadyToType(io) || len(keys) != 0 {
+		t.Fatalf("unreadable screen: keys = %q", keys)
+	}
+	if out := buf.String(); !strings.Contains(out, "caller=test") || !strings.Contains(out, "screen=loading") {
+		t.Errorf("log = %q; want caller and screen capture", out)
+	}
+}
+
+func TestClaudeReadyToType_RecordsIPresses(t *testing.T) {
+	vimConfig(t, "vim")
+	ty, _ := harness.LookupTyping(harness.Claude)
+	s := &screenIO{rows: [][]string{normalRows, insertRows}}
+	io := s.io()
+	io.Session = "presses"
+	if !ty.ReadyToType(io) || ty.InputPresses("presses") != 1 || ty.InputPresses("other") != 0 {
+		t.Fatalf("presses = %d", ty.InputPresses("presses"))
+	}
+}
+
+func TestClaudeReadyToType_LaunchOverrideSkipsUntilToggle(t *testing.T) {
+	vimConfig(t, "vim")
+	h, _ := harness.Lookup(harness.Claude)
+	h.Launch(harness.LaunchOptions{SessionID: "ovr"})
+	if !harness.EditorOverrideApplied("ovr") {
+		t.Fatal("override not recorded")
+	}
+	ty, _ := harness.LookupTyping(harness.Claude)
+	s := &screenIO{rows: [][]string{normalRows, insertRows}}
+	io := s.io()
+	io.Session = "ovr"
+	if !ty.ReadyToType(io) || len(s.keys) != 0 {
+		t.Fatalf("override with person's vim files: keys = %q", s.keys)
+	}
+	if err := os.WriteFile(filepath.Join(os.Getenv("CLAUDE_CONFIG_DIR"), "settings.json"), []byte(`{"editorMode":"vim"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !ty.ReadyToType(io) || !slices.Equal(s.keys, []string{"i"}) {
+		t.Fatalf("after /config toggle: keys = %q", s.keys)
 	}
 }
 

@@ -16,10 +16,12 @@ import (
 type claudeHarness struct{ env []string }
 
 func (claudeHarness) Launch(opts LaunchOptions) Command {
+	markEditorOverride(opts.SessionID, LaunchEnv(os.Environ(), opts.Env))
 	return claudeCommand(append([]string{"--session-id", opts.SessionID}, opts.Args...), opts.Env)
 }
 
 func (claudeHarness) Resume(conversationID string, opts LaunchOptions) (Command, bool) {
+	markEditorOverride(conversationID, LaunchEnv(os.Environ(), opts.Env))
 	return claudeCommand(append([]string{"--resume", conversationID}, opts.Args...), opts.Env), true
 }
 

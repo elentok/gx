@@ -2,63 +2,24 @@ package harness
 
 import (
 	"encoding/json"
-	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 )
 
-const (
-	vimInsertMarker = "-- INSERT --"
-	vimRecheck      = time.Second
-	vimRecheckPoll  = 50 * time.Millisecond
-)
+const vimInsertMarker = "-- INSERT --"
 
-// ReadyToType makes sure claude's input is in insert mode when vim mode is on:
-// NORMAL mode shows no marker, so without the marker it presses `i` and
-// re-checks for about a second. false means give-up; the caller must not type.
+// ReadyToType makes sure claude's input is in insert mode when the editor mode
+// could be vim (see probeWanted). A missing marker is never read as NORMAL: the
+// probe presses `i` and judges by what the input did. false means unknown; the
+// caller must not type.
 func (h claudeHarness) ReadyToType(io TypingIO) bool {
-	if !claudeVimMode(h.env) {
+	if !probeWanted(io.Session, h.env, io) {
 		return true
 	}
-	if insertMarkerShown(io) {
-		return true
-	}
-	slog.Info("claude vim mode has no INSERT marker, pressing i")
-	if err := io.SendKeys("i"); err != nil {
-		slog.Warn("claude vim mode: could not press i, not typing", "err", err)
-		return false
-	}
-	for deadline := time.Now().Add(vimRecheck); time.Now().Before(deadline); {
-		time.Sleep(vimRecheckPoll)
-		if insertMarkerShown(io) {
-			return true
-		}
-	}
-	slog.Warn("claude vim mode: no INSERT marker after pressing i, not typing")
-	return false
+	return probeVim(io.Session, io)
 }
 
-// insertMarkerShown looks for the marker in the footer rows below the last
-// input row. A read error counts as no marker: typing into NORMAL mode is the
-// worse mistake.
-func insertMarkerShown(io TypingIO) bool {
-	rows, err := io.Rows()
-	if err != nil {
-		return false
-	}
-	input := lastInputRow(rows, claudeInput)
-	if input < 0 {
-		return false
-	}
-	for _, row := range rows[input+1:] {
-		if strings.Contains(plain(row), vimInsertMarker) {
-			return true
-		}
-	}
-	return false
-}
+func (claudeHarness) InputPresses(session string) int { return InputPresses(session) }
 
 // claudeVimMode re-reads claude's config on every call, so a mid-session
 // /config toggle is caught. Either file may hold editorMode.

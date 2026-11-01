@@ -2,6 +2,7 @@ package harness
 
 import (
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"unicode"
@@ -34,6 +35,9 @@ type Typing interface {
 	// ReadyToType runs before any typed text and reports whether typing can
 	// start; false means give up. It may press keys and re-read through io.
 	ReadyToType(io TypingIO) bool
+	// InputPresses is how many `i` keys ReadyToType pressed in session, so a
+	// later check can tell gx's `i` from a draft.
+	InputPresses(session string) int
 	// SubmitKey is the key that sends typed text; working says a turn runs.
 	SubmitKey(working bool) string
 	// PastesText reports whether text goes in as one paste whatever its
@@ -46,6 +50,26 @@ type Typing interface {
 type TypingIO struct {
 	Rows     func() ([]string, error)
 	SendKeys func(keys string) error
+	// Session keys the probe's per-session memory (the id Launch or Resume was
+	// given). Log and Caller are optional: no Log logs nothing.
+	Session string
+	Log     *slog.Logger
+	Caller  string
+}
+
+func (io TypingIO) log(msg string) {
+	if io.Log != nil {
+		io.Log.Info("vim probe: "+msg, "caller", io.Caller, "session", io.Session)
+	}
+}
+
+// logUnknown logs an unknown result with a capture of the screen.
+func (io TypingIO) logUnknown(msg string) {
+	if io.Log == nil {
+		return
+	}
+	rows, _ := io.Rows()
+	io.Log.Warn("vim probe: unknown, not typing: "+msg, "caller", io.Caller, "session", io.Session, "screen", strings.Join(rows, "\n"))
 }
 
 // LookupTyping returns the typing rules for kind.
@@ -100,6 +124,8 @@ func (claudeHarness) PastesText(string) bool { return false }
 type codexTyping struct{ markerTyping }
 
 func (codexTyping) ReadyToType(TypingIO) bool { return true }
+
+func (codexTyping) InputPresses(string) int { return 0 }
 
 // SubmitKey is Tab while a turn runs, which queues the text until it ends.
 func (codexTyping) SubmitKey(working bool) string {
